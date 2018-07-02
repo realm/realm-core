@@ -474,7 +474,7 @@ Obj& Obj::set<int64_t>(ColKey col_key, int64_t value, bool is_default)
     update_if_needed();
     ensure_writeable();
 
-    if (StringIndex* index = m_table->get_search_index(col_key)) {
+    if (StringIndex* index = m_table->get_search_index(col_ndx)) {
         index->set<int64_t>(m_key, value);
     }
 
@@ -648,7 +648,7 @@ Obj& Obj::set(ColKey col_key, T value, bool is_default)
     update_if_needed();
     ensure_writeable();
 
-    if (StringIndex* index = m_table->get_search_index(col_key)) {
+    if (StringIndex* index = m_table->get_search_index(col_ndx)) {
         index->set<T>(m_key, value);
     }
 
@@ -864,7 +864,7 @@ Obj& Obj::set_null(ColKey col_key, bool is_default)
     update_if_needed();
     ensure_writeable();
 
-    if (StringIndex* index = m_table->get_search_index(col_key)) {
+    if (StringIndex* index = m_table->get_search_index(col_ndx)) {
         index->set(m_key, null{});
     }
 

@@ -16,7 +16,9 @@ v5.6.1, v5.6.2 and v5.6.3
 
 ### Enhancements
 
-* None.
+* Providing option to supply initial values when creating an object. This can be used as an
+  optimization when some columns have a search index. Then you don't have to first insert
+  the default value in the index and subsequently the real value.
 
 -----------
 

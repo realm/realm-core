@@ -1173,20 +1173,20 @@ TEST(Table_Multi_Sort)
 TEST(Table_IndexString)
 {
     Table table;
-    table.add_column(type_Int, "first");
+    auto col_int = table.add_column(type_Int, "first");
     auto col_str = table.add_column(type_String, "second");
 
-    ObjKey k0 = table.create_object().set_all(int(Mon), "jeff").get_key();
-    ObjKey k1 = table.create_object().set_all(int(Tue), "jim").get_key();
+    table.add_search_index(col_str);
+    CHECK(table.has_search_index(col_str));
+
+    ObjKey k0 = table.create_object({}, {{col_int, int(Mon)}, {col_str, "jeff"}}).get_key();
+    ObjKey k1 = table.create_object({}, {{col_str, "jim"}, {col_int, int(Tue)}}).get_key();
     table.create_object().set_all(int(Wed), "jennifer");
     table.create_object().set_all(int(Thu), "john");
     table.create_object().set_all(int(Fri), "jimmy");
     ObjKey k5 = table.create_object().set_all(int(Sat), "jimbo").get_key();
     ObjKey k6 = table.create_object().set_all(int(Sun), "johnny").get_key();
     table.create_object().set_all(int(Mon), "jennifer"); // duplicate
-
-    table.add_search_index(col_str);
-    CHECK(table.has_search_index(col_str));
 
     ObjKey r1 = table.find_first_string(col_str, "jimmi");
     CHECK_EQUAL(null_key, r1);

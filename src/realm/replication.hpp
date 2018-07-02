@@ -526,6 +526,9 @@ inline void Replication::set(const Table* table, ColKey col_key, ObjKey key, Obj
     set_link(table, col_key, key, target_key, variant);
 }
 
+template <>
+void Replication::set(const Table* table, ColKey col_key, ObjKey key, Mixed value, _impl::Instruction variant);
+
 inline TrivialReplication::TrivialReplication(const std::string& database_file)
     : Replication(m_stream)
     , m_database_file(database_file)

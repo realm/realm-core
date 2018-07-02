@@ -915,7 +915,7 @@ bool Table::create_objects()
                 // Create all objects
                 ClusterNode::State state;
                 for (size_t i = 0; i < sz; i++) {
-                    m_clusters.insert_fast(ObjKey(i), state);
+                    m_clusters.insert_fast(ObjKey(i), {}, state);
                 }
                 return true;
             }
@@ -2430,7 +2430,7 @@ void Table::dump_node_structure(std::ostream& out, int level) const
 
 #endif // LCOV_EXCL_STOP ignore debug functions
 
-Obj Table::create_object(ObjKey key)
+Obj Table::create_object(ObjKey key, const FieldValues& values)
 {
     if (key == null_key) {
         if (m_next_key_value == -1) {
@@ -2441,7 +2441,7 @@ Obj Table::create_object(ObjKey key)
 
     bump_content_version();
     bump_storage_version();
-    Obj obj = m_clusters.insert(key);
+    Obj obj = m_clusters.insert(key, values);
 
     return obj;
 }

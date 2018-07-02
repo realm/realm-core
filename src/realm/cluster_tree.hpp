@@ -119,9 +119,9 @@ public:
     }
 
     // Insert entry for object, but do not create and return the object
-    void insert_fast(ObjKey k, ClusterNode::State& state);
+    void insert_fast(ObjKey k, const InitValues& init_values, ClusterNode::State& state);
     // Create and return object
-    Obj insert(ObjKey k);
+    Obj insert(ObjKey k, const FieldValues&);
     // Delete object with given key
     void erase(ObjKey k, CascadeState& state);
     // Check if an object with given key exists

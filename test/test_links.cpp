@@ -128,8 +128,8 @@ TEST(Links_Basic)
         CHECK_EQUAL(table1, table2->get_link_target(col_link));
 
         // add a few links
-        Obj obj3 = table2->create_object().set(col_link, key1);
-        Obj obj4 = table2->create_object().set(col_link, key0);
+        Obj obj3 = table2->create_object({}, {{col_link, key1}});
+        Obj obj4 = table2->create_object({}, {{col_link, key0}});
         ObjKey key3 = obj3.get_key();
         key_origin = obj4.get_key();
 

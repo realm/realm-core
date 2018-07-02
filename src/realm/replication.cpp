@@ -64,6 +64,39 @@ public:
 
 } // anonymous namespace
 
+template <>
+void Replication::set(const Table* table, ColKey col_key, ObjKey key, Mixed value, _impl::Instruction variant)
+{
+    switch (value.get_type()) {
+        case type_Int:
+            set_int(table, col_key, key, value.get<Int>(), variant);
+            break;
+        case type_Bool:
+            set_bool(table, col_key, key, value.get<Bool>(), variant);
+            break;
+        case type_Float:
+            set_float(table, col_key, key, value.get<Float>(), variant);
+            break;
+        case type_Double:
+            set_double(table, col_key, key, value.get<Double>(), variant);
+            break;
+        case type_String:
+            set_string(table, col_key, key, value.get<String>(), variant);
+            break;
+        case type_Binary:
+            set_binary(table, col_key, key, value.get<Binary>(), variant);
+            break;
+        case type_Timestamp:
+            set_timestamp(table, col_key, key, value.get<Timestamp>(), variant);
+            break;
+        case type_Link:
+            set_link(table, col_key, key, value.get<ObjKey>(), variant);
+            break;
+        default:
+            break;
+    }
+}
+
 std::string TrivialReplication::get_database_path()
 {
     return m_database_file;

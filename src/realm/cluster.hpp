@@ -20,6 +20,7 @@
 #define REALM_CLUSTER_HPP
 
 #include <realm/keys.hpp>
+#include <realm/mixed.hpp>
 #include <realm/array.hpp>
 #include <realm/array_unsigned.hpp>
 #include <realm/data_type.hpp>
@@ -34,6 +35,14 @@ class ClusterNodeInner;
 class ClusterTree;
 class ColumnAttrMask;
 struct CascadeState;
+
+struct FieldValue {
+    ColKey col_key;
+    Mixed value;
+};
+
+using FieldValues = std::vector<FieldValue>;
+using InitValues = std::vector<std::pair<size_t, Mixed>>;
 
 class ClusterNode : public Array {
 public:
@@ -109,7 +118,7 @@ public:
     virtual void remove_column(size_t ndx) = 0;
     /// Create a new object identified by 'key' and update 'state' accordingly
     /// Return reference to new node created (if any)
-    virtual ref_type insert(ObjKey k, State& state) = 0;
+    virtual ref_type insert(ObjKey k, const InitValues& init_values, State& state) = 0;
     /// Locate object identified by 'key' and update 'state' accordingly
     virtual void get(ObjKey key, State& state) const = 0;
     /// Locate object identified by 'ndx' and update 'state' accordingly
@@ -212,7 +221,7 @@ public:
     void ensure_general_form() override;
     void insert_column(size_t ndx) override;
     void remove_column(size_t ndx) override;
-    ref_type insert(ObjKey k, State& state) override;
+    ref_type insert(ObjKey k, const InitValues& init_values, State& state) override;
     void get(ObjKey k, State& state) const override;
     ObjKey get(size_t, State& state) const override;
     size_t get_ndx(ObjKey key, size_t ndx) const override;
@@ -233,14 +242,14 @@ private:
         return size_t(Array::get(s_key_ref_or_size_index)) >> 1; // Size is stored as tagged value
     }
     friend class ClusterTree;
-    void insert_row(size_t ndx, ObjKey k);
+    void insert_row(size_t ndx, ObjKey k, const InitValues& init_values);
     void move(size_t ndx, ClusterNode* new_node, int64_t key_adj) override;
     template <class T>
     void do_create(size_t col_ndx);
     template <class T>
     void do_insert_column(size_t col_ndx, bool nullable);
     template <class T>
-    void do_insert_row(size_t ndx, size_t col_ndx, ColumnAttrMask attr);
+    void do_insert_row(size_t ndx, size_t col_ndx, Mixed init_val, bool nullable);
     template <class T>
     void do_move(size_t ndx, size_t col_ndx, Cluster* to);
     template <class T>
@@ -248,6 +257,7 @@ private:
     void remove_backlinks(ObjKey origin_key, size_t col_ndx, const std::vector<ObjKey>& keys,
                           CascadeState& state) const;
     void do_erase_key(size_t ndx, size_t col_ndx, CascadeState& state);
+    void do_insert_key(size_t ndx, size_t col_ndx, Mixed init_val, ObjKey origin_key);
 };
 
 }

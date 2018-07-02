@@ -105,7 +105,7 @@ public:
     void ensure_general_form() override;
     void insert_column(size_t ndx) override;
     void remove_column(size_t ndx) override;
-    ref_type insert(ObjKey k, State& state) override;
+    ref_type insert(ObjKey k, const InitValues& init_values, State& state) override;
     void get(ObjKey k, State& state) const override;
     ObjKey get(size_t ndx, State& state) const override;
     size_t get_ndx(ObjKey key, size_t ndx) const override;
@@ -276,10 +276,10 @@ MemRef ClusterNodeInner::ensure_writeable(ObjKey key)
         key, [](ClusterNode* node, ChildInfo& child_info) { return node->ensure_writeable(child_info.key); });
 }
 
-ref_type ClusterNodeInner::insert(ObjKey key, ClusterNode::State& state)
+ref_type ClusterNodeInner::insert(ObjKey key, const InitValues& init_values, ClusterNode::State& state)
 {
-    return recurse<ref_type>(key, [this, &state](ClusterNode* node, ChildInfo& child_info) {
-        ref_type new_sibling_ref = node->insert(child_info.key, state);
+    return recurse<ref_type>(key, [this, &state, &init_values](ClusterNode* node, ChildInfo& child_info) {
+        ref_type new_sibling_ref = node->insert(child_info.key, init_values, state);
 
         set_tree_size(get_tree_size() + 1);
 
@@ -786,24 +786,49 @@ MemRef Cluster::ensure_writeable(ObjKey)
 }
 
 template <class T>
-inline void Cluster::do_insert_row(size_t ndx, size_t col_ndx, ColumnAttrMask attr)
+inline void Cluster::do_insert_row(size_t ndx, size_t col_ndx, Mixed init_val, bool nullable)
 {
-    if (attr.test(col_attr_List)) {
-        ArrayInteger arr(m_alloc);
-        arr.set_parent(this, col_ndx + s_first_col_index);
-        arr.init_from_parent();
-        arr.insert(ndx, 0);
+    using U = typename util::RemoveOptional<typename T::value_type>::type;
+
+    T arr(m_alloc);
+    arr.set_parent(this, col_ndx + s_first_col_index);
+    arr.set_spec(const_cast<Spec*>(&m_tree_top.get_spec()), col_ndx);
+    arr.init_from_parent();
+    if (init_val.is_null()) {
+        arr.insert(ndx, T::default_value(nullable));
     }
     else {
-        T arr(m_alloc);
-        arr.set_parent(this, col_ndx + s_first_col_index);
-        arr.set_spec(const_cast<Spec*>(&m_tree_top.get_spec()), col_ndx);
-        arr.init_from_parent();
-        arr.insert(ndx, T::default_value(attr.test(col_attr_Nullable)));
+        arr.insert(ndx, init_val.get<U>());
     }
 }
 
-void Cluster::insert_row(size_t ndx, ObjKey k)
+inline void Cluster::do_insert_key(size_t ndx, size_t col_ndx, Mixed init_val, ObjKey origin_key)
+{
+    ObjKey key = init_val.is_null() ? ObjKey{} : init_val.get<ObjKey>();
+    ArrayKey arr(m_alloc);
+    arr.set_parent(this, col_ndx + s_first_col_index);
+    arr.init_from_parent();
+    arr.insert(ndx, key);
+
+    // Insert backlink if link is not null
+    if (key) {
+        const Table* origin_table = m_tree_top.get_owner();
+
+        // Find target table
+        ColKey origin_col_key = origin_table->ndx2colkey(col_ndx);
+        TableRef target_table = _impl::TableFriend::get_opposite_link_table(*origin_table, origin_col_key);
+
+        // Find actual backlink column
+        const Spec& target_table_spec = _impl::TableFriend::get_spec(*target_table);
+        size_t backlink_col = target_table_spec.find_backlink_column(origin_table->get_key(), origin_col_key);
+        ColKey backlink_col_key = target_table->ndx2colkey(backlink_col);
+
+        Obj target_obj = target_table->get_object(key);
+        target_obj.add_backlink(backlink_col_key, origin_key);
+    }
+}
+
+void Cluster::insert_row(size_t ndx, ObjKey k, const InitValues& init_values)
 {
     if (m_keys.is_attached()) {
         m_keys.insert(ndx, k.value);
@@ -813,47 +838,62 @@ void Cluster::insert_row(size_t ndx, ObjKey k)
     }
 
     size_t nb_columns = size() - 1;
+    auto val = init_values.begin();
     for (size_t col_ndx = 0; col_ndx < nb_columns; col_ndx++) {
         ColumnAttrMask attr = m_tree_top.get_spec().get_column_attr(col_ndx);
+        Mixed init_value;
+        if (val != init_values.end() && val->first == col_ndx) {
+            init_value = val->second;
+            ++val;
+        }
 
         if (attr.test(col_attr_List)) {
-            do_insert_row<ArrayInteger>(ndx, col_ndx, attr);
+            REALM_ASSERT(init_value.is_null());
+            ArrayInteger arr(m_alloc);
+            arr.set_parent(this, col_ndx + s_first_col_index);
+            arr.init_from_parent();
+            arr.insert(ndx, 0);
             continue;
         }
 
+        bool nullable = attr.test(col_attr_Nullable);
         switch (m_tree_top.get_spec().get_column_type(col_ndx)) {
             case col_type_Int:
                 if (attr.test(col_attr_Nullable)) {
-                    do_insert_row<ArrayIntNull>(ndx, col_ndx, attr);
+                    do_insert_row<ArrayIntNull>(ndx, col_ndx, init_value, nullable);
                 }
                 else {
-                    do_insert_row<ArrayInteger>(ndx, col_ndx, attr);
+                    do_insert_row<ArrayInteger>(ndx, col_ndx, init_value, nullable);
                 }
                 break;
             case col_type_Bool:
-                do_insert_row<ArrayBoolNull>(ndx, col_ndx, attr);
+                do_insert_row<ArrayBoolNull>(ndx, col_ndx, init_value, nullable);
                 break;
             case col_type_Float:
-                do_insert_row<ArrayFloat>(ndx, col_ndx, attr);
+                do_insert_row<ArrayFloat>(ndx, col_ndx, init_value, nullable);
                 break;
             case col_type_Double:
-                do_insert_row<ArrayDouble>(ndx, col_ndx, attr);
+                do_insert_row<ArrayDouble>(ndx, col_ndx, init_value, nullable);
                 break;
             case col_type_String:
-                do_insert_row<ArrayString>(ndx, col_ndx, attr);
+                do_insert_row<ArrayString>(ndx, col_ndx, init_value, nullable);
                 break;
             case col_type_Binary:
-                do_insert_row<ArrayBinary>(ndx, col_ndx, attr);
+                do_insert_row<ArrayBinary>(ndx, col_ndx, init_value, nullable);
                 break;
             case col_type_Timestamp:
-                do_insert_row<ArrayTimestamp>(ndx, col_ndx, attr);
+                do_insert_row<ArrayTimestamp>(ndx, col_ndx, init_value, nullable);
                 break;
             case col_type_Link:
-                do_insert_row<ArrayKey>(ndx, col_ndx, attr);
+                do_insert_key(ndx, col_ndx, init_value, ObjKey(k.value + get_offset()));
                 break;
-            case col_type_BackLink:
-                do_insert_row<ArrayBacklink>(ndx, col_ndx, attr);
+            case col_type_BackLink: {
+                ArrayBacklink arr(m_alloc);
+                arr.set_parent(this, col_ndx + s_first_col_index);
+                arr.init_from_parent();
+                arr.insert(ndx, 0);
                 break;
+            }
             default:
                 REALM_ASSERT(false);
                 break;
@@ -1033,7 +1073,7 @@ void Cluster::remove_column(size_t col_ndx)
     Array::erase(col_ndx);
 }
 
-ref_type Cluster::insert(ObjKey k, ClusterNode::State& state)
+ref_type Cluster::insert(ObjKey k, const InitValues& init_values, ClusterNode::State& state)
 {
     int64_t current_key_value = -1;
     size_t sz;
@@ -1065,7 +1105,7 @@ ref_type Cluster::insert(ObjKey k, ClusterNode::State& state)
 
     REALM_ASSERT_DEBUG(sz <= cluster_node_size);
     if (REALM_LIKELY(sz < cluster_node_size)) {
-        insert_row(ndx, k); // Throws
+        insert_row(ndx, k, init_values); // Throws
         state.mem = get_mem();
         state.index = ndx;
     }
@@ -1074,7 +1114,7 @@ ref_type Cluster::insert(ObjKey k, ClusterNode::State& state)
         Cluster new_leaf(0, m_alloc, m_tree_top);
         new_leaf.create(size() - 1);
         if (ndx == sz) {
-            new_leaf.insert_row(0, ObjKey(0)); // Throws
+            new_leaf.insert_row(0, ObjKey(0), init_values); // Throws
             state.split_key = k.value;
             state.mem = new_leaf.get_mem();
             state.index = 0;
@@ -1084,7 +1124,7 @@ ref_type Cluster::insert(ObjKey k, ClusterNode::State& state)
             REALM_ASSERT_DEBUG(m_keys.is_attached());
             new_leaf.ensure_general_form();
             move(ndx, &new_leaf, current_key_value);
-            insert_row(ndx, k); // Throws
+            insert_row(ndx, k, init_values); // Throws
             state.mem = get_mem();
             state.split_key = current_key_value;
             state.index = ndx;
@@ -1546,9 +1586,9 @@ void ClusterTree::clear()
     m_size = 0;
 }
 
-void ClusterTree::insert_fast(ObjKey k, ClusterNode::State& state)
+void ClusterTree::insert_fast(ObjKey k, const InitValues& init_values, ClusterNode::State& state)
 {
-    ref_type new_sibling_ref = m_root->insert(k, state);
+    ref_type new_sibling_ref = m_root->insert(k, init_values, state);
     if (REALM_UNLIKELY(new_sibling_ref)) {
         auto new_root = std::make_unique<ClusterNodeInner>(m_root->get_alloc(), *this);
         new_root->create(m_root->get_sub_tree_depth() + 1);
@@ -1562,30 +1602,70 @@ void ClusterTree::insert_fast(ObjKey k, ClusterNode::State& state)
     m_size++;
 }
 
-Obj ClusterTree::insert(ObjKey k)
+Obj ClusterTree::insert(ObjKey k, const FieldValues& values)
 {
     ClusterNode::State state;
-    insert_fast(k, state);
+    InitValues init_values;
+    const Table* table = get_owner();
+
+    if (!values.empty()) {
+        // Translate ColKey to index
+        for (auto& v : values) {
+            size_t col_ndx = table->colkey2ndx(v.col_key);
+            init_values.emplace_back(col_ndx, v.value);
+        }
+        // And sort according to index
+        std::sort(init_values.begin(), init_values.end(), [](auto& a, auto& b) { return a.first < b.first; });
+    }
+
+    insert_fast(k, init_values, state);
 
     // Update index
     const Spec& spec = get_spec();
     size_t num_cols = spec.get_public_column_count();
+    auto value = init_values.begin();
     for (size_t col_ndx = 0; col_ndx < num_cols; col_ndx++) {
-        auto col_key = m_owner->ndx2colkey(col_ndx);
-        if (StringIndex* index = m_owner->get_search_index(col_key)) {
+        // Check if initial value is provided
+        Mixed init_value;
+        if (value != init_values.end() && value->first == col_ndx) {
+            init_value = value->second;
+            ++value;
+        }
+
+        if (StringIndex* index = table->get_search_index(col_ndx)) {
             bool nullable = spec.get_column_attr(col_ndx).test(col_attr_Nullable);
             switch (spec.get_column_type(col_ndx)) {
                 case col_type_Int:
-                    index->insert(k, ArrayIntNull::default_value(nullable));
+                    if (init_value.is_null()) {
+                        index->insert(k, ArrayIntNull::default_value(nullable));
+                    }
+                    else {
+                        index->insert(k, init_value.get<int64_t>());
+                    }
                     break;
                 case col_type_Bool:
-                    index->insert(k, ArrayBoolNull::default_value(nullable));
+                    if (init_value.is_null()) {
+                        index->insert(k, ArrayBoolNull::default_value(nullable));
+                    }
+                    else {
+                        index->insert(k, init_value.get<bool>());
+                    }
                     break;
                 case col_type_String:
-                    index->insert(k, ArrayString::default_value(nullable));
+                    if (init_value.is_null()) {
+                        index->insert(k, ArrayString::default_value(nullable));
+                    }
+                    else {
+                        index->insert(k, init_value.get<String>());
+                    }
                     break;
                 case col_type_Timestamp:
-                    index->insert(k, ArrayTimestamp::default_value(nullable));
+                    if (init_value.is_null()) {
+                        index->insert(k, ArrayTimestamp::default_value(nullable));
+                    }
+                    else {
+                        index->insert(k, init_value.get<Timestamp>());
+                    }
                     break;
                 default:
                     break;
@@ -1594,7 +1674,10 @@ Obj ClusterTree::insert(ObjKey k)
     }
 
     if (Replication* repl = get_alloc().get_replication()) {
-        repl->create_object(get_owner(), k);
+        repl->create_object(table, k);
+        for (auto v : values) {
+            repl->set(table, v.col_key, k, v.value, _impl::instr_Set);
+        }
     }
 
     return Obj(this, state.mem, k, state.index);
