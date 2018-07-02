@@ -379,18 +379,8 @@ private:
     	int32_t block_after_size;  // positive if block is free - and zero at end
     };
 
-    // Disabling special small blocks handling:
-    // The allocator provides free()/re-allocation() of small blocks without merging/breaking.
-    // giving O(1) cost for these operations.
-    // Larger blocks are always merged when possible, resulting in O(log N) cost.
-    // At the moment, we cannot observe the benefit in O(1) for small blocks in
-    // real workloads - and the approach introduces some risk of increased fragmentation.
-    // Setting small_blocks_range to 1 effectively disables special
-    // handling of small blocks, treating all blocks as large blocks.
-    const static int small_blocks_range = 1;
-    FreeBlock* m_small_blocks[small_blocks_range];  // direct addressing for small blocks
     using FreeListMap = std::map<int, FreeBlock*>;  // log(N) addressing for larger blocks
-    FreeListMap m_large_blocks;
+    FreeListMap m_block_map;
 
     // abstract notion of a freelist - used to hide whether a freelist
     // is residing in the small blocks or the large blocks structures.
@@ -402,10 +392,6 @@ private:
     };
 
     // simple helper functions for accessing/navigating blocks and betweenblocks (TM)
-    bool is_small_block(int size)
-    {
-    	return size < (small_blocks_range << 3);
-    }
     BetweenBlocks* bb_before(FreeBlock* entry) const {
     	return reinterpret_cast<BetweenBlocks*>(entry) - 1;
     }
@@ -439,7 +425,7 @@ private:
 
     // Main entry points for alloc/free:
     FreeBlock* allocate_block(int size);
-    void free_block(ref_type ref, FreeBlock* addr, size_t size);
+    void free_block(ref_type ref, FreeBlock* addr);
 
     // Searching/manipulating freelists
     FreeList find(int size);
@@ -451,8 +437,6 @@ private:
     void rebuild_freelists_from_slab();
     void clear_freelists();
 
-    // producing blocks from a larger block or from new slab
-    void produce_many_small_blocks(int block_size);
     // grow the slab area to accommodate the requested size.
     // returns a free block large enough to handle the request.
     FreeBlock* grow_slab_for(int request_size);
@@ -464,7 +448,9 @@ private:
     // breaking/merging of blocks
     FreeBlock* get_prev_block_if_mergeable(FreeBlock* block);
     FreeBlock* get_next_block_if_mergeable(FreeBlock* block);
-    bool break_block(FreeBlock* block, int new_size, FreeBlock* &remaining_block);
+    // break 'block' to give it 'new_size'. Return remaining block.
+    // If the block is too small to split, return nullptr.
+    FreeBlock* break_block(FreeBlock* block, int new_size);
     FreeBlock* merge_blocks(FreeBlock* first, FreeBlock* second);
 
     // Values of each used bit in m_flags
