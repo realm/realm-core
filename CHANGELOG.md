@@ -10,7 +10,12 @@
 
 ### Enhancements
 
-* None.
+* Improved scalability for the slab allocator. This allows for larger
+  transactions. (PR #3067)
+* Add Table::add_row_with_keys(), which allows
+  sync::create_object_with_primary_key() to avoid updating the index twice when
+  creating an object with a string primary key.
+* Improved the performance of setting a link to its current value.
 
 -----------
 
