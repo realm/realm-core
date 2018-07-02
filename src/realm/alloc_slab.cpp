@@ -259,6 +259,7 @@ MemRef SlabAlloc::do_alloc(size_t size)
     REALM_ASSERT(0 < size);
     REALM_ASSERT((size & 0x7) == 0); // only allow sizes that are multiples of 8
     REALM_ASSERT(is_attached());
+    REALM_ASSERT(size < 1 * 1024 * 1024 * 1024);
 
     // If we failed to correctly record free space, new allocations cannot be
     // carried out until the free space record is reset.
@@ -274,7 +275,7 @@ MemRef SlabAlloc::do_alloc(size_t size)
     if (size & 0x7)
     	size = (size + 7) & ~0x7;
 
-    FreeBlock* entry = allocate_block(size);
+    FreeBlock* entry = allocate_block(static_cast<int>(size));
     mark_allocated(entry);
     ref_type ref = entry->ref;
 
@@ -445,7 +446,7 @@ SlabAlloc::FreeBlock* SlabAlloc::slab_to_entry(Slab slab, ref_type ref_start)
 {
 	auto bb = reinterpret_cast<BetweenBlocks*>(slab.addr);
 	bb->block_before_size = 0;
-	int block_size = slab.ref_end - ref_start - 2 * sizeof(BetweenBlocks);
+	int block_size = static_cast<int>(slab.ref_end - ref_start - 2 * sizeof(BetweenBlocks));
 	bb->block_after_size = block_size;
 	auto entry = block_after(bb);
 	entry->prev = entry->next = nullptr;
@@ -477,7 +478,7 @@ SlabAlloc::FreeBlock* SlabAlloc::break_block(FreeBlock* block, int new_size)
 	FreeBlock* remaining_block;
 	int size = size_from_block(block);
 	int remaining_size = size - (new_size + sizeof(BetweenBlocks));
-	if (remaining_size < (int)sizeof(FreeBlock))
+	if (remaining_size < static_cast<int>(sizeof(FreeBlock)))
 		return nullptr;
 	bb_after(block)->block_before_size = remaining_size;
 	bb_before(block)->block_after_size = new_size;
@@ -587,7 +588,7 @@ void SlabAlloc::do_free(ref_type ref, char* addr) noexcept
     // Get size from segment
     size_t size_ = read_only ? Array::get_byte_size_from_header(addr) : Array::get_capacity_from_header(addr);
     REALM_ASSERT(size_ < 2UL * 1024 * 1024 * 1024);
-    int size = size_;
+    int size = static_cast<int>(size_);
 
 #ifdef REALM_DEBUG
     if (REALM_COVER_NEVER(m_debug_out))
@@ -618,7 +619,7 @@ void SlabAlloc::do_free(ref_type ref, char* addr) noexcept
     }
     else {
     	// fixup size to take into account the allocator's need to store a FreeBlock in a freed block
-    	if (size < (int)sizeof(FreeBlock))
+    	if (size < static_cast<int>(sizeof(FreeBlock)))
     		size = sizeof(FreeBlock);
     	// align to multipla of 8
     	if (size & 0x7)
