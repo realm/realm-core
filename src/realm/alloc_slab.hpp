@@ -374,6 +374,7 @@ private:
     	FreeBlock* prev; // circular doubly linked list
     	FreeBlock* next;
     	void clear_links() { prev = next = nullptr; }
+    	void unlink();
     };
     struct BetweenBlocks { // stores sizes and used/free status of blocks before and after.
     	int32_t block_before_size; // negated if block is in use,
@@ -434,7 +435,6 @@ private:
     FreeBlock* pop_freelist_entry(FreeList list);
     void push_freelist_entry(FreeBlock* entry);
     void remove_freelist_entry(FreeBlock* element);
-    void entry_unlink(FreeBlock* entry);
     void rebuild_freelists_from_slab();
     void clear_freelists();
 

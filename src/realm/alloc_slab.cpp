@@ -344,17 +344,17 @@ SlabAlloc::FreeBlock* SlabAlloc::pop_freelist_entry(FreeList list)
 		m_block_map.erase(list.it);
 	else
 		list.it->second = header;
-	entry_unlink(retval);
+	retval->unlink();
 	return retval;
 }
 
-void SlabAlloc::entry_unlink(FreeBlock* entry)
+void SlabAlloc::FreeBlock::unlink()
 {
-	auto next = entry->next;
-	auto prev = entry->prev;
-	next->prev = prev;
-	prev->next = next;
-	entry->clear_links();
+	auto _next = next;
+	auto _prev = prev;
+	_next->prev = prev;
+	_prev->next = next;
+	clear_links();
 }
 
 void SlabAlloc::remove_freelist_entry(FreeBlock* entry)
@@ -370,7 +370,7 @@ void SlabAlloc::remove_freelist_entry(FreeBlock* entry)
 		else
 			it->second = header;
 	}
-	entry_unlink(entry);
+	entry->unlink();
 }
 
 void SlabAlloc::push_freelist_entry(FreeBlock* entry)
