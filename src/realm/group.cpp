@@ -1841,8 +1841,6 @@ void Group::prepare_history_parent(Array& history_root, int history_type,
 
 #ifdef REALM_DEBUG // LCOV_EXCL_START ignore debug functions
 
-namespace {
-
 class MemUsageVerifier : public Array::MemUsageHandler {
 public:
     MemUsageVerifier(ref_type ref_begin, ref_type immutable_ref_end, ref_type mutable_ref_end, ref_type baseline)
@@ -1941,8 +1939,6 @@ private:
     std::vector<Chunk> m_chunks;
     ref_type m_ref_begin, m_immutable_ref_end, m_mutable_ref_end, m_baseline;
 };
-
-} // anonymous namespace
 
 #endif
 
