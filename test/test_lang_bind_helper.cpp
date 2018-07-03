@@ -2850,7 +2850,7 @@ This unit test has been disabled as it occasionally gets itself into a hang
 */
 
 #if 0
-#ifdef LEGACY_TESTS
+// #ifdef LEGACY_TESTS
 // ^just a marker, that this disabled unittest will need porting
 // if we ever try to re-enable it.
 TEST(LangBindHelper_ImplicitTransactions_InterProcess)
@@ -2938,7 +2938,7 @@ TEST(LangBindHelper_ImplicitTransactions_InterProcess)
 
 }
 
-#endif // LEGACY_TESTS
+// #endif // LEGACY_TESTS
 #endif // 0
 #endif // !REALM_ANDROID && !REALM_IOS
 #endif // not REALM_ENABLE_ENCRYPTION
@@ -3197,7 +3197,7 @@ TEST(LangBindHelper_SubqueryHandoverQueryCreatedFromDeletedLinkView)
         CHECK_EQUAL(qq.count(), 0);
 
         reader = writer->duplicate();
-#ifdef LEGACY_TESTS
+#ifdef OLD_CORE_BEHAVIOR
         // FIXME: Old core would allow the code below, but new core will throw.
         //
         // Why should a query still be valid after a change, when it would not be possible
@@ -5946,97 +5946,56 @@ TEST(LangBindHelper_Bug2295)
 
     CHECK_EQUAL(lv1->size(), i);
 }
+#endif
 
-TEST(LangBindHelper_BigBinary)
+#ifdef LEGACY_TESTS
+// FIXME: Requires get_at() method to be available on ConstObj.
+ONLY(LangBindHelper_BigBinary)
 {
     SHARED_GROUP_TEST_PATH(path);
     ShortCircuitHistory hist(path);
-    DBRef sg_w = DB::create(hist);
-    DB sg_r(hist);
+    DBRef sg = DB::create(hist);
     std::string big_data(0x1000000, 'x');
+    auto rt = sg->start_read();
+    auto wt = sg->start_write();
 
-    ReadTransactionRef rt(sg_r);
+    std::string data(16777362, 'y');
+    TableRef target = wt->add_table("big");
+    auto col = target->add_column(type_Binary, "data");
+    target->create_object().set(col, BinaryData(data.data(), data.size()));
+    wt->commit();
+    rt->advance_read();
     {
-        std::string data(16777362, 'y');
-        WriteTransaction wt(sg_w);
-        Group& group = wt.get_group();
-        TableRef target = rt->add_table("big");
-        target->add_column(type_Binary, "data");
-        target->add_empty_row();
-        target->set_binary_big(0, 0, BinaryData(data.data(), 16777362));
+        WriteTransaction wt(sg);
+        TableRef t = wt.get_table("big");
+        t->begin()->set(col, BinaryData(big_data.data(), big_data.size()));
+        wt.get_group().verify();
         wt.commit();
     }
-
-    LangBindHelper::advance_read(sg_r);
-    {
-        WriteTransaction wt(sg_w);
-        Group& group = wt.get_group();
-        TableRef target = rt->get_table("big");
-        target->set_binary_big(0, 0, BinaryData(big_data.data(), 0x1000000));
-        rt->verify();
-        wt.commit();
-    }
-    LangBindHelper::advance_read(sg_r);
-    const Group& g = rt.get_group();
-    auto t = g.get_table("big");
+    rt->advance_read();
+    auto t = rt->get_table("big");
     size_t pos = 0;
-    BinaryData bin = t->get_binary_at(0, 0, pos);
+    BinaryData bin = t->begin()->get_at(col, pos); // <---- not there yet?
     CHECK_EQUAL(memcmp(big_data.data(), bin.data(), bin.size()), 0);
 }
+#endif
 
 TEST(LangBindHelper_CopyOnWriteOverflow)
 {
     SHARED_GROUP_TEST_PATH(path);
     ShortCircuitHistory hist(path);
-    DBRef sg_w = DB::create(hist);
-
-    {
-        WriteTransaction wt(sg_w);
-        Group& group = wt.get_group();
-        TableRef target = rt->add_table("big");
-        target->add_column(type_Binary, "data");
-        target->add_empty_row();
-        {
-            std::string data(0xfffff0, 'x');
-            target->set_binary(0, 0, BinaryData(data.data(), 0xfffff0));
-        }
-        wt.commit();
-    }
-
-    {
-        WriteTransaction wt(sg_w);
-        Group& group = wt.get_group();
-        rt->get_table(0)->set_binary(0, 0, BinaryData{"Hello", 5});
-        rt->verify();
-        wt.commit();
-    }
-}
-
-
-TEST(LangBindHelper_MixedStringRollback)
-{
-    SHARED_GROUP_TEST_PATH(path);
-    const char* key = crypt_key();
-    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    DBRef sg_w = DB::create(*hist_w, DBOptions(key));
-    Group& g = const_cast<Group&>(sg_w.begin_write());
-
-    TableRef t = g.add_table("table");
-    t->add_column(type_Mixed, "mixed_column", false);
-    t->add_empty_row();
-    LangBindHelper::commit_and_continue_as_read(sg_w);
-
-    // try with string
-    LangBindHelper::promote_to_write(sg_w);
-    t->set_mixed(0, 0, StringData("any string data"));
-    LangBindHelper::rollback_and_continue_as_read(sg_w);
-    g.verify();
-
-    // do the same with binary data
-    LangBindHelper::promote_to_write(sg_w);
-    t->set_mixed(0, 0, BinaryData("any binary data"));
-    LangBindHelper::rollback_and_continue_as_read(sg_w);
-    g.verify();
+    DBRef sg = DB::create(hist);
+    auto g = sg->start_write();
+    auto table = g->add_table("big");
+    auto obj = table->create_object();
+    auto col = table->add_column(type_Binary, "data");
+    std::string data(0xfffff0, 'x');
+    obj.set(col, BinaryData(data.data(), data.size()));
+    g->commit();
+    g = sg->start_write();
+    g->get_table("big")->begin()->set(col, BinaryData{"Hello", 5});
+    g->verify();
+    g->commit();
 }
 
 
@@ -6046,17 +6005,19 @@ TEST(LangBindHelper_RollbackOptimize)
     const char* key = crypt_key();
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
     DBRef sg_w = DB::create(*hist_w, DBOptions(key));
-    Group& g = sg_w.begin_write();
+    auto g = sg_w->start_write();
 
-    g.insert_table(0, "t0");
-    g.get_table(0)->add_column(type_String, "str_col_0", true);
-    LangBindHelper::commit_and_continue_as_read(sg_w);
-    g.verify();
-    LangBindHelper::promote_to_write(sg_w);
-    g.verify();
-    g.get_table(0)->add_empty_row(198);
-    g.get_table(0)->optimize(true);
-    LangBindHelper::rollback_and_continue_as_read(sg_w);
+    auto table = g->add_table("t0");
+    auto col = table->add_column(type_String, "str_col_0", true);
+    g->commit_and_continue_as_read();
+    g->verify();
+    g->promote_to_write();
+    g->verify();
+    std::vector<ObjKey> keys;
+    table->create_objects(198, keys);
+    table->enumerate_string_column(col);
+    g->rollback_and_continue_as_read();
+    g->verify();
 }
 
 
@@ -6066,11 +6027,10 @@ TEST(LangBindHelper_BinaryReallocOverMax)
     const char* key = crypt_key();
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
     DBRef sg_w = DB::create(*hist_w, DBOptions(key));
-    Group& g = const_cast<Group&>(sg_w.begin_write());
-
-    g.add_table("table");
-    g.get_table(0)->add_column(type_Binary, "binary_col", false);
-    g.get_table(0)->insert_empty_row(0, 1);
+    auto g = sg_w->start_write();
+    auto table = g->add_table("table");
+    auto col = table->add_column(type_Binary, "binary_col", false);
+    auto obj = table->create_object();
 
     // The sizes of these binaries were found with AFL. Essentially we must hit
     // the case where doubling the allocated memory goes above max_array_payload
@@ -6080,50 +6040,9 @@ TEST(LangBindHelper_BinaryReallocOverMax)
     BinaryData dataAlloc(blob1);
     BinaryData dataRealloc(blob2);
 
-    g.get_table(0)->set_binary(0, 0, dataAlloc);
-    g.get_table(0)->set_binary(0, 0, dataRealloc);
-    g.verify();
-}
-
-
-TEST(LangBindHelper_MixedTimestampTransaction)
-{
-    SHARED_GROUP_TEST_PATH(path);
-    ShortCircuitHistory hist(path);
-    DBRef sg_w = DB::create(hist);
-    DB sg_r(hist);
-
-    // the seconds part is constructed to test 64 bit integer reads
-    Timestamp time(68451041280, 29);
-    // also check that a negative time comes through the transaction intact
-    Timestamp neg_time(-57, -23);
-
-    ReadTransactionRef rt(sg_r);
-    {
-        WriteTransaction wt(sg_w);
-        Group& group = wt.get_group();
-        TableRef target = rt->add_table("table");
-        target->add_column(type_Mixed, "mixed_col");
-        target->add_empty_row(2);
-        wt.commit();
-    }
-
-    LangBindHelper::advance_read(sg_r);
-    {
-        WriteTransaction wt(sg_w);
-        Group& group = wt.get_group();
-        TableRef target = rt->get_table("table");
-        target->set_mixed(0, 0, Mixed(time));
-        target->set_mixed(0, 1, Mixed(neg_time));
-        rt->verify();
-        wt.commit();
-    }
-    LangBindHelper::advance_read(sg_r);
-    const Group& g = rt.get_group();
-    g.verify();
-    ConstTableRef t = g.get_table("table");
-    CHECK(t->get_mixed(0, 0) == time);
-    CHECK(t->get_mixed(0, 1) == neg_time);
+    obj.set(col, dataAlloc);
+    obj.set(col, dataRealloc);
+    g->verify();
 }
 
 
@@ -6132,28 +6051,25 @@ TEST(LangBindHelper_MixedTimestampTransaction)
 #if REALM_ENABLE_ENCRYPTION
 TEST(LangBindHelper_OpenAsEncrypted)
 {
-
+    SHARED_GROUP_TEST_PATH(path);
     {
-        SHARED_GROUP_TEST_PATH(path);
         ShortCircuitHistory hist(path);
-        DB sg_clear(hist);
+        DBRef sg_clear = DB::create(hist);
 
         {
             WriteTransaction wt(sg_clear);
-            Group& group = wt.get_group();
-            TableRef target = rt->add_table("table");
+            TableRef target = wt.add_table("table");
             target->add_column(type_String, "mixed_col");
-            target->add_empty_row();
+            target->create_object();
             wt.commit();
         }
-
-        sg_clear.close();
-
+    }
+    {
         const char* key = crypt_key(true);
         std::unique_ptr<Replication> hist_encrypt(make_in_realm_history(path));
         bool is_okay = false;
         try {
-            DB sg_encrypt(*hist_encrypt, DBOptions(key));
+            DBRef sg_encrypt = DB::create(*hist_encrypt, DBOptions(key));
         } catch (std::runtime_error&) {
             is_okay = true;
         }
@@ -6163,57 +6079,6 @@ TEST(LangBindHelper_OpenAsEncrypted)
 #endif
 
 
-TEST(LangBindHelper_IndexedStringEnumColumnSwapRows)
-{
-    // Test case generated in [realm-core-2.8.6] on Wed Jul 26 17:33:36 2017.
-    // The problem was that StringEnumColumn must override the default
-    // implementation of Column::swap_rows()
-    SHARED_GROUP_TEST_PATH(path);
-    const char* key = nullptr;
-    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    DBRef sg_w = DB::create(*hist_w, DBOptions(key));
-    Group& g = sg_w.begin_write();
-    try {
-        g.insert_table(0, "t0");
-    }
-    catch (const TableNameInUse&) {
-    }
-    g.get_table(0)->insert_column(0, DataType(2), "", true);
-    g.get_table(0)->add_search_index(0);
-    g.get_table(0)->optimize(true);
-    g.get_table(0)->insert_empty_row(0, 128);
-    g.verify();
-    g.get_table(0)->swap_rows(127, 30);
-    g.get_table(0)->insert_empty_row(95, 5);
-    g.get_table(0)->remove(30);
-    g.verify();
-}
-
-
-TEST(LangBindHelper_IndexedStringEnumColumnSwapRowsWithValue)
-{
-    // Test case generated in [realm-core-2.9.0] on Fri Aug 11 14:40:03 2017.
-    SHARED_GROUP_TEST_PATH(path);
-    const char* key = crypt_key();
-    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    DBRef sg_w = DB::create(*hist_w, DBOptions(key));
-    Group& g = sg_w.begin_write();
-
-    try {
-        g.add_table("table");
-    }
-    catch (const TableNameInUse&) {
-    }
-    g.get_table(0)->add_column(type_String, "str_col", true);
-    g.get_table(0)->add_search_index(0);
-    g.get_table(0)->insert_empty_row(0, 16);
-    g.get_table(0)->optimize(true);
-    g.get_table(0)->set_string(0, 2, "some string payload");
-    g.get_table(0)->swap_rows(2, 6);
-    g.verify();
-}
-
-
 // Test case generated in [realm-core-4.0.4] on Mon Dec 18 13:33:24 2017.
 // Adding 0 rows to a StringEnumColumn would add the default value to the keys
 // but not the indexes creating an inconsistency.
@@ -6221,29 +6086,23 @@ TEST(LangBindHelper_EnumColumnAddZeroRows)
 {
     SHARED_GROUP_TEST_PATH(path);
     const char* key = nullptr;
-    std::unique_ptr<Replication> hist_r(make_in_realm_history(path));
-    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    SharedGroup sg_r(*hist_r, DBOptions(key));
-    SharedGroup sg_w(*hist_w, DBOptions(key));
-    Group& g = sg_w.begin_write();
-    Group& g_r = const_cast<Group&>(sg_r.begin_read());
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    DBRef sg = DB::create(*hist, DBOptions(key));
+    auto g = sg->start_write();
+    auto g_r = sg->start_read();
+    auto table = g->add_table("");
 
-    try {
-        g.insert_table(0, "");
-    }
-    catch (const TableNameInUse&) {
-    }
-    g.get_table(0)->add_column(DataType(2), "table", false);
-    g.get_table(0)->optimize(true);
-    LangBindHelper::commit_and_continue_as_read(sg_w);
-    g.verify();
-    LangBindHelper::promote_to_write(sg_w);
-    g.verify();
-    g.get_table(0)->add_empty_row(0);
-    LangBindHelper::commit_and_continue_as_read(sg_w);
-    LangBindHelper::advance_read(sg_r);
-    g_r.verify();
-    g.verify();
+    auto col = table->add_column(DataType(2), "table", false);
+    table->enumerate_string_column(col);
+    g->commit_and_continue_as_read();
+    g->verify();
+    g->promote_to_write();
+    g->verify();
+    table->create_object();
+    g->commit_and_continue_as_read();
+    g_r->advance_read();
+    g_r->verify();
+    g->verify();
 }
 
 
@@ -6254,7 +6113,7 @@ TEST(LangBindHelper_NonsharedAccessToRealmWithHistory)
     SHARED_GROUP_TEST_PATH(path);
     {
         std::unique_ptr<Replication> history(make_in_realm_history(path));
-        DB sg{*history};
+        DBRef sg = DB::create(*history);
         WriteTransaction wt{sg};
         wt.add_table("foo");
         wt.commit();
@@ -6263,23 +6122,22 @@ TEST(LangBindHelper_NonsharedAccessToRealmWithHistory)
     // Since the stored history type is now Replication::hist_InRealm, it should
     // now be impossible to open in shared mode with no replication plugin
     // (Replication::hist_None).
-    CHECK_THROW(DB{path}, IncompatibleHistories);
+    CHECK_THROW(DB::create(path), IncompatibleHistories);
 
     // Now modify the file in nonshared mode, which will discard the history (as
     // nonshared mode does not understand how to update it correctly).
     {
         const char* crypt_key = nullptr;
         Group group{path, crypt_key, Group::mode_ReadWriteNoCreate};
-        rt->commit();
+        group.commit();
     }
 
     // Check the the history was actually discarded (reset to
     // Replication::hist_None).
-    DB sg{path};
-    ReadTransactionRef rt{sg};
+    DBRef sg = DB::create(path);
+    ReadTransaction rt{sg};
     CHECK(rt.has_table("foo"));
 }
-#endif
 
 TEST(LangBindHelper_RemoveObject)
 {
