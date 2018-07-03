@@ -113,6 +113,7 @@ protected:
     bool m_nullable = false;
 
     mutable std::vector<size_t> m_deleted;
+    mutable uint_fast64_t m_content_version = 0;
 
     ConstLstBase(ColKey col_key, const ConstObj* obj);
     virtual void init_from_parent() const = 0;
@@ -122,9 +123,14 @@ protected:
 
     void update_if_needed() const
     {
-        if (m_const_obj->update_if_needed()) {
+        auto content_version = m_const_obj->get_alloc().get_content_version();
+        if (m_const_obj->update_if_needed() || content_version != m_content_version) {
             init_from_parent();
         }
+    }
+    void update_content_version() const
+    {
+        m_content_version = m_const_obj->get_alloc().get_content_version();
     }
     // Increase index by one. I we land on and index that is deleted, keep
     // increasing until we get to a valid entry.
@@ -349,9 +355,10 @@ protected:
         return *this;
     }
 
-    void init_from_parent() const override
+    void init_from_parent() const final
     {
         m_valid = m_tree->init_from_parent();
+        update_content_version();
     }
 };
 

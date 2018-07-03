@@ -523,7 +523,12 @@ template <>
 inline void Replication::set(const Table* table, ColKey col_key, ObjKey key, ObjKey target_key,
                              _impl::Instruction variant)
 {
-    set_link(table, col_key, key, target_key, variant);
+    if (target_key) {
+        set_link(table, col_key, key, target_key, variant);
+    }
+    else {
+        nullify_link(table, col_key, key);
+    }
 }
 
 template <>

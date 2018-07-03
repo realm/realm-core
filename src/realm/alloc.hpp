@@ -268,6 +268,7 @@ private:
     friend class WrappedAllocator;
     friend class ConstObj;
     friend class Obj;
+    friend class ConstLstBase;
 };
 
 

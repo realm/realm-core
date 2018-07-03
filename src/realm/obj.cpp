@@ -734,32 +734,36 @@ void Obj::nullify_link(ColKey origin_col_key, ObjKey target_key)
     const Spec& spec = get_spec();
     ColumnAttrMask attr = spec.get_column_attr(origin_col_ndx);
     if (attr.test(col_attr_List)) {
-        Array linklists(alloc);
-        linklists.set_parent(&fields, origin_col_ndx + 1);
-        linklists.init_from_parent();
+        Lst<ObjKey> link_list(*this, origin_col_key);
+        size_t ndx = link_list.find_first(target_key);
 
-        BPlusTree<ObjKey> links(alloc);
-        links.set_parent(&linklists, m_row_ndx);
-        links.init_from_parent();
-        size_t ndx = links.find_first(target_key);
-        // There must be one
-        REALM_ASSERT(ndx != realm::npos);
-        links.erase(ndx);
+        REALM_ASSERT(ndx != realm::npos); // There has to be one
 
-        alloc.bump_storage_version();
+        // We cannot just call 'remove' on link_list as it would produce the wrong
+        // replication instruction and also attempt an update on the backlinks from
+        // the object that we in the process of removing.
+        BPlusTree<ObjKey>& tree = const_cast<BPlusTree<ObjKey>&>(link_list.get_tree());
+        tree.erase(ndx);
+
+        if (Replication* repl = alloc.get_replication()) {
+            repl->link_list_nullify(link_list, ndx); // Throws
+        }
     }
     else {
         ArrayKey links(alloc);
         links.set_parent(&fields, origin_col_ndx + 1);
         links.init_from_parent();
+
+        // Ensure we are nullifying correct link
         ObjKey key = links.get(m_row_ndx);
         REALM_ASSERT(key == target_key);
-        links.set(m_row_ndx, ObjKey{});
-        if (Replication* repl = alloc.get_replication())
-            repl->set<ObjKey>(m_table, origin_col_key, m_key, ObjKey{}, _impl::instr_Set); // Throws
 
-        alloc.bump_content_version();
+        links.set(m_row_ndx, ObjKey{});
+
+        if (Replication* repl = alloc.get_replication())
+            repl->nullify_link(m_table, origin_col_key, m_key); // Throws
     }
+    alloc.bump_content_version();
 }
 
 void Obj::set_backlink(ColKey col_key, ObjKey new_key)

@@ -380,7 +380,7 @@ public:
     /// nullifications.
 
     virtual void nullify_link(const Table*, ColKey col_key, ObjKey key);
-    virtual void link_list_nullify(const LnkLst&, size_t link_ndx);
+    virtual void link_list_nullify(const Lst<ObjKey>&, size_t link_ndx);
 
     //@}
 
@@ -1055,10 +1055,10 @@ inline void TransactLogConvenientEncoder::list_insert_link(const Lst<ObjKey>& li
     m_encoder.list_insert(link_ndx);                        // Throws
 }
 
-inline void TransactLogConvenientEncoder::link_list_nullify(const LnkLst& list, size_t link_ndx)
+inline void TransactLogConvenientEncoder::link_list_nullify(const Lst<ObjKey>& list, size_t link_ndx)
 {
     select_list(list);            // Throws
-    m_encoder.list_set(link_ndx); // Throws
+    m_encoder.list_erase(link_ndx); // Throws
 }
 
 inline bool TransactLogEncoder::list_move(size_t from_link_ndx, size_t to_link_ndx)
