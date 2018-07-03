@@ -333,7 +333,7 @@ protected:
             m_col_key = other.m_col_key;
             m_deleted.clear();
 
-            if (other.m_tree) {
+            if (other.size()) {
                 if (!m_tree) {
                     Allocator& alloc = other.m_tree->get_alloc();
                     m_tree = std::make_unique<BPlusTree<T>>(alloc);

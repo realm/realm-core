@@ -2697,23 +2697,21 @@ TEST(LangBindHelper_ImplicitTransactions_OverSharedGroupDestruction)
     }
 }
 
-#ifdef LEGACY_TESTS
 TEST(LangBindHelper_ImplicitTransactions_LinkList)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
     DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
-    Group* group = const_cast<Group*>(&sg.begin_read());
-    LangBindHelper::promote_to_write(sg);
+    auto group = sg->start_write();
     TableRef origin = group->add_table("origin");
     TableRef target = group->add_table("target");
-    origin->add_column_link(type_LinkList, "", *target);
+    auto col = origin->add_column_link(type_LinkList, "", *target);
     target->add_column(type_Int, "");
-    origin->add_empty_row();
-    target->add_empty_row();
-    LinkViewRef link_list = origin->get_linklist(0, 0);
-    link_list->add(0);
-    LangBindHelper::commit_and_continue_as_read(sg);
+    auto O0 = origin->create_object();
+    auto T0 = target->create_object();
+    auto link_list = O0.get_linklist(col);
+    link_list.add(T0.get_key());
+    group->commit_and_continue_as_read();
     group->verify();
 }
 
@@ -2723,71 +2721,62 @@ TEST(LangBindHelper_ImplicitTransactions_StringIndex)
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
     DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
-    Group* group = const_cast<Group*>(&sg.begin_read());
-    LangBindHelper::promote_to_write(sg);
+    auto group = sg->start_write();
     TableRef table = group->add_table("a");
-    table->add_column(type_String, "b");
-    table->add_search_index(0);
+    auto col = table->add_column(type_String, "b");
+    table->add_search_index(col);
     group->verify();
-    LangBindHelper::commit_and_continue_as_read(sg);
+    group->commit_and_continue_as_read();
     group->verify();
 }
 
 
 namespace {
 
-void multiple_trackers_writer_thread(std::string path)
+// Test that multiple trackers (of changes) always see a consistent picture.
+// This is done by having multiple writers update a table A, query it, and store
+// the count of the query in another table, B. Multiple readers then track the
+// changes and verify that the count on their query is consistent with the count
+// they read from table B. Terminate verification by signalling through a third
+// table, C, after a chosen number of yields, which should allow readers to
+// run their verification.
+void multiple_trackers_writer_thread(DBRef db)
 {
-    // Insert up to 10 rows at random positions through 10 separate
-    // transactions, then quit. No waiting.
+    // insert new random values
     Random random(random_int<unsigned long>());
-    std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
     for (int i = 0; i < 10; ++i) {
-        WriteTransaction wt(sg);
-        auto tr = wt.get_table("table");
-        size_t idx = 1 + random.draw_int_mod(tr->size() - 1);
-
-        if (tr->get_int(0, idx) == 42) {
-            // do nothing
+        WriteTransaction wt(db);
+        auto ta = wt.get_table("A");
+        auto col = ta->get_column_keys()[0];
+        for (auto it = ta->begin(); it != ta->end(); ++it) {
+            auto e = *it;
+            e.set(col, random.draw_int_mod(200));
         }
-        else {
-            insert(tr, idx, 0);
-        }
+        auto tb = wt.get_table("B");
+        auto count = ta->where().greater(col, 100).count();
+        tb->begin()->set<int64_t>(tb->get_column_keys()[0], count);
         wt.commit();
-        std::this_thread::yield();
     }
 }
 
-void multiple_trackers_reader_thread(TestContext& test_context, std::string path)
+void multiple_trackers_reader_thread(TestContext& test_context, DBRef db)
 {
-    Random random(random_int<unsigned long>());
-
-    std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
-    Group& g = const_cast<Group&>(sg.begin_read());
-    TableRef tr = g.get_table("table");
-    Query q = tr->where().equal(0, 42);
-    size_t row_ndx = q.find();
-    Row row = tr->get(row_ndx);
-    TableView tv = q.find_all();
-    LangBindHelper::promote_to_write(sg);
-    tr->set_int(0, 0, 1 + tr->get_int(0, 0));
-    LangBindHelper::commit_and_continue_as_read(sg);
-    for (;;) {
-        int_fast64_t val = row.get_int(0);
+    // verify that consistency is maintained as we advance_read through a
+    // stream of transactions
+    auto g = db->start_read();
+    auto ta = g->get_table("A");
+    auto tb = g->get_table("B");
+    auto tc = g->get_table("C");
+    auto col = ta->get_column_keys()[0];
+    auto b_col = tb->get_column_keys()[0];
+    TableView tv = ta->where().greater(col, 100).find_all();
+    while (tc->size() == 0) {
+        auto count = tb->begin()->get<int64_t>(b_col);
         tv.sync_if_needed();
-        if (val == 43)
-            break;
-        CHECK_EQUAL(42, val);
-        CHECK_EQUAL(1, tv.size());
-        CHECK_EQUAL(42, tv.get_int(0, 0));
-        while (!sg.has_changed())
-            std::this_thread::yield();
-        rt->advance_read();
+        CHECK_EQUAL(tv.size(), count);
+        std::this_thread::yield();
+        g->advance_read();
     }
-    CHECK_EQUAL(0, tv.size());
-    sg.end_read();
 }
 
 } // anonymous namespace
@@ -2796,55 +2785,54 @@ void multiple_trackers_reader_thread(TestContext& test_context, std::string path
 TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
 {
     const int write_thread_count = 7;
-    const int read_thread_count = 3; // must be less than 42 for correct operation
+    const int read_thread_count = 3;
 
     SHARED_GROUP_TEST_PATH(path);
 
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
     DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
+    ColKey col;
     {
+        // initialize table with 200 entries holding 0..200
         WriteTransaction wt(sg);
-        TableRef tr = wt.add_table("table");
-        tr->add_column(type_Int, "first");
-        tr->add_empty_row(200); // use first entry in table to count readers which have locked on
-        tr->set_int(0, 100, 42);
+        TableRef tr = wt.add_table("A");
+        col = tr->add_column(type_Int, "first");
+        for (int j = 0; j < 200; j++) {
+            tr->create_object().set_all(j);
+        }
+        auto table_b = wt.add_table("B");
+        table_b->add_column(type_Int, "bussemand");
+        table_b->create_object().set_all(99);
+        auto table_c = wt.add_table("C");
         wt.commit();
     }
     // FIXME: Use separate arrays for reader and writer threads for safety and readability.
     Thread threads[write_thread_count + read_thread_count];
     for (int i = 0; i < write_thread_count; ++i)
-        threads[i].start([&] { multiple_trackers_writer_thread(path); });
+        threads[i].start([&] { multiple_trackers_writer_thread(sg); });
     std::this_thread::yield();
     for (int i = 0; i < read_thread_count; ++i) {
-        threads[write_thread_count + i].start([&] { multiple_trackers_reader_thread(test_context, path); });
+        threads[write_thread_count + i].start([&] { multiple_trackers_reader_thread(test_context, sg); });
     }
 
     // Wait for all writer threads to complete
     for (int i = 0; i < write_thread_count; ++i)
         threads[i].join();
 
-    // Busy-wait for all reader threads to find and lock onto value '42'
-    for (;;) {
-        TransactionRef rt = sg->start_read() ConstTableRef tr = rt.get_table("table");
-        if (tr->get_int(0, 0) == read_thread_count)
-            break;
+    // Allow readers time to catch up
+    for (int k = 0; k < 100; ++k)
         std::this_thread::yield();
-    }
+
     // signal to all readers to complete
     {
         WriteTransaction wt(sg);
-        TableRef tr = wt.get_table("table");
-        Query q = tr->where().equal(0, 42);
-        size_t idx = q.find();
-        tr->set_int(0, idx, 43);
+        TableRef tr = wt.get_table("C");
+        tr->create_object();
         wt.commit();
     }
     // Wait for all reader threads to complete
     for (int i = 0; i < read_thread_count; ++i)
         threads[write_thread_count + i].join();
-
-    // cleanup
-    sg.end_read(); // FIXME: What cleanup? This seems out of place!?
 }
 
 #ifndef _WIN32
@@ -2862,7 +2850,9 @@ This unit test has been disabled as it occasionally gets itself into a hang
 */
 
 #if 0
-
+#ifdef LEGACY_TESTS
+// ^just a marker, that this disabled unittest will need porting
+// if we ever try to re-enable it.
 TEST(LangBindHelper_ImplicitTransactions_InterProcess)
 {
     const int write_process_count = 7;
@@ -2948,6 +2938,7 @@ TEST(LangBindHelper_ImplicitTransactions_InterProcess)
 
 }
 
+#endif // LEGACY_TESTS
 #endif // 0
 #endif // !REALM_ANDROID && !REALM_IOS
 #endif // not REALM_ENABLE_ENCRYPTION
@@ -2960,10 +2951,9 @@ TEST(LangBindHelper_ImplicitTransactions_NoExtremeFileSpaceLeaks)
     for (int i = 0; i < 100; ++i) {
         std::unique_ptr<Replication> hist(make_in_realm_history(path));
         DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
-        sg.begin_read();
-        LangBindHelper::promote_to_write(sg);
-        LangBindHelper::commit_and_continue_as_read(sg);
-        sg.end_read();
+        auto trans = sg->start_read();
+        trans->promote_to_write();
+        trans->commit_and_continue_as_read();
     }
 
 // the miminum filesize (after a commit) is one or two pages, depending on the
@@ -2978,7 +2968,6 @@ TEST(LangBindHelper_ImplicitTransactions_NoExtremeFileSpaceLeaks)
     CHECK_LESS_EQUAL(File(path).get_size(), 2 * page_size());
 #endif // REALM_ENABLE_ENCRYPTION
 }
-#endif // LEGACY_TESTS
 
 
 TEST(LangBindHelper_ImplicitTransactions_ContinuedUseOfTable)
@@ -4247,48 +4236,44 @@ TEST(LangBindHelper_HandoverWithReverseDependency)
     }
 }
 
-#ifdef LEGACY_TESTS
 TEST(LangBindHelper_HandoverTableViewFromBacklink)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
     DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
+    auto group_w = sg->start_write();
 
-    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    DBRef sg_w = DB::create(*hist_w, DBOptions(crypt_key()));
-    Group& group_w = const_cast<Group&>(sg_w.begin_read());
-
-    LangBindHelper::promote_to_write(sg_w);
-
-    TableRef source = group_w.add_table("source");
+    TableRef source = group_w->add_table("source");
     source->add_column(type_Int, "int");
 
-    TableRef links = group_w.add_table("links");
-    links->add_column_link(type_Link, "link", *source);
+    TableRef links = group_w->add_table("links");
+    ColKey col = links->add_column_link(type_Link, "link", *source);
 
-    source->add_empty_row(100);
-    links->add_empty_row(100);
+    std::vector<ObjKey> dummies;
+    source->create_objects(100, dummies);
+    links->create_objects(100, dummies);
+    auto source_it = source->begin();
+    auto links_it = links->begin();
     for (int i = 0; i < 100; ++i) {
-        source->set_int(0, i, i);
-        links->set_link(0, i, i);
+        auto obj = source_it->set_all(i);
+        links_it->set(col, obj.get_key());
+        ++source_it;
+        ++links_it;
     }
-    LangBindHelper::commit_and_continue_as_read(sg_w);
-    auto vid = sg_w.get_version_of_current_transaction();
+    group_w->commit_and_continue_as_read();
 
     for (int i = 0; i < 100; ++i) {
-        TableView tv = source->get_backlink_view(i, links.get(), 0);
+        TableView tv = source->get_object(i).get_backlink_view(links, col);
         CHECK(tv.is_attached());
         CHECK_EQUAL(1, tv.size());
-        CHECK_EQUAL(i, tv.get_link(0, 0));
-        auto handover1 = sg_w.export_for_handover(tv, ConstSourcePayload::Copy);
+        ObjKey o_key = source->get_object(i).get_key();
+        CHECK_EQUAL(o_key, tv.get_key(0));
+        auto group = group_w->duplicate();
+        auto tv2 = group->import_copy_of(tv, PayloadPolicy::Copy);
         CHECK(tv.is_attached());
-
-        sg.begin_read(vid);
-        auto tv2 = sg.import_from_handover(std::move(handover1));
         CHECK(tv2->is_attached());
         CHECK_EQUAL(1, tv2->size());
-        CHECK_EQUAL(i, tv2->get_link(0, 0));
-        sg.end_read();
+        CHECK_EQUAL(o_key, tv2->get_key(0));
     }
 }
 
@@ -4299,59 +4284,35 @@ TEST(LangBindHelper_HandoverOutOfSyncTableViewFromBacklinksToDeletedRow)
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
     DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
+    auto group_w = sg->start_write();
 
-    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    DBRef sg_w = DB::create(*hist_w, DBOptions(crypt_key()));
-    Group& group_w = const_cast<Group&>(sg_w.begin_read());
-
-    LangBindHelper::promote_to_write(sg_w);
-
-    TableRef target = group_w.add_table("target");
+    TableRef target = group_w->add_table("target");
     target->add_column(type_Int, "int");
 
-    TableRef links = group_w.add_table("links");
-    links->add_column_link(type_Link, "link", *target);
+    TableRef links = group_w->add_table("links");
+    auto col = links->add_column_link(type_Link, "link", *target);
 
-    target->add_empty_row();
-    target->set_int(0, 0, 0);
+    auto obj_t = target->create_object().set_all(0);
 
-    links->add_empty_row();
-    links->set_link(0, 0, 0);
+    links->create_object().set_all(obj_t.get_key());
 
-    TableView tv = target->get_backlink_view(0, links.get(), 0);
+    TableView tv = obj_t.get_backlink_view(links, col);
     CHECK_EQUAL(true, tv.is_attached());
     CHECK_EQUAL(true, tv.is_in_sync());
     CHECK_EQUAL(false, tv.depends_on_deleted_object());
     CHECK_EQUAL(1, tv.size());
 
     // Bring the view out of sync, and have it depend on a deleted row.
-    target->move_last_over(0);
+    target->remove_object(obj_t.get_key());
     CHECK_EQUAL(true, tv.is_attached());
     CHECK_EQUAL(false, tv.is_in_sync());
     CHECK_EQUAL(true, tv.depends_on_deleted_object());
     CHECK_EQUAL(1, tv.size());
-
-    LangBindHelper::commit_and_continue_as_read(sg_w);
-    DB::VersionID vid = sg_w.get_version_of_current_transaction();
-
-    auto handover = sg_w.export_for_handover(tv, ConstSourcePayload::Copy);
-    CHECK(tv.is_attached());
-    sg.begin_read(vid);
-
-    // The imported TableView should have the same state as the exported one.
-    auto tv2 = sg.import_from_handover(std::move(handover));
-    CHECK_EQUAL(true, tv2->is_attached());
-    CHECK_EQUAL(false, tv2->is_in_sync());
-    CHECK_EQUAL(true, tv.depends_on_deleted_object());
-    CHECK_EQUAL(1, tv2->size());
-
-    // Syncing the TableView should bring it into sync, and cause it to reflect
-    // that its source row was deleted.
-    tv2->sync_if_needed();
-    CHECK_EQUAL(true, tv2->is_attached());
-    CHECK_EQUAL(true, tv2->is_in_sync());
-    CHECK_EQUAL(true, tv.depends_on_deleted_object());
-    CHECK_EQUAL(0, tv2->size());
+    group_w->commit_and_continue_as_read();
+    auto group = group_w->duplicate();
+    // Change of policy compared to old Core. When a tv depends on a deleted object,
+    // you can not import a copy of it. Matches policy for forward links
+    CHECK_THROW(group->import_copy_of(tv, PayloadPolicy::Copy), InvalidKey);
 }
 
 // Test that we can handover a query involving links, and that after the
@@ -4361,107 +4322,72 @@ TEST(LangBindHelper_HandoverWithLinkQueries)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
-    sg.begin_read();
-
-    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    DBRef sg_w = DB::create(*hist_w, DBOptions(crypt_key()));
-    Group& group_w = const_cast<Group&>(sg_w.begin_read());
-
+    DBRef db = DB::create(*hist, DBOptions(crypt_key()));
+    auto group_w = db->start_write();
     // First setup data so that we can do a query on links
-    LangBindHelper::promote_to_write(sg_w);
-    TableRef table1 = group_w.add_table("table1");
-    TableRef table2 = group_w.add_table("table2");
+    TableRef table1 = group_w->add_table("table1");
+    TableRef table2 = group_w->add_table("table2");
     // add some more columns to table1 and table2
     table1->add_column(type_Int, "col1");
     table1->add_column(type_String, "str1");
 
     table2->add_column(type_Int, "col1");
-    table2->add_column(type_String, "str2");
+    auto col_str = table2->add_column(type_String, "str2");
 
     // add some rows
-    table1->add_empty_row();
-    table1->set_int(0, 0, 100);
-    table1->set_string(1, 0, "foo");
-    table1->add_empty_row();
-    table1->set_int(0, 1, 200);
-    table1->set_string(1, 1, "!");
-    table1->add_empty_row();
-    table1->set_int(0, 2, 300);
-    table1->set_string(1, 2, "bar");
+    auto o10 = table1->create_object().set_all(100, "foo");
+    auto o11 = table1->create_object().set_all(200, "!");
+    auto o12 = table1->create_object().set_all(300, "bar");
+    auto o20 = table2->create_object().set_all(400, "hello");
+    auto o21 = table2->create_object().set_all(500, "world");
+    auto o22 = table2->create_object().set_all(600, "!");
 
-    table2->add_empty_row();
-    table2->set_int(0, 0, 400);
-    table2->set_string(1, 0, "hello");
-    table2->add_empty_row();
-    table2->set_int(0, 1, 500);
-    table2->set_string(1, 1, "world");
-    table2->add_empty_row();
-    table2->set_int(0, 2, 600);
-    table2->set_string(1, 2, "!");
-
-
-    size_t col_link2 = table1->add_column_link(type_LinkList, "link", *table2);
+    ColKey col_link2 = table1->add_column_link(type_LinkList, "link", *table2);
 
     // set some links
-    LinkViewRef links1;
+    auto links1 = o10.get_linklist(col_link2);
+    CHECK(links1.is_attached());
+    links1.add(o21.get_key());
 
-    links1 = table1->get_linklist(col_link2, 0);
-    links1->add(1);
+    auto links2 = o11.get_linklist(col_link2);
+    CHECK(links2.is_attached());
+    links2.add(o21.get_key());
+    links2.add(o22.get_key());
+    group_w->commit_and_continue_as_read();
 
-    links1 = table1->get_linklist(col_link2, 1);
-    links1->add(1);
-    links1->add(2);
-    LangBindHelper::commit_and_continue_as_read(sg_w);
+    // Do a query (which will have zero results) and export it twice.
+    // To test separation, we'll later modify state at the exporting side,
+    // and verify that the two different imports still get identical results
+    realm::Query query = table1->link(col_link2).column<String>(col_str) == "nabil";
+    realm::TableView tv4 = query.find_all();
 
-    size_t match;
-
-    std::unique_ptr<DB::Handover<Query>> handoverQuery;
-    std::unique_ptr<DB::Handover<Query>> handoverQuery2;
-    std::unique_ptr<DB::Handover<Query>> handoverQuery_int;
-
+    auto rec1 = group_w->duplicate();
+    auto q1 = rec1->import_copy_of(query, PayloadPolicy::Copy);
+    auto rec2 = group_w->duplicate();
+    auto q2 = rec2->import_copy_of(query, PayloadPolicy::Copy);
 
     {
-        // Do a query (which will have zero results) and export it twice.
-        // To test separation, we'll later modify state at the exporting side,
-        // and verify that the two different imports still get identical results
-        realm::Query query = table1->link(col_link2).column<String>(1) == "nabil";
-        realm::TableView tv4 = query.find_all();
-
-        handoverQuery = sg_w.export_for_handover(query, ConstSourcePayload::Copy);
-        handoverQuery2 = sg_w.export_for_handover(query, ConstSourcePayload::Copy);
-    }
-
-    DB::VersionID vid = sg_w.get_version_of_current_transaction(); // vid == 2
-    {
-        LangBindHelper::advance_read(sg, vid);
-        std::unique_ptr<Query> q(sg.import_from_handover(move(handoverQuery)));
-        realm::TableView tv = q->find_all();
-        match = tv.size();
-        CHECK_EQUAL(0, match);
+        realm::TableView tv = q1->find_all();
+        CHECK_EQUAL(0, tv.size());
     }
 
     // On the exporting side, change the data such that the query will now have
     // non-zero results if evaluated in that context.
-    LangBindHelper::promote_to_write(sg_w);
-    table2->add_empty_row();
-    table2->set_int(0, 3, 700);
-    table2->set_string(1, 3, "nabil");
-    links1 = table1->get_linklist(col_link2, 2);
-    links1->add(3);
-    LangBindHelper::commit_and_continue_as_read(sg_w);
-
+    group_w->promote_to_write();
+    auto o23 = table2->create_object().set_all(700, "nabil");
+    links1.add(o23.get_key());
+    group_w->commit_and_continue_as_read();
+    CHECK_EQUAL(1, query.count());
     {
         // Import query and evaluate in the old context. This should *not* be
         // affected by the change done above on the exporting side.
-        std::unique_ptr<Query> q2(sg.import_from_handover(move(handoverQuery2)));
         realm::TableView tv2 = q2->find_all();
-        match = tv2.size();
-        CHECK_EQUAL(0, match);
+        CHECK_EQUAL(0, tv2.size());
     }
 }
 
 
+#ifdef LEGACY_TESTS
 TEST(LangBindHelper_HandoverQueryLinksTo)
 {
     SHARED_GROUP_TEST_PATH(path);
