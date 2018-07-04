@@ -156,14 +156,13 @@ TEST_CASE("list") {
             write([&] { lst.get(5).set(col_value, 6); });
             REQUIRE_INDICES(change.modifications, 5);
         }
-#if 0
-        // FIXME: Why does this not work?
+
         SECTION("deleting a target row sends a change notification") {
             auto token = require_change();
             write([&] { target->remove_object(target_keys[5]); });
             REQUIRE_INDICES(change.deletions, 5);
         }
-#endif
+
         SECTION("adding a row and then modifying the target row does not mark the row as modified") {
             auto token = require_change();
             write([&] {
@@ -196,8 +195,7 @@ TEST_CASE("list") {
             write([&] { target->get_object(target_keys[5]).set(col_value, 10); });
             REQUIRE_INDICES(change.modifications, 5, 10);
         }
-#if 0
-        // FIXME: Why does this not work?
+
         SECTION("deleting a row which appears multiple times in a list marks them all as modified") {
             r->begin_transaction();
             lst.add(target_keys[5]);
@@ -213,7 +211,7 @@ TEST_CASE("list") {
             write([&] { target->clear(); });
             REQUIRE_INDICES(change.deletions, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9);
         }
-#endif
+
         SECTION("moving a target row does not send a change notification") {
             // Remove a row from the LV so that we have one to delete that's not in the list
             r->begin_transaction();
