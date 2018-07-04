@@ -122,21 +122,8 @@ R ConstTableView::aggregate(ColKey column_key, size_t* result_count, ObjKey* ret
     size_t row_ndx;
 */
     R res = R{};
-    {
-        ObjKey key(m_key_values->get(0));
-        ConstObj obj = m_table->get_object(key);
-        auto first = obj.get<T>(column_key);
-
-        if (!obj.is_null(column_key)) { // cannot just use if(v) on float/double types
-            res = static_cast<R>(util::unwrap(first));
-            non_nulls++;
-            if (return_key) {
-                *return_key = key;
-            }
-        }
-    }
-
-    for (size_t tv_index = 1; tv_index < m_key_values->size(); ++tv_index) {
+    bool is_first = true;
+    for (size_t tv_index = 0; tv_index < m_key_values->size(); ++tv_index) {
 
         ObjKey key(m_key_values->get(tv_index));
 
@@ -154,26 +141,38 @@ R ConstTableView::aggregate(ColKey column_key, size_t* result_count, ObjKey* ret
             leaf_end = leaf_start + arrp->size();
         }
 */
-        ConstObj obj = m_table->get_object(key);
-        auto v = obj.get<T>(column_key);
+        // aggregation must be robust in the face of stale keys:
+        try {
+            ConstObj obj = m_table->get_object(key);
+            auto v = obj.get<T>(column_key);
 
-        if (!obj.is_null(column_key)) {
-            non_nulls++;
-            R unpacked = static_cast<R>(util::unwrap(v));
+            if (!obj.is_null(column_key)) {
+                non_nulls++;
+                R unpacked = static_cast<R>(util::unwrap(v));
 
-            if (action == act_Sum || action == act_Average) {
-                res += unpacked;
+                if (is_first) {
+                    if (return_key) {
+                        *return_key = key;
+                    }
+                    res = unpacked;
+                    is_first = false;
+                }
+                else if (action == act_Sum || action == act_Average) {
+                    res += unpacked;
+                }
+                else if ((action == act_Max && unpacked > res) || non_nulls == 1) {
+                    res = unpacked;
+                    if (return_key)
+                        *return_key = key;
+                }
+                else if ((action == act_Min && unpacked < res) || non_nulls == 1) {
+                    res = unpacked;
+                    if (return_key)
+                        *return_key = key;
+                }
             }
-            else if ((action == act_Max && unpacked > res) || non_nulls == 1) {
-                res = unpacked;
-                if (return_key)
-                    *return_key = key;
-            }
-            else if ((action == act_Min && unpacked < res) || non_nulls == 1) {
-                res = unpacked;
-                if (return_key)
-                    *return_key = key;
-            }
+        }
+        catch (realm::InvalidKey) {
         }
     }
 
@@ -206,11 +205,15 @@ size_t ConstTableView::aggregate_count(ColKey column_key, T count_target) const
         if (key == realm::null_key)
             continue;
 
-        ConstObj obj = m_table->get_object(key);
-        auto v = obj.get<T>(column_key);
+        try {
+            ConstObj obj = m_table->get_object(key);
+            auto v = obj.get<T>(column_key);
 
-        if (v == count_target) {
-            cnt++;
+            if (v == count_target) {
+                cnt++;
+            }
+        }
+        catch (realm::InvalidKey) {
         }
     }
 
