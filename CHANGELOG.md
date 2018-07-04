@@ -85,6 +85,17 @@ v5.6.1, v5.6.2 and v5.6.3
 
 ----------------------------------------------
 
+# 5.6.4 Release notes
+
+### Enhancements
+
+* Add Table::add_row_with_keys(), which allows
+  sync::create_object_with_primary_key() to avoid updating the index twice when
+  creating an object with a string primary key.
+* Improved the performance of setting a link to its current value.
+
+----------------------------------------------
+
 # 5.6.3 Release notes
 
 ### Enhancements

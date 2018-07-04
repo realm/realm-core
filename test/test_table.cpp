@@ -3929,6 +3929,28 @@ TEST(Table_StaleColumnKey)
     CHECK_THROW_ANY(obj.get<Int>(col));
 }
 
+TEST(Table_KeysRow)
+{
+    Table table;
+    auto col_int = table.add_column(type_Int, "int");
+    auto col_string = table.add_column(type_String, "string", true);
+    table.add_search_index(col_int);
+    table.add_search_index(col_string);
+
+    table.create_object(ObjKey(7), {{col_int, 123}, {col_string, "Hello, "}});
+    table.create_object(ObjKey(9), {{col_int, 456}, {col_string, StringData()}});
+
+    auto i = table.find_first_int(col_int, 123);
+    CHECK_EQUAL(i, ObjKey(7));
+    i = table.find_first_int(col_int, 456);
+    CHECK_EQUAL(i, ObjKey(9));
+
+    i = table.find_first_string(col_string, "Hello, ");
+    CHECK_EQUAL(i, ObjKey(7));
+    i = table.find_first_string(col_string, StringData());
+    CHECK_EQUAL(i, ObjKey(9));
+}
+
 TEST(Table_getLinkType)
 {
     Group g;

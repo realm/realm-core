@@ -252,7 +252,7 @@ TEST(Replication_HistorySchemaVersionUpgrade)
     }
 
     ReplSyncClient repl(path, 2);
-    DBRef sg_1 = DB::create(repl); // This will be the session initiater
+    DBRef sg_1 = DB::create(repl); // This will be the session initiator
     CHECK(repl.is_upgraded());
     WriteTransaction wt(sg_1);
     // When this one is opened, the file should have been upgraded
