@@ -517,7 +517,13 @@ public:
     ///
     /// If this group accessor is the detached state, this function returns
     /// zero.
-    size_t compute_aggregated_byte_size() const noexcept;
+    enum SizeAggregateControl {
+        size_of_state = 1,
+        size_of_history = 2,
+        size_of_freelists = 4,
+        size_of_all = 7
+    };
+    size_t compute_aggregated_byte_size(SizeAggregateControl ctrl = SizeAggregateControl::size_of_all) const noexcept;
 
     void verify() const;
 #ifdef REALM_DEBUG

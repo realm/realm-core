@@ -10,7 +10,9 @@
 
 ### Enhancements
 
-* None.
+* Improved Group::compute_aggregated_byte_size() allowing us to differentiate
+  between state, history and freelists.
+  (Issue #3063)
 
 -----------
 
