@@ -4919,8 +4919,8 @@ TEST(LangBindHelper_TableViewClear)
 {
     SHARED_GROUP_TEST_PATH(path);
 
-    size_t number_of_history = 1000;
-    size_t number_of_line = 18;
+    int64_t number_of_history = 1000;
+    int64_t number_of_line = 18;
 
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
     DBRef sg = DB::create(*hist_w, DBOptions(crypt_key()));
@@ -4955,15 +4955,15 @@ TEST(LangBindHelper_TableViewClear)
         auto obj = history->create_object();
         obj.set(col0, 1);
         auto ll = obj.get_linklist(col2);
-        for (size_t j = 0; j < number_of_line; ++j) {
+        for (int64_t j = 0; j < number_of_line; ++j) {
             Obj o = line->create_object().set_all(j, 0);
             ll.add(o.get_key());
         }
 
-        for (size_t i = 1; i < number_of_history; ++i) {
+        for (int64_t i = 1; i < number_of_history; ++i) {
             history->create_object().set_all(i, i + 1);
-            size_t rj = i * number_of_line;
-            for (size_t j = 1; j <= number_of_line; ++j) {
+            int64_t rj = i * number_of_line;
+            for (int64_t j = 1; j <= number_of_line; ++j) {
                 line->create_object().set_all(rj, j);
                 ++rj;
             }
@@ -4981,8 +4981,8 @@ TEST(LangBindHelper_TableViewClear)
         TableRef line = tr->get_table("line");
 
         //    number_of_line = 2;
-        for (size_t i = 1; i <= number_of_line; ++i) {
-            TableView tv = (line->column<Int>(colB) == int64_t(i)).find_all();
+        for (int64_t i = 1; i <= number_of_line; ++i) {
+            TableView tv = (line->column<Int>(colB) == i).find_all();
             tv.clear();
         }
         tr->commit_and_continue_as_read();
