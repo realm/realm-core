@@ -54,7 +54,15 @@ Results::Results(std::shared_ptr<Realm> r, std::shared_ptr<LstBase> list)
 {
 }
 
-Results::Results(SharedRealm, TableView, DescriptorOrdering) { throw std::runtime_error("not implemented"); }
+Results::Results(std::shared_ptr<Realm> r, TableView tv, DescriptorOrdering o)
+: m_realm(std::move(r))
+, m_table_view(std::move(tv))
+, m_descriptor_ordering(std::move(o))
+, m_mode(Mode::TableView)
+{
+    m_table = TableRef(&m_table_view.get_parent());
+}
+
 Results::Results(std::shared_ptr<Realm> r, std::shared_ptr<LnkLst> lv, util::Optional<Query> q, SortDescriptor s)
 : m_realm(std::move(r))
 , m_link_list(lv)
@@ -67,17 +75,6 @@ Results::Results(std::shared_ptr<Realm> r, std::shared_ptr<LnkLst> lv, util::Opt
     }
     m_descriptor_ordering.append_sort(std::move(s));
 }
-
-#if 0
-Results::Results(SharedRealm r, TableView tv, DescriptorOrdering o)
-: m_realm(std::move(r))
-, m_table_view(std::move(tv))
-, m_descriptor_ordering(std::move(o))
-, m_mode(Mode::TableView)
-{
-    m_table = m_table_view.get_parent();
-}
-#endif
 
 Results::Results(const Results&) = default;
 Results& Results::operator=(const Results&) = default;
@@ -505,6 +502,9 @@ Query Results::get_query() const
             Query query = m_table_view.get_query();
             if (query.get_table()) {
                 return query;
+            }
+            if (m_table_view.is_backlink_view()) {
+                return Query();
             }
 
             // The TableView has no associated query so create one with no conditions that is restricted

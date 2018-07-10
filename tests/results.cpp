@@ -149,7 +149,7 @@ TEST_CASE("notifications: async delivery") {
                 r->notify();
                 REQUIRE(notification_calls == 1);
             }
-#if 0
+
             SECTION("notify() without autorefresh") {
                 r->set_auto_refresh(false);
                 coordinator->on_change();
@@ -157,7 +157,7 @@ TEST_CASE("notifications: async delivery") {
                 r->notify();
                 REQUIRE(notification_calls == 1);
             }
-#endif
+
             SECTION("refresh()") {
                 coordinator->on_change();
                 REQUIRE_FALSE(r->is_in_read_transaction());
@@ -1959,10 +1959,11 @@ TEST_CASE("results: snapshots") {
             REQUIRE(!snapshot.get(0).is_valid());
         }
     }
-#if 0
+
     SECTION("snapshot of Results based on Query") {
         auto table = r->read_group().get_table("class_object");
-        Query q = table->column<Int>(0) > 0;
+        auto col_value = table->get_column_key("value");
+        Query q = table->column<Int>(col_value) > 0;
         Results results(r, std::move(q));
 
         {
@@ -1971,7 +1972,7 @@ TEST_CASE("results: snapshots") {
             REQUIRE(results.size() == 0);
             REQUIRE(snapshot.size() == 0);
             write([=]{
-                table->set_int(0, table->add_empty_row(), 1);
+                table->create_object().set(col_value, 1);
             });
             REQUIRE(results.size() == 1);
             REQUIRE(snapshot.size() == 0);
@@ -1983,32 +1984,33 @@ TEST_CASE("results: snapshots") {
             REQUIRE(results.size() == 1);
             REQUIRE(snapshot.size() == 1);
             write([=]{
-                table->set_int(0, 0, 0);
+                table->begin()->set(col_value, 0);
             });
             REQUIRE(results.size() == 0);
             REQUIRE(snapshot.size() == 1);
-            REQUIRE(snapshot.get(0).is_attached());
+            REQUIRE(snapshot.get(0).is_valid());
 
             // Removing a row present in the snapshot from its table should result in the snapshot
             // returning a detached row accessor.
             write([=]{
-                table->remove(0);
+                table->begin()->remove();
             });
             REQUIRE(snapshot.size() == 1);
-            REQUIRE(!snapshot.get(0).is_attached());
+            REQUIRE(!snapshot.get(0).is_valid());
 
             // Adding a new row that matches the query criteria shouldn't affect the state of the snapshot.
             write([=]{
-                table->set_int(0, table->add_empty_row(), 1);
+                table->create_object().set(col_value, 1);
             });
             REQUIRE(snapshot.size() == 1);
-            REQUIRE(!snapshot.get(0).is_attached());
+            REQUIRE(!snapshot.get(0).is_valid());
         }
     }
 
     SECTION("snapshot of Results based on TableView from query") {
         auto table = r->read_group().get_table("class_object");
-        Query q = table->column<Int>(0) > 0;
+        auto col_value = table->get_column_key("value");
+        Query q = table->column<Int>(col_value) > 0;
         Results results(r, q.find_all());
 
         {
@@ -2017,7 +2019,7 @@ TEST_CASE("results: snapshots") {
             REQUIRE(results.size() == 0);
             REQUIRE(snapshot.size() == 0);
             write([=]{
-                table->set_int(0, table->add_empty_row(), 1);
+                table->create_object().set(col_value, 1);
             });
             REQUIRE(results.size() == 1);
             REQUIRE(snapshot.size() == 0);
@@ -2029,49 +2031,52 @@ TEST_CASE("results: snapshots") {
             REQUIRE(results.size() == 1);
             REQUIRE(snapshot.size() == 1);
             write([=]{
-                table->set_int(0, 0, 0);
+                table->begin()->set(col_value, 0);
             });
             REQUIRE(results.size() == 0);
             REQUIRE(snapshot.size() == 1);
-            REQUIRE(snapshot.get(0).is_attached());
+            REQUIRE(snapshot.get(0).is_valid());
 
             // Removing a row present in the snapshot from its table should result in the snapshot
             // returning a detached row accessor.
             write([=]{
-                table->remove(0);
+                table->begin()->remove();
             });
             REQUIRE(snapshot.size() == 1);
-            REQUIRE(!snapshot.get(0).is_attached());
+            REQUIRE(!snapshot.get(0).is_valid());
 
             // Adding a new row that matches the query criteria shouldn't affect the state of the snapshot.
             write([=]{
-                table->set_int(0, table->add_empty_row(), 1);
+                table->create_object().set(col_value, 1);
             });
             REQUIRE(snapshot.size() == 1);
-            REQUIRE(!snapshot.get(0).is_attached());
+            REQUIRE(!snapshot.get(0).is_valid());
         }
     }
 
     SECTION("snapshot of Results based on TableView from backlinks") {
         auto object = r->read_group().get_table("class_object");
+        auto col_link = object->get_column_key("array");
         auto linked_to = r->read_group().get_table("class_linked to object");
 
         write([=]{
-            linked_to->add_empty_row();
+            linked_to->create_object();
+            object->create_object();
         });
 
-        TableView backlinks = linked_to->get_backlink_view(0, object.get(), 1);
-        Results results(r, std::move(backlinks));
+        auto linked_to_obj = *linked_to->begin();
+        auto lv = object->begin()->get_linklist_ptr(col_link);
 
-        auto lv = object->get_linklist(1, object->add_empty_row());
+        TableView backlinks = linked_to_obj.get_backlink_view(object, col_link);
+        Results results(r, std::move(backlinks));
 
         {
             // A newly-added row should not appear in the snapshot.
             auto snapshot = results.snapshot();
             REQUIRE(results.size() == 0);
             REQUIRE(snapshot.size() == 0);
-            write([=]{
-                lv->add(0);
+            write([&]{
+                lv->add(linked_to_obj.get_key());
             });
             REQUIRE(results.size() == 1);
             REQUIRE(snapshot.size() == 0);
@@ -2082,35 +2087,35 @@ TEST_CASE("results: snapshots") {
             auto snapshot = results.snapshot();
             REQUIRE(results.size() == 1);
             REQUIRE(snapshot.size() == 1);
-            write([=]{
-                lv->remove(0);
+            write([&]{
+                if (lv->size() > 0)
+                    lv->remove(0);
             });
             REQUIRE(results.size() == 0);
             REQUIRE(snapshot.size() == 1);
-            REQUIRE(snapshot.get(0).is_attached());
+            REQUIRE(snapshot.get(0).is_valid());
 
             // Removing a row present in the snapshot from its table should result in the snapshot
             // returning a detached row accessor.
             write([=]{
-                object->remove(0);
+                object->begin()->remove();
             });
             REQUIRE(snapshot.size() == 1);
-            REQUIRE(!snapshot.get(0).is_attached());
+            REQUIRE(!snapshot.get(0).is_valid());
 
             // Adding a new link shouldn't affect the state of the snapshot.
             write([=]{
-                object->add_empty_row();
-                auto lv = object->get_linklist(1, object->add_empty_row());
-                lv->add(0);
+                object->create_object().get_linklist(col_link).add(linked_to_obj.get_key());
             });
             REQUIRE(snapshot.size() == 1);
-            REQUIRE(!snapshot.get(0).is_attached());
+            REQUIRE(!snapshot.get(0).is_valid());
         }
     }
 
     SECTION("snapshot of Results with notification callback registered") {
         auto table = r->read_group().get_table("class_object");
-        Query q = table->column<Int>(0) > 0;
+        auto col_value = table->get_column_key("value");
+        Query q = table->column<Int>(col_value) > 0;
         Results results(r, q.find_all());
 
         auto token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
@@ -2121,7 +2126,7 @@ TEST_CASE("results: snapshots") {
         SECTION("snapshot of lvalue") {
             auto snapshot = results.snapshot();
             write([=] {
-                table->set_int(0, table->add_empty_row(), 1);
+                table->create_object().set(col_value, 1);
             });
             REQUIRE(snapshot.size() == 0);
         }
@@ -2129,7 +2134,7 @@ TEST_CASE("results: snapshots") {
         SECTION("snapshot of rvalue") {
             auto snapshot = std::move(results).snapshot();
             write([=] {
-                table->set_int(0, table->add_empty_row(), 1);
+                table->create_object().set(col_value, 1);
             });
             REQUIRE(snapshot.size() == 0);
         }
@@ -2137,7 +2142,8 @@ TEST_CASE("results: snapshots") {
 
     SECTION("adding notification callback to snapshot throws") {
         auto table = r->read_group().get_table("class_object");
-        Query q = table->column<Int>(0) > 0;
+        auto col_value = table->get_column_key("value");
+        Query q = table->column<Int>(col_value) > 0;
         Results results(r, q.find_all());
         auto snapshot = results.snapshot();
         CHECK_THROWS(snapshot.add_notification_callback([](CollectionChangeSet, std::exception_ptr) {}));
@@ -2146,7 +2152,7 @@ TEST_CASE("results: snapshots") {
     SECTION("accessors should return none for detached row") {
         auto table = r->read_group().get_table("class_object");
         write([=] {
-            table->add_empty_row();
+            table->create_object();
         });
         Results results(r, *table);
         auto snapshot = results.snapshot();
@@ -2154,11 +2160,10 @@ TEST_CASE("results: snapshots") {
             table->clear();
         });
 
-        REQUIRE_FALSE(snapshot.get(0).is_attached());
-        REQUIRE_FALSE(snapshot.first()->is_attached());
-        REQUIRE_FALSE(snapshot.last()->is_attached());
+        REQUIRE_FALSE(snapshot.get(0).is_valid());
+        REQUIRE_FALSE(snapshot.first()->is_valid());
+        REQUIRE_FALSE(snapshot.last()->is_valid());
     }
-    #endif
 }
 
 TEST_CASE("results: distinct") {
