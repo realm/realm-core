@@ -1,22 +1,9 @@
-# NEXT RELEASE
+# 5.7.1 Release notes
 
 ### Bugfixes
 
-* None.
-
-### Breaking changes
-
-* None.
-
-### Enhancements
-
-* None.
-
------------
-
-### Internals
-
-* None.
+* Fix crash in Group::compute_aggregated_byte_size() when applied on an empty
+realm file. (Issue #3072)
 
 ----------------------------------------------
 

@@ -1038,7 +1038,7 @@ size_t size_of_tree_from_ref(ref_type ref, Allocator& alloc) {
 size_t Group::compute_aggregated_byte_size(SizeAggregateControl ctrl) const noexcept
 {
     SlabAlloc& alloc = *const_cast<SlabAlloc*>(&m_alloc);
-    if (!is_attached())
+    if (!m_top.is_attached())
         return 0;
     size_t used = 0;
     if (ctrl & SizeAggregateControl::size_of_state) {
