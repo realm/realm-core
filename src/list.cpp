@@ -338,7 +338,14 @@ Results List::snapshot() const
     return as_results().snapshot();
 }
 
-template<class...> using VoidT = void;
+// The simpler definition of void_t below does not work in gcc 4.9 due to a bug
+// in that version of gcc (https://gcc.gnu.org/bugzilla/show_bug.cgi?id=64395)
+
+// template<class...> using VoidT = void;
+namespace _impl {
+    template<class... > struct MakeVoid { using type = void; };
+}
+template<class... T> using VoidT = typename _impl::MakeVoid<T...>::type;
 
 template<class, class = VoidT<>>
 struct HasMinmaxType : std::false_type { };
