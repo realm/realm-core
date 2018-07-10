@@ -2,7 +2,7 @@
 
 ### Bugfixes
 
-* None.
+* Fix a use-after-free when an observer is passed to rollback_and_continue_as_read().
 
 ### Breaking changes
 
