@@ -36,17 +36,23 @@ ConstTableView::ConstTableView(ConstTableView& src, Transaction*, PayloadPolicy)
 ConstTableView::ConstTableView(const ConstTableView& src, Transaction* tr, PayloadPolicy mode)
     : ObjList(&m_table_view_key_values)
     , m_source_column_key(src.m_source_column_key)
+    , m_linked_obj_key(src.m_linked_obj_key)
     , m_table_view_key_values(Allocator::get_default())
 {
     bool was_in_sync = src.is_in_sync();
     m_query = Query(src.m_query, tr, mode);
     m_table = tr->import_copy_of(src.m_table);
+
     if (mode == PayloadPolicy::Stay)
         was_in_sync = false;
+
+    /*
     VersionID src_version =
         dynamic_cast<Transaction*>(src.m_table->get_parent_group())->get_version_of_current_transaction();
     if (src_version != tr->get_version_of_current_transaction())
         throw realm::LogicError(LogicError::bad_version);
+    */
+
     if (was_in_sync)
         m_last_seen_versions = get_dependencies();
     else
@@ -54,7 +60,9 @@ ConstTableView::ConstTableView(const ConstTableView& src, Transaction* tr, Paylo
     m_table = tr->import_copy_of(src.m_table);
     m_linklist_source = tr->import_copy_of(src.m_linklist_source);
     if (src.m_source_column_key) {
-        m_linked_obj = tr->import_copy_of(src.m_linked_obj);
+        m_linked_table = tr->import_copy_of(src.m_linked_table);
+        // Check that object is still valid
+        m_linked_table->get_object(m_linked_obj_key);
     }
     // don't use methods which throw after this point...or m_table_view_key_values will leak
     if (mode == PayloadPolicy::Copy && src.m_table_view_key_values.is_attached()) {
@@ -451,14 +459,16 @@ TableVersions ConstTableView::get_dependencies() const
     }
 
     if (m_source_column_key) {
-        // m_linked_column is set when this TableView was created by Table::get_backlink_view().
-        if (m_linked_obj.is_valid()) {
-            auto table = m_linked_obj.get_table();
-            return {table->get_key(), table->get_content_version()};
+        if (m_table) {
+            // m_linked_column is set when this TableView was created by Table::get_backlink_view().
+            if (m_linked_table && m_linked_table->is_valid(m_linked_obj_key)) {
+                TableVersions ret;
+                ret.emplace_back(m_table->get_key(), m_table->get_content_version());
+                ret.emplace_back(m_linked_table->get_key(), m_linked_table->get_content_version());
+                return ret;
+            }
         }
-        else {
-            return {};
-        }
+        return {};
     }
     else if (m_query.m_table) {
         return m_query.get_outside_versions();
@@ -591,16 +601,19 @@ void ConstTableView::do_sync()
     }
     else if (m_source_column_key) {
         m_key_values->clear();
-        if (m_linked_obj.is_valid() && m_table) {
+        try {
             TableKey origin_table_key = m_table->get_key();
-            const Table* target_table = m_linked_obj.get_table();
-            const Spec& spec = _impl::TableFriend::get_spec(*target_table);
+            ConstObj m_linked_obj = m_linked_table->get_object(m_linked_obj_key);
+            const Spec& spec = _impl::TableFriend::get_spec(*m_linked_table);
             size_t backlink_col_ndx = spec.find_backlink_column(origin_table_key, m_source_column_key);
             if (backlink_col_ndx != realm::npos) {
                 size_t backlink_count = m_linked_obj.get_backlink_count(backlink_col_ndx);
                 for (size_t i = 0; i < backlink_count; i++)
                     m_key_values->add(m_linked_obj.get_backlink(backlink_col_ndx, i));
             }
+        }
+        catch (...) {
+            return;
         }
     }
     // FIXME: Unimplemented for link to a column
