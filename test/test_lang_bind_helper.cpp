@@ -4299,11 +4299,13 @@ TEST(LangBindHelper_HandoverOutOfSyncTableViewFromBacklinksToDeletedRow)
     CHECK_EQUAL(false, tv.is_in_sync());
     CHECK_EQUAL(true, tv.depends_on_deleted_object());
     CHECK_EQUAL(1, tv.size());
+    tv.sync_if_needed();
+    CHECK_EQUAL(0, tv.size());
     group_w->commit_and_continue_as_read();
     auto group = group_w->duplicate();
-    // Change of policy compared to old Core. When a tv depends on a deleted object,
-    // you can not import a copy of it. Matches policy for forward links
-    CHECK_THROW(group->import_copy_of(tv, PayloadPolicy::Copy), InvalidKey);
+    auto tv2 = group->import_copy_of(tv, PayloadPolicy::Copy);
+    CHECK_EQUAL(true, tv2->depends_on_deleted_object());
+    CHECK_EQUAL(0, tv2->size());
 }
 
 // Test that we can handover a query involving links, and that after the

@@ -61,8 +61,6 @@ ConstTableView::ConstTableView(const ConstTableView& src, Transaction* tr, Paylo
     m_linklist_source = tr->import_copy_of(src.m_linklist_source);
     if (src.m_source_column_key) {
         m_linked_table = tr->import_copy_of(src.m_linked_table);
-        // Check that object is still valid
-        m_linked_table->get_object(m_linked_obj_key);
     }
     // don't use methods which throw after this point...or m_table_view_key_values will leak
     if (mode == PayloadPolicy::Copy && src.m_table_view_key_values.is_attached()) {
@@ -436,10 +434,17 @@ void ConstTableView::row_to_string(size_t row_ndx, std::ostream& out) const
 
 bool ConstTableView::depends_on_deleted_object() const
 {
-    // FIXME: This does not work!
-    // outside_version() will call itself recursively for each TableView in the dependency chain
-    // and terminate with `max` if the deepest depends on a deleted LinkList or Row
-    return get_dependencies().empty();
+    if (m_linklist_source && !m_linklist_source->is_attached()) {
+        return true;
+    }
+
+    if (m_source_column_key && !(m_linked_table && m_linked_table->is_valid(m_linked_obj_key))) {
+        return true;
+    }
+    else if (m_query.m_source_table_view) {
+        return m_query.m_source_table_view->depends_on_deleted_object();
+    }
+    return false;
 }
 
 // Return version of whatever this TableView depends on
@@ -458,17 +463,14 @@ TableVersions ConstTableView::get_dependencies() const
         }
     }
 
+    // m_source_column_key is set when this TableView was created by Table::get_backlink_view().
     if (m_source_column_key) {
-        if (m_table) {
-            // m_linked_column is set when this TableView was created by Table::get_backlink_view().
-            if (m_linked_table && m_linked_table->is_valid(m_linked_obj_key)) {
-                TableVersions ret;
-                ret.emplace_back(m_table->get_key(), m_table->get_content_version());
-                ret.emplace_back(m_linked_table->get_key(), m_linked_table->get_content_version());
-                return ret;
-            }
+        if (m_linked_table) {
+            return {m_linked_table->get_key(), m_linked_table->get_content_version()};
         }
-        return {};
+        else {
+            return {};
+        }
     }
     else if (m_query.m_table) {
         return m_query.get_outside_versions();
@@ -613,7 +615,6 @@ void ConstTableView::do_sync()
             }
         }
         catch (...) {
-            return;
         }
     }
     // FIXME: Unimplemented for link to a column
