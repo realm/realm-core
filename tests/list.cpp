@@ -131,13 +131,13 @@ TEST_CASE("list") {
 
         SECTION("modifying the list sends a change notifications") {
             auto token = require_change();
-            write([&] { lst.remove(5); });
+            write([&] { if (lv2->size() > 5) lst.remove(5); });
             REQUIRE_INDICES(change.deletions, 5);
         }
 
         SECTION("modifying a different list doesn't send a change notification") {
             auto token = require_no_change();
-            write([&] { lv2->remove(5); });
+            write([&] { if (lv2->size() > 5) lv2->remove(5); });
         }
 
         SECTION("deleting the list sends a change notification") {
@@ -215,7 +215,8 @@ TEST_CASE("list") {
         SECTION("moving a target row does not send a change notification") {
             // Remove a row from the LV so that we have one to delete that's not in the list
             r->begin_transaction();
-            lv->remove(2);
+            if (lv->size() > 2)
+                lv->remove(2);
             r->commit_transaction();
 
             auto token = require_no_change();
@@ -415,7 +416,8 @@ TEST_CASE("list") {
             coordinator.on_change();
 
             r2->begin_transaction();
-            r2_lv->move(8, 5);
+            if (r2_lv->size() > 8)
+                r2_lv->move(8, 5);
             r2->commit_transaction();
             advance_and_notify(*r);
 
