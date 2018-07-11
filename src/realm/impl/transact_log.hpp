@@ -1437,8 +1437,9 @@ public:
 
     bool select_list(ColKey col_key, ObjKey key)
     {
+        sync_list();
         m_encoder.select_list(col_key, key);
-        append_instruction();
+        m_pending_ls_instr = get_inst();
         return true;
     }
 
@@ -1485,8 +1486,7 @@ private:
     std::vector<Instr> m_instructions;
     size_t current_instr_start = 0;
     Instr m_pending_ts_instr{0, 0};
-    Instr m_pending_ds_instr{0, 0};
-    Instr m_pending_lv_instr{0, 0};
+    Instr m_pending_ls_instr{0, 0};
 
     Instr get_inst()
     {
@@ -1521,20 +1521,14 @@ private:
         }
     }
 
-    void sync_linkview()
+    void sync_list()
     {
-        sync_select(m_pending_lv_instr);
-    }
-
-    void sync_descriptor()
-    {
-        sync_linkview();
-        sync_select(m_pending_ds_instr);
+        sync_select(m_pending_ls_instr);
     }
 
     void sync_table()
     {
-        sync_descriptor();
+        sync_list();
         sync_select(m_pending_ts_instr);
     }
 
