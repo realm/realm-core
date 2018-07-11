@@ -23,6 +23,7 @@
 #include <realm.hpp>
 #include <realm/util/file.hpp>
 #include <realm/array_key.hpp>
+#include <realm/history.hpp>
 
 #include "test.hpp"
 
@@ -709,6 +710,36 @@ TEST(Links_LinkList_Basics)
     CHECK_EQUAL(0, obj0.get_backlink_count(*origin, col_link));
     CHECK_EQUAL(0, obj1.get_backlink_count(*origin, col_link));
     CHECK_EQUAL(0, obj2.get_backlink_count(*origin, col_link));
+}
+
+TEST(ListList_Clear)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    DBRef db = DB::create(*hist);
+    auto group = db->start_write();
+
+    auto target = group->add_table("target");
+    target->add_column(type_Int, "value");
+
+    TableRef origin = group->add_table("origin");
+    auto col_link = origin->add_column_link(type_LinkList, "links", *target);
+
+    ObjKey key0 = target->create_object().set_all(1).get_key();
+    ObjKey key1 = target->create_object().set_all(2).get_key();
+
+    Obj obj3 = origin->create_object(ObjKey(0));
+    auto links = obj3.get_linklist(col_link);
+
+    links.add(key0);
+    links.add(key1);
+
+    group->commit_and_continue_as_read();
+    group->promote_to_write();
+
+    if (links.size() > 1)
+        links.set(1, key0);
+    links.clear();
 }
 
 TEST(Links_AddBacklinkToTableWithEnumColumns)

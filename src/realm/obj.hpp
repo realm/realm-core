@@ -153,16 +153,8 @@ protected:
     mutable uint64_t m_instance_version;
     mutable bool m_valid;
 
-    bool is_in_sync() const;
-    void do_update() const;
+    bool update() const;
     bool update_if_needed() const;
-    void update(ConstObj& other) const
-    {
-        m_mem = other.m_mem;
-        m_row_ndx = other.m_row_ndx;
-        m_storage_version = other.m_storage_version;
-        m_instance_version = other.m_instance_version;
-    }
     template <class T>
     bool do_is_null(size_t col_ndx) const;
 

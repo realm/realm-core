@@ -164,24 +164,28 @@ Obj::Obj(ClusterTree* tree_top, MemRef mem, ObjKey key, size_t row_ndx)
 {
 }
 
-bool ConstObj::is_in_sync() const
-{
-    auto current_version = get_alloc().get_storage_version(m_instance_version);
-    return (current_version == m_storage_version);
-}
-
-void ConstObj::do_update() const
+bool ConstObj::update() const
 {
     // Get a new object from key
     ConstObj new_obj = get_tree_top()->get(m_key);
-    update(new_obj);
+
+    bool changes = (m_mem.get_addr() != new_obj.m_mem.get_addr()) || (m_row_ndx != new_obj.m_row_ndx);
+    if (changes) {
+        m_mem = new_obj.m_mem;
+        m_row_ndx = new_obj.m_row_ndx;
+    }
+    // Always update versions
+    m_storage_version = new_obj.m_storage_version;
+    m_instance_version = new_obj.m_instance_version;
+
+    return changes;
 }
 
 bool ConstObj::update_if_needed() const
 {
-    if (!is_in_sync()) {
-        do_update();
-        return true;
+    auto current_version = get_alloc().get_storage_version(m_instance_version);
+    if (current_version != m_storage_version) {
+        return update();
     }
     return false;
 }
@@ -218,7 +222,7 @@ int64_t ConstObj::_get<int64_t>(size_t col_ndx) const
     auto& alloc = get_alloc();
     auto current_version = alloc.get_storage_version(m_instance_version);
     if (current_version != m_storage_version) {
-        do_update();
+        update();
     }
 
     ref_type ref = to_ref(Array::get(m_mem.get_addr(), col_ndx + 1));
@@ -237,7 +241,7 @@ StringData ConstObj::_get<StringData>(size_t col_ndx) const
     auto& alloc = get_alloc();
     auto current_version = alloc.get_storage_version(m_instance_version);
     if (current_version != m_storage_version) {
-        do_update();
+        update();
     }
 
     ref_type ref = to_ref(Array::get(m_mem.get_addr(), col_ndx + 1));
@@ -263,7 +267,7 @@ BinaryData ConstObj::_get<BinaryData>(size_t col_ndx) const
     auto& alloc = get_alloc();
     auto current_version = alloc.get_storage_version(m_instance_version);
     if (current_version != m_storage_version) {
-        do_update();
+        update();
     }
 
     ref_type ref = to_ref(Array::get(m_mem.get_addr(), col_ndx + 1));
@@ -443,8 +447,10 @@ ObjKey ConstObj::get_backlink(size_t backlink_col_ndx, size_t backlink_ndx) cons
 
 bool Obj::ensure_writeable()
 {
-    if (get_alloc().is_read_only(m_mem.get_ref())) {
+    Allocator& alloc = get_alloc();
+    if (alloc.is_read_only(m_mem.get_ref())) {
         m_mem = const_cast<ClusterTree*>(get_tree_top())->ensure_writeable(m_key);
+        m_storage_version = alloc.get_storage_version(m_instance_version);
         return true;
     }
     return false;

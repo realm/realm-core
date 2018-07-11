@@ -457,6 +457,7 @@ public:
 
     T set(size_t ndx, T value)
     {
+        REALM_ASSERT_DEBUG(!update_if_needed());
         // get will check for ndx out of bounds
         T old = get(ndx);
         if (old != value) {
@@ -472,6 +473,7 @@ public:
 
     void insert(size_t ndx, T value)
     {
+        REALM_ASSERT_DEBUG(!update_if_needed());
         ensure_created();
         if (ndx > m_tree->size()) {
             throw std::out_of_range("Index out of range");
@@ -491,6 +493,7 @@ public:
 
     T remove(size_t ndx)
     {
+        REALM_ASSERT_DEBUG(!update_if_needed());
         ensure_writeable();
         if (Replication* repl = this->m_const_obj->get_alloc().get_replication()) {
             ConstLstBase::erase_repl(repl, ndx);
@@ -512,6 +515,7 @@ public:
 
     void move(size_t from, size_t to) override
     {
+        REALM_ASSERT_DEBUG(!update_if_needed());
         if (from != to) {
             ensure_writeable();
             if (Replication* repl = this->m_const_obj->get_alloc().get_replication()) {
@@ -535,6 +539,7 @@ public:
 
     void swap(size_t ndx1, size_t ndx2) override
     {
+        REALM_ASSERT_DEBUG(!update_if_needed());
         if (ndx1 != ndx2) {
             if (Replication* repl = this->m_const_obj->get_alloc().get_replication()) {
                 ConstLstBase::swap_repl(repl, ndx1, ndx2);
