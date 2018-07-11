@@ -26,6 +26,7 @@
 #include "results.hpp"
 
 #include <realm/util/scope_exit.hpp>
+#include <realm/db.hpp>
 
 using namespace realm;
 
@@ -36,7 +37,7 @@ ThreadSafeReferenceBase::~ThreadSafeReferenceBase()
 ThreadSafeReference<List>::ThreadSafeReference(List const& list)
     : ThreadSafeReferenceBase()
     , m_key(list.m_list_base->get_key())
-    , m_object_schema_name(list.get_object_schema().name)
+    , m_table_key(list.m_list_base->get_table()->get_key())
     , m_col_key(list.m_list_base->get_col_key())
 {
 }
@@ -53,7 +54,7 @@ ThreadSafeReference<Object>::ThreadSafeReference(Object const& object)
 List ThreadSafeReference<List>::import_into(std::shared_ptr<Realm>& r)
 {
     try {
-        Obj obj = ObjectStore::table_for_object_type(r->read_group(), m_object_schema_name)->get_object(m_key);
+        Obj obj = r->read_group().get_table(m_table_key)->get_object(m_key);
         return List(r, obj, m_col_key);
     }
     catch (const InvalidKey&) {

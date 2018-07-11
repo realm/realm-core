@@ -57,7 +57,7 @@ class ThreadSafeReference<List>: public ThreadSafeReferenceBase {
     friend class Realm;
 
     ObjKey m_key;
-    std::string m_object_schema_name;
+    TableKey m_table_key;
     ColKey m_col_key;
 
     // Precondition: The associated Realm is for the current thread and is not in a write transaction;.

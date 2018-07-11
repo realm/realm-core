@@ -302,27 +302,6 @@ size_t Results::index_of(Context& ctx, T value)
     return dispatch([&](auto t) { return this->index_of(ctx.template unbox<std::decay_t<decltype(*t)>>(value)); });
 }
 
-template<typename T>
-auto Results::list_get_as(size_t ndx) const
-{
-    auto val = static_cast<Lst<T>&>(*m_list).get(ndx);
-    return util::Optional<T>(val);
-}
-
-template<>
-inline auto Results::list_get_as<util::Optional<float>>(size_t ndx) const
-{
-    auto val = static_cast<Lst<float>&>(*m_list).get(ndx);
-    return null::is_null_float(val) ? util::none : util::Optional<float>(val);
-}
-
-template<>
-inline auto Results::list_get_as<util::Optional<double>>(size_t ndx) const
-{
-    auto val = static_cast<Lst<double>&>(*m_list).get(ndx);
-    return null::is_null_float(val) ? util::none : util::Optional<double>(val);
-}
-
 } // namespace realm
 
 #endif // REALM_RESULTS_HPP

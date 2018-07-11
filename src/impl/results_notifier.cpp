@@ -205,7 +205,7 @@ void ResultsNotifier::deliver(Transaction&)
 bool ResultsNotifier::prepare_to_deliver()
 {
     auto lock = lock_target();
-    m_results_were_used = !!m_delivered_tv;
+    m_results_were_used = !m_delivered_tv; // Results were delivered if m_delivered_tv is now null
     m_delivered_tv = std::move(m_handover_tv);
     if (!get_realm())
         return false;

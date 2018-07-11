@@ -128,14 +128,9 @@ ObjectSchema const& List::get_object_schema() const
 {
     verify_attached();
 
+    REALM_ASSERT(get_type() == PropertyType::Object);
     if (!m_object_schema) {
-        StringData object_type;
-        if (get_type() == PropertyType::Object) {
-            object_type = object_name(static_cast<LnkLst&>(*m_list_base).get_target_table());
-        }
-        else {
-            object_type = object_name(*m_list_base->get_table());
-        }
+        auto object_type = object_name(static_cast<LnkLst&>(*m_list_base).get_target_table());
         auto it = m_realm->schema().find(object_type);
         REALM_ASSERT(it != m_realm->schema().end());
         m_object_schema = &*it;

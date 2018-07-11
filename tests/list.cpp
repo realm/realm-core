@@ -425,49 +425,6 @@ TEST_CASE("list") {
             REQUIRE_MOVES(change, {1, 2});
         }
 
-#if 0
-        // FIXME irrelevant?
-        SECTION("moving the list's containing row does not break notifications") {
-            auto token = require_change();
-
-            // insert rows before it
-            write([&] {
-                origin->insert_empty_row(0, 2);
-                lv->add(1);
-            });
-            REQUIRE_INDICES(change.insertions, 10);
-            REQUIRE(lst.size() == 11);
-            REQUIRE(lst.get(10).get_index() == 1);
-
-            // swap the row containing it with another row
-            write([&] {
-                origin->swap_rows(2, 3);
-                lv->add(2);
-            });
-            REQUIRE_INDICES(change.insertions, 11);
-            REQUIRE(lst.size() == 12);
-            REQUIRE(lst.get(11).get_index() == 2);
-
-            // swap it back to verify both of the rows in the swap are handled
-            write([&] {
-                origin->swap_rows(2, 3);
-                lv->add(3);
-            });
-            REQUIRE_INDICES(change.insertions, 12);
-            REQUIRE(lst.size() == 13);
-            REQUIRE(lst.get(12).get_index() == 3);
-
-            // delete a row so that it's moved (as it's at the end)
-            write([&] {
-                origin->move_last_over(0);
-                lv->add(4);
-            });
-            REQUIRE_INDICES(change.insertions, 13);
-            REQUIRE(lst.size() == 14);
-            REQUIRE(lst.get(13).get_index() == 4);
-        }
-#endif
-
         SECTION("changes are sent in initial notification") {
             auto token = lst.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
                 change = c;

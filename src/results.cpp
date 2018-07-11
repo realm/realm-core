@@ -87,8 +87,11 @@ bool Results::is_valid() const
         m_realm->verify_thread();
     }
 
+    // Here we cannot just use if (m_table) as it combines a check if the
+    // reference contains a value and if that value is valid.
+    // First we check if a table is referenced ...
     if (((const Table*)m_table) != nullptr)
-        return (bool)m_table;
+        return !!m_table; // ... and then we check if it is valid
 
     if (m_list)
         return m_list->is_attached();
@@ -152,6 +155,27 @@ StringData Results::get_object_type() const noexcept
     }
 
     return ObjectStore::object_type_for_table_name(m_table->get_name());
+}
+
+template<typename T>
+auto Results::list_get_as(size_t ndx) const
+{
+    auto val = static_cast<Lst<T>&>(*m_list).get(ndx);
+    return util::Optional<T>(val);
+}
+
+template<>
+inline auto Results::list_get_as<util::Optional<float>>(size_t ndx) const
+{
+    auto val = static_cast<Lst<float>&>(*m_list).get(ndx);
+    return null::is_null_float(val) ? util::none : util::Optional<float>(val);
+}
+
+template<>
+inline auto Results::list_get_as<util::Optional<double>>(size_t ndx) const
+{
+    auto val = static_cast<Lst<double>&>(*m_list).get(ndx);
+    return null::is_null_float(val) ? util::none : util::Optional<double>(val);
 }
 
 template<typename T>
@@ -241,8 +265,6 @@ void Results::evaluate_query_if_needed(bool wants_notifications)
         REALM_ASSERT(m_mode == Mode::TableView);
         return;
     }
-
-    // if (m_notifier) FIXME: Why was this condition added?
 
     switch (m_mode) {
         case Mode::Empty:
@@ -502,9 +524,6 @@ Query Results::get_query() const
             Query query = m_table_view.get_query();
             if (query.get_table()) {
                 return query;
-            }
-            if (m_table_view.is_backlink_view()) {
-                return Query();
             }
 
             // The TableView has no associated query so create one with no conditions that is restricted
