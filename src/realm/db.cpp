@@ -2256,7 +2256,7 @@ void Transaction::close()
         rollback();
     }
     if (m_transact_stage == DB::transact_Reading || m_transact_stage == DB::transact_Frozen) {
-        end_read();
+        do_end_read();
     }
 }
 
@@ -2264,6 +2264,13 @@ void Transaction::end_read()
 {
     if (m_transact_stage == DB::transact_Ready)
         return;
+    if (m_transact_stage == DB::transact_Writing)
+        throw LogicError(LogicError::wrong_transact_state);
+    do_end_read();
+}
+
+void Transaction::do_end_read() noexcept
+{
     detach();
     db->release_read_lock(m_read_lock);
     set_transact_stage(DB::transact_Ready);
@@ -2304,7 +2311,7 @@ void Transaction::rollback()
     if (Replication* repl = db->get_replication())
         repl->abort_transact();
 
-    end_read();
+    do_end_read();
 }
 
 DB::version_type Transaction::commit()
@@ -2329,7 +2336,7 @@ DB::version_type Transaction::commit()
 
     db->do_end_write();
 
-    end_read();
+    do_end_read();
     m_read_lock = lock_after_commit;
 
     return new_version;

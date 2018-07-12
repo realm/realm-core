@@ -562,6 +562,7 @@ private:
     template <class O>
     bool internal_advance_read(O* observer, VersionID target_version, _impl::History&, bool);
     void set_transact_stage(DB::TransactStage stage) noexcept;
+    void do_end_read() noexcept;
 
     DBRef db;
     DB::ReadLockInfo m_read_lock;
