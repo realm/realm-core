@@ -1452,7 +1452,7 @@ TEST_CASE("notifications: results") {
             REQUIRE_INDICES(callback.before_change.insertions, 4);
             REQUIRE_INDICES(callback.after_change.insertions, 4);
         }
-#if 0
+#ifdef UNITTESTS_NOT_PARSING
         SECTION("deleted objects are usable in before()") {
             callback.on_before = [&] {
                 REQUIRE(results.size() == 4);
@@ -1705,7 +1705,7 @@ TEST_CASE("notifications: results") {
             });
             REQUIRE_INDICES(change.modifications, 0, 1);
         }
-#if 0
+#ifdef UNITTESTS_NOT_PARSING
         SECTION("insert table before link target") {
             write([&] {
                 linked_table->get_object(target_keys[1]).set(col, 5);
@@ -2183,14 +2183,9 @@ TEST_CASE("results: distinct") {
 
     auto table = r->read_group().get_table("class_object");
 
-    #if 0
     r->begin_transaction();
-    table->add_empty_row(N);
     for (int i = 0; i < N; ++i) {
-        table->set_int(0, i, i % 3);
-        table->set_string(1, i, util::format("Foo_%1", i % 3).c_str());
-        table->set_int(2, i, N - i);
-        table->set_int(3, i, i % 2);
+        table->create_object().set_all(i % 3, util::format("Foo_%1", i % 3).c_str(), N - i, i % 2);
     }
     // table:
     //   0, Foo_0, 10,  0
@@ -2206,121 +2201,125 @@ TEST_CASE("results: distinct") {
 
     r->commit_transaction();
     Results results(r, table->where());
+    ColKey col_num1 = table->get_column_key("num1");
+    ColKey col_string = table->get_column_key("string");
+    ColKey col_num2 = table->get_column_key("num2");
+    ColKey col_num3 = table->get_column_key("num3");
 
     SECTION("Single integer property") {
-        Results unique = results.distinct(SortDescriptor(results.get_tableview().get_parent(), {{0}}));
+        Results unique = results.distinct(SortDescriptor({{col_num1}}));
         // unique:
         //  0, Foo_0, 10
         //  1, Foo_1,  9
         //  2, Foo_2,  8
         REQUIRE(unique.size() == 3);
-        REQUIRE(unique.get(0).get_int(2) == 10);
-        REQUIRE(unique.get(1).get_int(2) == 9);
-        REQUIRE(unique.get(2).get_int(2) == 8);
+        REQUIRE(unique.get(0).get<Int>(col_num2) == 10);
+        REQUIRE(unique.get(1).get<Int>(col_num2) == 9);
+        REQUIRE(unique.get(2).get<Int>(col_num2) == 8);
     }
 
     SECTION("Single integer via apply_ordering") {
         DescriptorOrdering ordering;
-        ordering.append_sort(SortDescriptor(results.get_tableview().get_parent(), {{0}}));
-        ordering.append_distinct(DistinctDescriptor(results.get_tableview().get_parent(), {{0}}));
+        ordering.append_sort(SortDescriptor({{col_num1}}));
+        ordering.append_distinct(DistinctDescriptor({{col_num1}}));
         Results unique = results.apply_ordering(std::move(ordering));
         // unique:
         //  0, Foo_0, 10
         //  1, Foo_1,  9
         //  2, Foo_2,  8
         REQUIRE(unique.size() == 3);
-        REQUIRE(unique.get(0).get_int(2) == 10);
-        REQUIRE(unique.get(1).get_int(2) == 9);
-        REQUIRE(unique.get(2).get_int(2) == 8);
+        REQUIRE(unique.get(0).get<Int>(col_num2) == 10);
+        REQUIRE(unique.get(1).get<Int>(col_num2) == 9);
+        REQUIRE(unique.get(2).get<Int>(col_num2) == 8);
     }
 
     SECTION("Single string property") {
-        Results unique = results.distinct(SortDescriptor(results.get_tableview().get_parent(), {{1}}));
+        Results unique = results.distinct(SortDescriptor({{col_string}}));
         // unique:
         //  0, Foo_0, 10
         //  1, Foo_1,  9
         //  2, Foo_2,  8
         REQUIRE(unique.size() == 3);
-        REQUIRE(unique.get(0).get_int(2) == 10);
-        REQUIRE(unique.get(1).get_int(2) == 9);
-        REQUIRE(unique.get(2).get_int(2) == 8);
+        REQUIRE(unique.get(0).get<Int>(col_num2) == 10);
+        REQUIRE(unique.get(1).get<Int>(col_num2) == 9);
+        REQUIRE(unique.get(2).get<Int>(col_num2) == 8);
     }
 
     SECTION("Two integer properties combined") {
-        Results unique = results.distinct(SortDescriptor(results.get_tableview().get_parent(), {{0}, {2}}));
+        Results unique = results.distinct(SortDescriptor({{col_num1}, {col_num2}}));
         // unique is the same as the table
         REQUIRE(unique.size() == N);
         for (int i = 0; i < N; ++i) {
-            REQUIRE(unique.get(i).get_string(1) == StringData(util::format("Foo_%1", i % 3).c_str()));
+            REQUIRE(unique.get(i).get<String>(col_string) == StringData(util::format("Foo_%1", i % 3).c_str()));
         }
     }
 
     SECTION("String and integer combined") {
-        Results unique = results.distinct(SortDescriptor(results.get_tableview().get_parent(), {{2}, {1}}));
+        Results unique = results.distinct(SortDescriptor({{col_num2}, {col_string}}));
         // unique is the same as the table
         REQUIRE(unique.size() == N);
         for (int i = 0; i < N; ++i) {
-            REQUIRE(unique.get(i).get_string(1) == StringData(util::format("Foo_%1", i % 3).c_str()));
+            REQUIRE(unique.get(i).get<String>(col_string) == StringData(util::format("Foo_%1", i % 3).c_str()));
         }
     }
 
     // This section and next section demonstrate that sort().distinct() != distinct().sort()
     SECTION("Order after sort and distinct") {
-        Results reverse = results.sort(SortDescriptor(results.get_tableview().get_parent(), {{2}}, {true}));
+        Results reverse = results.sort(SortDescriptor({{col_num2}}, {true}));
         // reverse:
         //   0, Foo_0,  1
         //  ...
         //   0, Foo_0, 10
-        REQUIRE(reverse.first()->get_int(2) == 1);
-        REQUIRE(reverse.last()->get_int(2) == 10);
+        REQUIRE(reverse.first()->get<Int>(col_num2) == 1);
+        REQUIRE(reverse.last()->get<Int>(col_num2) == 10);
 
         // distinct() will be applied to the table, after sorting
-        Results unique = reverse.distinct(SortDescriptor(reverse.get_tableview().get_parent(), {{0}}));
+        Results unique = reverse.distinct(SortDescriptor({{col_num1}}));
         // unique:
         //  0, Foo_0,  1
         //  2, Foo_2,  2
         //  1, Foo_1,  3
         REQUIRE(unique.size() == 3);
-        REQUIRE(unique.get(0).get_int(2) == 1);
-        REQUIRE(unique.get(1).get_int(2) == 2);
-        REQUIRE(unique.get(2).get_int(2) == 3);
+        REQUIRE(unique.get(0).get<Int>(col_num2) == 1);
+        REQUIRE(unique.get(1).get<Int>(col_num2) == 2);
+        REQUIRE(unique.get(2).get<Int>(col_num2) == 3);
     }
 
     SECTION("Order after distinct and sort") {
-        Results unique = results.distinct(SortDescriptor(results.get_tableview().get_parent(), {{0}}));
+        Results unique = results.distinct(SortDescriptor({{col_num1}}));
         // unique:
         //  0, Foo_0, 10
         //  1, Foo_1,  9
         //  2, Foo_2,  8
         REQUIRE(unique.size() == 3);
-        REQUIRE(unique.first()->get_int(2) == 10);
-        REQUIRE(unique.last()->get_int(2) == 8);
+        REQUIRE(unique.first()->get<Int>(col_num2) == 10);
+        REQUIRE(unique.last()->get<Int>(col_num2) == 8);
 
         // sort() is only applied to unique
-        Results reverse = unique.sort(SortDescriptor(unique.get_tableview().get_parent(), {{2}}, {true}));
+        Results reverse = unique.sort(SortDescriptor({{col_num2}}, {true}));
         // reversed:
         //  2, Foo_2,  8
         //  1, Foo_1,  9
         //  0, Foo_0, 10
         REQUIRE(reverse.size() == 3);
-        REQUIRE(reverse.get(0).get_int(2) == 8);
-        REQUIRE(reverse.get(1).get_int(2) == 9);
-        REQUIRE(reverse.get(2).get_int(2) == 10);
+        REQUIRE(reverse.get(0).get<Int>(col_num2) == 8);
+        REQUIRE(reverse.get(1).get<Int>(col_num2) == 9);
+        REQUIRE(reverse.get(2).get<Int>(col_num2) == 10);
     }
 
     SECTION("Chaining distinct") {
-        Results first = results.distinct(SortDescriptor(results.get_tableview().get_parent(), {{0}}));
+        Results first = results.distinct(SortDescriptor({{col_num1}}));
         REQUIRE(first.size() == 3);
 
         // distinct() will not discard the previous applied distinct() calls
-        Results second = first.distinct(SortDescriptor(first.get_tableview().get_parent(), {{3}}));
+        Results second = first.distinct(SortDescriptor({{col_num3}}));
         REQUIRE(second.size() == 2);
     }
 
     SECTION("Chaining sort") {
-        using cols_0_3 = std::pair<size_t, size_t>;
-        Results first = results.sort(SortDescriptor(results.get_tableview().get_parent(), {{0}}));
-        Results second = first.sort(SortDescriptor(first.get_tableview().get_parent(), {{3}}));
+        using cols_0_3 = std::pair<int, int>;
+        Results first = results.sort(SortDescriptor({{col_num1}}));
+        Results second = first.sort(SortDescriptor({{col_num3}}));
 
         REQUIRE(second.size() == 10);
         // results are ordered first by the last sorted column
@@ -2329,30 +2328,30 @@ TEST_CASE("results: distinct") {
         std::vector<cols_0_3> results
             = {{0, 0}, {0, 0}, {1, 0}, {2, 0}, {2, 0}, {0, 1}, {0, 1}, {1, 1}, {1, 1}, {2, 1}};
         for (size_t i = 0; i < results.size(); ++i) {
-            REQUIRE(second.get(i).get_int(0) == results[i].first);
-            REQUIRE(second.get(i).get_int(3) == results[i].second);
+            REQUIRE(second.get(i).get<Int>(col_num1) == results[i].first);
+            REQUIRE(second.get(i).get<Int>(col_num3) == results[i].second);
         }
     }
 
     SECTION("Distinct is carried over to new queries") {
-        Results unique = results.distinct(SortDescriptor(results.get_tableview().get_parent(), {{0}}));
+        Results unique = results.distinct(SortDescriptor({{col_num1}}));
         // unique:
         //  0, Foo_0, 10
         //  1, Foo_1,  9
         //  2, Foo_2,  8
         REQUIRE(unique.size() == 3);
 
-        Results filtered = unique.filter(Query(table->where().less(0, 2)));
+        Results filtered = unique.filter(Query(table->where().less(col_num1, 2)));
         // filtered:
         //  0, Foo_0, 10
         //  1, Foo_1,  9
         REQUIRE(filtered.size() == 2);
-        REQUIRE(filtered.get(0).get_int(2) == 10);
-        REQUIRE(filtered.get(1).get_int(2) == 9);
+        REQUIRE(filtered.get(0).get<Int>(col_num2) == 10);
+        REQUIRE(filtered.get(1).get<Int>(col_num2) == 9);
     }
 
     SECTION("Distinct will not forget previous query") {
-        Results filtered = results.filter(Query(table->where().greater(2, 5)));
+        Results filtered = results.filter(Query(table->where().greater(col_num2, 5)));
         // filtered:
         //   0, Foo_0, 10
         //   1, Foo_1,  9
@@ -2361,23 +2360,22 @@ TEST_CASE("results: distinct") {
         //   1, Foo_1,  6
         REQUIRE(filtered.size() == 5);
 
-        Results unique = filtered.distinct(SortDescriptor(filtered.get_tableview().get_parent(), {{0}}));
+        Results unique = filtered.distinct(SortDescriptor({{col_num1}}));
         // unique:
         //   0, Foo_0, 10
         //   1, Foo_1,  9
         //   2, Foo_2,  8
         REQUIRE(unique.size() == 3);
-        REQUIRE(unique.get(0).get_int(2) == 10);
-        REQUIRE(unique.get(1).get_int(2) == 9);
-        REQUIRE(unique.get(2).get_int(2) == 8);
+        REQUIRE(unique.get(0).get<Int>(col_num2) == 10);
+        REQUIRE(unique.get(1).get<Int>(col_num2) == 9);
+        REQUIRE(unique.get(2).get<Int>(col_num2) == 8);
 
-        Results further_filtered = unique.filter(Query(table->where().equal(2, 9)));
+        Results further_filtered = unique.filter(Query(table->where().equal(col_num2, 9)));
         // further_filtered:
         //   1, Foo_1,  9
         REQUIRE(further_filtered.size() == 1);
-        REQUIRE(further_filtered.get(0).get_int(2) == 9);
+        REQUIRE(further_filtered.get(0).get<Int>(col_num2) == 9);
     }
-    #endif
 }
 
 TEST_CASE("results: sort") {
@@ -2437,17 +2435,16 @@ TEST_CASE("results: sort") {
         }
     }
 
-    #if 0
     realm->begin_transaction();
-    table->add_empty_row(4);
-    table2->add_empty_row(4);
+    ObjKeys table_keys;
+    ObjKeys table2_keys;
+    table->create_objects(4, table_keys);
+    table2->create_objects(4, table2_keys);
+    ColKey col_link = table->get_column_key("link");
+    ColKey col_link2 = table2->get_column_key("link");
     for (int i = 0; i < 4; ++i) {
-        table->set_int(0, i, (i + 2) % 4);
-        table->set_bool(1, i, i % 2);
-        table->set_link(3, i, 3 - i);
-
-        table2->set_int(0, i, (i + 1) % 4);
-        table2->set_link(1, i, i);
+        table->get_object(table_keys[i]).set_all((i + 2) % 4, bool(i % 2)).set(col_link, table2_keys[3 - i]);
+        table2->get_object(table2_keys[i]).set_all((i + 1) % 4).set(col_link2, table_keys[i]);
     }
     realm->commit_transaction();
     /*
@@ -2460,10 +2457,10 @@ TEST_CASE("results: sort") {
      */
 
     #define REQUIRE_ORDER(sort, ...) do { \
-        std::vector<size_t> expected = {__VA_ARGS__}; \
+        ObjKeys expected({__VA_ARGS__}); \
         auto results = sort; \
         for (size_t i = 0; i < 4; ++i) \
-            REQUIRE(results.get(i).get_index() == expected[i]); \
+            REQUIRE(results.get(i).get_key() == expected[i]); \
     } while (0)
 
     SECTION("sort on single property") {
@@ -2495,10 +2492,8 @@ TEST_CASE("results: sort") {
         REQUIRE_ORDER((r.sort({{"link.link.value", false}})),
                       2, 3, 0, 1);
     }
-    #endif
 }
 
-#if 0
 struct ResultsFromTable {
     static Results call(std::shared_ptr<Realm> r, Table* table) {
         return Results(std::move(r), *table);
@@ -2518,10 +2513,9 @@ struct ResultsFromLinkView {
     static Results call(std::shared_ptr<Realm> r, Table* table) {
         r->begin_transaction();
         auto link_table = r->read_group().get_table("class_linking_object");
-        link_table->add_empty_row(1);
-        auto link_view = link_table->get_linklist(0, 0);
-        for (size_t i = 0; i < table->size(); ++i)
-            link_view->add(i);
+        std::shared_ptr<LnkLst> link_view = link_table->create_object().get_linklist_ptr(link_table->get_column_key("link"));
+        for (auto& o : *table)
+            link_view->add(o.get_key());
         r->commit_transaction();
         return Results(r, link_view);
     }
@@ -2545,127 +2539,124 @@ TEMPLATE_TEST_CASE("results: aggregate", ResultsFromTable, ResultsFromQuery, Res
     });
 
     auto table = r->read_group().get_table("class_object");
+    ColKey col_int = table->get_column_key("int");
+    ColKey col_float = table->get_column_key("float");
+    ColKey col_double = table->get_column_key("double");
+    ColKey col_date = table->get_column_key("date");
 
     SECTION("one row with null values") {
         r->begin_transaction();
-        table->add_empty_row(3);
-
-        table->set_int(0, 1, 0);
-        table->set_float(1, 1, 0.f);
-        table->set_double(2, 1, 0.0);
-        table->set_timestamp(3, 1, Timestamp(0, 0));
-
-        table->set_int(0, 2, 2);
-        table->set_float(1, 2, 2.f);
-        table->set_double(2, 2, 2.0);
-        table->set_timestamp(3, 2, Timestamp(2, 0));
+        table->create_object();
+        table->create_object().set_all(0, 0.f, 0.0, Timestamp(0, 0));
+        table->create_object().set_all(2, 2.f, 2.0, Timestamp(2, 0));
         // table:
         //  null, null, null,  null,
         //  0,    0,    0,    (0, 0)
         //  2,    2,    2,    (2, 0)
         r->commit_transaction();
 
-        Results results = TestType::call(r, table.get());
+        Results results = TestType::call(r, table);
 
         SECTION("max") {
-            REQUIRE(results.max(0)->get_int() == 2);
-            REQUIRE(results.max(1)->get_float() == 2.f);
-            REQUIRE(results.max(2)->get_double() == 2.0);
-            REQUIRE(results.max(3)->get_timestamp() == Timestamp(2, 0));
+            REQUIRE(results.max(col_int)->get_int() == 2);
+            REQUIRE(results.max(col_float)->get_float() == 2.f);
+            REQUIRE(results.max(col_double)->get_double() == 2.0);
+            REQUIRE(results.max(col_date)->get_timestamp() == Timestamp(2, 0));
         }
 
         SECTION("min") {
-            REQUIRE(results.min(0)->get_int() == 0);
-            REQUIRE(results.min(1)->get_float() == 0.f);
-            REQUIRE(results.min(2)->get_double() == 0.0);
-            REQUIRE(results.min(3)->get_timestamp() == Timestamp(0, 0));
+            REQUIRE(results.min(col_int)->get_int() == 0);
+            REQUIRE(results.min(col_float)->get_float() == 0.f);
+            REQUIRE(results.min(col_double)->get_double() == 0.0);
+            REQUIRE(results.min(col_date)->get_timestamp() == Timestamp(0, 0));
         }
 
         SECTION("average") {
-            REQUIRE(results.average(0) == 1.0);
-            REQUIRE(results.average(1) == 1.0);
-            REQUIRE(results.average(2) == 1.0);
-            REQUIRE_THROWS_AS(results.average(3), Results::UnsupportedColumnTypeException);
+            REQUIRE(results.average(col_int) == 1.0);
+            REQUIRE(results.average(col_float) == 1.0);
+            REQUIRE(results.average(col_double) == 1.0);
+            REQUIRE_THROWS_AS(results.average(col_date), Results::UnsupportedColumnTypeException);
         }
 
         SECTION("sum") {
-            REQUIRE(results.sum(0)->get_int() == 2);
-            REQUIRE(results.sum(1)->get_double() == 2.0);
-            REQUIRE(results.sum(2)->get_double() == 2.0);
-            REQUIRE_THROWS_AS(results.sum(3), Results::UnsupportedColumnTypeException);
+            REQUIRE(results.sum(col_int)->get_int() == 2);
+            REQUIRE(results.sum(col_float)->get_double() == 2.0);
+            REQUIRE(results.sum(col_double)->get_double() == 2.0);
+            REQUIRE_THROWS_AS(results.sum(col_date), Results::UnsupportedColumnTypeException);
         }
     }
 
     SECTION("rows with all null values") {
         r->begin_transaction();
-        table->add_empty_row(3);
+        table->create_object();
+        table->create_object();
+        table->create_object();
         // table:
         //  null, null, null,  null,  null
         //  null, null, null,  null,  null
         //  null, null, null,  null,  null
         r->commit_transaction();
 
-        Results results = TestType::call(r, table.get());
+        Results results = TestType::call(r, table);
 
         SECTION("max") {
-            REQUIRE(!results.max(0));
-            REQUIRE(!results.max(1));
-            REQUIRE(!results.max(2));
-            REQUIRE(!results.max(3));
+            REQUIRE(!results.max(col_int));
+            REQUIRE(!results.max(col_float));
+            REQUIRE(!results.max(col_double));
+            REQUIRE(!results.max(col_date));
         }
 
         SECTION("min") {
-            REQUIRE(!results.min(0));
-            REQUIRE(!results.min(1));
-            REQUIRE(!results.min(2));
-            REQUIRE(!results.min(3));
+            REQUIRE(!results.min(col_int));
+            REQUIRE(!results.min(col_float));
+            REQUIRE(!results.min(col_double));
+            REQUIRE(!results.min(col_date));
         }
 
         SECTION("average") {
-            REQUIRE(!results.average(0));
-            REQUIRE(!results.average(1));
-            REQUIRE(!results.average(2));
-            REQUIRE_THROWS_AS(results.average(3), Results::UnsupportedColumnTypeException);
+            REQUIRE(!results.average(col_int));
+            REQUIRE(!results.average(col_float));
+            REQUIRE(!results.average(col_double));
+            REQUIRE_THROWS_AS(results.average(col_date), Results::UnsupportedColumnTypeException);
         }
 
         SECTION("sum") {
-            REQUIRE(results.sum(0)->get_int() == 0);
-            REQUIRE(results.sum(1)->get_double() == 0.0);
-            REQUIRE(results.sum(2)->get_double() == 0.0);
-            REQUIRE_THROWS_AS(results.sum(3), Results::UnsupportedColumnTypeException);
+            REQUIRE(results.sum(col_int)->get_int() == 0);
+            REQUIRE(results.sum(col_float)->get_double() == 0.0);
+            REQUIRE(results.sum(col_double)->get_double() == 0.0);
+            REQUIRE_THROWS_AS(results.sum(col_date), Results::UnsupportedColumnTypeException);
         }
     }
 
     SECTION("empty") {
-        Results results = TestType::call(r, table.get());
+        Results results = TestType::call(r, table);
 
         SECTION("max") {
-            REQUIRE(!results.max(0));
-            REQUIRE(!results.max(1));
-            REQUIRE(!results.max(2));
-            REQUIRE(!results.max(3));
+            REQUIRE(!results.max(col_int));
+            REQUIRE(!results.max(col_float));
+            REQUIRE(!results.max(col_double));
+            REQUIRE(!results.max(col_date));
         }
 
         SECTION("min") {
-            REQUIRE(!results.min(0));
-            REQUIRE(!results.min(1));
-            REQUIRE(!results.min(2));
-            REQUIRE(!results.min(3));
+            REQUIRE(!results.min(col_int));
+            REQUIRE(!results.min(col_float));
+            REQUIRE(!results.min(col_double));
+            REQUIRE(!results.min(col_date));
         }
 
         SECTION("average") {
-            REQUIRE(!results.average(0));
-            REQUIRE(!results.average(1));
-            REQUIRE(!results.average(2));
-            REQUIRE_THROWS_AS(results.average(3), Results::UnsupportedColumnTypeException);
+            REQUIRE(!results.average(col_int));
+            REQUIRE(!results.average(col_float));
+            REQUIRE(!results.average(col_double));
+            REQUIRE_THROWS_AS(results.average(col_date), Results::UnsupportedColumnTypeException);
         }
 
         SECTION("sum") {
-            REQUIRE(results.sum(0)->get_int() == 0);
-            REQUIRE(results.sum(1)->get_double() == 0.0);
-            REQUIRE(results.sum(2)->get_double() == 0.0);
-            REQUIRE_THROWS_AS(results.sum(3), Results::UnsupportedColumnTypeException);
+            REQUIRE(results.sum(col_int)->get_int() == 0);
+            REQUIRE(results.sum(col_float)->get_double() == 0.0);
+            REQUIRE(results.sum(col_double)->get_double() == 0.0);
+            REQUIRE_THROWS_AS(results.sum(col_date), Results::UnsupportedColumnTypeException);
         }
     }
 }
-#endif

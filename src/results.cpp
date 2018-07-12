@@ -417,7 +417,7 @@ util::Optional<Mixed> Results::max(ColKey column)
                              [&](auto const& table) { return table.maximum_float(column, &return_ndx); },
                              [&](auto const& table) { return table.maximum_double(column, &return_ndx); },
                              [&](auto const& table) { return table.maximum_timestamp(column, &return_ndx); });
-    return return_ndx ? none : results;
+    return return_ndx ? results : none;
 }
 
 util::Optional<Mixed> Results::min(ColKey column)
@@ -428,7 +428,7 @@ util::Optional<Mixed> Results::min(ColKey column)
                              [&](auto const& table) { return table.minimum_float(column, &return_ndx); },
                              [&](auto const& table) { return table.minimum_double(column, &return_ndx); },
                              [&](auto const& table) { return table.minimum_timestamp(column, &return_ndx); });
-    return return_ndx ? none : results;
+    return return_ndx ? results : none;
 }
 
 util::Optional<Mixed> Results::sum(ColKey column)
