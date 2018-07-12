@@ -10,7 +10,7 @@
 
 ### Enhancements
 
-* None.
+* More informative InvalidDatabase exception messages
 
 -----------
 
