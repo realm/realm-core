@@ -753,7 +753,7 @@ void Realm::close()
         m_coordinator->unregister_realm(this);
     }
     if (!m_config.immutable()) {
-        transaction().end_read();
+        transaction().close();
     }
 
     m_permissions_cache = nullptr;

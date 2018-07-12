@@ -955,7 +955,7 @@ TEST_CASE("notifications: async error handling") {
         }},
     });
 
-    auto coordinator = _impl::RealmCoordinator::get_existing_coordinator(config.path);
+    auto coordinator = _impl::RealmCoordinator::get_coordinator(config.path);
     Results results(r, *r->read_group().get_table("class_object"));
 
     auto r2 = Realm::get_shared_realm(config);
