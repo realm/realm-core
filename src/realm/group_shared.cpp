@@ -1068,8 +1068,11 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
                     break;
             }
 
-            if (REALM_UNLIKELY(!file_format_ok))
-                throw InvalidDatabase("Unsupported Realm file format version", path);
+            if (REALM_UNLIKELY(!file_format_ok)) {
+                std::string msg =
+                    "Unsupported Realm file format version (" + util::to_string(current_file_format_version) + ")";
+                throw InvalidDatabase(msg, path);
+            }
 
             target_file_format_version =
                 gf::get_target_file_format_version_for_session(current_file_format_version,
