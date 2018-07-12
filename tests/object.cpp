@@ -31,6 +31,7 @@
 #include "impl/realm_coordinator.hpp"
 #include "impl/object_accessor_impl.hpp"
 
+#include <realm/group.hpp>
 #include <realm/util/any.hpp>
 
 #include <cstdint>
@@ -144,21 +145,19 @@ TEST_CASE("object") {
     auto r = Realm::get_shared_realm(config);
     auto& coordinator = *_impl::RealmCoordinator::get_coordinator(config.path);
 
-    #if 0
     SECTION("add_notification_callback()") {
         auto table = r->read_group().get_table("class_table");
+        auto col_keys = table->get_column_keys();
         r->begin_transaction();
-
-        table->add_empty_row(10);
         for (int i = 0; i < 10; ++i)
-            table->set_int(0, i, i);
+            table->create_object().set_all(i);
         r->commit_transaction();
 
         auto r2 = coordinator.get_realm();
 
         CollectionChangeSet change;
-        Row row = table->get(0);
-        Object object(r, *r->schema().find("table"), row);
+        auto obj = *table->begin();
+        Object object(r, obj);
 
         auto write = [&](auto&& f) {
             r->begin_transaction();
@@ -188,67 +187,50 @@ TEST_CASE("object") {
 
         SECTION("deleting the object sends a change notification") {
             auto token = require_change();
-            write([&] { row.move_last_over(); });
+            write([&] { obj.remove(); });
             REQUIRE_INDICES(change.deletions, 0);
         }
 
         SECTION("modifying the object sends a change notification") {
             auto token = require_change();
 
-            write([&] { row.set_int(0, 10); });
+            write([&] { obj.set(col_keys[0], 10); });
             REQUIRE_INDICES(change.modifications, 0);
             REQUIRE(change.columns.size() == 1);
-            REQUIRE_INDICES(change.columns[0], 0);
+            REQUIRE_INDICES(change.columns[col_keys[0].value], 0);
 
-            write([&] { row.set_int(1, 10); });
+            write([&] { obj.set(col_keys[1], 10); });
             REQUIRE_INDICES(change.modifications, 0);
-            REQUIRE(change.columns.size() == 2);
-            REQUIRE(change.columns[0].empty());
-            REQUIRE_INDICES(change.columns[1], 0);
+            REQUIRE(change.columns.size() == 1);
+            REQUIRE_INDICES(change.columns[col_keys[1].value], 0);
         }
 
         SECTION("modifying a different object") {
             auto token = require_no_change();
-            write([&] { table->get(1).set_int(0, 10); });
-        }
-
-        SECTION("moving the object") {
-            auto token = require_no_change();
-            write([&] { table->swap_rows(0, 5); });
-        }
-
-        SECTION("subsuming the object") {
-            auto token = require_change();
-            write([&] {
-                table->insert_empty_row(0);
-                table->merge_rows(row.get_index(), 0);
-                row.set_int(0, 10);
-            });
-            REQUIRE(change.columns.size() == 1);
-            REQUIRE_INDICES(change.columns[0], 0);
+            write([&] { table->get_object(1).set(col_keys[0], 10); });
         }
 
         SECTION("multiple write transactions") {
             auto token = require_change();
 
-            auto r2row = r2->read_group().get_table("class_table")->get(0);
+            auto r2row = r2->read_group().get_table("class_table")->get_object(0);
             r2->begin_transaction();
-            r2row.set_int(0, 1);
+            r2row.set(col_keys[0], 1);
             r2->commit_transaction();
             r2->begin_transaction();
-            r2row.set_int(1, 2);
+            r2row.set(col_keys[1], 2);
             r2->commit_transaction();
 
             advance_and_notify(*r);
             REQUIRE(change.columns.size() == 2);
-            REQUIRE_INDICES(change.columns[0], 0);
-            REQUIRE_INDICES(change.columns[1], 0);
+            REQUIRE_INDICES(change.columns[col_keys[0].value], 0);
+            REQUIRE_INDICES(change.columns[col_keys[1].value], 0);
         }
 
         SECTION("skipping a notification") {
             auto token = require_no_change();
             write([&] {
-                row.set_int(0, 1);
+                obj.set(col_keys[0], 1);
                 token.suppress_next();
             });
         }
@@ -263,9 +245,7 @@ TEST_CASE("object") {
             REQUIRE(change.empty());
 
             // should now produce a notification
-            write([&] {
-                row.set_int(0, 1);
-            });
+            write([&] { obj.set(col_keys[0], 1); });
             REQUIRE_INDICES(change.modifications, 0);
         }
 
@@ -276,18 +256,17 @@ TEST_CASE("object") {
                 });
             }
             auto token = require_change();
-            write([&] { row.move_last_over(); });
+            write([&] { obj.remove(); });
             REQUIRE_INDICES(change.deletions, 0);
         }
 
         SECTION("observing deleted object throws") {
             write([&] {
-                row.move_last_over();
+                obj.remove();
             });
             REQUIRE_THROWS(require_change());
         }
     }
-    #endif
 
     TestContext d(r);
     auto create = [&](util::Any&& value, bool update) {

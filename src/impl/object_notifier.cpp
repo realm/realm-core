@@ -42,17 +42,18 @@ void ObjectNotifier::run()
     if (!m_table)
         return;
 
-    if (m_info->tables[m_table.value].deletions.contains(m_obj.value)) {
+    auto it = m_info->tables.find(m_table.value);
+    if (it == m_info->tables.end())
+        return;
+    auto& change = it->second;
+
+    if (change.deletions.contains(m_obj.value)) {
         m_change.deletions.add(0);
         m_table = {};
         m_obj = {};
         return;
     }
 
-    size_t table_ndx = m_table.value;
-    if (table_ndx >= m_info->tables.size())
-        return;
-    auto& change = m_info->tables[table_ndx];
     if (!change.modifications.contains(m_obj.value))
         return;
     m_change.modifications.add(0);
