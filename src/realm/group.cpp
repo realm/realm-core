@@ -1277,14 +1277,51 @@ bool Group::operator==(const Group& g) const
     return true;
 }
 
+namespace {
 
-size_t Group::compute_aggregated_byte_size() const noexcept
+size_t size_of_tree_from_ref(ref_type ref, Allocator& alloc)
 {
-    if (!is_attached())
+    if (ref) {
+        Array a(alloc);
+        a.init_from_ref(ref);
+        MemStats stats;
+        a.stats(stats);
+        return stats.allocated;
+    }
+    else
         return 0;
-    MemStats stats_2;
-    m_top.stats(stats_2);
-    return stats_2.allocated;
+}
+}
+
+size_t Group::compute_aggregated_byte_size(SizeAggregateControl ctrl) const noexcept
+{
+    SlabAlloc& alloc = *const_cast<SlabAlloc*>(&m_alloc);
+    if (!m_top.is_attached())
+        return 0;
+    size_t used = 0;
+    if (ctrl & SizeAggregateControl::size_of_state) {
+        MemStats stats;
+        m_table_names.stats(stats);
+        m_tables.stats(stats);
+        used = stats.allocated + m_top.get_byte_size();
+    }
+    if (ctrl & SizeAggregateControl::size_of_freelists) {
+        if (m_top.size() >= 6) {
+            auto ref = m_top.get_as_ref_or_tagged(3).get_as_ref();
+            used += size_of_tree_from_ref(ref, alloc);
+            ref = m_top.get_as_ref_or_tagged(4).get_as_ref();
+            used += size_of_tree_from_ref(ref, alloc);
+            ref = m_top.get_as_ref_or_tagged(5).get_as_ref();
+            used += size_of_tree_from_ref(ref, alloc);
+        }
+    }
+    if (ctrl & SizeAggregateControl::size_of_history) {
+        if (m_top.size() >= 9) {
+            auto ref = m_top.get_as_ref_or_tagged(8).get_as_ref();
+            used += size_of_tree_from_ref(ref, alloc);
+        }
+    }
+    return used;
 }
 
 
@@ -1613,8 +1650,6 @@ void Group::prepare_top_for_history(int history_type, int history_schema_version
 
 #ifdef REALM_DEBUG // LCOV_EXCL_START ignore debug functions
 
-namespace {
-
 class MemUsageVerifier : public Array::MemUsageHandler {
 public:
     MemUsageVerifier(ref_type ref_begin, ref_type immutable_ref_end, ref_type mutable_ref_end, ref_type baseline)
@@ -1680,7 +1715,7 @@ public:
             while (++i_2 != end) {
                 ref_type prev_ref_end = i_1->ref + i_1->size;
                 REALM_ASSERT_3(prev_ref_end, <=, i_2->ref);
-                if (i_2->ref == prev_ref_end) {
+                if (i_2->ref == prev_ref_end) { // in-file
                     i_1->size += i_2->size; // Merge
                 }
                 else {
@@ -1713,8 +1748,6 @@ private:
     std::vector<Chunk> m_chunks;
     ref_type m_ref_begin, m_immutable_ref_end, m_mutable_ref_end, m_baseline;
 };
-
-} // anonymous namespace
 
 #endif
 
@@ -1822,11 +1855,9 @@ void Group::verify() const
     mem_usage_1.canonicalize();
     mem_usage_2.clear();
 
-    // Check the concistency of the allocation of the mutable memory that has
+    // Check the consistency of the allocation of the mutable memory that has
     // been marked as free
-    for (const auto& free_block : m_alloc.m_free_space) {
-        mem_usage_2.add_mutable(free_block.ref, free_block.size);
-    }
+    m_alloc.for_all_free_entries([&](ref_type ref, int sz) { mem_usage_2.add_mutable(ref, sz); });
     mem_usage_2.canonicalize();
     mem_usage_1.add(mem_usage_2);
     mem_usage_1.canonicalize();

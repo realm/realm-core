@@ -1,7 +1,7 @@
 # NEXT RELEASE
 
-Besides the changes below, this release also includes changes introduced by v5.6.0,
-v5.6.1, v5.6.2 and v5.6.3
+Besides the changes below, this release also includes changes introduced by v5.6.0 and
+up until v5.7.1
 
 ### Bugfixes
 
@@ -82,6 +82,34 @@ v5.6.1, v5.6.2 and v5.6.3
 
 * Major simplifications and optimizations to management of memory mappings.
 * Speed improvement for Sort().
+
+----------------------------------------------
+
+# 5.7.1 Release notes
+
+### Bugfixes
+
+* Fix crash in Group::compute_aggregated_byte_size() when applied on an empty
+realm file. (Issue #3072)
+
+----------------------------------------------
+
+# 5.7.0 Release notes
+
+### Enhancements
+
+* Improved Group::compute_aggregated_byte_size() allowing us to differentiate
+  between state, history and freelists.
+  (Issue #3063)
+
+----------------------------------------------
+
+# 5.6.5 Release notes
+
+### Enhancements
+
+* Improved scalability for the slab allocator. This allows for larger
+  transactions. (PR #3067)
 
 ----------------------------------------------
 

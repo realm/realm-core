@@ -189,10 +189,10 @@ protected:
     /// the old chunk.
     ///
     /// \throw std::bad_alloc If insufficient memory was available.
-    virtual MemRef do_realloc(ref_type, const char* addr, size_t old_size, size_t new_size) = 0;
+    virtual MemRef do_realloc(ref_type, char* addr, size_t old_size, size_t new_size) = 0;
 
     /// Release the specified chunk of memory.
-    virtual void do_free(ref_type, const char* addr) = 0;
+    virtual void do_free(ref_type, char* addr) = 0;
 
     /// Map the specified \a ref to the corresponding memory
     /// address. Note that if is_read_only(ref) returns true, then the
@@ -312,7 +312,7 @@ private:
         m_ref_translation_ptr.store(m_alloc->m_ref_translation_ptr);
         return result;
     }
-    virtual MemRef do_realloc(ref_type ref, const char* addr, size_t old_size, size_t new_size) override
+    virtual MemRef do_realloc(ref_type ref, char* addr, size_t old_size, size_t new_size) override
     {
         auto result = m_alloc->do_realloc(ref, addr, old_size, new_size);
         bump_storage_version();
@@ -321,7 +321,7 @@ private:
         return result;
     }
 
-    virtual void do_free(ref_type ref, const char* addr) noexcept override
+    virtual void do_free(ref_type ref, char* addr) noexcept override
     {
         return m_alloc->do_free(ref, addr);
     }
@@ -452,7 +452,7 @@ inline MemRef Allocator::realloc_(ref_type ref, const char* addr, size_t old_siz
 #endif
     if (m_is_read_only)
         throw realm::LogicError(realm::LogicError::wrong_transact_state);
-    return do_realloc(ref, addr, old_size, new_size);
+    return do_realloc(ref, const_cast<char*>(addr), old_size, new_size);
 }
 
 inline void Allocator::free_(ref_type ref, const char* addr) noexcept
@@ -463,7 +463,7 @@ inline void Allocator::free_(ref_type ref, const char* addr) noexcept
 #endif
     REALM_ASSERT(!m_is_read_only);
 
-    return do_free(ref, addr);
+    return do_free(ref, const_cast<char*>(addr));
 }
 
 inline void Allocator::free_(MemRef mem) noexcept

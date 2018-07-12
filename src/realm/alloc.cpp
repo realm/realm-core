@@ -76,7 +76,7 @@ public:
         return MemRef(addr, reinterpret_cast<size_t>(addr), *this);
     }
 
-    MemRef do_realloc(ref_type, const char* addr, size_t old_size, size_t new_size) override
+    MemRef do_realloc(ref_type, char* addr, size_t old_size, size_t new_size) override
     {
         char* new_addr = static_cast<char*>(::realloc(const_cast<char*>(addr), new_size));
         if (REALM_UNLIKELY(REALM_COVER_NEVER(!new_addr))) {
@@ -91,9 +91,9 @@ public:
         return MemRef(new_addr, reinterpret_cast<size_t>(new_addr), *this);
     }
 
-    void do_free(ref_type, const char* addr) override
+    void do_free(ref_type, char* addr) override
     {
-        ::free(const_cast<char*>(addr));
+        ::free(addr);
     }
 
     char* do_translate(ref_type ref) const noexcept override
