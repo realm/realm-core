@@ -34,8 +34,10 @@ namespace _impl {
 class Object {
 public:
     Object();
+    Object(std::shared_ptr<Realm> r, Obj const& o);
     Object(std::shared_ptr<Realm> r, ObjectSchema const& s, Obj const& o);
     Object(std::shared_ptr<Realm> r, StringData object_type, ObjKey key);
+    Object(std::shared_ptr<Realm> r, StringData object_type, size_t index);
 
     Object(Object const&);
     Object(Object&&);

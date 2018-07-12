@@ -35,19 +35,19 @@ ThreadSafeReferenceBase::~ThreadSafeReferenceBase()
 }
 
 ThreadSafeReference<List>::ThreadSafeReference(List const& list)
-    : ThreadSafeReferenceBase()
-    , m_key(list.m_list_base->get_key())
-    , m_table_key(list.m_list_base->get_table()->get_key())
-    , m_col_key(list.m_list_base->get_col_key())
+: ThreadSafeReferenceBase()
+, m_key(list.m_list_base->get_key())
+, m_table_key(list.m_list_base->get_table()->get_key())
+, m_col_key(list.m_list_base->get_col_key())
 {
 }
 
 ThreadSafeReference<Results>::ThreadSafeReference(Results const&) {}
 
 ThreadSafeReference<Object>::ThreadSafeReference(Object const& object)
-    : ThreadSafeReferenceBase()
-    , m_key(object.obj().get_key())
-    , m_object_schema_name(object.get_object_schema().name)
+: ThreadSafeReferenceBase()
+, m_key(object.obj().get_key())
+, m_object_schema_name(object.get_object_schema().name)
 {
 }
 
@@ -58,15 +58,20 @@ List ThreadSafeReference<List>::import_into(std::shared_ptr<Realm>& r)
         return List(r, obj, m_col_key);
     }
     catch (const InvalidKey&) {
+        return {};
     }
-    return {};
 }
 
 Results ThreadSafeReference<Results>::import_into(std::shared_ptr<Realm>&) { REALM_TERMINATE("not implemented"); }
 
 Object ThreadSafeReference<Object>::import_into(std::shared_ptr<Realm>& r)
 {
-    return Object(r, m_object_schema_name, m_key);
+    try {
+        return Object(r, m_object_schema_name, m_key);
+    }
+    catch (const InvalidKey&) {
+        return {};
+    }
 }
 
 #if 0

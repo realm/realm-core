@@ -54,15 +54,25 @@ ReadOnlyPropertyException::ReadOnlyPropertyException(const std::string& object_t
 Object::Object(SharedRealm r, ObjectSchema const& s, Obj const& o)
 : m_realm(std::move(r)), m_object_schema(&s), m_obj(o) { }
 
+Object::Object(SharedRealm r, Obj const& o)
+: m_realm(std::move(r))
+, m_object_schema(&*m_realm->schema().find(ObjectStore::object_type_for_table_name(o.get_table()->get_name())))
+, m_obj(o)
+{
+}
+
 Object::Object(SharedRealm r, StringData object_type, ObjKey key)
 : m_realm(std::move(r))
 , m_object_schema(&*m_realm->schema().find(object_type))
+, m_obj(ObjectStore::table_for_object_type(m_realm->read_group(), object_type)->get_object(key))
 {
-    try {
-        m_obj = ObjectStore::table_for_object_type(m_realm->read_group(), object_type)->get_object(key);
-    }
-    catch (const InvalidKey&) {
-    }
+}
+
+Object::Object(SharedRealm r, StringData object_type, size_t index)
+: m_realm(std::move(r))
+, m_object_schema(&*m_realm->schema().find(object_type))
+, m_obj(ObjectStore::table_for_object_type(m_realm->read_group(), object_type)->get_object(index))
+{
 }
 
 Object::Object() = default;
