@@ -143,7 +143,9 @@ template ConstLst<util::Optional<Int>>::ConstLst(const ConstObj& obj, ColKey col
 template ConstLst<bool>::ConstLst(const ConstObj& obj, ColKey col_key);
 template ConstLst<util::Optional<bool>>::ConstLst(const ConstObj& obj, ColKey col_key);
 template ConstLst<float>::ConstLst(const ConstObj& obj, ColKey col_key);
+template ConstLst<util::Optional<float>>::ConstLst(const ConstObj& obj, ColKey col_key);
 template ConstLst<double>::ConstLst(const ConstObj& obj, ColKey col_key);
+template ConstLst<util::Optional<double>>::ConstLst(const ConstObj& obj, ColKey col_key);
 template ConstLst<StringData>::ConstLst(const ConstObj& obj, ColKey col_key);
 template ConstLst<BinaryData>::ConstLst(const ConstObj& obj, ColKey col_key);
 template ConstLst<Timestamp>::ConstLst(const ConstObj& obj, ColKey col_key);
@@ -154,7 +156,9 @@ template Lst<util::Optional<Int>>::Lst(const Obj& obj, ColKey col_key);
 template Lst<bool>::Lst(const Obj& obj, ColKey col_key);
 template Lst<util::Optional<bool>>::Lst(const Obj& obj, ColKey col_key);
 template Lst<float>::Lst(const Obj& obj, ColKey col_key);
+template Lst<util::Optional<float>>::Lst(const Obj& obj, ColKey col_key);
 template Lst<double>::Lst(const Obj& obj, ColKey col_key);
+template Lst<util::Optional<double>>::Lst(const Obj& obj, ColKey col_key);
 template Lst<StringData>::Lst(const Obj& obj, ColKey col_key);
 template Lst<BinaryData>::Lst(const Obj& obj, ColKey col_key);
 template Lst<Timestamp>::Lst(const Obj& obj, ColKey col_key);
@@ -367,9 +371,31 @@ void Lst<Float>::set_repl(Replication* repl, size_t ndx, float value)
 }
 
 template <>
+void Lst<util::Optional<Float>>::set_repl(Replication* repl, size_t ndx, util::Optional<Float> value)
+{
+    if (value) {
+        repl->list_set_float(*this, ndx, *value);
+    }
+    else {
+        repl->list_set_null(*this, ndx);
+    }
+}
+
+template <>
 void Lst<Double>::set_repl(Replication* repl, size_t ndx, double value)
 {
     repl->list_set_double(*this, ndx, value);
+}
+
+template <>
+void Lst<util::Optional<Double>>::set_repl(Replication* repl, size_t ndx, util::Optional<Double> value)
+{
+    if (value) {
+        repl->list_set_double(*this, ndx, *value);
+    }
+    else {
+        repl->list_set_null(*this, ndx);
+    }
 }
 
 template <>
@@ -438,9 +464,31 @@ void Lst<Float>::insert_repl(Replication* repl, size_t ndx, float value)
 }
 
 template <>
+void Lst<util::Optional<Float>>::insert_repl(Replication* repl, size_t ndx, util::Optional<Float> value)
+{
+    if (value) {
+        repl->list_insert_float(*this, ndx, *value);
+    }
+    else {
+        repl->list_insert_null(*this, ndx);
+    }
+}
+
+template <>
 void Lst<Double>::insert_repl(Replication* repl, size_t ndx, double value)
 {
     repl->list_insert_double(*this, ndx, value);
+}
+
+template <>
+void Lst<util::Optional<Double>>::insert_repl(Replication* repl, size_t ndx, util::Optional<Double> value)
+{
+    if (value) {
+        repl->list_insert_double(*this, ndx, *value);
+    }
+    else {
+        repl->list_insert_null(*this, ndx);
+    }
 }
 
 template <>

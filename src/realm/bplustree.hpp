@@ -578,8 +578,8 @@ inline R bptree_aggregate_value(T val)
 {
     return val;
 }
-template <>
-inline bool bptree_aggregate_not_null(util::Optional<int64_t> val)
+template <class T>
+inline bool bptree_aggregate_not_null(util::Optional<T> val)
 {
     return !!val;
 }
@@ -598,8 +598,8 @@ inline bool bptree_aggregate_not_null(double val)
 {
     return !null::is_null_float(val);
 }
-template <>
-inline int64_t bptree_aggregate_value(util::Optional<int64_t> val)
+template <class T>
+inline T bptree_aggregate_value(util::Optional<T> val)
 {
     return *val;
 }

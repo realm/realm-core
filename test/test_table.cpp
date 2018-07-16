@@ -2339,6 +2339,16 @@ TEST(Table_Nulls)
         CHECK_EQUAL(k0, t.find_first_float(col_float, 1.23f));
         CHECK_EQUAL(k0, t.find_first_double(col_double, 12.3));
 
+        util::Optional<Float> f_val = 5.f;
+        obj0.set(col_float, f_val);
+        CHECK_NOT(obj0.is_null(col_float));
+        CHECK_EQUAL(obj0.get<Optional<float>>(col_float), 5.f);
+
+        util::Optional<Double> d_val = 5.;
+        obj0.set(col_double, d_val);
+        CHECK_NOT(obj0.is_null(col_double));
+        CHECK_EQUAL(obj0.get<Optional<double>>(col_double), 5.);
+
         obj0.set_null(col_float);
         obj0.set_null(col_double);
 
@@ -2747,26 +2757,27 @@ TEST(Table_list_basic)
     table.remove_object(ObjKey(5));
 }
 
-TEST(Table_list_nullable)
+TEST_TYPES(Table_list_nullable, int64_t, float, double)
 {
     Table table;
-    auto list_col = table.add_column_list(type_Int, "int_list", true);
-    int sum = 0;
+    auto list_col = table.add_column_list(ColumnTypeTraits<TEST_TYPE>::id, "int_list", true);
+    TEST_TYPE sum = 0;
 
     {
         Obj obj = table.create_object(ObjKey(5));
         CHECK_NOT(obj.is_null(list_col));
-        auto list = obj.get_list<util::Optional<Int>>(list_col);
+        auto list = obj.get_list<util::Optional<TEST_TYPE>>(list_col);
         CHECK_NOT(obj.is_null(list_col));
         CHECK(list.is_empty());
         for (int i = 0; i < 100; i++) {
-            list.add(i + 1000);
-            sum += (i + 1000);
+            TEST_TYPE val = TEST_TYPE(i + 1000);
+            list.add(val);
+            sum += (val);
         }
     }
     {
         Obj obj = table.get_object(ObjKey(5));
-        auto list1 = obj.get_list<util::Optional<Int>>(list_col);
+        auto list1 = obj.get_list<util::Optional<TEST_TYPE>>(list_col);
         CHECK_EQUAL(list1.size(), 100);
         CHECK_EQUAL(list1.get(0), 1000);
         CHECK_EQUAL(list1.get(99), 1099);
@@ -2776,8 +2787,8 @@ TEST(Table_list_nullable)
         CHECK_EQUAL(list_minimum(list1), 1000);
         CHECK_EQUAL(list_average(list1), double(sum) / 100);
 
-        auto list2 = obj.get_list<util::Optional<Int>>(list_col);
-        list2.set(50, 747);
+        auto list2 = obj.get_list<util::Optional<TEST_TYPE>>(list_col);
+        list2.set(50, TEST_TYPE(747));
         CHECK_EQUAL(list1.get(50), 747);
         list1.set_null(50);
         CHECK_NOT(list1.get(50));
@@ -2786,7 +2797,7 @@ TEST(Table_list_nullable)
     }
     {
         Obj obj = table.create_object(ObjKey(7));
-        auto list = obj.get_list<util::Optional<Int>>(list_col);
+        auto list = obj.get_list<util::Optional<TEST_TYPE>>(list_col);
         list.resize(10);
         CHECK_EQUAL(list.size(), 10);
         for (int i = 0; i < 10; i++) {

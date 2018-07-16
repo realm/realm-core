@@ -319,9 +319,9 @@ bool ConstObj::is_null(ColKey col_key) const
             case col_type_Bool:
                 return do_is_null<ArrayBoolNull>(col_ndx);
             case col_type_Float:
-                return do_is_null<ArrayFloat>(col_ndx);
+                return do_is_null<ArrayFloatNull>(col_ndx);
             case col_type_Double:
-                return do_is_null<ArrayDouble>(col_ndx);
+                return do_is_null<ArrayDoubleNull>(col_ndx);
             case col_type_String:
                 return do_is_null<ArrayString>(col_ndx);
             case col_type_Binary:
@@ -827,7 +827,9 @@ template util::Optional<int64_t> ConstObj::get<util::Optional<int64_t>>(ColKey c
 template bool ConstObj::get<Bool>(ColKey col_key) const;
 template util::Optional<Bool> ConstObj::get<util::Optional<Bool>>(ColKey col_key) const;
 template float ConstObj::get<float>(ColKey col_key) const;
+template util::Optional<float> ConstObj::get<util::Optional<float>>(ColKey col_key) const;
 template double ConstObj::get<double>(ColKey col_key) const;
+template util::Optional<double> ConstObj::get<util::Optional<double>>(ColKey col_key) const;
 template StringData ConstObj::get<StringData>(ColKey col_key) const;
 template BinaryData ConstObj::get<BinaryData>(ColKey col_key) const;
 template Timestamp ConstObj::get<Timestamp>(ColKey col_key) const;
@@ -886,10 +888,10 @@ Obj& Obj::set_null(ColKey col_key, bool is_default)
             do_set_null<ArrayBoolNull>(col_ndx);
             break;
         case col_type_Float:
-            do_set_null<ArrayFloat>(col_ndx);
+            do_set_null<ArrayFloatNull>(col_ndx);
             break;
         case col_type_Double:
-            do_set_null<ArrayDouble>(col_ndx);
+            do_set_null<ArrayDoubleNull>(col_ndx);
             break;
         case col_type_String:
             do_set_null<ArrayString>(col_ndx);

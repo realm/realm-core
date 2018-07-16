@@ -42,6 +42,8 @@ class ArrayKey;
 class ArrayKeyNonNullable;
 template <class>
 class BasicArray;
+template <class>
+class BasicArrayNull;
 
 template <class T>
 struct ColumnTypeTraits;
@@ -51,9 +53,9 @@ struct AggregateResultType {
     using result_type = T;
 };
 
-template <Action action>
-struct AggregateResultType<util::Optional<int64_t>, action> {
-    using result_type = int64_t;
+template <class T, Action action>
+struct AggregateResultType<util::Optional<T>, action> {
+    using result_type = T;
 };
 
 template <>
@@ -106,7 +108,6 @@ struct ColumnTypeTraits<ObjKey> {
 
 template <>
 struct ColumnTypeTraits<float> {
-    using leaf_type = BasicArray<float>;
     using cluster_leaf_type = BasicArray<float>;
     using sum_type = double;
     using minmax_type = float;
@@ -116,9 +117,28 @@ struct ColumnTypeTraits<float> {
 };
 
 template <>
+struct ColumnTypeTraits<util::Optional<float>> {
+    using cluster_leaf_type = BasicArrayNull<float>;
+    using sum_type = double;
+    using minmax_type = float;
+    static const DataType id = type_Float;
+    static const ColumnType column_id = col_type_Float;
+    static const ColumnType real_column_type = col_type_Float;
+};
+
+template <>
 struct ColumnTypeTraits<double> {
-    using leaf_type = BasicArray<double>;
     using cluster_leaf_type = BasicArray<double>;
+    using sum_type = double;
+    using minmax_type = double;
+    static const DataType id = type_Double;
+    static const ColumnType column_id = col_type_Double;
+    static const ColumnType real_column_type = col_type_Double;
+};
+
+template <>
+struct ColumnTypeTraits<util::Optional<double>> {
+    using cluster_leaf_type = BasicArrayNull<double>;
     using sum_type = double;
     using minmax_type = double;
     static const DataType id = type_Double;

@@ -268,20 +268,6 @@ private:
 };
 
 
-template <>
-inline Optional<float> ConstObj::get<Optional<float>>(ColKey col_key) const
-{
-    float f = get<float>(col_key);
-    return null::is_null_float(f) ? util::none : util::make_optional(f);
-}
-
-template <>
-inline Optional<double> ConstObj::get<Optional<double>>(ColKey col_key) const
-{
-    double f = get<double>(col_key);
-    return null::is_null_float(f) ? util::none : util::make_optional(f);
-}
-
 inline Obj Obj::get_linked_object(ColKey link_col_key)
 {
     return ConstObj::get_linked_object(link_col_key);
@@ -349,13 +335,13 @@ inline Obj& Obj::set(ColKey col_key, Optional<int64_t> value, bool is_default)
 template <>
 inline Obj& Obj::set(ColKey col_key, Optional<float> value, bool is_default)
 {
-    return set(col_key, value ? *value : null::get_null_float<float>(), is_default);
+    return value ? set(col_key, *value, is_default) : set_null(col_key, is_default);
 }
 
 template <>
 inline Obj& Obj::set(ColKey col_key, Optional<double> value, bool is_default)
 {
-    return set(col_key, value ? *value : null::get_null_float<double>(), is_default);
+    return value ? set(col_key, *value, is_default) : set_null(col_key, is_default);
 }
 
 template <typename U>

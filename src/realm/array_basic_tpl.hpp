@@ -108,16 +108,6 @@ inline T BasicArray<T>::get(size_t ndx) const noexcept
 
 
 template <class T>
-inline bool BasicArray<T>::is_null(size_t ndx) const noexcept
-{
-    // FIXME: This assumes BasicArray will only ever be instantiated for float-like T.
-    static_assert(realm::is_any<T, float, double>::value, "T can only be float or double");
-    auto x = get(ndx);
-    return null::is_null_float(x);
-}
-
-
-template <class T>
 inline T BasicArray<T>::get(const char* header, size_t ndx) noexcept
 {
     const char* data = get_data_from_header(header);
@@ -140,13 +130,6 @@ inline void BasicArray<T>::set(size_t ndx, T value)
     // Set the value
     T* data = reinterpret_cast<T*>(m_data) + ndx;
     *data = value;
-}
-
-template <class T>
-inline void BasicArray<T>::set_null(size_t ndx)
-{
-    // FIXME: This assumes BasicArray will only ever be instantiated for float-like T.
-    set(ndx, null::get_null_float<T>());
 }
 
 template <class T>
@@ -276,6 +259,33 @@ void BasicArray<T>::find_all(IntegerColumn* result, T value, size_t add_offset, 
         Array::add_to_column(result, first + add_offset);
     }
 }
+template <class T>
+size_t BasicArrayNull<T>::find_first_null(size_t begin, size_t end) const
+{
+    size_t sz = Array::size();
+    if (end == npos)
+        end = sz;
+    REALM_ASSERT(begin <= sz && end <= sz && begin <= end);
+    while (begin != end) {
+        if (is_null(begin))
+            return begin;
+        begin++;
+    }
+    return not_found;
+}
+
+template <class T>
+void BasicArrayNull<T>::find_all_null(IntegerColumn* result, size_t add_offset, size_t begin, size_t end) const
+{
+    size_t first = begin - 1;
+    for (;;) {
+        first = this->find_first_null(first + 1, end);
+        if (first == not_found)
+            break;
+
+        Array::add_to_column(result, first + add_offset);
+    }
+}
 
 template <class T>
 size_t BasicArray<T>::count(T value, size_t begin, size_t end) const
@@ -362,7 +372,6 @@ inline size_t BasicArray<T>::calc_aligned_byte_size(size_t size)
     size_t aligned_byte_size = ((byte_size - 1) | 7) + 1; // 8-byte alignment
     return aligned_byte_size;
 }
-
 
 #ifdef REALM_DEBUG
 

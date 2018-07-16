@@ -393,6 +393,25 @@ TEST(ArrayDouble_Maximum)
     BasicArray_Maximum<ArrayDouble, double>(test_context);
 }
 
+namespace {
+template <class T>
+std::vector<T> get_values();
+
+template <>
+std::vector<util::Optional<float>> get_values<util::Optional<float>>()
+{
+    using T = util::Optional<float>;
+    std::vector<T> values({T(1.1f), T(2.2f), T(), T(-1.0f), T(5.5f), T(1.1f), T(4.4f), T()});
+    return values;
+}
+template <>
+std::vector<util::Optional<double>> get_values<util::Optional<double>>()
+{
+    using T = util::Optional<double>;
+    std::vector<T> values({T(1.1), T(2.2), T(), T(-1.0), T(5.5), T(1.1), T(4.4), T()});
+    return values;
+}
+}
 
 template <class A, typename T>
 void BasicArray_Find(TestContext& test_context)
@@ -404,36 +423,43 @@ void BasicArray_Find(TestContext& test_context)
     CHECK_EQUAL(size_t(-1), f.find_first(0));
 
     // Add some values
-    T values[] = {T(1.1), T(2.2), T(-1.0), T(5.5), T(1.1), T(4.4)};
-    for (size_t i = 0; i < 6; ++i)
-        f.add(values[i]);
+    std::vector<T> values = get_values<T>();
+    for (auto v : values)
+        f.add(v);
 
     // Find (full range: start=0, end=-1)
-    CHECK_EQUAL(0, f.find_first(T(1.1)));
-    CHECK_EQUAL(5, f.find_first(T(4.4)));
-    CHECK_EQUAL(2, f.find_first(T(-1.0)));
+    CHECK_EQUAL(0, f.find_first(values[0]));
+    CHECK_EQUAL(6, f.find_first(values[6]));
+    CHECK_EQUAL(3, f.find_first(values[3]));
+    CHECK_EQUAL(2, f.find_first(T()));
 
     // non-existing
     CHECK_EQUAL(size_t(-1), f.find_first(T(0)));
 
     // various range limitations
-    CHECK_EQUAL(1, f.find_first(T(2.2), 1, 2)); // ok
-    CHECK_EQUAL(1, f.find_first(T(2.2), 1, 3));
-    CHECK_EQUAL(5, f.find_first(T(4.4), 1));             // defaul end=all
-    CHECK_EQUAL(size_t(-1), f.find_first(T(2.2), 1, 1)); // start=end
-    CHECK_EQUAL(size_t(-1), f.find_first(T(1.1), 1, 4)); // no match .end 1 too little
-    CHECK_EQUAL(4, f.find_first(T(1.1), 1, 5));          // skip first match, end at last match
+    CHECK_EQUAL(1, f.find_first(values[1], 1, 2)); // ok
+    CHECK_EQUAL(1, f.find_first(values[1], 1, 3));
+    CHECK_EQUAL(6, f.find_first(values[6], 1));             // defaul end=all
+    CHECK_EQUAL(size_t(-1), f.find_first(values[1], 1, 1)); // start=end
+    CHECK_EQUAL(size_t(-1), f.find_first(values[0], 1, 4)); // no match .end 1 too little
+    CHECK_EQUAL(5, f.find_first(values[0], 1, 6));          // skip first match, end at last match
 
     // Find all
     IntegerColumn results(Allocator::get_default());
     results.create();
-    f.find_all(&results, T(1.1), 0);
+    f.find_all(&results, values[0], 0);
     CHECK_EQUAL(2, results.size());
     CHECK_EQUAL(0, results.get(0));
-    CHECK_EQUAL(4, results.get(1));
+    CHECK_EQUAL(5, results.get(1));
+    // find_all nulls
+    results.clear();
+    f.find_all(&results, T(), 0);
+    CHECK_EQUAL(2, results.size());
+    CHECK_EQUAL(2, results.get(0));
+    CHECK_EQUAL(7, results.get(1));
     // Find all, range limited -> no match
     results.clear();
-    f.find_all(&results, T(1.1), 0, 1, 4);
+    f.find_all(&results, values[0], 0, 1, 4);
     CHECK_EQUAL(0, results.size());
     results.destroy();
 
@@ -441,11 +467,11 @@ void BasicArray_Find(TestContext& test_context)
 }
 TEST(ArrayFloat_Find)
 {
-    BasicArray_Find<ArrayFloat, float>(test_context);
+    BasicArray_Find<ArrayFloatNull, util::Optional<float>>(test_context);
 }
 TEST(ArrayDouble_Find)
 {
-    BasicArray_Find<ArrayDouble, double>(test_context);
+    BasicArray_Find<ArrayDoubleNull, util::Optional<double>>(test_context);
 }
 
 

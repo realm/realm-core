@@ -723,10 +723,10 @@ void Cluster::create(size_t nb_columns)
                 do_create<ArrayBoolNull>(col_ndx);
                 break;
             case col_type_Float:
-                do_create<ArrayFloat>(col_ndx);
+                do_create<ArrayFloatNull>(col_ndx);
                 break;
             case col_type_Double:
-                do_create<ArrayDouble>(col_ndx);
+                do_create<ArrayDoubleNull>(col_ndx);
                 break;
             case col_type_String:
                 if (m_tree_top.get_spec().is_string_enum_type(col_ndx)) {
@@ -870,10 +870,10 @@ void Cluster::insert_row(size_t ndx, ObjKey k, const InitValues& init_values)
                 do_insert_row<ArrayBoolNull>(ndx, col_ndx, init_value, nullable);
                 break;
             case col_type_Float:
-                do_insert_row<ArrayFloat>(ndx, col_ndx, init_value, nullable);
+                do_insert_row<ArrayFloatNull>(ndx, col_ndx, init_value, nullable);
                 break;
             case col_type_Double:
-                do_insert_row<ArrayDouble>(ndx, col_ndx, init_value, nullable);
+                do_insert_row<ArrayDoubleNull>(ndx, col_ndx, init_value, nullable);
                 break;
             case col_type_String:
                 do_insert_row<ArrayString>(ndx, col_ndx, init_value, nullable);
@@ -1037,10 +1037,10 @@ void Cluster::insert_column(size_t col_ndx)
             do_insert_column<ArrayBoolNull>(col_ndx, nullable);
             break;
         case col_type_Float:
-            do_insert_column<ArrayFloat>(col_ndx, nullable);
+            do_insert_column<ArrayFloatNull>(col_ndx, nullable);
             break;
         case col_type_Double:
-            do_insert_column<ArrayDouble>(col_ndx, nullable);
+            do_insert_column<ArrayDoubleNull>(col_ndx, nullable);
             break;
         case col_type_String:
             do_insert_column<ArrayString>(col_ndx, nullable);
@@ -1275,10 +1275,10 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
                 do_erase<ArrayBoolNull>(ndx, col_ndx);
                 break;
             case col_type_Float:
-                do_erase<ArrayFloat>(ndx, col_ndx);
+                do_erase<ArrayFloatNull>(ndx, col_ndx);
                 break;
             case col_type_Double:
-                do_erase<ArrayDouble>(ndx, col_ndx);
+                do_erase<ArrayDoubleNull>(ndx, col_ndx);
                 break;
             case col_type_String:
                 do_erase<ArrayString>(ndx, col_ndx);
@@ -1396,17 +1396,26 @@ void Cluster::dump_objects(int64_t key_offset, std::string lead) const
                     break;
                 }
                 case col_type_Float: {
-                    ArrayFloat arr(m_alloc);
+                    ArrayFloatNull arr(m_alloc);
                     ref_type ref = Array::get_as_ref(j);
                     arr.init_from_ref(ref);
-                    std::cout << ", " << arr.get(i);
+                    auto val = arr.get(i);
+                    if (val)
+                        std::cout << ", " << *val;
+                    else
+                        std::cout << ", null";
                     break;
                 }
                 case col_type_Double: {
-                    ArrayDouble arr(m_alloc);
+                    ArrayDoubleNull arr(m_alloc);
                     ref_type ref = Array::get_as_ref(j);
                     arr.init_from_ref(ref);
-                    std::cout << ", " << arr.get(i);
+                    auto val = arr.get(i);
+                    if (val)
+                        std::cout << ", " << *val;
+                    else
+                        std::cout << ", null";
+                    break;
                     break;
                 }
                 case col_type_String: {

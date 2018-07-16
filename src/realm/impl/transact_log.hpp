@@ -340,16 +340,16 @@ public:
 
     virtual void list_set_int(const ConstLstBase& list, size_t list_ndx, int64_t value);
     virtual void list_set_bool(const ConstLstBase& list, size_t list_ndx, bool value);
-    virtual void list_set_float(const Lst<Float>& list, size_t list_ndx, float value);
-    virtual void list_set_double(const Lst<Double>& list, size_t list_ndx, double value);
+    virtual void list_set_float(const ConstLstBase& list, size_t list_ndx, float value);
+    virtual void list_set_double(const ConstLstBase& list, size_t list_ndx, double value);
     virtual void list_set_string(const Lst<String>& list, size_t list_ndx, StringData value);
     virtual void list_set_binary(const Lst<Binary>& list, size_t list_ndx, BinaryData value);
     virtual void list_set_timestamp(const Lst<Timestamp>& list, size_t list_ndx, Timestamp value);
 
     virtual void list_insert_int(const ConstLstBase& list, size_t list_ndx, int64_t value);
     virtual void list_insert_bool(const ConstLstBase& list, size_t list_ndx, bool value);
-    virtual void list_insert_float(const Lst<Float>& list, size_t list_ndx, float value);
-    virtual void list_insert_double(const Lst<Double>& list, size_t list_ndx, double value);
+    virtual void list_insert_float(const ConstLstBase& list, size_t list_ndx, float value);
+    virtual void list_insert_double(const ConstLstBase& list, size_t list_ndx, double value);
     virtual void list_insert_string(const Lst<String>& list, size_t list_ndx, StringData value);
     virtual void list_insert_binary(const Lst<Binary>& list, size_t list_ndx, BinaryData value);
     virtual void list_insert_timestamp(const Lst<Timestamp>& list, size_t list_ndx, Timestamp value);
@@ -902,13 +902,13 @@ inline void TransactLogConvenientEncoder::list_set_bool(const ConstLstBase& list
     m_encoder.list_set(list_ndx); // Throws
 }
 
-inline void TransactLogConvenientEncoder::list_set_float(const Lst<Float>& list, size_t list_ndx, float)
+inline void TransactLogConvenientEncoder::list_set_float(const ConstLstBase& list, size_t list_ndx, float)
 {
     select_list(list);            // Throws
     m_encoder.list_set(list_ndx); // Throws
 }
 
-inline void TransactLogConvenientEncoder::list_set_double(const Lst<Double>& list, size_t list_ndx, double)
+inline void TransactLogConvenientEncoder::list_set_double(const ConstLstBase& list, size_t list_ndx, double)
 {
     select_list(list);            // Throws
     m_encoder.list_set(list_ndx); // Throws
@@ -950,13 +950,13 @@ inline void TransactLogConvenientEncoder::list_insert_bool(const ConstLstBase& l
     m_encoder.list_insert(list_ndx); // Throws
 }
 
-inline void TransactLogConvenientEncoder::list_insert_float(const Lst<Float>& list, size_t list_ndx, float)
+inline void TransactLogConvenientEncoder::list_insert_float(const ConstLstBase& list, size_t list_ndx, float)
 {
     select_list(list);               // Throws
     m_encoder.list_insert(list_ndx); // Throws
 }
 
-inline void TransactLogConvenientEncoder::list_insert_double(const Lst<Double>& list, size_t list_ndx, double)
+inline void TransactLogConvenientEncoder::list_insert_double(const ConstLstBase& list, size_t list_ndx, double)
 {
     select_list(list);               // Throws
     m_encoder.list_insert(list_ndx); // Throws
