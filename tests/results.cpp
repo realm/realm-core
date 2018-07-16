@@ -1452,7 +1452,7 @@ TEST_CASE("notifications: results") {
             REQUIRE_INDICES(callback.before_change.insertions, 4);
             REQUIRE_INDICES(callback.after_change.insertions, 4);
         }
-#ifdef UNITTESTS_NOT_PARSING
+
         SECTION("deleted objects are usable in before()") {
             callback.on_before = [&] {
                 REQUIRE(results.size() == 4);
@@ -1466,7 +1466,7 @@ TEST_CASE("notifications: results") {
             REQUIRE(callback.before_calls == 1);
             REQUIRE(callback.after_calls == 2);
         }
-#endif
+
         SECTION("inserted objects are usable in after()") {
             callback.on_after = [&] {
                 REQUIRE(results.size() == 5);

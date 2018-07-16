@@ -42,6 +42,7 @@ private:
     TableView m_run_tv;
     std::unique_ptr<TableView> m_handover_tv;
     std::unique_ptr<TableView> m_delivered_tv;
+    VersionID m_delivered_tv_version;
 
     // The table version from the last time the query was run. Used to avoid
     // rerunning the query when there's no chance of it changing.

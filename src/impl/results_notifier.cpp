@@ -43,12 +43,15 @@ void ResultsNotifier::release_data() noexcept
 
 bool ResultsNotifier::get_tableview(TableView& out)
 {
-    if (m_delivered_tv) {
-        out = std::move(*m_delivered_tv);
-        m_delivered_tv.reset();
-        return true;
-    }
-    return false;
+    if (!m_delivered_tv)
+        return false;
+    auto& transaction = source_shared_group();
+    if (m_delivered_tv_version != transaction.get_version_of_current_transaction())
+        return false;
+
+    out = std::move(*transaction.import_copy_of(*m_delivered_tv, PayloadPolicy::Move));
+    m_delivered_tv.reset();
+    return true;
 }
 
 // Most of the inter-thread synchronization for run(), prepare_handover(),
@@ -207,6 +210,7 @@ bool ResultsNotifier::prepare_to_deliver()
     auto lock = lock_target();
     m_results_were_used = !m_delivered_tv; // Results were delivered if m_delivered_tv is now null
     m_delivered_tv = std::move(m_handover_tv);
+    m_delivered_tv_version = version();
     if (!get_realm())
         return false;
     return true;
