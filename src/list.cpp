@@ -39,42 +39,6 @@ struct ListType<Obj> {
     using type = LnkLst;
 };
 
-template<>
-struct ListType<util::Optional<float>> {
-    using type = Lst<float>;
-};
-
-template<>
-struct ListType<util::Optional<double>> {
-    using type = Lst<double>;
-};
-
-// Core uses a magic bitpattern to signal nulls in floats, while we use
-// Optional<float>
-template<typename T>
-auto from_optional(T v) { return v; }
-float from_optional(util::Optional<float> v)
-{
-    return v ? *v : null::get_null_float<float>();
-}
-double from_optional(util::Optional<double> v)
-{
-    return v ? *v : null::get_null_float<double>();
-}
-
-template<typename T>
-auto to_optional(T v) { return v; }
-
-template<>
-auto to_optional<util::Optional<float>>(util::Optional<float> v)
-{
-    return null::is_null_float(*v) ? none : v;
-}
-template<>
-auto to_optional<util::Optional<double>>(util::Optional<double> v)
-{
-    return null::is_null_float(*v) ? none : v;
-}
 }
 
 namespace realm {
@@ -204,7 +168,7 @@ template<typename T>
 T List::get(size_t row_ndx) const
 {
     verify_valid_row(row_ndx);
-    return to_optional<T>(as<T>().get(row_ndx));
+    return as<T>().get(row_ndx);
 }
 
 template<>
@@ -219,7 +183,7 @@ template<typename T>
 size_t List::find(T const& value) const
 {
     verify_attached();
-    return as<T>().find_first(from_optional(value));
+    return as<T>().find_first(value);
 }
 
 template<>
@@ -247,7 +211,7 @@ template<typename T>
 void List::add(T value)
 {
     verify_in_transaction();
-    as<T>().add(from_optional(value));
+    as<T>().add(value);
 }
 
 template<>
@@ -263,7 +227,7 @@ void List::insert(size_t row_ndx, T value)
 {
     verify_in_transaction();
     verify_valid_row(row_ndx, true);
-    as<T>().insert(row_ndx, from_optional(value));
+    as<T>().insert(row_ndx, value);
 }
 
 template<>
@@ -305,7 +269,7 @@ void List::set(size_t row_ndx, T value)
     verify_in_transaction();
     verify_valid_row(row_ndx);
 //    validate(row);
-    as<T>().set(row_ndx, from_optional(value));
+    as<T>().set(row_ndx, value);
 }
 
 template<>

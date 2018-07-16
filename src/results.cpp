@@ -158,24 +158,9 @@ StringData Results::get_object_type() const noexcept
 }
 
 template<typename T>
-auto Results::list_get_as(size_t ndx) const
+auto& Results::list_as() const
 {
-    auto val = static_cast<Lst<T>&>(*m_list).get(ndx);
-    return util::Optional<T>(val);
-}
-
-template<>
-inline auto Results::list_get_as<util::Optional<float>>(size_t ndx) const
-{
-    auto val = static_cast<Lst<float>&>(*m_list).get(ndx);
-    return null::is_null_float(val) ? util::none : util::Optional<float>(val);
-}
-
-template<>
-inline auto Results::list_get_as<util::Optional<double>>(size_t ndx) const
-{
-    auto val = static_cast<Lst<double>&>(*m_list).get(ndx);
-    return null::is_null_float(val) ? util::none : util::Optional<double>(val);
+    return static_cast<Lst<T>&>(*m_list);
 }
 
 template<typename T>
@@ -184,7 +169,7 @@ util::Optional<T> Results::try_get(size_t ndx)
     validate_read();
     if (m_mode == Mode::List) {
         if (ndx < m_list->size())
-            return list_get_as<T>(ndx);
+            return list_as<T>().get(ndx);
     }
     return util::none;
 }
@@ -330,25 +315,28 @@ size_t Results::index_of(Obj const& row)
 }
 
 template<typename T>
-size_t Results::index_of(T const&)
+size_t Results::index_of(T const& value)
 {
-    throw "not implementd";
-#if 0
     validate_read();
     switch (m_mode) {
         case Mode::Empty:
             return not_found;
         case Mode::Table:
-            return m_table->find_first(0, value);
-        case Mode::LinkList:
             throw std::runtime_error("not implemented");
+            // return m_table->find_first(0, value);
+            return 0;
+        case Mode::List:
+            return list_as<T>().find_first(value);
+        case Mode::LinkList:
+            return 0;
         case Mode::Query:
         case Mode::TableView:
+            throw std::runtime_error("not implemented");
             evaluate_query_if_needed();
-            return m_table_view.find_first(0, value);
+            // return m_table_view.find_first(0, value);
+            return 0;
     }
     REALM_COMPILER_HINT_UNREACHABLE();
-#endif
 }
 
 size_t Results::index_of(Query&& q)

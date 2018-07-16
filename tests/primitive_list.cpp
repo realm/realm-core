@@ -516,7 +516,7 @@ TEMPLATE_TEST_CASE("primitive list", ::Int, ::Bool, ::Float, ::Double, ::String,
 
         REQUIRE_THROWS(list.set(list.size(), static_cast<T>(values[0])));
     }
-#if 0
+
     SECTION("find()") {
         // cast to T needed for vector<bool>'s wonky proxy
         for (size_t i = 0; i < values.size(); ++i) {
@@ -526,10 +526,11 @@ TEMPLATE_TEST_CASE("primitive list", ::Int, ::Bool, ::Float, ::Double, ::String,
 
             REQUIRE(list.find(ctx, TestType::to_any(values[i])) == i);
             REQUIRE(results.index_of(ctx, TestType::to_any(values[i])) == i);
-
+#if 0
             auto q = TestType::unwrap(values[i], [&] (auto v) { return table->get_subtable(0, 0)->column<W>(0) == v; });
             REQUIRE(list.find(Query(q)) == i);
             REQUIRE(results.index_of(std::move(q)) == i);
+#endif
         }
 
         list.remove(0);
@@ -539,7 +540,7 @@ TEMPLATE_TEST_CASE("primitive list", ::Int, ::Bool, ::Float, ::Double, ::String,
         REQUIRE(list.find(ctx, TestType::to_any(values[0])) == npos);
         REQUIRE(results.index_of(ctx, TestType::to_any(values[0])) == npos);
     }
-
+#if 0
     SECTION("sorted index_of()") {
         auto subtable = table->get_subtable(0, 0);
 

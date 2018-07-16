@@ -262,7 +262,7 @@ private:
     auto dispatch(Fn&&) const;
 
     template<typename T>
-    auto list_get_as(size_t ndx) const;
+    auto& list_as() const;
 };
 
 template<typename Fn>
