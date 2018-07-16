@@ -941,7 +941,7 @@ TEST_CASE("notifications: skip") {
     }
 }
 
-#if REALM_PLATFORM_APPLE
+#if REALM_PLATFORM_APPLE && NOTIFIER_BACKGROUND_ERRORS
 TEST_CASE("notifications: async error handling") {
     _impl::RealmCoordinator::assert_no_open_realms();
 
