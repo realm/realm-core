@@ -341,8 +341,13 @@ public:
 
     bool list_swap(size_t index1, size_t index2)
     {
-        list_set(index1);
-        list_set(index2);
+        if (m_active_list) {
+            if (index1 > index2)
+                std::swap(index1, index2);
+            m_active_list->move(index1, index2);
+            if (index1 + 1 != index2)
+                m_active_list->move(index2 - 1, index1);
+        }
         return true;
     }
 
