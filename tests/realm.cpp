@@ -1481,14 +1481,13 @@ TEST_CASE("BindingContext is notified about delivery of change notifications") {
             coordinator->on_change();
             r->refresh();
         }
-#if 0
-        // FIXME: Depends on RealmCoordinator::can_advance(Realm& realm) being implemented
+
         SECTION("closed in will_send() for notify()") {
             r->m_binding_context.reset(new CloseOnWillChange(*r));
             coordinator->on_change();
             r->notify();
         }
-#endif
+
         SECTION("closed in will_send() for refresh()") {
             do_close = false;
             coordinator->on_change();
