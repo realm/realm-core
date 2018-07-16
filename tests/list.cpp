@@ -222,7 +222,7 @@ TEST_CASE("list") {
             auto token = require_no_change();
             write([&] { target->remove_object(target_keys[2]); });
         }
-#if 0
+
         SECTION("multiple LinkViews for the same LinkList can get notifications") {
             r->begin_transaction();
             target->clear();
@@ -281,7 +281,7 @@ TEST_CASE("list") {
                 REQUIRE_INDICES(changes[i].modifications, 2);
             }
         }
-#endif
+
         SECTION("multiple callbacks for the same Lists can be skipped individually") {
             auto token = require_no_change();
             auto token2 = require_change();

@@ -691,7 +691,6 @@ public:
         // We now need to combine the transaction change info objects so that all of
         // the notifiers see the complete set of changes from their first version to
         // the most recent one
-        #if 0
         for (size_t i = m_info.size() - 1; i > 0; --i) {
             auto& cur = m_info[i];
             if (cur.tables.empty())
@@ -701,20 +700,17 @@ public:
                 prev.tables = cur.tables;
                 continue;
             }
-
-            for (size_t j = 0; j < prev.tables.size() && j < cur.tables.size(); ++j) {
-                prev.tables[j].merge(CollectionChangeBuilder{cur.tables[j]});
-            }
-            prev.tables.reserve(cur.tables.size());
-            while (prev.tables.size() < cur.tables.size()) {
-                prev.tables.push_back(cur.tables[prev.tables.size()]);
+            for (auto& ct : cur.tables) {
+                auto pt = prev.tables[ct.first];
+                if (pt.empty())
+                    pt = ct.second;
+                else
+                    pt.merge(CollectionChangeBuilder{ct.second});
             }
         }
-        #endif
 
         // Copy the list change info if there are multiple LinkViews for the same LinkList
-        #if 0
-        auto id = [](auto const& list) { return std::tie(list.table_ndx, list.col_ndx, list.row_ndx); };
+        auto id = [](auto const& list) { return std::tie(list.table_key, list.col_key, list.row_key); };
         for (size_t i = 1; i < m_current->lists.size(); ++i) {
             for (size_t j = i; j > 0; --j) {
                 if (id(m_current->lists[i]) == id(m_current->lists[j - 1])) {
@@ -722,7 +718,6 @@ public:
                 }
             }
         }
-        #endif
     }
 
 private:
