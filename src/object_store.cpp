@@ -176,8 +176,9 @@ void copy_property_values(Table& table, PropertyType type, ColKey old_col, ColKe
 {
     switch_on_type<ObjKey>(type, [&](auto t) {
         using T = std::decay_t<decltype(*t)>;
+        using U = typename util::RemoveOptional<T>::type;
         for (auto& obj : table) {
-            obj.set<T>(new_col, obj.get<T>(old_col));
+            obj.set<T>(new_col, obj.get<U>(old_col));
         }
     });
 }

@@ -1360,7 +1360,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             });
             REQUIRE(changes.array_change(0, tr_col) == (ArrayChange{Kind::Set, {2, 3, 6, 7, 8}}));
         }
-
+#ifdef UNITTESTS_NOT_PARSING
         SECTION("int array: emulated move()") {
             auto changes = observe({o}, [&] {
                 // list.move(8, 2);
@@ -1378,7 +1378,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             });
             REQUIRE(changes.array_change(0, tr_col) == (ArrayChange{Kind::Set, {2, 3, 6, 7, 8}}));
         }
-
+#endif
         SECTION("int array: swap()") {
             SECTION("adjacent") {
                 auto changes = observe({o}, [&] {

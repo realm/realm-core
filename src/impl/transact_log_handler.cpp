@@ -297,7 +297,12 @@ public:
         if (m_info.track_all)
             m_active_table = &m_info.tables[table_key];
         else {
+            auto list_it = std::find_if(m_info.lists.begin(), m_info.lists.end(), [&key](auto& l) { return l.table_key == key.value; });
             auto it = m_info.tables.find(table_key);
+            if (list_it != m_info.lists.end() && it == m_info.tables.end()) {
+                auto res = m_info.tables.emplace(table_key, _impl::CollectionChangeBuilder());
+                it = res.first;
+            }
             if (it == m_info.tables.end())
                 m_active_table = nullptr;
             else
