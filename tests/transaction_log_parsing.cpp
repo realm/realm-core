@@ -54,6 +54,7 @@ public:
 
         _impl::CollectionChangeBuilder c;
         _impl::TransactionChangeInfo info{};
+        info.tables[m_table_key.value];
         info.lists.push_back({m_table_key.value, 0, 0, &c});
         _impl::transaction::advance(*m_group, info);
 
