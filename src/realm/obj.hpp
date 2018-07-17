@@ -229,7 +229,7 @@ public:
     LnkLstPtr get_linklist_ptr(ColKey col_key) const;
     LnkLst get_linklist(StringData col_name) const;
 
-    LstBasePtr get_listbase_ptr(ColKey col_key, DataType type) const;
+    LstBasePtr get_listbase_ptr(ColKey col_key) const;
 
 private:
     friend class Cluster;

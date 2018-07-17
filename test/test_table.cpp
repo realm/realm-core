@@ -2731,6 +2731,9 @@ TEST(Table_list_basic)
         CHECK_EQUAL(list1.size(), 100);
         CHECK_EQUAL(list1.get(0), 1000);
         CHECK_EQUAL(list1.get(99), 1099);
+        auto list_base = obj.get_listbase_ptr(list_col);
+        CHECK_EQUAL(list_base->size(), 100);
+        CHECK(dynamic_cast<Lst<Int>*>(list_base.get()));
 
         CHECK_EQUAL(list_sum(list1), sum);
         CHECK_EQUAL(list_maximum(list1), 1099);
@@ -2781,6 +2784,9 @@ TEST_TYPES(Table_list_nullable, int64_t, float, double)
         CHECK_EQUAL(list1.size(), 100);
         CHECK_EQUAL(list1.get(0), 1000);
         CHECK_EQUAL(list1.get(99), 1099);
+        auto list_base = obj.get_listbase_ptr(list_col);
+        CHECK_EQUAL(list_base->size(), 100);
+        CHECK(dynamic_cast<Lst<util::Optional<TEST_TYPE>>*>(list_base.get()));
 
         CHECK_EQUAL(list_sum(list1), sum);
         CHECK_EQUAL(list_maximum(list1), 1099);

@@ -33,20 +33,36 @@
 
 using namespace realm;
 
-LstBasePtr Obj::get_listbase_ptr(ColKey col_key, DataType type) const
+LstBasePtr Obj::get_listbase_ptr(ColKey col_key) const
 {
-    switch (type) {
+    auto attr = get_table()->get_column_attr(col_key);
+    REALM_ASSERT(attr.test(col_attr_List));
+    bool nullable = attr.test(col_attr_Nullable);
+
+    switch (get_table()->get_column_type(col_key)) {
         case type_Int: {
-            return std::make_unique<Lst<Int>>(*this, col_key);
+            if (nullable)
+                return std::make_unique<Lst<util::Optional<Int>>>(*this, col_key);
+            else
+                return std::make_unique<Lst<Int>>(*this, col_key);
         }
         case type_Bool: {
-            return std::make_unique<Lst<Bool>>(*this, col_key);
+            if (nullable)
+                return std::make_unique<Lst<util::Optional<Bool>>>(*this, col_key);
+            else
+                return std::make_unique<Lst<Bool>>(*this, col_key);
         }
         case type_Float: {
-            return std::make_unique<Lst<Float>>(*this, col_key);
+            if (nullable)
+                return std::make_unique<Lst<util::Optional<Float>>>(*this, col_key);
+            else
+                return std::make_unique<Lst<Float>>(*this, col_key);
         }
         case type_Double: {
-            return std::make_unique<Lst<Double>>(*this, col_key);
+            if (nullable)
+                return std::make_unique<Lst<util::Optional<Double>>>(*this, col_key);
+            else
+                return std::make_unique<Lst<Double>>(*this, col_key);
         }
         case type_String: {
             return std::make_unique<Lst<String>>(*this, col_key);
