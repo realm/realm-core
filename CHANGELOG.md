@@ -1,22 +1,13 @@
-# NEXT RELEASE
+# 5.7.2 Release notes
 
 ### Bugfixes
 
 * Fix a use-after-free when an observer is passed to rollback_and_continue_as_read().
 
-### Breaking changes
-
-* None.
-
 ### Enhancements
 
 * More informative InvalidDatabase exception messages
-
------------
-
-### Internals
-
-* None.
+  Issue [#3075](https://github.com/realm/realm-core/issues/3075).
 
 ----------------------------------------------
 
