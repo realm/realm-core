@@ -41,6 +41,11 @@ using namespace realm;
 namespace {
 using AnyDict = std::map<std::string, util::Any>;
 using AnyVec = std::vector<util::Any>;
+template <class T>
+std::vector<T> get_vector(std::initializer_list<T> list)
+{
+    return std::vector<T>(list);
+}
 }
 
 struct TestContext : CppContext {
@@ -294,46 +299,49 @@ TEST_CASE("object") {
             {"double array", AnyVec{3.3, 4.4}},
             {"string array", AnyVec{"a"s, "b"s, "c"s}},
             {"data array", AnyVec{"d"s, "e"s, "f"s}},
-            {"date array", AnyVec{}},
+            {"date array", AnyVec{Timestamp(10, 20), Timestamp(30, 40)}},
             {"object array", AnyVec{AnyDict{{"value", INT64_C(20)}}}},
         }, false);
 
-        #if 0
-        auto row = obj.row();
-        REQUIRE(row.get_int(0) == 1);
-        REQUIRE(row.get_bool(1) == true);
-        REQUIRE(row.get_int(2) == 5);
-        REQUIRE(row.get_float(3) == 2.2f);
-        REQUIRE(row.get_double(4) == 3.3);
-        REQUIRE(row.get_string(5) == "hello");
-        REQUIRE(row.get_binary(6) == BinaryData("olleh", 5));
-        REQUIRE(row.get_timestamp(7) == Timestamp(10, 20));
-        REQUIRE(row.get_link(8) == 0);
+        auto row = obj.obj();
+        auto link_target = *r->read_group().get_table("class_link target")->begin();
+        auto table = row.get_table();
+        auto target_table = link_target.get_table();
+        REQUIRE(row.get<Int>(table->get_column_key("pk")) == 1);
+        REQUIRE(row.get<Bool>(table->get_column_key("bool")) == true);
+        REQUIRE(row.get<Int>(table->get_column_key("int")) == 5);
+        REQUIRE(row.get<float>(table->get_column_key("float")) == 2.2f);
+        REQUIRE(row.get<double>(table->get_column_key("double")) == 3.3);
+        REQUIRE(row.get<String>(table->get_column_key("string")) == "hello");
+        REQUIRE(row.get<Binary>(table->get_column_key("data")) == BinaryData("olleh", 5));
+        REQUIRE(row.get<Timestamp>(table->get_column_key("date")) == Timestamp(10, 20));
+        REQUIRE(row.get<ObjKey>(table->get_column_key("object")) == link_target.get_key());
 
-        auto link_target = r->read_group().get_table("class_link target")->get(0);
-        REQUIRE(link_target.get_int(0) == 10);
+        REQUIRE(link_target.get<Int>(target_table->get_column_key("value")) == 10);
 
-        auto check_array = [&](size_t col, auto... values) {
-            auto table = row.get_subtable(col);
+        auto check_array = [&](ColKey col, auto... values) {
+            auto vec = get_vector({values...});
+            using U = typename decltype(vec)::value_type;
+            auto list = row.get_list<U>(col);
             size_t i = 0;
-            for (auto& value : {values...}) {
+            for (const auto& value : vec) {
                 CAPTURE(i);
-                REQUIRE(i < row.get_subtable_size(col));
-                REQUIRE(value == table->get<typename std::decay<decltype(value)>::type>(0, i));
+                REQUIRE(i < list.size());
+                REQUIRE(value == list.get(i));
                 ++i;
             }
         };
-        check_array(9, true, false);
-        check_array(10, INT64_C(5), INT64_C(6));
-        check_array(11, 1.1f, 2.2f);
-        check_array(12, 3.3, 4.4);
-        check_array(13, StringData("a"), StringData("b"), StringData("c"));
-        check_array(14, BinaryData("d", 1), BinaryData("e", 1), BinaryData("f", 1));
+        check_array(table->get_column_key("bool array"), true, false);
+        check_array(table->get_column_key("int array"), INT64_C(5), INT64_C(6));
+        check_array(table->get_column_key("float array"), 1.1f, 2.2f);
+        check_array(table->get_column_key("double array"), 3.3, 4.4);
+        check_array(table->get_column_key("string array"), StringData("a"), StringData("b"), StringData("c"));
+        check_array(table->get_column_key("data array"), BinaryData("d", 1), BinaryData("e", 1), BinaryData("f", 1));
+        check_array(table->get_column_key("date array"), Timestamp(10, 20), Timestamp(30, 40));
 
-        auto list = row.get_linklist(16);
+        auto list = row.get_linklist_ptr(table->get_column_key("object array"));
         REQUIRE(list->size() == 1);
-        REQUIRE(list->get(0).get_int(0) == 20);
-        #endif
+        REQUIRE(list->get_object(0).get<Int>(target_table->get_column_key("value")) == 20);
     }
 
     SECTION("create uses defaults for missing values") {
@@ -362,26 +370,25 @@ TEST_CASE("object") {
             {"float", 6.6f},
         }, false);
 
-        #if 0
-        auto row = obj.row();
-        REQUIRE(row.get_int(0) == 1);
-        REQUIRE(row.get_bool(1) == true);
-        REQUIRE(row.get_int(2) == 5);
-        REQUIRE(row.get_float(3) == 6.6f);
-        REQUIRE(row.get_double(4) == 3.3);
-        REQUIRE(row.get_string(5) == "hello");
-        REQUIRE(row.get_binary(6) == BinaryData("olleh", 5));
-        REQUIRE(row.get_timestamp(7) == Timestamp(10, 20));
+        auto row = obj.obj();
+        auto table = row.get_table();
+        REQUIRE(row.get<Int>(table->get_column_key("pk")) == 1);
+        REQUIRE(row.get<Bool>(table->get_column_key("bool")) == true);
+        REQUIRE(row.get<Int>(table->get_column_key("int")) == 5);
+        REQUIRE(row.get<float>(table->get_column_key("float")) == 6.6f);
+        REQUIRE(row.get<double>(table->get_column_key("double")) == 3.3);
+        REQUIRE(row.get<String>(table->get_column_key("string")) == "hello");
+        REQUIRE(row.get<Binary>(table->get_column_key("data")) == BinaryData("olleh", 5));
+        REQUIRE(row.get<Timestamp>(table->get_column_key("date")) == Timestamp(10, 20));
 
-        REQUIRE(row.get_subtable(9)->size() == 2);
-        REQUIRE(row.get_subtable(10)->size() == 2);
-        REQUIRE(row.get_subtable(11)->size() == 2);
-        REQUIRE(row.get_subtable(12)->size() == 2);
-        REQUIRE(row.get_subtable(13)->size() == 3);
-        REQUIRE(row.get_subtable(14)->size() == 3);
-        REQUIRE(row.get_subtable(15)->size() == 0);
-        REQUIRE(row.get_linklist(16)->size() == 1);
-        #endif
+        REQUIRE(row.get_listbase_ptr(table->get_column_key("bool array"))->size() == 2);
+        REQUIRE(row.get_listbase_ptr(table->get_column_key("int array"))->size() == 2);
+        REQUIRE(row.get_listbase_ptr(table->get_column_key("float array"))->size() == 2);
+        REQUIRE(row.get_listbase_ptr(table->get_column_key("double array"))->size() == 2);
+        REQUIRE(row.get_listbase_ptr(table->get_column_key("string array"))->size() == 3);
+        REQUIRE(row.get_listbase_ptr(table->get_column_key("data array"))->size() == 3);
+        REQUIRE(row.get_listbase_ptr(table->get_column_key("date array"))->size() == 0);
+        REQUIRE(row.get_listbase_ptr(table->get_column_key("object array"))->size() == 1);
     }
 
     SECTION("create can use defaults for primary key") {
@@ -400,10 +407,8 @@ TEST_CASE("object") {
             {"array", AnyVector{AnyDict{{"value", INT64_C(20)}}}},
         }, false);
 
-        #if 0
-        auto row = obj.row();
-        REQUIRE(row.get_int(0) == 10);
-        #endif
+        auto row = obj.obj();
+        REQUIRE(row.get<Int>(row.get_table()->get_column_key("pk")) == 10);
     }
 
     SECTION("create does not complain about missing values for nullable fields") {
@@ -477,17 +482,16 @@ TEST_CASE("object") {
             {"string", "a"s},
         }, true);
 
-        #if 0
-        auto row = obj.row();
-        REQUIRE(row.get_int(0) == 1);
-        REQUIRE(row.get_bool(1) == true);
-        REQUIRE(row.get_int(2) == 6);
-        REQUIRE(row.get_float(3) == 2.2f);
-        REQUIRE(row.get_double(4) == 3.3);
-        REQUIRE(row.get_string(5) == "a");
-        REQUIRE(row.get_binary(6) == BinaryData("olleh", 5));
-        REQUIRE(row.get_timestamp(7) == Timestamp(10, 20));
-        #endif
+        auto row = obj.obj();
+        auto table = row.get_table();
+        REQUIRE(row.get<Int>(table->get_column_key("pk")) == 1);
+        REQUIRE(row.get<Bool>(table->get_column_key("bool")) == true);
+        REQUIRE(row.get<Int>(table->get_column_key("int")) == 6);
+        REQUIRE(row.get<float>(table->get_column_key("float")) == 2.2f);
+        REQUIRE(row.get<double>(table->get_column_key("double")) == 3.3);
+        REQUIRE(row.get<String>(table->get_column_key("string")) == "a");
+        REQUIRE(row.get<Binary>(table->get_column_key("data")) == BinaryData("olleh", 5));
+        REQUIRE(row.get<Timestamp>(table->get_column_key("date")) == Timestamp(10, 20));
     }
 
     SECTION("set existing fields to null with update") {
@@ -594,7 +598,6 @@ TEST_CASE("object") {
         }, false));
     }
 
-    #if 0
     SECTION("create with explicit null pk does not fall back to default") {
         d.defaults["nullable int pk"] = {
             {"pk", INT64_C(10)},
@@ -610,26 +613,28 @@ TEST_CASE("object") {
         };
 
         auto obj = create(AnyDict{{"pk", d.null_value()}}, "nullable int pk");
-        REQUIRE(obj.row().is_null(0));
+        auto col_pk_int = r->read_group().get_table("class_nullable int pk")->get_column_key("pk");
+        auto col_pk_str = r->read_group().get_table("class_nullable string pk")->get_column_key("pk");
+        REQUIRE(obj.obj().is_null(col_pk_int));
         obj = create(AnyDict{{"pk", d.null_value()}}, "nullable string pk");
-        REQUIRE(obj.row().is_null(0));
+        REQUIRE(obj.obj().is_null(col_pk_str));
 
         obj = create(AnyDict{{}}, "nullable int pk");
-        REQUIRE(obj.row().get_int(0) == 10);
+        REQUIRE(obj.obj().get<util::Optional<Int>>(col_pk_int) == 10);
         obj = create(AnyDict{{}}, "nullable string pk");
-        REQUIRE(obj.row().get_string(0) == "value");
+        REQUIRE(obj.obj().get<String>(col_pk_str) == "value");
     }
 
     SECTION("getters and setters") {
         r->begin_transaction();
 
         auto& table = *r->read_group().get_table("class_all types");
-        table.add_empty_row();
-        Object obj(r, *r->schema().find("all types"), table[0]);
+        table.create_object();
+        Object obj(r, *r->schema().find("all types"), *table.begin());
 
         auto& link_table = *r->read_group().get_table("class_link target");
-        link_table.add_empty_row();
-        Object linkobj(r, *r->schema().find("link target"), link_table[0]);
+        link_table.create_object();
+        Object linkobj(r, *r->schema().find("link target"), *link_table.begin());
 
         obj.set_property_value(d, "bool", util::Any(true), false);
         REQUIRE(any_cast<bool>(obj.get_property_value<util::Any>(d, "bool")) == true);
@@ -654,7 +659,7 @@ TEST_CASE("object") {
 
         REQUIRE_FALSE(obj.get_property_value<util::Any>(d, "object").has_value());
         obj.set_property_value(d, "object", util::Any(linkobj), false);
-        REQUIRE(any_cast<Object>(obj.get_property_value<util::Any>(d, "object")).row().get_index() == linkobj.row().get_index());
+        REQUIRE(any_cast<Object>(obj.get_property_value<util::Any>(d, "object")).obj().get_key() == linkobj.obj().get_key());
 
         auto linking = any_cast<Results>(linkobj.get_property_value<util::Any>(d, "origin"));
         REQUIRE(linking.size() == 1);
@@ -667,7 +672,6 @@ TEST_CASE("object") {
         REQUIRE_THROWS(obj.get_property_value<util::Any>(d, "not a property"));
         REQUIRE_THROWS(obj.set_property_value(d, "int", util::Any(INT64_C(5)), false));
     }
-    #endif
 
     SECTION("list property self-assign is a no-op") {
         auto obj = create(AnyDict{
