@@ -2401,23 +2401,30 @@ TableRef Transaction::import_copy_of(TableRef original)
 
 LnkLst Transaction::import_copy_of(const LnkLst& original)
 {
-    Obj obj = import_copy_of(original.m_obj);
+    Obj obj = import_copy_of(*original.m_const_obj);
     ColKey ck = original.m_col_key;
     return obj.get_linklist(ck);
+}
+
+LstBasePtr Transaction::import_copy_of(const LstBase& original)
+{
+    Obj obj = import_copy_of(*original.m_const_obj);
+    ColKey ck = original.get_col_key();
+    return obj.get_listbase_ptr(ck);
 }
 
 LnkLstPtr Transaction::import_copy_of(const LnkLstPtr& original)
 {
     if (!bool(original))
         return nullptr;
-    Obj obj = import_copy_of(original->m_obj);
+    Obj obj = import_copy_of(*original->m_const_obj);
     ColKey ck = original->m_col_key;
     return obj.get_linklist_ptr(ck);
 }
 
 ConstLnkLst Transaction::import_copy_of(const ConstLnkLst& original)
 {
-    ConstObj obj = import_copy_of(original.m_obj);
+    ConstObj obj = import_copy_of(*original.m_const_obj);
     ColKey ck = original.m_col_key;
     return obj.get_linklist(ck);
 }
@@ -2426,7 +2433,7 @@ ConstLnkLstPtr Transaction::import_copy_of(const ConstLnkLstPtr& original)
 {
     if (!bool(original))
         return nullptr;
-    Obj obj = import_copy_of(original->m_obj);
+    Obj obj = import_copy_of(*original->m_const_obj);
     ColKey ck = original->m_col_key;
     return obj.get_linklist_ptr(ck);
 }

@@ -245,8 +245,10 @@ TEST(Transactions_StateChanges)
     // verify handover of a list
     // FIXME: no change should be needed here
     auto frozen_list = frozen->import_copy_of(list);
-    CHECK_EQUAL(frozen_list.get(0), 5);
-    CHECK_EQUAL(frozen_list.get(1), 7);
+    auto frozen_int_list = dynamic_cast<Lst<int64_t>*>(frozen_list.get());
+    CHECK(frozen_int_list);
+    CHECK_EQUAL(frozen_int_list->get(0), 5);
+    CHECK_EQUAL(frozen_int_list->get(1), 7);
 
     // verify that a fresh read transaction is read only
     TransactionRef reader = db->start_read();

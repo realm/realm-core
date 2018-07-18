@@ -533,9 +533,8 @@ public:
     Obj import_copy_of(const ConstObj& original); // slicing is OK for Obj/ConstObj
     TableRef import_copy_of(const TableRef original);
     ConstTableRef import_copy_of(const ConstTableRef original);
-    template <typename T>
-    Lst<T> import_copy_of(const Lst<T>& original);
     LnkLst import_copy_of(const LnkLst& original);
+    LstBasePtr import_copy_of(const LstBase& original);
     LnkLstPtr import_copy_of(const LnkLstPtr& original);
     ConstLnkLst import_copy_of(const ConstLnkLst& original);
     ConstLnkLstPtr import_copy_of(const ConstLnkLstPtr& original);
@@ -747,15 +746,6 @@ private:
     DB& m_shared_group;
     ReadLockInfo* m_read_lock;
 };
-
-template <typename T>
-inline Lst<T> Transaction::import_copy_of(const Lst<T>& original)
-{
-    Obj obj = import_copy_of(original.m_obj);
-    ColKey ck = original.m_col_key;
-    return obj.get_list<T>(ck);
-}
-
 
 template <class O>
 inline void Transaction::advance_read(O* observer, VersionID version_id)

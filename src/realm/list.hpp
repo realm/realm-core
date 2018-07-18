@@ -107,6 +107,8 @@ public:
 protected:
     template <class>
     friend class LstIterator;
+    friend class Transaction;
+
 
     const ConstObj* m_const_obj;
     ColKey m_col_key;
@@ -392,6 +394,10 @@ public:
     virtual ~LstBase()
     {
     }
+    auto clone() const
+    {
+        return static_cast<const Obj*>(m_const_obj)->get_listbase_ptr(m_col_key);
+    }
     virtual void set_null(size_t ndx) = 0;
     virtual void insert_null(size_t ndx) = 0;
     virtual void resize(size_t new_size) = 0;
@@ -596,8 +602,6 @@ protected:
     }
     void set_repl(Replication* repl, size_t ndx, T value);
     void insert_repl(Replication* repl, size_t ndx, T value);
-
-    friend class Transaction;
 };
 
 template <class T>
@@ -675,8 +679,6 @@ public:
     }
 
 private:
-    friend class Transaction;
-
     ConstObj m_obj;
 };
 
