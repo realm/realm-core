@@ -254,12 +254,11 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         auto realm = Realm::get_shared_realm(config);
         REQUIRE(realm->schema().size() == 1);
         auto it = realm->schema().find("object");
+        auto table = realm->read_group().get_table("class_object");
         REQUIRE(it != realm->schema().end());
         REQUIRE(it->persisted_properties.size() == 1);
         REQUIRE(it->persisted_properties[0].name == "value");
-        #if 0
-        REQUIRE(it->persisted_properties[0].table_column == 0);
-        #endif
+        REQUIRE(it->persisted_properties[0].column_key == table->get_column_key("value"));
     }
 
     SECTION("should read the proper schema from the file if a custom version is supplied") {
@@ -322,12 +321,11 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         config.schema_mode = SchemaMode::Immutable;
         auto realm = Realm::get_shared_realm(config);
         auto it = realm->schema().find("object");
+        auto table = realm->read_group().get_table("class_object");
         REQUIRE(it != realm->schema().end());
         REQUIRE(it->persisted_properties.size() == 1);
         REQUIRE(it->persisted_properties[0].name == "value");
-        #if 0
-        REQUIRE(it->persisted_properties[0].table_column == 0);
-        #endif
+        REQUIRE(it->persisted_properties[0].column_key == table->get_column_key("value"));
     }
 
     SECTION("should support using different table subsets on different threads") {
@@ -664,12 +662,11 @@ TEST_CASE("ShareRealm: in-memory mode from buffer") {
         // Verify that it can read the schema and that it is the same
         REQUIRE(realm->schema().size() == 1);
         auto it = realm->schema().find("object");
+        auto table = realm->read_group().get_table("class_object");
         REQUIRE(it != realm->schema().end());
         REQUIRE(it->persisted_properties.size() == 1);
         REQUIRE(it->persisted_properties[0].name == "value");
-        #if 0
-        REQUIRE(it->persisted_properties[0].table_column == 0);
-        #endif
+        REQUIRE(it->persisted_properties[0].column_key == table->get_column_key("value"));
 
         // Test invalid configs
         realm::Realm::Config config3;

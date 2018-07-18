@@ -347,18 +347,16 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             REQUIRE_INDICES(info.tables[table_key].modifications, 10);
         }
 
-#if 0
-        SECTION("move_last_over() does not shift rows other than the last one") {
+        SECTION("remove_object() does not shift rows") {
             auto info = track_changes({table_key}, [&] {
                 table.remove_object(objects[2]);
                 table.remove_object(objects[3]);
             });
             REQUIRE(info.tables.size() == 1);
-            REQUIRE_INDICES(info.tables[table_key].deletions, 2, 3, 8, 9);
-            REQUIRE_INDICES(info.tables[table_key].insertions, 2, 3);
-            REQUIRE_MOVES(info.tables[table_key], {8, 3}, {9, 2});
+            REQUIRE_INDICES(info.tables[table_key].deletions, 2, 3);
+            REQUIRE(info.tables[table_key].insertions.empty());
+            REQUIRE(info.tables[table_key].moves.empty());
         }
-#endif
 
         SECTION("SetDefault does not mark a row as modified") {
             auto info = track_changes({table_key}, [&] {
