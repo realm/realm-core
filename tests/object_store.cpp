@@ -38,7 +38,7 @@ TEST_CASE("ObjectStore: table_name_for_object_type()") {
     }
 }
 
-#if 0
+#if 1
 TEST_CASE("ObjectStore:: property_for_column_index()") {
     SECTION("Property should match the schema") {
         Schema schema = {
@@ -64,8 +64,8 @@ TEST_CASE("ObjectStore:: property_for_column_index()") {
         REQUIRE_FALSE(it == realm->schema().end());
         ObjectSchema object_schema = *it;
 
-        size_t count = table->get_column_count();
-        for (size_t col = 0; col < count; col++) {
+        auto all_columns = table->get_column_keys();
+        for (auto col : all_columns) {
             auto property = ObjectStore::property_for_column_index(table, col);
             if (!property) {
 #if REALM_ENABLE_SYNC

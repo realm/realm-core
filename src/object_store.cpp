@@ -826,6 +826,31 @@ Schema ObjectStore::schema_from_group(Group const& group) {
     return schema;
 }
 
+util::Optional<Property> ObjectStore::property_for_column_index(ConstTableRef& table, ColKey column_key)
+{
+    StringData column_name = table->get_column_name(column_key);
+
+#if REALM_ENABLE_SYNC
+    // The object ID column is an implementation detail, and is omitted from the schema.
+    // FIXME: Consider filtering out all column names starting with `!`.
+    if (column_name == sync::object_id_column_name)
+        return util::none;
+#endif
+
+    Property property;
+    property.name = column_name;
+    property.type = ObjectSchema::from_core_type(*table, column_key);
+    property.is_indexed = table->has_search_index(column_key);
+    property.column_key = column_key;
+
+    if (property.type == PropertyType::Object) {
+        // set link type for objects and arrays
+        ConstTableRef linkTable = table->get_link_target(column_key);
+        property.object_type = ObjectStore::object_type_for_table_name(linkTable->get_name().data());
+    }
+    return property;
+}
+
 void ObjectStore::set_schema_columns(Group const& group, Schema& schema)
 {
     for (auto& object_schema : schema) {
