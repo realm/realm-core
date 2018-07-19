@@ -576,6 +576,21 @@ void RealmCoordinator::commit_write(Realm& realm)
     }
 }
 
+void RealmCoordinator::enable_wait_for_change()
+{
+    m_db->enable_wait_for_change();
+}
+
+bool RealmCoordinator::wait_for_change(std::shared_ptr<Transaction> tr)
+{
+    return m_db->wait_for_change(tr);
+}
+
+void RealmCoordinator::wait_for_change_release()
+{
+    m_db->wait_for_change_release();
+}
+
 void RealmCoordinator::pin_version(VersionID versionid)
 {
     REALM_ASSERT_DEBUG(!m_notifier_mutex.try_lock());

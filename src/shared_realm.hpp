@@ -278,6 +278,7 @@ public:
     // is not in a read transaction
     util::Optional<VersionID> current_transaction_version() const;
 
+    void enable_wait_for_change();
     bool wait_for_change();
     void wait_for_change_release();
 

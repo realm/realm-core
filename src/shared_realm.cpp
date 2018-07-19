@@ -499,6 +499,30 @@ bool Realm::is_in_transaction() const noexcept
         && m_group && transaction().get_transact_stage() == DB::transact_Writing;
 }
 
+util::Optional<VersionID> Realm::current_transaction_version() const
+{
+    util::Optional<VersionID> ret;
+    if (m_group) {
+        ret = static_cast<Transaction&>(*m_group).get_version_of_current_transaction();
+    }
+    return ret;
+}
+
+void Realm::enable_wait_for_change()
+{
+    m_coordinator->enable_wait_for_change();
+}
+
+bool Realm::wait_for_change()
+{
+    return m_group ? m_coordinator->wait_for_change(transaction_ref()) : false;
+}
+
+void Realm::wait_for_change_release()
+{
+    m_coordinator->wait_for_change_release();
+}
+
 void Realm::begin_transaction()
 {
     verify_thread();

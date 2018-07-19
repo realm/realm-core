@@ -142,6 +142,10 @@ public:
     // other Realm instances for that path, including in other processes
     void commit_write(Realm& realm);
 
+    void enable_wait_for_change();
+    bool wait_for_change(std::shared_ptr<Transaction> tr);
+    void wait_for_change_release();
+
     void close();
     bool compact();
 
