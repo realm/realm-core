@@ -142,6 +142,15 @@ bool ArrayBacklink::remove(size_t ndx, ObjKey key)
     return false;
 }
 
+void ArrayBacklink::erase(size_t ndx)
+{
+    int64_t value = Array::get(ndx);
+    if (value && (value & 1) == 0) {
+        Array::destroy(to_ref(value), m_alloc);
+    }
+    Array::erase(ndx);
+}
+
 size_t ArrayBacklink::get_backlink_count(size_t ndx) const
 {
     int64_t value = Array::get(ndx);

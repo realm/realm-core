@@ -35,13 +35,6 @@ namespace {
 
 enum Days { Mon, Tue, Wed, Thu, Fri, Sat, Sun };
 
-#ifdef LEGACY_TESTS
-void test_table_add_row(TableRef t, std::string first, int second, bool third, Days forth)
-{
-    t->create_object().set_all(first.c_str(), second, third, int(forth));
-}
-#endif // LEGACY_TESTS
-
 template <class T>
 void test_table_add_columns(T t)
 {
@@ -85,14 +78,12 @@ TEST(Links_Columns)
     CHECK_EQUAL(table_1_keys[0], obj.get_backlink(*table1, col_link2, 0));
     auto tv = obj.get_backlink_view(table1, col_link2);
     CHECK_EQUAL(tv.size(), 1);
-#ifdef LEGACY_TESTS
+
     // remove a column (moving link column back)'
-    // Enable this once columns are key based.
-    col_link2 -= 1; // TODO: When we have stable col ids, this should be removed
     table1->remove_column(col_1);
     CHECK_EQUAL(1, table2->get_object(table_2_keys[1]).get_backlink_count(*table1, col_link2));
     CHECK_EQUAL(table_1_keys[0], table2->get_object(table_2_keys[1]).get_backlink(*table1, col_link2, 0));
-#endif
+
     table1->remove_column(col_link2);
     tv.sync_if_needed();
     CHECK_EQUAL(tv.size(), 0);
@@ -240,10 +231,9 @@ TEST(Links_SetLinkLogicErrors)
 
     origin->remove_object(obj.get_key());
     CHECK_THROW(obj.set(col0, ObjKey(10)), InvalidKey);
-#ifdef LEGACY_TESTS
+
     group.remove_table("origin");
-    CHECK_LOGIC_ERROR(obj.set(col0, ObjKey(10)), LogicError::detached_accessor);
-#endif
+    CHECK_LOGIC_ERROR(obj.set(col0, ObjKey(10)), LogicError::column_does_not_exist);
 }
 
 
@@ -326,86 +316,6 @@ TEST(Links_Deletes)
     }
 }
 
-
-#ifdef LEGACY_TESTS
-TEST(Links_Inserts)
-{
-    Group group;
-
-    TableRef table1 = group.add_table("table1");
-    test_table_add_columns(table1);
-    test_table_add_row(table1, "test1", 1, true, Mon);
-    test_table_add_row(table1, "test2", 2, false, Tue);
-    test_table_add_row(table1, "test3", 3, true, Wed);
-
-    // create table with links to table1
-    TableRef table2 = group.add_table("table2");
-    size_t col_link = table2->add_column_link(type_Link, "link", *TableRef(table1));
-    CHECK_EQUAL(table1, table2->get_link_target(col_link));
-
-    // add a few links
-    table2->insert_empty_row(0);
-    table2->set_link(col_link, 0, 1);
-    table2->insert_empty_row(1);
-    table2->set_link(col_link, 1, 0);
-    table2->insert_empty_row(2);
-    table2->set_link(col_link, 2, 2);
-
-    table1->insert_empty_row(0);
-    table1->insert_empty_row(0);
-    table1->insert_empty_row(0);
-
-    CHECK_EQUAL(4, table2->get_link(col_link, 0));
-    CHECK_EQUAL(3, table2->get_link(col_link, 1));
-    CHECK_EQUAL(5, table2->get_link(col_link, 2));
-}
-
-TEST(Links_InsertTrackedByBacklinks)
-{
-    Group group;
-
-    auto table1 = group.add_table("target");
-    test_table_add_columns(table1);
-    test_table_add_row(table1, "test1", 1, true, Mon);
-    test_table_add_row(table1, "test2", 2, false, Tue);
-    test_table_add_row(table1, "test3", 3, true, Wed);
-
-    // create table with links to table1
-    TableRef table2 = group.add_table("table2");
-    size_t col_link = table2->add_column_link(type_Link, "link", *TableRef(table1));
-    CHECK_EQUAL(table1, table2->get_link_target(col_link));
-
-    // add a few links
-    table2->insert_empty_row(0);
-    table2->set_link(col_link, 0, 1);
-    table2->insert_empty_row(1);
-    table2->set_link(col_link, 1, 0);
-    table2->insert_empty_row(2);
-    table2->set_link(col_link, 2, 2);
-
-    // verify backlinks
-    CHECK_EQUAL(1, table1->get_backlink_count(0, *table2, col_link));
-    CHECK_EQUAL(1, table1->get_backlink(0, *table2, col_link, 0));
-    CHECK_EQUAL(1, table1->get_backlink_count(0, *table2, col_link));
-    CHECK_EQUAL(0, table1->get_backlink(1, *table2, col_link, 0));
-    CHECK_EQUAL(1, table1->get_backlink_count(0, *table2, col_link));
-    CHECK_EQUAL(2, table1->get_backlink(2, *table2, col_link, 0));
-
-    // insert in table 2, verify that backlinks are updated
-    table2->insert_empty_row(0);
-    table2->insert_empty_row(0);
-    table2->insert_empty_row(0);
-
-    // verify
-    CHECK_EQUAL(1, table1->get_backlink_count(0, *table2, col_link));
-    CHECK_EQUAL(4, table1->get_backlink(0, *table2, col_link, 0));
-    CHECK_EQUAL(1, table1->get_backlink_count(0, *table2, col_link));
-    CHECK_EQUAL(3, table1->get_backlink(1, *table2, col_link, 0));
-    CHECK_EQUAL(1, table1->get_backlink_count(0, *table2, col_link));
-    CHECK_EQUAL(5, table1->get_backlink(2, *table2, col_link, 0));
-}
-
-
 TEST(Links_Multi)
 {
     // Multiple links to same rows
@@ -413,67 +323,65 @@ TEST(Links_Multi)
 
     auto table1 = group.add_table("target");
     test_table_add_columns(table1);
-    test_table_add_row(table1, "test1", 1, true, Mon);
-    test_table_add_row(table1, "test2", 2, false, Tue);
-    test_table_add_row(table1, "test3", 3, true, Wed);
+    table1->create_object().set_all("test1", 1, true, int64_t(Mon));
+    Obj obj1 = table1->create_object().set_all("test2", 2, false, int64_t(Tue));
+    Obj obj2 = table1->create_object().set_all("test3", 3, true, int64_t(Wed));
+    ObjKey key1 = obj1.get_key();
+    ObjKey key2 = obj2.get_key();
 
     // create table with links to table1
     TableRef table2 = group.add_table("table2");
-    size_t col_link = table2->add_column_link(type_Link, "link", *TableRef(table1));
+    auto col_link = table2->add_column_link(type_Link, "link", *TableRef(table1));
     CHECK_EQUAL(table1, table2->get_link_target(col_link));
 
     // add a few links pointing to same row
-    table2->insert_empty_row(0);
-    table2->set_link(col_link, 0, 1);
-    table2->insert_empty_row(1);
-    table2->set_link(col_link, 1, 1);
-    table2->insert_empty_row(2);
-    table2->set_link(col_link, 2, 1);
+    auto k0 = table2->create_object().set(col_link, key1).get_key();
+    auto k1 = table2->create_object().set(col_link, key1).get_key();
+    auto k2 = table2->create_object().set(col_link, key1).get_key();
 
-    CHECK_EQUAL(3, table1->get_backlink_count(1, *table2, col_link));
-    CHECK_EQUAL(0, table1->get_backlink(1, *table2, col_link, 0));
-    CHECK_EQUAL(1, table1->get_backlink(1, *table2, col_link, 1));
-    CHECK_EQUAL(2, table1->get_backlink(1, *table2, col_link, 2));
+    CHECK_EQUAL(3, obj1.get_backlink_count(*table2, col_link));
+    CHECK_EQUAL(k0, obj1.get_backlink(*table2, col_link, 0));
+    CHECK_EQUAL(k1, obj1.get_backlink(*table2, col_link, 1));
+    CHECK_EQUAL(k2, obj1.get_backlink(*table2, col_link, 2));
 
     // nullify a link
-    table2->nullify_link(col_link, 1);
-    CHECK_EQUAL(2, table1->get_backlink_count(1, *table2, col_link));
-    CHECK_EQUAL(0, table1->get_backlink(1, *table2, col_link, 0));
-    CHECK_EQUAL(2, table1->get_backlink(1, *table2, col_link, 1));
+    table2->get_object(k1).set_null(col_link);
+    CHECK_EQUAL(2, obj1.get_backlink_count(*table2, col_link));
+    CHECK_EQUAL(k0, obj1.get_backlink(*table2, col_link, 0));
+    CHECK_EQUAL(k2, obj1.get_backlink(*table2, col_link, 1));
 
     // nullify one more to reduce to one link (test re-inlining)
-    table2->nullify_link(col_link, 0);
-    CHECK_EQUAL(1, table1->get_backlink_count(1, *table2, col_link));
-    CHECK_EQUAL(2, table1->get_backlink(1, *table2, col_link, 0));
+    table2->get_object(k0).set_null(col_link);
+    CHECK_EQUAL(1, obj1.get_backlink_count(*table2, col_link));
+    CHECK_EQUAL(k2, obj1.get_backlink(*table2, col_link, 0));
 
     // re-add links
-    table2->set_link(col_link, 0, 1);
-    table2->set_link(col_link, 1, 1);
+    table2->get_object(k0).set(col_link, k1);
+    table2->get_object(k1).set(col_link, k1);
 
     // remove a row
-    table2->move_last_over(0);
-    CHECK_EQUAL(2, table1->get_backlink_count(1, *table2, col_link));
-    CHECK_EQUAL(0, table1->get_backlink(1, *table2, col_link, 0));
-    CHECK_EQUAL(1, table1->get_backlink(1, *table2, col_link, 1));
+    table2->remove_object(k0);
+    CHECK_EQUAL(2, obj1.get_backlink_count(*table2, col_link));
+    CHECK_EQUAL(k2, obj1.get_backlink(*table2, col_link, 0));
+    CHECK_EQUAL(k1, obj1.get_backlink(*table2, col_link, 1));
 
     // add some more links and see that they get nullified when the target
     // is removed
-    table2->insert_empty_row(2);
-    table2->set_link(col_link, 2, 2);
-    table2->insert_empty_row(3);
-    table2->set_link(col_link, 3, 2);
-    CHECK_EQUAL(2, table1->get_backlink_count(2, *table2, col_link));
+    auto k3 = table2->create_object().set(col_link, key2).get_key();
+    auto k4 = table2->create_object().set(col_link, key2).get_key();
+    CHECK_EQUAL(2, obj2.get_backlink_count(*table2, col_link));
 
-    table1->move_last_over(1);
-    CHECK(table2->is_null_link(col_link, 0));
-    CHECK(table2->is_null_link(col_link, 1));
-    CHECK(!table2->is_null_link(col_link, 2));
-    CHECK(!table2->is_null_link(col_link, 3));
+    obj1.remove();
+    CHECK(table2->get_object(k1).is_null(col_link));
+    CHECK(table2->get_object(k2).is_null(col_link));
+    CHECK_NOT(table2->get_object(k3).is_null(col_link));
+    CHECK_NOT(table2->get_object(k4).is_null(col_link));
 
     // remove all rows from target and verify that links get nullified
     table1->clear();
-    CHECK(table2->is_null_link(col_link, 2));
-    CHECK(table2->is_null_link(col_link, 3));
+    for (auto o : *table2) {
+        CHECK(o.is_null(col_link));
+    }
 }
 
 
@@ -483,28 +391,24 @@ TEST(Links_MultiToSame)
 
     auto table1 = group.add_table("target");
     test_table_add_columns(table1);
-    test_table_add_row(table1, "test1", 1, true, Mon);
-    test_table_add_row(table1, "test2", 2, false, Tue);
-    test_table_add_row(table1, "test3", 3, true, Wed);
+    Obj obj0 = table1->create_object().set_all("test1", 1, true, int64_t(Mon));
+    ObjKey key0 = obj0.get_key();
 
     // create table with multiple links to table1
     TableRef table2 = group.add_table("table2");
-    size_t col_link1 = table2->add_column_link(type_Link, "link1", *TableRef(table1));
-    size_t col_link2 = table2->add_column_link(type_Link, "link2", *TableRef(table1));
+    auto col_link1 = table2->add_column_link(type_Link, "link1", *table1);
+    auto col_link2 = table2->add_column_link(type_Link, "link2", *table1);
     CHECK_EQUAL(table1, table2->get_link_target(col_link1));
     CHECK_EQUAL(table1, table2->get_link_target(col_link2));
 
-    table2->add_empty_row();
-    table2->set_link(col_link1, 0, 0);
-    table2->set_link(col_link2, 0, 0);
-    CHECK_EQUAL(1, table1->get_backlink_count(0, *table2, col_link1));
-    CHECK_EQUAL(1, table1->get_backlink_count(0, *table2, col_link2));
+    table2->create_object().set_all(key0, key0);
+    CHECK_EQUAL(1, obj0.get_backlink_count(*table2, col_link1));
+    CHECK_EQUAL(1, obj0.get_backlink_count(*table2, col_link2));
 
-    table2->move_last_over(0);
-    CHECK_EQUAL(0, table1->get_backlink_count(0, *table2, col_link1));
-    CHECK_EQUAL(0, table1->get_backlink_count(0, *table2, col_link2));
+    table2->begin()->remove();
+    CHECK_EQUAL(0, obj0.get_backlink_count(*table2, col_link1));
+    CHECK_EQUAL(0, obj0.get_backlink_count(*table2, col_link2));
 }
-#endif
 
 TEST(Links_LinkList_TableOps)
 {
@@ -753,54 +657,47 @@ TEST(Links_AddBacklinkToTableWithEnumColumns)
     table->add_column_link(type_Link, "link2", *table);
 }
 
-#ifdef LEGACY_TESTS
 TEST(Links_LinkList_Inserts)
 {
     Group group;
 
     auto target = group.add_table("target");
     test_table_add_columns(target);
-    test_table_add_row(target, "test1", 1, true, Mon);
-    test_table_add_row(target, "test2", 2, false, Tue);
-    test_table_add_row(target, "test3", 3, true, Wed);
+    auto col_date = target->get_column_key("fourth");
+    Obj obj0 = target->create_object().set_all("test1", 1, true, int64_t(Mon));
+    Obj obj1 = target->create_object().set_all("test2", 2, false, int64_t(Tue));
+    Obj obj2 = target->create_object().set_all("test3", 3, true, int64_t(Wed));
+    ObjKey key0 = obj0.get_key();
+    ObjKey key1 = obj1.get_key();
+    ObjKey key2 = obj2.get_key();
 
     // create table with links to target table
     TableRef origin = group.add_table("origin");
-    size_t col_link = origin->add_column_link(type_LinkList, "links", *TableRef(target));
+    auto col_link = origin->add_column_link(type_LinkList, "links", *target);
     CHECK_EQUAL(target, origin->get_link_target(col_link));
 
-    origin->insert_empty_row(0);
-
-    LinkViewRef links = origin->get_linklist(col_link, 0);
+    auto links = origin->create_object().get_linklist_ptr(col_link);
+    auto k0 = links->ConstLstBase::get_key();
 
     // add several links to a single linklist
-    links->add(2);
-    links->add(1);
-    links->add(0);
-    CHECK(!origin->linklist_is_empty(col_link, 0));
+    links->add(key2);
+    links->add(key1);
+    links->add(key0);
+
     CHECK_EQUAL(3, links->size());
-    CHECK_EQUAL(2, links->get(0).get_index());
-    CHECK_EQUAL(1, links->get(1).get_index());
-    CHECK_EQUAL(0, links->get(2).get_index());
-    CHECK_EQUAL(Wed, Days((*links)[0].get_int(3)));
+    CHECK_EQUAL(key2, links->get(0));
+    CHECK_EQUAL(key1, links->get(1));
+    CHECK_EQUAL(key0, links->get(2));
+    CHECK_EQUAL(Wed, Days((*links)[0].get<Int>(col_date)));
 
     // verify that backlinks was set correctly
-    CHECK_EQUAL(1, target->get_backlink_count(0, *origin, col_link));
-    CHECK_EQUAL(0, target->get_backlink(0, *origin, col_link, 0));
-    CHECK_EQUAL(1, target->get_backlink_count(1, *origin, col_link));
-    CHECK_EQUAL(0, target->get_backlink(1, *origin, col_link, 0));
-    CHECK_EQUAL(1, target->get_backlink_count(2, *origin, col_link));
-    CHECK_EQUAL(0, target->get_backlink(2, *origin, col_link, 0));
-
-    target->insert_empty_row(0);
-
-    // verify that all links in the linklist has tracked the movement
-    CHECK_EQUAL(3, links->size());
-    CHECK_EQUAL(3, links->get(0).get_index());
-    CHECK_EQUAL(2, links->get(1).get_index());
-    CHECK_EQUAL(1, links->get(2).get_index());
+    CHECK_EQUAL(1, obj0.get_backlink_count(*origin, col_link));
+    CHECK_EQUAL(k0, obj0.get_backlink(*origin, col_link, 0));
+    CHECK_EQUAL(1, obj1.get_backlink_count(*origin, col_link));
+    CHECK_EQUAL(k0, obj1.get_backlink(*origin, col_link, 0));
+    CHECK_EQUAL(1, obj2.get_backlink_count(*origin, col_link));
+    CHECK_EQUAL(k0, obj2.get_backlink(*origin, col_link, 0));
 }
-
 
 TEST(Links_LinkList_Backlinks)
 {
@@ -808,348 +705,82 @@ TEST(Links_LinkList_Backlinks)
 
     auto target = group.add_table("target");
     test_table_add_columns(target);
-    test_table_add_row(target, "test1", 1, true, Mon);
-    test_table_add_row(target, "test2", 2, false, Tue);
-    test_table_add_row(target, "test3", 3, true, Wed);
+    Obj obj0 = target->create_object().set_all("test1", 1, true, int64_t(Mon));
+    Obj obj1 = target->create_object().set_all("test2", 2, false, int64_t(Tue));
+    Obj obj2 = target->create_object().set_all("test3", 3, true, int64_t(Wed));
+    ObjKey key0 = obj0.get_key();
+    ObjKey key1 = obj1.get_key();
+    ObjKey key2 = obj2.get_key();
 
     // create table with links to target table
     TableRef origin = group.add_table("origin");
-    size_t col_link = origin->add_column_link(type_LinkList, "links", *TableRef(target));
+    auto col_link = origin->add_column_link(type_LinkList, "links", *target);
     CHECK_EQUAL(target, origin->get_link_target(col_link));
 
-    origin->insert_empty_row(0);
+    Obj origin_obj = origin->create_object();
+    auto links = origin_obj.get_linklist_ptr(col_link);
+    auto k0 = links->ConstLstBase::get_key();
 
-    LinkViewRef links = origin->get_linklist(col_link, 0);
-    links->add(2);
-    links->add(1);
-    links->add(0);
+    // add several links to a single linklist
+    links->add(key2);
+    links->add(key1);
+    links->add(key0);
 
     // remove a target row and check that origin links are removed as well
-    target->move_last_over(1);
-    CHECK_EQUAL(2, origin->get_link_count(col_link, 0));
-    CHECK_EQUAL(1, links->get(0).get_index());
-    CHECK_EQUAL(0, links->get(1).get_index());
+    target->remove_object(key1);
+    CHECK_EQUAL(2, origin_obj.get_link_count(col_link));
+    CHECK_EQUAL(key2, links->get(0));
+    CHECK_EQUAL(key0, links->get(1));
 
     // remove all
     target->clear();
-    CHECK_EQUAL(0, origin->get_link_count(col_link, 0));
+    CHECK_EQUAL(0, origin_obj.get_link_count(col_link));
     CHECK(links->is_empty());
 
     // re-add rows to target
-    test_table_add_row(target, "test1", 1, true, Mon);
-    test_table_add_row(target, "test2", 2, false, Tue);
-    test_table_add_row(target, "test3", 3, true, Wed);
+    obj0 = target->create_object().set_all("test1", 1, true, int64_t(Mon));
+    obj1 = target->create_object().set_all("test2", 2, false, int64_t(Tue));
+    obj2 = target->create_object().set_all("test3", 3, true, int64_t(Wed));
 
     // add more rows with links
-    origin->add_empty_row();
-    origin->add_empty_row();
-    LinkViewRef links1 = origin->get_linklist(col_link, 1);
-    LinkViewRef links2 = origin->get_linklist(col_link, 2);
-
-    // add links from each row
-    links->add(2);
-    links1->add(1);
-    links2->add(0);
+    links->add(obj2.get_key());
+    auto links1 = origin->create_object().get_linklist_ptr(col_link);
+    auto links2 = origin->create_object().get_linklist_ptr(col_link);
+    links1->add(obj1.get_key());
+    links2->add(obj0.get_key());
+    auto k1 = links1->ConstLstBase::get_key();
+    auto k2 = links2->ConstLstBase::get_key();
 
     // Verify backlinks
-    CHECK_EQUAL(1, target->get_backlink_count(0, *origin, col_link));
-    CHECK_EQUAL(2, target->get_backlink(0, *origin, col_link, 0));
-    CHECK_EQUAL(1, target->get_backlink_count(1, *origin, col_link));
-    CHECK_EQUAL(1, target->get_backlink(1, *origin, col_link, 0));
-    CHECK_EQUAL(1, target->get_backlink_count(2, *origin, col_link));
-    CHECK_EQUAL(0, target->get_backlink(2, *origin, col_link, 0));
+    CHECK_EQUAL(1, obj0.get_backlink_count(*origin, col_link));
+    CHECK_EQUAL(k2, obj0.get_backlink(*origin, col_link, 0));
+    CHECK_EQUAL(1, obj1.get_backlink_count(*origin, col_link));
+    CHECK_EQUAL(k1, obj1.get_backlink(*origin, col_link, 0));
+    CHECK_EQUAL(1, obj2.get_backlink_count(*origin, col_link));
+    CHECK_EQUAL(k0, obj2.get_backlink(*origin, col_link, 0));
 
     // delete a row and make sure backlinks are updated
-    origin->move_last_over(0);
-    CHECK_EQUAL(1, target->get_backlink_count(0, *origin, col_link));
-    CHECK_EQUAL(0, target->get_backlink(0, *origin, col_link, 0));
-    CHECK_EQUAL(1, target->get_backlink_count(1, *origin, col_link));
-    CHECK_EQUAL(1, target->get_backlink(1, *origin, col_link, 0));
-    CHECK_EQUAL(0, target->get_backlink_count(2, *origin, col_link));
+    origin->remove_object(k0);
+    CHECK_EQUAL(1, obj0.get_backlink_count(*origin, col_link));
+    CHECK_EQUAL(k2, obj0.get_backlink(*origin, col_link, 0));
+    CHECK_EQUAL(1, obj1.get_backlink_count(*origin, col_link));
+    CHECK_EQUAL(k1, obj1.get_backlink(*origin, col_link, 0));
+    CHECK_EQUAL(0, obj2.get_backlink_count(*origin, col_link));
 
     // delete last row and make sure backlinks are updated
-    origin->move_last_over(1);
-    CHECK_EQUAL(1, target->get_backlink_count(0, *origin, col_link));
-    CHECK_EQUAL(0, target->get_backlink(0, *origin, col_link, 0));
-    CHECK_EQUAL(0, target->get_backlink_count(1, *origin, col_link));
-    CHECK_EQUAL(0, target->get_backlink_count(2, *origin, col_link));
+    origin->remove_object(k2);
+    CHECK_EQUAL(0, obj0.get_backlink_count(*origin, col_link));
+    CHECK_EQUAL(1, obj1.get_backlink_count(*origin, col_link));
+    CHECK_EQUAL(k1, obj1.get_backlink(*origin, col_link, 0));
+    CHECK_EQUAL(0, obj2.get_backlink_count(*origin, col_link));
 
     // remove all link lists and make sure backlinks are updated
     origin->clear();
-    CHECK_EQUAL(0, target->get_backlink_count(0, *origin, col_link));
-    CHECK_EQUAL(0, target->get_backlink_count(1, *origin, col_link));
-    CHECK_EQUAL(0, target->get_backlink_count(2, *origin, col_link));
+    CHECK_EQUAL(0, obj0.get_backlink_count(*origin, col_link));
+    CHECK_EQUAL(0, obj1.get_backlink_count(*origin, col_link));
+    CHECK_EQUAL(0, obj2.get_backlink_count(*origin, col_link));
 }
 
-
-TEST(Links_LinkList_AccessorUpdates)
-{
-    Group group;
-
-    auto target = group.add_table("target");
-    test_table_add_columns(target);
-    test_table_add_row(target, "test1", 1, true, Mon);
-    test_table_add_row(target, "test2", 2, false, Tue);
-    test_table_add_row(target, "test3", 3, true, Wed);
-
-    // create table with links to target table
-    TableRef origin = group.add_table("origin");
-    size_t col_link = origin->add_column_link(type_LinkList, "links", *TableRef(target));
-    CHECK_EQUAL(target, origin->get_link_target(col_link));
-
-    origin->insert_empty_row(0);
-    origin->insert_empty_row(1);
-    origin->insert_empty_row(2);
-
-    LinkViewRef links0 = origin->get_linklist(col_link, 0);
-    links0->add(2);
-    links0->add(1);
-    links0->add(0);
-
-    LinkViewRef links1 = origin->get_linklist(col_link, 1);
-    links1->add(2);
-    links1->add(1);
-    links1->add(0);
-
-    LinkViewRef links2 = origin->get_linklist(col_link, 2);
-    links2->add(2);
-    links2->add(1);
-    links2->add(0);
-
-    CHECK_EQUAL(0, links0->get_origin_row_index());
-    CHECK_EQUAL(1, links1->get_origin_row_index());
-    CHECK_EQUAL(2, links2->get_origin_row_index());
-
-    // get the same linkview twice
-    LinkViewRef links2again = origin->get_linklist(col_link, 2);
-    CHECK_EQUAL(links2->get_origin_row_index(), links2again->get_origin_row_index());
-
-    // delete a row and make sure involved accessors are updated
-    origin->move_last_over(0);
-    CHECK_EQUAL(false, links0->is_attached());
-    CHECK_EQUAL(0, links2->get_origin_row_index());
-    CHECK_EQUAL(0, links2again->get_origin_row_index());
-
-    // clear and make sure all accessors get detached
-    origin->clear();
-    CHECK_EQUAL(false, links1->is_attached());
-    CHECK_EQUAL(false, links2->is_attached());
-    CHECK_EQUAL(false, links2again->is_attached());
-}
-
-
-TEST(Links_LinkListInsert_AccessorUpdates)
-{
-    Group group;
-
-    auto target = group.add_table("target");
-    test_table_add_columns(target);
-    test_table_add_row(target, "test1", 1, true, Mon);
-    test_table_add_row(target, "test2", 2, false, Tue);
-    test_table_add_row(target, "test3", 3, true, Wed);
-
-    // create table with links to target table
-    TableRef origin = group.add_table("origin");
-    size_t col_link = origin->add_column_link(type_LinkList, "links", *TableRef(target));
-    CHECK_EQUAL(target, origin->get_link_target(col_link));
-
-    origin->insert_empty_row(0);
-    origin->insert_empty_row(1);
-    origin->insert_empty_row(2);
-
-    LinkViewRef links0 = origin->get_linklist(col_link, 0);
-    links0->add(2);
-    links0->add(1);
-    links0->add(0);
-
-    LinkViewRef links1 = origin->get_linklist(col_link, 1);
-    links1->add(2);
-    links1->add(1);
-    links1->add(0);
-
-    LinkViewRef links2 = origin->get_linklist(col_link, 2);
-    links2->add(2);
-    links2->add(1);
-    links2->add(0);
-
-    CHECK_EQUAL(0, links0->get_origin_row_index());
-    CHECK_EQUAL(1, links1->get_origin_row_index());
-    CHECK_EQUAL(2, links2->get_origin_row_index());
-
-    // verify that backlinks was set correctly
-    CHECK_EQUAL(3, target->get_backlink_count(0, *origin, col_link));
-    CHECK_EQUAL(0, target->get_backlink(0, *origin, col_link, 0));
-    CHECK_EQUAL(1, target->get_backlink(0, *origin, col_link, 1));
-    CHECK_EQUAL(2, target->get_backlink(0, *origin, col_link, 2));
-    CHECK_EQUAL(3, target->get_backlink_count(1, *origin, col_link));
-    CHECK_EQUAL(0, target->get_backlink(1, *origin, col_link, 0));
-    CHECK_EQUAL(1, target->get_backlink(1, *origin, col_link, 1));
-    CHECK_EQUAL(2, target->get_backlink(1, *origin, col_link, 2));
-    CHECK_EQUAL(3, target->get_backlink_count(2, *origin, col_link));
-    CHECK_EQUAL(0, target->get_backlink(2, *origin, col_link, 0));
-    CHECK_EQUAL(1, target->get_backlink(2, *origin, col_link, 1));
-    CHECK_EQUAL(2, target->get_backlink(2, *origin, col_link, 2));
-
-    // accessors follow movement of linklist entries
-    origin->insert_empty_row(0);
-    CHECK_EQUAL(1, links0->get_origin_row_index());
-    CHECK_EQUAL(2, links1->get_origin_row_index());
-    CHECK_EQUAL(3, links2->get_origin_row_index());
-
-    // verify that backlinks was updated correctly
-    CHECK_EQUAL(3, target->get_backlink_count(0, *origin, col_link));
-    CHECK_EQUAL(1, target->get_backlink(0, *origin, col_link, 0));
-    CHECK_EQUAL(2, target->get_backlink(0, *origin, col_link, 1));
-    CHECK_EQUAL(3, target->get_backlink(0, *origin, col_link, 2));
-    CHECK_EQUAL(3, target->get_backlink_count(1, *origin, col_link));
-    CHECK_EQUAL(1, target->get_backlink(1, *origin, col_link, 0));
-    CHECK_EQUAL(2, target->get_backlink(1, *origin, col_link, 1));
-    CHECK_EQUAL(3, target->get_backlink(1, *origin, col_link, 2));
-    CHECK_EQUAL(3, target->get_backlink_count(2, *origin, col_link));
-    CHECK_EQUAL(1, target->get_backlink(2, *origin, col_link, 0));
-    CHECK_EQUAL(2, target->get_backlink(2, *origin, col_link, 1));
-    CHECK_EQUAL(3, target->get_backlink(2, *origin, col_link, 2));
-
-
-    // and changes of refs are visible through the accessors
-    target->insert_empty_row(0);
-    CHECK_EQUAL(1, links0->get_origin_row_index());
-    CHECK_EQUAL(2, links1->get_origin_row_index());
-    CHECK_EQUAL(3, links2->get_origin_row_index());
-}
-
-TEST(Links_LinkList_SwapRows)
-{
-    Group group;
-
-    auto target = group.add_table("target");
-    test_table_add_columns(target);
-    test_table_add_row(target, "test1", 1, true, Mon);
-    test_table_add_row(target, "test2", 2, false, Tue);
-    test_table_add_row(target, "test3", 3, true, Wed);
-
-    // create table with links to target table
-    TableRef origin = group.add_table("origin");
-    size_t col_link = origin->add_column_link(type_LinkList, "links", *TableRef(target));
-    CHECK_EQUAL(target, origin->get_link_target(col_link));
-
-    origin->insert_empty_row(0);
-    origin->insert_empty_row(1);
-    origin->insert_empty_row(2);
-
-    LinkViewRef links0 = origin->get_linklist(col_link, 0);
-    links0->add(2);
-    links0->add(1);
-    links0->add(0);
-
-    LinkViewRef links1 = origin->get_linklist(col_link, 1);
-    links1->add(2);
-    links1->add(1);
-    links1->add(0);
-
-    LinkViewRef links2 = origin->get_linklist(col_link, 2);
-    links2->add(2);
-    links2->add(1);
-    links2->add(0);
-
-    CHECK_EQUAL(0, links0->get_origin_row_index());
-    CHECK_EQUAL(1, links1->get_origin_row_index());
-    CHECK_EQUAL(2, links2->get_origin_row_index());
-
-    origin->swap_rows(1, 2);
-
-    // Check that accessors were updated
-    CHECK_EQUAL(0, links0->get_origin_row_index());
-    CHECK_EQUAL(2, links1->get_origin_row_index());
-    CHECK_EQUAL(1, links2->get_origin_row_index());
-
-    // verify that backlinks was updated correctly
-    CHECK_EQUAL(3, target->get_backlink_count(0, *origin, col_link));
-    CHECK_EQUAL(0, target->get_backlink(0, *origin, col_link, 0));
-    CHECK_EQUAL(2, target->get_backlink(0, *origin, col_link, 1));
-    CHECK_EQUAL(1, target->get_backlink(0, *origin, col_link, 2));
-    CHECK_EQUAL(3, target->get_backlink_count(1, *origin, col_link));
-    CHECK_EQUAL(0, target->get_backlink(1, *origin, col_link, 0));
-    CHECK_EQUAL(2, target->get_backlink(1, *origin, col_link, 1));
-    CHECK_EQUAL(1, target->get_backlink(1, *origin, col_link, 2));
-    CHECK_EQUAL(3, target->get_backlink_count(2, *origin, col_link));
-    CHECK_EQUAL(0, target->get_backlink(2, *origin, col_link, 0));
-    CHECK_EQUAL(2, target->get_backlink(2, *origin, col_link, 1));
-    CHECK_EQUAL(1, target->get_backlink(2, *origin, col_link, 2));
-
-    // Release the accessor so we can test swapping when only one of
-    // the two rows has an accessor.
-    links0.reset();
-
-    // Row 0 has no accessor.
-    origin->swap_rows(0, 1);
-    CHECK_EQUAL(2, links1->get_origin_row_index());
-    CHECK_EQUAL(0, links2->get_origin_row_index());
-
-    // Row 1 has no accessor.
-    origin->swap_rows(0, 1);
-    CHECK_EQUAL(2, links1->get_origin_row_index());
-    CHECK_EQUAL(1, links2->get_origin_row_index());
-}
-
-TEST(Links_LinkList_TargetSwapRows)
-{
-    Group group;
-
-    TableRef target = group.add_table("target");
-    target->add_column(type_String, "string");
-    target->add_empty_row(3);
-    target->set_string(0, 0, "test1");
-    target->set_string(0, 1, "test2");
-    target->set_string(0, 2, "test3");
-
-    // create table with links to target table
-    TableRef origin = group.add_table("origin");
-    size_t col_link = origin->add_column_link(type_LinkList, "links", *target);
-    CHECK_EQUAL(target, origin->get_link_target(col_link));
-
-    origin->insert_empty_row(0);
-    origin->insert_empty_row(1);
-    origin->insert_empty_row(2);
-
-    LinkViewRef links0 = origin->get_linklist(col_link, 0);
-    links0->add(2);
-    links0->add(1);
-    links0->add(0);
-
-    LinkViewRef links1 = origin->get_linklist(col_link, 1);
-    links1->add(2);
-    links1->add(1);
-    links1->add(1);
-
-    LinkViewRef links2 = origin->get_linklist(col_link, 2);
-    links2->add(2);
-    links2->add(2);
-    links2->add(0);
-
-    CHECK_EQUAL(0, links0->get_origin_row_index());
-    CHECK_EQUAL(1, links1->get_origin_row_index());
-    CHECK_EQUAL(2, links2->get_origin_row_index());
-
-    // FIXME: Table::swap_rows does not currently exist, so call through the
-    // private API for now.
-    _impl::TableFriend::do_swap_rows(*target, 1, 2);
-
-    // Check that the String column did the swap
-    CHECK_EQUAL(target->get_string(0, 1), "test3");
-    CHECK_EQUAL(target->get_string(0, 2), "test2");
-
-    // Check that links in the linklist were updated
-    CHECK_EQUAL(links0->get(0).get_index(), 1);
-    CHECK_EQUAL(links0->get(1).get_index(), 2);
-    CHECK_EQUAL(links0->get(2).get_index(), 0);
-    CHECK_EQUAL(links1->get(0).get_index(), 1);
-    CHECK_EQUAL(links1->get(1).get_index(), 2);
-    CHECK_EQUAL(links1->get(2).get_index(), 2);
-    CHECK_EQUAL(links2->get(0).get_index(), 1);
-    CHECK_EQUAL(links2->get(1).get_index(), 1);
-    CHECK_EQUAL(links2->get(2).get_index(), 0);
-}
 
 TEST(Links_LinkList_FindByOrigin)
 {
@@ -1157,49 +788,54 @@ TEST(Links_LinkList_FindByOrigin)
 
     auto target = group.add_table("target");
     test_table_add_columns(target);
-    test_table_add_row(target, "test1", 1, true, Mon);
-    test_table_add_row(target, "test2", 2, false, Tue);
-    test_table_add_row(target, "test3", 3, true, Wed);
+    Obj obj0 = target->create_object().set_all("test1", 1, true, int64_t(Mon));
+    Obj obj1 = target->create_object().set_all("test2", 2, false, int64_t(Tue));
+    Obj obj2 = target->create_object().set_all("test3", 3, true, int64_t(Wed));
+    ObjKey key0 = obj0.get_key();
+    ObjKey key1 = obj1.get_key();
+    ObjKey key2 = obj2.get_key();
 
     // create table with links to target table
     TableRef origin = group.add_table("origin");
-    size_t col_link = origin->add_column_link(type_LinkList, "links", *TableRef(target));
+    auto col_link = origin->add_column_link(type_LinkList, "links", *target);
+    CHECK_EQUAL(target, origin->get_link_target(col_link));
 
-    origin->add_empty_row();
-    LinkViewRef links = origin->get_linklist(col_link, 0);
-    links->add(2);
-    links->add(1);
-    links->add(0);
+    auto links = origin->create_object().get_linklist_ptr(col_link);
+    links->add(key2);
+    links->add(key1);
+    links->add(key0);
 
-    CHECK_EQUAL(0, links->find(2));
-    CHECK_EQUAL(1, links->find(1));
-    CHECK_EQUAL(2, links->find(0));
+    CHECK_EQUAL(0, links->find_first(key2));
+    CHECK_EQUAL(1, links->find_first(key1));
+    CHECK_EQUAL(2, links->find_first(key0));
 
     links->remove(0);
-    CHECK_EQUAL(not_found, links->find(2));
+    CHECK_EQUAL(not_found, links->find_first(key2));
 }
 
 
 TEST(Links_CircularAccessors)
 {
     SHARED_GROUP_TEST_PATH(path);
-    SharedGroup sg(path);
+    auto db = DB::create(path);
+    ColKey col1;
+    ColKey col2;
     {
-        WriteTransaction wt(sg);
+        WriteTransaction wt(db);
         TableRef table1 = wt.add_table("table1");
         TableRef table2 = wt.add_table("table2");
-        table1->add_column_link(type_Link, "link", *table2);
-        table2->add_column_link(type_Link, "link", *table1);
-        CHECK_EQUAL(table1, table2->get_link_target(0));
-        CHECK_EQUAL(table2, table1->get_link_target(0));
+        col1 = table1->add_column_link(type_Link, "link", *table2);
+        col2 = table2->add_column_link(type_Link, "link", *table1);
+        CHECK_EQUAL(table1, table2->get_link_target(col1));
+        CHECK_EQUAL(table2, table1->get_link_target(col2));
         wt.commit();
     }
     {
-        WriteTransaction wt(sg);
+        WriteTransaction wt(db);
         TableRef table1 = wt.get_table("table1");
         TableRef table2 = wt.get_table("table2");
-        CHECK_EQUAL(table1, table2->get_link_target(0));
-        CHECK_EQUAL(table2, table1->get_link_target(0));
+        CHECK_EQUAL(table1, table2->get_link_target(col1));
+        CHECK_EQUAL(table2, table1->get_link_target(col2));
     }
 }
 
@@ -1207,15 +843,14 @@ TEST(Links_CircularAccessors)
 TEST(Links_Transactions)
 {
     SHARED_GROUP_TEST_PATH(path);
-    SharedGroup sg(path);
+    auto db = DB::create(path);
 
-    size_t name_col = 0;
-    size_t dog_col = 1;
-    size_t tim_row = 0;
-    size_t harvey_row = 0;
+    ColKey dog_col;
+    ObjKey tim_key;
+    ObjKey harvey_key;
 
     {
-        WriteTransaction group(sg);
+        WriteTransaction group(db);
 
         // Create dogs table
         TableRef dogs = group.add_table("dogs");
@@ -1224,48 +859,46 @@ TEST(Links_Transactions)
         // Create owners table
         TableRef owners = group.add_table("owners");
         owners->add_column(type_String, "name");
-        owners->add_column_link(type_Link, "dog", *dogs);
+        dog_col = owners->add_column_link(type_Link, "dog", *dogs);
 
         // Insert a single dog
-        dogs->insert_empty_row(harvey_row);
-        dogs->set_string(name_col, harvey_row, "Harvey");
+        harvey_key = dogs->create_object().set_all("Harvey").get_key();
 
         // Insert an owner with link to dog
-        owners->insert_empty_row(tim_row);
-        owners->set_string(name_col, tim_row, "Tim");
-        owners->set_link(dog_col, tim_row, harvey_row);
+        tim_key = owners->create_object().set_all("Tim", harvey_key).get_key();
 
         group.commit();
     }
 
     {
-        ReadTransaction group(sg);
+        ReadTransaction group(db);
 
         // Verify that owner links to dog
         ConstTableRef owners = group.get_table("owners");
-        CHECK(!owners->is_null_link(dog_col, tim_row));
-        CHECK_EQUAL(harvey_row, owners->get_link(dog_col, tim_row));
+        ConstObj tim = owners->get_object(tim_key);
+        CHECK_NOT(tim.is_null(dog_col));
+        CHECK_EQUAL(harvey_key, tim.get<ObjKey>(dog_col));
     }
 
     {
-        WriteTransaction group(sg);
+        WriteTransaction group(db);
 
         // Delete dog
         TableRef dogs = group.get_table("dogs");
-        dogs->move_last_over(harvey_row);
+        dogs->remove_object(harvey_key);
 
         group.commit();
     }
 
     {
-        ReadTransaction group(sg);
+        ReadTransaction group(db);
 
         // Verify that link from owner was nullified
         ConstTableRef owners = group.get_table("owners");
-        CHECK(owners->is_null_link(dog_col, tim_row));
+        ConstObj tim = owners->get_object(tim_key);
+        CHECK(tim.is_null(dog_col));
     }
 }
-#endif
 
 TEST(Links_RemoveTargetRows)
 {
@@ -1353,80 +986,30 @@ TEST(Links_ClearLinkListWithTwoLevelBptree)
 }
 
 
-#ifdef LEGACY_TESTS
 TEST(Links_FormerMemLeakCase)
 {
     SHARED_GROUP_TEST_PATH(path);
-    SharedGroup sg_w(path);
+    auto sg_w = DB::create(path);
     {
         WriteTransaction wt(sg_w);
         TableRef origin = wt.add_table("origin");
         TableRef target = wt.add_table("target");
-        target->add_column(type_Int, "");
-        target->add_empty_row();
-        origin->add_column_link(type_Link, "", *target);
-        origin->add_empty_row(2);
-        origin->set_link(0, 0, 0);
-        origin->set_link(0, 1, 0);
+        target->add_column(type_Int, "int");
+        auto k = target->create_object().get_key();
+        auto col = origin->add_column_link(type_Link, "link", *target);
+        origin->create_object().set(col, k);
+        origin->create_object().set(col, k);
         wt.commit();
     }
     {
         WriteTransaction wt(sg_w);
         TableRef target = wt.get_table("target");
-        target->move_last_over(0);
+        target->begin()->remove();
         wt.get_group().verify();
         wt.commit();
     }
 }
 
-
-TEST(Links_RandomizedOperations)
-{
-    const size_t tests = 30;
-    Random rnd;
-    rnd.seed(random_int<unsigned long>()); // Seed from slow global generator
-
-    for (size_t outer_iter = 0; outer_iter < 1000; outer_iter++) {
-        Group group;
-        TableRef refs[tests]; // 'tests' is max number of tables that can be produced
-
-        std::vector<std::vector<size_t>> tables;
-
-        for (size_t inner_iter = 0; inner_iter < tests; inner_iter++) {
-            int action = rnd.draw_int_mod(100);
-
-            if (action < 33 && tables.size() > 0) {
-                // create link
-                size_t from = rnd.draw_int_mod(tables.size());
-                size_t to = rnd.draw_int_mod(tables.size());
-                tables[from].push_back(to);
-
-                int type = rnd.draw_int_mod(2);
-                if (type == 0)
-                    refs[from]->add_column_link(type_Link, "link", *refs[to]);
-                else
-                    refs[from]->add_column_link(type_LinkList, "link", *refs[to]);
-            }
-            else if (action < 66 && tables.size() > 0) {
-                // delete link
-                size_t from = rnd.draw_int_mod(tables.size());
-
-                if (tables[from].size() > 0) {
-                    size_t to = rnd.draw_int_mod(tables[from].size());
-                    tables[from].erase(tables[from].begin() + to);
-                    refs[from]->remove_column(to);
-                }
-            }
-            else if (tables.size() < 10) {
-                // create table
-                refs[tables.size()] = group.get_or_add_table(
-                    "table"); // FIXME: Lasse, did you really want to re-get the same table every time?
-                tables.push_back(std::vector<size_t>());
-            }
-        }
-    }
-}
-#endif
 
 TEST(Links_CascadeRemove_ColumnLink)
 {
@@ -1747,137 +1330,26 @@ TEST(Links_CascadeRemove_ColumnLinkList)
 }
 
 
-TEST(Links_CascadeRemove_MultiLevel)
-{
-}
-
-
-TEST(Links_CascadeRemove_Cycles)
-{
-}
-
-#ifdef LEGACY_TESTS
-TEST(Links_OrderedRowRemoval)
-{
-    {
-        Group group;
-        TableRef table = group.add_table("table");
-        table->add_column_link(type_LinkList, "link_list", *table);
-        table->add_empty_row();
-        table->add_empty_row();
-        table->get_linklist(0, 0)->add(0);
-        table->remove(0);
-        group.verify();
-    }
-    {
-        Group group;
-        TableRef table = group.add_table("table");
-        table->add_column_link(type_LinkList, "link_list", *table);
-        table->add_empty_row();
-        table->add_empty_row();
-        table->get_linklist(0, 0)->add(1);
-        table->remove(0);
-        group.verify();
-    }
-    {
-        Group group;
-        TableRef table = group.add_table("table");
-        table->add_column_link(type_LinkList, "link_list", *table);
-        table->add_empty_row();
-        table->add_empty_row();
-        table->get_linklist(0, 0)->add(0);
-        table->get_linklist(0, 1)->add(0);
-        table->remove(0);
-        group.verify();
-    }
-    {
-        Group group;
-        TableRef table = group.add_table("table");
-        table->add_column_link(type_LinkList, "link_list", *table);
-        table->add_empty_row();
-        table->add_empty_row();
-        table->get_linklist(0, 0)->add(1);
-        table->get_linklist(0, 1)->add(1);
-        table->remove(0);
-        group.verify();
-    }
-    {
-        Group group;
-        TableRef table = group.add_table("table");
-        table->add_column_link(type_LinkList, "link_list", *table);
-        table->add_empty_row();
-        table->add_empty_row();
-        table->get_linklist(0, 0)->add(0);
-        table->get_linklist(0, 1)->add(1);
-        table->remove(0);
-        group.verify();
-    }
-    {
-        Group group;
-        TableRef table = group.add_table("table");
-        table->add_column_link(type_LinkList, "link_list", *table);
-        table->add_empty_row();
-        table->add_empty_row();
-        table->get_linklist(0, 0)->add(1);
-        table->get_linklist(0, 1)->add(0);
-        table->remove(0);
-        group.verify();
-    }
-    {
-        Group group;
-        TableRef origin = group.add_table("origin");
-        TableRef target = group.add_table("target");
-        origin->add_column_link(type_LinkList, "", *target);
-        origin->add_empty_row();
-        target->add_empty_row();
-        origin->get_linklist(0, 0)->add(0);
-        origin->remove(0);
-        group.verify();
-    }
-    {
-        Group group;
-        TableRef origin = group.add_table("origin");
-        TableRef target = group.add_table("target");
-        origin->add_column_link(type_LinkList, "", *target);
-        target->add_column(type_Int, "");
-        origin->add_empty_row();
-        target->add_empty_row();
-        origin->get_linklist(0, 0)->add(0);
-        origin->remove(0);
-        group.verify();
-    }
-    {
-        Group group;
-        TableRef origin = group.add_table("origin");
-        TableRef target = group.add_table("target");
-        origin->add_column_link(type_LinkList, "", *target);
-        target->add_column(type_Int, "");
-        origin->add_empty_row();
-        target->add_empty_row();
-        origin->get_linklist(0, 0)->add(0);
-        target->remove(0);
-        group.verify();
-    }
-}
-
-
 TEST(Links_LinkList_Swap)
 {
     struct Fixture {
         Group group;
         TableRef origin = group.add_table("origin");
         TableRef target = group.add_table("target");
-        LinkViewRef llinklists[1] link_list_2;
+        LnkLstPtr link_list_1;
+        LnkLstPtr link_list_2;
+        ObjKeys okeys;
+        ObjKeys tkeys;
         Fixture()
         {
-            origin->add_column_link(type_LinkList, "", *target);
+            auto col_link = origin->add_column_link(type_LinkList, "", *target);
             target->add_column(type_Int, "");
-            origin->add_empty_row(2);
-            target->add_empty_row(2);
-            link_list_1 = origin->get_linklist(0, 0);
-            link_list_1->add(0);
-            link_list_1->add(1);
-            link_list_2 = origin->get_linklist(0, 1); // Leave it empty
+            origin->create_objects(2, okeys);
+            target->create_objects(2, tkeys);
+            link_list_1 = origin->get_object(okeys[0]).get_linklist_ptr(col_link);
+            link_list_1->add(tkeys[0]);
+            link_list_1->add(tkeys[1]);
+            link_list_2 = origin->get_object(okeys[1]).get_linklist_ptr(col_link); // Leave it empty
         }
     };
 
@@ -1885,8 +1357,8 @@ TEST(Links_LinkList_Swap)
     {
         Fixture f;
         CHECK_EQUAL(2, f.link_list_1->size());
-        CHECK_EQUAL(0, f.link_list_1->get(0).get_index());
-        CHECK_EQUAL(1, f.link_list_1->get(1).get_index());
+        CHECK_EQUAL(f.tkeys[0], f.link_list_1->get(0));
+        CHECK_EQUAL(f.tkeys[1], f.link_list_1->get(1));
         CHECK_EQUAL(0, f.link_list_2->size());
         f.group.verify();
     }
@@ -1896,12 +1368,12 @@ TEST(Links_LinkList_Swap)
         Fixture f;
         f.link_list_1->swap(0, 0);
         CHECK_EQUAL(2, f.link_list_1->size());
-        CHECK_EQUAL(0, f.link_list_1->get(0).get_index());
-        CHECK_EQUAL(1, f.link_list_1->get(1).get_index());
+        CHECK_EQUAL(f.tkeys[0], f.link_list_1->get(0));
+        CHECK_EQUAL(f.tkeys[1], f.link_list_1->get(1));
         f.link_list_1->swap(1, 1);
         CHECK_EQUAL(2, f.link_list_1->size());
-        CHECK_EQUAL(0, f.link_list_1->get(0).get_index());
-        CHECK_EQUAL(1, f.link_list_1->get(1).get_index());
+        CHECK_EQUAL(f.tkeys[0], f.link_list_1->get(0));
+        CHECK_EQUAL(f.tkeys[1], f.link_list_1->get(1));
         f.group.verify();
     }
 
@@ -1910,71 +1382,14 @@ TEST(Links_LinkList_Swap)
         Fixture f;
         f.link_list_1->swap(0, 1);
         CHECK_EQUAL(2, f.link_list_1->size());
-        CHECK_EQUAL(1, f.link_list_1->get(0).get_index());
-        CHECK_EQUAL(0, f.link_list_1->get(1).get_index());
+        CHECK_EQUAL(f.tkeys[1], f.link_list_1->get(0));
+        CHECK_EQUAL(f.tkeys[0], f.link_list_1->get(1));
         f.link_list_1->swap(1, 0);
         CHECK_EQUAL(2, f.link_list_1->size());
-        CHECK_EQUAL(0, f.link_list_1->get(0).get_index());
-        CHECK_EQUAL(1, f.link_list_1->get(1).get_index());
+        CHECK_EQUAL(f.tkeys[0], f.link_list_1->get(0));
+        CHECK_EQUAL(f.tkeys[1], f.link_list_1->get(1));
         f.group.verify();
     }
-
-    // Detached accessor
-    {
-        Fixture f;
-        f.origin->remove(0);
-        CHECK_LOGIC_ERROR(f.link_list_1->swap(0, 1), LogicError::detached_accessor);
-        f.group.verify();
-    }
-
-    // Index out of range
-    {
-        Fixture f;
-        CHECK_LOGIC_ERROR(f.link_list_1->swap(1, 2), LogicError::link_index_out_of_range);
-        CHECK_LOGIC_ERROR(f.link_list_1->swap(2, 1), LogicError::link_index_out_of_range);
-        CHECK_LOGIC_ERROR(f.link_list_2->swap(0, 0), LogicError::link_index_out_of_range);
-        f.group.verify();
-    }
-}
-
-
-TEST(Links_LinkListAccessors_MoveOver)
-{
-    Group group;
-    TableRef origin = group.add_table("origin");
-    TableRef target = group.add_table("target");
-    origin->add_column_link(type_LinkList, "", *target);
-    origin->add_empty_row(4);
-    LinkViewRef links0 = origin->get_linklist(0, 0);
-    LinkViewRef links3 = origin->get_linklist(0, 3);
-
-    // FIXME: Table::move_over does not currently exist, so call through private API
-    // for now. Note that this only updates accessors, not the underlying rows.
-    using tf = _impl::TableFriend;
-
-    // Move a row with an attached accessor over one without.
-    tf::adj_acc_move_over(*origin, 0, 1);
-    tf::refresh_accessor_tree(*origin);
-    CHECK_EQUAL(1, links0->get_origin_row_index());
-    CHECK_EQUAL(3, links3->get_origin_row_index());
-
-    // Move a row without an attached accessor over a row that has one.
-    tf::adj_acc_move_over(*origin, 3, 2);
-    tf::refresh_accessor_tree(*origin);
-    CHECK_EQUAL(1, links0->get_origin_row_index());
-    CHECK_EQUAL(2, links3->get_origin_row_index());
-
-    // Move a row with an accessor over another row with an accessor.
-    tf::adj_acc_move_over(*origin, 2, 1);
-    tf::refresh_accessor_tree(*origin);
-    CHECK_EQUAL(false, links0->is_attached());
-    CHECK_EQUAL(1, links3->get_origin_row_index());
-
-    // Move a row with an accessor over itself.
-    tf::adj_acc_move_over(*origin, 1, 1);
-    tf::refresh_accessor_tree(*origin);
-    CHECK_EQUAL(false, links0->is_attached());
-    CHECK_EQUAL(false, links3->is_attached());
 }
 
 
@@ -1982,16 +1397,15 @@ TEST(Links_DetachedAccessor)
 {
     Group group;
     TableRef table = group.add_table("table");
-    table->add_column_link(type_LinkList, "l", *table);
-    table->add_empty_row();
-    LinkViewRef link_list = table->get_linklist(0, 0);
-    link_list->add(0);
-    link_list->add(0);
+    auto col = table->add_column_link(type_LinkList, "l", *table);
+    Obj obj = table->create_object();
+    auto link_list = obj.get_linklist(col);
+    link_list.add(obj.get_key());
+    link_list.add(obj.get_key());
     group.remove_table("table");
 
-    CHECK_LOGIC_ERROR(link_list->move(0, 1), LogicError::detached_accessor);
-    CHECK_LOGIC_ERROR(link_list->swap(0, 1), LogicError::detached_accessor);
+    CHECK_EQUAL(link_list.size(), 0);
+    CHECK_NOT(link_list.is_attached());
 }
-#endif
 
 #endif // TEST_LINKS

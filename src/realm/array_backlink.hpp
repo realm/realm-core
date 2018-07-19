@@ -30,7 +30,6 @@ public:
     using Array::update_parent;
     using Array::get_ref;
     using Array::size;
-    using Array::erase;
 
     static int64_t default_value(bool)
     {
@@ -65,6 +64,7 @@ public:
     void nullify_fwd_links(size_t ndx, CascadeState& state);
     void add(size_t ndx, ObjKey key);
     bool remove(size_t ndx, ObjKey key);
+    void erase(size_t ndx);
     size_t get_backlink_count(size_t ndx) const;
     ObjKey get_backlink(size_t ndx, size_t index) const;
     void move(ArrayBacklink& dst, size_t ndx)
