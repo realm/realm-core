@@ -386,6 +386,28 @@ void Array::move(size_t begin, size_t end, size_t dest_begin)
     realm::safe_copy_n(begin_2, end_2 - begin_2, dest_begin_2);
 }
 
+void Array::move(Array& dst, size_t ndx)
+{
+    size_t nb_to_move = m_size - ndx;
+    dst.copy_on_write();
+    dst.ensure_minimum_width(this->m_ubound);
+    dst.alloc(dst.m_size + nb_to_move, dst.m_width); // Make room for the new elements
+
+    // cache variables used in tight loop
+    size_t dest_begin = dst.m_size;
+    auto getter = m_getter;
+    auto setter = dst.m_vtable->setter;
+    size_t sz = m_size;
+
+    for (size_t i = ndx; i < sz; i++) {
+        auto v = (this->*getter)(i);
+        (dst.*setter)(dest_begin++, v);
+    }
+
+    dst.m_size += nb_to_move;
+    truncate(ndx);
+}
+
 void Array::move_backward(size_t begin, size_t end, size_t dest_end)
 {
     REALM_ASSERT_3(begin, <=, end);

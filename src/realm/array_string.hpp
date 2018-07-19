@@ -81,11 +81,8 @@ public:
     StringData get(size_t ndx) const;
     bool is_null(size_t ndx) const;
     void erase(size_t ndx);
-    void truncate_and_destroy_children(size_t ndx);
-    void clear()
-    {
-        truncate_and_destroy_children(0);
-    }
+    void move(ArrayString& dst, size_t ndx);
+    void clear();
 
     size_t find_first(StringData value, size_t begin, size_t end) const noexcept;
 

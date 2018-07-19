@@ -59,9 +59,12 @@ public:
     void insert(size_t ndx, T value);
     void erase(size_t ndx);
     void truncate(size_t size);
-    void truncate_and_destroy_children(size_t new_size)
+    void move(BasicArray& dst, size_t ndx)
     {
-        truncate(new_size); // There are no children to destroy
+        for (size_t i = ndx; i < m_size; i++) {
+            dst.add(get(i));
+        }
+        truncate(ndx);
     }
     void clear();
 

@@ -89,9 +89,9 @@ public:
     {
         return Array::get(ndx) == 0;
     }
-    void truncate_and_destroy_children(size_t ndx)
+    void move(ArrayKeyBase& dst, size_t ndx)
     {
-        Array::truncate(ndx);
+        Array::move(dst, ndx);
     }
 
     size_t find_first(ObjKey value, size_t begin, size_t end) const noexcept

@@ -247,3 +247,12 @@ void ArrayIntNull::get_chunk(size_t ndx, value_type res[8]) const noexcept
         res[i] = tmp[i] == null ? util::Optional<int64_t>() : tmp[i];
     }
 }
+
+void ArrayIntNull::move(ArrayIntNull& dst, size_t ndx)
+{
+    size_t sz = size();
+    for (size_t i = ndx; i < sz; i++) {
+        dst.add(get(i));
+    }
+    truncate(ndx + 1);
+}

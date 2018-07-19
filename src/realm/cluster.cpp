@@ -904,7 +904,6 @@ void Cluster::insert_row(size_t ndx, ObjKey k, const InitValues& init_values)
 template <class T>
 inline void Cluster::do_move(size_t ndx, size_t col_ndx, Cluster* to)
 {
-    size_t end = node_size();
     T src(m_alloc);
     src.set_parent(this, col_ndx + s_first_col_index);
     src.init_from_parent();
@@ -913,27 +912,7 @@ inline void Cluster::do_move(size_t ndx, size_t col_ndx, Cluster* to)
     dst.set_parent(to, col_ndx + s_first_col_index);
     dst.init_from_parent();
 
-    for (size_t j = ndx; j < end; j++) {
-        dst.add(src.get(j));
-    }
-    src.truncate_and_destroy_children(ndx);
-}
-
-inline void Cluster::do_move_list(size_t ndx, size_t col_ndx, Cluster* to)
-{
-    size_t end = node_size();
-    Array src(m_alloc);
-    src.set_parent(this, col_ndx + s_first_col_index);
-    src.init_from_parent();
-
-    Array dst(m_alloc);
-    dst.set_parent(to, col_ndx + s_first_col_index);
-    dst.init_from_parent();
-
-    for (size_t j = ndx; j < end; j++) {
-        dst.add(src.get(j));
-    }
-    src.truncate(ndx);
+    src.move(dst, ndx);
 }
 
 void Cluster::move(size_t ndx, ClusterNode* new_node, int64_t offset)
@@ -946,7 +925,7 @@ void Cluster::move(size_t ndx, ClusterNode* new_node, int64_t offset)
         ColumnAttrMask attr = spec.get_column_attr(col_ndx);
 
         if (attr.test(col_attr_List)) {
-            do_move_list(ndx, col_ndx, new_leaf);
+            do_move<ArrayInteger>(ndx, col_ndx, new_leaf);
             continue;
         }
 

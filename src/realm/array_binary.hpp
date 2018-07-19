@@ -72,7 +72,8 @@ public:
     BinaryData get_at(size_t ndx, size_t& pos) const;
     bool is_null(size_t ndx) const;
     void erase(size_t ndx);
-    void truncate_and_destroy_children(size_t ndx);
+    void move(ArrayBinary& dst, size_t ndx);
+    void clear();
 
     size_t find_first(BinaryData value, size_t begin, size_t end) const noexcept;
 

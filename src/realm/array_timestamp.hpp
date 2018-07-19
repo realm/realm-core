@@ -83,10 +83,15 @@ public:
         m_seconds.erase(ndx);
         m_nanoseconds.erase(ndx);
     }
-    void truncate_and_destroy_children(size_t ndx)
+    void move(ArrayTimestamp& dst, size_t ndx)
     {
-        m_seconds.truncate(ndx);
-        m_nanoseconds.truncate(ndx);
+        m_seconds.move(dst.m_seconds, ndx);
+        m_nanoseconds.move(dst.m_nanoseconds, ndx);
+    }
+    void clear()
+    {
+        m_seconds.clear();
+        m_nanoseconds.clear();
     }
 
     size_t find_first(Timestamp value, size_t begin, size_t end) const noexcept;

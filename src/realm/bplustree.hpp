@@ -349,12 +349,7 @@ public:
         void move(BPlusTreeNode* new_node, size_t ndx, int64_t) override
         {
             LeafNode* dst(static_cast<LeafNode*>(new_node));
-            size_t end = get_node_size();
-
-            for (size_t j = ndx; j < end; j++) {
-                dst->add(LeafArray::get(j));
-            }
-            LeafArray::truncate_and_destroy_children(ndx);
+            LeafArray::move(*dst, ndx);
         }
     };
 
@@ -488,7 +483,7 @@ public:
     {
         if (m_root->is_leaf()) {
             LeafNode* leaf = static_cast<LeafNode*>(m_root.get());
-            leaf->truncate_and_destroy_children(0);
+            leaf->clear();
         }
         else {
             destroy();

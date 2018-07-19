@@ -57,6 +57,10 @@ public:
     uint64_t get_uint(size_t ndx) const noexcept;
     static int64_t get(const char* header, size_t ndx) noexcept;
     bool compare(const ArrayInteger& a) const noexcept;
+    void move(ArrayInteger& dst, size_t ndx)
+    {
+        Array::move(dst, ndx);
+    }
 
     bool is_null(size_t) const
     {
@@ -130,11 +134,7 @@ public:
     value_type back() const noexcept;
     void erase(size_t ndx);
     void erase(size_t begin, size_t end);
-    void truncate(size_t size);
-    void truncate_and_destroy_children(size_t sz)
-    {
-        truncate(sz);
-    }
+    void move(ArrayIntNull& dst, size_t ndx);
     void clear();
     void set_all_to_zero();
 
@@ -409,14 +409,10 @@ inline void ArrayIntNull::erase(size_t begin, size_t end)
     Array::erase(begin + 1, end + 1);
 }
 
-inline void ArrayIntNull::truncate(size_t to_size)
-{
-    Array::truncate(to_size + 1);
-}
-
 inline void ArrayIntNull::clear()
 {
-    truncate(0);
+    Array::truncate(0);
+    Array::add(0);
 }
 
 inline void ArrayIntNull::set_all_to_zero()

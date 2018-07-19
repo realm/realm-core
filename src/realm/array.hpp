@@ -346,6 +346,9 @@ public:
     void move_backward(size_t begin, size_t end, size_t dest_end);
     //@}
 
+    // Move elements from ndx and above to another array
+    void move(Array& dst, size_t ndx);
+
     /// move_rotate moves one element from \a from to be located at index \a to,
     /// shifting all elements inbetween by one.
     ///

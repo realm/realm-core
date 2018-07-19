@@ -142,13 +142,28 @@ void ArrayBinary::erase(size_t ndx)
     }
 }
 
-void ArrayBinary::truncate_and_destroy_children(size_t ndx)
+void ArrayBinary::move(ArrayBinary& dst, size_t ndx)
 {
+    size_t sz = size();
+    for (size_t i = ndx; i < sz; i++) {
+        dst.add(get(i));
+    }
+
     if (!m_is_big) {
         return static_cast<ArraySmallBlobs*>(m_arr)->truncate(ndx);
     }
     else {
         return static_cast<ArrayBigBlobs*>(m_arr)->truncate(ndx);
+    }
+}
+
+void ArrayBinary::clear()
+{
+    if (!m_is_big) {
+        return static_cast<ArraySmallBlobs*>(m_arr)->clear();
+    }
+    else {
+        return static_cast<ArrayBigBlobs*>(m_arr)->clear();
     }
 }
 

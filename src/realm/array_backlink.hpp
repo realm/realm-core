@@ -31,7 +31,6 @@ public:
     using Array::get_ref;
     using Array::size;
     using Array::erase;
-    using Array::truncate_and_destroy_children;
 
     static int64_t default_value(bool)
     {
@@ -68,6 +67,14 @@ public:
     bool remove(size_t ndx, ObjKey key);
     size_t get_backlink_count(size_t ndx) const;
     ObjKey get_backlink(size_t ndx, size_t index) const;
+    void move(ArrayBacklink& dst, size_t ndx)
+    {
+        Array::move(dst, ndx);
+    }
+    void clear()
+    {
+        Array::truncate_and_destroy_children(0);
+    }
 };
 }
 

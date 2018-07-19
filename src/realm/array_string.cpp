@@ -222,8 +222,13 @@ void ArrayString::erase(size_t ndx)
     }
 }
 
-void ArrayString::truncate_and_destroy_children(size_t ndx)
+void ArrayString::move(ArrayString& dst, size_t ndx)
 {
+    size_t sz = size();
+    for (size_t i = ndx; i < sz; i++) {
+        dst.add(get(i));
+    }
+
     switch (m_type) {
         case Type::small_strings:
             static_cast<ArrayStringShort*>(m_arr)->truncate(ndx);
@@ -235,7 +240,26 @@ void ArrayString::truncate_and_destroy_children(size_t ndx)
             static_cast<ArrayBigBlobs*>(m_arr)->truncate(ndx);
             break;
         case Type::enum_strings:
-            static_cast<ArrayInteger*>(m_arr)->truncate(ndx);
+            // this operation will never be called for enumerated columns
+            REALM_UNREACHABLE();
+            break;
+    }
+}
+
+void ArrayString::clear()
+{
+    switch (m_type) {
+        case Type::small_strings:
+            static_cast<ArrayStringShort*>(m_arr)->clear();
+            break;
+        case Type::medium_strings:
+            static_cast<ArraySmallBlobs*>(m_arr)->clear();
+            break;
+        case Type::big_strings:
+            static_cast<ArrayBigBlobs*>(m_arr)->clear();
+            break;
+        case Type::enum_strings:
+            static_cast<ArrayInteger*>(m_arr)->clear();
             break;
     }
 }

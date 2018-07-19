@@ -258,7 +258,6 @@ private:
                           CascadeState& state) const;
     void do_erase_key(size_t ndx, size_t col_ndx, CascadeState& state);
     void do_insert_key(size_t ndx, size_t col_ndx, Mixed init_val, ObjKey origin_key);
-    void do_move_list(size_t ndx, size_t col_ndx, Cluster* to);
 };
 
 }
