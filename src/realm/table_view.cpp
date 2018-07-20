@@ -365,26 +365,6 @@ size_t ConstTableView::count_timestamp(ColKey column_key, Timestamp target) cons
     return count;
 }
 
-void ConstTableView::to_json(std::ostream& out) const
-{
-    check_cookie();
-
-    // Represent table as list of objects
-    out << "[";
-
-    const size_t row_count = size();
-    for (size_t r = 0; r < row_count; ++r) {
-        ObjKey key = get_key(r);
-        if (key != realm::null_key) {
-            if (r > 0)
-                out << ",";
-            m_table->to_json_row(size_t(key.value), out); // FIXME
-        }
-    }
-
-    out << "]";
-}
-
 void ConstTableView::to_string(std::ostream& out, size_t limit) const
 {
     check_cookie();

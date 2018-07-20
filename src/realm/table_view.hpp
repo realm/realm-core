@@ -273,7 +273,6 @@ public:
     }
 
     // Conversion
-    void to_json(std::ostream&) const;
     void to_string(std::ostream&, size_t limit = 500) const;
     void row_to_string(size_t row_ndx, std::ostream&) const;
 

@@ -546,8 +546,6 @@ public:
     Table& backlink(const Table& origin, ColKey origin_col_key);
 
     // Conversion
-    void to_json(std::ostream& out, size_t link_depth = 0,
-                 std::map<std::string, std::string>* renames = nullptr) const;
     void to_string(std::ostream& out, size_t limit = 500) const;
     void row_to_string(ObjKey key, std::ostream& out) const;
 
@@ -693,14 +691,6 @@ private:
     // Support function for conversions
     void to_string_header(std::ostream& out, std::vector<size_t>& widths) const;
     void to_string_row(ObjKey key, std::ostream& out, const std::vector<size_t>& widths) const;
-
-    // recursive methods called by to_json, to follow links
-    void to_json(std::ostream& out, size_t link_depth, std::map<std::string, std::string>& renames,
-                 std::vector<ref_type>& followed) const;
-    void to_json_row(size_t row_ndx, std::ostream& out, size_t link_depth,
-                     std::map<std::string, std::string>& renames, std::vector<ref_type>& followed) const;
-    void to_json_row(size_t row_ndx, std::ostream& out, size_t link_depth = 0,
-                     std::map<std::string, std::string>* renames = nullptr) const;
 
     // Detach accessor. This recycles the Table accessor and all subordinate
     // accessors become invalid.
