@@ -365,53 +365,6 @@ size_t ConstTableView::count_timestamp(ColKey column_key, Timestamp target) cons
     return count;
 }
 
-void ConstTableView::to_string(std::ostream& out, size_t limit) const
-{
-    check_cookie();
-
-    // Print header (will also calculate widths)
-    std::vector<size_t> widths;
-    m_table->to_string_header(out, widths);
-
-    // Set limit=-1 to print all rows, otherwise only print to limit
-    const size_t row_count = size();
-    const size_t out_count = (limit == size_t(-1)) ? row_count : (row_count < limit) ? row_count : limit;
-
-    // Print rows
-    size_t i = 0;
-    size_t count = out_count;
-    while (count) {
-        ObjKey key = get_key(count);
-        if (key != realm::null_key) {
-            m_table->to_string_row(key, out, widths); // FIXME
-            --count;
-        }
-        ++i;
-    }
-
-    if (out_count < row_count) {
-        const size_t rest = row_count - out_count;
-        out << "... and " << rest << " more rows (total " << row_count << ")";
-    }
-}
-
-void ConstTableView::row_to_string(size_t row_ndx, std::ostream& out) const
-{
-    check_cookie();
-
-    REALM_ASSERT(row_ndx < m_key_values->size());
-
-    // Print header (will also calculate widths)
-    std::vector<size_t> widths;
-    m_table->to_string_header(out, widths);
-
-    // Print row contents
-    ObjKey key = get_key(row_ndx);
-    REALM_ASSERT(key != realm::null_key);
-    m_table->to_string_row(key, out, widths); // FIXME
-}
-
-
 bool ConstTableView::depends_on_deleted_object() const
 {
     if (m_linklist_source && !m_linklist_source->is_attached()) {

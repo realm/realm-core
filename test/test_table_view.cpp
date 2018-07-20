@@ -1312,42 +1312,6 @@ TEST(TableView_HighLevelSubtables)
 }
 
 
-TEST(TableView_ToString)
-{
-    TestTable tbl;
-    tbl.add_column(type_Int, "first");
-    tbl.add_column(type_Int, "second");	
-
-    add(tbl, 2, 123456);
-    add(tbl, 4, 1234567);
-    add(tbl, 6, 12345678);
-    add(tbl, 4, 12345678);
-
-    std::string s = "    first    second\n";
-    std::string s0 = "0:      2    123456\n";
-    std::string s1 = "1:      4   1234567\n";
-    std::string s2 = "2:      6  12345678\n";
-    std::string s3 = "3:      4  12345678\n";
-
-    // Test full view
-    std::stringstream ss;
-    TableView tv = tbl.where().find_all();
-    tv.to_string(ss);
-    CHECK_EQUAL(s + s0 + s1 + s2 + s3, ss.str());
-
-    // Find partial view: row 1+3
-    std::stringstream ss2;
-    tv = tbl.where().equal(0, 4).find_all();
-    tv.to_string(ss2);
-    CHECK_EQUAL(s + s1 + s3, ss2.str());
-
-    // test row_to_string. get row 0 of previous view - i.e. row 1 in tbl
-    std::stringstream ss3;
-    tv.row_to_string(0, ss3);
-    CHECK_EQUAL(s + s1, ss3.str());
-}
-
-
 TEST(TableView_RefCounting)
 {
     TableView tv, tv2;

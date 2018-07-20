@@ -272,10 +272,6 @@ public:
         return m_key_values->find_first(key);
     }
 
-    // Conversion
-    void to_string(std::ostream&, size_t limit = 500) const;
-    void row_to_string(size_t row_ndx, std::ostream&) const;
-
     // Determine if the view is 'in sync' with the underlying table
     // as well as other views used to generate the view. Note that updates
     // through views maintains synchronization between view and table.

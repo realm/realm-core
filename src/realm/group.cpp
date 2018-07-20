@@ -1325,45 +1325,6 @@ size_t Group::compute_aggregated_byte_size(SizeAggregateControl ctrl) const noex
 }
 
 
-void Group::to_string(std::ostream& out) const
-{
-    // Calculate widths
-    size_t index_width = 16;
-    size_t name_width = 10;
-    size_t rows_width = 6;
-
-    auto keys = get_table_keys();
-    for (auto key : keys) {
-        StringData name = get_table_name(key);
-        if (name_width < name.size())
-            name_width = name.size();
-
-        ConstTableRef table = get_table(name);
-        size_t row_count = table->size();
-        if (rows_width < row_count) { // FIXME: should be the number of digits in row_count: floor(log10(row_count+1))
-            rows_width = row_count;
-        }
-    }
-
-
-    // Print header
-    out << std::setw(int(index_width + 1)) << std::left << " ";
-    out << std::setw(int(name_width + 1)) << std::left << "tables";
-    out << std::setw(int(rows_width)) << std::left << "rows" << std::endl;
-
-    // Print tables
-    for (auto key : keys) {
-        StringData name = get_table_name(key);
-        ConstTableRef table = get_table(name);
-        size_t row_count = table->size();
-
-        out << std::setw(int(index_width)) << std::right << key.value << " ";
-        out << std::setw(int(name_width)) << std::left << std::string(name) << " ";
-        out << std::setw(int(rows_width)) << std::left << row_count << std::endl;
-    }
-}
-
-
 class Group::TransactAdvancer {
 public:
     TransactAdvancer(Group&, bool& schema_changed)

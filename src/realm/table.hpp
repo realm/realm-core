@@ -545,10 +545,6 @@ public:
     }
     Table& backlink(const Table& origin, ColKey origin_col_key);
 
-    // Conversion
-    void to_string(std::ostream& out, size_t limit = 500) const;
-    void row_to_string(ObjKey key, std::ostream& out) const;
-
     // Get a reference to this table
     TableRef get_table_ref()
     {
@@ -687,10 +683,6 @@ private:
     /// accessors obtained during a transaction are always detached
     /// when the transaction ends.
     void update_from_parent(size_t old_baseline) noexcept;
-
-    // Support function for conversions
-    void to_string_header(std::ostream& out, std::vector<size_t>& widths) const;
-    void to_string_row(ObjKey key, std::ostream& out, const std::vector<size_t>& widths) const;
 
     // Detach accessor. This recycles the Table accessor and all subordinate
     // accessors become invalid.
