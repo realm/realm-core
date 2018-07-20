@@ -264,10 +264,10 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
         *log << "std::unique_ptr<Replication> hist_r(make_in_realm_history(path));\n";
         *log << "std::unique_ptr<Replication> hist_w(make_in_realm_history(path));\n";
 
-        *log << "DB db_w(*hist_w, DBOptions(key));\n";
-        *log << "DB db_r(*hist_r, DBOptions(key));\n";
-        *log << "auto wt = db_w.start_write();\n";
-        *log << "auto rt = db_r.start_read();\n";
+        *log << "DBRef db_r = DB::create(*hist_r, DBOptions(key));\n";
+        *log << "DBRef db_w = DB::create(*hist_w, DBOptions(key));\n";
+        *log << "auto wt = db_w->start_write();\n";
+        *log << "auto rt = db_r->start_read();\n";
         *log << "std::vector<TableView> table_views;\n";
         *log << "std::vector<TableRef> subtable_refs;\n";
 
@@ -630,17 +630,17 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 bool read_group = get_next(s) % 2 == 0;
                 if (read_group) {
                     if (log) {
-                        *log << "db_r.close();\n";
+                        *log << "rt = nullptr;\n";
+                        *log << "db_r->close();\n";
                     }
                     rt = nullptr; // transactions must be done/closed before closing the DB.
                     db_r->close();
                     if (log) {
-                        *log << "db_r.open(path, true, DBOptions(key));\n";
+                        *log << "db_r = DB::create(*hist_r, DBOptions(key));\n";
                     }
                     db_r = DB::create(*hist_r, DBOptions(encryption_key));
                     if (log) {
-                        *log << "rt = nullptr;\n";
-                        *log << "rt = db_r.start_read();\n";
+                        *log << "rt = db_r->start_read();\n";
                     }
                     rt = db_r->start_read();
                     REALM_DO_IF_VERIFY(log, rt->verify());
@@ -648,16 +648,16 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 else {
                     if (log) {
                         *log << "wt = nullptr;\n";
-                        *log << "db_w.close();\n";
+                        *log << "db_w->close();\n";
                     }
                     wt = nullptr;
                     db_w->close();
                     if (log) {
-                        *log << "db_w.open(path, true, DBOptions(key));\n";
+                        *log << "db_w = DB::create(*hist_w, DBOptions(key));\n";
                     }
                     db_w = DB::create(*hist_w, DBOptions(encryption_key));
                     if (log) {
-                        *log << "wt = db_w.start_write();\n";
+                        *log << "wt = db_w->start_write();\n";
                     }
                     wt = db_w->start_write();
                     REALM_DO_IF_VERIFY(log, wt->verify());
