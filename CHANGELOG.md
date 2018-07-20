@@ -1,7 +1,7 @@
 # NEXT RELEASE
 
 Besides the changes below, this release also includes changes introduced by v5.6.0 and
-up until v5.7.1
+up until v5.7.2
 
 ### Bugfixes
 
@@ -82,6 +82,19 @@ up until v5.7.1
 
 * Major simplifications and optimizations to management of memory mappings.
 * Speed improvement for Sort().
+
+----------------------------------------------
+
+# 5.7.2 Release notes
+
+### Bugfixes
+
+* Fix a use-after-free when an observer is passed to rollback_and_continue_as_read().
+
+### Enhancements
+
+* More informative InvalidDatabase exception messages
+  Issue [#3075](https://github.com/realm/realm-core/issues/3075).
 
 ----------------------------------------------
 

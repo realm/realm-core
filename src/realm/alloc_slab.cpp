@@ -16,6 +16,7 @@
  *
  **************************************************************************/
 
+#include <cinttypes>
 #include <type_traits>
 #include <exception>
 #include <algorithm>
@@ -990,19 +991,32 @@ void SlabAlloc::attach_empty()
 #endif
 }
 
+void SlabAlloc::throw_header_exception(std::string msg, const Header& header, const std::string& path)
+{
+    char buf[256];
+    sprintf(buf, ". top_ref[0]: %" PRIX64 ", top_ref[1]: %" PRIX64 ", "
+                 "mnemonic: %X %X %X %X, fmt[0]: %d, fmt[1]: %d, flags: %X",
+            header.m_top_ref[0], header.m_top_ref[1], header.m_mnemonic[0], header.m_mnemonic[1],
+            header.m_mnemonic[2], header.m_mnemonic[3], header.m_file_format[0], header.m_file_format[1],
+            header.m_flags);
+    msg += buf;
+    throw InvalidDatabase(msg, path);
+}
 
 void SlabAlloc::validate_header(const char* data, size_t size, const std::string& path)
 {
-    // Verify that size is sane and 8-byte aligned
-    if (REALM_UNLIKELY(size < sizeof(Header) || size % 8 != 0))
-        throw InvalidDatabase("Realm file has bad size", path);
-
     const Header& header = *reinterpret_cast<const Header*>(data);
+
+    // Verify that size is sane and 8-byte aligned
+    if (REALM_UNLIKELY(size < sizeof(Header) || size % 8 != 0)) {
+        std::string msg = "Realm file has bad size (" + util::to_string(size) + ")";
+        throw InvalidDatabase(msg, path);
+    }
 
     // First four bytes of info block is file format id
     if (REALM_UNLIKELY(!(char(header.m_mnemonic[0]) == 'T' && char(header.m_mnemonic[1]) == '-' &&
                          char(header.m_mnemonic[2]) == 'D' && char(header.m_mnemonic[3]) == 'B')))
-        throw InvalidDatabase("Not a Realm file", path);
+        throw_header_exception("Invalid mnemonic", header, path);
 
     // Last bit in info block indicates which top_ref block is valid
     int slot_selector = ((header.m_flags & SlabAlloc::flags_SelectBit) != 0 ? 1 : 0);
@@ -1010,17 +1024,25 @@ void SlabAlloc::validate_header(const char* data, size_t size, const std::string
     // Top-ref must always point within buffer
     uint_fast64_t top_ref = uint_fast64_t(header.m_top_ref[slot_selector]);
     if (slot_selector == 0 && top_ref == 0xFFFFFFFFFFFFFFFFULL) {
-        if (REALM_UNLIKELY(size < sizeof(Header) + sizeof(StreamingFooter)))
-            throw InvalidDatabase("Realm file in streaming form has bad size", path);
+        if (REALM_UNLIKELY(size < sizeof(Header) + sizeof(StreamingFooter))) {
+            std::string msg = "Invalid streaming format size (" + util::to_string(size) + ")";
+            throw InvalidDatabase(msg, path);
+        }
         const StreamingFooter& footer = *(reinterpret_cast<const StreamingFooter*>(data + size) - 1);
         top_ref = footer.m_top_ref;
-        if (REALM_UNLIKELY(footer.m_magic_cookie != footer_magic_cookie))
-            throw InvalidDatabase("Bad Realm file header (#1)", path);
+        if (REALM_UNLIKELY(footer.m_magic_cookie != footer_magic_cookie)) {
+            std::string msg = "Invalid streaming format cookie (" + util::to_string(footer.m_magic_cookie) + ")";
+            throw InvalidDatabase(msg, path);
+        }
     }
-    if (REALM_UNLIKELY(top_ref % 8 != 0))
-        throw InvalidDatabase("Bad Realm file header (#2)", path);
-    if (REALM_UNLIKELY(top_ref >= size))
-        throw InvalidDatabase("Bad Realm file header (#3)", path);
+    if (REALM_UNLIKELY(top_ref % 8 != 0)) {
+        std::string msg = "Top ref not aligned (" + util::to_string(top_ref) + ")";
+        throw_header_exception(msg, header, path);
+    }
+    if (REALM_UNLIKELY(top_ref >= size)) {
+        std::string msg = "Top ref outside file (size = " + util::to_string(size) + ")";
+        throw_header_exception(msg, header, path);
+    }
 }
 
 
