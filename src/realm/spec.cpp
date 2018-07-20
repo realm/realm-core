@@ -327,7 +327,7 @@ void Spec::erase_column(size_t column_ndx)
     }
 
     // Remove this column from the enum keys lookup and clean it up if it's now empty
-    if (m_enumkeys.is_attached()) {
+    if (m_enumkeys.is_attached() && type != col_type_BackLink) {
         m_enumkeys.erase(column_ndx); // Throws
         bool all_empty = true;
         for (size_t i = 0; i < m_enumkeys.size(); i++) {

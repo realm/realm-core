@@ -3847,4 +3847,32 @@ TEST(Shared_OpenAfterClose)
     db_w->close();
 }
 
+TEST(Shared_RemoveTableWithEnumAndLinkColumns)
+{
+    // Test case generated with fuzzer
+    SHARED_GROUP_TEST_PATH(path);
+    DBRef db_w = DB::create(path);
+    TableKey tk;
+    {
+        auto wt = db_w->start_write();
+        wt->add_table("Table_2");
+        wt->commit();
+    }
+    {
+        auto wt = db_w->start_write();
+        auto table = wt->get_table("Table_2");
+        tk = table->get_key();
+        auto col_key = table->add_column(DataType(2), "string_3", false);
+        table->enumerate_string_column(col_key);
+        table->add_column_link(type_Link, "link_5", *table);
+        table->add_search_index(col_key);
+        wt->commit();
+    }
+    {
+        auto wt = db_w->start_write();
+        wt->remove_table(tk);
+        wt->commit();
+    }
+}
+
 #endif // TEST_SHARED
