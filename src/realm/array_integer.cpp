@@ -70,43 +70,10 @@ bool ArrayInteger::minmax(size_t from, size_t to, uint64_t maxdiff, int64_t* min
     }
 }
 
-
-std::vector<int64_t> ArrayInteger::to_vector() const
+MemRef ArrayIntNull::create_array(Type type, bool context_flag, size_t size, Allocator& alloc)
 {
-    std::vector<int64_t> v;
-    const size_t array_size = size();
-    for (size_t t = 0; t < array_size; ++t)
-        v.push_back(Array::get(t));
-    return v;
-}
-
-// if value does not contain an integer, then create an all 0 array with 0 also represeting null
-// if value contains an integer, make sure to pick a different integer to represent null
-MemRef ArrayIntNull::create_array(Type type, bool context_flag, size_t size, value_type value, Allocator& alloc)
-{
-    int64_t val = value.value_or(0);
-    MemRef r = Array::create(type, context_flag, wtype_Bits, size + 1, val, alloc); // Throws
-    ArrayIntNull arr(alloc);
-    _impl::DestroyGuard<ArrayIntNull> dg(&arr);
-    arr.Array::init_from_mem(r);
-    if (value) {
-        if (arr.m_width == 64) {
-            int_fast64_t null_value = val ^ 1; // Just anything different from value.
-            arr.Array::set(0, null_value);     // Throws
-        }
-        else {
-            // For all other bit widths, we use the upper bound to represent null (also stored at index 0).
-            int_fast64_t null_value = arr.m_ubound;
-            if (val == null_value) {
-                // the initial value is equal to the existing upper bound, so expand to next bit width
-                int_fast64_t next_upper_bound = ubound_for_width(bit_width(arr.m_ubound + 1));
-                null_value = next_upper_bound;
-            }
-            arr.Array::set(0, null_value); // Throws
-        }
-    }
-    dg.release();
-    return arr.get_mem();
+    // Create an array with null value as the first element
+    return Array::create(type, context_flag, wtype_Bits, size + 1, 0, alloc); // Throws
 }
 
 

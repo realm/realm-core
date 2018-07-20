@@ -657,22 +657,6 @@ Table* Group::do_get_table(StringData name, DescMatcher desc_matcher)
 }
 
 
-Table* Group::do_get_table(TableKey key, DescMatcher desc_matcher)
-{
-    if (!m_table_names.is_attached())
-        return 0;
-    size_t table_ndx = key2ndx(key);
-    if (table_ndx >= m_tables.size())
-        return 0;
-
-    Table* table = do_get_table(table_ndx, desc_matcher); // Throws
-    if (table->get_key() != key) {
-        throw InvalidKey("no such key");
-    }
-    return table;
-}
-
-
 Table* Group::do_add_table(StringData name, DescSetter desc_setter, bool require_unique_name)
 {
     if (!m_is_writable)
@@ -705,31 +689,6 @@ Table* Group::do_add_table(StringData name, DescSetter desc_setter, bool require
 }
 
 
-Table* Group::do_add_table(TableKey key, StringData name, DescSetter desc_setter, bool require_unique_name)
-{
-    if (!m_table_names.is_attached())
-        return 0;
-    auto ndx = key2ndx(key);
-    if (m_tables.is_attached() && m_tables.size() > ndx) {
-        auto rot = m_tables.get_as_ref_or_tagged(ndx);
-        // validate that no such table is already there
-        if (rot.is_ref())
-            throw InvalidKey("Key already in use");
-        REALM_ASSERT(m_table_accessors[ndx] == nullptr);
-    }
-    // validate name if required
-    if (require_unique_name) {
-        size_t table_ndx = m_table_names.find_first(name);
-        if (table_ndx != not_found)
-            throw TableNameInUse();
-    }
-    create_and_insert_table(key, name);
-    Table* table = create_table_accessor(ndx);
-    if (desc_setter)
-        (*desc_setter)(*table);
-    return table;
-}
-
 Table* Group::do_get_or_add_table(StringData name, DescMatcher desc_matcher, DescSetter desc_setter, bool* was_added)
 {
     REALM_ASSERT(m_table_names.is_attached());
@@ -741,28 +700,6 @@ Table* Group::do_get_or_add_table(StringData name, DescMatcher desc_matcher, Des
     }
     else {
         table = do_add_table(name, desc_setter, false);
-        if (was_added)
-            *was_added = true;
-        return table;
-    }
-}
-
-
-Table* Group::do_get_or_add_table(TableKey key, StringData name, DescMatcher desc_matcher, DescSetter desc_setter,
-                                  bool* was_added)
-{
-    REALM_ASSERT(m_table_names.is_attached());
-    auto table = do_get_table(key, desc_matcher);
-    if (table) {
-        if (m_table_names.get(key2ndx(key)) != name) {
-            throw InvalidKey("Key and name does not match");
-        }
-        if (was_added)
-            *was_added = false;
-        return table;
-    }
-    else {
-        table = do_add_table(key, name, desc_setter, false);
         if (was_added)
             *was_added = true;
         return table;

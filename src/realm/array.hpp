@@ -336,28 +336,16 @@ public:
     void adjust_ge(int_fast64_t limit, int_fast64_t diff);
 
     //@{
-    /// These are similar in spirit to std::move() and std::move_backward from
-    /// `<algorithm>`. \a dest_begin must not be in the range [`begin`,`end`), and
-    /// \a dest_end must not be in the range (`begin`,`end`].
+    /// This is similar in spirit to std::move() from `<algorithm>`.
+    /// \a dest_begin must not be in the range [`begin`,`end`)
     ///
-    /// These functions are guaranteed to not throw if
+    /// This function is guaranteed to not throw if
     /// `get_alloc().is_read_only(get_ref())` returns false.
     void move(size_t begin, size_t end, size_t dest_begin);
-    void move_backward(size_t begin, size_t end, size_t dest_end);
     //@}
 
     // Move elements from ndx and above to another array
     void move(Array& dst, size_t ndx);
-
-    /// move_rotate moves one element from \a from to be located at index \a to,
-    /// shifting all elements inbetween by one.
-    ///
-    /// If \a from is larger than \a to, the elements inbetween are shifted down.
-    /// If \a to is larger than \a from, the elements inbetween are shifted up.
-    ///
-    /// This function is guaranteed to not throw if
-    /// `get_alloc().is_read_only(get_ref())` returns false.
-    void move_rotate(size_t from, size_t to, size_t num_elems = 1);
 
     //@{
     /// Find the lower/upper bound of the specified value in a sequence of
@@ -417,9 +405,6 @@ public:
     ///        this \c Array, sorted in ascending order
     /// \return the index of the value if found, or realm::not_found otherwise
     size_t find_gte(const int64_t target, size_t start, size_t end = size_t(-1)) const;
-
-    void preset(int64_t min, int64_t max, size_t num_items);
-    void preset(size_t bitwidth, size_t num_items);
 
     int64_t sum(size_t start = 0, size_t end = size_t(-1)) const;
     size_t count(int64_t value) const noexcept;

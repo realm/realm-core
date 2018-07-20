@@ -673,17 +673,12 @@ private:
     typedef bool (*DescMatcher)(const Spec&);
 
     Table* do_get_table(size_t ndx, DescMatcher desc_matcher);
-    Table* do_get_table(TableKey key, DescMatcher desc_matcher);
     const Table* do_get_table(size_t ndx, DescMatcher desc_matcher) const;
     Table* do_get_table(StringData name, DescMatcher desc_matcher);
     const Table* do_get_table(StringData name, DescMatcher desc_matcher) const;
     Table* do_add_table(StringData name, DescSetter desc_setter, bool require_unique_name);
-    Table* do_add_table(TableKey key, StringData name, DescSetter desc_setter, bool require_unique_name);
 
     Table* do_get_or_add_table(StringData name, DescMatcher desc_matcher, DescSetter setter, bool* was_added);
-    TableRef get_or_add_table(TableKey key, StringData name, bool* was_added = nullptr);
-    Table* do_get_or_add_table(TableKey key, StringData name, DescMatcher desc_matcher, DescSetter setter,
-                               bool* was_added);
 
     void create_and_insert_table(TableKey key, StringData name);
     Table* create_table_accessor(size_t table_ndx);
@@ -971,16 +966,6 @@ inline TableRef Group::get_or_add_table(StringData name, bool* was_added)
     DescMatcher desc_matcher = nullptr;                                             // Do not check descriptor
     DescSetter desc_setter = nullptr;                                               // Do not add any columns
     Table* table = do_get_or_add_table(name, desc_matcher, desc_setter, was_added); // Throws
-    return TableRef(table);
-}
-
-inline TableRef Group::get_or_add_table(TableKey key, StringData name, bool* was_added)
-{
-    if (!is_attached())
-        throw LogicError(LogicError::detached_accessor);
-    DescMatcher desc_matcher = nullptr;                                             // Do not check descriptor
-    DescSetter desc_setter = nullptr;                                               // Do not add any columns
-    Table* table = do_get_or_add_table(key, name, desc_matcher, desc_setter, was_added); // Throws
     return TableRef(table);
 }
 

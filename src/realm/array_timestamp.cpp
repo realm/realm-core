@@ -33,7 +33,7 @@ void ArrayTimestamp::create()
 {
     Array::create(Array::type_HasRefs, false /* context_flag */, 2);
 
-    MemRef seconds = ArrayIntNull::create_array(Array::type_Normal, false, 0, util::none, m_alloc);
+    MemRef seconds = ArrayIntNull::create_array(Array::type_Normal, false, 0, m_alloc);
     Array::set_as_ref(0, seconds.get_ref());
     MemRef nanoseconds = ArrayInteger::create_empty_array(Array::type_Normal, false, m_alloc);
     Array::set_as_ref(1, nanoseconds.get_ref());

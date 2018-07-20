@@ -277,24 +277,6 @@ void Array::set_type(Type type)
 }
 
 
-// Allocates space for 'num_items' items being between min and min in size, both inclusive. Crashes! Why? Todo/fixme
-void Array::preset(size_t bitwidth, size_t num_items)
-{
-    clear_and_destroy_children();
-    set_width(bitwidth);
-    alloc(num_items, bitwidth); // Throws
-    m_size = num_items;
-    for (size_t i = 0; i != num_items; ++i)
-        set(i, 0);
-}
-
-void Array::preset(int64_t min, int64_t max, size_t num_items)
-{
-    size_t w = std::max(bit_width(max), bit_width(min));
-    preset(w, num_items);
-}
-
-
 void Array::destroy_children(size_t offset) noexcept
 {
     for (size_t i = offset; i != m_size; ++i) {
@@ -407,111 +389,6 @@ void Array::move(Array& dst, size_t ndx)
     dst.m_size += nb_to_move;
     truncate(ndx);
 }
-
-void Array::move_backward(size_t begin, size_t end, size_t dest_end)
-{
-    REALM_ASSERT_3(begin, <=, end);
-    REALM_ASSERT_3(end, <=, m_size);
-    REALM_ASSERT_3(dest_end, <=, m_size);
-    REALM_ASSERT_3(end - begin, <=, dest_end);
-    REALM_ASSERT(!(dest_end > begin && dest_end <= end)); // Required by std::copy_backward
-
-    // Check if we need to copy before modifying
-    copy_on_write(); // Throws
-
-    size_t bits_per_elem = m_width;
-    const char* header = get_header_from_data(m_data);
-    if (get_wtype_from_header(header) == wtype_Multiply) {
-        bits_per_elem *= 8;
-    }
-
-    if (bits_per_elem < 8) {
-        // FIXME: Should be optimized
-        for (size_t i = end; i != begin; --i) {
-            int_fast64_t v = (this->*m_getter)(i - 1);
-            (this->*(m_vtable->setter))(--dest_end, v);
-        }
-        return;
-    }
-
-    size_t bytes_per_elem = bits_per_elem / 8;
-    const char* begin_2 = m_data + begin * bytes_per_elem;
-    const char* end_2 = m_data + end * bytes_per_elem;
-    char* dest_end_2 = m_data + dest_end * bytes_per_elem;
-    std::copy_backward(begin_2, end_2, dest_end_2);
-}
-
-
-void Array::move_rotate(size_t from, size_t to, size_t num_elems)
-{
-    REALM_ASSERT_DEBUG_EX(from < m_size && to < m_size && num_elems <= m_size, from, to, num_elems, m_size);
-
-    if (from == to)
-        return;
-
-    copy_on_write(); // Throws
-
-    size_t bits_per_elem = m_width;
-    const char* header = get_header_from_data(m_data);
-    if (get_wtype_from_header(header) == wtype_Multiply) {
-        bits_per_elem *= 8;
-    }
-
-    if (bits_per_elem < 8) {
-        // Allocate some space for saving the moved elements.
-        // FIXME: Optimize this.
-        // FIXME: Support larger numbers of elements.
-        static const size_t small_save_limit = 32;
-        std::array<int64_t, small_save_limit> small_save;
-        std::unique_ptr<int64_t[]> big_save;
-        int64_t* save;
-        if (num_elems < small_save_limit) {
-            save = small_save.data();
-        }
-        else {
-            big_save.reset(new int64_t[num_elems]);
-            save = big_save.get();
-        }
-
-        // Save elements that should be moved.=
-        for (size_t i = 0; i < num_elems; ++i) {
-            save[i] = get(from + i);
-        }
-
-        // Shift elements in between up or down.
-        if (from < to) {
-            // Shift down.
-            move(from + num_elems, to + num_elems, from);
-        }
-        else { // from > to
-            // Shift up.
-            move_backward(to, from, from + num_elems);
-        }
-
-        // Restore saved elements at new location.
-        for (size_t i = 0; i < num_elems; ++i) {
-            set(to + i, save[i]);
-        }
-    }
-    else {
-        size_t bytes_per_elem = bits_per_elem / 8;
-        char* first;
-        char* new_first;
-        char* last;
-        if (from < to) {
-            first = m_data + (from * bytes_per_elem);
-            new_first = m_data + ((from + num_elems) * bytes_per_elem);
-            last = m_data + ((to + num_elems) * bytes_per_elem);
-        }
-        else {
-            first = m_data + (to * bytes_per_elem);
-            new_first = m_data + (from * bytes_per_elem);
-            last = m_data + ((from + num_elems) * bytes_per_elem);
-        }
-        std::rotate(first, new_first, last);
-    }
-}
-
 
 void Array::add_to_column(IntegerColumn* column, int64_t value)
 {

@@ -87,8 +87,6 @@ public:
     size_t lower_bound(int64_t value) const noexcept;
     size_t upper_bound(int64_t value) const noexcept;
 
-    std::vector<int64_t> to_vector() const;
-
 private:
     template <size_t w>
     bool minmax(size_t from, size_t to, uint64_t maxdiff, int64_t* min, int64_t* max) const;
@@ -109,7 +107,7 @@ public:
     /// Construct an array of the specified type and size, and return just the
     /// reference to the underlying memory. All elements will be initialized to
     /// the specified value.
-    static MemRef create_array(Type, bool context_flag, size_t size, value_type value, Allocator&);
+    static MemRef create_array(Type, bool context_flag, size_t size, Allocator&);
     void create(Type = type_Normal, bool context_flag = false);
 
     void init_from_ref(ref_type) noexcept override;
@@ -139,7 +137,6 @@ public:
     void set_all_to_zero();
 
     void move(size_t begin, size_t end, size_t dest_begin);
-    void move_backward(size_t begin, size_t end, size_t dest_end);
 
     size_t lower_bound(int64_t value) const noexcept;
     size_t upper_bound(int64_t value) const noexcept;
@@ -300,7 +297,7 @@ inline ArrayIntNull::~ArrayIntNull() noexcept
 
 inline void ArrayIntNull::create(Type type, bool context_flag)
 {
-    MemRef r = create_array(type, context_flag, 0, util::none, m_alloc);
+    MemRef r = create_array(type, context_flag, 0, m_alloc);
     init_from_mem(r);
 }
 
@@ -426,11 +423,6 @@ inline void ArrayIntNull::set_all_to_zero()
 inline void ArrayIntNull::move(size_t begin, size_t end, size_t dest_begin)
 {
     Array::move(begin + 1, end + 1, dest_begin + 1);
-}
-
-inline void ArrayIntNull::move_backward(size_t begin, size_t end, size_t dest_end)
-{
-    Array::move_backward(begin + 1, end + 1, dest_end + 1);
 }
 
 inline size_t ArrayIntNull::lower_bound(int64_t value) const noexcept
