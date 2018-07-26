@@ -283,7 +283,7 @@ auto Results::first(Context& ctx)
     // GCC 4.9 complains about `ctx` not being defined within the lambda without this goofy capture
     return dispatch([this, ctx = &ctx](auto t) {
         auto value = this->first<std::decay_t<decltype(*t)>>();
-        return value ? static_cast<decltype(ctx->no_value())>(ctx->box(*value)) : ctx->no_value();
+        return value ? static_cast<decltype(ctx->no_value())>(ctx->box(std::move(*value))) : ctx->no_value();
     });
 }
 
@@ -292,7 +292,7 @@ auto Results::last(Context& ctx)
 {
     return dispatch([&](auto t) {
         auto value = this->last<std::decay_t<decltype(*t)>>();
-        return value ? static_cast<decltype(ctx.no_value())>(ctx.box(*value)) : ctx.no_value();
+        return value ? static_cast<decltype(ctx.no_value())>(ctx.box(std::move(*value))) : ctx.no_value();
     });
 }
 
