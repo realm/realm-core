@@ -933,14 +933,14 @@ ComputedPrivileges Realm::get_privileges(StringData object_type)
     return static_cast<ComputedPrivileges>(privileges & s_allClassPrivileges);
 }
 
-ComputedPrivileges Realm::get_privileges(RowExpr row)
+ComputedPrivileges Realm::get_privileges(Obj const& obj)
 {
     if (!init_permission_cache())
         return static_cast<ComputedPrivileges>(s_allObjectPrivileges);
 
-    auto& table = *row.get_table();
+    auto& table = *obj.get_table();
     auto object_type = ObjectStore::object_type_for_table_name(table.get_name());
-    sync::GlobalID global_id{object_type, sync::object_id_for_row(read_group(), table, row.get_index())};
+    sync::GlobalID global_id{object_type, sync::object_id_for_row(read_group(), table, obj.get_key())};
     auto privileges = inherited_mask(m_permissions_cache->get_realm_privileges())
                     & inherited_mask(m_permissions_cache->get_class_privileges(object_type))
                     & m_permissions_cache->get_object_privileges(global_id);

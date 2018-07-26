@@ -35,19 +35,16 @@ namespace realm {
 class BindingContext;
 class DB;
 class Group;
+class Obj;
 class Realm;
 class Replication;
-class Transaction;
 class StringData;
 class Table;
+class Transaction;
 struct SyncConfig;
 class ThreadSafeReferenceBase;
 template <typename T> class ThreadSafeReference;
 struct VersionID;
-template<typename Table> class BasicRow;
-typedef BasicRow<Table> Row;
-template<typename> class BasicRowExpr;
-using RowExpr = BasicRowExpr<Table>;
 typedef std::shared_ptr<Realm> SharedRealm;
 typedef std::weak_ptr<Realm> WeakRealm;
 
@@ -327,7 +324,7 @@ public:
 
     ComputedPrivileges get_privileges();
     ComputedPrivileges get_privileges(StringData object_type);
-    ComputedPrivileges get_privileges(RowExpr row);
+    ComputedPrivileges get_privileges(Obj const& obj);
 
     static SharedRealm make_shared_realm(Config config,
                                          std::shared_ptr<_impl::RealmCoordinator> coordinator)
