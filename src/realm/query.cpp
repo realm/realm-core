@@ -1268,19 +1268,19 @@ void Query::find_all(ConstTableView& ret, size_t begin, size_t end, size_t limit
 
     init();
 
-    if (end == size_t(-1))
-        end = m_table->size();
-
     if (m_view) {
-        size_t sz = m_view->size();
-        for (size_t t = 0; t < sz && ret.size() < limit; t++) {
+        if (end == size_t(-1))
+            end = m_view->size();
+        for (size_t t = begin; t < end && ret.size() < limit; t++) {
             ConstObj obj = m_view->get_object(t);
-            if (t >= begin && t < end && eval_object(obj)) {
+            if (eval_object(obj)) {
                 ret.m_key_values->add(obj.get_key());
             }
         }
     }
     else {
+        if (end == size_t(-1))
+            end = m_table->size();
         if (!has_conditions()) {
             KeyColumn* refs = ret.m_key_values;
 

@@ -67,15 +67,17 @@ set(REALM_INSTALL_GENERAL_HEADERS
     array_basic_tpl.hpp
     array_binary.hpp
     array_blob.hpp
-    array_blobs_small.hpp
     array_blobs_big.hpp
+    array_blobs_small.hpp
+    array_bool.hpp
     array_direct.hpp
     array_integer.hpp
-    array_bool.hpp
-    array_unsigned.hpp
+    array_key.hpp
+    array_list.hpp
     array_string.hpp
     array_string_short.hpp
     array_timestamp.hpp
+    array_unsigned.hpp
     binary_data.hpp
     bplustree.hpp
     cluster.hpp

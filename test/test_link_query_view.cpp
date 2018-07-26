@@ -1318,6 +1318,49 @@ TEST(LinkList_QueryOnLinkList)
     CHECK_EQUAL(key4, match);
 }
 
+TEST(LinkList_QueryOnLinkListWithDuplicates)
+{
+    Group group;
+
+    TableRef target = group.add_table("target");
+    auto int_col = target->add_column(type_Int, "col1");
+    TableRef origin = group.add_table("origin");
+    auto link_col = origin->add_column_link(type_LinkList, "linklist", *target);
+
+    std::vector<ObjKey> target_keys;
+    target->create_objects(3, target_keys);
+    target->get_object(target_keys[1]).set_all(1);
+    target->get_object(target_keys[2]).set_all(2);
+
+    Obj origin_obj = origin->create_object();
+    LnkLst list = origin_obj.get_linklist(link_col);
+
+    list.add(target_keys[0]);
+    list.add(target_keys[1]);
+    list.add(target_keys[2]);
+    list.add(target_keys[0]);
+    list.add(target_keys[1]);
+    list.add(target_keys[2]);
+
+    // TableView should contain both instances of each row
+    auto all_rows = target->where(list).find_all();
+    CHECK_EQUAL(6, all_rows.size());
+    CHECK_EQUAL(target_keys[0], all_rows.get_key(0));
+    CHECK_EQUAL(target_keys[1], all_rows.get_key(1));
+    CHECK_EQUAL(target_keys[2], all_rows.get_key(2));
+    CHECK_EQUAL(target_keys[0], all_rows.get_key(3));
+    CHECK_EQUAL(target_keys[1], all_rows.get_key(4));
+    CHECK_EQUAL(target_keys[2], all_rows.get_key(5));
+
+    // TableView should contain both instances of each row matching the query
+    auto some_rows = target->where(list).and_query(target->column<Int>(int_col) != 1).find_all();
+    CHECK_EQUAL(4, some_rows.size());
+    CHECK_EQUAL(target_keys[0], some_rows.get_key(0));
+    CHECK_EQUAL(target_keys[2], some_rows.get_key(1));
+    CHECK_EQUAL(target_keys[0], some_rows.get_key(2));
+    CHECK_EQUAL(target_keys[2], some_rows.get_key(3));
+}
+
 #ifdef LEGACY_TESTS
 TEST(LinkList_QueryOnIndexedPropertyOfLinkListSingleMatch)
 {
