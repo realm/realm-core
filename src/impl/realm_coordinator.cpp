@@ -274,6 +274,11 @@ REALM_NOINLINE void translate_file_exception(StringData path, bool immutable)
                                  "in order to proceed.",
                                  ex.what());
     }
+    catch (UnsupportedFileFormatVersion const& ex) {
+        throw RealmFileException(RealmFileException::Kind::FormatUpgradeRequired, path,
+                                 util::format("Opening Realm files of format version %1 is not supported by this version of Realm", ex.source_version),
+                                 ex.what());
+    }
 }
 } // namespace _impl
 } // namespace realm
@@ -341,6 +346,13 @@ void RealmCoordinator::open_db()
             m_db->compact();
     }
     catch (realm::FileFormatUpgradeRequired const&) {
+        if (m_config.schema_mode != SchemaMode::ResetFile) {
+            translate_file_exception(m_config.path, m_config.immutable());
+        }
+        util::File::remove(m_config.path);
+        return open_db();
+    }
+    catch (UnsupportedFileFormatVersion const&) {
         if (m_config.schema_mode != SchemaMode::ResetFile) {
             translate_file_exception(m_config.path, m_config.immutable());
         }
