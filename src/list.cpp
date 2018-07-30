@@ -416,9 +416,9 @@ util::Optional<double> List::average(size_t)
 
 bool List::operator==(List const& rgt) const noexcept
 {
-    return m_list_base->get_key() == rgt.m_list_base->get_key()
+    return m_list_base->get_table() == rgt.m_list_base->get_table()
+        && m_list_base->get_key() == rgt.m_list_base->get_key()
         && m_list_base->get_col_key() == rgt.m_list_base->get_col_key();
-    return false;
 }
 
 NotificationToken List::add_notification_callback(CollectionChangeCallback cb) &
