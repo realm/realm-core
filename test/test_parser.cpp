@@ -197,6 +197,16 @@ static std::vector<std::string> valid_queries = {
     "a == b and c==d sort(a ASC, b DESC) DISTINCT(p) sort(c ASC, d DESC) DISTINCT(q.r)",
     "a == b  sort(     a   ASC  ,  b DESC) and c==d   DISTINCT(   p )  sort(   c   ASC  ,  d   DESC  )  DISTINCT(   q.r ,   p)   ",
 
+    // limit
+    "a=b LIMIT(1)",
+    "a=b LIMIT ( 1 )",
+    "a=b LIMIT( 1234567890 )",
+    "a=b LIMIT(1) && c=d",
+    "a=b && c=d || e=f LIMIT(1)",
+    "a=b LIMIT(1) SORT(a ASC) DISTINCT(b)",
+    "a=b SORT(a ASC) LIMIT(1) DISTINCT(b)",
+    "a=b SORT(a ASC) DISTINCT(b) LIMIT(1)",
+
     // subquery expression
     "SUBQUERY(items, $x, $x.name == 'Tom').@size > 0",
     "SUBQUERY(items, $x, $x.name == 'Tom').@count > 0",
@@ -279,6 +289,22 @@ static std::vector<std::string> invalid_queries = {
     "a=b DISTINCT(p", // no braces
     "a=b sort(p.q DESC a ASC)", // missing comma
     "a=b DISTINCT(p q)", // missing comma
+
+    // limit
+    "LIMIT(1)", // no query conditions
+    "a=b LIMIT", // no params
+    "a=b LIMIT()", // no params
+    "a=b LIMIT(2", // missing end paren
+    "a=b LIMIT2)", // missing open paren
+    "a=b LIMIT(-1)", // negative limit
+    "a=b LIMIT(2.7)", // input must be an integer
+    "a=b LIMIT(0xFFEE)", // input must be an integer
+    "a=b LIMIT(word)", // non numeric limit
+    "a=b LIMIT(11asdf)", // non numeric limit
+    "a=b LIMIT(1, 1)", // only accept one input
+    "a=b LIMIT(1) b=c LIMIT(2)", // only one limit allowed
+    "a=b LIMIT(1) LIMIT(2)", // only one limit allowed
+    "LIMIT(1) a=b LIMIT(2)", // only one limit allowed
 
     // subquery
     "SUBQUERY(items, $x, $x.name == 'Tom') > 0", // missing .@count

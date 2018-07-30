@@ -23,6 +23,8 @@
 #include <string>
 #include <vector>
 
+#include <realm/util/optional.hpp>
+
 namespace realm {
 
 namespace parser {
@@ -120,6 +122,8 @@ struct DescriptorOrderingState
     std::vector<SingleOrderingState> orderings;
 };
 
+typedef realm::util::Optional<size_t> ParserLimit;
+
 struct ParserResult
 {
     ParserResult(Predicate p, DescriptorOrderingState o)
@@ -127,6 +131,7 @@ struct ParserResult
     , ordering(o) {}
     Predicate predicate;
     DescriptorOrderingState ordering;
+    ParserLimit limit;
 };
 
 ParserResult parse(const std::string &query);
