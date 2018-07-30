@@ -931,6 +931,10 @@ void ObjectStore::rename_property(Group& group, Schema& target_schema, StringDat
     table->remove_column(new_property->column_key);
     table->rename_column(old_property->column_key, new_name);
 
+    if (auto prop = target_object_schema->property_for_name(new_name)) {
+        prop->column_key = old_property->column_key;
+    }
+
     // update nullability for column
     if (is_nullable(new_property->type) && !is_nullable(old_property->type)) {
         auto prop = *new_property;
