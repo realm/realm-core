@@ -32,7 +32,7 @@ struct IndexPair {
 };
 } // anonymous namespace
 
-CommonDescriptor::CommonDescriptor(Table const& table, std::vector<std::vector<size_t>> column_indices)
+ColumnsDescriptor::ColumnsDescriptor(Table const& table, std::vector<std::vector<size_t>> column_indices)
 {
     if (table.is_degenerate()) {
         // We need access to the column acessors and that's not available in a
@@ -62,14 +62,14 @@ CommonDescriptor::CommonDescriptor(Table const& table, std::vector<std::vector<s
     }
 }
 
-std::unique_ptr<CommonDescriptor> CommonDescriptor::clone() const
+std::unique_ptr<ColumnsDescriptor> ColumnsDescriptor::clone() const
 {
-    return std::unique_ptr<CommonDescriptor>(new CommonDescriptor(*this));
+    return std::unique_ptr<ColumnsDescriptor>(new ColumnsDescriptor(*this));
 }
 
 SortDescriptor::SortDescriptor(Table const& table, std::vector<std::vector<size_t>> column_indices,
                                std::vector<bool> ascending)
-    : CommonDescriptor(table, column_indices)
+    : ColumnsDescriptor(table, column_indices)
     , m_ascending(std::move(ascending))
 {
     REALM_ASSERT_EX(m_ascending.empty() || m_ascending.size() == column_indices.size(), m_ascending.size(),
@@ -81,9 +81,9 @@ SortDescriptor::SortDescriptor(Table const& table, std::vector<std::vector<size_
     }
 }
 
-std::unique_ptr<CommonDescriptor> SortDescriptor::clone() const
+std::unique_ptr<ColumnsDescriptor> SortDescriptor::clone() const
 {
-    return std::unique_ptr<CommonDescriptor>(new SortDescriptor(*this));
+    return std::unique_ptr<ColumnsDescriptor>(new SortDescriptor(*this));
 }
 
 void SortDescriptor::merge_with(SortDescriptor&& other)
@@ -98,7 +98,7 @@ void SortDescriptor::merge_with(SortDescriptor&& other)
                        other.m_ascending.end());
 }
 
-class CommonDescriptor::Sorter {
+class ColumnsDescriptor::Sorter {
 public:
     Sorter(std::vector<std::vector<const ColumnBase*>> const& columns, std::vector<bool> const& ascending,
            IntegerColumn const& row_indexes);
@@ -128,7 +128,7 @@ private:
     std::vector<SortColumn> m_columns;
 };
 
-CommonDescriptor::Sorter::Sorter(std::vector<std::vector<const ColumnBase*>> const& columns,
+ColumnsDescriptor::Sorter::Sorter(std::vector<std::vector<const ColumnBase*>> const& columns,
                                  std::vector<bool> const& ascending, IntegerColumn const& row_indexes)
 {
     REALM_ASSERT(!columns.empty());
@@ -151,7 +151,7 @@ CommonDescriptor::Sorter::Sorter(std::vector<std::vector<const ColumnBase*>> con
         for (size_t row_ndx = 0; row_ndx < num_rows; row_ndx++) {
             size_t translated_index = to_size_t(row_indexes.get(row_ndx));
             for (size_t j = 0; j + 1 < columns[i].size(); ++j) {
-                // type was checked when creating the CommonDescriptor
+                // type was checked when creating the ColumnsDescriptor
                 auto link_col = static_cast<const LinkColumn*>(columns[i][j]);
                 if (link_col->is_null(translated_index)) {
                     is_null[row_ndx] = true;
@@ -164,7 +164,7 @@ CommonDescriptor::Sorter::Sorter(std::vector<std::vector<const ColumnBase*>> con
     }
 }
 
-std::vector<std::vector<size_t>> CommonDescriptor::export_column_indices() const
+std::vector<std::vector<size_t>> ColumnsDescriptor::export_column_indices() const
 {
     std::vector<std::vector<size_t>> column_indices;
     column_indices.reserve(m_columns.size());
@@ -215,7 +215,7 @@ std::string SortDescriptor::get_description(TableRef attached_table) const
     return description;
 }
 
-std::string CommonDescriptor::get_description(TableRef attached_table) const
+std::string ColumnsDescriptor::get_description(TableRef attached_table) const
 {
     std::string description = "DISTINCT(";
     for (size_t i = 0; i < m_columns.size(); ++i) {
@@ -239,7 +239,7 @@ std::string CommonDescriptor::get_description(TableRef attached_table) const
     return description;
 }
 
-CommonDescriptor::Sorter CommonDescriptor::sorter(IntegerColumn const& row_indexes) const
+ColumnsDescriptor::Sorter ColumnsDescriptor::sorter(IntegerColumn const& row_indexes) const
 {
     REALM_ASSERT(!m_columns.empty());
     std::vector<bool> ascending(m_columns.size(), true);
@@ -335,14 +335,14 @@ bool DescriptorOrdering::descriptor_is_distinct(size_t index) const
     return !descriptor_is_sort(index);
 }
 
-const CommonDescriptor* DescriptorOrdering::operator[](size_t ndx) const
+const ColumnsDescriptor* DescriptorOrdering::operator[](size_t ndx) const
 {
     return m_descriptors.at(ndx).get(); // may throw std::out_of_range
 }
 
 bool DescriptorOrdering::will_apply_sort() const
 {
-    return std::any_of(m_descriptors.begin(), m_descriptors. end(), [](const std::unique_ptr<CommonDescriptor>& desc) {
+    return std::any_of(m_descriptors.begin(), m_descriptors. end(), [](const std::unique_ptr<ColumnsDescriptor>& desc) {
         REALM_ASSERT(desc.get()->is_valid());
         return dynamic_cast<SortDescriptor*>(desc.get()) != nullptr;
     });
@@ -350,7 +350,7 @@ bool DescriptorOrdering::will_apply_sort() const
 
 bool DescriptorOrdering::will_apply_distinct() const
 {
-    return std::any_of(m_descriptors.begin(), m_descriptors.end(), [](const std::unique_ptr<CommonDescriptor>& desc) {
+    return std::any_of(m_descriptors.begin(), m_descriptors.end(), [](const std::unique_ptr<ColumnsDescriptor>& desc) {
         REALM_ASSERT(desc.get()->is_valid());
         return dynamic_cast<SortDescriptor*>(desc.get()) == nullptr;
     });
@@ -381,7 +381,7 @@ void DescriptorOrdering::generate_patch(DescriptorOrdering const& descriptors, H
         column_indices.reserve(num_descriptors);
         column_orders.reserve(num_descriptors);
         for (size_t desc_ndx = 0; desc_ndx < num_descriptors; ++desc_ndx) {
-            const CommonDescriptor* desc = descriptors[desc_ndx];
+            const ColumnsDescriptor* desc = descriptors[desc_ndx];
             column_indices.push_back(desc->export_column_indices());
             column_orders.push_back(desc->export_order());
         }
@@ -453,7 +453,7 @@ void RowIndexes::do_sort(const DescriptorOrdering& ordering) {
 
     const int num_descriptors = int(ordering.size());
     for (int desc_ndx = 0; desc_ndx < num_descriptors; ++desc_ndx) {
-        const CommonDescriptor* common_descr = ordering[desc_ndx];
+        const ColumnsDescriptor* common_descr = ordering[desc_ndx];
 
         if (const auto* sort_descr = dynamic_cast<const SortDescriptor*>(common_descr)) {
 
