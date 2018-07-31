@@ -285,6 +285,7 @@ DescriptorOrdering::DescriptorOrdering(const DescriptorOrdering& other)
     for (const auto& d : other.m_descriptors) {
         m_descriptors.emplace_back(d->clone());
     }
+    m_limit = other.m_limit;
 }
 
 DescriptorOrdering& DescriptorOrdering::operator=(const DescriptorOrdering& rhs)
@@ -294,6 +295,7 @@ DescriptorOrdering& DescriptorOrdering::operator=(const DescriptorOrdering& rhs)
         for (const auto& d : rhs.m_descriptors) {
             m_descriptors.emplace_back(d->clone());
         }
+        m_limit = rhs.m_limit;
     }
     return *this;
 }
@@ -362,6 +364,9 @@ std::string DescriptorOrdering::get_description(TableRef target_table) const
             description += " ";
         }
     }
+    if (has_limit()) {
+        description += " LIMIT(" + serializer::print_value(get_limit()) + ")";
+    }
     return description;
 }
 
@@ -378,7 +383,9 @@ void DescriptorOrdering::generate_patch(DescriptorOrdering const& descriptors, H
             column_indices.push_back(desc->export_column_indices());
             column_orders.push_back(desc->export_order());
         }
-        patch.reset(new DescriptorOrderingHandoverPatch{std::move(column_indices), std::move(column_orders)});
+        const size_t limit_for_handover = descriptors.has_limit() ? descriptors.get_limit() : -1;
+        patch.reset(new DescriptorOrderingHandoverPatch{std::move(column_indices), std::move(column_orders),
+            limit_for_handover, descriptors.has_limit()});
     }
 }
 
@@ -399,14 +406,24 @@ DescriptorOrdering DescriptorOrdering::create_from_and_consume_patch(HandoverPat
                                                     std::move(patch->ascending[desc_ndx])));
             }
         }
+        if (patch->has_limit) {
+            ordering.set_limit(patch->limit);
+        }
+
         patch.reset();
     }
     return ordering;
 }
 
 void RowIndexes::do_sort(const DescriptorOrdering& ordering) {
-    if (ordering.is_empty())
+    if (ordering.is_empty()) {
+        size_t sz = size();
+        if (ordering.value_exceeds_limit(sz)) {
+            const size_t num_rows_to_erase = sz - ordering.get_limit();
+            m_row_indexes.erase_rows(ordering.get_limit(), num_rows_to_erase, sz, false);
+        }
         return;
+    }
     size_t sz = size();
     if (sz == 0)
         return;
@@ -480,10 +497,21 @@ void RowIndexes::do_sort(const DescriptorOrdering& ordering) {
     }
     // Apply the results
     m_row_indexes.clear();
-    for (auto& pair : v)
+    size_t rows_added = 0; // keep track of size ourselves since Column.size() is a slow tree traversal
+    for (auto& pair : v) {
+        if (ordering.value_exceeds_limit(rows_added + 1)) {
+            return;
+        }
         m_row_indexes.add(pair.index_in_column);
-    for (size_t t = 0; t < detached_ref_count; ++t)
+        ++rows_added;
+    }
+    for (size_t t = 0; t < detached_ref_count; ++t) {
+        if (ordering.value_exceeds_limit(rows_added + 1)) {
+            return;
+        }
         m_row_indexes.add(-1);
+        ++rows_added;
+    }
 }
 
 RowIndexes::RowIndexes(IntegerColumn::unattached_root_tag urt, realm::Allocator& alloc)

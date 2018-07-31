@@ -803,6 +803,9 @@ void apply_ordering(DescriptorOrdering& ordering, ConstTableRef target, const pa
             ordering.append_sort(SortDescriptor{*target.get(), property_indices, ascendings});
         }
     }
+    if (bool(state.limit)) {
+        ordering.set_limit(*state.limit);
+    }
 }
 
 void apply_ordering(DescriptorOrdering& ordering, ConstTableRef target, const parser::DescriptorOrderingState& state)
@@ -810,6 +813,7 @@ void apply_ordering(DescriptorOrdering& ordering, ConstTableRef target, const pa
     NoArguments args;
     apply_ordering(ordering, target, state, args);
 }
+
 
 } // namespace query_builder
 } // namespace realm

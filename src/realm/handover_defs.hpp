@@ -60,6 +60,8 @@ struct QueryHandoverPatch {
 struct DescriptorOrderingHandoverPatch {
     std::vector<std::vector<std::vector<size_t>>> columns;
     std::vector<std::vector<bool>> ascending;
+    size_t limit;
+    bool has_limit;
 };
 
 struct TableViewHandoverPatch {

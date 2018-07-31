@@ -202,7 +202,6 @@ struct ParserState
     std::string subquery_path, subquery_var;
     std::vector<Predicate> subqueries;
     Predicate::ComparisonType pending_comparison_type;
-    realm::util::Optional<size_t> limit_modifier;
 
     Predicate *current_group()
     {
@@ -480,19 +479,20 @@ template<> struct action< distinct >
 template<> struct action< limit_param >
 {
     template< typename Input >
-    static bool apply(const Input& in, ParserState & state)
+    static void apply(const Input& in, ParserState & state)
     {
         DEBUG_PRINT_TOKEN(in.string() + " LIMIT PARAM");
-        if (bool(state.limit_modifier)) {
+        if (bool(state.ordering_state.limit)) {
             // if we already have limit set we disallow a second LIMIT
-            return false;
+            const static std::string message = "Invalid Predicate. 'LIMIT' may only be used once.";
+            throw tao::pegtl::parse_error(message, in);
         }
         try {
-            state.limit_modifier = realm::util::stot<size_t>(in.string());
+            state.ordering_state.limit = realm::util::stot<size_t>(in.string());
         } catch (...) {
-            return false;
+            const static std::string message = "Invalid Predicate. 'LIMIT' accepts a positive integer parameter eg: 'LIMIT(10)'";
+            throw tao::pegtl::parse_error(message, in);
         }
-        return true;
     }
 };
 
@@ -700,9 +700,6 @@ struct error_message_control : tao::pegtl::normal< Rule >
 
 template<>
 const std::string error_message_control< chars >::error_message = "Invalid characters in string constant.";
-
-template<>
-const std::string error_message_control< limit_param >::error_message = "Invalid Predicate. 'LIMIT' may only be used once and accepts one positive integer parameter eg: 'LIMIT(10)'";
 
 template< typename Rule>
 const std::string error_message_control< Rule >::error_message = "Invalid predicate.";

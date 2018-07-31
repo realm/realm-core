@@ -116,6 +116,10 @@ public:
     bool descriptor_is_distinct(size_t index) const;
     bool is_empty() const { return m_descriptors.empty(); }
     size_t size() const { return m_descriptors.size(); }
+    bool has_limit() const { return bool(m_limit); }
+    size_t get_limit() const { return *m_limit; } // throws
+    bool value_exceeds_limit(size_t test_value) const { return bool(m_limit) && test_value > *m_limit; }
+    void set_limit(size_t new_limit) { m_limit = new_limit; }
     const CommonDescriptor* operator[](size_t ndx) const;
     bool will_apply_sort() const;
     bool will_apply_distinct() const;
@@ -127,6 +131,7 @@ public:
     static DescriptorOrdering create_from_and_consume_patch(HandoverPatch&, Table const&);
 
 private:
+    realm::util::Optional<size_t> m_limit;
     std::vector<std::unique_ptr<CommonDescriptor>> m_descriptors;
 };
 

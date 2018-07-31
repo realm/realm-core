@@ -107,6 +107,8 @@ struct Predicate
     Predicate(Type t, bool n = false) : type(t), negate(n) {}
 };
 
+typedef realm::util::Optional<size_t> LimitDescriptor;
+
 struct DescriptorOrderingState
 {
     struct PropertyState
@@ -120,9 +122,8 @@ struct DescriptorOrderingState
         bool is_distinct;
     };
     std::vector<SingleOrderingState> orderings;
+    LimitDescriptor limit;
 };
-
-typedef realm::util::Optional<size_t> ParserLimit;
 
 struct ParserResult
 {
@@ -131,7 +132,6 @@ struct ParserResult
     , ordering(o) {}
     Predicate predicate;
     DescriptorOrderingState ordering;
-    ParserLimit limit;
 };
 
 ParserResult parse(const std::string &query);

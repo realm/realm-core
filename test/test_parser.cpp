@@ -1565,7 +1565,6 @@ TableView get_sorted_view(TableRef t, std::string query_string)
     realm::query_builder::apply_predicate(q, result.predicate, args);
     DescriptorOrdering ordering;
     realm::query_builder::apply_ordering(ordering, t, result.ordering);
-
     std::string query_description = q.get_description();
     std::string ordering_description = ordering.get_description(t);
     std::string combined = query_description + " " + ordering_description;
@@ -1689,6 +1688,124 @@ TEST(Parser_SortAndDistinct)
 
     CHECK_THROW_ANY_GET_MESSAGE(get_sorted_view(people, "TRUEPREDICATE sort(account.name ASC)"), message);
     CHECK_EQUAL(message, "No property 'name' found on object type 'account' specified in 'sort' clause");
+}
+
+
+TEST(Parser_Limit)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
+
+    Group& g = sg.begin_write();
+    TableRef people = g.add_table("person");
+
+    size_t name_col = people->add_column(type_String, "name");
+    size_t age_col = people->add_column(type_Int, "age");
+
+    people->add_empty_row(3);
+    people->set_string(name_col, 0, "Adam");
+    people->set_int(age_col, 0, 28);
+    people->set_string(name_col, 1, "Frank");
+    people->set_int(age_col, 1, 30);
+    people->set_string(name_col, 2, "Ben");
+    people->set_int(age_col, 2, 28);
+
+    // solely limit
+    TableView tv = get_sorted_view(people, "TRUEPREDICATE LIMIT(0)");
+    CHECK_EQUAL(tv.size(), 0);
+    tv = get_sorted_view(people, "TRUEPREDICATE LIMIT(1)");
+    CHECK_EQUAL(tv.size(), 1);
+    tv = get_sorted_view(people, "TRUEPREDICATE LIMIT(2)");
+    CHECK_EQUAL(tv.size(), 2);
+    tv = get_sorted_view(people, "TRUEPREDICATE LIMIT(3)");
+    CHECK_EQUAL(tv.size(), 3);
+    tv = get_sorted_view(people, "TRUEPREDICATE LIMIT(4)");
+    CHECK_EQUAL(tv.size(), 3);
+
+    // sort + limit
+    tv = get_sorted_view(people, "TRUEPREDICATE SORT(name ASC) LIMIT(0)");
+    CHECK_EQUAL(tv.size(), 0);
+    tv = get_sorted_view(people, "TRUEPREDICATE SORT(name ASC) LIMIT(1)");
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv.get_string(name_col, 0), "Adam");
+    tv = get_sorted_view(people, "TRUEPREDICATE SORT(name ASC) LIMIT(2)");
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(tv.get_string(name_col, 0), "Adam");
+    CHECK_EQUAL(tv.get_string(name_col, 1), "Ben");
+    tv = get_sorted_view(people, "TRUEPREDICATE SORT(name ASC) LIMIT(3)");
+    CHECK_EQUAL(tv.size(), 3);
+    CHECK_EQUAL(tv.get_string(name_col, 0), "Adam");
+    CHECK_EQUAL(tv.get_string(name_col, 1), "Ben");
+    CHECK_EQUAL(tv.get_string(name_col, 2), "Frank");
+    tv = get_sorted_view(people, "TRUEPREDICATE SORT(name ASC) LIMIT(4)");
+    CHECK_EQUAL(tv.size(), 3);
+
+    // sort + distinct + limit
+    tv = get_sorted_view(people, "TRUEPREDICATE SORT(name ASC) DISTINCT(age) LIMIT(0)");
+    CHECK_EQUAL(tv.size(), 0);
+    tv = get_sorted_view(people, "TRUEPREDICATE SORT(name ASC) DISTINCT(age) LIMIT(1)");
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv.get_string(name_col, 0), "Adam");
+    tv = get_sorted_view(people, "TRUEPREDICATE SORT(name ASC) DISTINCT(age) LIMIT(2)");
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(tv.get_string(name_col, 0), "Adam");
+    CHECK_EQUAL(tv.get_string(name_col, 1), "Frank");
+    tv = get_sorted_view(people, "TRUEPREDICATE SORT(name ASC) DISTINCT(age) LIMIT(3)");
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(tv.get_string(name_col, 0), "Adam");
+    CHECK_EQUAL(tv.get_string(name_col, 1), "Frank");
+    tv = get_sorted_view(people, "TRUEPREDICATE SORT(name ASC) DISTINCT(age) LIMIT(4)");
+    CHECK_EQUAL(tv.size(), 2);
+
+    // query + limit
+    tv = get_sorted_view(people, "age < 30 SORT(name ASC) DISTINCT(age) LIMIT(0)");
+    CHECK_EQUAL(tv.size(), 0);
+    tv = get_sorted_view(people, "age < 30 SORT(name ASC) DISTINCT(age) LIMIT(1)");
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv.get_string(name_col, 0), "Adam");
+    tv = get_sorted_view(people, "age < 30 SORT(name ASC) DISTINCT(age) LIMIT(2)");
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv.get_string(name_col, 0), "Adam");
+    tv = get_sorted_view(people, "age < 30 SORT(name ASC) DISTINCT(age) LIMIT(3)");
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv.get_string(name_col, 0), "Adam");
+    tv = get_sorted_view(people, "age < 30 SORT(name ASC) DISTINCT(age) LIMIT(4)");
+    CHECK_EQUAL(tv.size(), 1);
+
+    // compound query + limit
+    tv = get_sorted_view(people, "age < 30 && name == 'Adam' LIMIT(0)");
+    CHECK_EQUAL(tv.size(), 0);
+    tv = get_sorted_view(people, "age < 30 && name == 'Adam' LIMIT(1)");
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv.get_string(name_col, 0), "Adam");
+
+    // errors
+    CHECK_THROW_ANY(get_sorted_view(people, "TRUEPREDICATE LIMIT(-1)")); // only accepting positive integers
+    CHECK_THROW_ANY(get_sorted_view(people, "TRUEPREDICATE LIMIT(age)")); // only accepting positive integers
+    CHECK_THROW_ANY(get_sorted_view(people, "TRUEPREDICATE LIMIT('age')")); // only accepting positive integers
+    std::string message;
+    CHECK_THROW_ANY_GET_MESSAGE(get_sorted_view(people, "TRUEPREDICATE LIMIT(1) LIMIT(1)"), message);
+    CHECK(message.find("'LIMIT' may only be used once") != std::string::npos);
+
+    sg.commit();
+
+    // handover
+    const Group& reader = sg.begin_read();
+    ConstTableRef peopleRead = reader.get_table("person");
+
+    TableView items = peopleRead->where().find_all();
+    CHECK_EQUAL(items.size(), 3);
+    realm::DescriptorOrdering desc;
+    desc.set_limit(1);
+    items.apply_descriptor_ordering(desc);
+    CHECK_EQUAL(items.size(), 1);
+    std::unique_ptr<SharedGroup::Handover<TableView>> handover = sg.export_for_handover(items, ConstSourcePayload::Copy);
+
+    std::unique_ptr<TableView> tv2(sg.import_from_handover(move(handover)));
+    CHECK(tv2->is_attached());
+    CHECK(tv2->is_in_sync());
+    CHECK_EQUAL(tv2->size(), 1);
 }
 
 
