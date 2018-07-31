@@ -10,7 +10,7 @@
 
 ### Enhancements
 
-* None.
+* Support limiting queries via `DescriptorOrdering::set_limit` and by supporting "LIMIT(x)" in string queries.
 
 -----------
 
