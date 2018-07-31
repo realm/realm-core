@@ -21,6 +21,8 @@
 #include <realm/column_link.hpp>
 #include <realm/table.hpp>
 
+#include <realm/util/optional.hpp>
+
 using namespace realm;
 
 namespace {
@@ -383,9 +385,8 @@ void DescriptorOrdering::generate_patch(DescriptorOrdering const& descriptors, H
             column_indices.push_back(desc->export_column_indices());
             column_orders.push_back(desc->export_order());
         }
-        const size_t limit_for_handover = descriptors.has_limit() ? descriptors.get_limit() : -1;
-        patch.reset(new DescriptorOrderingHandoverPatch{std::move(column_indices), std::move(column_orders),
-            limit_for_handover, descriptors.has_limit()});
+        realm::util::Optional<size_t> limit = descriptors.get_optional_limit();
+        patch.reset(new DescriptorOrderingHandoverPatch{std::move(column_indices), std::move(column_orders), limit});
     }
 }
 
@@ -406,9 +407,7 @@ DescriptorOrdering DescriptorOrdering::create_from_and_consume_patch(HandoverPat
                                                     std::move(patch->ascending[desc_ndx])));
             }
         }
-        if (patch->has_limit) {
-            ordering.set_limit(patch->limit);
-        }
+        ordering.set_optional_limit(patch->limit);
 
         patch.reset();
     }

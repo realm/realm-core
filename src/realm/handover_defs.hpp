@@ -22,6 +22,8 @@
 #include <memory>
 #include <vector>
 
+#include <realm/util/optional.hpp>
+
 namespace realm {
 
 enum class ConstSourcePayload { Copy, Stay };
@@ -60,8 +62,7 @@ struct QueryHandoverPatch {
 struct DescriptorOrderingHandoverPatch {
     std::vector<std::vector<std::vector<size_t>>> columns;
     std::vector<std::vector<bool>> ascending;
-    size_t limit;
-    bool has_limit;
+    realm::util::Optional<size_t> limit;
 };
 
 struct TableViewHandoverPatch {

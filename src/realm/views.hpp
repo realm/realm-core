@@ -118,6 +118,8 @@ public:
     size_t size() const { return m_descriptors.size(); }
     bool has_limit() const { return bool(m_limit); }
     size_t get_limit() const { return *m_limit; } // throws
+    realm::util::Optional<size_t> get_optional_limit() const { return m_limit; }
+    void set_optional_limit(realm::util::Optional<size_t> new_limit) { m_limit = new_limit; }
     bool value_exceeds_limit(size_t test_value) const { return bool(m_limit) && test_value > *m_limit; }
     void set_limit(size_t new_limit) { m_limit = new_limit; }
     const CommonDescriptor* operator[](size_t ndx) const;
