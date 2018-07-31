@@ -116,11 +116,11 @@ public:
     bool descriptor_is_distinct(size_t index) const;
     bool is_empty() const { return m_descriptors.empty(); }
     size_t size() const { return m_descriptors.size(); }
-    bool has_limit() const { return bool(m_limit); }
+    bool has_limit() const noexcept { return bool(m_limit); }
     size_t get_limit() const { return *m_limit; } // throws
-    realm::util::Optional<size_t> get_optional_limit() const { return m_limit; }
+    realm::util::Optional<size_t> get_optional_limit() const noexcept { return m_limit; }
     void set_optional_limit(realm::util::Optional<size_t> new_limit) { m_limit = new_limit; }
-    bool value_exceeds_limit(size_t test_value) const { return bool(m_limit) && test_value > *m_limit; }
+    bool value_exceeds_limit(size_t test_value) const noexcept { return bool(m_limit) && test_value > *m_limit; }
     void set_limit(size_t new_limit) { m_limit = new_limit; }
     const CommonDescriptor* operator[](size_t ndx) const;
     bool will_apply_sort() const;
@@ -162,6 +162,10 @@ public:
     virtual const ColumnBase& get_column_base(size_t index) const = 0;
 
     virtual size_t size() const = 0;
+    // get the number of total results which could have been returned if the results were not constrained with "LIMIT"
+    // if this result does not have a limit applied, this will return the same as `size()`
+    // the returned value is only accurate since the last sync
+    virtual size_t size_unlimited() const noexcept { return m_unlimited_size; }
 
     // These two methods are overridden by TableView and LinkView.
     virtual uint_fast64_t sync_if_needed() const = 0;
@@ -181,8 +185,10 @@ public:
 
 protected:
     void do_sort(const DescriptorOrdering& ordering);
+    void truncate_results_to_limit(const DescriptorOrdering& ordering) noexcept;
 
     static const uint64_t cookie_expected = 0x7765697677777777ull; // 0x77656976 = 'view'; 0x77777777 = '7777' = alive
+    size_t m_unlimited_size = 0;
     uint64_t m_debug_cookie;
 };
 

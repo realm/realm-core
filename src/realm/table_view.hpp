@@ -800,6 +800,7 @@ inline TableViewBase::TableViewBase(const TableViewBase& tv)
         m_table->register_view(this); // Throws
     m_row_indexes.init_from_mem(alloc, mem);
     ref_guard.release();
+    RowIndexes::m_unlimited_size = tv.m_unlimited_size;
 }
 
 inline TableViewBase::TableViewBase(TableViewBase&& tv) noexcept
@@ -820,6 +821,7 @@ inline TableViewBase::TableViewBase(TableViewBase&& tv) noexcept
     m_last_seen_version(tv.m_last_seen_version)
     , m_num_detached_refs(tv.m_num_detached_refs)
 {
+    RowIndexes::m_unlimited_size = tv.m_unlimited_size;
     if (m_table)
         m_table->move_registered_view(&tv, this);
 }
@@ -842,6 +844,7 @@ inline TableViewBase& TableViewBase::operator=(TableViewBase&& tv) noexcept
         m_table->move_registered_view(&tv, this);
 
     m_row_indexes.move_assign(tv.m_row_indexes);
+    m_unlimited_size = tv.m_unlimited_size;
     m_query = std::move(tv.m_query);
     m_num_detached_refs = tv.m_num_detached_refs;
     m_last_seen_version = tv.m_last_seen_version;
@@ -876,6 +879,7 @@ inline TableViewBase& TableViewBase::operator=(const TableViewBase& tv)
     m_row_indexes.destroy();
     m_row_indexes.get_root_array()->init_from_mem(mem);
     ref_guard.release();
+    m_unlimited_size = tv.m_unlimited_size;
 
     m_query = tv.m_query;
     m_num_detached_refs = tv.m_num_detached_refs;

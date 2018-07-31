@@ -414,18 +414,25 @@ DescriptorOrdering DescriptorOrdering::create_from_and_consume_patch(HandoverPat
     return ordering;
 }
 
+void RowIndexes::truncate_results_to_limit(const DescriptorOrdering& ordering) noexcept {
+    size_t results_size = size();
+    m_unlimited_size = results_size;
+    if (ordering.value_exceeds_limit(results_size)) {
+        const size_t num_rows_to_erase = results_size - ordering.get_limit();
+        m_row_indexes.erase_rows(ordering.get_limit(), num_rows_to_erase, results_size, false);
+    }
+}
+
 void RowIndexes::do_sort(const DescriptorOrdering& ordering) {
     if (ordering.is_empty()) {
-        size_t sz = size();
-        if (ordering.value_exceeds_limit(sz)) {
-            const size_t num_rows_to_erase = sz - ordering.get_limit();
-            m_row_indexes.erase_rows(ordering.get_limit(), num_rows_to_erase, sz, false);
-        }
+        truncate_results_to_limit(ordering);
         return;
     }
     size_t sz = size();
-    if (sz == 0)
+    if (sz == 0) {
+        m_unlimited_size = 0;
         return;
+    }
 
     // Gather the current rows into a container we can use std algorithms on
     size_t detached_ref_count = 0;
@@ -494,6 +501,7 @@ void RowIndexes::do_sort(const DescriptorOrdering& ordering) {
             }
         }
     }
+    m_unlimited_size = v.size() + detached_ref_count;
     // Apply the results
     m_row_indexes.clear();
     size_t rows_added = 0; // keep track of size ourselves since Column.size() is a slow tree traversal
@@ -533,8 +541,9 @@ RowIndexes::RowIndexes(IntegerColumn&& col)
 // FIXME: this only works (and is only used) for row indexes with memory
 // managed by the default allocator, e.q. for TableViews.
 RowIndexes::RowIndexes(const RowIndexes& source, ConstSourcePayload mode)
+    : m_unlimited_size(source.m_unlimited_size)
 #ifdef REALM_COOKIE_CHECK
-    : m_debug_cookie(source.m_debug_cookie)
+    , m_debug_cookie(source.m_debug_cookie)
 #endif
 {
     REALM_ASSERT(&source.m_row_indexes.get_alloc() == &Allocator::get_default());
@@ -546,8 +555,9 @@ RowIndexes::RowIndexes(const RowIndexes& source, ConstSourcePayload mode)
 }
 
 RowIndexes::RowIndexes(RowIndexes& source, MutableSourcePayload)
+    : m_unlimited_size(source.m_unlimited_size)
 #ifdef REALM_COOKIE_CHECK
-    : m_debug_cookie(source.m_debug_cookie)
+    , m_debug_cookie(source.m_debug_cookie)
 #endif
 {
     REALM_ASSERT(&source.m_row_indexes.get_alloc() == &Allocator::get_default());

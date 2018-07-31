@@ -1714,71 +1714,140 @@ TEST(Parser_Limit)
     // solely limit
     TableView tv = get_sorted_view(people, "TRUEPREDICATE LIMIT(0)");
     CHECK_EQUAL(tv.size(), 0);
+    CHECK_EQUAL(tv.size_unlimited(), 3);
     tv = get_sorted_view(people, "TRUEPREDICATE LIMIT(1)");
     CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv.size_unlimited(), 3);
     tv = get_sorted_view(people, "TRUEPREDICATE LIMIT(2)");
     CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(tv.size_unlimited(), 3);
     tv = get_sorted_view(people, "TRUEPREDICATE LIMIT(3)");
     CHECK_EQUAL(tv.size(), 3);
+    CHECK_EQUAL(tv.size_unlimited(), 3);
     tv = get_sorted_view(people, "TRUEPREDICATE LIMIT(4)");
     CHECK_EQUAL(tv.size(), 3);
+    CHECK_EQUAL(tv.size_unlimited(), 3);
 
     // sort + limit
     tv = get_sorted_view(people, "TRUEPREDICATE SORT(name ASC) LIMIT(0)");
     CHECK_EQUAL(tv.size(), 0);
+    CHECK_EQUAL(tv.size_unlimited(), 3);
     tv = get_sorted_view(people, "TRUEPREDICATE SORT(name ASC) LIMIT(1)");
     CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv.size_unlimited(), 3);
     CHECK_EQUAL(tv.get_string(name_col, 0), "Adam");
     tv = get_sorted_view(people, "TRUEPREDICATE SORT(name ASC) LIMIT(2)");
     CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(tv.size_unlimited(), 3);
     CHECK_EQUAL(tv.get_string(name_col, 0), "Adam");
     CHECK_EQUAL(tv.get_string(name_col, 1), "Ben");
     tv = get_sorted_view(people, "TRUEPREDICATE SORT(name ASC) LIMIT(3)");
     CHECK_EQUAL(tv.size(), 3);
+    CHECK_EQUAL(tv.size_unlimited(), 3);
     CHECK_EQUAL(tv.get_string(name_col, 0), "Adam");
     CHECK_EQUAL(tv.get_string(name_col, 1), "Ben");
     CHECK_EQUAL(tv.get_string(name_col, 2), "Frank");
     tv = get_sorted_view(people, "TRUEPREDICATE SORT(name ASC) LIMIT(4)");
     CHECK_EQUAL(tv.size(), 3);
+    CHECK_EQUAL(tv.size_unlimited(), 3);
 
     // sort + distinct + limit
     tv = get_sorted_view(people, "TRUEPREDICATE SORT(name ASC) DISTINCT(age) LIMIT(0)");
     CHECK_EQUAL(tv.size(), 0);
+    CHECK_EQUAL(tv.size_unlimited(), 2);
     tv = get_sorted_view(people, "TRUEPREDICATE SORT(name ASC) DISTINCT(age) LIMIT(1)");
     CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv.size_unlimited(), 2);
     CHECK_EQUAL(tv.get_string(name_col, 0), "Adam");
     tv = get_sorted_view(people, "TRUEPREDICATE SORT(name ASC) DISTINCT(age) LIMIT(2)");
     CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(tv.size_unlimited(), 2);
     CHECK_EQUAL(tv.get_string(name_col, 0), "Adam");
     CHECK_EQUAL(tv.get_string(name_col, 1), "Frank");
     tv = get_sorted_view(people, "TRUEPREDICATE SORT(name ASC) DISTINCT(age) LIMIT(3)");
     CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(tv.size_unlimited(), 2);
     CHECK_EQUAL(tv.get_string(name_col, 0), "Adam");
     CHECK_EQUAL(tv.get_string(name_col, 1), "Frank");
     tv = get_sorted_view(people, "TRUEPREDICATE SORT(name ASC) DISTINCT(age) LIMIT(4)");
     CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(tv.size_unlimited(), 2);
 
     // query + limit
     tv = get_sorted_view(people, "age < 30 SORT(name ASC) DISTINCT(age) LIMIT(0)");
     CHECK_EQUAL(tv.size(), 0);
+    CHECK_EQUAL(tv.size_unlimited(), 1);
     tv = get_sorted_view(people, "age < 30 SORT(name ASC) DISTINCT(age) LIMIT(1)");
     CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv.size_unlimited(), 1);
     CHECK_EQUAL(tv.get_string(name_col, 0), "Adam");
     tv = get_sorted_view(people, "age < 30 SORT(name ASC) DISTINCT(age) LIMIT(2)");
     CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv.size_unlimited(), 1);
     CHECK_EQUAL(tv.get_string(name_col, 0), "Adam");
     tv = get_sorted_view(people, "age < 30 SORT(name ASC) DISTINCT(age) LIMIT(3)");
     CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv.size_unlimited(), 1);
     CHECK_EQUAL(tv.get_string(name_col, 0), "Adam");
     tv = get_sorted_view(people, "age < 30 SORT(name ASC) DISTINCT(age) LIMIT(4)");
     CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv.size_unlimited(), 1);
 
     // compound query + limit
     tv = get_sorted_view(people, "age < 30 && name == 'Adam' LIMIT(0)");
     CHECK_EQUAL(tv.size(), 0);
+    CHECK_EQUAL(tv.size_unlimited(), 1);
     tv = get_sorted_view(people, "age < 30 && name == 'Adam' LIMIT(1)");
     CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv.size_unlimited(), 1);
     CHECK_EQUAL(tv.get_string(name_col, 0), "Adam");
+
+    // size_unlimited() checks
+    tv = get_sorted_view(people, "age == 30");
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv.size_unlimited(), 1);
+    tv = get_sorted_view(people, "age == 30 LIMIT(0)");
+    CHECK_EQUAL(tv.size(), 0);
+    CHECK_EQUAL(tv.size_unlimited(), 1);
+    tv = get_sorted_view(people, "age == 1000");
+    CHECK_EQUAL(tv.size(), 0);
+    CHECK_EQUAL(tv.size_unlimited(), 0);
+    tv = get_sorted_view(people, "age == 1000 LIMIT(0)");
+    CHECK_EQUAL(tv.size(), 0);
+    CHECK_EQUAL(tv.size_unlimited(), 0);
+    tv = get_sorted_view(people, "age == 1000 SORT(name ASC)");
+    CHECK_EQUAL(tv.size(), 0);
+    CHECK_EQUAL(tv.size_unlimited(), 0);
+    tv = get_sorted_view(people, "age == 1000 SORT(name ASC) LIMIT(0)");
+    CHECK_EQUAL(tv.size(), 0);
+    CHECK_EQUAL(tv.size_unlimited(), 0);
+    tv = get_sorted_view(people, "age == 28 SORT(name ASC)");
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(tv.size_unlimited(), 2);
+    tv = get_sorted_view(people, "age == 28 SORT(name ASC) LIMIT(1)");
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv.size_unlimited(), 2);
+    tv = get_sorted_view(people, "age == 28 DISTINCT(age)");
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv.size_unlimited(), 1);
+    tv = get_sorted_view(people, "age == 28 DISTINCT(age) LIMIT(0)");
+    CHECK_EQUAL(tv.size(), 0);
+    CHECK_EQUAL(tv.size_unlimited(), 1);
+    tv = get_sorted_view(people, "age == 28 SORT(name ASC) DISTINCT(age)");
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv.size_unlimited(), 1);
+    tv = get_sorted_view(people, "age == 28 SORT(name ASC) DISTINCT(age) LIMIT(0)");
+    CHECK_EQUAL(tv.size(), 0);
+    CHECK_EQUAL(tv.size_unlimited(), 1);
+    tv = get_sorted_view(people, "FALSEPREDICATE");
+    CHECK_EQUAL(tv.size(), 0);
+    CHECK_EQUAL(tv.size_unlimited(), 0);
+    tv = get_sorted_view(people, "FALSEPREDICATE LIMIT(0)");
+    CHECK_EQUAL(tv.size(), 0);
+    CHECK_EQUAL(tv.size_unlimited(), 0);
+    tv = get_sorted_view(people, "FALSEPREDICATE LIMIT(1)");
+    CHECK_EQUAL(tv.size(), 0);
+    CHECK_EQUAL(tv.size_unlimited(), 0);
 
     // errors
     CHECK_THROW_ANY(get_sorted_view(people, "TRUEPREDICATE LIMIT(-1)")); // only accepting positive integers
