@@ -775,36 +775,38 @@ void apply_predicate(Query &query, const Predicate &predicate, Arguments &argume
 void apply_ordering(DescriptorOrdering& ordering, ConstTableRef target, const parser::DescriptorOrderingState& state, Arguments&)
 {
     for (const DescriptorOrderingState::SingleOrderingState& cur_ordering : state.orderings) {
-        std::vector<std::vector<size_t>> property_indices;
-        std::vector<bool> ascendings;
-        for (const DescriptorOrderingState::PropertyState& cur_property : cur_ordering.properties) {
-            KeyPath path = key_path_from_string(cur_property.key_path);
-            std::vector<size_t> indices;
-            ConstTableRef cur_table = target;
-            for (size_t ndx_in_path = 0; ndx_in_path < path.size(); ++ndx_in_path) {
-                size_t col_ndx = cur_table->get_column_index(path[ndx_in_path]);
-                if (col_ndx == realm::not_found) {
-                    throw std::runtime_error(
-                        util::format("No property '%1' found on object type '%2' specified in '%3' clause",
-                            path[ndx_in_path], cur_table->get_name(), cur_ordering.is_distinct ? "distinct" : "sort"));
-                }
-                indices.push_back(col_ndx);
-                if (ndx_in_path < path.size() - 1) {
-                    cur_table = cur_table->get_link_target(col_ndx);
-                }
-            }
-            property_indices.push_back(indices);
-            ascendings.push_back(cur_property.ascending);
-        }
-
-        if (cur_ordering.is_distinct) {
-            ordering.append_distinct(DistinctDescriptor{*target.get(), property_indices});
+        if (cur_ordering.type == DescriptorOrderingState::SingleOrderingState::DescriptorType::Limit) {
+            ordering.append_limit(cur_ordering.limit);
         } else {
-            ordering.append_sort(SortDescriptor{*target.get(), property_indices, ascendings});
+            bool is_distinct = cur_ordering.type == DescriptorOrderingState::SingleOrderingState::DescriptorType::Distinct;
+            std::vector<std::vector<size_t>> property_indices;
+            std::vector<bool> ascendings;
+            for (const DescriptorOrderingState::PropertyState& cur_property : cur_ordering.properties) {
+                KeyPath path = key_path_from_string(cur_property.key_path);
+                std::vector<size_t> indices;
+                ConstTableRef cur_table = target;
+                for (size_t ndx_in_path = 0; ndx_in_path < path.size(); ++ndx_in_path) {
+                    size_t col_ndx = cur_table->get_column_index(path[ndx_in_path]);
+                    if (col_ndx == realm::not_found) {
+                        throw std::runtime_error(
+                            util::format("No property '%1' found on object type '%2' specified in '%3' clause",
+                                path[ndx_in_path], cur_table->get_name(), is_distinct ? "distinct" : "sort"));
+                    }
+                    indices.push_back(col_ndx);
+                    if (ndx_in_path < path.size() - 1) {
+                        cur_table = cur_table->get_link_target(col_ndx);
+                    }
+                }
+                property_indices.push_back(indices);
+                ascendings.push_back(cur_property.ascending);
+            }
+
+            if (is_distinct) {
+                ordering.append_distinct(DistinctDescriptor{*target.get(), property_indices});
+            } else {
+                ordering.append_sort(SortDescriptor{*target.get(), property_indices, ascendings});
+            }
         }
-    }
-    if (bool(state.limit)) {
-        ordering.set_limit(*state.limit);
     }
 }
 

@@ -4247,36 +4247,71 @@ TEST(Query_DescriptorsWillApply)
 
     CHECK(!ordering.will_apply_sort());
     CHECK(!ordering.will_apply_distinct());
+    CHECK(!ordering.will_apply_limit());
 
     ordering.append_sort(SortDescriptor());
     CHECK(!ordering.will_apply_sort());
     CHECK(!ordering.will_apply_distinct());
+    CHECK(!ordering.will_apply_limit());
 
     ordering.append_distinct(DistinctDescriptor());
     CHECK(!ordering.will_apply_sort());
     CHECK(!ordering.will_apply_distinct());
+    CHECK(!ordering.will_apply_limit());
 
     ordering.append_sort(SortDescriptor(*t1, {{t1_int_col}}));
     CHECK(ordering.will_apply_sort());
     CHECK(!ordering.will_apply_distinct());
+    CHECK(!ordering.will_apply_limit());
 
     ordering.append_distinct(DistinctDescriptor(*t1, {{t1_int_col}}));
     CHECK(ordering.will_apply_sort());
     CHECK(ordering.will_apply_distinct());
+    CHECK(!ordering.will_apply_limit());
 
     ordering.append_distinct(DistinctDescriptor(*t1, {{t1_str_col}}));
     CHECK(ordering.will_apply_sort());
     CHECK(ordering.will_apply_distinct());
+    CHECK(!ordering.will_apply_limit());
 
     ordering.append_sort(SortDescriptor(*t1, {{t1_str_col}}));
     CHECK(ordering.will_apply_sort());
     CHECK(ordering.will_apply_distinct());
+    CHECK(!ordering.will_apply_limit());
+
+    ordering.append_limit(LimitDescriptor(1));
+    CHECK(ordering.will_apply_sort());
+    CHECK(ordering.will_apply_distinct());
+    CHECK(ordering.will_apply_limit());
+
+    CHECK_EQUAL(ordering.size(), 5);
+    CHECK(ordering.descriptor_is_sort(0));
+    CHECK(!ordering.descriptor_is_distinct(0));
+    CHECK(!ordering.descriptor_is_limit(0));
+
+    CHECK(!ordering.descriptor_is_sort(1));
+    CHECK(ordering.descriptor_is_distinct(1));
+    CHECK(!ordering.descriptor_is_limit(1));
+
+    CHECK(!ordering.descriptor_is_sort(2));
+    CHECK(ordering.descriptor_is_distinct(2));
+    CHECK(!ordering.descriptor_is_limit(2));
+
+    CHECK(ordering.descriptor_is_sort(3));
+    CHECK(!ordering.descriptor_is_distinct(3));
+    CHECK(!ordering.descriptor_is_limit(3));
+
+    CHECK(!ordering.descriptor_is_sort(4));
+    CHECK(!ordering.descriptor_is_distinct(4));
+    CHECK(ordering.descriptor_is_limit(4));
 
     DescriptorOrdering ordering_copy = ordering;
     CHECK(ordering.will_apply_sort());
     CHECK(ordering.will_apply_distinct());
+    CHECK(ordering.will_apply_limit());
     CHECK(ordering_copy.will_apply_sort());
     CHECK(ordering_copy.will_apply_distinct());
+    CHECK(ordering_copy.will_apply_limit());
 }
 
 

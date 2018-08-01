@@ -62,9 +62,9 @@ ColumnsDescriptor::ColumnsDescriptor(Table const& table, std::vector<std::vector
     }
 }
 
-std::unique_ptr<ColumnsDescriptor> ColumnsDescriptor::clone() const
+std::unique_ptr<BaseDescriptor> ColumnsDescriptor::clone() const
 {
-    return std::unique_ptr<ColumnsDescriptor>(new ColumnsDescriptor(*this));
+    return std::unique_ptr<BaseDescriptor>(new ColumnsDescriptor(*this));
 }
 
 SortDescriptor::SortDescriptor(Table const& table, std::vector<std::vector<size_t>> column_indices,
@@ -81,7 +81,7 @@ SortDescriptor::SortDescriptor(Table const& table, std::vector<std::vector<size_
     }
 }
 
-std::unique_ptr<ColumnsDescriptor> SortDescriptor::clone() const
+std::unique_ptr<BaseDescriptor> SortDescriptor::clone() const
 {
     return std::unique_ptr<ColumnsDescriptor>(new SortDescriptor(*this));
 }
@@ -164,7 +164,7 @@ ColumnsDescriptor::Sorter::Sorter(std::vector<std::vector<const ColumnBase*>> co
     }
 }
 
-std::vector<std::vector<size_t>> ColumnsDescriptor::export_column_indices() const
+DescriptorExport ColumnsDescriptor::export_for_handover() const
 {
     std::vector<std::vector<size_t>> column_indices;
     column_indices.reserve(m_columns.size());
@@ -175,12 +175,18 @@ std::vector<std::vector<size_t>> ColumnsDescriptor::export_column_indices() cons
             indices.push_back(col->get_column_index());
         column_indices.push_back(indices);
     }
-    return column_indices;
+    DescriptorExport out;
+    out.type = DescriptorType::Distinct;
+    out.columns = column_indices;
+    return out;
 }
 
-std::vector<bool> SortDescriptor::export_order() const
+DescriptorExport SortDescriptor::export_for_handover() const
 {
-    return m_ascending;
+    DescriptorExport out = ColumnsDescriptor::export_for_handover();
+    out.type = DescriptorType::Sort;
+    out.ordering = m_ascending;
+    return out;
 }
 
 std::string SortDescriptor::get_description(TableRef attached_table) const
@@ -282,12 +288,34 @@ bool SortDescriptor::Sorter::operator()(IndexPair i, IndexPair j, bool total_ord
     return total_ordering ? i.index_in_view < j.index_in_view : 0;
 }
 
+LimitDescriptor::LimitDescriptor(size_t limit)
+    : m_limit(limit)
+{
+}
+
+std::string LimitDescriptor::get_description(TableRef) const
+{
+    return "LIMIT(" + serializer::print_value(m_limit) + ")";
+}
+
+std::unique_ptr<BaseDescriptor> LimitDescriptor::clone() const
+{
+    return std::unique_ptr<BaseDescriptor>(new LimitDescriptor(*this));
+}
+
+DescriptorExport LimitDescriptor::export_for_handover() const
+{
+    DescriptorExport out;
+    out.type = DescriptorType::Limit;
+    out.limit = m_limit;
+    return out;
+}
+
 DescriptorOrdering::DescriptorOrdering(const DescriptorOrdering& other)
 {
     for (const auto& d : other.m_descriptors) {
         m_descriptors.emplace_back(d->clone());
     }
-    m_limit = other.m_limit;
 }
 
 DescriptorOrdering& DescriptorOrdering::operator=(const DescriptorOrdering& rhs)
@@ -297,7 +325,6 @@ DescriptorOrdering& DescriptorOrdering::operator=(const DescriptorOrdering& rhs)
         for (const auto& d : rhs.m_descriptors) {
             m_descriptors.emplace_back(d->clone());
         }
-        m_limit = rhs.m_limit;
     }
     return *this;
 }
@@ -323,6 +350,12 @@ void DescriptorOrdering::append_distinct(DistinctDescriptor distinct)
     }
 }
 
+void DescriptorOrdering::append_limit(LimitDescriptor limit)
+{
+    REALM_ASSERT(limit.is_valid());
+    m_descriptors.emplace_back(new LimitDescriptor(std::move(limit)));
+}
+
 bool DescriptorOrdering::descriptor_is_sort(size_t index) const
 {
     REALM_ASSERT(index < m_descriptors.size());
@@ -332,17 +365,27 @@ bool DescriptorOrdering::descriptor_is_sort(size_t index) const
 
 bool DescriptorOrdering::descriptor_is_distinct(size_t index) const
 {
-    return !descriptor_is_sort(index);
+    REALM_ASSERT(index < m_descriptors.size());
+    SortDescriptor* sort_descr = dynamic_cast<SortDescriptor*>(m_descriptors[index].get());
+    LimitDescriptor* limit_descr = dynamic_cast<LimitDescriptor*>(m_descriptors[index].get());
+    return (!sort_descr && !limit_descr); // dynamic cast of a sort descriptor to ColumnsDescriptor will succeed
 }
 
-const ColumnsDescriptor* DescriptorOrdering::operator[](size_t ndx) const
+bool DescriptorOrdering::descriptor_is_limit(size_t index) const
+{
+    REALM_ASSERT(index < m_descriptors.size());
+    LimitDescriptor* desc = dynamic_cast<LimitDescriptor*>(m_descriptors[index].get());
+    return (desc != nullptr);
+}
+
+const BaseDescriptor* DescriptorOrdering::operator[](size_t ndx) const
 {
     return m_descriptors.at(ndx).get(); // may throw std::out_of_range
 }
 
 bool DescriptorOrdering::will_apply_sort() const
 {
-    return std::any_of(m_descriptors.begin(), m_descriptors. end(), [](const std::unique_ptr<ColumnsDescriptor>& desc) {
+    return std::any_of(m_descriptors.begin(), m_descriptors.end(), [](const std::unique_ptr<BaseDescriptor>& desc) {
         REALM_ASSERT(desc.get()->is_valid());
         return dynamic_cast<SortDescriptor*>(desc.get()) != nullptr;
     });
@@ -350,9 +393,17 @@ bool DescriptorOrdering::will_apply_sort() const
 
 bool DescriptorOrdering::will_apply_distinct() const
 {
-    return std::any_of(m_descriptors.begin(), m_descriptors.end(), [](const std::unique_ptr<ColumnsDescriptor>& desc) {
+    return std::any_of(m_descriptors.begin(), m_descriptors.end(), [](const std::unique_ptr<BaseDescriptor>& desc) {
         REALM_ASSERT(desc.get()->is_valid());
-        return dynamic_cast<SortDescriptor*>(desc.get()) == nullptr;
+        return dynamic_cast<SortDescriptor*>(desc.get()) == nullptr && dynamic_cast<LimitDescriptor*>(desc.get()) == nullptr;
+    });
+}
+
+bool DescriptorOrdering::will_apply_limit() const
+{
+    return std::any_of(m_descriptors.begin(), m_descriptors.end(), [](const std::unique_ptr<BaseDescriptor>& desc) {
+        REALM_ASSERT(desc.get()->is_valid());
+        return dynamic_cast<LimitDescriptor*>(desc.get()) != nullptr;
     });
 }
 
@@ -366,9 +417,6 @@ std::string DescriptorOrdering::get_description(TableRef target_table) const
             description += " ";
         }
     }
-    if (has_limit()) {
-        description += " LIMIT(" + serializer::print_value(get_limit()) + ")";
-    }
     return description;
 }
 
@@ -376,17 +424,13 @@ void DescriptorOrdering::generate_patch(DescriptorOrdering const& descriptors, H
 {
     if (!descriptors.is_empty()) {
         const size_t num_descriptors = descriptors.size();
-        std::vector<std::vector<std::vector<size_t>>> column_indices;
-        std::vector<std::vector<bool>> column_orders;
-        column_indices.reserve(num_descriptors);
-        column_orders.reserve(num_descriptors);
+        std::vector<DescriptorExport> out;
+        out.reserve(num_descriptors);
         for (size_t desc_ndx = 0; desc_ndx < num_descriptors; ++desc_ndx) {
-            const ColumnsDescriptor* desc = descriptors[desc_ndx];
-            column_indices.push_back(desc->export_column_indices());
-            column_orders.push_back(desc->export_order());
+            const BaseDescriptor* desc = descriptors[desc_ndx];
+            out.push_back(desc->export_for_handover());
         }
-        realm::util::Optional<size_t> limit = descriptors.get_optional_limit();
-        patch.reset(new DescriptorOrderingHandoverPatch{std::move(column_indices), std::move(column_orders), limit});
+        patch.reset(new DescriptorOrderingHandoverPatch{std::move(out)});
     }
 }
 
@@ -394,45 +438,33 @@ DescriptorOrdering DescriptorOrdering::create_from_and_consume_patch(HandoverPat
 {
     DescriptorOrdering ordering;
     if (patch) {
-        const size_t num_descriptors = patch->columns.size();
-        REALM_ASSERT_EX(num_descriptors == patch->ascending.size(),
-                        num_descriptors, patch->ascending.size());
-        for (size_t desc_ndx = 0; desc_ndx < num_descriptors; ++desc_ndx) {
-            if (patch->columns[desc_ndx].size() != patch->ascending[desc_ndx].size()) {
-                // If size differs, it must be a distinct
-                ordering.append_distinct(DistinctDescriptor(table, std::move(patch->columns[desc_ndx])));
-            }
-            else {
-                ordering.append_sort(SortDescriptor(table, std::move(patch->columns[desc_ndx]),
-                                                    std::move(patch->ascending[desc_ndx])));
+        for (size_t desc_ndx = 0; desc_ndx < patch->descriptors.size(); ++desc_ndx) {
+            DescriptorExport single = patch->descriptors[desc_ndx];
+            switch (single.type) {
+                case DescriptorType::Sort:
+                    ordering.append_sort(SortDescriptor(table, std::move(single.columns), std::move(single.ordering)));
+                    break;
+                case DescriptorType::Distinct:
+                    ordering.append_distinct(DistinctDescriptor(table, std::move(single.columns)));
+                    break;
+                case DescriptorType::Limit:
+                    ordering.append_limit(LimitDescriptor(single.limit));
+                    break;
             }
         }
-        ordering.set_optional_limit(patch->limit);
-
         patch.reset();
     }
     return ordering;
 }
 
-void RowIndexes::truncate_results_to_limit(const DescriptorOrdering& ordering) noexcept {
-    size_t results_size = size();
-    m_unlimited_size = results_size;
-    if (ordering.value_exceeds_limit(results_size)) {
-        const size_t num_rows_to_erase = results_size - ordering.get_limit();
-        m_row_indexes.erase_rows(ordering.get_limit(), num_rows_to_erase, results_size, false);
-    }
-}
-
 void RowIndexes::do_sort(const DescriptorOrdering& ordering) {
-    if (ordering.is_empty()) {
-        truncate_results_to_limit(ordering);
+    m_limit_count = 0;
+    if (ordering.is_empty())
         return;
-    }
+
     size_t sz = size();
-    if (sz == 0) {
-        m_unlimited_size = 0;
+    if (sz == 0)
         return;
-    }
 
     // Gather the current rows into a container we can use std algorithms on
     size_t detached_ref_count = 0;
@@ -453,7 +485,7 @@ void RowIndexes::do_sort(const DescriptorOrdering& ordering) {
 
     const int num_descriptors = int(ordering.size());
     for (int desc_ndx = 0; desc_ndx < num_descriptors; ++desc_ndx) {
-        const ColumnsDescriptor* common_descr = ordering[desc_ndx];
+        const BaseDescriptor* common_descr = ordering[desc_ndx];
 
         if (const auto* sort_descr = dynamic_cast<const SortDescriptor*>(common_descr)) {
 
@@ -473,8 +505,8 @@ void RowIndexes::do_sort(const DescriptorOrdering& ordering) {
                 }
             }
         }
-        else { // distinct descriptor
-            auto distinct_predicate = common_descr->sorter(m_row_indexes);
+        else if(const auto* distinct_descr = dynamic_cast<const DistinctDescriptor*>(common_descr)){ // distinct descriptor
+            auto distinct_predicate = distinct_descr->sorter(m_row_indexes);
 
             // Remove all rows which have a null link along the way to the distinct columns
             if (distinct_predicate.has_links()) {
@@ -499,23 +531,24 @@ void RowIndexes::do_sort(const DescriptorOrdering& ordering) {
                 // tableview order or the order of the previous sort
                 std::sort(v.begin(), v.end(), [](auto a, auto b) { return a.index_in_view < b.index_in_view; });
             }
+        } else if (const auto* limit_descr = dynamic_cast<const LimitDescriptor*>(common_descr)) {
+            const size_t limit = limit_descr->get_limit();
+            if (v.size() > limit) {
+                m_limit_count += v.size() - limit;
+                v.erase(v.begin() + limit, v.end());
+            }
+        } else {
+            REALM_UNREACHABLE();
         }
     }
-    m_unlimited_size = v.size() + detached_ref_count;
     // Apply the results
     m_row_indexes.clear();
     size_t rows_added = 0; // keep track of size ourselves since Column.size() is a slow tree traversal
     for (auto& pair : v) {
-        if (ordering.value_exceeds_limit(rows_added + 1)) {
-            return;
-        }
         m_row_indexes.add(pair.index_in_column);
         ++rows_added;
     }
     for (size_t t = 0; t < detached_ref_count; ++t) {
-        if (ordering.value_exceeds_limit(rows_added + 1)) {
-            return;
-        }
         m_row_indexes.add(-1);
         ++rows_added;
     }
@@ -541,7 +574,7 @@ RowIndexes::RowIndexes(IntegerColumn&& col)
 // FIXME: this only works (and is only used) for row indexes with memory
 // managed by the default allocator, e.q. for TableViews.
 RowIndexes::RowIndexes(const RowIndexes& source, ConstSourcePayload mode)
-    : m_unlimited_size(source.m_unlimited_size)
+    : m_limit_count(source.m_limit_count)
 #ifdef REALM_COOKIE_CHECK
     , m_debug_cookie(source.m_debug_cookie)
 #endif
@@ -555,7 +588,7 @@ RowIndexes::RowIndexes(const RowIndexes& source, ConstSourcePayload mode)
 }
 
 RowIndexes::RowIndexes(RowIndexes& source, MutableSourcePayload)
-    : m_unlimited_size(source.m_unlimited_size)
+    : m_limit_count(source.m_limit_count)
 #ifdef REALM_COOKIE_CHECK
     , m_debug_cookie(source.m_debug_cookie)
 #endif

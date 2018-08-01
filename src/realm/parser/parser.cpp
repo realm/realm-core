@@ -458,7 +458,7 @@ template<> struct action< sort >
     static void apply(const Input& in, ParserState & state)
     {
         DEBUG_PRINT_TOKEN(in.string());
-        state.temp_ordering.is_distinct = false;
+        state.temp_ordering.type = DescriptorOrderingState::SingleOrderingState::DescriptorType::Sort;
         state.ordering_state.orderings.push_back(state.temp_ordering);
         state.temp_ordering.properties.clear();
     }
@@ -470,7 +470,7 @@ template<> struct action< distinct >
     static void apply(const Input& in, ParserState & state)
     {
         DEBUG_PRINT_TOKEN(in.string());
-        state.temp_ordering.is_distinct = true;
+        state.temp_ordering.type = DescriptorOrderingState::SingleOrderingState::DescriptorType::Distinct;
         state.ordering_state.orderings.push_back(state.temp_ordering);
         state.temp_ordering.properties.clear();
     }
@@ -482,13 +482,11 @@ template<> struct action< limit_param >
     static void apply(const Input& in, ParserState & state)
     {
         DEBUG_PRINT_TOKEN(in.string() + " LIMIT PARAM");
-        if (bool(state.ordering_state.limit)) {
-            // if we already have limit set we disallow a second LIMIT
-            const static std::string message = "Invalid Predicate. 'LIMIT' may only be used once.";
-            throw tao::pegtl::parse_error(message, in);
-        }
         try {
-            state.ordering_state.limit = realm::util::stot<size_t>(in.string());
+            DescriptorOrderingState::SingleOrderingState limit_state;
+            limit_state.type = DescriptorOrderingState::SingleOrderingState::DescriptorType::Limit;
+            limit_state.limit = realm::util::stot<size_t>(in.string());
+            state.ordering_state.orderings.push_back(limit_state);
         } catch (...) {
             const static std::string message = "Invalid Predicate. 'LIMIT' accepts a positive integer parameter eg: 'LIMIT(10)'";
             throw tao::pegtl::parse_error(message, in);

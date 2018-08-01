@@ -30,6 +30,16 @@ const int64_t detached_ref = -1;
 
 class RowIndexes;
 
+class BaseDescriptor {
+public:
+    BaseDescriptor() = default;
+    virtual ~BaseDescriptor() = default;
+    virtual bool is_valid() const noexcept = 0;
+    virtual std::string get_description(TableRef attached_table) const = 0;
+    virtual std::unique_ptr<BaseDescriptor> clone() const = 0;
+    virtual DescriptorExport export_for_handover() const = 0;
+};
+
 // Forward declaration needed for deleted ColumnsDescriptor constructor
 class SortDescriptor;
 
@@ -37,7 +47,7 @@ class SortDescriptor;
 // links), which is used to indicate the criteria columns for sort and distinct.
 // Although the input is column indices, it does not rely on those indices
 // remaining stable as long as the columns continue to exist.
-class ColumnsDescriptor {
+class ColumnsDescriptor : public BaseDescriptor {
 public:
     ColumnsDescriptor() = default;
     // Enforce type saftey to prevent automatic conversion of derived class
@@ -52,10 +62,10 @@ public:
     // `column_indices` must be non-empty, and each vector within it must also
     // be non-empty.
     ColumnsDescriptor(Table const& table, std::vector<std::vector<size_t>> column_indices);
-    virtual std::unique_ptr<ColumnsDescriptor> clone() const;
+    virtual std::unique_ptr<BaseDescriptor> clone() const override;
 
     // returns whether this descriptor is valid and can be used to sort
-    bool is_valid() const noexcept
+    bool is_valid() const noexcept override
     {
         return !m_columns.empty();
     }
@@ -64,12 +74,9 @@ public:
     virtual Sorter sorter(IntegerColumn const& row_indexes) const;
 
     // handover support
-    std::vector<std::vector<size_t>> export_column_indices() const;
-    virtual std::vector<bool> export_order() const
-    {
-        return {};
-    }
-    virtual std::string get_description(TableRef attached_table) const;
+    virtual DescriptorExport export_for_handover() const override;
+
+    virtual std::string get_description(TableRef attached_table) const override;
 
 protected:
     std::vector<std::vector<const ColumnBase*>> m_columns;
@@ -85,20 +92,32 @@ public:
                    std::vector<bool> ascending = {});
     SortDescriptor() = default;
     ~SortDescriptor() = default;
-    std::unique_ptr<ColumnsDescriptor> clone() const override;
+    std::unique_ptr<BaseDescriptor> clone() const override;
 
     void merge_with(SortDescriptor&& other);
 
     Sorter sorter(IntegerColumn const& row_indexes) const override;
 
     // handover support
-    std::vector<bool> export_order() const override;
+    virtual DescriptorExport export_for_handover() const override;
     std::string get_description(TableRef attached_table) const override;
 
 private:
     std::vector<bool> m_ascending;
 };
 
+class LimitDescriptor : public BaseDescriptor {
+public:
+    LimitDescriptor(size_t limit);
+    virtual ~LimitDescriptor() = default;
+    virtual bool is_valid() const noexcept override { return true; }
+    virtual std::string get_description(TableRef attached_table) const override;
+    virtual std::unique_ptr<BaseDescriptor> clone() const override;
+    virtual DescriptorExport export_for_handover() const override;
+    size_t get_limit() const noexcept { return m_limit; }
+private:
+    size_t m_limit = 0;
+};
 
 
 // Distinct uses the same syntax as sort except that the order is meaningless.
@@ -114,19 +133,16 @@ public:
 
     void append_sort(SortDescriptor sort);
     void append_distinct(DistinctDescriptor distinct);
+    void append_limit(LimitDescriptor limit);
     bool descriptor_is_sort(size_t index) const;
     bool descriptor_is_distinct(size_t index) const;
+    bool descriptor_is_limit(size_t index) const;
     bool is_empty() const { return m_descriptors.empty(); }
     size_t size() const { return m_descriptors.size(); }
-    bool has_limit() const noexcept { return bool(m_limit); }
-    size_t get_limit() const { return *m_limit; } // throws
-    realm::util::Optional<size_t> get_optional_limit() const noexcept { return m_limit; }
-    void set_optional_limit(realm::util::Optional<size_t> new_limit) { m_limit = new_limit; }
-    bool value_exceeds_limit(size_t test_value) const noexcept { return bool(m_limit) && test_value > *m_limit; }
-    void set_limit(size_t new_limit) { m_limit = new_limit; }
-    const ColumnsDescriptor* operator[](size_t ndx) const;
+    const BaseDescriptor* operator[](size_t ndx) const;
     bool will_apply_sort() const;
     bool will_apply_distinct() const;
+    bool will_apply_limit() const;
     std::string get_description(TableRef target_table) const;
 
     // handover support
@@ -135,8 +151,7 @@ public:
     static DescriptorOrdering create_from_and_consume_patch(HandoverPatch&, Table const&);
 
 private:
-    realm::util::Optional<size_t> m_limit;
-    std::vector<std::unique_ptr<ColumnsDescriptor>> m_descriptors;
+    std::vector<std::unique_ptr<BaseDescriptor>> m_descriptors;
 };
 
 // This class is for common functionality of ListView and LinkView which inherit from it. Currently it only
@@ -164,10 +179,9 @@ public:
     virtual const ColumnBase& get_column_base(size_t index) const = 0;
 
     virtual size_t size() const = 0;
-    // get the number of total results which could have been returned if the results were not constrained with "LIMIT"
-    // if this result does not have a limit applied, this will return the same as `size()`
-    // the returned value is only accurate since the last sync
-    virtual size_t size_unlimited() const noexcept { return m_unlimited_size; }
+    // Get the number of total results which have been filtered out because a number of "LIMIT" operations have
+    // been applied. This number only applies to the last sync.
+    virtual size_t get_num_results_excluded_by_limit() const noexcept { return m_limit_count; }
 
     // These two methods are overridden by TableView and LinkView.
     virtual uint_fast64_t sync_if_needed() const = 0;
@@ -187,10 +201,9 @@ public:
 
 protected:
     void do_sort(const DescriptorOrdering& ordering);
-    void truncate_results_to_limit(const DescriptorOrdering& ordering) noexcept;
 
     static const uint64_t cookie_expected = 0x7765697677777777ull; // 0x77656976 = 'view'; 0x77777777 = '7777' = alive
-    size_t m_unlimited_size = 0;
+    size_t m_limit_count = 0;
     uint64_t m_debug_cookie;
 };
 
