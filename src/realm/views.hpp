@@ -143,6 +143,7 @@ public:
     bool will_apply_sort() const;
     bool will_apply_distinct() const;
     bool will_apply_limit() const;
+    bool will_limit_to_zero() const;
     std::string get_description(TableRef target_table) const;
 
     // handover support

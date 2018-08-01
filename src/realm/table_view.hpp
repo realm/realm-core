@@ -300,6 +300,7 @@ public:
     // Each time you call distinct() it will compound on the previous calls
     void distinct(size_t column);
     void distinct(DistinctDescriptor columns);
+    void limit(LimitDescriptor limit);
 
     // Replace the order of sort and distinct operations, bypassing manually
     // calling sort and distinct. This is a convenience method for bindings.

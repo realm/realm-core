@@ -407,6 +407,15 @@ bool DescriptorOrdering::will_apply_limit() const
     });
 }
 
+bool DescriptorOrdering::will_limit_to_zero() const
+{
+    return std::any_of(m_descriptors.begin(), m_descriptors.end(), [](const std::unique_ptr<BaseDescriptor>& desc) {
+        REALM_ASSERT(desc.get()->is_valid());
+        LimitDescriptor* limit = dynamic_cast<LimitDescriptor*>(desc.get());
+        return (limit != nullptr && limit->get_limit() == 0);
+    });
+}
+
 std::string DescriptorOrdering::get_description(TableRef target_table) const
 {
     std::string description = "";

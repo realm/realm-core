@@ -4248,41 +4248,49 @@ TEST(Query_DescriptorsWillApply)
     CHECK(!ordering.will_apply_sort());
     CHECK(!ordering.will_apply_distinct());
     CHECK(!ordering.will_apply_limit());
+    CHECK(!ordering.will_limit_to_zero());
 
     ordering.append_sort(SortDescriptor());
     CHECK(!ordering.will_apply_sort());
     CHECK(!ordering.will_apply_distinct());
     CHECK(!ordering.will_apply_limit());
+    CHECK(!ordering.will_limit_to_zero());
 
     ordering.append_distinct(DistinctDescriptor());
     CHECK(!ordering.will_apply_sort());
     CHECK(!ordering.will_apply_distinct());
     CHECK(!ordering.will_apply_limit());
+    CHECK(!ordering.will_limit_to_zero());
 
     ordering.append_sort(SortDescriptor(*t1, {{t1_int_col}}));
     CHECK(ordering.will_apply_sort());
     CHECK(!ordering.will_apply_distinct());
     CHECK(!ordering.will_apply_limit());
+    CHECK(!ordering.will_limit_to_zero());
 
     ordering.append_distinct(DistinctDescriptor(*t1, {{t1_int_col}}));
     CHECK(ordering.will_apply_sort());
     CHECK(ordering.will_apply_distinct());
     CHECK(!ordering.will_apply_limit());
+    CHECK(!ordering.will_limit_to_zero());
 
     ordering.append_distinct(DistinctDescriptor(*t1, {{t1_str_col}}));
     CHECK(ordering.will_apply_sort());
     CHECK(ordering.will_apply_distinct());
     CHECK(!ordering.will_apply_limit());
+    CHECK(!ordering.will_limit_to_zero());
 
     ordering.append_sort(SortDescriptor(*t1, {{t1_str_col}}));
     CHECK(ordering.will_apply_sort());
     CHECK(ordering.will_apply_distinct());
     CHECK(!ordering.will_apply_limit());
+    CHECK(!ordering.will_limit_to_zero());
 
     ordering.append_limit(LimitDescriptor(1));
     CHECK(ordering.will_apply_sort());
     CHECK(ordering.will_apply_distinct());
     CHECK(ordering.will_apply_limit());
+    CHECK(!ordering.will_limit_to_zero());
 
     CHECK_EQUAL(ordering.size(), 5);
     CHECK(ordering.descriptor_is_sort(0));
@@ -4309,9 +4317,132 @@ TEST(Query_DescriptorsWillApply)
     CHECK(ordering.will_apply_sort());
     CHECK(ordering.will_apply_distinct());
     CHECK(ordering.will_apply_limit());
+    CHECK(!ordering.will_limit_to_zero());
     CHECK(ordering_copy.will_apply_sort());
     CHECK(ordering_copy.will_apply_distinct());
     CHECK(ordering_copy.will_apply_limit());
+    CHECK(!ordering_copy.will_limit_to_zero());
+
+    ordering_copy.append_limit({10});
+    ordering_copy.append_limit({0});
+    CHECK(ordering_copy.will_limit_to_zero());
+}
+
+TEST(Query_FindWithDescriptorOrdering)
+{
+    Group g;
+    TableRef t1 = g.add_table("t1");
+    size_t t1_int_col = t1->add_column(type_Int, "t1_int");
+    size_t t1_str_col = t1->add_column(type_String, "t1_str");
+    t1->add_empty_row(6);
+
+    t1->set_int(0, 0, 1); t1->set_string(1, 0, "A");
+    t1->set_int(0, 1, 1); t1->set_string(1, 1, "A");
+    t1->set_int(0, 2, 1); t1->set_string(1, 2, "B");
+    t1->set_int(0, 3, 2); t1->set_string(1, 3, "B");
+    t1->set_int(0, 4, 2); t1->set_string(1, 4, "A");
+    t1->set_int(0, 5, 2); t1->set_string(1, 5, "A");
+
+    //     T1
+    //   | t1_int   t1_str  |
+    //   ====================
+    // 0 | 1        "A"     |
+    // 1 | 1        "A"     |
+    // 2 | 1        "B"     |
+    // 3 | 2        "B"     |
+    // 4 | 2        "A"     |
+    // 5 | 2        "A"     |
+
+    using ResultList = std::vector<std::pair<size_t, size_t>>; // value, index
+    {   // applying only limit
+        DescriptorOrdering ordering;
+        TableView tv = t1->where().find_all(ordering);
+        CHECK_EQUAL(tv.size(), 6);
+        CHECK_EQUAL(t1->where().count(ordering), 6);
+        ordering.append_limit({2});
+        ResultList expected = {{1, 0}, {1, 1}};
+        tv = t1->where().find_all(ordering);
+        CHECK_EQUAL(tv.size(), expected.size());
+        CHECK_EQUAL(t1->where().count(ordering), expected.size());
+        for (size_t i = 0; i < tv.size(); ++i) {
+            CHECK_EQUAL(tv.get_int(t1_int_col, i), expected[i].first);
+            CHECK_EQUAL(tv.get_source_ndx(i), expected[i].second);
+        }
+        ordering.append_limit({1}); // two limits should apply the minimum limit
+        expected = {{1, 0}};
+        tv = t1->where().find_all(ordering);
+        CHECK_EQUAL(tv.size(), expected.size());
+        CHECK_EQUAL(t1->where().count(ordering), expected.size());
+        for (size_t i = 0; i < tv.size(); ++i) {
+            CHECK_EQUAL(tv.get_int(t1_int_col, i), expected[i].first);
+            CHECK_EQUAL(tv.get_source_ndx(i), expected[i].second);
+        }
+    }
+    {   // applying sort and limit
+        DescriptorOrdering ordering;
+        ordering.append_sort(SortDescriptor(*t1, {{t1_str_col}}, {false}));
+        ordering.append_limit({2});
+        TableView tv = t1->where().find_all(ordering);
+        ResultList expected = {{1, 2}, {2, 3}};
+        CHECK_EQUAL(tv.size(), expected.size());
+        for (size_t i = 0; i < tv.size(); ++i) {
+            CHECK_EQUAL(tv.get_int(t1_int_col, i), expected[i].first);
+            CHECK_EQUAL(tv.get_source_ndx(i), expected[i].second);
+        }
+    }
+    {   // sort limit distinct
+        DescriptorOrdering ordering;
+        ordering.append_sort(SortDescriptor(*t1, {{t1_str_col}}, {false}));
+        ordering.append_limit({3});
+        ordering.append_distinct(DistinctDescriptor(*t1, {{t1_int_col}}));
+        TableView tv = t1->where().find_all(ordering);
+        ResultList expected = {{1, 2}, {2, 3}};
+        CHECK_EQUAL(tv.size(), expected.size());
+        for (size_t i = 0; i < tv.size(); ++i) {
+            CHECK_EQUAL(tv.get_int(t1_int_col, i), expected[i].first);
+            CHECK_EQUAL(tv.get_source_ndx(i), expected[i].second);
+        }
+    }
+    {   // sort distinct limit
+        DescriptorOrdering ordering;
+        ordering.append_sort(SortDescriptor(*t1, {{t1_str_col}}, {false}));
+        ordering.append_distinct(DistinctDescriptor(*t1, {{t1_int_col}}));
+        ordering.append_limit({1});
+        TableView tv = t1->where().find_all(ordering);
+        ResultList expected = {{1, 2}};
+        CHECK_EQUAL(tv.size(), expected.size());
+        for (size_t i = 0; i < tv.size(); ++i) {
+            CHECK_EQUAL(tv.get_int(t1_int_col, i), expected[i].first);
+            CHECK_EQUAL(tv.get_source_ndx(i), expected[i].second);
+        }
+    }
+    {   // limit sort distinct
+        DescriptorOrdering ordering;
+        ordering.append_limit({2});
+        ordering.append_sort(SortDescriptor(*t1, {{t1_str_col}}, {false}));
+        ordering.append_distinct(DistinctDescriptor(*t1, {{t1_int_col}}));
+        TableView tv = t1->where().find_all(ordering);
+        ResultList expected = {{1, 0}};
+        CHECK_EQUAL(tv.size(), expected.size());
+        for (size_t i = 0; i < tv.size(); ++i) {
+            CHECK_EQUAL(tv.get_int(t1_int_col, i), expected[i].first);
+            CHECK_EQUAL(tv.get_source_ndx(i), expected[i].second);
+        }
+    }
+    {   // sort limit sort limit
+        DescriptorOrdering ordering;
+        ordering.append_sort(SortDescriptor(*t1, {{t1_str_col}}, {true}));
+        ordering.append_limit({5});
+        ordering.append_sort(SortDescriptor(*t1, {{t1_int_col}}, {false}));
+        ordering.append_limit({3});
+        TableView tv = t1->where().find_all(ordering);
+        ResultList expected = {{2, 4}, {2, 5}, {1, 0}};
+        CHECK_EQUAL(tv.size(), expected.size());
+        for (size_t i = 0; i < tv.size(); ++i) {
+            CHECK_EQUAL(tv.get_int(t1_int_col, i), expected[i].first);
+            CHECK_EQUAL(tv.get_source_ndx(i), expected[i].second);
+        }
+    }
 }
 
 
@@ -4488,6 +4619,16 @@ TEST(Query_SortDistinctOrderThroughHandover) {
             CHECK_EQUAL(tv.get_string(1, i), results[i].first);
             CHECK_EQUAL(tv.get_source_ndx(i), results[i].second);
         }
+        HandoverPtr hp = sg_w.export_for_handover(tv, ConstSourcePayload::Stay);
+        check_across_handover(results, std::move(hp));
+    }
+    {   // sort descending then distinct then limit
+        TableView tv = t1->where().find_all();
+        ResultList results = {};
+        tv.sort(SortDescriptor(*t1, {{t1_int_col}}, {false}));
+        tv.distinct(DistinctDescriptor(*t1, {{t1_str_col}}));
+        tv.limit(LimitDescriptor(0));
+        CHECK_EQUAL(tv.size(), results.size());
         HandoverPtr hp = sg_w.export_for_handover(tv, ConstSourcePayload::Stay);
         check_across_handover(results, std::move(hp));
     }
