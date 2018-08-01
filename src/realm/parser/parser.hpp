@@ -23,8 +23,6 @@
 #include <string>
 #include <vector>
 
-#include <realm/util/optional.hpp>
-
 namespace realm {
 
 namespace parser {

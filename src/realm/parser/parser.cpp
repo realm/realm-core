@@ -25,7 +25,6 @@
 #include <pegtl/contrib/tracer.hpp>
 
 #include <realm/util/assert.hpp>
-#include <realm/util/optional.hpp>
 
 #include <realm/parser/parser_utils.hpp>
 

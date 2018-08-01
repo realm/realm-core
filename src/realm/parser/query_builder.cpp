@@ -816,6 +816,5 @@ void apply_ordering(DescriptorOrdering& ordering, ConstTableRef target, const pa
     apply_ordering(ordering, target, state, args);
 }
 
-
 } // namespace query_builder
 } // namespace realm

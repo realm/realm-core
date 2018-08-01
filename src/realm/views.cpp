@@ -21,8 +21,6 @@
 #include <realm/column_link.hpp>
 #include <realm/table.hpp>
 
-#include <realm/util/optional.hpp>
-
 using namespace realm;
 
 namespace {
