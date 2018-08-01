@@ -543,14 +543,11 @@ void RowIndexes::do_sort(const DescriptorOrdering& ordering) {
     }
     // Apply the results
     m_row_indexes.clear();
-    size_t rows_added = 0; // keep track of size ourselves since Column.size() is a slow tree traversal
     for (auto& pair : v) {
         m_row_indexes.add(pair.index_in_column);
-        ++rows_added;
     }
     for (size_t t = 0; t < detached_ref_count; ++t) {
         m_row_indexes.add(-1);
-        ++rows_added;
     }
 }
 

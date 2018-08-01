@@ -62,7 +62,7 @@ public:
     // `column_indices` must be non-empty, and each vector within it must also
     // be non-empty.
     ColumnsDescriptor(Table const& table, std::vector<std::vector<size_t>> column_indices);
-    virtual std::unique_ptr<BaseDescriptor> clone() const override;
+    std::unique_ptr<BaseDescriptor> clone() const override;
 
     // returns whether this descriptor is valid and can be used to sort
     bool is_valid() const noexcept override
@@ -74,9 +74,9 @@ public:
     virtual Sorter sorter(IntegerColumn const& row_indexes) const;
 
     // handover support
-    virtual DescriptorExport export_for_handover() const override;
+    DescriptorExport export_for_handover() const override;
 
-    virtual std::string get_description(TableRef attached_table) const override;
+    std::string get_description(TableRef attached_table) const override;
 
 protected:
     std::vector<std::vector<const ColumnBase*>> m_columns;
@@ -99,7 +99,7 @@ public:
     Sorter sorter(IntegerColumn const& row_indexes) const override;
 
     // handover support
-    virtual DescriptorExport export_for_handover() const override;
+    DescriptorExport export_for_handover() const override;
     std::string get_description(TableRef attached_table) const override;
 
 private:
@@ -110,10 +110,10 @@ class LimitDescriptor : public BaseDescriptor {
 public:
     LimitDescriptor(size_t limit);
     virtual ~LimitDescriptor() = default;
-    virtual bool is_valid() const noexcept override { return true; }
-    virtual std::string get_description(TableRef attached_table) const override;
-    virtual std::unique_ptr<BaseDescriptor> clone() const override;
-    virtual DescriptorExport export_for_handover() const override;
+    bool is_valid() const noexcept override { return true; }
+    std::string get_description(TableRef attached_table) const override;
+    std::unique_ptr<BaseDescriptor> clone() const override;
+    DescriptorExport export_for_handover() const override;
     size_t get_limit() const noexcept { return m_limit; }
 private:
     size_t m_limit = 0;
