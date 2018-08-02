@@ -1456,11 +1456,12 @@ TableView Query::do_find_all(const DescriptorOrdering& descriptor)
     bool only_limit = true;
     size_t min_limit = size_t(-1);
     for (size_t i = 0; i < descriptor.size(); ++i) {
-        const LimitDescriptor* limit = dynamic_cast<const LimitDescriptor*>(descriptor[i]);
-        if (!limit) {
+        if (!descriptor.descriptor_is_limit(i)) {
             only_limit = false;
             break;
         } else {
+            const LimitDescriptor* limit = dynamic_cast<const LimitDescriptor*>(descriptor[i]);
+            REALM_ASSERT(limit);
             min_limit = std::min(min_limit, limit->get_limit());
         }
     }
@@ -1489,12 +1490,53 @@ size_t Query::count(const DescriptorOrdering& descriptor)
 #if REALM_METRICS
     std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Count);
 #endif
+    realm::util::Optional<size_t> min_limit = descriptor.get_min_limit();
 
-    if (descriptor.will_limit_to_zero() || m_table->is_degenerate())
+    if ((bool(min_limit) && *min_limit == 0) || m_table->is_degenerate())
         return 0;
 
-    TableView tv = do_find_all(descriptor);
-    return tv.size();
+    const size_t start = 0;
+    const size_t end = m_table->size();
+    size_t limit = size_t(-1);
+
+    if (!descriptor.will_apply_distinct()) {
+        if (bool(min_limit)) {
+            limit = *min_limit;
+        }
+
+        if (!has_conditions()) {
+            // User created query with no criteria; count all
+            if (m_view) {
+                return (limit < m_view->size() - start ? limit : m_view->size() - start);
+            }
+            else {
+                return (limit < end - start ? limit : end - start);
+            }
+        }
+
+        init();
+        size_t cnt = 0;
+
+        if (m_view) {
+            for (size_t t = 0; t < m_view->size() && cnt < limit; t++) {
+                size_t tablerow = static_cast<size_t>(m_view->m_row_indexes.get(t));
+                if (tablerow < end && peek_tablerow(tablerow) != not_found) {
+                    cnt++;
+                }
+            }
+        }
+        else {
+            QueryState<int64_t> st;
+            st.init(act_Count, nullptr, limit);
+            aggregate_internal(act_Count, ColumnTypeTraits<int64_t>::id, false, root_node(), &st, start, end, nullptr);
+            cnt = size_t(st.m_state);
+        }
+        return cnt;
+    }
+
+    TableView ret(*m_table, *this, start, end, limit);
+    ret.apply_descriptor_ordering(descriptor);
+    return ret.size();
 }
 
 

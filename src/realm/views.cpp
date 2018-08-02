@@ -409,6 +409,20 @@ bool DescriptorOrdering::will_apply_limit() const
     });
 }
 
+realm::util::Optional<size_t> DescriptorOrdering::get_min_limit() const
+{
+    realm::util::Optional<size_t> min_limit;
+    for (size_t i = 0; i < m_descriptors.size(); ++i) {
+        auto& temp = *m_descriptors[i].get(); // a temporary to workaround a clang warning
+        if (typeid(temp) == typeid(LimitDescriptor)) {
+            const LimitDescriptor* limit = dynamic_cast<const LimitDescriptor*>(m_descriptors[i].get());
+            REALM_ASSERT(limit);
+            min_limit = bool(min_limit) ? std::min(*min_limit, limit->get_limit()) : limit->get_limit();
+        }
+    }
+    return min_limit;
+}
+
 bool DescriptorOrdering::will_limit_to_zero() const
 {
     return std::any_of(m_descriptors.begin(), m_descriptors.end(), [](const std::unique_ptr<BaseDescriptor>& desc) {

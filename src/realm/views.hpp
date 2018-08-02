@@ -22,6 +22,8 @@
 #include <realm/column.hpp>
 #include <realm/handover_defs.hpp>
 
+#include <realm/util/optional.hpp>
+
 #include <vector>
 
 namespace realm {
@@ -143,6 +145,7 @@ public:
     bool will_apply_sort() const;
     bool will_apply_distinct() const;
     bool will_apply_limit() const;
+    realm::util::Optional<size_t> get_min_limit() const;
     bool will_limit_to_zero() const;
     std::string get_description(TableRef target_table) const;
 

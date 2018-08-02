@@ -4385,6 +4385,7 @@ TEST(Query_FindWithDescriptorOrdering)
         TableView tv = t1->where().find_all(ordering);
         ResultList expected = {{1, 2}, {2, 3}};
         CHECK_EQUAL(tv.size(), expected.size());
+        CHECK_EQUAL(t1->where().count(ordering), expected.size());
         for (size_t i = 0; i < tv.size(); ++i) {
             CHECK_EQUAL(tv.get_int(t1_int_col, i), expected[i].first);
             CHECK_EQUAL(tv.get_source_ndx(i), expected[i].second);
@@ -4398,6 +4399,7 @@ TEST(Query_FindWithDescriptorOrdering)
         TableView tv = t1->where().find_all(ordering);
         ResultList expected = {{1, 2}, {2, 3}};
         CHECK_EQUAL(tv.size(), expected.size());
+        CHECK_EQUAL(t1->where().count(ordering), expected.size());
         for (size_t i = 0; i < tv.size(); ++i) {
             CHECK_EQUAL(tv.get_int(t1_int_col, i), expected[i].first);
             CHECK_EQUAL(tv.get_source_ndx(i), expected[i].second);
@@ -4411,6 +4413,7 @@ TEST(Query_FindWithDescriptorOrdering)
         TableView tv = t1->where().find_all(ordering);
         ResultList expected = {{1, 2}};
         CHECK_EQUAL(tv.size(), expected.size());
+        CHECK_EQUAL(t1->where().count(ordering), expected.size());
         for (size_t i = 0; i < tv.size(); ++i) {
             CHECK_EQUAL(tv.get_int(t1_int_col, i), expected[i].first);
             CHECK_EQUAL(tv.get_source_ndx(i), expected[i].second);
@@ -4424,6 +4427,7 @@ TEST(Query_FindWithDescriptorOrdering)
         TableView tv = t1->where().find_all(ordering);
         ResultList expected = {{1, 0}};
         CHECK_EQUAL(tv.size(), expected.size());
+        CHECK_EQUAL(t1->where().count(ordering), expected.size());
         for (size_t i = 0; i < tv.size(); ++i) {
             CHECK_EQUAL(tv.get_int(t1_int_col, i), expected[i].first);
             CHECK_EQUAL(tv.get_source_ndx(i), expected[i].second);
@@ -4438,6 +4442,7 @@ TEST(Query_FindWithDescriptorOrdering)
         TableView tv = t1->where().find_all(ordering);
         ResultList expected = {{2, 4}, {2, 5}, {1, 0}};
         CHECK_EQUAL(tv.size(), expected.size());
+        CHECK_EQUAL(t1->where().count(ordering), expected.size());
         for (size_t i = 0; i < tv.size(); ++i) {
             CHECK_EQUAL(tv.get_int(t1_int_col, i), expected[i].first);
             CHECK_EQUAL(tv.get_source_ndx(i), expected[i].second);
