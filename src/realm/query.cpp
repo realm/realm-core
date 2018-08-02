@@ -1441,7 +1441,7 @@ size_t Query::count(size_t start, size_t end, size_t limit) const
     return cnt;
 }
 
-TableView Query::do_find_all(const DescriptorOrdering descriptor)
+TableView Query::do_find_all(const DescriptorOrdering& descriptor)
 {
     const size_t default_start = 0;
     const size_t default_end = size_t(-1);
@@ -1475,7 +1475,7 @@ TableView Query::do_find_all(const DescriptorOrdering descriptor)
     return ret;
 }
 
-TableView Query::find_all(const DescriptorOrdering descriptor)
+TableView Query::find_all(const DescriptorOrdering& descriptor)
 {
 #if REALM_METRICS
     std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_FindAll);
@@ -1484,7 +1484,7 @@ TableView Query::find_all(const DescriptorOrdering descriptor)
 }
 
 
-size_t Query::count(const DescriptorOrdering descriptor)
+size_t Query::count(const DescriptorOrdering& descriptor)
 {
 #if REALM_METRICS
     std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Count);

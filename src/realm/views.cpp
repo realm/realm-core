@@ -21,6 +21,8 @@
 #include <realm/column_link.hpp>
 #include <realm/table.hpp>
 
+#include <typeinfo>
+
 using namespace realm;
 
 namespace {
@@ -332,11 +334,11 @@ void DescriptorOrdering::append_sort(SortDescriptor sort)
     if (!sort.is_valid()) {
         return;
     }
-    if (!m_descriptors.empty()) {
-        if (SortDescriptor* previous_sort = dynamic_cast<SortDescriptor*>(m_descriptors.back().get())) {
-            previous_sort->merge_with(std::move(sort));
-            return;
-        }
+    if (!m_descriptors.empty() && descriptor_is_sort(m_descriptors.size() - 1)) {
+        SortDescriptor* previous_sort = dynamic_cast<SortDescriptor*>(m_descriptors.back().get());
+        REALM_ASSERT(previous_sort);
+        previous_sort->merge_with(std::move(sort));
+        return;
     }
     m_descriptors.emplace_back(new SortDescriptor(std::move(sort)));
 }
@@ -357,23 +359,22 @@ void DescriptorOrdering::append_limit(LimitDescriptor limit)
 bool DescriptorOrdering::descriptor_is_sort(size_t index) const
 {
     REALM_ASSERT(index < m_descriptors.size());
-    SortDescriptor* sort_descr = dynamic_cast<SortDescriptor*>(m_descriptors[index].get());
-    return (sort_descr != nullptr);
+    auto& temp = *m_descriptors[index].get(); // a temporary to workaround a clang warning
+    return typeid(temp) == typeid(SortDescriptor);
 }
 
 bool DescriptorOrdering::descriptor_is_distinct(size_t index) const
 {
     REALM_ASSERT(index < m_descriptors.size());
-    SortDescriptor* sort_descr = dynamic_cast<SortDescriptor*>(m_descriptors[index].get());
-    LimitDescriptor* limit_descr = dynamic_cast<LimitDescriptor*>(m_descriptors[index].get());
-    return (!sort_descr && !limit_descr); // dynamic cast of a sort descriptor to ColumnsDescriptor will succeed
+    auto& temp = *m_descriptors[index].get(); // a temporary to workaround a clang warning
+    return typeid(temp) == typeid(DistinctDescriptor);
 }
 
 bool DescriptorOrdering::descriptor_is_limit(size_t index) const
 {
     REALM_ASSERT(index < m_descriptors.size());
-    LimitDescriptor* desc = dynamic_cast<LimitDescriptor*>(m_descriptors[index].get());
-    return (desc != nullptr);
+    auto& temp = *m_descriptors[index].get(); // a temporary to workaround a clang warning
+    return typeid(temp) == typeid(LimitDescriptor);
 }
 
 const BaseDescriptor* DescriptorOrdering::operator[](size_t ndx) const
@@ -385,7 +386,8 @@ bool DescriptorOrdering::will_apply_sort() const
 {
     return std::any_of(m_descriptors.begin(), m_descriptors.end(), [](const std::unique_ptr<BaseDescriptor>& desc) {
         REALM_ASSERT(desc.get()->is_valid());
-        return dynamic_cast<SortDescriptor*>(desc.get()) != nullptr;
+        auto& temp = *desc.get(); // a temporary to workaround a clang warning
+        return typeid(temp) == typeid(SortDescriptor);
     });
 }
 
@@ -393,7 +395,8 @@ bool DescriptorOrdering::will_apply_distinct() const
 {
     return std::any_of(m_descriptors.begin(), m_descriptors.end(), [](const std::unique_ptr<BaseDescriptor>& desc) {
         REALM_ASSERT(desc.get()->is_valid());
-        return dynamic_cast<SortDescriptor*>(desc.get()) == nullptr && dynamic_cast<LimitDescriptor*>(desc.get()) == nullptr;
+        auto& temp = *desc.get(); // a temporary to workaround a clang warning
+        return typeid(temp) == typeid(DistinctDescriptor);
     });
 }
 
@@ -401,7 +404,8 @@ bool DescriptorOrdering::will_apply_limit() const
 {
     return std::any_of(m_descriptors.begin(), m_descriptors.end(), [](const std::unique_ptr<BaseDescriptor>& desc) {
         REALM_ASSERT(desc.get()->is_valid());
-        return dynamic_cast<LimitDescriptor*>(desc.get()) != nullptr;
+        auto& temp = *desc.get(); // a temporary to workaround a clang warning
+        return typeid(temp) == typeid(LimitDescriptor);
     });
 }
 
@@ -409,8 +413,8 @@ bool DescriptorOrdering::will_limit_to_zero() const
 {
     return std::any_of(m_descriptors.begin(), m_descriptors.end(), [](const std::unique_ptr<BaseDescriptor>& desc) {
         REALM_ASSERT(desc.get()->is_valid());
-        LimitDescriptor* limit = dynamic_cast<LimitDescriptor*>(desc.get());
-        return (limit != nullptr && limit->get_limit() == 0);
+        auto& temp = *desc.get(); // a temporary to workaround a clang warning
+        return (typeid(temp) == typeid(LimitDescriptor) && dynamic_cast<LimitDescriptor*>(desc.get())->get_limit() == 0);
     });
 }
 
@@ -492,10 +496,9 @@ void RowIndexes::do_sort(const DescriptorOrdering& ordering) {
 
     const int num_descriptors = int(ordering.size());
     for (int desc_ndx = 0; desc_ndx < num_descriptors; ++desc_ndx) {
-        const BaseDescriptor* common_descr = ordering[desc_ndx];
 
-        if (const auto* sort_descr = dynamic_cast<const SortDescriptor*>(common_descr)) {
-
+        if (ordering.descriptor_is_sort(desc_ndx)) {
+            const auto* sort_descr = dynamic_cast<const SortDescriptor*>(ordering[desc_ndx]);
             SortDescriptor::Sorter sort_predicate = sort_descr->sorter(m_row_indexes);
 
             std::sort(v.begin(), v.end(), std::ref(sort_predicate));
@@ -512,7 +515,8 @@ void RowIndexes::do_sort(const DescriptorOrdering& ordering) {
                 }
             }
         }
-        else if(const auto* distinct_descr = dynamic_cast<const DistinctDescriptor*>(common_descr)){ // distinct descriptor
+        else if(ordering.descriptor_is_distinct(desc_ndx)) {
+            const auto* distinct_descr = dynamic_cast<const DistinctDescriptor*>(ordering[desc_ndx]);
             auto distinct_predicate = distinct_descr->sorter(m_row_indexes);
 
             // Remove all rows which have a null link along the way to the distinct columns
@@ -538,7 +542,8 @@ void RowIndexes::do_sort(const DescriptorOrdering& ordering) {
                 // tableview order or the order of the previous sort
                 std::sort(v.begin(), v.end(), [](auto a, auto b) { return a.index_in_view < b.index_in_view; });
             }
-        } else if (const auto* limit_descr = dynamic_cast<const LimitDescriptor*>(common_descr)) {
+        } else if (ordering.descriptor_is_limit(desc_ndx)) {
+            const auto* limit_descr = dynamic_cast<const LimitDescriptor*>(ordering[desc_ndx]);
             const size_t limit = limit_descr->get_limit();
             if (v.size() > limit) {
                 m_limit_count += v.size() - limit;
