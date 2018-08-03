@@ -516,6 +516,7 @@ TEST(Links_LinkList_Basics)
 
     // insert a link at a specific position in the linklist
     links.insert(1, key2);
+    CHECK_EQUAL(4, links2.size());
     CHECK_EQUAL(4, obj3.get_link_count(col_link));
     CHECK_EQUAL(key2, links.get(0));
     CHECK_EQUAL(key2, links.get(1));
@@ -534,6 +535,12 @@ TEST(Links_LinkList_Basics)
     CHECK_EQUAL(key1, links.get(2));
     CHECK_EQUAL(key0, links.get(3));
 
+    CHECK_EQUAL(4, links2.size());
+    CHECK_EQUAL(key1, links2.get(0));
+    CHECK_EQUAL(key2, links2.get(1));
+    CHECK_EQUAL(key1, links2.get(2));
+    CHECK_EQUAL(key0, links2.get(3));
+
     CHECK_EQUAL(1, obj0.get_backlink_count(*origin, col_link));
     CHECK_EQUAL(key3, obj0.get_backlink(*origin, col_link, 0));
     CHECK_EQUAL(2, obj1.get_backlink_count(*origin, col_link));
@@ -550,12 +557,24 @@ TEST(Links_LinkList_Basics)
     CHECK_EQUAL(key2, links.get(2));
     CHECK_EQUAL(key1, links.get(3));
 
+    CHECK_EQUAL(4, links2.size());
+    CHECK_EQUAL(key0, links2.get(0));
+    CHECK_EQUAL(key1, links2.get(1));
+    CHECK_EQUAL(key2, links2.get(2));
+    CHECK_EQUAL(key1, links2.get(3));
+
     links.move(0, 2);
     CHECK_EQUAL(4, obj3.get_link_count(col_link));
     CHECK_EQUAL(key1, links.get(0));
     CHECK_EQUAL(key2, links.get(1));
     CHECK_EQUAL(key0, links.get(2));
     CHECK_EQUAL(key1, links.get(3));
+
+    CHECK_EQUAL(4, links2.size());
+    CHECK_EQUAL(key1, links2.get(0));
+    CHECK_EQUAL(key2, links2.get(1));
+    CHECK_EQUAL(key0, links2.get(2));
+    CHECK_EQUAL(key1, links2.get(3));
 
     links.move(2, 0);
     CHECK_EQUAL(4, obj3.get_link_count(col_link));
@@ -564,12 +583,24 @@ TEST(Links_LinkList_Basics)
     CHECK_EQUAL(key2, links.get(2));
     CHECK_EQUAL(key1, links.get(3));
 
+    CHECK_EQUAL(4, links2.size());
+    CHECK_EQUAL(key0, links2.get(0));
+    CHECK_EQUAL(key1, links2.get(1));
+    CHECK_EQUAL(key2, links2.get(2));
+    CHECK_EQUAL(key1, links2.get(3));
+
     links.move(2, 2);
     CHECK_EQUAL(4, obj3.get_link_count(col_link));
     CHECK_EQUAL(key0, links.get(0));
     CHECK_EQUAL(key1, links.get(1));
     CHECK_EQUAL(key2, links.get(2));
     CHECK_EQUAL(key1, links.get(3));
+
+    CHECK_EQUAL(4, links2.size());
+    CHECK_EQUAL(key0, links2.get(0));
+    CHECK_EQUAL(key1, links2.get(1));
+    CHECK_EQUAL(key2, links2.get(2));
+    CHECK_EQUAL(key1, links2.get(3));
 
     // swap two links
     links.swap(1, 2);
@@ -579,6 +610,12 @@ TEST(Links_LinkList_Basics)
     CHECK_EQUAL(key1, links.get(2));
     CHECK_EQUAL(key1, links.get(3));
 
+    CHECK_EQUAL(4, links2.size());
+    CHECK_EQUAL(key0, links2.get(0));
+    CHECK_EQUAL(key2, links2.get(1));
+    CHECK_EQUAL(key1, links2.get(2));
+    CHECK_EQUAL(key1, links2.get(3));
+
     // swap a link with itself
     links.swap(2, 2);
     CHECK_EQUAL(4, obj3.get_link_count(col_link));
@@ -587,13 +624,21 @@ TEST(Links_LinkList_Basics)
     CHECK_EQUAL(key1, links.get(2));
     CHECK_EQUAL(key1, links.get(3));
 
+    CHECK_EQUAL(4, links2.size());
+    CHECK_EQUAL(key0, links2.get(0));
+    CHECK_EQUAL(key2, links2.get(1));
+    CHECK_EQUAL(key1, links2.get(2));
+    CHECK_EQUAL(key1, links2.get(3));
+
     // remove a link
     links.remove(0);
+    CHECK_EQUAL(3, links2.size());
     CHECK_EQUAL(3, obj3.get_link_count(col_link));
     CHECK_EQUAL(0, obj0.get_backlink_count(*origin, col_link));
 
     // remove all links
     links.clear();
+    CHECK_EQUAL(0, links2.size());
     CHECK_EQUAL(0, obj3.get_link_count(col_link));
     CHECK_EQUAL(0, obj0.get_backlink_count(*origin, col_link));
     CHECK_EQUAL(0, obj1.get_backlink_count(*origin, col_link));
@@ -603,6 +648,8 @@ TEST(Links_LinkList_Basics)
     links.add(key2);
     links.add(key1);
     links.add(key0);
+
+    CHECK_EQUAL(3, links2.size());
 
     // verify that backlinks were set
     CHECK_EQUAL(1, obj0.get_backlink_count(*origin, col_link));
@@ -676,8 +723,13 @@ TEST(Links_LinkList_Inserts)
     auto col_link = origin->add_column_link(type_LinkList, "links", *target);
     CHECK_EQUAL(target, origin->get_link_target(col_link));
 
-    auto links = origin->create_object().get_linklist_ptr(col_link);
+    auto obj = origin->create_object();
+    auto links = obj.get_linklist_ptr(col_link);
+    auto links2 = obj.get_linklist_ptr(col_link);
     auto k0 = links->ConstLstBase::get_key();
+
+    CHECK_EQUAL(0, links->size());
+    CHECK_EQUAL(0, links2->size());
 
     // add several links to a single linklist
     links->add(key2);
@@ -689,6 +741,12 @@ TEST(Links_LinkList_Inserts)
     CHECK_EQUAL(key1, links->get(1));
     CHECK_EQUAL(key0, links->get(2));
     CHECK_EQUAL(Wed, Days((*links)[0].get<Int>(col_date)));
+
+    CHECK_EQUAL(3, links2->size());
+    CHECK_EQUAL(key2, links2->get(0));
+    CHECK_EQUAL(key1, links2->get(1));
+    CHECK_EQUAL(key0, links2->get(2));
+    CHECK_EQUAL(Wed, Days((*links2)[0].get<Int>(col_date)));
 
     // verify that backlinks was set correctly
     CHECK_EQUAL(1, obj0.get_backlink_count(*origin, col_link));
@@ -800,7 +858,12 @@ TEST(Links_LinkList_FindByOrigin)
     auto col_link = origin->add_column_link(type_LinkList, "links", *target);
     CHECK_EQUAL(target, origin->get_link_target(col_link));
 
-    auto links = origin->create_object().get_linklist_ptr(col_link);
+    auto obj = origin->create_object();
+    auto links = obj.get_linklist_ptr(col_link);
+    auto links2 = obj.get_linklist_ptr(col_link);
+    CHECK_EQUAL(not_found, links->find_first(key2));
+    CHECK_EQUAL(not_found, links2->find_first(key2));
+
     links->add(key2);
     links->add(key1);
     links->add(key0);
@@ -808,9 +871,14 @@ TEST(Links_LinkList_FindByOrigin)
     CHECK_EQUAL(0, links->find_first(key2));
     CHECK_EQUAL(1, links->find_first(key1));
     CHECK_EQUAL(2, links->find_first(key0));
+    CHECK_EQUAL(0, links2->find_first(key2));
+    CHECK_EQUAL(1, links2->find_first(key1));
+    CHECK_EQUAL(2, links2->find_first(key0));
 
     links->remove(0);
+
     CHECK_EQUAL(not_found, links->find_first(key2));
+    CHECK_EQUAL(not_found, links2->find_first(key2));
 }
 
 

@@ -241,6 +241,8 @@ void Lst<ObjKey>::clear()
             m_tree->erase(ndx);
             ConstLstBase::adj_remove(ndx);
         }
+        //m_obj.bump_both_versions();
+        m_obj.bump_content_version();
         return;
     }
 

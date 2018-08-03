@@ -118,7 +118,7 @@ protected:
     mutable uint_fast64_t m_content_version = 0;
 
     ConstLstBase(ColKey col_key, const ConstObj* obj);
-    virtual void init_from_parent() const = 0;
+    virtual bool init_from_parent() const = 0;
 
     ref_type get_child_ref(size_t) const noexcept override;
     std::pair<ref_type, size_t> get_to_dot_parent(size_t) const override;
@@ -266,9 +266,9 @@ public:
     {
         if (!is_attached())
             return 0;
+        update_if_needed();
         if (!m_valid)
             return 0;
-        update_if_needed();
 
         return m_tree->size();
     }
@@ -293,6 +293,8 @@ public:
     }
     size_t find_first(T value) const
     {
+        if (!m_valid && !init_from_parent())
+            return not_found;
         return m_tree->find_first(value);
     }
     const BPlusTree<T>& get_tree() const
@@ -357,10 +359,11 @@ protected:
         return *this;
     }
 
-    void init_from_parent() const final
+    bool init_from_parent() const final
     {
         m_valid = m_tree->init_from_parent();
         update_content_version();
+        return m_valid;
     }
 };
 
@@ -489,7 +492,7 @@ public:
             insert_repl(repl, ndx, value);
         }
         do_insert(ndx, value);
-        m_obj.bump_both_versions();
+        m_obj.bump_content_version();
     }
 
     T remove(LstIterator<T>& it)
@@ -507,7 +510,7 @@ public:
         T old = get(ndx);
         do_remove(ndx);
         ConstLstBase::adj_remove(ndx);
-        m_obj.bump_both_versions();
+        m_obj.bump_content_version();
 
         return old;
     }
@@ -540,6 +543,8 @@ public:
             m_tree->insert(to, BPlusTree<T>::default_value(m_nullable));
             m_tree->swap(from, to);
             m_tree->erase(from);
+
+            m_obj.bump_content_version();
         }
     }
 
@@ -551,6 +556,7 @@ public:
                 ConstLstBase::swap_repl(repl, ndx1, ndx2);
             }
             m_tree->swap(ndx1, ndx2);
+            m_obj.bump_content_version();
         }
     }
 
@@ -563,7 +569,7 @@ public:
             ConstLstBase::clear_repl(repl);
         }
         m_tree->clear();
-        m_obj.bump_both_versions();
+        m_obj.bump_content_version();
     }
 
 protected:
@@ -571,8 +577,7 @@ protected:
     bool update_if_needed()
     {
         if (m_obj.update_if_needed()) {
-            m_tree->init_from_parent();
-            return true;
+            return init_from_parent();
         }
         return false;
     }
@@ -585,7 +590,7 @@ protected:
     void ensure_writeable()
     {
         if (m_obj.ensure_writeable()) {
-            m_tree->init_from_parent();
+            init_from_parent();
         }
     }
     void do_set(size_t ndx, T value)
