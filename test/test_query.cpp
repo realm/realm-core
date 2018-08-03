@@ -197,6 +197,8 @@ TEST(Query_NextGenSyntax)
 
     match = (untyped.column<bool>(c3) == false).find();
     CHECK_EQUAL(match, k1);
+    match = (false == untyped.column<bool>(c3)).find();
+    CHECK_EQUAL(match, k1);
 
     match = (20.3 > untyped.column<double>(c2) + 2).find();
     CHECK_EQUAL(match, k0);
@@ -9310,7 +9312,7 @@ TEST(Query_LinksTo)
     CHECK_EQUAL(found_key, source_keys[2]);
 
     auto linklist = source->get_object(source_keys[1]).get_linklist_ptr(col_linklist);
-    linklist->add(target_keys[7]);
+    linklist->add(target_keys[6]);
     linklist = source->get_object(source_keys[2]).get_linklist_ptr(col_linklist);
     linklist->add(target_keys[0]);
     linklist->add(target_keys[1]);
@@ -9318,13 +9320,13 @@ TEST(Query_LinksTo)
     linklist = source->get_object(source_keys[8]).get_linklist_ptr(col_linklist);
     linklist->add(target_keys[0]);
     linklist->add(target_keys[5]);
-    linklist->add(target_keys[6]);
+    linklist->add(target_keys[7]);
 
     q = source->column<Link>(col_linklist) == target->get_object(target_keys[5]);
     found_key = q.find();
     CHECK_EQUAL(found_key, source_keys[8]);
 
-    q = source->column<Link>(col_linklist) != target->get_object(target_keys[7]);
+    q = source->column<Link>(col_linklist) != target->get_object(target_keys[6]);
     found_key = q.find();
     CHECK_EQUAL(found_key, source_keys[2]);
 }

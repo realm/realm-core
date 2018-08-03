@@ -1508,6 +1508,11 @@ Query operator==(Timestamp left, const Subexpr2<R>& right)
     return create<Equal>(left, right);
 }
 template <class R>
+Query operator==(bool left, const Subexpr2<R>& right)
+{
+    return create<Equal>(left, right);
+}
+template <class R>
 Query operator>=(double left, const Subexpr2<R>& right)
 {
     return create<GreaterEqual>(left, right);
@@ -1579,6 +1584,11 @@ Query operator!=(int64_t left, const Subexpr2<R>& right)
 }
 template <class R>
 Query operator!=(Timestamp left, const Subexpr2<R>& right)
+{
+    return create<NotEqual>(left, right);
+}
+template <class R>
+Query operator!=(bool left, const Subexpr2<R>& right)
 {
     return create<NotEqual>(left, right);
 }

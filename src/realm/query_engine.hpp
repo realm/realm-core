@@ -1964,7 +1964,7 @@ public:
             return static_cast<const ArrayKey*>(m_leaf_ptr)->find_first(m_target_key, start, end);
         }
         else if (m_column_type == type_LinkList) {
-            ArrayKey arr(m_table->get_alloc());
+            ArrayKeyNonNullable arr(m_table->get_alloc());
             for (size_t i = start; i < end; i++) {
                 if (ref_type ref = static_cast<const ArrayList*>(m_leaf_ptr)->get(i)) {
                     arr.init_from_ref(ref);
