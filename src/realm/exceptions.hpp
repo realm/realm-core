@@ -68,6 +68,18 @@ public:
     const char* what() const noexcept override;
 };
 
+/// The UnsupportedFileFormatVersion exception is thrown by DB::open()
+/// constructor when opening a database that uses a deprecated file format
+/// and/or a deprecated history schema which this version of Realm cannot
+/// upgrade from.
+class UnsupportedFileFormatVersion : public std::exception {
+public:
+    UnsupportedFileFormatVersion(int source_version);
+    /// The unsupported version of the file.
+    int source_version = 0;
+    const char* what() const noexcept override;
+};
+
 
 /// Thrown when a sync agent attempts to join a session in which there is
 /// already a sync agent. A session may only contain one sync agent at any given
@@ -282,6 +294,16 @@ inline const char* DescriptorMismatch::what() const noexcept
 inline const char* FileFormatUpgradeRequired::what() const noexcept
 {
     return "Database upgrade required but prohibited";
+}
+
+inline UnsupportedFileFormatVersion::UnsupportedFileFormatVersion(int version)
+: source_version(version)
+{
+}
+
+inline const char* UnsupportedFileFormatVersion::what() const noexcept
+{
+    return "Database has an unsupported version and cannot be upgraded";
 }
 
 inline const char* MultipleSyncAgents::what() const noexcept

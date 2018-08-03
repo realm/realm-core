@@ -43,7 +43,7 @@ class WriteLogCollector;
 class Transaction;
 using TransactionRef = std::shared_ptr<Transaction>;
 
-/// Thrown by SharedGroup::open() if the lock file is already open in another
+/// Thrown by DB::create() if the lock file is already open in another
 /// process which can't share mutexes with this process
 struct IncompatibleLockFile : std::runtime_error {
     IncompatibleLockFile(const std::string& msg)
@@ -52,11 +52,11 @@ struct IncompatibleLockFile : std::runtime_error {
     }
 };
 
-/// Thrown by SharedGroup::open() if the type of history
+/// Thrown by DB::create() if the type of history
 /// (Replication::HistoryType) in the opened Realm file is incompatible with the
 /// mode in which the Realm file is opened. For example, if there is a mismatch
 /// between the history type in the file, and the history type associated with
-/// the replication plugin passed to SharedGroup::open().
+/// the replication plugin passed to DB::create().
 ///
 /// This exception will also be thrown if the history schema version is lower
 /// than required, and no migration is possible
@@ -395,8 +395,12 @@ private:
     /// util::File::AccessError, the derived exception type is thrown. Note that
     /// InvalidDatabase is among these derived exception types.
     ///
-    /// \throw FileFormatUpgradeRequired only if \a SharedGroupOptions::allow_upgrade
+    /// \throw FileFormatUpgradeRequired if \a DBOptions::allow_upgrade
     /// is `false` and an upgrade is required.
+    ///
+    /// \throw UnsupportedFileFormatVersion if the file format version or
+    /// history schema version is one which this version of Realm does not know
+    /// how to migrate from.
     void open(const std::string& file, bool no_create = false, const DBOptions options = DBOptions());
 
     /// Open this group in replication mode. The specified Replication instance

@@ -1047,9 +1047,7 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
             }
 
             if (REALM_UNLIKELY(!file_format_ok)) {
-                std::string msg =
-                    "Unsupported Realm file format version (" + util::to_string(current_file_format_version) + ")";
-                throw InvalidDatabase(msg, path);
+                throw UnsupportedFileFormatVersion(current_file_format_version);
             }
 
             target_file_format_version =
