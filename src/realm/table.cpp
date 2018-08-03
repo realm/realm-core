@@ -2340,6 +2340,7 @@ Table::BacklinkOrigin Table::find_backlink_origin(ColKey backlink_col) const noe
     return {};
 }
 
+// LCOV_EXCL_START
 void Table::verify_inv() const
 {
 #ifdef REALM_DEBUG
@@ -2375,3 +2376,4 @@ void Table::verify_inv() const
         }
     }
 }
+// LCOV_EXCL_STOP

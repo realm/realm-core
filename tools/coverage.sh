@@ -18,7 +18,7 @@ cd build.cov/test/
 ./realm-tests 
 cd ${PROJECT_DIR}
 lcov --no-external --directory . --capture --output-file ./coverage-test.info
-lcov --add-tracefile coverage-base.info --add-tracefile coverage-test.info --output-file ./coverage-total.info
+lcov --add-tracefile coverage-base.info --add-tracefile coverage-test.info --output-file ${PROJECT_DIR}/coverage-total.info
 lcov --remove coverage-total.info "/usr/*" "${PROJECT_DIR}/test/*" "${PROJECT_DIR}/src/external/*" --output-file coverage-filtered.info
 genhtml coverage-filtered.info --output-directory html
 firefox html/index.html > /dev/null 2>&1 &

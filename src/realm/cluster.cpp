@@ -551,6 +551,7 @@ bool ClusterNodeInner::get_leaf(ObjKey key, ClusterNode::IteratorState& state) c
     return false;
 }
 
+// LCOV_EXCL_START
 void ClusterNodeInner::dump_objects(int64_t key_offset, std::string lead) const
 {
     std::cout << lead << "node" << std::endl;
@@ -570,7 +571,7 @@ void ClusterNodeInner::dump_objects(int64_t key_offset, std::string lead) const
         m_tree_top.get_node(_get_child_ref(i))->dump_objects(key_value, lead + "   ");
     }
 }
-
+// LCOV_EXCL_STOP
 void ClusterNodeInner::move(size_t ndx, ClusterNode* new_node, int64_t key_adj)
 {
     auto new_cluster_node_inner = static_cast<ClusterNodeInner*>(new_node);
@@ -1346,6 +1347,7 @@ void Cluster::add_leaf(size_t col_ndx, ref_type ref)
     Array::insert(col_ndx + 1, from_ref(ref));
 }
 
+// LCOV_EXCL_START
 void Cluster::dump_objects(int64_t key_offset, std::string lead) const
 {
     std::cout << lead << "leaf - size: " << node_size() << std::endl;
@@ -1453,6 +1455,7 @@ void Cluster::dump_objects(int64_t key_offset, std::string lead) const
         std::cout << std::endl;
     }
 }
+// LCOV_EXCL_STOP
 
 void Cluster::remove_backlinks(ObjKey origin_key, size_t origin_col_ndx, const std::vector<ObjKey>& keys,
                                CascadeState& state) const

@@ -3777,11 +3777,11 @@ struct Tester {
 
     static ColKey col;
 
-    static std::vector<ObjKey> find_all_reference(Table& table, T v)
+    static std::vector<ObjKey> find_all_reference(TableRef table, T v)
     {
         std::vector<ObjKey> res;
-        Table::Iterator it = table.begin();
-        while (it != table.end()) {
+        Table::Iterator it = table->begin();
+        while (it != table->end()) {
             if (!it->is_null(col)) {
                 T v2 = it->get<T>(col);
                 if (v == v2) {
@@ -3794,16 +3794,16 @@ struct Tester {
         return res;
     }
 
-    static void validate(Table& table)
+    static void validate(TableRef table)
     {
-        Table::Iterator it = table.begin();
+        Table::Iterator it = table->begin();
 
-        if (it != table.end()) {
+        if (it != table->end()) {
             auto v = it->get<T>(col);
 
             if (!it->is_null(col)) {
                 std::vector<ObjKey> res;
-                table.get_search_index(col)->find_all(res, v, false);
+                table->get_search_index(col)->find_all(res, v, false);
                 std::vector<ObjKey> ref = find_all_reference(table, v);
 
                 size_t a = ref.size();
@@ -3814,11 +3814,12 @@ struct Tester {
         }
     }
 
-    static void run(realm::DataType type)
+    static void run(DBRef db, realm::DataType type)
     {
-        Table table;
-        col = table.add_column(type, "name", nullable);
-        table.add_search_index(col);
+    	auto trans = db->start_write();
+        auto table = trans->add_table("my_table");
+        col = table->add_column(type, "name", nullable);
+        table->add_search_index(col);
         const size_t iters = 1000;
 
         bool add_trend = true;
@@ -3831,7 +3832,7 @@ struct Tester {
 
             // Add object (with 60% probability, so we grow the object count over time)
             if (fastrand(100) < (add_trend ? 80 : 20)) {
-                Obj o = table.create_object();
+                Obj o = table->create_object();
                 bool set_to_null = fastrand(100) < 20;
 
                 if (!set_to_null) {
@@ -3841,28 +3842,28 @@ struct Tester {
             }
 
             // Remove random object
-            if (fastrand(100) < 50 && table.size() > 0) {
-                Table::Iterator it = table.begin();
-                auto r = fastrand(table.size() - 1);
+            if (fastrand(100) < 50 && table->size() > 0) {
+                Table::Iterator it = table->begin();
+                auto r = fastrand(table->size() - 1);
                 // FIXME: Is there a faster way to pick a random object?
                 for (unsigned t = 0; t < r; t++) {
                     ++it;
                 }
                 Obj o = *it;
-                table.remove_object(o.get_key());
+                table->remove_object(o.get_key());
             }
 
             // Edit random object
-            if (table.size() > 0) {
-                Table::Iterator it = table.begin();
-                auto r = fastrand(table.size() - 1);
+            if (table->size() > 0) {
+                Table::Iterator it = table->begin();
+                auto r = fastrand(table->size() - 1);
                 // FIXME: Is there a faster way to pick a random object?
                 for (unsigned t = 0; t < r; t++) {
                     ++it;
                 }
                 Obj o = *it;
                 bool set_to_null = fastrand(100) < 20;
-                if (set_to_null && table.is_nullable(col)) {
+                if (set_to_null && table->is_nullable(col)) {
                     o.set_null(col);
                 }
                 else {
@@ -3875,6 +3876,7 @@ struct Tester {
                 validate(table);
             }
         }
+        trans->rollback();
     }
 
 
@@ -3916,19 +3918,23 @@ TEST(Table_search_index_fuzzer)
     // nullable:  If the columns must be is nullable or not
     // Obj::set() will be automatically be called with set<RemoveOptional<T>>()
 
-    Tester<bool, false>::run(type_Bool);
-    Tester<Optional<bool>, true>::run(type_Bool);
+	SHARED_GROUP_TEST_PATH(path);
+	std::unique_ptr<Replication> hist(make_in_realm_history(path));
+	auto db = DB::create(*hist);
+	//auto db = DB::create(path);
+    Tester<bool, false>::run(db, type_Bool);
+    Tester<Optional<bool>, true>::run(db, type_Bool);
 
-    Tester<int64_t, false>::run(type_Int);
-    Tester<Optional<int64_t>, true>::run(type_Int);
+    Tester<int64_t, false>::run(db, type_Int);
+    Tester<Optional<int64_t>, true>::run(db, type_Int);
 
     // Self-contained null state
-    Tester<Timestamp, false>::run(type_Timestamp);
-    Tester<Timestamp, true>::run(type_Timestamp);
+    Tester<Timestamp, false>::run(db, type_Timestamp);
+    Tester<Timestamp, true>::run(db, type_Timestamp);
 
     // Self-contained null state
-    Tester<StringData, true>::run(type_String);
-    Tester<StringData, false>::run(type_String);
+    Tester<StringData, true>::run(db, type_String);
+    Tester<StringData, false>::run(db, type_String);
 }
 
 TEST(Table_StaleColumnKey)
@@ -3989,5 +3995,233 @@ TEST(Table_getLinkType)
     g.remove_table("table");
     CHECK_THROW(table->get_link_type(col_weak_link), NoSuchTable);
 }
+
+template<typename T> T generate_value() { return test_util::random_int<T>(); }
+
+template<> StringData generate_value()
+{
+	char* str = new char[32];
+	for (int j = 0; j < 31; ++j) str[j] = test_util::random_int<char>();
+	str[31] = 0;
+	return StringData(str, 32);
+}
+
+template<> BinaryData generate_value()
+{
+	char* str = new char[32];
+	for (int j = 0; j < 31; ++j) str[j] = test_util::random_int<char>();
+	str[31] = 0;
+	return BinaryData(str, 32);
+}
+
+template<> bool generate_value() { return test_util::random_int<int>() & 0x1; }
+template<> float generate_value() { return float(1.0 * test_util::random_int<int>() / (test_util::random_int<int>(1, 1000))); }
+template<> double generate_value() { return 1.0 * test_util::random_int<int>() / (test_util::random_int<int>(1, 1000)); }
+template<> Timestamp generate_value() { return Timestamp(test_util::random_int<int>(0, 1000000), test_util::random_int<int>(0, 1000000000)); }
+
+template<typename T> void dispose_value(T) {}
+template<> void dispose_value(StringData value)
+{
+	delete[] value.data();
+}
+template<> void dispose_value(BinaryData value)
+{
+	delete[] value.data();
+}
+template<typename T> void check_values(TestContext& test_context, Lst<T>& lst, std::vector<T>& reference) {
+	CHECK_EQUAL(lst.size(), reference.size());
+	for (unsigned j = 0; j < reference.size(); ++j)
+		CHECK_EQUAL(lst.get(j), reference[j]);
+}
+
+template<typename T> struct generator {
+	static T get() { return generate_value<T>(); }
+	static void dispose(T value) { dispose_value<T>(value); }
+};
+
+template<typename T> struct generator<Optional<T>> {
+	static Optional<T> get() {
+		if ((test_util::random_int<int>() % 10) == 0)
+			return Optional<T>();
+		else
+			return Optional<T>(generate_value<T>());
+	}
+	static void dispose(Optional<T> value) {
+		if (bool(value))
+			dispose_value<T>(value.value());
+	}
+};
+
+template<typename T> void test_lists(TestContext& test_context, DBRef sg, const realm::DataType type_id, bool optional = false) {
+	auto t = sg->start_write();
+	auto table = t->add_table("the_table");
+	auto col = table->add_column_list(type_id, "the column", optional);
+	Obj o = table->create_object();
+	Lst<T> lst = o.get_list<T>(col);
+	std::vector<T> reference;
+	for (int j = 0; j < 10000; ++j) {
+		T value = generator<T>::get();
+		lst.add(value);
+		reference.push_back(value);
+	}
+	check_values(test_context, lst, reference);
+	for (int j = 0; j < 1000; ++j) {
+		T value = generator<T>::get();
+		lst.insert(4993, value);
+		generator<T>::dispose(value);
+		value = generator<T>::get();
+		lst.set(4993, value);
+		reference.insert(reference.begin() + 4993, value);
+	}
+	check_values(test_context, lst, reference);
+	for (int j = 0; j < 1000; ++j) {
+		lst.remove(1452);
+		T val = reference[1452];
+		reference.erase(reference.begin() + 1452);
+		generator<T>::dispose(val);
+	}
+	check_values(test_context, lst, reference);
+	for (int disp = 0; disp < 4; ++disp) {
+		for (int j = 2500 + disp; j > 500; j -= 3) {
+			lst.remove(j);
+			T val = reference[j];
+			reference.erase(reference.begin() + j);
+			generator<T>::dispose(val);
+		}
+		check_values(test_context, lst, reference);
+	}
+	auto it = reference.begin();
+	for (auto value : lst) {
+		CHECK(value == *it);
+		++it;
+	}
+	for (size_t j = lst.size(); j >= 1000; --j) {
+		lst.remove(j - 1);
+		generator<T>::dispose(reference.back());
+		reference.pop_back();
+	}
+	check_values(test_context, lst, reference);
+	while (size_t sz = lst.size()) {
+		lst.remove(sz - 1);
+		generator<T>::dispose(reference.back());
+		reference.pop_back();
+	}
+	CHECK_EQUAL(0, reference.size());
+	t->rollback();
+}
+
+TEST(List_Ops) {
+    SHARED_GROUP_TEST_PATH(path);
+
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
+
+	test_lists<int64_t>(test_context, sg, type_Int);
+	test_lists<StringData>(test_context, sg, type_String);
+	test_lists<BinaryData>(test_context, sg, type_Binary);
+	test_lists<bool>(test_context, sg, type_Bool);
+	test_lists<float>(test_context, sg, type_Float);
+	test_lists<double>(test_context, sg, type_Double);
+	test_lists<Timestamp>(test_context, sg, type_Timestamp);
+
+	test_lists<Optional<int64_t>>(test_context, sg, type_Int, true);
+	test_lists<StringData>(test_context, sg, type_String, true); // always Optional?
+	test_lists<BinaryData>(test_context, sg, type_Binary, true); // always Optional?
+	test_lists<Optional<bool>>(test_context, sg, type_Bool, true);
+	test_lists<Optional<float>>(test_context, sg, type_Float, true);
+	test_lists<Optional<double>>(test_context, sg, type_Double, true);
+	test_lists<Timestamp>(test_context, sg, type_Timestamp, true); // always Optional?
+}
+
+template<typename T> void check_table_values(TestContext& test_context, TableRef t, ColKey col, std::map<int, T>& reference) {
+	CHECK_EQUAL(t->size(), reference.size());
+	for (auto it : reference) {
+		T value = it.second;
+		Obj o = t->get_object(ObjKey(it.first));
+		CHECK_EQUAL(o.get<T>(col), value);
+	}
+}
+
+template<typename T> void test_tables(TestContext& test_context, DBRef sg, const realm::DataType type_id, bool optional = false) {
+	auto t = sg->start_write();
+	auto table = t->add_table("the_table");
+	auto col = table->add_column(type_id, "the column", optional);
+	std::map<int, T> reference;
+
+	// insert elements 0 - 999
+	for (int j = 0; j < 1000; ++j) {
+		T value = generator<T>::get();
+		Obj o = table->create_object(ObjKey(j)).set_all(value);
+		reference.insert(std::pair<int, T>(j, value));
+	}
+	// insert elements 10000 - 10999
+	for (int j = 10000; j < 11000; ++j) {
+		T value = generator<T>::get();
+		Obj o = table->create_object(ObjKey(j)).set_all(value);
+		reference.insert(std::pair<int, T>(j, value));
+	}
+	// insert in between previous groups
+	for (int j = 4000; j < 7000; ++j) {
+		T value = generator<T>::get();
+		Obj o = table->create_object(ObjKey(j)).set_all(value);
+		reference.insert(std::pair<int, T>(j, value));
+	}
+	check_table_values(test_context, table, col, reference);
+
+	// modify values
+	for (int j = 0; j < 11000; j+=100) {
+		auto it = reference.find(j);
+		if (it == reference.end()) // skip over holes in the key range
+			continue;
+		T value = generator<T>::get();
+		Obj o = table->get_object(ObjKey(j));
+		generator<T>::dispose(it->second);
+		o.set<T>(col, value);
+		it->second = value;
+	}
+	check_table_values(test_context, table, col, reference);
+
+	// remove chunk in the middle
+	for (int j = 1000; j < 10000; ++j) {
+		auto it = reference.find(j);
+		if (it == reference.end()) // skip over holes in the key range
+			continue;
+		table->remove_object(ObjKey(j));
+		T value = it->second;
+		generator<T>::dispose(value);
+		reference.erase(it);
+	}
+	// cleanup remaining values (avoid leaking)
+	for (auto it : reference) generator<T>::dispose(it.second);
+	reference.clear();
+	table->clear();
+
+	check_table_values(test_context, table, col, reference);
+	t->rollback();
+}
+
+TEST(Table_Ops) {
+    SHARED_GROUP_TEST_PATH(path);
+
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
+
+	test_tables<int64_t>(test_context, sg, type_Int);
+	test_tables<StringData>(test_context, sg, type_String);
+	test_tables<BinaryData>(test_context, sg, type_Binary);
+	test_tables<bool>(test_context, sg, type_Bool);
+	test_tables<float>(test_context, sg, type_Float);
+	test_tables<double>(test_context, sg, type_Double);
+	test_tables<Timestamp>(test_context, sg, type_Timestamp);
+
+	test_tables<Optional<int64_t>>(test_context, sg, type_Int, true);
+	test_tables<StringData>(test_context, sg, type_String, true); // always Optional?
+	test_tables<BinaryData>(test_context, sg, type_Binary, true); // always Optional?
+	test_tables<Optional<bool>>(test_context, sg, type_Bool, true);
+	test_tables<Optional<float>>(test_context, sg, type_Float, true);
+	test_tables<Optional<double>>(test_context, sg, type_Double, true);
+	test_tables<Timestamp>(test_context, sg, type_Timestamp, true); // always Optional?
+}
+
 
 #endif // TEST_TABLE
