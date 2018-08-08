@@ -274,7 +274,7 @@ public:
     }
     T get(size_t ndx) const
     {
-        if (ndx >= m_tree->size()) {
+        if (ndx >= size()) {
             throw std::out_of_range("Index out of range");
         }
         return m_tree->get(ndx);

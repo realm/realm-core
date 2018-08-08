@@ -4224,4 +4224,34 @@ TEST(Table_Ops) {
 }
 
 
+ONLY(Table_MultipleObjs) {
+    SHARED_GROUP_TEST_PATH(path);
+
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
+
+    auto tr = sg->start_write();
+    auto table = tr->add_table("my_table");
+    auto col = table->add_column_link(type_LinkList, "the links", *table);
+    auto col_int = table->add_column_list(type_String, "the integers");
+    auto obj_key = table->create_object().get_key();
+    tr->commit();
+    tr = sg->start_write();
+    table = tr->get_table("my_table");
+    auto obj = table->get_object(obj_key);
+    auto list_1 = obj.get_linklist(col);
+    auto list_2 = obj.get_linklist(col);
+
+    auto list_3 = obj.get_list<StringData>(col_int);
+    auto list_4 = obj.get_list<StringData>(col_int);
+    std::string s = "42";
+    StringData ss(s.data(), s.size());
+    list_3.add(ss);
+    CHECK_EQUAL(list_4.get(0), ss);
+
+    list_1.add(obj_key);
+    CHECK_EQUAL(list_1.get(0), obj_key);
+    CHECK_EQUAL(list_2.get(0), obj_key);
+}
+
 #endif // TEST_TABLE
