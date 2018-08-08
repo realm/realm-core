@@ -2673,9 +2673,9 @@ TEST(Table_ObjectsWithNoColumns)
 {
     Table table;
     std::vector<ObjKey> keys;
-    table.create_objects(120, keys);
+    table.create_objects(REALM_MAX_BPNODE_SIZE * 2, keys);
     CHECK_NOT(table.is_empty());
-    CHECK_EQUAL(table.size(), 120);
+    CHECK_EQUAL(table.size(), REALM_MAX_BPNODE_SIZE * 2);
     for (ObjKey k : keys) {
         Obj obj = table.get_object(k);
         CHECK(obj.is_valid());

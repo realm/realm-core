@@ -148,37 +148,36 @@ R ConstTableView::aggregate(ColKey column_key, size_t* result_count, ObjKey* ret
         }
 */
         // aggregation must be robust in the face of stale keys:
-        try {
-            ConstObj obj = m_table->get_object(key);
-            auto v = obj.get<T>(column_key);
+        if (!m_table->is_valid(key))
+            continue;
 
-            if (!obj.is_null(column_key)) {
-                non_nulls++;
-                R unpacked = static_cast<R>(util::unwrap(v));
+        ConstObj obj = m_table->get_object(key);
+        auto v = obj.get<T>(column_key);
 
-                if (is_first) {
-                    if (return_key) {
-                        *return_key = key;
-                    }
-                    res = unpacked;
-                    is_first = false;
+        if (!obj.is_null(column_key)) {
+            non_nulls++;
+            R unpacked = static_cast<R>(util::unwrap(v));
+
+            if (is_first) {
+                if (return_key) {
+                    *return_key = key;
                 }
-                else if (action == act_Sum || action == act_Average) {
-                    res += unpacked;
-                }
-                else if ((action == act_Max && unpacked > res) || non_nulls == 1) {
-                    res = unpacked;
-                    if (return_key)
-                        *return_key = key;
-                }
-                else if ((action == act_Min && unpacked < res) || non_nulls == 1) {
-                    res = unpacked;
-                    if (return_key)
-                        *return_key = key;
-                }
+                res = unpacked;
+                is_first = false;
             }
-        }
-        catch (realm::InvalidKey) {
+            else if (action == act_Sum || action == act_Average) {
+                res += unpacked;
+            }
+            else if ((action == act_Max && unpacked > res) || non_nulls == 1) {
+                res = unpacked;
+                if (return_key)
+                    *return_key = key;
+            }
+            else if ((action == act_Min && unpacked < res) || non_nulls == 1) {
+                res = unpacked;
+                if (return_key)
+                    *return_key = key;
+            }
         }
     }
 
@@ -536,7 +535,7 @@ void ConstTableView::do_sync()
     }
     else if (m_source_column_key) {
         m_key_values->clear();
-        try {
+        if (m_table && m_linked_table->is_valid(m_linked_obj_key)) {
             TableKey origin_table_key = m_table->get_key();
             ConstObj m_linked_obj = m_linked_table->get_object(m_linked_obj_key);
             const Spec& spec = _impl::TableFriend::get_spec(*m_linked_table);
@@ -546,8 +545,6 @@ void ConstTableView::do_sync()
                 for (size_t i = 0; i < backlink_count; i++)
                     m_key_values->add(m_linked_obj.get_backlink(backlink_col_ndx, i));
             }
-        }
-        catch (...) {
         }
     }
     // FIXME: Unimplemented for link to a column

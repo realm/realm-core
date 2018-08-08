@@ -149,8 +149,10 @@ Lst<T>::Lst(const Obj& obj, ColKey col_key)
     , ConstLstIf<T>(obj.get_alloc())
     , m_obj(obj)
 {
-    this->m_nullable = obj.m_table->is_nullable(col_key);
-    this->init_from_parent();
+    if (m_obj) {
+        this->m_nullable = obj.m_table->is_nullable(col_key);
+        this->init_from_parent();
+    }
 }
 
 namespace realm {

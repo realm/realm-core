@@ -3751,10 +3751,10 @@ TEST(LangBindHelper_HandoverDependentViews)
 }
 
 
-TEST(LangBindHelper_HandoverTableViewWithLinkView)
+TEST(LangBindHelper_HandoverTableViewWithLnkLst)
 {
-    // First iteration hands-over a normal valid attached LinkView. Second
-    // iteration hands-over a detached LinkView.
+    // First iteration hands-over a normal valid attached LnkLst. Second
+    // iteration hands-over a detached LnkLst.
     for (int detached = 0; detached < 2; detached++) {
         SHARED_GROUP_TEST_PATH(path);
         std::unique_ptr<Replication> hist(make_in_realm_history(path));
@@ -3763,6 +3763,7 @@ TEST(LangBindHelper_HandoverTableViewWithLinkView)
         ObjKey ok0, ok1, ok2;
         TransactionRef tr;
         std::unique_ptr<TableView> tv2;
+        std::unique_ptr<Query> q2;
         {
             TableView tv;
             auto group_w = sg->start_write();
@@ -3794,8 +3795,8 @@ TEST(LangBindHelper_HandoverTableViewWithLinkView)
             // q.m_view = lvr
             Query q = table1->where(lvr).and_query(table1->column<Int>(col0) > 100);
 
-            // Remove the LinkList that the query depends on, to see if a detached LinkView can be handed over
-            // correctly
+            // Remove the LinkList that the query depends on, to see if a detached
+            // LinkList can be handed over correctly
             if (detached == 1)
                 table2->remove_object(o.get_key());
 
@@ -3804,19 +3805,77 @@ TEST(LangBindHelper_HandoverTableViewWithLinkView)
             group_w->commit_and_continue_as_read();
             tr = group_w->duplicate();
             CHECK(tv.is_in_sync());
-            if (detached == 1) { // import will fail
-                CHECK_THROW(tr->import_copy_of(tv, PayloadPolicy::Copy), InvalidKey);
-            }
-            else {
-                tv2 = tr->import_copy_of(tv, PayloadPolicy::Copy);
-            }
+            tv2 = tr->import_copy_of(tv, PayloadPolicy::Copy);
+            q2 = tr->import_copy_of(q, PayloadPolicy::Copy);
         }
         {
+            auto tv3 = q2->find_all();
+            CHECK(tv2->is_in_sync());
             if (detached == 0) {
-                CHECK(tv2->is_in_sync());
                 CHECK_EQUAL(2, tv2->size());
                 CHECK_EQUAL(ok0, tv2->get_key(0));
                 CHECK_EQUAL(ok2, tv2->get_key(1));
+                CHECK_EQUAL(2, tv3.size());
+                CHECK_EQUAL(ok0, tv3.get_key(0));
+                CHECK_EQUAL(ok2, tv3.get_key(1));
+            }
+            else {
+                CHECK_EQUAL(0, tv2->size());
+                CHECK_EQUAL(0, tv3.size());
+            }
+            tr->close();
+        }
+    }
+}
+
+
+TEST(LangBindHelper_HandoverTableViewWithQueryOnLink)
+{
+    for (int detached = 0; detached < 2; detached++) {
+        SHARED_GROUP_TEST_PATH(path);
+        std::unique_ptr<Replication> hist(make_in_realm_history(path));
+        DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
+        TransactionRef tr;
+        ObjKey target;
+        std::unique_ptr<TableView> tv2;
+        std::unique_ptr<Query> q2;
+        {
+            auto group_w = sg->start_write();
+
+            TableRef table1 = group_w->add_table("table1");
+            TableRef table2 = group_w->add_table("table2");
+            table1->add_column(type_Int, "col1");
+            auto col_link = table2->add_column_link(type_Link, "link", *table1);
+
+            target = table1->create_object().set_all(300).get_key();
+            auto o = table2->create_object().set_all(target);
+            Query q = table2->where().and_query(table2->column<Link>(col_link) == table1->get_object(target));
+
+            // Remove the object that the query depends on, to see if a detached
+            // object can be handed over correctly
+            if (detached == 1)
+                table2->remove_object(o.get_key());
+
+            auto tv = q.find_all();
+            CHECK(tv.is_in_sync());
+            group_w->commit_and_continue_as_read();
+            tr = group_w->duplicate();
+            CHECK(tv.is_in_sync());
+            tv2 = tr->import_copy_of(tv, PayloadPolicy::Copy);
+            q2 = tr->import_copy_of(q, PayloadPolicy::Copy);
+        }
+        {
+            auto tv3 = q2->find_all();
+            CHECK(tv2->is_in_sync());
+            if (detached == 0) {
+                CHECK_EQUAL(1, tv2->size());
+                CHECK_EQUAL(target, tv2->get_key(0));
+                CHECK_EQUAL(1, tv3.size());
+                CHECK_EQUAL(target, tv3.get_key(0));
+            }
+            else {
+                CHECK_EQUAL(0, tv2->size());
+                CHECK_EQUAL(0, tv3.size());
             }
             tr->close();
         }

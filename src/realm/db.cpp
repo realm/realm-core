@@ -2385,7 +2385,8 @@ Obj Transaction::import_copy_of(const ConstObj& original)
 {
     TableKey tk = original.get_table_key();
     ObjKey rk = original.get_key();
-    return get_table(tk)->get_object(rk);
+    auto table = get_table(tk);
+    return table->is_valid(rk) ? table->get_object(rk) : Obj();
 }
 
 ConstTableRef Transaction::import_copy_of(ConstTableRef original)
@@ -2419,6 +2420,8 @@ LnkLstPtr Transaction::import_copy_of(const LnkLstPtr& original)
     if (!bool(original))
         return nullptr;
     Obj obj = import_copy_of(*original->m_const_obj);
+    if (!obj)
+        return std::make_unique<LnkLst>();
     ColKey ck = original->m_col_key;
     return obj.get_linklist_ptr(ck);
 }

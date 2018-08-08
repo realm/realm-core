@@ -120,7 +120,10 @@ public:
     /// Return reference to new node created (if any)
     virtual ref_type insert(ObjKey k, const InitValues& init_values, State& state) = 0;
     /// Locate object identified by 'key' and update 'state' accordingly
-    virtual void get(ObjKey key, State& state) const = 0;
+    void get(ObjKey key, State& state) const;
+    /// Locate object identified by 'key' and update 'state' accordingly
+    /// Returns `false` if the object doesn't not exist.
+    virtual bool try_get(ObjKey key, State& state) const = 0;
     /// Locate object identified by 'ndx' and update 'state' accordingly
     virtual ObjKey get(size_t ndx, State& state) const = 0;
     /// Return the index at which key is stored
@@ -222,7 +225,7 @@ public:
     void insert_column(size_t ndx) override;
     void remove_column(size_t ndx) override;
     ref_type insert(ObjKey k, const InitValues& init_values, State& state) override;
-    void get(ObjKey k, State& state) const override;
+    bool try_get(ObjKey k, State& state) const override;
     ObjKey get(size_t, State& state) const override;
     size_t get_ndx(ObjKey key, size_t ndx) const override;
     size_t erase(ObjKey k, CascadeState& state) override;

@@ -52,6 +52,7 @@ public:
     // Get key for object this view is "looking" at.
     ObjKey get_key(size_t ndx) const;
 
+    ConstObj try_get_object(size_t row_ndx) const;
     ConstObj get_object(size_t row_ndx) const;
     ConstObj front() const noexcept
     {
@@ -110,13 +111,9 @@ void ObjList::for_each(F func) const
 {
     auto sz = size();
     for (size_t i = 0; i < sz; i++) {
-        try {
-            ConstObj o = get_object(i);
-            if (func(o))
-                return;
-        }
-        catch (const InvalidKey&) {
-        }
+        auto o = try_get_object(i);
+        if (o && func(o))
+            return;
     }
 }
 

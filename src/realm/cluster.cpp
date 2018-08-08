@@ -106,7 +106,7 @@ public:
     void insert_column(size_t ndx) override;
     void remove_column(size_t ndx) override;
     ref_type insert(ObjKey k, const InitValues& init_values, State& state) override;
-    void get(ObjKey k, State& state) const override;
+    bool try_get(ObjKey k, State& state) const override;
     ObjKey get(size_t ndx, State& state) const override;
     size_t get_ndx(ObjKey key, size_t ndx) const override;
     size_t erase(ObjKey k, CascadeState& state) override;
@@ -143,21 +143,20 @@ private:
         size_t ndx;
         uint64_t offset;
         ObjKey key;
+        MemRef mem;
     };
-    ChildInfo find_child(ObjKey key) const
+    bool find_child(ObjKey key, ChildInfo& ret) const
     {
-        ChildInfo ret;
         if (m_keys.is_attached()) {
             auto upper = m_keys.upper_bound(uint64_t(key.value));
             // The first entry in m_keys will always be smaller than or equal
             // to all keys in this subtree. If you get zero returned here, the
             // key is not in the tree
             if (upper == 0) {
-                throw InvalidKey("Key not found");
+                return false;
             }
             ret.ndx = upper - 1;
             ret.offset = m_keys.get(ret.ndx);
-            ret.key = ObjKey(key.value - ret.offset);
         }
         else {
             size_t sz = node_size();
@@ -165,9 +164,12 @@ private:
             size_t max_ndx = sz - 1;
             ret.ndx = std::min(size_t(key.value) >> m_shift_factor, max_ndx);
             ret.offset = ret.ndx << m_shift_factor;
-            ret.key = ObjKey(key.value - ret.offset);
         }
-        return ret;
+        ret.key = ObjKey(key.value - ret.offset);
+        ref_type child_ref = _get_child_ref(ret.ndx);
+        char* child_header = m_alloc.translate(child_ref);
+        ret.mem = MemRef(child_header, child_ref, m_alloc);
+        return true;
     }
 
     ref_type _get_child_ref(size_t ndx) const
@@ -186,6 +188,9 @@ private:
 
     template <class T, class F>
     T recurse(ObjKey key, F func);
+
+    template <class T, class F>
+    T recurse(ChildInfo& child_info, F func);
 };
 }
 
@@ -194,6 +199,13 @@ void ClusterNode::IteratorState::clear()
     m_current_leaf.detach();
     m_key_offset = 0;
     m_current_index = size_t(-1);
+}
+
+void ClusterNode::get(ObjKey k, ClusterNode::State& state) const
+{
+    if (!try_get(k, state)) {
+        throw InvalidKey("Key not found");
+    }
 }
 
 /***************************** ClusterNodeInner ******************************/
@@ -250,21 +262,27 @@ bool ClusterNodeInner::update_from_parent(size_t old_baseline) noexcept
 template <class T, class F>
 T ClusterNodeInner::recurse(ObjKey key, F func)
 {
-    ChildInfo child_info = find_child(key);
+    ChildInfo child_info;
+    if (!find_child(key, child_info)) {
+        throw InvalidKey("Key not found");
+    }
+    return recurse<T>(child_info, func);
+}
 
-    ref_type child_ref = _get_child_ref(child_info.ndx);
-    char* child_header = m_alloc.translate(child_ref);
-    bool child_is_leaf = !Array::get_is_inner_bptree_node_from_header(child_header);
+template <class T, class F>
+T ClusterNodeInner::recurse(ChildInfo& child_info, F func)
+{
+    bool child_is_leaf = !Array::get_is_inner_bptree_node_from_header(child_info.mem.get_addr());
     if (child_is_leaf) {
         Cluster leaf(child_info.offset + m_offset, m_alloc, m_tree_top);
         leaf.set_parent(this, child_info.ndx + s_first_node_index);
-        leaf.init(MemRef(child_header, child_ref, m_alloc));
+        leaf.init(child_info.mem);
         return func(&leaf, child_info);
     }
     else {
         ClusterNodeInner node(m_alloc, m_tree_top);
         node.set_parent(this, child_info.ndx + s_first_node_index);
-        node.init(MemRef(child_header, child_ref, m_alloc));
+        node.init(child_info.mem);
         node.set_offset(child_info.offset + m_offset);
         return func(&node, child_info);
     }
@@ -327,10 +345,14 @@ ref_type ClusterNodeInner::insert(ObjKey key, const InitValues& init_values, Clu
     });
 }
 
-void ClusterNodeInner::get(ObjKey key, ClusterNode::State& state) const
+bool ClusterNodeInner::try_get(ObjKey key, ClusterNode::State& state) const
 {
-    return const_cast<ClusterNodeInner*>(this)->recurse<void>(
-        key, [&state](const ClusterNode* node, ChildInfo& child_info) { return node->get(child_info.key, state); });
+    ChildInfo child_info;
+    if (!find_child(key, child_info)) {
+        return false;
+    }
+    return const_cast<ClusterNodeInner*>(this)->recurse<bool>(
+        child_info, [&state](const ClusterNode* node, ChildInfo& info) { return node->try_get(info.key, state); });
 }
 
 ObjKey ClusterNodeInner::get(size_t ndx, ClusterNode::State& state) const
@@ -369,14 +391,15 @@ ObjKey ClusterNodeInner::get(size_t ndx, ClusterNode::State& state) const
 
 size_t ClusterNodeInner::get_ndx(ObjKey key, size_t ndx) const
 {
-    ChildInfo child_info = find_child(key);
+    ChildInfo child_info;
+    if (!find_child(key, child_info)) {
+        throw InvalidKey("Key not found");
+    }
 
     // First figure out how many objects there are in nodes before actual one
     // then descent in tree
 
-    ref_type child_ref = _get_child_ref(child_info.ndx);
-    char* child_header = m_alloc.translate(child_ref);
-    bool child_is_leaf = !Array::get_is_inner_bptree_node_from_header(child_header);
+    bool child_is_leaf = !Array::get_is_inner_bptree_node_from_header(child_info.mem.get_addr());
     if (child_is_leaf) {
         for (unsigned i = 0; i < child_info.ndx; i++) {
             ref_type ref = _get_child_ref(i);
@@ -387,7 +410,7 @@ size_t ClusterNodeInner::get_ndx(ObjKey key, size_t ndx) const
             ndx += leaf.get_tree_size();
         }
         Cluster leaf(child_info.offset + m_offset, m_alloc, m_tree_top);
-        leaf.init(MemRef(child_header, child_ref, m_alloc));
+        leaf.init(child_info.mem);
         return leaf.get_ndx(child_info.key, ndx);
     }
     else {
@@ -396,7 +419,7 @@ size_t ClusterNodeInner::get_ndx(ObjKey key, size_t ndx) const
             ndx += size_t(Array::get(header, s_sub_tree_size)) >> 1;
         }
         ClusterNodeInner node(m_alloc, m_tree_top);
-        node.init(MemRef(child_header, child_ref, m_alloc));
+        node.init(child_info.mem);
         node.set_offset(child_info.offset + m_offset);
         return node.get_ndx(child_info.key, ndx);
     }
@@ -1132,20 +1155,16 @@ ref_type Cluster::insert(ObjKey k, const InitValues& init_values, ClusterNode::S
     return ret;
 }
 
-void Cluster::get(ObjKey k, ClusterNode::State& state) const
+bool Cluster::try_get(ObjKey k, ClusterNode::State& state) const
 {
     state.mem = get_mem();
     if (m_keys.is_attached()) {
         state.index = m_keys.lower_bound(uint64_t(k.value));
-        if (state.index == m_keys.size() || m_keys.get(state.index) != uint64_t(k.value)) {
-            throw InvalidKey("Key not found");
-        }
+        return state.index != m_keys.size() && m_keys.get(state.index) == uint64_t(k.value);
     }
     else {
         state.index = size_t(k.value);
-        if (state.index >= get_as_ref_or_tagged(0).get_as_int()) {
-            throw InvalidKey("Key not found");
-        }
+        return state.index < get_as_ref_or_tagged(0).get_as_int();
     }
 }
 
@@ -1693,14 +1712,8 @@ Obj ClusterTree::insert(ObjKey k, const FieldValues& values)
 
 bool ClusterTree::is_valid(ObjKey k) const
 {
-    try {
-        ClusterNode::State state;
-        m_root->get(k, state);
-    }
-    catch (const InvalidKey&) {
-        return false;
-    }
-    return true;
+    ClusterNode::State state;
+    return m_root->try_get(k, state);
 }
 
 ConstObj ClusterTree::get(ObjKey k) const

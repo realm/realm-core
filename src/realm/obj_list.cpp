@@ -106,6 +106,15 @@ ConstObj ObjList::get_object(size_t row_ndx) const
     return m_table->get_object(key);
 }
 
+ConstObj ObjList::try_get_object(size_t row_ndx) const
+{
+    REALM_ASSERT(m_table);
+    REALM_ASSERT(row_ndx < m_key_values->size());
+    ObjKey key(m_key_values->get(row_ndx));
+    REALM_ASSERT(key != realm::null_key);
+    return m_table->is_valid(key) ? m_table->get_object(key) : ConstObj();
+}
+
 void ObjList::assign(KeyColumn* key_values, const Table* parent)
 {
     m_key_values = key_values;
