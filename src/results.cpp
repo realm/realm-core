@@ -794,8 +794,9 @@ Results::OutOfBoundsIndexException::OutOfBoundsIndexException(size_t r, size_t c
 
 static std::string unsupported_operation_msg(ColKey column, const Table* table, const char* operation)
 {
-    const char* column_type = string_for_property_type(ObjectSchema::from_core_type(*table, column));
-    if (table->is_group_level())
+    auto type = ObjectSchema::from_core_type(*table, column);
+    const char* column_type = string_for_property_type(type & ~PropertyType::Array);
+    if (!is_array(type))
         return util::format("Cannot %1 property '%2': operation not supported for '%3' properties",
                             operation, table->get_column_name(column), column_type);
     return util::format("Cannot %1 '%2' array: operation not supported",
@@ -806,7 +807,7 @@ Results::UnsupportedColumnTypeException::UnsupportedColumnTypeException(ColKey c
 : std::logic_error(unsupported_operation_msg(column, table, operation))
 , column_key(column)
 , column_name(table->get_column_name(column))
-, property_type(ObjectSchema::from_core_type(*table, ColKey(column)))
+, property_type(ObjectSchema::from_core_type(*table, ColKey(column)) & ~PropertyType::Array)
 {
 }
 

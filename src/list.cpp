@@ -369,14 +369,16 @@ struct If<false> {
     static auto call(T, Then&&, Else&& fn) { return fn(); }
 };
 
-template<template<class...> class Predicate, typename Fn, typename Err>
-auto List::aggregate(Fn&& fn, Err&& error) const
+template<template<class...> class Predicate, typename Ret, typename Fn>
+Ret List::aggregate(const char *type, Fn&& fn) const
 {
-    return dispatch([&](auto t) {
+    return dispatch([&](auto t) -> Ret {
         using T = std::decay_t<decltype(*t)>;
         return If<Predicate<T>::value>::call(this, [&](auto self) {
             return fn(self->template as<T>());
-        }, error);
+        }, [=] () -> Ret {
+            throw realm::Results::UnsupportedColumnTypeException(m_list_base->get_col_key(), m_list_base->get_table(), type);
+        });
     });
 }
 
@@ -384,42 +386,42 @@ util::Optional<Mixed> List::max(ColKey col)
 {
     if (get_type() == PropertyType::Object)
         return as_results().max(col);
-    return aggregate<HasMinmaxType>([](auto& list) {
+    return aggregate<HasMinmaxType, util::Optional<Mixed>>("max", [](auto& list) {
         size_t out_ndx = not_found;
         auto result = list_maximum(list, &out_ndx);
         return out_ndx == not_found ? none : make_optional(Mixed(result));
-    }, []() -> util::Optional<Mixed> { throw "type error"; });
+    });
 }
 
 util::Optional<Mixed> List::min(ColKey col)
 {
     if (get_type() == PropertyType::Object)
         return as_results().min(col);
-    return aggregate<HasMinmaxType>([](auto& list) {
+    return aggregate<HasMinmaxType, util::Optional<Mixed>>("min", [](auto& list) {
         size_t out_ndx = not_found;
         auto result = list_minimum(list, &out_ndx);
         return out_ndx == not_found ? none : make_optional(Mixed(result));
-    }, []() -> util::Optional<Mixed> { throw "type error"; });
+    });
 }
 
 Mixed List::sum(ColKey col)
 {
     if (get_type() == PropertyType::Object)
         return *as_results().sum(col);
-    return aggregate<HasSumType>([](auto& list) {
+    return aggregate<HasSumType, Mixed>("sum", [](auto& list) {
         return Mixed(list_sum(list));
-    }, []() -> Mixed { throw "type error"; });
+    });
 }
 
 util::Optional<double> List::average(ColKey col)
 {
     if (get_type() == PropertyType::Object)
         return as_results().average(col);
-    return aggregate<HasSumType>([](auto& list) {
+    return aggregate<HasSumType, util::Optional<double>>("average", [](auto& list) {
         size_t count = 0;
         auto result = list_average(list, &count);
         return count == 0 ? none : make_optional(result);
-    }, []() -> util::Optional<double> { throw "type error"; });
+    });
 }
 
 bool List::operator==(List const& rgt) const noexcept

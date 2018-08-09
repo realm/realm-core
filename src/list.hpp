@@ -166,8 +166,8 @@ private:
 
     template<typename Fn>
     auto dispatch(Fn&&) const;
-    template<template<class...> class Predicate, typename Fn, typename Err>
-    auto aggregate(Fn&&, Err&&) const;
+    template<template<class...> class Predicate, typename Ret, typename Fn>
+    Ret aggregate(const char *type, Fn&&) const;
     template<typename T>
     auto& as() const;
 
