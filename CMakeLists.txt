@@ -86,6 +86,8 @@ if(CMAKE_SYSTEM_NAME MATCHES "^Windows")
     add_definitions(-D_SCL_SECURE_NO_WARNINGS -DWIN32_LEAN_AND_MEAN)
 endif()
 
+option(REALM_DEBUG_EXTREME "Enable extreme debug runtime checks in debug builds (debug iterators, stack checks, etc.)" OFF)
+
 if(MSVC)
     add_compile_options(
         /MP # Enable multi-processor compilation
@@ -103,7 +105,7 @@ if(MSVC)
 
             # Disable runtime stack bound checks, because these slow down unit tests
             # disproportionately.
-            if(${flag_var} MATCHES "/RTC")
+            if(NOT REALM_DEBUG_EXTREME AND ${flag_var} MATCHES "/RTC")
                 string(REGEX REPLACE "/RTC(su|[1su])" "" ${flag_var} "${${flag_var}}")
             endif()
         endforeach()
