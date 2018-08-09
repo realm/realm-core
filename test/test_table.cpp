@@ -2720,6 +2720,17 @@ TEST(Table_list_basic)
         auto list = obj.get_list<int64_t>(list_col);
         CHECK_NOT(obj.is_null(list_col));
         CHECK(list.is_empty());
+
+        size_t return_cnt = 0;
+        list_sum(list, &return_cnt);
+        CHECK_EQUAL(return_cnt, 0);
+        list_maximum(list, &return_cnt);
+        CHECK_EQUAL(return_cnt, 0);
+        list_minimum(list, &return_cnt);
+        CHECK_EQUAL(return_cnt, 0);
+        list_average(list, &return_cnt);
+        CHECK_EQUAL(return_cnt, 0);
+
         for (int i = 0; i < 100; i++) {
             list.add(i + 1000);
             sum += (i + 1000);

@@ -497,7 +497,9 @@ public:
 
     void traverse(BPlusTreeNode::TraverseFunc& func) const
     {
-        m_root->bptree_traverse(func);
+        if (m_root) {
+            m_root->bptree_traverse(func);
+        }
     }
 
     size_t find_first(T value) const noexcept
