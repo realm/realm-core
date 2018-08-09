@@ -110,10 +110,10 @@ public:
     // sum() returns 0,
     // Throws UnsupportedColumnTypeException for sum/average on timestamp or non-numeric column
     // Throws OutOfBoundsIndexException for an out-of-bounds column
-    util::Optional<Mixed> max(size_t column=0);
-    util::Optional<Mixed> min(size_t column=0);
-    util::Optional<double> average(size_t column=0);
-    Mixed sum(size_t column=0);
+    util::Optional<Mixed> max(ColKey column={});
+    util::Optional<Mixed> min(ColKey column={});
+    util::Optional<double> average(ColKey column={});
+    Mixed sum(ColKey column={});
 
     bool operator==(List const& rgt) const noexcept;
 

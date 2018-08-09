@@ -380,8 +380,10 @@ auto List::aggregate(Fn&& fn, Err&& error) const
     });
 }
 
-util::Optional<Mixed> List::max(size_t)
+util::Optional<Mixed> List::max(ColKey col)
 {
+    if (get_type() == PropertyType::Object)
+        return as_results().max(col);
     return aggregate<HasMinmaxType>([](auto& list) {
         size_t out_ndx = not_found;
         auto result = list_maximum(list, &out_ndx);
@@ -389,8 +391,10 @@ util::Optional<Mixed> List::max(size_t)
     }, []() -> util::Optional<Mixed> { throw "type error"; });
 }
 
-util::Optional<Mixed> List::min(size_t)
+util::Optional<Mixed> List::min(ColKey col)
 {
+    if (get_type() == PropertyType::Object)
+        return as_results().min(col);
     return aggregate<HasMinmaxType>([](auto& list) {
         size_t out_ndx = not_found;
         auto result = list_minimum(list, &out_ndx);
@@ -398,15 +402,19 @@ util::Optional<Mixed> List::min(size_t)
     }, []() -> util::Optional<Mixed> { throw "type error"; });
 }
 
-Mixed List::sum(size_t)
+Mixed List::sum(ColKey col)
 {
+    if (get_type() == PropertyType::Object)
+        return *as_results().sum(col);
     return aggregate<HasSumType>([](auto& list) {
         return Mixed(list_sum(list));
     }, []() -> Mixed { throw "type error"; });
 }
 
-util::Optional<double> List::average(size_t)
+util::Optional<double> List::average(ColKey col)
 {
+    if (get_type() == PropertyType::Object)
+        return as_results().average(col);
     return aggregate<HasSumType>([](auto& list) {
         size_t count = 0;
         auto result = list_average(list, &count);
