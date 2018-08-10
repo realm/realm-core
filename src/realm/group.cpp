@@ -68,7 +68,8 @@ Group::Group()
     m_file_format_version = get_target_file_format_version_for_session(0, Replication::hist_None);
     ref_type top_ref = 0; // Instantiate a new empty group
     bool create_group_when_missing = true;
-    attach(top_ref, create_group_when_missing); // Throws
+    bool writable = create_group_when_missing;
+    attach(top_ref, writable, create_group_when_missing); // Throws
 }
 
 
@@ -408,7 +409,8 @@ void Group::open(ref_type top_ref, const std::string& file_path)
     reset_free_space_tracking(); // Throws
 
     bool create_group_when_missing = true;
-    attach(top_ref, create_group_when_missing); // Throws
+    bool writable = create_group_when_missing;
+    attach(top_ref, writable, create_group_when_missing); // Throws
     dg.release();                               // Do not detach after all
 }
 
@@ -487,16 +489,18 @@ void Group::remap_and_update_refs(ref_type new_top_ref, size_t new_file_size, bo
 }
 
 
-void Group::attach(ref_type top_ref, bool create_group_when_missing)
+void Group::attach(ref_type top_ref, bool writable, bool create_group_when_missing)
 {
     REALM_ASSERT(!m_top.is_attached());
+    if (create_group_when_missing)
+    	REALM_ASSERT(writable);
 
     // If this function throws, it must leave the group accesor in a the
     // unattached state.
 
     m_tables.detach();
     m_table_names.detach();
-    m_is_writable = create_group_when_missing;
+    m_is_writable = writable;
 
     if (top_ref != 0) {
         m_top.init_from_ref(top_ref);
@@ -588,7 +592,7 @@ void Group::attach_shared(ref_type new_top_ref, size_t new_file_size, bool writa
     // nodes to attached them to. In the case of write transactions, the nodes
     // have to be created, as they have to be ready for being modified.
     bool create_group_when_missing = writable;
-    attach(new_top_ref, create_group_when_missing); // Throws
+    attach(new_top_ref, writable, create_group_when_missing); // Throws
 }
 
 
@@ -1514,7 +1518,7 @@ void Group::advance_transact(ref_type new_top_ref, size_t new_file_size, _impl::
 
     m_top.detach();                                 // Soft detach
     bool create_group_when_missing = false;         // See Group::attach_shared().
-    attach(new_top_ref, create_group_when_missing); // Throws
+    attach(new_top_ref, writable, create_group_when_missing); // Throws
     refresh_dirty_accessors();                      // Throws
 
     if (schema_changed)

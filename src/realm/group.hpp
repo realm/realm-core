@@ -627,9 +627,8 @@ private:
     /// If `top_ref` is not zero, attach this group accessor to the specified
     /// underlying node structure. If `top_ref` is zero and \a
     /// create_group_when_missing is true, create a new node structure that
-    /// represents an empty group, and attach this group accessor to it. It is
-    /// an error to call this function on an already attached group accessor.
-    void attach(ref_type top_ref, bool create_group_when_missing);
+    /// represents an empty group, and attach this group accessor to it.
+    void attach(ref_type top_ref, bool writable, bool create_group_when_missing);
 
     /// Detach this group accessor from the underlying node structure. If this
     /// group accessors is already in the detached state, this function does
