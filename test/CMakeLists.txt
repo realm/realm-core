@@ -27,7 +27,6 @@ set(NORMAL_TESTS
     test_column_string.cpp
     test_column_timestamp.cpp
     test_destroy_guard.cpp
-    test_destructor_thread_safety.cpp
     test_file.cpp
     test_file_locks.cpp
     test_group.cpp

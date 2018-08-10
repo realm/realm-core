@@ -180,44 +180,48 @@ bool allow_async = true;
 
 namespace {
 
-void test_table_add_columns(TableRef t)
+std::vector<ColKey> test_table_add_columns(TableRef t)
 {
-    t->add_column(type_Int, "first");
-    t->add_column(type_Int, "second");
-    t->add_column(type_Bool, "third");
-    t->add_column(type_String, "fourth");
-    t->add_column(type_Timestamp, "fifth");
+	std::vector<ColKey> res;
+    res.push_back(t->add_column(type_Int, "first"));
+    res.push_back(t->add_column(type_Int, "second"));
+    res.push_back(t->add_column(type_Bool, "third"));
+    res.push_back(t->add_column(type_String, "fourth"));
+    res.push_back(t->add_column(type_Timestamp, "fifth"));
+    return res;
 }
 }
 
-#ifdef LEGACY_TESTS
-void writer(DBRef sg, int id)
+void writer(DBRef sg, uint64_t id)
 {
     // std::cerr << "Started writer " << std::endl;
     try {
+    	auto tr = sg->start_read();
         bool done = false;
         // std::cerr << "Opened sg " << std::endl;
         for (int i = 0; !done; ++i) {
             // std::cerr << "       - " << getpid() << std::endl;
-            WriteTransaction wt(sg);
-            auto t1 = wt.get_table("test");
-            auto cols = t1->get_column_keys();
+            tr->promote_to_write();
+            auto t1 = tr->get_table("test");
+            ColKeys _cols = t1->get_column_keys();
+            std::vector<ColKey> cols;
+            for (auto e : _cols) cols.push_back(e);
             Obj obj = t1->get_object(ObjKey(id));
             done = obj.get<Bool>(cols[2]);
             if (i & 1) {
                 obj.add_int(cols[0], 1);
             }
             std::this_thread::yield(); // increase chance of signal arriving in the middle of a transaction
-            wt.commit();
+            tr->commit_and_continue_as_read();
         }
         // std::cerr << "Ended pid " << getpid() << std::endl;
+        tr->end_read();
     }
     catch (...) {
         // std::cerr << "Exception from " << getpid() << std::endl;
         REALM_ASSERT(false);
     }
 }
-#endif
 
 #if !defined(_WIN32) && !REALM_ENABLE_ENCRYPTION
 void killer(TestContext& test_context, int pid, std::string path, int id)
@@ -420,20 +424,22 @@ ONLY(Shared_DiskSpace)
 
 #endif // Only disables above special unit test
 
-#ifdef LEGACY_TESTS
+
 TEST(Shared_CompactingOnTheFly)
 {
     SHARED_GROUP_TEST_PATH(path);
     Thread writer_thread;
     {
-        DBRef sg = DB::create(path, false, DBOptions(crypt_key()));
+        std::unique_ptr<Replication> hist(make_in_realm_history(path));
+        DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
         // Create table entries
-        realm::ColKeys cols;
+        std::vector<ColKey> cols; // unsafe to hold colkeys across transaction! FIXME: should be reported
         {
             WriteTransaction wt(sg);
             auto t1 = wt.add_table("test");
             test_table_add_columns(t1);
-            cols = t1->get_column_keys();
+            ColKeys _cols = t1->get_column_keys();
+            for (auto e : _cols) cols.push_back(e);
             for (int i = 0; i < 100; ++i) {
                 t1->create_object(ObjKey(i)).set_all(0, i, false, "test");
             }
@@ -467,7 +473,8 @@ TEST(Shared_CompactingOnTheFly)
         writer_thread.join();
     }
     {
-        DBRef sg2 = DB::create(path, true, DBOptions(crypt_key()));
+        std::unique_ptr<Replication> hist(make_in_realm_history(path));
+        DBRef sg2 = DB::create(*hist, DBOptions(crypt_key()));
         {
             WriteTransaction wt(sg2);
             wt.commit();
@@ -481,7 +488,8 @@ TEST(Shared_CompactingOnTheFly)
         rt2.get_group().verify();
     }
     {
-        DBRef sg2 = DB::create(path, true, DBOptions(crypt_key()));
+        std::unique_ptr<Replication> hist(make_in_realm_history(path));
+        DBRef sg2 = DB::create(*hist, DBOptions(crypt_key()));
         ReadTransaction rt2(sg2);
         auto table = rt2.get_table("test");
         CHECK(table);
@@ -489,7 +497,7 @@ TEST(Shared_CompactingOnTheFly)
         rt2.get_group().verify();
     }
 }
-#endif
+
 
 TEST(Shared_EncryptedRemap)
 {
@@ -689,7 +697,6 @@ TEST(Shared_Initial2_Mem)
     }
 }
 
-#ifdef LEGACY_TESTS
 TEST(Shared_1)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -697,32 +704,30 @@ TEST(Shared_1)
         // Create a new shared db
         DBRef sg = DB::create(path, false, DBOptions(crypt_key()));
         Timestamp first_timestamp_value{1, 1};
+        std::vector<ColKey> cols;
 
         // Create first table in group
         {
             WriteTransaction wt(sg);
             wt.get_group().verify();
             auto t1 = wt.add_table("test");
-            test_table_add_columns(t1);
+            cols = test_table_add_columns(t1);
             t1->create_object(ObjKey(7)).set_all(1, 2, false, "test", Timestamp{1, 1});
             wt.commit();
         }
-
-        // Open same db again
-        DB sg2(path, false, DBOptions(crypt_key()));
         {
-            ReadTransaction rt(sg2);
+            ReadTransaction rt(sg);
             rt.get_group().verify();
 
             // Verify that last set of changes are commited
             auto t2 = rt.get_table("test");
             CHECK(t2->size() == 1);
             ConstObj obj = t2->get_object(ObjKey(7));
-            CHECK_EQUAL(1, obj.get<Int>(0));
-            CHECK_EQUAL(2, obj.get<Int>(1));
-            CHECK_EQUAL(false, obj.get<Bool>(2));
-            CHECK_EQUAL("test", obj.get<String>(3));
-            CHECK_EQUAL(first_timestamp_value, obj.get<Timestamp>(4));
+            CHECK_EQUAL(1, obj.get<Int>(cols[0]));
+            CHECK_EQUAL(2, obj.get<Int>(cols[1]));
+            CHECK_EQUAL(false, obj.get<Bool>(cols[2]));
+            CHECK_EQUAL("test", obj.get<String>(cols[3]));
+            CHECK_EQUAL(first_timestamp_value, obj.get<Timestamp>(cols[4]));
 
             // Do a new change while still having current read transaction open
             {
@@ -736,11 +741,11 @@ TEST(Shared_1)
             // Verify that that the read transaction does not see
             // the change yet (is isolated)
             CHECK(t2->size() == 1);
-            CHECK_EQUAL(1, obj.get<Int>(0));
-            CHECK_EQUAL(2, obj.get<Int>(1));
-            CHECK_EQUAL(false, obj.get<Bool>(2));
-            CHECK_EQUAL("test", obj.get<String>(3));
-            CHECK_EQUAL(first_timestamp_value, obj.get<Timestamp>(4));
+            CHECK_EQUAL(1, obj.get<Int>(cols[0]));
+            CHECK_EQUAL(2, obj.get<Int>(cols[1]));
+            CHECK_EQUAL(false, obj.get<Bool>(cols[2]));
+            CHECK_EQUAL("test", obj.get<String>(cols[3]));
+            CHECK_EQUAL(first_timestamp_value, obj.get<Timestamp>(cols[4]));
             // Do one more new change while still having current read transaction open
             // so we know that it does not overwrite data held by
             {
@@ -754,48 +759,48 @@ TEST(Shared_1)
             // Verify that that the read transaction does still not see
             // the change yet (is isolated)
             CHECK(t2->size() == 1);
-            CHECK_EQUAL(1, obj.get<Int>(0));
-            CHECK_EQUAL(2, obj.get<Int>(1));
-            CHECK_EQUAL(false, obj.get<Bool>(2));
-            CHECK_EQUAL("test", obj.get<String>(3));
-            CHECK_EQUAL(first_timestamp_value, obj.get<Timestamp>(4));
+            CHECK_EQUAL(1, obj.get<Int>(cols[0]));
+            CHECK_EQUAL(2, obj.get<Int>(cols[1]));
+            CHECK_EQUAL(false, obj.get<Bool>(cols[2]));
+            CHECK_EQUAL("test", obj.get<String>(cols[3]));
+            CHECK_EQUAL(first_timestamp_value, obj.get<Timestamp>(cols[4]));
         }
 
         // Start a new read transaction and verify that it can now see the changes
         {
-            ReadTransaction rt(sg2);
+            ReadTransaction rt(sg);
             rt.get_group().verify();
             auto t3 = rt.get_table("test");
 
             CHECK(t3->size() == 3);
             ConstObj obj7 = t3->get_object(ObjKey(7));
-            CHECK_EQUAL(1, obj7.get<Int>(0));
-            CHECK_EQUAL(2, obj7.get<Int>(1));
-            CHECK_EQUAL(false, obj7.get<Bool>(2));
-            CHECK_EQUAL("test", obj7.get<String>(3));
-            CHECK_EQUAL(first_timestamp_value, obj7.get<Timestamp>(4));
+            CHECK_EQUAL(1, obj7.get<Int>(cols[0]));
+            CHECK_EQUAL(2, obj7.get<Int>(cols[1]));
+            CHECK_EQUAL(false, obj7.get<Bool>(cols[2]));
+            CHECK_EQUAL("test", obj7.get<String>(cols[3]));
+            CHECK_EQUAL(first_timestamp_value, obj7.get<Timestamp>(cols[4]));
 
             ConstObj obj8 = t3->get_object(ObjKey(8));
-            CHECK_EQUAL(2, obj8.get<Int>(0));
-            CHECK_EQUAL(3, obj8.get<Int>(1));
-            CHECK_EQUAL(true, obj8.get<Bool>(2));
-            CHECK_EQUAL("more test", obj8.get<String>(3));
+            CHECK_EQUAL(2, obj8.get<Int>(cols[0]));
+            CHECK_EQUAL(3, obj8.get<Int>(cols[1]));
+            CHECK_EQUAL(true, obj8.get<Bool>(cols[2]));
+            CHECK_EQUAL("more test", obj8.get<String>(cols[3]));
             Timestamp second_timestamp_value{2, 2};
-            CHECK_EQUAL(second_timestamp_value, obj8.get<Timestamp>(4));
+            CHECK_EQUAL(second_timestamp_value, obj8.get<Timestamp>(cols[4]));
 
             ConstObj obj9 = t3->get_object(ObjKey(9));
-            CHECK_EQUAL(0, obj9.get<Int>(0));
-            CHECK_EQUAL(1, obj9.get<Int>(1));
-            CHECK_EQUAL(false, obj9.get<Bool>(2));
-            CHECK_EQUAL("even more test", obj9.get<String>(3));
+            CHECK_EQUAL(0, obj9.get<Int>(cols[0]));
+            CHECK_EQUAL(1, obj9.get<Int>(cols[1]));
+            CHECK_EQUAL(false, obj9.get<Bool>(cols[2]));
+            CHECK_EQUAL("even more test", obj9.get<String>(cols[3]));
             Timestamp third_timestamp_value{3, 3};
-            CHECK_EQUAL(third_timestamp_value, obj9.get<Timestamp>(4));
+            CHECK_EQUAL(third_timestamp_value, obj9.get<Timestamp>(cols[4]));
         }
     }
 }
-#endif
 
 #ifdef LEGACY_TESTS
+// FIXME: try_begin_write currently unimplemented
 TEST(Shared_try_begin_write)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -884,20 +889,20 @@ TEST(Shared_try_begin_write)
 }
 #endif
 
-#ifdef LEGACY_TESTS
 TEST(Shared_Rollback)
 {
     SHARED_GROUP_TEST_PATH(path);
     {
         // Create a new shared db
         DBRef sg = DB::create(path, false, DBOptions(crypt_key()));
+        std::vector<ColKey> cols;
 
         // Create first table in group (but rollback)
         {
             WriteTransaction wt(sg);
             wt.get_group().verify();
             auto t1 = wt.add_table("test");
-            test_table_add_columns(t1);
+            cols = test_table_add_columns(t1);
             t1->create_object().set_all(1, 2, false, "test");
             // Note: Implicit rollback
         }
@@ -914,7 +919,7 @@ TEST(Shared_Rollback)
             WriteTransaction wt(sg);
             wt.get_group().verify();
             auto t1 = wt.add_table("test");
-            test_table_add_columns(t1);
+            cols = test_table_add_columns(t1);
             t1->create_object(ObjKey(7)).set_all(1, 2, false, "test");
             wt.commit();
         }
@@ -926,10 +931,10 @@ TEST(Shared_Rollback)
             auto t = rt.get_table("test");
             CHECK(t->size() == 1);
             ConstObj obj = t->get_object(ObjKey(7));
-            CHECK_EQUAL(1, obj.get<Int>(0));
-            CHECK_EQUAL(2, obj.get<Int>(1));
-            CHECK_EQUAL(false, obj.get<Bool>(2));
-            CHECK_EQUAL("test", obj.get<String>(3));
+            CHECK_EQUAL(1, obj.get<Int>(cols[0]));
+            CHECK_EQUAL(2, obj.get<Int>(cols[1]));
+            CHECK_EQUAL(false, obj.get<Bool>(cols[2]));
+            CHECK_EQUAL("test", obj.get<String>(cols[3]));
         }
 
         // Greate more changes (but rollback)
@@ -948,29 +953,28 @@ TEST(Shared_Rollback)
             auto t = rt.get_table("test");
             CHECK(t->size() == 1);
             ConstObj obj = t->get_object(ObjKey(7));
-            CHECK_EQUAL(1, obj.get<Int>(0));
-            CHECK_EQUAL(2, obj.get<Int>(1));
-            CHECK_EQUAL(false, obj.get<Bool>(2));
-            CHECK_EQUAL("test", obj.get<String>(3));
+            CHECK_EQUAL(1, obj.get<Int>(cols[0]));
+            CHECK_EQUAL(2, obj.get<Int>(cols[1]));
+            CHECK_EQUAL(false, obj.get<Bool>(cols[2]));
+            CHECK_EQUAL("test", obj.get<String>(cols[3]));
         }
     }
 }
-#endif
 
-#ifdef LEGACY_TESTS
 TEST(Shared_Writes)
 {
     SHARED_GROUP_TEST_PATH(path);
     {
         // Create a new shared db
         DBRef sg = DB::create(path, false, DBOptions(crypt_key()));
+        std::vector<ColKey> cols;
 
         // Create first table in group
         {
             WriteTransaction wt(sg);
             wt.get_group().verify();
             auto t1 = wt.add_table("test");
-            test_table_add_columns(t1);
+            cols = test_table_add_columns(t1);
             t1->create_object(ObjKey(7)).set_all(0, 2, false, "test");
             wt.commit();
         }
@@ -980,7 +984,7 @@ TEST(Shared_Writes)
             WriteTransaction wt(sg);
             wt.get_group().verify();
             auto t1 = wt.get_table("test");
-            t1->get_object(ObjKey(7)).add_int(0, 1);
+            t1->get_object(ObjKey(7)).add_int(cols[0], 1);
             wt.commit();
         }
 
@@ -989,12 +993,11 @@ TEST(Shared_Writes)
             ReadTransaction rt(sg);
             rt.get_group().verify();
             auto t = rt.get_table("test");
-            const int64_t v = t->get_object(ObjKey(7)).get<Int>(0);
+            const int64_t v = t->get_object(ObjKey(7)).get<Int>(cols[0]);
             CHECK_EQUAL(100, v);
         }
     }
 }
-#endif
 
 #ifdef LEGACY_TESTS
 namespace {
@@ -1654,29 +1657,28 @@ TEST(Shared_FromSerialized)
     }
 }
 
-#ifdef LEGACY_TESTS
 TEST_IF(Shared_StringIndexBug1, TEST_DURATION >= 1)
 {
     SHARED_GROUP_TEST_PATH(path);
-    DB db(path, false, DBOptions(crypt_key()));
+    DBRef db = DB::create(path, false, DBOptions(crypt_key()));
 
     {
-        Group& group = db.begin_write();
-        TableRef table = group.add_table("users");
-        table->add_column(type_String, "username");
-        table->add_search_index(0);
+        auto tr = db->start_write();
+        TableRef table = tr->add_table("users");
+        auto col = table->add_column(type_String, "username");
+        table->add_search_index(col);
         for (int i = 0; i < REALM_MAX_BPNODE_SIZE + 1; ++i)
-            table->add_empty_row();
+            table->create_object();
         for (int i = 0; i < REALM_MAX_BPNODE_SIZE + 1; ++i)
-            table->remove(0);
-        db.commit();
+            table->remove_object(table->begin());
+        tr->commit();
     }
 
     {
-        Group& group = db.begin_write();
-        TableRef table = group.get_table("users");
-        table->add_empty_row();
-        db.commit();
+        auto tr = db->start_write();
+        TableRef table = tr->get_table("users");
+        table->create_object();
+        tr->commit();
     }
 }
 
@@ -1690,9 +1692,9 @@ TEST(Shared_StringIndexBug2)
         WriteTransaction wt(sg);
         wt.get_group().verify();
         TableRef table = wt.add_table("a");
-        table->add_column(type_String, "b");
-        table->add_search_index(0); // Not adding index makes it work
-        table->add_empty_row();
+        auto col = table->add_column(type_String, "b");
+        table->add_search_index(col); // Not adding index makes it work
+        table->create_object();
         wt.commit();
     }
 
@@ -1716,19 +1718,19 @@ void rand_str(Random& random, char* res, size_t len)
 TEST(Shared_StringIndexBug3)
 {
     SHARED_GROUP_TEST_PATH(path);
-    DB db(path, false, DBOptions(crypt_key()));
-
+    DBRef db = DB::create(path, false, DBOptions(crypt_key()));
+    ColKey col;
     {
-        Group& group = db.begin_write();
-        TableRef table = group.add_table("users");
-        table->add_column(type_String, "username");
-        table->add_search_index(0); // Disabling index makes it work
-        db.commit();
+        auto tr = db->start_write();
+        TableRef table = tr->add_table("users");
+        col = table->add_column(type_String, "username");
+        table->add_search_index(col); // Disabling index makes it work
+        tr->commit();
     }
 
     Random random(random_int<unsigned long>()); // Seed from slow global generator
     size_t transactions = 0;
-
+    std::vector<ObjKey> keys;
     for (size_t n = 0; n < 100; ++n) {
         const uint64_t action = random.draw_int_mod(1000);
 
@@ -1736,32 +1738,32 @@ TEST(Shared_StringIndexBug3)
 
         if (action <= 500) {
             // delete random user
-            Group& group = db.begin_write();
-            TableRef table = group.get_table("users");
+            auto tr = db->start_write();
+            TableRef table = tr->get_table("users");
             if (table->size() > 0) {
                 size_t del = random.draw_int_mod(table->size());
                 // cerr << "-" << del << ": " << table->get_string(0, del) << std::endl;
-                table->remove(del);
+                table->remove_object(keys[del]);
+                keys.erase(keys.begin() + del);
                 table->verify();
             }
-            db.commit();
+            tr->commit();
         }
         else {
             // add new user
-            Group& group = db.begin_write();
-            TableRef table = group.get_table("users");
-            table->add_empty_row();
+            auto tr = db->start_write();
+            TableRef table = tr->get_table("users");
             char txt[100];
             rand_str(random, txt, 8);
             txt[8] = 0;
             // cerr << "+" << txt << std::endl;
-            table->set_string(0, table->size() - 1, txt);
+            auto key = table->create_object().set_all(txt).get_key();
+            keys.push_back(key);
             table->verify();
-            db.commit();
+            tr->commit();
         }
     }
 }
-#endif
 
 TEST(Shared_ClearColumnWithBasicArrayRootLeaf)
 {
@@ -2492,10 +2494,10 @@ TEST(Shared_EncryptionKeyCheck_2)
 }
 
 // if opened by one key, it cannot be opened by a different key
-#ifdef LEGACY_TESTS
 // disabled for now... needs to add a check in the encryption layer
 // based on a hash of the key.
-TEST(Shared_EncryptionKeyCheck_3)
+#ifdef LEGACY_TESTS
+ONLY(Shared_EncryptionKeyCheck_3)
 {
     SHARED_GROUP_TEST_PATH(path);
     const char* first_key = crypt_key(true);
@@ -2505,12 +2507,12 @@ TEST(Shared_EncryptionKeyCheck_3)
     DBRef sg = DB::create(path, false, DBOptions(first_key));
     bool ok = false;
     try {
-        DB sg_2(path, false, DBOptions(second_key));
+        DBRef sg_2 = DB::create(path, false, DBOptions(second_key));
     } catch (std::runtime_error&) {
         ok = true;
     }
     CHECK(ok);
-    DB sg3(path, false, DBOptions(first_key));
+    DBRef sg3 = DB::create(path, false, DBOptions(first_key));
 }
 #endif
 
@@ -2858,66 +2860,6 @@ TEST(Shared_MovingSearchIndex)
 
         wt.commit();
     }
-#ifdef LEGACY_TESTS
-    // Insert a column after the string columns and remove the indexes
-    {
-        WriteTransaction wt(sg);
-        TableRef table = wt.get_table("foo");
-        CHECK_EQUAL(0, table->get_num_unique_values(0));
-        CHECK_EQUAL(4, table->get_num_unique_values(1));
-        CHECK_EQUAL(62, table->find_first_string(0, "foo62"));
-        CHECK_EQUAL(63, table->find_first_string(1, "bar63"));
-
-        table->insert_column(2, type_Int, "i");
-        for (size_t i = 0; i < table->size(); ++i)
-            table->set_int(2, i, i);
-        wt.get_group().verify();
-        table->remove_search_index(0);
-        wt.get_group().verify();
-        table->remove_search_index(1);
-        wt.get_group().verify();
-
-        CHECK_EQUAL(0, table->get_num_unique_values(0));
-        CHECK_EQUAL(4, table->get_num_unique_values(1));
-        CHECK_EQUAL(0, table->get_num_unique_values(2));
-        CHECK_EQUAL(62, table->find_first_string(0, "foo62"));
-        CHECK_EQUAL(63, table->find_first_string(1, "bar63"));
-        CHECK_EQUAL(60, table->find_first_int(2, 60));
-        wt.commit();
-    }
-    // add and remove the indexes in reverse order
-    {
-        WriteTransaction wt(sg);
-        TableRef table = wt.get_table("foo");
-
-        wt.get_group().verify();
-        table->add_search_index(1);
-        wt.get_group().verify();
-        table->add_search_index(0);
-        wt.get_group().verify();
-
-        CHECK_EQUAL(0, table->get_num_unique_values(0));
-        CHECK_EQUAL(4, table->get_num_unique_values(1));
-        CHECK_EQUAL(0, table->get_num_unique_values(2));
-        CHECK_EQUAL(62, table->find_first_string(0, "foo62"));
-        CHECK_EQUAL(63, table->find_first_string(1, "bar63"));
-        CHECK_EQUAL(60, table->find_first_int(2, 60));
-
-        wt.get_group().verify();
-        table->remove_search_index(1);
-        wt.get_group().verify();
-        table->remove_search_index(0);
-        wt.get_group().verify();
-
-        CHECK_EQUAL(0, table->get_num_unique_values(0));
-        CHECK_EQUAL(4, table->get_num_unique_values(1));
-        CHECK_EQUAL(0, table->get_num_unique_values(2));
-        CHECK_EQUAL(62, table->find_first_string(0, "foo62"));
-        CHECK_EQUAL(63, table->find_first_string(1, "bar63"));
-        CHECK_EQUAL(60, table->find_first_int(2, 60));
-        wt.commit();
-    }
-#endif
 }
 
 TEST_IF(Shared_BeginReadFailure, _impl::SimulatedFailure::is_enabled())
@@ -3083,7 +3025,7 @@ NONCONCURRENT_TEST(Shared_OutOfMemory)
 // If this check fails for some reason, you can find the problem by changing
 // the parse_and_apply_instructions call to use std::cerr which will print out
 // the instructions used to duplicate the failure.
-TEST(Shared_StaticFuzzTestRunSanityCheck)
+NONCONCURRENT_TEST(Shared_StaticFuzzTestRunSanityCheck)
 {
     // Either provide a crash file generated by AFL to reproduce a crash, or leave it blank in order to run
     // a very simple fuzz test that just uses a random generator for generating Realm actions.

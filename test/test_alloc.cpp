@@ -330,38 +330,6 @@ public:
 
 } // end anonymous namespace
 
-#ifdef LEGACY_TESTS
-// FIXME: Replace by something reflecting the new slab allocator
-TEST(Alloc_MaxSectionBoundaryOverflow)
-{
-    TestSlabAlloc alloc;
-
-    size_t first_bound_lower = alloc.test_get_lower_section_boundary(0);
-    size_t first_bound_upper = alloc.test_get_upper_section_boundary(0);
-    CHECK_EQUAL(first_bound_lower, 0);
-    CHECK_EQUAL(alloc.test_get_lower_section_boundary(1), first_bound_lower);
-    CHECK_LESS(first_bound_lower, first_bound_upper);
-
-    size_t max = std::numeric_limits<size_t>::max();
-
-    size_t last_1_bound_lower = alloc.test_get_lower_section_boundary(max - 1);
-    size_t last_1_bound_upper = alloc.test_get_upper_section_boundary(max - 1);
-    CHECK_LESS(last_1_bound_lower, last_1_bound_upper);
-
-    size_t last_bound_lower = alloc.test_get_lower_section_boundary(max);
-    size_t last_bound_upper = alloc.test_get_upper_section_boundary(max);
-    CHECK_LESS(last_bound_lower, last_bound_upper);
-
-    size_t max_index = alloc.test_get_section_index(max);
-    for (size_t i = 0; i <= max_index; ++i) {
-        size_t lowest_ref_in_section = alloc.test_get_section_base(i);
-        size_t lower_boundary = alloc.test_get_lower_section_boundary(lowest_ref_in_section);
-        size_t upper_boundary = alloc.test_get_upper_section_boundary(lowest_ref_in_section);
-        CHECK_EQUAL(lowest_ref_in_section, lower_boundary);
-        CHECK_LESS(lower_boundary, upper_boundary);
-    }
-}
-#endif
 
 // This test reproduces the sporadic issue that was seen for large refs (addresses)
 // on 32-bit iPhone 5 Simulator runs on certain host machines.

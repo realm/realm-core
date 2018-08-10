@@ -1201,23 +1201,6 @@ TEST(Group_Persist)
     }
 }
 
-#ifdef LEGACY_TESTS
-TEST(Group_ToString)
-{
-    Group g;
-    TableRef table = g.add_table("test");
-    test_table_add_columns(table);
-
-    add(table, "jeff", 1, true, int(Wed));
-    add(table, "jim", 1, true, int(Wed));
-    std::ostringstream out;
-    g.to_string(out);
-    std::string str = out.str();
-    CHECK(str.length() > 0);
-    CHECK_EQUAL("     tables     rows  \n   0 test       2     \n", str.c_str());
-}
-#endif // LEGACY_TESTS
-
 TEST(Group_IndexString)
 {
     Group to_mem;
@@ -1860,29 +1843,6 @@ TEST(Group_SharedMappingsForReadOnlyStreamingForm)
     }
 }
 
-
-#ifdef LEGACY_TESTS
-// This test embodies a current limitation of our merge algorithm. If this
-// limitation is lifted, the code for the SET_UNIQUE instruction in
-// fuzz_group.cpp should be strengthened to reflect this.
-// (i.e. remove the try / catch for LogicError of kind illegal_combination)
-TEST(Group_SetNullUniqueLimitation)
-{
-    Group g;
-    TableRef t = g.add_table("t0");
-    t->add_column(type_Int, "", true);
-    t->add_search_index(0);
-    t->add_column_link(type_LinkList, "", *t);
-    t->add_empty_row();
-    t->get_linklist(1, 0)->add(0);
-    try {
-        t->set_null_unique(0, 0);
-    }
-    catch (const LogicError& le) {
-        CHECK(le.kind() == LogicError::illegal_combination);
-    }
-}
-#endif // LEGACY_TESTS
 
 // This test ensures that cascading delete works by testing that
 // a linked row is deleted when the parent row is deleted, but only

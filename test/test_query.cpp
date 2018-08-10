@@ -3760,14 +3760,13 @@ TEST(Query_DistinctAndSort)
     }
 }
 
-#ifdef LEGACY_TESTS
 TEST(Query_SortDistinctOrderThroughHandover) {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    DB sg_w(*hist_w, SharedGroupOptions(crypt_key()));
-    Group& g = sg_w.begin_write();
+    DBRef sg_w = DB::create(*hist_w, DBOptions(crypt_key()));
+    auto g = sg_w->start_write();
 
-    TableRef t1 = g.add_table("t1");
+    TableRef t1 = g->add_table("t1");
     auto t1_int_col = t1->add_column(type_Int, "t1_int");
     auto t1_str_col = t1->add_column(type_String, "t1_str");
 
@@ -3777,17 +3776,10 @@ TEST(Query_SortDistinctOrderThroughHandover) {
     t1->create_object().set_all(300, "A");
     ObjKey k4 = t1->create_object().set_all(400, "A").get_key();
 
-    LangBindHelper::commit_and_continue_as_read(sg_w);
-    DB::VersionID version_id = sg_w.get_version_of_current_transaction();
-    using HandoverPtr = std::unique_ptr<DB::Handover<TableView>>;
+    g->commit_and_continue_as_read();
     using ResultList = std::vector<std::pair<std::string, ObjKey>>;
 
-    auto check_across_handover = [&](ResultList results, HandoverPtr handover) {
-        std::unique_ptr<Replication> hist(make_in_realm_history(path));
-        DB sg(*hist, SharedGroupOptions(crypt_key()));
-        sg.begin_read();
-        LangBindHelper::advance_read(sg, version_id);
-        auto tv = sg.import_from_handover(std::move(handover));
+    auto check_across_handover = [&](ResultList results, std::unique_ptr<TableView> tv) {
         tv->sync_if_needed();
         CHECK(tv->is_in_sync());
         CHECK_EQUAL(tv->size(), results.size());
@@ -3795,7 +3787,6 @@ TEST(Query_SortDistinctOrderThroughHandover) {
             CHECK_EQUAL(tv->get(i).get<String>(t1_str_col), results[i].first);
             CHECK_EQUAL(tv->get_key(i), results[i].second);
         }
-        sg.end_read();
     };
 
     //     T1
@@ -3818,8 +3809,9 @@ TEST(Query_SortDistinctOrderThroughHandover) {
             CHECK_EQUAL(tv.get(i).get<String>(t1_str_col), results[i].first);
             CHECK_EQUAL(tv.get_key(i), results[i].second);
         }
-        HandoverPtr hp = sg_w.export_for_handover(tv, ConstSourcePayload::Stay);
-        check_across_handover(results, std::move(hp));
+        auto tr = g->duplicate();
+        auto tv2 = tr->import_copy_of(tv, PayloadPolicy::Stay);
+        check_across_handover(results, std::move(tv2));
     }
     {   // distinct then sort descending
         TableView tv = t1->where().find_all();
@@ -3831,8 +3823,9 @@ TEST(Query_SortDistinctOrderThroughHandover) {
             CHECK_EQUAL(tv.get(i).get<String>(t1_str_col), results[i].first);
             CHECK_EQUAL(tv.get_key(i), results[i].second);
         }
-        HandoverPtr hp = sg_w.export_for_handover(tv, ConstSourcePayload::Stay);
-        check_across_handover(results, std::move(hp));
+        auto tr = g->duplicate();
+        auto tv2 = tr->import_copy_of(tv, PayloadPolicy::Stay);
+        check_across_handover(results, std::move(tv2));
     }
     {   // sort descending then multicolumn distinct
         TableView tv = t1->where().find_all();
@@ -3844,8 +3837,9 @@ TEST(Query_SortDistinctOrderThroughHandover) {
             CHECK_EQUAL(tv.get(i).get<String>(t1_str_col), results[i].first);
             CHECK_EQUAL(tv.get_key(i), results[i].second);
         }
-        HandoverPtr hp = sg_w.export_for_handover(tv, ConstSourcePayload::Stay);
-        check_across_handover(results, std::move(hp));
+        auto tr = g->duplicate();
+        auto tv2 = tr->import_copy_of(tv, PayloadPolicy::Stay);
+        check_across_handover(results, std::move(tv2));
     }
     {   // multicolumn distinct then sort descending
         TableView tv = t1->where().find_all();
@@ -3857,19 +3851,19 @@ TEST(Query_SortDistinctOrderThroughHandover) {
             CHECK_EQUAL(tv.get(i).get<String>(t1_str_col), results[i].first);
             CHECK_EQUAL(tv.get_key(i), results[i].second);
         }
-        HandoverPtr hp = sg_w.export_for_handover(tv, ConstSourcePayload::Stay);
-        check_across_handover(results, std::move(hp));
+        auto tr = g->duplicate();
+        auto tv2 = tr->import_copy_of(tv, PayloadPolicy::Stay);
+        check_across_handover(results, std::move(tv2));
     }
 }
-
 
 TEST(Query_CompoundDescriptors) {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    DB sg_w(*hist_w, SharedGroupOptions(crypt_key()));
-    Group& g = sg_w.begin_write();
+    DBRef sg_w = DB::create(*hist_w, DBOptions(crypt_key()));
+    auto g = sg_w->start_write();
 
-    TableRef t1 = g.add_table("t1");
+    TableRef t1 = g->add_table("t1");
     ColKey t1_int_col = t1->add_column(type_Int, "t1_int");
     ColKey t1_str_col = t1->add_column(type_String, "t1_str");
 
@@ -3880,17 +3874,10 @@ TEST(Query_CompoundDescriptors) {
     ObjKey k4 = t1->create_object().set_all(2, "A").get_key();
     ObjKey k5 = t1->create_object().set_all(2, "A").get_key();
 
-    LangBindHelper::commit_and_continue_as_read(sg_w);
-    DB::VersionID version_id = sg_w.get_version_of_current_transaction();
-    using HandoverPtr = std::unique_ptr<DB::Handover<TableView>>;
-    using ResultList = std::vector<std::pair<size_t, ObjKey>>; // value, index
+    g->commit_and_continue_as_read();
+    using ResultList = std::vector<std::pair<size_t, ObjKey>>;
 
-    auto check_across_handover = [&](ResultList results, HandoverPtr handover) {
-        std::unique_ptr<Replication> hist(make_in_realm_history(path));
-        DB sg(*hist, SharedGroupOptions(crypt_key()));
-        sg.begin_read();
-        LangBindHelper::advance_read(sg, version_id);
-        auto tv = sg.import_from_handover(std::move(handover));
+    auto check_across_handover = [&](ResultList results, std::unique_ptr<TableView> tv) {
         tv->sync_if_needed();
         CHECK(tv->is_in_sync());
         CHECK_EQUAL(tv->size(), results.size());
@@ -3898,7 +3885,6 @@ TEST(Query_CompoundDescriptors) {
             CHECK_EQUAL(tv->get(i).get<Int>(t1_int_col), results[i].first);
             CHECK_EQUAL(tv->get_key(i), results[i].second);
         }
-        sg.end_read();
     };
 
     //     T1
@@ -3922,8 +3908,9 @@ TEST(Query_CompoundDescriptors) {
             CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results[i].first);
             CHECK_EQUAL(tv.get_key(i), results[i].second);
         }
-        HandoverPtr hp = sg_w.export_for_handover(tv, ConstSourcePayload::Stay);
-        check_across_handover(results, std::move(hp));
+        auto tr = g->duplicate();
+        auto tv2 = tr->import_copy_of(tv, PayloadPolicy::Stay);
+        check_across_handover(results, std::move(tv2));
 
         tv = t1->where().find_all();
         tv.sort(SortDescriptor({{t1_str_col}, {t1_int_col}}, {false, false}));
@@ -3932,7 +3919,7 @@ TEST(Query_CompoundDescriptors) {
             CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results[i].first);
             CHECK_EQUAL(tv.get_key(i), results[i].second);
         }
-        hp = sg_w.export_for_handover(tv, ConstSourcePayload::Stay);
+        auto hp = tr->import_copy_of(tv, PayloadPolicy::Stay);
         check_across_handover(results, std::move(hp));
     }
 
@@ -3946,8 +3933,9 @@ TEST(Query_CompoundDescriptors) {
             CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results[i].first);
             CHECK_EQUAL(tv.get_key(i), results[i].second);
         }
-        HandoverPtr hp = sg_w.export_for_handover(tv, ConstSourcePayload::Stay);
-        check_across_handover(results, std::move(hp));
+        auto tr = g->duplicate();
+        auto tv2 = tr->import_copy_of(tv, PayloadPolicy::Stay);
+        check_across_handover(results, std::move(tv2));
 
         results = {{1, k0}, {1, k2}, {2, k3}, {2, k4}};
         tv = t1->where().find_all();
@@ -3957,7 +3945,7 @@ TEST(Query_CompoundDescriptors) {
             CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results[i].first);
             CHECK_EQUAL(tv.get_key(i), results[i].second);
         }
-        hp = sg_w.export_for_handover(tv, ConstSourcePayload::Stay);
+        auto hp = tr->import_copy_of(tv, PayloadPolicy::Stay);
         check_across_handover(results, std::move(hp));
     }
 
@@ -3971,8 +3959,9 @@ TEST(Query_CompoundDescriptors) {
             CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results[i].first);
             CHECK_EQUAL(tv.get_key(i), results[i].second);
         }
-        HandoverPtr hp = sg_w.export_for_handover(tv, ConstSourcePayload::Stay);
-        check_across_handover(results, std::move(hp));
+        auto tr = g->duplicate();
+        auto tv2 = tr->import_copy_of(tv, PayloadPolicy::Stay);
+        check_across_handover(results, std::move(tv2));
 
         tv.sort(SortDescriptor({{t1_int_col}}, {false})); // = {{2, 4}, {1, 0}}
         tv.distinct(DistinctDescriptor({{t1_str_col}}));  // = {{2, 4}}
@@ -3982,11 +3971,10 @@ TEST(Query_CompoundDescriptors) {
             CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results[i].first);
             CHECK_EQUAL(tv.get_key(i), results[i].second);
         }
-        hp = sg_w.export_for_handover(tv, ConstSourcePayload::Stay);
+        auto hp = tr->import_copy_of(tv, PayloadPolicy::Stay);
         check_across_handover(results, std::move(hp));
     }
 }
-#endif
 
 TEST(Query_DistinctThroughLinks)
 {

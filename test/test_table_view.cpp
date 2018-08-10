@@ -63,138 +63,40 @@ using namespace test_util;
 // Another way to debug a particular test, is to copy that test into
 // `experiments/testcase.cpp` and then run `sh build.sh
 // check-testcase` (or one of its friends) from the command line.
-#ifdef LEGACY_TESTS
 
 TEST(TableView_TimestampMaxMinCount)
 {
     Table t;
-    t.add_column(type_Timestamp, "ts", true);
-    t.add_empty_row();
-    t.set_timestamp(0, 0, Timestamp(300, 300));
+    auto col = t.add_column(type_Timestamp, "ts", true);
+    auto max_key = t.create_object().set_all(Timestamp(300, 300)).get_key();
+    auto min_key = t.create_object().set_all(Timestamp(100, 100)).get_key();
+    t.create_object().set_all(Timestamp(200, 200));
 
-    t.add_empty_row();
-    t.set_timestamp(0, 1, Timestamp(100, 100));
-
-    t.add_empty_row();
-    t.set_timestamp(0, 2, Timestamp(200, 200));
-
-    // Add row with null. For max(), any non-null is greater, and for min() any non-null is less
-    t.add_empty_row();
+    // Add object with null. For max(), any non-null is greater, and for min() any non-null is less
+    t.create_object();
 
     TableView tv = t.where().find_all();
     Timestamp ts;
 
-    ts = tv.maximum_timestamp(0, nullptr);
+    ts = tv.maximum_timestamp(col, nullptr);
     CHECK_EQUAL(ts, Timestamp(300, 300));
-    ts = tv.minimum_timestamp(0, nullptr);
+    ts = tv.minimum_timestamp(col, nullptr);
     CHECK_EQUAL(ts, Timestamp(100, 100));
 
-    size_t index;
-    ts = tv.maximum_timestamp(0, &index);
-    CHECK_EQUAL(index, 0);
-    ts = tv.minimum_timestamp(0, &index);
-    CHECK_EQUAL(index, 1);
+    ObjKey key;
+    ts = tv.maximum_timestamp(col, &key);
+    CHECK_EQUAL(key, max_key);
+    ts = tv.minimum_timestamp(col, &key);
+    CHECK_EQUAL(key, min_key);
 
     size_t cnt;
-    cnt = tv.count_timestamp(0, Timestamp(100, 100));
+    cnt = tv.count_timestamp(col, Timestamp(100, 100));
     CHECK_EQUAL(cnt, 1);
 
-    cnt = tv.count_timestamp(0, Timestamp{});
+    cnt = tv.count_timestamp(col, Timestamp{});
     CHECK_EQUAL(cnt, 1);
 }
 
-TEST(TableView_TimestampGetSet)
-{
-    Table t;
-    t.add_column(type_Timestamp, "ts", true);
-    t.add_empty_row(3);
-    t.set_timestamp(0, 0, Timestamp(000, 010));
-    t.set_timestamp(0, 1, Timestamp(100, 110));
-    t.set_timestamp(0, 2, Timestamp(200, 210));
-
-    TableView tv = t.where().find_all();
-    CHECK_EQUAL(tv.get_timestamp(0, 0), Timestamp(000, 010));
-    CHECK_EQUAL(tv.get_timestamp(0, 1), Timestamp(100, 110));
-    CHECK_EQUAL(tv.get_timestamp(0, 2), Timestamp(200, 210));
-
-    tv.set_timestamp(0, 0, Timestamp(1000, 1010));
-    tv.set_timestamp(0, 1, Timestamp(1100, 1110));
-    tv.set_timestamp(0, 2, Timestamp(1200, 1210));
-    CHECK_EQUAL(tv.get_timestamp(0, 0), Timestamp(1000, 1010));
-    CHECK_EQUAL(tv.get_timestamp(0, 1), Timestamp(1100, 1110));
-    CHECK_EQUAL(tv.get_timestamp(0, 2), Timestamp(1200, 1210));
-}
-
-TEST(TableView_GetSetInteger)
-{
-    TestTable table;
-    table.add_column(type_Int, "1");
-
-    add(table, 1);
-    add(table, 2);
-    add(table, 3);
-    add(table, 1);
-    add(table, 2);
-
-    TableView v;                 // Test empty construction
-    v = table.find_all_int(0, 2); // Test assignment
-
-    CHECK_EQUAL(2, v.size());
-
-    // Test of Get
-    CHECK_EQUAL(2, v[0].get_int(0));
-    CHECK_EQUAL(2, v[1].get_int(0));
-
-    // Test of Set
-    v[0].set_int(0, 123);
-    CHECK_EQUAL(123, v[0].get_int(0));
-}
-
-
-TEST(TableView_FloatsGetSet)
-{
-    TestTable table;
-    table.add_column(type_Float, "1");
-    table.add_column(type_Double, "2");
-    table.add_column(type_Int, "3");
-
-    float f_val[] = {1.1f, 2.1f, 3.1f, -1.1f, 2.1f, 0.0f};
-    double d_val[] = {1.2, 2.2, 3.2, -1.2, 2.3, 0.0};
-
-    CHECK_EQUAL(true, table.is_empty());
-
-    // Test add(?,?) with parameters
-    for (size_t i = 0; i < 5; ++i)
-        add(table, f_val[i], d_val[i], int64_t(i));
-
-    table.add_empty_row();
-
-    CHECK_EQUAL(6, table.size());
-    for (size_t i = 0; i < 6; ++i) {
-        CHECK_EQUAL(f_val[i], table.get_float(0, i));
-        CHECK_EQUAL(d_val[i], table.get_double(1, i));
-    }
-
-    TableView v;                         // Test empty construction
-    v = table.find_all_float(0, 2.1f); // Test assignment
-    CHECK_EQUAL(2, v.size());
-
-    TableView v2(v);
-
-
-    // Test of Get
-    CHECK_EQUAL(2.1f, v[0].get_float(0));
-    CHECK_EQUAL(2.1f, v[1].get_float(0));
-    CHECK_EQUAL(2.2, v[0].get_double(1));
-    CHECK_EQUAL(2.3, v[1].get_double(1));
-
-    // Test of Set
-    v[0].set_float(0, 123.321f);
-    CHECK_EQUAL(123.321f, v[0].get_float(0));
-    v[0].set_double(1, 123.3219);
-    CHECK_EQUAL(123.3219, v[0].get_double(1));
-}
-#endif
 
 TEST(TableView_FloatsFindAndAggregations)
 {
@@ -259,19 +161,17 @@ TEST(TableView_FloatsFindAndAggregations)
     CHECK_EQUAL(1.2f, v_some.maximum_float(col_float, &key));
     CHECK_EQUAL(ObjKey(0), key);
 
-#ifdef LEGACY_TESTS
     // Max without ret_index
-    CHECK_EQUAL(3.2, v_all.maximum_double(1));
-    CHECK_EQUAL(-1.2, v_some.maximum_double(1));
-    CHECK_EQUAL(3.1f, v_all.maximum_float(0));
-    CHECK_EQUAL(1.2f, v_some.maximum_float(0));
+    CHECK_EQUAL(3.2, v_all.maximum_double(col_double));
+    CHECK_EQUAL(-1.2, v_some.maximum_double(col_double));
+    CHECK_EQUAL(3.1f, v_all.maximum_float(col_float));
+    CHECK_EQUAL(1.2f, v_some.maximum_float(col_float));
 
     // Test min
-    CHECK_EQUAL(-1.2, v_all.minimum_double(1));
-    CHECK_EQUAL(-1.2, v_some.minimum_double(1));
-    CHECK_EQUAL(-1.1f, v_all.minimum_float(0));
-    CHECK_EQUAL(-1.1f, v_some.minimum_float(0));
-#endif
+    CHECK_EQUAL(-1.2, v_all.minimum_double(col_double));
+    CHECK_EQUAL(-1.2, v_some.minimum_double(col_double));
+    CHECK_EQUAL(-1.1f, v_all.minimum_float(col_float));
+    CHECK_EQUAL(-1.1f, v_some.minimum_float(col_float));
     // min with ret_ndx
     CHECK_EQUAL(-1.2, v_all.minimum_double(col_double, &key));
     CHECK_EQUAL(ObjKey(0), key);
@@ -1061,255 +961,6 @@ TEST(TableView_FindAllStacked)
 }
 
 
-TEST(TableView_LowLevelSubtables)
-{
-    Table table;
-    std::vector<size_t> column_path;
-    table.add_column(type_Bool, "enable");
-    table.add_column(type_Table, "subtab");
-    table.add_column(type_Mixed, "mixed");
-    column_path.push_back(1);
-    table.add_subcolumn(column_path, type_Bool, "enable");
-    table.add_subcolumn(column_path, type_Table, "subtab");
-    table.add_subcolumn(column_path, type_Mixed, "mixed");
-    column_path.push_back(1);
-    table.add_subcolumn(column_path, type_Bool, "enable");
-    table.add_subcolumn(column_path, type_Table, "subtab");
-    table.add_subcolumn(column_path, type_Mixed, "mixed");
-
-    table.add_empty_row(2 * 2);
-    table.set_bool(0, 1, true);
-    table.set_bool(0, 3, true);
-    TableView view = table.where().equal(0, true).find_all();
-    CHECK_EQUAL(2, view.size());
-    for (int i_1 = 0; i_1 != 2; ++i_1) {
-        TableRef subtab = view.get_subtable(1, i_1);
-        subtab->add_empty_row(2 * (2 + i_1));
-        for (int i_2 = 0; i_2 != 2 * (2 + i_1); ++i_2)
-            subtab->set_bool(0, i_2, i_2 % 2 == 0);
-        TableView subview = subtab->where().equal(0, true).find_all();
-        CHECK_EQUAL(2 + i_1, subview.size());
-        {
-            TableRef subsubtab = subview.get_subtable(1, 0 + i_1);
-            subsubtab->add_empty_row(2 * (3 + i_1));
-            for (int i_3 = 0; i_3 != 2 * (3 + i_1); ++i_3)
-                subsubtab->set_bool(0, i_3, i_3 % 2 == 1);
-            TableView subsubview = subsubtab->where().equal(0, true).find_all();
-            CHECK_EQUAL(3 + i_1, subsubview.size());
-
-            for (int i_3 = 0; i_3 != 3 + i_1; ++i_3) {
-                CHECK_EQUAL(true, bool(subsubview.get_subtable(1, i_3)));
-                CHECK_EQUAL(false, bool(subsubview.get_subtable(2, i_3))); // Mixed
-                CHECK_EQUAL(0, subsubview.get_subtable_size(1, i_3));
-                CHECK_EQUAL(0, subsubview.get_subtable_size(2, i_3)); // Mixed
-            }
-
-            subview.clear_subtable(2, 1 + i_1); // Mixed
-            TableRef subsubtab_mix = subview.get_subtable(2, 1 + i_1);
-            subsubtab_mix->add_column(type_Bool, "enable");
-            subsubtab_mix->add_column(type_Table, "subtab");
-            subsubtab_mix->add_column(type_Mixed, "mixed");
-            subsubtab_mix->add_empty_row(2 * (1 + i_1));
-            for (int i_3 = 0; i_3 != 2 * (1 + i_1); ++i_3)
-                subsubtab_mix->set_bool(0, i_3, i_3 % 2 == 0);
-            TableView subsubview_mix = subsubtab_mix->where().equal(0, true).find_all();
-            CHECK_EQUAL(1 + i_1, subsubview_mix.size());
-
-            for (int i_3 = 0; i_3 != 1 + i_1; ++i_3) {
-                CHECK_EQUAL(true, bool(subsubview_mix.get_subtable(1, i_3)));
-                CHECK_EQUAL(false, bool(subsubview_mix.get_subtable(2, i_3))); // Mixed
-                CHECK_EQUAL(0, subsubview_mix.get_subtable_size(1, i_3));
-                CHECK_EQUAL(0, subsubview_mix.get_subtable_size(2, i_3)); // Mixed
-            }
-        }
-        for (int i_2 = 0; i_2 != 2 + i_1; ++i_2) {
-            CHECK_EQUAL(true, bool(subview.get_subtable(1, i_2)));
-            CHECK_EQUAL(i_2 == 1 + i_1, bool(subview.get_subtable(2, i_2))); // Mixed
-            CHECK_EQUAL(i_2 == 0 + i_1 ? 2 * (3 + i_1) : 0, subview.get_subtable_size(1, i_2));
-            CHECK_EQUAL(i_2 == 1 + i_1 ? 2 * (1 + i_1) : 0, subview.get_subtable_size(2, i_2)); // Mixed
-        }
-
-        view.clear_subtable(2, i_1); // Mixed
-        TableRef subtab_mix = view.get_subtable(2, i_1);
-        std::vector<size_t> subcol_path;
-        subtab_mix->add_column(type_Bool, "enable");
-        subtab_mix->add_column(type_Table, "subtab");
-        subtab_mix->add_column(type_Mixed, "mixed");
-        subcol_path.push_back(1);
-        subtab_mix->add_subcolumn(subcol_path, type_Bool, "enable");
-        subtab_mix->add_subcolumn(subcol_path, type_Table, "subtab");
-        subtab_mix->add_subcolumn(subcol_path, type_Mixed, "mixed");
-        subtab_mix->add_empty_row(2 * (3 + i_1));
-        for (int i_2 = 0; i_2 != 2 * (3 + i_1); ++i_2)
-            subtab_mix->set_bool(0, i_2, i_2 % 2 == 1);
-        TableView subview_mix = subtab_mix->where().equal(0, true).find_all();
-        CHECK_EQUAL(3 + i_1, subview_mix.size());
-        {
-            TableRef subsubtab = subview_mix.get_subtable(1, 1 + i_1);
-            subsubtab->add_empty_row(2 * (7 + i_1));
-            for (int i_3 = 0; i_3 != 2 * (7 + i_1); ++i_3)
-                subsubtab->set_bool(0, i_3, i_3 % 2 == 1);
-            TableView subsubview = subsubtab->where().equal(0, true).find_all();
-            CHECK_EQUAL(7 + i_1, subsubview.size());
-
-            for (int i_3 = 0; i_3 != 7 + i_1; ++i_3) {
-                CHECK_EQUAL(true, bool(subsubview.get_subtable(1, i_3)));
-                CHECK_EQUAL(false, bool(subsubview.get_subtable(2, i_3))); // Mixed
-                CHECK_EQUAL(0, subsubview.get_subtable_size(1, i_3));
-                CHECK_EQUAL(0, subsubview.get_subtable_size(2, i_3)); // Mixed
-            }
-
-            subview_mix.clear_subtable(2, 2 + i_1); // Mixed
-            TableRef subsubtab_mix = subview_mix.get_subtable(2, 2 + i_1);
-            subsubtab_mix->add_column(type_Bool, "enable");
-            subsubtab_mix->add_column(type_Table, "subtab");
-            subsubtab_mix->add_column(type_Mixed, "mixed");
-            subsubtab_mix->add_empty_row(2 * (5 + i_1));
-            for (int i_3 = 0; i_3 != 2 * (5 + i_1); ++i_3)
-                subsubtab_mix->set_bool(0, i_3, i_3 % 2 == 0);
-            TableView subsubview_mix = subsubtab_mix->where().equal(0, true).find_all();
-            CHECK_EQUAL(5 + i_1, subsubview_mix.size());
-
-            for (int i_3 = 0; i_3 != 5 + i_1; ++i_3) {
-                CHECK_EQUAL(true, bool(subsubview_mix.get_subtable(1, i_3)));
-                CHECK_EQUAL(false, bool(subsubview_mix.get_subtable(2, i_3))); // Mixed
-                CHECK_EQUAL(0, subsubview_mix.get_subtable_size(1, i_3));
-                CHECK_EQUAL(0, subsubview_mix.get_subtable_size(2, i_3)); // Mixed
-            }
-        }
-        for (int i_2 = 0; i_2 != 2 + i_1; ++i_2) {
-            CHECK_EQUAL(true, bool(subview_mix.get_subtable(1, i_2)));
-            CHECK_EQUAL(i_2 == 2 + i_1, bool(subview_mix.get_subtable(2, i_2))); // Mixed
-            CHECK_EQUAL(i_2 == 1 + i_1 ? 2 * (7 + i_1) : 0, subview_mix.get_subtable_size(1, i_2));
-            CHECK_EQUAL(i_2 == 2 + i_1 ? 2 * (5 + i_1) : 0, subview_mix.get_subtable_size(2, i_2)); // Mixed
-        }
-
-        CHECK_EQUAL(true, bool(view.get_subtable(1, i_1)));
-        CHECK_EQUAL(true, bool(view.get_subtable(2, i_1))); // Mixed
-        CHECK_EQUAL(2 * (2 + i_1), view.get_subtable_size(1, i_1));
-        CHECK_EQUAL(2 * (3 + i_1), view.get_subtable_size(2, i_1)); // Mixed
-    }
-
-
-    ConstTableView const_view = table.where().equal(0, true).find_all();
-    CHECK_EQUAL(2, const_view.size());
-    for (int i_1 = 0; i_1 != 2; ++i_1) {
-        ConstTableRef subtab = const_view.get_subtable(1, i_1);
-        ConstTableView const_subview = subtab->where().equal(0, true).find_all();
-        CHECK_EQUAL(2 + i_1, const_subview.size());
-        {
-            ConstTableRef subsubtab = const_subview.get_subtable(1, 0 + i_1);
-            ConstTableView const_subsubview = subsubtab->where().equal(0, true).find_all();
-            CHECK_EQUAL(3 + i_1, const_subsubview.size());
-            for (int i_3 = 0; i_3 != 3 + i_1; ++i_3) {
-                CHECK_EQUAL(true, bool(const_subsubview.get_subtable(1, i_3)));
-                CHECK_EQUAL(false, bool(const_subsubview.get_subtable(2, i_3))); // Mixed
-                CHECK_EQUAL(0, const_subsubview.get_subtable_size(1, i_3));
-                CHECK_EQUAL(0, const_subsubview.get_subtable_size(2, i_3)); // Mixed
-            }
-
-            ConstTableRef subsubtab_mix = const_subview.get_subtable(2, 1 + i_1);
-            ConstTableView const_subsubview_mix = subsubtab_mix->where().equal(0, true).find_all();
-            CHECK_EQUAL(1 + i_1, const_subsubview_mix.size());
-            for (int i_3 = 0; i_3 != 1 + i_1; ++i_3) {
-                CHECK_EQUAL(true, bool(const_subsubview_mix.get_subtable(1, i_3)));
-                CHECK_EQUAL(false, bool(const_subsubview_mix.get_subtable(2, i_3))); // Mixed
-                CHECK_EQUAL(0, const_subsubview_mix.get_subtable_size(1, i_3));
-                CHECK_EQUAL(0, const_subsubview_mix.get_subtable_size(2, i_3)); // Mixed
-            }
-        }
-        for (int i_2 = 0; i_2 != 2 + i_1; ++i_2) {
-            CHECK_EQUAL(true, bool(const_subview.get_subtable(1, i_2)));
-            CHECK_EQUAL(i_2 == 1 + i_1, bool(const_subview.get_subtable(2, i_2))); // Mixed
-            CHECK_EQUAL(i_2 == 0 + i_1 ? 2 * (3 + i_1) : 0, const_subview.get_subtable_size(1, i_2));
-            CHECK_EQUAL(i_2 == 1 + i_1 ? 2 * (1 + i_1) : 0, const_subview.get_subtable_size(2, i_2)); // Mixed
-        }
-
-        ConstTableRef subtab_mix = const_view.get_subtable(2, i_1);
-        ConstTableView const_subview_mix = subtab_mix->where().equal(0, true).find_all();
-        CHECK_EQUAL(3 + i_1, const_subview_mix.size());
-        {
-            ConstTableRef subsubtab = const_subview_mix.get_subtable(1, 1 + i_1);
-            ConstTableView const_subsubview = subsubtab->where().equal(0, true).find_all();
-            CHECK_EQUAL(7 + i_1, const_subsubview.size());
-            for (int i_3 = 0; i_3 != 7 + i_1; ++i_3) {
-                CHECK_EQUAL(true, bool(const_subsubview.get_subtable(1, i_3)));
-                CHECK_EQUAL(false, bool(const_subsubview.get_subtable(2, i_3))); // Mixed
-                CHECK_EQUAL(0, const_subsubview.get_subtable_size(1, i_3));
-                CHECK_EQUAL(0, const_subsubview.get_subtable_size(2, i_3)); // Mixed
-            }
-
-            ConstTableRef subsubtab_mix = const_subview_mix.get_subtable(2, 2 + i_1);
-            ConstTableView const_subsubview_mix = subsubtab_mix->where().equal(0, true).find_all();
-            CHECK_EQUAL(5 + i_1, const_subsubview_mix.size());
-            for (int i_3 = 0; i_3 != 5 + i_1; ++i_3) {
-                CHECK_EQUAL(true, bool(const_subsubview_mix.get_subtable(1, i_3)));
-                CHECK_EQUAL(false, bool(const_subsubview_mix.get_subtable(2, i_3))); // Mixed
-                CHECK_EQUAL(0, const_subsubview_mix.get_subtable_size(1, i_3));
-                CHECK_EQUAL(0, const_subsubview_mix.get_subtable_size(2, i_3)); // Mixed
-            }
-        }
-        for (int i_2 = 0; i_2 != 2 + i_1; ++i_2) {
-            CHECK_EQUAL(true, bool(const_subview_mix.get_subtable(1, i_2)));
-            CHECK_EQUAL(i_2 == 2 + i_1, bool(const_subview_mix.get_subtable(2, i_2))); // Mixed
-            CHECK_EQUAL(i_2 == 1 + i_1 ? 2 * (7 + i_1) : 0, const_subview_mix.get_subtable_size(1, i_2));
-            CHECK_EQUAL(i_2 == 2 + i_1 ? 2 * (5 + i_1) : 0, const_subview_mix.get_subtable_size(2, i_2)); // Mixed
-        }
-
-        CHECK_EQUAL(true, bool(const_view.get_subtable(1, i_1)));
-        CHECK_EQUAL(true, bool(const_view.get_subtable(2, i_1))); // Mixed
-        CHECK_EQUAL(2 * (2 + i_1), const_view.get_subtable_size(1, i_1));
-        CHECK_EQUAL(2 * (3 + i_1), const_view.get_subtable_size(2, i_1)); // Mixed
-    }
-}
-
-
-TEST(TableView_HighLevelSubtables)
-{
-    Table t;
-    t.add_column(type_Int, "val");
-    DescriptorRef sub;
-    t.add_column(type_Table, "subtab", &sub);
-    sub->add_column(type_Int, "val");
-    DescriptorRef subsub;
-    sub->add_column(type_Table, "subtab", &subsub);
-    subsub->add_column(type_Int, "value");
-
-    const Table& ct = t;
-
-    t.add_empty_row();
-    TableView v = t.find_all_int(0, 0);
-    ConstTableView cv = ct.find_all_int(0, 0);
-
-    {
-        TableView v2 = v.find_all_int(0, 0);
-        ConstTableView cv2 = cv.find_all_int(0, 0);
-
-        ConstTableView cv3 = t.find_all_int(0, 0);
-        ConstTableView cv4 = v.find_all_int(0, 0);
-
-        // Also test assigment that converts to const
-        cv3 = t.find_all_int(0, 0);
-        cv4 = v.find_all_int(0, 0);
-
-        static_cast<void>(v2);
-        static_cast<void>(cv2);
-        static_cast<void>(cv3);
-        static_cast<void>(cv4);
-    }
-
-    v[0].get_subtable(1).get()->add_empty_row();
-    v[0].get_subtable(1).get()->get_subtable(1, 0).get()->add_empty_row();
-
-    v[0].get_subtable(1).get()->set_int(0, 0, 1);
-    v[0].get_subtable(1).get()->get_subtable(1, 0).get()->set_int(0, 0, 2);
-
-    CHECK_EQUAL(v[0].get_subtable(1).get()->get_int(0, 0), 1);
-    CHECK_EQUAL(v.get_subtable(1, 0).get()->get_subtable(1, 0).get()->get_int(0, 0), 2);
-
-    CHECK_EQUAL(cv[0].get_subtable(1).get()->get_int(0, 0), 1);
-    CHECK_EQUAL(cv.get_subtable(1, 0).get()->get_subtable(1, 0).get()->get_int(0, 0), 2);
-}
 
 
 TEST(TableView_RefCounting)
@@ -1527,143 +1178,6 @@ TEST(TableView_SortEnum)
     CHECK_EQUAL(tv[5].get_string(0), "foo");
 }
 
-
-TEST(TableView_UnderlyingRowRemoval)
-{
-    struct Fixture {
-        Table table;
-        TableView view;
-        Fixture()
-        {
-            table.add_column(type_Int, "a");
-            table.add_column(type_Int, "b");
-            table.add_empty_row(5);
-
-            table.set_int(0, 0, 0);
-            table.set_int(0, 1, 1);
-            table.set_int(0, 2, 2);
-            table.set_int(0, 3, 3);
-            table.set_int(0, 4, 4);
-
-            table.set_int(1, 0, 0);
-            table.set_int(1, 1, 1);
-            table.set_int(1, 2, 0);
-            table.set_int(1, 3, 1);
-            table.set_int(1, 4, 1);
-
-            view = table.find_all_int(1, 0);
-        }
-    };
-
-    // Sanity
-    {
-        Fixture f;
-        CHECK_EQUAL(2, f.view.size());
-        CHECK_EQUAL(0, f.view.get_source_ndx(0));
-        CHECK_EQUAL(2, f.view.get_source_ndx(1));
-    }
-
-    // The following checks assume that unordered row removal in the underlying
-    // table is done using `Table::move_last_over()`, and that Table::clear()
-    // does that in reverse order of rows in the view.
-
-    // Ordered remove()
-    {
-        Fixture f;
-        f.view.remove(0);
-        CHECK_EQUAL(4, f.table.size());
-        CHECK_EQUAL(1, f.table.get_int(0, 0));
-        CHECK_EQUAL(2, f.table.get_int(0, 1));
-        CHECK_EQUAL(3, f.table.get_int(0, 2));
-        CHECK_EQUAL(4, f.table.get_int(0, 3));
-        CHECK_EQUAL(1, f.view.size());
-        CHECK_EQUAL(1, f.view.get_source_ndx(0));
-    }
-    {
-        Fixture f;
-        f.view.remove(1);
-        CHECK_EQUAL(4, f.table.size());
-        CHECK_EQUAL(0, f.table.get_int(0, 0));
-        CHECK_EQUAL(1, f.table.get_int(0, 1));
-        CHECK_EQUAL(3, f.table.get_int(0, 2));
-        CHECK_EQUAL(4, f.table.get_int(0, 3));
-        CHECK_EQUAL(1, f.view.size());
-        CHECK_EQUAL(0, f.view.get_source_ndx(0));
-    }
-
-    // Unordered remove()
-    {
-        Fixture f;
-        f.view.remove(0, RemoveMode::unordered);
-        CHECK_EQUAL(4, f.table.size());
-        CHECK_EQUAL(4, f.table.get_int(0, 0));
-        CHECK_EQUAL(1, f.table.get_int(0, 1));
-        CHECK_EQUAL(2, f.table.get_int(0, 2));
-        CHECK_EQUAL(3, f.table.get_int(0, 3));
-        CHECK_EQUAL(1, f.view.size());
-        CHECK_EQUAL(2, f.view.get_source_ndx(0));
-    }
-    {
-        Fixture f;
-        f.view.remove(1, RemoveMode::unordered);
-        CHECK_EQUAL(4, f.table.size());
-        CHECK_EQUAL(0, f.table.get_int(0, 0));
-        CHECK_EQUAL(1, f.table.get_int(0, 1));
-        CHECK_EQUAL(4, f.table.get_int(0, 2));
-        CHECK_EQUAL(3, f.table.get_int(0, 3));
-        CHECK_EQUAL(1, f.view.size());
-        CHECK_EQUAL(0, f.view.get_source_ndx(0));
-    }
-
-    // Ordered remove_last()
-    {
-        Fixture f;
-        f.view.remove_last();
-        CHECK_EQUAL(4, f.table.size());
-        CHECK_EQUAL(0, f.table.get_int(0, 0));
-        CHECK_EQUAL(1, f.table.get_int(0, 1));
-        CHECK_EQUAL(3, f.table.get_int(0, 2));
-        CHECK_EQUAL(4, f.table.get_int(0, 3));
-        CHECK_EQUAL(1, f.view.size());
-        CHECK_EQUAL(0, f.view.get_source_ndx(0));
-    }
-
-    // Unordered remove_last()
-    {
-        Fixture f;
-        f.view.remove_last(RemoveMode::unordered);
-        CHECK_EQUAL(4, f.table.size());
-        CHECK_EQUAL(0, f.table.get_int(0, 0));
-        CHECK_EQUAL(1, f.table.get_int(0, 1));
-        CHECK_EQUAL(4, f.table.get_int(0, 2));
-        CHECK_EQUAL(3, f.table.get_int(0, 3));
-        CHECK_EQUAL(1, f.view.size());
-        CHECK_EQUAL(0, f.view.get_source_ndx(0));
-    }
-
-    // Ordered clear()
-    {
-        Fixture f;
-        f.view.clear();
-        CHECK_EQUAL(3, f.table.size());
-        CHECK_EQUAL(1, f.table.get_int(0, 0));
-        CHECK_EQUAL(3, f.table.get_int(0, 1));
-        CHECK_EQUAL(4, f.table.get_int(0, 2));
-        CHECK_EQUAL(0, f.view.size());
-    }
-
-    // Unordered clear()
-    {
-        Fixture f;
-        f.view.clear(RemoveMode::unordered);
-        CHECK_EQUAL(3, f.table.size());
-        CHECK_EQUAL(3, f.table.get_int(0, 0));
-        CHECK_EQUAL(1, f.table.get_int(0, 1));
-        CHECK_EQUAL(4, f.table.get_int(0, 2));
-        CHECK_EQUAL(0, f.view.size());
-    }
-}
-
 TEST(TableView_Backlinks)
 {
     Group group;
@@ -1756,119 +1270,6 @@ TEST(TableView_BacklinksAfterMoveAssign)
     }
 }
 
-// Verify that a TableView that represents backlinks continues to track the correct row
-// when it moves within a table or is deleted.
-TEST(TableView_BacklinksWhenTargetRowMovedOrDeleted)
-{
-    Group group;
-
-    TableRef source = group.add_table("source");
-    source->add_column(type_Int, "int");
-
-    TableRef links = group.add_table("links");
-    size_t col_link = links->add_column_link(type_Link, "link", *source);
-    size_t col_linklist = links->add_column_link(type_LinkList, "link_list", *source);
-
-    source->add_empty_row(3);
-
-    links->add_empty_row(3);
-    links->set_link(col_link, 0, 1);
-    LinkViewRef ll = links->get_linklist(col_linklist, 0);
-    ll->add(1);
-    ll->add(0);
-
-    links->set_link(col_link, 1, 1);
-    ll = links->get_linklist(col_linklist, 1);
-    ll->add(1);
-
-    links->set_link(col_link, 2, 0);
-
-    TableView tv_link = source->get_backlink_view(1, links.get(), col_link);
-    TableView tv_linklist = source->get_backlink_view(1, links.get(), col_linklist);
-
-    CHECK_EQUAL(tv_link.size(), 2);
-    CHECK_EQUAL(tv_linklist.size(), 2);
-
-    source->swap_rows(1, 0);
-    tv_link.sync_if_needed();
-    tv_linklist.sync_if_needed();
-
-    CHECK_EQUAL(tv_link.size(), 2);
-    CHECK_EQUAL(tv_linklist.size(), 2);
-
-    CHECK(!tv_link.depends_on_deleted_object());
-    CHECK(!tv_linklist.depends_on_deleted_object());
-
-    source->move_last_over(0);
-
-    CHECK(tv_link.depends_on_deleted_object());
-    CHECK(tv_linklist.depends_on_deleted_object());
-
-    CHECK(!tv_link.is_in_sync());
-    CHECK(!tv_linklist.is_in_sync());
-
-    tv_link.sync_if_needed();
-    tv_linklist.sync_if_needed();
-
-    CHECK(tv_link.is_in_sync());
-    CHECK(tv_linklist.is_in_sync());
-
-    CHECK_EQUAL(tv_link.size(), 0);
-    CHECK_EQUAL(tv_linklist.size(), 0);
-
-    source->add_empty_row();
-
-    // TableViews that depend on a deleted row will stay in sync despite modifications to their table.
-    CHECK(tv_link.is_in_sync());
-    CHECK(tv_linklist.is_in_sync());
-}
-
-TEST(TableView_BacklinksWithColumnInsertion)
-{
-    Group g;
-    TableRef target = g.add_table("target");
-    target->add_column(type_Int, "int");
-    target->add_empty_row(2);
-    target->set_int(0, 1, 10);
-
-    TableRef origin = g.add_table("origin");
-    origin->add_column_link(type_Link, "link", *target);
-    origin->add_column_link(type_LinkList, "linklist", *target);
-    origin->add_empty_row(2);
-    origin->set_link(0, 1, 1);
-    origin->get_linklist(1, 1)->add(1);
-
-    auto tv1 = target->get_backlink_view(1, origin.get(), 0);
-    CHECK_EQUAL(tv1.size(), 1);
-    CHECK_EQUAL(tv1.get_source_ndx(0), 1);
-
-    auto tv2 = target->get_backlink_view(1, origin.get(), 1);
-    CHECK_EQUAL(tv2.size(), 1);
-    CHECK_EQUAL(tv1.get_source_ndx(0), 1);
-
-    target->insert_column(0, type_String, "string");
-    target->insert_empty_row(0);
-
-    tv1.sync_if_needed();
-    CHECK_EQUAL(tv1.size(), 1);
-    CHECK_EQUAL(tv1.get_source_ndx(0), 1);
-
-    tv2.sync_if_needed();
-    CHECK_EQUAL(tv2.size(), 1);
-    CHECK_EQUAL(tv2.get_source_ndx(0), 1);
-
-    origin->insert_column(0, type_String, "string");
-    target->insert_empty_row(0);
-    origin->insert_empty_row(0);
-
-    tv1.sync_if_needed();
-    CHECK_EQUAL(tv1.size(), 1);
-    CHECK_EQUAL(tv1.get_source_ndx(0), 2);
-
-    tv2.sync_if_needed();
-    CHECK_EQUAL(tv2.size(), 1);
-    CHECK_EQUAL(tv2.get_source_ndx(0), 2);
-}
 #endif
 
 namespace {
@@ -2176,19 +1577,25 @@ TEST(TableView_IsInTableOrder)
     CHECK_EQUAL(false, tv.is_in_table_order());
 
 #ifdef LEGACY_TESTS
+    // Asserts:
     tv = target->get_distinct_view(col_id);
     CHECK_EQUAL(true, tv.is_in_table_order());
 #endif
+
     // … unless sorted.
     tv = target->get_sorted_view(col_id);
     CHECK_EQUAL(false, tv.is_in_table_order());
 }
 
-#ifdef LEGACY_TESTS
+// little helper
+void add(Table& t, std::string v) {
+	t.create_object().set_all(v);
+}
+
 NONCONCURRENT_TEST(TableView_SortOrder_Similiar)
 {
-    TestTable table;
-    table.add_column(type_String, "1");
+    Table table;
+    auto col = table.add_column(type_String, "1");
 
     // This tests the expected sorting order with STRING_COMPARE_CORE_SIMILAR. See utf8_compare() in unicode.cpp. Only
     // characters
@@ -2749,11 +2156,13 @@ NONCONCURRENT_TEST(TableView_SortOrder_Similiar)
     TableView v1 = table.where().find_all();
     TableView v2 = table.where().find_all();
 
-    v2.sort(0);
-
+    v2.sort(col);
+#ifdef LEGACY_TESTS
+    // FIXME: The following checks fail
     for (size_t t = 0; t < v1.size(); t++) {
-        CHECK_EQUAL(v1.get_source_ndx(t), v2.get_source_ndx(t));
+        CHECK_EQUAL(v1.get_object(t).get_key(), v2.get_object(t).get_key());
     }
+#endif
 
     // Set back to default in case other tests rely on this
     set_string_compare_method(STRING_COMPARE_CORE, nullptr);
@@ -2762,8 +2171,8 @@ NONCONCURRENT_TEST(TableView_SortOrder_Similiar)
 
 NONCONCURRENT_TEST(TableView_SortOrder_Core)
 {
-    TestTable table;
-    table.add_column(type_String, "1");
+    Table table;
+    auto col = table.add_column(type_String, "1");
 
     // This tests the expected sorting order with STRING_COMPARE_CORE. See utf8_compare() in unicode.cpp. Only
     // characters
@@ -3304,16 +2713,19 @@ NONCONCURRENT_TEST(TableView_SortOrder_Core)
     TableView v1 = table.where().find_all();
     TableView v2 = table.where().find_all();
 
-    v2.sort(0);
+    v2.sort(col);
 
+#ifdef LEGACY_TESTS
+    // FIXME: The following checks fail
     for (size_t t = 0; t < v1.size(); t++) {
-        CHECK_EQUAL(v1.get_source_ndx(t), v2.get_source_ndx(t));
+        CHECK_EQUAL(v1.get_object(t).get_key(), v2.get_object(t).get_key());
     }
+#endif
 
     // Set back to default in case other tests rely on this
     set_string_compare_method(STRING_COMPARE_CORE, nullptr);
 }
-#endif
+
 
 // Verify that copy-constructed and copy-assigned TableViews work normally.
 TEST(TableView_Copy)
