@@ -4224,7 +4224,7 @@ TEST(Table_Ops) {
 }
 
 
-ONLY(Table_MultipleObjs) {
+TEST(Table_MultipleObjs) {
     SHARED_GROUP_TEST_PATH(path);
 
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
