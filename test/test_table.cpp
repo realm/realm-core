@@ -1313,6 +1313,16 @@ TEST(Table_AddInt)
     CHECK_LOGIC_ERROR(obj.add_int(col_int_null, 123), LogicError::illegal_combination);
 }
 
+TEST(Table_AddIntIndexed)
+{
+    Table table;
+    auto col = table.add_column(DataType(0), "int_1", false);
+    Obj obj = table.create_object();
+    table.add_search_index(col);
+    obj.add_int(col, 8463800223514590069);
+    obj.remove();
+}
+
 TEST(Table_Distinct)
 {
     Table table;
