@@ -4731,10 +4731,9 @@ TEST(LangBindHelper_TableViewAggregateAfterAdvanceRead)
     CHECK_EQUAL(ObjKey(), res);
 }
 
-#ifdef LEGACY_TESTS   // FIXME fails
 // Tests handover of a Query. Especially it tests if next-gen-syntax nodes are deep copied correctly by
 // executing an imported query multiple times in parallel
-ONLY(LangBindHelper_HandoverFuzzyTest)
+TEST(LangBindHelper_HandoverFuzzyTest)
 {
     SHARED_GROUP_TEST_PATH(path);
 
@@ -4778,6 +4777,11 @@ ONLY(LangBindHelper_HandoverFuzzyTest)
                 ll.add(o_d.get_key());
             }
         }
+        rt->verify();
+        {
+        	realm::Query query = dog->link(c3).column<String>(c0) == "owner" + to_string(rand() % numberOfOwner);
+        	query.find_all(); // <-- fails
+        }
         rt->commit();
     }
 
@@ -4810,7 +4814,7 @@ ONLY(LangBindHelper_HandoverFuzzyTest)
     TableRef owner = rt->get_table("Owner");
     TableRef dog = rt->get_table("Dog");
 
-    realm::Query query = dog->link(c3).column<String>(c2) == "owner" + to_string(rand() % numberOfOwner);
+    realm::Query query = dog->link(c3).column<String>(c0) == "owner" + to_string(rand() % numberOfOwner);
     query.find_all(); // <-- fails
 
     Thread slaves[threads];
@@ -4841,7 +4845,6 @@ ONLY(LangBindHelper_HandoverFuzzyTest)
     for (int i = 0; i != threads; ++i)
         slaves[i].join();
 }
-#endif
 
 
 // TableView::clear() was originally reported to be slow when table was indexed and had links, but performance
