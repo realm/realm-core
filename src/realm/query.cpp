@@ -1397,13 +1397,8 @@ TableView Query::find_all(size_t start, size_t end, size_t limit)
     return ret;
 }
 
-
-size_t Query::count(size_t start, size_t end, size_t limit) const
+size_t Query::do_count(size_t start, size_t end, size_t limit) const
 {
-#if REALM_METRICS
-    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Count);
-#endif
-
     if (limit == 0 || m_table->is_degenerate())
         return 0;
 
@@ -1441,8 +1436,20 @@ size_t Query::count(size_t start, size_t end, size_t limit) const
     return cnt;
 }
 
-TableView Query::do_find_all(const DescriptorOrdering& descriptor)
+size_t Query::count(size_t start, size_t end, size_t limit) const
 {
+#if REALM_METRICS
+    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Count);
+#endif
+    return do_count(start, end, limit);
+
+}
+
+TableView Query::find_all(const DescriptorOrdering& descriptor)
+{
+#if REALM_METRICS
+    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_FindAll);
+#endif
     const size_t default_start = 0;
     const size_t default_end = size_t(-1);
     const size_t default_limit = size_t(-1);
@@ -1476,15 +1483,6 @@ TableView Query::do_find_all(const DescriptorOrdering& descriptor)
     return ret;
 }
 
-TableView Query::find_all(const DescriptorOrdering& descriptor)
-{
-#if REALM_METRICS
-    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_FindAll);
-#endif
-    return do_find_all(descriptor);
-}
-
-
 size_t Query::count(const DescriptorOrdering& descriptor)
 {
 #if REALM_METRICS
@@ -1503,42 +1501,13 @@ size_t Query::count(const DescriptorOrdering& descriptor)
         if (bool(min_limit)) {
             limit = *min_limit;
         }
-
-        if (!has_conditions()) {
-            // User created query with no criteria; count all
-            if (m_view) {
-                return (limit < m_view->size() - start ? limit : m_view->size() - start);
-            }
-            else {
-                return (limit < end - start ? limit : end - start);
-            }
-        }
-
-        init();
-        size_t cnt = 0;
-
-        if (m_view) {
-            for (size_t t = 0; t < m_view->size() && cnt < limit; t++) {
-                size_t tablerow = static_cast<size_t>(m_view->m_row_indexes.get(t));
-                if (tablerow < end && peek_tablerow(tablerow) != not_found) {
-                    cnt++;
-                }
-            }
-        }
-        else {
-            QueryState<int64_t> st;
-            st.init(act_Count, nullptr, limit);
-            aggregate_internal(act_Count, ColumnTypeTraits<int64_t>::id, false, root_node(), &st, start, end, nullptr);
-            cnt = size_t(st.m_state);
-        }
-        return cnt;
+        return do_count(start, end, limit);
     }
 
     TableView ret(*m_table, *this, start, end, limit);
     ret.apply_descriptor_ordering(descriptor);
     return ret.size();
 }
-
 
 // todo, not sure if start, end and limit could be useful for delete.
 size_t Query::remove()
