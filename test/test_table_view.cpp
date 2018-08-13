@@ -704,40 +704,40 @@ NONCONCURRENT_TEST(TableView_StringSort)
     // Set back to default for use by other unit tests
     set_string_compare_method(STRING_COMPARE_CORE, nullptr);
 }
-
+#endif
 
 TEST(TableView_FloatDoubleSort)
 {
     Table t;
-    t.add_column(type_Float, "1");
-    t.add_column(type_Double, "2");
+    auto col_float = t.add_column(type_Float, "1");
+    auto col_double = t.add_column(type_Double, "2");
 
-    add(t, 1.0f, 10.0);
-    add(t, 3.0f, 30.0);
-    add(t, 2.0f, 20.0);
-    add(t, 0.0f, 5.0);
+    t.create_object().set_all(1.0f, 10.0);
+    t.create_object().set_all(3.0f, 30.0);
+    t.create_object().set_all(2.0f, 20.0);
+    t.create_object().set_all(0.0f, 5.0);
 
     TableView tv = t.where().find_all();
-    tv.sort(0);
+    tv.sort(col_float);
 
-    CHECK_EQUAL(0.0f, tv[0].get_float(0));
-    CHECK_EQUAL(1.0f, tv[1].get_float(0));
-    CHECK_EQUAL(2.0f, tv[2].get_float(0));
-    CHECK_EQUAL(3.0f, tv[3].get_float(0));
+    CHECK_EQUAL(0.0f, tv[0].get<float>(col_float));
+    CHECK_EQUAL(1.0f, tv[1].get<float>(col_float));
+    CHECK_EQUAL(2.0f, tv[2].get<float>(col_float));
+    CHECK_EQUAL(3.0f, tv[3].get<float>(col_float));
 
-    tv.sort(1);
-    CHECK_EQUAL(5.0f, tv[0].get_double(1));
-    CHECK_EQUAL(10.0f, tv[1].get_double(1));
-    CHECK_EQUAL(20.0f, tv[2].get_double(1));
-    CHECK_EQUAL(30.0f, tv[3].get_double(1));
+    tv.sort(col_double);
+    CHECK_EQUAL(5.0f, tv[0].get<double>(col_double));
+    CHECK_EQUAL(10.0f, tv[1].get<double>(col_double));
+    CHECK_EQUAL(20.0f, tv[2].get<double>(col_double));
+    CHECK_EQUAL(30.0f, tv[3].get<double>(col_double));
 }
 
 TEST(TableView_DoubleSortPrecision)
 {
-    // Detect if sorting algorithm accidentially casts doubles to float somewhere so that precision gets lost
+    // Detect if sorting algorithm accidentally casts doubles to float somewhere so that precision gets lost
     Table t;
-    t.add_column(type_Float, "1");
-    t.add_column(type_Double, "2");
+    auto col_float = t.add_column(type_Float, "1");
+    auto col_double = t.add_column(type_Double, "2");
 
     double d1 = 100000000000.0;
     double d2 = 100000000001.0;
@@ -752,124 +752,134 @@ TEST(TableView_DoubleSortPrecision)
     // First verify that our unit is guaranteed to find such a bug; that is, test if such a cast is guaranteed to give
     // bad sorting order. This is not granted, because an unstable sorting algorithm could *by chance* give the
     // correct sorting order. Fortunatly we use std::stable_sort which must maintain order on draws.
-    add(t, f2, d2);
-    add(t, f1, d1);
+    t.create_object().set_all(f2, d2);
+    t.create_object().set_all(f1, d1);
 
     TableView tv = t.where().find_all();
-    tv.sort(0);
+    tv.sort(col_float);
 
     // Sort should be stable
-    CHECK_EQUAL(f2, tv[0].get_float(0));
-    CHECK_EQUAL(f1, tv[1].get_float(0));
+    CHECK_EQUAL(f2, tv[0].get<float>(col_float));
+    CHECK_EQUAL(f1, tv[1].get<float>(col_float));
 
-    // If sort is stable, and compare makes a draw because the doubles are accidentially casted to float in Realm,
+    // If sort is stable, and compare makes a draw because the doubles are accidentally casted to float in Realm,
     // then
     // original order would be maintained. Check that it's not maintained:
-    tv.sort(1);
-    CHECK_EQUAL(d1, tv[0].get_double(1));
-    CHECK_EQUAL(d2, tv[1].get_double(1));
+    tv.sort(col_double);
+    CHECK_EQUAL(d1, tv[0].get<double>(col_double));
+    CHECK_EQUAL(d2, tv[1].get<double>(col_double));
 }
 
 TEST(TableView_SortNullString)
 {
     Table t;
-    t.add_column(type_String, "s", true);
-    t.add_empty_row(4);
-    t.set_string(0, 0, StringData("")); // empty string
-    t.set_string(0, 1, realm::null());  // realm::null()
-    t.set_string(0, 2, StringData("")); // empty string
-    t.set_string(0, 3, realm::null());  // realm::null()
+    auto col = t.add_column(type_String, "s", true);
+    Obj obj = t.create_object().set(col, StringData("")); // empty string
+    t.create_object().set(col, realm::null());            // realm::null()
+    t.create_object().set(col, StringData(""));           // empty string
+    t.create_object().set(col, realm::null());            // realm::null()
 
     TableView tv;
 
     tv = t.where().find_all();
-    tv.sort(0);
-    CHECK(tv.get_string(0, 0).is_null());
-    CHECK(tv.get_string(0, 1).is_null());
-    CHECK(!tv.get_string(0, 2).is_null());
-    CHECK(!tv.get_string(0, 3).is_null());
+    tv.sort(col);
+    CHECK(tv[0].get<String>(col).is_null());
+    CHECK(tv[1].get<String>(col).is_null());
+    CHECK_NOT(tv[2].get<String>(col).is_null());
+    CHECK_NOT(tv[3].get<String>(col).is_null());
 
-    t.set_string(0, 0, StringData("medium medium medium medium"));
-
-    tv = t.where().find_all();
-    tv.sort(0);
-    CHECK(tv.get_string(0, 0).is_null());
-    CHECK(tv.get_string(0, 1).is_null());
-    CHECK(!tv.get_string(0, 2).is_null());
-    CHECK(!tv.get_string(0, 3).is_null());
-
-    t.set_string(0, 0, StringData("long long long long long long long long long long long long long long"));
+    obj.set(col, StringData("medium medium medium medium"));
 
     tv = t.where().find_all();
-    tv.sort(0);
-    CHECK(tv.get_string(0, 0).is_null());
-    CHECK(tv.get_string(0, 1).is_null());
-    CHECK(!tv.get_string(0, 2).is_null());
-    CHECK(!tv.get_string(0, 3).is_null());
+    tv.sort(col);
+    CHECK(tv[0].get<String>(col).is_null());
+    CHECK(tv[1].get<String>(col).is_null());
+    CHECK_NOT(tv[2].get<String>(col).is_null());
+    CHECK_NOT(tv[3].get<String>(col).is_null());
+
+    obj.set(col, StringData("long long long long long long long long long long long long long long"));
+
+    tv = t.where().find_all();
+    tv.sort(col);
+    CHECK(tv[0].get<String>(col).is_null());
+    CHECK(tv[1].get<String>(col).is_null());
+    CHECK_NOT(tv[2].get<String>(col).is_null());
+    CHECK_NOT(tv[3].get<String>(col).is_null());
 }
 
 TEST(TableView_Delete)
 {
     Table table;
-    table.add_column(type_Int, "first");
+    auto col = table.add_column(type_Int, "first");
 
-    table.create_object().set_all( 1);
-    table.create_object().set_all( 2);
-    table.create_object().set_all( 1);
-    table.create_object().set_all( 3);
-    table.create_object().set_all( 1);
+    auto k0 = table.create_object().set(col, 1).get_key();
+    table.create_object().set(col, 2);
+    table.create_object().set(col, 1);
+    table.create_object().set(col, 3);
+    auto k4 = table.create_object().set(col, 1).get_key();
 
-    TableView v = table.find_all_int(0, 1);
-    CHECK_EQUAL(3, v.size());
+    TableView v = table.find_all_int(col, 1);
+    CHECK_EQUAL(3, v.size()); // k0, k2, k4
 
-    v.remove(1);
+    v.remove(1); // k0, k4
     CHECK_EQUAL(2, v.size());
-    CHECK_EQUAL(0, v.get_source_ndx(0));
-    CHECK_EQUAL(3, v.get_source_ndx(1));
+    CHECK_EQUAL(k0, v.get_key(0));
+    CHECK_EQUAL(k4, v.get_key(1));
 
     CHECK_EQUAL(4, table.size());
-    CHECK_EQUAL(1, table[0].get_int(0));
-    CHECK_EQUAL(2, table[1].get_int(0));
-    CHECK_EQUAL(3, table[2].get_int(0));
-    CHECK_EQUAL(1, table[3].get_int(0));
+    auto it = table.begin();
+    CHECK_EQUAL(1, it->get<int64_t>(col));
+    ++it;
+    CHECK_EQUAL(2, it->get<int64_t>(col));
+    ++it;
+    CHECK_EQUAL(3, it->get<int64_t>(col));
+    ++it;
+    CHECK_EQUAL(1, it->get<int64_t>(col));
 
-    v.remove(0);
+    v.remove(0); // k4
     CHECK_EQUAL(1, v.size());
-    CHECK_EQUAL(2, v.get_source_ndx(0));
+    CHECK_EQUAL(k4, v.get_key(0));
 
     CHECK_EQUAL(3, table.size());
-    CHECK_EQUAL(2, table[0].get_int(0));
-    CHECK_EQUAL(3, table[1].get_int(0));
-    CHECK_EQUAL(1, table[2].get_int(0));
+    it = table.begin();
+    CHECK_EQUAL(2, it->get<int64_t>(col));
+    ++it;
+    CHECK_EQUAL(3, it->get<int64_t>(col));
+    ++it;
+    CHECK_EQUAL(1, it->get<int64_t>(col));
 
     v.remove(0);
     CHECK_EQUAL(0, v.size());
 
     CHECK_EQUAL(2, table.size());
-    CHECK_EQUAL(2, table[0].get_int(0));
-    CHECK_EQUAL(3, table[1].get_int(0));
+    it = table.begin();
+    CHECK_EQUAL(2, it->get<int64_t>(col));
+    ++it;
+    CHECK_EQUAL(3, it->get<int64_t>(col));
 }
 
 TEST(TableView_Clear)
 {
     Table table;
-    table.add_column(type_Int, "first");
+    auto col = table.add_column(type_Int, "first");
 
-    table.create_object().set_all( 1);
-    table.create_object().set_all( 2);
-    table.create_object().set_all( 1);
-    table.create_object().set_all( 3);
-    table.create_object().set_all( 1);
+    table.create_object().set(col, 1);
+    table.create_object().set(col, 2);
+    table.create_object().set(col, 1);
+    table.create_object().set(col, 3);
+    table.create_object().set(col, 1);
 
-    TableView v = table.find_all_int(0, 1);
+    TableView v = table.find_all_int(col, 1);
     CHECK_EQUAL(3, v.size());
 
     v.clear();
     CHECK_EQUAL(0, v.size());
 
     CHECK_EQUAL(2, table.size());
-    CHECK_EQUAL(2, table[0].get_int(0));
-    CHECK_EQUAL(3, table[1].get_int(0));
+    auto it = table.begin();
+    CHECK_EQUAL(2, it->get<int64_t>(col));
+    ++it;
+    CHECK_EQUAL(3, it->get<int64_t>(col));
 }
 
 
@@ -878,20 +888,18 @@ TEST(TableView_Clear)
 TEST(TableView_Imperative_Clear)
 {
     Table t;
-    t.add_column(type_Int, "i1");
-    t.add_empty_row(3);
-    t.set_int(0, 0, 7);
-    t.set_int(0, 1, 13);
-    t.set_int(0, 2, 29);
+    auto col = t.add_column(type_Int, "i1");
+    t.create_object().set(col, 7);
+    t.create_object().set(col, 13);
+    t.create_object().set(col, 29);
 
-    TableView v = t.where().less(0, 20).find_all();
+    TableView v = t.where().less(col, 20).find_all();
     CHECK_EQUAL(2, v.size());
     // remove the underlying entry in the table, introducing a detached ref
-    t.move_last_over(v.get_source_ndx(0));
+    t.remove_object(v.get_key(0));
     // the detached ref still counts as an entry when calling size()
     CHECK_EQUAL(2, v.size());
-    // but is does not count as attached anymore:
-    CHECK_EQUAL(1, v.num_attached_rows());
+
     v.clear();
     CHECK_EQUAL(0, v.size());
     CHECK_EQUAL(1, t.size());
@@ -904,30 +912,25 @@ TEST(TableView_Imperative_Clear)
 TEST(TableView_Stacked)
 {
     Table t;
-    t.add_column(type_Int, "i1");
-    t.add_column(type_Int, "i2");
-    t.add_column(type_String, "S1");
-    t.add_empty_row(2);
-    t.set_int(0, 0, 1);      // 1
-    t.set_int(1, 0, 2);      // 2
-    t.set_string(2, 0, "A"); // "A"
-    t.set_int(0, 1, 2);      // 2
-    t.set_int(1, 1, 2);      // 2
-    t.set_string(2, 1, "B"); // "B"
+    auto col_int0 = t.add_column(type_Int, "i1");
+    auto col_int1 = t.add_column(type_Int, "i2");
+    auto col_str = t.add_column(type_String, "S1");
+    t.create_object().set_all(1, 2, "A");
+    t.create_object().set_all(2, 2, "B");
 
-    TableView tv = t.find_all_int(0, 2);
-    TableView tv2 = tv.find_all_int(1, 2);
+    TableView tv = t.find_all_int(col_int0, 2);
+    auto tv2 = tv.find_all<Int>(col_int1, 2);
     CHECK_EQUAL(1, tv2.size());             // evaluates tv2.size to 1 which is expected
-    CHECK_EQUAL("B", tv2.get_string(2, 0)); // evalates get_string(2,0) to "A" which is not expected
+    CHECK_EQUAL("B", tv2[0].get<String>(col_str)); // evalates get_string(2,0) to "A" which is not expected
 }
 
 
 TEST(TableView_ClearNone)
 {
     Table table;
-    table.add_column(type_Int, "first");
+    auto col = table.add_column(type_Int, "first");
 
-    TableView v = table.find_all_int(0, 1);
+    TableView v = table.find_all_int(col, 1);
     CHECK_EQUAL(0, v.size());
 
     v.clear();
@@ -936,29 +939,27 @@ TEST(TableView_ClearNone)
 TEST(TableView_FindAllStacked)
 {
     Table table;
-    table.add_column(type_Int, "1");
-    table.add_column(type_Int, "2");	
+    auto col_int0 = table.add_column(type_Int, "1");
+    auto col_int1 = table.add_column(type_Int, "2");
 
     table.create_object().set_all( 0, 1);
-    table.create_object().set_all( 0, 2);
+    auto k = table.create_object().set_all(0, 2).get_key();
     table.create_object().set_all( 0, 3);
     table.create_object().set_all( 1, 1);
     table.create_object().set_all( 1, 2);
     table.create_object().set_all( 1, 3);
 
-    TableView v = table.find_all_int(0, 0);
+    TableView v = table.find_all_int(col_int0, 0);
     CHECK_EQUAL(3, v.size());
 
-    TableView v2 = v.find_all_int(1, 2);
+    auto v2 = v.find_all<Int>(col_int1, 2);
     CHECK_EQUAL(1, v2.size());
-    CHECK_EQUAL(0, v2[0].get_int(0));
-    CHECK_EQUAL(2, v2[0].get_int(1));
-    CHECK_EQUAL(1, v2.get_source_ndx(0));
+    CHECK_EQUAL(0, v2[0].get<Int>(col_int0));
+    CHECK_EQUAL(2, v2[0].get<Int>(col_int1));
+    CHECK_EQUAL(k, v2.get_key(0));
 }
 
-
-
-
+#ifdef LEGACY_TESTS
 TEST(TableView_DynPivot)
 {
     TableRef table = Table::create();

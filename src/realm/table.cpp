@@ -1249,7 +1249,7 @@ void Table::batch_erase_rows(const KeyColumn& keys)
     vec.reserve(num_objs);
     for (size_t i = 0; i < num_objs; ++i) {
         ObjKey key = keys.get(i);
-        if (key != null_key) {
+        if (key != null_key && is_valid(key)) {
             vec.push_back(key);
         }
     }
