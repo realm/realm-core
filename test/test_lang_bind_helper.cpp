@@ -2840,8 +2840,7 @@ This unit test has been disabled as it occasionally gets itself into a hang
 */
 
 #if 0
-// #ifdef LEGACY_TESTS
-// ^just a marker, that this disabled unittest will need porting
+// This disabled unittest will need porting
 // if we ever try to re-enable it.
 TEST(LangBindHelper_ImplicitTransactions_InterProcess)
 {
@@ -2928,7 +2927,6 @@ TEST(LangBindHelper_ImplicitTransactions_InterProcess)
 
 }
 
-// #endif // LEGACY_TESTS
 #endif // 0
 #endif // !REALM_ANDROID && !REALM_IOS
 #endif // not REALM_ENABLE_ENCRYPTION
@@ -3883,7 +3881,7 @@ TEST(LangBindHelper_HandoverTableViewWithQueryOnLink)
 }
 
 
-#ifdef LEGACY_TESTS
+#ifdef LEGACY_TESTS   // (not useful as std unittest)
 namespace {
 
 void do_write_work(std::string path, size_t id, size_t num_rows) {
@@ -4002,115 +4000,6 @@ TEST_IF(Thread_AsynchronousIODataConsistency, false)
 }
 #endif
 
-#ifdef LEGACY_TESTS
-TEST(Query_ListOfPrimitivesHandover)
-{
-    SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
-    auto& group = sg.begin_read();
-
-    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    DBRef sg_w = DB::create(*hist_w, DBOptions(crypt_key()));
-    Group& group_w = const_cast<Group&>(sg_w.begin_read());
-    DB::VersionID vid;
-
-    std::unique_ptr<DB::Handover<TableView>> table_view_handover;
-    {
-        LangBindHelper::promote_to_write(sg_w);
-
-        TableRef t = group_w.add_table("table");
-        DescriptorRef subdesc;
-        size_t int_col = t->add_column(type_Table, "integers", false, &subdesc);
-        subdesc->add_column(type_Int, "list", nullptr, true);
-
-        t->add_empty_row(10);
-
-        auto set_list = [](TableRef subtable, const std::vector<int64_t>& value_list) {
-            size_t sz = value_list.size();
-            subtable->clear();
-            subtable->add_empty_row(sz);
-            for (size_t i = 0; i < sz; i++) {
-                subtable->set_int(0, i, value_list[i]);
-            }
-        };
-
-        set_list(t->get_subtable(int_col, 0), std::vector<int64_t>({1, 2, 3}));
-        set_list(t->get_subtable(int_col, 1), std::vector<int64_t>({1, 3, 5, 7}));
-        set_list(t->get_subtable(int_col, 2), std::vector<int64_t>({100, 400, 200, 500, 300}));
-
-        auto query = t->get_subtable(int_col, 2)->column<Int>(0) > 225;
-        auto tv = query.find_all();
-
-        LangBindHelper::commit_and_continue_as_read(sg_w);
-        vid = sg_w.get_version_of_current_transaction();
-        table_view_handover = sg_w.export_for_handover(tv, ConstSourcePayload::Stay);
-    }
-
-    LangBindHelper::advance_read(sg, vid);
-    auto table_view = sg.import_from_handover(std::move(table_view_handover));
-    table_view->sync_if_needed();
-    CHECK_EQUAL(table_view->size(), 3);
-    CHECK_EQUAL(table_view->get_int(0, 0), 400);
-
-    {
-        LangBindHelper::promote_to_write(sg_w);
-
-        TableRef t = group_w.get_or_add_table("table");
-        auto sub = t->get_subtable(0, 2);
-        sub->insert_empty_row(0);
-        sub->set_int(0, 0, 600);
-        t->remove(0);
-        // table_view is now associated with row 1
-
-        LangBindHelper::commit_and_continue_as_read(sg_w);
-    }
-
-    rt->advance_read();
-    table_view->sync_if_needed();
-    CHECK_EQUAL(table_view->size(), 4);
-    CHECK_EQUAL(table_view->get_int(0, 0), 600);
-    auto subtable = rt->get_table("table")->get_subtable(0, 0);
-    auto query = subtable->where();
-    auto sum = query.sum_int(0);
-    CHECK_EQUAL(sum, 16);
-
-    {
-        LangBindHelper::promote_to_write(sg_w);
-
-        TableRef t = group_w.get_or_add_table("table");
-        // Remove the row, table_view is associated with
-        t->remove(1);
-
-        // Create a view based on a degenerate table
-        auto q = t->get_subtable(0, 2)->column<Int>(0) > 225;
-        auto tv = q.find_all();
-
-        LangBindHelper::commit_and_continue_as_read(sg_w);
-        table_view_handover = sg_w.export_for_handover(tv, ConstSourcePayload::Stay);
-    }
-    rt->advance_read();
-    CHECK(!table_view->is_attached());
-
-    table_view = sg.import_from_handover(std::move(table_view_handover));
-    table_view->sync_if_needed();
-    CHECK_EQUAL(table_view->size(), 0);
-
-    {
-        LangBindHelper::promote_to_write(sg_w);
-
-        TableRef t = group_w.get_or_add_table("table");
-        // Remove the row, g is associated with
-        t->remove(0);
-
-        LangBindHelper::commit_and_continue_as_read(sg_w);
-    }
-    rt->advance_read();
-    sum = 0;
-    CHECK_LOGIC_ERROR(sum = query.sum_int(0), LogicError::detached_accessor);
-    CHECK_EQUAL(sum, 0);
-}
-#endif
 
 TEST(LangBindHelper_HandoverTableRef)
 {
@@ -4842,11 +4731,10 @@ TEST(LangBindHelper_TableViewAggregateAfterAdvanceRead)
     CHECK_EQUAL(ObjKey(), res);
 }
 
-
-#ifdef LEGACY_TESTS
+#ifdef LEGACY_TESTS   // FIXME fails
 // Tests handover of a Query. Especially it tests if next-gen-syntax nodes are deep copied correctly by
 // executing an imported query multiple times in parallel
-TEST(LangBindHelper_HandoverFuzzyTest)
+ONLY(LangBindHelper_HandoverFuzzyTest)
 {
     SHARED_GROUP_TEST_PATH(path);
 
@@ -4855,77 +4743,60 @@ TEST(LangBindHelper_HandoverFuzzyTest)
     size_t numberOfOwner = 100;
     size_t numberOfDogsPerOwner = 20;
 
-    std::vector<DB::VersionID> vids;
-    std::vector<std::unique_ptr<DB::Handover<Query>>> qs;
+    std::vector<TransactionRef> vids;
+    std::vector<std::unique_ptr<Query>> qs;
     std::mutex vector_mutex;
 
     std::atomic<bool> end_signal(false);
-
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
+    ColKey c0, c1, c2, c3;
     {
-        std::unique_ptr<Replication> hist(make_in_realm_history(path));
-        DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
-        sg.begin_read();
+        auto rt = sg->start_write();
 
-        std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-        DBRef sg_w = DB::create(*hist_w, DBOptions(crypt_key()));
-        Group& group_w = const_cast<Group&>(sg_w.begin_read());
+        TableRef owner = rt->add_table("Owner");
+        TableRef dog = rt->add_table("Dog");
 
-        // First setup data so that we can do a query on links
-        LangBindHelper::promote_to_write(sg_w);
+        c0 = owner->add_column(type_String, "name");
+        c1 = owner->add_column_link(type_LinkList, "link", *dog);
 
-        TableRef owner = group_w.add_table("Owner");
-        TableRef dog = group_w.add_table("Dog");
-
-        owner->add_column(type_String, "name");
-        owner->add_column_link(type_LinkList, "link", *dog);
-
-        dog->add_column(type_String, "name");
-        dog->add_column_link(type_Link, "link", *owner);
+        c2 = dog->add_column(type_String, "name");
+        c3 = dog->add_column_link(type_Link, "link", *owner);
 
         for (size_t i = 0; i < numberOfOwner; i++) {
 
-            size_t r_i = owner->add_empty_row();
+            auto o = owner->create_object();
             std::string owner_str(std::string("owner") + to_string(i));
-            owner->set_string(0, r_i, owner_str);
+            o.set<StringData>(c0, owner_str);
 
             for (size_t j = 0; j < numberOfDogsPerOwner; j++) {
-                size_t r_j = dog->add_empty_row();
+                auto o_d = dog->create_object();
                 std::string dog_str(std::string("dog") + to_string(i * numberOfOwner + j));
-                dog->set_string(0, r_j, dog_str);
-                dog->set_link(1, r_j, i);
-                LinkViewRef ll = owner->get_linklist(1, i);
-                ll->add(r_j);
+                o_d.set<StringData>(c2, dog_str);
+                o_d.set(c3, o.get_key());
+                auto ll = o.get_linklist(c1);
+                ll.add(o_d.get_key());
             }
         }
-
-        LangBindHelper::commit_and_continue_as_read(sg_w);
+        rt->commit();
     }
 
     auto async = [&]() {
         // Async thread
         //************************************************************************************************
-        std::unique_ptr<Replication> hist(make_in_realm_history(path));
-        DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
-        sg.begin_read();
-
         while (!end_signal) {
             millisleep(10);
 
             vector_mutex.lock();
             if (qs.size() > 0) {
 
-                DB::VersionID v = std::move(vids[0]);
+            	auto t = vids[0];
                 vids.erase(vids.begin());
-                std::unique_ptr<DB::Handover<Query>> qptr = move(qs[0]);
+                auto q = std::move(qs[0]);
                 qs.erase(qs.begin());
                 vector_mutex.unlock();
 
-                // We cannot advance backwards compared to our initial begin_read() outside the while loop
-                if (v >= sg.get_version_of_current_transaction()) {
-                    LangBindHelper::advance_read(sg, v);
-                    std::unique_ptr<Query> q(sg.import_from_handover(move(qptr)));
-                    realm::TableView tv = q->find_all();
-                }
+                realm::TableView tv = q->find_all();
             }
             else {
                 vector_mutex.unlock();
@@ -4934,15 +4805,13 @@ TEST(LangBindHelper_HandoverFuzzyTest)
         //************************************************************************************************
     };
 
-    std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
-    Group& group = const_cast<Group&>(sg.begin_read());
-
+    auto rt = sg->start_read();
     // Create and export query
     TableRef owner = rt->get_table("Owner");
     TableRef dog = rt->get_table("Dog");
 
-    realm::Query query = dog->link(1).column<String>(0) == "owner" + to_string(rand() % numberOfOwner);
+    realm::Query query = dog->link(c3).column<String>(c2) == "owner" + to_string(rand() % numberOfOwner);
+    query.find_all(); // <-- fails
 
     Thread slaves[threads];
     for (int i = 0; i != threads; ++i) {
@@ -4953,12 +4822,13 @@ TEST(LangBindHelper_HandoverFuzzyTest)
     //************************************************************************************************
     for (size_t iter = 0; iter < 20 + TEST_DURATION * TEST_DURATION * 500; iter++) {
         vector_mutex.lock();
-        LangBindHelper::promote_to_write(sg);
-        LangBindHelper::commit_and_continue_as_read(sg);
+        rt->promote_to_write();
+        rt->commit_and_continue_as_read();
         if (qs.size() < 100) {
             for (size_t t = 0; t < 5; t++) {
-                qs.push_back(sg.export_for_handover(query, MutableSourcePayload::Move));
-                vids.push_back(sg.get_version_of_current_transaction());
+            	auto t2 = rt->duplicate();
+                qs.push_back(t2->import_copy_of(query, PayloadPolicy::Move));
+                vids.push_back(t2);
             }
         }
         vector_mutex.unlock();
@@ -5439,8 +5309,7 @@ TEST(LangBindHelper_Bug2295)
     CHECK_EQUAL(lv1.size(), i);
 }
 
-#ifdef LEGACY_TESTS
-// FIXME: Requires get_at() method to be available on ConstObj.
+#ifdef LEGACY_TESTS   // FIXME: Requires get_at() method to be available on ConstObj.
 ONLY(LangBindHelper_BigBinary)
 {
     SHARED_GROUP_TEST_PATH(path);

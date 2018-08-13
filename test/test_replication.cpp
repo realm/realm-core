@@ -197,15 +197,6 @@ private:
     std::unique_ptr<BinaryColumn> m_arr;
 };
 
-#ifdef LEGACY_TESTS
-void check(TestContext& test_context, DB& sg_1, const ReadTransaction& rt_2)
-{
-    ReadTransaction rt_1(sg_1);
-    rt_1.get_group().verify();
-    rt_2.get_group().verify();
-    CHECK(rt_1.get_group() == rt_2.get_group());
-}
-#endif
 } // anonymous namespace
 
 TEST(Replication_HistorySchemaVersionNormal)
