@@ -536,7 +536,11 @@ Obj& Obj::add_int(ColKey col_key, int64_t value)
         values.init_from_parent();
         Optional<int64_t> old = values.get(m_row_ndx);
         if (old) {
-            values.set(m_row_ndx, add_wrap(*old, value));
+            auto new_val = add_wrap(*old, value);
+            if (StringIndex* index = m_table->get_search_index(col_ndx)) {
+                index->set<int64_t>(m_key, new_val);
+            }
+            values.set(m_row_ndx, new_val);
         }
         else {
             throw LogicError{LogicError::illegal_combination};
@@ -547,7 +551,11 @@ Obj& Obj::add_int(ColKey col_key, int64_t value)
         values.set_parent(&fields, col_ndx + 1);
         values.init_from_parent();
         int64_t old = values.get(m_row_ndx);
-        values.set(m_row_ndx, add_wrap(old, value));
+        auto new_val = add_wrap(old, value);
+        if (StringIndex* index = m_table->get_search_index(col_ndx)) {
+            index->set<int64_t>(m_key, new_val);
+        }
+        values.set(m_row_ndx, new_val);
     }
 
     if (Replication* repl = alloc.get_replication()) {
