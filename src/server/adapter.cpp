@@ -542,7 +542,6 @@ private:
     std::shared_ptr<SyncUser> m_user;
     std::function<SyncBindSessionHandler> m_bind_callback;
     std::shared_ptr<ChangesetCooker> m_transformer;
-    std::string m_regular_realms_dir;
 
     std::function<void(std::string)> m_realm_changed;
     std::regex m_regex;
@@ -555,11 +554,9 @@ Adapter::Impl::Impl(std::function<void(std::string)> realm_changed, std::regex r
                     std::string local_root_dir, SyncConfig sync_config_template)
 : AdminRealmListener(std::move(local_root_dir), std::move(sync_config_template))
 , m_transformer(std::make_shared<ChangesetCooker>())
-, m_regular_realms_dir(util::File::resolve("realms", local_root_dir)) // Throws
 , m_realm_changed(std::move(realm_changed))
 , m_regex(std::move(regex))
 {
-    util::try_make_dir(m_regular_realms_dir); // Throws
 }
 
 Realm::Config Adapter::Impl::get_config(StringData virtual_path, util::Optional<Schema> schema) const {

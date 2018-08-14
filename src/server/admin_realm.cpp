@@ -166,7 +166,7 @@ void AdminRealmListener::start()
 Realm::Config AdminRealmListener::get_config(StringData virtual_path, StringData id) const {
     Realm::Config config;
 
-    std::string file_path = m_local_root_dir + virtual_path.data();
+    std::string file_path = m_local_root_dir + "/realms" + virtual_path.data();
     if (id) {
         file_path += std::string("/") + id.data();
     }

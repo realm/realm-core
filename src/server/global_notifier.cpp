@@ -103,7 +103,6 @@ public:
 
     const std::unique_ptr<util::Logger> m_logger;
     const std::unique_ptr<Callback> m_target;
-    std::string m_regular_realms_dir;
 
     std::mutex m_work_queue_mutex;
     struct RealmToCalculate {
@@ -144,9 +143,7 @@ GlobalNotifier::Impl::Impl(std::unique_ptr<Callback> async_target,
 : AdminRealmListener(local_root_dir, std::move(sync_config_template))
 , m_logger(make_logger())
 , m_target(std::move(async_target))
-, m_regular_realms_dir(util::File::resolve("realms", local_root_dir)) // Throws
 {
-    util::try_make_dir(m_regular_realms_dir); // Throws
 }
 
 void GlobalNotifier::Impl::register_realm(sync::ObjectID id, StringData path) {
