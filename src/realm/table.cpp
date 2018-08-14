@@ -2104,7 +2104,7 @@ void Table::dump_node_structure(std::ostream& out, int level) const
 Obj Table::create_object(ObjKey key, const FieldValues& values)
 {
     if (key == null_key) {
-        if (m_next_key_value == -1) {
+        if (m_next_key_value == -1 || is_valid(ObjKey(m_next_key_value))) {
             m_next_key_value = m_clusters.get_last_key_value() + 1;
         }
         key = ObjKey(m_next_key_value++);

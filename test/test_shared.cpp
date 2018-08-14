@@ -3817,4 +3817,50 @@ TEST(Shared_RemoveTableWithEnumAndLinkColumns)
     }
 }
 
+TEST(Shared_GenerateObjectIdAfterRollback)
+{
+    // Test case generated in [realm-core-6.0.0-alpha.0] on Mon Aug 13 14:43:06 2018.
+    // REALM_MAX_BPNODE_SIZE is 1000
+    // ----------------------------------------------------------------------
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
+    DBRef db_w = DB::create(*hist_w);
+
+    auto wt = db_w->start_write();
+
+    wt->add_table("Table_0");
+    {
+        std::vector<ObjKey> keys;
+        wt->get_table(TableKey(0))->create_objects(254, keys);
+    }
+    wt->commit_and_continue_as_read();
+
+    wt->promote_to_write();
+    try {
+        wt->remove_table(TableKey(0));
+    }
+    catch (const CrossTableLinkTarget&) {
+    }
+    // Table accessor recycled
+    wt->rollback_and_continue_as_read();
+
+    wt->promote_to_write();
+    // New table accessor created with m_next_key_value == -1
+    wt->get_table(TableKey(0))->clear();
+    {
+        std::vector<ObjKey> keys;
+        wt->get_table(TableKey(0))->create_objects(11, keys);
+    }
+    // table->m_next_key_value is now 11
+    wt->get_table(TableKey(0))->add_column(DataType(9), "float_1", false);
+    wt->rollback_and_continue_as_read();
+
+    wt->promote_to_write();
+    // Should not try to create object with key == 11
+    {
+        std::vector<ObjKey> keys;
+        wt->get_table(TableKey(0))->create_objects(22, keys);
+    }
+}
+
 #endif // TEST_SHARED
