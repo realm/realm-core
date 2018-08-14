@@ -384,42 +384,42 @@ TableVersions ConstTableView::get_dependencies() const
 {
     check_cookie();
 
+    TableVersions ret;
+
     if (m_linklist_source) {
         // m_linkview_source is set when this TableView was created by LinkView::get_as_sorted_view().
         if (m_linklist_source->is_attached()) {
             Table& table = m_linklist_source->get_target_table();
-            return {table.get_key(), table.get_content_version()};
-        }
-        else {
-            return {};
+            ret.emplace_back(table.get_key(), table.get_content_version());
         }
     }
-
-    // m_source_column_key is set when this TableView was created by Table::get_backlink_view().
-    if (m_source_column_key) {
+    else if (m_source_column_key) {
+        // m_source_column_key is set when this TableView was created by Table::get_backlink_view().
         if (m_linked_table) {
-            return {m_linked_table->get_key(), m_linked_table->get_content_version()};
-        }
-        else {
-            return {};
+            ret.emplace_back(m_linked_table->get_key(), m_linked_table->get_content_version());
         }
     }
     else if (m_query.m_table) {
-        return m_query.get_outside_versions();
+        ret = m_query.get_outside_versions();
+    }
+    else {
+        // This TableView was created by Table::get_distinct_view()
+        ret.emplace_back(m_table->get_key(), m_table->get_content_version());
     }
 
-    // This TableView was created by Table::get_distinct_view()
-    return {m_table->get_key(), m_table->get_content_version()};
+    // Finally add dependencies from sort/distinct
+    if (m_table) {
+        m_descriptor_ordering.get_versions(m_table->get_parent_group(), ret);
+    }
+
+    return ret;
 }
 
 bool ConstTableView::is_in_sync() const
 {
     check_cookie();
 
-    bool table = bool(m_table);
-    bool version = bool(m_last_seen_versions == get_dependencies());
-
-    return table && version;
+    return !m_table ? false : m_last_seen_versions == get_dependencies();
 }
 
 TableVersions ConstTableView::sync_if_needed() const
@@ -484,12 +484,16 @@ void ConstTableView::distinct(ColKey column)
 void ConstTableView::distinct(DistinctDescriptor columns)
 {
     m_descriptor_ordering.append_distinct(std::move(columns));
+    m_descriptor_ordering.collect_dependencies(m_table);
+
     do_sync();
 }
 
 void ConstTableView::apply_descriptor_ordering(DescriptorOrdering new_ordering)
 {
     m_descriptor_ordering = new_ordering;
+    m_descriptor_ordering.collect_dependencies(m_table);
+
     do_sync();
 }
 
@@ -508,6 +512,8 @@ void ConstTableView::sort(ColKey column, bool ascending)
 void ConstTableView::sort(SortDescriptor order)
 {
     m_descriptor_ordering.append_sort(std::move(order));
+    m_descriptor_ordering.collect_dependencies(m_table);
+
     do_sort(m_descriptor_ordering);
 }
 

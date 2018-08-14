@@ -18,6 +18,7 @@
 
 #include <realm/sort_descriptor.hpp>
 #include <realm/table.hpp>
+#include <realm/db.hpp>
 #include <realm/util/assert.hpp>
 
 using namespace realm;
@@ -30,6 +31,28 @@ CommonDescriptor::CommonDescriptor(std::vector<std::vector<ColKey>> column_keys)
 std::unique_ptr<CommonDescriptor> CommonDescriptor::clone() const
 {
     return std::unique_ptr<CommonDescriptor>(new CommonDescriptor(*this));
+}
+
+void CommonDescriptor::collect_dependencies(const Table* table, std::vector<TableKey>& table_keys) const
+{
+    for (auto& columns : m_column_keys) {
+        auto sz = columns.size();
+        // If size is 0 or 1 there is no link chain and hence no additional tables to check
+        if (sz > 1) {
+            const Table* t = table;
+            for (size_t i = 0; i < sz - 1; i++) {
+                ColKey col = columns[i];
+                ConstTableRef target_table;
+                if (t->get_column_type(col) == type_Link) {
+                    target_table = t->get_link_target(col);
+                }
+                if (!target_table)
+                    return;
+                table_keys.push_back(target_table->get_key());
+                t = target_table;
+            }
+        }
+    }
 }
 
 std::string CommonDescriptor::get_description(ConstTableRef attached_table) const
@@ -122,16 +145,17 @@ CommonDescriptor::Sorter::Sorter(std::vector<std::vector<ColKey>> const& column_
     m_columns.reserve(column_lists.size());
     for (size_t i = 0; i < column_lists.size(); ++i) {
         auto& columns = column_lists[i];
+        auto sz = columns.size();
         REALM_ASSERT_EX(!columns.empty(), i);
 
-        if (columns.size() == 1) { // no link chain
+        if (sz == 1) { // no link chain
             m_columns.emplace_back(&root_table, columns[0], ascending[i]);
             continue;
         }
 
         std::vector<const Table*> tables = {&root_table};
-        tables.resize(columns.size());
-        for (size_t j = 0; j + 1 < columns.size(); ++j) {
+        tables.resize(sz);
+        for (size_t j = 0; j + 1 < sz; ++j) {
             if (tables[j]->get_column_type(columns[j]) != type_Link) {
                 // Only last column in link chain is allowed to be non-link
                 throw LogicError(LogicError::type_mismatch);
@@ -148,7 +172,7 @@ CommonDescriptor::Sorter::Sorter(std::vector<std::vector<ColKey>> const& column_
 
         for (size_t row_ndx = 0; row_ndx < num_objs; row_ndx++) {
             ObjKey translated_key = ObjKey(key_values.get(row_ndx));
-            for (size_t j = 0; j + 1 < columns.size(); ++j) {
+            for (size_t j = 0; j + 1 < sz; ++j) {
                 ConstObj obj = tables[j]->get_object(translated_key);
                 // type was checked when creating the CommonDescriptor
                 if (obj.is_null(columns[j])) {
@@ -416,3 +440,18 @@ std::string DescriptorOrdering::get_description(ConstTableRef target_table) cons
     return description;
 }
 
+void DescriptorOrdering::collect_dependencies(const Table* table)
+{
+    m_dependencies.clear();
+    for (auto& descr : m_descriptors) {
+        descr->collect_dependencies(table, m_dependencies);
+    }
+}
+
+void DescriptorOrdering::get_versions(const Group* group, TableVersions& versions) const
+{
+    for (auto table_key : m_dependencies) {
+        REALM_ASSERT_DEBUG(group);
+        versions.emplace_back(table_key, group->get_table(table_key)->get_content_version());
+    }
+}

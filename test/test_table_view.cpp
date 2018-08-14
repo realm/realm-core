@@ -1242,6 +1242,115 @@ TEST(TableView_BacklinksAfterMoveAssign)
 
 #endif
 
+TEST(TableView_SortOverLink)
+{
+    Group g;
+    TableRef target = g.add_table("target");
+    TableRef origin = g.add_table("origin");
+    auto col_link = origin->add_column_link(type_Link, "link", *target);
+    auto col_int = origin->add_column(type_Int, "int");
+
+    auto col_str = target->add_column(type_String, "s", true);
+
+    target->create_object().set(col_str, StringData("bravo"));
+    target->create_object().set(col_str, StringData("alfa"));
+    target->create_object().set(col_str, StringData("delta"));
+    Obj obj = target->create_object().set(col_str, StringData("charley"));
+
+    int64_t i = 0;
+    for (auto it : *target) {
+        Obj o = origin->create_object();
+        o.set(col_int, i);
+        o.set(col_link, it.get_key());
+        i++;
+    }
+
+    auto tv = origin->where().greater(col_int, 1).find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(tv[0].get<Int>(col_int), 2);
+    CHECK_EQUAL(tv[1].get<Int>(col_int), 3);
+
+    std::vector<std::vector<ColKey>> v = {{col_link, col_str}};
+    std::vector<bool> a = {true};
+    tv.sort(SortDescriptor{v, a});
+    CHECK_EQUAL(tv[0].get<Int>(col_int), 3);
+    CHECK_EQUAL(tv[1].get<Int>(col_int), 2);
+
+    // Modifying origin table should trigger query - and sort
+    origin->begin()->set(col_int, 6);
+    tv.sync_if_needed();
+    CHECK_EQUAL(tv.size(), 3);
+    CHECK_EQUAL(tv[0].get<Int>(col_int), 6);
+    CHECK_EQUAL(tv[1].get<Int>(col_int), 3);
+    CHECK_EQUAL(tv[2].get<Int>(col_int), 2);
+
+    // Modifying target table should trigger sort
+    obj.set(col_str, StringData("echo"));
+    tv.sync_if_needed();
+    CHECK_EQUAL(tv.size(), 3);
+    CHECK_EQUAL(tv[0].get<Int>(col_int), 6);
+    CHECK_EQUAL(tv[1].get<Int>(col_int), 2);
+    CHECK_EQUAL(tv[2].get<Int>(col_int), 3);
+}
+
+TEST(TableView_SortOverMultiLink)
+{
+    Group g;
+    TableRef target = g.add_table("target");
+    TableRef between = g.add_table("between");
+    TableRef origin = g.add_table("origin");
+    auto col_link1 = origin->add_column_link(type_Link, "link", *between);
+    auto col_link2 = between->add_column_link(type_Link, "link", *target);
+    auto col_int = origin->add_column(type_Int, "int");
+
+    auto col_str = target->add_column(type_String, "str");
+
+    target->create_object().set(col_str, StringData("bravo"));
+    target->create_object().set(col_str, StringData("alfa"));
+    target->create_object().set(col_str, StringData("delta"));
+    target->create_object().set(col_str, StringData("charley"));
+
+    int64_t i = 27;
+    for (auto it : *target) {
+        Obj o1 = origin->create_object();
+        ObjKey k(i);
+        Obj o2 = between->create_object(k);
+        o1.set(col_int, i);
+        o1.set(col_link1, k);
+        o2.set(col_link2, it.get_key());
+        i++;
+    }
+
+    auto tv = origin->where().find_all();
+    CHECK_EQUAL(tv.size(), 4);
+    CHECK_EQUAL(tv[0].get<Int>(col_int), 27);
+    CHECK_EQUAL(tv[1].get<Int>(col_int), 28);
+    CHECK_EQUAL(tv[2].get<Int>(col_int), 29);
+    CHECK_EQUAL(tv[3].get<Int>(col_int), 30);
+
+    std::vector<std::vector<ColKey>> v = {{col_link1, col_link2, col_str}};
+    std::vector<bool> a = {true};
+    tv.sort(SortDescriptor{v, a});
+    CHECK_EQUAL(tv.size(), 4);
+    CHECK_EQUAL(tv[0].get<Int>(col_int), 28);
+    CHECK_EQUAL(tv[1].get<Int>(col_int), 27);
+    CHECK_EQUAL(tv[2].get<Int>(col_int), 30);
+    CHECK_EQUAL(tv[3].get<Int>(col_int), 29);
+
+    // swap first two links in between
+    auto it = target->begin();
+    between->get_object(1).set(col_link2, it->get_key());
+    ++it;
+    between->get_object(0).set(col_link2, it->get_key());
+
+    tv.sync_if_needed();
+    CHECK_EQUAL(tv.size(), 4);
+    CHECK_EQUAL(tv[0].get<Int>(col_int), 27);
+    CHECK_EQUAL(tv[1].get<Int>(col_int), 28);
+    CHECK_EQUAL(tv[2].get<Int>(col_int), 30);
+    CHECK_EQUAL(tv[3].get<Int>(col_int), 29);
+}
+
 namespace {
 struct DistinctDirect {
     Table& table;

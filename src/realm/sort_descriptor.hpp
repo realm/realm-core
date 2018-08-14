@@ -27,6 +27,7 @@ namespace realm {
 
 class SortDescriptor;
 class ConstTableRef;
+class Group;
 
 // CommonDescriptor encapsulates a reference to a set of columns (possibly over
 // links), which is used to indicate the criteria columns for sort and distinct.
@@ -64,6 +65,8 @@ public:
     {
         return !m_column_keys.empty();
     }
+
+    void collect_dependencies(const Table* table, std::vector<TableKey>& table_keys) const;
 
     class Sorter {
     public:
@@ -173,9 +176,12 @@ public:
     bool will_apply_sort() const;
     bool will_apply_distinct() const;
     std::string get_description(ConstTableRef target_table) const;
+    void collect_dependencies(const Table* table);
+    void get_versions(const Group* group, TableVersions& versions) const;
 
 private:
     std::vector<std::unique_ptr<CommonDescriptor>> m_descriptors;
+    std::vector<TableKey> m_dependencies;
 };
 }
 
