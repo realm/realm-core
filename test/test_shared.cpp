@@ -3863,4 +3863,27 @@ TEST(Shared_GenerateObjectIdAfterRollback)
     }
 }
 
+TEST(Shared_UpgradeBinArray)
+{
+    // Checks that parent is updated appropriately when upgrading binary array
+    SHARED_GROUP_TEST_PATH(path);
+    DBRef db_w = DB::create(path);
+
+    {
+        auto wt = db_w->start_write();
+        auto table = wt->add_table("Table_0");
+        std::vector<ObjKey> keys;
+        table->create_objects(65, keys);
+        auto col = table->add_column(type_Binary, "binary_0", true);
+        Obj obj = table->get_object(keys[0]);
+        // This will upgrade from small to big blobs. Parent should be updated.
+        obj.set(col, BinaryData{"dgrpnpgmjbchktdgagmqlihjckcdhpjccsjhnqlcjnbtersepknglaqnckqbffehqfgjnr"});
+        wt->commit();
+    }
+
+    auto rt = db_w->start_read();
+    CHECK_NOT(rt->get_table(TableKey(0))->get_object(ObjKey(0)).is_null(ColKey(0)));
+    CHECK(rt->get_table(TableKey(0))->get_object(ObjKey(54)).is_null(ColKey(0)));
+}
+
 #endif // TEST_SHARED

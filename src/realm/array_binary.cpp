@@ -195,11 +195,14 @@ bool ArrayBinary::upgrade_leaf(size_t value_size)
     for (size_t i = 0; i < n; i++) {
         big_blobs.add(small_blobs->get(i)); // Throws
     }
-    big_blobs.set_parent(small_blobs->get_parent(), small_blobs->get_ndx_in_parent());
-    big_blobs.update_parent(); // Throws
+    auto parent = small_blobs->get_parent();
+    auto ndx_in_parent = small_blobs->get_ndx_in_parent();
     small_blobs->destroy();
+
     auto arr = new (&m_storage.m_big_blobs) ArrayBigBlobs(m_alloc, true);
     arr->init_from_mem(big_blobs.get_mem());
+    arr->set_parent(parent, ndx_in_parent);
+    arr->update_parent(); // Throws
 
     m_is_big = true;
     return true;

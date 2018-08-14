@@ -269,7 +269,6 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
         *log << "auto wt = db_w->start_write();\n";
         *log << "auto rt = db_r->start_read();\n";
         *log << "std::vector<TableView> table_views;\n";
-        *log << "std::vector<TableRef> subtable_refs;\n";
 
         *log << "\n";
     }
@@ -282,7 +281,6 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
     auto wt = db_w->start_write();
     auto rt = db_r->start_read();
     std::vector<TableView> table_views;
-    std::vector<TableRef> subtable_refs;
 
     try {
 
@@ -723,7 +721,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                     ColKey col = all_col_keys[ndx];
                     ObjKey key = t->get_object(get_int32(s) % t->size()).get_key();
                     if (log) {
-                        *log << "g_r.get_table(" << table_key << ")->get_object(" << key << ").is_null(" << col
+                        *log << "wt->get_table(" << table_key << ")->get_object(" << key << ").is_null(" << col
                              << ");\n";
                     }
                     bool res = t->get_object(key).is_null(col);
