@@ -91,7 +91,6 @@ bool set_string_compare_method(string_compare_method_t method, StringCompareCall
     return true;
 }
 
-
 // clang-format off
 // Returns the number of bytes in a UTF-8 sequence whose leading byte is as specified.
 size_t sequence_length(char lead)
@@ -269,7 +268,6 @@ bool utf8_compare(StringData string1, StringData string2)
     REALM_ASSERT(false);
     return false;
 }
-
 
 // Here is a version for Windows that may be closer to what is ultimately needed.
 /*

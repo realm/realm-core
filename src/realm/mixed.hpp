@@ -24,6 +24,7 @@
 #include <cstddef> // size_t
 #include <cstring>
 
+#include <realm/unicode.hpp>
 #include <realm/keys.hpp>
 #include <realm/binary_data.hpp>
 #include <realm/data_type.hpp>
@@ -336,6 +337,15 @@ inline bool Mixed::is_null() const
     return false;
 }
 
+namespace {
+inline int comp(StringData a, StringData b)
+{
+    if (a == b)
+        return 0;
+    return utf8_compare(a, b) ? -1 : 1;
+}
+}
+
 inline int Mixed::compare(const Mixed& b) const
 {
     if (is_null()) {
@@ -352,10 +362,7 @@ inline int Mixed::compare(const Mixed& b) const
                 return -1;
             break;
         case type_String:
-            if (get<StringData>() > b.get<StringData>())
-                return 1;
-            else if (get<StringData>() < b.get<StringData>())
-                return -1;
+            return comp(get<StringData>(), b.get<StringData>());
             break;
         case type_Float:
             if (get<float>() > b.get<float>())

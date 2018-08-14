@@ -2121,12 +2121,10 @@ NONCONCURRENT_TEST(TableView_SortOrder_Similiar)
     TableView v2 = table.where().find_all();
 
     v2.sort(col);
-#ifdef LEGACY_TESTS   // FIXME
-    // FIXME: The following checks fail
+
     for (size_t t = 0; t < v1.size(); t++) {
         CHECK_EQUAL(v1.get_object(t).get_key(), v2.get_object(t).get_key());
     }
-#endif
 
     // Set back to default in case other tests rely on this
     set_string_compare_method(STRING_COMPARE_CORE, nullptr);
@@ -2679,12 +2677,9 @@ NONCONCURRENT_TEST(TableView_SortOrder_Core)
 
     v2.sort(col);
 
-#ifdef LEGACY_TESTS   // FIXME
-    // FIXME: The following checks fail
     for (size_t t = 0; t < v1.size(); t++) {
         CHECK_EQUAL(v1.get_object(t).get_key(), v2.get_object(t).get_key());
     }
-#endif
 
     // Set back to default in case other tests rely on this
     set_string_compare_method(STRING_COMPARE_CORE, nullptr);
