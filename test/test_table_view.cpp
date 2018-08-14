@@ -2701,12 +2701,14 @@ TEST(TableView_SortNull)
     auto k = table.create_object().set_all(1, false, 1.0f, 1.0, "1", Timestamp(1, 1)).get_key();
     keys.push_back(k);
     auto all_cols = table.get_column_keys();
-    for (size_t i = 0; i < all_cols.size(); i++) {
+    int i = 0;
+    for (auto col : all_cols) {
         Obj o = table.create_object();
         o.set_all(int64_t(i), false, float(i), double(i), util::to_string(i), Timestamp(i, i));
         // Set one field to Null. This element must come first when sorting by this column
-        o.set_null(all_cols[i]);
+        o.set_null(col);
         keys.push_back(o.get_key());
+        i++;
     }
 
     auto tv = table.where().find_all();
