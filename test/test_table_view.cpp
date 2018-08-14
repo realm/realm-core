@@ -2686,6 +2686,49 @@ NONCONCURRENT_TEST(TableView_SortOrder_Core)
 }
 
 
+TEST(TableView_SortNull)
+{
+    // Verifiest that NULL values will come first when sorting
+    Table table;
+    auto col_int = table.add_column(type_Int, "int", true);
+    auto col_bool = table.add_column(type_Bool, "bool", true);
+    auto col_float = table.add_column(type_Float, "float", true);
+    auto col_double = table.add_column(type_Double, "double", true);
+    auto col_str = table.add_column(type_String, "string", true);
+    auto col_date = table.add_column(type_Timestamp, "date", true);
+
+    std::vector<ObjKey> keys;
+    auto k = table.create_object().set_all(1, false, 1.0f, 1.0, "1", Timestamp(1, 1)).get_key();
+    keys.push_back(k);
+    auto all_cols = table.get_column_keys();
+    for (size_t i = 0; i < all_cols.size(); i++) {
+        Obj o = table.create_object();
+        o.set_all(int64_t(i), false, float(i), double(i), util::to_string(i), Timestamp(i, i));
+        // Set one field to Null. This element must come first when sorting by this column
+        o.set_null(all_cols[i]);
+        keys.push_back(o.get_key());
+    }
+
+    auto tv = table.where().find_all();
+    // Without sorting first object comes first
+    CHECK_EQUAL(tv.get_object(0).get_key(), keys[0]);
+    tv.sort(col_int);
+    // Now second element should come first
+    CHECK_EQUAL(tv.get_object(0).get_key(), keys[1]);
+    tv.sort(col_bool);
+    // Now third element should come first
+    CHECK_EQUAL(tv.get_object(0).get_key(), keys[2]);
+    tv.sort(col_float);
+    // etc.
+    CHECK_EQUAL(tv.get_object(0).get_key(), keys[3]);
+    tv.sort(col_double);
+    CHECK_EQUAL(tv.get_object(0).get_key(), keys[4]);
+    tv.sort(col_str);
+    CHECK_EQUAL(tv.get_object(0).get_key(), keys[5]);
+    tv.sort(col_date);
+    CHECK_EQUAL(tv.get_object(0).get_key(), keys[6]);
+}
+
 // Verify that copy-constructed and copy-assigned TableViews work normally.
 TEST(TableView_Copy)
 {

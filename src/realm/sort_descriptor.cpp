@@ -310,13 +310,28 @@ void SortDescriptor::Sorter::cache_first_column(IndexPairs& v)
                 index.cached_value = obj.get<String>(ck);
                 break;
             case type_Float:
-                index.cached_value = obj.get<Float>(ck);
+                if (is_nullable && obj.is_null(ck)) {
+                    index.cached_value = Mixed();
+                }
+                else {
+                    index.cached_value = obj.get<Float>(ck);
+                }
                 break;
             case type_Double:
-                index.cached_value = obj.get<Double>(ck);
+                if (is_nullable && obj.is_null(ck)) {
+                    index.cached_value = Mixed();
+                }
+                else {
+                    index.cached_value = obj.get<Double>(ck);
+                }
                 break;
             case type_Bool:
-                index.cached_value = obj.get<Bool>(ck);
+                if (is_nullable && obj.is_null(ck)) {
+                    index.cached_value = Mixed();
+                }
+                else {
+                    index.cached_value = obj.get<Bool>(ck);
+                }
                 break;
             case type_Link:
                 index.cached_value = obj.get<ObjKey>(ck);
