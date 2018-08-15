@@ -1225,7 +1225,6 @@ TEST(Parser_string_binary_encoding)
         "FALSE",
         "None",
         "hasOwnProperty",
-        "\\",
         "\\\\",
         "1.00",
         "$1.00",
@@ -1307,9 +1306,9 @@ TEST(Parser_string_binary_encoding)
 
     t->add_empty_row(); // nulls
     // add a single char of each value
-    for (size_t i = 0; i < 255; ++i) {
+    for (size_t i = 0; i < 256; ++i) {
         unsigned char c = static_cast<unsigned char>(i);
-        test_strings.push_back(std::string(c, 1));
+        test_strings.push_back(std::string(1, c));
     }
     // a single string of 100 nulls
     test_strings.push_back(std::string(100, '\0'));
@@ -1322,6 +1321,10 @@ TEST(Parser_string_binary_encoding)
         t->set_binary(bin_col_ndx, row_ndx, bd);
     }
 
+    size_t num_times_null_strings_were_replaced = 0;
+    size_t num_times_char_128_replaced = 0;
+    size_t num_times_char_173_replaced = 0;
+    size_t num_times_char_255_replaced = 0;
     for (const std::string& buff : test_strings) {
         size_t num_results = 1;
         Query qstr = t->where().equal(str_col_ndx, StringData(buff), true);
@@ -1330,6 +1333,28 @@ TEST(Parser_string_binary_encoding)
         CHECK_EQUAL(qbin.count(), num_results);
         std::string string_description = qstr.get_description();
         std::string binary_description = qbin.get_description();
+
+        if (buff.find('\x0') != std::string::npos) {
+            CHECK_EQUAL(string_description.find('\x0'), std::string::npos);
+            CHECK_EQUAL(binary_description.find('\x0'), std::string::npos);
+            ++num_times_null_strings_were_replaced;
+        }
+        if (buff.find('\x80') != std::string::npos) {
+            CHECK_EQUAL(string_description.find('\x80'), std::string::npos);
+            CHECK_EQUAL(binary_description.find('\x80'), std::string::npos);
+            ++num_times_char_128_replaced;
+        }
+        if (buff.find('\xAD') != std::string::npos) {
+            CHECK_EQUAL(string_description.find('\xAD'), std::string::npos);
+            CHECK_EQUAL(binary_description.find('\xAD'), std::string::npos);
+            ++num_times_char_173_replaced;
+        }
+        if (buff.find('\xFF') != std::string::npos) {
+            CHECK_EQUAL(string_description.find('\xFF'), std::string::npos);
+            CHECK_EQUAL(binary_description.find('\xFF'), std::string::npos);
+            ++num_times_char_255_replaced;
+        }
+
         //std::cerr << "original: " << buff << "\tdescribed: " << string_description << "\n";
 
         query_builder::NoArguments args;
@@ -1343,6 +1368,10 @@ TEST(Parser_string_binary_encoding)
         realm::query_builder::apply_predicate(qbin2, pbin2, args);
         CHECK_EQUAL(qbin2.count(), num_results);
     }
+    CHECK(num_times_null_strings_were_replaced != 0);
+    CHECK(num_times_char_128_replaced != 0);
+    CHECK(num_times_char_173_replaced != 0);
+    CHECK(num_times_char_255_replaced != 0);
 }
 
 TEST(Parser_collection_aggregates)
