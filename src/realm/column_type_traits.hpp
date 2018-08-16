@@ -150,6 +150,7 @@ template <>
 
 struct ColumnTypeTraits<Timestamp> {
     using cluster_leaf_type = ArrayTimestamp;
+    using minmax_type = Timestamp;
     static const DataType id = type_Timestamp;
     static const ColumnType column_id = col_type_Timestamp;
 };

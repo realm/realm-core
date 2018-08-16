@@ -164,4 +164,19 @@ inline std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& out, const
 
 } // namespace realm
 
+namespace std {
+template <>
+struct numeric_limits<realm::Timestamp> {
+    static constexpr bool is_integer = false;
+    static realm::Timestamp min()
+    {
+        return realm::Timestamp(numeric_limits<int64_t>::min(), 0);
+    }
+    static realm::Timestamp max()
+    {
+        return realm::Timestamp(numeric_limits<int64_t>::max(), 0);
+    }
+};
+}
+
 #endif // REALM_TIMESTAMP_HPP

@@ -3003,6 +3003,11 @@ TEST(Table_ListOfPrimitives)
     for (unsigned i = 0; i < timestamp_list.size(); i++) {
         CHECK_EQUAL(timestamp_vector[i], timestamp_list.get(i));
     }
+    size_t return_ndx = 7;
+    list_minimum(timestamp_list, &return_ndx);
+    CHECK_EQUAL(return_ndx, 0);
+    list_maximum(timestamp_list, &return_ndx);
+    CHECK_EQUAL(return_ndx, 1);
 
     t->remove_object(ObjKey(7));
     CHECK_NOT(timestamp_list.is_attached());
