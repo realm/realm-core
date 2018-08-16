@@ -1160,7 +1160,7 @@ bool Table::copy_content_from_columns(size_t col_ndx)
         col_refs.set(ndx_in_parent, 0);
     }
 
-#ifdef REALM_DEBUG
+#if 0
     if (fastrand(100) < 20) {
         throw std::runtime_error("Upgrade interrupted");
     }

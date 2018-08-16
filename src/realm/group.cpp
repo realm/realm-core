@@ -325,6 +325,9 @@ void Transaction::upgrade_file_format(int target_file_format_version)
             int initial_history_schema_version = 0;
             m_top.add(initial_history_schema_version); // Throws
         }
+        set_file_format_version(7);
+        commit_and_continue_as_read();
+        promote_to_write();
     }
 
     // NOTE: Additional future upgrade steps go here.

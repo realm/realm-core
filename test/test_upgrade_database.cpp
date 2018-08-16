@@ -1065,6 +1065,7 @@ TEST_IF(Upgrade_Database_5_6_StringIndex, REALM_MAX_BPNODE_SIZE == 4 || REALM_MA
     g.write(path);
 #endif // TEST_READ_UPGRADE_MODE
 }
+#endif
 
 TEST_IF(Upgrade_Database_6_7, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZE == 1000)
 {
@@ -1084,33 +1085,17 @@ TEST_IF(Upgrade_Database_6_7, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
 
         // Constructing this SharedGroup will trigger an upgrade
         auto hist = make_in_realm_history(temp_copy);
-        DB sg(*hist);
+        DBRef sg = DB::create(*hist);
 
-        ReadTransaction rt(sg);
-        CHECK_EQUAL(_impl::GroupFriend::get_history_schema_version(rt.get_group()),
-                    hist->get_history_schema_version());
+        auto rt = sg->start_read();
+        CHECK_EQUAL(rt->get_history_schema_version(), hist->get_history_schema_version());
 
-        ConstTableRef t = rt.get_table("table");
+        ConstTableRef t = rt->get_table("table");
+        auto col = t->get_column_key("value");
         CHECK(t);
         CHECK_EQUAL(t->size(), 1);
-        CHECK_EQUAL(t->get_int(0, 0), 123);
+        CHECK_EQUAL(t->begin()->get<Int>(col), 123);
     }
-
-    // Opening old file with Group
-    {
-        CHECK_OR_RETURN(File::exists(path));
-
-        // Opening in read-only mode, so it doesn't upgrade
-        Group g(path);
-        CHECK_EQUAL(_impl::GroupFriend::get_history_schema_version(g), 0);
-        CHECK_EQUAL(_impl::GroupFriend::get_file_format_version(g), 6);
-
-        ConstTableRef t = g.get_table("table");
-        CHECK(t);
-        CHECK_EQUAL(t->size(), 1);
-        CHECK_EQUAL(t->get_int(0, 0), 123);
-    }
-
 #else  // test write mode
     // NOTE: This code must be executed from an old file-format-version 6
     // core in order to create a file-format-version 6 test file!
@@ -1142,33 +1127,17 @@ TEST_IF(Upgrade_Database_7_8, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
 
         // Constructing this SharedGroup will trigger an upgrade
         auto hist = make_in_realm_history(temp_copy);
-        DB sg(*hist);
+        DBRef sg = DB::create(*hist);
 
-        ReadTransaction rt(sg);
-        CHECK_EQUAL(_impl::GroupFriend::get_history_schema_version(rt.get_group()),
-                    hist->get_history_schema_version());
+        auto rt = sg->start_read();
+        CHECK_EQUAL(rt->get_history_schema_version(), hist->get_history_schema_version());
 
-        ConstTableRef t = rt.get_table("table");
+        ConstTableRef t = rt->get_table("table");
+        auto col = t->get_column_key("value");
         CHECK(t);
         CHECK_EQUAL(t->size(), 1);
-        CHECK_EQUAL(t->get_int(0, 0), 123);
+        CHECK_EQUAL(t->begin()->get<Int>(col), 123);
     }
-
-    // Opening old file with Group
-    {
-        CHECK_OR_RETURN(File::exists(path));
-
-        // Opening in read-only mode, so it doesn't upgrade
-        Group g(path);
-        CHECK_EQUAL(_impl::GroupFriend::get_history_schema_version(g), 0);
-        CHECK_EQUAL(_impl::GroupFriend::get_file_format_version(g), 7);
-
-        ConstTableRef t = g.get_table("table");
-        CHECK(t);
-        CHECK_EQUAL(t->size(), 1);
-        CHECK_EQUAL(t->get_int(0, 0), 123);
-    }
-
 #else  // test write mode
     // NOTE: This code must be executed from an old file-format-version 7
     // core in order to create a file-format-version 7 test file!
@@ -1201,35 +1170,19 @@ TEST_IF(Upgrade_Database_8_9, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
 
         // Constructing this SharedGroup will trigger an upgrade
         auto hist = make_in_realm_history(temp_copy);
-        DB sg(*hist);
+        DBRef sg = DB::create(*hist);
 
-        ReadTransaction rt(sg);
-        CHECK_EQUAL(_impl::GroupFriend::get_history_schema_version(rt.get_group()),
-                    hist->get_history_schema_version());
+        auto rt = sg->start_read();
+        CHECK_EQUAL(rt->get_history_schema_version(), hist->get_history_schema_version());
 
-        ConstTableRef t = rt.get_table("table");
+        ConstTableRef t = rt->get_table("table");
+        auto col_int = t->get_column_key("value");
+        auto col_str = t->get_column_key("str_col");
         CHECK(t);
         CHECK_EQUAL(t->size(), 1);
-        CHECK_EQUAL(t->get_int(0, 0), 123);
-        CHECK_EQUAL(t->get_string(1, 0), validation_str);
+        CHECK_EQUAL(t->begin()->get<Int>(col_int), 123);
+        CHECK_EQUAL(t->begin()->get<String>(col_str), validation_str);
     }
-
-    // Opening old file with Group
-    {
-        CHECK_OR_RETURN(File::exists(path));
-
-        // Opening in read-only mode, so it doesn't upgrade
-        Group g(path);
-        CHECK_EQUAL(_impl::GroupFriend::get_history_schema_version(g), 0);
-        CHECK_EQUAL(_impl::GroupFriend::get_file_format_version(g), 8);
-
-        ConstTableRef t = g.get_table("table");
-        CHECK(t);
-        CHECK_EQUAL(t->size(), 1);
-        CHECK_EQUAL(t->get_int(0, 0), 123);
-        CHECK_EQUAL(t->get_string(1, 0), validation_str);
-    }
-
 #else  // test write mode
     // NOTE: This code must be executed from an old file-format-version 8
     // core in order to create a file-format-version 8 test file!
@@ -1245,7 +1198,6 @@ TEST_IF(Upgrade_Database_8_9, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
     g.write(path);
 #endif // TEST_READ_UPGRADE_MODE
 }
-#endif
 
 TEST_IF(Upgrade_Database_9_10, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZE == 1000)
 {
