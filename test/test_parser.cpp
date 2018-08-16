@@ -1307,7 +1307,7 @@ TEST(Parser_string_binary_encoding)
     t->add_empty_row(); // nulls
     // add a single char of each value
     for (size_t i = 0; i < 256; ++i) {
-        unsigned char c = static_cast<unsigned char>(i);
+        char c = static_cast<char>(i);
         test_strings.push_back(std::string(1, c));
     }
     // a single string of 100 nulls
@@ -1321,10 +1321,28 @@ TEST(Parser_string_binary_encoding)
         t->set_binary(bin_col_ndx, row_ndx, bd);
     }
 
-    size_t num_times_null_strings_were_replaced = 0;
-    size_t num_times_char_128_replaced = 0;
-    size_t num_times_char_173_replaced = 0;
-    size_t num_times_char_255_replaced = 0;
+    struct TestValues {
+        TestValues(size_t processed, bool replace) : num_processed(processed), should_be_replaced(replace) {}
+        TestValues() {}
+        size_t num_processed = 0;
+        bool should_be_replaced = false;
+    };
+
+    std::unordered_map<unsigned char, TestValues> expected_replacements;
+    expected_replacements['\x0'] = TestValues{0, true}; // non printable characters require replacement
+    expected_replacements['\x7f'] = TestValues{0, true};
+    expected_replacements['\x80'] = TestValues{0, true};
+    expected_replacements['\xad'] = TestValues{0, true};
+    expected_replacements['\xff'] = TestValues{0, true};
+    expected_replacements['A'] = TestValues{0, false}; // ascii characters can be represented in plain text
+    expected_replacements['z'] = TestValues{0, false};
+    expected_replacements['0'] = TestValues{0, false};
+    expected_replacements['9'] = TestValues{0, false};
+    expected_replacements['"'] = TestValues{0, true}; // quotes must be replaced as b64
+    expected_replacements['\''] = TestValues{0, true};
+    static const std::string base64_prefix = "B64\"";
+    static const std::string base64_suffix = "==\"";
+
     for (const std::string& buff : test_strings) {
         size_t num_results = 1;
         Query qstr = t->where().equal(str_col_ndx, StringData(buff), true);
@@ -1334,25 +1352,51 @@ TEST(Parser_string_binary_encoding)
         std::string string_description = qstr.get_description();
         std::string binary_description = qbin.get_description();
 
-        if (buff.find('\x0') != std::string::npos) {
-            CHECK_EQUAL(string_description.find('\x0'), std::string::npos);
-            CHECK_EQUAL(binary_description.find('\x0'), std::string::npos);
-            ++num_times_null_strings_were_replaced;
-        }
-        if (buff.find('\x80') != std::string::npos) {
-            CHECK_EQUAL(string_description.find('\x80'), std::string::npos);
-            CHECK_EQUAL(binary_description.find('\x80'), std::string::npos);
-            ++num_times_char_128_replaced;
-        }
-        if (buff.find('\xAD') != std::string::npos) {
-            CHECK_EQUAL(string_description.find('\xAD'), std::string::npos);
-            CHECK_EQUAL(binary_description.find('\xAD'), std::string::npos);
-            ++num_times_char_173_replaced;
-        }
-        if (buff.find('\xFF') != std::string::npos) {
-            CHECK_EQUAL(string_description.find('\xFF'), std::string::npos);
-            CHECK_EQUAL(binary_description.find('\xFF'), std::string::npos);
-            ++num_times_char_255_replaced;
+        if (buff.size() == 1) {
+            auto it = expected_replacements.find(buff[0]);
+            if (it != expected_replacements.end()) {
+                ++it->second.num_processed;
+
+
+                // std::cout << "string: '" << it->first << "' described: " << string_description << std::endl;
+                if (!it->second.should_be_replaced) {
+                    bool validate = string_description.find(base64_prefix) == std::string::npos
+                        && string_description.find(base64_suffix) == std::string::npos
+                        && binary_description.find(base64_prefix) == std::string::npos
+                        && binary_description.find(base64_suffix) == std::string::npos
+                        && string_description.find(it->first) != std::string::npos
+                        && binary_description.find(it->first) != std::string::npos;
+                    CHECK(validate);
+                    if (!validate) {
+                        std::stringstream ss;
+                        ss << "string should not be replaced: '" << it->first << "' described: " << string_description;
+                        CHECK_EQUAL(ss.str(), "");
+                    }
+
+                } else {
+                    size_t str_b64_pre_pos = string_description.find(base64_prefix);
+                    size_t str_b64_suf_pos = string_description.find(base64_suffix);
+                    size_t bin_b64_pre_pos = binary_description.find(base64_prefix);
+                    size_t bin_b64_suf_pos = binary_description.find(base64_suffix);
+
+                    bool validate = str_b64_pre_pos != std::string::npos
+                        && str_b64_suf_pos != std::string::npos
+                        && bin_b64_pre_pos != std::string::npos
+                        && bin_b64_suf_pos != std::string::npos;
+                    CHECK(validate);
+
+                    size_t contents_str = string_description.find(it->first, str_b64_pre_pos + base64_prefix.size());
+                    size_t contents_bin = binary_description.find(it->first, bin_b64_pre_pos + base64_prefix.size());
+
+                    bool validate_contents = contents_str > str_b64_suf_pos && contents_bin > bin_b64_suf_pos;
+                    CHECK(validate_contents);
+                    if (!validate || !validate_contents) {
+                        std::stringstream ss;
+                        ss << "string should be replaced: '" << it->first << "' described: " << string_description;
+                        CHECK_EQUAL(ss.str(), "");
+                    }
+                }
+            }
         }
 
         //std::cerr << "original: " << buff << "\tdescribed: " << string_description << "\n";
@@ -1368,10 +1412,14 @@ TEST(Parser_string_binary_encoding)
         realm::query_builder::apply_predicate(qbin2, pbin2, args);
         CHECK_EQUAL(qbin2.count(), num_results);
     }
-    CHECK(num_times_null_strings_were_replaced != 0);
-    CHECK(num_times_char_128_replaced != 0);
-    CHECK(num_times_char_173_replaced != 0);
-    CHECK(num_times_char_255_replaced != 0);
+
+    for (auto it = expected_replacements.begin(); it != expected_replacements.end(); ++it) {
+        bool processed = it->second.num_processed == 1;
+        CHECK(processed);
+        if (!processed) { // the check is expected to fail, but will print which character is failing
+            CHECK_EQUAL(it->first, it->second.num_processed);
+        }
+    }
 }
 
 TEST(Parser_collection_aggregates)
