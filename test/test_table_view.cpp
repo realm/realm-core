@@ -490,17 +490,16 @@ TEST(TableView_Find)
 }
 
 
-#ifdef LEGACY_TESTS
 TEST(TableView_Follows_Changes)
 {
     Table table;
-    table.add_column(type_Int, "first");
-    table.add_empty_row();
-    table.set_int(0, 0, 1);
-    Query q = table.where().equal(0, 1);
+    auto col = table.add_column(type_Int, "first");
+    Obj obj0 = table.create_object().set(col, 1);
+
+    Query q = table.where().equal(col, 1);
     TableView v = q.find_all();
     CHECK_EQUAL(1, v.size());
-    CHECK_EQUAL(1, v.get_int(0, 0));
+    CHECK_EQUAL(1, v[0].get<Int>(col));
 
     // low level sanity check that we can copy a query and run the copy:
     Query q2 = q;
@@ -508,49 +507,45 @@ TEST(TableView_Follows_Changes)
 
     // now the fun begins
     CHECK_EQUAL(1, v.size());
-    table.add_empty_row();
+    Obj obj1 = table.create_object();
     CHECK_EQUAL(1, v.size());
-    table.set_int(0, 1, 1);
+    obj1.set<Int>(col, 1);
     v.sync_if_needed();
     CHECK_EQUAL(2, v.size());
-    CHECK_EQUAL(1, v.get_int(0, 0));
-    CHECK_EQUAL(1, v.get_int(0, 1));
-    table.set_int(0, 0, 7);
+    CHECK_EQUAL(1, v[0].get<Int>(col));
+    CHECK_EQUAL(1, v[1].get<Int>(col));
+    obj0.set<Int>(col, 7);
     v.sync_if_needed();
     CHECK_EQUAL(1, v.size());
-    CHECK_EQUAL(1, v.get_int(0, 0));
-    table.set_int(0, 1, 7);
+    CHECK_EQUAL(1, v[0].get<Int>(col));
+    obj1.set<Int>(col, 7);
     v.sync_if_needed();
     CHECK_EQUAL(0, v.size());
-    table.set_int(0, 1, 1);
+    obj1.set<Int>(col, 1);
     v.sync_if_needed();
     CHECK_EQUAL(1, v.size());
-    CHECK_EQUAL(1, v.get_int(0, 0));
+    CHECK_EQUAL(1, v[0].get<Int>(col));
 }
 
 
 TEST(TableView_Distinct_Follows_Changes)
 {
     Table table;
-    table.add_column(type_Int, "first");
+    auto col_int = table.add_column(type_Int, "first");
     table.add_column(type_String, "second");
-    table.add_search_index(0);
+    table.add_search_index(col_int);
 
-    table.add_empty_row(5);
     for (int i = 0; i < 5; ++i) {
-        table.set_int(0, i, i);
-        table.set_string(1, i, "Foo");
+        table.create_object().set_all(i, "Foo");
     }
 
-    TableView distinct_ints = table.get_distinct_view(0);
+    TableView distinct_ints = table.get_distinct_view(col_int);
     CHECK_EQUAL(5, distinct_ints.size());
     CHECK(distinct_ints.is_in_sync());
 
     // Check that adding a value that doesn't actually impact the
     // view still invalidates the view (which is inspected for now).
-    table.add_empty_row();
-    table.set_int(0, 5, 4);
-    table.set_string(1, 5, "Foo");
+    table.create_object().set_all(4, "Foo");
     CHECK(!distinct_ints.is_in_sync());
     distinct_ints.sync_if_needed();
     CHECK(distinct_ints.is_in_sync());
@@ -558,9 +553,7 @@ TEST(TableView_Distinct_Follows_Changes)
 
     // Check that adding a value that impacts the view invalidates the view.
     distinct_ints.sync_if_needed();
-    table.add_empty_row();
-    table.set_int(0, 6, 10);
-    table.set_string(1, 6, "Foo");
+    table.create_object().set_all(6, "Foo");
     CHECK(!distinct_ints.is_in_sync());
     distinct_ints.sync_if_needed();
     CHECK(distinct_ints.is_in_sync());
@@ -571,23 +564,21 @@ TEST(TableView_Distinct_Follows_Changes)
 TEST(TableView_SyncAfterCopy)
 {
     Table table;
-    table.add_column(type_Int, "first");
-    table.add_empty_row();
-    table.set_int(0, 0, 1);
+    auto col = table.add_column(type_Int, "first");
+    table.create_object().set(col, 1);
 
     // do initial query
-    Query q = table.where().equal(0, 1);
+    Query q = table.where().equal(col, 1);
     TableView v = q.find_all();
     CHECK_EQUAL(1, v.size());
-    CHECK_EQUAL(1, v.get_int(0, 0));
+    CHECK_EQUAL(1, v[0].get<Int>(col));
 
     // move the tableview
     TableView v2 = v;
     CHECK_EQUAL(1, v2.size());
 
     // make a change
-    size_t ndx2 = table.add_empty_row();
-    table.set_int(0, ndx2, 1);
+    table.create_object().set(col, 1);
 
     // verify that the copied view sees the change
     v2.sync_if_needed();
@@ -597,44 +588,44 @@ TEST(TableView_SyncAfterCopy)
 TEST(TableView_FindAll)
 {
     Table table;
-    table.add_column(type_Int, "first");
+    auto col = table.add_column(type_Int, "first");
 
-    table.create_object().set_all( 0);
-    table.create_object().set_all( 0);
-    table.create_object().set_all( 0);
+    table.create_object().set_all(3);
+    auto k1 = table.create_object().set_all(3).get_key();
+    auto k2 = table.create_object().set_all(3).get_key();
 
-    TableView v = table.find_all_int(0, 0);
+    TableView v = table.find_all_int(col, 3);
     CHECK_EQUAL(3, v.size());
-    v[0].set_int(0, 5);
-    v[1].set_int(0, 4); // match
-    v[2].set_int(0, 4); // match
+    v[0].set(col, 5);
+    v[1].set(col, 4); // match
+    v[2].set(col, 4); // match
 
     // todo, add creation to wrapper function in table.h
-    TableView v2 = v.find_all_int(0, 4);
+    auto v2 = v.find_all<Int>(col, 4);
     CHECK_EQUAL(2, v2.size());
-    CHECK_EQUAL(1, v2.get_source_ndx(0));
-    CHECK_EQUAL(2, v2.get_source_ndx(1));
+    CHECK_EQUAL(k1, v2.get_key(0));
+    CHECK_EQUAL(k2, v2.get_key(1));
 }
 
 
 TEST(TableView_FindAllString)
 {
     Table table;
-    table.add_column(type_String, "1");
+    auto col = table.add_column(type_String, "1");
 
-    table.create_object().set_all( "a");
-    table.create_object().set_all( "a");
-    table.create_object().set_all( "a");
+    table.create_object().set_all("a").get_key();
+    auto k1 = table.create_object().set_all("a").get_key();
+    auto k2 = table.create_object().set_all("a").get_key();
 
-    TableView v = table.find_all_string(0, "a");
-    v[0].set_string(0, "foo");
-    v[1].set_string(0, "bar"); // match
-    v[2].set_string(0, "bar"); // match
+    TableView v = table.find_all_string(col, "a");
+    v[0].set<String>(col, "foo");
+    v[1].set<String>(col, "bar"); // match
+    v[2].set<String>(col, "bar"); // match
 
     // todo, add creation to wrapper function in table.h
-    TableView v2 = v.find_all_string(0, "bar");
-    CHECK_EQUAL(1, v2.get_source_ndx(0));
-    CHECK_EQUAL(2, v2.get_source_ndx(1));
+    auto v2 = v.find_all(col, StringData("bar"));
+    CHECK_EQUAL(k1, v2.get_key(0));
+    CHECK_EQUAL(k2, v2.get_key(1));
 }
 
 
@@ -645,7 +636,7 @@ NONCONCURRENT_TEST(TableView_StringSort)
 
     // Test of handling of unicode takes place in test_utf8.cpp
     Table table;
-    table.add_column(type_String, "1");
+    auto col = table.add_column(type_String, "1");
 
     table.create_object().set_all( "alpha");
     table.create_object().set_all( "zebra");
@@ -654,28 +645,28 @@ NONCONCURRENT_TEST(TableView_StringSort)
 
     // Core-only is default comparer
     TableView v = table.where().find_all();
-    v.sort(0);
-    CHECK_EQUAL("alpha", v[0].get_string(0));
-    CHECK_EQUAL("ALPHA", v[1].get_string(0));
-    CHECK_EQUAL("zebra", v[2].get_string(0));
-    CHECK_EQUAL("ZEBRA", v[3].get_string(0));
+    v.sort(col);
+    CHECK_EQUAL("alpha", v[0].get<String>(col));
+    CHECK_EQUAL("ALPHA", v[1].get<String>(col));
+    CHECK_EQUAL("zebra", v[2].get<String>(col));
+    CHECK_EQUAL("ZEBRA", v[3].get<String>(col));
 
     // Should be exactly the same as above because 0 was default already
     set_string_compare_method(STRING_COMPARE_CORE, nullptr);
     v = table.where().find_all();
-    v.sort(0);
-    CHECK_EQUAL("alpha", v[0].get_string(0));
-    CHECK_EQUAL("ALPHA", v[1].get_string(0));
-    CHECK_EQUAL("zebra", v[2].get_string(0));
-    CHECK_EQUAL("ZEBRA", v[3].get_string(0));
+    v.sort(col);
+    CHECK_EQUAL("alpha", v[0].get<String>(col));
+    CHECK_EQUAL("ALPHA", v[1].get<String>(col));
+    CHECK_EQUAL("zebra", v[2].get<String>(col));
+    CHECK_EQUAL("ZEBRA", v[3].get<String>(col));
 
     // Test descending mode
     v = table.where().find_all();
-    v.sort(0, false);
-    CHECK_EQUAL("alpha", v[3].get_string(0));
-    CHECK_EQUAL("ALPHA", v[2].get_string(0));
-    CHECK_EQUAL("zebra", v[1].get_string(0));
-    CHECK_EQUAL("ZEBRA", v[0].get_string(0));
+    v.sort(col, false);
+    CHECK_EQUAL("alpha", v[3].get<String>(col));
+    CHECK_EQUAL("ALPHA", v[2].get<String>(col));
+    CHECK_EQUAL("zebra", v[1].get<String>(col));
+    CHECK_EQUAL("ZEBRA", v[0].get<String>(col));
 
     // primitive C locale comparer. But that's OK since all we want to test is
     // if the callback is invoked
@@ -688,11 +679,11 @@ NONCONCURRENT_TEST(TableView_StringSort)
     // Test if callback comparer works. Our callback is a primitive dummy-comparer
     set_string_compare_method(STRING_COMPARE_CALLBACK, comparer);
     v = table.where().find_all();
-    v.sort(0);
-    CHECK_EQUAL("ALPHA", v[0].get_string(0));
-    CHECK_EQUAL("ZEBRA", v[1].get_string(0));
-    CHECK_EQUAL("alpha", v[2].get_string(0));
-    CHECK_EQUAL("zebra", v[3].get_string(0));
+    v.sort(col);
+    CHECK_EQUAL("ALPHA", v[0].get<String>(col));
+    CHECK_EQUAL("ZEBRA", v[1].get<String>(col));
+    CHECK_EQUAL("alpha", v[2].get<String>(col));
+    CHECK_EQUAL("zebra", v[3].get<String>(col));
     CHECK_EQUAL(true, got_called);
 
 #ifdef _MSC_VER
@@ -702,11 +693,11 @@ NONCONCURRENT_TEST(TableView_StringSort)
     bool available = set_string_compare_method(STRING_COMPARE_CPP11, nullptr);
     if (available) {
         v = table.where().find_all();
-        v.sort(0);
-        CHECK_EQUAL("alpha", v[0].get_string(0));
-        CHECK_EQUAL("ALPHA", v[1].get_string(0));
-        CHECK_EQUAL("zebra", v[2].get_string(0));
-        CHECK_EQUAL("ZEBRA", v[3].get_string(0));
+        v.sort(col);
+        CHECK_EQUAL("alpha", v[0].get<String>(col));
+        CHECK_EQUAL("ALPHA", v[1].get<String>(col));
+        CHECK_EQUAL("zebra", v[2].get<String>(col));
+        CHECK_EQUAL("ZEBRA", v[3].get<String>(col));
         CHECK_EQUAL(false, got_called);
     }
 #endif
@@ -714,7 +705,7 @@ NONCONCURRENT_TEST(TableView_StringSort)
     // Set back to default for use by other unit tests
     set_string_compare_method(STRING_COMPARE_CORE, nullptr);
 }
-#endif
+
 
 TEST(TableView_FloatDoubleSort)
 {
@@ -969,145 +960,53 @@ TEST(TableView_FindAllStacked)
     CHECK_EQUAL(k, v2.get_key(0));
 }
 
-#ifdef LEGACY_TESTS
-TEST(TableView_DynPivot)
-{
-    TableRef table = Table::create();
-    size_t column_ndx_sex = table->add_column(type_String, "sex");
-    size_t column_ndx_age = table->add_column(type_Int, "age");
-    table->add_column(type_Bool, "hired");
-
-    size_t count = 5000;
-    for (size_t i = 0; i < count; ++i) {
-        StringData sex = i % 2 ? "Male" : "Female";
-        table->insert_empty_row(i);
-        table->set_string(0, i, sex);
-        table->set_int(1, i, 20 + (i % 20));
-        table->set_bool(2, i, true);
-    }
-
-    TableView tv = table->where().find_all();
-
-    Table result_count;
-    tv.aggregate(0, 1, Table::aggr_count, result_count);
-    int64_t half = count / 2;
-    CHECK_EQUAL(2, result_count.get_column_count());
-    CHECK_EQUAL(2, result_count.size());
-    CHECK_EQUAL(half, result_count.get_int(1, 0));
-    CHECK_EQUAL(half, result_count.get_int(1, 1));
-
-    Table result_sum;
-    tv.aggregate(column_ndx_sex, column_ndx_age, Table::aggr_sum, result_sum);
-
-    Table result_avg;
-    tv.aggregate(column_ndx_sex, column_ndx_age, Table::aggr_avg, result_avg);
-
-    Table result_min;
-    tv.aggregate(column_ndx_sex, column_ndx_age, Table::aggr_min, result_min);
-
-    Table result_max;
-    tv.aggregate(column_ndx_sex, column_ndx_age, Table::aggr_max, result_max);
-
-
-    // Test with enumerated strings
-    table->optimize();
-
-    Table result_count2;
-    tv.aggregate(column_ndx_sex, column_ndx_age, Table::aggr_count, result_count2);
-    CHECK_EQUAL(2, result_count2.get_column_count());
-    CHECK_EQUAL(2, result_count2.size());
-    CHECK_EQUAL(half, result_count2.get_int(1, 0));
-    CHECK_EQUAL(half, result_count2.get_int(1, 1));
-}
-
-
-TEST(TableView_RowAccessor)
-{
-    Table table;
-    table.add_column(type_Int, "");
-    table.add_empty_row();
-    table.set_int(0, 0, 703);
-    TableView tv = table.where().find_all();
-    Row row = tv[0];
-    CHECK_EQUAL(703, row.get_int(0));
-    ConstRow crow = tv[0];
-    CHECK_EQUAL(703, crow.get_int(0));
-    ConstTableView ctv = table.where().find_all();
-    ConstRow crow_2 = ctv[0];
-    CHECK_EQUAL(703, crow_2.get_int(0));
-}
-
-TEST(TableView_FindBySourceNdx)
-{
-    Table table;
-    table.add_column(type_Int, "");
-    table.add_empty_row();
-    table.add_empty_row();
-    table.add_empty_row();
-    table[0].set_int(0, 0);
-    table[1].set_int(0, 1);
-    table[2].set_int(0, 2);
-    TableView tv = table.where().find_all();
-    tv.sort(0, false);
-    CHECK_EQUAL(0, tv.find_by_source_ndx(2));
-    CHECK_EQUAL(1, tv.find_by_source_ndx(1));
-    CHECK_EQUAL(2, tv.find_by_source_ndx(0));
-}
 
 TEST(TableView_MultiColSort)
 {
     Table table;
-    table.add_column(type_Int, "");
-    table.add_column(type_Float, "");
-    table.add_empty_row();
-    table.add_empty_row();
-    table.add_empty_row();
-    table[0].set_int(0, 0);
-    table[1].set_int(0, 1);
-    table[2].set_int(0, 1);
+    auto col_int = table.add_column(type_Int, "int");
+    auto col_float = table.add_column(type_Float, "float");
 
-    table[0].set_float(1, 0.f);
-    table[1].set_float(1, 2.f);
-    table[2].set_float(1, 1.f);
+    table.create_object().set_all(0, 0.f);
+    table.create_object().set_all(1, 2.f);
+    table.create_object().set_all(1, 1.f);
 
     TableView tv = table.where().find_all();
 
-    std::vector<std::vector<size_t>> v = {{0}, {1}};
+    std::vector<std::vector<ColKey>> v = {{col_int}, {col_float}};
     std::vector<bool> a = {true, true};
 
-    tv.sort(SortDescriptor{table, v, a});
+    tv.sort(SortDescriptor{v, a});
 
-    CHECK_EQUAL(tv.get_float(1, 0), 0.f);
-    CHECK_EQUAL(tv.get_float(1, 1), 1.f);
-    CHECK_EQUAL(tv.get_float(1, 2), 2.f);
+    CHECK_EQUAL(tv[0].get<float>(col_float), 0.f);
+    CHECK_EQUAL(tv[1].get<float>(col_float), 1.f);
+    CHECK_EQUAL(tv[2].get<float>(col_float), 2.f);
 
     std::vector<bool> a_descending = {false, false};
     tv = table.where().find_all();
-    tv.sort(SortDescriptor{table, v, a_descending});
+    tv.sort(SortDescriptor{v, a_descending});
 
-    CHECK_EQUAL(tv.get_float(1, 0), 2.f);
-    CHECK_EQUAL(tv.get_float(1, 1), 1.f);
-    CHECK_EQUAL(tv.get_float(1, 2), 0.f);
+    CHECK_EQUAL(tv[0].get<float>(col_float), 2.f);
+    CHECK_EQUAL(tv[1].get<float>(col_float), 1.f);
+    CHECK_EQUAL(tv[2].get<float>(col_float), 0.f);
 
     std::vector<bool> a_ascdesc = {true, false};
     tv = table.where().find_all();
-    tv.sort(SortDescriptor{table, v, a_ascdesc});
+    tv.sort(SortDescriptor{v, a_ascdesc});
 
-    CHECK_EQUAL(tv.get_float(1, 0), 0.f);
-    CHECK_EQUAL(tv.get_float(1, 1), 2.f);
-    CHECK_EQUAL(tv.get_float(1, 2), 1.f);
+    CHECK_EQUAL(tv[0].get<float>(col_float), 0.f);
+    CHECK_EQUAL(tv[1].get<float>(col_float), 2.f);
+    CHECK_EQUAL(tv[2].get<float>(col_float), 1.f);
 }
 
 TEST(TableView_QueryCopy)
 {
     Table table;
-    table.add_column(type_Int, "");
-    table.add_empty_row();
-    table.add_empty_row();
-    table.add_empty_row();
-    table[0].set_int(0, 0);
-    table[1].set_int(0, 1);
-    table[2].set_int(0, 2);
+    auto col = table.add_column(type_Int, "");
+
+    table.create_object().set_all(0);
+    table.create_object().set_all(1);
+    table.create_object().set_all(2);
 
     // Test if copy-assign of Query in TableView works
     TableView tv = table.where().find_all();
@@ -1115,15 +1014,15 @@ TEST(TableView_QueryCopy)
     Query q = table.where();
 
     q.group();
-    q.equal(0, 1);
+    q.equal(col, 1);
     q.Or();
-    q.equal(0, 2);
+    q.equal(col, 2);
     q.end_group();
 
     q.count();
 
     Query q2;
-    q2 = table.where().equal(0, 1234);
+    q2 = table.where().equal(col, 1234);
 
     q2 = q;
     size_t t = q2.count();
@@ -1131,31 +1030,31 @@ TEST(TableView_QueryCopy)
     CHECK_EQUAL(t, 2);
 }
 
+
 TEST(TableView_SortEnum)
 {
     Table table;
-    table.add_column(type_String, "str");
-    table.add_empty_row(3);
-    table[0].set_string(0, "foo");
-    table[1].set_string(0, "foo");
-    table[2].set_string(0, "foo");
+    auto col = table.add_column(type_String, "str");
 
-    table.optimize();
+    table.create_object().set_all("foo");
+    table.create_object().set_all("foo");
+    table.create_object().set_all("foo");
 
-    table.add_empty_row(3);
-    table[3].set_string(0, "bbb");
-    table[4].set_string(0, "aaa");
-    table[5].set_string(0, "baz");
+    table.enumerate_string_column(col);
+
+    table.create_object().set_all("bbb");
+    table.create_object().set_all("aaa");
+    table.create_object().set_all("baz");
 
     TableView tv = table.where().find_all();
-    tv.sort(0);
+    tv.sort(col);
 
-    CHECK_EQUAL(tv[0].get_string(0), "aaa");
-    CHECK_EQUAL(tv[1].get_string(0), "baz");
-    CHECK_EQUAL(tv[2].get_string(0), "bbb");
-    CHECK_EQUAL(tv[3].get_string(0), "foo");
-    CHECK_EQUAL(tv[4].get_string(0), "foo");
-    CHECK_EQUAL(tv[5].get_string(0), "foo");
+    CHECK_EQUAL(tv[0].get<String>(col), "aaa");
+    CHECK_EQUAL(tv[1].get<String>(col), "baz");
+    CHECK_EQUAL(tv[2].get<String>(col), "bbb");
+    CHECK_EQUAL(tv[3].get<String>(col), "foo");
+    CHECK_EQUAL(tv[4].get<String>(col), "foo");
+    CHECK_EQUAL(tv[5].get<String>(col), "foo");
 }
 
 TEST(TableView_Backlinks)
@@ -1166,38 +1065,41 @@ TEST(TableView_Backlinks)
     source->add_column(type_Int, "int");
 
     TableRef links = group.add_table("links");
-    links->add_column_link(type_Link, "link", *source);
-    links->add_column_link(type_LinkList, "link_list", *source);
+    auto col_link = links->add_column_link(type_Link, "link", *source);
+    auto col_linklist = links->add_column_link(type_LinkList, "link_list", *source);
 
-    source->add_empty_row(3);
-
+    std::vector<ObjKey> keys;
+    source->create_objects(3, keys);
+    ObjKey k(500);
     {
         // Links
-        TableView tv = source->get_backlink_view(2, links.get(), 0);
+        Obj obj = source->get_object(keys[2]);
+        TableView tv = obj.get_backlink_view(links, col_link);
 
         CHECK_EQUAL(tv.size(), 0);
 
-        links->add_empty_row();
-        links->set_link(0, 0, 2);
+        links->create_object(k).set(col_link, keys[2]).get_key();
 
         tv.sync_if_needed();
         CHECK_EQUAL(tv.size(), 1);
-        CHECK_EQUAL(tv[0].get_index(), links->get(0).get_index());
+        CHECK_EQUAL(tv[0].get_key(), k);
     }
     {
         // LinkViews
-        TableView tv = source->get_backlink_view(2, links.get(), 1);
+        Obj obj = source->get_object(keys[2]);
+        TableView tv = obj.get_backlink_view(links, col_linklist);
 
         CHECK_EQUAL(tv.size(), 0);
 
-        auto ll = links->get_linklist(1, 0);
-        ll->add(2);
-        ll->add(0);
-        ll->add(2);
+        auto ll = links->get_object(k).get_linklist_ptr(col_linklist);
+        ll->add(keys[2]);
+        ll->add(keys[0]);
+        ll->add(keys[2]);
 
         tv.sync_if_needed();
         CHECK_EQUAL(tv.size(), 2);
-        CHECK_EQUAL(tv[0].get_index(), links->get(0).get_index());
+        CHECK_EQUAL(tv[0].get_key(), k);
+        CHECK_EQUAL(tv[1].get_key(), k);
     }
 }
 
@@ -1211,46 +1113,46 @@ TEST(TableView_BacklinksAfterMoveAssign)
     source->add_column(type_Int, "int");
 
     TableRef links = group.add_table("links");
-    links->add_column_link(type_Link, "link", *source);
-    links->add_column_link(type_LinkList, "link_list", *source);
+    auto col_link = links->add_column_link(type_Link, "link", *source);
+    auto col_linklist = links->add_column_link(type_LinkList, "link_list", *source);
 
-    source->add_empty_row(3);
-
+    std::vector<ObjKey> keys;
+    source->create_objects(3, keys);
+    ObjKey k(500);
     {
         // Links
-        TableView tv_source = source->get_backlink_view(2, links.get(), 0);
+        Obj obj = source->get_object(keys[2]);
+        TableView tv_source = obj.get_backlink_view(links, col_link);
         TableView tv;
         tv = std::move(tv_source);
 
         CHECK_EQUAL(tv.size(), 0);
 
-        links->add_empty_row();
-        links->set_link(0, 0, 2);
+        links->create_object(k).set(col_link, keys[2]).get_key();
 
         tv.sync_if_needed();
         CHECK_EQUAL(tv.size(), 1);
-        CHECK_EQUAL(tv[0].get_index(), links->get(0).get_index());
+        CHECK_EQUAL(tv[0].get_key(), k);
     }
     {
         // LinkViews
-        TableView tv_source = source->get_backlink_view(2, links.get(), 1);
+        Obj obj = source->get_object(keys[2]);
+        TableView tv_source = obj.get_backlink_view(links, col_linklist);
         TableView tv;
         tv = std::move(tv_source);
 
         CHECK_EQUAL(tv.size(), 0);
 
-        auto ll = links->get_linklist(1, 0);
-        ll->add(2);
-        ll->add(0);
-        ll->add(2);
+        auto ll = links->get_object(k).get_linklist_ptr(col_linklist);
+        ll->add(keys[2]);
+        ll->add(keys[0]);
+        ll->add(keys[2]);
 
         tv.sync_if_needed();
         CHECK_EQUAL(tv.size(), 2);
-        CHECK_EQUAL(tv[0].get_index(), links->get(0).get_index());
+        CHECK_EQUAL(tv[0].get_key(), k);
     }
 }
-
-#endif
 
 TEST(TableView_SortOverLink)
 {
@@ -1629,7 +1531,7 @@ TEST(TableView_IsInTableOrder)
     auto col_link = source->add_column_link(type_LinkList, "link", *target);
     auto col_name = source->add_column(type_String, "name");
     auto col_id = target->add_column(type_Int, "id");
-    // target->add_search_index(col_id);
+    target->add_search_index(col_id);
 
     Obj obj7 = target->create_object(ObjKey(7));
     Obj src_obj = source->create_object();
@@ -1665,11 +1567,8 @@ TEST(TableView_IsInTableOrder)
     tv = ll->get_sorted_view(col_name);
     CHECK_EQUAL(false, tv.is_in_table_order());
 
-#ifdef LEGACY_TESTS   // FIXME
-    // Asserts:
     tv = target->get_distinct_view(col_id);
     CHECK_EQUAL(true, tv.is_in_table_order());
-#endif
 
     // … unless sorted.
     tv = target->get_sorted_view(col_id);
@@ -2933,31 +2832,6 @@ TEST(TableView_TimestampMaxRemoveRow)
     tv.sync_if_needed();
     CHECK_EQUAL(tv.size(), 9);
     CHECK_EQUAL(tv.maximum_timestamp(col_date), Timestamp(8, 0));
-}
-
-TEST(TableView_FindAll)
-{
-    Table t;
-    auto col_str = t.add_column(type_String, "strings");
-    auto col_int = t.add_column(type_Int, "integers");
-
-    ObjKey k0 = t.create_object().set_all("hello", 1).get_key();
-    t.create_object().set_all("world", 2).get_key();
-    ObjKey k2 = t.create_object().set_all("hello", 3).get_key();
-    t.create_object().set_all("world", 4).get_key();
-    ObjKey k4 = t.create_object().set_all("hello", 5).get_key();
-
-    ConstTableView tv = t.where().find_all();
-
-    size_t j = tv.find_first<Int>(col_int, 4);
-    CHECK_EQUAL(j, 3);
-    size_t k = tv.find_first<String>(col_str, "world");
-    CHECK_EQUAL(k, 1);
-    auto tv1 = tv.find_all<String>(col_str, "hello");
-    CHECK_EQUAL(tv1.size(), 3);
-    CHECK_EQUAL(tv1.get_key(0), k0);
-    CHECK_EQUAL(tv1.get_key(1), k2);
-    CHECK_EQUAL(tv1.get_key(2), k4);
 }
 
 #endif // TEST_TABLE_VIEW
