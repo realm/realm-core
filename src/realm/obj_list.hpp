@@ -75,7 +75,7 @@ public:
     ConstTableView find_all(ColKey column_key, T value);
 
     template <class T>
-    ObjKey find_first(ColKey column_key, T value);
+    size_t find_first(ColKey column_key, T value);
 
     // These three methods are overridden by TableView and ObjList/LnkLst.
     virtual TableVersions sync_if_needed() const = 0;
@@ -107,7 +107,7 @@ protected:
 };
 
 template <class F>
-void ObjList::for_each(F func) const
+inline void ObjList::for_each(F func) const
 {
     auto sz = size();
     for (size_t i = 0; i < sz; i++) {
@@ -118,18 +118,18 @@ void ObjList::for_each(F func) const
 }
 
 template <class T>
-ObjKey ObjList::find_first(ColKey column_key, T value)
+size_t ObjList::find_first(ColKey column_key, T value)
 {
-    ObjKey k;
-    for_each([column_key, value, &k](ConstObj& o) {
-        T v = o.get<T>(column_key);
-        if (v == value) {
-            k = o.get_key();
-            return true;
+    auto sz = size();
+    for (size_t i = 0; i < sz; i++) {
+        auto o = try_get_object(i);
+        if (o) {
+            T v = o.get<T>(column_key);
+            if (v == value)
+                return i;
         }
-        return false;
-    });
-    return k;
+    }
+    return realm::npos;
 }
 }
 

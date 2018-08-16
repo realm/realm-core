@@ -128,13 +128,13 @@ TEST(TableView_FloatsFindAndAggregations)
     CHECK_EQUAL(ObjKey(3), v_some.get_key(1));
 
     // Test find_first
-    CHECK_EQUAL(keys[0], v_all.find_first<Double>(col_double, -1.2));
-    CHECK_EQUAL(keys[5], v_all.find_first<Double>(col_double, 0.0));
-    CHECK_EQUAL(keys[2], v_all.find_first<Double>(col_double, 3.2));
+    CHECK_EQUAL(0, v_all.find_first<Double>(col_double, -1.2));
+    CHECK_EQUAL(5, v_all.find_first<Double>(col_double, 0.0));
+    CHECK_EQUAL(2, v_all.find_first<Double>(col_double, 3.2));
 
-    CHECK_EQUAL(keys[1], v_all.find_first<float>(col_float, 2.1f));
-    CHECK_EQUAL(keys[5], v_all.find_first<float>(col_float, 0.0f));
-    CHECK_EQUAL(keys[2], v_all.find_first<float>(col_float, 3.1f));
+    CHECK_EQUAL(1, v_all.find_first<float>(col_float, 2.1f));
+    CHECK_EQUAL(5, v_all.find_first<float>(col_float, 0.0f));
+    CHECK_EQUAL(2, v_all.find_first<float>(col_float, 3.1f));
 
     // TODO: add for float as well
 
@@ -356,31 +356,40 @@ TEST(TableView_Min2)
 }
 
 
-#ifdef LEGACY_TESTS
 TEST(TableView_Find)
 {
     Table table;
-    table.add_column(type_Int, "int");
-    table.add_column(type_Int, "int?", true);
-    table.add_column(type_Bool, "bool");
-    table.add_column(type_Bool, "bool?", true);
-    table.add_column(type_Float, "float");
-    table.add_column(type_Float, "float?", true);
-    table.add_column(type_Double, "double");
-    table.add_column(type_Double, "double?", true);
-    table.add_column(type_Timestamp, "timestamp");
-    table.add_column(type_Timestamp, "timestamp?", true);
-    table.add_column(type_String, "string");
-    table.add_column(type_String, "string?", true);
-    table.add_column(type_Binary, "binary");
-    table.add_column(type_Binary, "binary?", true);
+    auto col0 = table.add_column(type_Int, "int");
+    auto col1 = table.add_column(type_Int, "int?", true);
+    auto col2 = table.add_column(type_Bool, "bool");
+    auto col3 = table.add_column(type_Bool, "bool?", true);
+    auto col4 = table.add_column(type_Float, "float");
+    auto col5 = table.add_column(type_Float, "float?", true);
+    auto col6 = table.add_column(type_Double, "double");
+    auto col7 = table.add_column(type_Double, "double?", true);
+    auto col8 = table.add_column(type_Timestamp, "timestamp");
+    auto col9 = table.add_column(type_Timestamp, "timestamp?", true);
+    auto col10 = table.add_column(type_String, "string");
+    auto col11 = table.add_column(type_String, "string?", true);
+    auto col12 = table.add_column(type_Binary, "binary");
+    auto col13 = table.add_column(type_Binary, "binary?", true);
 
-    table.create_object().set_all( 0);
-    table.create_object().set_all( 1, 1, false, false, 1.1f, 1.1f, 1.1, 1.1, Timestamp(1, 1), Timestamp(1, 1),
-        "a", "a", BinaryData("a", 1), BinaryData("a", 1));
-    table.create_object().set_all( 2, nullptr, true, nullptr, 2.2f, nullptr, 2.2, nullptr, Timestamp(2, 2), nullptr,
-        "b", nullptr, BinaryData("b", 1), nullptr);
-    table.create_object().set_all( -1);
+    Obj obj0 = table.create_object();
+    Obj obj1 = table.create_object();
+    Obj obj2 = table.create_object();
+    Obj obj3 = table.create_object();
+
+    obj0.set(col0, 0);
+    obj1.set_all(1, 1, false, false, 1.1f, 1.1f, 1.1, 1.1, Timestamp(1, 1), Timestamp(1, 1), "a", "a",
+                 BinaryData("a", 1), BinaryData("a", 1));
+    obj2.set(col0, 2);
+    obj2.set(col2, true);
+    obj2.set(col4, 2.2f);
+    obj2.set(col6, 2.2);
+    obj2.set(col8, Timestamp(2, 2));
+    obj2.set(col10, "b");
+    obj2.set(col12, BinaryData("b", 1));
+    obj3.set(col0, -1);
 
     // TV where index in TV equals the index in the table
     TableView all = table.where().find_all();
@@ -388,99 +397,100 @@ TEST(TableView_Find)
     TableView after_first = table.where().find_all(1);
 
     // Ensure the TVs have a detached ref to deal with
-    table.remove(3);
+    obj3.remove();
 
     // Look for the values in the second row
-    CHECK_EQUAL(1, all.find_first_int(0, 1));
-    CHECK_EQUAL(1, all.find_first(1, util::Optional<int64_t>(1)));
-    CHECK_EQUAL(0, all.find_first(2, false));
-    CHECK_EQUAL(1, all.find_first(3, util::make_optional(false)));
-    CHECK_EQUAL(1, all.find_first(4, 1.1f));
-    CHECK_EQUAL(1, all.find_first(5, util::make_optional(1.1f)));
-    CHECK_EQUAL(1, all.find_first(6, 1.1));
-    CHECK_EQUAL(1, all.find_first(7, util::make_optional(1.1)));
-    CHECK_EQUAL(1, all.find_first(8, Timestamp(1, 1)));
-    CHECK_EQUAL(1, all.find_first(9, Timestamp(1, 1)));
-    CHECK_EQUAL(1, all.find_first(10, StringData("a")));
-    CHECK_EQUAL(1, all.find_first(11, StringData("a")));
-    CHECK_EQUAL(1, all.find_first(12, BinaryData("a", 1)));
-    CHECK_EQUAL(1, all.find_first(13, BinaryData("a", 1)));
+    CHECK_EQUAL(1, all.find_first<Int>(col0, 1));
+    CHECK_EQUAL(1, all.find_first(col1, util::Optional<int64_t>(1)));
+    CHECK_EQUAL(0, all.find_first(col2, false));
+    CHECK_EQUAL(1, all.find_first(col3, util::make_optional(false)));
+    CHECK_EQUAL(1, all.find_first(col4, 1.1f));
+    CHECK_EQUAL(1, all.find_first(col5, util::make_optional(1.1f)));
+    CHECK_EQUAL(1, all.find_first(col6, 1.1));
+    CHECK_EQUAL(1, all.find_first(col7, util::make_optional(1.1)));
+    CHECK_EQUAL(1, all.find_first(col8, Timestamp(1, 1)));
+    CHECK_EQUAL(1, all.find_first(col9, Timestamp(1, 1)));
+    CHECK_EQUAL(1, all.find_first(col10, StringData("a")));
+    CHECK_EQUAL(1, all.find_first(col11, StringData("a")));
+    CHECK_EQUAL(1, all.find_first(col12, BinaryData("a", 1)));
+    CHECK_EQUAL(1, all.find_first(col13, BinaryData("a", 1)));
 
-    CHECK_EQUAL(0, after_first.find_first_int(0, 1));
-    CHECK_EQUAL(0, after_first.find_first(1, util::Optional<int64_t>(1)));
-    CHECK_EQUAL(0, after_first.find_first(2, false));
-    CHECK_EQUAL(0, after_first.find_first(3, util::make_optional(false)));
-    CHECK_EQUAL(0, after_first.find_first(4, 1.1f));
-    CHECK_EQUAL(0, after_first.find_first(5, util::make_optional(1.1f)));
-    CHECK_EQUAL(0, after_first.find_first(6, 1.1));
-    CHECK_EQUAL(0, after_first.find_first(7, util::make_optional(1.1)));
-    CHECK_EQUAL(0, after_first.find_first(8, Timestamp(1, 1)));
-    CHECK_EQUAL(0, after_first.find_first(9, Timestamp(1, 1)));
-    CHECK_EQUAL(0, after_first.find_first(10, StringData("a")));
-    CHECK_EQUAL(0, after_first.find_first(11, StringData("a")));
-    CHECK_EQUAL(0, after_first.find_first(12, BinaryData("a", 1)));
-    CHECK_EQUAL(0, after_first.find_first(13, BinaryData("a", 1)));
+    CHECK_EQUAL(0, after_first.find_first<Int>(col0, 1));
+    CHECK_EQUAL(0, after_first.find_first(col1, util::Optional<int64_t>(1)));
+    CHECK_EQUAL(0, after_first.find_first(col2, false));
+    CHECK_EQUAL(0, after_first.find_first(col3, util::make_optional(false)));
+    CHECK_EQUAL(0, after_first.find_first(col4, 1.1f));
+    CHECK_EQUAL(0, after_first.find_first(col5, util::make_optional(1.1f)));
+    CHECK_EQUAL(0, after_first.find_first(col6, 1.1));
+    CHECK_EQUAL(0, after_first.find_first(col7, util::make_optional(1.1)));
+    CHECK_EQUAL(0, after_first.find_first(col8, Timestamp(1, 1)));
+    CHECK_EQUAL(0, after_first.find_first(col9, Timestamp(1, 1)));
+    CHECK_EQUAL(0, after_first.find_first(col10, StringData("a")));
+    CHECK_EQUAL(0, after_first.find_first(col11, StringData("a")));
+    CHECK_EQUAL(0, after_first.find_first(col12, BinaryData("a", 1)));
+    CHECK_EQUAL(0, after_first.find_first(col13, BinaryData("a", 1)));
 
     // Look for the values in the third row
-    CHECK_EQUAL(2, all.find_first_int(0, 2));
-    CHECK_EQUAL(0, all.find_first(1, util::Optional<int64_t>()));
-    CHECK_EQUAL(2, all.find_first(2, true));
-    CHECK_EQUAL(0, all.find_first(3, util::Optional<bool>()));
-    CHECK_EQUAL(2, all.find_first(4, 2.2f));
-    CHECK_EQUAL(0, all.find_first(5, util::Optional<float>()));
-    CHECK_EQUAL(2, all.find_first(6, 2.2));
-    CHECK_EQUAL(0, all.find_first(7, util::Optional<double>()));
-    CHECK_EQUAL(2, all.find_first(8, Timestamp(2, 2)));
-    CHECK_EQUAL(0, all.find_first(9, Timestamp()));
-    CHECK_EQUAL(2, all.find_first(10, StringData("b")));
-    CHECK_EQUAL(0, all.find_first(11, StringData()));
-    CHECK_EQUAL(2, all.find_first(12, BinaryData("b", 1)));
-    CHECK_EQUAL(0, all.find_first(13, BinaryData()));
+    CHECK_EQUAL(2, all.find_first<Int>(col0, 2));
+    CHECK_EQUAL(0, all.find_first(col1, util::Optional<int64_t>()));
+    CHECK_EQUAL(2, all.find_first(col2, true));
+    CHECK_EQUAL(0, all.find_first(col3, util::Optional<bool>()));
+    CHECK_EQUAL(2, all.find_first(col4, 2.2f));
+    CHECK_EQUAL(0, all.find_first(col5, util::Optional<float>()));
+    CHECK_EQUAL(2, all.find_first(col6, 2.2));
+    CHECK_EQUAL(0, all.find_first(col7, util::Optional<double>()));
+    CHECK_EQUAL(2, all.find_first(col8, Timestamp(2, 2)));
+    CHECK_EQUAL(0, all.find_first(col9, Timestamp()));
+    CHECK_EQUAL(2, all.find_first(col10, StringData("b")));
+    CHECK_EQUAL(0, all.find_first(col11, StringData()));
+    CHECK_EQUAL(2, all.find_first(col12, BinaryData("b", 1)));
+    CHECK_EQUAL(0, all.find_first(col13, BinaryData()));
 
-    CHECK_EQUAL(1, after_first.find_first_int(0, 2));
-    CHECK_EQUAL(1, after_first.find_first(1, util::Optional<int64_t>()));
-    CHECK_EQUAL(1, after_first.find_first(2, true));
-    CHECK_EQUAL(1, after_first.find_first(3, util::Optional<bool>()));
-    CHECK_EQUAL(1, after_first.find_first(4, 2.2f));
-    CHECK_EQUAL(1, after_first.find_first(5, util::Optional<float>()));
-    CHECK_EQUAL(1, after_first.find_first(6, 2.2));
-    CHECK_EQUAL(1, after_first.find_first(7, util::Optional<double>()));
-    CHECK_EQUAL(1, after_first.find_first(8, Timestamp(2, 2)));
-    CHECK_EQUAL(1, after_first.find_first(9, Timestamp()));
-    CHECK_EQUAL(1, after_first.find_first(10, StringData("b")));
-    CHECK_EQUAL(1, after_first.find_first(11, StringData()));
-    CHECK_EQUAL(1, after_first.find_first(12, BinaryData("b", 1)));
-    CHECK_EQUAL(1, after_first.find_first(13, BinaryData()));
+    CHECK_EQUAL(1, after_first.find_first<Int>(col0, 2));
+    CHECK_EQUAL(1, after_first.find_first(col1, util::Optional<int64_t>()));
+    CHECK_EQUAL(1, after_first.find_first(col2, true));
+    CHECK_EQUAL(1, after_first.find_first(col3, util::Optional<bool>()));
+    CHECK_EQUAL(1, after_first.find_first(col4, 2.2f));
+    CHECK_EQUAL(1, after_first.find_first(col5, util::Optional<float>()));
+    CHECK_EQUAL(1, after_first.find_first(col6, 2.2));
+    CHECK_EQUAL(1, after_first.find_first(col7, util::Optional<double>()));
+    CHECK_EQUAL(1, after_first.find_first(col8, Timestamp(2, 2)));
+    CHECK_EQUAL(1, after_first.find_first(col9, Timestamp()));
+    CHECK_EQUAL(1, after_first.find_first(col10, StringData("b")));
+    CHECK_EQUAL(1, after_first.find_first(col11, StringData()));
+    CHECK_EQUAL(1, after_first.find_first(col12, BinaryData("b", 1)));
+    CHECK_EQUAL(1, after_first.find_first(col13, BinaryData()));
 
     // Look for values that aren't present
-    CHECK_EQUAL(npos, all.find_first_int(0, 5));
-    CHECK_EQUAL(npos, all.find_first(1, util::Optional<int64_t>(5)));
-    CHECK_EQUAL(npos, all.find_first(4, 3.3f));
-    CHECK_EQUAL(npos, all.find_first(5, util::make_optional(3.3f)));
-    CHECK_EQUAL(npos, all.find_first(6, 3.3));
-    CHECK_EQUAL(npos, all.find_first(7, util::make_optional(3.3)));
-    CHECK_EQUAL(npos, all.find_first(8, Timestamp(3, 3)));
-    CHECK_EQUAL(npos, all.find_first(9, Timestamp(3, 3)));
-    CHECK_EQUAL(npos, all.find_first(10, StringData("c")));
-    CHECK_EQUAL(npos, all.find_first(11, StringData("c")));
-    CHECK_EQUAL(npos, all.find_first(12, BinaryData("c", 1)));
-    CHECK_EQUAL(npos, all.find_first(13, BinaryData("c", 1)));
+    CHECK_EQUAL(npos, all.find_first<Int>(col0, 5));
+    CHECK_EQUAL(npos, all.find_first(col1, util::Optional<int64_t>(5)));
+    CHECK_EQUAL(npos, all.find_first(col4, 3.3f));
+    CHECK_EQUAL(npos, all.find_first(col5, util::make_optional(3.3f)));
+    CHECK_EQUAL(npos, all.find_first(col6, 3.3));
+    CHECK_EQUAL(npos, all.find_first(col7, util::make_optional(3.3)));
+    CHECK_EQUAL(npos, all.find_first(col8, Timestamp(3, 3)));
+    CHECK_EQUAL(npos, all.find_first(col9, Timestamp(3, 3)));
+    CHECK_EQUAL(npos, all.find_first(col10, StringData("c")));
+    CHECK_EQUAL(npos, all.find_first(col11, StringData("c")));
+    CHECK_EQUAL(npos, all.find_first(col12, BinaryData("c", 1)));
+    CHECK_EQUAL(npos, all.find_first(col13, BinaryData("c", 1)));
 
-    CHECK_EQUAL(npos, after_first.find_first_int(0, 5));
-    CHECK_EQUAL(npos, after_first.find_first(1, util::Optional<int64_t>(5)));
-    CHECK_EQUAL(npos, after_first.find_first(4, 3.3f));
-    CHECK_EQUAL(npos, after_first.find_first(5, util::make_optional(3.3f)));
-    CHECK_EQUAL(npos, after_first.find_first(6, 3.3));
-    CHECK_EQUAL(npos, after_first.find_first(7, util::make_optional(3.3)));
-    CHECK_EQUAL(npos, after_first.find_first(8, Timestamp(3, 3)));
-    CHECK_EQUAL(npos, after_first.find_first(9, Timestamp(3, 3)));
-    CHECK_EQUAL(npos, after_first.find_first(10, StringData("c")));
-    CHECK_EQUAL(npos, after_first.find_first(11, StringData("c")));
-    CHECK_EQUAL(npos, after_first.find_first(12, BinaryData("c", 1)));
-    CHECK_EQUAL(npos, after_first.find_first(13, BinaryData("c", 1)));
+    CHECK_EQUAL(npos, after_first.find_first<Int>(col0, 5));
+    CHECK_EQUAL(npos, after_first.find_first(col1, util::Optional<int64_t>(5)));
+    CHECK_EQUAL(npos, after_first.find_first(col4, 3.3f));
+    CHECK_EQUAL(npos, after_first.find_first(col5, util::make_optional(3.3f)));
+    CHECK_EQUAL(npos, after_first.find_first(col6, 3.3));
+    CHECK_EQUAL(npos, after_first.find_first(col7, util::make_optional(3.3)));
+    CHECK_EQUAL(npos, after_first.find_first(col8, Timestamp(3, 3)));
+    CHECK_EQUAL(npos, after_first.find_first(col9, Timestamp(3, 3)));
+    CHECK_EQUAL(npos, after_first.find_first(col10, StringData("c")));
+    CHECK_EQUAL(npos, after_first.find_first(col11, StringData("c")));
+    CHECK_EQUAL(npos, after_first.find_first(col12, BinaryData("c", 1)));
+    CHECK_EQUAL(npos, after_first.find_first(col13, BinaryData("c", 1)));
 }
 
 
+#ifdef LEGACY_TESTS
 TEST(TableView_Follows_Changes)
 {
     Table table;
@@ -2932,17 +2942,17 @@ TEST(TableView_FindAll)
     auto col_int = t.add_column(type_Int, "integers");
 
     ObjKey k0 = t.create_object().set_all("hello", 1).get_key();
-    ObjKey k1 = t.create_object().set_all("world", 2).get_key();
+    t.create_object().set_all("world", 2).get_key();
     ObjKey k2 = t.create_object().set_all("hello", 3).get_key();
-    ObjKey k3 = t.create_object().set_all("world", 4).get_key();
+    t.create_object().set_all("world", 4).get_key();
     ObjKey k4 = t.create_object().set_all("hello", 5).get_key();
 
     ConstTableView tv = t.where().find_all();
 
-    ObjKey j = tv.find_first<Int>(col_int, 4);
-    CHECK_EQUAL(j, k3);
-    ObjKey k = tv.find_first<String>(col_str, "world");
-    CHECK_EQUAL(k, k1);
+    size_t j = tv.find_first<Int>(col_int, 4);
+    CHECK_EQUAL(j, 3);
+    size_t k = tv.find_first<String>(col_str, "world");
+    CHECK_EQUAL(k, 1);
     auto tv1 = tv.find_all<String>(col_str, "hello");
     CHECK_EQUAL(tv1.size(), 3);
     CHECK_EQUAL(tv1.get_key(0), k0);
