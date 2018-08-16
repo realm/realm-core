@@ -1183,9 +1183,7 @@ bool Table::is_nullable(ColKey col_key) const
 {
     REALM_ASSERT_DEBUG(valid_column(col_key));
     size_t col_ndx = colkey2ndx(col_key);
-    return m_spec.get_column_attr(col_ndx).test(col_attr_Nullable) ||
-           (m_spec.get_column_type(col_ndx) == col_type_Link &&
-           !m_spec.get_column_attr(col_ndx).test(col_attr_List));
+    return m_spec.get_column_attr(col_ndx).test(col_attr_Nullable);
 }
 
 bool Table::is_list(ColKey col_key) const
