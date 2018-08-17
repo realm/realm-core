@@ -438,6 +438,15 @@ public:
     void bump_storage_version() const noexcept;
     void bump_content_version() const noexcept;
 
+    // Change the nullability of the column identified by col_key.
+    // This might result in the creation of a new column and deletion of the old.
+    // The column key to use going forward is returned.
+    // If the conversion is from nullable to non-nullable, throw_on_null determines
+    // the reaction to encountering a null value: If clear, null values will be
+    // converted to default values. If set, a 'column_not_nullable' is thrown and the
+    // table is unchanged.
+    ColKey set_nullability(ColKey col_key, bool nullable, bool throw_on_null);
+
 private:
     template <class T>
     TableView find_all(ColKey col_key, T value);
@@ -446,6 +455,11 @@ private:
     // remove a mapping, moving all later mappings to a lower index
     void remove_col_mapping(size_t ndx);
     ColKey generate_col_key();
+    void convert_column(ColKey from, ColKey to, bool throw_on_null);
+    template <class F, class T>
+    void change_nullability(ColKey from, ColKey to, bool throw_on_null);
+    template <class F, class T>
+    void change_nullability_list(ColKey from, ColKey to, bool throw_on_null);
 
 public:
     size_t colkey2ndx(ColKey key) const;
@@ -1206,7 +1220,6 @@ bool inline Table::valid_column(ColKey col_key) const
         return false;
     return true;
 }
-
 
 // This class groups together information about the target of a link column
 // This is not a valid link if the target table == nullptr

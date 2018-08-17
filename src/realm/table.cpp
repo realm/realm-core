@@ -2338,6 +2338,202 @@ Table::BacklinkOrigin Table::find_backlink_origin(ColKey backlink_col) const noe
     return {};
 }
 
+namespace {
+template <class T>
+typename util::RemoveOptional<T>::type remove_optional(T val)
+{
+    return val;
+}
+template <>
+int64_t remove_optional<Optional<int64_t>>(Optional<int64_t> val)
+{
+    return val.value();
+}
+template <>
+bool remove_optional<Optional<bool>>(Optional<bool> val)
+{
+    return val.value();
+}
+}
+
+template <class F, class T>
+void Table::change_nullability(ColKey key_from, ColKey key_to, bool throw_on_null)
+{
+    Allocator& allocator = this->get_alloc();
+    bool from_nullability = is_nullable(key_from);
+    size_t to = colkey2ndx(key_to);
+    size_t from = colkey2ndx(key_from);
+    ClusterTree::UpdateFunction func = [from, to, throw_on_null, from_nullability, &allocator](Cluster* cluster) {
+        size_t sz = cluster->node_size();
+
+        typename ColumnTypeTraits<F>::cluster_leaf_type from_arr(allocator);
+        typename ColumnTypeTraits<T>::cluster_leaf_type to_arr(allocator);
+        cluster->init_leaf(from, &from_arr);
+        cluster->init_leaf(to, &to_arr);
+
+        for (size_t i = 0; i < sz; i++) {
+            if (from_nullability && from_arr.is_null(i)) {
+                if (throw_on_null) {
+                    throw realm::LogicError(realm::LogicError::column_not_nullable);
+                }
+                else {
+                    to_arr.set(i, ColumnTypeTraits<T>::cluster_leaf_type::default_value(false));
+                }
+            }
+            else {
+                auto v = remove_optional(from_arr.get(i));
+                to_arr.set(i, v);
+            }
+        }
+    };
+
+    m_clusters.update(func);
+}
+
+template <class F, class T>
+void Table::change_nullability_list(ColKey key_from, ColKey key_to, bool throw_on_null)
+{
+    Allocator& allocator = this->get_alloc();
+    bool from_nullability = is_nullable(key_from);
+    size_t to = colkey2ndx(key_to);
+    size_t from = colkey2ndx(key_from);
+    ClusterTree::UpdateFunction func = [from, to, throw_on_null, from_nullability, &allocator](Cluster* cluster) {
+        size_t sz = cluster->node_size();
+
+        ArrayInteger from_arr(allocator);
+        ArrayInteger to_arr(allocator);
+        cluster->init_leaf(from, &from_arr);
+        cluster->init_leaf(to, &to_arr);
+
+        for (size_t i = 0; i < sz; i++) {
+            ref_type ref_from = to_ref(from_arr.get(i));
+            ref_type ref_to = to_ref(to_arr.get(i));
+            REALM_ASSERT(!ref_to);
+
+            BPlusTree<F> from_list(allocator);
+            BPlusTree<T> to_list(allocator);
+            from_list.init_from_ref(ref_from);
+            to_list.create();
+            size_t n = from_list.size();
+            for (size_t j = 0; j < n; j++) {
+                auto v = from_list.get(j);
+                if (!from_nullability || bptree_aggregate_not_null(v)) {
+                    to_list.add(remove_optional(v));
+                }
+                else {
+                    if (throw_on_null) {
+                        throw realm::LogicError(realm::LogicError::column_not_nullable);
+                    }
+                    else {
+                        to_list.add(ColumnTypeTraits<T>::cluster_leaf_type::default_value(false));
+                    }
+                }
+            }
+            to_arr.set(i, from_ref(to_list.get_ref()));
+        }
+    };
+
+    m_clusters.update(func);
+}
+
+void Table::convert_column(ColKey from, ColKey to, bool throw_on_null)
+{
+    realm::DataType type_id = get_column_type(from);
+    bool _is_list = is_list(from);
+    if (_is_list) {
+        switch (type_id) {
+            case type_Int:
+                if (is_nullable(from)) {
+                    change_nullability_list<Optional<int64_t>, int64_t>(from, to, throw_on_null);
+                }
+                else {
+                    change_nullability_list<int64_t, Optional<int64_t>>(from, to, throw_on_null);
+                }
+                break;
+            case type_Float:
+                change_nullability_list<float, float>(from, to, throw_on_null);
+                break;
+            case type_Double:
+                change_nullability_list<double, double>(from, to, throw_on_null);
+                break;
+            case type_Bool:
+                change_nullability_list<Optional<bool>, Optional<bool>>(from, to, throw_on_null);
+                break;
+            case type_String:
+                change_nullability_list<StringData, StringData>(from, to, throw_on_null);
+                break;
+            case type_Binary:
+                change_nullability_list<BinaryData, BinaryData>(from, to, throw_on_null);
+                break;
+            case type_Timestamp:
+                change_nullability_list<Timestamp, Timestamp>(from, to, throw_on_null);
+                break;
+            default:
+                REALM_UNREACHABLE();
+                break;
+        }
+    }
+    else {
+        switch (type_id) {
+            case type_Int:
+                if (is_nullable(from)) {
+                    change_nullability<Optional<int64_t>, int64_t>(from, to, throw_on_null);
+                }
+                else {
+                    change_nullability<int64_t, Optional<int64_t>>(from, to, throw_on_null);
+                }
+                break;
+            case type_Float:
+                change_nullability<float, float>(from, to, throw_on_null);
+                break;
+            case type_Double:
+                change_nullability<double, double>(from, to, throw_on_null);
+                break;
+            case type_Bool:
+                change_nullability<Optional<bool>, Optional<bool>>(from, to, throw_on_null);
+                break;
+            case type_String:
+                change_nullability<StringData, StringData>(from, to, throw_on_null);
+                break;
+            case type_Binary:
+                change_nullability<BinaryData, BinaryData>(from, to, throw_on_null);
+                break;
+            case type_Timestamp:
+                change_nullability<Timestamp, Timestamp>(from, to, throw_on_null);
+                break;
+            default:
+                REALM_UNREACHABLE();
+                break;
+        }
+    }
+}
+
+
+ColKey Table::set_nullability(ColKey col_key, bool nullable, bool throw_on_null)
+{
+    if (is_nullable(col_key) == nullable)
+        return col_key;
+    ColKey new_col;
+    if (is_list(col_key)) {
+        new_col = add_column_list(get_column_type(col_key), "", nullable);
+    }
+    else {
+        new_col = add_column(get_column_type(col_key), "", nullable);
+    }
+    try {
+        convert_column(col_key, new_col, throw_on_null);
+    }
+    catch (LogicError&) {
+        // remove any partially filled column
+        remove_column(new_col);
+        throw;
+    }
+    std::string column_name(get_column_name(col_key));
+    remove_column(col_key);
+    rename_column(new_col, column_name);
+    return new_col;
+}
+
 // LCOV_EXCL_START
 void Table::verify_inv() const
 {

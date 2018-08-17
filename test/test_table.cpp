@@ -88,6 +88,146 @@ using unit_test::TestContext;
 // `experiments/testcase.cpp` and then run `sh build.sh
 // check-testcase` (or one of its friends) from the command line.
 
+namespace {
+
+// copy and convert values between nullable/not nullable as expressed by types
+// both non-nullable:
+template <typename T1, typename T2>
+struct value_copier {
+    value_copier(bool)
+    {
+    }
+    T2 operator()(T1 from_value)
+    {
+        return from_value;
+    }
+};
+
+// copy from non-nullable to nullable
+template <typename T1, typename T2>
+struct value_copier<T1, Optional<T2>> {
+    value_copier(bool throw_on_null)
+        : internal_copier(throw_on_null)
+    {
+    }
+    value_copier<T1, T2> internal_copier; // we need state for strings and binaries.
+    Optional<T2> operator()(T1 from_value)
+    {
+        return Optional<T2>(internal_copier(from_value));
+    }
+};
+
+// copy from nullable to non-nullable - nulls may trigger exception or become default value
+template <typename T1, typename T2>
+struct value_copier<Optional<T1>, T2> {
+    value_copier(bool throw_on_null)
+        : m_throw_on_null(throw_on_null)
+    {
+    }
+    bool m_throw_on_null;
+    T2 operator()(Optional<T1> from_value)
+    {
+        if (bool(from_value))
+            return from_value.value();
+        else {
+            if (m_throw_on_null)
+                throw realm::LogicError(realm::LogicError::column_not_nullable);
+            else
+                return T2(); // default value for type
+        }
+    }
+};
+
+// identical to non-specialized case, but specialization needed to avoid capture by 2 previous decls
+template <typename T1, typename T2>
+struct value_copier<Optional<T1>, Optional<T2>> {
+    value_copier(bool)
+    {
+    }
+    Optional<T2> operator()(Optional<T1> from_value)
+    {
+        return from_value;
+    }
+};
+
+// Specialization for StringData, BinaryData and Timestamp.
+// these types do not encode/express nullability.
+
+template <>
+struct value_copier<StringData, StringData> {
+    value_copier(bool throw_on_null)
+        : m_throw_on_null(throw_on_null)
+    {
+    }
+    bool m_throw_on_null;
+    std::vector<char> data; // we need to make a local copy because writing may invalidate the argument
+    StringData operator()(StringData from_value)
+    {
+        if (from_value.is_null()) {
+            if (m_throw_on_null) {
+                // possibly incorrect - may need to convert to default value for non-nullable entries instead
+                throw realm::LogicError(realm::LogicError::column_not_nullable);
+            }
+            else
+                return StringData("", 0);
+        }
+        const char* p = from_value.data();
+        const char* limit = p + from_value.size();
+        data.clear();
+        data.reserve(from_value.size());
+        while (p != limit)
+            data.push_back(*p++);
+        return StringData(&data[0], from_value.size());
+    }
+};
+
+template <>
+struct value_copier<BinaryData, BinaryData> {
+    value_copier(bool throw_on_null)
+        : m_throw_on_null(throw_on_null)
+    {
+    }
+    bool m_throw_on_null;
+    std::vector<char> data; // we need to make a local copy because writing may invalidate the argument
+    BinaryData operator()(BinaryData from_value)
+    {
+        if (from_value.is_null()) {
+            if (m_throw_on_null) {
+                // possibly incorrect - may need to convert to default value for non-nullable entries instead
+                throw realm::LogicError(realm::LogicError::column_not_nullable);
+            }
+            else
+                return BinaryData("", 0);
+        }
+        const char* p = from_value.data();
+        const char* limit = p + from_value.size();
+        data.clear();
+        data.reserve(from_value.size());
+        while (p != limit)
+            data.push_back(*p++);
+        return BinaryData(&data[0], from_value.size());
+    }
+};
+
+template <>
+struct value_copier<Timestamp, Timestamp> {
+    value_copier(bool throw_on_null)
+        : m_throw_on_null(throw_on_null)
+    {
+    }
+    bool m_throw_on_null;
+    Timestamp operator()(Timestamp from_value)
+    {
+        if (from_value.is_null()) {
+            if (m_throw_on_null)
+                throw realm::LogicError(realm::LogicError::column_not_nullable);
+            else
+                return Timestamp();
+        }
+        return from_value;
+    }
+};
+}
 
 #ifdef JAVA_MANY_COLUMNS_CRASH
 
@@ -1446,7 +1586,7 @@ TEST(Table_DistinctTimestamp)
 }
 
 
-TEST(Table_DistinctFromPersistedTable)
+TEST(Table_DistincTBasePersistedTable)
 {
     GROUP_TEST_PATH(path);
 
@@ -4022,6 +4162,7 @@ TEST(Table_getLinkType)
     CHECK_THROW(table->get_link_type(col_weak_link), NoSuchTable);
 }
 
+
 template<typename T> T generate_value() { return test_util::random_int<T>(); }
 
 template<> StringData generate_value()
@@ -4045,95 +4186,220 @@ template<> float generate_value() { return float(1.0 * test_util::random_int<int
 template<> double generate_value() { return 1.0 * test_util::random_int<int>() / (test_util::random_int<int>(1, 1000)); }
 template<> Timestamp generate_value() { return Timestamp(test_util::random_int<int>(0, 1000000), test_util::random_int<int>(0, 1000000000)); }
 
-template<typename T> void dispose_value(T) {}
-template<> void dispose_value(StringData value)
+// helper object taking care of destroying memory underlying StringData and BinaryData
+// just a passthrough for other types
+template <typename T>
+struct managed {
+    T value;
+    managed(const T& v)
+        : value(v)
+    {
+    }
+    managed(const managed<T>& v)
+        : value(v.value)
+    {
+    }
+};
+
+template <>
+struct managed<StringData> {
+    StringData value;
+    char* memory;
+    ~managed()
+    {
+        delete[] memory;
+    }
+    void copy(const StringData& v)
+    {
+        if (v.size()) {
+            auto sz = v.size();
+            const char* data = v.data();
+            memory = new char[sz];
+            for (size_t i = 0; i < sz; ++i)
+                memory[i] = data[i];
+            value = StringData(memory, sz);
+        }
+        else if (v.data()) {
+            memory = nullptr;
+            value = StringData("", 0);
+        }
+        else {
+            memory = nullptr;
+            value = StringData();
+        }
+    }
+    managed(const StringData& v)
+    {
+        copy(v);
+    }
+    managed(const managed<StringData>& v)
+    {
+        copy(v.value);
+    }
+    managed(managed<StringData>&& v)
+    {
+        copy(v.value);
+    }
+    managed<StringData>& operator=(const managed<StringData>& v)
+    {
+        delete[] memory;
+        copy(v.value);
+        return *this;
+    }
+};
+
+template <>
+struct managed<BinaryData> {
+    BinaryData value;
+    char* memory;
+    ~managed()
+    {
+        delete[] memory;
+    }
+    void copy(const BinaryData& v)
+    {
+        if (v.size()) {
+            auto sz = v.size();
+            const char* data = v.data();
+            memory = new char[sz];
+            for (size_t i = 0; i < sz; ++i)
+                memory[i] = data[i];
+            value = BinaryData(memory, sz);
+        }
+        else if (v.data()) {
+            memory = nullptr;
+            value = BinaryData("", 0);
+        }
+        else {
+            memory = nullptr;
+            value = BinaryData();
+        }
+    }
+    managed(const BinaryData& v)
+    {
+        copy(v);
+    }
+    managed(const managed<BinaryData>& v)
+    {
+        copy(v.value);
+    }
+    managed(managed<BinaryData>&& v)
+    {
+        copy(v.value);
+    }
+    managed<Binary>& operator=(const managed<BinaryData>& v)
+    {
+        delete[] memory;
+        copy(v.value);
+        return *this;
+    }
+};
+
+
+template <typename T>
+void check_values(TestContext& test_context, Lst<T>& lst, std::vector<managed<T>>& reference)
 {
-	delete[] value.data();
-}
-template<> void dispose_value(BinaryData value)
-{
-	delete[] value.data();
-}
-template<typename T> void check_values(TestContext& test_context, Lst<T>& lst, std::vector<T>& reference) {
-	CHECK_EQUAL(lst.size(), reference.size());
-	for (unsigned j = 0; j < reference.size(); ++j)
-		CHECK_EQUAL(lst.get(j), reference[j]);
+    CHECK_EQUAL(lst.size(), reference.size());
+    for (unsigned j = 0; j < reference.size(); ++j)
+        CHECK_EQUAL(lst.get(j), reference[j].value);
 }
 
 template<typename T> struct generator {
-	static T get() { return generate_value<T>(); }
-	static void dispose(T value) { dispose_value<T>(value); }
+    static managed<T> get()
+    {
+        return managed<T>(generate_value<T>());
+    }
+};
+
+template <>
+struct generator<StringData> {
+    static managed<StringData> get()
+    {
+        StringData v = generate_value<StringData>();
+        managed<StringData> rv(v);
+        delete[] v.data();
+        return rv;
+    }
+};
+
+template <>
+struct generator<BinaryData> {
+    static managed<BinaryData> get()
+    {
+        BinaryData v = generate_value<BinaryData>();
+        managed<BinaryData> rv(v);
+        delete[] v.data();
+        return rv;
+    }
 };
 
 template<typename T> struct generator<Optional<T>> {
-	static Optional<T> get() {
-		if ((test_util::random_int<int>() % 10) == 0)
-			return Optional<T>();
-		else
-			return Optional<T>(generate_value<T>());
-	}
-	static void dispose(Optional<T> value) {
-		if (bool(value))
-			dispose_value<T>(value.value());
-	}
+    static managed<Optional<T>> get()
+    {
+        if ((test_util::random_int<int>() % 10) == 0)
+            return managed<Optional<T>>(Optional<T>());
+        else
+            return managed<Optional<T>>(Optional<T>(generate_value<T>()));
+    }
+};
+
+// specialize for Optional<StringData> and Optional<BinaryData> just to trigger errors if ever used
+template <>
+struct generator<Optional<StringData>> {
+};
+template <>
+struct generator<Optional<BinaryData>> {
 };
 
 template<typename T> void test_lists(TestContext& test_context, DBRef sg, const realm::DataType type_id, bool optional = false) {
-	auto t = sg->start_write();
-	auto table = t->add_table("the_table");
-	auto col = table->add_column_list(type_id, "the column", optional);
-	Obj o = table->create_object();
-	Lst<T> lst = o.get_list<T>(col);
-	std::vector<T> reference;
-	for (int j = 0; j < 10000; ++j) {
-		T value = generator<T>::get();
-		lst.add(value);
-		reference.push_back(value);
-	}
-	check_values(test_context, lst, reference);
-	for (int j = 0; j < 1000; ++j) {
-		T value = generator<T>::get();
-		lst.insert(4993, value);
-		generator<T>::dispose(value);
-		value = generator<T>::get();
-		lst.set(4993, value);
-		reference.insert(reference.begin() + 4993, value);
-	}
-	check_values(test_context, lst, reference);
-	for (int j = 0; j < 1000; ++j) {
-		lst.remove(1452);
-		T val = reference[1452];
-		reference.erase(reference.begin() + 1452);
-		generator<T>::dispose(val);
-	}
-	check_values(test_context, lst, reference);
-	for (int disp = 0; disp < 4; ++disp) {
-		for (int j = 2500 + disp; j > 500; j -= 3) {
-			lst.remove(j);
-			T val = reference[j];
-			reference.erase(reference.begin() + j);
-			generator<T>::dispose(val);
-		}
-		check_values(test_context, lst, reference);
-	}
-	auto it = reference.begin();
-	for (auto value : lst) {
-		CHECK(value == *it);
-		++it;
-	}
-	for (size_t j = lst.size(); j >= 1000; --j) {
-		lst.remove(j - 1);
-		generator<T>::dispose(reference.back());
-		reference.pop_back();
-	}
-	check_values(test_context, lst, reference);
-	while (size_t sz = lst.size()) {
-		lst.remove(sz - 1);
-		generator<T>::dispose(reference.back());
-		reference.pop_back();
-	}
-	CHECK_EQUAL(0, reference.size());
-	t->rollback();
+    auto t = sg->start_write();
+    auto table = t->add_table("the_table");
+    auto col = table->add_column_list(type_id, "the column", optional);
+    Obj o = table->create_object();
+    Lst<T> lst = o.get_list<T>(col);
+    std::vector<managed<T>> reference;
+    for (int j = 0; j < 10000; ++j) {
+        managed<T> value = generator<T>::get();
+        lst.add(value.value);
+        reference.push_back(value);
+    }
+    check_values(test_context, lst, reference);
+    for (int j = 0; j < 1000; ++j) {
+        managed<T> value = generator<T>::get();
+        lst.insert(4993, value.value);
+        value = generator<T>::get();
+        lst.set(4993, value.value);
+        reference.insert(reference.begin() + 4993, value);
+    }
+    check_values(test_context, lst, reference);
+    for (int j = 0; j < 1000; ++j) {
+        lst.remove(1452);
+        reference.erase(reference.begin() + 1452);
+    }
+    check_values(test_context, lst, reference);
+    for (int disp = 0; disp < 4; ++disp) {
+        for (int j = 2500 + disp; j > 500; j -= 3) {
+            lst.remove(j);
+            reference.erase(reference.begin() + j);
+        }
+        check_values(test_context, lst, reference);
+    }
+    auto it = reference.begin();
+    for (auto value : lst) {
+        CHECK(value == it->value);
+        ++it;
+    }
+    for (size_t j = lst.size(); j >= 1000; --j) {
+        lst.remove(j - 1);
+        reference.pop_back();
+    }
+    check_values(test_context, lst, reference);
+    while (size_t sz = lst.size()) {
+        lst.remove(sz - 1);
+        reference.pop_back();
+    }
+    CHECK_EQUAL(0, reference.size());
+    t->rollback();
 }
 
 TEST(List_Ops) {
@@ -4159,74 +4425,72 @@ TEST(List_Ops) {
 	test_lists<Timestamp>(test_context, sg, type_Timestamp, true); // always Optional?
 }
 
-template<typename T> void check_table_values(TestContext& test_context, TableRef t, ColKey col, std::map<int, T>& reference) {
-	CHECK_EQUAL(t->size(), reference.size());
-	for (auto it : reference) {
-		T value = it.second;
-		Obj o = t->get_object(ObjKey(it.first));
-		CHECK_EQUAL(o.get<T>(col), value);
-	}
+template <typename T>
+void check_table_values(TestContext& test_context, TableRef t, ColKey col, std::map<int, managed<T>>& reference)
+{
+    if (t->size() != reference.size()) {
+        std::cout << "gah" << std::endl;
+    }
+    CHECK_EQUAL(t->size(), reference.size());
+    for (auto it : reference) {
+        T value = it.second.value;
+        Obj o = t->get_object(ObjKey(it.first));
+        CHECK_EQUAL(o.get<T>(col), value);
+    }
 }
 
 template<typename T> void test_tables(TestContext& test_context, DBRef sg, const realm::DataType type_id, bool optional = false) {
-	auto t = sg->start_write();
-	auto table = t->add_table("the_table");
-	auto col = table->add_column(type_id, "the column", optional);
-	std::map<int, T> reference;
+    auto t = sg->start_write();
+    auto table = t->add_table("the_table");
+    auto col = table->add_column(type_id, "the column", optional);
+    std::map<int, managed<T>> reference;
 
-	// insert elements 0 - 999
-	for (int j = 0; j < 1000; ++j) {
-		T value = generator<T>::get();
-		Obj o = table->create_object(ObjKey(j)).set_all(value);
-		reference.insert(std::pair<int, T>(j, value));
-	}
-	// insert elements 10000 - 10999
-	for (int j = 10000; j < 11000; ++j) {
-		T value = generator<T>::get();
-		Obj o = table->create_object(ObjKey(j)).set_all(value);
-		reference.insert(std::pair<int, T>(j, value));
-	}
-	// insert in between previous groups
-	for (int j = 4000; j < 7000; ++j) {
-		T value = generator<T>::get();
-		Obj o = table->create_object(ObjKey(j)).set_all(value);
-		reference.insert(std::pair<int, T>(j, value));
-	}
-	check_table_values(test_context, table, col, reference);
+    // insert elements 0 - 999
+    for (int j = 0; j < 1000; ++j) {
+        managed<T> value = generator<T>::get();
+        Obj o = table->create_object(ObjKey(j)).set_all(value.value);
+        reference.insert(std::pair<int, managed<T>>(j, value));
+    }
+    // insert elements 10000 - 10999
+    for (int j = 10000; j < 11000; ++j) {
+        managed<T> value = generator<T>::get();
+        Obj o = table->create_object(ObjKey(j)).set_all(value.value);
+        reference.insert(std::pair<int, managed<T>>(j, value));
+    }
+    // insert in between previous groups
+    for (int j = 4000; j < 7000; ++j) {
+        managed<T> value = generator<T>::get();
+        Obj o = table->create_object(ObjKey(j)).set_all(value.value);
+        reference.insert(std::pair<int, managed<T>>(j, value));
+    }
+    check_table_values(test_context, table, col, reference);
 
-	// modify values
-	for (int j = 0; j < 11000; j+=100) {
-		auto it = reference.find(j);
-		if (it == reference.end()) // skip over holes in the key range
-			continue;
-		T value = generator<T>::get();
-		Obj o = table->get_object(ObjKey(j));
-		generator<T>::dispose(it->second);
-		o.set<T>(col, value);
-		it->second = value;
-	}
-	check_table_values(test_context, table, col, reference);
+    // modify values
+    for (int j = 0; j < 11000; j += 100) {
+        auto it = reference.find(j);
+        if (it == reference.end()) // skip over holes in the key range
+            continue;
+        managed<T> value = generator<T>::get();
+        Obj o = table->get_object(ObjKey(j));
+        o.set<T>(col, value.value);
+        it->second = value;
+    }
+    check_table_values(test_context, table, col, reference);
 
-	// remove chunk in the middle
-	for (int j = 1000; j < 10000; ++j) {
-		auto it = reference.find(j);
-		if (it == reference.end()) // skip over holes in the key range
-			continue;
-		table->remove_object(ObjKey(j));
-		T value = it->second;
-		generator<T>::dispose(value);
-		reference.erase(it);
-	}
-	// cleanup remaining values (avoid leaking)
-	for (auto it : reference) generator<T>::dispose(it.second);
-	reference.clear();
-	table->clear();
-
-	check_table_values(test_context, table, col, reference);
-	t->rollback();
+    // remove chunk in the middle
+    for (int j = 1000; j < 10000; ++j) {
+        auto it = reference.find(j);
+        if (it == reference.end()) // skip over holes in the key range
+            continue;
+        table->remove_object(ObjKey(j));
+        reference.erase(it);
+    }
+    check_table_values(test_context, table, col, reference);
+    t->rollback();
 }
 
-TEST(Table_Ops) {
+TEST(Table_Ops)
+{
     SHARED_GROUP_TEST_PATH(path);
 
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
@@ -4249,7 +4513,141 @@ TEST(Table_Ops) {
 	test_tables<Timestamp>(test_context, sg, type_Timestamp, true); // always Optional?
 }
 
+template <typename TFrom, typename TTo>
+void test_dynamic_conversion(TestContext& test_context, DBRef sg, realm::DataType type_id, bool from_nullable,
+                             bool to_nullable)
+{
+    // Create values of type TFrom and ask for dynamic conversion to TTo
+    auto t = sg->start_write();
+    auto table = t->add_table("the_table");
+    auto col_from = table->add_column(type_id, "the column", from_nullable);
+    std::map<int, managed<TTo>> reference;
+    value_copier<TFrom, TTo> copier(false);
+    for (int j = 0; j < 10; ++j) {
+        managed<TFrom> value = generator<TFrom>::get();
+        Obj o =
+            table->create_object(ObjKey(j)).set_all(value.value); // <-- so set_all works even if it doesn't set all?
+        TTo conv_value =
+            copier(value.value); // one may argue that using the same converter for ref and dut is.. mmmh...
+        reference.insert(std::pair<int, managed<TTo>>(j, managed<TTo>(conv_value)));
+    }
+    auto col_to = table->set_nullability(col_from, to_nullable, false);
+    check_table_values(test_context, table, col_to, reference);
+    t->rollback();
+}
 
+template <typename TFrom, typename TTo>
+void test_dynamic_conversion_list(TestContext& test_context, DBRef sg, realm::DataType type_id, bool from_nullable,
+                                  bool to_nullable)
+{
+    // Create values of type TFrom and ask for dynamic conversion to TTo
+    auto t = sg->start_write();
+    auto table = t->add_table("the_table");
+    auto col_from = table->add_column_list(type_id, "the column", from_nullable);
+    Obj o = table->create_object();
+    Lst<TFrom> from_lst = o.get_list<TFrom>(col_from);
+    std::vector<managed<TTo>> reference;
+    for (int j = 0; j < 1000; ++j) {
+        managed<TFrom> value = generator<TFrom>::get();
+        from_lst.add(value.value);
+        value_copier<TFrom, TTo> copier(false);
+        TTo conv_value = copier(value.value);
+        reference.push_back(conv_value);
+    }
+    auto col_to = table->set_nullability(col_from, to_nullable, false);
+    Lst<TTo> to_lst = o.get_list<TTo>(col_to);
+    check_values(test_context, to_lst, reference);
+    t->rollback();
+}
+
+template <typename T>
+void test_dynamic_conversion_combi(TestContext& test_context, DBRef sg, realm::DataType type_id)
+{
+    test_dynamic_conversion<T, Optional<T>>(test_context, sg, type_id, false, true);
+    test_dynamic_conversion<Optional<T>, T>(test_context, sg, type_id, true, false);
+    test_dynamic_conversion<T, T>(test_context, sg, type_id, false, false);
+    test_dynamic_conversion<Optional<T>, Optional<T>>(test_context, sg, type_id, true, true);
+}
+
+template <typename T>
+void test_dynamic_conversion_combi_sametype(TestContext& test_context, DBRef sg, realm::DataType type_id)
+{
+    test_dynamic_conversion<T, T>(test_context, sg, type_id, false, true);
+    test_dynamic_conversion<T, T>(test_context, sg, type_id, true, false);
+    test_dynamic_conversion<T, T>(test_context, sg, type_id, false, false);
+    test_dynamic_conversion<T, T>(test_context, sg, type_id, true, true);
+}
+
+template <typename T>
+void test_dynamic_conversion_list_combi(TestContext& test_context, DBRef sg, realm::DataType type_id)
+{
+    test_dynamic_conversion_list<T, Optional<T>>(test_context, sg, type_id, false, true);
+    test_dynamic_conversion_list<Optional<T>, T>(test_context, sg, type_id, true, false);
+    test_dynamic_conversion_list<T, T>(test_context, sg, type_id, false, false);
+    test_dynamic_conversion_list<Optional<T>, Optional<T>>(test_context, sg, type_id, true, true);
+}
+
+template <typename T>
+void test_dynamic_conversion_list_combi_sametype(TestContext& test_context, DBRef sg, realm::DataType type_id)
+{
+    test_dynamic_conversion_list<T, T>(test_context, sg, type_id, false, true);
+    test_dynamic_conversion_list<T, T>(test_context, sg, type_id, true, false);
+    test_dynamic_conversion_list<T, T>(test_context, sg, type_id, false, false);
+    test_dynamic_conversion_list<T, T>(test_context, sg, type_id, true, true);
+}
+
+TEST(Table_Column_DynamicConversions)
+{
+    SHARED_GROUP_TEST_PATH(path);
+
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
+
+    test_dynamic_conversion_combi<int64_t>(test_context, sg, type_Int);
+    test_dynamic_conversion_combi<float>(test_context, sg, type_Float);
+    test_dynamic_conversion_combi<double>(test_context, sg, type_Double);
+    test_dynamic_conversion_combi<bool>(test_context, sg, type_Bool);
+
+    test_dynamic_conversion_combi_sametype<StringData>(test_context, sg, type_String);
+    test_dynamic_conversion_combi_sametype<BinaryData>(test_context, sg, type_Binary);
+    test_dynamic_conversion_combi_sametype<Timestamp>(test_context, sg, type_Timestamp);
+    // lists...:
+    test_dynamic_conversion_list_combi<int64_t>(test_context, sg, type_Int);
+    test_dynamic_conversion_list_combi<float>(test_context, sg, type_Float);
+    test_dynamic_conversion_list_combi<double>(test_context, sg, type_Double);
+    test_dynamic_conversion_list_combi<bool>(test_context, sg, type_Bool);
+
+    test_dynamic_conversion_list_combi_sametype<StringData>(test_context, sg, type_String);
+    test_dynamic_conversion_list_combi_sametype<BinaryData>(test_context, sg, type_Binary);
+    test_dynamic_conversion_list_combi_sametype<Timestamp>(test_context, sg, type_Timestamp);
+}
+/*
+TEST(Table_Column_Conversions)
+{
+    SHARED_GROUP_TEST_PATH(path);
+
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
+
+    test_column_conversion<int64_t, Optional<int64_t>>(test_context, sg, type_Int);
+    test_column_conversion<float, Optional<float>>(test_context, sg, type_Float);
+    test_column_conversion<double, Optional<double>>(test_context, sg, type_Double);
+    test_column_conversion<bool, Optional<bool>>(test_context, sg, type_Bool);
+    test_column_conversion<StringData, StringData>(test_context, sg, type_String);
+    test_column_conversion<BinaryData, BinaryData>(test_context, sg, type_Binary);
+    test_column_conversion<Timestamp, Timestamp>(test_context, sg, type_Timestamp);
+
+    test_column_conversion_optional<int64_t>(test_context, sg, type_Int);
+    test_column_conversion_optional<float>(test_context, sg, type_Float);
+    test_column_conversion_optional<double>(test_context, sg, type_Double);
+    test_column_conversion_optional<bool>(test_context, sg, type_Bool);
+
+    test_column_conversion_sametype<StringData>(test_context, sg, type_String);
+    test_column_conversion_sametype<BinaryData>(test_context, sg, type_Binary);
+    test_column_conversion_sametype<Timestamp>(test_context, sg, type_Timestamp);
+
+}
+*/
 TEST(Table_MultipleObjs) {
     SHARED_GROUP_TEST_PATH(path);
 
