@@ -52,7 +52,7 @@ public:
     {
         return m_arr->get_ndx_in_parent();
     }
-    void set_parent(ArrayParent* p, size_t n)
+    void set_parent(ArrayParent* p, size_t n) noexcept override
     {
         m_arr->set_parent(p, n);
     }

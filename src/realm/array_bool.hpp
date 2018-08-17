@@ -33,7 +33,6 @@ public:
     using value_type = bool;
 
     using Array::Array;
-    using Array::set_parent;
     using Array::init_from_ref;
     using Array::init_from_parent;
     using Array::update_parent;
@@ -53,6 +52,10 @@ public:
     void init_from_ref(ref_type ref) noexcept override
     {
         Array::init_from_ref(ref);
+    }
+    void set_parent(ArrayParent* parent, size_t ndx_in_parent) noexcept override
+    {
+        Array::set_parent(parent, ndx_in_parent);
     }
     bool is_null(size_t) const
     {

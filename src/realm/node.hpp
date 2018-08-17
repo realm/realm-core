@@ -327,6 +327,7 @@ class ArrayPayload {
 public:
     virtual ~ArrayPayload();
     virtual void init_from_ref(ref_type) noexcept = 0;
+    virtual void set_parent(ArrayParent* parent, size_t ndx_in_parent) noexcept = 0;
     void set_spec(Spec* spec, size_t col_ndx) const
     {
         m_spec = spec;

@@ -267,7 +267,7 @@ size_t BasicArrayNull<T>::find_first_null(size_t begin, size_t end) const
         end = sz;
     REALM_ASSERT(begin <= sz && end <= sz && begin <= end);
     while (begin != end) {
-        if (is_null(begin))
+        if (this->is_null(begin))
             return begin;
         begin++;
     }

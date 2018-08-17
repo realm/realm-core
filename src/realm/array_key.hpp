@@ -33,7 +33,6 @@ class ArrayKeyBase : public ArrayPayload, private Array {
 public:
     using value_type = ObjKey;
 
-    using Array::set_parent;
     using Array::is_attached;
     using Array::init_from_mem;
     using Array::init_from_parent;
@@ -57,6 +56,11 @@ public:
     void init_from_ref(ref_type ref) noexcept override
     {
         Array::init_from_ref(ref);
+    }
+
+    void set_parent(ArrayParent* parent, size_t ndx_in_parent) noexcept override
+    {
+        Array::set_parent(parent, ndx_in_parent);
     }
 
     void create()

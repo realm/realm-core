@@ -1358,6 +1358,7 @@ void Cluster::init_leaf(size_t col_ndx, ArrayPayload* leaf) const noexcept
     ref_type ref = to_ref(Array::get(col_ndx + 1));
     leaf->set_spec(const_cast<Spec*>(&m_tree_top.get_spec()), col_ndx);
     leaf->init_from_ref(ref);
+    leaf->set_parent(const_cast<Cluster*>(this), col_ndx + 1);
 }
 
 void Cluster::add_leaf(size_t col_ndx, ref_type ref)

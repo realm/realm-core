@@ -43,6 +43,10 @@ public:
     {
         Array::init_from_ref(ref);
     }
+    void set_parent(ArrayParent* parent, size_t ndx_in_parent) noexcept override
+    {
+        Array::set_parent(parent, ndx_in_parent);
+    }
 
     // Disable copying, this is not allowed.
     ArrayInteger& operator=(const ArrayInteger&) = delete;
@@ -111,6 +115,10 @@ public:
     void create(Type = type_Normal, bool context_flag = false);
 
     void init_from_ref(ref_type) noexcept override;
+    void set_parent(ArrayParent* parent, size_t ndx_in_parent) noexcept override
+    {
+        Array::set_parent(parent, ndx_in_parent);
+    }
     void init_from_mem(MemRef) noexcept;
     void init_from_parent() noexcept;
 

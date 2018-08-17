@@ -30,7 +30,6 @@ public:
 
     explicit ArrayTimestamp(Allocator&);
 
-    using Array::set_parent;
     using Array::update_parent;
     using Array::get_parent;
     using Array::get_ndx_in_parent;
@@ -47,6 +46,10 @@ public:
     void init_from_ref(ref_type ref) noexcept override
     {
         init_from_mem(MemRef(m_alloc.translate(ref), ref, m_alloc));
+    }
+    void set_parent(ArrayParent* parent, size_t ndx_in_parent) noexcept override
+    {
+        Array::set_parent(parent, ndx_in_parent);
     }
     void init_from_parent()
     {

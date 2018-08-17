@@ -42,7 +42,7 @@ public:
         return m_arr->get_ref();
     }
 
-    void set_parent(ArrayParent* parent, size_t ndx_in_parent)
+    void set_parent(ArrayParent* parent, size_t ndx_in_parent) noexcept override
     {
         m_arr->set_parent(parent, ndx_in_parent);
     }

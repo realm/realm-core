@@ -56,7 +56,7 @@ public:
         init_from_mem(MemRef(header, ref, m_alloc));
     }
 
-    void set_parent(ArrayParent* p, size_t n) override
+    void bp_set_parent(ArrayParent* p, size_t n) override
     {
         Array::set_parent(p, n);
     }
@@ -376,7 +376,7 @@ size_t BPlusTreeInner::bptree_erase(size_t n, EraseFunc& func)
             node2.init_from_ref(sibling_ref);
             sibling_node = &node2;
         }
-        sibling_node->set_parent(this, sibling_ndx + 1);
+        sibling_node->bp_set_parent(this, sibling_ndx + 1);
 
         size_t combined_size = sibling_node->get_node_size() + erase_node_size;
 
@@ -491,7 +491,7 @@ void BPlusTreeInner::ensure_offsets()
 inline BPlusTreeLeaf* BPlusTreeInner::cache_leaf(MemRef mem, size_t ndx, size_t offset)
 {
     BPlusTreeLeaf* leaf = m_tree->cache_leaf(mem);
-    leaf->set_parent(this, ndx + 1);
+    leaf->bp_set_parent(this, ndx + 1);
     size_t sz = leaf->get_node_size();
     m_tree->set_leaf_bounds(offset, offset + sz);
 
@@ -688,7 +688,7 @@ void BPlusTreeBase::create()
         m_parent->update_child_ref(m_ndx_in_parent, ref); // Throws
         destroy_guard.release();
     }
-    m_root->set_parent(m_parent, m_ndx_in_parent);
+    m_root->bp_set_parent(m_parent, m_ndx_in_parent);
 }
 
 void BPlusTreeBase::destroy()
@@ -703,7 +703,7 @@ void BPlusTreeBase::destroy()
 void BPlusTreeBase::replace_root(std::unique_ptr<BPlusTreeNode> new_root)
 {
     // Maintain parent.
-    new_root->set_parent(m_parent, m_ndx_in_parent);
+    new_root->bp_set_parent(m_parent, m_ndx_in_parent);
     new_root->update_parent(); // Throws
 
     m_root = std::move(new_root);

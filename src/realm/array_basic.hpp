@@ -45,14 +45,22 @@ public:
         Array::init_from_ref(ref);
     }
 
+    void set_parent(ArrayParent* parent, size_t ndx_in_parent) noexcept override
+    {
+        Array::set_parent(parent, ndx_in_parent);
+    }
+
     // Disable copying, this is not allowed.
     BasicArray& operator=(const BasicArray&) = delete;
     BasicArray(const BasicArray&) = delete;
 
     T get(size_t ndx) const noexcept;
-    bool is_null(size_t) const noexcept
+    bool is_null(size_t ndx) const noexcept
     {
-        return false;
+        // FIXME: This assumes BasicArray will only ever be instantiated for float-like T.
+        static_assert(realm::is_any<T, float, double>::value, "T can only be float or double");
+        auto x = BasicArray<T>::get(ndx);
+        return null::is_null_float(x);
     }
     void add(T value);
     void set(size_t ndx, T value);
@@ -157,14 +165,6 @@ public:
         else {
             BasicArray<T>::insert(ndx, null::get_null_float<T>());
         }
-    }
-
-    bool is_null(size_t ndx) const noexcept
-    {
-        // FIXME: This assumes BasicArray will only ever be instantiated for float-like T.
-        static_assert(realm::is_any<T, float, double>::value, "T can only be float or double");
-        auto x = BasicArray<T>::get(ndx);
-        return null::is_null_float(x);
     }
 
     void set_null(size_t ndx)

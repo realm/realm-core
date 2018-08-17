@@ -68,7 +68,7 @@ public:
 
     virtual void init_from_ref(ref_type ref) noexcept = 0;
 
-    virtual void set_parent(ArrayParent* parent, size_t ndx_in_parent) = 0;
+    virtual void bp_set_parent(ArrayParent* parent, size_t ndx_in_parent) = 0;
     virtual void update_parent() = 0;
 
     // Number of elements in this node
@@ -162,7 +162,7 @@ public:
     void init_from_ref(ref_type ref)
     {
         auto new_root = create_root_from_ref(ref);
-        new_root->set_parent(m_parent, m_ndx_in_parent);
+        new_root->bp_set_parent(m_parent, m_ndx_in_parent);
 
         m_root = std::move(new_root);
 
@@ -177,7 +177,7 @@ public:
             return false;
         }
         auto new_root = create_root_from_ref(ref);
-        new_root->set_parent(m_parent, m_ndx_in_parent);
+        new_root->bp_set_parent(m_parent, m_ndx_in_parent);
         m_root = std::move(new_root);
         invalidate_leaf_cache();
         m_size = m_root->get_tree_size();
@@ -189,7 +189,7 @@ public:
         m_parent = parent;
         m_ndx_in_parent = ndx_in_parent;
         if (is_attached())
-            m_root->set_parent(parent, ndx_in_parent);
+            m_root->bp_set_parent(parent, ndx_in_parent);
     }
 
     void create();
@@ -326,7 +326,7 @@ public:
             return LeafArray::get_ref();
         }
 
-        void set_parent(realm::ArrayParent* p, size_t n) override
+        void bp_set_parent(realm::ArrayParent* p, size_t n) override
         {
             LeafArray::set_parent(p, n);
         }
