@@ -229,8 +229,10 @@ TEST_CASE("Partial sync", "[sync]") {
     SyncManager::shared().configure_file_system(tmp_dir(), SyncManager::MetadataMode::NoEncryption);
 
     SyncServer server;
-    SyncTestFile config(server, "test", partial_sync_schema());
-    SyncTestFile partial_config(server, "test", partial_sync_schema(), true);
+    SyncTestFile config(server, "test");
+    config.schema = partial_sync_schema();
+    SyncTestFile partial_config(server, "test", true);
+    partial_config.schema = partial_sync_schema();
     // Add some objects for test purposes.
     populate_realm(config,
         {{1, 10, "partial"}, {2, 2, "partial"}, {3, 8, "sync"}},
@@ -558,7 +560,8 @@ TEST_CASE("Partial sync error checking", "[sync]") {
 
         SECTION("synced, non-partial Realm") {
             SyncServer server;
-            SyncTestFile config(server, "test", partial_sync_schema());
+            SyncTestFile config(server, "test");
+            config.schema = partial_sync_schema();
             auto realm = Realm::get_shared_realm(config);
             auto table = ObjectStore::table_for_object_type(realm->read_group(), "object_a");
             CHECK_THROWS(subscribe_and_wait(Results(realm, *table), util::none, [](Results, std::exception_ptr) { }));
@@ -567,8 +570,10 @@ TEST_CASE("Partial sync error checking", "[sync]") {
 
     SECTION("subscription error handling") {
         SyncServer server;
-        SyncTestFile config(server, "test", partial_sync_schema());
-        SyncTestFile partial_config(server, "test", partial_sync_schema(), true);
+        SyncTestFile config(server, "test");
+        config.schema = partial_sync_schema();
+        SyncTestFile partial_config(server, "test", true);
+        partial_config.schema = partial_sync_schema();
         // Add some objects for test purposes.
         populate_realm(config,
             {{1, 10, "partial"}, {2, 2, "partial"}, {3, 8, "sync"}},

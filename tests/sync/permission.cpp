@@ -187,7 +187,7 @@ TEST_CASE("Object-level Permissions") {
                 wait_for_upload(*r);
             }
 
-            SyncTestFile config2{server, "default", util::none, true};
+            SyncTestFile config2{server, "default", true};
             config2.automatic_change_notifications = false;
             auto r = Realm::get_shared_realm(config2);
             wait_for_download(*r);
@@ -206,7 +206,7 @@ TEST_CASE("Object-level Permissions") {
                 wait_for_upload(*r);
             }
 
-            SyncTestFile config2{server, "default", util::none, true};
+            SyncTestFile config2{server, "default", true};
             config2.automatic_change_notifications = false;
             config2.sync_config->user->set_is_admin(false);
             auto r = Realm::get_shared_realm(config2);
@@ -306,15 +306,17 @@ TEST_CASE("Object-level Permissions") {
             r->commit_transaction();
             wait_for_upload(*r);
         }
-        auto user = config.sync_config->user;
-        user->log_out();
 
-        SyncTestFile nonadmin{server, "default", util::none, true};
+        SyncTestFile nonadmin{server, "default", true, "user2"};
         nonadmin.automatic_change_notifications = false;
         nonadmin.sync_config->user->set_is_admin(false);
-        auto log_in = [&] {
+        auto bind_session_handler = nonadmin.sync_config->bind_session_handler;
+        nonadmin.sync_config->bind_session_handler = [](auto, auto, auto) { };
+        auto log_in = [&](auto& realm) {
             auto session = SyncManager::shared().get_session(nonadmin.path, *nonadmin.sync_config);
-            nonadmin.sync_config->bind_session_handler("", *nonadmin.sync_config, session);
+            bind_session_handler("", *nonadmin.sync_config, session);
+            wait_for_upload(realm);
+            wait_for_download(realm);
         };
 
         SECTION("reverted column insertion") {
@@ -328,33 +330,28 @@ TEST_CASE("Object-level Permissions") {
             r->invalidate();
 
             SECTION("no active read transaction") {
-                log_in();
-                wait_for_upload(*r);
-                wait_for_download(*r);
+                log_in(*r);
                 REQUIRE_THROWS_WITH(r->read_group(),
                                     Catch::Matchers::Contains("Property 'object.value 2' has been removed."));
             }
 
             SECTION("notify()") {
                 r->read_group();
-                log_in();
-                wait_for_download(*r);
+                log_in(*r);
                 REQUIRE_THROWS_WITH(r->notify(),
                                     Catch::Matchers::Contains("Property 'object.value 2' has been removed."));
             }
 
             SECTION("refresh()") {
                 r->read_group();
-                log_in();
-                wait_for_download(*r);
+                log_in(*r);
                 REQUIRE_THROWS_WITH(r->refresh(),
                                     Catch::Matchers::Contains("Property 'object.value 2' has been removed."));
             }
 
             SECTION("begin_transaction()") {
                 r->read_group();
-                log_in();
-                wait_for_download(*r);
+                log_in(*r);
                 REQUIRE_THROWS_WITH(r->begin_transaction(),
                                     Catch::Matchers::Contains("Property 'object.value 2' has been removed."));
             }
@@ -371,8 +368,7 @@ TEST_CASE("Object-level Permissions") {
             };
             auto r = Realm::get_shared_realm(nonadmin);
             r->read_group();
-            log_in();
-            wait_for_download(*r);
+            log_in(*r);
             REQUIRE_THROWS_WITH(r->notify(),
                                 Catch::Matchers::Contains("Class 'object 2' has been removed."));
         }
