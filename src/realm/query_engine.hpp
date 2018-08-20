@@ -1152,6 +1152,7 @@ public:
         : ParentNode(from, tr)
         , m_value(from.m_value)
         , m_is_string_enum(from.m_is_string_enum)
+        , m_has_search_index(from.m_has_search_index)
     {
     }
 
