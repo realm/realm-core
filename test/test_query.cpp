@@ -8016,14 +8016,17 @@ TEST(Query_NegativeNumbers)
         CHECK_EQUAL(10, (table->column<Int>(c0) < 0).find_all().size());
         TableView view = table->where().less(c0, 0).find_all();
         CHECK_EQUAL(10, view.size());
+
         id = -1;
-#ifdef LEGACY_TESTS   // FIXME
-        // nullability!
         for (size_t i = 0; i < view.size(); ++i) {
-        	CHECK_EQUAL(id, view.get(i).get<Int>(c0));
-        	id--;
+            if (nullable == 0) {
+                CHECK_EQUAL(id, view.get(i).get<Optional<Int>>(c0));
+            }
+            else {
+                CHECK_EQUAL(id, view.get(i).get<Int>(c0));
+            }
+            id--;
         }
-#endif
     }
 }
 
@@ -8046,16 +8049,9 @@ TEST(Query_MaximumSumAverage)
 
         table1->create_object().set_all(3, 3, 3.0);
         table1->create_object().set_all(4, 4, 4.0);
-        if (n) table1->create_object();
-        /*
-        table1->add_empty_row(n ? 3 : 2);
-        table1->set_int(0, 0, 3);
-        table1->set_int(0, 1, 4);
-        table1->set_int(1, 0, 3);
-        table1->set_int(1, 1, 4);
-        table1->set_double(2, 0, 3.);
-        table1->set_double(2, 1, 4.);
-         */
+        if (n)
+            table1->create_object();
+
         // Average
         {
             double d;
@@ -8070,11 +8066,10 @@ TEST(Query_MaximumSumAverage)
             // Criteria on same column as average
             d = table1->where().not_equal(c0, 1234).average_int(c0);
             CHECK_APPROXIMATELY_EQUAL(d, 7. / 2., 0.001);
-#ifdef LEGACY_TESTS  // FIXME!
+
             // Criteria on other column than average (triggers different code paths)
             d = table1->where().not_equal(c0, 1234).average_int(c1);
             CHECK_APPROXIMATELY_EQUAL(d, 7. / 2., 0.001);
-#endif
 
             // Average of double, criteria on integer
             d = table1->where().not_equal(c0, 1234).average_double(c2);
@@ -8095,11 +8090,10 @@ TEST(Query_MaximumSumAverage)
             d = table1->where().equal(c0, 3).average_int(c0);
             CHECK_APPROXIMATELY_EQUAL(d, 3., 0.001);
 
-#ifdef LEGACY_TESTS   // FIXME
             // Criteria on other column than average (triggers different code paths)
             d = table1->where().equal(c0, 3).average_int(c1);
             CHECK_APPROXIMATELY_EQUAL(d, 3., 0.001);
-#endif
+
             // Average of double, criteria on integer
             d = table1->where().not_equal(c0, 3).average_double(c2);
             CHECK_APPROXIMATELY_EQUAL(d, 4., 0.001);
@@ -8114,13 +8108,11 @@ TEST(Query_MaximumSumAverage)
             d = (table1->column<Double>(c2) != null()).average_double(c2);
             CHECK_APPROXIMATELY_EQUAL(d, 7. / 2., 0.001);
 
-#ifdef LEGACY_TESTS  // FIXME
             d = (table1->column<Int>(c0) != null()).average_int(c0);
             CHECK_APPROXIMATELY_EQUAL(d, 7. / 2., 0.001);
 
             d = (table1->column<Int>(c1) != null()).average_int(c0);
             CHECK_APPROXIMATELY_EQUAL(d, 7. / 2., 0.001);
-#endif
         }
 
 
@@ -8139,7 +8131,6 @@ TEST(Query_MaximumSumAverage)
             d = table1->where().not_equal(c0, 1234).maximum_int(c0);
             CHECK_EQUAL(d, 4);
 
-#ifdef LEGACY_TESTS   // FIXME
             // Criteria on other column than maximum (triggers different code paths)
             d = table1->where().not_equal(c0, 1234).maximum_int(c1);
             CHECK_EQUAL(d, 4);
@@ -8150,7 +8141,6 @@ TEST(Query_MaximumSumAverage)
 
             dbl = table1->where().not_equal(c2, 1234.).maximum_double(c2);
             CHECK_EQUAL(d, 4.);
-#endif
 
             // Those with criteria now only include some rows, whereof none are null
             d = table1->where().maximum_int(c0);
@@ -8163,11 +8153,10 @@ TEST(Query_MaximumSumAverage)
             d = table1->where().equal(c0, 4).maximum_int(c0);
             CHECK_EQUAL(d, 4);
 
-#ifdef LEGACY_TESTS   // FIXME
             // Criteria on other column than maximum (triggers different code paths)
             d = table1->where().equal(c0, 4).maximum_int(c1);
             CHECK_EQUAL(d, 4);
-#endif
+
             // Average of double, criteria on integer
             dbl = table1->where().not_equal(c0, 3).maximum_double(c2);
             CHECK_EQUAL(dbl, 4.);
@@ -8179,7 +8168,6 @@ TEST(Query_MaximumSumAverage)
             dbl = (table1->column<Int>(c0) != null()).maximum_double(c2);
             CHECK_EQUAL(dbl, 4.);
 
-#ifdef LEGACY_TESTS   // FIXME
             dbl = (table1->column<Double>(c2) != null()).maximum_double(c2);
             CHECK_EQUAL(dbl, 4.);
 
@@ -8188,7 +8176,6 @@ TEST(Query_MaximumSumAverage)
 
             d = (table1->column<Int>(c1) != null()).maximum_int(c0);
             CHECK_EQUAL(dbl, 4);
-#endif
         }
 
 
@@ -8230,11 +8217,10 @@ TEST(Query_MaximumSumAverage)
             d = table1->where().equal(c0, 4).minimum_int(c0);
             CHECK_EQUAL(d, 4);
 
-#ifdef LEGACY_TESTS   // FIXME
             // Criteria on other column than minimum (triggers different code paths)
             d = table1->where().equal(c0, 4).minimum_int(c1);
             CHECK_EQUAL(d, 4);
-#endif
+
             // Average of double, criteria on integer
             dbl = table1->where().not_equal(c0, 3).minimum_double(c2);
             CHECK_EQUAL(dbl, 4.);
@@ -8249,13 +8235,11 @@ TEST(Query_MaximumSumAverage)
             dbl = (table1->column<Double>(c2) != null()).minimum_double(c2);
             CHECK_EQUAL(dbl, 3.);
 
-#ifdef LEGACY_TESTS   // FIXME
             d = (table1->column<Int>(c0) != null()).minimum_int(c0);
             CHECK_EQUAL(dbl, 3);
 
             d = (table1->column<Int>(c1) != null()).minimum_int(c0);
             CHECK_EQUAL(dbl, 3);
-#endif
         }
 
         // Sum
@@ -8270,7 +8254,6 @@ TEST(Query_MaximumSumAverage)
             d = table1->where().not_equal(c0, 1234).sum_int(c0);
             CHECK_EQUAL(d, 7);
 
-#ifdef LEGACY_TESTS   // FIXME
             // Criteria on other column than maximum (triggers different code paths)
             d = table1->where().not_equal(c0, 1234).sum_int(c1);
             CHECK_EQUAL(d, 7);
@@ -8278,7 +8261,6 @@ TEST(Query_MaximumSumAverage)
             // Average of double, criteria on integer
             dbl = table1->where().not_equal(c0, 1234).sum_double(c2);
             CHECK_EQUAL(d, 7.);
-#endif
 
             dbl = table1->where().not_equal(c2, 1234.).sum_double(c2);
             CHECK_APPROXIMATELY_EQUAL(dbl, 7., 0.001);
@@ -8295,11 +8277,9 @@ TEST(Query_MaximumSumAverage)
             d = table1->where().equal(c0, 4).sum_int(c0);
             CHECK_EQUAL(d, 4);
 
-#ifdef LEGACY_TESTS   // FIXME
             // Criteria on other column than maximum (triggers different code paths)
             d = table1->where().equal(c0, 4).sum_int(c1);
             CHECK_EQUAL(d, 4);
-#endif
 
             // Average of double, criteria on integer
             dbl = table1->where().not_equal(c0, 3).sum_double(c2);
@@ -8315,13 +8295,11 @@ TEST(Query_MaximumSumAverage)
             dbl = (table1->column<Double>(c2) != null()).sum_double(c2);
             CHECK_APPROXIMATELY_EQUAL(dbl, 7., 0.001);
 
-#ifdef LEGACY_TESTS   // FIXME
             d = (table1->column<Int>(c0) != null()).sum_int(c0);
             CHECK_EQUAL(dbl, 7);
 
             d = (table1->column<Int>(c1) != null()).sum_int(c0);
             CHECK_EQUAL(dbl, 7);
-#endif
         }
 
 
