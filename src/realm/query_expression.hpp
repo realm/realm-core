@@ -3258,7 +3258,6 @@ public:
     void set_cluster(const Cluster* cluster) override
     {
         m_link_map.set_cluster(cluster);
-        m_column.set_cluster(cluster);
     }
 
     void collect_dependencies(std::vector<TableKey>& tables) const override

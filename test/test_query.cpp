@@ -5353,60 +5353,46 @@ TEST(Query_Avg2)
     CHECK_EQUAL(3, cnt);
 }
 
-#ifdef LEGACY_TESTS
+
 TEST(Query_OfByOne)
 {
-    TestTable t;
-    t.add_column(type_Int, "1");
+    Table t;
+    auto col_int = t.add_column(type_Int, "1");
     t.add_column(type_String, "2");
-
-    for (size_t i = 0; i < REALM_MAX_BPNODE_SIZE * 2; ++i) {
-        add(t, 1, "a");
+    size_t cluster_size = (REALM_MAX_BPNODE_SIZE > 256) ? 256 : 4;
+    for (size_t i = 0; i < cluster_size * 2; ++i) {
+        t.create_object().set_all(1, "a");
     }
 
     // Top
-    t[0].set_int(0, 0);
-    size_t res = t.where().equal(0, 0).find();
-    CHECK_EQUAL(0, res);
-    t[0].set_int(0, 1); // reset
+    Obj obj0 = t.get_object(0);
+    obj0.set(col_int, 0);
+    ObjKey res = t.where().equal(col_int, 0).find();
+    CHECK_EQUAL(obj0.get_key(), res);
+    obj0.set(col_int, 1); // reset
 
     // Before split
-    t[REALM_MAX_BPNODE_SIZE - 1].set_int(0, 0);
-    res = t.where().equal(0, 0).find();
-    CHECK_EQUAL(REALM_MAX_BPNODE_SIZE - 1, res);
-    t[REALM_MAX_BPNODE_SIZE - 1].set_int(0, 1); // reset
+    Obj obj1 = t.get_object(cluster_size - 1);
+    obj1.set(col_int, 0);
+    res = t.where().equal(col_int, 0).find();
+    CHECK_EQUAL(obj1.get_key(), res);
+    obj1.set(col_int, 1); // reset
 
     // After split
-    t[REALM_MAX_BPNODE_SIZE].set_int(0, 0);
-    res = t.where().equal(0, 0).find();
-    CHECK_EQUAL(REALM_MAX_BPNODE_SIZE, res);
-    t[REALM_MAX_BPNODE_SIZE].set_int(0, 1); // reset
+    Obj obj2 = t.get_object(cluster_size);
+    obj2.set(col_int, 0);
+    res = t.where().equal(col_int, 0).find();
+    CHECK_EQUAL(obj2.get_key(), res);
+    obj2.set(col_int, 1); // reset
 
     // Before end
-    const size_t last_pos = (REALM_MAX_BPNODE_SIZE * 2) - 1;
-    t[last_pos].set_int(0, 0);
-    res = t.where().equal(0, 0).find();
-    CHECK_EQUAL(last_pos, res);
+    Obj obj3 = t.get_object((cluster_size * 2) - 1);
+    obj3.set(col_int, 0);
+    res = t.where().equal(col_int, 0).find();
+    CHECK_EQUAL(obj3.get_key(), res);
+    obj3.set(col_int, 1); // reset
 }
 
-TEST(Query_Const)
-{
-    TestTable t;
-    t.add_column(type_Int, "1");
-    t.add_column(type_String, "2");
-
-    add(t, 10, "a");
-    add(t, 100, "b");
-    add(t, 20, "a");
-
-    const Table& const_table = t;
-
-    const size_t count = const_table.where().equal(1, "a").count();
-    CHECK_EQUAL(2, count);
-
-    // TODO: Should not be possible
-    const_table.where().equal(1, "a").remove();
-}
 
 TEST(Query_AllTypesDynamicallyTyped)
 {
@@ -5414,131 +5400,89 @@ TEST(Query_AllTypesDynamicallyTyped)
         bool n = (nullable == 1);
 
         Table table;
-        DescriptorRef sub1;
-        table.add_column(type_Bool, "boo", n);
-        table.add_column(type_Int, "int", n);
-        table.add_column(type_Float, "flt", n);
-        table.add_column(type_Double, "dbl", n);
-        table.add_column(type_String, "str", n);
-        table.add_column(type_Binary, "bin", n);
-        table.add_column(type_OldDateTime, "dat", n);
-        table.add_column(type_Table, "tab", &sub1);
-        table.add_column(type_Mixed, "mix");
-        sub1->add_column(type_Int, "sub_int");
-        sub1.reset();
+        auto col_boo = table.add_column(type_Bool, "boo", n);
+        auto col_int = table.add_column(type_Int, "int", n);
+        auto col_flt = table.add_column(type_Float, "flt", n);
+        auto col_dbl = table.add_column(type_Double, "dbl", n);
+        auto col_str = table.add_column(type_String, "str", n);
+        auto col_bin = table.add_column(type_Binary, "bin", n);
+        auto col_dat = table.add_column(type_Timestamp, "dat", n);
+        auto col_lst = table.add_column_list(type_Int, "int_list");
 
         const char bin[4] = {0, 1, 2, 3};
         BinaryData bin1(bin, sizeof bin / 2);
         BinaryData bin2(bin, sizeof bin);
-        int_fast64_t time_now = time(nullptr);
-        Mixed mix_int(int64_t(1));
-        Mixed mix_subtab((Mixed::subtable_tag()));
+        Timestamp time_now(time(nullptr), 0);
 
-        table.add_empty_row();
-        table.set_bool(0, 0, false);
-        table.set_int(1, 0, 54);
-        table.set_float(2, 0, 0.7f);
-        table.set_double(3, 0, 0.8);
-        table.set_string(4, 0, "foo");
-        table.set_binary(5, 0, bin1);
-        table.set_olddatetime(6, 0, 0);
-        table.set_mixed(8, 0, mix_int);
+        Obj obj0 = table.create_object().set_all(false, 54, 0.7f, 0.8, StringData("foo"), bin1, Timestamp(0, 0));
+        Obj obj1 = table.create_object().set_all(true, 506, 7.7f, 8.8, StringData("banach"), bin2, time_now);
+        obj1.get_list<Int>(col_lst).add(100);
 
-        table.add_empty_row();
-        table.set_bool(0, 1, true);
-        table.set_int(1, 1, 506);
-        table.set_float(2, 1, 7.7f);
-        table.set_double(3, 1, 8.8);
-        table.set_string(4, 1, "banach");
-        table.set_binary(5, 1, bin2);
-        table.set_olddatetime(6, 1, time_now);
-        TableRef subtab = table.get_subtable(7, 1);
-        subtab->add_empty_row();
-        subtab->set_int(0, 0, 100);
-        table.set_mixed(8, 1, mix_subtab);
-
-        CHECK_EQUAL(1, table.where().equal(0, false).count());
-        CHECK_EQUAL(1, table.where().equal(1, int64_t(54)).count());
-        CHECK_EQUAL(1, table.where().equal(2, 0.7f).count());
-        CHECK_EQUAL(1, table.where().equal(3, 0.8).count());
-        CHECK_EQUAL(1, table.where().equal(4, "foo").count());
-        CHECK_EQUAL(1, table.where().equal(5, bin1).count());
-        CHECK_EQUAL(1, table.where().equal_olddatetime(6, 0).count());
+        CHECK_EQUAL(1, table.where().equal(col_boo, false).count());
+        CHECK_EQUAL(1, table.where().equal(col_int, int64_t(54)).count());
+        CHECK_EQUAL(1, table.where().equal(col_flt, 0.7f).count());
+        CHECK_EQUAL(1, table.where().equal(col_dbl, 0.8).count());
+        CHECK_EQUAL(1, table.where().equal(col_str, "foo").count());
+        CHECK_EQUAL(1, table.where().equal(col_bin, bin1).count());
+        CHECK_EQUAL(1, table.where().equal(col_dat, Timestamp(0, 0)).count());
         //    CHECK_EQUAL(1, table.where().equal(7, subtab).count());
         //    CHECK_EQUAL(1, table.where().equal(8, mix_int).count());
 
-        Query query = table.where().equal(0, false);
+        Query query = table.where().equal(col_boo, false);
 
-        size_t ndx = not_found;
+        ObjKey ndx;
 
-        CHECK_EQUAL(54, query.minimum_int(1));
-        query.minimum_int(1, nullptr, 0, not_found, not_found, &ndx);
-        CHECK_EQUAL(0, ndx);
+        CHECK_EQUAL(54, query.minimum_int(col_int));
+        query.minimum_int(col_int, &ndx);
+        CHECK_EQUAL(obj0.get_key(), ndx);
 
-        CHECK_EQUAL(54, query.maximum_int(1));
-        query.maximum_int(1, nullptr, 0, not_found, not_found, &ndx);
-        CHECK_EQUAL(0, ndx);
+        CHECK_EQUAL(54, query.maximum_int(col_int));
+        query.maximum_int(col_int, &ndx);
+        CHECK_EQUAL(obj0.get_key(), ndx);
 
-        CHECK_EQUAL(54, query.sum_int(1));
-        CHECK_EQUAL(54, query.average_int(1));
+        CHECK_EQUAL(54, query.sum_int(col_int));
+        CHECK_EQUAL(54, query.average_int(col_int));
 
-        CHECK_EQUAL(0.7f, query.minimum_float(2));
-        query.minimum_float(2, nullptr, 0, not_found, not_found, &ndx);
-        CHECK_EQUAL(0, ndx);
+        CHECK_EQUAL(0.7f, query.minimum_float(col_flt));
+        query.minimum_float(col_flt, &ndx);
+        CHECK_EQUAL(obj0.get_key(), ndx);
 
-        CHECK_EQUAL(0.7f, query.maximum_float(2));
-        query.maximum_float(2, nullptr, 0, not_found, not_found, &ndx);
-        CHECK_EQUAL(0, ndx);
+        CHECK_EQUAL(0.7f, query.maximum_float(col_flt));
+        query.maximum_float(col_flt, &ndx);
+        CHECK_EQUAL(obj0.get_key(), ndx);
 
-        CHECK_EQUAL(0.7f, query.sum_float(2));
-        CHECK_EQUAL(0.7f, query.average_float(2));
+        CHECK_EQUAL(0.7f, query.sum_float(col_flt));
+        CHECK_EQUAL(0.7f, query.average_float(col_flt));
 
-        CHECK_EQUAL(0.8, query.minimum_double(3));
-        query.minimum_double(3, nullptr, 0, not_found, not_found, &ndx);
-        CHECK_EQUAL(0, ndx);
+        CHECK_EQUAL(0.8, query.minimum_double(col_dbl));
+        query.minimum_double(col_dbl, &ndx);
+        CHECK_EQUAL(obj0.get_key(), ndx);
 
-        CHECK_EQUAL(0.8, query.maximum_double(3));
-        query.maximum_double(3, nullptr, 0, not_found, not_found, &ndx);
-        CHECK_EQUAL(0, ndx);
+        CHECK_EQUAL(0.8, query.maximum_double(col_dbl));
+        query.maximum_double(col_dbl, &ndx);
+        CHECK_EQUAL(obj0.get_key(), ndx);
 
-        CHECK_EQUAL(0.8, query.sum_double(3));
-        CHECK_EQUAL(0.8, query.average_double(3));
+        CHECK_EQUAL(0.8, query.sum_double(col_dbl));
+        CHECK_EQUAL(0.8, query.average_double(col_dbl));
     }
 }
+
 
 TEST(Query_AggregateSortedView)
 {
     Table table;
-    table.add_column(type_Double, "col");
+    auto col = table.add_column(type_Double, "col");
 
     const int count = REALM_MAX_BPNODE_SIZE * 2;
-    table.add_empty_row(count);
     for (int i = 0; i < count; ++i)
-        table.set_double(0, i, i + 1); // no 0s to reduce chance of passing by coincidence
+        table.create_object().set(col, double(i + 1)); // no 0s to reduce chance of passing by coincidence
 
-    TableView tv = table.where().greater(0, 1.0).find_all();
-    tv.sort(0, false);
+    TableView tv = table.where().greater(col, 1.0).find_all();
+    tv.sort(col, false);
 
-    CHECK_EQUAL(2.0, tv.minimum_double(0));
-    CHECK_EQUAL(count, tv.maximum_double(0));
-    CHECK_APPROXIMATELY_EQUAL((count + 1) * count / 2, tv.sum_double(0), .1);
-}
-
-
-TEST(Query_RefCounting)
-{
-    Table* t = LangBindHelper::new_table();
-    t->add_column(type_Int, "myint");
-    t->insert_empty_row(0);
-    t->set_int(0, 0, 12);
-
-    Query q = t->where();
-
-    LangBindHelper::unbind_table_ptr(t);
-
-    // Now try to access Query and see that the Table is still alive
-    TableView tv = q.find_all();
-    CHECK_EQUAL(1, tv.size());
+    CHECK_EQUAL(2.0, tv.minimum_double(col));
+    CHECK_EQUAL(count, tv.maximum_double(col));
+    CHECK_APPROXIMATELY_EQUAL((count + 1) * count / 2, tv.sum_double(col), .1);
 }
 
 
@@ -5547,24 +5491,24 @@ TEST(Query_DeepCopy)
     // NOTE: You can only create a copy of a fully constructed; i.e. you cannot copy a query which is missing an
     // end_group(). Run Query::validate() to see if it's fully constructed.
 
-    TestTable t;
-    t.add_column(type_Int, "1");
-    t.add_column(type_String, "2");
-    t.add_column(type_Double, "3");
+    Table t;
+    auto col_int = t.add_column(type_Int, "1");
+    auto col_str = t.add_column(type_String, "2");
+    auto col_dbl = t.add_column(type_Double, "3");
 
-    add(t, 1, "1", 1.1);
-    add(t, 2, "2", 2.2);
-    add(t, 3, "3", 3.3);
-    add(t, 4, "4", 4.4);
+    ObjKey k0 = t.create_object().set_all(1, "1", 1.1).get_key();
+    t.create_object().set_all(2, "2", 2.2);
+    ObjKey k2 = t.create_object().set_all(3, "3", 3.3).get_key();
+    ObjKey k3 = t.create_object().set_all(4, "4", 4.4).get_key();
 
-    Query q = t.column<Int>(0) >
-              Value<Int>(2); // Explicit use of Value<>() makes query_expression node instead of query_engine.
+    // Explicit use of Value<>() makes query_expression node instead of query_engine.
+    Query q = t.column<Int>(col_int) > Value<Int>(2);
 
 
     // Test if we can execute a copy
     Query q2(q);
 
-    CHECK_EQUAL(2, q2.find());
+    CHECK_EQUAL(k2, q2.find());
 
 
     // See if we can execute a copy of a deleted query. The copy should not contain references to the original.
@@ -5584,69 +5528,67 @@ TEST(Query_DeepCopy)
         delete[] tmp[i];
     }
 
-    CHECK_EQUAL(2, q4->find());
+    CHECK_EQUAL(k2, q4->find());
     delete q4;
 
     // See if we can append a criteria to a query
-    Query q5 = t.column<Int>(0) >
-               Value<Int>(2); // Explicit use of Value<>() makes query_expression node instead of query_engine
-    q5.greater(2, 4.0);
-    CHECK_EQUAL(3, q5.find());
+    // Explicit use of Value<>() makes query_expression node instead of query_engine
+    Query q5 = t.column<Int>(col_int) > Value<Int>(2);
+    q5.greater(col_dbl, 4.0);
+    CHECK_EQUAL(k3, q5.find());
 
     // See if we can append a criteria to a copy without modifying the original (copy should not contain references
     // to original). Tests query_expression integer node.
-    Query q6 = t.column<Int>(0) >
-               Value<Int>(2); // Explicit use of Value<>() makes query_expression node instead of query_engine
+    // Explicit use of Value<>() makes query_expression node instead of query_engine
+    Query q6 = t.column<Int>(col_int) > Value<Int>(2);
     Query q7(q6);
 
-    q7.greater(2, 4.0);
-    CHECK_EQUAL(3, q7.find());
-    CHECK_EQUAL(2, q6.find());
+    q7.greater(col_dbl, 4.0);
+    CHECK_EQUAL(k3, q7.find());
+    CHECK_EQUAL(k2, q6.find());
 
 
     // See if we can append a criteria to a copy without modifying the original (copy should not contain references
     // to original). Tests query_engine integer node.
-    Query q8 = t.column<Int>(0) > 2;
+    Query q8 = t.column<Int>(col_int) > 2;
     Query q9(q8);
 
-    q9.greater(2, 4.0);
-    CHECK_EQUAL(3, q9.find());
-    CHECK_EQUAL(2, q8.find());
+    q9.greater(col_dbl, 4.0);
+    CHECK_EQUAL(k3, q9.find());
+    CHECK_EQUAL(k2, q8.find());
 
 
     // See if we can append a criteria to a copy without modifying the original (copy should not contain references
     // to original). Tests query_engine string node.
-    Query q10 = t.column<String>(1) != "2";
+    Query q10 = t.column<String>(col_str) != "2";
     Query q11(q10);
 
-    q11.greater(2, 4.0);
-    CHECK_EQUAL(3, q11.find());
-    CHECK_EQUAL(0, q10.find());
+    q11.greater(col_dbl, 4.0);
+    CHECK_EQUAL(k3, q11.find());
+    CHECK_EQUAL(k0, q10.find());
 
     // Test and_query() on a copy
-    Query q12 = t.column<Int>(0) > 2;
+    Query q12 = t.column<Int>(col_int) > 2;
     Query q13(q12);
 
-    q13.and_query(t.column<String>(1) != "3");
-    CHECK_EQUAL(3, q13.find());
-    CHECK_EQUAL(2, q12.find());
+    q13.and_query(t.column<String>(col_str) != "3");
+    CHECK_EQUAL(k3, q13.find());
+    CHECK_EQUAL(k2, q12.find());
 }
 
 TEST(Query_TableViewMoveAssign1)
 {
-    TestTable t;
-    t.add_column(type_Int, "1");
-    t.add_column(type_String, "2");
-    t.add_column(type_Double, "3");
+    Table t;
+    auto col_int = t.add_column(type_Int, "1");
 
-    add(t, 1, "1", 1.1);
-    add(t, 2, "2", 2.2);
-    add(t, 3, "3", 3.3);
-    add(t, 4, "4", 4.4);
+    t.create_object().set(col_int, 1);
+    t.create_object().set(col_int, 2);
+    t.create_object().set(col_int, 3);
+    t.create_object().set(col_int, 4);
 
     // temporary query is created, then q makes and stores a deep copy and then temporary is destructed
-    Query q = t.column<Int>(0) >
-              Value<Int>(2); // Explicit use of Value<>() makes query_expression node instead of query_engine
+    // Explicit use of Value<>() makes query_expression node instead of query_engine
+    Query q = t.column<Int>(col_int) > Value<Int>(2);
 
     // now deep copy should be destructed and replaced by new temporary
     TableView tv = q.find_all();
@@ -5659,11 +5601,11 @@ TEST(Query_TableViewMoveAssign1)
 TEST(Query_TableViewMoveAssignLeak2)
 {
     Table t;
-    t.add_column(type_Int, "1");
-    t.add_column(type_String, "2");
-    t.add_column(type_Double, "3");
+    auto col_int = t.add_column(type_Int, "1");
+    auto col_str = t.add_column(type_String, "2");
+    auto col_dbl = t.add_column(type_Double, "3");
 
-    Query q = t.column<Int>(0) < t.column<double>(2) && t.column<String>(1) == "4";
+    Query q = t.column<Int>(col_int) < t.column<double>(col_dbl) && t.column<String>(col_str) == "4";
     TableView tv = q.find_all();
 
     // Upon each find_all() call, tv copies the query 'q' into itself. See if this copying works
@@ -5673,18 +5615,18 @@ TEST(Query_TableViewMoveAssignLeak2)
     tv = q.find_all();
     tv = q.find_all();
 
-    tv.sort(0, true);
+    tv.sort(col_int, true);
 
     tv = q.find_all();
 
-    Query q2 = t.column<Int>(0) <= t.column<double>(2);
+    Query q2 = t.column<Int>(col_int) <= t.column<double>(col_dbl);
     tv = q2.find_all();
     q.and_query(q2);
     tv = q.find_all();
 
     tv.sync_if_needed();
 
-    size_t t2 = q.find();
+    ObjKey t2 = q.find();
     static_cast<void>(t2);
     tv = q.find_all();
     tv.sync_if_needed();
@@ -5701,7 +5643,7 @@ TEST(Query_TableViewMoveAssignLeak2)
 
     Query q3;
 
-    q2 = t.column<Int>(0) <= t.column<double>(2);
+    q2 = t.column<Int>(col_int) <= t.column<double>(col_dbl);
     q3 = q2;
 
     q3.find();
@@ -5714,19 +5656,14 @@ TEST(Query_DeepCopyLeak1)
     // NOTE: You can only create a copy of a fully constructed; i.e. you cannot copy a query which is missing an
     // end_group(). Run Query::validate() to see if it's fully constructed.
 
-    TestTable t;
-    t.add_column(type_Int, "1");
-    t.add_column(type_String, "2");
-    t.add_column(type_Double, "3");
-
-    add(t, 1, "1", 1.1);
-    add(t, 2, "2", 2.2);
-    add(t, 3, "3", 3.3);
-    add(t, 4, "4", 4.4);
+    Table t;
+    auto col_int = t.add_column(type_Int, "1");
+    auto col_dbl = t.add_column(type_Double, "3");
 
     // See if copying of a mix of query_expression and query_engine nodes will leak
-    Query q = !(t.column<Int>(0) > Value<Int>(2) && t.column<Int>(0) > 2 && t.column<double>(2) > 2.2) ||
-              t.column<Int>(0) == 4 || t.column<Int>(0) == Value<Int>(4);
+    Query q =
+        !(t.column<Int>(col_int) > Value<Int>(2) && t.column<Int>(col_int) > 2 && t.column<double>(col_dbl) > 2.2) ||
+        t.column<Int>(col_int) == 4 || t.column<Int>(col_int) == Value<Int>(4);
     Query q2(q);
     Query q3(q2);
 }
@@ -5751,10 +5688,10 @@ TEST(Query_StringIndexCrash)
     // Test for a crash which occured when a query testing for equality on a
     // string index was deep-copied after being run
     Table table;
-    table.add_column(type_String, "s", true);
-    table.add_search_index(0);
+    auto col = table.add_column(type_String, "s", true);
+    table.add_search_index(col);
 
-    Query q = table.where().equal(0, StringData(""));
+    Query q = table.where().equal(col, StringData(""));
     q.count();
     Query q2(q);
 }
@@ -5762,64 +5699,64 @@ TEST(Query_StringIndexCrash)
 TEST(Query_NullStrings)
 {
     Table table;
-    table.add_column(type_String, "s", true);
-    table.add_empty_row(3);
+    auto col = table.add_column(type_String, "s", true);
 
     Query q;
     TableView v;
 
     // Short strings
-    table.set_string(0, 0, "Albertslund"); // Normal non-empty string
-    table.set_string(0, 1, realm::null()); // NULL string
-    table.set_string(0, 2, "");            // Empty string
+    auto k0 = table.create_object().set<String>(col, "Albertslund").get_key(); // Normal non-empty string
+    auto k1 = table.create_object().set<String>(col, realm::null()).get_key(); // NULL string
+    auto k2 = table.create_object().set<String>(col, "").get_key();            // Empty string
 
-    q = table.column<StringData>(0) == realm::null();
+    q = table.column<StringData>(col) == realm::null();
     v = q.find_all();
     CHECK_EQUAL(1, v.size());
-    CHECK_EQUAL(1, v.get_key(0));
+    CHECK_EQUAL(k1, v.get_key(0));
 
-    q = table.column<StringData>(0) != realm::null();
+    q = table.column<StringData>(col) != realm::null();
     v = q.find_all();
     CHECK_EQUAL(2, v.size());
-    CHECK_EQUAL(0, v.get_key(0));
-    CHECK_EQUAL(2, v.get_key(1));
+    CHECK_EQUAL(k0, v.get_key(0));
+    CHECK_EQUAL(k2, v.get_key(1));
 
     // contrary to SQL, comparisons with realm::null() can be true in Realm (todo, discuss if we want this behaviour)
-    q = table.column<StringData>(0) != StringData("Albertslund");
+    q = table.column<StringData>(col) != StringData("Albertslund");
     v = q.find_all();
     CHECK_EQUAL(2, v.size());
-    CHECK_EQUAL(1, v.get_key(0));
-    CHECK_EQUAL(2, v.get_key(1));
+    CHECK_EQUAL(k1, v.get_key(0));
+    CHECK_EQUAL(k2, v.get_key(1));
 
-    q = table.column<StringData>(0) == "";
+    q = table.column<StringData>(col) == "";
     v = q.find_all();
     CHECK_EQUAL(1, v.size());
-    CHECK_EQUAL(2, v.get_key(0));
+    CHECK_EQUAL(k2, v.get_key(0));
 
     // Medium strings (16+)
-    table.set_string(0, 0, "AlbertslundAlbertslundAlbert");
+    table.get_object(k0).set<String>(col, "AlbertslundAlbertslundAlbert");
 
-    q = table.column<StringData>(0) == realm::null();
+    q = table.column<StringData>(col) == realm::null();
     v = q.find_all();
     CHECK_EQUAL(1, v.size());
-    CHECK_EQUAL(1, v.get_key(0));
+    CHECK_EQUAL(k1, v.get_key(0));
 
-    q = table.column<StringData>(0) == "";
+    q = table.column<StringData>(col) == "";
     v = q.find_all();
     CHECK_EQUAL(1, v.size());
-    CHECK_EQUAL(2, v.get_key(0));
+    CHECK_EQUAL(k2, v.get_key(0));
 
     // Long strings (64+)
-    table.set_string(0, 0, "AlbertslundAlbertslundAlbertslundAlbertslundAlbertslundAlbertslundAlbertslund");
-    q = table.column<StringData>(0) == realm::null();
+    table.get_object(k0).set<String>(col,
+                                     "AlbertslundAlbertslundAlbertslundAlbertslundAlbertslundAlbertslundAlbertslund");
+    q = table.column<StringData>(col) == realm::null();
     v = q.find_all();
     CHECK_EQUAL(1, v.size());
-    CHECK_EQUAL(1, v.get_key(0));
+    CHECK_EQUAL(k1, v.get_key(0));
 
-    q = table.column<StringData>(0) == "";
+    q = table.column<StringData>(col) == "";
     v = q.find_all();
     CHECK_EQUAL(1, v.size());
-    CHECK_EQUAL(2, v.get_key(0));
+    CHECK_EQUAL(k2, v.get_key(0));
 }
 
 TEST(Query_Nulls_Fuzzy)
@@ -5829,27 +5766,27 @@ TEST(Query_Nulls_Fuzzy)
 
         for (size_t t = 0; t < 10; t++) {
             Table table;
-            table.add_column(type_String, "string", true);
+            auto col = table.add_column(type_String, "string", true);
 
             if (attributes == 0) {
             }
             if (attributes == 1) {
-                table.add_search_index(0);
+                table.add_search_index(col);
             }
             else if (attributes == 2) {
-                table.optimize(true);
+                table.enumerate_string_column(col);
             }
             else if (attributes == 3) {
-                table.add_search_index(0);
-                table.optimize(true);
+                table.add_search_index(col);
+                table.enumerate_string_column(col);
             }
             else if (attributes == 4) {
-                table.optimize(true);
-                table.add_search_index(0);
+                table.enumerate_string_column(col);
+                table.add_search_index(col);
             }
 
-            // vector that is kept in sync with the column so that we can compare with it
-            std::vector<std::string> v;
+            // map that is kept in sync with the column so that we can compare with it
+            std::map<ObjKey, std::string> v;
 
             // ArrayString capacity starts at 128 bytes, so we need lots of elements
             // to test if relocation works
@@ -5907,28 +5844,33 @@ TEST(Query_Nulls_Fuzzy)
                         }
                     }
 
-                    size_t pos = random.draw_int_max<size_t>(table.size());
-                    table.insert_empty_row(pos);
-                    table.set_string(0, pos, sd);
+                    try {
+                        size_t pos = random.draw_int_max<size_t>(100000);
+                        auto k = table.create_object(ObjKey(int64_t(pos))).set<String>(col, sd).get_key();
 
-                    v.insert(v.begin() + pos, st);
+                        v.emplace(k, st);
+                    }
+                    catch (...) {
+                    }
                     free(buf1);
                 }
                 else if (table.size() > 0) {
                     // delete
                     size_t row = random.draw_int_max<size_t>(table.size() - 1);
-                    table.remove(row);
-                    v.erase(v.begin() + row);
+                    Obj obj = table.get_object(row);
+                    obj.remove();
+                    v.erase(obj.get_key());
                 }
 
 
                 CHECK_EQUAL(table.size(), v.size());
-                for (size_t j = 0; j < table.size(); j++) {
-                    if (v[j] == "null") {
-                        CHECK(table.get_string(0, j).is_null());
+                for (auto& o : table) {
+                    auto k = o.get_key();
+                    if (v[k] == "null") {
+                        CHECK(o.get<String>(col).is_null());
                     }
                     else {
-                        CHECK(table.get_string(0, j) == v[j]);
+                        CHECK(o.get<String>(col) == v[k]);
                     }
                 }
             }
@@ -5936,92 +5878,93 @@ TEST(Query_Nulls_Fuzzy)
     }
 }
 
-
 TEST(Query_BinaryNull)
 {
     Table table;
-    table.add_column(type_Binary, "first", true);
-    table.add_empty_row(3);
-    table.set_binary(0, 0, BinaryData());
-    table.set_binary(0, 1, BinaryData("", 0)); // NOTE: Specify size = 0, else size turns into 1!
-    table.set_binary(0, 2, BinaryData("foo"));
+    auto col = table.add_column(type_Binary, "first", true);
+
+    auto k0 = table.create_object().set(col, BinaryData()).get_key();
+    auto k1 = table.create_object()
+                  .set(col, BinaryData("", 0))
+                  .get_key(); // NOTE: Specify size = 0, else size turns into 1!
+    auto k2 = table.create_object().set(col, BinaryData("foo")).get_key();
 
     TableView t;
 
     // Next gen syntax
-    t = (table.column<BinaryData>(0) == BinaryData()).find_all();
+    t = (table.column<BinaryData>(col) == BinaryData()).find_all();
     CHECK_EQUAL(1, t.size());
-    CHECK_EQUAL(0, t.get_key(0));
+    CHECK_EQUAL(k0, t.get_key(0));
 
-    t = (BinaryData() == table.column<BinaryData>(0)).find_all();
+    t = (BinaryData() == table.column<BinaryData>(col)).find_all();
     CHECK_EQUAL(1, t.size());
-    CHECK_EQUAL(0, t.get_key(0));
+    CHECK_EQUAL(k0, t.get_key(0));
 
-    t = (table.column<BinaryData>(0) == BinaryData("", 0)).find_all();
+    t = (table.column<BinaryData>(col) == BinaryData("", 0)).find_all();
     CHECK_EQUAL(1, t.size());
-    CHECK_EQUAL(1, t.get_key(0));
+    CHECK_EQUAL(k1, t.get_key(0));
 
-    t = (BinaryData("", 0) == table.column<BinaryData>(0)).find_all();
+    t = (BinaryData("", 0) == table.column<BinaryData>(col)).find_all();
     CHECK_EQUAL(1, t.size());
-    CHECK_EQUAL(1, t.get_key(0));
+    CHECK_EQUAL(k1, t.get_key(0));
 
-    t = (table.column<BinaryData>(0) != BinaryData("", 0)).find_all();
+    t = (table.column<BinaryData>(col) != BinaryData("", 0)).find_all();
     CHECK_EQUAL(2, t.size());
-    CHECK_EQUAL(0, t.get_key(0));
-    CHECK_EQUAL(2, t.get_key(1));
+    CHECK_EQUAL(k0, t.get_key(0));
+    CHECK_EQUAL(k2, t.get_key(1));
 
-    t = (BinaryData("", 0) != table.column<BinaryData>(0)).find_all();
+    t = (BinaryData("", 0) != table.column<BinaryData>(col)).find_all();
     CHECK_EQUAL(2, t.size());
-    CHECK_EQUAL(0, t.get_key(0));
-    CHECK_EQUAL(2, t.get_key(1));
+    CHECK_EQUAL(k0, t.get_key(0));
+    CHECK_EQUAL(k2, t.get_key(1));
 
 
     // Old syntax
-    t = table.where().equal(0, BinaryData()).find_all();
-    CHECK_EQUAL(0, t.get_key(0));
+    t = table.where().equal(col, BinaryData()).find_all();
     CHECK_EQUAL(1, t.size());
+    CHECK_EQUAL(k0, t.get_key(0));
 
-    t = table.where().equal(0, BinaryData("", 0)).find_all();
-    CHECK_EQUAL(1, t.get_key(0));
+    t = table.where().equal(col, BinaryData("", 0)).find_all();
     CHECK_EQUAL(1, t.size());
+    CHECK_EQUAL(k1, t.get_key(0));
 
-    t = table.where().equal(0, BinaryData("foo")).find_all();
-    CHECK_EQUAL(2, t.get_key(0));
+    t = table.where().equal(col, BinaryData("foo")).find_all();
     CHECK_EQUAL(1, t.size());
+    CHECK_EQUAL(k2, t.get_key(0));
 
-    t = table.where().not_equal(0, BinaryData()).find_all();
-    CHECK_EQUAL(1, t.get_key(0));
-    CHECK_EQUAL(2, t.get_key(1));
+    t = table.where().not_equal(col, BinaryData()).find_all();
     CHECK_EQUAL(2, t.size());
+    CHECK_EQUAL(k1, t.get_key(0));
+    CHECK_EQUAL(k2, t.get_key(1));
 
-    t = table.where().not_equal(0, BinaryData("", 0)).find_all();
-    CHECK_EQUAL(0, t.get_key(0));
-    CHECK_EQUAL(2, t.get_key(1));
+    t = table.where().not_equal(col, BinaryData("", 0)).find_all();
     CHECK_EQUAL(2, t.size());
+    CHECK_EQUAL(k0, t.get_key(0));
+    CHECK_EQUAL(k2, t.get_key(1));
 
-    t = table.where().begins_with(0, BinaryData()).find_all();
+    t = table.where().begins_with(col, BinaryData()).find_all();
     CHECK_EQUAL(3, t.size());
 
-    t = table.where().begins_with(0, BinaryData("", 0)).find_all();
+    t = table.where().begins_with(col, BinaryData("", 0)).find_all();
     CHECK_EQUAL(2, t.size());
-    CHECK_EQUAL(1, t.get_key(0));
-    CHECK_EQUAL(2, t.get_key(1));
+    CHECK_EQUAL(k1, t.get_key(0));
+    CHECK_EQUAL(k2, t.get_key(1));
 
-    t = table.where().begins_with(0, BinaryData("foo")).find_all();
+    t = table.where().begins_with(col, BinaryData("foo")).find_all();
     CHECK_EQUAL(1, t.size());
-    CHECK_EQUAL(2, t.get_key(0));
+    CHECK_EQUAL(k2, t.get_key(0));
 
-    t = table.where().ends_with(0, BinaryData()).find_all();
+    t = table.where().ends_with(col, BinaryData()).find_all();
     CHECK_EQUAL(3, t.size());
 
-    t = table.where().ends_with(0, BinaryData("", 0)).find_all();
+    t = table.where().ends_with(col, BinaryData("", 0)).find_all();
     CHECK_EQUAL(2, t.size());
-    CHECK_EQUAL(1, t.get_key(0));
-    CHECK_EQUAL(2, t.get_key(1));
+    CHECK_EQUAL(k1, t.get_key(0));
+    CHECK_EQUAL(k2, t.get_key(1));
 
-    t = table.where().ends_with(0, BinaryData("foo")).find_all();
+    t = table.where().ends_with(col, BinaryData("foo")).find_all();
     CHECK_EQUAL(1, t.size());
-    CHECK_EQUAL(2, t.get_key(0));
+    CHECK_EQUAL(k2, t.get_key(0));
 }
 
 TEST(Query_IntegerNullOldQueryEngine)
@@ -6034,60 +5977,63 @@ TEST(Query_IntegerNullOldQueryEngine)
           null    null      4
     */
     Table table;
-    table.add_column(type_Int, "first", true);
-    table.add_column(type_Int, "second", true);
-    table.add_column(type_Int, "third", false);
-    table.add_empty_row(4);
+    auto c0 = table.add_column(type_Int, "first", true);
+    auto c1 = table.add_column(type_Int, "second", true);
+    auto c2 = table.add_column(type_Int, "third", false);
 
-    table.set_int(0, 1, 0);
-    table.set_int(0, 2, 123);
-
-    table.set_int(1, 0, 100);
-    table.set_int(1, 2, 200);
-
-    table.set_int(2, 0, 1);
-    table.set_int(2, 1, 2);
-    table.set_int(2, 2, 3);
-    table.set_int(2, 3, 4);
+    auto k0 = table.create_object(ObjKey(4), {/*      */ {c1, 100}, {c2, 1}}).get_key();
+    auto k1 = table.create_object(ObjKey(5), {{c0, 0}, /*        */ {c2, 2}}).get_key();
+    auto k2 = table.create_object(ObjKey(6), {{c0, 123}, {c1, 200}, {c2, 3}}).get_key();
+    auto k3 = table.create_object(ObjKey(7), {/*                 */ {c2, 7}}).get_key();
 
     TableView t;
 
-    t = table.where().equal(0, null{}).find_all();
+    t = table.where().equal(c0, null{}).find_all();
     CHECK_EQUAL(2, t.size());
-    CHECK_EQUAL(0, t.get_key(0));
-    CHECK_EQUAL(3, t.get_key(1));
+    CHECK_EQUAL(k0, t.get_key(0));
+    CHECK_EQUAL(k3, t.get_key(1));
 
-    t = table.where().equal(0, 0).find_all();
-    CHECK_EQUAL(1, t.size());
-    CHECK_EQUAL(1, t.get_key(0));
-
-    t = table.where().equal(0, 123).find_all();
-    CHECK_EQUAL(1, t.size());
-    CHECK_EQUAL(2, t.get_key(0));
-
-    t = table.where().not_equal(0, null{}).find_all();
+    t = table.where().equal(c1, null{}).find_all();
     CHECK_EQUAL(2, t.size());
-    CHECK_EQUAL(1, t.get_key(0));
-    CHECK_EQUAL(2, t.get_key(1));
+    CHECK_EQUAL(k1, t.get_key(0));
+    CHECK_EQUAL(k3, t.get_key(1));
 
-    t = table.where().not_equal(0, 0).find_all();
+    t = table.where().equal(c0, 0).find_all();
+    CHECK_EQUAL(1, t.size());
+    CHECK_EQUAL(k1, t.get_key(0));
+
+    t = table.where().equal(c0, 123).find_all();
+    CHECK_EQUAL(1, t.size());
+    CHECK_EQUAL(k2, t.get_key(0));
+
+    t = table.where().not_equal(c0, null{}).find_all();
+    CHECK_EQUAL(2, t.size());
+    CHECK_EQUAL(k1, t.get_key(0));
+    CHECK_EQUAL(k2, t.get_key(1));
+
+    t = table.where().not_equal(c0, 0).find_all();
     CHECK_EQUAL(3, t.size());
-    CHECK_EQUAL(0, t.get_key(0));
-    CHECK_EQUAL(2, t.get_key(1));
-    CHECK_EQUAL(3, t.get_key(2));
+    CHECK_EQUAL(k0, t.get_key(0));
+    CHECK_EQUAL(k2, t.get_key(1));
+    CHECK_EQUAL(k3, t.get_key(2));
 
-    t = table.where().greater(0, 0).find_all();
+    t = table.where().greater(c0, 0).find_all();
     CHECK_EQUAL(1, t.size());
-    CHECK_EQUAL(2, t.get_key(0));
+    CHECK_EQUAL(k2, t.get_key(0));
+
+    t = table.where().greater(c2, 5).find_all();
+    CHECK_EQUAL(1, t.size());
+    CHECK_EQUAL(k3, t.get_key(0));
 }
 
 TEST(Query_IntegerNonNull)
 {
     Table table;
-    table.add_column(type_Int, "first", false);
-    table.add_empty_row(3);
-    table.set_int(0, 1, 123);
-    table.set_int(0, 2, 456);
+    auto col = table.add_column(type_Int, "first", false);
+
+    table.create_object().set(col, 123);
+    table.create_object().set(col, 456);
+    table.create_object();
 
     TableView t;
 
@@ -6096,82 +6042,83 @@ TEST(Query_IntegerNonNull)
     //    CHECK_EQUAL(0, t.size());
 }
 
-
 TEST(Query_64BitValues)
 {
     Group g;
-    size_t m;
+    ObjKey m;
     TableRef table = g.add_table("table");
-    table->insert_column(0, type_Int, "key");
-    table->insert_column(1, type_Int, "16bit");
+    auto c0 = table->add_column(type_Int, "key");
+    auto c1 = table->add_column(type_Int, "16bit");
 
     const int64_t start = 4485019129LL;
     const int64_t count = 20; // First 16 SSE-searched, four fallback
     const int64_t min = std::numeric_limits<int64_t>::min();
     const int64_t max = std::numeric_limits<int64_t>::max();
-    table->add_empty_row(count);
+
     for (size_t i = 0; i < count; ++i) {
-        table->set_int(0, i, start + i);
+        table->create_object().set(c0, start + i);
     }
 
-    for (size_t i = 0; i < 5; i++) {
+    auto it = table->begin();
+    for (int64_t v = 5; v > 0; v--) {
         // Insert values 5, 4, 3, 2, 1
-        table->set_int(1, i, 5 - i);
+        it->set(c1, v);
+        ++it;
     }
 
-    m = table->where().less(1, 4).find();
-    CHECK_EQUAL(2, m);
+    m = table->where().less(c1, 4).find();
+    CHECK_EQUAL(2, m.value);
 
-    m = table->where().less(1, 5).find();
-    CHECK_EQUAL(1, m);
+    m = table->where().less(c1, 5).find();
+    CHECK_EQUAL(1, m.value);
 
-    CHECK_EQUAL(0, table->where().less(0, min).count());
-    CHECK_EQUAL(0, table->where().less(0, start).count());
-    CHECK_EQUAL(1, table->where().less(0, start + 1).count());
-    CHECK_EQUAL(count, table->where().less(0, start + count).count());
-    CHECK_EQUAL(count, table->where().less(0, max).count());
+    CHECK_EQUAL(0, table->where().less(c0, min).count());
+    CHECK_EQUAL(0, table->where().less(c0, start).count());
+    CHECK_EQUAL(1, table->where().less(c0, start + 1).count());
+    CHECK_EQUAL(count, table->where().less(c0, start + count).count());
+    CHECK_EQUAL(count, table->where().less(c0, max).count());
 
-    CHECK_EQUAL(0, table->where().less_equal(0, min).count());
-    CHECK_EQUAL(1, table->where().less_equal(0, start).count());
-    CHECK_EQUAL(count, table->where().less_equal(0, start + count).count());
-    CHECK_EQUAL(count, table->where().less_equal(0, max).count());
+    CHECK_EQUAL(0, table->where().less_equal(c0, min).count());
+    CHECK_EQUAL(1, table->where().less_equal(c0, start).count());
+    CHECK_EQUAL(count, table->where().less_equal(c0, start + count).count());
+    CHECK_EQUAL(count, table->where().less_equal(c0, max).count());
 
-    CHECK_EQUAL(count, table->where().greater(0, min).count());
-    CHECK_EQUAL(count - 1, table->where().greater(0, start).count());
-    CHECK_EQUAL(1, table->where().greater(0, start + count - 2).count());
-    CHECK_EQUAL(0, table->where().greater(0, start + count - 1).count());
-    CHECK_EQUAL(0, table->where().greater(0, max).count());
+    CHECK_EQUAL(count, table->where().greater(c0, min).count());
+    CHECK_EQUAL(count - 1, table->where().greater(c0, start).count());
+    CHECK_EQUAL(1, table->where().greater(c0, start + count - 2).count());
+    CHECK_EQUAL(0, table->where().greater(c0, start + count - 1).count());
+    CHECK_EQUAL(0, table->where().greater(c0, max).count());
 
-    CHECK_EQUAL(count, table->where().greater_equal(0, min).count());
-    CHECK_EQUAL(count, table->where().greater_equal(0, start).count());
-    CHECK_EQUAL(count - 1, table->where().greater_equal(0, start + 1).count());
-    CHECK_EQUAL(1, table->where().greater_equal(0, start + count - 1).count());
-    CHECK_EQUAL(0, table->where().greater_equal(0, start + count).count());
-    CHECK_EQUAL(0, table->where().greater_equal(0, max).count());
+    CHECK_EQUAL(count, table->where().greater_equal(c0, min).count());
+    CHECK_EQUAL(count, table->where().greater_equal(c0, start).count());
+    CHECK_EQUAL(count - 1, table->where().greater_equal(c0, start + 1).count());
+    CHECK_EQUAL(1, table->where().greater_equal(c0, start + count - 1).count());
+    CHECK_EQUAL(0, table->where().greater_equal(c0, start + count).count());
+    CHECK_EQUAL(0, table->where().greater_equal(c0, max).count());
 }
 
 namespace {
 
 void create_columns(TableRef table, bool nullable = true)
 {
-    table->insert_column(0, type_Int, "Price", nullable);
-    table->insert_column(1, type_Float, "Shipping", nullable);
-    table->insert_column(2, type_String, "Description", nullable);
-    table->insert_column(3, type_Double, "Rating", nullable);
-    table->insert_column(4, type_Bool, "Stock", nullable);
-    table->insert_column(5, type_OldDateTime, "Delivery date", nullable);
-    table->insert_column(6, type_Binary, "Photo", nullable);
-    table->insert_column(7, type_Timestamp, "ts", nullable);
+    table->add_column(type_Int, "Price", nullable);
+    table->add_column(type_Float, "Shipping", nullable);
+    table->add_column(type_String, "Description", nullable);
+    table->add_column(type_Double, "Rating", nullable);
+    table->add_column(type_Bool, "Stock", nullable);
+    table->add_column(type_Timestamp, "Delivery date", nullable);
+    table->add_column(type_Binary, "Photo", nullable);
 }
 
-bool equals(TableView& tv, std::vector<size_t> indexes)
+bool equals(TableView& tv, const std::vector<int64_t>& keys)
 {
-    if (static_cast<int>(tv.size()) != indexes.end() - indexes.begin()) {
+    if (tv.size() != keys.size()) {
         return false;
     }
 
-    for (auto it = indexes.begin(); it != indexes.end(); ++it) {
-        if (tv.get_key(it - indexes.begin()) != *it) {
+    size_t sz = tv.size();
+    for (size_t i = 0; i < sz; i++) {
+        if (tv.get_key(i).value != keys[i]) {
             return false;
         }
     }
@@ -6181,33 +6128,10 @@ bool equals(TableView& tv, std::vector<size_t> indexes)
 
 void fill_data(TableRef table)
 {
-    table->add_empty_row(3);
-
-    table->set_int(0, 0, 1);
-    table->set_null(0, 1);
-    table->set_int(0, 2, 3);
-
-    table->set_null(1, 0);
-    table->set_null(1, 1);
-    table->set_float(1, 2, 30.f);
-
-    table->set_string(2, 0, null());
-    table->set_string(2, 1, "foo");
-    table->set_string(2, 2, "bar");
-
-    table->set_double(3, 0, 1.1);
-    table->set_double(3, 1, 2.2);
-    table->set_null(3, 2);
-
-    table->set_bool(4, 0, true);
-    table->set_null(4, 1);
-    table->set_bool(4, 2, false);
-
-    table->set_olddatetime(5, 0, OldDateTime(2016, 2, 2));
-    table->set_null(5, 1);
-    table->set_olddatetime(5, 2, OldDateTime(2016, 6, 6));
+    table->create_object().set_all(1, null(), null(), 1.1, true, Timestamp(12345, 0));
+    table->create_object().set_all(null(), null(), "foo", 2.2, null(), null());
+    table->create_object().set_all(3, 30.f, "bar", null(), false, Timestamp(12345, 67));
 }
-
 } // unnamed namespace
 
 TEST(Query_NullShowcase)
@@ -6244,55 +6168,32 @@ TEST(Query_NullShowcase)
     TableRef table = g.add_table("Inventory");
     create_columns(table);
 
-    table->add_empty_row(3);
+    Obj obj0 = table->create_object();
+    Obj obj1 = table->create_object();
+    Obj obj2 = table->create_object();
 
     // Default values for all nullable columns
-    CHECK(table->is_null(0, 0));
-    CHECK(table->is_null(1, 0));
-    CHECK(table->is_null(2, 0));
-    CHECK(table->is_null(3, 0));
-    CHECK(table->is_null(4, 0));
-    CHECK(table->is_null(5, 0));
-    CHECK(table->is_null(6, 0));
+    for (auto col : table->get_column_keys()) {
+        CHECK(obj0.is_null(col));
+    }
 
-    table->set_null(0, 0);
-    table->set_int(0, 1, 10);
-    table->set_int(0, 2, 20);
+    obj0.set_all(null(), null(), null(), 1.1, true, Timestamp(12345, 0), BinaryData("foo"));
+    obj1.set_all(10, null(), "foo", 2.2, null(), null(), BinaryData("", 0));
+    obj2.set_all(20, 30.f, "bar", 3.3, false, Timestamp(12345, 67), null());
 
-    table->set_null(1, 0);
-    table->set_null(1, 1);
-    table->set_float(1, 2, 30.f);
-
-    table->set_string(2, 0, null());
-    table->set_string(2, 1, "foo");
-    table->set_string(2, 2, "bar");
-
-    table->set_double(3, 0, 1.1);
-    table->set_double(3, 1, 2.2);
-    table->set_double(3, 2, 3.3);
-
-    table->set_bool(4, 0, true);
-    table->set_null(4, 1);
-    table->set_bool(4, 2, false);
-
-    table->set_olddatetime(5, 0, OldDateTime(2016, 2, 2));
-    table->set_null(5, 1);
-    table->set_olddatetime(5, 2, OldDateTime(2016, 6, 6));
-
-    table->set_binary(6, 0, BinaryData("foo"));
-    table->set_binary(6, 1,
-                      BinaryData("", 0)); // remember 0, else it will have length of 1 due to 0 termination of c++
-    table->set_null(6, 2);
-
-    Columns<Int> price = table->column<Int>(0);
-    Columns<Float> shipping = table->column<Float>(1);
-    Columns<Double> rating = table->column<Double>(3);
-    Columns<Bool> stock = table->column<Bool>(4);
-    Columns<OldDateTime> delivery = table->column<OldDateTime>(5);
-    Columns<BinaryData> photo = table->column<BinaryData>(6);
+    auto col_price = table->get_column_key("Price");
+    auto col_shipping = table->get_column_key("Shipping");
+    auto col_rating = table->get_column_key("Rating");
+    auto col_date = table->get_column_key("Delivery date");
+    Columns<Int> price = table->column<Int>(col_price);
+    Columns<Float> shipping = table->column<Float>(col_shipping);
+    Columns<Double> rating = table->column<Double>(col_rating);
+    Columns<Bool> stock = table->column<Bool>(table->get_column_key("Stock"));
+    Columns<Timestamp> delivery = table->column<Timestamp>(col_date);
+    Columns<BinaryData> photo = table->column<BinaryData>(table->get_column_key("Photo"));
 
     // check int/double type mismatch error handling
-    CHECK_THROW_ANY(table->column<Int>(3));
+    CHECK_THROW_ANY(table->column<Int>(table->get_column_key("Description")));
 
     TableView tv;
 
@@ -6362,10 +6263,10 @@ TEST(Query_NullShowcase)
     CHECK(equals(tv, {0, 2}));
 
     // Dates
-    tv = (delivery == OldDateTime(2016, 6, 6)).find_all();
+    tv = (delivery == Timestamp(12345, 67)).find_all();
     CHECK(equals(tv, {2}));
 
-    tv = (delivery != OldDateTime(2016, 6, 6)).find_all();
+    tv = (delivery != Timestamp(12345, 67)).find_all();
     CHECK(equals(tv, {0, 1}));
 
     tv = (delivery == null()).find_all();
@@ -6390,10 +6291,10 @@ TEST(Query_NullShowcase)
     CHECK(equals(tv, {1, 2}));
 
     // Old query syntax
-    tv = table->where().equal(0, null()).find_all();
+    tv = table->where().equal(col_price, null()).find_all();
     CHECK(equals(tv, {0}));
 
-    tv = table->where().not_equal(0, null()).find_all();
+    tv = table->where().not_equal(col_price, null()).find_all();
     CHECK(equals(tv, {1, 2}));
 
     // You can also compare against user-given null with > and <, but only in the expression syntax!
@@ -6408,86 +6309,88 @@ TEST(Query_NullShowcase)
     // (tv = table->where().greater(0, null()).find_all());
 
     // Nullable floats in old syntax
-    tv = table->where().equal(1, null()).find_all();
+    tv = table->where().equal(col_shipping, null()).find_all();
     CHECK(equals(tv, {0, 1}));
 
-    tv = table->where().not_equal(1, null()).find_all();
+    tv = table->where().not_equal(col_shipping, null()).find_all();
     CHECK(equals(tv, {2}));
 
-    tv = table->where().greater(1, 0.0f).find_all();
+    tv = table->where().greater(col_shipping, 0.0f).find_all();
     CHECK(equals(tv, {2}));
 
-    tv = table->where().less(1, 20.0f).find_all();
+    tv = table->where().less(col_shipping, 20.0f).find_all();
     CHECK(equals(tv, {}));
 
     // TableView
     size_t count;
     int64_t i;
     double d;
-    OldDateTime dt;
+    Timestamp dt;
     tv = table->where().find_all();
 
     // Integer column
-    i = tv.maximum_int(0);
+    i = tv.maximum_int(col_price);
     CHECK_EQUAL(i, 20);
 
-    i = tv.minimum_int(0);
+    i = tv.minimum_int(col_price);
     CHECK_EQUAL(i, 10);
 
     count = 123;
-    d = tv.average_int(0, &count);
+    d = tv.average_int(col_price, &count);
     CHECK_APPROXIMATELY_EQUAL(d, 15., 0.001);
     CHECK_EQUAL(count, 2);
 
-    i = tv.sum_int(0);
+    i = tv.sum_int(col_price);
     CHECK_EQUAL(i, 30);
 
 
     // Float column
-    d = tv.maximum_float(1);
+    d = tv.maximum_float(col_shipping);
     CHECK_EQUAL(d, 30.);
 
-    d = tv.minimum_float(1);
+    d = tv.minimum_float(col_shipping);
     CHECK_EQUAL(d, 30.);
 
     count = 123;
-    d = tv.average_float(1, &count);
+    d = tv.average_float(col_shipping, &count);
     CHECK_APPROXIMATELY_EQUAL(d, 30., 0.001);
     CHECK_EQUAL(count, 1);
 
-    d = tv.sum_float(1);
+    d = tv.sum_float(col_shipping);
     CHECK_APPROXIMATELY_EQUAL(d, 30., 0.001);
 
     // Double column
-    d = tv.maximum_double(3);
+    d = tv.maximum_double(col_rating);
     CHECK_EQUAL(d, 3.3);
-    d = tv.minimum_double(3);
+    d = tv.minimum_double(col_rating);
     CHECK_EQUAL(d, 1.1);
-    d = tv.average_double(3);
+    d = tv.average_double(col_rating);
     CHECK_APPROXIMATELY_EQUAL(d, (1.1 + 2.2 + 3.3) / 3, 0.001);
-    d = tv.sum_double(3);
+    d = tv.sum_double(col_rating);
     CHECK_APPROXIMATELY_EQUAL(d, 1.1 + 2.2 + 3.3, 0.001);
 
     // OldDateTime column
-    dt = tv.maximum_olddatetime(5);
-    CHECK_EQUAL(dt, OldDateTime(2016, 6, 6));
-    dt = tv.minimum_olddatetime(5);
-    CHECK_EQUAL(dt, OldDateTime(2016, 2, 2));
+    dt = tv.maximum_timestamp(col_date);
+    CHECK_EQUAL(dt, Timestamp(12345, 67));
+    dt = tv.minimum_timestamp(col_date);
+    CHECK_EQUAL(dt, Timestamp(12345, 0));
 
+#if 0 // FIXME?
     // NaN
     // null converts to 0 when calling get_float() on it. We intentionally do not return the bit pattern
     // for internal Realm representation, because that's a NaN, hence making it harder for the end user
     // to distinguish between his own NaNs and null
-    CHECK_EQUAL(table->get_float(1, 0), 0);
+    CHECK_EQUAL(obj0.get<Float>(col_shipping), 0);
+#endif
 
-    table->set_float(1, 0, std::numeric_limits<float>::signaling_NaN());
-    table->set_float(1, 1, std::numeric_limits<float>::quiet_NaN());
+    obj0.set<Float>(col_shipping, std::numeric_limits<float>::signaling_NaN());
+    obj1.set<Float>(col_shipping, std::numeric_limits<float>::quiet_NaN());
 
     // Realm may return a signalling/quiet NaN that is different from the signalling/quiet NaN you stored
     // (the IEEE standard defines a sequence of bits in the NaN that can have custom contents). Realm does
     // not preserve these bits.
-    CHECK(std::isnan(table->get_float(1, 0)));
-    CHECK(std::isnan(table->get_float(1, 1)));
+    CHECK(std::isnan(obj0.get<Float>(col_shipping)));
+    CHECK(std::isnan(obj1.get<Float>(col_shipping)));
 
 
 // FIXME: std::numeric_limits<float>::signaling_NaN() seems broken in VS2015 in that it returns a non-
@@ -6499,29 +6402,29 @@ TEST(Query_NullShowcase)
 // to work fine on ARM in both 32 and 64 bit mode.
 
 #if !defined(_WIN32) && !REALM_ARCHITECTURE_X86_32
-    CHECK(null::is_signaling(table->get_float(1, 0)));
+    CHECK(null::is_signaling(obj0.get<Float>(col_shipping)));
 #endif
 
 #ifndef _WIN32 // signaling_NaN() may be broken in VS2015 (see long comment above)
-    CHECK(!null::is_signaling(table->get_float(1, 1)));
+    CHECK(!null::is_signaling(obj1.get<Float>(col_shipping)));
 #endif
 
-    CHECK(!table->is_null(1, 0));
-    CHECK(!table->is_null(1, 1));
+    CHECK(!obj0.is_null(col_shipping));
+    CHECK(!obj1.is_null(col_shipping));
 
-    table->set_double(3, 0, std::numeric_limits<double>::signaling_NaN());
-    table->set_double(3, 1, std::numeric_limits<double>::quiet_NaN());
-    CHECK(std::isnan(table->get_double(3, 0)));
-    CHECK(std::isnan(table->get_double(3, 1)));
+    obj0.set<Double>(col_rating, std::numeric_limits<double>::signaling_NaN());
+    obj1.set<Double>(col_rating, std::numeric_limits<double>::quiet_NaN());
+    CHECK(std::isnan(obj0.get<Double>(col_rating)));
+    CHECK(std::isnan(obj1.get<Double>(col_rating)));
 
 // signaling_NaN() broken in VS2015, and broken in 32bit intel
 #if !defined(_WIN32) && !REALM_ARCHITECTURE_X86_32
-    CHECK(null::is_signaling(table->get_double(3, 0)));
-    CHECK(!null::is_signaling(table->get_double(3, 1)));
+    CHECK(null::is_signaling(obj0.get<Double>(col_rating)));
+    CHECK(!null::is_signaling(obj1.get<Double>(col_rating)));
 #endif
 
-    CHECK(!table->is_null(3, 0));
-    CHECK(!table->is_null(3, 1));
+    CHECK(!obj0.is_null(col_rating));
+    CHECK(!obj1.is_null(col_rating));
 
     // NOTE NOTE Queries on float/double columns that contain user-given NaNs are undefined.
 }
@@ -6537,38 +6440,28 @@ TEST(Query_Null_DefaultsAndErrorhandling)
         TableRef table = g.add_table("Inventory");
         create_columns(table, false /* nullability */);
 
-        table->add_empty_row(1);
+        Obj obj = table->create_object();
 
-        CHECK(!table->is_nullable(0));
-        CHECK(!table->is_nullable(1));
-        CHECK(!table->is_nullable(2));
-        CHECK(!table->is_nullable(3));
-        CHECK(!table->is_nullable(4));
-        CHECK(!table->is_nullable(5));
+        auto all_cols = table->get_column_keys();
+
+        for (auto col : all_cols) {
+            CHECK(!table->is_nullable(col));
+        }
 
         // is_null() on non-nullable column returns false. If you want it to throw, then do so
         // in the language binding
-        CHECK(!table->is_null(0, 0));
-        CHECK(!table->is_null(1, 0));
-        CHECK(!table->is_null(2, 0));
-        CHECK(!table->is_null(3, 0));
-        CHECK(!table->is_null(4, 0));
-        CHECK(!table->is_null(5, 0));
+        for (auto col : all_cols) {
+            CHECK(!obj.is_null(col));
+        }
 
-        CHECK_THROW_ANY(table->set_null(0, 0));
-        CHECK_THROW_ANY(table->set_null(1, 0));
-        CHECK_THROW_ANY(table->set_null(2, 0));
-        CHECK_THROW_ANY(table->set_null(3, 0));
-        CHECK_THROW_ANY(table->set_null(4, 0));
-        CHECK_THROW_ANY(table->set_null(5, 0));
+        for (auto col : all_cols) {
+            CHECK_THROW_ANY(obj.set_null(col));
+        }
 
         // verify that set_null() did not have any side effects
-        CHECK(!table->is_null(0, 0));
-        CHECK(!table->is_null(1, 0));
-        CHECK(!table->is_null(2, 0));
-        CHECK(!table->is_null(3, 0));
-        CHECK(!table->is_null(4, 0));
-        CHECK(!table->is_null(5, 0));
+        for (auto col : all_cols) {
+            CHECK(!obj.is_null(col));
+        }
     }
 
     // Nullable columns: Tests that default value is null, and tests is_nullable() and set_null()
@@ -6576,58 +6469,43 @@ TEST(Query_Null_DefaultsAndErrorhandling)
         Group g;
         TableRef table = g.add_table("Inventory");
         create_columns(table);
-        table->add_empty_row(1);
 
-        CHECK(table->is_nullable(0));
-        CHECK(table->is_nullable(1));
-        CHECK(table->is_nullable(2));
-        CHECK(table->is_nullable(3));
-        CHECK(table->is_nullable(4));
-        CHECK(table->is_nullable(5));
+        Obj obj = table->create_object();
+
+        auto all_cols = table->get_column_keys();
+
+        for (auto col : all_cols) {
+            CHECK(table->is_nullable(col));
+        }
 
         // default values should be null
-        CHECK(table->is_null(0, 0));
-        CHECK(table->is_null(1, 0));
-        CHECK(table->is_null(2, 0));
-        CHECK(table->is_null(3, 0));
-        CHECK(table->is_null(4, 0));
-        CHECK(table->is_null(5, 0));
+        for (auto col : all_cols) {
+            CHECK(obj.is_null(col));
+        }
 
+#if 0
         // calling get() on a numeric column must return following:
         CHECK_EQUAL(table->get_int(0, 0), 0);
         CHECK_EQUAL(table->get_float(1, 0), 0.0f);
         CHECK_EQUAL(table->get_double(3, 0), 0.0);
         CHECK_EQUAL(table->get_bool(4, 0), false);
         CHECK_EQUAL(table->get_olddatetime(5, 0), OldDateTime(0));
-
+#endif
         // Set everything to non-null values
-        table->set_int(0, 0, 0);
-        table->set_float(1, 0, 0.f);
-        table->set_string(2, 0, StringData("", 0));
-        table->set_double(3, 0, 0.);
-        table->set_bool(4, 0, false);
-        table->set_olddatetime(5, 0, OldDateTime(0));
+        char bin = 8;
+        obj.set_all(0, 0.f, StringData("", 0), 0., false, Timestamp(1, 2), Binary(&bin, sizeof(bin)));
 
-        CHECK(!table->is_null(0, 0));
-        CHECK(!table->is_null(1, 0));
-        CHECK(!table->is_null(2, 0));
-        CHECK(!table->is_null(3, 0));
-        CHECK(!table->is_null(4, 0));
-        CHECK(!table->is_null(5, 0));
+        for (auto col : all_cols) {
+            CHECK(!obj.is_null(col));
+        }
 
-        table->set_null(0, 0);
-        table->set_null(1, 0);
-        table->set_null(2, 0);
-        table->set_null(3, 0);
-        table->set_null(4, 0);
-        table->set_null(5, 0);
+        for (auto col : all_cols) {
+            obj.set_null(col);
+        }
 
-        CHECK(table->is_null(0, 0));
-        CHECK(table->is_null(1, 0));
-        CHECK(table->is_null(2, 0));
-        CHECK(table->is_null(3, 0));
-        CHECK(table->is_null(4, 0));
-        CHECK(table->is_null(5, 0));
+        for (auto col : all_cols) {
+            CHECK(obj.is_null(col));
+        }
     }
 }
 
@@ -6640,21 +6518,27 @@ TEST(Query_Null_Two_Columns)
     create_columns(table);
     fill_data(table);
 
-    Columns<Int> price = table->column<Int>(0);
-    Columns<Float> shipping = table->column<Float>(1);
-    Columns<String> description = table->column<String>(2);
-    Columns<Double> rating = table->column<Double>(3);
-    Columns<Bool> stock = table->column<Bool>(4);
-    Columns<OldDateTime> delivery = table->column<OldDateTime>(5);
+    auto col_price = table->get_column_key("Price");
+    auto col_shipping = table->get_column_key("Shipping");
+    auto col_description = table->get_column_key("Description");
+    auto col_rating = table->get_column_key("Rating");
+    auto col_date = table->get_column_key("Delivery date");
+    Columns<Int> price = table->column<Int>(col_price);
+    Columns<Float> shipping = table->column<Float>(col_shipping);
+    Columns<String> description = table->column<String>(col_description);
+    Columns<Double> rating = table->column<Double>(col_rating);
+    Columns<Bool> stock = table->column<Bool>(table->get_column_key("Stock"));
+    Columns<Timestamp> delivery = table->column<Timestamp>(col_date);
+    Columns<BinaryData> photo = table->column<BinaryData>(table->get_column_key("Photo"));
 
     TableView tv;
 
     /*
-    Price<int>      Shipping<float>     Description<String>     Rating<double>      Stock<bool> Delivery<OldDateTime>
+    Price<int>      Shipping<float>     Description<String>     Rating<double>      Stock<bool> Delivery<Timestamp>
     ----------------------------------------------------------------------------------------------------------------
-    0   1           null                null                    1.1                 true          2016-2-2
+    0   1           null                null                    1.1                 true          12345, 0
     1   null        null                "foo"                   2.2                 null          null
-    2   3           30.0                "bar"                   null                false         2016-6-6
+    2   3           30.0                "bar"                   null                false         12345, 67
     */
 
     tv = (shipping > rating).find_all();
@@ -6763,39 +6647,39 @@ TEST(Query_Null_Two_Columns)
     CHECK(equals(tv, {1}));
 
     // Test a few untested things
-    tv = table->where().equal(3, null()).find_all();
+    tv = table->where().equal(col_rating, null()).find_all();
     CHECK(equals(tv, {2}));
 
-    tv = table->where().equal(0, null()).find_all();
+    tv = table->where().equal(col_price, null()).find_all();
     CHECK(equals(tv, {1}));
 
-    tv = table->where().not_equal(3, null()).find_all();
+    tv = table->where().not_equal(col_rating, null()).find_all();
     CHECK(equals(tv, {0, 1}));
 
-    tv = table->where().between(0, 2, 4).find_all();
+    tv = table->where().between(col_price, 2, 4).find_all();
     CHECK(equals(tv, {2}));
 
     // between for floats
-    tv = table->where().between(1, 10.f, 40.f).find_all();
+    tv = table->where().between(col_shipping, 10.f, 40.f).find_all();
     CHECK(equals(tv, {2}));
 
-    tv = table->where().between(1, 0.f, 20.f).find_all();
+    tv = table->where().between(col_shipping, 0.f, 20.f).find_all();
     CHECK(equals(tv, {}));
 
-    tv = table->where().between(1, 40.f, 100.f).find_all();
+    tv = table->where().between(col_shipping, 40.f, 100.f).find_all();
     CHECK(equals(tv, {}));
 
     // between for doubles
-    tv = table->where().between(3, 0., 100.).find_all();
+    tv = table->where().between(col_rating, 0., 100.).find_all();
     CHECK(equals(tv, {0, 1}));
 
-    tv = table->where().between(3, 1., 2.).find_all();
+    tv = table->where().between(col_rating, 1., 2.).find_all();
     CHECK(equals(tv, {0}));
 
-    tv = table->where().between(3, 2., 3.).find_all();
+    tv = table->where().between(col_rating, 2., 3.).find_all();
     CHECK(equals(tv, {1}));
 
-    tv = table->where().between(3, 3., 100.).find_all();
+    tv = table->where().between(col_rating, 3., 100.).find_all();
     CHECK(equals(tv, {}));
 }
 
@@ -6805,7 +6689,11 @@ TEST(Query_Null_BetweenMinMax_Nullable)
     Group g;
     TableRef table = g.add_table("Inventory");
     create_columns(table);
-    table->add_empty_row();
+    table->create_object();
+    auto col_price = table->get_column_key("Price");
+    auto col_shipping = table->get_column_key("Shipping");
+    auto col_rating = table->get_column_key("Rating");
+    auto col_date = table->get_column_key("Delivery date");
 
     /*
     Price<int>      Shipping<float>     Description<String>     Rating<double>      Stock<bool>
@@ -6815,7 +6703,7 @@ TEST(Query_Null_BetweenMinMax_Nullable)
     */
 
     TableView tv;
-    size_t match;
+    ObjKey match;
     size_t count;
 
     // Here we test max/min/average with 0 rows used to compute the value, either becuase all inputs are null or
@@ -6823,64 +6711,54 @@ TEST(Query_Null_BetweenMinMax_Nullable)
     auto test_tv = [&]() {
         // int
         match = 123;
-        tv.maximum_int(0, &match);
-        CHECK_EQUAL(match, npos);
+        tv.maximum_int(col_price, &match);
+        CHECK_EQUAL(match, realm::null_key);
 
         match = 123;
-        tv.minimum_int(0, &match);
-        CHECK_EQUAL(match, npos);
+        tv.minimum_int(col_price, &match);
+        CHECK_EQUAL(match, realm::null_key);
 
-        CHECK_EQUAL(tv.sum_int(0), 0);
+        CHECK_EQUAL(tv.sum_int(col_price), 0);
         count = 123;
-        CHECK_EQUAL(tv.average_int(0, &count), 0.);
+        CHECK_EQUAL(tv.average_int(col_price, &count), 0.);
         CHECK_EQUAL(count, 0);
 
         // float
         match = 123;
-        tv.maximum_float(1, &match);
-        CHECK_EQUAL(match, npos);
+        tv.maximum_float(col_shipping, &match);
+        CHECK_EQUAL(match, realm::null_key);
 
         match = 123;
-        tv.minimum_float(1, &match);
-        CHECK_EQUAL(match, npos);
+        tv.minimum_float(col_shipping, &match);
+        CHECK_EQUAL(match, realm::null_key);
 
-        CHECK_EQUAL(tv.sum_float(1), 0.);
+        CHECK_EQUAL(tv.sum_float(col_shipping), 0.);
         count = 123;
-        CHECK_EQUAL(tv.average_float(1, &count), 0.);
+        CHECK_EQUAL(tv.average_float(col_shipping, &count), 0.);
         CHECK_EQUAL(count, 0);
 
         // double
         match = 123;
-        tv.maximum_double(3, &match);
-        CHECK_EQUAL(match, npos);
+        tv.maximum_double(col_rating, &match);
+        CHECK_EQUAL(match, realm::null_key);
 
         match = 123;
-        tv.minimum_double(3, &match);
-        CHECK_EQUAL(match, npos);
+        tv.minimum_double(col_rating, &match);
+        CHECK_EQUAL(match, realm::null_key);
 
-        CHECK_EQUAL(tv.sum_double(3), 0.);
+        CHECK_EQUAL(tv.sum_double(col_rating), 0.);
         count = 123;
-        CHECK_EQUAL(tv.average_double(3, &count), 0.);
+        CHECK_EQUAL(tv.average_double(col_rating, &count), 0.);
         CHECK_EQUAL(count, 0);
 
         // date
         match = 123;
-        tv.maximum_olddatetime(5, &match);
-        CHECK_EQUAL(match, npos);
+        tv.maximum_timestamp(col_date, &match);
+        CHECK_EQUAL(match, realm::null_key);
 
         match = 123;
-        tv.minimum_olddatetime(5, &match);
-        CHECK_EQUAL(match, npos);
-
-        // timestamp
-        match = 123;
-        tv.maximum_timestamp(7, &match);
-        CHECK_EQUAL(match, npos);
-
-        match = 123;
-        tv.minimum_timestamp(7, &match);
-        CHECK_EQUAL(match, npos);
-
+        tv.minimum_timestamp(col_date, &match);
+        CHECK_EQUAL(match, realm::null_key);
     };
 
     // There are rows in TableView but they all point to null
@@ -6888,7 +6766,7 @@ TEST(Query_Null_BetweenMinMax_Nullable)
     test_tv();
 
     // There are 0 rows in TableView
-    tv = table->where().equal(0, 123).find_all();
+    tv = table->where().equal(col_price, 123).find_all();
     test_tv();
 
     // Now we test that average does not include nulls in row count:
@@ -6899,20 +6777,17 @@ TEST(Query_Null_BetweenMinMax_Nullable)
     10              10.f                null                    10.                 null            null
     */
 
-    table->add_empty_row();
-    table->set_int(0, 1, 10);
-    table->set_float(1, 1, 10.f);
-    table->set_double(3, 1, 10.);
+    table->create_object().set_all(10, 10.f, null(), 10.);
 
     tv = table->where().find_all();
     count = 123;
-    CHECK_EQUAL(tv.average_int(0, &count), 10);
+    CHECK_EQUAL(tv.average_int(col_price, &count), 10);
     CHECK_EQUAL(count, 1);
     count = 123;
-    CHECK_EQUAL(tv.average_float(1, &count), 10.);
+    CHECK_EQUAL(tv.average_float(col_shipping, &count), 10.);
     CHECK_EQUAL(count, 1);
     count = 123;
-    CHECK_EQUAL(tv.average_double(3, &count), 10.);
+    CHECK_EQUAL(tv.average_double(col_rating, &count), 10.);
     CHECK_EQUAL(count, 1);
 }
 
@@ -6926,53 +6801,52 @@ TEST(Query_Null_ManyRows)
     TableRef table = g.add_table("Inventory");
     create_columns(table);
 
-    Columns<Int> price = table->column<Int>(0);
-    Columns<Float> shipping = table->column<Float>(1);
-    Columns<String> description = table->column<String>(2);
-    Columns<Double> rating = table->column<Double>(3);
-    Columns<Bool> stock = table->column<Bool>(4);
-    Columns<OldDateTime> delivery = table->column<OldDateTime>(5);
+    auto col_price = table->get_column_key("Price");
+    auto col_shipping = table->get_column_key("Shipping");
+    auto col_description = table->get_column_key("Description");
+    auto col_rating = table->get_column_key("Rating");
+    auto col_date = table->get_column_key("Delivery date");
+    Columns<Int> price = table->column<Int>(col_price);
+    Columns<Float> shipping = table->column<Float>(col_shipping);
+    Columns<String> description = table->column<String>(col_description);
+    Columns<Double> rating = table->column<Double>(col_rating);
+    Columns<Bool> stock = table->column<Bool>(table->get_column_key("Stock"));
+    Columns<Timestamp> delivery = table->column<Timestamp>(col_date);
 
     // Create lots of non-null rows
     for (size_t t = 0; t < 2000; t++) {
-        table->add_empty_row(1);
-        table->set_int(0, t, 123);
-        table->set_float(1, t, 30.f);
-        table->set_string(2, t, "foo");
-        table->set_double(3, t, 12.3);
-        table->set_bool(4, t, true);
-        table->set_olddatetime(5, t, OldDateTime(2016, 2, 2));
+        table->create_object().set_all(123, 30.f, "foo", 12.3, true, Timestamp(1, 2));
     }
 
     // Reference lists used to verify query results
-    std::vector<size_t> nulls;     // List of rows that have all fields set to null
-    std::vector<size_t> non_nulls; // List of non-null rows
+    std::vector<int64_t> nulls;     // List of rows that have all fields set to null
+    std::vector<int64_t> non_nulls; // List of non-null rows
+
+    auto all_cols = table->get_column_keys();
 
     // Fill in nulls in random rows, at each 10'th row on average
     for (size_t t = 0; t < table->size() / 10; t++) {
         // Bad but fast random generator
         size_t prime = 883;
         size_t random = ((t + prime) * prime + t) % table->size();
+        Obj obj = table->get_object(random);
 
         // Test if already null (simplest way to avoid dublicates in our nulls vector)
-        if (!table->is_null(0, random)) {
-            table->set_null(0, random);
-            table->set_null(1, random);
-            table->set_null(2, random);
-            table->set_null(3, random);
-            table->set_null(4, random);
-            table->set_null(5, random);
-            nulls.push_back(random);
+        if (!obj.is_null(col_price)) {
+            for (auto col : all_cols) {
+                obj.set_null(col);
+            }
+            nulls.push_back(obj.get_key().value);
         }
     }
 
     // Fill out non_nulls vector
-    for (size_t t = 0; t < table->size(); t++) {
-        if (!table->is_null(0, t))
-            non_nulls.push_back(t);
+    for (auto& o : *table) {
+        if (!o.is_null(col_price))
+            non_nulls.push_back(o.get_key().value);
     }
 
-    std::sort(nulls.begin(), nulls.end(), [](size_t a, size_t b) { return b > a; });
+    std::sort(nulls.begin(), nulls.end());
     TableView tv;
 
     // Search for nulls and non-nulls and verify matches against our manually created `nulls` and non_nulls vectors.
@@ -7020,36 +6894,25 @@ TEST(Query_Null_Sort)
     TableRef table = g.add_table("Inventory");
     create_columns(table);
 
-    table->add_empty_row(3);
+    auto k0 = table->create_object().set_all(0, 0.f, "0", 0.0, false, Timestamp(0, 0)).get_key();
+    auto k1 = table->create_object().get_key();
+    auto k2 = table->create_object().set_all(2, 2.f, "2", 2.0, true, Timestamp(2, 0)).get_key();
 
-    table->set_int(0, 0, 0);
-    table->set_float(1, 0, 0.f);
-    table->set_string(2, 0, "0");
-    table->set_double(3, 0, 0.0);
-    table->set_bool(4, 0, false);
-    table->set_olddatetime(5, 0, OldDateTime(0));
-
-    table->set_int(0, 2, 2);
-    table->set_float(1, 2, 2.f);
-    table->set_string(2, 2, "2");
-    table->set_double(3, 2, 2.0);
-    table->set_bool(4, 2, true);
-    table->set_olddatetime(5, 2, OldDateTime(2000));
-
+    auto all_cols = table->get_column_keys();
     for (int i = 0; i <= 5; i++) {
         TableView tv = table->where().find_all();
         CHECK(tv.size() == 3);
 
-        tv.sort(i, true);
-        CHECK_EQUAL(tv.get_key(0), 1);
-        CHECK_EQUAL(tv.get_key(1), 0);
-        CHECK_EQUAL(tv.get_key(2), 2);
+        tv.sort(all_cols[i], true);
+        CHECK_EQUAL(tv.get_key(0), k1);
+        CHECK_EQUAL(tv.get_key(1), k0);
+        CHECK_EQUAL(tv.get_key(2), k2);
 
         tv = table->where().find_all();
-        tv.sort(i, false);
-        CHECK_EQUAL(tv.get_key(0), 2);
-        CHECK_EQUAL(tv.get_key(1), 0);
-        CHECK_EQUAL(tv.get_key(2), 1);
+        tv.sort(all_cols[i], false);
+        CHECK_EQUAL(tv.get_key(0), k2);
+        CHECK_EQUAL(tv.get_key(1), k0);
+        CHECK_EQUAL(tv.get_key(2), k1);
     }
 }
 
@@ -7057,101 +6920,74 @@ TEST(Query_LinkCounts)
 {
     Group group;
     TableRef table1 = group.add_table("table1");
-    table1->add_column(type_String, "str");
+    auto col_str = table1->add_column(type_String, "str");
 
-    table1->add_empty_row();
-    table1->set_string(0, 0, "abc");
-    table1->add_empty_row();
-    table1->set_string(0, 1, "def");
-    table1->add_empty_row();
-    table1->set_string(0, 2, "ghi");
+    auto k0 = table1->create_object().set(col_str, "abc").get_key();
+    auto k1 = table1->create_object().set(col_str, "def").get_key();
+    auto k2 = table1->create_object().set(col_str, "ghi").get_key();
 
     TableRef table2 = group.add_table("table2");
-    size_t col_int = table2->add_column(type_Int, "int");
-    size_t col_link = table2->add_column_link(type_Link, "link", *table1);
-    size_t col_linklist = table2->add_column_link(type_LinkList, "linklist", *table1);
+    auto col_int = table2->add_column(type_Int, "int");
+    auto col_link = table2->add_column_link(type_Link, "link", *table1);
+    auto col_linklist = table2->add_column_link(type_LinkList, "linklist", *table1);
 
-    table2->add_empty_row();
-    table2->set_int(col_int, 0, 0);
-
-    table2->add_empty_row();
-    table2->set_int(col_int, 1, 1);
-    table2->set_link(col_link, 1, 1);
-    LinkViewRef links = table2->get_linklist(col_linklist, 1);
-    links->add(1);
-
-    table2->add_empty_row();
-    table2->set_int(col_int, 2, 2);
-    table2->set_link(col_link, 2, 2);
-    links = table2->get_linklist(col_linklist, 2);
-    links->add(1);
-    links->add(2);
+    table2->create_object().set_all(0);
+    table2->create_object().set_all(1, k1).get_linklist(col_linklist).add(k1);
+    auto ll = table2->create_object().set_all(2, k2).get_linklist(col_linklist);
+    ll.add(k1);
+    ll.add(k2);
 
     Query q;
-    size_t match;
+    ObjKey match;
 
     // Verify that queries against the count of a LinkList column work.
-    q = table2->column<LnkLst>(col_linklist).count() == 0;
+    q = table2->column<Link>(col_linklist).count() == 0;
     match = q.find();
-    CHECK_EQUAL(0, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(not_found, match);
+    CHECK_EQUAL(k0, match);
 
-    q = table2->column<LnkLst>(col_linklist).count() == 1;
+    q = table2->column<Link>(col_linklist).count() == 1;
     match = q.find();
-    CHECK_EQUAL(1, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(not_found, match);
+    CHECK_EQUAL(k1, match);
 
-    q = table2->column<LnkLst>(col_linklist).count() >= 1;
-    match = q.find();
-    CHECK_EQUAL(1, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(2, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(not_found, match);
+    q = table2->column<Link>(col_linklist).count() >= 1;
+    auto tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(k1, tv.get_key(0));
+    CHECK_EQUAL(k2, tv.get_key(1));
 
 
     // Verify that queries against the count of a Link column work.
     q = table2->column<Link>(col_link).count() == 0;
     match = q.find();
-    CHECK_EQUAL(0, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(not_found, match);
+    CHECK_EQUAL(k0, match);
 
     q = table2->column<Link>(col_link).count() == 1;
-    match = q.find();
-    CHECK_EQUAL(1, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(2, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(not_found, match);
-
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(k1, tv.get_key(0));
+    CHECK_EQUAL(k2, tv.get_key(1));
 
     // Verify that reusing the count expression works.
-    auto link_count = table2->column<LnkLst>(col_linklist).count();
+    auto link_count = table2->column<Link>(col_linklist).count();
     size_t match_count = (link_count == 0).count();
     CHECK_EQUAL(1, match_count);
 
     match_count = (link_count >= 1).count();
     CHECK_EQUAL(2, match_count);
 
-
     // Verify that combining the count expression with other queries on the same table works.
-    q = table2->column<LnkLst>(col_linklist).count() == 1 && table2->column<Int>(col_int) == 1;
+    q = table2->column<Link>(col_linklist).count() == 1 && table2->column<Int>(col_int) == 1;
     match = q.find();
-    CHECK_EQUAL(1, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(not_found, match);
+    CHECK_EQUAL(k1, match);
 }
 
 TEST(Query_Link_Minimum)
 {
     Group group;
     TableRef table1 = group.add_table("table1");
-    table1->add_column(type_Int, "int", /* nullable */ true);
-    table1->add_column(type_Float, "float", /* nullable */ true);
-    table1->add_column(type_Double, "double", /* nullable */ true);
+    auto col_int = table1->add_column(type_Int, "int", /* nullable */ true);
+    auto col_float = table1->add_column(type_Float, "float", /* nullable */ true);
+    auto col_double = table1->add_column(type_Double, "double", /* nullable */ true);
 
     // table1
     // 0: 789 789.0f 789.0
@@ -7159,25 +6995,13 @@ TEST(Query_Link_Minimum)
     // 2: 123 123.0f 123.0
     // 3: null null null
 
-    table1->add_empty_row();
-    table1->set_int(0, 0, 789);
-    table1->set_float(1, 0, 789.0f);
-    table1->set_double(2, 0, 789.0);
-    table1->add_empty_row();
-    table1->set_int(0, 1, 456);
-    table1->set_float(1, 1, 456.0f);
-    table1->set_double(2, 1, 456.0);
-    table1->add_empty_row();
-    table1->set_int(0, 2, 123);
-    table1->set_float(1, 2, 123.0f);
-    table1->set_double(2, 2, 123.0);
-    table1->add_empty_row();
-    table1->set_null(0, 3);
-    table1->set_null(1, 3);
-    table1->set_null(2, 3);
+    auto k0 = table1->create_object().set_all(789, 789.f, 789.).get_key();
+    auto k1 = table1->create_object().set_all(456, 456.f, 456.).get_key();
+    auto k2 = table1->create_object().set_all(123, 123.f, 123.).get_key();
+    auto k3 = table1->create_object().get_key();
 
     TableRef table2 = group.add_table("table2");
-    size_t col_linklist = table2->add_column_link(type_LinkList, "linklist", *table1);
+    auto col_linklist = table2->add_column_link(type_LinkList, "linklist", *table1);
 
     // table2
     // 0: { }
@@ -7185,77 +7009,60 @@ TEST(Query_Link_Minimum)
     // 2: { 1, 2 }
     // 3: { 1, 2, 3 }
 
-    table2->add_empty_row();
-
-    table2->add_empty_row();
-    LinkViewRef links = table2->get_linklist(col_linklist, 1);
-    links->add(1);
-
-    table2->add_empty_row();
-    links = table2->get_linklist(col_linklist, 2);
-    links->add(1);
-    links->add(2);
-
-    table2->add_empty_row();
-    links = table2->get_linklist(col_linklist, 3);
-    links->add(1);
-    links->add(2);
-    links->add(3);
+    LnkLst ll;
+    table2->create_object();
+    ll = table2->create_object().get_linklist(col_linklist);
+    ll.add(k1);
+    ll = table2->create_object().get_linklist(col_linklist);
+    ll.add(k1);
+    ll.add(k2);
+    ll = table2->create_object().get_linklist(col_linklist);
+    ll.add(k1);
+    ll.add(k2);
+    ll.add(k3);
 
     Query q;
-    size_t match;
 
-    q = table2->column<LnkLst>(col_linklist).column<Int>(0).min() == 123;
-    match = q.find();
-    CHECK_EQUAL(2, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(3, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(not_found, match);
+    q = table2->column<Link>(col_linklist).column<Int>(col_int).min() == 123;
+    auto tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(k2, tv.get_key(0));
+    CHECK_EQUAL(k3, tv.get_key(1));
 
-    q = table2->column<LnkLst>(col_linklist).column<Int>(0).min() == 456;
-    match = q.find();
-    CHECK_EQUAL(1, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(not_found, match);
+    q = table2->column<Link>(col_linklist).column<Int>(col_int).min() == 456;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(k1, tv.get_key(0));
 
-    q = table2->column<LnkLst>(col_linklist).column<Int>(0).min() == null();
-    match = q.find();
-    CHECK_EQUAL(0, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(not_found, match);
+    q = table2->column<Link>(col_linklist).column<Int>(col_int).min() == null();
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(k0, tv.get_key(0));
 
+    q = table2->column<Link>(col_linklist).column<Float>(col_float).min() == 123.0f;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(k2, tv.get_key(0));
+    CHECK_EQUAL(k3, tv.get_key(1));
 
-    q = table2->column<LnkLst>(col_linklist).column<Float>(1).min() == 123.0f;
-    match = q.find();
-    CHECK_EQUAL(2, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(3, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(not_found, match);
+    q = table2->column<Link>(col_linklist).column<Float>(col_float).min() == 456.0f;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(k1, tv.get_key(0));
 
-    q = table2->column<LnkLst>(col_linklist).column<Float>(1).min() == 456.0f;
-    match = q.find();
-    CHECK_EQUAL(1, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(not_found, match);
+    q = table2->column<Link>(col_linklist).column<Double>(col_double).min() == 123.0;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(k2, tv.get_key(0));
+    CHECK_EQUAL(k3, tv.get_key(1));
 
-
-    q = table2->column<LnkLst>(col_linklist).column<Double>(2).min() == 123.0;
-    match = q.find();
-    CHECK_EQUAL(2, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(3, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(not_found, match);
-
-    q = table2->column<LnkLst>(col_linklist).column<Double>(2).min() == 456.0;
-    match = q.find();
-    CHECK_EQUAL(1, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(not_found, match);
+    q = table2->column<Link>(col_linklist).column<Double>(col_double).min() == 456.0;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(k1, tv.get_key(0));
 }
 
+#ifdef LEGACY_TESTS
 TEST(Query_Link_MaximumSumAverage)
 {
     Group group;

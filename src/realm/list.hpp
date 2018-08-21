@@ -345,18 +345,14 @@ protected:
             m_valid = other.m_valid;
             m_col_key = other.m_col_key;
             m_deleted.clear();
+            m_tree = nullptr;
 
             if (other.m_tree) {
-                if (!m_tree) {
-                    Allocator& alloc = other.m_tree->get_alloc();
-                    m_tree = std::make_unique<BPlusTree<T>>(alloc);
-                    m_tree->set_parent(this, 0);
-                }
+                Allocator& alloc = other.m_tree->get_alloc();
+                m_tree = std::make_unique<BPlusTree<T>>(alloc);
+                m_tree->set_parent(this, 0);
                 if (m_valid)
                     m_tree->init_from_ref(other.m_tree->get_ref());
-            }
-            else {
-                m_tree = nullptr;
             }
         }
         return *this;

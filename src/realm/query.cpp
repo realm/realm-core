@@ -1209,7 +1209,7 @@ Query& Query::Or()
     return *this;
 }
 
-// todo, add size_t end? could be useful
+
 ObjKey Query::find()
 {
 #if REALM_METRICS
