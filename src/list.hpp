@@ -36,9 +36,9 @@ class Query;
 class Realm;
 class Results;
 class SortDescriptor;
+class ThreadSafeReference;
 struct ColKey;
 struct ObjKey;
-template <typename T> class ThreadSafeReference;
 
 namespace _impl {
 class ListNotifier;
@@ -58,7 +58,10 @@ public:
 
     const std::shared_ptr<Realm>& get_realm() const { return m_realm; }
     Query get_query() const;
+
+    ColKey get_parent_column_key() const;
     ObjKey get_parent_object_key() const;
+    TableKey get_parent_table_key() const;
 
     // Get the type of the values contained in this List
     PropertyType get_type() const { return m_type; }
@@ -153,8 +156,6 @@ public:
     static std::unique_ptr<LstBase> get_list(PropertyType type, const LstBase& list);
 
 private:
-    friend ThreadSafeReference<List>;
-
     std::shared_ptr<Realm> m_realm;
     PropertyType m_type;
     mutable const ObjectSchema* m_object_schema = nullptr;

@@ -116,6 +116,18 @@ ObjKey List::get_parent_object_key() const
     return m_list_base->get_key();
 }
 
+ColKey List::get_parent_column_key() const
+{
+    verify_attached();
+    return m_list_base->get_col_key();
+}
+
+TableKey List::get_parent_table_key() const
+{
+    verify_attached();
+    return m_list_base->get_table()->get_key();
+}
+
 void List::verify_valid_row(size_t row_ndx, bool insertion) const
 {
     size_t s = size();

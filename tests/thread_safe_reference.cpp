@@ -30,12 +30,10 @@
 
 #include "impl/object_accessor_impl.hpp"
 
-#include <realm/history.hpp>
 #include <realm/db.hpp>
+#include <realm/history.hpp>
+#include <realm/string_data.hpp>
 #include <realm/util/optional.hpp>
-
-#include <future>
-#include <thread>
 
 using namespace realm;
 
@@ -79,15 +77,17 @@ TEST_CASE("thread safe reference") {
     auto foo = create_object(r, "foo object", {{"ignore me", INT64_C(0)}});
     r->commit_transaction();
 
-    SECTION("disallowed during write transactions") {
+    const auto int_obj_col = r->schema().find("int object")->persisted_properties[0].column_key;
+
+    SECTION("allowed during write transactions") {
         SECTION("obtain") {
             r->begin_transaction();
-            REQUIRE_THROWS(r->obtain_thread_safe_reference(foo));
+            REQUIRE_NOTHROW(ThreadSafeReference(foo));
         }
         SECTION("resolve") {
-            auto ref = r->obtain_thread_safe_reference(foo);
+            auto ref = ThreadSafeReference(foo);
             r->begin_transaction();
-            REQUIRE_THROWS(r->resolve_thread_safe_reference(std::move(ref)));
+            REQUIRE_NOTHROW(ref.resolve<Object>(r));
         }
     }
 
@@ -102,28 +102,18 @@ TEST_CASE("thread safe reference") {
         };
 
         auto reference_version = get_current_version();
-        auto ref = util::make_optional(r->obtain_thread_safe_reference(foo));
+        auto ref = util::make_optional(ThreadSafeReference(foo));
         r->begin_transaction(); r->commit_transaction(); // Advance version
 
         REQUIRE(get_current_version() != reference_version); // Ensure advanced
-        {
         REQUIRE_NOTHROW(shared_group->start_read(reference_version)); // Ensure pinned
-        }
 
-        SECTION("destroyed without being resolved") {
-            ref = {}; // Destroy thread safe reference, unpinning version
-        }
-        SECTION("exception thrown on resolve") {
-            r->begin_transaction(); // Get into state that'll throw exception on resolve
-            REQUIRE_THROWS(r->resolve_thread_safe_reference(std::move(*ref)));
-            r->commit_transaction();
-        }
+        ref = {}; // Destroy thread safe reference, unpinning version
         r->begin_transaction(); r->commit_transaction(); // Clean up old versions
-        REQUIRE_THROWS(shared_group->start_read(reference_version)); // Ensure unpinned
+        REQUIRE_THROWS(shared_group->start_read(reference_version)); // Verify unpinned
     }
 
     SECTION("version mismatch") {
-#ifndef _MSC_VER // Visual C++'s buggy <future> needs its template argument to be default constructible so skip this test
         SECTION("resolves at older version") {
             r->begin_transaction();
             Object num = create_object(r, "int object", {{"value", INT64_C(7)}});
@@ -133,20 +123,21 @@ TEST_CASE("thread safe reference") {
             ObjKey k = num.obj().get_key();
 
             REQUIRE(num.obj().get<Int>(col) == 7);
-            auto ref = std::async([config, k, col]() -> auto {
-                SharedRealm r = Realm::get_shared_realm(config);
-                Object num = Object(r, "int object", k);
+            ThreadSafeReference ref;
+            {
+                SharedRealm r2 = Realm::get_shared_realm(config);
+                Object num = Object(r2, "int object", k);
                 REQUIRE(num.obj().get<Int>(col) == 7);
 
-                r->begin_transaction();
+                r2->begin_transaction();
                 num.obj().set(col, 9);
-                r->commit_transaction();
+                r2->commit_transaction();
 
-                return r->obtain_thread_safe_reference(num);
-            }).get();
+                ref = num;
+            };
 
             REQUIRE(num.obj().get<Int>(col) == 7);
-            Object num_prime = r->resolve_thread_safe_reference(std::move(ref));
+            Object num_prime = ref.resolve<Object>(r);
             REQUIRE(num_prime.obj().get<Int>(col) == 9);
             REQUIRE(num.obj().get<Int>(col) == 9);
 
@@ -157,7 +148,6 @@ TEST_CASE("thread safe reference") {
             REQUIRE(num_prime.obj().get<Int>(col) == 11);
             REQUIRE(num.obj().get<Int>(col) == 11);
         }
-#endif
 
         SECTION("resolve at newer version") {
             r->begin_transaction();
@@ -168,26 +158,26 @@ TEST_CASE("thread safe reference") {
             ObjKey k = num.obj().get_key();
 
             REQUIRE(num.obj().get<Int>(col) == 7);
-            auto ref = r->obtain_thread_safe_reference(num);
-            std::thread([ref = std::move(ref), config, k, col]() mutable {
-                SharedRealm r = Realm::get_shared_realm(config);
-                Object num = Object(r, "int object", k);
+            auto ref = ThreadSafeReference(num);
+            {
+                SharedRealm r2 = Realm::get_shared_realm(config);
+                Object num = Object(r2, "int object", k);
 
-                r->begin_transaction();
+                r2->begin_transaction();
                 num.obj().set(col, 9);
-                r->commit_transaction();
+                r2->commit_transaction();
                 REQUIRE(num.obj().get<Int>(col) == 9);
 
-                Object num_prime = r->resolve_thread_safe_reference(std::move(ref));
+                Object num_prime = ref.resolve<Object>(r2);
                 REQUIRE(num_prime.obj().get<Int>(col) == 9);
 
-                r->begin_transaction();
+                r2->begin_transaction();
                 num_prime.obj().set(col, 11);
-                r->commit_transaction();
+                r2->commit_transaction();
 
                 REQUIRE(num.obj().get<Int>(col) == 11);
                 REQUIRE(num_prime.obj().get<Int>(col) == 11);
-            }).join();
+            }
 
             REQUIRE(num.obj().get<Int>(col) == 7);
             r->refresh();
@@ -203,13 +193,13 @@ TEST_CASE("thread safe reference") {
             r->commit_transaction();
 
             ColKey col = num.get_object_schema().property_for_name("value")->column_key;
-            auto ref = r->obtain_thread_safe_reference(num);
+            auto ref = ThreadSafeReference(num);
 
             r->begin_transaction();
             num.obj().set(col, 9);
             r->commit_transaction();
 
-            REQUIRE_NOTHROW(r->resolve_thread_safe_reference(std::move(ref)));
+            REQUIRE_NOTHROW(ref.resolve<Object>(r));
         }
 
         SECTION("resolve references at multiple versions") {
@@ -220,17 +210,17 @@ TEST_CASE("thread safe reference") {
                 return num;
             };
 
-            auto ref1 = r->obtain_thread_safe_reference(commit_new_num(1));
-            auto ref2 = r->obtain_thread_safe_reference(commit_new_num(2));
-            std::thread([ref1 = std::move(ref1), ref2 = std::move(ref2), config]() mutable {
-                SharedRealm r = Realm::get_shared_realm(config);
-                Object num1 = r->resolve_thread_safe_reference(std::move(ref1));
-                Object num2 = r->resolve_thread_safe_reference(std::move(ref2));
+            auto ref1 = ThreadSafeReference(commit_new_num(1));
+            auto ref2 = ThreadSafeReference(commit_new_num(2));
+            {
+                SharedRealm r2 = Realm::get_shared_realm(config);
+                Object num1 = ref1.resolve<Object>(r2);
+                Object num2 = ref2.resolve<Object>(r2);
 
                 ColKey col = num1.get_object_schema().property_for_name("value")->column_key;
                 REQUIRE(num1.obj().get<Int>(col) == 1);
                 REQUIRE(num2.obj().get<Int>(col) == 2);
-            }).join();
+            }
         }
     }
 
@@ -241,10 +231,10 @@ TEST_CASE("thread safe reference") {
 
         ColKey col = num.get_object_schema().property_for_name("value")->column_key;
         REQUIRE(num.obj().get<Int>(col) == 7);
-        auto ref = r->obtain_thread_safe_reference(num);
+        auto ref = ThreadSafeReference(num);
         SECTION("same realm") {
             {
-                Object num = r->resolve_thread_safe_reference(std::move(ref));
+                Object num = ref.resolve<Object>(r);
                 REQUIRE(num.obj().get<Int>(col) == 7);
                 r->begin_transaction();
                 num.obj().set(col, 9);
@@ -256,7 +246,7 @@ TEST_CASE("thread safe reference") {
         SECTION("different realm") {
             {
                 SharedRealm r = Realm::get_shared_realm(config);
-                Object num = r->resolve_thread_safe_reference(std::move(ref));
+                Object num = ref.resolve<Object>(r);
                 REQUIRE(num.obj().get<Int>(col) == 7);
                 r->begin_transaction();
                 num.obj().set(col, 9);
@@ -278,21 +268,21 @@ TEST_CASE("thread safe reference") {
 
             ColKey col_num = num.get_object_schema().property_for_name("value")->column_key;
             ColKey col_str = str.get_object_schema().property_for_name("value")->column_key;
-            auto ref_str = r->obtain_thread_safe_reference(str);
-            auto ref_num = r->obtain_thread_safe_reference(num);
-            std::thread([ref_str = std::move(ref_str), ref_num = std::move(ref_num), config, col_num, col_str]() mutable {
-                SharedRealm r = Realm::get_shared_realm(config);
-                Object str = r->resolve_thread_safe_reference(std::move(ref_str));
-                Object num = r->resolve_thread_safe_reference(std::move(ref_num));
+            auto ref_str = ThreadSafeReference(str);
+            auto ref_num = ThreadSafeReference(num);
+            {
+                SharedRealm r2 = Realm::get_shared_realm(config);
+                Object str = ref_str.resolve<Object>(r2);
+                Object num = ref_num.resolve<Object>(r2);
 
                 REQUIRE(str.obj().get<String>(col_str).is_null());
                 REQUIRE(num.obj().get<Int>(col_num) == 0);
 
-                r->begin_transaction();
+                r2->begin_transaction();
                 str.obj().set(col_str, "the meaning of life");
                 num.obj().set(col_num, 42);
-                r->commit_transaction();
-            }).join();
+                r2->commit_transaction();
+            }
 
             REQUIRE(str.obj().get<String>(col_str).is_null());
             REQUIRE(num.obj().get<Int>(col_num) == 0);
@@ -303,49 +293,49 @@ TEST_CASE("thread safe reference") {
             REQUIRE(num.obj().get<Int>(col_num) == 42);
         }
 
-#if 0
         SECTION("object list") {
             r->begin_transaction();
             auto zero = create_object(r, "int object", {{"value", INT64_C(0)}});
-            create_object(r, "int array object", {{"value", AnyVector{zero}}});
-            List list(r, *get_table(*r, "int array object"), 0, 0);
+            auto obj = create_object(r, "int array object", {{"value", AnyVector{zero}}});
+            List list(r, obj.obj(), ColKey(0));
             r->commit_transaction();
 
             REQUIRE(list.size() == 1);
-            REQUIRE(list.get(0).get_int(0) == 0);
-            auto ref = r->obtain_thread_safe_reference(list);
-            std::thread([ref = std::move(ref), config]() mutable {
-                SharedRealm r = Realm::get_shared_realm(config);
-                List list = r->resolve_thread_safe_reference(std::move(ref));
+            REQUIRE(list.get(0).get<int64_t>(int_obj_col) == 0);
+            auto ref = ThreadSafeReference(list);
+            {
+                SharedRealm r2 = Realm::get_shared_realm(config);
+                List list = ref.resolve<List>(r2);
                 REQUIRE(list.size() == 1);
-                REQUIRE(list.get(0).get_int(0) == 0);
+                REQUIRE(list.get(0).get<int64_t>(int_obj_col) == 0);
 
-                r->begin_transaction();
+                r2->begin_transaction();
                 list.remove_all();
-                auto one = create_object(r, "int object", {{"value", INT64_C(1)}});
-                auto two = create_object(r, "int object", {{"value", INT64_C(2)}});
-                list.add(one.row());
-                list.add(two.row());
-                r->commit_transaction();
+                auto one = create_object(r2, "int object", {{"value", INT64_C(1)}});
+                auto two = create_object(r2, "int object", {{"value", INT64_C(2)}});
+                list.add(one.obj());
+                list.add(two.obj());
+                r2->commit_transaction();
 
                 REQUIRE(list.size() == 2);
-                REQUIRE(list.get(0).get_int(0) == 1);
-                REQUIRE(list.get(1).get_int(0) == 2);
-            }).join();
+                REQUIRE(list.get(0).get<int64_t>(int_obj_col) == 1);
+                REQUIRE(list.get(1).get<int64_t>(int_obj_col) == 2);
+            }
 
             REQUIRE(list.size() == 1);
-            REQUIRE(list.get(0).get_int(0) == 0);
+            REQUIRE(list.get(0).get<int64_t>(int_obj_col) == 0);
 
             r->refresh();
 
             REQUIRE(list.size() == 2);
-            REQUIRE(list.get(0).get_int(0) == 1);
-            REQUIRE(list.get(1).get_int(0) == 2);
+            REQUIRE(list.get(0).get<int64_t>(int_obj_col) == 1);
+            REQUIRE(list.get(1).get<int64_t>(int_obj_col) == 2);
         }
 
         SECTION("sorted object results") {
             auto& table = *get_table(*r, "string object");
-            auto results = Results(r, table.where().not_equal(0, "C")).sort({table, {{0}}, {false}});
+            auto col = table.get_column_key("value");
+            auto results = Results(r, table.where().not_equal(col, "C")).sort({{{col}}, {false}});
 
             r->begin_transaction();
             create_object(r, "string object", {{"value", "A"s}});
@@ -355,45 +345,46 @@ TEST_CASE("thread safe reference") {
             r->commit_transaction();
 
             REQUIRE(results.size() == 3);
-            REQUIRE(results.get(0).get_string(0) == "D");
-            REQUIRE(results.get(1).get_string(0) == "B");
-            REQUIRE(results.get(2).get_string(0) == "A");
-            auto ref = r->obtain_thread_safe_reference(results);
-            std::thread([ref = std::move(ref), config]() mutable {
-                SharedRealm r = Realm::get_shared_realm(config);
-                Results results = r->resolve_thread_safe_reference(std::move(ref));
+            REQUIRE(results.get(0).get<StringData>(col) == "D");
+            REQUIRE(results.get(1).get<StringData>(col) == "B");
+            REQUIRE(results.get(2).get<StringData>(col) == "A");
+            auto ref = ThreadSafeReference(results);
+            {
+                SharedRealm r2 = Realm::get_shared_realm(config);
+                Results results = ref.resolve<Results>(r2);
 
                 REQUIRE(results.size() == 3);
-                REQUIRE(results.get(0).get_string(0) == "D");
-                REQUIRE(results.get(1).get_string(0) == "B");
-                REQUIRE(results.get(2).get_string(0) == "A");
+                REQUIRE(results.get(0).get<StringData>(col) == "D");
+                REQUIRE(results.get(1).get<StringData>(col) == "B");
+                REQUIRE(results.get(2).get<StringData>(col) == "A");
 
-                r->begin_transaction();
-                results.get(2).move_last_over();
-                results.get(0).move_last_over();
-                create_object(r, "string object", {{"value", "E"s}});
-                r->commit_transaction();
+                r2->begin_transaction();
+                results.get(2).remove();
+                results.get(0).remove();
+                create_object(r2, "string object", {{"value", "E"s}});
+                r2->commit_transaction();
 
                 REQUIRE(results.size() == 2);
-                REQUIRE(results.get(0).get_string(0) == "E");
-                REQUIRE(results.get(1).get_string(0) == "B");
-            }).join();
+                REQUIRE(results.get(0).get<StringData>(col) == "E");
+                REQUIRE(results.get(1).get<StringData>(col) == "B");
+            }
 
             REQUIRE(results.size() == 3);
-            REQUIRE(results.get(0).get_string(0) == "D");
-            REQUIRE(results.get(1).get_string(0) == "B");
-            REQUIRE(results.get(2).get_string(0) == "A");
+            REQUIRE(results.get(0).get<StringData>(col) == "D");
+            REQUIRE(results.get(1).get<StringData>(col) == "B");
+            REQUIRE(results.get(2).get<StringData>(col) == "A");
 
             r->refresh();
 
             REQUIRE(results.size() == 2);
-            REQUIRE(results.get(0).get_string(0) == "E");
-            REQUIRE(results.get(1).get_string(0) == "B");
+            REQUIRE(results.get(0).get<StringData>(col) == "E");
+            REQUIRE(results.get(1).get<StringData>(col) == "B");
         }
 
         SECTION("distinct object results") {
             auto& table = *get_table(*r, "string object");
-            auto results = Results(r, table.where()).distinct({table, {{0}}}).sort({{"value", true}});
+            auto col = table.get_column_key("value");
+            auto results = Results(r, table.where()).distinct({{{col}}}).sort({{"value", true}});
 
             r->begin_transaction();
             create_object(r, "string object", {{"value", "A"s}});
@@ -402,63 +393,63 @@ TEST_CASE("thread safe reference") {
             r->commit_transaction();
 
             REQUIRE(results.size() == 2);
-            REQUIRE(results.get(0).get_string(0) == "A");
-            REQUIRE(results.get(1).get_string(0) == "B");
-            auto ref = r->obtain_thread_safe_reference(results);
-            std::thread([ref = std::move(ref), config]() mutable {
-                SharedRealm r = Realm::get_shared_realm(config);
-                Results results = r->resolve_thread_safe_reference(std::move(ref));
+            REQUIRE(results.get(0).get<StringData>(col) == "A");
+            REQUIRE(results.get(1).get<StringData>(col) == "B");
+            auto ref = ThreadSafeReference(results);
+            {
+                SharedRealm r2 = Realm::get_shared_realm(config);
+                Results results = ref.resolve<Results>(r2);
 
                 REQUIRE(results.size() == 2);
-                REQUIRE(results.get(0).get_string(0) == "A");
-                REQUIRE(results.get(1).get_string(0) == "B");
+                REQUIRE(results.get(0).get<StringData>(col) == "A");
+                REQUIRE(results.get(1).get<StringData>(col) == "B");
 
-                r->begin_transaction();
-                results.get(0).move_last_over();
-                create_object(r, "string object", {{"value", "C"s}});
-                r->commit_transaction();
+                r2->begin_transaction();
+                results.get(0).remove();
+                create_object(r2, "string object", {{"value", "C"s}});
+                r2->commit_transaction();
 
                 REQUIRE(results.size() == 3);
-                REQUIRE(results.get(0).get_string(0) == "A");
-                REQUIRE(results.get(1).get_string(0) == "B");
-                REQUIRE(results.get(2).get_string(0) == "C");
-            }).join();
+                REQUIRE(results.get(0).get<StringData>(col) == "A");
+                REQUIRE(results.get(1).get<StringData>(col) == "B");
+                REQUIRE(results.get(2).get<StringData>(col) == "C");
+            }
 
             REQUIRE(results.size() == 2);
-            REQUIRE(results.get(0).get_string(0) == "A");
-            REQUIRE(results.get(1).get_string(0) == "B");
+            REQUIRE(results.get(0).get<StringData>(col) == "A");
+            REQUIRE(results.get(1).get<StringData>(col) == "B");
 
             r->refresh();
 
             REQUIRE(results.size() == 3);
-            REQUIRE(results.get(0).get_string(0) == "A");
-            REQUIRE(results.get(1).get_string(0) == "B");
-            REQUIRE(results.get(2).get_string(0) == "C");
+            REQUIRE(results.get(0).get<StringData>(col) == "A");
+            REQUIRE(results.get(1).get<StringData>(col) == "B");
+            REQUIRE(results.get(2).get<StringData>(col) == "C");
         }
 
         SECTION("int list") {
             r->begin_transaction();
-            create_object(r, "int array", {{"value", AnyVector{INT64_C(0)}}});
-            List list(r, *get_table(*r, "int array"), 0, 0);
+            auto obj = create_object(r, "int array", {{"value", AnyVector{INT64_C(0)}}});
+            List list(r, obj.obj(), ColKey(0));
             r->commit_transaction();
 
-            auto ref = r->obtain_thread_safe_reference(list);
-            std::thread([ref = std::move(ref), config]() mutable {
-                SharedRealm r = Realm::get_shared_realm(config);
-                List list = r->resolve_thread_safe_reference(std::move(ref));
+            auto ref = ThreadSafeReference(list);
+            {
+                SharedRealm r2 = Realm::get_shared_realm(config);
+                List list = ref.resolve<List>(r2);
                 REQUIRE(list.size() == 1);
                 REQUIRE(list.get<int64_t>(0) == 0);
 
-                r->begin_transaction();
+                r2->begin_transaction();
                 list.remove_all();
-                list.add(1);
-                list.add(2);
-                r->commit_transaction();
+                list.add(1LL);
+                list.add(2LL);
+                r2->commit_transaction();
 
                 REQUIRE(list.size() == 2);
                 REQUIRE(list.get<int64_t>(0) == 1);
                 REQUIRE(list.get<int64_t>(1) == 2);
-            }).join();
+            };
 
             REQUIRE(list.size() == 1);
             REQUIRE(list.get<int64_t>(0) == 0);
@@ -470,6 +461,7 @@ TEST_CASE("thread safe reference") {
             REQUIRE(list.get<int64_t>(1) == 2);
         }
 
+#if 0
         SECTION("sorted int results") {
             r->begin_transaction();
             create_object(r, "int array", {{"value", AnyVector{INT64_C(0), INT64_C(2), INT64_C(1)}}});
@@ -482,10 +474,10 @@ TEST_CASE("thread safe reference") {
             REQUIRE(results.get<int64_t>(0) == 0);
             REQUIRE(results.get<int64_t>(1) == 1);
             REQUIRE(results.get<int64_t>(2) == 2);
-            auto ref = r->obtain_thread_safe_reference(results);
+            auto ref = ThreadSafeReference(results);
             std::thread([ref = std::move(ref), config]() mutable {
                 SharedRealm r = Realm::get_shared_realm(config);
-                Results results = r->resolve_thread_safe_reference(std::move(ref));
+                Results results = ref.resolve<Object>(r);
 
                 REQUIRE(results.size() == 3);
                 REQUIRE(results.get<int64_t>(0) == 0);
@@ -531,10 +523,10 @@ TEST_CASE("thread safe reference") {
             REQUIRE(results.get<int64_t>(1) == 2);
             REQUIRE(results.get<int64_t>(2) == 3);
 
-            auto ref = r->obtain_thread_safe_reference(results);
+            auto ref = ThreadSafeReference(results);
             std::thread([ref = std::move(ref), config]() mutable {
                 SharedRealm r = Realm::get_shared_realm(config);
-                Results results = r->resolve_thread_safe_reference(std::move(ref));
+                Results results = ref.resolve<Object>(r);
 
                 REQUIRE(results.size() == 3);
                 REQUIRE(results.get<int64_t>(0) == 1);
@@ -563,66 +555,65 @@ TEST_CASE("thread safe reference") {
             REQUIRE(results.get<int64_t>(0) == 1);
             REQUIRE(results.get<int64_t>(1) == 2);
         }
+#endif
 
         SECTION("multiple types") {
-            auto results = Results(r, get_table(*r, "int object")->where().equal(0, 5));
+            auto results = Results(r, get_table(*r, "int object")->where().equal(int_obj_col, 5));
 
             r->begin_transaction();
             auto num = create_object(r, "int object", {{"value", INT64_C(5)}});
-            create_object(r, "int array object", {{"value", AnyVector{}}});
-            List list(r, *get_table(*r, "int array object"), 0, 0);
+            auto obj = create_object(r, "int array object", {{"value", AnyVector{}}});
+            List list(r, obj.obj(), ColKey(0));
             r->commit_transaction();
 
             REQUIRE(list.size() == 0);
             REQUIRE(results.size() == 1);
-            REQUIRE(results.get(0).get_int(0) == 5);
-            auto ref_num = r->obtain_thread_safe_reference(num);
-            auto ref_list = r->obtain_thread_safe_reference(list);
-            auto ref_results = r->obtain_thread_safe_reference(results);
-            std::thread([ref_num = std::move(ref_num), ref_list = std::move(ref_list),
-                         ref_results = std::move(ref_results), config]() mutable {
-                SharedRealm r = Realm::get_shared_realm(config);
-                Object num = r->resolve_thread_safe_reference(std::move(ref_num));
-                List list = r->resolve_thread_safe_reference(std::move(ref_list));
-                Results results = r->resolve_thread_safe_reference(std::move(ref_results));
+            REQUIRE(results.get(0).get<int64_t>(int_obj_col) == 5);
+            auto ref_num = ThreadSafeReference(num);
+            auto ref_list = ThreadSafeReference(list);
+            auto ref_results = ThreadSafeReference(results);
+            {
+                SharedRealm r2 = Realm::get_shared_realm(config);
+                auto num = ref_num.resolve<Object>(r2);
+                auto list = ref_list.resolve<List>(r2);
+                auto results = ref_results.resolve<Results>(r2);
 
                 REQUIRE(list.size() == 0);
                 REQUIRE(results.size() == 1);
-                REQUIRE(results.get(0).get_int(0) == 5);
+                REQUIRE(results.get(0).get<int64_t>(int_obj_col) == 5);
 
-                r->begin_transaction();
-                num.obj().set(0, 6);
-                list.add(num.row().get_index());
-                r->commit_transaction();
+                r2->begin_transaction();
+                num.obj().set_all(6);
+                list.add(num.obj().get_key());
+                r2->commit_transaction();
 
                 REQUIRE(list.size() == 1);
-                REQUIRE(list.get(0).get_int(0) == 6);
+                REQUIRE(list.get(0).get<int64_t>(int_obj_col) == 6);
                 REQUIRE(results.size() == 0);
-            }).join();
+            }
 
             REQUIRE(list.size() == 0);
             REQUIRE(results.size() == 1);
-            REQUIRE(results.get(0).get_int(0) == 5);
+            REQUIRE(results.get(0).get<int64_t>(int_obj_col) == 5);
 
             r->refresh();
 
             REQUIRE(list.size() == 1);
-            REQUIRE(list.get(0).get_int(0) == 6);
+            REQUIRE(list.get(0).get<int64_t>(int_obj_col) == 6);
             REQUIRE(results.size() == 0);
         }
-#endif
     }
 
     SECTION("resolve at version where handed over thing has been deleted") {
         Object obj;
         auto delete_and_resolve = [&](auto&& list) {
-            auto ref = r->obtain_thread_safe_reference(list);
+            auto ref = ThreadSafeReference(list);
 
             r->begin_transaction();
             obj.obj().remove();
             r->commit_transaction();
 
-            return r->resolve_thread_safe_reference(std::move(ref));
+            return ref.resolve<typename std::remove_reference<decltype(list)>::type>(r);
         };
 
         SECTION("object") {
@@ -632,11 +623,11 @@ TEST_CASE("thread safe reference") {
 
             REQUIRE(!delete_and_resolve(obj).is_valid());
         }
-#if 0
+
         SECTION("object list") {
             r->begin_transaction();
             obj = create_object(r, "int array object", {{"value", AnyVector{AnyDict{{"value", INT64_C(0)}}}}});
-            List list(r, *get_table(*r, "int array object"), 0, 0);
+            List list(r, obj.obj(), ColKey(0));
             r->commit_transaction();
 
             REQUIRE(!delete_and_resolve(list).is_valid());
@@ -645,7 +636,7 @@ TEST_CASE("thread safe reference") {
         SECTION("int list") {
             r->begin_transaction();
             obj = create_object(r, "int array", {{"value", AnyVector{INT64_C(1)}}});
-            List list(r, *get_table(*r, "int array"), 0, 0);
+            List list(r, obj.obj(), ColKey(0));
             r->commit_transaction();
 
             REQUIRE(!delete_and_resolve(list).is_valid());
@@ -654,14 +645,14 @@ TEST_CASE("thread safe reference") {
         SECTION("object results") {
             r->begin_transaction();
             obj = create_object(r, "int array object", {{"value", AnyVector{AnyDict{{"value", INT64_C(0)}}}}});
-            List list(r, *get_table(*r, "int array object"), 0, 0);
+            List list(r, obj.obj(), ColKey(0));
             r->commit_transaction();
 
             auto results = delete_and_resolve(list.sort({{"value", true}}));
             REQUIRE(results.is_valid());
             REQUIRE(results.size() == 0);
         }
-
+#if 0
         SECTION("int results") {
             r->begin_transaction();
             obj = create_object(r, "int array", {{"value", AnyVector{INT64_C(1)}}});
@@ -677,10 +668,10 @@ TEST_CASE("thread safe reference") {
 
     SECTION("lifetime") {
         SECTION("retains source realm") { // else version will become unpinned
-            auto ref = r->obtain_thread_safe_reference(foo);
+            auto ref = ThreadSafeReference(foo);
             r = nullptr;
             r = Realm::get_shared_realm(config);
-            REQUIRE_NOTHROW(r->resolve_thread_safe_reference(std::move(ref)));
+            REQUIRE_NOTHROW(ref.resolve<Object>(r));
         }
     }
 
@@ -690,17 +681,17 @@ TEST_CASE("thread safe reference") {
         r->commit_transaction();
         REQUIRE(num.get_object_schema().name == "int object");
 
-        auto ref = r->obtain_thread_safe_reference(num);
-        std::thread([ref = std::move(ref), config]() mutable {
-            SharedRealm r = Realm::get_shared_realm(config);
-            Object num = r->resolve_thread_safe_reference(std::move(ref));
+        auto ref = ThreadSafeReference(num);
+        {
+            SharedRealm r2 = Realm::get_shared_realm(config);
+            Object num = ref.resolve<Object>(r2);
             REQUIRE(num.get_object_schema().name == "int object");
-        }).join();
+        }
     }
 
-    SECTION("disallow multiple resolves") {
-        auto ref = r->obtain_thread_safe_reference(foo);
-        r->resolve_thread_safe_reference(std::move(ref));
-        REQUIRE_THROWS(r->resolve_thread_safe_reference(std::move(ref)));
+    SECTION("allow multiple resolves") {
+        auto ref = ThreadSafeReference(foo);
+        ref.resolve<Object>(r);
+        REQUIRE_NOTHROW(ref.resolve<Object>(r));
     }
 }

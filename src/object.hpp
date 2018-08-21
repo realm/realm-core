@@ -47,6 +47,7 @@ public:
     ~Object();
 
     std::shared_ptr<Realm> const& realm() const { return m_realm; }
+    std::shared_ptr<Realm> const& get_realm() const { return m_realm; }
     ObjectSchema const& get_object_schema() const { return *m_object_schema; }
     Obj obj() const { return m_obj; }
 

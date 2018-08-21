@@ -41,9 +41,8 @@ class Replication;
 class StringData;
 class Table;
 class Transaction;
+class ThreadSafeReference;
 struct SyncConfig;
-class ThreadSafeReferenceBase;
-template <typename T> class ThreadSafeReference;
 struct VersionID;
 typedef std::shared_ptr<Realm> SharedRealm;
 typedef std::weak_ptr<Realm> WeakRealm;
@@ -313,15 +312,6 @@ public:
     Realm& operator=(Realm&&) = delete;
     ~Realm();
 
-    // Construct a thread safe reference, pinning the version in the process.
-    template <typename T>
-    ThreadSafeReference<T> obtain_thread_safe_reference(T const& value);
-
-    // Advances the read transaction to the latest version, resolving the thread safe reference and unpinning the
-    // version in the process.
-    template <typename T>
-    T resolve_thread_safe_reference(ThreadSafeReference<T> reference);
-
     ComputedPrivileges get_privileges();
     ComputedPrivileges get_privileges(StringData object_type);
     ComputedPrivileges get_privileges(Obj const& obj);
@@ -338,14 +328,13 @@ public:
         friend class _impl::CollectionNotifier;
         friend class _impl::PartialSyncHelper;
         friend class _impl::RealmCoordinator;
-        friend class ThreadSafeReferenceBase;
+        friend class ThreadSafeReference;
         friend class GlobalNotifier;
         friend class TestHelper;
 
         static std::shared_ptr<Group> const& get_group_ptr(Realm& realm) {
             return realm.m_group;
         }
-
 
         // ResultsNotifier and ListNotifier need access to the Transaction
         // to be able to call the handover functions, which are not very wrappable

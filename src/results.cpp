@@ -597,7 +597,7 @@ Results Results::sort(std::vector<std::pair<std::string, bool>> const& keypaths)
     if (keypaths.empty())
         return *this;
     if (get_type() != PropertyType::Object) {
-        throw "not implemented";
+        throw std::runtime_error("not implemented");
 #if 0
         if (keypaths.size() != 1)
             throw std::invalid_argument(util::format("Cannot sort array of '%1' on more than one key path",
