@@ -450,6 +450,64 @@ TEST(Links_LinkList_TableOps)
 }
 
 
+TEST(Links_LinkList_Construction)
+{
+    Group group;
+
+    auto table1 = group.add_table("target");
+
+    // create table with links to table1
+    TableRef origin = group.add_table("origin");
+    auto col_link = origin->add_column_link(type_LinkList, "links", *table1);
+    CHECK_EQUAL(table1, origin->get_link_target(col_link));
+
+    ObjKeys target_keys({4, 5, 6});
+    table1->create_objects(target_keys);
+
+    auto links0 = origin->create_object().get_linklist(col_link);
+    auto links1 = origin->create_object().get_linklist(col_link);
+
+    // add several links to a single linklist
+    links1.add(target_keys[0]);
+    links1.add(target_keys[1]);
+    links1.add(target_keys[2]);
+
+    CHECK_EQUAL(0, links0.size());
+    CHECK_EQUAL(3, links1.size());
+
+    LnkLst default_list; // Default constructed list
+    CHECK_EQUAL(0, default_list.size());
+
+    LnkLst list0(links0); // Constructed from empty list
+    CHECK_EQUAL(0, list0.size());
+    list0.add(target_keys[0]); // Ensure usability
+    list0.clear();             // Make it empty again
+
+    LnkLst list1(links1); // Constructed from not empty list
+    CHECK_EQUAL(3, list1.size());
+    list1.clear();
+    CHECK_EQUAL(0, list1.size());
+    list1.add(target_keys[0]);
+    list1.add(target_keys[1]);
+    list1.add(target_keys[2]);
+
+    LnkLst list2 = default_list; // Constructed from default object
+    CHECK_EQUAL(0, list2.size());
+
+    list1 = default_list; // Assignment from default
+    CHECK_EQUAL(0, list1.size());
+
+    list1 = links0; // Assignment from empty list
+    CHECK_EQUAL(0, list1.size());
+    list1.add(target_keys[0]);
+    list1.clear();
+
+    list2 = links1; // Assignment from non empty list
+    CHECK_EQUAL(3, list2.size());
+    list2.clear();
+    CHECK_EQUAL(0, list2.size());
+}
+
 TEST(Links_LinkList_Basics)
 {
     Group group;
@@ -488,20 +546,8 @@ TEST(Links_LinkList_Basics)
     CHECK_EQUAL(key0, links.get(2));
     CHECK_EQUAL(Wed, Days(links[0].get<Int>(day_col)));
 
-    LnkLst default_list;
-    CHECK_EQUAL(0, default_list.size());
+    LnkLst links2 = links;
 
-    LnkLst links0 = default_list; // Copy construction from default object
-    CHECK_EQUAL(0, links0.size());
-
-    LnkLst links1 = links; // Copy construction
-    CHECK_EQUAL(3, links1.size());
-
-    LnkLst links2;
-    links2 = default_list; // Assignment from default
-    CHECK_EQUAL(0, links2.size());
-
-    links2 = links; // Assignment
     CHECK_EQUAL(3, links2.size());
     ObjList* obj_list = &links2;
     CHECK_EQUAL(key2, obj_list->get_key(0));

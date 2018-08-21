@@ -310,6 +310,7 @@ protected:
         : ConstLstBase(ColKey{}, nullptr)
     {
     }
+
     ConstLstIf(Allocator& alloc)
         : ConstLstBase(ColKey{}, nullptr)
         , m_tree(new BPlusTree<T>(alloc))
@@ -325,7 +326,8 @@ protected:
             Allocator& alloc = other.m_tree->get_alloc();
             m_tree = std::make_unique<BPlusTree<T>>(alloc);
             m_tree->set_parent(this, 0);
-            m_tree->init_from_ref(other.m_tree->get_ref());
+            if (m_valid)
+                m_tree->init_from_ref(other.m_tree->get_ref());
         }
     }
 
@@ -340,21 +342,22 @@ protected:
     ConstLstIf& operator=(const ConstLstIf& other)
     {
         if (this != &other) {
+            m_valid = other.m_valid;
             m_col_key = other.m_col_key;
             m_deleted.clear();
 
-            if (other.size()) {
+            if (other.m_tree) {
                 if (!m_tree) {
                     Allocator& alloc = other.m_tree->get_alloc();
                     m_tree = std::make_unique<BPlusTree<T>>(alloc);
                     m_tree->set_parent(this, 0);
                 }
-                m_tree->init_from_ref(other.m_tree->get_ref());
+                if (m_valid)
+                    m_tree->init_from_ref(other.m_tree->get_ref());
             }
             else {
                 m_tree = nullptr;
             }
-            m_valid = other.m_valid;
         }
         return *this;
     }
