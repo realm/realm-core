@@ -16,7 +16,98 @@
 
 ### Internals
 
+* None.
+
+----------------------------------------------
+
+# 5.7.2 Release notes
+
+### Bugfixes
+
+* Fix a use-after-free when an observer is passed to rollback_and_continue_as_read().
+
+### Enhancements
+
+* More informative InvalidDatabase exception messages
+  Issue [#3075](https://github.com/realm/realm-core/issues/3075).
+
+----------------------------------------------
+
+# 5.7.1 Release notes
+
+### Bugfixes
+
+* Fix crash in Group::compute_aggregated_byte_size() when applied on an empty
+realm file. (Issue #3072)
+
+----------------------------------------------
+
+# 5.7.0 Release notes
+
+### Enhancements
+
+* Improved Group::compute_aggregated_byte_size() allowing us to differentiate
+  between state, history and freelists.
+  (Issue #3063)
+
+----------------------------------------------
+
+# 5.6.5 Release notes
+
+### Enhancements
+
+* Improved scalability for the slab allocator. This allows for larger
+  transactions. (PR #3067)
+
+----------------------------------------------
+
+# 5.6.4 Release notes
+
+### Enhancements
+
+* Add Table::add_row_with_keys(), which allows
+  sync::create_object_with_primary_key() to avoid updating the index twice when
+  creating an object with a string primary key.
+* Improved the performance of setting a link to its current value.
+
+----------------------------------------------
+
+# 5.6.3 Release notes
+
+### Enhancements
+
+* Improved scalability for in-file freelist handling. This reduces
+  commit overhead on large transactions.
+* Improved scalability for in-file allocation during commit.
+* Minimized use of memory mappings and msync() on large commits
+  on devices which can support large address spaces.
+
+----------------------------------------------
+
+# 5.6.2 Release notes
+
+### Bugfixes
+
+* Fix curruption of freelist with more than 2M entries.
+  PR [#3059](https://github.com/realm/realm-core/pull/3059).
+
+----------------------------------------------
+
+# 5.6.1 Release notes
+
+### Bugfixes
+
+* More readable error message in the query parser when requesting an a bad argument.
+* Don't write history information in `SharedGroup::compact()` for
+  non-syncronized Realms.
+
+-----------
+
+### Internals
+
 * Restore -fvisibility-inlines-hidden for the binaries for Apple platforms.
+* Remove a few warnings at compile time.
+* Improve error detection related to memory allocation/release
 
 ----------------------------------------------
 

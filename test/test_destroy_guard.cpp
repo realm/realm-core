@@ -97,14 +97,14 @@ public:
         return MemRef(addr, ref, *this);
     }
 
-    MemRef do_realloc(ref_type, const char*, size_t, size_t) override
+    MemRef do_realloc(ref_type, char*, size_t, size_t) override
     {
         throw std::runtime_error("Not implemented");
 
         return {};
     }
 
-    void do_free(ref_type ref, const char* addr) noexcept override
+    void do_free(ref_type ref, char* addr) noexcept override
     {
         typedef std::map<ref_type, char*>::iterator iter;
         iter i = m_map.find(ref);

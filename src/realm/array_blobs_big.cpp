@@ -58,7 +58,6 @@ void ArrayBigBlobs::set(size_t ndx, BinaryData value, bool add_zero_term)
     REALM_ASSERT_3(ndx, <, size());
     REALM_ASSERT_7(value.size(), ==, 0, ||, value.data(), !=, 0);
 
-    ArrayBlob blob(m_alloc);
     ref_type ref = get_as_ref(ndx);
 
     if (ref == 0 && value.is_null()) {
@@ -72,11 +71,25 @@ void ArrayBigBlobs::set(size_t ndx, BinaryData value, bool add_zero_term)
         return;
     }
     else if (ref != 0 && value.data() != nullptr) {
-        blob.init_from_ref(ref);
-        blob.set_parent(this, ndx);
-        ref_type new_ref = blob.replace(0, blob.blob_size(), value.data(), value.size(), add_zero_term); // Throws
-        if (new_ref != ref) {
-            Array::set_as_ref(ndx, new_ref);
+        char* header = m_alloc.translate(ref);
+        if (Array::get_context_flag_from_header(header)) {
+            Array arr(m_alloc);
+            arr.init_from_mem(MemRef(header, ref, m_alloc));
+            arr.set_parent(this, ndx);
+            ref_type new_ref =
+                arr.blob_replace(0, arr.blob_size(), value.data(), value.size(), add_zero_term); // Throws
+            if (new_ref != ref) {
+                Array::set_as_ref(ndx, new_ref);
+            }
+        }
+        else {
+            ArrayBlob blob(m_alloc);
+            blob.init_from_mem(MemRef(header, ref, m_alloc));
+            blob.set_parent(this, ndx);
+            ref_type new_ref = blob.replace(0, blob.blob_size(), value.data(), value.size(), add_zero_term); // Throws
+            if (new_ref != ref) {
+                Array::set_as_ref(ndx, new_ref);
+            }
         }
         return;
     }
@@ -147,8 +160,8 @@ size_t ArrayBigBlobs::find_first(BinaryData value, bool is_string, size_t begin,
             ref_type ref = get_as_ref(i);
             if (ref) {
                 const char* blob_header = get_alloc().translate(ref);
-                size_t blob_size = get_size_from_header(blob_header);
-                if (blob_size == full_size) {
+                size_t sz = get_size_from_header(blob_header);
+                if (sz == full_size) {
                     const char* blob_value = ArrayBlob::get(blob_header, 0);
                     if (std::equal(blob_value, blob_value + value_size, value.data()))
                         return i;
