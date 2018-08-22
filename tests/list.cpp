@@ -834,35 +834,35 @@ TEST_CASE("list") {
             REQUIRE(list.find(std::move(target->where().equal(col_value, 11))) == npos);
         }
     }
-#if 0
+
     SECTION("add(Context)") {
         List list(r, *lv);
         CppContext ctx(r, &list.get_object_schema());
         r->begin_transaction();
 
         SECTION("adds boxed RowExpr") {
-            list.add(ctx, util::Any(target->get(5)));
+            list.add(ctx, util::Any(target->get_object(5)));
             REQUIRE(list.size() == 11);
-            REQUIRE(list.get(10).get_index() == 5);
+            REQUIRE(list.get(10) == target->get_object(5));
         }
 
         SECTION("adds boxed realm::Object") {
-            realm::Object obj(r, list.get_object_schema(), target->get(5));
+            realm::Object obj(r, list.get_object_schema(), target->get_object(5));
             list.add(ctx, util::Any(obj));
             REQUIRE(list.size() == 11);
-            REQUIRE(list.get(10).get_index() == 5);
+            REQUIRE(list.get(10) == target->get_object(5));
         }
 
         SECTION("creates new object for dictionary") {
             list.add(ctx, util::Any(AnyDict{{"value", INT64_C(20)}}));
             REQUIRE(list.size() == 11);
             REQUIRE(target->size() == 11);
-            REQUIRE(list.get(10).get_int(0) == 20);
+            REQUIRE(list.get(10).get<int64_t>("value") == 20);
         }
 
         SECTION("throws for object in wrong table") {
-            REQUIRE_THROWS(list.add(ctx, util::Any(origin->get(0))));
-            realm::Object obj(r, *r->schema().find("origin"), origin->get(0));
+            REQUIRE_THROWS(list.add(ctx, util::Any(origin->get_object(0))));
+            realm::Object obj(r, *r->schema().find("origin"), origin->get_object(0));
             REQUIRE_THROWS(list.add(ctx, util::Any(obj)));
         }
 
@@ -870,15 +870,15 @@ TEST_CASE("list") {
     }
 
     SECTION("find(Context)") {
-        List list(r, lv);
+        List list(r, *lv);
         CppContext ctx(r, &list.get_object_schema());
 
         SECTION("returns index in list for boxed RowExpr") {
-            REQUIRE(list.find(ctx, util::Any(target->get(5))) == 5);
+            REQUIRE(list.find(ctx, util::Any(target->get_object(5))) == 5);
         }
 
         SECTION("returns index in list for boxed Object") {
-            realm::Object obj(r, *r->schema().find("origin"), target->get(5));
+            realm::Object obj(r, *r->schema().find("origin"), target->get_object(5));
             REQUIRE(list.find(ctx, util::Any(obj)) == 5);
         }
 
@@ -888,7 +888,7 @@ TEST_CASE("list") {
         }
 
         SECTION("throws for object in wrong table") {
-            REQUIRE_THROWS(list.find(ctx, util::Any(origin->get(0))));
+            REQUIRE_THROWS(list.find(ctx, util::Any(origin->get_object(0))));
         }
     }
 
@@ -899,7 +899,6 @@ TEST_CASE("list") {
         Object obj;
         REQUIRE_NOTHROW(obj = any_cast<Object&&>(list.get(ctx, 1)));
         REQUIRE(obj.is_valid());
-        REQUIRE(obj.row().get_index() == 1);
+        REQUIRE(obj.obj() == target->get_object(1));
     }
-#endif
 }
