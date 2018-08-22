@@ -57,9 +57,13 @@ std::string print_value<>(realm::null)
 }
 
 bool contains_invalids(StringData data) {
+    // the custom whitelist is different from std::isprint because it doesn't include quotations
     const static std::string whitelist = " {|}~:;<=>?@!#$%&()*+,-./[]^_`";
     for (size_t i = 0; i < data.size(); ++i) {
-        if (!std::isalnum(data.data()[i]) && whitelist.find(data.data()[i]) == std::string::npos) {
+        using unsigned_char_t = unsigned char;
+        char c = data.data()[i];
+        // std::isalnum takes an int, but is undefined for negative values so we must pass an unsigned char
+        if (!std::isalnum(unsigned_char_t(c)) && whitelist.find(c) == std::string::npos) {
             return true;
         }
     }
