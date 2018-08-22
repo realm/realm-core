@@ -508,7 +508,7 @@ TEST_CASE("list") {
 
             advance_and_notify(*r);
         };
-#if 0
+
         SECTION("add duplicates") {
             write([&] {
                 lst.add(target_keys[5]);
@@ -518,7 +518,7 @@ TEST_CASE("list") {
             REQUIRE(notification_calls == 2);
             REQUIRE_INDICES(change.insertions, 5, 6, 7);
         }
-#endif
+
         SECTION("change order by modifying target") {
             write([&] {
                 lst.get(5).set(col_value, 15);
@@ -564,7 +564,7 @@ TEST_CASE("list") {
 
             advance_and_notify(*r);
         };
-#if 0
+
         SECTION("add duplicates") {
             write([&] {
                 lst.add(target_keys[5]);
@@ -574,7 +574,7 @@ TEST_CASE("list") {
             REQUIRE(notification_calls == 2);
             REQUIRE_INDICES(change.insertions, 9, 10, 11);
         }
-#endif
+
         SECTION("swap") {
             write([&] {
                 lst.swap(1, 2);
