@@ -17,7 +17,7 @@ RUN apt-key add /tmp/llvm.key
 
 # Install clang and everything needed to build core
 RUN apt-get update \
-    && apt-get install -y clang-6.0 \
+    && apt-get install -y clang-8.0 \
                        cmake \
                        libprocps4-dev \
                        libssl-dev \
@@ -25,5 +25,5 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 # Make clang the default compiler
-ENV CC /usr/bin/clang-6.0
-ENV CXX /usr/bin/clang++-6.0
+ENV CC /usr/bin/clang-8.0
+ENV CXX /usr/bin/clang++-8.0
