@@ -2151,73 +2151,62 @@ NONCONCURRENT_TEST(Shared_InterprocessWaitForChange)
 #endif
 #endif
 
-#ifdef LEGACY_TESTS
-// FIXME: Reenable once wait_for_change has been reimplemented
-
-// This test does not work with valgrind
 // This test will hang infinitely instead of failing!!!
-TEST_IF(Shared_WaitForChange, !running_with_valgrind)
+TEST(Shared_WaitForChange)
 {
     const int num_threads = 3;
     Mutex mutex;
     int shared_state[num_threads];
-    DB* sgs[num_threads];
+    for (int j = 0; j < num_threads; j++)
+        shared_state[j] = 0;
+    SHARED_GROUP_TEST_PATH(path);
+    DBRef sg = DB::create(path, false);
 
-    auto waiter = [&](std::string path, int i) {
-        DB* sg = new DB(path, true);
+    auto waiter = [&](DBRef db, int i) {
+        TransactionRef tr;
         {
             LockGuard l(mutex);
             shared_state[i] = 1;
-            sgs[i] = sg;
+            tr = db->start_read();
         }
-        {
-            // open a transaction at least once to make "changed" well defined
-            ReadTransaction rt(*sg);
-        }
-        sg->wait_for_change();
+        db->wait_for_change(tr);
         {
             LockGuard l(mutex);
             shared_state[i] = 2; // this state should not be observed by the writer
         }
-        sg->wait_for_change(); // we'll fall right through here, because we haven't advanced our readlock
+        db->wait_for_change(tr); // we'll fall right through here, because we haven't advanced our readlock
         {
             LockGuard l(mutex);
             shared_state[i] = 3;
         }
-        {
-            ReadTransaction rt(*sg);
-        }
-        sg->wait_for_change(); // this time we'll wait because state hasn't advanced since we did.
+        tr->end_read();
+        tr = db->start_read();
+        db->wait_for_change(tr); // this time we'll wait because state hasn't advanced since we did.
         {
             LockGuard l(mutex);
             shared_state[i] = 4;
         }
         // works within a read transaction as well
         {
-            ReadTransaction rt(*sg);
-            sg->wait_for_change();
+            auto rt = db->start_read();
+            db->wait_for_change(rt); // everybody waits in state 4
         }
         {
             LockGuard l(mutex);
             shared_state[i] = 5;
         }
-        {
-            ReadTransaction rt(*sg);
-        }
-        sg->wait_for_change(); // wait until wait_for_change is released
+        tr->end_read();
+        tr = db->start_read();
+        db->wait_for_change(tr); // wait until wait_for_change is released
         {
             LockGuard l(mutex);
             shared_state[i] = 6;
         }
     };
 
-    SHARED_GROUP_TEST_PATH(path);
-    for (int j = 0; j < num_threads; j++)
-        shared_state[j] = 0;
-    DBRef sg = DB::create(path, false);
     Thread threads[num_threads];
     for (int j = 0; j < num_threads; j++)
-        threads[j].start([waiter, &path, j] { waiter(path, j); });
+        threads[j].start([waiter, sg, j] { waiter(sg, j); });
     bool try_again = true;
     while (try_again) {
         try_again = false;
@@ -2227,7 +2216,8 @@ TEST_IF(Shared_WaitForChange, !running_with_valgrind)
             CHECK(shared_state[j] < 2);
         }
     }
-
+    // At this point all transactions have progress to state 1,
+    // and none of them has progressed further.
     // This write transaction should allow all readers to run again
     {
         WriteTransaction wt(sg);
@@ -2245,7 +2235,7 @@ TEST_IF(Shared_WaitForChange, !running_with_valgrind)
             CHECK(shared_state[j] < 4);
         }
     }
-
+    // all readers now waiting before entering state 4
     {
         WriteTransaction wt(sg);
         wt.commit();
@@ -2258,10 +2248,12 @@ TEST_IF(Shared_WaitForChange, !running_with_valgrind)
             if (4 != shared_state[j]) try_again = true;
         }
     }
+    // all readers now waiting in stage 4
     {
         WriteTransaction wt(sg);
         wt.commit();
     }
+    // readers racing into stage 5
     try_again = true;
     while (try_again) {
         try_again = false;
@@ -2270,14 +2262,13 @@ TEST_IF(Shared_WaitForChange, !running_with_valgrind)
             if (5 != shared_state[j]) try_again = true;
         }
     }
+    // everybod reached stage 5 and waiting
     try_again = true;
+    sg->wait_for_change_release();
     while (try_again) {
         try_again = false;
         for (int j = 0; j < num_threads; j++) {
             LockGuard l(mutex);
-            if (sgs[j]) {
-                sgs[j]->wait_for_change_release();
-            }
             if (6 != shared_state[j]) {
                 try_again = true;
             }
@@ -2285,12 +2276,7 @@ TEST_IF(Shared_WaitForChange, !running_with_valgrind)
     }
     for (int j = 0; j < num_threads; j++)
         threads[j].join();
-    for (int j = 0; j < num_threads; j++) {
-        delete sgs[j];
-        sgs[j] = 0;
-    }
 }
-#endif
 
 TEST(Shared_MultipleSharersOfStreamingFormat)
 {
