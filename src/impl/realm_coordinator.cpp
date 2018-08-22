@@ -700,7 +700,10 @@ public:
         if (version != m_sg.get_version_of_current_transaction()) {
             transaction::advance(m_sg, *m_current, version);
             m_info.push_back({std::move(m_current->lists)});
-            m_current = &m_info.back();
+            auto next = &m_info.back();
+            for (auto& table : m_current->tables)
+                next->tables[table.first];
+            m_current = next;
             return true;
         }
         return false;
@@ -728,7 +731,7 @@ public:
                 continue;
             }
             for (auto& ct : cur.tables) {
-                auto pt = prev.tables[ct.first];
+                auto& pt = prev.tables[ct.first];
                 if (pt.empty())
                     pt = ct.second;
                 else

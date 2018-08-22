@@ -332,12 +332,6 @@ public:
         friend class GlobalNotifier;
         friend class TestHelper;
 
-        static std::shared_ptr<Group> const& get_group_ptr(Realm& realm) {
-            return realm.m_group;
-        }
-
-        // ResultsNotifier and ListNotifier need access to the Transaction
-        // to be able to call the handover functions, which are not very wrappable
         static Transaction& get_transaction(Realm& realm) { return realm.transaction(); }
         static std::shared_ptr<Transaction> get_transaction_ref(Realm& realm) { return realm.transaction_ref(); }
 

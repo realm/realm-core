@@ -335,7 +335,7 @@ TEST_CASE("list") {
             auto token = require_no_change();
             write([&] { other_lv->add(other_target_keys[0]); });
         }
-#if 0
+
         SECTION("changes are reported correctly for multiple tables") {
             List list2(r, *other_lv);
             CollectionChangeSet other_changes;
@@ -348,6 +348,7 @@ TEST_CASE("list") {
                 lv->add(target_keys[1]);
 
                 other_origin->create_object();
+                other_lv->size();
                 other_lv->insert(1, other_target_keys[0]);
 
                 lv->add(target_keys[2]);
@@ -357,7 +358,7 @@ TEST_CASE("list") {
 
             write([&] {
                 lv->add(target_keys[3]);
-                other_origin->get_object(1).remove();
+                other_origin->get_object(other_lv->ConstLstBase::get_key()).remove();
                 lv->add(target_keys[4]);
             });
             REQUIRE_INDICES(change.insertions, 12, 13);
@@ -402,7 +403,7 @@ TEST_CASE("list") {
             REQUIRE_INDICES(changes1.modifications, 0, 2);
             REQUIRE_INDICES(changes2.modifications, 3);
         }
-#endif
+
         SECTION("modifications are reported for rows that are moved and then moved back in a second transaction") {
             auto token = require_change();
 
