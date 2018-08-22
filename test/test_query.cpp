@@ -4249,18 +4249,21 @@ TEST(Query_DescriptorsWillApply)
     CHECK(!ordering.will_apply_distinct());
     CHECK(!ordering.will_apply_limit());
     CHECK(!ordering.will_limit_to_zero());
+    CHECK_EQUAL(ordering.size(), 0);
 
     ordering.append_sort(SortDescriptor());
     CHECK(!ordering.will_apply_sort());
     CHECK(!ordering.will_apply_distinct());
     CHECK(!ordering.will_apply_limit());
     CHECK(!ordering.will_limit_to_zero());
+    CHECK_EQUAL(ordering.size(), 0);
 
     ordering.append_distinct(DistinctDescriptor());
     CHECK(!ordering.will_apply_sort());
     CHECK(!ordering.will_apply_distinct());
     CHECK(!ordering.will_apply_limit());
     CHECK(!ordering.will_limit_to_zero());
+    CHECK_EQUAL(ordering.size(), 0);
 
     ordering.append_sort(SortDescriptor(*t1, {{t1_int_col}}));
     CHECK(ordering.will_apply_sort());
@@ -4296,22 +4299,27 @@ TEST(Query_DescriptorsWillApply)
     CHECK(ordering.descriptor_is_sort(0));
     CHECK(!ordering.descriptor_is_distinct(0));
     CHECK(!ordering.descriptor_is_limit(0));
+    CHECK(ordering.get_type(0) == DescriptorType::Sort);
 
     CHECK(!ordering.descriptor_is_sort(1));
     CHECK(ordering.descriptor_is_distinct(1));
     CHECK(!ordering.descriptor_is_limit(1));
+    CHECK(ordering.get_type(1) == DescriptorType::Distinct);
 
     CHECK(!ordering.descriptor_is_sort(2));
     CHECK(ordering.descriptor_is_distinct(2));
     CHECK(!ordering.descriptor_is_limit(2));
+    CHECK(ordering.get_type(2) == DescriptorType::Distinct);
 
     CHECK(ordering.descriptor_is_sort(3));
     CHECK(!ordering.descriptor_is_distinct(3));
     CHECK(!ordering.descriptor_is_limit(3));
+    CHECK(ordering.get_type(3) == DescriptorType::Sort);
 
     CHECK(!ordering.descriptor_is_sort(4));
     CHECK(!ordering.descriptor_is_distinct(4));
     CHECK(ordering.descriptor_is_limit(4));
+    CHECK(ordering.get_type(4) == DescriptorType::Limit);
 
     DescriptorOrdering ordering_copy = ordering;
     CHECK(ordering.will_apply_sort());
@@ -4446,6 +4454,99 @@ TEST(Query_FindWithDescriptorOrdering)
         for (size_t i = 0; i < tv.size(); ++i) {
             CHECK_EQUAL(tv.get_int(t1_int_col, i), expected[i].first);
             CHECK_EQUAL(tv.get_source_ndx(i), expected[i].second);
+        }
+    }
+}
+
+
+TEST(Query_FindWithDescriptorOrderingOverTableviewSync)
+{
+    Group g;
+    TableRef t1 = g.add_table("t1");
+    size_t t1_int_col = t1->add_column(type_Int, "t1_int");
+    size_t t1_str_col = t1->add_column(type_String, "t1_str");
+
+    auto init_table = [&]() {
+        t1->clear();
+        t1->add_empty_row(6);
+        t1->set_int(t1_int_col, 0, 0); t1->set_string(t1_str_col, 0, "A");
+        t1->set_int(t1_int_col, 1, 1); t1->set_string(t1_str_col, 1, "A");
+        t1->set_int(t1_int_col, 2, 2); t1->set_string(t1_str_col, 2, "B");
+        t1->set_int(t1_int_col, 3, 3); t1->set_string(t1_str_col, 3, "B");
+        t1->set_int(t1_int_col, 4, 4); t1->set_string(t1_str_col, 4, "A");
+        t1->set_int(t1_int_col, 5, 5); t1->set_string(t1_str_col, 5, "A");
+    };
+
+    //     T1
+    //   | t1_int   t1_str  |
+    //   ====================
+    // 0 | 0        "A"     |
+    // 1 | 1        "A"     |
+    // 2 | 2        "B"     |
+    // 3 | 3        "B"     |
+    // 4 | 4        "A"     |
+    // 5 | 5        "A"     |
+
+    using ResultList = std::vector<std::pair<size_t, std::string>>; // t1_int, t1_str
+    {   // applying only limit
+        init_table();
+        DescriptorOrdering ordering;
+        Query base = t1->where().greater(t1_int_col, 2);
+        TableView tv = base.find_all(ordering);
+        CHECK_EQUAL(tv.size(), 3);
+        CHECK_EQUAL(base.count(ordering), 3);
+        ordering.append_limit({2});
+        ResultList expected = {{3, "B"}, {4, "A"}};
+        tv = base.find_all(ordering);
+        CHECK_EQUAL(tv.size(), expected.size());
+        CHECK_EQUAL(base.count(ordering), expected.size());
+        for (size_t i = 0; i < tv.size(); ++i) {
+            CHECK_EQUAL(tv.get_int(t1_int_col, i), expected[i].first);
+            CHECK_EQUAL(tv.get_string(t1_str_col, i), expected[i].second);
+        }
+        size_t new_ndx = t1->add_empty_row();
+        t1->set_int(t1_int_col, new_ndx, 6);
+        t1->set_string(t1_str_col, new_ndx, "C");
+        t1->remove(4);
+        expected = {{3, "B"}, {5, "A"}};
+        CHECK(!tv.is_in_sync());
+        tv.sync_if_needed();
+        CHECK_EQUAL(tv.size(), expected.size());
+        CHECK_EQUAL(base.count(ordering), expected.size());
+        for (size_t i = 0; i < tv.size(); ++i) {
+            CHECK_EQUAL(tv.get_int(t1_int_col, i), expected[i].first);
+            CHECK_EQUAL(tv.get_string(t1_str_col, i), expected[i].second);
+        }
+    }
+    {   // applying sort and limit
+        init_table();
+        DescriptorOrdering ordering;
+        Query base = t1->where().greater(t1_int_col, 2);
+        TableView tv = base.find_all(ordering);
+        CHECK_EQUAL(tv.size(), 3);
+        CHECK_EQUAL(base.count(ordering), 3);
+        ordering.append_sort(SortDescriptor(*t1, {{t1_str_col}}, {true}));
+        ordering.append_limit({2});
+        ResultList expected = {{4, "A"}, {5, "A"}};
+        tv = base.find_all(ordering);
+        CHECK_EQUAL(tv.size(), expected.size());
+        CHECK_EQUAL(base.count(ordering), expected.size());
+        for (size_t i = 0; i < tv.size(); ++i) {
+            CHECK_EQUAL(tv.get_int(t1_int_col, i), expected[i].first);
+            CHECK_EQUAL(tv.get_string(t1_str_col, i), expected[i].second);
+        }
+        size_t new_ndx = t1->add_empty_row();
+        t1->set_int(t1_int_col, new_ndx, 6);
+        t1->set_string(t1_str_col, new_ndx, "C");
+        t1->remove(4);
+        expected = {{5, "A"}, {3, "B"}};
+        CHECK(!tv.is_in_sync());
+        tv.sync_if_needed();
+        CHECK_EQUAL(tv.size(), expected.size());
+        CHECK_EQUAL(base.count(ordering), expected.size());
+        for (size_t i = 0; i < tv.size(); ++i) {
+            CHECK_EQUAL(tv.get_int(t1_int_col, i), expected[i].first);
+            CHECK_EQUAL(tv.get_string(t1_str_col, i), expected[i].second);
         }
     }
 }

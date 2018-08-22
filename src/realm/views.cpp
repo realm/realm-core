@@ -359,22 +359,25 @@ void DescriptorOrdering::append_limit(LimitDescriptor limit)
 bool DescriptorOrdering::descriptor_is_sort(size_t index) const
 {
     REALM_ASSERT(index < m_descriptors.size());
-    auto& temp = *m_descriptors[index].get(); // a temporary to workaround a clang warning
-    return typeid(temp) == typeid(SortDescriptor);
+    return m_descriptors[index]->get_type() == DescriptorType::Sort;
 }
 
 bool DescriptorOrdering::descriptor_is_distinct(size_t index) const
 {
     REALM_ASSERT(index < m_descriptors.size());
-    auto& temp = *m_descriptors[index].get(); // a temporary to workaround a clang warning
-    return typeid(temp) == typeid(DistinctDescriptor);
+    return m_descriptors[index]->get_type() == DescriptorType::Distinct;
 }
 
 bool DescriptorOrdering::descriptor_is_limit(size_t index) const
 {
     REALM_ASSERT(index < m_descriptors.size());
-    auto& temp = *m_descriptors[index].get(); // a temporary to workaround a clang warning
-    return typeid(temp) == typeid(LimitDescriptor);
+    return m_descriptors[index]->get_type() == DescriptorType::Limit;
+}
+
+DescriptorType DescriptorOrdering::get_type(size_t index) const
+{
+    REALM_ASSERT(index < m_descriptors.size());
+    return m_descriptors[index]->get_type();
 }
 
 const BaseDescriptor* DescriptorOrdering::operator[](size_t ndx) const
@@ -386,8 +389,7 @@ bool DescriptorOrdering::will_apply_sort() const
 {
     return std::any_of(m_descriptors.begin(), m_descriptors.end(), [](const std::unique_ptr<BaseDescriptor>& desc) {
         REALM_ASSERT(desc.get()->is_valid());
-        auto& temp = *desc.get(); // a temporary to workaround a clang warning
-        return typeid(temp) == typeid(SortDescriptor);
+        return desc->get_type() == DescriptorType::Sort;
     });
 }
 
@@ -395,8 +397,7 @@ bool DescriptorOrdering::will_apply_distinct() const
 {
     return std::any_of(m_descriptors.begin(), m_descriptors.end(), [](const std::unique_ptr<BaseDescriptor>& desc) {
         REALM_ASSERT(desc.get()->is_valid());
-        auto& temp = *desc.get(); // a temporary to workaround a clang warning
-        return typeid(temp) == typeid(DistinctDescriptor);
+        return desc->get_type() == DescriptorType::Distinct;
     });
 }
 
@@ -404,8 +405,7 @@ bool DescriptorOrdering::will_apply_limit() const
 {
     return std::any_of(m_descriptors.begin(), m_descriptors.end(), [](const std::unique_ptr<BaseDescriptor>& desc) {
         REALM_ASSERT(desc.get()->is_valid());
-        auto& temp = *desc.get(); // a temporary to workaround a clang warning
-        return typeid(temp) == typeid(LimitDescriptor);
+        return desc->get_type() == DescriptorType::Limit;
     });
 }
 
@@ -413,8 +413,7 @@ realm::util::Optional<size_t> DescriptorOrdering::get_min_limit() const
 {
     realm::util::Optional<size_t> min_limit;
     for (size_t i = 0; i < m_descriptors.size(); ++i) {
-        auto& temp = *m_descriptors[i].get(); // a temporary to workaround a clang warning
-        if (typeid(temp) == typeid(LimitDescriptor)) {
+        if (m_descriptors[i]->get_type() == DescriptorType::Limit) {
             const LimitDescriptor* limit = dynamic_cast<const LimitDescriptor*>(m_descriptors[i].get());
             REALM_ASSERT(limit);
             min_limit = bool(min_limit) ? std::min(*min_limit, limit->get_limit()) : limit->get_limit();
@@ -427,8 +426,7 @@ bool DescriptorOrdering::will_limit_to_zero() const
 {
     return std::any_of(m_descriptors.begin(), m_descriptors.end(), [](const std::unique_ptr<BaseDescriptor>& desc) {
         REALM_ASSERT(desc.get()->is_valid());
-        auto& temp = *desc.get(); // a temporary to workaround a clang warning
-        return (typeid(temp) == typeid(LimitDescriptor) && dynamic_cast<LimitDescriptor*>(desc.get())->get_limit() == 0);
+        return (desc->get_type() == DescriptorType::Limit && dynamic_cast<LimitDescriptor*>(desc.get())->get_limit() == 0);
     });
 }
 
@@ -511,60 +509,69 @@ void RowIndexes::do_sort(const DescriptorOrdering& ordering) {
     const int num_descriptors = int(ordering.size());
     for (int desc_ndx = 0; desc_ndx < num_descriptors; ++desc_ndx) {
 
-        if (ordering.descriptor_is_sort(desc_ndx)) {
-            const auto* sort_descr = dynamic_cast<const SortDescriptor*>(ordering[desc_ndx]);
-            SortDescriptor::Sorter sort_predicate = sort_descr->sorter(m_row_indexes);
+        DescriptorType type = ordering.get_type(desc_ndx);
+        switch (type) {
+            case DescriptorType::Sort:
+            {
+                const auto* sort_descr = dynamic_cast<const SortDescriptor*>(ordering[desc_ndx]);
+                SortDescriptor::Sorter sort_predicate = sort_descr->sorter(m_row_indexes);
 
-            std::sort(v.begin(), v.end(), std::ref(sort_predicate));
+                std::sort(v.begin(), v.end(), std::ref(sort_predicate));
 
-            bool is_last_ordering = desc_ndx == num_descriptors - 1;
-            // not doing this on the last step is an optimisation
-            if (!is_last_ordering) {
-                const size_t v_size = v.size();
-                // Distinct must choose the winning unique elements by sorted
-                // order not by the previous tableview order, the lowest
-                // "index_in_view" wins.
-                for (size_t i = 0; i < v_size; ++i) {
-                    v[i].index_in_view = i;
+                bool is_last_ordering = desc_ndx == num_descriptors - 1;
+                // not doing this on the last step is an optimisation
+                if (!is_last_ordering) {
+                    const size_t v_size = v.size();
+                    // Distinct must choose the winning unique elements by sorted
+                    // order not by the previous tableview order, the lowest
+                    // "index_in_view" wins.
+                    for (size_t i = 0; i < v_size; ++i) {
+                        v[i].index_in_view = i;
+                    }
                 }
+                break;
             }
-        }
-        else if(ordering.descriptor_is_distinct(desc_ndx)) {
-            const auto* distinct_descr = dynamic_cast<const DistinctDescriptor*>(ordering[desc_ndx]);
-            auto distinct_predicate = distinct_descr->sorter(m_row_indexes);
+            case DescriptorType::Distinct:
+            {
+                const auto* distinct_descr = dynamic_cast<const DistinctDescriptor*>(ordering[desc_ndx]);
+                auto distinct_predicate = distinct_descr->sorter(m_row_indexes);
 
-            // Remove all rows which have a null link along the way to the distinct columns
-            if (distinct_predicate.has_links()) {
-                v.erase(std::remove_if(v.begin(), v.end(),
-                                       [&](auto&& index) { return distinct_predicate.any_is_null(index); }),
+                // Remove all rows which have a null link along the way to the distinct columns
+                if (distinct_predicate.has_links()) {
+                    v.erase(std::remove_if(v.begin(), v.end(),
+                                           [&](auto&& index) { return distinct_predicate.any_is_null(index); }),
+                            v.end());
+                }
+
+                // Sort by the columns to distinct on
+                std::sort(v.begin(), v.end(), std::ref(distinct_predicate));
+
+                // Remove all duplicates
+                v.erase(std::unique(v.begin(), v.end(),
+                                    [&](auto&& a, auto&& b) {
+                                        // "not less than" is "equal" since they're sorted
+                                        return !distinct_predicate(a, b, false);
+                                    }),
                         v.end());
-            }
+                bool will_be_sorted_next = desc_ndx < num_descriptors - 1 && ordering.descriptor_is_sort(desc_ndx + 1);
+                if (!will_be_sorted_next) {
+                    // Restore the original order, this is either the original
+                    // tableview order or the order of the previous sort
+                    std::sort(v.begin(), v.end(), [](auto a, auto b) { return a.index_in_view < b.index_in_view; });
+                }
 
-            // Sort by the columns to distinct on
-            std::sort(v.begin(), v.end(), std::ref(distinct_predicate));
-
-            // Remove all duplicates
-            v.erase(std::unique(v.begin(), v.end(),
-                                [&](auto&& a, auto&& b) {
-                                    // "not less than" is "equal" since they're sorted
-                                    return !distinct_predicate(a, b, false);
-                                }),
-                    v.end());
-            bool will_be_sorted_next = desc_ndx < num_descriptors - 1 && ordering.descriptor_is_sort(desc_ndx + 1);
-            if (!will_be_sorted_next) {
-                // Restore the original order, this is either the original
-                // tableview order or the order of the previous sort
-                std::sort(v.begin(), v.end(), [](auto a, auto b) { return a.index_in_view < b.index_in_view; });
+                break;
             }
-        } else if (ordering.descriptor_is_limit(desc_ndx)) {
-            const auto* limit_descr = dynamic_cast<const LimitDescriptor*>(ordering[desc_ndx]);
-            const size_t limit = limit_descr->get_limit();
-            if (v.size() > limit) {
-                m_limit_count += v.size() - limit;
-                v.erase(v.begin() + limit, v.end());
+            case DescriptorType::Limit:
+            {
+                const auto* limit_descr = dynamic_cast<const LimitDescriptor*>(ordering[desc_ndx]);
+                const size_t limit = limit_descr->get_limit();
+                if (v.size() > limit) {
+                    m_limit_count += v.size() - limit;
+                    v.erase(v.begin() + limit, v.end());
+                }
+                break;
             }
-        } else {
-            REALM_UNREACHABLE();
         }
     }
     // Apply the results

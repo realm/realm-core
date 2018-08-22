@@ -1473,7 +1473,7 @@ TableView Query::find_all(const DescriptorOrdering& descriptor)
         }
     }
     if (only_limit) {
-        TableView ret(*m_table, *this, default_start, default_end, default_limit);
+        TableView ret(*m_table, *this, default_start, default_end, min_limit);
         find_all(ret, default_start, default_end, min_limit);
         return ret;
     }

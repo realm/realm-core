@@ -40,6 +40,7 @@ public:
     virtual std::string get_description(TableRef attached_table) const = 0;
     virtual std::unique_ptr<BaseDescriptor> clone() const = 0;
     virtual DescriptorExport export_for_handover() const = 0;
+    virtual DescriptorType get_type() const = 0;
 };
 
 // Forward declaration needed for deleted ColumnsDescriptor constructor
@@ -67,10 +68,8 @@ public:
     std::unique_ptr<BaseDescriptor> clone() const override;
 
     // returns whether this descriptor is valid and can be used to sort
-    bool is_valid() const noexcept override
-    {
-        return !m_columns.empty();
-    }
+    bool is_valid() const noexcept override { return !m_columns.empty(); }
+    virtual DescriptorType get_type() const override { return DescriptorType::Distinct; }
 
     class Sorter;
     virtual Sorter sorter(IntegerColumn const& row_indexes) const;
@@ -95,6 +94,7 @@ public:
     SortDescriptor() = default;
     ~SortDescriptor() = default;
     std::unique_ptr<BaseDescriptor> clone() const override;
+    DescriptorType get_type() const override { return DescriptorType::Sort; }
 
     void merge_with(SortDescriptor&& other);
 
@@ -117,6 +117,7 @@ public:
     std::unique_ptr<BaseDescriptor> clone() const override;
     DescriptorExport export_for_handover() const override;
     size_t get_limit() const noexcept { return m_limit; }
+    DescriptorType get_type() const override { return DescriptorType::Limit; }
 private:
     size_t m_limit = 0;
 };
@@ -139,6 +140,7 @@ public:
     bool descriptor_is_sort(size_t index) const;
     bool descriptor_is_distinct(size_t index) const;
     bool descriptor_is_limit(size_t index) const;
+    DescriptorType get_type(size_t index) const;
     bool is_empty() const { return m_descriptors.empty(); }
     size_t size() const { return m_descriptors.size(); }
     const BaseDescriptor* operator[](size_t ndx) const;
