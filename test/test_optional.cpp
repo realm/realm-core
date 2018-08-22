@@ -278,6 +278,7 @@ TEST(Optional_ConstExpr)
     constexpr Optional<int> a;
     constexpr Optional<int> b{none};
     constexpr Optional<int> c{1};
+    CHECK_EQUAL(bool(a), false);
     CHECK_EQUAL(bool(c), true);
     constexpr int d = *c;
     CHECK_EQUAL(1, d);
@@ -295,6 +296,8 @@ TEST(Optional_ReferenceConstExpr)
     constexpr Optional<const int&> a;
     constexpr Optional<const int&> b{none};
     constexpr Optional<const int&> c{global_i};
+    CHECK_EQUAL(bool(a), false);
+    CHECK_EQUAL(bool(b), false);
     CHECK_EQUAL(bool(c), true);
     constexpr int d = *c;
     CHECK_EQUAL(0, d);
