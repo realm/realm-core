@@ -820,7 +820,7 @@ bool Obj::remove_backlink(ColKey col_key, ObjKey old_key, CascadeState& state)
             bool have_backlinks = target_obj.has_backlinks(state.m_mode == CascadeState::strong);
 
             if (!have_backlinks) {
-                state.rows.emplace_back(target_table->get_key(), old_key);
+                state.m_to_be_deleted.emplace_back(target_table->get_key(), old_key);
                 recurse = true;
             }
         }

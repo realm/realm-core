@@ -48,22 +48,14 @@ void ArrayBacklink::nullify_fwd_links(size_t ndx, CascadeState& state)
         TableRef source_table = _impl::TableFriend::get_opposite_link_table(*target_table, target_col_key);
         source_table->bump_content_version();
         const Spec& target_spec = cluster->m_tree_top.get_spec();
-        ColKey source_col_key = target_spec.get_origin_column_key(target_col_ndx);
+        ColKey src_col_key = target_spec.get_origin_column_key(target_col_ndx);
+        TableKey src_table_key = source_table->get_key();
 
-        // helper which will clear fwd link residing in source table/column/key
-        // and pointing to target_key.
-        auto clear_link = [&source_table, source_col_key, target_key, &state](ObjKey source_key) {
-            Obj obj = source_table->get_object(source_key);
-            obj.nullify_link(source_col_key, target_key);
-            if (state.track_link_nullifications) {
-                state.links.push_back({source_table, source_col_key, source_key, target_key});
-            }
-        };
-
+        Group::CascadeNotification notifications;
         // Now follow all backlinks to their origin and clear forward links.
         if ((value & 1) != 0) {
             // just a single one
-            clear_link(ObjKey(value >> 1));
+            notifications.links.emplace_back(src_table_key, src_col_key, ObjKey(value >> 1), target_key);
         }
         else {
             // There is more than one backlink - Iterate through them all
@@ -73,8 +65,19 @@ void ArrayBacklink::nullify_fwd_links(size_t ndx, CascadeState& state)
 
             size_t sz = backlink_list.size();
             for (size_t i = 0; i < sz; i++) {
-                clear_link(ObjKey(backlink_list.get(i)));
+                notifications.links.emplace_back(src_table_key, src_col_key, ObjKey(backlink_list.get(i)),
+                                                 target_key);
             }
+        }
+
+        if (state.notification_handler()) {
+            state.send_notifications(notifications);
+        }
+
+        // Nullify links
+        for (auto& l : notifications.links) {
+            Obj obj = source_table->get_object(l.origin_key);
+            obj.nullify_link(src_col_key, target_key);
         }
     }
 }

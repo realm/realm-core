@@ -1253,6 +1253,12 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
         values.nullify_fwd_links(ndx, state);
     }
 
+    if (state.notification_handler()) {
+        Group::CascadeNotification notifications;
+        notifications.rows.emplace_back(m_tree_top.get_owner()->get_key(), get_real_key(ndx));
+        state.send_notifications(notifications);
+    }
+
     for (size_t col_ndx = 0; col_ndx < num_cols; col_ndx++) {
         auto col_type = spec.get_column_type(col_ndx);
         ColumnAttrMask attr = spec.get_column_attr(col_ndx);
@@ -1507,7 +1513,7 @@ void Cluster::remove_backlinks(ObjKey origin_key, size_t origin_col_ndx, const s
 
                 if (!has_backlinks) {
                     // Object has no more backlinks - add to list for deletion
-                    state.rows.emplace_back(target_table_key, key);
+                    state.m_to_be_deleted.emplace_back(target_table_key, key);
                 }
             }
         }
@@ -1900,7 +1906,7 @@ void ClusterTree::remove_links()
 {
     const Spec& spec = get_spec();
     CascadeState state(CascadeState::Mode::strong);
-    state.track_link_nullifications = true;
+    state.m_group = m_owner->get_parent_group();
     Allocator& alloc = get_alloc();
     // This function will add objects that should be deleted to 'state'
     ClusterTree::TraverseFunction func = [&spec, &state, &alloc](const Cluster* cluster) {

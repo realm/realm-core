@@ -321,15 +321,17 @@ void Table::remove_recursive(CascadeState& cascade_state)
 {
     // recursive remove not relevant for free standing tables
     if (Group* group = get_parent_group()) {
-        // We will have to re-evaluate size() after each call to clusters.erase
-        for (size_t i = 0; i < cascade_state.rows.size(); ++i) {
-            CascadeState::row& row = cascade_state.rows[i];
-            auto table = group->get_table(row.table_key);
-            // This might add to the list of objects that should be deleted
-            table->m_clusters.erase(row.key, cascade_state);
+        if (group->has_cascade_notification_handler()) {
+            cascade_state.m_group = group;
         }
-        if (group->has_cascade_notification_handler())
-            group->send_cascade_notification(cascade_state);
+
+        while (!cascade_state.m_to_be_deleted.empty()) {
+            auto obj = cascade_state.m_to_be_deleted.back();
+            auto table = group->get_table(obj.first);
+            cascade_state.m_to_be_deleted.pop_back();
+            // This might add to the list of objects that should be deleted
+            table->m_clusters.erase(obj.second, cascade_state);
+        }
     }
 }
 
@@ -1256,8 +1258,9 @@ void Table::batch_erase_rows(const KeyColumn& keys)
 
     if (m_spec.has_strong_link_columns() || (g && g->has_cascade_notification_handler())) {
         CascadeState state(CascadeState::Mode::strong);
-        state.track_link_nullifications = true;
-        std::for_each(vec.begin(), vec.end(), [this, &state](ObjKey k) { state.rows.emplace_back(m_key, k); });
+        state.m_group = g;
+        std::for_each(vec.begin(), vec.end(),
+                      [this, &state](ObjKey k) { state.m_to_be_deleted.emplace_back(m_key, k); });
         remove_recursive(state);
     }
     else {
@@ -2136,7 +2139,7 @@ void Table::create_objects(const std::vector<ObjKey>& keys)
 void Table::do_remove_object(ObjKey key)
 {
     CascadeState state(CascadeState::Mode::none);
-    state.rows.emplace_back(m_key, key);
+    state.m_to_be_deleted.emplace_back(m_key, key);
     remove_recursive(state);
 }
 
@@ -2146,8 +2149,8 @@ void Table::remove_object(ObjKey key)
 
     if (m_spec.has_strong_link_columns() || (g && g->has_cascade_notification_handler())) {
         CascadeState state(CascadeState::Mode::strong);
-        state.track_link_nullifications = true;
-        state.rows.emplace_back(m_key, key);
+        state.m_group = g;
+        state.m_to_be_deleted.emplace_back(m_key, key);
         remove_recursive(state);
     }
     else {
@@ -2161,7 +2164,7 @@ void Table::remove_object_recursive(ObjKey key)
     size_t table_ndx = get_index_in_group();
     if (table_ndx != realm::npos) {
         CascadeState state(CascadeState::Mode::all);
-        state.rows.emplace_back(m_key, key);
+        state.m_to_be_deleted.emplace_back(m_key, key);
         remove_recursive(state);
     }
     else {

@@ -253,8 +253,6 @@ void Lst<ObjKey>::clear()
     ColKey backlink_col = target_table->find_backlink_column(m_obj.get_table_key(), m_col_key);
 
     CascadeState state;
-    state.stop_on_link_list_column_key = m_col_key;
-    state.stop_on_link_list_key = m_obj.get_key();
 
     typedef _impl::TableFriend tf;
     size_t num_links = size();
@@ -264,7 +262,7 @@ void Lst<ObjKey>::clear()
         target_obj.remove_one_backlink(backlink_col, m_obj.get_key()); // Throws
         size_t num_remaining = target_obj.get_backlink_count(*origin_table, m_col_key);
         if (num_remaining == 0) {
-            state.rows.emplace_back(target_table_key, target_key);
+            state.m_to_be_deleted.emplace_back(target_table_key, target_key);
         }
     }
 

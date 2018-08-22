@@ -432,8 +432,16 @@ public:
         };
 
         struct link {
-            const Table* origin_table; ///< A group-level table.
-            ColKey origin_col_ndx;     ///< Link column being nullified.
+            link() = default;
+            link(TableKey tk, ColKey ck, ObjKey k, ObjKey otk)
+                : origin_table(tk)
+                , origin_col_key(ck)
+                , origin_key(k)
+                , old_target_key(otk)
+            {
+            }
+            TableKey origin_table;     ///< A group-level table.
+            ColKey origin_col_key;     ///< Link column being nullified.
             ObjKey origin_key;         ///< Row in column being nullified.
             /// The target row index which is being removed. Mostly relevant for
             /// LinkList (to know which entries are being removed), but also
@@ -807,6 +815,7 @@ private:
     friend class metrics::Metrics;
     friend class Transaction;
     friend class TableKeyIterator;
+    friend class CascadeState;
 };
 
 class TableKeyIterator {
@@ -997,8 +1006,8 @@ Group::set_cascade_notification_handler(std::function<void(const CascadeNotifica
 
 inline void Group::send_cascade_notification(const CascadeNotification& notification) const
 {
-    if (m_notify_handler)
-        m_notify_handler(notification);
+    REALM_ASSERT_DEBUG(m_notify_handler);
+    m_notify_handler(notification);
 }
 
 inline bool Group::has_schema_change_notification_handler() const noexcept
@@ -1190,40 +1199,31 @@ public:
 };
 
 
-struct CascadeState : Group::CascadeNotification {
+class CascadeState {
+public:
     enum Mode { all, strong, none };
 
-    CascadeState(Mode mode = Mode::strong)
+    CascadeState(Mode mode = Mode::strong) noexcept
         : m_mode(mode)
     {
     }
-    /// If non-null, then no recursion will be performed for rows of that
-    /// table. The effect is then exactly as if all the rows of that table were
-    /// added to \a state.rows initially, and then removed again after the
-    /// explicit invocations of Table::cascade_break_backlinks_to() (one for
-    /// each initiating row). This is used by Table::clear() to avoid
-    /// reentrance.
-    ///
-    /// Must never be set concurrently with stop_on_link_list_column.
-    Table* stop_on_table = nullptr;
-
-    /// If non-null, then Table::cascade_break_backlinks_to() will skip the
-    /// removal of reciprocal backlinks for the link list at
-    /// stop_on_link_list_row_ndx in this column, and no recursion will happen
-    /// on its behalf. This is used by LinkView::clear() to avoid reentrance.
-    ///
-    /// Must never be set concurrently with stop_on_table.
-    ColKey stop_on_link_list_column_key = ColKey();
-
-    /// Is ignored if stop_on_link_list_column is null.
-    ObjKey stop_on_link_list_key;
-
-    /// If false, the links field is not needed, so any work done just for that
-    /// can be skipped.
-    bool track_link_nullifications = false;
 
     /// Indicate which links to take action on. Either all, strong or none.
     Mode m_mode;
+
+    std::vector<std::pair<TableKey, ObjKey>> m_to_be_deleted;
+    Group* m_group = nullptr;
+
+    bool notification_handler() const noexcept
+    {
+        return m_group && m_group->has_cascade_notification_handler();
+    }
+
+    void send_notifications(Group::CascadeNotification& notifications) const
+    {
+        REALM_ASSERT_DEBUG(notification_handler());
+        m_group->send_cascade_notification(notifications);
+    }
 };
 
 } // namespace realm

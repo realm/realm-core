@@ -34,7 +34,7 @@ class Cluster;
 class ClusterNodeInner;
 class ClusterTree;
 class ColumnAttrMask;
-struct CascadeState;
+class CascadeState;
 
 struct FieldValue {
     ColKey col_key;
