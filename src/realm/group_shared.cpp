@@ -259,7 +259,7 @@ public:
     {
         // std::cout << "expanding to " << new_entries << std::endl;
         // dump();
-        for (uint_fast32_t i = entries; i < new_entries; i++) {
+        for (uint32_t i = entries; i < new_entries; i++) {
             data[i].version = 1;
             data[i].count.store(1, std::memory_order_relaxed);
             data[i].current_top = 0;
@@ -268,7 +268,7 @@ public:
         }
         data[new_entries - 1].next = old_pos;
         data[put_pos.load(std::memory_order_relaxed)].next = entries;
-        entries = new_entries;
+        entries = uint32_t(new_entries);
         // dump();
     }
 
@@ -346,7 +346,7 @@ public:
     void use_next() noexcept
     {
         atomic_dec(get_next().count); // .store_release(0);
-        put_pos.store(next(), std::memory_order_release);
+        put_pos.store(uint32_t(next()), std::memory_order_release);
     }
 
     void cleanup() noexcept
@@ -2038,7 +2038,7 @@ void SharedGroup::do_begin_write()
     //
     // We use a ticketing scheme to ensure fairness wrt performing write transactions.
     // (But cannot do that on Windows until we have interprocess condition variables there)
-    uint_fast32_t my_ticket = info->next_ticket.fetch_add(1, std::memory_order_relaxed);
+    uint32_t my_ticket = info->next_ticket.fetch_add(1, std::memory_order_relaxed);
     m_writemutex.lock(); // Throws
 
     // allow for comparison even after wrap around of ticket numbering:
