@@ -1833,9 +1833,6 @@ void DB::grab_read_lock(ReadLockInfo& read_lock, VersionID version_id)
     }
 }
 
-/*
- * FIXME: Currently unsupported
- *
 bool DB::do_try_begin_write()
 {
     // In the non-blocking case, we will only succeed if there is no contention for
@@ -1847,7 +1844,6 @@ bool DB::do_try_begin_write()
     }
     return got_the_lock;
 }
-*/
 
 void DB::do_begin_write()
 {
@@ -2356,9 +2352,17 @@ DB::VersionID Transaction::get_version_of_current_transaction()
 }
 
 
-TransactionRef DB::start_write()
+TransactionRef DB::start_write(bool nonblocking)
 {
-    do_begin_write();
+    if (nonblocking) {
+        bool succes = do_try_begin_write();
+        if (!succes) {
+            return TransactionRef();
+        }
+    }
+    else {
+        do_begin_write();
+    }
     ReadLockInfo read_lock;
     Transaction* tr;
     try {

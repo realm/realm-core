@@ -799,8 +799,6 @@ TEST(Shared_1)
     }
 }
 
-#ifdef LEGACY_TESTS
-// FIXME: try_begin_write currently unimplemented
 TEST(Shared_try_begin_write)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -812,22 +810,21 @@ TEST(Shared_try_begin_write)
     bool init_complete = false;
 
     auto do_async = [&]() {
-        DB sg2(path, false, DBOptions(crypt_key()));
-        Group* gw = nullptr;
-        bool success = sg2.try_begin_write(gw);
+
+        auto tr = sg->start_write(true);
+        bool success = bool(tr);
         CHECK(success);
-        CHECK(gw != nullptr);
         {
             std::lock_guard<std::mutex> lock(cv_lock);
             init_complete = true;
         }
         cv.notify_one();
-        TableRef t = gw->add_table(StringData("table"));
-        t->insert_column(0, type_String, StringData("string_col"));
+        TableRef t = tr->add_table(StringData("table"));
+        t->add_column(type_String, StringData("string_col"));
         std::vector<ObjKey> keys;
         t->create_objects(1000, keys);
         thread_obtains_write_lock.lock();
-        sg2.commit();
+        tr->commit();
         thread_obtains_write_lock.unlock();
     };
 
@@ -840,10 +837,9 @@ TEST(Shared_try_begin_write)
     cv.wait(lock, [&]{ return init_complete; });
 
     // Try to also obtain a write lock. This should fail but not block.
-    Group* g = nullptr;
-    bool success = sg.try_begin_write(g);
+    auto tr = sg->start_write(true);
+    bool success = bool(tr);
     CHECK(!success);
-    CHECK(g == nullptr);
 
     // Let the async thread finish its write transaction.
     thread_obtains_write_lock.unlock();
@@ -851,33 +847,25 @@ TEST(Shared_try_begin_write)
 
     {
         // Verify that the thread transaction commit succeeded.
-        ReadTransaction rt(sg);
-        const Group& gr = rt.get_group();
-        auto keys = gr.get_keys();
-        ConstTableRef t = gr.get_table(keys[0]);
+        auto rt = sg->start_read();
+        ConstTableRef t = rt->get_table(rt->get_table_keys()[0]);
         CHECK(t->get_name() == StringData("table"));
-        CHECK(t->get_column_name(0) == StringData("string_col"));
+        CHECK(t->get_column_name(t->get_column_keys()[0]) == StringData("string_col"));
         CHECK(t->size() == 1000);
-        CHECK(keys.size() == 1);
-        CHECK(gr.size() == 1);
+        CHECK(rt->size() == 1);
     }
 
     // Now try to start a transaction without any contenders.
-    success = sg.try_begin_write(g);
+    tr = sg->start_write(true);
+    success = bool(tr);
     CHECK(success);
-    CHECK(g != nullptr);
-    CHECK(g->size() == 1);
-    g->verify();
-    {
-        // make sure we still get a useful error message when trying to
-        // obtain two write locks on the same thread
-        CHECK_LOGIC_ERROR(sg.try_begin_write(g), LogicError::wrong_transact_state);
-    }
+    CHECK(tr->size() == 1);
+    tr->verify();
 
     // Add some data and finish the transaction.
-    auto t2k = g->add_table(StringData("table 2"))->get_key();
-    CHECK(g->size() == 2);
-    sg.commit();
+    auto t2k = tr->add_table(StringData("table 2"))->get_key();
+    CHECK(tr->size() == 2);
+    tr->commit();
 
     {
         // Verify that the main thread transaction now succeeded.
@@ -887,7 +875,6 @@ TEST(Shared_try_begin_write)
         CHECK(gr.get_table(t2k)->get_name() == StringData("table 2"));
     }
 }
-#endif
 
 TEST(Shared_Rollback)
 {

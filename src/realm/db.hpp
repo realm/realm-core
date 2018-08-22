@@ -189,7 +189,9 @@ public:
     /// Transactions are obtained from one of the following 3 methods:
     TransactionRef start_read(VersionID = VersionID());
     TransactionRef start_frozen(VersionID = VersionID());
-    TransactionRef start_write();
+    // If nonblocking is true and a write transaction is already active,
+    // an invalid TransactionRef is returned.
+    TransactionRef start_write(bool nonblocking = false);
 
 
     // report statistics of last commit done on THIS shared group.
@@ -442,8 +444,7 @@ private:
     void release_read_lock(ReadLockInfo&) noexcept;
 
     /// return true if write transaction can commence, false otherwise.
-    // FIXME unsupported: bool do_try_begin_write();
-
+    bool do_try_begin_write();
     void do_begin_write();
     version_type do_commit(Group&);
     void do_end_write() noexcept;
@@ -524,11 +525,11 @@ public:
         advance_read(&o, target_version);
     }
     template <class O>
-    void promote_to_write(O* observer);
-    void promote_to_write()
+    bool promote_to_write(O* observer, bool nonblocking = false);
+    bool promote_to_write(bool nonblocking = false)
     {
         _impl::NullInstructionObserver o;
-        promote_to_write(&o);
+        return promote_to_write(&o, nonblocking);
     }
     TransactionRef freeze();
     TransactionRef duplicate();
@@ -769,12 +770,20 @@ inline void Transaction::advance_read(O* observer, VersionID version_id)
 }
 
 template <class O>
-inline void Transaction::promote_to_write(O* observer)
+inline bool Transaction::promote_to_write(O* observer, bool nonblocking)
 {
     if (m_transact_stage != DB::transact_Reading)
         throw LogicError(LogicError::wrong_transact_state);
 
-    db->do_begin_write(); // Throws
+    if (nonblocking) {
+        bool succes = db->do_try_begin_write();
+        if (!succes) {
+            return false;
+        }
+    }
+    else {
+        db->do_begin_write(); // Throws
+    }
     try {
         Replication* repl = db->get_replication();
         if (!repl)
@@ -799,6 +808,7 @@ inline void Transaction::promote_to_write(O* observer)
     }
 
     set_transact_stage(DB::transact_Writing);
+    return true;
 }
 
 template <class O>
