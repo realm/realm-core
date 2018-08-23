@@ -2513,13 +2513,14 @@ ColKey Table::set_nullability(ColKey col_key, bool nullable, bool throw_on_null)
 {
     if (is_nullable(col_key) == nullable)
         return col_key;
-    ColKey new_col;
-    if (is_list(col_key)) {
-        new_col = add_column_list(get_column_type(col_key), "", nullable);
-    }
-    else {
-        new_col = add_column(get_column_type(col_key), "", nullable);
-    }
+
+    bool si = has_search_index(col_key);
+    std::string column_name(get_column_name(col_key));
+    auto type = get_real_column_type(col_key);
+    auto list = is_list(col_key);
+
+    ColKey new_col = do_insert_root_column(ColKey(), type, "__temporary", nullable, list);
+
     try {
         convert_column(col_key, new_col, throw_on_null);
     }
@@ -2528,9 +2529,16 @@ ColKey Table::set_nullability(ColKey col_key, bool nullable, bool throw_on_null)
         remove_column(new_col);
         throw;
     }
-    std::string column_name(get_column_name(col_key));
-    remove_column(col_key);
-    rename_column(new_col, column_name);
+
+    bump_content_version();
+    bump_storage_version();
+
+    erase_root_column(col_key);
+    m_spec.rename_column(colkey2ndx(new_col), column_name);
+
+    if (si)
+        add_search_index(new_col);
+
     return new_col;
 }
 
