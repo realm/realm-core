@@ -21,6 +21,7 @@
 #include "event_loop_dispatcher.hpp"
 #include "object_store.hpp"
 #include "results.hpp"
+#include "object_schema.hpp"
 
 #include "sync/sync_config.hpp"
 #include "sync/sync_manager.hpp"
@@ -50,7 +51,14 @@ AdminRealmListener::AdminRealmListener(std::string local_root_dir, SyncConfig sy
 {
     m_config.cache = false;
     m_config.path = util::File::resolve("realms.realm", m_local_root_dir);
-    m_config.schema_mode = SchemaMode::ReadOnlyAlternative;
+    // We explicitly set the schema to avoid a race condition where the Admin Realm may
+    // have been created but its schema may not have been uploaded to the server yet.
+    m_config.schema_mode = SchemaMode::Additive;
+    m_config.schema = Schema{
+        {"RealmFile", {
+            Property{"path", PropertyType::String, Property::IsPrimary{true}},
+        }},
+    };
     m_config.sync_config = std::make_shared<SyncConfig>(m_sync_config_template);
     m_config.sync_config->reference_realm_url += "/__admin";
 }
