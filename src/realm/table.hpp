@@ -387,7 +387,6 @@ public:
     template <class T>
     ObjKey find_first(ColKey col_key, T value) const;
 
-    //    Key find_first_link(Key target_key) const;
     ObjKey find_first_int(ColKey col_key, int64_t value) const;
     ObjKey find_first_bool(ColKey col_key, bool value) const;
     ObjKey find_first_timestamp(ColKey col_key, Timestamp value) const;

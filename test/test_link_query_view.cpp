@@ -37,21 +37,22 @@ using namespace realm;
 using namespace test_util;
 using namespace realm::util;
 
-#ifdef LEGACY_TESTS
 
 namespace {
 
 void check_table_view(test_util::unit_test::TestContext& test_context, const char* file, long line,
-                      const TableView& tv, std::vector<size_t> expected, const std::string& tv_str,
+                      const TableView& tv, std::vector<ObjKey> expected, const std::string& tv_str,
                       const std::string& expected_str)
 {
     test_context.check_equal(tv.size(), expected.size(), file, line, (tv_str + ".size()").c_str(),
                              (expected_str + ".size()").c_str());
     if (tv.size() == expected.size()) {
         for (size_t i = 0; i < expected.size(); ++i) {
-            test_context.check_equal(tv.get_source_ndx(i), expected[i], file, line,
-                                     (tv_str + ".get_source_ndx(" + util::to_string(i) + ")").c_str(),
-                                     (expected_str + "[" + util::to_string(i) + "]").c_str());
+            Obj o = const_cast<TableView&>(tv)[i];
+            ObjKey ok = o.get_key();
+            test_context.check_equal(ok, expected[i], file, line,
+                                     (tv_str + ".get_source_key(" + util::to_string(ok.value) + ")").c_str(),
+                                     (expected_str + "[" + util::to_string(ok.value) + "]").c_str());
         }
     }
 }
@@ -70,73 +71,61 @@ TEST(LinkList_Basic1)
     TableRef table2 = group.add_table("table2");
 
     // add some more columns to table1 and table2
-    table1->add_column(type_Int, "col1");
-    table1->add_column(type_String, "str1");
-    table1->add_column(type_Binary, "bin1", true /*nullable*/);
+    auto c0 = table1->add_column(type_Int, "col1");
+    auto c1 = table1->add_column(type_String, "str1");
+    auto c2 = table1->add_column(type_Binary, "bin1", true /*nullable*/);
 
     // add some rows
-    table1->add_empty_row();
-    table1->set_int(0, 0, 100);
-    table1->set_string(1, 0, "foo");
-    table1->set_binary(2, 0, BinaryData("foo"));
+    auto o0 = table1->create_object().set_all(100, "foo", BinaryData("foo"));
+    auto o1 = table1->create_object().set_all(200, "!", BinaryData("", 0));
+    auto o2 = table1->create_object().set_all(300, "bar", BinaryData());
 
-    table1->add_empty_row();
-    table1->set_int(0, 1, 200);
-    table1->set_string(1, 1, "!");
-    table1->set_binary(2, 1, BinaryData("", 0)); // empty binary
+    auto col_link2 = table2->add_column_link(type_Link, "link", *table1);
+    auto o20 = table2->create_object().set_all(o1.get_key());
+    auto o21 = table2->create_object().set_all(o2.get_key());
 
-    table1->add_empty_row();
-    table1->set_int(0, 2, 300);
-    table1->set_string(1, 2, "bar");
-    table1->set_binary(2, 2, BinaryData()); // null binary
-
-    size_t col_link2 = table2->add_column_link(type_Link, "link", *table1);
-    table2->add_empty_row();
-    table2->add_empty_row();
-
-    table2->set_link(col_link2, 0, 1);
-    table2->set_link(col_link2, 1, 2);
-
-    Query q = table2->link(col_link2).column<String>(1) == "!";
+    Query q = table2->link(col_link2).column<String>(c1) == "!";
     TableView tv = q.find_all();
     CHECK_EQUAL(tv.size(), 1);
-    CHECK_EQUAL(tv[0].get_index(), 0);
+    CHECK_EQUAL(tv[0].get_key(), o20.get_key());
 
-    q = table2->link(col_link2).column<BinaryData>(2) == BinaryData(); // == null
+    q = table2->link(col_link2).column<BinaryData>(c2) == BinaryData(); // == null
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 1);
-    CHECK_EQUAL(tv[0].get_index(), 1);
+    CHECK_EQUAL(tv[0].get_key(), o21.get_key());
 
-    q = table2->link(col_link2).column<BinaryData>(2) == BinaryData("", 0); // == empty binary
+    q = table2->link(col_link2).column<BinaryData>(c2) == BinaryData("", 0); // == empty binary
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 1);
-    CHECK_EQUAL(tv[0].get_index(), 0);
+    CHECK_EQUAL(tv[0].get_key(), o20.get_key());
 
-    q = table2->link(col_link2).column<BinaryData>(2) != BinaryData(); // != null
+    q = table2->link(col_link2).column<BinaryData>(c2) != BinaryData(); // != null
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 1);
-    CHECK_EQUAL(tv[0].get_index(), 0);
+    CHECK_EQUAL(tv[0].get_key(), o20.get_key());
 
-    Query q2 = table2->link(col_link2).column<Int>(0) == 200;
+    Query q2 = table2->link(col_link2).column<Int>(c0) == 200;
     TableView tv2 = q2.find_all();
     CHECK_EQUAL(tv2.size(), 1);
-    CHECK_EQUAL(tv2[0].get_index(), 0);
+    CHECK_EQUAL(tv2[0].get_key(), o20.get_key());
 
     // Just a few tests for the new string conditions to see if they work with links too.
     // The new string conditions are tested themself in Query_NextGen_StringConditions in test_query.cpp
-    Query q3 = table2->link(col_link2).column<String>(1).contains("A", false);
+    Query q3 = table2->link(col_link2).column<String>(c1).contains("A", false);
     TableView tv3 = q3.find_all();
     CHECK_EQUAL(tv3.size(), 1);
-    CHECK_EQUAL(tv3[0].get_index(), 1); // "bar" contained an "A"
+    CHECK_EQUAL(tv3[0].get_key(), o1.get_key()); // "bar" contained an "A"
 
-    table2->add_column(type_String, "str2");
-    table2->set_string(1, 0, "A");
-    table2->set_string(1, 1, "A");
+    auto c22 = table2->add_column(type_String, "str2");
+    o20.set(c22, "A");
+    o21.set(c22, "A");
+    // table2->set_string(1, 0, "A");
+    // table2->set_string(1, 1, "A");
 
-    Query q4 = table2->link(col_link2).column<String>(1).contains(table2->column<String>(1), false);
+    Query q4 = table2->link(col_link2).column<String>(c1).contains(table2->column<String>(c1), false);
     TableView tv4 = q4.find_all();
     CHECK_EQUAL(tv4.size(), 1);
-    CHECK_EQUAL(tv4[0].get_index(), 1); // "bar" contained an "A"
+    CHECK_EQUAL(tv4[0].get_key(), o1.get_key()); // "bar" contained an "A"
 }
 
 
@@ -150,34 +139,25 @@ TEST(LinkList_MissingDeepCopy)
 
     // add some more columns to table1 and table2
     table1->add_column(type_Int, "col1");
-    table1->add_column(type_String, "str1");
+    auto c1 = table1->add_column(type_String, "str1");
 
     // add some rows
-    table1->add_empty_row();
-    table1->set_int(0, 0, 100);
-    table1->set_string(1, 0, "foo");
-    table1->add_empty_row();
-    table1->set_int(0, 1, 200);
-    table1->set_string(1, 1, "!");
-    table1->add_empty_row();
-    table1->set_int(0, 2, 300);
-    table1->set_string(1, 2, "bar");
+    auto o1 = table1->create_object().set_all(100, "foo");
+    auto o2 = table1->create_object().set_all(200, "!");
+    auto o3 = table1->create_object().set_all(300, "bar");
 
-    size_t col_link2 = table2->add_column_link(type_Link, "link", *table1);
-    table2->add_empty_row();
-    table2->add_empty_row();
-
-    table2->set_link(col_link2, 0, 1);
-    table2->set_link(col_link2, 1, 2);
+    auto col_link2 = table2->add_column_link(type_Link, "link", *table1);
+    auto o20 = table2->create_object().set_all(o2.get_key());
+    auto o21 = table2->create_object().set_all(o3.get_key());
 
     char* c = new char[10000000];
     c[10000000 - 1] = '!';
-    Query q = table2->link(col_link2).column<String>(1) == StringData(&c[10000000 - 1], 1);
+    Query q = table2->link(col_link2).column<String>(c1) == StringData(&c[10000000 - 1], 1);
 
     delete[] c;
     // If this segfaults, Query hasn't made its own deep copy of "!"
-    size_t m = q.find();
-    CHECK_EQUAL(0, m);
+    ObjKey m = q.find();
+    CHECK_EQUAL(o20.get_key(), m);
 }
 
 TEST(LinkList_Basic2)
@@ -188,82 +168,63 @@ TEST(LinkList_Basic2)
     TableRef table2 = group.add_table("table2");
 
     // add some more columns to table1 and table2
-    table1->add_column(type_Int, "col1");
-    table1->add_column(type_String, "str1");
+    auto c0 = table1->add_column(type_Int, "col1");
+    auto c1 = table1->add_column(type_String, "str1");
 
-    table2->add_column(type_Int, "col1");
-    table2->add_column(type_String, "str2");
+    auto c2 = table2->add_column(type_Int, "col1");
+    auto c3 = table2->add_column(type_String, "str2");
 
     // add some rows
-    table1->add_empty_row();
-    table1->set_int(0, 0, 100);
-    table1->set_string(1, 0, "foo");
-    table1->add_empty_row();
-    table1->set_int(0, 1, 200);
-    table1->set_string(1, 1, "!");
-    table1->add_empty_row();
-    table1->set_int(0, 2, 300);
-    table1->set_string(1, 2, "bar");
+    auto o10 = table1->create_object().set_all(100, "foo");
+    auto o11 = table1->create_object().set_all(200, "!");
+    table1->create_object().set_all(300, "bar");
+    auto o20 = table2->create_object().set_all(400, "hello");
+    auto o21 = table2->create_object().set_all(500, "world");
+    auto o22 = table2->create_object().set_all(600, "!");
 
-    table2->add_empty_row();
-    table2->set_int(0, 0, 400);
-    table2->set_string(1, 0, "hello");
-    table2->add_empty_row();
-    table2->set_int(0, 1, 500);
-    table2->set_string(1, 1, "world");
-    table2->add_empty_row();
-    table2->set_int(0, 2, 600);
-    table2->set_string(1, 2, "!");
-
-    size_t col_link2 = table1->add_column_link(type_LinkList, "link", *table2);
+    auto col_link2 = table1->add_column_link(type_LinkList, "link", *table2);
 
     // set some links
-    LinkViewRef links1;
+    LnkLst links1;
 
-    links1 = table1->get_linklist(col_link2, 0);
-    links1->add(1);
+    links1 = o10.get_linklist(col_link2); // next add segfaults
+    links1.add(o21.get_key());
 
-    links1 = table1->get_linklist(col_link2, 1);
-    links1->add(1);
-    links1->add(2);
-
-
-    size_t match;
-
-    match = (table1->link(col_link2).column<Int>(0) > 550).find();
-    CHECK_EQUAL(1, match);
+    links1 = o11.get_linklist(col_link2);
+    links1.add(o21.get_key());
+    links1.add(o22.get_key());
 
 
-    match = (table2->column<String>(1) == "world").find();
-    CHECK_EQUAL(1, match);
+    ObjKey match;
 
-    match = (table2->column<Int>(0) == 500).find();
-    CHECK_EQUAL(1, match);
+    match = (table1->link(col_link2).column<Int>(c0) > 550).find();
+    CHECK_EQUAL(o11.get_key(), match);
 
-    match = (table1->link(col_link2).column<String>(1) == "!").find();
-    CHECK_EQUAL(1, match);
 
-    match = (table1->link(col_link2).column<Int>(0) == 600).find();
-    CHECK_EQUAL(1, match);
+    match = (table2->column<String>(c3) == "world").find();
+    CHECK_EQUAL(o21.get_key(), match);
 
-    match = (table1->link(col_link2).column<String>(1) == "world").find();
-    CHECK_EQUAL(0, match);
+    match = (table2->column<Int>(c2) == 500).find();
+    CHECK_EQUAL(o21.get_key(), match);
 
-    match = (table1->link(col_link2).column<Int>(0) == 500).find();
-    CHECK_EQUAL(0, match);
+    match = (table1->link(col_link2).column<String>(c1) == "!").find();
+    CHECK_EQUAL(o11.get_key(), match);
 
-    match = (table1->link(col_link2).column<String>(1) == "world").find(1);
-    CHECK_EQUAL(1, match);
+    match = (table1->link(col_link2).column<Int>(c0) == 600).find();
+    CHECK_EQUAL(o11.get_key(), match);
 
-    match = (table1->link(col_link2).column<Int>(0) == 500).find(1);
-    CHECK_EQUAL(1, match);
+    match = (table1->link(col_link2).column<String>(c1) == "world").find();
+    CHECK_EQUAL(o10.get_key(), match);
+
+    match = (table1->link(col_link2).column<Int>(c0) == 500).find();
+    CHECK_EQUAL(o10.get_key(), match);
 
     // Test link lists with 0 entries (3'rd row has no links)
-    match = (table1->link(col_link2).column<String>(1) == "foobar").find();
-    CHECK_EQUAL(not_found, match);
+    match = (table1->link(col_link2).column<String>(c1) == "foobar").find();
+    CHECK_EQUAL(ObjKey(), match);
 
-    match = (table1->link(col_link2).column<String>(1) == table1->column<String>(1)).find();
-    CHECK_EQUAL(1, match);
+    match = (table1->link(col_link2).column<String>(c1) == table1->column<String>(c1)).find();
+    CHECK_EQUAL(o11.get_key(), match);
 }
 
 
@@ -278,49 +239,35 @@ TEST(LinkList_QuerySingle)
     table1->add_column(type_Int, "col1");
     table1->add_column(type_String, "str1");
 
-    table2->add_column(type_Int, "col1");
-    table2->add_column(type_String, "str2");
+    auto c0 = table2->add_column(type_Int, "col1");
+    auto c1 = table2->add_column(type_String, "str2");
 
     // add some rows
-    table1->add_empty_row();
-    table1->set_int(0, 0, 100);
-    table1->set_string(1, 0, "foo");
-    table1->add_empty_row();
-    table1->set_int(0, 1, 200);
-    table1->set_string(1, 1, "!");
-    table1->add_empty_row();
-    table1->set_int(0, 2, 300);
-    table1->set_string(1, 2, "bar");
+    auto x0 = table1->create_object().set_all(100, "foo");
+    auto x1 = table1->create_object().set_all(200, "!");
+    table1->create_object().set_all(300, "bar");
+    table2->create_object().set_all(400, "hello");
+    auto o1 = table2->create_object().set_all(500, "world");
+    auto o2 = table2->create_object().set_all(600, "!");
 
-    table2->add_empty_row();
-
-    table2->set_int(0, 0, 400);
-    table2->set_string(1, 0, "hello");
-    table2->add_empty_row();
-    table2->set_int(0, 1, 500);
-    table2->set_string(1, 1, "world");
-    table2->add_empty_row();
-    table2->set_int(0, 2, 600);
-    table2->set_string(1, 2, "!");
-
-    size_t col_link2 = table1->add_column_link(type_Link, "link", *table2);
+    auto col_link2 = table1->add_column_link(type_Link, "link", *table2);
 
     // set some links
 
-    table1->set_link(col_link2, 0, 1);
-    table1->set_link(col_link2, 1, 2);
+    x0.set(col_link2, o1.get_key());
+    x1.set(col_link2, o2.get_key());
 
-    size_t match;
+    ObjKey match;
 
-    match = (table1->link(col_link2).column<Int>(0) > 450).find();
-    CHECK_EQUAL(0, match);
+    match = (table1->link(col_link2).column<Int>(c0) > 450).find();
+    CHECK_EQUAL(x0.get_key(), match);
 
-    match = (table1->link(col_link2).column<String>(1) == "!").find();
-    CHECK_EQUAL(1, match);
+    match = (table1->link(col_link2).column<String>(c1) == "!").find();
+    CHECK_EQUAL(x1.get_key(), match);
 
     // See if NULL-link can be handled (3'rd row doesn't have any link)
-    match = (table1->link(col_link2).column<String>(1) == "foobar").find();
-    CHECK_EQUAL(not_found, match);
+    match = (table1->link(col_link2).column<String>(c1) == "foobar").find();
+    CHECK_EQUAL(ObjKey(), match);
 }
 
 
@@ -333,181 +280,33 @@ TEST(LinkList_TableViewTracking)
 
     // add some more columns to table1 and table2
     table1->add_column(type_Int, "col1");
-    table1->add_column(type_String, "str1");
+    auto c1 = table1->add_column(type_String, "str1");
 
     // add some rows
-    table1->add_empty_row();
-    table1->set_int(0, 0, 100);
-    table1->set_string(1, 0, "foo");
-    table1->add_empty_row();
-    table1->set_int(0, 1, 200);
-    table1->set_string(1, 1, "!");
-    table1->add_empty_row();
-    table1->set_int(0, 2, 300);
-    table1->set_string(1, 2, "bar");
+    auto o0 = table1->create_object().set_all(100, "foo");
+    auto o1 = table1->create_object().set_all(200, "!");
+    auto o2 = table1->create_object().set_all(300, "bar");
 
-    size_t col_link2 = table2->add_column_link(type_Link, "link", *table1);
-    table2->add_empty_row();
-    table2->add_empty_row();
-    table2->add_empty_row();
-    table2->set_link(col_link2, 0, 1);
-    table2->set_link(col_link2, 1, 2);
-    table2->set_link(col_link2, 2, 0);
+    auto col_link2 = table2->add_column_link(type_Link, "link", *table1);
+    table2->create_object().set_all(o1.get_key());
+    table2->create_object().set_all(o2.get_key());
+    table2->create_object().set_all(o0.get_key());
 
-    TableView tv = (table2->link(col_link2).column<String>(1) == "!").find_all();
+    TableView tv = (table2->link(col_link2).column<String>(c1) == "!").find_all();
     CHECK_EQUAL(1, tv.size());
 
     // make entry NOT satisfy criteria, validate that sync removes entry from view
-    table1->set_string(1, 1, "fnyt");
+    o1.set(c1, "fnyt");
     CHECK_EQUAL(1, tv.size());
     tv.sync_if_needed();
     CHECK_EQUAL(0, tv.size());
 
     // make it SATISFY criteria again, validate that sync puts entry back in view
-    table1->set_string(1, 1, "!");
+    o1.set(c1, "!");
     CHECK_EQUAL(0, tv.size());
     tv.sync_if_needed();
     CHECK_EQUAL(1, tv.size());
 }
-
-
-// Attempts to expose a bug (it would assert) where TableView::clear() was called with an unordered m_table.
-// Internally, clear() tests if TableView::m_table is unordered by testing if it has any link or backlink columns
-// (asana task made with 'fixme' because it's unreliable - in the future you could have unordered tables with no
-// links).
-TEST(LinkList_ClearView1)
-{
-    // m_table has:
-    //      type_Link
-    //      type_BackLink
-    // tv: increasing target row indexes
-    {
-        Group group;
-
-        TableRef table1 = group.add_table("table1");
-        TableRef table2 = group.add_table("table2");
-
-        // add some more columns to table1 and table2
-        table1->add_column(type_Int, "col1");
-        table1->add_column(type_String, "str1");
-
-        // add some rows
-        table1->add_empty_row();
-        table1->set_int(0, 0, 300);
-        table1->set_string(1, 0, "foo");
-        table1->add_empty_row();
-        table1->set_int(0, 1, 200);
-        table1->set_string(1, 1, "!");
-        table1->add_empty_row();
-        table1->set_int(0, 2, 100);
-        table1->set_string(1, 2, "bar");
-
-        size_t col_link2 = table2->add_column_link(type_Link, "link", *table1);
-        table2->add_empty_row();
-        table2->add_empty_row();
-
-        table2->set_link(col_link2, 0, 1);
-        table2->set_link(col_link2, 1, 2);
-
-        TableView tv = (table2->link(col_link2).column<String>(1) != "!").find_all();
-
-        tv.clear(RemoveMode::unordered);
-        CHECK_EQUAL(1, table2->size());
-    }
-
-    // m_table has:
-    //      type_LinkList
-    //      type_BackLink
-    // tv: increasing target row indexes
-    {
-        Group group;
-
-        TableRef table1 = group.add_table("table1");
-        TableRef table2 = group.add_table("table2");
-
-        // add some more columns to table1 and table2
-        table1->add_column(type_Int, "col1");
-        table1->add_column(type_String, "str1");
-
-        // add some rows
-        table1->add_empty_row();
-        table1->set_int(0, 0, 300);
-        table1->set_string(1, 0, "foo");
-        table1->add_empty_row();
-        table1->set_int(0, 1, 200);
-        table1->set_string(1, 1, "!");
-        table1->add_empty_row();
-        table1->set_int(0, 2, 100);
-        table1->set_string(1, 2, "bar");
-
-        size_t col_link2 = table2->add_column_link(type_LinkList, "link", *table1);
-        table2->add_empty_row();
-        table2->add_empty_row();
-        table2->add_empty_row();
-
-        LinkViewRef links1;
-
-        links1 = table2->get_linklist(col_link2, 0);
-        links1->add(0);
-        links1->add(1);
-
-        links1 = table2->get_linklist(col_link2, 2);
-        links1->add(1);
-        links1->add(2);
-
-        TableView tv = (table2->link(col_link2).column<String>(1) == "!").find_all();
-
-        tv.clear(RemoveMode::unordered);
-        CHECK_EQUAL(1, table2->size());
-    }
-
-
-    // m_table has:
-    //      type_BackLink
-    // tv: random target row index order (due to sort() - this can be interesting to test because clear() performs a
-    // sort internally.
-    {
-        Group group;
-
-        TableRef table1 = group.add_table("table1");
-        TableRef table2 = group.add_table("table2");
-
-        // add some more columns to table1 and table2
-        table1->add_column(type_Int, "col1");
-        table1->add_column(type_String, "str1");
-
-        // add some rows
-        table1->add_empty_row();
-        table1->set_int(0, 0, 300);
-        table1->set_string(1, 0, "foo");
-        table1->add_empty_row();
-        table1->set_int(0, 1, 200);
-        table1->set_string(1, 1, "!");
-        table1->add_empty_row();
-        table1->set_int(0, 2, 100);
-        table1->set_string(1, 2, "bar");
-
-        size_t col_link2 = table2->add_column_link(type_LinkList, "link", *table1);
-        table2->add_empty_row();
-        table2->add_empty_row();
-
-        LinkViewRef links1;
-
-        links1 = table2->get_linklist(col_link2, 0);
-        links1->add(0);
-        links1->add(1);
-
-        links1 = table2->get_linklist(col_link2, 1);
-        links1->add(1);
-        links1->add(2);
-
-        TableView tv = (table1->column<String>(1) != "!").find_all();
-        tv.sort(1);
-        tv.clear();
-        CHECK_EQUAL(1, table1->size());
-    }
-}
-
 
 TEST(LinkList_QueryFindLinkTarget)
 {
@@ -524,162 +323,113 @@ TEST(LinkList_QueryFindLinkTarget)
     table2->add_column(type_String, "str2");
 
     // add some rows
-    table1->add_empty_row();
-    table1->set_int(0, 0, 100);
-    table1->set_string(1, 0, "foo");
-    table1->add_empty_row();
-    table1->set_int(0, 1, 200);
-    table1->set_string(1, 1, "!");
-    table1->add_empty_row();
-    table1->set_int(0, 2, 300);
-    table1->set_string(1, 2, "bar");
+    auto o10 = table1->create_object().set_all(100, "foo");
+    auto o11 = table1->create_object().set_all(200, "!");
+    auto o12 = table1->create_object().set_all(300, "bar");
+    auto o20 = table2->create_object();
+    auto o21 = table2->create_object().set_all(400, "hello");
+    auto o22 = table2->create_object().set_all(500, "world");
+    auto o23 = table2->create_object().set_all(600, "!");
 
-    table2->add_empty_row();
-
-    table2->set_int(0, 0, 400);
-    table2->set_string(1, 0, "hello");
-    table2->add_empty_row();
-    table2->set_int(0, 1, 500);
-    table2->set_string(1, 1, "world");
-    table2->add_empty_row();
-    table2->set_int(0, 2, 600);
-    table2->set_string(1, 2, "!");
-    table2->add_empty_row();
-    table2->set_int(0, 3, 700);
-    table2->set_string(1, 3, "!!");
-
-    size_t col_link2 = table1->add_column_link(type_Link, "link", *table2);
-    size_t col_link3 = table1->add_column_link(type_LinkList, "link", *table2);
+    auto col_link2 = table1->add_column_link(type_Link, "link", *table2);
+    auto col_link3 = table1->add_column_link(type_LinkList, "links", *table2);
 
     // set some links
 
-    table1->set_link(col_link2, 0, 1);
-    table1->set_link(col_link2, 1, 2);
+    o10.set(col_link2, o21.get_key());
+    o11.set(col_link2, o22.get_key());
 
-    LinkViewRef lvr;
+    LnkLst lvr;
 
-    lvr = table1->get_linklist(col_link3, 0);
-    lvr->add(0);
-    lvr->add(1);
+    lvr = o10.get_linklist(col_link3);
+    lvr.add(o20.get_key());
+    lvr.add(o21.get_key());
 
-    lvr = table1->get_linklist(col_link3, 1);
-    lvr->add(1);
-    lvr->add(2);
+    lvr = o11.get_linklist(col_link3);
+    lvr.add(o21.get_key());
+    lvr.add(o22.get_key());
 
-    size_t match;
+    ObjKey match;
 
-    // First we test find_*_link on Table
+    match = table1->find_first(col_link2, o21.get_key());
+    CHECK_EQUAL(o10.get_key(), match);
 
-    // find on Link
-    match = table1->link(col_link2).find_first_link(1);
-    CHECK_EQUAL(0, match);
+    match = table1->find_first(col_link2, o22.get_key());
+    CHECK_EQUAL(o11.get_key(), match);
 
-    match = table1->link(col_link2).find_first_link(2);
-    CHECK_EQUAL(1, match);
-
-    match = table1->link(col_link2).find_first_link(3);
-    CHECK_EQUAL(not_found, match);
+    match = table1->find_first(col_link2, o23.get_key());
+    CHECK_EQUAL(ObjKey(), match);
 
     // find on LinkList
-    match = table1->link(col_link3).find_first_link(1);
-    CHECK_EQUAL(0, match);
+    match = (table1->column<Link>(col_link3) == o21).find();
+    CHECK_EQUAL(o10.get_key(), match);
 
-    match = table1->link(col_link3).find_first_link(2);
-    CHECK_EQUAL(1, match);
+    match = (table1->column<Link>(col_link3) == o22).find();
+    CHECK_EQUAL(o11.get_key(), match);
 
-    match = table1->link(col_link3).find_first_link(3);
-    CHECK_EQUAL(not_found, match);
-
-
-    // find_all on Link
-
-    TableView tv;
-
-    tv = table1->link(col_link2).find_all_link(2);
-    CHECK_EQUAL(1, tv.size());
-    CHECK_EQUAL(1, tv.get_source_ndx(0));
-
-    tv = table1->link(col_link2).find_all_link(1);
-    CHECK_EQUAL(1, tv.size());
-    CHECK_EQUAL(0, tv.get_source_ndx(0));
-
-    tv = table1->link(col_link2).find_all_link(3);
-    CHECK_EQUAL(0, tv.size());
-
-    // find_all on LinkList
-    tv = table1->link(col_link3).find_all_link(2);
-    CHECK_EQUAL(1, tv.size());
-    CHECK_EQUAL(1, tv.get_source_ndx(0));
-
-    tv = table1->link(col_link3).find_all_link(1);
-    CHECK_EQUAL(2, tv.size());
-    CHECK_EQUAL(0, tv.get_source_ndx(0));
-    CHECK_EQUAL(1, tv.get_source_ndx(1));
-
-    tv = table1->link(col_link3).find_all_link(3);
-    CHECK_EQUAL(0, tv.size());
-
+    match = (table1->column<Link>(col_link3) == o23).find();
+    CHECK_EQUAL(ObjKey(), match);
 
     // find on query with Link
-    match = (table1->column<Link>(col_link2) == table2->get(1)).find();
-    CHECK_EQUAL(0, match);
+    match = (table1->column<Link>(col_link2) == o21).find();
+    CHECK_EQUAL(o10.get_key(), match);
 
-    match = (table1->column<Link>(col_link2) == table2->get(2)).find();
-    CHECK_EQUAL(1, match);
+    match = (table1->column<Link>(col_link2) == o22).find();
+    CHECK_EQUAL(o11.get_key(), match);
 
-    match = (table1->column<Link>(col_link2) == table2->get(3)).find();
-    CHECK_EQUAL(not_found, match);
+    match = (table1->column<Link>(col_link2) == o23).find();
+    CHECK_EQUAL(ObjKey(), match);
 
 
     // find_all on query with Link
-    tv = (table1->column<Link>(col_link2) == table2->get(2)).find_all();
-    CHECK_TABLE_VIEW(tv, {1});
+    TableView tv;
+    tv = (table1->column<Link>(col_link2) == o22).find_all();
+    CHECK_TABLE_VIEW(tv, {o11.get_key()});
 
-    tv = (table1->column<Link>(col_link2) == table2->get(1)).find_all();
-    CHECK_TABLE_VIEW(tv, {0});
+    tv = (table1->column<Link>(col_link2) == o21).find_all();
+    CHECK_TABLE_VIEW(tv, {o10.get_key()});
 
-    tv = (table1->column<Link>(col_link2) == table2->get(3)).find_all();
+    tv = (table1->column<Link>(col_link2) == o23).find_all();
     CHECK_TABLE_VIEW(tv, {});
 
-    tv = (table1->column<Link>(col_link2) != table2->get(2)).find_all();
-    CHECK_TABLE_VIEW(tv, {0, 2});
+    tv = (table1->column<Link>(col_link2) != o22).find_all();
+    CHECK_TABLE_VIEW(tv, {o10.get_key(), o12.get_key()});
 
-    tv = (table1->column<Link>(col_link2) != table2->get(1)).find_all();
-    CHECK_TABLE_VIEW(tv, {1, 2});
+    tv = (table1->column<Link>(col_link2) != o21).find_all();
+    CHECK_TABLE_VIEW(tv, {o11.get_key(), o12.get_key()});
 
-    tv = (table1->column<Link>(col_link2) != table2->get(3)).find_all();
-    CHECK_TABLE_VIEW(tv, {0, 1, 2});
+    tv = (table1->column<Link>(col_link2) != o23).find_all();
+    CHECK_TABLE_VIEW(tv, {o10.get_key(), o11.get_key(), o12.get_key()});
 
     // find on query with LinkList
-    match = (table1->column<LnkLst>(col_link3) == table2->get(1)).find();
-    CHECK_EQUAL(0, match);
+    match = (table1->column<Link>(col_link3) == o21).find();
+    CHECK_EQUAL(o10.get_key(), match);
 
-    match = (table1->column<LnkLst>(col_link3) == table2->get(2)).find();
-    CHECK_EQUAL(1, match);
+    match = (table1->column<Link>(col_link3) == o22).find();
+    CHECK_EQUAL(o11.get_key(), match);
 
-    match = (table1->column<LnkLst>(col_link3) == table2->get(3)).find();
-    CHECK_EQUAL(not_found, match);
+    match = (table1->column<Link>(col_link3) == o23).find();
+    CHECK_EQUAL(ObjKey(), match);
 
     // find_all on query with LinkList
-    tv = (table1->column<LnkLst>(col_link3) == table2->get(2)).find_all();
-    CHECK_TABLE_VIEW(tv, {1});
+    tv = (table1->column<Link>(col_link3) == o22).find_all();
+    CHECK_TABLE_VIEW(tv, {o11.get_key()});
 
-    tv = (table1->column<LnkLst>(col_link3) == table2->get(1)).find_all();
-    CHECK_TABLE_VIEW(tv, {0, 1});
+    tv = (table1->column<Link>(col_link3) == o21).find_all();
+    CHECK_TABLE_VIEW(tv, {o10.get_key(), o11.get_key()});
 
-    tv = (table1->column<LnkLst>(col_link3) == table2->get(3)).find_all();
+    tv = (table1->column<Link>(col_link3) == o23).find_all();
     CHECK_TABLE_VIEW(tv, {});
 
-    tv = (table1->column<LnkLst>(col_link3) != table2->get(2)).find_all();
-    CHECK_TABLE_VIEW(tv, {0, 1});
+    tv = (table1->column<Link>(col_link3) != o22).find_all();
+    CHECK_TABLE_VIEW(tv, {o10.get_key(), o11.get_key()});
 
-    tv = (table1->column<LnkLst>(col_link3) != table2->get(1)).find_all();
-    CHECK_TABLE_VIEW(tv, {0, 1});
+    tv = (table1->column<Link>(col_link3) != o21).find_all();
+    CHECK_TABLE_VIEW(tv, {o10.get_key(), o11.get_key()});
 
-    tv = (table1->column<LnkLst>(col_link3) != table2->get(3)).find_all();
-    CHECK_TABLE_VIEW(tv, {0, 1});
+    tv = (table1->column<Link>(col_link3) != o23).find_all();
+    CHECK_TABLE_VIEW(tv, {o10.get_key(), o11.get_key()});
 }
-
 
 // Tests chains of links, such as table->link(2).link(0)...
 TEST(LinkList_MultiLinkQuery)
@@ -691,222 +441,205 @@ TEST(LinkList_MultiLinkQuery)
     TableRef table3 = group.add_table("table3");
     TableRef table4 = group.add_table("table4");
 
-    size_t col_linklist2 = table1->add_column_link(type_LinkList, "link", *table2);
-    size_t col_link2 = table1->add_column_link(type_Link, "link", *table2);
+    ColKey col_linklist2 = table1->add_column_link(type_LinkList, "link", *table2);
+    ColKey col_link2 = table1->add_column_link(type_Link, "linkl", *table2);
 
-    size_t col_link3 = table2->add_column_link(type_Link, "link", *table3);
-    size_t col_linklist3 = table2->add_column_link(type_LinkList, "link", *table3);
+    ColKey col_link3 = table2->add_column_link(type_Link, "link", *table3);
+    ColKey col_linklist3 = table2->add_column_link(type_LinkList, "linkl", *table3);
 
-    table4->add_column(type_Int, "int");
-    table4->add_empty_row();
-    table4->set_int(0, 0, 1000);
-    table4->add_empty_row();
-    table4->set_int(0, 1, 2000);
+    ColKey c40 = table4->add_column(type_Int, "int");
 
-    table3->add_column(type_Int, "int");
-    table3->add_column(type_String, "string");
-    table3->add_column(type_Float, "string");
+    table4->create_object(ObjKey(0)).set_all(1000);
+    table4->create_object(ObjKey(1)).set_all(2000);
 
-    size_t col_link4 = table3->add_column_link(type_Link, "link", *table4);
-    size_t col_linklist4 = table3->add_column_link(type_LinkList, "link", *table4);
+    ColKey c30 = table3->add_column(type_Int, "int");
+    ColKey c31 = table3->add_column(type_String, "string");
+    ColKey c32 = table3->add_column(type_Float, "float");
+
+    ColKey col_link4 = table3->add_column_link(type_Link, "link", *table4);
+    ColKey col_linklist4 = table3->add_column_link(type_LinkList, "linkl", *table4);
 
     // add some rows
-    table3->add_empty_row();
-    table3->set_int(0, 0, 100);
-    table3->set_string(1, 0, "foo");
-    table3->set_float(2, 0, 100.0f);
+    table3->create_object(ObjKey(0)).set_all(100, "foo", 100.0f);
+    table3->create_object(ObjKey(1)).set_all(200, "bar", 200.0f);
+    table3->create_object(ObjKey(2)).set_all(300, "baz", 300.0f);
 
-    table3->add_empty_row();
-    table3->set_int(0, 1, 200);
-    table3->set_string(1, 1, "bar");
-    table3->set_float(2, 1, 200.0f);
+    LnkLst lvr;
 
-    table3->add_empty_row();
-    table3->set_int(0, 2, 300);
-    table3->set_string(1, 2, "baz");
-    table3->set_float(2, 2, 300.0f);
+    table3->create_object(ObjKey(3));
+    auto o30 = table3->get_object(ObjKey(0));
+    o30.set(col_link4, ObjKey(0));
+    lvr = o30.get_linklist(col_linklist4);
+    lvr.add(ObjKey(0));
+    lvr.add(ObjKey(1));
 
-    LinkViewRef lvr;
+    auto o20 = table2->create_object(ObjKey(0));
+    o20.set(col_link3, ObjKey(0));
+    lvr = o20.get_linklist(col_linklist3);
+    lvr.add(ObjKey(0));
+    lvr.add(ObjKey(1));
 
-    table3->add_empty_row();
-    table3->set_link(col_link4, 0, 0);
-    lvr = table3->get_linklist(col_linklist4, 0);
-    lvr->add(0);
-    lvr->add(1);
+    auto o21 = table2->create_object(ObjKey(1));
+    o21.set(col_link3, ObjKey(2));
+    lvr = o21.get_linklist(col_linklist3);
+    lvr.add(ObjKey(2));
 
-    table2->add_empty_row();
-    table2->set_link(col_link3, 0, 0);
-    lvr = table2->get_linklist(col_linklist3, 0);
-    lvr->add(0);
-    lvr->add(1);
+    auto o22 = table2->create_object(ObjKey(2));
 
-    table2->add_empty_row();
-    table2->set_link(col_link3, 1, 2);
-    lvr = table2->get_linklist(col_linklist3, 1);
-    lvr->add(2);
+    auto o10 = table1->create_object();
+    o10.set(col_link2, ObjKey(1));
+    lvr = o10.get_linklist(col_linklist2);
+    lvr.add(ObjKey(0));
+    lvr.add(ObjKey(1));
 
-    table2->add_empty_row();
+    auto o11 = table1->create_object();
+    o11.set(col_link2, ObjKey(0));
+    lvr = o11.get_linklist(col_linklist2);
+    lvr.add(ObjKey(2));
 
-    table1->add_empty_row();
-    table1->set_link(col_link2, 0, 1);
-    lvr = table1->get_linklist(col_linklist2, 0);
-    lvr->add(0);
-    lvr->add(1);
-
-    table1->add_empty_row();
-    table1->set_link(col_link2, 1, 0);
-    lvr = table1->get_linklist(col_linklist2, 1);
-    lvr->add(2);
-
-    table1->add_empty_row();
+    table1->create_object();
 
     TableView tv;
 
     // Link -> Link
-    tv = (table1->link(col_link2).link(col_link3).column<Int>(0) == 300).find_all();
+    tv = (table1->link(col_link2).link(col_link3).column<Int>(c30) == 300).find_all();
     CHECK_EQUAL(1, tv.size());
-    CHECK_EQUAL(0, tv.get_source_ndx(0));
+    CHECK_EQUAL(o10.get_key(), tv.get_key(0));
 
-    tv = (table1->link(col_link2).link(col_link3).column<Int>(0) == 100).find_all();
+    tv = (table1->link(col_link2).link(col_link3).column<Int>(c30) == 100).find_all();
     CHECK_EQUAL(1, tv.size());
-    CHECK_EQUAL(1, tv.get_source_ndx(0));
+    CHECK_EQUAL(o11.get_key(), tv.get_key(0));
 
-    tv = (table1->link(col_link2).link(col_link3).column<Int>(0) == 200).find_all();
+    tv = (table1->link(col_link2).link(col_link3).column<Int>(c30) == 200).find_all();
     CHECK_EQUAL(0, tv.size());
 
 
-    tv = (table1->link(col_link2).link(col_link3).column<String>(1) == "baz").find_all();
+    tv = (table1->link(col_link2).link(col_link3).column<String>(c31) == "baz").find_all();
     CHECK_EQUAL(1, tv.size());
-    CHECK_EQUAL(0, tv.get_source_ndx(0));
+    CHECK_EQUAL(o10.get_key(), tv.get_key(0));
 
-    tv = (table1->link(col_link2).link(col_link3).column<String>(1) == "foo").find_all();
+    tv = (table1->link(col_link2).link(col_link3).column<String>(c31) == "foo").find_all();
     CHECK_EQUAL(1, tv.size());
-    CHECK_EQUAL(1, tv.get_source_ndx(0));
+    CHECK_EQUAL(o11.get_key(), tv.get_key(0));
 
-    tv = (table1->link(col_link2).link(col_link3).column<String>(1) == "bar").find_all();
+    tv = (table1->link(col_link2).link(col_link3).column<String>(c31) == "bar").find_all();
     CHECK_EQUAL(0, tv.size());
 
 
-    tv = (table1->link(col_link2).link(col_link3).column<Float>(2) == 300.).find_all();
+    tv = (table1->link(col_link2).link(col_link3).column<Float>(c32) == 300.).find_all();
     CHECK_EQUAL(1, tv.size());
-    CHECK_EQUAL(0, tv.get_source_ndx(0));
+    CHECK_EQUAL(o10.get_key(), tv.get_key(0));
 
-    tv = (table1->link(col_link2).link(col_link3).column<Float>(2) == 100.).find_all();
+    tv = (table1->link(col_link2).link(col_link3).column<Float>(c32) == 100.).find_all();
     CHECK_EQUAL(1, tv.size());
-    CHECK_EQUAL(1, tv.get_source_ndx(0));
+    CHECK_EQUAL(o11.get_key(), tv.get_key(0));
 
-    tv = (table1->link(col_link2).link(col_link3).column<Float>(2) == 200.).find_all();
+    tv = (table1->link(col_link2).link(col_link3).column<Float>(c32) == 200.).find_all();
     CHECK_EQUAL(0, tv.size());
-
 
     // Link -> LinkList
-    tv = (table1->link(col_link2).link(col_linklist3).column<Int>(0) == 300).find_all();
+    tv = (table1->link(col_link2).link(col_linklist3).column<Int>(c30) == 300).find_all();
     CHECK_EQUAL(1, tv.size());
-    CHECK_EQUAL(0, tv.get_source_ndx(0));
+    CHECK_EQUAL(o10.get_key(), tv.get_key(0));
 
-    tv = (table1->link(col_link2).link(col_linklist3).column<Int>(0) < 300).find_all();
+    tv = (table1->link(col_link2).link(col_linklist3).column<Int>(c30) < 300).find_all();
     CHECK_EQUAL(1, tv.size());
-    CHECK_EQUAL(1, tv.get_source_ndx(0));
+    CHECK_EQUAL(o11.get_key(), tv.get_key(0));
 
-    tv = (table1->link(col_link2).link(col_linklist3).column<Int>(0) == 400).find_all();
+    tv = (table1->link(col_link2).link(col_linklist3).column<Int>(c30) == 400).find_all();
     CHECK_EQUAL(0, tv.size());
 
 
-    tv = (table1->link(col_link2).link(col_linklist3).column<String>(1) == "baz").find_all();
+    tv = (table1->link(col_link2).link(col_linklist3).column<String>(c31) == "baz").find_all();
     CHECK_EQUAL(1, tv.size());
-    CHECK_EQUAL(0, tv.get_source_ndx(0));
+    CHECK_EQUAL(o10.get_key(), tv.get_key(0));
 
-    tv = (table1->link(col_link2).link(col_linklist3).column<String>(1) == "none").find_all();
+    tv = (table1->link(col_link2).link(col_linklist3).column<String>(c31) == "none").find_all();
     CHECK_EQUAL(0, tv.size());
-
 
     // LinkList -> Link
-    tv = (table1->link(col_linklist2).link(col_link3).column<Int>(0) == 300).find_all();
+    tv = (table1->link(col_linklist2).link(col_link3).column<Int>(c30) == 300).find_all();
     CHECK_EQUAL(1, tv.size());
-    CHECK_EQUAL(0, tv.get_source_ndx(0));
+    CHECK_EQUAL(o10.get_key(), tv.get_key(0));
 
-    tv = (table1->link(col_linklist2).link(col_link3).column<Int>(0) == 100).find_all();
+    tv = (table1->link(col_linklist2).link(col_link3).column<Int>(c30) == 100).find_all();
     CHECK_EQUAL(1, tv.size());
-    CHECK_EQUAL(0, tv.get_source_ndx(0));
+    CHECK_EQUAL(o10.get_key(), tv.get_key(0));
 
-    tv = (table1->link(col_linklist2).link(col_link3).column<Int>(0) == 200).find_all();
+    tv = (table1->link(col_linklist2).link(col_link3).column<Int>(c30) == 200).find_all();
     CHECK_EQUAL(0, tv.size());
 
 
-    tv = (table1->link(col_linklist2).link(col_link3).column<String>(1) == "baz").find_all();
+    tv = (table1->link(col_linklist2).link(col_link3).column<String>(c31) == "baz").find_all();
     CHECK_EQUAL(1, tv.size());
-    CHECK_EQUAL(0, tv.get_source_ndx(0));
+    CHECK_EQUAL(o10.get_key(), tv.get_key(0));
 
 
-    tv = (table1->link(col_linklist2).link(col_link3).column<String>(1) == "foo").find_all();
+    tv = (table1->link(col_linklist2).link(col_link3).column<String>(c31) == "foo").find_all();
     CHECK_EQUAL(1, tv.size());
-    CHECK_EQUAL(0, tv.get_source_ndx(0));
+    CHECK_EQUAL(o10.get_key(), tv.get_key(0));
 
-    tv = (table1->link(col_linklist2).link(col_link3).column<String>(1) == "bar").find_all();
+    tv = (table1->link(col_linklist2).link(col_link3).column<String>(c31) == "bar").find_all();
     CHECK_EQUAL(0, tv.size());
-
 
     // LinkList -> LinkList
-    tv = (table1->link(col_linklist2).link(col_linklist3).column<Int>(0) == 100).find_all();
+    tv = (table1->link(col_linklist2).link(col_linklist3).column<Int>(c30) == 100).find_all();
     CHECK_EQUAL(1, tv.size());
-    CHECK_EQUAL(0, tv.get_source_ndx(0));
+    CHECK_EQUAL(o10.get_key(), tv.get_key(0));
 
-    tv = (table1->link(col_linklist2).link(col_linklist3).column<Int>(0) == 200).find_all();
+    tv = (table1->link(col_linklist2).link(col_linklist3).column<Int>(c30) == 200).find_all();
     CHECK_EQUAL(1, tv.size());
-    CHECK_EQUAL(0, tv.get_source_ndx(0));
+    CHECK_EQUAL(o10.get_key(), tv.get_key(0));
 
-    tv = (table1->link(col_linklist2).link(col_linklist3).column<Int>(0) == 300).find_all();
+    tv = (table1->link(col_linklist2).link(col_linklist3).column<Int>(c30) == 300).find_all();
     CHECK_EQUAL(1, tv.size());
-    CHECK_EQUAL(0, tv.get_source_ndx(0));
+    CHECK_EQUAL(o10.get_key(), tv.get_key(0));
 
-    tv = (table1->link(col_linklist2).link(col_linklist3).column<Int>(0) == 400).find_all();
+    tv = (table1->link(col_linklist2).link(col_linklist3).column<Int>(c30) == 400).find_all();
     CHECK_EQUAL(0, tv.size());
 
-
-    tv = (table1->link(col_linklist2).link(col_linklist3).column<String>(1) == "foo").find_all();
+    tv = (table1->link(col_linklist2).link(col_linklist3).column<String>(c31) == "foo").find_all();
     CHECK_EQUAL(1, tv.size());
-    CHECK_EQUAL(0, tv.get_source_ndx(0));
+    CHECK_EQUAL(o10.get_key(), tv.get_key(0));
 
-    tv = (table1->link(col_linklist2).link(col_linklist3).column<String>(1) == "bar").find_all();
+    tv = (table1->link(col_linklist2).link(col_linklist3).column<String>(c31) == "bar").find_all();
     CHECK_EQUAL(1, tv.size());
-    CHECK_EQUAL(0, tv.get_source_ndx(0));
+    CHECK_EQUAL(o10.get_key(), tv.get_key(0));
 
-    tv = (table1->link(col_linklist2).link(col_linklist3).column<String>(1) == "baz").find_all();
+    tv = (table1->link(col_linklist2).link(col_linklist3).column<String>(c31) == "baz").find_all();
     CHECK_EQUAL(1, tv.size());
-    CHECK_EQUAL(0, tv.get_source_ndx(0));
+    CHECK_EQUAL(o10.get_key(), tv.get_key(0));
 
-    tv = (table1->link(col_linklist2).link(col_linklist3).column<String>(1) == "none").find_all();
+    tv = (table1->link(col_linklist2).link(col_linklist3).column<String>(c31) == "none").find_all();
     CHECK_EQUAL(0, tv.size());
 
-
-    tv = (table1->link(col_linklist2).link(col_linklist3).column<Float>(2) == 100.).find_all();
+    tv = (table1->link(col_linklist2).link(col_linklist3).column<Float>(c32) == 100.).find_all();
     CHECK_EQUAL(1, tv.size());
-    CHECK_EQUAL(0, tv.get_source_ndx(0));
+    CHECK_EQUAL(o10.get_key(), tv.get_key(0));
 
-    tv = (table1->link(col_linklist2).link(col_linklist3).column<Float>(2) == 200.).find_all();
+    tv = (table1->link(col_linklist2).link(col_linklist3).column<Float>(c32) == 200.).find_all();
     CHECK_EQUAL(1, tv.size());
-    CHECK_EQUAL(0, tv.get_source_ndx(0));
+    CHECK_EQUAL(o10.get_key(), tv.get_key(0));
 
-    tv = (table1->link(col_linklist2).link(col_linklist3).column<Float>(2) == 300.).find_all();
+    tv = (table1->link(col_linklist2).link(col_linklist3).column<Float>(c32) == 300.).find_all();
     CHECK_EQUAL(1, tv.size());
-    CHECK_EQUAL(0, tv.get_source_ndx(0));
+    CHECK_EQUAL(o10.get_key(), tv.get_key(0));
 
-    tv = (table1->link(col_linklist2).link(col_linklist3).column<Float>(2) == 400.).find_all();
+    tv = (table1->link(col_linklist2).link(col_linklist3).column<Float>(c32) == 400.).find_all();
     CHECK_EQUAL(0, tv.size());
 
     // 3 levels of links
-    tv = (table1->link(col_linklist2).link(col_linklist3).link(col_linklist4).column<Int>(0) > 0).find_all();
+    tv = (table1->link(col_linklist2).link(col_linklist3).link(col_linklist4).column<Int>(c40) > 0).find_all();
     CHECK_EQUAL(1, tv.size());
-    CHECK_EQUAL(0, tv.get_source_ndx(0));
+    CHECK_EQUAL(o10.get_key(), tv.get_key(0));
 
-    tv = (table1->link(col_link2).link(col_link3).link(col_link4).column<Int>(0) == 1000).find_all();
+    tv = (table1->link(col_link2).link(col_link3).link(col_link4).column<Int>(c40) == 1000).find_all();
     CHECK_EQUAL(1, tv.size());
-    CHECK_EQUAL(1, tv.get_source_ndx(0));
+    CHECK_EQUAL(o11.get_key(), tv.get_key(0));
 
-    tv = (table1->link(col_link2).link(col_link3).link(col_link4).column<Int>(0) == 2000).find_all();
+    tv = (table1->link(col_link2).link(col_link3).link(col_link4).column<Int>(c40) == 2000).find_all();
     CHECK_EQUAL(0, tv.size());
 }
-#endif
 
 TEST(LinkList_SortLinkView)
 {
@@ -1361,41 +1094,39 @@ TEST(LinkList_QueryOnLinkListWithDuplicates)
     CHECK_EQUAL(target_keys[2], some_rows.get_key(3));
 }
 
-#ifdef LEGACY_TESTS
 TEST(LinkList_QueryOnIndexedPropertyOfLinkListSingleMatch)
 {
     Group group;
 
     TableRef data_table = group.add_table("data");
-    data_table->add_column(type_String, "col");
-    data_table->add_search_index(0);
+    auto c0 = data_table->add_column(type_String, "col");
+    data_table->add_search_index(c0);
 
     TableRef link_table = group.add_table("link");
-    link_table->add_column_link(type_LinkList, "col", *data_table);
+    auto c1 = link_table->add_column_link(type_LinkList, "col", *data_table);
 
-    data_table->add_empty_row(2);
-    data_table->set_string(0, 0, "a");
-    data_table->set_string(0, 1, "b");
+    auto k0 = data_table->create_object().set_all("a").get_key();
+    auto k1 = data_table->create_object().set_all("b").get_key();
 
-    link_table->add_empty_row();
-    LinkViewRef lvr = link_table->get_linklist(0, 0);
+    auto o = link_table->create_object();
+    auto lvr = o.get_linklist(c1);
 
     // Test with LinkList order matching Table order
-    lvr->add(0);
-    lvr->add(1);
+    lvr.add(k0);
+    lvr.add(k1);
 
-    CHECK_EQUAL(0, data_table->where(lvr).and_query(data_table->column<String>(0) == "a").find());
-    CHECK_EQUAL(1, data_table->where(lvr).and_query(data_table->column<String>(0) == "b").find());
-    CHECK_EQUAL(not_found, data_table->where(lvr).and_query(data_table->column<String>(0) == "c").find());
+    CHECK_EQUAL(k0, data_table->where(lvr).and_query(data_table->column<String>(c0) == "a").find());
+    CHECK_EQUAL(k1, data_table->where(lvr).and_query(data_table->column<String>(c0) == "b").find());
+    CHECK_EQUAL(ObjKey(), data_table->where(lvr).and_query(data_table->column<String>(c0) == "c").find());
 
     // Test with LinkList being the reverse of Table order
-    lvr->clear();
-    lvr->add(1);
-    lvr->add(0);
+    lvr.clear();
+    lvr.add(k1);
+    lvr.add(k0);
 
-    CHECK_EQUAL(0, data_table->where(lvr).and_query(data_table->column<String>(0) == "a").find());
-    CHECK_EQUAL(1, data_table->where(lvr).and_query(data_table->column<String>(0) == "b").find());
-    CHECK_EQUAL(not_found, data_table->where(lvr).and_query(data_table->column<String>(0) == "c").find());
+    CHECK_EQUAL(k0, data_table->where(lvr).and_query(data_table->column<String>(c0) == "a").find());
+    CHECK_EQUAL(k1, data_table->where(lvr).and_query(data_table->column<String>(c0) == "b").find());
+    CHECK_EQUAL(ObjKey(), data_table->where(lvr).and_query(data_table->column<String>(c0) == "c").find());
 }
 
 TEST(LinkList_QueryLinkNull)
@@ -1403,224 +1134,189 @@ TEST(LinkList_QueryLinkNull)
     Group group;
 
     TableRef data_table = group.add_table("data");
-    data_table->add_column(type_String, "string", true);
-    data_table->add_column_link(type_Link, "link", *data_table);
-    data_table->add_column(type_Int, "int", true);
-    data_table->add_column(type_Double, "double", true);
-    data_table->add_column(type_OldDateTime, "date", true);
+    auto c0 = data_table->add_column(type_String, "string", true);
+    auto c1 = data_table->add_column_link(type_Link, "link", *data_table);
+    auto c2 = data_table->add_column(type_Int, "int", true);
+    auto c3 = data_table->add_column(type_Double, "double", true);
+    auto c4 = data_table->add_column(type_Timestamp, "date", true);
 
     // +-+--------+------+------+--------+------+
     // | |   0    |  1   |   2  |  3     |  4   |
     // +-+--------+------+------+--------+------+
-    // | | string | link | int  | double | date |
+    // | | string | link | int  | double | time |
     // +-+--------+------+------+--------+------+
     // |0| Fish   |    0 |   1  |   1.0  |  1   |
     // |1| null   | null | null |  null  | null |
     // |2| Horse  |    1 |   2  |   2.0  |  2   |
     // +-+--------+------+------+--------+------+
 
-    data_table->add_empty_row();
-    data_table->set_string(0, 0, "Fish");
-    data_table->set_link(1, 0, 0);
-    data_table->set_int(2, 0, 1);
-    data_table->set_double(3, 0, 1.0);
-    data_table->set_olddatetime(4, 0, OldDateTime(1));
+    auto o0 = data_table->create_object();
+    o0.set_all("Fish", o0.get_key(), 1, 1.0, Timestamp(0, 1));
+    auto o1 = data_table->create_object();
+    auto o2 = data_table->create_object();
+    o2.set_all("Horse", o1.get_key(), 2, 2.0, Timestamp(0, 2));
 
-    data_table->add_empty_row();
-    data_table->set_string(0, 1, realm::null());
-    data_table->nullify_link(1, 1);
-    data_table->set_null(2, 1);
-    data_table->set_null(3, 1);
-    data_table->set_null(4, 1);
+    CHECK_EQUAL(1, data_table->where().and_query(data_table->column<String>(c0) == realm::null()).count());
+    CHECK_EQUAL(2, data_table->where().and_query(data_table->column<String>(c0) != realm::null()).count());
 
-    data_table->add_empty_row();
-    data_table->set_string(0, 2, "Horse");
-    data_table->set_link(1, 2, 1);
-    data_table->set_int(2, 2, 2);
-    data_table->set_double(3, 2, 2.0);
-    data_table->set_olddatetime(4, 2, OldDateTime(2));
+    CHECK_EQUAL(1, data_table->where().and_query(data_table->column<Int>(c2) == realm::null()).count());
+    CHECK_EQUAL(1, data_table->where().and_query(data_table->column<Double>(c3) == realm::null()).count());
+    CHECK_EQUAL(1, data_table->where().and_query(data_table->column<Timestamp>(c4) == realm::null()).count());
 
-    CHECK_EQUAL(1, data_table->where().and_query(data_table->column<String>(0) == realm::null()).count());
-    CHECK_EQUAL(2, data_table->where().and_query(data_table->column<String>(0) != realm::null()).count());
+    CHECK_EQUAL(2, data_table->where().and_query(data_table->link(c1).column<String>(c0) == realm::null()).count());
+    CHECK_EQUAL(1, data_table->where().and_query(data_table->link(c1).column<String>(c0) != realm::null()).count());
+    CHECK_EQUAL(o0.get_key(), data_table->where()
+                                  .and_query(data_table->link(c1).column<String>(c0) != realm::null())
+                                  .find_all()
+                                  .get_key(0));
 
-    CHECK_EQUAL(1, data_table->where().and_query(data_table->column<Int>(2) == realm::null()).count());
-    CHECK_EQUAL(1, data_table->where().and_query(data_table->column<Double>(3) == realm::null()).count());
-    CHECK_EQUAL(1, data_table->where().and_query(data_table->column<OldDateTime>(4) == realm::null()).count());
+    CHECK_EQUAL(2, data_table->where().and_query(data_table->link(c1).column<Int>(c2) == realm::null()).count());
+    CHECK_EQUAL(1, data_table->where().and_query(data_table->link(c1).column<Int>(c2) != realm::null()).count());
 
-    CHECK_EQUAL(2, data_table->where().and_query(data_table->link(1).column<String>(0) == realm::null()).count());
-    CHECK_EQUAL(1, data_table->where().and_query(data_table->link(1).column<String>(0) != realm::null()).count());
-    CHECK_EQUAL(0, data_table->where()
-                       .and_query(data_table->link(1).column<String>(0) != realm::null())
-                       .find_all()
-                       .get_source_ndx(0));
-
-    CHECK_EQUAL(2, data_table->where().and_query(data_table->link(1).column<Int>(2) == realm::null()).count());
-    CHECK_EQUAL(1, data_table->where().and_query(data_table->link(1).column<Int>(2) != realm::null()).count());
-
-    CHECK_EQUAL(2, data_table->where().and_query(data_table->link(1).column<Double>(3) == realm::null()).count());
-    CHECK_EQUAL(1, data_table->where().and_query(data_table->link(1).column<Double>(3) != realm::null()).count());
+    CHECK_EQUAL(2, data_table->where().and_query(data_table->link(c1).column<Double>(c3) == realm::null()).count());
+    CHECK_EQUAL(1, data_table->where().and_query(data_table->link(c1).column<Double>(c3) != realm::null()).count());
 
     CHECK_EQUAL(2,
-                data_table->where().and_query(data_table->link(1).column<OldDateTime>(4) == realm::null()).count());
+                data_table->where().and_query(data_table->link(c1).column<Timestamp>(c4) == realm::null()).count());
     CHECK_EQUAL(1,
-                data_table->where().and_query(data_table->link(1).column<OldDateTime>(4) != realm::null()).count());
+                data_table->where().and_query(data_table->link(c1).column<Timestamp>(c4) != realm::null()).count());
 
-    CHECK_EQUAL(2, data_table->where().and_query(data_table->link(1).column<String>(0).equal(realm::null())).count());
+    CHECK_EQUAL(2,
+                data_table->where().and_query(data_table->link(c1).column<String>(c0).equal(realm::null())).count());
     CHECK_EQUAL(
-        1, data_table->where().and_query(data_table->link(1).column<String>(0).not_equal(realm::null())).count());
+        1, data_table->where().and_query(data_table->link(c1).column<String>(c0).not_equal(realm::null())).count());
 
-    CHECK_EQUAL(
-        2,
-        data_table->where().Not().and_query(data_table->link(1).column<String>(0).not_equal(realm::null())).count());
-    CHECK_EQUAL(1, data_table->where()
-                       .Not()
-                       .and_query(data_table->link(1).column<String>(0).not_equal(realm::null()))
-                       .find_all()
-                       .get_source_ndx(0));
     CHECK_EQUAL(2, data_table->where()
                        .Not()
-                       .and_query(data_table->link(1).column<String>(0).not_equal(realm::null()))
-                       .find_all()
-                       .get_source_ndx(1));
+                       .and_query(data_table->link(c1).column<String>(c0).not_equal(realm::null()))
+                       .count());
+    CHECK_EQUAL(o1.get_key(), data_table->where()
+                                  .Not()
+                                  .and_query(data_table->link(c1).column<String>(c0).not_equal(realm::null()))
+                                  .find_all()
+                                  .get_key(0));
+    CHECK_EQUAL(o2.get_key(), data_table->where()
+                                  .Not()
+                                  .and_query(data_table->link(c1).column<String>(c0).not_equal(realm::null()))
+                                  .find_all()
+                                  .get_key(1));
 
     CHECK_EQUAL(
-        1, data_table->where().Not().and_query(data_table->link(1).column<String>(0).equal(realm::null())).count());
-    CHECK_EQUAL(0, data_table->where()
-                       .Not()
-                       .and_query(data_table->link(1).column<String>(0).equal(realm::null()))
-                       .find_all()
-                       .get_source_ndx(0));
+        1, data_table->where().Not().and_query(data_table->link(c1).column<String>(c0).equal(realm::null())).count());
+    CHECK_EQUAL(o0.get_key(), data_table->where()
+                                  .Not()
+                                  .and_query(data_table->link(c1).column<String>(c0).equal(realm::null()))
+                                  .find_all()
+                                  .get_key(0));
 
-    CHECK_EQUAL(1, (data_table->column<Link>(1) == realm::null()).count());
-    CHECK_EQUAL(2, (data_table->column<Link>(1) != realm::null()).count());
-
-    CHECK_EQUAL(0, (data_table->column<Link>(1) == Row()).count());
-    CHECK_EQUAL(3, (data_table->column<Link>(1) != Row()).count());
+    CHECK_EQUAL(1, (data_table->column<Link>(c1) == realm::null()).count());
+    CHECK_EQUAL(2, (data_table->column<Link>(c1) != realm::null()).count());
 }
-
 
 TEST(LinkList_QueryOnIndexedPropertyOfLinkListMultipleMatches)
 {
     Group group;
 
     TableRef data_table = group.add_table("data");
-    data_table->add_column(type_String, "col");
-    data_table->add_search_index(0);
+    auto c0 = data_table->add_column(type_String, "col");
+    data_table->add_search_index(c0);
 
     TableRef link_table = group.add_table("link");
-    link_table->add_column_link(type_LinkList, "col", *data_table);
+    auto c1 = link_table->add_column_link(type_LinkList, "col", *data_table);
 
     // Ensure that the results from the index don't fit in a single leaf
     const size_t count = round_up(std::max(REALM_MAX_BPNODE_SIZE * 8, 100), 4);
-    data_table->add_empty_row(count);
+    // data_table->add_empty_row(count);
     for (size_t i = 0; i < count; ++i) {
         char str[2]{};
         str[0] = 'a' + (i % 4);
-        data_table->set_string(0, i, StringData(str, 1));
+        data_table->create_object(ObjKey(i)).set_all(StringData(str, 1));
+        // data_table->set_string(0, i, StringData(str, 1));
     }
 
-    link_table->add_empty_row();
-    LinkViewRef lvr = link_table->get_linklist(0, 0);
+    auto o = link_table->create_object();
+    auto lvr = o.get_linklist(c1);
 
     // Add every other row to the LinkList in the same order as the table
     for (size_t i = 0; i < count; i += 2)
-        lvr->add(i);
+        lvr.add(ObjKey(i));
 
     // in table and linkview
-    TableView tv = data_table->where(lvr).and_query(data_table->column<String>(0) == "a").find_all();
+    TableView tv = data_table->where(lvr).and_query(data_table->column<String>(c0) == "a").find_all();
     CHECK_EQUAL(count / 4, tv.size());
-    CHECK_EQUAL(0, tv[0].get_index());
-    CHECK_EQUAL(4, tv[1].get_index());
+    CHECK_EQUAL(ObjKey(0), tv[0].get_key());
+    CHECK_EQUAL(ObjKey(4), tv[1].get_key());
 
-    tv = data_table->where(lvr).and_query(data_table->column<String>(0) == "c").find_all();
+    tv = data_table->where(lvr).and_query(data_table->column<String>(c0) == "c").find_all();
     CHECK_EQUAL(count / 4, tv.size());
-    CHECK_EQUAL(2, tv[0].get_index());
-    CHECK_EQUAL(6, tv[1].get_index());
+    CHECK_EQUAL(ObjKey(2), tv[0].get_key());
+    CHECK_EQUAL(ObjKey(6), tv[1].get_key());
 
     // in table, not in linkview
-    tv = data_table->where(lvr).and_query(data_table->column<String>(0) == "b").find_all();
+    tv = data_table->where(lvr).and_query(data_table->column<String>(c0) == "b").find_all();
     CHECK_EQUAL(0, tv.size());
 
     // not in table
-    tv = data_table->where(lvr).and_query(data_table->column<String>(0) == "A").find_all();
+    tv = data_table->where(lvr).and_query(data_table->column<String>(c0) == "A").find_all();
     CHECK_EQUAL(0, tv.size());
 
     // Add every other row to the LinkList in the opposite order as the table
-    lvr->clear();
+    lvr.clear();
     for (size_t i = count; i > 1; i -= 2)
-        lvr->add(i - 2);
+        lvr.add(ObjKey(i - 2));
 
     // in table and linkview
-    tv = data_table->where(lvr).and_query(data_table->column<String>(0) == "a").find_all();
+    tv = data_table->where(lvr).and_query(data_table->column<String>(c0) == "a").find_all();
     CHECK_EQUAL(count / 4, tv.size());
-    CHECK_EQUAL(count - 4, tv[0].get_index());
-    CHECK_EQUAL(count - 8, tv[1].get_index());
+    CHECK_EQUAL(ObjKey(count - 4), tv[0].get_key());
+    CHECK_EQUAL(ObjKey(count - 8), tv[1].get_key());
 
-    tv = data_table->where(lvr).and_query(data_table->column<String>(0) == "c").find_all();
+    tv = data_table->where(lvr).and_query(data_table->column<String>(c0) == "c").find_all();
     CHECK_EQUAL(count / 4, tv.size());
-    CHECK_EQUAL(count - 2, tv[0].get_index());
-    CHECK_EQUAL(count - 6, tv[1].get_index());
+    CHECK_EQUAL(ObjKey(count - 2), tv[0].get_key());
+    CHECK_EQUAL(ObjKey(count - 6), tv[1].get_key());
 
     // in table, not in linkview
-    tv = data_table->where(lvr).and_query(data_table->column<String>(0) == "b").find_all();
+    tv = data_table->where(lvr).and_query(data_table->column<String>(c0) == "b").find_all();
     CHECK_EQUAL(0, tv.size());
 
     // not in table
-    tv = data_table->where(lvr).and_query(data_table->column<String>(0) == "A").find_all();
+    tv = data_table->where(lvr).and_query(data_table->column<String>(c0) == "A").find_all();
     CHECK_EQUAL(0, tv.size());
 }
+
 
 TEST(LinkList_QueryUnsortedListWithOr)
 {
     Group group;
 
     TableRef data_table = group.add_table("data");
-    data_table->add_column(type_Int, "col");
+    auto int_col = data_table->add_column(type_Int, "col");
 
     TableRef link_table = group.add_table("link");
-    link_table->add_column_link(type_LinkList, "col", *data_table);
+    auto link_col = link_table->add_column_link(type_LinkList, "col", *data_table);
 
     const size_t count = 5;
-    data_table->add_empty_row(count);
-    link_table->add_empty_row();
-    LinkViewRef lvr = link_table->get_linklist(0, 0);
+    ObjKeys data_keys;
+    data_table->create_objects(count, data_keys);
+    auto o = link_table->create_object();
+    auto lvr = o.get_linklist(link_col);
 
     // Populate data and add rows to the linkview in the opposite order of the
     // table's order
     for (size_t i = 0; i < count; ++i) {
-        data_table->set_int(0, i, i);
-        lvr->add(count - i - 1);
+        auto oo = data_table->get_object(data_keys[i]);
+        oo.set<Int>(int_col, i);
+        lvr.add(data_keys[count - i - 1]);
     }
 
     // Verify that a query with Or() returns all results
-    TableView tv = data_table->where(lvr).group().equal(0, 1000).Or().between(0, 2, 4).end_group().find_all();
+    TableView tv =
+        data_table->where(lvr).group().equal(int_col, 1000).Or().between(int_col, 2, 4).end_group().find_all();
     CHECK_EQUAL(3, tv.size());
-    CHECK_EQUAL(4, tv[0].get_index());
-    CHECK_EQUAL(3, tv[1].get_index());
-    CHECK_EQUAL(2, tv[2].get_index());
-}
-
-TEST(LinkList_QueryDateTime)
-{
-    Group group;
-
-    TableRef table1 = group.add_table("first");
-    TableRef table2 = group.add_table("second");
-
-    table1->add_column_link(type_LinkList, "link", *table2);
-
-    table2->add_column(type_OldDateTime, "date");
-
-    table2->add_empty_row();
-    table2->set_olddatetime(0, 0, OldDateTime(1));
-
-    table1->add_empty_row();
-    LinkViewRef lvr = table1->get_linklist(0, 0);
-    lvr->add(0);
-
-    TableView tv = (table1->link(0).column<OldDateTime>(0) >= OldDateTime(1)).find_all();
-
-    CHECK_EQUAL(1, tv.size());
+    CHECK_EQUAL(data_keys[4], tv[0].get_key());
+    CHECK_EQUAL(data_keys[3], tv[1].get_key());
+    CHECK_EQUAL(data_keys[2], tv[2].get_key());
 }
 
 // Check that table views created through backlinks are updated correctly
@@ -1632,73 +1328,73 @@ TEST(BackLink_Query_TableViewSyncsWhenNeeded)
     TableRef source = group.add_table("source");
     TableRef target = group.add_table("target");
 
-    size_t col_int = source->add_column(type_Int, "id");
-    size_t col_link = source->add_column_link(type_Link, "link", *target);
-    size_t col_linklist = source->add_column_link(type_LinkList, "linklist", *target);
+    ColKey col_int = source->add_column(type_Int, "id");
+    ColKey col_link = source->add_column_link(type_Link, "link", *target);
+    ColKey col_linklist = source->add_column_link(type_LinkList, "linklist", *target);
 
     target->add_column(type_Int, "id");
 
-    source->add_empty_row(3);
-    source->set_int(col_int, 0, 0);
-    source->set_int(col_int, 1, 0);
-    source->set_int(col_int, 2, 2);
+    auto o0 = source->create_object().set_all(0);
+    auto o1 = source->create_object().set_all(0);
+    auto o2 = source->create_object().set_all(2);
 
-    target->add_empty_row(3);
-    source->set_link(col_link, 0, 0);
-    source->set_link(col_link, 1, 1);
+    ObjKeys keys;
+    target->create_objects(3, keys);
+    o0.set(col_link, keys[0]);
+    o1.set(col_link, keys[1]);
 
     Query q = target->backlink(*source, col_link).column<Int>(col_int) > 0;
     TableView tv = q.find_all();
     CHECK_TABLE_VIEW(tv, {});
 
-    source->set_int(col_int, 1, 1);
+    o1.set(col_int, 1);
     CHECK_EQUAL(false, tv.is_in_sync());
 
     tv.sync_if_needed();
-    CHECK_TABLE_VIEW(tv, {1});
+    CHECK_TABLE_VIEW(tv, {keys[1]});
 
-    source->set_link(col_link, 2, 2);
+    o2.set(col_link, keys[2]);
     CHECK_EQUAL(false, tv.is_in_sync());
 
     tv.sync_if_needed();
-    CHECK_TABLE_VIEW(tv, {1, 2});
+    CHECK_TABLE_VIEW(tv, {keys[1], keys[2]});
 
     Query list_query = target->backlink(*source, col_linklist).column<Int>(col_int) > 0;
     TableView list_tv = list_query.find_all();
     CHECK_TABLE_VIEW(list_tv, {});
 
-    CHECK_EQUAL(0, source->get_link_count(col_linklist, 0));
-    LinkViewRef list = source->get_linklist(col_linklist, 0);
+    CHECK_EQUAL(0, o0.get_link_count(col_linklist));
+    auto list = o0.get_linklist(col_linklist);
 
-    list->add(0);
-    list->add(0);
-
-    CHECK_EQUAL(false, list_tv.is_in_sync());
-    list_tv.sync_if_needed();
-    CHECK_EQUAL(true, list_tv.is_in_sync());
-
-    CHECK_EQUAL(2, source->get_link_count(col_linklist, 0));
-    CHECK_TABLE_VIEW(list_tv, {});
-
-    list->add(2);
+    list.add(keys[0]);
+    list.add(keys[0]);
 
     CHECK_EQUAL(false, list_tv.is_in_sync());
     list_tv.sync_if_needed();
     CHECK_EQUAL(true, list_tv.is_in_sync());
 
-    CHECK_EQUAL(3, source->get_link_count(col_linklist, 0));
+    CHECK_EQUAL(2, o0.get_link_count(col_linklist));
     CHECK_TABLE_VIEW(list_tv, {});
 
-    LinkViewRef list2 = source->get_linklist(col_linklist, 2);
-    list2->add(0);
+    list.add(keys[2]);
 
-    CHECK_EQUAL(1, source->get_link_count(col_linklist, 2));
+    CHECK_EQUAL(false, list_tv.is_in_sync());
+    list_tv.sync_if_needed();
+    CHECK_EQUAL(true, list_tv.is_in_sync());
+
+    CHECK_EQUAL(3, o0.get_link_count(col_linklist));
+    CHECK_TABLE_VIEW(list_tv, {});
+
+    auto list2 = o2.get_linklist(col_linklist);
+    list2.add(keys[0]);
+
+    CHECK_EQUAL(1, o2.get_link_count(col_linklist));
     CHECK_TABLE_VIEW(list_tv, {});
     CHECK_EQUAL(false, list_tv.is_in_sync());
     list_tv.sync_if_needed();
     CHECK_EQUAL(true, list_tv.is_in_sync());
 
-    CHECK_TABLE_VIEW(list_tv, {0});
+    CHECK_TABLE_VIEW(list_tv, {keys[0]});
 }
 
 // Test queries involving the backlinks of a link column.
@@ -1709,60 +1405,59 @@ TEST(BackLink_Query_Link)
     TableRef source = group.add_table("source");
     TableRef target = group.add_table("target");
 
-    size_t col_id = target->add_column(type_Int, "id");
 
-    target->add_empty_row(4);
-    target->set_int(col_id, 0, 0);
-    target->set_int(col_id, 1, 1);
-    target->set_int(col_id, 2, 2);
-    target->set_int(col_id, 3, 3);
+    target->add_column(type_Int, "id");
 
-    size_t col_link = source->add_column_link(type_Link, "link", *target);
-    size_t col_int = source->add_column(type_Int, "int");
-    size_t col_double = source->add_column(type_Double, "double");
-    size_t col_string = source->add_column(type_String, "string");
+    auto k0 = target->create_object().set_all(0).get_key();
+    auto k1 = target->create_object().set_all(1).get_key();
+    auto k2 = target->create_object().set_all(2).get_key();
+    auto k3 = target->create_object().set_all(3).get_key();
 
-    auto add_row = [&](util::Optional<size_t> link_target, int64_t i, double d, const char* string) {
-        size_t row = source->add_empty_row();
-        if (link_target)
-            source->set_link(col_link, row, *link_target);
-        source->set_int(col_int, row, i);
-        source->set_double(col_double, row, d);
-        source->set_string(col_string, row, string);
+    auto col_link = source->add_column_link(type_Link, "link", *target);
+    auto col_int = source->add_column(type_Int, "int");
+    auto col_double = source->add_column(type_Double, "double");
+    auto col_string = source->add_column(type_String, "string");
+
+    auto add_row = [&](std::vector<ObjKey> link_targets, int64_t i, double d, const char* string) {
+        auto row = source->create_object();
+        for (auto link_target : link_targets) // only 0 or 1 element
+            row.set(col_link, link_target);
+        row.set(col_int, i);
+        row.set(col_double, d);
+        row.set(col_string, string);
     };
 
-    add_row(util::none, 10, 10.0, "first");
-    add_row(1, 20, 20.0, "second");
-    add_row(2, 30, 30.0, "third");
-    add_row(3, 40, 40.0, "fourth");
-    add_row(3, 50, 50.0, "fifth");
+    add_row({}, 10, 10.0, "first");
+    add_row({k1}, 20, 20.0, "second");
+    add_row({k2}, 30, 30.0, "third");
+    add_row({k3}, 40, 40.0, "fourth");
+    add_row({k3}, 50, 50.0, "fifth");
 
     Query q1 = target->backlink(*source, col_link).column<Int>(col_int) > 25;
-    CHECK_TABLE_VIEW(q1.find_all(), {2, 3});
+    CHECK_TABLE_VIEW(q1.find_all(), {k2, k3});
 
     Query q2 = target->backlink(*source, col_link).column<Double>(col_double) < 25.0;
-    CHECK_TABLE_VIEW(q2.find_all(), {1});
+    CHECK_TABLE_VIEW(q2.find_all(), {k1});
 
     Query q3 = target->backlink(*source, col_link).column<StringData>(col_string).begins_with("f");
-    CHECK_TABLE_VIEW(q3.find_all(), {3});
+    CHECK_TABLE_VIEW(q3.find_all(), {k3});
 
     Query q4 = target->column<BackLink>(*source, col_link).is_null();
-    CHECK_TABLE_VIEW(q4.find_all(), {0});
+    CHECK_TABLE_VIEW(q4.find_all(), {k0});
 
     Query q5 = target->column<BackLink>(*source, col_link).count() == 0;
-    CHECK_TABLE_VIEW(q5.find_all(), {0});
-
+    CHECK_TABLE_VIEW(q5.find_all(), {k0});
     Query q6 = target->column<BackLink>(*source, col_link).column<Int>(col_int).average() > 42.5;
-    CHECK_TABLE_VIEW(q6.find_all(), {3});
+    CHECK_TABLE_VIEW(q6.find_all(), {k3});
 
     Query q7 = target->column<BackLink>(*source, col_link).column<Double>(col_double).min() < 30.0;
-    CHECK_TABLE_VIEW(q7.find_all(), {1});
+    CHECK_TABLE_VIEW(q7.find_all(), {k1});
 
     Query q8 = target->column<BackLink>(*source, col_link).column<Int>(col_int).sum() == 0;
-    CHECK_TABLE_VIEW(q8.find_all(), {0});
+    CHECK_TABLE_VIEW(q8.find_all(), {k0});
 
     Query q9 = target->column<BackLink>(*source, col_link).column<Int>(col_int).average() == null();
-    CHECK_TABLE_VIEW(q9.find_all(), {0});
+    CHECK_TABLE_VIEW(q9.find_all(), {k0});
 }
 
 // Test queries involving the backlinks of a link list column.
@@ -1773,69 +1468,68 @@ TEST(BackLink_Query_LinkList)
     TableRef source = group.add_table("source");
     TableRef target = group.add_table("target");
 
-    size_t col_id = target->add_column(type_Int, "id");
+    target->add_column(type_Int, "id");
 
-    target->add_empty_row(5);
-    target->set_int(col_id, 0, 0);
-    target->set_int(col_id, 1, 1);
-    target->set_int(col_id, 2, 2);
-    target->set_int(col_id, 3, 3);
-    target->set_int(col_id, 4, 4);
+    auto k0 = target->create_object().set_all(0).get_key();
+    auto k1 = target->create_object().set_all(1).get_key();
+    auto k2 = target->create_object().set_all(2).get_key();
+    auto k3 = target->create_object().set_all(3).get_key();
+    auto k4 = target->create_object().set_all(4).get_key();
 
-    size_t col_linklist = source->add_column_link(type_LinkList, "linklist", *target);
-    size_t col_int = source->add_column(type_Int, "int");
-    size_t col_double = source->add_column(type_Double, "double");
-    size_t col_string = source->add_column(type_String, "string");
+    auto col_linklist = source->add_column_link(type_LinkList, "linklist", *target);
+    auto col_int = source->add_column(type_Int, "int");
+    auto col_double = source->add_column(type_Double, "double");
+    auto col_string = source->add_column(type_String, "string");
 
-    auto add_row = [&](std::vector<size_t> link_targets, int64_t i, double d, const char* string) {
-        size_t row = source->add_empty_row();
-        auto link_view = source->get_linklist(col_linklist, row);
+    auto add_row = [&](std::vector<ObjKey> link_targets, int64_t i, double d, const char* string) {
+        auto row = source->create_object();
+        auto link_view = row.get_linklist(col_linklist);
         for (auto link_target : link_targets)
-            link_view->add(link_target);
-        source->set_int(col_int, row, i);
-        source->set_double(col_double, row, d);
-        source->set_string(col_string, row, string);
+            link_view.add(link_target);
+        row.set(col_int, i);
+        row.set(col_double, d);
+        row.set(col_string, string);
     };
 
     add_row({}, 10, 10.0, "first");
-    add_row({1, 1}, 20, 20.0, "second");
-    add_row({0, 1}, 30, 30.0, "third");
-    add_row({2, 3}, 40, 40.0, "fourth");
-    add_row({3}, 50, 50.0, "fifth");
+    add_row({k1, k1}, 20, 20.0, "second");
+    add_row({k0, k1}, 30, 30.0, "third");
+    add_row({k2, k3}, 40, 40.0, "fourth");
+    add_row({k3}, 50, 50.0, "fifth");
 
     Query q1 = target->backlink(*source, col_linklist).column<Int>(col_int) > 25;
-    CHECK_TABLE_VIEW(q1.find_all(), {0, 1, 2, 3});
+    CHECK_TABLE_VIEW(q1.find_all(), {k0, k1, k2, k3});
 
     Query q2 = target->backlink(*source, col_linklist).column<Double>(col_double) < 25.0;
-    CHECK_TABLE_VIEW(q2.find_all(), {1});
+    CHECK_TABLE_VIEW(q2.find_all(), {k1});
 
     Query q3 = target->backlink(*source, col_linklist).column<StringData>(col_string).begins_with("f");
-    CHECK_TABLE_VIEW(q3.find_all(), {2, 3});
+    CHECK_TABLE_VIEW(q3.find_all(), {k2, k3});
 
     Query q4 = target->column<BackLink>(*source, col_linklist).is_null();
-    CHECK_TABLE_VIEW(q4.find_all(), {4});
+    CHECK_TABLE_VIEW(q4.find_all(), {k4});
 
     Query q5 = target->column<BackLink>(*source, col_linklist).count() == 0;
-    CHECK_TABLE_VIEW(q5.find_all(), {4});
+    CHECK_TABLE_VIEW(q5.find_all(), {k4});
 
     Query q6 = target->column<BackLink>(*source, col_linklist).column<Int>(col_int).average() > 42.5;
-    CHECK_TABLE_VIEW(q6.find_all(), {3});
+    CHECK_TABLE_VIEW(q6.find_all(), {k3});
 
     Query q7 = target->column<BackLink>(*source, col_linklist).column<Double>(col_double).min() < 30.0;
-    CHECK_TABLE_VIEW(q7.find_all(), {1});
+    CHECK_TABLE_VIEW(q7.find_all(), {k1});
 
     Query q8 = target->column<BackLink>(*source, col_linklist).column<Int>(col_int).sum() == 0;
-    CHECK_TABLE_VIEW(q8.find_all(), {4});
+    CHECK_TABLE_VIEW(q8.find_all(), {k4});
 
     Query q9 = target->column<BackLink>(*source, col_linklist).column<Int>(col_int).average() == null();
-    CHECK_TABLE_VIEW(q9.find_all(), {4});
+    CHECK_TABLE_VIEW(q9.find_all(), {k4});
 
     Query q10 = target->column<BackLink>(*source, col_linklist).column<Double>(col_double).sum() == 70;
-    CHECK_TABLE_VIEW(q10.find_all(), {1});
+    CHECK_TABLE_VIEW(q10.find_all(), {k1});
 
     Query q11 =
         target->column<BackLink>(*source, col_linklist, source->column<Double>(col_double) == 20.0).count() == 2;
-    CHECK_TABLE_VIEW(q11.find_all(), {1});
+    CHECK_TABLE_VIEW(q11.find_all(), {k1});
 }
 
 // Test queries involving multiple levels of links and backlinks.
@@ -1845,18 +1539,18 @@ TEST(BackLink_Query_MultipleLevels)
 
     TableRef people = group.add_table("people");
 
-    size_t col_name = people->add_column(type_String, "name");
-    size_t col_age = people->add_column(type_Int, "age");
-    size_t col_children = people->add_column_link(type_LinkList, "children", *people);
+    auto col_name = people->add_column(type_String, "name");
+    auto col_age = people->add_column(type_Int, "age");
+    auto col_children = people->add_column_link(type_LinkList, "children", *people);
 
-    auto add_person = [&](std::string name, int age, std::vector<size_t> children) {
-        size_t row = people->add_empty_row();
-        auto children_link_view = people->get_linklist(col_children, row);
+    auto add_person = [&](std::string name, int age, std::vector<ObjKey> children) {
+        auto row = people->create_object();
+        auto children_link_view = row.get_linklist(col_children);
         for (auto child : children)
-            children_link_view->add(child);
-        people->set_string(col_name, row, name);
-        people->set_int(col_age, row, age);
-        return row;
+            children_link_view.add(child);
+        row.set(col_name, name);
+        row.set(col_age, age);
+        return row.get_key();
     };
 
     auto hannah = add_person("Hannah", 0, {});
@@ -1906,20 +1600,20 @@ TEST(BackLink_Query_MultipleLevels)
     CHECK_TABLE_VIEW(q6.find_all(), {mark, jason, diane, carol});
 
     // People that have Raewynne as a parent.
-    Query q7 = people->column<BackLink>(*people, col_children) == people->get(raewynne);
+    Query q7 = people->column<BackLink>(*people, col_children) == people->get_object(raewynne);
     CHECK_TABLE_VIEW(q7.find_all(), {mark, jason});
 
     // People that have Mark as a child.
-    Query q8 = people->column<Link>(col_children) == people->get(mark);
+    Query q8 = people->column<Link>(col_children) == people->get_object(mark);
     CHECK_TABLE_VIEW(q8.find_all(), {michael, raewynne});
 
     // People that have Michael as a grandparent.
-    Query q9 =
-        people->backlink(*people, col_children).column<BackLink>(*people, col_children) == people->get(michael);
+    Query q9 = people->backlink(*people, col_children).column<BackLink>(*people, col_children) ==
+               people->get_object(michael);
     CHECK_TABLE_VIEW(q9.find_all(), {hannah, elijah});
 
     // People that have Hannah as a grandchild.
-    Query q10 = people->link(col_children).column<Link>(col_children) == people->get(hannah);
+    Query q10 = people->link(col_children).column<Link>(col_children) == people->get_object(hannah);
     CHECK_TABLE_VIEW(q10.find_all(), {don, diane_sr, michael, raewynne});
 
     // People that have no listed parents.
@@ -1933,14 +1627,6 @@ TEST(BackLink_Query_MultipleLevels)
     // Backlinks can never contain null so this will match all rows with backlinks.
     Query q13 = people->column<BackLink>(*people, col_children) != null();
     CHECK_TABLE_VIEW(q13.find_all(), {hannah, elijah, mark, jason, diane, carol});
-
-    // No links are equal to a detached row accessor.
-    Query q14 = people->column<BackLink>(*people, col_children) == Row();
-    CHECK_TABLE_VIEW(q14.find_all(), {});
-
-    // All links are not equal to a detached row accessor so this will match all rows with backlinks.
-    Query q15 = people->column<BackLink>(*people, col_children) != Row();
-    CHECK_TABLE_VIEW(q15.find_all(), {hannah, elijah, mark, jason, diane, carol});
 }
 
 // Test queries involving the multiple levels of backlinks across multiple tables.
@@ -1953,38 +1639,25 @@ TEST(BackLink_Query_MultipleLevelsAndTables)
     TableRef c = group.add_table("c");
     TableRef d = group.add_table("d");
 
-    size_t col_id = a->add_column(type_Int, "id");
-    size_t col_a_to_b = a->add_column_link(type_Link, "link", *b);
+    auto col_id = a->add_column(type_Int, "id");
+    auto col_a_to_b = a->add_column_link(type_Link, "link", *b);
 
-    size_t col_b_to_c = b->add_column_link(type_Link, "link", *c);
-    size_t col_c_to_d = c->add_column_link(type_Link, "link", *d);
+    auto col_b_to_c = b->add_column_link(type_Link, "link", *c);
+    auto col_c_to_d = c->add_column_link(type_Link, "link", *d);
 
     d->add_column(type_Int, "id");
 
-    auto add_row = [&](Table& table, std::vector<size_t> values, util::Optional<size_t> link) {
-        size_t row = table.add_empty_row();
-        size_t i = 0;
-        for (; i < values.size(); ++i)
-            table.set_int(i, row, values[i]);
-        if (link)
-            table.set_link(i, row, *link);
-    };
-
-    add_row(*d, {0}, util::none);
-    add_row(*d, {1}, util::none);
-
-    add_row(*c, {}, 0);
-    add_row(*c, {}, 1);
-
-    add_row(*b, {}, 0);
-    add_row(*b, {}, 1);
-
-    add_row(*a, {0}, 0);
-    add_row(*a, {1}, 1);
-
+    auto k0 = d->create_object().set_all(0).get_key();
+    auto k1 = d->create_object().set_all(1).get_key();
+    auto saved1 = k1; // the thing to find in the end
+    k0 = c->create_object().set_all(k0).get_key();
+    k1 = c->create_object().set_all(k1).get_key();
+    k0 = b->create_object().set_all(k0).get_key();
+    k1 = b->create_object().set_all(k1).get_key();
+    k0 = a->create_object().set_all(0, k0).get_key();
+    k1 = a->create_object().set_all(1, k1).get_key();
     Query q = d->backlink(*c, col_c_to_d).backlink(*b, col_b_to_c).backlink(*a, col_a_to_b).column<Int>(col_id) == 1;
-    CHECK_TABLE_VIEW(q.find_all(), {1});
+    CHECK_TABLE_VIEW(q.find_all(), {saved1});
 }
 
-#endif
 #endif

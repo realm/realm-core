@@ -526,66 +526,6 @@ TEST(Transactions_Continuous_SerialWrites)
     }
 }
 
-#ifdef LEGACY_TESTS
-
-// Rollback a table move operation and check accessors.
-// This case checks column accessors when a table is inserted, moved, rolled back.
-// In this case it is easy to see (by just looking at the assert message) that the
-// accessors have not been updated after rollback because the column count is swapped.
-TEST(Transactions_RollbackMoveTableColumns)
-{
-    SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    DB sg_w(*hist_w, SharedGroupOptions(crypt_key()));
-    WriteTransaction wt(sg_w);
-    Group& g = wt.get_group();
-
-    auto t0k = g.add_table("t0")->get_key();
-    g.get_table(t0k)->insert_column_link(0, type_Link, "t0_link0_to_t0", *g.get_table(t0k));
-
-    LangBindHelper::commit_and_continue_as_read(sg_w);
-    LangBindHelper::promote_to_write(sg_w);
-
-    g.add_table("t1")->get_key();
-
-    g.add_table(0, "inserted_at_the end");
-    LangBindHelper::rollback_and_continue_as_read(sg_w);
-
-    g.verify(); // table.cpp:5249: [realm-core-0.97.0] Assertion failed: col_ndx <= m_cols.size() [2, 0]
-
-    LangBindHelper::promote_to_write(sg_w);
-
-    CHECK_EQUAL(g.get_table(t0k)->get_name(), StringData("t0"));
-    CHECK_EQUAL(g.size(), 1);
-}
-
-// Rollback a table move operation and check accessors.
-// This case reveals that after cancelling a table move operation
-// the accessor references in memory are not what they should be
-TEST(Transactions_RollbackMoveTableReferences)
-{
-    SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    DB sg_w(*hist_w, SharedGroupOptions(crypt_key()));
-    WriteTransaction wt(sg_w);
-    Group& g = wt.get_group();
-
-    auto t0k = g.add_table(0, "t0")->get_key();
-    g.get_table(t0k)->insert_column(0, type_Int, "t0_int0");
-
-    LangBindHelper::commit_and_continue_as_read(sg_w);
-    LangBindHelper::promote_to_write(sg_w);
-    g.add_table("t1");
-    LangBindHelper::rollback_and_continue_as_read(sg_w);
-
-    g.verify(); // array.cpp:2111: [realm-core-0.97.0] Assertion failed: ref_in_parent == m_ref [112, 4864]
-
-    LangBindHelper::promote_to_write(sg_w);
-
-    CHECK_EQUAL(g.get_table(t0k)->get_name(), StringData("t0"));
-    CHECK_EQUAL(g.size(), 1);
-}
-#endif
 
 // Check that enumeration is gone after
 // rolling back the insertion of a string enum column

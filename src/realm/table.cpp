@@ -1472,6 +1472,32 @@ ObjKey Table::find_first(ColKey col_key, T value) const
 namespace realm {
 
 template <>
+ObjKey Table::find_first(ColKey col_key, ObjKey value) const
+{
+    if (REALM_UNLIKELY(!valid_column(col_key)))
+        throw InvalidKey("Non-existing column");
+
+    ObjKey key;
+    using LeafType = typename ColumnTypeTraits<ObjKey>::cluster_leaf_type;
+    LeafType leaf(get_alloc());
+    size_t col_ndx = colkey2ndx(col_key);
+
+    ClusterTree::TraverseFunction f = [&key, &col_ndx, &value, &leaf](const Cluster* cluster) {
+        cluster->init_leaf(col_ndx, &leaf);
+        size_t row = leaf.find_first(value, 0, cluster->node_size());
+        if (row != realm::npos) {
+            key = cluster->get_real_key(row);
+            return true;
+        }
+        return false;
+    };
+
+    traverse_clusters(f);
+
+    return key;
+}
+
+template <>
 ObjKey Table::find_first(ColKey col_key, util::Optional<float> value) const
 {
     return value ? find_first(col_key, *value) : find_first_null(col_key);
@@ -1500,17 +1526,6 @@ template ObjKey Table::find_first(ColKey col_key, util::Optional<int64_t>) const
 template ObjKey Table::find_first(ColKey col_key, BinaryData) const;
 
 
-/*
-Key Table::find_first_link(ColKey) const
-{
-        auto target_row = get_link_target(m_link_chain[0])->get(target_row_index);
-        size_t ret = where().links_to(m_link_chain[0], target_row).find();
-        m_link_chain.clear();
-        return ret;
-    // TODO
-    return null_key;
-}
-*/
 
 ObjKey Table::find_first_int(ColKey col_key, int64_t value) const
 {
@@ -1563,19 +1578,7 @@ TableView Table::find_all(ColKey col_key, T value)
 {
     return where().equal(col_key, value).find_all();
 }
-/*
-TableView Table::find_all_link(Key target_key)
-{
-    TableView tv = where().links_to(m_link_chain[0], target_key).find_all();
-    m_link_chain.clear();
-    return tv;
-}
 
-ConstTableView Table::find_all_link(Key target_key) const
-{
-    return const_cast<Table*>(this)->find_all_link(target_key);
-}
-*/
 TableView Table::find_all_int(ColKey col_key, int64_t value)
 {
     return find_all<int64_t>(col_key, value);
