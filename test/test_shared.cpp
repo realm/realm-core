@@ -986,13 +986,12 @@ TEST(Shared_Writes)
     }
 }
 
-#ifdef LEGACY_TESTS
 namespace {
 
-void add_int(Table& table, size_t col_ndx, int_fast64_t diff)
+void add_int(Table& table, ColKey col, int64_t diff)
 {
-    for (size_t i = 0; i < table.size(); ++i) {
-        table.set_int(col_ndx, i, table.get_int(col_ndx, i) + diff);
+    for (auto& o : table) {
+        o.add_int(col, diff);
     }
 }
 
@@ -1023,8 +1022,10 @@ TEST(Shared_ManyReaders)
 
     const int max_N = 64;
     CHECK(max_N >= rounds[num_rounds - 1]);
-    std::unique_ptr<DB> shared_groups[8 * max_N];
-    std::unique_ptr<ReadTransaction> read_transactions[8 * max_N];
+    DBRef shared_groups[8 * max_N];
+    TransactionRef read_transactions[8 * max_N];
+    ColKey col_int;
+    ColKey col_bin;
 
     for (int round = 0; round < num_rounds; ++round) {
         int N = rounds[round];
@@ -1032,7 +1033,7 @@ TEST(Shared_ManyReaders)
         SHARED_GROUP_TEST_PATH(path);
 
         bool no_create = false;
-        DB root_sg(path, no_create, DBOptions(DBOptions::Durability::MemOnly));
+        auto root_sg = DB::create(path, no_create, DBOptions(DBOptions::Durability::MemOnly));
 
         // Add two tables
         {
@@ -1041,12 +1042,12 @@ TEST(Shared_ManyReaders)
             bool was_added = false;
             TableRef test_1 = wt.get_or_add_table("test_1", &was_added);
             if (was_added) {
-                test_1->add_column(type_Int, "i");
+                col_int = test_1->add_column(type_Int, "i");
             }
-            test_1->create_object(ObjKey(0)).set(0, 0);
+            test_1->create_object().set(col_int, 0);
             TableRef test_2 = wt.get_or_add_table("test_2", &was_added);
             if (was_added) {
-                test_2->add_column(type_Binary, "b");
+                col_bin = test_2->add_column(type_Binary, "b");
             }
             wt.commit();
         }
@@ -1054,33 +1055,36 @@ TEST(Shared_ManyReaders)
 
         // Create 8*N shared group accessors
         for (int i = 0; i < 8 * N; ++i)
-            shared_groups[i].reset(new DB(path, no_create, DBOptions(DBOptions::Durability::MemOnly)));
+            shared_groups[i] = DB::create(path, no_create, DBOptions(DBOptions::Durability::MemOnly));
 
         // Initiate 2*N read transactions with progressive changes
         for (int i = 0; i < 2 * N; ++i) {
-            read_transactions[i].reset(new ReadTransaction(*shared_groups[i]));
-            read_transactions[i]->get_group().verify();
+            read_transactions[i] = shared_groups[i]->start_read();
+            read_transactions[i]->verify();
             {
                 ConstTableRef test_1 = read_transactions[i]->get_table("test_1");
                 CHECK_EQUAL(1u, test_1->size());
-                CHECK_EQUAL(i, test_1->get_object(ObjKey(0)).get<Int>(0));
+                CHECK_EQUAL(i, test_1->begin()->get<Int>(col_int));
                 ConstTableRef test_2 = read_transactions[i]->get_table("test_2");
                 int n_1 = i * 1;
                 int n_2 = i * 18;
                 CHECK_EQUAL(n_1 + n_2, test_2->size());
-                for (int j = 0; j < n_1; ++j)
-                    CHECK_EQUAL(BinaryData(chunk_1), test_2->get_binary(0, j));
-                for (int j = n_1; j < n_1 + n_2; ++j)
-                    CHECK_EQUAL(BinaryData(chunk_2), test_2->get_binary(0, j));
+                for (int j = 0; j < n_1 + n_2; ++j) {
+                    if (j % 19 == 0) {
+                        CHECK_EQUAL(BinaryData(chunk_1), test_2->get_object(j).get<Binary>(col_bin));
+                    }
+                    else {
+                        CHECK_EQUAL(BinaryData(chunk_2), test_2->get_object(j).get<Binary>(col_bin));
+                    }
+                }
             }
             {
                 WriteTransaction wt(root_sg);
                 wt.get_group().verify();
                 TableRef test_1 = wt.get_table("test_1");
-                add_int(*test_1, 0, 1);
+                add_int(*test_1, col_int, 1);
                 TableRef test_2 = wt.get_table("test_2");
-                test_2->insert_empty_row(0);
-                test_2->set_binary(0, 0, BinaryData(chunk_1));
+                test_2->create_object().set(col_bin, BinaryData(chunk_1));
                 wt.commit();
             }
             {
@@ -1088,8 +1092,7 @@ TEST(Shared_ManyReaders)
                 wt.get_group().verify();
                 TableRef test_2 = wt.get_table("test_2");
                 for (int j = 0; j < 18; ++j) {
-                    test_2->insert_empty_row(test_2->size());
-                    test_2->set_binary(0, test_2->size() - 1, BinaryData(chunk_2));
+                    test_2->create_object().set(col_bin, BinaryData(chunk_2));
                 }
                 wt.commit();
             }
@@ -1099,15 +1102,19 @@ TEST(Shared_ManyReaders)
         for (int i = 0; i < 2 * N; ++i) {
             ConstTableRef test_1 = read_transactions[i]->get_table("test_1");
             CHECK_EQUAL(1, test_1->size());
-            CHECK_EQUAL(i, test_1->get_int(0, 0));
+            CHECK_EQUAL(i, test_1->begin()->get<Int>(col_int));
             ConstTableRef test_2 = read_transactions[i]->get_table("test_2");
             int n_1 = i * 1;
             int n_2 = i * 18;
             CHECK_EQUAL(n_1 + n_2, test_2->size());
-            for (int j = 0; j < n_1; ++j)
-                CHECK_EQUAL(BinaryData(chunk_1), test_2->get_binary(0, j));
-            for (int j = n_1; j < n_1 + n_2; ++j)
-                CHECK_EQUAL(BinaryData(chunk_2), test_2->get_binary(0, j));
+            for (int j = 0; j < n_1 + n_2; ++j) {
+                if (j % 19 == 0) {
+                    CHECK_EQUAL(BinaryData(chunk_1), test_2->get_object(j).get<Binary>(col_bin));
+                }
+                else {
+                    CHECK_EQUAL(BinaryData(chunk_2), test_2->get_object(j).get<Binary>(col_bin));
+                }
+            }
         }
 
         // End the first half of the read transactions during further
@@ -1119,44 +1126,52 @@ TEST(Shared_ManyReaders)
                 wt.get_group().verify();
 #endif
                 TableRef test_1 = wt.get_table("test_1");
-                add_int(*test_1, 0, 2);
+                add_int(*test_1, col_int, 2);
                 wt.commit();
             }
             {
                 ConstTableRef test_1 = read_transactions[i]->get_table("test_1");
                 CHECK_EQUAL(1, test_1->size());
-                CHECK_EQUAL(i, test_1->get_int(0, 0));
+                CHECK_EQUAL(i, test_1->begin()->get<Int>(col_int));
                 ConstTableRef test_2 = read_transactions[i]->get_table("test_2");
                 int n_1 = i * 1;
                 int n_2 = i * 18;
                 CHECK_EQUAL(n_1 + n_2, test_2->size());
-                for (int j = 0; j < n_1; ++j)
-                    CHECK_EQUAL(BinaryData(chunk_1), test_2->get_binary(0, j));
-                for (int j = n_1; j < n_1 + n_2; ++j)
-                    CHECK_EQUAL(BinaryData(chunk_2), test_2->get_binary(0, j));
+                for (int j = 0; j < n_1 + n_2; ++j) {
+                    if (j % 19 == 0) {
+                        CHECK_EQUAL(BinaryData(chunk_1), test_2->get_object(j).get<Binary>(col_bin));
+                    }
+                    else {
+                        CHECK_EQUAL(BinaryData(chunk_2), test_2->get_object(j).get<Binary>(col_bin));
+                    }
+                }
             }
-            read_transactions[i].reset();
+            read_transactions[i] = nullptr;
         }
 
         // Initiate 6*N extra read transactionss with further progressive changes
         for (int i = 2 * N; i < 8 * N; ++i) {
-            read_transactions[i].reset(new ReadTransaction(*shared_groups[i]));
+            read_transactions[i] = shared_groups[i]->start_read();
 #if !defined(_WIN32) || TEST_DURATION > 0
-            read_transactions[i]->get_group().verify();
+            read_transactions[i]->verify();
 #endif
             {
                 ConstTableRef test_1 = read_transactions[i]->get_table("test_1");
                 CHECK_EQUAL(1u, test_1->size());
                 int i_2 = 2 * N + i;
-                CHECK_EQUAL(i_2, test_1->get_int(0, 0));
+                CHECK_EQUAL(i_2, test_1->begin()->get<Int>(col_int));
                 ConstTableRef test_2 = read_transactions[i]->get_table("test_2");
                 int n_1 = i * 1;
                 int n_2 = i * 18;
                 CHECK_EQUAL(n_1 + n_2, test_2->size());
-                for (int j = 0; j < n_1; ++j)
-                    CHECK_EQUAL(BinaryData(chunk_1), test_2->get_binary(0, j));
-                for (int j = n_1; j < n_1 + n_2; ++j)
-                    CHECK_EQUAL(BinaryData(chunk_2), test_2->get_binary(0, j));
+                for (int j = 0; j < n_1 + n_2; ++j) {
+                    if (j % 19 == 0) {
+                        CHECK_EQUAL(BinaryData(chunk_1), test_2->get_object(j).get<Binary>(col_bin));
+                    }
+                    else {
+                        CHECK_EQUAL(BinaryData(chunk_2), test_2->get_object(j).get<Binary>(col_bin));
+                    }
+                }
             }
             {
                 WriteTransaction wt(root_sg);
@@ -1164,10 +1179,9 @@ TEST(Shared_ManyReaders)
                 wt.get_group().verify();
 #endif
                 TableRef test_1 = wt.get_table("test_1");
-                add_int(*test_1, 0, 1);
+                add_int(*test_1, col_int, 1);
                 TableRef test_2 = wt.get_table("test_2");
-                test_2->insert_empty_row(0);
-                test_2->set_binary(0, 0, BinaryData(chunk_1));
+                test_2->create_object().set(col_bin, BinaryData(chunk_1));
                 wt.commit();
             }
             {
@@ -1177,8 +1191,7 @@ TEST(Shared_ManyReaders)
 #endif
                 TableRef test_2 = wt.get_table("test_2");
                 for (int j = 0; j < 18; ++j) {
-                    test_2->insert_empty_row(test_2->size());
-                    test_2->set_binary(0, test_2->size() - 1, BinaryData(chunk_2));
+                    test_2->create_object().set(col_bin, BinaryData(chunk_2));
                 }
                 wt.commit();
             }
@@ -1192,46 +1205,54 @@ TEST(Shared_ManyReaders)
                 wt.get_group().verify();
 #endif
                 TableRef test_1 = wt.get_table("test_1");
-                add_int(*test_1, 0, 2);
+                add_int(*test_1, col_int, 2);
                 wt.commit();
             }
             {
                 ConstTableRef test_1 = read_transactions[i]->get_table("test_1");
                 CHECK_EQUAL(1, test_1->size());
                 int i_2 = i < 2 * N ? i : 2 * N + i;
-                CHECK_EQUAL(i_2, test_1->get_int(0, 0));
+                CHECK_EQUAL(i_2, test_1->begin()->get<Int>(col_int));
                 ConstTableRef test_2 = read_transactions[i]->get_table("test_2");
                 int n_1 = i * 1;
                 int n_2 = i * 18;
                 CHECK_EQUAL(n_1 + n_2, test_2->size());
-                for (int j = 0; j < n_1; ++j)
-                    CHECK_EQUAL(BinaryData(chunk_1), test_2->get_binary(0, j));
-                for (int j = n_1; j < n_1 + n_2; ++j)
-                    CHECK_EQUAL(BinaryData(chunk_2), test_2->get_binary(0, j));
+                for (int j = 0; j < n_1 + n_2; ++j) {
+                    if (j % 19 == 0) {
+                        CHECK_EQUAL(BinaryData(chunk_1), test_2->get_object(j).get<Binary>(col_bin));
+                    }
+                    else {
+                        CHECK_EQUAL(BinaryData(chunk_2), test_2->get_object(j).get<Binary>(col_bin));
+                    }
+                }
             }
-            read_transactions[i].reset();
+            read_transactions[i] = nullptr;
         }
 
         // Check final state via each shared group, then destroy it
         for (int i = 0; i < 8 * N; ++i) {
             {
-                ReadTransaction rt(*shared_groups[i]);
+                ReadTransaction rt(shared_groups[i]);
 #if !defined(_WIN32) || TEST_DURATION > 0
                 rt.get_group().verify();
 #endif
                 ConstTableRef test_1 = rt.get_table("test_1");
                 CHECK_EQUAL(1, test_1->size());
-                CHECK_EQUAL(3 * 8 * N, test_1->get_int(0, 0));
+                CHECK_EQUAL(3 * 8 * N, test_1->begin()->get<Int>(col_int));
                 ConstTableRef test_2 = rt.get_table("test_2");
                 int n_1 = 8 * N * 1;
                 int n_2 = 8 * N * 18;
                 CHECK_EQUAL(n_1 + n_2, test_2->size());
-                for (int j = 0; j < n_1; ++j)
-                    CHECK_EQUAL(BinaryData(chunk_1), test_2->get_binary(0, j));
-                for (int j = n_1; j < n_1 + n_2; ++j)
-                    CHECK_EQUAL(BinaryData(chunk_2), test_2->get_binary(0, j));
+                for (int j = 0; j < n_1 + n_2; ++j) {
+                    if (j % 19 == 0) {
+                        CHECK_EQUAL(BinaryData(chunk_1), test_2->get_object(j).get<Binary>(col_bin));
+                    }
+                    else {
+                        CHECK_EQUAL(BinaryData(chunk_2), test_2->get_object(j).get<Binary>(col_bin));
+                    }
+                }
             }
-            shared_groups[i].reset();
+            shared_groups[i] = nullptr;
         }
 
         // Check final state via new shared group
@@ -1243,19 +1264,22 @@ TEST(Shared_ManyReaders)
 #endif
             ConstTableRef test_1 = rt.get_table("test_1");
             CHECK_EQUAL(1, test_1->size());
-            CHECK_EQUAL(3 * 8 * N, test_1->get_int(0, 0));
+            CHECK_EQUAL(3 * 8 * N, test_1->begin()->get<Int>(col_int));
             ConstTableRef test_2 = rt.get_table("test_2");
             int n_1 = 8 * N * 1;
             int n_2 = 8 * N * 18;
             CHECK_EQUAL(n_1 + n_2, test_2->size());
-            for (int j = 0; j < n_1; ++j)
-                CHECK_EQUAL(BinaryData(chunk_1), test_2->get_binary(0, j));
-            for (int j = n_1; j < n_1 + n_2; ++j)
-                CHECK_EQUAL(BinaryData(chunk_2), test_2->get_binary(0, j));
+            for (int j = 0; j < n_1 + n_2; ++j) {
+                if (j % 19 == 0) {
+                    CHECK_EQUAL(BinaryData(chunk_1), test_2->get_object(j).get<Binary>(col_bin));
+                }
+                else {
+                    CHECK_EQUAL(BinaryData(chunk_2), test_2->get_object(j).get<Binary>(col_bin));
+                }
+            }
         }
     }
 }
-#endif
 
 // This test is a minimal repro. of core issue #842.
 TEST(Many_ConcurrentReaders)
@@ -2047,7 +2071,6 @@ TEST_IF(Shared_AsyncMultiprocess, allow_async)
 #endif // !defined(_WIN32) && !REALM_PLATFORM_APPLE
 
 #ifdef _WIN32
-#ifdef LEGACY_TESTS
 #if 0
 
 TEST(Shared_WaitForChangeAfterOwnCommit)
@@ -2077,20 +2100,21 @@ NONCONCURRENT_TEST(Shared_InterprocessWaitForChange)
         return;
     }
 
-    std::unique_ptr<DB> sg(new DB(path));
+    auto sg = DB::create(path);
 
     // An old .realm file with random contents can exist (such as a leftover from earlier crash) with random
     // data, so we always initialize the database
     {
-        Group& g = sg->begin_write();
+        auto tr = sg->start_write();
+        Group& g(*tr);
         if (g.size() == 1) {
             g.remove_table("data");
             TableRef table = g.add_table("data");
             auto col = table->add_column(type_Int, "ints");
             table->create_object().set(col, 0);
         }
-        sg->commit();
-        sg->wait_for_change();
+        tr->commit();
+        sg->wait_for_change(tr);
     }
 
     bool first = false;
@@ -2099,7 +2123,8 @@ NONCONCURRENT_TEST(Shared_InterprocessWaitForChange)
     // By turn, incremenet the counter and wait for the other to increment it too
     for (int i = 0; i < 10; i++)
     {
-        Group& g = sg->begin_write();
+        auto tr = sg->start_write();
+        Group& g(*tr);
         if (g.size() == 1) {
             TableRef table = g.get_table("data");
             auto col = table->get_column_key("ints");
@@ -2120,22 +2145,21 @@ NONCONCURRENT_TEST(Shared_InterprocessWaitForChange)
         if(fastrand(1))
             millisleep((time(0) % 10) * 10);
 
-        sg->commit();
+        tr->commit();
 
         if (fastrand(1))
             millisleep((time(0) % 10) * 10);
 
-        sg->wait_for_change();
+        sg->wait_for_change(tr);
 
         if (fastrand(1))
             millisleep((time(0) % 10) * 10);
     }
 
     // Wake up other process so it will exit too
-    sg->begin_write();
-    sg->commit();
+    auto tr = sg->start_write();
+    tr->commit();
 }
-#endif
 #endif
 
 // This test will hang infinitely instead of failing!!!
@@ -2469,7 +2493,7 @@ TEST(Shared_EncryptionKeyCheck_2)
 // if opened by one key, it cannot be opened by a different key
 // disabled for now... needs to add a check in the encryption layer
 // based on a hash of the key.
-#ifdef LEGACY_TESTS
+#if 0 // in principle this should be implemented.....
 ONLY(Shared_EncryptionKeyCheck_3)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -2539,7 +2563,6 @@ TEST(Shared_MultipleEndReads)
     reader->end_read();
 }
 
-#ifdef LEGACY_TESTS
 #ifdef REALM_DEBUG
 // SharedGroup::reserve() is a debug method only available in debug mode
 TEST(Shared_ReserveDiskSpace)
@@ -2552,14 +2575,14 @@ TEST(Shared_ReserveDiskSpace)
         // Check that reserve() does not change the file size if the
         // specified size is less than the actual file size.
         size_t reserve_size_1 = orig_file_size / 2;
-        sg.reserve(reserve_size_1);
+        sg->reserve(reserve_size_1);
         size_t new_file_size_1 = size_t(File(path).get_size());
         CHECK_EQUAL(orig_file_size, new_file_size_1);
 
         // Check that reserve() does not change the file size if the
         // specified size is equal to the actual file size.
         size_t reserve_size_2 = orig_file_size;
-        sg.reserve(reserve_size_2);
+        sg->reserve(reserve_size_2);
         size_t new_file_size_2 = size_t(File(path).get_size());
         if (crypt_key()) {
             // For encrypted files, reserve() may actually grow the file
@@ -2574,9 +2597,10 @@ TEST(Shared_ReserveDiskSpace)
         // specified size is greater than the actual file size, and
         // that the new size is at least as big as the requested size.
         size_t reserve_size_3 = orig_file_size + 1;
-        sg.reserve(reserve_size_3);
+        sg->reserve(reserve_size_3);
         size_t new_file_size_3 = size_t(File(path).get_size());
         CHECK(new_file_size_3 >= reserve_size_3);
+        ObjKeys keys;
 
         // Check that disk space reservation is independent of transactions
         {
@@ -2584,12 +2608,12 @@ TEST(Shared_ReserveDiskSpace)
             wt.get_group().verify();
             auto t = wt.add_table("table_1");
             test_table_add_columns(t);
-            t->add_empty_row(2000);
+            t->create_objects(2000, keys);
             wt.commit();
         }
         orig_file_size = size_t(File(path).get_size());
         size_t reserve_size_4 = 2 * orig_file_size + 1;
-        sg.reserve(reserve_size_4);
+        sg->reserve(reserve_size_4);
         size_t new_file_size_4 = size_t(File(path).get_size());
         CHECK(new_file_size_4 >= reserve_size_4);
         {
@@ -2597,132 +2621,26 @@ TEST(Shared_ReserveDiskSpace)
             wt.get_group().verify();
             auto t = wt.add_table("table_2");
             test_table_add_columns(t);
-            t->add_empty_row(2000);
+            t->create_objects(2000, keys);
             orig_file_size = size_t(File(path).get_size());
             size_t reserve_size_5 = orig_file_size + 333;
-            sg.reserve(reserve_size_5);
+            sg->reserve(reserve_size_5);
             size_t new_file_size_5 = size_t(File(path).get_size());
             CHECK(new_file_size_5 >= reserve_size_5);
             t = wt.add_table("table_3");
             test_table_add_columns(t);
-            t->add_empty_row(2000);
+            t->create_objects(2000, keys);
             wt.commit();
         }
         orig_file_size = size_t(File(path).get_size());
         size_t reserve_size_6 = orig_file_size + 459;
-        sg.reserve(reserve_size_6);
+        sg->reserve(reserve_size_6);
         size_t new_file_size_6 = size_t(File(path).get_size());
         CHECK(new_file_size_6 >= reserve_size_6);
         {
             WriteTransaction wt(sg);
             wt.get_group().verify();
             wt.commit();
-        }
-    }
-}
-#endif
-
-TEST(Shared_MovingEnumStringColumn)
-{
-    // Test that the 'index in parent' property of the column of unique strings
-    // in a StringEnumColumn is properly adjusted when other string enumeration
-    // columns are inserted or removed before it. Note that the parent of the
-    // column of unique strings in a StringEnumColumn is a child of an array
-    // node in the Spec class.
-
-    SHARED_GROUP_TEST_PATH(path);
-    DBRef sg = DB::create(path, false, DBOptions(crypt_key()));
-
-    {
-        WriteTransaction wt(sg);
-        TableRef table = wt.add_table("foo");
-        table->add_column(type_String, "foo_strings");
-        table->add_empty_row(64);
-        for (int i = 0; i < 64; ++i)
-            table->set_string(0, i, "foo");
-        table->optimize();
-        CHECK_EQUAL(1, table->get_num_unique_values(0));
-        wt.commit();
-    }
-    // Insert new string enumeration column
-    {
-        WriteTransaction wt(sg);
-        TableRef table = wt.get_table("foo");
-        CHECK_EQUAL(1, table->get_num_unique_values(0));
-        table->insert_column(0, type_String, "a_or_b");
-        for (int i = 0; i < 64; ++i)
-            table->set_string(0, i, i % 2 == 0 ? "a" : "b");
-        table->optimize();
-        wt.get_group().verify();
-        CHECK_EQUAL(2, table->get_num_unique_values(0));
-        CHECK_EQUAL(1, table->get_num_unique_values(1));
-        table->set_string(1, 0, "bar0");
-        table->set_string(1, 1, "bar1");
-        wt.get_group().verify();
-        CHECK_EQUAL(2, table->get_num_unique_values(0));
-        CHECK_EQUAL(3, table->get_num_unique_values(1));
-        wt.commit();
-    }
-    {
-        ReadTransaction rt(sg);
-        rt.get_group().verify();
-        ConstTableRef table = rt.get_table("foo");
-        CHECK_EQUAL(2, table->get_num_unique_values(0));
-        CHECK_EQUAL(3, table->get_num_unique_values(1));
-        for (int i = 0; i < 64; ++i) {
-            std::string value = table->get_string(0, i);
-            if (i % 2 == 0) {
-                CHECK_EQUAL("a", value);
-            }
-            else {
-                CHECK_EQUAL("b", value);
-            }
-            value = table->get_string(1, i);
-            if (i == 0) {
-                CHECK_EQUAL("bar0", value);
-            }
-            else if (i == 1) {
-                CHECK_EQUAL("bar1", value);
-            }
-            else {
-                CHECK_EQUAL("foo", value);
-            }
-        }
-    }
-    // Remove the recently inserted string enumeration column
-    {
-        WriteTransaction wt(sg);
-        wt.get_group().verify();
-        TableRef table = wt.get_table("foo");
-        CHECK_EQUAL(2, table->get_num_unique_values(0));
-        CHECK_EQUAL(3, table->get_num_unique_values(1));
-        table->remove_column(0);
-        wt.get_group().verify();
-        CHECK_EQUAL(3, table->get_num_unique_values(0));
-        table->set_string(0, 2, "bar2");
-        wt.get_group().verify();
-        CHECK_EQUAL(4, table->get_num_unique_values(0));
-        wt.commit();
-    }
-    {
-        ReadTransaction rt(sg);
-        rt.get_group().verify();
-        ConstTableRef table = rt.get_table("foo");
-        CHECK_EQUAL(4, table->get_num_unique_values(0));
-        for (int i = 0; i < 64; ++i) {
-            std::string value = table->get_string(0, i);
-            if (i == 0) {
-                CHECK_EQUAL("bar0", value);
-            }
-            else if (i == 1) {
-                CHECK_EQUAL("bar1", value);
-            }
-            else if (i == 2) {
-                CHECK_EQUAL("bar2", value);
-            }
-            else {
-                CHECK_EQUAL("foo", value);
-            }
         }
     }
 }
@@ -3053,7 +2971,7 @@ NONCONCURRENT_TEST(Shared_StaticFuzzTestRunSanityCheck)
     }
 }
 
-#ifdef LEGACY_TESTS
+#if 0 // not suitable for automatic testing
 // This test checks what happens when a version is pinned and there are many
 // large write transactions that grow the file quickly. It takes a long time
 // and can make very very large files so it is not suited to automatic testing.
@@ -3672,7 +3590,6 @@ TEST(Shared_ConstList)
     CHECK_EQUAL(list1.get(0), 47);
 }
 
-#ifdef LEGACY_TESTS
 // Test if we can successfully open an existing encrypted file (generated by Core 4.0.3)
 TEST_IF(Shared_DecryptExisting, REALM_ENABLE_ENCRYPTION)
 {
@@ -3684,30 +3601,34 @@ TEST_IF(Shared_DecryptExisting, REALM_ENABLE_ENCRYPTION)
 #if 0 // set to 1 to generate the .realm file
     {
         File::try_remove(path);
-        DB db(path, false, DBOptions(crypt_key(true)));
-        Group& group = db.begin_write();
-		TableRef table = group.add_table("table");
-		table->add_column(type_String, "string");
-		table->add_empty_row();
+        //DB db(path, false, DBOptions(crypt_key(true)));
+        auto db = DB::create(path, false, DBOptions(crypt_key(true)));
+        auto rt = db->start_write();
+        //Group& group = db.begin_write();
+		TableRef table = rt->add_table("table");
+		auto c0 = table->add_column(type_String, "string");
+		auto o1 = table->create_object();
 		std::string s = std::string(size_t(1.5 * page_size()), 'a');
-		table->set_string(0, 0, s);
-        db.commit();
+		o1.set(c0, s);
+        rt->commit();
     }
 #else
     {
         SHARED_GROUP_TEST_PATH(temp_copy);
         File::copy(path, temp_copy);
-        DBRef sg = DB::create(temp_copy, true, DBOptions(crypt_key(true)));
-        const Group& group = sg.begin_read();
-		ConstTableRef table = group.get_table("table");
-		std::string s1 = table->get_string(0, 0);
-		std::string s2 = std::string(size_t(1.5 * page_size()), 'a');
+        // Use history as we will now have to upgrade file
+        std::unique_ptr<Replication> hist_w(make_in_realm_history(temp_copy));
+        auto db = DB::create(*hist_w, DBOptions(crypt_key(true)));
+        auto rt = db->start_read();
+        ConstTableRef table = rt->get_table("table");
+        auto o1 = *table->begin();
+        std::string s1 = o1.get<StringData>(table->get_column_key("string"));
+        std::string s2 = std::string(size_t(1.5 * page_size()), 'a');
 		CHECK_EQUAL(s1, s2);
-		group.verify();
+        rt->verify();
     }
 #endif
 }
-#endif
 
 TEST(Shared_RollbackFirstTransaction)
 {
