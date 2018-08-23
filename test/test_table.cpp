@@ -4521,6 +4521,9 @@ void test_dynamic_conversion(TestContext& test_context, DBRef sg, realm::DataTyp
     auto t = sg->start_write();
     auto table = t->add_table("the_table");
     auto col_from = table->add_column(type_id, "the column", from_nullable);
+    if (type_id == type_String) {
+        table->add_search_index(col_from);
+    }
     std::map<int, managed<TTo>> reference;
     value_copier<TFrom, TTo> copier(false);
     for (int j = 0; j < 10; ++j) {
@@ -4532,6 +4535,9 @@ void test_dynamic_conversion(TestContext& test_context, DBRef sg, realm::DataTyp
         reference.insert(std::pair<int, managed<TTo>>(j, managed<TTo>(conv_value)));
     }
     auto col_to = table->set_nullability(col_from, to_nullable, false);
+    if (type_id == type_String) {
+        CHECK(table->has_search_index(col_to));
+    }
     check_table_values(test_context, table, col_to, reference);
     t->rollback();
 }
@@ -4545,6 +4551,7 @@ void test_dynamic_conversion_list(TestContext& test_context, DBRef sg, realm::Da
     auto table = t->add_table("the_table");
     auto col_from = table->add_column_list(type_id, "the column", from_nullable);
     Obj o = table->create_object();
+    table->create_object(); // This object will have an empty list
     Lst<TFrom> from_lst = o.get_list<TFrom>(col_from);
     std::vector<managed<TTo>> reference;
     for (int j = 0; j < 1000; ++j) {
@@ -4621,6 +4628,7 @@ TEST(Table_Column_DynamicConversions)
     test_dynamic_conversion_list_combi_sametype<BinaryData>(test_context, sg, type_Binary);
     test_dynamic_conversion_list_combi_sametype<Timestamp>(test_context, sg, type_Timestamp);
 }
+
 /*
 TEST(Table_Column_Conversions)
 {

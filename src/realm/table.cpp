@@ -2410,26 +2410,28 @@ void Table::change_nullability_list(ColKey key_from, ColKey key_to, bool throw_o
             ref_type ref_to = to_ref(to_arr.get(i));
             REALM_ASSERT(!ref_to);
 
-            BPlusTree<F> from_list(allocator);
-            BPlusTree<T> to_list(allocator);
-            from_list.init_from_ref(ref_from);
-            to_list.create();
-            size_t n = from_list.size();
-            for (size_t j = 0; j < n; j++) {
-                auto v = from_list.get(j);
-                if (!from_nullability || bptree_aggregate_not_null(v)) {
-                    to_list.add(remove_optional(v));
-                }
-                else {
-                    if (throw_on_null) {
-                        throw realm::LogicError(realm::LogicError::column_not_nullable);
+            if (ref_from) {
+                BPlusTree<F> from_list(allocator);
+                BPlusTree<T> to_list(allocator);
+                from_list.init_from_ref(ref_from);
+                to_list.create();
+                size_t n = from_list.size();
+                for (size_t j = 0; j < n; j++) {
+                    auto v = from_list.get(j);
+                    if (!from_nullability || bptree_aggregate_not_null(v)) {
+                        to_list.add(remove_optional(v));
                     }
                     else {
-                        to_list.add(ColumnTypeTraits<T>::cluster_leaf_type::default_value(false));
+                        if (throw_on_null) {
+                            throw realm::LogicError(realm::LogicError::column_not_nullable);
+                        }
+                        else {
+                            to_list.add(ColumnTypeTraits<T>::cluster_leaf_type::default_value(false));
+                        }
                     }
                 }
+                to_arr.set(i, from_ref(to_list.get_ref()));
             }
-            to_arr.set(i, from_ref(to_list.get_ref()));
         }
     };
 
@@ -2513,13 +2515,14 @@ ColKey Table::set_nullability(ColKey col_key, bool nullable, bool throw_on_null)
 {
     if (is_nullable(col_key) == nullable)
         return col_key;
-    ColKey new_col;
-    if (is_list(col_key)) {
-        new_col = add_column_list(get_column_type(col_key), "", nullable);
-    }
-    else {
-        new_col = add_column(get_column_type(col_key), "", nullable);
-    }
+
+    bool si = has_search_index(col_key);
+    std::string column_name(get_column_name(col_key));
+    auto type = get_real_column_type(col_key);
+    auto list = is_list(col_key);
+
+    ColKey new_col = do_insert_root_column(ColKey(), type, "__temporary", nullable, list);
+
     try {
         convert_column(col_key, new_col, throw_on_null);
     }
@@ -2528,9 +2531,16 @@ ColKey Table::set_nullability(ColKey col_key, bool nullable, bool throw_on_null)
         remove_column(new_col);
         throw;
     }
-    std::string column_name(get_column_name(col_key));
-    remove_column(col_key);
-    rename_column(new_col, column_name);
+
+    bump_content_version();
+    bump_storage_version();
+
+    erase_root_column(col_key);
+    m_spec.rename_column(colkey2ndx(new_col), column_name);
+
+    if (si)
+        add_search_index(new_col);
+
     return new_col;
 }
 
