@@ -25,6 +25,9 @@
 #include <pegtl/contrib/tracer.hpp>
 
 #include <realm/util/assert.hpp>
+
+#include <realm/parser/parser_utils.hpp>
+
 // String tokens can't be followed by [A-z0-9_].
 #define string_token_t(s) seq< TAOCPP_PEGTL_ISTRING(s), not_at< identifier_other > >
 
@@ -154,7 +157,9 @@ struct sort_param : seq< star< blank >, descriptor_property, plus< blank >, sor<
 struct sort : seq< sort_prefix, sort_param, star< seq< one< ',' >, sort_param > >, one< ')' > > {};
 struct distinct_param : seq< star< blank >, descriptor_property, star< blank > > {};
 struct distinct : seq < distinct_prefix, distinct_param, star< seq< one< ',' >, distinct_param > >, one< ')' > > {};
-struct descriptor_ordering : sor< sort, distinct > {};
+struct limit_param : disable < int_num > {};
+struct limit : seq < string_token_t("limit"), star< blank >, one< '(' >, star< blank >, limit_param, star < blank >, one < ')' > > {};
+struct predicate_suffix_modifier : sor< sort, distinct, limit > {};
 
 struct string_oper : seq< sor< contains, begins, ends, like>, star< blank >, opt< case_insensitive > > {};
 // "=" is equality and since other operators can start with "=" we must check equal last
@@ -173,7 +178,7 @@ struct true_pred : string_token_t("truepredicate") {};
 struct false_pred : string_token_t("falsepredicate") {};
 
 struct not_pre : seq< sor< one< '!' >, string_token_t("not") > > {};
-struct atom_pred : seq< opt< not_pre >, pad< sor<group_pred, true_pred, false_pred, agg_shortcut_pred, comparison_pred>, blank >, star< pad< descriptor_ordering, blank > > > {};
+struct atom_pred : seq< opt< not_pre >, pad< sor<group_pred, true_pred, false_pred, agg_shortcut_pred, comparison_pred>, blank >, star< pad< predicate_suffix_modifier, blank > > > {};
 
 struct and_op : pad< sor< two< '&' >, string_token_t("and") >, blank > {};
 struct or_op : pad< sor< two< '|' >, string_token_t("or") >, blank > {};
@@ -452,7 +457,7 @@ template<> struct action< sort >
     static void apply(const Input& in, ParserState & state)
     {
         DEBUG_PRINT_TOKEN(in.string());
-        state.temp_ordering.is_distinct = false;
+        state.temp_ordering.type = DescriptorOrderingState::SingleOrderingState::DescriptorType::Sort;
         state.ordering_state.orderings.push_back(state.temp_ordering);
         state.temp_ordering.properties.clear();
     }
@@ -464,9 +469,27 @@ template<> struct action< distinct >
     static void apply(const Input& in, ParserState & state)
     {
         DEBUG_PRINT_TOKEN(in.string());
-        state.temp_ordering.is_distinct = true;
+        state.temp_ordering.type = DescriptorOrderingState::SingleOrderingState::DescriptorType::Distinct;
         state.ordering_state.orderings.push_back(state.temp_ordering);
         state.temp_ordering.properties.clear();
+    }
+};
+
+template<> struct action< limit_param >
+{
+    template< typename Input >
+    static void apply(const Input& in, ParserState & state)
+    {
+        DEBUG_PRINT_TOKEN(in.string() + " LIMIT PARAM");
+        try {
+            DescriptorOrderingState::SingleOrderingState limit_state;
+            limit_state.type = DescriptorOrderingState::SingleOrderingState::DescriptorType::Limit;
+            limit_state.limit = realm::util::stot<size_t>(in.string());
+            state.ordering_state.orderings.push_back(limit_state);
+        } catch (...) {
+            const static std::string message = "Invalid Predicate. 'LIMIT' accepts a positive integer parameter eg: 'LIMIT(10)'";
+            throw tao::pegtl::parse_error(message, in);
+        }
     }
 };
 

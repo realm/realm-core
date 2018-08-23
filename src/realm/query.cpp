@@ -1397,13 +1397,8 @@ TableView Query::find_all(size_t start, size_t end, size_t limit)
     return ret;
 }
 
-
-size_t Query::count(size_t start, size_t end, size_t limit) const
+size_t Query::do_count(size_t start, size_t end, size_t limit) const
 {
-#if REALM_METRICS
-    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Count);
-#endif
-
     if (limit == 0 || m_table->is_degenerate())
         return 0;
 
@@ -1441,6 +1436,78 @@ size_t Query::count(size_t start, size_t end, size_t limit) const
     return cnt;
 }
 
+size_t Query::count(size_t start, size_t end, size_t limit) const
+{
+#if REALM_METRICS
+    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Count);
+#endif
+    return do_count(start, end, limit);
+
+}
+
+TableView Query::find_all(const DescriptorOrdering& descriptor)
+{
+#if REALM_METRICS
+    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_FindAll);
+#endif
+    const size_t default_start = 0;
+    const size_t default_end = size_t(-1);
+    const size_t default_limit = size_t(-1);
+
+    if (descriptor.is_empty()) {
+        TableView ret(*m_table, *this, default_start, default_end, default_limit);
+        find_all(ret);
+        return ret;
+    }
+
+    bool only_limit = true;
+    size_t min_limit = size_t(-1);
+    for (size_t i = 0; i < descriptor.size(); ++i) {
+        if (!descriptor.descriptor_is_limit(i)) {
+            only_limit = false;
+            break;
+        } else {
+            const LimitDescriptor* limit = dynamic_cast<const LimitDescriptor*>(descriptor[i]);
+            REALM_ASSERT(limit);
+            min_limit = std::min(min_limit, limit->get_limit());
+        }
+    }
+    if (only_limit) {
+        TableView ret(*m_table, *this, default_start, default_end, min_limit);
+        find_all(ret, default_start, default_end, min_limit);
+        return ret;
+    }
+
+    TableView ret(*m_table, *this, default_start, default_end, default_limit);
+    ret.apply_descriptor_ordering(descriptor);
+    return ret;
+}
+
+size_t Query::count(const DescriptorOrdering& descriptor)
+{
+#if REALM_METRICS
+    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Count);
+#endif
+    realm::util::Optional<size_t> min_limit = descriptor.get_min_limit();
+
+    if ((bool(min_limit) && *min_limit == 0) || m_table->is_degenerate())
+        return 0;
+
+    const size_t start = 0;
+    const size_t end = m_table->size();
+    size_t limit = size_t(-1);
+
+    if (!descriptor.will_apply_distinct()) {
+        if (bool(min_limit)) {
+            limit = *min_limit;
+        }
+        return do_count(start, end, limit);
+    }
+
+    TableView ret(*m_table, *this, start, end, limit);
+    ret.apply_descriptor_ordering(descriptor);
+    return ret.size();
+}
 
 // todo, not sure if start, end and limit could be useful for delete.
 size_t Query::remove()
