@@ -334,9 +334,8 @@ void DescriptorOrdering::append_sort(SortDescriptor sort)
     if (!sort.is_valid()) {
         return;
     }
-    if (!m_descriptors.empty() && descriptor_is_sort(m_descriptors.size() - 1)) {
-        SortDescriptor* previous_sort = dynamic_cast<SortDescriptor*>(m_descriptors.back().get());
-        REALM_ASSERT(previous_sort);
+    if (!m_descriptors.empty() && m_descriptors.back()->get_type() == DescriptorType::Sort) {
+        SortDescriptor* previous_sort = static_cast<SortDescriptor*>(m_descriptors.back().get());
         previous_sort->merge_with(std::move(sort));
         return;
     }
@@ -414,7 +413,7 @@ realm::util::Optional<size_t> DescriptorOrdering::get_min_limit() const
     realm::util::Optional<size_t> min_limit;
     for (size_t i = 0; i < m_descriptors.size(); ++i) {
         if (m_descriptors[i]->get_type() == DescriptorType::Limit) {
-            const LimitDescriptor* limit = dynamic_cast<const LimitDescriptor*>(m_descriptors[i].get());
+            const LimitDescriptor* limit = static_cast<const LimitDescriptor*>(m_descriptors[i].get());
             REALM_ASSERT(limit);
             min_limit = bool(min_limit) ? std::min(*min_limit, limit->get_limit()) : limit->get_limit();
         }
@@ -426,7 +425,8 @@ bool DescriptorOrdering::will_limit_to_zero() const
 {
     return std::any_of(m_descriptors.begin(), m_descriptors.end(), [](const std::unique_ptr<BaseDescriptor>& desc) {
         REALM_ASSERT(desc.get()->is_valid());
-        return (desc->get_type() == DescriptorType::Limit && dynamic_cast<LimitDescriptor*>(desc.get())->get_limit() == 0);
+        return (desc->get_type() == DescriptorType::Limit &&
+                static_cast<LimitDescriptor*>(desc.get())->get_limit() == 0);
     });
 }
 
@@ -513,7 +513,7 @@ void RowIndexes::do_sort(const DescriptorOrdering& ordering) {
         switch (type) {
             case DescriptorType::Sort:
             {
-                const auto* sort_descr = dynamic_cast<const SortDescriptor*>(ordering[desc_ndx]);
+                const auto* sort_descr = static_cast<const SortDescriptor*>(ordering[desc_ndx]);
                 SortDescriptor::Sorter sort_predicate = sort_descr->sorter(m_row_indexes);
 
                 std::sort(v.begin(), v.end(), std::ref(sort_predicate));
@@ -533,7 +533,7 @@ void RowIndexes::do_sort(const DescriptorOrdering& ordering) {
             }
             case DescriptorType::Distinct:
             {
-                const auto* distinct_descr = dynamic_cast<const DistinctDescriptor*>(ordering[desc_ndx]);
+                const auto* distinct_descr = static_cast<const DistinctDescriptor*>(ordering[desc_ndx]);
                 auto distinct_predicate = distinct_descr->sorter(m_row_indexes);
 
                 // Remove all rows which have a null link along the way to the distinct columns
@@ -564,7 +564,7 @@ void RowIndexes::do_sort(const DescriptorOrdering& ordering) {
             }
             case DescriptorType::Limit:
             {
-                const auto* limit_descr = dynamic_cast<const LimitDescriptor*>(ordering[desc_ndx]);
+                const auto* limit_descr = static_cast<const LimitDescriptor*>(ordering[desc_ndx]);
                 const size_t limit = limit_descr->get_limit();
                 if (v.size() > limit) {
                     m_limit_count += v.size() - limit;

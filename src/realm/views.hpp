@@ -68,8 +68,14 @@ public:
     std::unique_ptr<BaseDescriptor> clone() const override;
 
     // returns whether this descriptor is valid and can be used to sort
-    bool is_valid() const noexcept override { return !m_columns.empty(); }
-    virtual DescriptorType get_type() const override { return DescriptorType::Distinct; }
+    bool is_valid() const noexcept override
+    {
+        return !m_columns.empty();
+    }
+    DescriptorType get_type() const override
+    {
+        return DescriptorType::Distinct;
+    }
 
     class Sorter;
     virtual Sorter sorter(IntegerColumn const& row_indexes) const;
@@ -94,7 +100,10 @@ public:
     SortDescriptor() = default;
     ~SortDescriptor() = default;
     std::unique_ptr<BaseDescriptor> clone() const override;
-    DescriptorType get_type() const override { return DescriptorType::Sort; }
+    DescriptorType get_type() const override
+    {
+        return DescriptorType::Sort;
+    }
 
     void merge_with(SortDescriptor&& other);
 
@@ -117,7 +126,11 @@ public:
     std::unique_ptr<BaseDescriptor> clone() const override;
     DescriptorExport export_for_handover() const override;
     size_t get_limit() const noexcept { return m_limit; }
-    DescriptorType get_type() const override { return DescriptorType::Limit; }
+    DescriptorType get_type() const override
+    {
+        return DescriptorType::Limit;
+    }
+
 private:
     size_t m_limit = 0;
 };
