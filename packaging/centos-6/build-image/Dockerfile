@@ -13,9 +13,9 @@ RUN touch /var/lib/rpm/* \
         which \
         chrpath \
         openssl-devel \
-        devtoolset-3-gcc \
-        devtoolset-3-gcc-c++ \
-        devtoolset-3-binutils \
+        devtoolset-6-gcc \
+        devtoolset-6-gcc-c++ \
+        devtoolset-6-binutils \
     && yum clean all
 
 # Install CMake

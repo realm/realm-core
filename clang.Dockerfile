@@ -1,7 +1,7 @@
 FROM ubuntu:16.04
 
 # Setup the LLVM repository
-RUN echo deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial-5.0 main > /etc/apt/sources.list.d/clang.list
+RUN echo deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial-6.0 main > /etc/apt/sources.list.d/clang.list
 
 # This forces dpkg not to call sync() after package extraction and speeds up install
 RUN echo "force-unsafe-io" > /etc/dpkg/dpkg.cfg.d/02apt-speedup
@@ -17,7 +17,7 @@ RUN apt-key add /tmp/llvm.key
 
 # Install clang and everything needed to build core
 RUN apt-get update \
-    && apt-get install -y clang-5.0 \
+    && apt-get install -y clang-6.0 \
                        cmake \
                        libprocps4-dev \
                        libssl-dev \
@@ -25,5 +25,5 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 # Make clang the default compiler
-ENV CC /usr/bin/clang-5.0
-ENV CXX /usr/bin/clang++-5.0
+ENV CC /usr/bin/clang-6.0
+ENV CXX /usr/bin/clang++-6.0

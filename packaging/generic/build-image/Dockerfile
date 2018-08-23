@@ -8,9 +8,9 @@ FROM ci/realm-core:generic-base
 RUN touch /var/lib/rpm/* \
     && yum -y install \
         chrpath \
-        devtoolset-3-binutils \
-        devtoolset-3-gcc \
-        devtoolset-3-gcc-c++ \
+        devtoolset-6-binutils \
+        devtoolset-6-gcc \
+        devtoolset-6-gcc-c++ \
         git \
         openssl-devel \
         unzip \

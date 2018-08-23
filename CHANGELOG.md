@@ -2,7 +2,8 @@
 
 ### Bugfixes
 
-* None.
+* Fix a crash on some platforms when using the query parser to look for a string or binary
+  object which has a certain combination of non-printable characters.
 
 ### Breaking changes
 
