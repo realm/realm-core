@@ -585,6 +585,14 @@ inline bool bptree_aggregate_not_null(Timestamp val)
 {
     return !val.is_null();
 }
+inline bool bptree_aggregate_not_null(StringData val)
+{
+    return !val.is_null();
+}
+inline bool bptree_aggregate_not_null(BinaryData val)
+{
+    return !val.is_null();
+}
 template <>
 inline bool bptree_aggregate_not_null(float val)
 {

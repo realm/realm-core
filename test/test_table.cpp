@@ -97,7 +97,7 @@ struct value_copier {
     value_copier(bool)
     {
     }
-    T2 operator()(T1 from_value)
+    T2 operator()(T1 from_value, bool = false)
     {
         return from_value;
     }
@@ -111,7 +111,7 @@ struct value_copier<T1, Optional<T2>> {
     {
     }
     value_copier<T1, T2> internal_copier; // we need state for strings and binaries.
-    Optional<T2> operator()(T1 from_value)
+    Optional<T2> operator()(T1 from_value, bool)
     {
         return Optional<T2>(internal_copier(from_value));
     }
@@ -125,7 +125,7 @@ struct value_copier<Optional<T1>, T2> {
     {
     }
     bool m_throw_on_null;
-    T2 operator()(Optional<T1> from_value)
+    T2 operator()(Optional<T1> from_value, bool)
     {
         if (bool(from_value))
             return from_value.value();
@@ -144,7 +144,7 @@ struct value_copier<Optional<T1>, Optional<T2>> {
     value_copier(bool)
     {
     }
-    Optional<T2> operator()(Optional<T1> from_value)
+    Optional<T2> operator()(Optional<T1> from_value, bool)
     {
         return from_value;
     }
@@ -161,9 +161,12 @@ struct value_copier<StringData, StringData> {
     }
     bool m_throw_on_null;
     std::vector<char> data; // we need to make a local copy because writing may invalidate the argument
-    StringData operator()(StringData from_value)
+    StringData operator()(StringData from_value, bool to_optional)
     {
         if (from_value.is_null()) {
+            if (to_optional)
+                return StringData();
+
             if (m_throw_on_null) {
                 // possibly incorrect - may need to convert to default value for non-nullable entries instead
                 throw realm::LogicError(realm::LogicError::column_not_nullable);
@@ -189,9 +192,12 @@ struct value_copier<BinaryData, BinaryData> {
     }
     bool m_throw_on_null;
     std::vector<char> data; // we need to make a local copy because writing may invalidate the argument
-    BinaryData operator()(BinaryData from_value)
+    BinaryData operator()(BinaryData from_value, bool to_optional)
     {
         if (from_value.is_null()) {
+            if (to_optional)
+                return BinaryData();
+
             if (m_throw_on_null) {
                 // possibly incorrect - may need to convert to default value for non-nullable entries instead
                 throw realm::LogicError(realm::LogicError::column_not_nullable);
@@ -216,13 +222,16 @@ struct value_copier<Timestamp, Timestamp> {
     {
     }
     bool m_throw_on_null;
-    Timestamp operator()(Timestamp from_value)
+    Timestamp operator()(Timestamp from_value, bool to_optional)
     {
         if (from_value.is_null()) {
+            if (to_optional)
+                return Timestamp();
+
             if (m_throw_on_null)
                 throw realm::LogicError(realm::LogicError::column_not_nullable);
             else
-                return Timestamp();
+                return Timestamp(0, 0);
         }
         return from_value;
     }
@@ -4305,36 +4314,51 @@ void check_values(TestContext& test_context, Lst<T>& lst, std::vector<managed<T>
 }
 
 template<typename T> struct generator {
-    static managed<T> get()
+    static managed<T> get(bool optional)
     {
-        return managed<T>(generate_value<T>());
+        if (optional && (test_util::random_int<int>() % 10) == 0) {
+            return managed<T>(T());
+        }
+        else {
+            return managed<T>(generate_value<T>());
+        }
     }
 };
 
 template <>
 struct generator<StringData> {
-    static managed<StringData> get()
+    static managed<StringData> get(bool optional)
     {
-        StringData v = generate_value<StringData>();
-        managed<StringData> rv(v);
-        delete[] v.data();
-        return rv;
+        if (optional && (test_util::random_int<int>() % 10) == 0) {
+            return managed<StringData>(StringData());
+        }
+        else {
+            StringData v = generate_value<StringData>();
+            managed<StringData> rv(v);
+            delete[] v.data();
+            return rv;
+        }
     }
 };
 
 template <>
 struct generator<BinaryData> {
-    static managed<BinaryData> get()
+    static managed<BinaryData> get(bool optional)
     {
-        BinaryData v = generate_value<BinaryData>();
-        managed<BinaryData> rv(v);
-        delete[] v.data();
-        return rv;
+        if (optional && (test_util::random_int<int>() % 10) == 0) {
+            return managed<BinaryData>(BinaryData());
+        }
+        else {
+            BinaryData v = generate_value<BinaryData>();
+            managed<BinaryData> rv(v);
+            delete[] v.data();
+            return rv;
+        }
     }
 };
 
 template<typename T> struct generator<Optional<T>> {
-    static managed<Optional<T>> get()
+    static managed<Optional<T>> get(bool)
     {
         if ((test_util::random_int<int>() % 10) == 0)
             return managed<Optional<T>>(Optional<T>());
@@ -4359,15 +4383,15 @@ template<typename T> void test_lists(TestContext& test_context, DBRef sg, const 
     Lst<T> lst = o.get_list<T>(col);
     std::vector<managed<T>> reference;
     for (int j = 0; j < 10000; ++j) {
-        managed<T> value = generator<T>::get();
+        managed<T> value = generator<T>::get(optional);
         lst.add(value.value);
         reference.push_back(value);
     }
     check_values(test_context, lst, reference);
     for (int j = 0; j < 1000; ++j) {
-        managed<T> value = generator<T>::get();
+        managed<T> value = generator<T>::get(optional);
         lst.insert(4993, value.value);
-        value = generator<T>::get();
+        value = generator<T>::get(optional);
         lst.set(4993, value.value);
         reference.insert(reference.begin() + 4993, value);
     }
@@ -4447,19 +4471,19 @@ template<typename T> void test_tables(TestContext& test_context, DBRef sg, const
 
     // insert elements 0 - 999
     for (int j = 0; j < 1000; ++j) {
-        managed<T> value = generator<T>::get();
+        managed<T> value = generator<T>::get(optional);
         Obj o = table->create_object(ObjKey(j)).set_all(value.value);
         reference.insert(std::pair<int, managed<T>>(j, value));
     }
     // insert elements 10000 - 10999
     for (int j = 10000; j < 11000; ++j) {
-        managed<T> value = generator<T>::get();
+        managed<T> value = generator<T>::get(optional);
         Obj o = table->create_object(ObjKey(j)).set_all(value.value);
         reference.insert(std::pair<int, managed<T>>(j, value));
     }
     // insert in between previous groups
     for (int j = 4000; j < 7000; ++j) {
-        managed<T> value = generator<T>::get();
+        managed<T> value = generator<T>::get(optional);
         Obj o = table->create_object(ObjKey(j)).set_all(value.value);
         reference.insert(std::pair<int, managed<T>>(j, value));
     }
@@ -4470,7 +4494,7 @@ template<typename T> void test_tables(TestContext& test_context, DBRef sg, const
         auto it = reference.find(j);
         if (it == reference.end()) // skip over holes in the key range
             continue;
-        managed<T> value = generator<T>::get();
+        managed<T> value = generator<T>::get(optional);
         Obj o = table->get_object(ObjKey(j));
         o.set<T>(col, value.value);
         it->second = value;
@@ -4527,11 +4551,11 @@ void test_dynamic_conversion(TestContext& test_context, DBRef sg, realm::DataTyp
     std::map<int, managed<TTo>> reference;
     value_copier<TFrom, TTo> copier(false);
     for (int j = 0; j < 10; ++j) {
-        managed<TFrom> value = generator<TFrom>::get();
+        managed<TFrom> value = generator<TFrom>::get(from_nullable);
         Obj o =
             table->create_object(ObjKey(j)).set_all(value.value); // <-- so set_all works even if it doesn't set all?
-        TTo conv_value =
-            copier(value.value); // one may argue that using the same converter for ref and dut is.. mmmh...
+        TTo conv_value = copier(
+            value.value, to_nullable); // one may argue that using the same converter for ref and dut is.. mmmh...
         reference.insert(std::pair<int, managed<TTo>>(j, managed<TTo>(conv_value)));
     }
     auto col_to = table->set_nullability(col_from, to_nullable, false);
@@ -4554,11 +4578,11 @@ void test_dynamic_conversion_list(TestContext& test_context, DBRef sg, realm::Da
     table->create_object(); // This object will have an empty list
     Lst<TFrom> from_lst = o.get_list<TFrom>(col_from);
     std::vector<managed<TTo>> reference;
+    value_copier<TFrom, TTo> copier(false);
     for (int j = 0; j < 1000; ++j) {
-        managed<TFrom> value = generator<TFrom>::get();
+        managed<TFrom> value = generator<TFrom>::get(from_nullable);
         from_lst.add(value.value);
-        value_copier<TFrom, TTo> copier(false);
-        TTo conv_value = copier(value.value);
+        TTo conv_value = copier(value.value, to_nullable);
         reference.push_back(conv_value);
     }
     auto col_to = table->set_nullability(col_from, to_nullable, false);
