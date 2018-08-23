@@ -329,14 +329,12 @@ void RealmCoordinator::open_db()
         if (!m_config.should_compact_on_launch_function)
             return;
 
-        size_t free_space = -1;
-        size_t used_space = -1;
-        {
-            // FIXME What about try_begin_write ?
-            auto tr = m_db->start_write();
+        size_t free_space = 0;
+        size_t used_space = 0;
+        if (auto tr = m_db->start_write(false)) {
             tr->commit();
+            m_db->get_stats(free_space, used_space);
         }
-        m_db->get_stats(free_space, used_space);
         if (free_space > 0 && m_config.should_compact_on_launch_function(free_space + used_space, used_space))
             m_db->compact();
     }
