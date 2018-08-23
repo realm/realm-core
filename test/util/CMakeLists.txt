@@ -21,3 +21,14 @@ add_library(TestUtil ${TEST_UTIL_SOURCES})
 
 target_link_libraries(TestUtil Core)
 
+if(UNIX AND NOT APPLE)
+    find_library(LIBRT rt)
+    if(LIBRT)
+        target_link_libraries(TestUtil ${LIBRT})
+    else()
+        message(WARNING "librt was not found. This means that the benchmarks will not be able to link properly.")
+    endif()
+endif()
+
+
+
