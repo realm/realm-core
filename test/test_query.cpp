@@ -7022,9 +7022,10 @@ TEST(Query_Link_Minimum)
     ll.add(k3);
 
     Query q;
+    TableView tv;
 
     q = table2->column<Link>(col_linklist).column<Int>(col_int).min() == 123;
-    auto tv = q.find_all();
+    tv = q.find_all();
     CHECK_EQUAL(tv.size(), 2);
     CHECK_EQUAL(k2, tv.get_key(0));
     CHECK_EQUAL(k3, tv.get_key(1));
@@ -7062,14 +7063,13 @@ TEST(Query_Link_Minimum)
     CHECK_EQUAL(k1, tv.get_key(0));
 }
 
-#ifdef LEGACY_TESTS
 TEST(Query_Link_MaximumSumAverage)
 {
     Group group;
     TableRef table1 = group.add_table("table1");
-    table1->add_column(type_Int, "int", /* nullable */ true);
-    table1->add_column(type_Float, "float", /* nullable */ true);
-    table1->add_column(type_Double, "double", /* nullable */ true);
+    auto col_int = table1->add_column(type_Int, "int", /* nullable */ true);
+    auto col_flt = table1->add_column(type_Float, "float", /* nullable */ true);
+    auto col_dbl = table1->add_column(type_Double, "double", /* nullable */ true);
 
     // table1
     // 0: 123 123.0f 123.0
@@ -7077,27 +7077,17 @@ TEST(Query_Link_MaximumSumAverage)
     // 2: 789 789.0f 789.0
     // 3: null null null
 
-    table1->add_empty_row();
-    table1->set_int(0, 0, 123);
-    table1->set_float(1, 0, 123.0f);
-    table1->set_double(2, 0, 123.0);
-    table1->add_empty_row();
-    table1->set_int(0, 1, 456);
-    table1->set_float(1, 1, 456.0f);
-    table1->set_double(2, 1, 456.0);
-    table1->add_empty_row();
-    table1->set_int(0, 2, 789);
-    table1->set_float(1, 2, 789.0f);
-    table1->set_double(2, 2, 789.0);
-    table1->add_empty_row();
-    table1->set_null(0, 3);
-    table1->set_null(1, 3);
-    table1->set_null(2, 3);
+    ObjKeys keys({3, 5, 7, 9});
+    table1->create_objects(keys);
+    auto it = table1->begin();
+    it->set_all(123, 123.f, 123.);
+    (++it)->set_all(456, 456.f, 456.);
+    (++it)->set_all(789, 789.f, 789.);
 
     TableRef table2 = group.add_table("table2");
-    size_t col_double = table2->add_column(type_Double, "double");
-    size_t col_link = table2->add_column_link(type_Link, "link", *table1);
-    size_t col_linklist = table2->add_column_link(type_LinkList, "linklist", *table1);
+    auto col_double = table2->add_column(type_Double, "double");
+    auto col_link = table2->add_column_link(type_Link, "link", *table1);
+    auto col_linklist = table2->add_column_link(type_LinkList, "linklist", *table1);
 
     // table2
     // 0: 456.0 ->0 { }
@@ -7105,450 +7095,367 @@ TEST(Query_Link_MaximumSumAverage)
     // 2: 456.0 ->2 { 1, 2 }
     // 3: 456.0 ->3 { 1, 2, 3 }
 
-    table2->add_empty_row();
-    table2->set_double(col_double, 0, 456.0);
-    table2->set_link(col_link, 0, 0);
-
-    table2->add_empty_row();
-    table2->set_double(col_double, 1, 456.0);
-    table2->set_link(col_link, 1, 1);
-    LinkViewRef links = table2->get_linklist(col_linklist, 1);
-    links->add(1);
-
-    table2->add_empty_row();
-    table2->set_double(col_double, 2, 456.0);
-    table2->set_link(col_link, 2, 2);
-    links = table2->get_linklist(col_linklist, 2);
-    links->add(1);
-    links->add(2);
-
-    table2->add_empty_row();
-    table2->set_double(col_double, 3, 456.0);
-    table2->set_link(col_link, 3, 3);
-    links = table2->get_linklist(col_linklist, 3);
-    links->add(1);
-    links->add(2);
-    links->add(3);
+    LnkLst ll;
+    auto k0 = table2->create_object().set_all(456.0, keys[0]).get_key();
+    auto k1 = table2->create_object().set_all(456.0, keys[1]).get_key();
+    auto k2 = table2->create_object().set_all(456.0, keys[2]).get_key();
+    auto k3 = table2->create_object().set_all(456.0, keys[3]).get_key();
+    ll = table2->get_object(k1).get_linklist(col_linklist);
+    ll.add(keys[1]);
+    ll = table2->get_object(k2).get_linklist(col_linklist);
+    ll.add(keys[1]);
+    ll.add(keys[2]);
+    ll = table2->get_object(k3).get_linklist(col_linklist);
+    ll.add(keys[1]);
+    ll.add(keys[2]);
+    ll.add(keys[3]);
 
     Query q;
-    size_t match;
+    TableView tv;
 
     // Maximum.
 
-    q = table2->column<LnkLst>(col_linklist).column<Int>(0).max() == 789;
-    match = q.find();
-    CHECK_EQUAL(2, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(3, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(not_found, match);
+    q = table2->column<Link>(col_linklist).column<Int>(col_int).max() == 789;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(k2, tv.get_key(0));
+    CHECK_EQUAL(k3, tv.get_key(1));
 
-    q = table2->column<LnkLst>(col_linklist).column<Int>(0).max() == 456;
-    match = q.find();
-    CHECK_EQUAL(1, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(not_found, match);
+    q = table2->column<Link>(col_linklist).column<Int>(col_int).max() == 456;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(k1, tv.get_key(0));
 
-    q = table2->column<LnkLst>(col_linklist).column<Int>(0).max() == null();
-    match = q.find();
-    CHECK_EQUAL(0, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(not_found, match);
+    q = table2->column<Link>(col_linklist).column<Int>(col_int).max() == null();
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(k0, tv.get_key(0));
 
-    q = table2->column<LnkLst>(col_linklist).column<Int>(0).max() == table2->link(col_link).column<Int>(0);
-    match = q.find();
-    CHECK_EQUAL(1, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(2, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(not_found, match);
+    q = table2->column<Link>(col_linklist).column<Int>(col_int).max() == table2->link(col_link).column<Int>(col_int);
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(k1, tv.get_key(0));
+    CHECK_EQUAL(k2, tv.get_key(1));
 
-    q = table2->column<LnkLst>(col_linklist).column<Int>(0).max() == table2->column<Double>(col_double);
-    match = q.find();
-    CHECK_EQUAL(1, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(not_found, match);
+    q = table2->column<Link>(col_linklist).column<Int>(col_int).max() == table2->column<Double>(col_double);
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(k1, tv.get_key(0));
 
 
-    q = table2->column<LnkLst>(col_linklist).column<Float>(1).max() == 789.0f;
-    match = q.find();
-    CHECK_EQUAL(2, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(3, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(not_found, match);
+    q = table2->column<Link>(col_linklist).column<Float>(col_flt).max() == 789.0f;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(k2, tv.get_key(0));
+    CHECK_EQUAL(k3, tv.get_key(1));
 
-    q = table2->column<LnkLst>(col_linklist).column<Float>(1).max() == 456.0f;
-    match = q.find();
-    CHECK_EQUAL(1, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(not_found, match);
+    q = table2->column<Link>(col_linklist).column<Float>(col_flt).max() == 456.0f;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(k1, tv.get_key(0));
 
 
-    q = table2->column<LnkLst>(col_linklist).column<Double>(2).max() == 789.0;
-    match = q.find();
-    CHECK_EQUAL(2, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(3, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(not_found, match);
+    q = table2->column<Link>(col_linklist).column<Double>(col_dbl).max() == 789.0;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(k2, tv.get_key(0));
+    CHECK_EQUAL(k3, tv.get_key(1));
 
-    q = table2->column<LnkLst>(col_linklist).column<Double>(2).max() == 456.0;
-    match = q.find();
-    CHECK_EQUAL(1, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(not_found, match);
+    q = table2->column<Link>(col_linklist).column<Double>(col_dbl).max() == 456.0;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(k1, tv.get_key(0));
 
 
     // Sum.
     // Floating point results below may be inexact for some combination of architectures, compilers, and compiler
     // flags.
 
-    q = table2->column<LnkLst>(col_linklist).column<Int>(0).sum() == 1245;
-    match = q.find();
-    CHECK_EQUAL(2, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(3, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(not_found, match);
+    q = table2->column<Link>(col_linklist).column<Int>(col_int).sum() == 1245;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(k2, tv.get_key(0));
+    CHECK_EQUAL(k3, tv.get_key(1));
 
-    q = table2->column<LnkLst>(col_linklist).column<Int>(0).sum() == 456;
-    match = q.find();
-    CHECK_EQUAL(1, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(not_found, match);
+    q = table2->column<Link>(col_linklist).column<Int>(col_int).sum() == 456;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(k1, tv.get_key(0));
 
-    q = table2->column<LnkLst>(col_linklist).column<Int>(0).sum() == table2->link(col_link).column<Int>(0);
-    match = q.find();
-    CHECK_EQUAL(1, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(not_found, match);
+    q = table2->column<Link>(col_linklist).column<Int>(col_int).sum() == table2->link(col_link).column<Int>(col_int);
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(k1, tv.get_key(0));
 
-    q = table2->column<LnkLst>(col_linklist).column<Int>(0).sum() == table2->column<Double>(col_double);
-    match = q.find();
-    CHECK_EQUAL(1, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(not_found, match);
+    q = table2->column<Link>(col_linklist).column<Int>(col_int).sum() == table2->column<Double>(col_double);
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(k1, tv.get_key(0));
 
 
-    q = table2->column<LnkLst>(col_linklist).column<Float>(1).sum() == 1245.0f;
-    match = q.find();
-    CHECK_EQUAL(2, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(3, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(not_found, match);
+    q = table2->column<Link>(col_linklist).column<Float>(col_flt).sum() == 1245.0f;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(k2, tv.get_key(0));
+    CHECK_EQUAL(k3, tv.get_key(1));
 
-    q = table2->column<LnkLst>(col_linklist).column<Float>(1).sum() == 456.0f;
-    match = q.find();
-    CHECK_EQUAL(1, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(not_found, match);
+    q = table2->column<Link>(col_linklist).column<Float>(col_flt).sum() == 456.0f;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(k1, tv.get_key(0));
 
 
-    q = table2->column<LnkLst>(col_linklist).column<Double>(2).sum() == 1245.0;
-    match = q.find();
-    CHECK_EQUAL(2, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(3, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(not_found, match);
+    q = table2->column<Link>(col_linklist).column<Double>(col_dbl).sum() == 1245.0;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(k2, tv.get_key(0));
+    CHECK_EQUAL(k3, tv.get_key(1));
 
-    q = table2->column<LnkLst>(col_linklist).column<Double>(2).sum() == 456.0;
-    match = q.find();
-    CHECK_EQUAL(1, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(not_found, match);
+    q = table2->column<Link>(col_linklist).column<Double>(col_dbl).sum() == 456.0;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(k1, tv.get_key(0));
 
 
     // Average.
     // Floating point results below may be inexact for some combination of architectures, compilers, and compiler
     // flags.
 
-    q = table2->column<LnkLst>(col_linklist).column<Int>(0).average() == 622.5;
-    match = q.find();
-    CHECK_EQUAL(2, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(3, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(not_found, match);
+    q = table2->column<Link>(col_linklist).column<Int>(col_int).average() == 622.5;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(k2, tv.get_key(0));
+    CHECK_EQUAL(k3, tv.get_key(1));
 
-    q = table2->column<LnkLst>(col_linklist).column<Int>(0).average() == 456;
-    match = q.find();
-    CHECK_EQUAL(1, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(not_found, match);
+    q = table2->column<Link>(col_linklist).column<Int>(col_int).average() == 456;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(k1, tv.get_key(0));
 
-    q = table2->column<LnkLst>(col_linklist).column<Int>(0).average() == null();
-    match = q.find();
-    CHECK_EQUAL(0, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(not_found, match);
+    q = table2->column<Link>(col_linklist).column<Int>(col_int).average() == null();
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(k0, tv.get_key(0));
 
-    q = table2->column<LnkLst>(col_linklist).column<Int>(0).average() < table2->link(col_link).column<Int>(0);
-    match = q.find();
-    CHECK_EQUAL(2, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(not_found, match);
+    q = table2->column<Link>(col_linklist).column<Int>(col_int).average() <
+        table2->link(col_link).column<Int>(col_int);
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(k2, tv.get_key(0));
 
-    q = table2->column<LnkLst>(col_linklist).column<Int>(0).average() == table2->column<Double>(col_double);
-    match = q.find();
-    CHECK_EQUAL(1, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(not_found, match);
+    q = table2->column<Link>(col_linklist).column<Int>(col_int).average() == table2->column<Double>(col_double);
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(k1, tv.get_key(0));
 
 
-    q = table2->column<LnkLst>(col_linklist).column<Float>(1).average() == 622.5;
-    match = q.find();
-    CHECK_EQUAL(2, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(3, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(not_found, match);
+    q = table2->column<Link>(col_linklist).column<Float>(col_flt).average() == 622.5;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(k2, tv.get_key(0));
+    CHECK_EQUAL(k3, tv.get_key(1));
 
-    q = table2->column<LnkLst>(col_linklist).column<Float>(1).average() == 456.0f;
-    match = q.find();
-    CHECK_EQUAL(1, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(not_found, match);
+    q = table2->column<Link>(col_linklist).column<Float>(col_flt).average() == 456.0f;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(k1, tv.get_key(0));
 
 
-    q = table2->column<LnkLst>(col_linklist).column<Double>(2).average() == 622.5;
-    match = q.find();
-    CHECK_EQUAL(2, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(3, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(not_found, match);
+    q = table2->column<Link>(col_linklist).column<Double>(col_dbl).average() == 622.5;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(k2, tv.get_key(0));
+    CHECK_EQUAL(k3, tv.get_key(1));
 
-    q = table2->column<LnkLst>(col_linklist).column<Double>(2).average() == 456.0;
-    match = q.find();
-    CHECK_EQUAL(1, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(not_found, match);
+    q = table2->column<Link>(col_linklist).column<Double>(col_dbl).average() == 456.0;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(k1, tv.get_key(0));
 }
 
 TEST(Query_OperatorsOverLink)
 {
     Group group;
     TableRef table1 = group.add_table("table1");
-    table1->add_column(type_Int, "int");
-    table1->add_column(type_Double, "double");
+    auto col_int = table1->add_column(type_Int, "int");
+    auto col_dbl = table1->add_column(type_Double, "double");
 
     // table1
     // 0: 2 2.0
     // 1: 3 3.0
 
-    table1->add_empty_row();
-    table1->set_int(0, 0, 2);
-    table1->set_double(1, 0, 2.0);
-    table1->add_empty_row();
-    table1->set_int(0, 1, 3);
-    table1->set_double(1, 1, 3.0);
+    ObjKeys keys({5, 6});
+    table1->create_objects(keys);
+    table1->get_object(keys[0]).set_all(2, 2.0);
+    table1->get_object(keys[1]).set_all(3, 3.0);
 
     TableRef table2 = group.add_table("table2");
-    table2->add_column(type_Int, "int");
-    size_t col_linklist = table2->add_column_link(type_LinkList, "linklist", *table1);
+    auto col_int2 = table2->add_column(type_Int, "int");
+    auto col_linklist = table2->add_column_link(type_LinkList, "linklist", *table1);
 
     // table2
     // 0:  0 { }
     // 1:  4 { 0 }
     // 2:  4 { 1, 0 }
 
-    table2->add_empty_row();
-    table2->set_int(0, 0, 0);
+    table2->create_object();
+    auto k1 = table2->create_object().set_all(4).get_key();
+    auto k2 = table2->create_object().set_all(4).get_key();
 
-    table2->add_empty_row();
-    table2->set_int(0, 1, 4);
-    LinkViewRef links = table2->get_linklist(col_linklist, 1);
-    links->add(0);
+    auto ll = table2->get_object(k1).get_linklist(col_linklist);
+    ll.add(keys[0]);
 
-    table2->add_empty_row();
-    table2->set_int(0, 2, 4);
-    links = table2->get_linklist(col_linklist, 2);
-    links->add(1);
-    links->add(0);
+    ll = table2->get_object(k2).get_linklist(col_linklist);
+    ll.add(keys[1]);
+    ll.add(keys[0]);
 
     Query q;
-    size_t match;
+    TableView tv;
 
     // Unary operators.
 
     // Rows 1 and 2 should match this query as 2 * 2 == 4.
     // Row 0 should not as the power subexpression will not produce any results.
-    q = power(table2->link(col_linklist).column<Int>(0)) == table2->column<Int>(0);
-    match = q.find();
-    CHECK_EQUAL(1, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(2, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(not_found, match);
+    q = power(table2->link(col_linklist).column<Int>(col_int)) == table2->column<Int>(col_int2);
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(k1, tv.get_key(0));
+    CHECK_EQUAL(k2, tv.get_key(1));
 
     // Rows 1 and 2 should match this query as 2 * 2 == 4.
     // Row 0 should not as the power subexpression will not produce any results.
-    q = table2->column<Int>(0) == power(table2->link(col_linklist).column<Int>(0));
-    match = q.find();
-    CHECK_EQUAL(1, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(2, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(not_found, match);
+    q = table2->column<Int>(col_int) == power(table2->link(col_linklist).column<Int>(col_int));
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(k1, tv.get_key(0));
+    CHECK_EQUAL(k2, tv.get_key(1));
 
 
     // Rows 1 and 2 should match this query as 2.0 * 2.0 == 4.0.
     // Row 0 should not as the power subexpression will not produce any results.
-    q = power(table2->link(col_linklist).column<Double>(1)) == table2->column<Int>(0);
-    match = q.find();
-    CHECK_EQUAL(1, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(2, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(not_found, match);
+    q = power(table2->link(col_linklist).column<Double>(col_dbl)) == table2->column<Int>(col_int);
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(k1, tv.get_key(0));
+    CHECK_EQUAL(k2, tv.get_key(1));
 
     // Rows 1 and 2 should match this query as 2.0 * 2.0 == 4.0.
     // Row 0 should not as the power subexpression will not produce any results.
-    q = table2->column<Int>(0) == power(table2->link(col_linklist).column<Double>(1));
-    match = q.find();
-    CHECK_EQUAL(1, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(2, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(not_found, match);
+    q = table2->column<Int>(col_int) == power(table2->link(col_linklist).column<Double>(col_dbl));
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(k1, tv.get_key(0));
+    CHECK_EQUAL(k2, tv.get_key(1));
 
 
     // Binary operators.
 
     // Rows 1 and 2 should match this query as 2 * 2 == 4.
     // Row 0 should not as the multiplication will not produce any results.
-    q = table2->link(col_linklist).column<Int>(0) * 2 == table2->column<Int>(0);
-    match = q.find();
-    CHECK_EQUAL(1, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(2, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(not_found, match);
+    q = table2->link(col_linklist).column<Int>(col_int) * 2 == table2->column<Int>(col_int);
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(k1, tv.get_key(0));
+    CHECK_EQUAL(k2, tv.get_key(1));
 
     // Rows 1 and 2 should match this query as 2 * 2 == 4.
     // Row 0 should not as the multiplication will not produce any results.
-    q = table2->column<Int>(0) == 2 * table2->link(col_linklist).column<Int>(0);
-    match = q.find();
-    CHECK_EQUAL(1, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(2, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(not_found, match);
+    q = table2->column<Int>(col_int) == 2 * table2->link(col_linklist).column<Int>(col_int);
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(k1, tv.get_key(0));
+    CHECK_EQUAL(k2, tv.get_key(1));
 
     // Rows 1 and 2 should match this query as 2.0 * 2.0 == 4.0.
     // Row 0 should not as the multiplication will not produce any results.
-    q = table2->link(col_linklist).column<Double>(1) * 2 == table2->column<Int>(0);
-    match = q.find();
-    CHECK_EQUAL(1, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(2, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(not_found, match);
+    q = table2->link(col_linklist).column<Double>(col_dbl) * 2 == table2->column<Int>(col_int);
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(k1, tv.get_key(0));
+    CHECK_EQUAL(k2, tv.get_key(1));
 
     // Rows 1 and 2 should match this query as 2.0 * 2.0 == 4.0.
     // Row 0 should not as the multiplication will not produce any results.
-    q = table2->column<Int>(0) == 2 * table2->link(col_linklist).column<Double>(1);
-    match = q.find();
-    CHECK_EQUAL(1, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(2, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(not_found, match);
+    q = table2->column<Int>(col_int) == 2 * table2->link(col_linklist).column<Double>(col_dbl);
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(k1, tv.get_key(0));
+    CHECK_EQUAL(k2, tv.get_key(1));
 }
 
 TEST(Query_CompareLinkedColumnVsColumn)
 {
     Group group;
     TableRef table1 = group.add_table("table1");
-    table1->add_column(type_Int, "int");
-    table1->add_column(type_Double, "double");
+    auto col_int = table1->add_column(type_Int, "int");
+    auto col_dbl = table1->add_column(type_Double, "double");
 
     // table1
     // 0: 2 2.0
     // 1: 3 3.0
 
-    table1->add_empty_row();
-    table1->set_int(0, 0, 2);
-    table1->set_double(1, 0, 2.0);
-    table1->add_empty_row();
-    table1->set_int(0, 1, 3);
-    table1->set_double(1, 1, 3.0);
+    ObjKeys keys({5, 6});
+    table1->create_objects(keys);
+    table1->get_object(keys[0]).set_all(2, 2.0);
+    table1->get_object(keys[1]).set_all(3, 3.0);
 
     TableRef table2 = group.add_table("table2");
-    table2->add_column(type_Int, "int");
-    size_t col_link1 = table2->add_column_link(type_Link, "link1", *table1);
-    size_t col_link2 = table2->add_column_link(type_Link, "link2", *table1);
+    auto col_int2 = table2->add_column(type_Int, "int");
+    auto col_link1 = table2->add_column_link(type_Link, "link1", *table1);
+    auto col_link2 = table2->add_column_link(type_Link, "link2", *table1);
 
     // table2
-    // 0: 0 {   } { 0 }
+    // 0: 2 {   } { 0 }
     // 1: 4 { 0 } { 1 }
     // 2: 4 { 1 } {   }
 
-    table2->add_empty_row();
-    table2->set_int(0, 0, 0);
-    table2->set_link(col_link2, 0, 0);
-
-    table2->add_empty_row();
-    table2->set_int(0, 1, 4);
-    table2->set_link(col_link1, 1, 0);
-    table2->set_link(col_link2, 1, 1);
-
-    table2->add_empty_row();
-    table2->set_int(0, 2, 4);
-    table2->set_link(col_link1, 2, 1);
+    auto k0 = table2->create_object().set_all(2, null(), keys[0]).get_key();
+    auto k1 = table2->create_object().set_all(4, keys[0], keys[1]).get_key();
+    auto k2 = table2->create_object().set_all(4, keys[1], null()).get_key();
 
     Query q;
-    size_t match;
+    TableView tv;
 
-    q = table2->link(col_link1).column<Int>(0) < table2->column<Int>(0);
-    match = q.find();
-    CHECK_EQUAL(1, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(2, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(not_found, match);
+    q = table2->link(col_link1).column<Int>(col_int) < table2->column<Int>(col_int2);
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(k1, tv.get_key(0));
+    CHECK_EQUAL(k2, tv.get_key(1));
 
-    q = table2->link(col_link1).column<Double>(1) < table2->column<Int>(0);
-    match = q.find();
-    CHECK_EQUAL(1, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(2, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(not_found, match);
+    q = table2->link(col_link1).column<Double>(col_dbl) < table2->column<Int>(col_int2);
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(k1, tv.get_key(0));
+    CHECK_EQUAL(k2, tv.get_key(1));
+
+    q = table2->link(col_link2).column<Int>(col_int) == table2->column<Int>(col_int2);
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(k0, tv.get_key(0));
 }
 
 TEST(Query_CompareThroughUnaryLinks)
 {
     Group group;
     TableRef table1 = group.add_table("table1");
-    table1->add_column(type_Int, "int");
-    table1->add_column(type_Double, "double");
-    table1->add_column(type_String, "string");
+    auto col_int = table1->add_column(type_Int, "int");
+    auto col_dbl = table1->add_column(type_Double, "double");
+    auto col_str = table1->add_column(type_String, "string");
 
     // table1
     // 0: 2 2.0 "abc"
     // 1: 3 3.0 "def"
     // 2: 8 8.0 "def"
 
-    table1->add_empty_row();
-    table1->set_int(0, 0, 2);
-    table1->set_double(1, 0, 2.0);
-    table1->set_string(2, 0, "abc");
-    table1->add_empty_row();
-    table1->set_int(0, 1, 3);
-    table1->set_double(1, 1, 3.0);
-    table1->set_string(2, 1, "def");
-    table1->add_empty_row();
-    table1->set_int(0, 2, 8);
-    table1->set_double(1, 2, 8.0);
-    table1->set_string(2, 2, "def");
+    ObjKeys keys({5, 6, 7});
+    table1->create_objects(keys);
+    table1->get_object(keys[0]).set_all(2, 2.0, "abc");
+    table1->get_object(keys[1]).set_all(3, 3.0, "def");
+    table1->get_object(keys[2]).set_all(8, 8.0, "def");
 
     TableRef table2 = group.add_table("table2");
-    size_t col_link1 = table2->add_column_link(type_Link, "link1", *table1);
-    size_t col_link2 = table2->add_column_link(type_Link, "link2", *table1);
+    auto col_link1 = table2->add_column_link(type_Link, "link1", *table1);
+    auto col_link2 = table2->add_column_link(type_Link, "link2", *table1);
 
     // table2
     // 0: {   } { 0 }
@@ -7556,44 +7463,30 @@ TEST(Query_CompareThroughUnaryLinks)
     // 2: { 1 } { 2 }
     // 3: { 2 } {   }
 
-    table2->add_empty_row();
-    table2->set_link(col_link2, 0, 0);
-
-    table2->add_empty_row();
-    table2->set_link(col_link1, 1, 0);
-    table2->set_link(col_link2, 1, 1);
-
-    table2->add_empty_row();
-    table2->set_link(col_link1, 2, 1);
-    table2->set_link(col_link2, 2, 2);
-
-    table2->add_empty_row();
-    table2->set_link(col_link1, 3, 2);
+    table2->create_object().set_all(null(), keys[0]).get_key();
+    auto k1 = table2->create_object().set_all(keys[0], keys[1]).get_key();
+    auto k2 = table2->create_object().set_all(keys[1], keys[2]).get_key();
+    table2->create_object().set_all(keys[2], null()).get_key();
 
     Query q;
-    size_t match;
+    TableView tv;
 
-    q = table2->link(col_link1).column<Int>(0) < table2->link(col_link2).column<Int>(0);
-    match = q.find();
-    CHECK_EQUAL(1, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(2, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(not_found, match);
+    q = table2->link(col_link1).column<Int>(col_int) < table2->link(col_link2).column<Int>(col_int);
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(k1, tv.get_key(0));
+    CHECK_EQUAL(k2, tv.get_key(1));
 
-    q = table2->link(col_link1).column<Double>(1) < table2->link(col_link2).column<Double>(1);
-    match = q.find();
-    CHECK_EQUAL(1, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(2, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(not_found, match);
+    q = table2->link(col_link1).column<Double>(col_dbl) < table2->link(col_link2).column<Double>(col_dbl);
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(k1, tv.get_key(0));
+    CHECK_EQUAL(k2, tv.get_key(1));
 
-    q = table2->link(col_link1).column<String>(2) == table2->link(col_link2).column<String>(2);
-    match = q.find();
-    CHECK_EQUAL(2, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(not_found, match);
+    q = table2->link(col_link1).column<String>(col_str) == table2->link(col_link2).column<String>(col_str);
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(k2, tv.get_key(0));
 }
 
 TEST(Query_DeepLink)
@@ -7609,57 +7502,56 @@ TEST(Query_DeepLink)
     // |       N | even(N)| 0, .., N-1 |
     // +---------+--------+-------------+
 
-    const size_t N = 10;
+    const int N = 10;
 
     Group group;
     TableRef table = group.add_table("test");
-    size_t col_int = table->add_column(type_Int, "int");
-    size_t col_bool = table->add_column(type_Bool, "bool");
-    size_t col_linklist = table->add_column_link(type_LinkList, "list", *table);
+    table->add_column(type_Int, "int");
+    auto col_bool = table->add_column(type_Bool, "bool");
+    auto col_linklist = table->add_column_link(type_LinkList, "list", *table);
 
-    for (size_t j = 0; j < N; ++j) {
-        table->add_empty_row();
-        table->set_int(col_int, j, j);
-        table->set_bool(col_bool, j, (j % 2) == 0);
-
-        LinkViewRef links = table->get_linklist(col_linklist, j);
+    for (int j = 0; j < N; ++j) {
         TableView view = table->where().find_all();
+
+        Obj obj = table->create_object().set_all(j, (j % 2) == 0);
+        auto ll = obj.get_linklist(col_linklist);
         for (size_t i = 0; i < view.size(); ++i) {
-            links->add(i);
+            ll.add(view.get_key(i));
         }
     }
 
     Query query = table->link(col_linklist).column<Bool>(col_bool) == true;
     TableView view = query.find_all();
-    CHECK_EQUAL(N, view.size());
+    CHECK_EQUAL(N - 1, view.size());
 }
 
 TEST(Query_LinksToDeletedOrMovedRow)
 {
+    // This test is not that relevant with stable keys
     Group group;
 
     TableRef source = group.add_table("source");
     TableRef target = group.add_table("target");
 
-    size_t col_link = source->add_column_link(type_Link, "link", *target);
-    size_t col_name = target->add_column(type_String, "name");
+    auto col_link = source->add_column_link(type_Link, "link", *target);
+    auto col_name = target->add_column(type_String, "name");
 
-    target->add_empty_row(3);
-    target->set_string(col_name, 0, "A");
-    target->set_string(col_name, 1, "B");
-    target->set_string(col_name, 2, "C");
+    ObjKeys keys({4, 6, 8});
+    target->create_objects(keys);
+    target->get_object(keys[0]).set(col_name, "A");
+    target->get_object(keys[1]).set(col_name, "B");
+    target->get_object(keys[2]).set(col_name, "C");
 
-    source->add_empty_row(3);
-    source->set_link(col_link, 0, 0);
-    source->set_link(col_link, 1, 1);
-    source->set_link(col_link, 2, 2);
+    source->create_object().set(col_link, keys[0]);
+    source->create_object().set(col_link, keys[1]).get_key();
+    source->create_object().set(col_link, keys[2]);
 
-    Query qA = source->column<Link>(col_link) == target->get(0);
-    Query qB = source->column<Link>(col_link) == target->get(1);
-    Query qC = source->column<Link>(col_link) == target->get(2);
+    Query qA = source->column<Link>(col_link) == target->get_object(keys[0]);
+    Query qB = source->column<Link>(col_link) == target->get_object(keys[1]);
+    Query qC = source->column<Link>(col_link) == target->get_object(keys[2]);
 
-    // Move row C over row A. Row C is now at position 0, and row A has been removed.
-    target->move_last_over(0);
+    // Remove first object
+    target->remove_object(keys[0]);
 
     // Row A should not be found as it has been removed.
     TableView tvA = qA.find_all();
@@ -7668,14 +7560,14 @@ TEST(Query_LinksToDeletedOrMovedRow)
     // Row B should be found as it was not changed.
     TableView tvB = qB.find_all();
     CHECK_EQUAL(1, tvB.size());
-    CHECK_EQUAL(1, tvB[0].get_link(col_link));
-    CHECK_EQUAL("B", target->get_string(col_name, tvB[0].get_link(col_link)));
+    CHECK_EQUAL(keys[1], tvB[0].get<ObjKey>(col_link));
+    CHECK_EQUAL("B", tvB.get(0).get_linked_object(col_link).get<String>(col_name));
 
-    // Row C should still be found, despite having been moved.
+    // Row C should still be found
     TableView tvC = qC.find_all();
     CHECK_EQUAL(1, tvC.size());
-    CHECK_EQUAL(0, tvC[0].get_link(col_link));
-    CHECK_EQUAL("C", target->get_string(col_name, tvC[0].get_link(col_link)));
+    CHECK_EQUAL(keys[2], tvC[0].get<ObjKey>(col_link));
+    CHECK_EQUAL("C", tvC.get(0).get_linked_object(col_link).get<String>(col_name));
 }
 
 // Triggers bug in compare_relation()
@@ -7683,26 +7575,19 @@ TEST(Query_BrokenFindGT)
 {
     Group group;
     TableRef table = group.add_table("test");
-    size_t col = table->add_column(type_Int, "int");
+    auto col = table->add_column(type_Int, "int");
 
     const size_t rows = 12;
     for (size_t i = 0; i < rows; ++i) {
-        table->add_empty_row();
-        table->set_int(col, i, i + 2);
+        table->create_object().set(col, int64_t(i + 2));
     }
 
-    table->add_empty_row();
-    table->set_int(col, rows + 0, 1);
-
-    table->add_empty_row();
-    table->set_int(col, rows + 1, 1);
-
-    table->add_empty_row();
-    table->set_int(col, rows + 2, 1);
+    table->create_object().set(col, 1);
+    table->create_object().set(col, 1);
+    table->create_object().set(col, 1);
 
     for (size_t i = 0; i < 3; ++i) {
-        table->add_empty_row();
-        table->set_int(col, rows + 3 + i, i + 2);
+        table->create_object().set(col, int64_t(i + 2));
     }
 
     CHECK_EQUAL(18, table->size());
@@ -7712,7 +7597,7 @@ TEST(Query_BrokenFindGT)
     CHECK_EQUAL(15, tv.size());
 
     for (size_t i = 0; i < tv.size(); ++i) {
-        CHECK_NOT_EQUAL(1, tv.get_int(col, i));
+        CHECK_NOT_EQUAL(1, tv[i].get<Int>(col));
     }
 }
 
@@ -7723,35 +7608,34 @@ TEST(Query_FuzzyFind)
     for (size_t iter = 0; iter < 50 + TEST_DURATION * 2000; iter++) {
         Group group;
         TableRef table = group.add_table("test");
-        size_t col = table->add_column(type_Int, "int");
+        auto col = table->add_column(type_Int, "int");
 
         // The bug happened when values were stored in 4 bits or less. So create a table full of such random values
         const size_t rows = 18;
         for (size_t i = 0; i < rows; ++i) {
-            table->add_empty_row();
-
             // Produce numbers -3 ... 17. Just to test edge cases around 4-bit values also
             int64_t t = (fastrand() % 21) - 3;
-            table->set_int(col, i, t);
+
+            table->create_object().set(col, t);
         }
 
         for (int64_t s = -2; s < 18; s++) {
             Query q_g = table->where().greater(col, s);
             TableView tv_g = q_g.find_all();
             for (size_t i = 0; i < tv_g.size(); ++i) {
-                CHECK(tv_g.get_int(col, i) > s);
+                CHECK(tv_g[i].get<Int>(col) > s);
             }
 
             Query q_l = table->where().less(col, s);
             TableView tv_l = q_l.find_all();
             for (size_t i = 0; i < tv_l.size(); ++i) {
-                CHECK(tv_l.get_int(col, i) < s);
+                CHECK(tv_l[i].get<Int>(col) < s);
             }
 
             Query q_le = table->where().less_equal(col, s);
             TableView tv_le = q_le.find_all();
             for (size_t i = 0; i < tv_le.size(); ++i) {
-                CHECK(tv_le.get_int(col, i) <= s);
+                CHECK(tv_le[i].get<Int>(col) <= s);
             }
 
             // Sum of values greater + less-or-equal should be total number of rows. This ensures that both
@@ -7760,7 +7644,6 @@ TEST(Query_FuzzyFind)
         }
     }
 }
-#endif
 
 TEST(Query_AverageNullableColumns)
 {
