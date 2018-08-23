@@ -4551,6 +4551,7 @@ void test_dynamic_conversion_list(TestContext& test_context, DBRef sg, realm::Da
     auto table = t->add_table("the_table");
     auto col_from = table->add_column_list(type_id, "the column", from_nullable);
     Obj o = table->create_object();
+    table->create_object(); // This object will have an empty list
     Lst<TFrom> from_lst = o.get_list<TFrom>(col_from);
     std::vector<managed<TTo>> reference;
     for (int j = 0; j < 1000; ++j) {
@@ -4627,6 +4628,7 @@ TEST(Table_Column_DynamicConversions)
     test_dynamic_conversion_list_combi_sametype<BinaryData>(test_context, sg, type_Binary);
     test_dynamic_conversion_list_combi_sametype<Timestamp>(test_context, sg, type_Timestamp);
 }
+
 /*
 TEST(Table_Column_Conversions)
 {

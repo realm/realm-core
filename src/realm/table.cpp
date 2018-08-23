@@ -2410,26 +2410,28 @@ void Table::change_nullability_list(ColKey key_from, ColKey key_to, bool throw_o
             ref_type ref_to = to_ref(to_arr.get(i));
             REALM_ASSERT(!ref_to);
 
-            BPlusTree<F> from_list(allocator);
-            BPlusTree<T> to_list(allocator);
-            from_list.init_from_ref(ref_from);
-            to_list.create();
-            size_t n = from_list.size();
-            for (size_t j = 0; j < n; j++) {
-                auto v = from_list.get(j);
-                if (!from_nullability || bptree_aggregate_not_null(v)) {
-                    to_list.add(remove_optional(v));
-                }
-                else {
-                    if (throw_on_null) {
-                        throw realm::LogicError(realm::LogicError::column_not_nullable);
+            if (ref_from) {
+                BPlusTree<F> from_list(allocator);
+                BPlusTree<T> to_list(allocator);
+                from_list.init_from_ref(ref_from);
+                to_list.create();
+                size_t n = from_list.size();
+                for (size_t j = 0; j < n; j++) {
+                    auto v = from_list.get(j);
+                    if (!from_nullability || bptree_aggregate_not_null(v)) {
+                        to_list.add(remove_optional(v));
                     }
                     else {
-                        to_list.add(ColumnTypeTraits<T>::cluster_leaf_type::default_value(false));
+                        if (throw_on_null) {
+                            throw realm::LogicError(realm::LogicError::column_not_nullable);
+                        }
+                        else {
+                            to_list.add(ColumnTypeTraits<T>::cluster_leaf_type::default_value(false));
+                        }
                     }
                 }
+                to_arr.set(i, from_ref(to_list.get_ref()));
             }
-            to_arr.set(i, from_ref(to_list.get_ref()));
         }
     };
 
