@@ -172,25 +172,11 @@ void add_initial_columns(Group& group, ObjectSchema const& object_schema)
     }
 }
 
-void copy_property_values(Table& table, PropertyType type, ColKey old_col, ColKey new_col)
-{
-    switch_on_type<ObjKey>(type, [&](auto t) {
-        using T = std::decay_t<decltype(*t)>;
-        using U = typename util::RemoveOptional<T>::type;
-        for (auto& obj : table) {
-            obj.set<T>(new_col, obj.get<U>(old_col));
-        }
-    });
-}
-
-void make_property_optional(Group& group, Table& table, Property property)
+void make_property_optional(Table& table, Property property)
 {
     property.type |= PropertyType::Nullable;
-    auto old_key = property.column_key;
-    table.rename_column(old_key, "");
-    property.column_key = add_column(group, table, property);
-    copy_property_values(table, property.type, old_key, property.column_key);
-    table.remove_column(old_key);
+    const bool throw_on_null = false;
+    property.column_key = table.set_nullability(property.column_key, true, throw_on_null);
 }
 
 void make_property_required(Group& group, Table& table, Property property)
@@ -542,7 +528,7 @@ static void create_initial_tables(Group& group, std::vector<SchemaChange> const&
         // downside.
         void operator()(AddProperty op) { add_column(group, table(op.object), *op.property); }
         void operator()(RemoveProperty op) { table(op.object).remove_column(op.property->column_key); }
-        void operator()(MakePropertyNullable op) { make_property_optional(group, table(op.object), *op.property); }
+        void operator()(MakePropertyNullable op) { make_property_optional(table(op.object), *op.property); }
         void operator()(MakePropertyRequired op) { make_property_required(group, table(op.object), *op.property); }
         void operator()(ChangePrimaryKey op) { ObjectStore::set_primary_key_for_object(group, op.object->name, op.property ? StringData{op.property->name} : ""); }
         void operator()(AddIndex op) { table(op.object).add_search_index(op.property->column_key); }
@@ -603,7 +589,7 @@ static void apply_pre_migration_changes(Group& group, std::vector<SchemaChange> 
         void operator()(AddProperty op) { add_column(group, table(op.object), *op.property); }
         void operator()(RemoveProperty) { /* delayed until after the migration */ }
         void operator()(ChangePropertyType op) { replace_column(group, table(op.object), *op.old_property, *op.new_property); }
-        void operator()(MakePropertyNullable op) { make_property_optional(group, table(op.object), *op.property); }
+        void operator()(MakePropertyNullable op) { make_property_optional(table(op.object), *op.property); }
         void operator()(MakePropertyRequired op) { make_property_required(group, table(op.object), *op.property); }
         void operator()(ChangePrimaryKey op) { ObjectStore::set_primary_key_for_object(group, op.object->name.c_str(), op.property ? op.property->name.c_str() : ""); }
         void operator()(AddIndex op) { table(op.object).add_search_index(op.property->column_key); }
@@ -864,14 +850,16 @@ void ObjectStore::set_schema_columns(Group const& group, Schema& schema)
     }
 }
 
-void ObjectStore::delete_data_for_object(Group& group, StringData object_type) {
+void ObjectStore::delete_data_for_object(Group& group, StringData object_type)
+{
     if (TableRef table = table_for_object_type(group, object_type)) {
         group.remove_table(table->get_key());
         ObjectStore::set_primary_key_for_object(group, object_type, "");
     }
 }
 
-bool ObjectStore::is_empty(Group const& group) {
+bool ObjectStore::is_empty(Group const& group)
+{
     for (auto key : group.get_table_keys()) {
         ConstTableRef table = group.get_table(key);
         auto object_type = object_type_for_table_name(table->get_name());
@@ -935,7 +923,7 @@ void ObjectStore::rename_property(Group& group, Schema& target_schema, StringDat
     if (is_nullable(new_property->type) && !is_nullable(old_property->type)) {
         auto prop = *new_property;
         prop.column_key = old_property->column_key;
-        make_property_optional(group, *table, prop);
+        make_property_optional(*table, prop);
     }
 }
 
