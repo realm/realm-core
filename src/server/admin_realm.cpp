@@ -59,6 +59,7 @@ AdminRealmListener::AdminRealmListener(std::string local_root_dir, SyncConfig sy
             Property{"path", PropertyType::String, Property::IsPrimary{true}},
         }},
     };
+    m_config.schema_version = 0;
     m_config.sync_config = std::make_shared<SyncConfig>(m_sync_config_template);
     m_config.sync_config->reference_realm_url += "/__admin";
 }
