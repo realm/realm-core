@@ -1,23 +1,15 @@
-# NEXT RELEASE
+# 5.8.0 Release notes
 
 ### Bugfixes
 
-* Fix a crash on some platforms when using the query parser to look for a string or binary
-  object which has a certain combination of non-printable characters.
-
-### Breaking changes
-
-* None.
+* Fix a crash on some platforms when using the query parser to look for a string
+  or binary object which has a certain combination of non-printable characters.
 
 ### Enhancements
 
-* Support limiting queries via `DescriptorOrdering::set_limit` and by supporting "LIMIT(x)" in string queries.
-
------------
-
-### Internals
-
-* None.
+* Support limiting queries via `DescriptorOrdering::set_limit` and by supporting
+  "LIMIT(x)" in string queries.
+  Issue [realm_sync:#2223](https://github.com/realm/realm-sync/issues/2223)
 
 ----------------------------------------------
 
@@ -39,7 +31,7 @@
 ### Bugfixes
 
 * Fix crash in Group::compute_aggregated_byte_size() when applied on an empty
-realm file. (Issue #3072)
+  realm file. (Issue #3072)
 
 ----------------------------------------------
 
