@@ -1,3 +1,25 @@
+# NEXT RELEASE
+
+### Bugfixes
+
+* None.
+
+### Breaking changes
+
+* None.
+
+### Enhancements
+
+* None.
+
+-----------
+
+### Internals
+
+* None.
+
+----------------------------------------------
+
 # 5.8.0 Release notes
 
 ### Bugfixes
