@@ -285,35 +285,6 @@ target_compile_definitions(Core PUBLIC
   "$<$<CXX_COMPILER_ID:MSVC>:_SCL_SECURE_NO_WARNINGS>"
 )
 
-if(REALM_DEBUG_EXTREME)
-    if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
-        target_compile_definitions(CoreObjects PRIVATE
-            "_ITERATOR_DEBUG_LEVEL=2"
-        )
-        target_compile_definitions(Core PUBLIC
-            "_ITERATOR_DEBUG_LEVEL=2"
-        )
-    elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
-        target_compile_definitions(CoreObjects PRIVATE
-            "_GLIBCXX_DEBUG"
-            "_GLIBCXX_SANITIZE_VECTOR"
-        )
-        target_compile_definitions(Core PUBLIC
-            "_GLIBCXX_DEBUG"
-            "_GLIBCXX_SANITIZE_VECTOR"
-        )
-    elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
-        target_compile_definitions(CoreObjects PRIVATE
-            "_LIBCPP_DEBUG=1"
-        )
-        target_compile_definitions(Core PUBLIC
-            "_LIBCPP_DEBUG=1"
-        )
-    else()
-        message(WARNING "No extreme debug flags for compiler ID '${CMAKE_COMPILER_ID}'.")
-    endif()
-endif(REALM_DEBUG_EXTREME)
-
 # GCC 4.9 does not adhere to the C++11 ABI for std::string. This communicates
 # to dependencies built with newer compilers that the old ABI should be used.
 # Note: We cannot use generator expressions to perform this check, because it
