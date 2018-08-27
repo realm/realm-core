@@ -1352,18 +1352,18 @@ TableView Query::find_all(size_t start, size_t end, size_t limit)
 }
 
 
-size_t Query::count() const
+size_t Query::do_count(size_t limit) const
 {
-#if REALM_METRICS
-    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Count);
-#endif
+    if (limit == 0)
+        return 0;
+
     if (!has_conditions()) {
         // User created query with no criteria; count all
         if (m_view) {
-            return m_view->size();
+            return std::min(m_view->size(), limit);
         }
         else {
-            return m_table->size();
+            return std::min(m_table->size(), limit);
         }
     }
 
@@ -1372,7 +1372,7 @@ size_t Query::count() const
 
     if (m_view) {
         size_t sz = m_view->size();
-        for (size_t t = 0; t < sz; t++) {
+        for (size_t t = 0; t < sz && cnt < limit; t++) {
             ConstObj obj = m_view->get_object(t);
             if (eval_object(obj)) {
                 cnt++;
@@ -1381,15 +1381,17 @@ size_t Query::count() const
     }
     else {
         auto node = root_node();
-        QueryState<int64_t> st(act_Count);
+        QueryState<int64_t> st(act_Count, limit);
 
         ClusterTree::TraverseFunction f = [&node, &st, this](const Cluster* cluster) {
             size_t e = cluster->node_size();
             node->set_cluster(cluster);
             st.m_key_offset = cluster->get_offset();
             st.m_key_values = cluster->get_key_array();
-            aggregate_internal(act_Count, ColumnTypeTraits<int64_t>::id, false, node, &st, 0, e, nullptr);
-            return false;
+            DataType col_id = ColumnTypeTraits<int64_t>::id;
+            aggregate_internal(act_Count, col_id, false, node, &st, 0, e, nullptr);
+            // Stop if limit or end is reached
+            return st.m_match_count == st.m_limit;
         };
 
         m_table->traverse_clusters(f);
@@ -1400,6 +1402,78 @@ size_t Query::count() const
     return cnt;
 }
 
+size_t Query::count() const
+{
+#if REALM_METRICS
+    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Count);
+#endif
+    return do_count();
+}
+
+TableView Query::find_all(const DescriptorOrdering& descriptor)
+{
+#if REALM_METRICS
+    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_FindAll);
+#endif
+    const size_t default_start = 0;
+    const size_t default_end = size_t(-1);
+    const size_t default_limit = size_t(-1);
+
+    if (descriptor.is_empty()) {
+        TableView ret(*m_table, *this, default_start, default_end, default_limit);
+        find_all(ret);
+        return ret;
+    }
+
+    bool only_limit = true;
+    size_t min_limit = size_t(-1);
+    for (size_t i = 0; i < descriptor.size(); ++i) {
+        if (descriptor.get_type(i) != DescriptorType::Limit) {
+            only_limit = false;
+            break;
+        }
+        else {
+            REALM_ASSERT(dynamic_cast<const LimitDescriptor*>(descriptor[i]));
+            const LimitDescriptor* limit = static_cast<const LimitDescriptor*>(descriptor[i]);
+            min_limit = std::min(min_limit, limit->get_limit());
+        }
+    }
+    if (only_limit) {
+        TableView ret(*m_table, *this, default_start, default_end, min_limit);
+        find_all(ret, default_start, default_end, min_limit);
+        return ret;
+    }
+
+    TableView ret(*m_table, *this, default_start, default_end, default_limit);
+    ret.apply_descriptor_ordering(descriptor);
+    return ret;
+}
+
+size_t Query::count(const DescriptorOrdering& descriptor)
+{
+#if REALM_METRICS
+    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Count);
+#endif
+    realm::util::Optional<size_t> min_limit = descriptor.get_min_limit();
+
+    if (bool(min_limit) && *min_limit == 0)
+        return 0;
+
+    const size_t start = 0;
+    const size_t end = m_table->size();
+    size_t limit = size_t(-1);
+
+    if (!descriptor.will_apply_distinct()) {
+        if (bool(min_limit)) {
+            limit = *min_limit;
+        }
+        return do_count(limit);
+    }
+
+    TableView ret(*m_table, *this, start, end, limit);
+    ret.apply_descriptor_ordering(descriptor);
+    return ret.size();
+}
 
 // todo, not sure if start, end and limit could be useful for delete.
 size_t Query::remove()

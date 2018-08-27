@@ -186,8 +186,12 @@ def doBuildInDocker(String buildType, String maxBpNodeSize = '1000', String sani
     return {
         node('docker') {
             getArchive()
-
-            def buildEnv = docker.build 'realm-core:snapshot'
+            def buildEnv
+            if (sanitizeMode == '') {
+                buildEnv = docker.build 'realm-core:snapshot'
+            } else {
+                buildEnv = docker.build('realm-core-clang:snapshot', '-f clang.Dockerfile .')
+            }
             def environment = environment()
             def sanitizeFlags = ''
             environment << 'UNITTEST_PROGRESS=1'
@@ -199,7 +203,7 @@ def doBuildInDocker(String buildType, String maxBpNodeSize = '1000', String sani
                 sanitizeFlags = '-D REALM_ASAN=ON'
             }
             withEnv(environment) {
-                buildEnv.inside {
+                buildEnv.inside(sanitizeMode == 'address' ? '--privileged' : '') {
                     try {
                         sh """
                            mkdir build-dir

@@ -3611,36 +3611,293 @@ TEST(Query_DescriptorsWillApply)
 
     CHECK(!ordering.will_apply_sort());
     CHECK(!ordering.will_apply_distinct());
+    CHECK(!ordering.will_apply_limit());
+    CHECK(!ordering.will_limit_to_zero());
+    CHECK_EQUAL(ordering.size(), 0);
 
     ordering.append_sort(SortDescriptor());
     CHECK(!ordering.will_apply_sort());
     CHECK(!ordering.will_apply_distinct());
+    CHECK(!ordering.will_apply_limit());
+    CHECK(!ordering.will_limit_to_zero());
+    CHECK_EQUAL(ordering.size(), 0);
 
     ordering.append_distinct(DistinctDescriptor());
     CHECK(!ordering.will_apply_sort());
     CHECK(!ordering.will_apply_distinct());
+    CHECK(!ordering.will_apply_limit());
+    CHECK(!ordering.will_limit_to_zero());
+    CHECK_EQUAL(ordering.size(), 0);
+
+    ordering.append_limit(LimitDescriptor());
+    CHECK(!ordering.will_apply_sort());
+    CHECK(!ordering.will_apply_distinct());
+    CHECK(!ordering.will_apply_limit());
+    CHECK(!ordering.will_limit_to_zero());
+    CHECK_EQUAL(ordering.size(), 0);
 
     ordering.append_sort(SortDescriptor({{t1_int_col}}));
     CHECK(ordering.will_apply_sort());
     CHECK(!ordering.will_apply_distinct());
+    CHECK(!ordering.will_apply_limit());
+    CHECK(!ordering.will_limit_to_zero());
 
     ordering.append_distinct(DistinctDescriptor({{t1_int_col}}));
     CHECK(ordering.will_apply_sort());
     CHECK(ordering.will_apply_distinct());
+    CHECK(!ordering.will_apply_limit());
+    CHECK(!ordering.will_limit_to_zero());
 
     ordering.append_distinct(DistinctDescriptor({{t1_str_col}}));
     CHECK(ordering.will_apply_sort());
     CHECK(ordering.will_apply_distinct());
+    CHECK(!ordering.will_apply_limit());
+    CHECK(!ordering.will_limit_to_zero());
 
     ordering.append_sort(SortDescriptor({{t1_str_col}}));
     CHECK(ordering.will_apply_sort());
     CHECK(ordering.will_apply_distinct());
+    CHECK(!ordering.will_apply_limit());
+    CHECK(!ordering.will_limit_to_zero());
+
+    ordering.append_limit(LimitDescriptor(1));
+    CHECK(ordering.will_apply_sort());
+    CHECK(ordering.will_apply_distinct());
+    CHECK(ordering.will_apply_limit());
+    CHECK(!ordering.will_limit_to_zero());
+
+    CHECK_EQUAL(ordering.size(), 5);
+    CHECK(ordering.get_type(0) == DescriptorType::Sort);
+    CHECK(ordering.get_type(1) == DescriptorType::Distinct);
+    CHECK(ordering.get_type(2) == DescriptorType::Distinct);
+    CHECK(ordering.get_type(3) == DescriptorType::Sort);
+    CHECK(ordering.get_type(4) == DescriptorType::Limit);
 
     DescriptorOrdering ordering_copy = ordering;
     CHECK(ordering.will_apply_sort());
     CHECK(ordering.will_apply_distinct());
+    CHECK(ordering.will_apply_limit());
+    CHECK(!ordering.will_limit_to_zero());
     CHECK(ordering_copy.will_apply_sort());
     CHECK(ordering_copy.will_apply_distinct());
+    CHECK(ordering_copy.will_apply_limit());
+    CHECK(!ordering_copy.will_limit_to_zero());
+
+    ordering_copy.append_limit({10});
+    ordering_copy.append_limit({0});
+    CHECK(ordering_copy.will_limit_to_zero());
+}
+
+TEST(Query_FindWithDescriptorOrdering)
+{
+    Group g;
+    TableRef t1 = g.add_table("t1");
+    auto t1_int_col = t1->add_column(type_Int, "t1_int");
+    auto t1_str_col = t1->add_column(type_String, "t1_str");
+
+    auto k0 = t1->create_object().set_all(1, "A").get_key();
+    auto k1 = t1->create_object().set_all(1, "A").get_key();
+    auto k2 = t1->create_object().set_all(1, "B").get_key();
+    auto k3 = t1->create_object().set_all(2, "B").get_key();
+    auto k4 = t1->create_object().set_all(2, "A").get_key();
+    auto k5 = t1->create_object().set_all(2, "A").get_key();
+
+    //     T1
+    //   | t1_int   t1_str  |
+    //   ====================
+    // 0 | 1        "A"     |
+    // 1 | 1        "A"     |
+    // 2 | 1        "B"     |
+    // 3 | 2        "B"     |
+    // 4 | 2        "A"     |
+    // 5 | 2        "A"     |
+
+    using ResultList = std::vector<std::pair<int64_t, ObjKey>>; // value, key
+    {
+        // applying only limit
+        DescriptorOrdering ordering;
+        TableView tv = t1->where().find_all(ordering);
+        CHECK_EQUAL(tv.size(), 6);
+        CHECK_EQUAL(t1->where().count(ordering), 6);
+        ordering.append_limit({2});
+        ResultList expected = {{1, k0}, {1, k1}};
+        tv = t1->where().find_all(ordering);
+        CHECK_EQUAL(tv.size(), expected.size());
+        CHECK_EQUAL(t1->where().count(ordering), expected.size());
+        for (size_t i = 0; i < tv.size(); ++i) {
+            CHECK_EQUAL(tv[i].get<Int>(t1_int_col), expected[i].first);
+            CHECK_EQUAL(tv.get_key(i), expected[i].second);
+        }
+        ordering.append_limit({1}); // two limits should apply the minimum limit
+        expected = {{1, k0}};
+        tv = t1->where().find_all(ordering);
+        CHECK_EQUAL(tv.size(), expected.size());
+        CHECK_EQUAL(t1->where().count(ordering), expected.size());
+        for (size_t i = 0; i < tv.size(); ++i) {
+            CHECK_EQUAL(tv[i].get<Int>(t1_int_col), expected[i].first);
+            CHECK_EQUAL(tv.get_key(i), expected[i].second);
+        }
+    }
+    {
+        // applying sort and limit
+        DescriptorOrdering ordering;
+        ordering.append_sort(SortDescriptor({{t1_str_col}}, {false}));
+        ordering.append_limit({2});
+        TableView tv = t1->where().find_all(ordering);
+        ResultList expected = {{1, k2}, {2, k3}};
+        CHECK_EQUAL(tv.size(), expected.size());
+        CHECK_EQUAL(t1->where().count(ordering), expected.size());
+        for (size_t i = 0; i < tv.size(); ++i) {
+            CHECK_EQUAL(tv[i].get<Int>(t1_int_col), expected[i].first);
+            CHECK_EQUAL(tv.get_key(i), expected[i].second);
+        }
+    }
+    { // sort limit distinct
+        DescriptorOrdering ordering;
+        ordering.append_sort(SortDescriptor({{t1_str_col}}, {false}));
+        ordering.append_limit({3});
+        ordering.append_distinct(DistinctDescriptor({{t1_int_col}}));
+        TableView tv = t1->where().find_all(ordering);
+        ResultList expected = {{1, k2}, {2, k3}};
+        CHECK_EQUAL(tv.size(), expected.size());
+        CHECK_EQUAL(t1->where().count(ordering), expected.size());
+        for (size_t i = 0; i < tv.size(); ++i) {
+            CHECK_EQUAL(tv[i].get<Int>(t1_int_col), expected[i].first);
+            CHECK_EQUAL(tv.get_key(i), expected[i].second);
+        }
+    }
+    { // sort distinct limit
+        DescriptorOrdering ordering;
+        ordering.append_sort(SortDescriptor({{t1_str_col}}, {false}));
+        ordering.append_distinct(DistinctDescriptor({{t1_int_col}}));
+        ordering.append_limit({1});
+        TableView tv = t1->where().find_all(ordering);
+        ResultList expected = {{1, k2}};
+        CHECK_EQUAL(tv.size(), expected.size());
+        CHECK_EQUAL(t1->where().count(ordering), expected.size());
+        for (size_t i = 0; i < tv.size(); ++i) {
+            CHECK_EQUAL(tv[i].get<Int>(t1_int_col), expected[i].first);
+            CHECK_EQUAL(tv.get_key(i), expected[i].second);
+        }
+    }
+    { // limit sort distinct
+        DescriptorOrdering ordering;
+        ordering.append_limit({2});
+        ordering.append_sort(SortDescriptor({{t1_str_col}}, {false}));
+        ordering.append_distinct(DistinctDescriptor({{t1_int_col}}));
+        TableView tv = t1->where().find_all(ordering);
+        ResultList expected = {{1, k0}};
+        CHECK_EQUAL(tv.size(), expected.size());
+        CHECK_EQUAL(t1->where().count(ordering), expected.size());
+        for (size_t i = 0; i < tv.size(); ++i) {
+            CHECK_EQUAL(tv[i].get<Int>(t1_int_col), expected[i].first);
+            CHECK_EQUAL(tv.get_key(i), expected[i].second);
+        }
+    }
+    { // sort limit sort limit
+        DescriptorOrdering ordering;
+        ordering.append_sort(SortDescriptor({{t1_str_col}}, {true}));
+        ordering.append_limit({5});
+        ordering.append_sort(SortDescriptor({{t1_int_col}}, {false}));
+        ordering.append_limit({3});
+        TableView tv = t1->where().find_all(ordering);
+        ResultList expected = {{2, k4}, {2, k5}, {1, k0}};
+        CHECK_EQUAL(tv.size(), expected.size());
+        CHECK_EQUAL(t1->where().count(ordering), expected.size());
+        for (size_t i = 0; i < tv.size(); ++i) {
+            CHECK_EQUAL(tv[i].get<Int>(t1_int_col), expected[i].first);
+            CHECK_EQUAL(tv.get_key(i), expected[i].second);
+        }
+    }
+}
+
+
+TEST(Query_FindWithDescriptorOrderingOverTableviewSync)
+{
+    Group g;
+    TableRef t1 = g.add_table("t1");
+    auto t1_int_col = t1->add_column(type_Int, "t1_int");
+    auto t1_str_col = t1->add_column(type_String, "t1_str");
+
+    auto init_table = [&]() {
+        t1->clear();
+        t1->create_object().set_all(0, "A");
+        t1->create_object().set_all(1, "A");
+        t1->create_object().set_all(2, "B");
+        t1->create_object().set_all(3, "B");
+        t1->create_object().set_all(4, "A");
+        t1->create_object().set_all(5, "A");
+    };
+
+    //     T1
+    //   | t1_int   t1_str  |
+    //   ====================
+    // 0 | 0        "A"     |
+    // 1 | 1        "A"     |
+    // 2 | 2        "B"     |
+    // 3 | 3        "B"     |
+    // 4 | 4        "A"     |
+    // 5 | 5        "A"     |
+
+    using ResultList = std::vector<std::pair<size_t, std::string>>; // t1_int, t1_str
+    {
+        // applying only limit
+        init_table();
+        DescriptorOrdering ordering;
+        Query base = t1->where().greater(t1_int_col, 2);
+        TableView tv = base.find_all(ordering);
+        CHECK_EQUAL(tv.size(), 3);
+        CHECK_EQUAL(base.count(ordering), 3);
+        ordering.append_limit({2});
+        ResultList expected = {{3, "B"}, {4, "A"}};
+        tv = base.find_all(ordering);
+        CHECK_EQUAL(tv.size(), expected.size());
+        CHECK_EQUAL(base.count(ordering), expected.size());
+        for (size_t i = 0; i < tv.size(); ++i) {
+            CHECK_EQUAL(tv[i].get<Int>(t1_int_col), expected[i].first);
+            CHECK_EQUAL(tv[i].get<String>(t1_str_col), expected[i].second);
+        }
+        t1->create_object().set_all(6, "C");
+        t1->get_object(4).remove();
+        expected = {{3, "B"}, {5, "A"}};
+        CHECK(!tv.is_in_sync());
+        tv.sync_if_needed();
+        CHECK_EQUAL(tv.size(), expected.size());
+        CHECK_EQUAL(base.count(ordering), expected.size());
+        for (size_t i = 0; i < tv.size(); ++i) {
+            CHECK_EQUAL(tv[i].get<Int>(t1_int_col), expected[i].first);
+            CHECK_EQUAL(tv[i].get<String>(t1_str_col), expected[i].second);
+        }
+    }
+    { // applying sort and limit
+        init_table();
+        DescriptorOrdering ordering;
+        Query base = t1->where().greater(t1_int_col, 2);
+        TableView tv = base.find_all(ordering);
+        CHECK_EQUAL(tv.size(), 3);
+        CHECK_EQUAL(base.count(ordering), 3);
+        ordering.append_sort(SortDescriptor({{t1_str_col}}, {true}));
+        ordering.append_limit({2});
+        ResultList expected = {{4, "A"}, {5, "A"}};
+        tv = base.find_all(ordering);
+        CHECK_EQUAL(tv.size(), expected.size());
+        CHECK_EQUAL(base.count(ordering), expected.size());
+        for (size_t i = 0; i < tv.size(); ++i) {
+            CHECK_EQUAL(tv[i].get<Int>(t1_int_col), expected[i].first);
+            CHECK_EQUAL(tv[i].get<String>(t1_str_col), expected[i].second);
+        }
+        t1->create_object().set_all(6, "C");
+        t1->get_object(4).remove();
+        expected = {{5, "A"}, {3, "B"}};
+        CHECK(!tv.is_in_sync());
+        tv.sync_if_needed();
+        CHECK_EQUAL(tv.size(), expected.size());
+        CHECK_EQUAL(base.count(ordering), expected.size());
+        for (size_t i = 0; i < tv.size(); ++i) {
+            CHECK_EQUAL(tv[i].get<Int>(t1_int_col), expected[i].first);
+            CHECK_EQUAL(tv[i].get<String>(t1_str_col), expected[i].second);
+        }
+    }
 }
 
 TEST(Query_DistinctAndSort)
@@ -3760,7 +4017,8 @@ TEST(Query_DistinctAndSort)
     }
 }
 
-TEST(Query_SortDistinctOrderThroughHandover) {
+TEST(Query_SortDistinctOrderThroughHandover)
+{
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
     DBRef sg_w = DB::create(*hist_w, DBOptions(crypt_key()));
@@ -3809,6 +4067,17 @@ TEST(Query_SortDistinctOrderThroughHandover) {
             CHECK_EQUAL(tv.get(i).get<String>(t1_str_col), results[i].first);
             CHECK_EQUAL(tv.get_key(i), results[i].second);
         }
+        auto tr = g->duplicate();
+        auto tv2 = tr->import_copy_of(tv, PayloadPolicy::Stay);
+        check_across_handover(results, std::move(tv2));
+    }
+    { // sort descending then distinct then limit
+        TableView tv = t1->where().find_all();
+        ResultList results = {};
+        tv.sort(SortDescriptor({{t1_int_col}}, {false}));
+        tv.distinct(DistinctDescriptor({{t1_str_col}}));
+        tv.limit(LimitDescriptor(0));
+        CHECK_EQUAL(tv.size(), results.size());
         auto tr = g->duplicate();
         auto tv2 = tr->import_copy_of(tv, PayloadPolicy::Stay);
         check_across_handover(results, std::move(tv2));

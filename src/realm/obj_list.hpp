@@ -49,6 +49,13 @@ public:
 
     virtual size_t size() const;
 
+    // Get the number of total results which have been filtered out because a number of "LIMIT" operations have
+    // been applied. This number only applies to the last sync.
+    size_t get_num_results_excluded_by_limit() const noexcept
+    {
+        return m_limit_count;
+    }
+
     // Get key for object this view is "looking" at.
     ObjKey get_key(size_t ndx) const;
 
@@ -95,6 +102,7 @@ protected:
     // Null if, and only if, the view is detached.
     mutable ConstTableRef m_table;
     KeyColumn* m_key_values = nullptr;
+    size_t m_limit_count = 0;
     uint64_t m_debug_cookie;
 
     void assign(KeyColumn* key_values, const Table* parent);

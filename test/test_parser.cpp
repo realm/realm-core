@@ -198,6 +198,19 @@ static std::vector<std::string> valid_queries = {
     "a == b and c==d sort(a ASC, b DESC) DISTINCT(p) sort(c ASC, d DESC) DISTINCT(q.r)",
     "a == b  sort(     a   ASC  ,  b DESC) and c==d   DISTINCT(   p )  sort(   c   ASC  ,  d   DESC  )  DISTINCT(   q.r ,   p)   ",
 
+    // limit
+    "a=b LIMIT(1)",
+    "a=b LIMIT ( 1 )",
+    "a=b LIMIT( 1234567890 )",
+    "a=b LIMIT(1) && c=d",
+    "a=b && c=d || e=f LIMIT(1)",
+    "a=b LIMIT(1) SORT(a ASC) DISTINCT(b)",
+    "a=b SORT(a ASC) LIMIT(1) DISTINCT(b)",
+    "a=b SORT(a ASC) DISTINCT(b) LIMIT(1)",
+    "a=b LIMIT(2) LIMIT(1)",
+    "a=b LIMIT(5) && c=d LIMIT(2)",
+    "a=b LIMIT(5) SORT(age ASC) DISTINCT(name) LIMIT(2)",
+
     // subquery expression
     "SUBQUERY(items, $x, $x.name == 'Tom').@size > 0",
     "SUBQUERY(items, $x, $x.name == 'Tom').@count > 0",
@@ -280,6 +293,19 @@ static std::vector<std::string> invalid_queries = {
     "a=b DISTINCT(p", // no braces
     "a=b sort(p.q DESC a ASC)", // missing comma
     "a=b DISTINCT(p q)", // missing comma
+
+    // limit
+    "LIMIT(1)", // no query conditions
+    "a=b LIMIT", // no params
+    "a=b LIMIT()", // no params
+    "a=b LIMIT(2", // missing end paren
+    "a=b LIMIT2)", // missing open paren
+    "a=b LIMIT(-1)", // negative limit
+    "a=b LIMIT(2.7)", // input must be an integer
+    "a=b LIMIT(0xFFEE)", // input must be an integer
+    "a=b LIMIT(word)", // non numeric limit
+    "a=b LIMIT(11asdf)", // non numeric limit
+    "a=b LIMIT(1, 1)", // only accept one input
 
     // subquery
     "SUBQUERY(items, $x, $x.name == 'Tom') > 0", // missing .@count
@@ -1269,7 +1295,6 @@ TEST(Parser_string_binary_encoding)
         "FALSE",
         "None",
         "hasOwnProperty",
-        "\\",
         "\\\\",
         "1.00",
         "$1.00",
@@ -1351,9 +1376,9 @@ TEST(Parser_string_binary_encoding)
 
     t->create_object(); // nulls
     // add a single char of each value
-    for (size_t i = 0; i < 255; ++i) {
-        unsigned char c = static_cast<unsigned char>(i);
-        test_strings.push_back(std::string(c, 1));
+    for (size_t i = 0; i < 256; ++i) {
+        char c = static_cast<char>(i);
+        test_strings.push_back(std::string(1, c));
     }
     // a single string of 100 nulls
     test_strings.push_back(std::string(100, '\0'));
@@ -1366,6 +1391,34 @@ TEST(Parser_string_binary_encoding)
         obj.set(bin_col, bd);
     }
 
+    struct TestValues {
+        TestValues(size_t processed, bool replace)
+            : num_processed(processed)
+            , should_be_replaced(replace)
+        {
+        }
+        TestValues()
+        {
+        }
+        size_t num_processed = 0;
+        bool should_be_replaced = false;
+    };
+
+    std::unordered_map<unsigned char, TestValues> expected_replacements;
+    expected_replacements['\x0'] = TestValues{0, true}; // non printable characters require replacement
+    expected_replacements['\x7f'] = TestValues{0, true};
+    expected_replacements['\x80'] = TestValues{0, true};
+    expected_replacements['\xad'] = TestValues{0, true};
+    expected_replacements['\xff'] = TestValues{0, true};
+    expected_replacements['A'] = TestValues{0, false}; // ascii characters can be represented in plain text
+    expected_replacements['z'] = TestValues{0, false};
+    expected_replacements['0'] = TestValues{0, false};
+    expected_replacements['9'] = TestValues{0, false};
+    expected_replacements['"'] = TestValues{0, true}; // quotes must be replaced as b64
+    expected_replacements['\''] = TestValues{0, true};
+    static const std::string base64_prefix = "B64\"";
+    static const std::string base64_suffix = "==\"";
+
     for (const std::string& buff : test_strings) {
         size_t num_results = 1;
         Query qstr = t->where().equal(str_col, StringData(buff), true);
@@ -1374,6 +1427,53 @@ TEST(Parser_string_binary_encoding)
         CHECK_EQUAL(qbin.count(), num_results);
         std::string string_description = qstr.get_description();
         std::string binary_description = qbin.get_description();
+
+        if (buff.size() == 1) {
+            auto it = expected_replacements.find(buff[0]);
+            if (it != expected_replacements.end()) {
+                ++it->second.num_processed;
+
+
+                // std::cout << "string: '" << it->first << "' described: " << string_description << std::endl;
+                if (!it->second.should_be_replaced) {
+                    bool validate = string_description.find(base64_prefix) == std::string::npos &&
+                                    string_description.find(base64_suffix) == std::string::npos &&
+                                    binary_description.find(base64_prefix) == std::string::npos &&
+                                    binary_description.find(base64_suffix) == std::string::npos &&
+                                    string_description.find(it->first) != std::string::npos &&
+                                    binary_description.find(it->first) != std::string::npos;
+                    CHECK(validate);
+                    if (!validate) {
+                        std::stringstream ss;
+                        ss << "string should not be replaced: '" << it->first
+                           << "' described: " << string_description;
+                        CHECK_EQUAL(ss.str(), "");
+                    }
+                }
+                else {
+                    size_t str_b64_pre_pos = string_description.find(base64_prefix);
+                    size_t str_b64_suf_pos = string_description.find(base64_suffix);
+                    size_t bin_b64_pre_pos = binary_description.find(base64_prefix);
+                    size_t bin_b64_suf_pos = binary_description.find(base64_suffix);
+
+                    bool validate = str_b64_pre_pos != std::string::npos && str_b64_suf_pos != std::string::npos &&
+                                    bin_b64_pre_pos != std::string::npos && bin_b64_suf_pos != std::string::npos;
+                    CHECK(validate);
+
+                    size_t contents_str = string_description.find(it->first, str_b64_pre_pos + base64_prefix.size());
+                    size_t contents_bin = binary_description.find(it->first, bin_b64_pre_pos + base64_prefix.size());
+
+                    bool validate_contents = contents_str > str_b64_suf_pos && contents_bin > bin_b64_suf_pos;
+                    CHECK(validate_contents);
+                    if (!validate || !validate_contents) {
+                        std::stringstream ss;
+                        ss << "string should be replaced: '" << it->first << "' described: " << string_description;
+                        CHECK_EQUAL(ss.str(), "");
+                    }
+                }
+            }
+        }
+
         //std::cerr << "original: " << buff << "\tdescribed: " << string_description << "\n";
 
         query_builder::NoArguments args;
@@ -1386,6 +1486,14 @@ TEST(Parser_string_binary_encoding)
         realm::parser::Predicate pbin2 = realm::parser::parse(binary_description).predicate;
         realm::query_builder::apply_predicate(qbin2, pbin2, args);
         CHECK_EQUAL(qbin2.count(), num_results);
+    }
+
+    for (auto it = expected_replacements.begin(); it != expected_replacements.end(); ++it) {
+        bool processed = it->second.num_processed == 1;
+        CHECK(processed);
+        if (!processed) { // the check is expected to fail, but will print which character is failing
+            CHECK_EQUAL(it->first, it->second.num_processed);
+        }
     }
 }
 
@@ -1590,7 +1698,6 @@ TableView get_sorted_view(TableRef t, std::string query_string)
     realm::query_builder::apply_predicate(q, result.predicate, args);
     DescriptorOrdering ordering;
     realm::query_builder::apply_ordering(ordering, t, result.ordering);
-
     std::string query_description = q.get_description();
     std::string ordering_description = ordering.get_description(t);
     std::string combined = query_description + " " + ordering_description;
@@ -1721,6 +1828,213 @@ TEST(Parser_SortAndDistinct)
     CHECK_THROW_ANY_GET_MESSAGE(get_sorted_view(people, "TRUEPREDICATE sort(account.name ASC)"), message);
     CHECK_EQUAL(message, "No property 'name' found on object type 'account' specified in 'sort' clause");
 }
+
+TEST(Parser_Limit)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    auto sg = DB::create(*hist, DBOptions(crypt_key()));
+
+    auto wt = sg->start_write();
+    TableRef people = wt->add_table("person");
+
+    auto name_col = people->add_column(type_String, "name");
+    people->add_column(type_Int, "age");
+
+    people->create_object().set_all("Adam", 28);
+    people->create_object().set_all("Frank", 30);
+    people->create_object().set_all("Ben", 28);
+
+    // solely limit
+    TableView tv = get_sorted_view(people, "TRUEPREDICATE LIMIT(0)");
+    CHECK_EQUAL(tv.size(), 0);
+    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 3);
+    tv = get_sorted_view(people, "TRUEPREDICATE LIMIT(1)");
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 2);
+    tv = get_sorted_view(people, "TRUEPREDICATE LIMIT(2)");
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 1);
+    tv = get_sorted_view(people, "TRUEPREDICATE LIMIT(3)");
+    CHECK_EQUAL(tv.size(), 3);
+    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
+    tv = get_sorted_view(people, "TRUEPREDICATE LIMIT(4)");
+    CHECK_EQUAL(tv.size(), 3);
+    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
+
+    // sort + limit
+    tv = get_sorted_view(people, "TRUEPREDICATE SORT(name ASC) LIMIT(0)");
+    CHECK_EQUAL(tv.size(), 0);
+    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 3);
+    tv = get_sorted_view(people, "TRUEPREDICATE SORT(name ASC) LIMIT(1)");
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 2);
+    CHECK_EQUAL(tv[0].get<String>(name_col), "Adam");
+    tv = get_sorted_view(people, "TRUEPREDICATE SORT(name ASC) LIMIT(2)");
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 1);
+    CHECK_EQUAL(tv[0].get<String>(name_col), "Adam");
+    CHECK_EQUAL(tv[1].get<String>(name_col), "Ben");
+    tv = get_sorted_view(people, "TRUEPREDICATE SORT(name ASC) LIMIT(3)");
+    CHECK_EQUAL(tv.size(), 3);
+    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
+    CHECK_EQUAL(tv[0].get<String>(name_col), "Adam");
+    CHECK_EQUAL(tv[1].get<String>(name_col), "Ben");
+    CHECK_EQUAL(tv[2].get<String>(name_col), "Frank");
+    tv = get_sorted_view(people, "TRUEPREDICATE SORT(name ASC) LIMIT(4)");
+    CHECK_EQUAL(tv.size(), 3);
+    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
+
+    // sort + distinct + limit
+    tv = get_sorted_view(people, "TRUEPREDICATE SORT(name ASC) DISTINCT(age) LIMIT(0)");
+    CHECK_EQUAL(tv.size(), 0);
+    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 2);
+    tv = get_sorted_view(people, "TRUEPREDICATE SORT(name ASC) DISTINCT(age) LIMIT(1)");
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 1);
+    CHECK_EQUAL(tv[0].get<String>(name_col), "Adam");
+    tv = get_sorted_view(people, "TRUEPREDICATE SORT(name ASC) DISTINCT(age) LIMIT(2)");
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
+    CHECK_EQUAL(tv[0].get<String>(name_col), "Adam");
+    CHECK_EQUAL(tv[1].get<String>(name_col), "Frank");
+    tv = get_sorted_view(people, "TRUEPREDICATE SORT(name ASC) DISTINCT(age) LIMIT(3)");
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
+    CHECK_EQUAL(tv[0].get<String>(name_col), "Adam");
+    CHECK_EQUAL(tv[1].get<String>(name_col), "Frank");
+    tv = get_sorted_view(people, "TRUEPREDICATE SORT(name ASC) DISTINCT(age) LIMIT(4)");
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
+
+    // query + limit
+    tv = get_sorted_view(people, "age < 30 SORT(name ASC) DISTINCT(age) LIMIT(0)");
+    CHECK_EQUAL(tv.size(), 0);
+    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 1);
+    tv = get_sorted_view(people, "age < 30 SORT(name ASC) DISTINCT(age) LIMIT(1)");
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
+    CHECK_EQUAL(tv[0].get<String>(name_col), "Adam");
+    tv = get_sorted_view(people, "age < 30 SORT(name ASC) DISTINCT(age) LIMIT(2)");
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
+    CHECK_EQUAL(tv[0].get<String>(name_col), "Adam");
+    tv = get_sorted_view(people, "age < 30 SORT(name ASC) DISTINCT(age) LIMIT(3)");
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
+    CHECK_EQUAL(tv[0].get<String>(name_col), "Adam");
+    tv = get_sorted_view(people, "age < 30 SORT(name ASC) DISTINCT(age) LIMIT(4)");
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
+
+    // compound query + limit
+    tv = get_sorted_view(people, "age < 30 && name == 'Adam' LIMIT(0)");
+    CHECK_EQUAL(tv.size(), 0);
+    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 1);
+    tv = get_sorted_view(people, "age < 30 && name == 'Adam' LIMIT(1)");
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
+    CHECK_EQUAL(tv[0].get<String>(name_col), "Adam");
+
+    // limit multiple times, order matters
+    tv = get_sorted_view(people, "TRUEPREDICATE LIMIT(2) LIMIT(1)");
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 2);
+    tv = get_sorted_view(people, "TRUEPREDICATE LIMIT(3) LIMIT(2) LIMIT(1) LIMIT(10)");
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 2);
+    tv = get_sorted_view(people, "age > 0 SORT(name ASC) LIMIT(2)");
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 1);
+    CHECK_EQUAL(tv[0].get<String>(name_col), "Adam");
+    CHECK_EQUAL(tv[1].get<String>(name_col), "Ben");
+    tv = get_sorted_view(people, "age > 0 LIMIT(2) SORT(name ASC)");
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 1);
+    CHECK_EQUAL(tv[0].get<String>(name_col), "Adam");
+    CHECK_EQUAL(tv[1].get<String>(name_col), "Frank");
+    tv = get_sorted_view(people, "age > 0 SORT(name ASC) LIMIT(2) DISTINCT(age)");
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 1); // the other result is excluded by distinct not limit
+    tv = get_sorted_view(people, "age > 0 SORT(name DESC) LIMIT(2) SORT(age ASC) LIMIT(1)");
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 2);
+    CHECK_EQUAL(tv[0].get<String>(name_col), "Ben");
+
+    // size_unlimited() checks
+    tv = get_sorted_view(people, "age == 30");
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
+    tv = get_sorted_view(people, "age == 30 LIMIT(0)");
+    CHECK_EQUAL(tv.size(), 0);
+    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 1);
+    tv = get_sorted_view(people, "age == 1000");
+    CHECK_EQUAL(tv.size(), 0);
+    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
+    tv = get_sorted_view(people, "age == 1000 LIMIT(0)");
+    CHECK_EQUAL(tv.size(), 0);
+    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
+    tv = get_sorted_view(people, "age == 1000 SORT(name ASC)");
+    CHECK_EQUAL(tv.size(), 0);
+    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
+    tv = get_sorted_view(people, "age == 1000 SORT(name ASC) LIMIT(0)");
+    CHECK_EQUAL(tv.size(), 0);
+    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
+    tv = get_sorted_view(people, "age == 28 SORT(name ASC)");
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
+    tv = get_sorted_view(people, "age == 28 SORT(name ASC) LIMIT(1)");
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 1);
+    tv = get_sorted_view(people, "age == 28 DISTINCT(age)");
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
+    tv = get_sorted_view(people, "age == 28 DISTINCT(age) LIMIT(0)");
+    CHECK_EQUAL(tv.size(), 0);
+    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 1);
+    tv = get_sorted_view(people, "age == 28 SORT(name ASC) DISTINCT(age)");
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
+    tv = get_sorted_view(people, "age == 28 SORT(name ASC) DISTINCT(age) LIMIT(0)");
+    CHECK_EQUAL(tv.size(), 0);
+    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 1);
+    tv = get_sorted_view(people, "FALSEPREDICATE");
+    CHECK_EQUAL(tv.size(), 0);
+    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
+    tv = get_sorted_view(people, "FALSEPREDICATE LIMIT(0)");
+    CHECK_EQUAL(tv.size(), 0);
+    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
+    tv = get_sorted_view(people, "FALSEPREDICATE LIMIT(1)");
+    CHECK_EQUAL(tv.size(), 0);
+    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
+
+    // errors
+    CHECK_THROW_ANY(get_sorted_view(people, "TRUEPREDICATE LIMIT(-1)"));    // only accepting positive integers
+    CHECK_THROW_ANY(get_sorted_view(people, "TRUEPREDICATE LIMIT(age)"));   // only accepting positive integers
+    CHECK_THROW_ANY(get_sorted_view(people, "TRUEPREDICATE LIMIT('age')")); // only accepting positive integers
+
+    wt->commit();
+
+    // handover
+    auto reader = sg->start_read();
+    ConstTableRef peopleRead = reader->get_table("person");
+
+    TableView items = peopleRead->where().find_all();
+    CHECK_EQUAL(items.size(), 3);
+    realm::DescriptorOrdering desc;
+    CHECK(!desc.will_apply_limit());
+    desc.append_limit(1);
+    CHECK(desc.will_apply_limit());
+    items.apply_descriptor_ordering(desc);
+    CHECK_EQUAL(items.size(), 1);
+
+    auto tr = reader->duplicate();
+    auto tv2 = tr->import_copy_of(items, PayloadPolicy::Copy);
+    CHECK(tv2->is_attached());
+    CHECK(tv2->is_in_sync());
+    CHECK_EQUAL(tv2->size(), 1);
+}
+
 
 TEST(Parser_Backlinks)
 {

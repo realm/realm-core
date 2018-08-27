@@ -29,9 +29,9 @@ class SortDescriptor;
 class ConstTableRef;
 class Group;
 
-// CommonDescriptor encapsulates a reference to a set of columns (possibly over
-// links), which is used to indicate the criteria columns for sort and distinct.
-class CommonDescriptor {
+enum class DescriptorType { Sort, Distinct, Limit };
+
+class BaseDescriptor {
 public:
     struct IndexPair {
         IndexPair(ObjKey k, size_t i)
@@ -43,31 +43,10 @@ public:
         size_t index_in_view;
         Mixed cached_value;
     };
-    using IndexPairs = std::vector<CommonDescriptor::IndexPair>;
-
-    CommonDescriptor() = default;
-    // Enforce type saftey to prevent automatic conversion of derived class
-    // SortDescriptor into CommonDescriptor at compile time.
-    CommonDescriptor(const SortDescriptor&) = delete;
-    virtual ~CommonDescriptor() = default;
-
-    // Create a descriptor for the given columns on the given table.
-    // Each vector in `column_keys` represents a chain of columns, where
-    // all but the last are Link columns (n.b.: LinkList and Backlink are not
-    // supported), and the final is any column type that can be sorted on.
-    // `column_keys` must be non-empty, and each vector within it must also
-    // be non-empty.
-    CommonDescriptor(std::vector<std::vector<ColKey>> column_keys);
-    virtual std::unique_ptr<CommonDescriptor> clone() const;
-
-    // returns whether this descriptor is valid and can be used to sort
-    bool is_valid() const noexcept
-    {
-        return !m_column_keys.empty();
-    }
-
-    void collect_dependencies(const Table* table, std::vector<TableKey>& table_keys) const;
-
+    class IndexPairs : public std::vector<BaseDescriptor::IndexPair> {
+    public:
+        size_t m_removed_by_limit = 0;
+    };
     class Sorter {
     public:
         Sorter(std::vector<std::vector<ColKey>> const& columns, std::vector<bool> const& ascending,
@@ -110,40 +89,81 @@ public:
         std::vector<SortColumn> m_columns;
         friend class ObjList;
     };
-    virtual bool is_sort() const
-    {
-        return false;
-    }
-    virtual Sorter sorter(Table const& table, KeyColumn const& row_indexes) const;
-    // Do what you have to do
-    virtual void execute(IndexPairs& v, const Sorter& predicate, const CommonDescriptor* next) const;
 
-    virtual std::string get_description(ConstTableRef attached_table) const;
+    BaseDescriptor() = default;
+    virtual ~BaseDescriptor() = default;
+    virtual bool is_valid() const noexcept = 0;
+    virtual std::string get_description(ConstTableRef attached_table) const = 0;
+    virtual std::unique_ptr<BaseDescriptor> clone() const = 0;
+    virtual DescriptorType get_type() const = 0;
+    virtual void collect_dependencies(const Table* table, std::vector<TableKey>& table_keys) const = 0;
+    virtual Sorter sorter(Table const& table, KeyColumn const& row_indexes) const = 0;
+    // Do what you have to do
+    virtual void execute(IndexPairs& v, const Sorter& predicate, const BaseDescriptor* next) const = 0;
+};
+
+
+// ColumnsDescriptor encapsulates a reference to a set of columns (possibly over
+// links), which is used to indicate the criteria columns for sort and distinct.
+class ColumnsDescriptor : public BaseDescriptor {
+public:
+    ColumnsDescriptor() = default;
+    // Enforce type saftey to prevent automatic conversion of derived class
+    // SortDescriptor into ColumnsDescriptor at compile time.
+    ColumnsDescriptor(const SortDescriptor&) = delete;
+    virtual ~ColumnsDescriptor() = default;
+
+    // Create a descriptor for the given columns on the given table.
+    // Each vector in `column_keys` represents a chain of columns, where
+    // all but the last are Link columns (n.b.: LinkList and Backlink are not
+    // supported), and the final is any column type that can be sorted on.
+    // `column_keys` must be non-empty, and each vector within it must also
+    // be non-empty.
+    ColumnsDescriptor(std::vector<std::vector<ColKey>> column_keys);
+    std::unique_ptr<BaseDescriptor> clone() const override;
+
+    // returns whether this descriptor is valid and can be used to sort
+    bool is_valid() const noexcept override
+    {
+        return !m_column_keys.empty();
+    }
+    DescriptorType get_type() const override
+    {
+        return DescriptorType::Distinct;
+    }
+
+    void collect_dependencies(const Table* table, std::vector<TableKey>& table_keys) const override;
+
+    Sorter sorter(Table const& table, KeyColumn const& row_indexes) const override;
+    void execute(IndexPairs& v, const Sorter& predicate, const BaseDescriptor* next) const override;
+
+    std::string get_description(ConstTableRef attached_table) const override;
 
 protected:
     std::vector<std::vector<ColKey>> m_column_keys;
 };
 
-class SortDescriptor : public CommonDescriptor {
+class SortDescriptor : public ColumnsDescriptor {
 public:
     // Create a sort descriptor for the given columns on the given table.
-    // See CommonDescriptor for restrictions on `column_keys`.
+    // See ColumnsDescriptor for restrictions on `column_keys`.
     // The sort order can be specified by using `ascending` which must either be
     // empty or have one entry for each column index chain.
     SortDescriptor(std::vector<std::vector<ColKey>> column_indices, std::vector<bool> ascending = {});
     SortDescriptor() = default;
     ~SortDescriptor() = default;
-    std::unique_ptr<CommonDescriptor> clone() const override;
+    std::unique_ptr<BaseDescriptor> clone() const override;
+
+    DescriptorType get_type() const override
+    {
+        return DescriptorType::Sort;
+    }
 
     void merge_with(SortDescriptor&& other);
 
-    bool is_sort() const override
-    {
-        return true;
-    }
     Sorter sorter(Table const& table, KeyColumn const& row_indexes) const override;
 
-    void execute(IndexPairs& v, const Sorter& predicate, const CommonDescriptor* next) const override;
+    void execute(IndexPairs& v, const Sorter& predicate, const BaseDescriptor* next) const override;
 
     std::string get_description(ConstTableRef attached_table) const override;
 
@@ -151,8 +171,47 @@ private:
     std::vector<bool> m_ascending;
 };
 
+class LimitDescriptor : public BaseDescriptor {
+public:
+    LimitDescriptor(size_t limit)
+        : m_limit(limit)
+    {
+    }
+    LimitDescriptor() = default;
+    ~LimitDescriptor() = default;
+
+    bool is_valid() const noexcept override
+    {
+        return m_limit != size_t(-1);
+    }
+    std::string get_description(ConstTableRef attached_table) const override;
+    std::unique_ptr<BaseDescriptor> clone() const override;
+    size_t get_limit() const noexcept
+    {
+        return m_limit;
+    }
+
+    DescriptorType get_type() const override
+    {
+        return DescriptorType::Limit;
+    }
+
+    Sorter sorter(Table const&, KeyColumn const&) const override
+    {
+        return Sorter();
+    }
+
+    void collect_dependencies(const Table*, std::vector<TableKey>&) const override
+    {
+    }
+    void execute(IndexPairs& v, const Sorter& predicate, const BaseDescriptor* next) const override;
+
+private:
+    size_t m_limit = size_t(-1);
+};
+
 // Distinct uses the same syntax as sort except that the order is meaningless.
-typedef CommonDescriptor DistinctDescriptor;
+typedef ColumnsDescriptor DistinctDescriptor;
 
 class DescriptorOrdering {
 public:
@@ -164,6 +223,10 @@ public:
 
     void append_sort(SortDescriptor sort);
     void append_distinct(DistinctDescriptor distinct);
+    void append_limit(LimitDescriptor limit);
+    realm::util::Optional<size_t> get_min_limit() const;
+    bool will_limit_to_zero() const;
+    DescriptorType get_type(size_t index) const;
     bool is_empty() const
     {
         return m_descriptors.empty();
@@ -172,15 +235,16 @@ public:
     {
         return m_descriptors.size();
     }
-    const CommonDescriptor* operator[](size_t ndx) const;
+    const BaseDescriptor* operator[](size_t ndx) const;
     bool will_apply_sort() const;
     bool will_apply_distinct() const;
+    bool will_apply_limit() const;
     std::string get_description(ConstTableRef target_table) const;
     void collect_dependencies(const Table* table);
     void get_versions(const Group* group, TableVersions& versions) const;
 
 private:
-    std::vector<std::unique_ptr<CommonDescriptor>> m_descriptors;
+    std::vector<std::unique_ptr<BaseDescriptor>> m_descriptors;
     std::vector<TableKey> m_dependencies;
 };
 }

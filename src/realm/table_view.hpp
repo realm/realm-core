@@ -310,6 +310,7 @@ public:
     // Each time you call distinct() it will compound on the previous calls
     void distinct(ColKey column);
     void distinct(DistinctDescriptor columns);
+    void limit(LimitDescriptor limit);
 
     // Replace the order of sort and distinct operations, bypassing manually
     // calling sort and distinct. This is a convenience method for bindings.
@@ -528,6 +529,7 @@ inline ConstTableView::ConstTableView(const ConstTableView& tv)
     , m_last_seen_versions(tv.m_last_seen_versions)
     , m_table_view_key_values(tv.m_table_view_key_values)
 {
+    m_limit_count = tv.m_limit_count;
 }
 
 inline ConstTableView::ConstTableView(ConstTableView&& tv) noexcept
@@ -542,12 +544,12 @@ inline ConstTableView::ConstTableView(ConstTableView&& tv) noexcept
     , m_start(tv.m_start)
     , m_end(tv.m_end)
     , m_limit(tv.m_limit)
-    ,
     // if we are created from a table view which is outdated, take care to use the outdated
     // version number so that we can later trigger a sync if needed.
-    m_last_seen_versions(std::move(tv.m_last_seen_versions))
+    , m_last_seen_versions(std::move(tv.m_last_seen_versions))
     , m_table_view_key_values(std::move(tv.m_table_view_key_values))
 {
+    m_limit_count = tv.m_limit_count;
 }
 
 inline ConstTableView& ConstTableView::operator=(ConstTableView&& tv) noexcept
@@ -560,6 +562,7 @@ inline ConstTableView& ConstTableView::operator=(ConstTableView&& tv) noexcept
     m_start = tv.m_start;
     m_end = tv.m_end;
     m_limit = tv.m_limit;
+    m_limit_count = tv.m_limit_count;
     m_source_column_key = tv.m_source_column_key;
     m_linked_obj_key = tv.m_linked_obj_key;
     m_linked_table = tv.m_linked_table;
@@ -582,6 +585,7 @@ inline ConstTableView& ConstTableView::operator=(const ConstTableView& tv)
     m_start = tv.m_start;
     m_end = tv.m_end;
     m_limit = tv.m_limit;
+    m_limit_count = tv.m_limit_count;
     m_source_column_key = tv.m_source_column_key;
     m_linked_obj_key = tv.m_linked_obj_key;
     m_linked_table = tv.m_linked_table;

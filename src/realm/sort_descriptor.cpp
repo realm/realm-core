@@ -23,17 +23,17 @@
 
 using namespace realm;
 
-CommonDescriptor::CommonDescriptor(std::vector<std::vector<ColKey>> column_keys)
+ColumnsDescriptor::ColumnsDescriptor(std::vector<std::vector<ColKey>> column_keys)
     : m_column_keys(std::move(column_keys))
 {
 }
 
-std::unique_ptr<CommonDescriptor> CommonDescriptor::clone() const
+std::unique_ptr<BaseDescriptor> ColumnsDescriptor::clone() const
 {
-    return std::unique_ptr<CommonDescriptor>(new CommonDescriptor(*this));
+    return std::unique_ptr<ColumnsDescriptor>(new ColumnsDescriptor(*this));
 }
 
-void CommonDescriptor::collect_dependencies(const Table* table, std::vector<TableKey>& table_keys) const
+void ColumnsDescriptor::collect_dependencies(const Table* table, std::vector<TableKey>& table_keys) const
 {
     for (auto& columns : m_column_keys) {
         auto sz = columns.size();
@@ -55,7 +55,7 @@ void CommonDescriptor::collect_dependencies(const Table* table, std::vector<Tabl
     }
 }
 
-std::string CommonDescriptor::get_description(ConstTableRef attached_table) const
+std::string ColumnsDescriptor::get_description(ConstTableRef attached_table) const
 {
     std::string description = "DISTINCT(";
     for (size_t i = 0; i < m_column_keys.size(); ++i) {
@@ -111,7 +111,7 @@ std::string SortDescriptor::get_description(ConstTableRef attached_table) const
 }
 
 SortDescriptor::SortDescriptor(std::vector<std::vector<ColKey>> column_keys, std::vector<bool> ascending)
-    : CommonDescriptor(std::move(column_keys))
+    : ColumnsDescriptor(std::move(column_keys))
     , m_ascending(std::move(ascending))
 {
     REALM_ASSERT_EX(m_ascending.empty() || m_ascending.size() == m_column_keys.size(), m_ascending.size(),
@@ -120,9 +120,9 @@ SortDescriptor::SortDescriptor(std::vector<std::vector<ColKey>> column_keys, std
         m_ascending.resize(m_column_keys.size(), true);
 }
 
-std::unique_ptr<CommonDescriptor> SortDescriptor::clone() const
+std::unique_ptr<BaseDescriptor> SortDescriptor::clone() const
 {
-    return std::unique_ptr<CommonDescriptor>(new SortDescriptor(*this));
+    return std::unique_ptr<ColumnsDescriptor>(new SortDescriptor(*this));
 }
 
 void SortDescriptor::merge_with(SortDescriptor&& other)
@@ -134,9 +134,9 @@ void SortDescriptor::merge_with(SortDescriptor&& other)
 }
 
 
-CommonDescriptor::Sorter::Sorter(std::vector<std::vector<ColKey>> const& column_lists,
-                                 std::vector<bool> const& ascending, Table const& root_table,
-                                 KeyColumn const& key_values)
+BaseDescriptor::Sorter::Sorter(std::vector<std::vector<ColKey>> const& column_lists,
+                               std::vector<bool> const& ascending, Table const& root_table,
+                               KeyColumn const& key_values)
 {
     REALM_ASSERT(!column_lists.empty());
     REALM_ASSERT_EX(column_lists.size() == ascending.size(), column_lists.size(), ascending.size());
@@ -174,7 +174,7 @@ CommonDescriptor::Sorter::Sorter(std::vector<std::vector<ColKey>> const& column_
             ObjKey translated_key = ObjKey(key_values.get(row_ndx));
             for (size_t j = 0; j + 1 < sz; ++j) {
                 ConstObj obj = tables[j]->get_object(translated_key);
-                // type was checked when creating the CommonDescriptor
+                // type was checked when creating the ColumnsDescriptor
                 if (obj.is_null(columns[j])) {
                     is_null[row_ndx] = true;
                     break;
@@ -186,16 +186,16 @@ CommonDescriptor::Sorter::Sorter(std::vector<std::vector<ColKey>> const& column_
     }
 }
 
-CommonDescriptor::Sorter CommonDescriptor::sorter(Table const& table, KeyColumn const& row_indexes) const
+BaseDescriptor::Sorter ColumnsDescriptor::sorter(Table const& table, KeyColumn const& row_indexes) const
 {
     REALM_ASSERT(!m_column_keys.empty());
     std::vector<bool> ascending(m_column_keys.size(), true);
     return Sorter(m_column_keys, ascending, table, row_indexes);
 }
 
-void CommonDescriptor::execute(IndexPairs& v, const Sorter& predicate, const CommonDescriptor* next) const
+void ColumnsDescriptor::execute(IndexPairs& v, const Sorter& predicate, const BaseDescriptor* next) const
 {
-    using IP = CommonDescriptor::IndexPair;
+    using IP = ColumnsDescriptor::IndexPair;
     // Remove all rows which have a null link along the way to the distinct columns
     if (predicate.has_links()) {
         auto nulls =
@@ -211,7 +211,7 @@ void CommonDescriptor::execute(IndexPairs& v, const Sorter& predicate, const Com
         std::unique(v.begin(), v.end(), [&](const IP& a, const IP& b) { return !predicate(a, b, false); });
     // Erase the duplicates
     v.erase(duplicates, v.end());
-    bool will_be_sorted_next = next && next->is_sort();
+    bool will_be_sorted_next = next && next->get_type() == DescriptorType::Sort;
     if (!will_be_sorted_next) {
         // Restore the original order, this is either the original
         // tableview order or the order of the previous sort
@@ -219,13 +219,13 @@ void CommonDescriptor::execute(IndexPairs& v, const Sorter& predicate, const Com
     }
 }
 
-SortDescriptor::Sorter SortDescriptor::sorter(Table const& table, KeyColumn const& row_indexes) const
+BaseDescriptor::Sorter SortDescriptor::sorter(Table const& table, KeyColumn const& row_indexes) const
 {
     REALM_ASSERT(!m_column_keys.empty());
     return Sorter(m_column_keys, m_ascending, table, row_indexes);
 }
 
-void SortDescriptor::execute(IndexPairs& v, const Sorter& predicate, const CommonDescriptor* next) const
+void SortDescriptor::execute(IndexPairs& v, const Sorter& predicate, const BaseDescriptor* next) const
 {
     std::sort(v.begin(), v.end(), std::ref(predicate));
 
@@ -241,9 +241,28 @@ void SortDescriptor::execute(IndexPairs& v, const Sorter& predicate, const Commo
     }
 }
 
+std::string LimitDescriptor::get_description(ConstTableRef) const
+{
+    return "LIMIT(" + serializer::print_value(m_limit) + ")";
+}
+
+std::unique_ptr<BaseDescriptor> LimitDescriptor::clone() const
+{
+    return std::unique_ptr<BaseDescriptor>(new LimitDescriptor(*this));
+}
+
+void LimitDescriptor::execute(IndexPairs& v, const Sorter&, const BaseDescriptor*) const
+{
+    if (v.size() > m_limit) {
+        v.m_removed_by_limit += v.size() - m_limit;
+        v.erase(v.begin() + m_limit, v.end());
+    }
+}
+
+
 // This function must conform to 'is less' predicate - that is:
 // return true if i is strictly smaller than j
-bool SortDescriptor::Sorter::operator()(IndexPair i, IndexPair j, bool total_ordering) const
+bool BaseDescriptor::Sorter::operator()(IndexPair i, IndexPair j, bool total_ordering) const
 {
     // Sorting can be specified by multiple columns, so that if two entries in the first column are
     // identical, then the rows are ordered according to the second column, and so forth. For the
@@ -290,8 +309,11 @@ bool SortDescriptor::Sorter::operator()(IndexPair i, IndexPair j, bool total_ord
     return total_ordering ? i.index_in_view < j.index_in_view : 0;
 }
 
-void SortDescriptor::Sorter::cache_first_column(IndexPairs& v)
+void BaseDescriptor::Sorter::cache_first_column(IndexPairs& v)
 {
+    if (m_columns.empty())
+        return;
+
     auto& col = m_columns[0];
     ColKey ck = col.col_key;
     DataType dt = m_columns[0].table->get_column_type(ck);
@@ -406,24 +428,67 @@ void DescriptorOrdering::append_distinct(DistinctDescriptor distinct)
     }
 }
 
-const CommonDescriptor* DescriptorOrdering::operator[](size_t ndx) const
+void DescriptorOrdering::append_limit(LimitDescriptor limit)
+{
+    if (limit.is_valid()) {
+        m_descriptors.emplace_back(new LimitDescriptor(std::move(limit)));
+    }
+}
+
+DescriptorType DescriptorOrdering::get_type(size_t index) const
+{
+    REALM_ASSERT(index < m_descriptors.size());
+    return m_descriptors[index]->get_type();
+}
+
+const BaseDescriptor* DescriptorOrdering::operator[](size_t ndx) const
 {
     return m_descriptors.at(ndx).get(); // may throw std::out_of_range
 }
 
 bool DescriptorOrdering::will_apply_sort() const
 {
-    return std::any_of(m_descriptors.begin(), m_descriptors.end(), [](const std::unique_ptr<CommonDescriptor>& desc) {
+    return std::any_of(m_descriptors.begin(), m_descriptors.end(), [](const std::unique_ptr<BaseDescriptor>& desc) {
         REALM_ASSERT(desc->is_valid());
-        return desc->is_sort();
+        return desc->get_type() == DescriptorType::Sort;
     });
 }
 
 bool DescriptorOrdering::will_apply_distinct() const
 {
-    return std::any_of(m_descriptors.begin(), m_descriptors.end(), [](const std::unique_ptr<CommonDescriptor>& desc) {
+    return std::any_of(m_descriptors.begin(), m_descriptors.end(), [](const std::unique_ptr<BaseDescriptor>& desc) {
         REALM_ASSERT(desc->is_valid());
-        return !desc->is_sort();
+        return desc->get_type() == DescriptorType::Distinct;
+    });
+}
+
+bool DescriptorOrdering::will_apply_limit() const
+{
+    return std::any_of(m_descriptors.begin(), m_descriptors.end(), [](const std::unique_ptr<BaseDescriptor>& desc) {
+        REALM_ASSERT(desc->is_valid());
+        return desc->get_type() == DescriptorType::Limit;
+    });
+}
+
+realm::util::Optional<size_t> DescriptorOrdering::get_min_limit() const
+{
+    realm::util::Optional<size_t> min_limit;
+    for (size_t i = 0; i < m_descriptors.size(); ++i) {
+        if (m_descriptors[i]->get_type() == DescriptorType::Limit) {
+            const LimitDescriptor* limit = static_cast<const LimitDescriptor*>(m_descriptors[i].get());
+            REALM_ASSERT(limit);
+            min_limit = bool(min_limit) ? std::min(*min_limit, limit->get_limit()) : limit->get_limit();
+        }
+    }
+    return min_limit;
+}
+
+bool DescriptorOrdering::will_limit_to_zero() const
+{
+    return std::any_of(m_descriptors.begin(), m_descriptors.end(), [](const std::unique_ptr<BaseDescriptor>& desc) {
+        REALM_ASSERT(desc.get()->is_valid());
+        return (desc->get_type() == DescriptorType::Limit &&
+                static_cast<LimitDescriptor*>(desc.get())->get_limit() == 0);
     });
 }
 

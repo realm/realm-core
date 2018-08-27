@@ -967,7 +967,6 @@ TEST_IF(Thread_CondvarAtomicWaitUnlock, !running_with_valgrind)
             InterprocessCondVar::init_shared_part(condvar_part);
 
             std::atomic<bool> signal(false);
-            std::atomic<bool> end(false);
 
             std::thread t1([&]() {
                 for (int i = 0; i < iter; i++) {

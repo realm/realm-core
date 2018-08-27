@@ -301,7 +301,7 @@ std::vector<std::string> RealmFile::process_names(uint64_t ref)
     return names;
 }
 
-static std::string columnType_to_str(int t)
+static std::string columnType_to_str(int64_t t)
 {
     switch (t) {
     // Column types
@@ -353,7 +353,7 @@ std::vector<std::string> RealmFile::process_types(uint64_t ref)
 
 void RealmFile::process_free_list(uint64_t pos_ref, uint64_t size_ref, uint64_t version_ref)
 {
-    std::set<int> version_set;
+    std::set<int64_t> version_set;
     uint64_t newest = 0;
     auto positions = process_numbers(pos_ref);
     auto sizes = process_numbers(size_ref);
@@ -508,7 +508,7 @@ std::vector<Entry> RealmFile::check_refs()
 {
     std::vector<Entry> leaked;
 
-    unsigned start = sizeof(Header);
+    uint64_t start = sizeof(Header);
     std::vector<Entry> combined(m_refs.size() + free_list.size());
     auto it = std::set_union(m_refs.begin(), m_refs.end(), free_list.begin(), free_list.end(), combined.begin());
     combined.resize(it - combined.begin());
@@ -536,8 +536,8 @@ void RealmFile::check_leaked()
         std::cerr << err_txt << std::hex << "Leaked space: pos: 0x" << a.start << ", size: 0x" << a.length << std::dec
                   << std::endl;
         std::set<Entry> local_refs;
-        unsigned start = a.start;
-        unsigned end = a.start + a.length;
+        uint64_t start = a.start;
+        uint64_t end = a.start + a.length;
         while (start < end) {
             DbEntry db_entry(m_is, start, local_refs);
             start += 8;

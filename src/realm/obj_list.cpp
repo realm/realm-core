@@ -43,7 +43,7 @@ void ObjList::do_sort(const DescriptorOrdering& ordering)
 
     // Gather the current rows into a container we can use std algorithms on
     size_t detached_ref_count = 0;
-    CommonDescriptor::IndexPairs index_pairs;
+    BaseDescriptor::IndexPairs index_pairs;
     index_pairs.reserve(sz);
     // always put any detached refs at the end of the sort
     // FIXME: reconsider if this is the right thing to do
@@ -60,18 +60,19 @@ void ObjList::do_sort(const DescriptorOrdering& ordering)
 
     const int num_descriptors = int(ordering.size());
     for (int desc_ndx = 0; desc_ndx < num_descriptors; ++desc_ndx) {
-        const CommonDescriptor* common_descr = ordering[desc_ndx];
-        const CommonDescriptor* next = ((desc_ndx + 1) < num_descriptors) ? ordering[desc_ndx + 1] : nullptr;
-        SortDescriptor::Sorter predicate = common_descr->sorter(get_parent(), *m_key_values);
+        const BaseDescriptor* base_descr = ordering[desc_ndx];
+        const BaseDescriptor* next = ((desc_ndx + 1) < num_descriptors) ? ordering[desc_ndx + 1] : nullptr;
+        BaseDescriptor::Sorter predicate = base_descr->sorter(get_parent(), *m_key_values);
 
         // Sorting can be specified by multiple columns, so that if two entries in the first column are
         // identical, then the rows are ordered according to the second column, and so forth. For the
         // first column, we cache all the payload of fields of the view in a std::vector<Mixed>
         predicate.cache_first_column(index_pairs);
 
-        common_descr->execute(index_pairs, predicate, next);
+        base_descr->execute(index_pairs, predicate, next);
     }
     // Apply the results
+    m_limit_count = index_pairs.m_removed_by_limit;
     m_key_values->clear();
     for (auto& pair : index_pairs) {
         m_key_values->add(pair.key_for_object);
