@@ -112,9 +112,9 @@ public:
         {
             return m_owner->m_table.get_object(m_keys[ndx]).template get<T>(m_owner->m_col_key);
         }
-        T get(ObjKey key)
+        T get(ObjKey obj_key)
         {
-            return m_owner->m_table.get_object(key).template get<T>(m_owner->m_col_key);
+            return m_owner->m_table.get_object(obj_key).template get<T>(m_owner->m_col_key);
         }
         void erase(size_t ndx)
         {

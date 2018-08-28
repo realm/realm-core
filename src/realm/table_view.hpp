@@ -465,12 +465,12 @@ inline ConstTableView::ConstTableView(const Table* parent)
     }
 }
 
-inline ConstTableView::ConstTableView(const Table* parent, Query& query, size_t start, size_t end, size_t limit)
+inline ConstTableView::ConstTableView(const Table* parent, Query& query, size_t start, size_t end, size_t lim)
     : ObjList(&m_table_view_key_values, parent)
     , m_query(query)
     , m_start(start)
     , m_end(end)
-    , m_limit(limit)
+    , m_limit(lim)
     , m_table_view_key_values(Allocator::get_default())
 {
     m_table_view_key_values.create();
@@ -656,8 +656,8 @@ inline TableView::TableView(Table& parent)
 {
 }
 
-inline TableView::TableView(Table& parent, Query& query, size_t start, size_t end, size_t limit)
-    : ConstTableView(&parent, query, start, end, limit)
+inline TableView::TableView(Table& parent, Query& query, size_t start, size_t end, size_t lim)
+    : ConstTableView(&parent, query, start, end, lim)
 {
 }
 

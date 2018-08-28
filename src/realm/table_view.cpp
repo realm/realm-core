@@ -489,9 +489,9 @@ void ConstTableView::distinct(DistinctDescriptor columns)
     do_sync();
 }
 
-void ConstTableView::limit(LimitDescriptor limit)
+void ConstTableView::limit(LimitDescriptor lim)
 {
-    m_descriptor_ordering.append_limit(std::move(limit));
+    m_descriptor_ordering.append_limit(std::move(lim));
     do_sync();
 }
 
