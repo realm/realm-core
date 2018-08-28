@@ -108,10 +108,6 @@ public:
 class ColumnsDescriptor : public BaseDescriptor {
 public:
     ColumnsDescriptor() = default;
-    // Enforce type saftey to prevent automatic conversion of derived class
-    // SortDescriptor into ColumnsDescriptor at compile time.
-    ColumnsDescriptor(const SortDescriptor&) = delete;
-    virtual ~ColumnsDescriptor() = default;
 
     // Create a descriptor for the given columns on the given table.
     // Each vector in `column_keys` represents a chain of columns, where
@@ -120,27 +116,37 @@ public:
     // `column_keys` must be non-empty, and each vector within it must also
     // be non-empty.
     ColumnsDescriptor(std::vector<std::vector<ColKey>> column_keys);
-    std::unique_ptr<BaseDescriptor> clone() const override;
 
-    // returns whether this descriptor is valid and can be used to sort
+    // returns whether this descriptor is valid and can be used for sort or distinct
     bool is_valid() const noexcept override
     {
         return !m_column_keys.empty();
     }
+    void collect_dependencies(const Table* table, std::vector<TableKey>& table_keys) const override;
+
+protected:
+    std::vector<std::vector<ColKey>> m_column_keys;
+};
+
+class DistinctDescriptor : public ColumnsDescriptor {
+public:
+    DistinctDescriptor() = default;
+    DistinctDescriptor(std::vector<std::vector<ColKey>> column_keys)
+        : ColumnsDescriptor(column_keys)
+    {
+    }
+
+    std::unique_ptr<BaseDescriptor> clone() const override;
+
     DescriptorType get_type() const override
     {
         return DescriptorType::Distinct;
     }
 
-    void collect_dependencies(const Table* table, std::vector<TableKey>& table_keys) const override;
-
     Sorter sorter(Table const& table, KeyColumn const& row_indexes) const override;
     void execute(IndexPairs& v, const Sorter& predicate, const BaseDescriptor* next) const override;
 
     std::string get_description(ConstTableRef attached_table) const override;
-
-protected:
-    std::vector<std::vector<ColKey>> m_column_keys;
 };
 
 class SortDescriptor : public ColumnsDescriptor {
@@ -209,9 +215,6 @@ public:
 private:
     size_t m_limit = size_t(-1);
 };
-
-// Distinct uses the same syntax as sort except that the order is meaningless.
-typedef ColumnsDescriptor DistinctDescriptor;
 
 class DescriptorOrdering {
 public:

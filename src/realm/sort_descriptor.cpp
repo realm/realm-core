@@ -28,9 +28,9 @@ ColumnsDescriptor::ColumnsDescriptor(std::vector<std::vector<ColKey>> column_key
 {
 }
 
-std::unique_ptr<BaseDescriptor> ColumnsDescriptor::clone() const
+std::unique_ptr<BaseDescriptor> DistinctDescriptor::clone() const
 {
-    return std::unique_ptr<ColumnsDescriptor>(new ColumnsDescriptor(*this));
+    return std::unique_ptr<DistinctDescriptor>(new DistinctDescriptor(*this));
 }
 
 void ColumnsDescriptor::collect_dependencies(const Table* table, std::vector<TableKey>& table_keys) const
@@ -55,7 +55,7 @@ void ColumnsDescriptor::collect_dependencies(const Table* table, std::vector<Tab
     }
 }
 
-std::string ColumnsDescriptor::get_description(ConstTableRef attached_table) const
+std::string DistinctDescriptor::get_description(ConstTableRef attached_table) const
 {
     std::string description = "DISTINCT(";
     for (size_t i = 0; i < m_column_keys.size(); ++i) {
@@ -186,14 +186,14 @@ BaseDescriptor::Sorter::Sorter(std::vector<std::vector<ColKey>> const& column_li
     }
 }
 
-BaseDescriptor::Sorter ColumnsDescriptor::sorter(Table const& table, KeyColumn const& row_indexes) const
+BaseDescriptor::Sorter DistinctDescriptor::sorter(Table const& table, KeyColumn const& row_indexes) const
 {
     REALM_ASSERT(!m_column_keys.empty());
     std::vector<bool> ascending(m_column_keys.size(), true);
     return Sorter(m_column_keys, ascending, table, row_indexes);
 }
 
-void ColumnsDescriptor::execute(IndexPairs& v, const Sorter& predicate, const BaseDescriptor* next) const
+void DistinctDescriptor::execute(IndexPairs& v, const Sorter& predicate, const BaseDescriptor* next) const
 {
     using IP = ColumnsDescriptor::IndexPair;
     // Remove all rows which have a null link along the way to the distinct columns
