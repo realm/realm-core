@@ -1014,6 +1014,7 @@ TEST(Links_Transactions)
     }
 }
 
+#if !REALM_ANDROID // FIXME
 TEST(Links_RemoveTargetRows)
 {
     Group group;
@@ -1060,6 +1061,7 @@ TEST(Links_RemoveTargetRows)
     CHECK(target->is_empty());
     CHECK(links.is_empty());
 }
+#endif
 
 TEST(Links_ClearColumnWithTwoLevelBptree)
 {
