@@ -1122,6 +1122,7 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
                 info->number_of_versions = 1;
 
                 info->latest_version_number = version;
+                alloc.m_youngest_live_version = version;
 
                 SharedInfo* r_info = m_reader_map.get_addr();
                 size_t file_size = alloc.get_baseline();

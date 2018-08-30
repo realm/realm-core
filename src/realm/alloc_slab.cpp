@@ -1310,7 +1310,8 @@ void SlabAlloc::rebuild_translations(bool requires_new_translation, size_t old_n
     if (requires_new_translation) {
         // we need a new translation table, but must preserve old, as translations using it
         // may be in progress concurrently
-        m_old_translations.emplace_back(m_youngest_live_version, m_ref_translation_ptr.load());
+        if (m_translation_table_size)
+            m_old_translations.emplace_back(m_youngest_live_version, m_ref_translation_ptr.load());
         m_translation_table_size = num_mappings + free_space_size + m_sections_in_compatibility_mapping;
         new_translation_table = new RefTranslation[m_translation_table_size];
         for (int i = 0; i < m_sections_in_compatibility_mapping; ++i) {
@@ -1356,15 +1357,16 @@ void SlabAlloc::purge_old_mappings(uint64_t oldest_live_version, uint64_t younge
     }
 
     for (size_t i = 0; i < m_old_translations.size();) {
-        if (m_old_translations[i].replaced_at_version >= oldest_live_version) {
-            ++i;
-            continue;
+        if (m_old_translations[i].replaced_at_version < oldest_live_version) {
+            // This translation is too old - purge by move last over:
+            auto oldie = std::move(m_old_translations[i]);
+            m_old_translations[i] = std::move(m_old_translations.back());
+            m_old_translations.pop_back();
+            delete[] oldie.translations;
         }
-        // move last over:
-        auto oldie = std::move(m_old_translations[i]);
-        m_old_translations[i] = std::move(m_old_translations.back());
-        m_old_translations.pop_back();
-        delete[] oldie.translations;
+        else {
+            ++i;
+        }
     }
     m_youngest_live_version = youngest_live_version;
 }

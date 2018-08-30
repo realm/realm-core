@@ -3784,4 +3784,55 @@ TEST(Shared_UpgradeBinArray)
     CHECK(rt->get_table(TableKey(0))->get_object(ObjKey(54)).is_null(ColKey(0)));
 }
 
+TEST(Shared_MoreVersionsInUse)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    const char* key = "1234567890123456789012345678901123456789012345678901234567890123";
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    ColKey col;
+    {
+        DBRef db = DB::create(*hist, DBOptions(key));
+        {
+            auto wt = db->start_write();
+            auto t = wt->add_table("Table_0");
+            col = t->add_column(type_Int, "Integers");
+            t->create_object();
+            wt->add_table("Table_1");
+            wt->commit();
+        }
+        // Create a number of versions
+        for (int i = 0; i < 10; i++) {
+            auto wt = db->start_write();
+            auto t = wt->get_table("Table_1");
+            for (int j = 0; j < 200; j++) {
+                t->create_object();
+            }
+            wt->commit();
+        }
+    }
+    {
+        DBRef db = DB::create(*hist, DBOptions(key));
+
+        // rt will now hold onto version 12
+        auto rt = db->start_read();
+        // Create table accessor to Table_0 - will use initial mapping
+        auto table_r = rt->get_table("Table_0");
+        {
+            auto wt = db->start_write();
+            auto t = wt->get_table("Table_1");
+            // This will require extention of the mappings
+            t->add_column(type_String, "Strings");
+            // Here the mappings no longer required will be purged
+            // Before the fix, this would delete the mapping used by
+            // table_r accessor
+            wt->commit();
+        }
+
+        auto obj = table_r->get_object(0);
+        // Here we will need to translate a ref
+        auto i = obj.get<Int>(col);
+        CHECK_EQUAL(i, 0);
+    }
+}
+
 #endif // TEST_SHARED
