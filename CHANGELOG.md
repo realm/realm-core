@@ -1,38 +1,35 @@
-# NEXT RELEASE
+# 6.0.0-alpha.1 Release notes
 
 Besides the changes below, this release also includes changes introduced by v5.6.0 and
 up until v5.8.0
 
+### Open issues
+
+* Encrypted files may not work on Android
+  [Issue#248](https://github.com/realm/realm-core-private/issues/248)
+* Building queries are not thread safe
+  [Issue#237](https://github.com/realm/realm-core-private/issues/237)
+  
 ### Bugfixes
 
-* Various small fixes.
+* Many small fixes.
 
 ### Breaking changes
 
-* Disallowing list columns to be nullable. Conceptually you will always have a list
-  which initially will be empty.
 * DB objects are now heap allocated and accessed through a DBRef. You must create a DB using 
   static DB::create() function.
+* All list like classes have been renamed
 
 ### Enhancements
 
 * Providing option to supply initial values when creating an object. This can be used as an
   optimization when some columns have a search index. Then you don't have to first insert
   the default value in the index and subsequently the real value.
-
------------
-
-### Internals
-
-* None.
+* Many small enhancements required by ObjectStore and Sync.
 
 ----------------------------------------------
 
 # 6.0.0-alpha.0 Release notes
-
-### Bugfixes
-
-* None.
 
 ### Breaking changes
 
