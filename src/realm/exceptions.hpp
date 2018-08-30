@@ -22,12 +22,28 @@
 #include <stdexcept>
 
 #include <realm/util/features.h>
+#include <realm/util/backtrace.hpp>
 
 namespace realm {
 
+template <class Base = std::runtime_error>
+class ExceptionWithBacktrace : public Base {
+public:
+    template <class... Args>
+    inline ExceptionWithBacktrace(Args&&... args)
+        : Base(std::forward<Args>(args)...)
+        , m_backtrace(util::Backtrace::capture())
+    {}
+
+    const util::Backtrace& backtrace() const noexcept { return m_backtrace; }
+
+private:
+    util::Backtrace m_backtrace;
+};
+
 /// Thrown by various functions to indicate that a specified table does not
 /// exist.
-class NoSuchTable : public std::exception {
+class NoSuchTable : public ExceptionWithBacktrace<std::exception> {
 public:
     const char* what() const noexcept override;
 };
@@ -35,7 +51,7 @@ public:
 
 /// Thrown by various functions to indicate that a specified table name is
 /// already in use.
-class TableNameInUse : public std::exception {
+class TableNameInUse : public ExceptionWithBacktrace<std::exception> {
 public:
     const char* what() const noexcept override;
 };
@@ -43,7 +59,7 @@ public:
 
 // Thrown by functions that require a table to **not** be the target of link
 // columns, unless those link columns are part of the table itself.
-class CrossTableLinkTarget : public std::exception {
+class CrossTableLinkTarget : public ExceptionWithBacktrace<std::exception> {
 public:
     const char* what() const noexcept override;
 };
@@ -51,7 +67,7 @@ public:
 
 /// Thrown by various functions to indicate that the dynamic type of a table
 /// does not match a particular other table type (dynamic or static).
-class DescriptorMismatch : public std::exception {
+class DescriptorMismatch : public ExceptionWithBacktrace<std::exception> {
 public:
     const char* what() const noexcept override;
 };
@@ -63,7 +79,7 @@ public:
 /// want automatic upgrades to be performed. This exception indicates that until
 /// an upgrade of the file format is performed, the database will be unavailable
 /// for read or write operations.
-class FileFormatUpgradeRequired : public std::exception {
+class FileFormatUpgradeRequired : public ExceptionWithBacktrace<std::exception> {
 public:
     const char* what() const noexcept override;
 };
@@ -72,7 +88,7 @@ public:
 /// Thrown when a sync agent attempts to join a session in which there is
 /// already a sync agent. A session may only contain one sync agent at any given
 /// time.
-class MultipleSyncAgents : public std::exception {
+class MultipleSyncAgents : public ExceptionWithBacktrace<std::exception> {
 public:
     const char* what() const noexcept override;
 };
@@ -100,7 +116,7 @@ public:
 };
 
 
-class SerialisationError : public std::runtime_error {
+class SerialisationError : public ExceptionWithBacktrace<std::runtime_error> {
 public:
     SerialisationError(const std::string& msg);
     /// runtime_error::what() returns the msg provided in the constructor.
@@ -138,7 +154,7 @@ public:
 ///
 /// FIXME: This exception class should probably be moved to the `_impl`
 /// namespace, in order to avoid some confusion.
-class LogicError : public std::exception {
+class LogicError : public ExceptionWithBacktrace<std::exception> {
 public:
     enum ErrorKind {
         string_too_big,
@@ -296,7 +312,7 @@ inline OutOfDiskSpace::OutOfDiskSpace(const std::string& msg)
 }
 
 inline SerialisationError::SerialisationError(const std::string& msg)
-: std::runtime_error(msg)
+: ExceptionWithBacktrace<std::runtime_error>(msg)
 {
 }
 
@@ -312,5 +328,6 @@ inline LogicError::ErrorKind LogicError::kind() const noexcept
 
 
 } // namespace realm
+
 
 #endif // REALM_EXCEPTIONS_HPP
