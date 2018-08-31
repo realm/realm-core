@@ -23,19 +23,52 @@
 
 #include <realm/util/features.h>
 #include <realm/util/backtrace.hpp>
+#include <realm/util/optional.hpp>
 
 namespace realm {
+namespace _impl {
+
+class ExceptionWithBacktraceBase {
+public:
+    ExceptionWithBacktraceBase()
+        : m_backtrace(util::Backtrace::capture())
+    {}
+    const util::Backtrace& backtrace() const noexcept { return m_backtrace; }
+    virtual const char* message() const noexcept = 0;
+protected:
+    util::Backtrace m_backtrace;
+    mutable util::Optional<std::string> m_message_with_backtrace;
+
+    // Render the message and the backtrace into m_message_with_backtrace. If an
+    // exception is thrown while rendering the message, the message without the
+    // backtrace will be returned.
+    const char* materialize_message() const noexcept;
+};
+
+}
 
 template <class Base = std::runtime_error>
-class ExceptionWithBacktrace : public Base {
+class ExceptionWithBacktrace : public Base, public _impl::ExceptionWithBacktraceBase {
 public:
     template <class... Args>
     inline ExceptionWithBacktrace(Args&&... args)
         : Base(std::forward<Args>(args)...)
-        , m_backtrace(util::Backtrace::capture())
+        , _impl::ExceptionWithBacktraceBase() // backtrace captured here
     {}
 
-    const util::Backtrace& backtrace() const noexcept { return m_backtrace; }
+    /// Return the message of the exception, including the backtrace of where
+    /// the exception was thrown.
+    const char* what() const noexcept override final
+    {
+        return materialize_message();
+    }
+
+    /// Return the message of the exception without the backtrace. The default
+    /// implementation calls `Base::what()`.
+    virtual const char* message() const noexcept override
+    {
+        return Base::what();
+    }
 
 private:
     util::Backtrace m_backtrace;
@@ -45,7 +78,7 @@ private:
 /// exist.
 class NoSuchTable : public ExceptionWithBacktrace<std::exception> {
 public:
-    const char* what() const noexcept override;
+    const char* message() const noexcept override;
 };
 
 
@@ -53,7 +86,7 @@ public:
 /// already in use.
 class TableNameInUse : public ExceptionWithBacktrace<std::exception> {
 public:
-    const char* what() const noexcept override;
+    const char* message() const noexcept override;
 };
 
 
@@ -61,7 +94,7 @@ public:
 // columns, unless those link columns are part of the table itself.
 class CrossTableLinkTarget : public ExceptionWithBacktrace<std::exception> {
 public:
-    const char* what() const noexcept override;
+    const char* message() const noexcept override;
 };
 
 
@@ -69,7 +102,7 @@ public:
 /// does not match a particular other table type (dynamic or static).
 class DescriptorMismatch : public ExceptionWithBacktrace<std::exception> {
 public:
-    const char* what() const noexcept override;
+    const char* message() const noexcept override;
 };
 
 
@@ -81,7 +114,7 @@ public:
 /// for read or write operations.
 class FileFormatUpgradeRequired : public ExceptionWithBacktrace<std::exception> {
 public:
-    const char* what() const noexcept override;
+    const char* message() const noexcept override;
 };
 
 
@@ -90,7 +123,7 @@ public:
 /// time.
 class MultipleSyncAgents : public ExceptionWithBacktrace<std::exception> {
 public:
-    const char* what() const noexcept override;
+    const char* message() const noexcept override;
 };
 
 
@@ -252,7 +285,7 @@ public:
 
     LogicError(ErrorKind message);
 
-    const char* what() const noexcept override;
+    const char* message() const noexcept override;
     ErrorKind kind() const noexcept;
 
 private:
@@ -264,32 +297,32 @@ private:
 
 // LCOV_EXCL_START (Wording of what() strings are not to be tested)
 
-inline const char* NoSuchTable::what() const noexcept
+inline const char* NoSuchTable::message() const noexcept
 {
     return "No such table exists";
 }
 
-inline const char* TableNameInUse::what() const noexcept
+inline const char* TableNameInUse::message() const noexcept
 {
     return "The specified table name is already in use";
 }
 
-inline const char* CrossTableLinkTarget::what() const noexcept
+inline const char* CrossTableLinkTarget::message() const noexcept
 {
     return "Table is target of cross-table link columns";
 }
 
-inline const char* DescriptorMismatch::what() const noexcept
+inline const char* DescriptorMismatch::message() const noexcept
 {
     return "Table descriptor mismatch";
 }
 
-inline const char* FileFormatUpgradeRequired::what() const noexcept
+inline const char* FileFormatUpgradeRequired::message() const noexcept
 {
     return "Database upgrade required but prohibited";
 }
 
-inline const char* MultipleSyncAgents::what() const noexcept
+inline const char* MultipleSyncAgents::message() const noexcept
 {
     return "Multiple sync agents attempted to join the same session";
 }
