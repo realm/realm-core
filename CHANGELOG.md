@@ -16,7 +16,11 @@
 
 ### Internals
 
-* None.
+* Most exception types now report the stack trace of the point where they were
+  thrown in their `what()` message. This is intended to aid debugging.
+  Additionally, assertion failures on Linux now report their stack traces as
+  well, similar to Apple platforms. Recording stack traces is only supported on
+  Linux (non-Android) and Apple platforms for now.
 
 ----------------------------------------------
 
