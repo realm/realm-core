@@ -32,9 +32,14 @@ class ExceptionWithBacktraceBase {
 public:
     ExceptionWithBacktraceBase()
         : m_backtrace(util::Backtrace::capture())
-    {}
-    const util::Backtrace& backtrace() const noexcept { return m_backtrace; }
+    {
+    }
+    const util::Backtrace& backtrace() const noexcept
+    {
+        return m_backtrace;
+    }
     virtual const char* message() const noexcept = 0;
+
 protected:
     util::Backtrace m_backtrace;
     mutable util::Optional<std::string> m_message_with_backtrace;
@@ -112,7 +117,8 @@ public:
     inline ExceptionWithBacktrace(Args&&... args)
         : Base(std::forward<Args>(args)...)
         , _impl::ExceptionWithBacktraceBase() // backtrace captured here
-    {}
+    {
+    }
 
     /// Return the message of the exception, including the backtrace of where
     /// the exception was thrown.
@@ -400,7 +406,7 @@ inline OutOfDiskSpace::OutOfDiskSpace(const std::string& msg)
 }
 
 inline SerialisationError::SerialisationError(const std::string& msg)
-: ExceptionWithBacktrace<std::runtime_error>(msg)
+    : ExceptionWithBacktrace<std::runtime_error>(msg)
 {
 }
 

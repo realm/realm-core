@@ -41,12 +41,14 @@ Backtrace::~Backtrace()
     std::free(m_memory);
 }
 
-Backtrace::Backtrace(Backtrace&& other) noexcept : Backtrace()
+Backtrace::Backtrace(Backtrace&& other) noexcept
+    : Backtrace()
 {
     *this = std::move(other);
 }
 
-Backtrace::Backtrace(const Backtrace& other) noexcept : Backtrace()
+Backtrace::Backtrace(const Backtrace& other) noexcept
+    : Backtrace()
 {
     *this = other;
 }

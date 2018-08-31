@@ -43,7 +43,9 @@ struct Backtrace {
     void print(std::ostream&) const;
 
     /// Construct an empty stack trace.
-    Backtrace() noexcept {}
+    Backtrace() noexcept
+    {
+    }
 
     /// Move constructor. This operation cannot fail.
     Backtrace(Backtrace&&) noexcept;
@@ -66,12 +68,14 @@ private:
         : m_memory(memory)
         , m_strs(strs)
         , m_len(len)
-    {}
+    {
+    }
     Backtrace(void* memory, size_t len)
         : m_memory(memory)
         , m_strs(static_cast<char* const*>(memory))
         , m_len(len)
-    {}
+    {
+    }
 
     // m_memory is a pointer to the memory block returned by
     // `backtrace_symbols()`. It is usually equal to `m_strs`, except in the
