@@ -3443,6 +3443,42 @@ NONCONCURRENT_TEST(Shared_BigAllocations)
     sg.close();
 }
 
+TEST_IF(Shared_CompactEncrypt, REALM_ENABLE_ENCRYPTION)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    const char* key1 = "KdrL2ieWyspILXIPetpkLD6rQYKhYnS6lvGsgk4qsJAMr1adQnKsYo3oTEYJDIfa";
+    const char* key2 = "ti6rOKviXrwxSGMPVk35Dp9Q4eku8Cu8YTtnnZKAejOTNIEv7TvXrYdjOPSNexMR";
+    {
+        SharedGroup sg(path, false, SharedGroupOptions(key1));
+        Group& g = sg.begin_write();
+        TableRef t = g.add_table("table");
+        sg.commit();
+
+        CHECK(sg.compact());
+        const Group& rg = sg.begin_read();
+        CHECK(rg.has_table("table"));
+        sg.end_read();
+
+        bool bump_version_number = true;
+        CHECK(sg.compact(bump_version_number, key2));
+        const Group& rg2 = sg.begin_read();
+        CHECK(rg2.has_table("table"));
+        sg.end_read();
+
+        CHECK(sg.compact(bump_version_number, nullptr));
+        const Group& rg3 = sg.begin_read();
+        CHECK(rg3.has_table("table"));
+        sg.end_read();
+    }
+    {
+        SharedGroup sg(path, true, SharedGroupOptions());
+        const Group& rg = sg.begin_read();
+        CHECK(rg.has_table("table"));
+        sg.end_read();
+    }
+}
+
+
 // Repro case for: Assertion failed: top_size == 3 || top_size == 5 || top_size == 7 [0, 3, 0, 5, 0, 7]
 NONCONCURRENT_TEST(Shared_BigAllocationsMinimized)
 {

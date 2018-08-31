@@ -1320,7 +1320,7 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
 
 // WARNING / FIXME: compact() should NOT be exposed publicly on Windows because it's not crash safe! It may
 // corrupt your database if something fails
-bool SharedGroup::compact(bool bump_version_number)
+bool SharedGroup::compact(bool bump_version_number, util::Optional<const char*> output_encryption_key)
 {
     // Verify that the database file is attached
     if (is_attached() == false) {
@@ -1332,6 +1332,7 @@ bool SharedGroup::compact(bool bump_version_number)
     }
     Durability dura;
     std::string tmp_path = m_db_path + ".tmp_compaction_space";
+    const char* write_key = bool(output_encryption_key) ? *output_encryption_key : m_key;
     {
         SharedInfo* info = m_file_map.get_addr();
         std::unique_lock<InterprocessMutex> lock(m_controlmutex); // Throws
@@ -1354,7 +1355,7 @@ bool SharedGroup::compact(bool bump_version_number)
             File file;
             file.open(tmp_path, File::access_ReadWrite, File::create_Must, 0);
             int incr = bump_version_number ? 1 : 0;
-            m_group.write(file, m_key, info->latest_version_number + incr); // Throws
+            m_group.write(file, write_key, info->latest_version_number + incr); // Throws
             // Data needs to be flushed to the disk before renaming.
             bool disable_sync = get_disable_sync_to_disk();
             if (!disable_sync)
@@ -1392,7 +1393,7 @@ bool SharedGroup::compact(bool bump_version_number)
     }
     SharedGroupOptions new_options;
     new_options.durability = dura;
-    new_options.encryption_key = m_key;
+    new_options.encryption_key = write_key;
     new_options.allow_file_format_upgrade = false;
     do_open(m_db_path, true, false, new_options);
     return true;
