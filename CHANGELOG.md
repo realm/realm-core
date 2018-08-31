@@ -10,7 +10,8 @@
 
 ### Enhancements
 
-* None.
+* Allow a version number in Group::write which will cause a file with (sync)
+  history to be written.
 
 -----------
 

@@ -966,7 +966,7 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
         m_file_mappings->m_first_additional_mapping = get_section_index(m_initial_chunk_size);
         m_attach_mode = cfg.is_shared ? attach_SharedFile : attach_UnsharedFile;
     }
-    catch (DecryptionFailed) {
+    catch (const DecryptionFailed&) {
         throw InvalidDatabase("Realm file decryption failed", path);
     }
     // make sure that any call to begin_read cause any slab to be placed in free

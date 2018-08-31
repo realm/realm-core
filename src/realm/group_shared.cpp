@@ -1320,7 +1320,7 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
 
 // WARNING / FIXME: compact() should NOT be exposed publicly on Windows because it's not crash safe! It may
 // corrupt your database if something fails
-bool SharedGroup::compact()
+bool SharedGroup::compact(bool bump_version_number)
 {
     // Verify that the database file is attached
     if (is_attached() == false) {
@@ -1353,7 +1353,8 @@ bool SharedGroup::compact()
         try {
             File file;
             file.open(tmp_path, File::access_ReadWrite, File::create_Must, 0);
-            m_group.write(file, m_key, info->latest_version_number); // Throws
+            int incr = bump_version_number ? 1 : 0;
+            m_group.write(file, m_key, info->latest_version_number + incr); // Throws
             // Data needs to be flushed to the disk before renaming.
             bool disable_sync = get_disable_sync_to_disk();
             if (!disable_sync)

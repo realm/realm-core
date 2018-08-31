@@ -755,12 +755,7 @@ void Group::write(std::ostream& out, bool pad_for_encryption, uint_fast64_t vers
     write(out, m_file_format_version, table_writer, no_top_array, pad_for_encryption, version_number); // Throws
 }
 
-void Group::write(const std::string& path, const char* encryption_key) const
-{
-    write(path, encryption_key, 0);
-}
-
-void Group::write(const std::string& path, const char* encryption_key, uint_fast64_t version_number) const
+void Group::write(const std::string& path, const char* encryption_key, uint64_t version_number) const
 {
     File file;
     int flags = 0;
