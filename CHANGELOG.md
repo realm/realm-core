@@ -10,7 +10,7 @@
 
 ### Enhancements
 
-* None.
+* Allow compact to take an optional output encryption key.
 
 -----------
 

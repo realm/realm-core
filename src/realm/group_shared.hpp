@@ -413,7 +413,7 @@ public:
     ///
     /// WARNING / FIXME: compact() should NOT be exposed publicly on Windows
     /// because it's not crash safe! It may corrupt your database if something fails
-    bool compact(bool bump_version_number = false);
+    bool compact(bool bump_version_number = false, util::Optional<const char*>output_encryption_key = util::none);
 
 #ifdef REALM_DEBUG
     void test_ringbuf();
