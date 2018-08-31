@@ -112,7 +112,7 @@ Backtrace Backtrace::capture() noexcept
         // Translate the backtrace to symbols (and exclude the call to the
         // capture() function from the trace).
         --frames;
-        void* memory = ::backtrace_symbols(callstack + 1, frames );
+        void* memory = ::backtrace_symbols(callstack + 1, frames);
         if (REALM_UNLIKELY(memory == nullptr)) {
             return Backtrace(nullptr, &g_backtrace_symbolicate_error, 1);
         }
