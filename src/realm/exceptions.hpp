@@ -45,8 +45,66 @@ protected:
     const char* materialize_message() const noexcept;
 };
 
-}
+} // namespace _impl
 
+
+/// Base class for exceptions that record a stack trace of where they were
+/// thrown.
+///
+/// The template argument is expected to be an exception type conforming to the
+/// standard library exception API (`std::exception` and friends).
+///
+/// It is possible to opt in to exception backtraces in two ways, (a) as part of
+/// the exception type, in which case the backtrace will always be included for
+/// all exceptions of that type, or (b) at the call-site of an opaque exception
+/// type, in which case it is up to the throw-site to decide whether a backtrace
+/// should be included.
+///
+/// Example (a):
+/// ```
+///     class MyException : ExceptionWithBacktrace<std::exception> {
+///     public:
+///         const char* message() const noexcept override
+///         {
+///             return "MyException error message";
+///         }
+///     };
+///
+///     ...
+///
+///     try {
+///         throw MyException{};
+///     }
+///     catch (const MyException& ex) {
+///         // Print the backtrace without the message:
+///         std::cerr << ex.backtrace() << "\n";
+///         // Print the exception message and the backtrace:
+///         std::cerr << ex.what() << "\n";
+///         // Print the exception message without the backtrace:
+///         std::cerr << ex.message() << "\n";
+///     }
+/// ```
+///
+/// Example (b):
+/// ```
+///     class MyException : std::exception {
+///     public:
+///         const char* what() const noexcept override
+///         {
+///             return "MyException error message";
+///         }
+///     };
+///
+///     ...
+///
+///     try {
+///         throw ExceptionWithBacktrace<MyException>{};
+///     }
+///     catch (const MyException& ex) {
+///         // Print the exception message and the backtrace:
+///         std::cerr << ex.what() << "\n";
+///     }
+/// ```
 template <class Base = std::runtime_error>
 class ExceptionWithBacktrace : public Base, public _impl::ExceptionWithBacktraceBase {
 public:
