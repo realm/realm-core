@@ -3443,7 +3443,7 @@ NONCONCURRENT_TEST(Shared_BigAllocations)
     sg.close();
 }
 
-NONCONCURRENT_TEST_IF(Shared_CompactEncrypt, REALM_ENABLE_ENCRYPTION)
+TEST_IF(Shared_CompactEncrypt, REALM_ENABLE_ENCRYPTION)
 {
     SHARED_GROUP_TEST_PATH(path);
     const char* key1 = "KdrL2ieWyspILXIPetpkLD6rQYKhYnS6lvGsgk4qsJAMr1adQnKsYo3oTEYJDIfa";
