@@ -133,7 +133,7 @@ target_link_libraries(CoreTests
                       TestUtil QueryParser ${EXTRA_TEST_LIBS} ${PLATFORM_LIBRARIES}
 )
 
-if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+if(UNIX AND NOT APPLE)
     # This enables symbols in backtraces
     target_link_libraries(CoreTests "-rdynamic")
 endif()
