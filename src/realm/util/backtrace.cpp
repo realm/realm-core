@@ -84,7 +84,12 @@ Backtrace& Backtrace::operator=(const Backtrace& other) noexcept
     char* p = static_cast<char*>(new_memory) + sizeof(char*) * m_len;
     for (size_t i = 0; i < m_len; ++i) {
         *(new_strs++) = p;
-        p = ::stpcpy(p, other.m_strs[i]) + 1;
+        // FIXME: stpcpy() is not supported on Android, so we gotta manually
+        // calculate the end of the destination here.
+        size_t len = std::strlen(other.m_strs[i]);
+        std::memcpy(p, other.m_strs[i], len);
+        p[len] = '\0';
+        p += len + 1;
     }
     std::free(m_memory);
     m_memory = new_memory;
