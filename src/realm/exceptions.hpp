@@ -58,14 +58,14 @@ public:
 
     /// Return the message of the exception, including the backtrace of where
     /// the exception was thrown.
-    const char* what() const noexcept override final
+    const char* what() const noexcept final
     {
         return materialize_message();
     }
 
     /// Return the message of the exception without the backtrace. The default
     /// implementation calls `Base::what()`.
-    virtual const char* message() const noexcept override
+    const char* message() const noexcept override
     {
         return Base::what();
     }

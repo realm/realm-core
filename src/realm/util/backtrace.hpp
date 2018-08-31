@@ -36,6 +36,7 @@ struct Backtrace {
     ~Backtrace();
     Backtrace& operator=(Backtrace&&) noexcept;
     Backtrace& operator=(const Backtrace&) noexcept;
+
 private:
     Backtrace(void* memory, const char* const* strs, size_t len)
         : m_memory(memory)
