@@ -30,11 +30,25 @@ struct Backtrace {
     static Backtrace capture() noexcept;
     void print(std::ostream&) const;
 
-    Backtrace() {}
+    Backtrace() noexcept {}
+    Backtrace(Backtrace&&) noexcept;
+    Backtrace(const Backtrace&) noexcept;
     ~Backtrace();
+    Backtrace& operator=(Backtrace&&) noexcept;
+    Backtrace& operator=(const Backtrace&) noexcept;
 private:
-    Backtrace(const char** strs, size_t len) : m_strs(strs), m_len(len) {}
+    Backtrace(void* memory, const char* const* strs, size_t len)
+        : m_memory(memory)
+        , m_strs(strs)
+        , m_len(len)
+    {}
+    Backtrace(void* memory, size_t len)
+        : m_memory(memory)
+        , m_strs(static_cast<char* const*>(memory))
+        , m_len(len)
+    {}
 
+    void* m_memory = nullptr;
     const char* const* m_strs = nullptr;
     size_t m_len = 0;
 };
