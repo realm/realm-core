@@ -22,38 +22,148 @@
 #include <stdexcept>
 
 #include <realm/util/features.h>
+#include <realm/util/backtrace.hpp>
+#include <realm/util/optional.hpp>
 
 namespace realm {
+namespace _impl {
+
+class ExceptionWithBacktraceBase {
+public:
+    ExceptionWithBacktraceBase()
+        : m_backtrace(util::Backtrace::capture())
+    {
+    }
+    const util::Backtrace& backtrace() const noexcept
+    {
+        return m_backtrace;
+    }
+    virtual const char* message() const noexcept = 0;
+
+protected:
+    util::Backtrace m_backtrace;
+    mutable util::Optional<std::string> m_message_with_backtrace;
+
+    // Render the message and the backtrace into m_message_with_backtrace. If an
+    // exception is thrown while rendering the message, the message without the
+    // backtrace will be returned.
+    const char* materialize_message() const noexcept;
+};
+
+} // namespace _impl
+
+
+/// Base class for exceptions that record a stack trace of where they were
+/// thrown.
+///
+/// The template argument is expected to be an exception type conforming to the
+/// standard library exception API (`std::exception` and friends).
+///
+/// It is possible to opt in to exception backtraces in two ways, (a) as part of
+/// the exception type, in which case the backtrace will always be included for
+/// all exceptions of that type, or (b) at the call-site of an opaque exception
+/// type, in which case it is up to the throw-site to decide whether a backtrace
+/// should be included.
+///
+/// Example (a):
+/// ```
+///     class MyException : ExceptionWithBacktrace<std::exception> {
+///     public:
+///         const char* message() const noexcept override
+///         {
+///             return "MyException error message";
+///         }
+///     };
+///
+///     ...
+///
+///     try {
+///         throw MyException{};
+///     }
+///     catch (const MyException& ex) {
+///         // Print the backtrace without the message:
+///         std::cerr << ex.backtrace() << "\n";
+///         // Print the exception message and the backtrace:
+///         std::cerr << ex.what() << "\n";
+///         // Print the exception message without the backtrace:
+///         std::cerr << ex.message() << "\n";
+///     }
+/// ```
+///
+/// Example (b):
+/// ```
+///     class MyException : std::exception {
+///     public:
+///         const char* what() const noexcept override
+///         {
+///             return "MyException error message";
+///         }
+///     };
+///
+///     ...
+///
+///     try {
+///         throw ExceptionWithBacktrace<MyException>{};
+///     }
+///     catch (const MyException& ex) {
+///         // Print the exception message and the backtrace:
+///         std::cerr << ex.what() << "\n";
+///     }
+/// ```
+template <class Base = std::runtime_error>
+class ExceptionWithBacktrace : public Base, public _impl::ExceptionWithBacktraceBase {
+public:
+    template <class... Args>
+    inline ExceptionWithBacktrace(Args&&... args)
+        : Base(std::forward<Args>(args)...)
+        , _impl::ExceptionWithBacktraceBase() // backtrace captured here
+    {
+    }
+
+    /// Return the message of the exception, including the backtrace of where
+    /// the exception was thrown.
+    const char* what() const noexcept final
+    {
+        return materialize_message();
+    }
+
+    /// Return the message of the exception without the backtrace. The default
+    /// implementation calls `Base::what()`.
+    const char* message() const noexcept override
+    {
+        return Base::what();
+    }
+};
 
 /// Thrown by various functions to indicate that a specified table does not
 /// exist.
-class NoSuchTable : public std::exception {
+class NoSuchTable : public ExceptionWithBacktrace<std::exception> {
 public:
-    const char* what() const noexcept override;
+    const char* message() const noexcept override;
 };
 
 
 /// Thrown by various functions to indicate that a specified table name is
 /// already in use.
-class TableNameInUse : public std::exception {
+class TableNameInUse : public ExceptionWithBacktrace<std::exception> {
 public:
-    const char* what() const noexcept override;
+    const char* message() const noexcept override;
 };
 
 
 // Thrown by functions that require a table to **not** be the target of link
 // columns, unless those link columns are part of the table itself.
-class CrossTableLinkTarget : public std::exception {
+class CrossTableLinkTarget : public ExceptionWithBacktrace<std::exception> {
 public:
-    const char* what() const noexcept override;
+    const char* message() const noexcept override;
 };
 
 
 /// Thrown by various functions to indicate that the dynamic type of a table
 /// does not match a particular other table type (dynamic or static).
-class DescriptorMismatch : public std::exception {
+class DescriptorMismatch : public ExceptionWithBacktrace<std::exception> {
 public:
-    const char* what() const noexcept override;
+    const char* message() const noexcept override;
 };
 
 
@@ -63,18 +173,18 @@ public:
 /// want automatic upgrades to be performed. This exception indicates that until
 /// an upgrade of the file format is performed, the database will be unavailable
 /// for read or write operations.
-class FileFormatUpgradeRequired : public std::exception {
+class FileFormatUpgradeRequired : public ExceptionWithBacktrace<std::exception> {
 public:
-    const char* what() const noexcept override;
+    const char* message() const noexcept override;
 };
 
 
 /// Thrown when a sync agent attempts to join a session in which there is
 /// already a sync agent. A session may only contain one sync agent at any given
 /// time.
-class MultipleSyncAgents : public std::exception {
+class MultipleSyncAgents : public ExceptionWithBacktrace<std::exception> {
 public:
-    const char* what() const noexcept override;
+    const char* message() const noexcept override;
 };
 
 
@@ -100,7 +210,7 @@ public:
 };
 
 
-class SerialisationError : public std::runtime_error {
+class SerialisationError : public ExceptionWithBacktrace<std::runtime_error> {
 public:
     SerialisationError(const std::string& msg);
     /// runtime_error::what() returns the msg provided in the constructor.
@@ -138,7 +248,7 @@ public:
 ///
 /// FIXME: This exception class should probably be moved to the `_impl`
 /// namespace, in order to avoid some confusion.
-class LogicError : public std::exception {
+class LogicError : public ExceptionWithBacktrace<std::exception> {
 public:
     enum ErrorKind {
         string_too_big,
@@ -236,7 +346,7 @@ public:
 
     LogicError(ErrorKind message);
 
-    const char* what() const noexcept override;
+    const char* message() const noexcept override;
     ErrorKind kind() const noexcept;
 
 private:
@@ -248,32 +358,32 @@ private:
 
 // LCOV_EXCL_START (Wording of what() strings are not to be tested)
 
-inline const char* NoSuchTable::what() const noexcept
+inline const char* NoSuchTable::message() const noexcept
 {
     return "No such table exists";
 }
 
-inline const char* TableNameInUse::what() const noexcept
+inline const char* TableNameInUse::message() const noexcept
 {
     return "The specified table name is already in use";
 }
 
-inline const char* CrossTableLinkTarget::what() const noexcept
+inline const char* CrossTableLinkTarget::message() const noexcept
 {
     return "Table is target of cross-table link columns";
 }
 
-inline const char* DescriptorMismatch::what() const noexcept
+inline const char* DescriptorMismatch::message() const noexcept
 {
     return "Table descriptor mismatch";
 }
 
-inline const char* FileFormatUpgradeRequired::what() const noexcept
+inline const char* FileFormatUpgradeRequired::message() const noexcept
 {
     return "Database upgrade required but prohibited";
 }
 
-inline const char* MultipleSyncAgents::what() const noexcept
+inline const char* MultipleSyncAgents::message() const noexcept
 {
     return "Multiple sync agents attempted to join the same session";
 }
@@ -296,7 +406,7 @@ inline OutOfDiskSpace::OutOfDiskSpace(const std::string& msg)
 }
 
 inline SerialisationError::SerialisationError(const std::string& msg)
-: std::runtime_error(msg)
+    : ExceptionWithBacktrace<std::runtime_error>(msg)
 {
 }
 
@@ -312,5 +422,6 @@ inline LogicError::ErrorKind LogicError::kind() const noexcept
 
 
 } // namespace realm
+
 
 #endif // REALM_EXCEPTIONS_HPP

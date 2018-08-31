@@ -22,6 +22,7 @@
 #include <sstream>
 #include <realm/util/features.h>
 #include <realm/util/thread.hpp>
+#include <realm/util/backtrace.hpp>
 
 #if REALM_PLATFORM_APPLE
 
@@ -105,16 +106,7 @@ namespace util {
 // LCOV_EXCL_START
 REALM_NORETURN static void terminate_internal(std::stringstream& ss) noexcept
 {
-
-#if REALM_PLATFORM_APPLE
-    void* callstack[128];
-    int frames = backtrace(callstack, 128);
-    char** strs = backtrace_symbols(callstack, frames);
-    for (int i = 0; i < frames; ++i) {
-        ss << strs[i] << '\n';
-    }
-    free(strs);
-#endif
+    util::Backtrace::capture().print(ss);
 
     ss << "!!! IMPORTANT: Please send this log and info about Realm SDK version and other relevant reproduction info to help@realm.io.";
     if (termination_notification_callback) {
