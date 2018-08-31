@@ -69,9 +69,6 @@ public:
     {
         return Base::what();
     }
-
-private:
-    util::Backtrace m_backtrace;
 };
 
 /// Thrown by various functions to indicate that a specified table does not
