@@ -68,7 +68,7 @@ Backtrace& Backtrace::operator=(const Backtrace& other) noexcept
     m_len = other.m_len;
     size_t required_memory = sizeof(char*) * m_len;
     for (size_t i = 0; i < m_len; ++i) {
-        required_memory += std::strlen(m_strs[i]) + 1;
+        required_memory += std::strlen(other.m_strs[i]) + 1;
     }
 
     void* new_memory = std::malloc(required_memory);
@@ -84,7 +84,7 @@ Backtrace& Backtrace::operator=(const Backtrace& other) noexcept
     char* p = static_cast<char*>(new_memory) + sizeof(char*) * m_len;
     for (size_t i = 0; i < m_len; ++i) {
         *(new_strs++) = p;
-        p = std::strcpy(p, other.m_strs[i]);
+        p = ::stpcpy(p, other.m_strs[i]) + 1;
     }
     std::free(m_memory);
     m_memory = new_memory;
@@ -126,7 +126,7 @@ Backtrace Backtrace::capture() noexcept
 void Backtrace::print(std::ostream& os) const
 {
     for (size_t i = 0; i < m_len; ++i) {
-        os << "[#" << i << "]: " << m_strs[i];
+        os << m_strs[i];
         if (i + 1 != m_len) {
             os << "\n";
         }
