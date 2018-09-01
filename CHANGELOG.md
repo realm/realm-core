@@ -1,3 +1,25 @@
+# NEXT RELEASE
+
+### Bugfixes
+
+* None.
+
+### Breaking changes
+
+* None.
+
+### Enhancements
+
+* None.
+
+-----------
+
+### Internals
+
+* None.
+
+----------------------------------------------
+
 # 5.10.0 Release notes
 
 ### Enhancements
