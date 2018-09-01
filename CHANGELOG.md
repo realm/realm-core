@@ -1,22 +1,9 @@
-# NEXT RELEASE
-
-### Bugfixes
-
-* None.
-
-### Breaking changes
-
-* None.
+# 5.10.0 Release notes
 
 ### Enhancements
 
 * Allow compact to take an optional output encryption key.
-
------------
-
-### Internals
-
-* None.
+  PR [#3090](https://github.com/realm/realm-core/pull/3090).
 
 ----------------------------------------------
 
