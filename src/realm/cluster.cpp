@@ -1250,6 +1250,14 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
         ArrayBacklink values(m_alloc);
         values.set_parent(this, col_ndx + s_first_col_index);
         values.init_from_parent();
+        // Ensure that Cluster is writable and able to hold references to nodes in
+        // the slab area before nullifying or deleting links. These operation may
+        // both have the effect that other objects may be constructed and manipulated.
+        // If those other object are in the same cluster that the object to be deleted
+        // is in, then that will cause another accessor to this cluster to be created.
+        // It would lead to an error if the cluster node was relocated without it being
+        // reflected in the context here.
+        values.copy_on_write();
         values.nullify_fwd_links(ndx, state);
     }
 

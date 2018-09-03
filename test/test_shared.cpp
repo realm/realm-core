@@ -3835,4 +3835,46 @@ TEST(Shared_MoreVersionsInUse)
     }
 }
 
+TEST(Shared_LinksToSameCluster)
+{
+    // There was a problem when a link referred an object livind in the same
+    // Cluster as the origin object.
+    SHARED_GROUP_TEST_PATH(path);
+    const char* key = "1234567890123456789012345678901123456789012345678901234567890123";
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    DBRef db = DB::create(*hist, DBOptions(key));
+    std::vector<ObjKey> keys;
+    {
+        auto wt = db->start_write();
+        auto rt = db->start_read();
+        std::vector<TableView> table_views;
+
+        auto t = wt->add_table("Table_0");
+        // Create more object that can be held in a single cluster
+        t->create_objects(267, keys);
+        t->add_column_link(type_Link, "link_0", *wt->get_table("Table_0"));
+
+        // Create two links
+        Obj obj = t->get_object(keys[48]);
+        obj.set<ObjKey>(ColKey(0), keys[0]);
+        obj = t->get_object(keys[49]);
+        obj.set<ObjKey>(ColKey(0), keys[1]);
+        wt->commit();
+    }
+    {
+        auto wt = db->start_write();
+        // Delete origin obj
+        wt->get_table("Table_0")->remove_object(keys[48]);
+        wt->verify();
+        wt->commit();
+    }
+    {
+        auto wt = db->start_write();
+        // Delete target obj
+        wt->get_table("Table_0")->remove_object(keys[1]);
+        wt->verify();
+        wt->commit();
+    }
+}
+
 #endif // TEST_SHARED

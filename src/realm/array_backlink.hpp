@@ -26,6 +26,7 @@ class ArrayBacklink : public ArrayPayload, private Array {
 public:
     using Array::Array;
     using Array::init_from_parent;
+    using Array::copy_on_write;
     using Array::update_parent;
     using Array::get_ref;
     using Array::size;
