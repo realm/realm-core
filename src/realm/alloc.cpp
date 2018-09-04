@@ -67,7 +67,7 @@ public:
         char* addr = static_cast<char*>(::malloc(size));
         if (REALM_UNLIKELY(REALM_COVER_NEVER(!addr))) {
             REALM_ASSERT_DEBUG(errno == ENOMEM);
-            throw std::bad_alloc();
+            throw util::bad_alloc();
         }
 #if REALM_ENABLE_ALLOC_SET_ZERO
         std::fill(addr, addr + size, 0);
@@ -80,7 +80,7 @@ public:
         char* new_addr = static_cast<char*>(::realloc(const_cast<char*>(addr), new_size));
         if (REALM_UNLIKELY(REALM_COVER_NEVER(!new_addr))) {
             REALM_ASSERT_DEBUG(errno == ENOMEM);
-            throw std::bad_alloc();
+            throw util::bad_alloc();
         }
 #if REALM_ENABLE_ALLOC_SET_ZERO
         std::fill(new_addr + old_size, new_addr + new_size, 0);

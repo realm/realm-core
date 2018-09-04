@@ -161,7 +161,7 @@ REALM_NORETURN void Mutex::init_failed(int err)
 {
     switch (err) {
         case ENOMEM:
-            throw std::bad_alloc();
+            throw util::bad_alloc();
         default:
             throw std::runtime_error("pthread_mutex_init() failed");
     }
@@ -171,7 +171,7 @@ REALM_NORETURN void Mutex::attr_init_failed(int err)
 {
     switch (err) {
         case ENOMEM:
-            throw std::bad_alloc();
+            throw util::bad_alloc();
         default:
             throw std::runtime_error("pthread_mutexattr_init() failed");
     }
@@ -301,7 +301,7 @@ REALM_NORETURN void CondVar::init_failed(int err)
 {
     switch (err) {
         case ENOMEM:
-            throw std::bad_alloc();
+            throw util::bad_alloc();
         default:
             throw std::runtime_error("pthread_cond_init() failed");
     }
@@ -330,7 +330,7 @@ REALM_NORETURN void CondVar::attr_init_failed(int err)
 {
     switch (err) {
         case ENOMEM:
-            throw std::bad_alloc();
+            throw util::bad_alloc();
         default:
             throw std::runtime_error("pthread_condattr_init() failed");
     }
