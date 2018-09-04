@@ -19,6 +19,7 @@
 #include <stdexcept>
 
 #include <realm/util/features.h>
+#include <realm/util/backtrace.hpp>
 
 #if defined _WIN32
 #include <windows.h>
