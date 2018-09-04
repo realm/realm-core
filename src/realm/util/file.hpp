@@ -42,6 +42,7 @@ namespace std {
 #endif
 
 #include <realm/utilities.hpp>
+#include <realm/util/backtrace.hpp>
 #include <realm/util/features.h>
 #include <realm/util/assert.hpp>
 #include <realm/util/safe_int_ops.hpp>
