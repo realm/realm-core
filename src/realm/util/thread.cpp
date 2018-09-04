@@ -18,8 +18,10 @@
 
 #include <cstring>
 #include <stdexcept>
+#include <system_error>
 
 #include <realm/util/thread.hpp>
+#include <realm/util/backtrace.hpp>
 
 #if !defined _WIN32
 #include <unistd.h>
@@ -153,7 +155,7 @@ void Mutex::init_as_process_shared(bool robust_if_available)
         init_failed(r);
 #else // !REALM_HAVE_PTHREAD_PROCESS_SHARED
     static_cast<void>(robust_if_available);
-    throw std::runtime_error("No support for process-shared mutexes");
+    throw util::runtime_error("No support for process-shared mutexes");
 #endif
 }
 
@@ -293,7 +295,7 @@ CondVar::CondVar(process_shared_tag)
     if (REALM_UNLIKELY(r != 0))
         init_failed(r);
 #else
-    throw std::runtime_error("No support for process-shared condition variables");
+    throw util::runtime_error("No support for process-shared condition variables");
 #endif
 }
 

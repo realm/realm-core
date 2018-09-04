@@ -1081,7 +1081,7 @@ bool File::is_dir(const std::string& path)
     return std::filesystem::is_directory(path);
 #else
     static_cast<void>(path);
-    throw std::runtime_error("Not yet supported");
+    throw util::runtime_error("Not yet supported");
 #endif
 }
 
@@ -1223,7 +1223,7 @@ File::UniqueID File::get_unique_id() const
 {
     REALM_ASSERT_RELEASE(is_attached());
 #ifdef _WIN32 // Windows version
-    throw std::runtime_error("Not yet supported");
+    throw util::runtime_error("Not yet supported");
 #else // POSIX version
     struct stat statbuf;
     if (::fstat(m_fd, &statbuf) == 0) {
@@ -1317,7 +1317,7 @@ std::string File::resolve(const std::string& path, const std::string& base_dir)
 #else
     static_cast<void>(path);
     static_cast<void>(base_dir);
-    throw std::runtime_error("Not yet supported");
+    throw util::runtime_error("Not yet supported");
 #endif
 }
 
@@ -1341,7 +1341,7 @@ void File::set_encryption_key(const char* key)
     }
 #else
     if (key) {
-        throw std::runtime_error("Encryption not enabled");
+        throw util::runtime_error("Encryption not enabled");
     }
 #endif
 }
@@ -1438,7 +1438,7 @@ bool DirScanner::next(std::string& name)
 
 DirScanner::DirScanner(const std::string&, bool)
 {
-    throw std::runtime_error("Not yet supported");
+    throw util::runtime_error("Not yet supported");
 }
 
 DirScanner::~DirScanner() noexcept

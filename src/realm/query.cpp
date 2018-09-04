@@ -1806,7 +1806,7 @@ Query Query::operator&&(const Query& q)
 Query Query::operator!()
 {
     if (!root_node())
-        throw std::runtime_error("negation of empty query is not supported");
+        throw util::runtime_error("negation of empty query is not supported");
     Query q(*this->m_table);
     q.Not();
     q.and_query(*this);

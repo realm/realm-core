@@ -1266,7 +1266,7 @@ inline File::Exists::Exists(const std::string& msg, const std::string& path)
 inline bool operator==(const File::UniqueID& lhs, const File::UniqueID& rhs)
 {
 #ifdef _WIN32 // Windows version
-    throw std::runtime_error("Not yet supported");
+    throw util::runtime_error("Not yet supported");
 #else // POSIX version
     return lhs.device == rhs.device && lhs.inode == rhs.inode;
 #endif
@@ -1280,7 +1280,7 @@ inline bool operator!=(const File::UniqueID& lhs, const File::UniqueID& rhs)
 inline bool operator<(const File::UniqueID& lhs, const File::UniqueID& rhs)
 {
 #ifdef _WIN32 // Windows version
-    throw std::runtime_error("Not yet supported");
+    throw util::runtime_error("Not yet supported");
 #else // POSIX version
     if (lhs.device < rhs.device)
         return true;

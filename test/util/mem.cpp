@@ -162,7 +162,7 @@ size_t get_mem_usage()
 
 #else
 
-    throw std::runtime_error("Not supported");
+    throw util::runtime_error("Not supported");
 
 #endif
 }

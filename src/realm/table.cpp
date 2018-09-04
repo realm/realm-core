@@ -4356,13 +4356,13 @@ ConstTableView Table::find_all_string(size_t col_ndx, StringData value) const
 TableView Table::find_all_binary(size_t, BinaryData)
 {
     // FIXME: Implement this!
-    throw std::runtime_error("Not implemented");
+    throw util::runtime_error("Not implemented");
 }
 
 ConstTableView Table::find_all_binary(size_t, BinaryData) const
 {
     // FIXME: Implement this!
-    throw std::runtime_error("Not implemented");
+    throw util::runtime_error("Not implemented");
 }
 
 TableView Table::find_all_null(size_t col_ndx)

@@ -117,17 +117,17 @@ bool system_has_rlimit(Resource) noexcept
 
 long get_hard_rlimit(Resource)
 {
-    throw std::runtime_error("Not supported");
+    throw util::runtime_error("Not supported");
 }
 
 long get_soft_rlimit(Resource)
 {
-    throw std::runtime_error("Not supported");
+    throw util::runtime_error("Not supported");
 }
 
 void set_soft_rlimit(Resource, long)
 {
-    throw std::runtime_error("Not supported");
+    throw util::runtime_error("Not supported");
 }
 
 #endif // ! REALM_HAVE_POSIX_RLIMIT
