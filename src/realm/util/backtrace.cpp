@@ -19,7 +19,7 @@
 #include <realm/util/backtrace.hpp>
 #include <realm/util/features.h>
 
-#include <ostream>
+#include <sstream>
 #include <cstdlib>
 #include <cstring>
 
@@ -137,5 +137,27 @@ void Backtrace::print(std::ostream& os) const
         if (i + 1 != m_len) {
             os << "\n";
         }
+    }
+}
+
+const char* detail::ExceptionWithBacktraceBase::materialize_message() const noexcept
+{
+    if (m_has_materialized_message) {
+        return m_materialized_message.c_str();
+    }
+
+    const char* msg = message();
+
+    try {
+        std::stringstream ss;
+        ss << msg << "\n";
+        ss << "Exception backtrace:\n";
+        m_backtrace.print(ss);
+        m_materialized_message = ss.str();
+        m_has_materialized_message = true;
+        return m_materialized_message.c_str();
+    }
+    catch (...) {
+        return msg;
     }
 }
