@@ -695,8 +695,8 @@ void File::prealloc(size_t size)
     if (m_encryption_key) {
         new_size = static_cast<size_t>(data_size_to_encrypted_size(size));
         if (new_size < size) {
-            throw std::runtime_error("File size overflow: data_size_to_encrypted_size("
-                                     + realm::util::to_string(size) + ") == " + realm::util::to_string(new_size));
+            throw util::runtime_error("File size overflow: data_size_to_encrypted_size("
+                                      + realm::util::to_string(size) + ") == " + realm::util::to_string(new_size));
         }
     }
 

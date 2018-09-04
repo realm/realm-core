@@ -6413,12 +6413,12 @@ void Table::generate_patch(const Table* table, std::unique_ptr<HandoverPatch>& p
                 Table* parent_table = col->m_table;
                 patch->m_table_num = parent_table->get_index_in_group();
                 if (patch->m_table_num == npos)
-                    throw std::runtime_error("Table handover failed: only first level subtables supported");
+                    throw util::runtime_error("Table handover failed: only first level subtables supported");
                 patch->m_col_ndx = col->get_column_index();
                 patch->m_row_ndx = table->m_columns.get_ndx_in_parent();
             }
             else {
-                throw std::runtime_error("Table handover failed: not a group level table");
+                throw util::runtime_error("Table handover failed: not a group level table");
             }
         }
     }

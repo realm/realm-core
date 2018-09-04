@@ -61,7 +61,7 @@ using namespace realm::util;
 void Thread::join()
 {
     if (!m_joinable)
-        throw std::runtime_error("Thread is not joinable");
+        throw util::runtime_error("Thread is not joinable");
 
 #ifdef _WIN32
     // Returns void; error handling not possible
