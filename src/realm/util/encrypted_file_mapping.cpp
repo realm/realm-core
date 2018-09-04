@@ -565,7 +565,7 @@ void EncryptedFileMapping::sync() noexcept
 #ifdef _WIN32
     if (FlushFileBuffers(m_file.fd))
         return;
-    throw std::runtime_error("FlushFileBuffers() failed");
+    throw std::system_error(GetLastError(), std::system_category(), "FlushFileBuffers() failed");
 #else
     fsync(m_file.fd);
     // FIXME: on iOS/OSX fsync may not be enough to ensure crash safety.

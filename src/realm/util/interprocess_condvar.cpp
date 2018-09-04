@@ -235,7 +235,7 @@ void InterprocessCondVar::set_shared_part(SharedPart& shared_part, std::string b
         0x7fffffff,  // max count
         LPWSTR(se.c_str()));
     if (!m_sema) {
-        throw std::system_error(std::error_code(::GetLastError(), std::system_category()), "Error opening semaphore");
+        throw std::system_error(GetLastError(), std::system_category(), "Error opening semaphore");
     }
 
     m_waiters_done = CreateEventW(
@@ -244,7 +244,7 @@ void InterprocessCondVar::set_shared_part(SharedPart& shared_part, std::string b
         false,      // non-signaled initially
         LPWSTR(ev.c_str()));
     if (!m_waiters_done) {
-        throw std::system_error(std::error_code(::GetLastError(), std::system_category()), "Error opening event");
+        throw std::system_error(GetLastError(), std::system_category(), "Error opening event");
     }
     
     // InterprocessMutex::SharedPart() is an unused dummy object

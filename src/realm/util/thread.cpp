@@ -88,11 +88,11 @@ void Thread::set_name(const std::string& name)
     pthread_t id = pthread_self();
     int r = pthread_setname_np(id, name_2);
     if (REALM_UNLIKELY(r != 0))
-        throw std::runtime_error("pthread_setname_np() failed.");
+        throw std::system_error(r, std::system_category(), "pthread_setname_np() failed");
 #elif REALM_PLATFORM_APPLE
     int r = pthread_setname_np(name.data());
     if (REALM_UNLIKELY(r != 0))
-        throw std::runtime_error("pthread_setname_np() failed.");
+        throw std::system_error(r, std::system_category(), "pthread_setname_np() failed");
 #else
     static_cast<void>(name);
 #endif
@@ -107,7 +107,7 @@ bool Thread::get_name(std::string& name)
     pthread_t id = pthread_self();
     int r = pthread_getname_np(id, name_2, max);
     if (REALM_UNLIKELY(r != 0))
-        throw std::runtime_error("pthread_getname_np() failed.");
+        throw std::system_error(r, std::system_category(), "pthread_getname_np() failed");
     name_2[max - 1] = '\0';              // Eliminate any risk of buffer overrun in strlen().
     name.assign(name_2, strlen(name_2)); // Throws
     return true;
@@ -163,7 +163,7 @@ REALM_NORETURN void Mutex::init_failed(int err)
         case ENOMEM:
             throw util::bad_alloc();
         default:
-            throw std::runtime_error("pthread_mutex_init() failed");
+            throw std::system_error(err, std::system_category(), "pthread_mutex_init() failed");
     }
 }
 
@@ -173,7 +173,7 @@ REALM_NORETURN void Mutex::attr_init_failed(int err)
         case ENOMEM:
             throw util::bad_alloc();
         default:
-            throw std::runtime_error("pthread_mutexattr_init() failed");
+            throw std::system_error(err, std::system_category(), "pthread_mutexattr_init() failed");
     }
 }
 
@@ -303,7 +303,7 @@ REALM_NORETURN void CondVar::init_failed(int err)
         case ENOMEM:
             throw util::bad_alloc();
         default:
-            throw std::runtime_error("pthread_cond_init() failed");
+            throw std::system_error(err, std::system_category(), "pthread_cond_init() failed");
     }
 }
 
@@ -332,7 +332,7 @@ REALM_NORETURN void CondVar::attr_init_failed(int err)
         case ENOMEM:
             throw util::bad_alloc();
         default:
-            throw std::runtime_error("pthread_condattr_init() failed");
+            throw std::system_error(err, std::system_category(), "pthread_condattr_init() failed");
     }
 }
 

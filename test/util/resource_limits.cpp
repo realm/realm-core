@@ -16,9 +16,10 @@
  *
  **************************************************************************/
 
-#include <stdexcept>
+#include <system_error>
 
 #include <realm/util/assert.hpp>
+#include <realm/util/backtrace.hpp>
 
 #include "resource_limits.hpp"
 
@@ -49,7 +50,7 @@ long get_rlimit(Resource resource, bool hard)
     rlimit rlimit;
     int status = getrlimit(resource_2, &rlimit);
     if (status < 0)
-        throw std::runtime_error("getrlimit() failed");
+        throw std::system_error(errno, std::system_category(), "getrlimit() failed");
     rlim_t value = hard ? rlimit.rlim_max : rlimit.rlim_cur;
     return value == RLIM_INFINITY ? -1 : long(value);
 }
@@ -66,12 +67,12 @@ void set_rlimit(Resource resource, long value, bool hard)
     rlimit rlimit;
     int status = getrlimit(resource_2, &rlimit);
     if (status < 0)
-        throw std::runtime_error("getrlimit() failed");
+        throw std::system_error(errno, std::system_category(), "getrlimit() failed");
     rlim_t value_2 = value < 0 ? RLIM_INFINITY : rlim_t(value);
     (hard ? rlimit.rlim_max : rlimit.rlim_cur) = value_2;
     status = setrlimit(resource_2, &rlimit);
     if (status < 0)
-        throw std::runtime_error("setrlimit() failed");
+        throw std::system_error(errno, std::system_category(), "setrlimit() failed");
 }
 
 } // anonymous namespace

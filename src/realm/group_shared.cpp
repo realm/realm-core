@@ -644,7 +644,7 @@ void spawn_daemon(const std::string& file)
     if (m < 0) {
         if (errno) {
             int err = errno; // Eliminate any risk of clobbering
-            throw std::runtime_error(get_errno_msg("'sysconf(_SC_OPEN_MAX)' failed: ", err));
+            throw std::system_error(err, std::system_category(), "sysconf(_SC_OPEN_MAX) failed");
         }
         throw std::runtime_error("'sysconf(_SC_OPEN_MAX)' failed with no reason");
     }
