@@ -29,6 +29,8 @@
 namespace realm {
 namespace util {
 
+using bad_cast = ExceptionWithBacktrace<std::bad_cast>;
+
 // A naive implementation of C++17's std::any
 // This does not perform the small-object optimization or make any particular
 // attempt at being performant
@@ -117,7 +119,7 @@ T any_cast(Any const& value)
 {
     auto ptr = any_cast<typename std::add_const<typename std::remove_reference<T>::type>::type>(&value);
     if (!ptr)
-        throw util::bad_cast();
+        throw bad_cast();
     return *ptr;
 }
 
@@ -126,7 +128,7 @@ T any_cast(Any& value)
 {
     auto ptr = any_cast<typename std::remove_reference<T>::type>(&value);
     if (!ptr)
-        throw util::bad_cast();
+        throw bad_cast();
     return *ptr;
 }
 
@@ -135,7 +137,7 @@ T any_cast(Any&& value)
 {
     auto ptr = any_cast<typename std::remove_reference<T>::type>(&value);
     if (!ptr)
-        throw util::bad_cast();
+        throw bad_cast();
     return std::move(*ptr);
 }
 

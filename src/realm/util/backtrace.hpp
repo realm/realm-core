@@ -212,7 +212,6 @@ using underflow_error = ExceptionWithBacktrace<std::underflow_error>;
 using bad_alloc = ExceptionWithBacktrace<std::bad_alloc>;
 using invalid_argument = ExceptionWithBacktrace<std::invalid_argument>;
 using out_of_range = ExceptionWithBacktrace<std::out_of_range>;
-using bad_cast = ExceptionWithBacktrace<std::bad_cast>;
 using logic_error = ExceptionWithBacktrace<std::logic_error>;
 
 } // namespace util
