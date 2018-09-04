@@ -204,6 +204,17 @@ public:
     }
 };
 
+// Wrappers for standard exception types with backtrace support
+using runtime_error = ExceptionWithBacktrace<std::runtime_error>;
+using range_error = ExceptionWithBacktrace<std::range_error>;
+using overflow_error = ExceptionWithBacktrace<std::overflow_error>;
+using underflow_error = ExceptionWithBacktrace<std::underflow_error>;
+using bad_alloc = ExceptionWithBacktrace<std::bad_alloc>;
+using invalid_argument = ExceptionWithBacktrace<std::invalid_argument>;
+using out_of_range = ExceptionWithBacktrace<std::out_of_range>;
+using bad_cast = ExceptionWithBacktrace<std::bad_cast>;
+using logic_error = ExceptionWithBacktrace<std::logic_error>;
+
 } // namespace util
 } // namespace realm
 
