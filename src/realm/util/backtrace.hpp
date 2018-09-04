@@ -19,9 +19,9 @@
 #ifndef REALM_UTIL_BACKTRACE_HPP
 #define REALM_UTIL_BACKTRACE_HPP
 
-#include <vector>
 #include <string>
 #include <iosfwd>
+#include <stdexcept>
 
 namespace realm {
 namespace util {
