@@ -5024,7 +5024,7 @@ void Table::write(std::ostream& out, size_t offset, size_t slice_size, StringDat
 {
     size_t table_size = this->size();
     if (offset > table_size)
-        throw std::out_of_range("Offset is out of range");
+        throw util::out_of_range("Offset is out of range");
     size_t remaining_size = table_size - offset;
     size_t size_2 = slice_size;
     if (size_2 > remaining_size)
