@@ -594,7 +594,7 @@ File::SizeType File::get_size_static(FileDesc fd)
     if (GetFileSizeEx(fd, &large_int)) {
         File::SizeType size;
         if (int_cast_with_overflow_detect(large_int.QuadPart, size))
-            throw std::runtime_error("File size overflow");
+            throw util::overflow_error("File size overflow");
 
         return size;
     }
@@ -606,7 +606,7 @@ File::SizeType File::get_size_static(FileDesc fd)
     if (::fstat(fd, &statbuf) == 0) {
         SizeType size;
         if (int_cast_with_overflow_detect(statbuf.st_size, size))
-            throw std::runtime_error("File size overflow");
+            throw util::overflow_error("File size overflow");
 
         return size;
     }
@@ -663,7 +663,7 @@ void File::resize(SizeType size)
 
     off_t size2;
     if (int_cast_with_overflow_detect(size, size2))
-        throw std::runtime_error("File size overflow");
+        throw util::overflow_error("File size overflow");
 
     // POSIX specifies that introduced bytes read as zero. This is not
     // required by File::resize().
@@ -727,12 +727,12 @@ void File::prealloc(size_t size)
 
     size_t allocated_size;
     if (int_cast_with_overflow_detect(statbuf.st_blocks, allocated_size)) {
-        throw std::runtime_error("Overflow on block conversion to size_t " + realm::util::to_string(statbuf.st_blocks));
+        throw util::overflow_error("Overflow on block conversion to size_t " + realm::util::to_string(statbuf.st_blocks));
     }
     if (int_multiply_with_overflow_detect(allocated_size, S_BLKSIZE)) {
-        throw std::runtime_error("Overflow computing existing file space allocation blocks: "
-                                 + realm::util::to_string(allocated_size)
-                                 + " block size: " + realm::util::to_string(S_BLKSIZE));
+        throw util::overflow_error("Overflow computing existing file space allocation blocks: "
+                                   + realm::util::to_string(allocated_size)
+                                   + " block size: " + realm::util::to_string(S_BLKSIZE));
     }
 
     // Only attempt to preallocate space if there's not already sufficient free space in the file.
@@ -799,7 +799,7 @@ void File::prealloc_if_supported(SizeType offset, size_t size)
 
     off_t size2;
     if (int_cast_with_overflow_detect(size, size2))
-        throw std::runtime_error("File size overflow");
+        throw util::overflow_error("File size overflow");
 
     if (size2 == 0) {
         // calling posix_fallocate with a size of 0 will cause a return of EINVAL
@@ -868,7 +868,7 @@ void File::seek_static(FileDesc fd, SizeType position)
 
     LARGE_INTEGER large_int;
     if (int_cast_with_overflow_detect(position, large_int.QuadPart))
-        throw std::runtime_error("File position overflow");
+        throw util::overflow_error("File position overflow");
 
     if (!SetFilePointerEx(fd, large_int, 0, FILE_BEGIN))
         throw std::runtime_error("SetFilePointerEx() failed");
@@ -877,7 +877,7 @@ void File::seek_static(FileDesc fd, SizeType position)
 
     off_t position2;
     if (int_cast_with_overflow_detect(position, position2))
-        throw std::runtime_error("File position overflow");
+        throw util::overflow_error("File position overflow");
 
     if (0 <= ::lseek(fd, position2, SEEK_SET))
         return;

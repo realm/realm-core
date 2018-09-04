@@ -1182,7 +1182,7 @@ void Table::update_subtables(Descriptor& desc, SubtableUpdater* updater)
             return;
         }
         if (int_multiply_with_overflow_detect(size, 2))
-            throw std::runtime_error("Too many subdescriptor nesting levels");
+            throw util::overflow_error("Too many subdescriptor nesting levels");
         begin = new size_t[size]; // Throws
         end = begin + size;
         dyn_buf.reset(begin);

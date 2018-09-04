@@ -359,7 +359,7 @@ void* mmap(FileDesc fd, size_t size, File::AccessMode access, size_t offset, con
                                         " size: " + util::to_string(size) + " offset: " + util::to_string(offset));
 
         if (int_cast_with_overflow_detect(offset, large_int.QuadPart))
-            throw std::runtime_error("Map offset is too large");
+            throw util::overflow_error("Map offset is too large");
 
         SIZE_T _size = size;
         void* addr = MapViewOfFileFromApp(map_handle, desired_access, offset, _size);

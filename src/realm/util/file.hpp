@@ -1223,7 +1223,7 @@ inline File::Streambuf::pos_type File::Streambuf::seekpos(pos_type pos, std::ios
     flush();
     SizeType pos2 = 0;
     if (int_cast_with_overflow_detect(std::streamsize(pos), pos2))
-        throw std::runtime_error("Seek position overflow");
+        throw util::overflow_error("Seek position overflow");
     m_file.seek(pos2);
     return pos;
 }
