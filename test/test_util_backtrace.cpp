@@ -19,7 +19,6 @@ TEST(Backtrace_LogicError)
     }
     catch (const LogicError& err) {
 #if REALM_WINDOWS || REALM_PLATFORM_APPLE || (defined(__linux__) && !REALM_ANDROID)
-        std::cerr << err.backtrace() << std::endl;
         CHECK(StringData{err.what()}.contains("throw_logic_error"));
 #endif
         LogicError copy = err;
