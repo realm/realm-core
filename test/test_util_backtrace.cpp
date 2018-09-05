@@ -18,7 +18,8 @@ TEST(Backtrace_LogicError)
         throw_logic_error(LogicError::string_too_big);
     }
     catch (const LogicError& err) {
-#if REALM_PLATFORM_APPLE || (defined(__linux__) && !REALM_ANDROID)
+#if REALM_WINDOWS || REALM_PLATFORM_APPLE || (defined(__linux__) && !REALM_ANDROID)
+        std::cerr << err.backtrace() << std::endl;
         CHECK(StringData{err.what()}.contains("throw_logic_error"));
 #endif
         LogicError copy = err;

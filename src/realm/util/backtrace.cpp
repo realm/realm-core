@@ -27,6 +27,14 @@
 #include <execinfo.h>
 #endif
 
+#if REALM_WINDOWS
+#pragma comment(lib, "dbghelp.lib")
+#include <Windows.h>
+#include <DbgHelp.h>
+#include <mutex>
+#include <stdio.h> // snprintf
+#endif // REALM_WINDOWS
+
 using namespace realm::util;
 
 static const size_t g_backtrace_depth = 128;
@@ -34,6 +42,31 @@ static const char* g_backtrace_error = "<error calculating backtrace>";
 static const char* g_backtrace_alloc_error = "<error allocating backtrace>";
 static const char* g_backtrace_symbolicate_error = "<error symbolicating backtrace>";
 static const char* g_backtrace_unsupported_error = "<backtrace not supported on this platform>";
+
+#if REALM_WINDOWS
+// DbgHelp routines are not thread-safe. :-(
+static std::mutex g_symbol_info_mutex;
+
+struct SymbolGuard {
+    SymbolGuard()
+        : m_process(GetCurrentProcess())
+        , m_lock(g_symbol_info_mutex)
+    {
+        // use system defaults, including environment variables _NT_SYMBOL_PATH and _NT_ALTERNATE_SYMBOL_PATH
+        LPCSTR symbol_search_path = NULL;
+        BOOL invade_process = true;
+        SymInitialize(m_process, symbol_search_path, invade_process);
+    }
+
+    ~SymbolGuard()
+    {
+        SymCleanup(m_process);
+    }
+
+    HANDLE m_process;
+    std::unique_lock<std::mutex> m_lock;
+};
+#endif // REALM_WINDOWS
 
 Backtrace::~Backtrace()
 {
@@ -122,6 +155,45 @@ Backtrace Backtrace::capture() noexcept
             return Backtrace{memory, size_t(frames)};
         }
     }
+#elif REALM_WINDOWS
+    static_cast<void>(g_backtrace_unsupported_error);
+    SymbolGuard guard;
+
+    void* callstack[g_backtrace_depth];
+    unsigned short frames = CaptureStackBackTrace(0, g_backtrace_depth, callstack, NULL);
+    if (REALM_UNLIKELY(frames <= 1)) {
+        return Backtrace(nullptr, &g_backtrace_error, 1);
+    }
+
+    static const size_t max_name_len = 128;
+    static const size_t prefix_len = 5; // "#000 ";
+    static const size_t max_line_len = max_name_len + prefix_len; // including prefix of "#000 "
+    void* memory = std::malloc(sizeof(char*) * frames + // pointers at beginning
+                               max_line_len * frames);  // symbol names
+    if (memory == nullptr) {
+        return Backtrace(nullptr, &g_backtrace_symbolicate_error, 1);
+    }
+    char** p = static_cast<char**>(memory);
+    char* name_p = static_cast<char*>(memory) + sizeof(char*) * frames;
+    for (unsigned short i = 0; i < frames; ++i) {
+        char sym_mem[sizeof(SYMBOL_INFO) + max_name_len];
+        SYMBOL_INFO* symbol = reinterpret_cast<SYMBOL_INFO*>(sym_mem);
+        symbol->SizeOfStruct = sizeof(SYMBOL_INFO);
+        symbol->MaxNameLen = max_name_len - 1;
+        *(p++) = name_p;
+
+        int n;
+        if (SymFromAddr(guard.m_process, (DWORD64)callstack[i], 0, symbol)) {
+            std::ptrdiff_t offset = std::ptrdiff_t(callstack[i]) - symbol->Address;
+            n = std::snprintf(name_p, max_line_len, "#%03d %s + 0x%llx", int(i), symbol->Name, offset);
+        }
+        else {
+            std::strcpy(name_p, "<symbol lookup failed>");
+            n = std::snprintf(name_p, max_line_len, "#%03d <symbol lookup_failed>", int(i));
+        }
+        name_p += n + 1;
+    }
+    return Backtrace(memory, frames);
 #else
     static_cast<void>(g_backtrace_error);
     static_cast<void>(g_backtrace_symbolicate_error);
