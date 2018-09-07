@@ -230,7 +230,7 @@ std::string make_temp_dir()
     std::filesystem::path path;
     for (;;) {
         if (GetTempFileNameW(temp.c_str(), L"rlm", 0, buffer) == 0)
-            throw std::runtime_error("GetTempFileName() failed");
+            throw std::system_error(GetLastError(), std::system_category(), "GetTempFileName() failed");
         path = buffer;
         std::filesystem::remove(path);
         try {
@@ -249,7 +249,7 @@ std::string make_temp_dir()
 #if REALM_ANDROID
     char buffer[] = "/data/local/tmp/realm_XXXXXX";
     if (mkdtemp(buffer) == 0) {
-        throw std::runtime_error("mkdtemp() failed"); // LCOV_EXCL_LINE
+        throw std::system_error(errno, std::system_category(), "mkdtemp() failed"); // LCOV_EXCL_LINE
     }
     return std::string(buffer);
 #else
@@ -257,7 +257,7 @@ std::string make_temp_dir()
     std::unique_ptr<char[]> buffer = std::make_unique<char[]>(tmp.size()); // Throws
     memcpy(buffer.get(), tmp.c_str(), tmp.size());
     if (mkdtemp(buffer.get()) == 0) {
-        throw std::runtime_error("mkdtemp() failed"); // LCOV_EXCL_LINE
+        throw std::system_error(errno, std::system_category(), "mkdtemp() failed"); // LCOV_EXCL_LINE
     }
     return std::string(buffer.get());
 #endif
@@ -451,8 +451,7 @@ size_t File::read_static(FileDesc fd, char* data, size_t size)
 
 error:
     DWORD err = GetLastError(); // Eliminate any risk of clobbering
-    std::string msg = get_last_error_msg("ReadFile() failed: ", err);
-    throw std::runtime_error(msg);
+    throw std::system_error(err, std::system_category(), "ReadFile() failed");
 
 #else // POSIX version
 
@@ -473,10 +472,8 @@ error:
 
 error:
     // LCOV_EXCL_START
-    int err = errno; // Eliminate any risk of clobbering
-    std::string msg = get_errno_msg("read(): failed: ", err);
-    throw std::runtime_error(msg);
-// LCOV_EXCL_STOP
+    throw std::system_error(errno, std::system_category(), "read() failed");
+    // LCOV_EXCL_STOP
 #endif
 }
 
@@ -518,11 +515,11 @@ void File::write_static(FileDesc fd, const char* data, size_t size)
 
 error:
     DWORD err = GetLastError(); // Eliminate any risk of clobbering
-    std::string msg = get_last_error_msg("WriteFile() failed: ", err);
     if (err == ERROR_HANDLE_DISK_FULL || err == ERROR_DISK_FULL) {
+        std::string msg = get_last_error_msg("WriteFile() failed: ", err);
         throw OutOfDiskSpace(msg);
     }
-    throw std::runtime_error(msg);
+    throw std::system_error(err, std::system_category(), "WriteFile() failed");
 #else
     while (0 < size) {
         // POSIX requires that 'n' is less than or equal to SSIZE_MAX
@@ -540,11 +537,11 @@ error:
 error:
     // LCOV_EXCL_START
     int err = errno; // Eliminate any risk of clobbering
-    std::string msg = get_errno_msg("write(): failed: ", err);
     if (err == ENOSPC || err == EDQUOT) {
+        std::string msg = get_errno_msg("write() failed: ", err);
         throw OutOfDiskSpace(msg);
     }
-    throw std::runtime_error(msg);
+    throw std::system_error(err, std::system_category(), "write() failed");
 // LCOV_EXCL_STOP
 
 #endif
@@ -579,7 +576,7 @@ uint64_t File::get_file_pos(FileDesc fd)
     li.QuadPart = 0;
     bool ok = SetFilePointerEx(fd, li, &res, FILE_CURRENT);
     if (!ok)
-        throw std::runtime_error("SetFilePointer() failed");
+        throw std::system_error(GetLastError(), std::system_category(), "SetFilePointer() failed");
 
     return uint64_t(res.QuadPart);
 #else
@@ -594,11 +591,11 @@ File::SizeType File::get_size_static(FileDesc fd)
     if (GetFileSizeEx(fd, &large_int)) {
         File::SizeType size;
         if (int_cast_with_overflow_detect(large_int.QuadPart, size))
-            throw std::runtime_error("File size overflow");
+            throw util::overflow_error("File size overflow");
 
         return size;
     }
-    throw std::runtime_error("GetFileSizeEx() failed");
+    throw std::system_error(GetLastError(), std::system_category(), "GetFileSizeEx() failed");
 
 #else // POSIX version
 
@@ -606,11 +603,11 @@ File::SizeType File::get_size_static(FileDesc fd)
     if (::fstat(fd, &statbuf) == 0) {
         SizeType size;
         if (int_cast_with_overflow_detect(statbuf.st_size, size))
-            throw std::runtime_error("File size overflow");
+            throw util::overflow_error("File size overflow");
 
         return size;
     }
-    throw std::runtime_error("fstat() failed");
+    throw std::system_error(errno, std::system_category(), "fstat() failed");
 
 #endif
 }
@@ -646,11 +643,11 @@ void File::resize(SizeType size)
 
     if (!SetEndOfFile(m_fd)) {
         DWORD err = GetLastError(); // Eliminate any risk of clobbering
-        std::string msg = get_last_error_msg("SetEndOfFile() failed: ", err);
         if (err == ERROR_HANDLE_DISK_FULL || err == ERROR_DISK_FULL) {
+            std::string msg = get_last_error_msg("SetEndOfFile() failed: ", err);
             throw OutOfDiskSpace(msg);
         }
-        throw std::runtime_error(msg);
+        throw std::system_error(err, std::system_category(), "SetEndOfFile() failed");
     }
 
     // Restore file position
@@ -663,17 +660,17 @@ void File::resize(SizeType size)
 
     off_t size2;
     if (int_cast_with_overflow_detect(size, size2))
-        throw std::runtime_error("File size overflow");
+        throw util::overflow_error("File size overflow");
 
     // POSIX specifies that introduced bytes read as zero. This is not
     // required by File::resize().
     if (::ftruncate(m_fd, size2) != 0) {
         int err = errno; // Eliminate any risk of clobbering
-        std::string msg = get_errno_msg("ftruncate() failed: ", err);
         if (err == ENOSPC || err == EDQUOT) {
+            std::string msg = get_errno_msg("ftruncate() failed: ", err);
             throw OutOfDiskSpace(msg);
         }
-        throw std::runtime_error(msg);
+        throw std::system_error(err, std::system_category(), "ftruncate() failed");
     }
 
 #endif
@@ -698,8 +695,8 @@ void File::prealloc(size_t size)
     if (m_encryption_key) {
         new_size = static_cast<size_t>(data_size_to_encrypted_size(size));
         if (new_size < size) {
-            throw std::runtime_error("File size overflow: data_size_to_encrypted_size("
-                                     + realm::util::to_string(size) + ") == " + realm::util::to_string(new_size));
+            throw util::runtime_error("File size overflow: data_size_to_encrypted_size("
+                                      + realm::util::to_string(size) + ") == " + realm::util::to_string(new_size));
         }
     }
 
@@ -722,17 +719,17 @@ void File::prealloc(size_t size)
     struct stat statbuf;
     if (::fstat(m_fd, &statbuf) != 0) {
         int err = errno;
-        throw std::runtime_error(get_errno_msg("fstat() inside prealloc() failed: ", err));
+        throw std::system_error(err, std::system_category(), "fstat() inside prealloc() failed");
     }
 
     size_t allocated_size;
     if (int_cast_with_overflow_detect(statbuf.st_blocks, allocated_size)) {
-        throw std::runtime_error("Overflow on block conversion to size_t " + realm::util::to_string(statbuf.st_blocks));
+        throw util::overflow_error("Overflow on block conversion to size_t " + realm::util::to_string(statbuf.st_blocks));
     }
     if (int_multiply_with_overflow_detect(allocated_size, S_BLKSIZE)) {
-        throw std::runtime_error("Overflow computing existing file space allocation blocks: "
-                                 + realm::util::to_string(allocated_size)
-                                 + " block size: " + realm::util::to_string(S_BLKSIZE));
+        throw util::overflow_error("Overflow computing existing file space allocation blocks: "
+                                   + realm::util::to_string(allocated_size)
+                                   + " block size: " + realm::util::to_string(S_BLKSIZE));
     }
 
     // Only attempt to preallocate space if there's not already sufficient free space in the file.
@@ -772,7 +769,7 @@ void File::prealloc(size_t size)
         int err = errno;
         // by the definition of F_PREALLOCATE, a proceeding ftruncate will not fail due to out of disk space
         // so this is some other runtime error and not OutOfDiskSpace
-        throw std::runtime_error(get_errno_msg("ftruncate() inside prealloc() failed: ", err));
+        throw std::system_error(err, std::system_category(), "ftruncate() inside prealloc() failed");
     }
 #elif REALM_ANDROID || defined(_WIN32)
 
@@ -799,7 +796,7 @@ void File::prealloc_if_supported(SizeType offset, size_t size)
 
     off_t size2;
     if (int_cast_with_overflow_detect(size, size2))
-        throw std::runtime_error("File size overflow");
+        throw util::overflow_error("File size overflow");
 
     if (size2 == 0) {
         // calling posix_fallocate with a size of 0 will cause a return of EINVAL
@@ -818,11 +815,11 @@ void File::prealloc_if_supported(SizeType offset, size_t size)
         return;
     }
 
-    std::string msg = get_errno_msg("posix_fallocate() failed: ", status);
     if (status == ENOSPC || status == EDQUOT) {
+        std::string msg = get_errno_msg("posix_fallocate() failed: ", status);
         throw OutOfDiskSpace(msg);
     }
-    throw std::runtime_error(msg);
+    throw std::system_error(status, std::system_category(), "posix_fallocate() failed");
 
 // FIXME: OS X does not have any version of fallocate, but see
 // http://stackoverflow.com/questions/11497567/fallocate-command-equivalent-in-os-x
@@ -868,20 +865,20 @@ void File::seek_static(FileDesc fd, SizeType position)
 
     LARGE_INTEGER large_int;
     if (int_cast_with_overflow_detect(position, large_int.QuadPart))
-        throw std::runtime_error("File position overflow");
+        throw util::overflow_error("File position overflow");
 
     if (!SetFilePointerEx(fd, large_int, 0, FILE_BEGIN))
-        throw std::runtime_error("SetFilePointerEx() failed");
+        throw std::system_error(GetLastError(), std::system_category(), "SetFilePointerEx() failed");
 
 #else // POSIX version
 
     off_t position2;
     if (int_cast_with_overflow_detect(position, position2))
-        throw std::runtime_error("File position overflow");
+        throw util::overflow_error("File position overflow");
 
     if (0 <= ::lseek(fd, position2, SEEK_SET))
         return;
-    throw std::runtime_error("lseek() failed");
+    throw std::system_error(errno, std::system_category(), "lseek() failed");
 
 #endif
 }
@@ -898,20 +895,19 @@ void File::sync()
 
     if (FlushFileBuffers(m_fd))
         return;
-    throw std::runtime_error("FlushFileBuffers() failed");
+    throw std::system_error(GetLastError(), std::system_category(), "FlushFileBuffers() failed");
 
 #elif REALM_PLATFORM_APPLE
 
     if (::fcntl(m_fd, F_FULLFSYNC) == 0)
         return;
-    int err = errno; // Eliminate any risk of clobbering
-    throw std::runtime_error(get_errno_msg("fcntl() with F_FULLFSYNC failed: ", err));
+    throw std::system_error(errno, std::system_category(), "fcntl() with F_FULLSYNC failed");
 
 #else // POSIX version
 
     if (::fsync(m_fd) == 0)
         return;
-    throw std::runtime_error("fsync() failed");
+    throw std::system_error(errno, std::system_category(), "fsync() failed");
 
 #endif
 }
@@ -945,8 +941,7 @@ bool File::lock(bool exclusive, bool non_blocking)
     DWORD err = GetLastError(); // Eliminate any risk of clobbering
     if (err == ERROR_LOCK_VIOLATION)
         return false;
-    std::string msg = get_last_error_msg("LockFileEx() failed: ", err);
-    throw std::runtime_error(msg);
+    throw std::system_error(err, std::system_category(), "LockFileEx() failed");
 
 #else // BSD / Linux flock()
 
@@ -978,8 +973,7 @@ bool File::lock(bool exclusive, bool non_blocking)
     int err = errno; // Eliminate any risk of clobbering
     if (err == EWOULDBLOCK)
         return false;
-    std::string msg = get_errno_msg("flock() failed: ", err);
-    throw std::runtime_error(msg);
+    throw std::system_error(err, std::system_category(), "flock() failed");
 
 #endif
 }
@@ -1065,8 +1059,7 @@ bool File::exists(const std::string& path)
         case ENOTDIR:
             return false;
     }
-    std::string msg = get_errno_msg("access() failed: ", err);
-    throw std::runtime_error(msg);
+    throw std::system_error(err, std::system_category(), "access() failed");
 }
 
 
@@ -1083,13 +1076,12 @@ bool File::is_dir(const std::string& path)
         case ENOTDIR:
             return false;
     }
-    std::string msg = get_errno_msg("stat() failed: ", err);
-    throw std::runtime_error(msg);
+    throw std::system_error(err, std::system_category(), "stat() failed");
 #elif REALM_HAVE_STD_FILESYSTEM
     return std::filesystem::is_directory(path);
 #else
     static_cast<void>(path);
-    throw std::runtime_error("Not yet supported");
+    throw util::runtime_error("Not yet supported");
 #endif
 }
 
@@ -1204,9 +1196,7 @@ bool File::is_same_file_static(FileDesc f1, FileDesc f2)
                    fi1.VolumeSerialNumber == fi2.VolumeSerialNumber;
         }
     }
-    DWORD err = GetLastError(); // Eliminate any risk of clobbering
-    std::string msg = get_last_error_msg("GetFileInformationByHandleEx() failed: ", err);
-    throw std::runtime_error(msg);
+    throw std::system_error(GetLastError(), std::system_category(), "GetFileInformationByHandleEx() failed");
 
 #else // POSIX version
 
@@ -1217,9 +1207,7 @@ bool File::is_same_file_static(FileDesc f1, FileDesc f2)
         if (::fstat(f2, &statbuf) == 0)
             return device_id == statbuf.st_dev && inode_num == statbuf.st_ino;
     }
-    int err = errno; // Eliminate any risk of clobbering
-    std::string msg = get_errno_msg("fstat() failed: ", err);
-    throw std::runtime_error(msg);
+    throw std::system_error(errno, std::system_category(), "fstat() failed");
 
 #endif
 }
@@ -1235,15 +1223,13 @@ File::UniqueID File::get_unique_id() const
 {
     REALM_ASSERT_RELEASE(is_attached());
 #ifdef _WIN32 // Windows version
-    throw std::runtime_error("Not yet supported");
+    throw util::runtime_error("Not yet supported");
 #else // POSIX version
     struct stat statbuf;
     if (::fstat(m_fd, &statbuf) == 0) {
         return {static_cast<uint_fast64_t>(statbuf.st_dev), static_cast<uint_fast64_t>(statbuf.st_ino)};
     }
-    int err = errno; // Eliminate any risk of clobbering
-    std::string msg = get_errno_msg("fstat() failed: ", err);
-    throw std::runtime_error(msg);
+    throw std::system_error(errno, std::system_category(), "fstat() failed");
 #endif
 }
 
@@ -1262,9 +1248,7 @@ bool File::get_unique_id(const std::string& path, File::UniqueID& uid)
     // File doesn't exist
     if (err == ENOENT)
         return false;
-
-    std::string msg = get_errno_msg("fstat() failed: ", err);
-    throw std::runtime_error(msg);
+    throw std::system_error(err, std::system_category(), "fstat() failed");
 #endif
 }
 
@@ -1281,7 +1265,7 @@ bool File::is_removed() const
     struct stat statbuf;
     if (::fstat(m_fd, &statbuf) == 0)
         return statbuf.st_nlink == 0;
-    throw std::runtime_error("fstat() failed");
+    throw std::system_error(errno, std::system_category(), "fstat() failed");
 
 #endif
 }
@@ -1333,7 +1317,7 @@ std::string File::resolve(const std::string& path, const std::string& base_dir)
 #else
     static_cast<void>(path);
     static_cast<void>(base_dir);
-    throw std::runtime_error("Not yet supported");
+    throw util::runtime_error("Not yet supported");
 #endif
 }
 
@@ -1357,7 +1341,7 @@ void File::set_encryption_key(const char* key)
     }
 #else
     if (key) {
-        throw std::runtime_error("Encryption not enabled");
+        throw util::runtime_error("Encryption not enabled");
     }
 #endif
 }
@@ -1411,8 +1395,7 @@ bool DirScanner::next(std::string& name)
     for (;;) {
         int err = readdir_r(m_dirp, &u.m_dirent, &dirent);
         if (err != 0) {
-            std::string msg = get_errno_msg("readdir_r() failed: ", err);
-            throw std::runtime_error(msg);
+            throw std::system_error(err, std::system_category(), "readdir_r() failed");
         }
         if (!dirent)
             return false; // End of stream
@@ -1455,7 +1438,7 @@ bool DirScanner::next(std::string& name)
 
 DirScanner::DirScanner(const std::string&, bool)
 {
-    throw std::runtime_error("Not yet supported");
+    throw util::runtime_error("Not yet supported");
 }
 
 DirScanner::~DirScanner() noexcept

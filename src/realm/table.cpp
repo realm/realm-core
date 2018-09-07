@@ -1182,7 +1182,7 @@ void Table::update_subtables(Descriptor& desc, SubtableUpdater* updater)
             return;
         }
         if (int_multiply_with_overflow_detect(size, 2))
-            throw std::runtime_error("Too many subdescriptor nesting levels");
+            throw util::overflow_error("Too many subdescriptor nesting levels");
         begin = new size_t[size]; // Throws
         end = begin + size;
         dyn_buf.reset(begin);
@@ -4356,13 +4356,13 @@ ConstTableView Table::find_all_string(size_t col_ndx, StringData value) const
 TableView Table::find_all_binary(size_t, BinaryData)
 {
     // FIXME: Implement this!
-    throw std::runtime_error("Not implemented");
+    throw util::runtime_error("Not implemented");
 }
 
 ConstTableView Table::find_all_binary(size_t, BinaryData) const
 {
     // FIXME: Implement this!
-    throw std::runtime_error("Not implemented");
+    throw util::runtime_error("Not implemented");
 }
 
 TableView Table::find_all_null(size_t col_ndx)
@@ -5024,7 +5024,7 @@ void Table::write(std::ostream& out, size_t offset, size_t slice_size, StringDat
 {
     size_t table_size = this->size();
     if (offset > table_size)
-        throw std::out_of_range("Offset is out of range");
+        throw util::out_of_range("Offset is out of range");
     size_t remaining_size = table_size - offset;
     size_t size_2 = slice_size;
     if (size_2 > remaining_size)
@@ -6413,12 +6413,12 @@ void Table::generate_patch(const Table* table, std::unique_ptr<HandoverPatch>& p
                 Table* parent_table = col->m_table;
                 patch->m_table_num = parent_table->get_index_in_group();
                 if (patch->m_table_num == npos)
-                    throw std::runtime_error("Table handover failed: only first level subtables supported");
+                    throw util::runtime_error("Table handover failed: only first level subtables supported");
                 patch->m_col_ndx = col->get_column_index();
                 patch->m_row_ndx = table->m_columns.get_ndx_in_parent();
             }
             else {
-                throw std::runtime_error("Table handover failed: not a group level table");
+                throw util::runtime_error("Table handover failed: not a group level table");
             }
         }
     }

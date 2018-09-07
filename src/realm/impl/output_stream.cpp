@@ -20,6 +20,7 @@
 #include <stdexcept>
 
 #include <realm/util/safe_int_ops.hpp>
+#include <realm/util/backtrace.hpp>
 #include <realm/impl/output_stream.hpp>
 
 using namespace realm;
@@ -34,7 +35,7 @@ void OutputStream::write(const char* data, size_t size)
     do_write(data, size); // Throws
 
     if (int_add_with_overflow_detect(m_next_ref, size))
-        throw std::runtime_error("Stream size overflow");
+        throw util::overflow_error("Stream size overflow");
 }
 
 
@@ -54,7 +55,7 @@ ref_type OutputStream::write_array(const char* data, size_t size, uint32_t check
 
     ref_type ref = m_next_ref;
     if (int_add_with_overflow_detect(m_next_ref, size))
-        throw std::runtime_error("Stream size overflow");
+        throw util::overflow_error("Stream size overflow");
 
     return ref;
 }

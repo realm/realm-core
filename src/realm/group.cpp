@@ -788,7 +788,7 @@ BinaryData Group::write_to_mem() const
 
     char* buffer = static_cast<char*>(malloc(max_size)); // Throws
     if (!buffer)
-        throw std::bad_alloc();
+        throw util::bad_alloc();
     try {
         MemoryOutputStream out; // Throws
         out.set_buffer(buffer, buffer + max_size);

@@ -19,31 +19,7 @@
 #include <realm/exceptions.hpp>
 #include <realm/version.hpp>
 
-#include <sstream>
-
 using namespace realm;
-using namespace realm::_impl;
-
-const char* ExceptionWithBacktraceBase::materialize_message() const noexcept
-{
-    if (m_message_with_backtrace) {
-        return m_message_with_backtrace->c_str();
-    }
-
-    const char* msg = message();
-
-    try {
-        std::stringstream ss;
-        ss << msg << "\n";
-        ss << "Exception backtrace:\n";
-        m_backtrace.print(ss);
-        m_message_with_backtrace = ss.str();
-        return m_message_with_backtrace->c_str();
-    }
-    catch (...) {
-        return msg;
-    }
-}
 
 // LCOV_EXCL_START (LogicError is not a part of the public API, so code may never
 // rely on the contents of these strings, as they are deliberately unspecified.)

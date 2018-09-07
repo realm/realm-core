@@ -19,9 +19,9 @@
 #ifndef REALM_UTIL_BACKTRACE_HPP
 #define REALM_UTIL_BACKTRACE_HPP
 
-#include <vector>
 #include <string>
 #include <iosfwd>
+#include <stdexcept>
 
 namespace realm {
 namespace util {
@@ -92,6 +92,127 @@ private:
     // Number of entries in this stack trace.
     size_t m_len = 0;
 };
+
+namespace detail {
+
+class ExceptionWithBacktraceBase {
+public:
+    ExceptionWithBacktraceBase()
+        : m_backtrace(util::Backtrace::capture())
+    {
+    }
+    const util::Backtrace& backtrace() const noexcept
+    {
+        return m_backtrace;
+    }
+    virtual const char* message() const noexcept = 0;
+
+protected:
+    util::Backtrace m_backtrace;
+    // Cannot use Optional here, because Optional wants to use
+    // ExceptionWithBacktrace.
+    mutable bool m_has_materialized_message = false;
+    mutable std::string m_materialized_message;
+
+    // Render the message and the backtrace into m_message_with_backtrace. If an
+    // exception is thrown while rendering the message, the message without the
+    // backtrace will be returned.
+    const char* materialize_message() const noexcept;
+};
+
+} // namespace detail
+
+/// Base class for exceptions that record a stack trace of where they were
+/// thrown.
+///
+/// The template argument is expected to be an exception type conforming to the
+/// standard library exception API (`std::exception` and friends).
+///
+/// It is possible to opt in to exception backtraces in two ways, (a) as part of
+/// the exception type, in which case the backtrace will always be included for
+/// all exceptions of that type, or (b) at the call-site of an opaque exception
+/// type, in which case it is up to the throw-site to decide whether a backtrace
+/// should be included.
+///
+/// Example (a):
+/// ```
+///     class MyException : ExceptionWithBacktrace<std::exception> {
+///     public:
+///         const char* message() const noexcept override
+///         {
+///             return "MyException error message";
+///         }
+///     };
+///
+///     ...
+///
+///     try {
+///         throw MyException{};
+///     }
+///     catch (const MyException& ex) {
+///         // Print the backtrace without the message:
+///         std::cerr << ex.backtrace() << "\n";
+///         // Print the exception message and the backtrace:
+///         std::cerr << ex.what() << "\n";
+///         // Print the exception message without the backtrace:
+///         std::cerr << ex.message() << "\n";
+///     }
+/// ```
+///
+/// Example (b):
+/// ```
+///     class MyException : std::exception {
+///     public:
+///         const char* what() const noexcept override
+///         {
+///             return "MyException error message";
+///         }
+///     };
+///
+///     ...
+///
+///     try {
+///         throw ExceptionWithBacktrace<MyException>{};
+///     }
+///     catch (const MyException& ex) {
+///         // Print the exception message and the backtrace:
+///         std::cerr << ex.what() << "\n";
+///     }
+/// ```
+template <class Base = std::runtime_error>
+class ExceptionWithBacktrace : public Base, public detail::ExceptionWithBacktraceBase {
+public:
+    template <class... Args>
+    inline ExceptionWithBacktrace(Args&&... args)
+        : Base(std::forward<Args>(args)...)
+        , detail::ExceptionWithBacktraceBase() // backtrace captured here
+    {
+    }
+
+    /// Return the message of the exception, including the backtrace of where
+    /// the exception was thrown.
+    const char* what() const noexcept final
+    {
+        return materialize_message();
+    }
+
+    /// Return the message of the exception without the backtrace. The default
+    /// implementation calls `Base::what()`.
+    const char* message() const noexcept override
+    {
+        return Base::what();
+    }
+};
+
+// Wrappers for standard exception types with backtrace support
+using runtime_error = ExceptionWithBacktrace<std::runtime_error>;
+using range_error = ExceptionWithBacktrace<std::range_error>;
+using overflow_error = ExceptionWithBacktrace<std::overflow_error>;
+using underflow_error = ExceptionWithBacktrace<std::underflow_error>;
+using bad_alloc = ExceptionWithBacktrace<std::bad_alloc>;
+using invalid_argument = ExceptionWithBacktrace<std::invalid_argument>;
+using out_of_range = ExceptionWithBacktrace<std::out_of_range>;
+using logic_error = ExceptionWithBacktrace<std::logic_error>;
 
 } // namespace util
 } // namespace realm

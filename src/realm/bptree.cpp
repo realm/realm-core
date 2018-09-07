@@ -910,7 +910,7 @@ void TreeWriter::ParentLevel::add_child_ref(ref_type child_ref, size_t elems_in_
             Allocator& alloc = m_main.get_alloc();
             size_t next_level_elems_per_child = m_max_elems_per_child;
             if (util::int_multiply_with_overflow_detect(next_level_elems_per_child, REALM_MAX_BPNODE_SIZE))
-                throw std::runtime_error("Overflow in number of elements per child");
+                throw util::overflow_error("Overflow in number of elements per child");
             m_prev_parent_level.reset(new ParentLevel(alloc, m_out, next_level_elems_per_child)); // Throws
         }
     }

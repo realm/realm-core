@@ -19,6 +19,7 @@
 #include <stdexcept>
 
 #include <realm/util/features.h>
+#include <realm/util/backtrace.hpp>
 
 #if defined _WIN32
 #include <windows.h>
@@ -162,7 +163,7 @@ size_t get_mem_usage()
 
 #else
 
-    throw std::runtime_error("Not supported");
+    throw util::runtime_error("Not supported");
 
 #endif
 }
