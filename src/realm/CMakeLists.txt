@@ -292,8 +292,8 @@ target_compile_definitions(Core PUBLIC
 # This performs a linking test and communicates to dependencies built with newer compilers 
 # that the old ABI should be used.
 if(UNIX AND NOT APPLE AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    try_compile(SUPPORTS_CXX11_ABI ${CMAKE_BINARY_DIR}/abitest ${CMAKE_CURRENT_LIST_DIR}/../../tools/cmake/abitest abitest)
-    if(NOT SUPPORTS_CXX11_ABI)
+    try_compile(USES_OLD_ABI ${CMAKE_BINARY_DIR}/abitest ${CMAKE_CURRENT_LIST_DIR}/../../tools/cmake/abitest abitest)
+    if(USES_OLD_ABI)
         message(WARNING "You are compiling on a system that uses a non-compliant C++11 ABI. Downstream components depending on Realm::Core will be built with _GLIBCXX_USE_CXX11_ABI=0.")
         target_compile_definitions(Core INTERFACE "_GLIBCXX_USE_CXX11_ABI=0")
     endif()
