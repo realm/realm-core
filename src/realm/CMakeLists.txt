@@ -287,15 +287,16 @@ target_compile_definitions(Core PUBLIC
   "$<$<CXX_COMPILER_ID:MSVC>:_SCL_SECURE_NO_WARNINGS>"
 )
 
-# GCC 4.9 does not adhere to the C++11 ABI for std::string. This communicates
-# to dependencies built with newer compilers that the old ABI should be used.
-# Note: We cannot use generator expressions to perform this check, because it
-# will evaluate different when imported downstream.
-if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 5.0.0)
-    message(WARNING "You are compiling with GCC < 5.0. This version of GCC uses a non-compliant C++11 ABI. Downstream components depending on Realm::Core will be built with _GLIBCXX_USE_CXX11_ABI=0.")
-    target_compile_definitions(Core INTERFACE
-        "_GLIBCXX_USE_CXX11_ABI=0"
-    )
+# GCC<5.1 does not adhere to the C++11 ABI for std::string but some systems
+# still produce non-compliant C++11 ABI even with newer version of GCC (Centos 6 for example).
+# This performs a linking test and communicates to dependencies built with newer compilers 
+# that the old ABI should be used.
+if(UNIX AND NOT APPLE AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    try_compile(SUPPORTS_CXX11_ABI ${CMAKE_BINARY_DIR}/abitest ${CMAKE_CURRENT_LIST_DIR}/../../tools/cmake/abitest abitest)
+    if(NOT SUPPORTS_CXX11_ABI)
+        message(WARNING "You are compiling on a system that uses a non-compliant C++11 ABI. Downstream components depending on Realm::Core will be built with _GLIBCXX_USE_CXX11_ABI=0.")
+        target_compile_definitions(Core INTERFACE "_GLIBCXX_USE_CXX11_ABI=0")
+    endif()
 endif()
 
 target_include_directories(Core INTERFACE
