@@ -1012,7 +1012,7 @@ void File::unlock() noexcept
     do {
         r = flock(m_fd, LOCK_UN);
     } while (r != 0 && errno == EINTR);
-    REALM_ASSERT_RELEASE(r == 0);
+    REALM_ASSERT_RELEASE_EX(r == 0 && "File::unlock()", r, errno);
 
 #endif
 }
