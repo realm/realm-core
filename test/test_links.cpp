@@ -62,21 +62,31 @@ TEST(Links_Columns)
     auto col_1 = table1->add_column(type_String, "col1");
     table2->add_column(type_String, "col2");
 
-    std::vector<ObjKey> table_1_keys;
-    std::vector<ObjKey> table_2_keys;
+    // Use two keys where the first has the the second most significant bit set.
+    // When this is shifted up and down again, the most significant bit must
+    // still be 0. The second key will have the MSB set and should be stored
+    // in a separate array.
+    ObjKeys table_1_keys({0x7FFFFFFFFFFF0000, -5});
+    ObjKeys table_2_keys({2, 7});
     // add some rows
-    table1->create_objects(2, table_1_keys);
-    table2->create_objects(2, table_2_keys);
+    table1->create_objects(table_1_keys);
+    table2->create_objects(table_2_keys);
 
     table1->get_object(table_1_keys[0]).set<String>(col_1, "string1");
     auto col_link2 = table1->add_column_link(type_Link, "link", *table2);
 
     // set some links
     table1->get_object(table_1_keys[0]).set(col_link2, table_2_keys[1]);
-    Obj obj = table2->get_object(table_2_keys[1]);
-    CHECK_EQUAL(1, table2->get_object(table_2_keys[1]).get_backlink_count(*table1, col_link2));
-    CHECK_EQUAL(table_1_keys[0], obj.get_backlink(*table1, col_link2, 0));
-    auto tv = obj.get_backlink_view(table1, col_link2);
+    Obj obj1 = table2->get_object(table_2_keys[1]);
+    table1->get_object(table_1_keys[1]).set(col_link2, table_2_keys[0]);
+    Obj obj0 = table2->get_object(table_2_keys[0]);
+
+    CHECK_EQUAL(1, obj0.get_backlink_count(*table1, col_link2));
+    CHECK_EQUAL(table_1_keys[1], obj0.get_backlink(*table1, col_link2, 0));
+    CHECK_EQUAL(1, obj1.get_backlink_count(*table1, col_link2));
+    CHECK_EQUAL(table_1_keys[0], obj1.get_backlink(*table1, col_link2, 0));
+
+    auto tv = obj1.get_backlink_view(table1, col_link2);
     CHECK_EQUAL(tv.size(), 1);
 
     // remove a column (moving link column back)'

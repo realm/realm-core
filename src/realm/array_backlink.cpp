@@ -86,8 +86,9 @@ void ArrayBacklink::add(size_t ndx, ObjKey key)
 {
     uint64_t value = Array::get(ndx);
 
-    // A backlink list of size 1 is stored as a single non-ref column value.
-    if (value == 0) {
+    // A backlink list of size 1 is stored as a single non-ref column value
+    // if the value is not negative (MSB is 0)
+    if (value == 0 && key.value >= 0) {
         set(ndx, key.value << 1 | 1); // Throws
         return;
     }
@@ -96,10 +97,16 @@ void ArrayBacklink::add(size_t ndx, ObjKey key)
     // convert from the single non-ref column value representation, to a B+-tree
     // representation.
     Array backlink_list(m_alloc);
-    if ((value & 1) != 0) {
+    if (value == 0) {
         // Create new column to hold backlinks
         backlink_list.create(Array::type_Normal);
         set_as_ref(ndx, backlink_list.get_ref());
+    }
+    else if ((value & 1) != 0) {
+        // Create new column to hold backlinks
+        backlink_list.create(Array::type_Normal);
+        set_as_ref(ndx, backlink_list.get_ref());
+        // Add the one we had already
         backlink_list.add(value >> 1);
     }
     else {
@@ -112,22 +119,21 @@ void ArrayBacklink::add(size_t ndx, ObjKey key)
 // Return true if the last link was removed
 bool ArrayBacklink::remove(size_t ndx, ObjKey key)
 {
-    int64_t value = Array::get(ndx);
+    uint64_t value = uint64_t(Array::get(ndx));
     REALM_ASSERT(value != 0);
 
     // If there is only a single backlink, it can be stored as
     // a tagged value
     if ((value & 1) != 0) {
-        REALM_ASSERT_3(value >> 1, ==, key.value);
+        REALM_ASSERT_3(int64_t(value >> 1), ==, key.value);
         set(ndx, 0);
         return true;
     }
 
     // if there is a list of backlinks we have to find
     // the right one and remove it.
-    ref_type ref = to_ref(value);
     Array backlink_list(m_alloc);
-    backlink_list.init_from_ref(ref);
+    backlink_list.init_from_ref(value);
     backlink_list.set_parent(this, ndx);
 
     size_t backlink_ndx = backlink_list.find_first(key.value);
@@ -147,17 +153,19 @@ bool ArrayBacklink::remove(size_t ndx, ObjKey key)
 
 void ArrayBacklink::erase(size_t ndx)
 {
-    int64_t value = Array::get(ndx);
+    uint64_t value = uint64_t(Array::get(ndx));
     if (value && (value & 1) == 0) {
-        Array::destroy(to_ref(value), m_alloc);
+        // Value is not null and not tagged as a value
+        Array::destroy(value, m_alloc);
     }
     Array::erase(ndx);
 }
 
 size_t ArrayBacklink::get_backlink_count(size_t ndx) const
 {
-    int64_t value = Array::get(ndx);
+    uint64_t value = uint64_t(Array::get(ndx));
     if (value == 0) {
+        // value is null
         return 0;
     }
 
@@ -168,25 +176,24 @@ size_t ArrayBacklink::get_backlink_count(size_t ndx) const
     }
 
     // return size of list
-    MemRef mem(to_ref(value), m_alloc);
+    MemRef mem(value, m_alloc);
     return Array::get_size_from_header(mem.get_addr());
 }
 
 ObjKey ArrayBacklink::get_backlink(size_t ndx, size_t index) const
 {
-    int64_t value = Array::get(ndx);
+    uint64_t value = uint64_t(Array::get(ndx));
     REALM_ASSERT(value != 0);
 
     // If there is only a single backlink, it can be stored as
     // a tagged value
     if ((value & 1) != 0) {
         REALM_ASSERT(index == 0);
-        return ObjKey(value >> 1);
+        return ObjKey(int64_t(value >> 1));
     }
 
-    ref_type ref = to_ref(value);
     Array backlink_list(m_alloc);
-    backlink_list.init_from_ref(ref);
+    backlink_list.init_from_ref(value);
 
     REALM_ASSERT(index < backlink_list.size());
     return ObjKey(backlink_list.get(index));
