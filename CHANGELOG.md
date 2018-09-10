@@ -1,22 +1,8 @@
-# NEXT RELEASE
-
-### Bugfixes
-
-* None.
-
-### Breaking changes
-
-* None.
-
-### Enhancements
-
-* None.
-
------------
+# 5.10.1 Release notes
 
 ### Internals
 
-* None.
+* Stack trace also available when throwing std:: exceptions.
 
 ----------------------------------------------
 
