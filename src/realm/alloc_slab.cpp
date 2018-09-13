@@ -746,9 +746,7 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
     auto physical_file_size = m_file.get_size();
     // Note that get_size() may (will) return a different size before and after
     // the call below to set_encryption_key.
-    if (cfg.encryption_key) {
-        m_file.set_encryption_key(cfg.encryption_key);
-    }
+    m_file.set_encryption_key(cfg.encryption_key);
     File::CloseGuard fcg(m_file);
 
     size_t size = 0;
@@ -808,7 +806,7 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
         m_baseline = 0;
         m_attach_mode = cfg.is_shared ? attach_SharedFile : attach_UnsharedFile;
     }
-    catch (DecryptionFailed) {
+    catch (const DecryptionFailed&) {
         throw InvalidDatabase("Realm file decryption failed", path);
     }
     // make sure that any call to begin_read cause any slab to be placed in free

@@ -629,7 +629,7 @@ void spawn_daemon(const std::string& file)
     if (m < 0) {
         if (errno) {
             int err = errno; // Eliminate any risk of clobbering
-            throw std::runtime_error(get_errno_msg("'sysconf(_SC_OPEN_MAX)' failed: ", err));
+            throw std::system_error(err, std::system_category(), "sysconf(_SC_OPEN_MAX) failed");
         }
         throw std::runtime_error("'sysconf(_SC_OPEN_MAX)' failed with no reason");
     }
@@ -1333,7 +1333,7 @@ void DB::open(Replication& repl, const DBOptions options)
 // Unmapping (during close()) while transactions are live, is not considered an error. There
 // is a potential race between unmapping during close() and any operation carried out by a live
 // transaction. The user must ensure that this race never happens if she uses DB::close().
-bool DB::compact()
+bool DB::compact(bool bump_version_number, util::Optional<const char*> output_encryption_key)
 {
     std::string tmp_path = m_db_path + ".tmp_compaction_space";
 
@@ -1345,6 +1345,7 @@ bool DB::compact()
     if (is_attached() == false) {
         throw std::runtime_error(m_db_path + ": compact must be done on an open/attached DB");
     }
+    const char* write_key = bool(output_encryption_key) ? *output_encryption_key : m_key;
     {
         SharedInfo* info = m_file_map.get_addr();
         std::unique_lock<InterprocessMutex> lock(m_controlmutex); // Throws
@@ -1377,7 +1378,8 @@ bool DB::compact()
         try {
             File file;
             file.open(tmp_path, File::access_ReadWrite, File::create_Must, 0);
-            tr->write(file, m_key, info->latest_version_number); // Throws
+            int incr = bump_version_number ? 1 : 0;
+            tr->write(file, write_key, info->latest_version_number + incr); // Throws
             // Data needs to be flushed to the disk before renaming.
             bool disable_sync = get_disable_sync_to_disk();
             if (!disable_sync)
@@ -1418,7 +1420,7 @@ bool DB::compact()
         cfg.skip_validate = false;
         cfg.no_create = true;
         cfg.clear_file = false;
-        cfg.encryption_key = m_key;
+        cfg.encryption_key = write_key;
         ref_type top_ref;
         top_ref = m_alloc.attach_file(m_db_path, cfg);
         info->number_of_versions = 1;

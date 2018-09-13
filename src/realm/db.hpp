@@ -240,7 +240,7 @@ public:
     /// because it's not crash safe! It may corrupt your database if something fails
     ///
     /// WARNING: Compact() is not thread-safe with respect to a concurrent close()
-    bool compact();
+    bool compact(bool bump_version_number = false, util::Optional<const char*> output_encryption_key = util::none);
 
 #ifdef REALM_DEBUG
     void test_ringbuf();

@@ -31,6 +31,7 @@
 #include <realm/util/errno.hpp>
 #include <realm/util/to_string.hpp>
 #include <realm/exceptions.hpp>
+#include <system_error>
 
 #if REALM_ENABLE_ENCRYPTION
 
@@ -131,7 +132,7 @@ EncryptedFileMapping* add_mapping(void* addr, size_t size, FileDesc fd, size_t f
 
     if (fstat(fd, &st)) {
         int err = errno; // Eliminate any risk of clobbering
-        throw std::runtime_error(get_errno_msg("fstat() failed: ", err));
+        throw std::system_error(err, std::system_category(), "fstat() failed");
     }
 #endif
 
@@ -161,14 +162,14 @@ EncryptedFileMapping* add_mapping(void* addr, size_t size, FileDesc fd, size_t f
 #ifdef _WIN32
         FileDesc fd2;
         if (!DuplicateHandle(GetCurrentProcess(), fd, GetCurrentProcess(), &fd2, 0, FALSE, DUPLICATE_SAME_ACCESS))
-            throw std::runtime_error(get_errno_msg("DuplicateHandle() failed: ", GetLastError()));
+            throw std::system_error(GetLastError(), std::system_category(), "DuplicateHandle() failed");
         fd = fd2;
 #else
         fd = dup(fd);
 
         if (fd == -1) {
             int err = errno; // Eliminate any risk of clobbering
-            throw std::runtime_error(get_errno_msg("dup() failed: ", err));
+            throw std::system_error(err, std::system_category(), "dup() failed");
         }
 #endif
         mappings_for_file f;
@@ -234,12 +235,12 @@ void remove_mapping(void* addr, size_t size)
         if (it->info->mappings.empty()) {
 #ifdef _WIN32
             if (!CloseHandle(it->info->fd))
-                throw std::runtime_error(get_errno_msg("CloseHandle() failed: ", GetLastError()));
+                throw std::system_error(GetLastError(), std::system_category(), "CloseHandle() failed");
 #else
             if (::close(it->info->fd) != 0) {
                 int err = errno;                // Eliminate any risk of clobbering
                 if (err == EBADF || err == EIO) // FIXME: how do we handle EINTR?
-                    throw std::runtime_error(get_errno_msg("close() failed: ", err));
+                    throw std::system_error(err, std::system_category(), "close() failed");
             }
 #endif
             mappings_by_file.erase(it);
@@ -314,12 +315,12 @@ void* mmap_anon(size_t size)
     
     hMapFile = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, s.HighPart, s.LowPart, nullptr);
     if (hMapFile == NULL) {
-        throw std::runtime_error(get_errno_msg("CreateFileMapping() failed: ", GetLastError()));
+        throw std::system_error(GetLastError(), std::system_category(), "CreateFileMapping() failed");
     }
 
     pBuf = (LPTSTR)MapViewOfFile(hMapFile, FILE_MAP_ALL_ACCESS, 0, 0, size);
     if (pBuf == nullptr) {
-        throw std::runtime_error(get_errno_msg("MapViewOfFile() failed: ", GetLastError()));
+        throw std::system_error(GetLastError(), std::system_category(), "MapViewOfFile() failed");
     }
 
     CloseHandle(hMapFile);
@@ -331,8 +332,8 @@ void* mmap_anon(size_t size)
         if (is_mmap_memory_error(err)) {
             throw AddressSpaceExhausted(get_errno_msg("mmap() failed: ", err) + " size: " + util::to_string(size));
         }
-        throw std::runtime_error(get_errno_msg("mmap() failed: ", err) + "size: " + util::to_string(size) +
-                                 "offset is 0");
+        throw std::system_error(err, std::system_category(),
+                                std::string("mmap() failed (size: ") + util::to_string(size) + ", offset is 0)");
     }
     return addr;
 #endif
@@ -410,8 +411,9 @@ void* mmap(FileDesc fd, size_t size, File::AccessMode access, size_t offset, con
                                         " offset: " + util::to_string(offset));
         }
 
-        throw std::runtime_error(get_errno_msg("mmap() failed: ", err) + "size: " + util::to_string(size) +
-                                 "offset: " + util::to_string(offset));
+        throw std::system_error(err, std::system_category(),
+                                std::string("mmap() failed (size: ") + util::to_string(size) +
+                                    ", offset: " + util::to_string(offset));
 
 #else
         // FIXME: Is there anything that we must do on Windows to honor map_NoSync?
@@ -435,7 +437,7 @@ void* mmap(FileDesc fd, size_t size, File::AccessMode access, size_t offset, con
                                         " size: " + util::to_string(size) + " offset: " + util::to_string(offset));
 
         if (int_cast_with_overflow_detect(offset, large_int.QuadPart))
-            throw std::runtime_error("Map offset is too large");
+            throw util::overflow_error("Map offset is too large");
 
         SIZE_T _size = size;
         void* addr = MapViewOfFileFromApp(map_handle, desired_access, offset, _size);
@@ -458,12 +460,12 @@ void munmap(void* addr, size_t size)
 
 #ifdef _WIN32
     if (!UnmapViewOfFile(addr))
-        throw std::runtime_error(get_errno_msg("UnmapViewOfFile failed: ", GetLastError()));
+        throw std::system_error(GetLastError(), std::system_category(), "UnmapViewOfFile() failed");
 
 #else
     if (::munmap(addr, size) != 0) {
         int err = errno;
-        throw std::runtime_error(get_errno_msg("munmap() failed: ", err));
+        throw std::system_error(err, std::system_category(), "munmap() failed");
     }
 #endif
 }
@@ -486,11 +488,11 @@ void* mremap(FileDesc fd, size_t file_offset, void* old_addr, size_t old_size, F
             m->size = rounded_new_size;
 #ifdef _WIN32
             if (!UnmapViewOfFile(old_addr))
-                throw std::runtime_error(get_errno_msg("UnmapViewOfFile failed: ", GetLastError()));
+                throw std::system_error(GetLastError(), std::system_category(), "UnmapViewOfFile() failed");
 #else
             if (::munmap(old_addr, rounded_old_size)) {
                 int err = errno;
-                throw std::runtime_error(get_errno_msg("munmap() failed: ", err));
+                throw std::system_error(err, std::system_category(), "munmap() failed");
             }
 #endif
             return new_addr;
@@ -519,8 +521,9 @@ void* mremap(FileDesc fd, size_t file_offset, void* old_addr, size_t old_size, F
                 throw AddressSpaceExhausted(get_errno_msg("mremap() failed: ", err) + " old size: " +
                                             util::to_string(old_size) + " new size: " + util::to_string(new_size));
             }
-            throw std::runtime_error(get_errno_msg("_gnu_src mmap() failed: ", err) + " old size: " +
-                                     util::to_string(old_size) + " new_size: " + util::to_string(new_size));
+            throw std::system_error(err, std::system_category(),
+                                    std::string("_gnu_src mmap() failed (") + "old_size: " +
+                                        util::to_string(old_size) + ", new_size: " + util::to_string(new_size) + ")");
         }
     }
 #endif
@@ -529,11 +532,11 @@ void* mremap(FileDesc fd, size_t file_offset, void* old_addr, size_t old_size, F
 
 #ifdef _WIN32
     if (!UnmapViewOfFile(old_addr))
-        throw std::runtime_error(get_errno_msg("UnmapViewOfFile failed: ", GetLastError()));
+        throw std::system_error(GetLastError(), std::system_category(), "UnmapViewOfFile() failed");
 #else
     if (::munmap(old_addr, old_size) != 0) {
         int err = errno;
-        throw std::runtime_error(get_errno_msg("munmap() failed: ", err));
+        throw std::system_error(err, std::system_category(), "munmap() failed");
     }
 #endif
 
@@ -569,18 +572,18 @@ void msync(FileDesc fd, void* addr, size_t size)
 #ifdef _WIN32
     // FlushViewOfFile() is asynchronous and won't flush metadata (file size, etc)
     if (!FlushViewOfFile(addr, size)) {
-        throw std::runtime_error("FlushViewOfFile() failed");
+        throw std::system_error(GetLastError(), std::system_category(), "FlushViewOfFile() failed");
     }
     // Block until data and metadata is written physically to the media
     if (!FlushFileBuffers(fd)) {
-        throw std::runtime_error("FlushFileBuffers() failed");
+        throw std::system_error(GetLastError(), std::system_category(), "FlushFileBuffers() failed");
     }
     return;
 #else
     static_cast<void>(fd);
     if (::msync(addr, size, MS_SYNC) != 0) {
         int err = errno; // Eliminate any risk of clobbering
-        throw std::runtime_error(get_errno_msg("msync() failed: ", err));
+        throw std::system_error(err, std::system_category(), "msync() failed");
     }
 #endif
 }

@@ -1164,7 +1164,7 @@ bool Table::copy_content_from_columns(size_t col_ndx)
 
 #if 0
     if (fastrand(100) < 20) {
-        throw std::runtime_error("Upgrade interrupted");
+        throw util::runtime_error("Upgrade interrupted");
     }
 #endif
 
@@ -1636,13 +1636,13 @@ ConstTableView Table::find_all_string(ColKey col_key, StringData value) const
 TableView Table::find_all_binary(ColKey, BinaryData)
 {
     // FIXME: Implement this!
-    throw std::runtime_error("Not implemented");
+    throw util::runtime_error("Not implemented");
 }
 
 ConstTableView Table::find_all_binary(ColKey, BinaryData) const
 {
     // FIXME: Implement this!
-    throw std::runtime_error("Not implemented");
+    throw util::runtime_error("Not implemented");
 }
 
 TableView Table::find_all_null(ColKey col_key)
@@ -2210,7 +2210,7 @@ const uint64_t Table::max_num_columns;
 void Table::insert_col_mapping(size_t ndx, ColKey key)
 {
     if (ndx >= max_num_columns)
-        throw std::runtime_error("Max number of columns exceeded");
+        throw util::runtime_error("Max number of columns exceeded");
     REALM_ASSERT(!valid_column(key));
 
     // increment index at all entries in key->ndx map pointing at ndx or above

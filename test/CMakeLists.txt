@@ -54,6 +54,7 @@ set(NORMAL_TESTS
     test_upgrade_database.cpp
     test_utf8.cpp
     test_util_any.cpp
+    test_util_backtrace.cpp
     test_util_base64.cpp
     test_util_error.cpp
     test_util_file.cpp
@@ -127,6 +128,11 @@ endif()
 target_link_libraries(CoreTests
                       TestUtil QueryParser ${EXTRA_TEST_LIBS} ${PLATFORM_LIBRARIES}
 )
+
+if(UNIX AND NOT APPLE)
+    # This enables symbols in backtraces
+    target_link_libraries(CoreTests "-rdynamic")
+endif()
 
 target_include_directories(CoreTests PUBLIC ${EXTRA_TEST_CFLAGS})
 

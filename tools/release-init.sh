@@ -5,7 +5,7 @@
 # Description of release procedure can be found at https://github.com/realm/realm-wiki/wiki/Releasing-Realm-Core
 #
 
-realm_version=$(echo "$1" | egrep '^[0-9].[0-9].[0-9](-.*)?$')
+realm_version=$(echo "$1" | egrep '^[0-9].[0-9]+.[0-9](-.*)?$')
 if [ -z "${realm_version}" ]; then
     echo Wrong version format: "$1"
     exit 1

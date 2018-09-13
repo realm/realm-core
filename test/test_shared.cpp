@@ -3070,6 +3070,46 @@ NONCONCURRENT_TEST(Shared_BigAllocations)
     sg->close();
 }
 
+TEST_IF(Shared_CompactEncrypt, REALM_ENABLE_ENCRYPTION)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    const char* key1 = "KdrL2ieWyspILXIPetpkLD6rQYKhYnS6lvGsgk4qsJAMr1adQnKsYo3oTEYJDIfa";
+    const char* key2 = "ti6rOKviXrwxSGMPVk35Dp9Q4eku8Cu8YTtnnZKAejOTNIEv7TvXrYdjOPSNexMR";
+    {
+        auto db = DB::create(path, false, DBOptions(key1));
+        auto tr = db->start_write();
+        TableRef t = tr->add_table("table");
+        tr->commit();
+
+        CHECK(db->compact());
+        {
+            auto rt = db->start_read();
+            CHECK(rt->has_table("table"));
+        }
+
+        bool bump_version_number = true;
+        CHECK(db->compact(bump_version_number, key2));
+        {
+            auto rt = db->start_read();
+            CHECK(rt->has_table("table"));
+        }
+
+        CHECK(db->compact(bump_version_number, nullptr));
+        {
+            auto rt = db->start_read();
+            CHECK(rt->has_table("table"));
+        }
+    }
+    {
+        auto db = DB::create(path, true, DBOptions());
+        {
+            auto rt = db->start_read();
+            CHECK(rt->has_table("table"));
+        }
+    }
+}
+
+
 // Repro case for: Assertion failed: top_size == 3 || top_size == 5 || top_size == 7 [0, 3, 0, 5, 0, 7]
 NONCONCURRENT_TEST(Shared_BigAllocationsMinimized)
 {

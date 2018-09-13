@@ -40,6 +40,7 @@ set(REALM_SOURCES
     table_view.cpp
     sort_descriptor.cpp
     unicode.cpp
+    util/backtrace.cpp
     util/base64.cpp
     util/basic_system_errors.cpp
     util/encrypted_file_mapping.cpp
@@ -160,6 +161,7 @@ set(REALM_INSTALL_IMPL_HEADERS
 set(REALM_INSTALL_UTIL_HEADERS
     util/any.hpp
     util/assert.hpp
+    util/backtrace.hpp
     util/base64.hpp
     util/basic_system_errors.hpp
     util/bind_ptr.hpp
@@ -276,15 +278,16 @@ target_compile_definitions(Core PUBLIC
   "$<$<CXX_COMPILER_ID:MSVC>:_SCL_SECURE_NO_WARNINGS>"
 )
 
-# GCC 4.9 does not adhere to the C++11 ABI for std::string. This communicates
-# to dependencies built with newer compilers that the old ABI should be used.
-# Note: We cannot use generator expressions to perform this check, because it
-# will evaluate different when imported downstream.
-if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 5.0.0)
-    message(WARNING "You are compiling with GCC < 5.0. This version of GCC uses a non-compliant C++11 ABI. Downstream components depending on Realm::Core will be built with _GLIBCXX_USE_CXX11_ABI=0.")
-    target_compile_definitions(Core INTERFACE
-        "_GLIBCXX_USE_CXX11_ABI=0"
-    )
+# GCC<5.1 does not adhere to the C++11 ABI for std::string but some systems
+# still produce non-compliant C++11 ABI even with newer version of GCC (Centos 6 for example).
+# This performs a linking test and communicates to dependencies built with newer compilers 
+# that the old ABI should be used.
+if(UNIX AND NOT APPLE AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    try_compile(USES_OLD_ABI ${CMAKE_BINARY_DIR}/abitest ${CMAKE_CURRENT_LIST_DIR}/../../tools/cmake/abitest abitest)
+    if(USES_OLD_ABI)
+        message(WARNING "You are compiling on a system that uses a non-compliant C++11 ABI. Downstream components depending on Realm::Core will be built with _GLIBCXX_USE_CXX11_ABI=0.")
+        target_compile_definitions(Core INTERFACE "_GLIBCXX_USE_CXX11_ABI=0")
+    endif()
 endif()
 
 target_include_directories(Core INTERFACE
@@ -435,7 +438,7 @@ if(NOT APPLE AND NOT ANDROID AND NOT CMAKE_SYSTEM_NAME MATCHES "^Windows" AND NO
     #     DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX})
     # target_link_libraries(RealmImporter realm)
 
-    add_executable(RealmTrawler realm_trawler.cpp)
+    add_executable(RealmTrawler realm_trawler.cpp util/backtrace.cpp)
     set_target_properties(RealmTrawler PROPERTIES
         OUTPUT_NAME "realm-trawler"
         DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX})

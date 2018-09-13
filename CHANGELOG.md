@@ -1,5 +1,8 @@
 # NEXT RELEASE
 
+Besides the changes below, this release also includes changes introduced by v5.9.0 and
+up until v5.10.1
+
 ### Bugfixes
 
 * None.
@@ -101,6 +104,42 @@ up until v5.8.0
 
 * Major simplifications and optimizations to management of memory mappings.
 * Speed improvement for Sort().
+
+----------------------------------------------
+
+# 5.10.1 Release notes
+
+### Internals
+
+* Stack trace also available when throwing std:: exceptions.
+
+----------------------------------------------
+
+# 5.10.0 Release notes
+
+### Enhancements
+
+* Allow compact to take an optional output encryption key.
+  PR [#3090](https://github.com/realm/realm-core/pull/3090).
+
+----------------------------------------------
+
+# 5.9.0 Release notes
+
+### Enhancements
+
+* Allow a version number in Group::write which will cause a file with (sync)
+  history to be written.
+
+-----------
+
+### Internals
+
+* Most exception types now report the stack trace of the point where they were
+  thrown in their `what()` message. This is intended to aid debugging.
+  Additionally, assertion failures on Linux now report their stack traces as
+  well, similar to Apple platforms. Recording stack traces is only supported on
+  Linux (non-Android) and Apple platforms for now.
 
 ----------------------------------------------
 
