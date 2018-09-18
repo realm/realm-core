@@ -10,7 +10,7 @@
 
 ### Enhancements
 
-* None.
+* Add an arm64_32 slice to the watchOS build.
 
 -----------
 
