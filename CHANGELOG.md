@@ -1,22 +1,8 @@
-# NEXT RELEASE
-
-### Bugfixes
-
-* None.
-
-### Breaking changes
-
-* None.
+# 5.10.2 Release notes
 
 ### Enhancements
 
 * Add an arm64_32 slice to the watchOS build.
-
------------
-
-### Internals
-
-* None.
 
 ----------------------------------------------
 
