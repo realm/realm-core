@@ -1,25 +1,18 @@
-# NEXT RELEASE
+# 6.0.0-alpha.2 Release notes
 
-Besides the changes below, this release also includes changes introduced by v5.9.0 and
-up until v5.10.1
+Besides the changes below, this release includes changes introduced by v5.9.0 and up
+until v5.10.1
 
 ### Bugfixes
 
-* None.
-
-### Breaking changes
-
-* None.
-
-### Enhancements
-
-* None.
+* A few fixes improving the stability.
 
 -----------
 
 ### Internals
 
-* None.
+* Object keys are now allowed to use all 64 bits. Only illegal value is 0xFFFFFFFFFFFFFFFF
+  which is the encoding of a null-value.
 
 ----------------------------------------------
 
