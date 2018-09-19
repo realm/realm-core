@@ -91,7 +91,7 @@ if(MSVC)
         /MP # Enable multi-processor compilation
     )
     add_definitions(
-        /D_ENABLE_EXTENDED_ALIGNED_STORAGE #https://developercommunity.visualstudio.com/comments/279328/view.html
+        /D_DISABLE_EXTENDED_ALIGNED_STORAGE #https://developercommunity.visualstudio.com/comments/279328/view.html
     )
     if(NOT WINDOWS_STORE)
         # Statically link the run-time library
