@@ -1,8 +1,12 @@
 # 6.0.0-alpha.2 Release notes
 
-Besides the changes below, this release includes changes introduced by v5.9.0 and up
-until v5.10.1
+### Open issues
 
+* Encrypted files may not work on Android
+  [Issue#248](https://github.com/realm/realm-core-private/issues/248)
+* Building queries are not thread safe
+  [Issue#237](https://github.com/realm/realm-core-private/issues/237)
+  
 ### Bugfixes
 
 * A few fixes improving the stability.
@@ -16,10 +20,46 @@ until v5.10.1
 
 ----------------------------------------------
 
-# 6.0.0-alpha.1 Release notes
+Besides the changes above, this release includes changes introduced by v5.9.0 and up
+until v5.10.1
 
-Besides the changes below, this release also includes changes introduced by v5.6.0 and
-up until v5.8.0
+| # 5.10.1 Release notes
+| 
+| ### Internals
+| 
+| * Stack trace also available when throwing std:: exceptions.
+| 
+| ----------------------------------------------
+| 
+| # 5.10.0 Release notes
+| 
+| ### Enhancements
+| 
+| * Allow compact to take an optional output encryption key.
+|   PR [#3090](https://github.com/realm/realm-core/pull/3090).
+| 
+| ----------------------------------------------
+| 
+| # 5.9.0 Release notes
+| 
+| ### Enhancements
+| 
+| * Allow a version number in Group::write which will cause a file with (sync)
+|   history to be written.
+| 
+| -----------
+| 
+| ### Internals
+| 
+| * Most exception types now report the stack trace of the point where they were
+|   thrown in their `what()` message. This is intended to aid debugging.
+|   Additionally, assertion failures on Linux now report their stack traces as
+|   well, similar to Apple platforms. Recording stack traces is only supported on
+|   Linux (non-Android) and Apple platforms for now.
+
+----------------------------------------------
+
+# 6.0.0-alpha.1 Release notes
 
 ### Open issues
 
@@ -44,6 +84,152 @@ up until v5.8.0
   optimization when some columns have a search index. Then you don't have to first insert
   the default value in the index and subsequently the real value.
 * Many small enhancements required by ObjectStore and Sync.
+
+----------------------------------------------
+
+Besides the changes above, this release also includes changes introduced by v5.5.0 and
+up until v5.8.0
+  
+| # 5.8.0 Release notes
+| 
+| ### Bugfixes
+| 
+| * Fix a crash on some platforms when using the query parser to look for a string
+|   or binary object which has a certain combination of non-printable characters.
+| 
+| ### Enhancements
+| 
+| * Support limiting queries via `DescriptorOrdering::set_limit` and by supporting
+|   "LIMIT(x)" in string queries.
+|   Issue [realm_sync:#2223](https://github.com/realm/realm-sync/issues/2223)
+| 
+| - ---------------------------------------------
+|   
+| # 5.7.2 Release notes
+| 
+| ### Bugfixes
+| 
+| * Fix a use-after-free when an observer is passed to rollback_and_continue_as_read().
+| 
+| ### Enhancements
+| 
+| * More informative InvalidDatabase exception messages
+|   Issue [#3075](https://github.com/realm/realm-core/issues/3075).
+| 
+| ----------------------------------------------
+| 
+| # 5.7.1 Release notes
+| 
+| ### Bugfixes
+| 
+| * Fix crash in Group::compute_aggregated_byte_size() when applied on an empty
+|   realm file. (Issue #3072)
+| 
+| - ---------------------------------------------
+|  
+| # 5.7.0 Release notes
+| 
+| ### Enhancements
+| 
+| * Improved Group::compute_aggregated_byte_size() allowing us to differentiate
+|   between state, history and freelists.
+|   (Issue #3063)
+| 
+| ----------------------------------------------
+| 
+| # 5.6.5 Release notes
+| 
+| ### Enhancements
+| 
+| * Improved scalability for the slab allocator. This allows for larger
+|   transactions. (PR #3067)
+| 
+| ----------------------------------------------
+| 
+| # 5.6.4 Release notes
+| 
+| ### Enhancements
+| 
+| * Add Table::add_row_with_keys(), which allows
+|   sync::create_object_with_primary_key() to avoid updating the index twice when
+|   creating an object with a string primary key.
+| * Improved the performance of setting a link to its current value.
+|   
+| - ---------------------------------------------
+|  
+| # 5.6.3 Release notes
+| 
+| ### Enhancements
+| 
+| * Improved scalability for in-file freelist handling. This reduces
+|   commit overhead on large transactions.
+| * Improved scalability for in-file allocation during commit.
+| * Minimized use of memory mappings and msync() on large commits
+|   on devices which can support large address spaces.
+| 
+| ----------------------------------------------
+| 
+| # 5.6.2 Release notes
+| 
+| ### Bugfixes
+| 
+| * Fix curruption of freelist with more than 2M entries.
+|    PR [#3059](https://github.com/realm/realm-core/pull/3059).
+|   
+|- ---------------------------------------------
+|  
+| # 5.6.1 Release notes
+| 
+| ### Bugfixes
+| 
+| * More readable error message in the query parser when requesting an a bad argument.
+| * Don't write history information in `SharedGroup::compact()` for
+|   non-syncronized Realms.
+| 
+| -----------
+| 
+| ### Internals
+| 
+| * Restore -fvisibility-inlines-hidden for the binaries for Apple platforms.
+| * Remove a few warnings at compile time.
+| * Improve error detection related to memory allocation/release
+|
+|----------------------------------------------
+|
+|   # 5.6.0 Release notes
+|   
+|   ### Bugfixes
+|   
+|   * In the parser, fix `@links.@count` when applied over lists to return
+|     the sum of backlinks for all connected rows in the list.
+|   * Fix null comparisons in queries not serialising properly in some cases.
+|     Also explicitly disable list IN list comparisons since its not supported.
+|     PR [#3037](https://github.com/realm/realm-core/pull/3037).
+|   
+|   ### Enhancements
+|   
+|   * `SharedGroup::compact()` now also compacts history information, which means
+|     that Sync'ed Realm files can now be compacted (under the usual restrictions;
+|     see `group_shared.hpp` for details).
+|   
+| ----------------------------------------------
+| 
+| # 5.5.0 Release notes
+| 
+| ### Enhancements
+| 
+| * Parser improvements:
+|     - Allow an arbitrary prefix on backlink class names of @links queries.
+|       This will allow users to query unnamed backlinks using the `@links.Class.property` syntax.
+|     - Case insensitive `nil` is now recognised as a synonym to `NULL`.
+|     - Add support for `@links.@count` which gives the count of all backlinks to an object.
+|       See Issue [#3003](https://github.com/realm/realm-core/issues/3003).
+| 
+| -----------
+| 
+| ### Internals
+| 
+| * Apple binaries are now built with Xcode 8.3.3.
 
 ----------------------------------------------
 
@@ -98,186 +284,7 @@ up until v5.8.0
 * Major simplifications and optimizations to management of memory mappings.
 * Speed improvement for Sort().
 
-----------------------------------------------
-
-# 5.10.1 Release notes
-
-### Internals
-
-* Stack trace also available when throwing std:: exceptions.
-
-----------------------------------------------
-
-# 5.10.0 Release notes
-
-### Enhancements
-
-* Allow compact to take an optional output encryption key.
-  PR [#3090](https://github.com/realm/realm-core/pull/3090).
-
-----------------------------------------------
-
-# 5.9.0 Release notes
-
-### Enhancements
-
-* Allow a version number in Group::write which will cause a file with (sync)
-  history to be written.
-
------------
-
-### Internals
-
-* Most exception types now report the stack trace of the point where they were
-  thrown in their `what()` message. This is intended to aid debugging.
-  Additionally, assertion failures on Linux now report their stack traces as
-  well, similar to Apple platforms. Recording stack traces is only supported on
-  Linux (non-Android) and Apple platforms for now.
-
-----------------------------------------------
-
-# 5.8.0 Release notes
-
-### Bugfixes
-
-* Fix a crash on some platforms when using the query parser to look for a string
-  or binary object which has a certain combination of non-printable characters.
-
-### Enhancements
-
-* Support limiting queries via `DescriptorOrdering::set_limit` and by supporting
-  "LIMIT(x)" in string queries.
-  Issue [realm_sync:#2223](https://github.com/realm/realm-sync/issues/2223)
-
-----------------------------------------------
-
-# 5.7.2 Release notes
-
-### Bugfixes
-
-* Fix a use-after-free when an observer is passed to rollback_and_continue_as_read().
-
-### Enhancements
-
-* More informative InvalidDatabase exception messages
-  Issue [#3075](https://github.com/realm/realm-core/issues/3075).
-
-----------------------------------------------
-
-# 5.7.1 Release notes
-
-### Bugfixes
-
-* Fix crash in Group::compute_aggregated_byte_size() when applied on an empty
-  realm file. (Issue #3072)
-
-----------------------------------------------
-
-# 5.7.0 Release notes
-
-### Enhancements
-
-* Improved Group::compute_aggregated_byte_size() allowing us to differentiate
-  between state, history and freelists.
-  (Issue #3063)
-
-----------------------------------------------
-
-# 5.6.5 Release notes
-
-### Enhancements
-
-* Improved scalability for the slab allocator. This allows for larger
-  transactions. (PR #3067)
-
-----------------------------------------------
-
-# 5.6.4 Release notes
-
-### Enhancements
-
-* Add Table::add_row_with_keys(), which allows
-  sync::create_object_with_primary_key() to avoid updating the index twice when
-  creating an object with a string primary key.
-* Improved the performance of setting a link to its current value.
-
-----------------------------------------------
-
-# 5.6.3 Release notes
-
-### Enhancements
-
-* Improved scalability for in-file freelist handling. This reduces
-  commit overhead on large transactions.
-* Improved scalability for in-file allocation during commit.
-* Minimized use of memory mappings and msync() on large commits
-  on devices which can support large address spaces.
-
-----------------------------------------------
-
-# 5.6.2 Release notes
-
-### Bugfixes
-
-* Fix curruption of freelist with more than 2M entries.
-  PR [#3059](https://github.com/realm/realm-core/pull/3059).
-
-----------------------------------------------
-
-# 5.6.1 Release notes
-
-### Bugfixes
-
-* More readable error message in the query parser when requesting an a bad argument.
-* Don't write history information in `SharedGroup::compact()` for
-  non-syncronized Realms.
-
------------
-
-### Internals
-
-* Restore -fvisibility-inlines-hidden for the binaries for Apple platforms.
-* Remove a few warnings at compile time.
-* Improve error detection related to memory allocation/release
-
-----------------------------------------------
-
-# 5.6.0 Release notes
-
-### Bugfixes
-
-* In the parser, fix `@links.@count` when applied over lists to return
-  the sum of backlinks for all connected rows in the list.
-* Fix null comparisons in queries not serialising properly in some cases.
-  Also explicitly disable list IN list comparisons since its not supported.
-  PR [#3037](https://github.com/realm/realm-core/pull/3037).
-
-### Enhancements
-
-* `SharedGroup::compact()` now also compacts history information, which means
-  that Sync'ed Realm files can now be compacted (under the usual restrictions;
-  see `group_shared.hpp` for details).
-
-----------------------------------------------
-
-# 5.5.0 Release notes
-
-### Enhancements
-
-* Parser improvements:
-    - Allow an arbitrary prefix on backlink class names of @links queries.
-      This will allow users to query unnamed backlinks using the `@links.Class.property` syntax.
-    - Case insensitive `nil` is now recognised as a synonym to `NULL`.
-    - Add support for `@links.@count` which gives the count of all backlinks to an object.
-      See Issue [#3003](https://github.com/realm/realm-core/issues/3003).
-
------------
-
-### Internals
-
-* Apple binaries are now built with Xcode 8.3.3.
-
-----------------------------------------------
+---------------------------------------------
 
 # 5.4.2 Release notes
 
