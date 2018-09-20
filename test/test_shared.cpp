@@ -3070,6 +3070,7 @@ NONCONCURRENT_TEST(Shared_BigAllocations)
     sg->close();
 }
 
+#if !REALM_ANDROID // FIXME
 TEST_IF(Shared_CompactEncrypt, REALM_ENABLE_ENCRYPTION)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -3108,7 +3109,7 @@ TEST_IF(Shared_CompactEncrypt, REALM_ENABLE_ENCRYPTION)
         }
     }
 }
-
+#endif
 
 // Repro case for: Assertion failed: top_size == 3 || top_size == 5 || top_size == 7 [0, 3, 0, 5, 0, 7]
 NONCONCURRENT_TEST(Shared_BigAllocationsMinimized)
@@ -3824,6 +3825,7 @@ TEST(Shared_UpgradeBinArray)
     CHECK(rt->get_table(TableKey(0))->get_object(ObjKey(54)).is_null(ColKey(0)));
 }
 
+#if !REALM_ANDROID // FIXME
 TEST(Shared_MoreVersionsInUse)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -3916,5 +3918,5 @@ TEST(Shared_LinksToSameCluster)
         wt->commit();
     }
 }
-
+#endif
 #endif // TEST_SHARED
