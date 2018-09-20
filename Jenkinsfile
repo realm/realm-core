@@ -523,7 +523,8 @@ def doBuildCoverage() {
           cd ..
           lcov --no-external --capture --initial --directory . --output-file ${workspace}/coverage-base.info
           cd build/test
-          ./realm-tests
+          ulimit -c unlimited
+          UNITTEST_PROGRESS=1 ./realm-tests
           cd ../..
           lcov --no-external --directory . --capture --output-file ${workspace}/coverage-test.info
           lcov --add-tracefile ${workspace}/coverage-base.info --add-tracefile coverage-test.info --output-file ${workspace}/coverage-total.info
