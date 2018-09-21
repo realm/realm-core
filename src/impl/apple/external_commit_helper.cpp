@@ -154,7 +154,7 @@ ExternalCommitHelper::ExternalCommitHelper(RealmCoordinator& parent)
     m_shutdown_read_fd = shutdown_pipe[0];
     m_shutdown_write_fd = shutdown_pipe[1];
 
-    m_thread = std::async(std::launch::async, [=] {
+    m_thread = std::thread([=] {
         try {
             listen();
         }
@@ -177,7 +177,7 @@ ExternalCommitHelper::ExternalCommitHelper(RealmCoordinator& parent)
 ExternalCommitHelper::~ExternalCommitHelper()
 {
     notify_fd(m_shutdown_write_fd, m_shutdown_read_fd);
-    m_thread.wait(); // Wait for the thread to exit
+    m_thread.join(); // Wait for the thread to exit
 }
 
 void ExternalCommitHelper::listen()
