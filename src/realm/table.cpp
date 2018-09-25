@@ -2114,6 +2114,8 @@ Obj Table::create_object(ObjKey key, const FieldValues& values)
         key = ObjKey(m_next_key_value++);
     }
 
+    REALM_ASSERT(key.value >= 0);
+
     bump_content_version();
     bump_storage_version();
     Obj obj = m_clusters.insert(key, values);

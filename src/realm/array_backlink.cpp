@@ -112,22 +112,21 @@ void ArrayBacklink::add(size_t ndx, ObjKey key)
 // Return true if the last link was removed
 bool ArrayBacklink::remove(size_t ndx, ObjKey key)
 {
-    int64_t value = Array::get(ndx);
+    uint64_t value = Array::get(ndx);
     REALM_ASSERT(value != 0);
 
     // If there is only a single backlink, it can be stored as
     // a tagged value
     if ((value & 1) != 0) {
-        REALM_ASSERT_3(value >> 1, ==, key.value);
+        REALM_ASSERT_3(int64_t(value >> 1), ==, key.value);
         set(ndx, 0);
         return true;
     }
 
     // if there is a list of backlinks we have to find
     // the right one and remove it.
-    ref_type ref = to_ref(value);
     Array backlink_list(m_alloc);
-    backlink_list.init_from_ref(ref);
+    backlink_list.init_from_ref(ref_type(value));
     backlink_list.set_parent(this, ndx);
 
     size_t backlink_ndx = backlink_list.find_first(key.value);
@@ -147,16 +146,16 @@ bool ArrayBacklink::remove(size_t ndx, ObjKey key)
 
 void ArrayBacklink::erase(size_t ndx)
 {
-    int64_t value = Array::get(ndx);
+    uint64_t value = Array::get(ndx);
     if (value && (value & 1) == 0) {
-        Array::destroy(to_ref(value), m_alloc);
+        Array::destroy(ref_type(value), m_alloc);
     }
     Array::erase(ndx);
 }
 
 size_t ArrayBacklink::get_backlink_count(size_t ndx) const
 {
-    int64_t value = Array::get(ndx);
+    uint64_t value = Array::get(ndx);
     if (value == 0) {
         return 0;
     }
@@ -168,25 +167,24 @@ size_t ArrayBacklink::get_backlink_count(size_t ndx) const
     }
 
     // return size of list
-    MemRef mem(to_ref(value), m_alloc);
+    MemRef mem(ref_type(value), m_alloc);
     return Array::get_size_from_header(mem.get_addr());
 }
 
 ObjKey ArrayBacklink::get_backlink(size_t ndx, size_t index) const
 {
-    int64_t value = Array::get(ndx);
+    uint64_t value = Array::get(ndx);
     REALM_ASSERT(value != 0);
 
     // If there is only a single backlink, it can be stored as
     // a tagged value
     if ((value & 1) != 0) {
         REALM_ASSERT(index == 0);
-        return ObjKey(value >> 1);
+        return ObjKey(int64_t(value >> 1));
     }
 
-    ref_type ref = to_ref(value);
     Array backlink_list(m_alloc);
-    backlink_list.init_from_ref(ref);
+    backlink_list.init_from_ref(ref_type(value));
 
     REALM_ASSERT(index < backlink_list.size());
     return ObjKey(backlink_list.get(index));

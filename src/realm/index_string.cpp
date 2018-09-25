@@ -251,7 +251,7 @@ int64_t IndexArray::index_string(StringData value, InternalFindResult& result_re
 
         // Get entry under key
         size_t pos_refs = pos + 1; // first entry in refs points to offsets
-        int64_t ref = get_direct(data, width, pos_refs);
+        uint64_t ref = get_direct(data, width, pos_refs);
 
         if (is_inner_node) {
             // Set vars for next iteration
@@ -269,7 +269,7 @@ int64_t IndexArray::index_string(StringData value, InternalFindResult& result_re
 
         // Literal row index (tagged)
         if (ref & 1) {
-            int64_t key_value = ref >> 1;
+            int64_t key_value = int64_t(ref >> 1);
 
             // The buffer is needed when for when this is an integer index.
             StringConversionBuffer buffer;
@@ -281,12 +281,12 @@ int64_t IndexArray::index_string(StringData value, InternalFindResult& result_re
             return local_not_found;
         }
 
-        const char* sub_header = m_alloc.translate(to_ref(ref));
+        const char* sub_header = m_alloc.translate(ref_type(ref));
         const bool sub_isindex = get_context_flag_from_header(sub_header);
 
         // List of row indices with common prefix up to this point, in sorted order.
         if (!sub_isindex) {
-            const IntegerColumn sub(m_alloc, to_ref(ref));
+            const IntegerColumn sub(m_alloc, ref_type(ref));
             return from_list<method>(value, result_ref, sub, column);
         }
 
@@ -1276,17 +1276,17 @@ void StringIndex::do_delete(ObjKey obj_key, StringData value, size_t offset)
         }
     }
     else {
-        int64_t ref = m_array->get(pos_refs);
+        uint64_t ref = m_array->get(pos_refs);
         if (ref & 1) {
-            REALM_ASSERT((ref >> 1) == obj_key.value);
+            REALM_ASSERT(int64_t(ref >> 1) == obj_key.value);
             values.erase(pos);
             m_array->erase(pos_refs);
         }
         else {
             // A real ref either points to a list or a subindex
-            char* header = alloc.translate(to_ref(ref));
+            char* header = alloc.translate(ref_type(ref));
             if (Array::get_context_flag_from_header(header)) {
-                StringIndex subindex(to_ref(ref), m_array.get(), pos_refs, m_target_column, alloc);
+                StringIndex subindex(ref_type(ref), m_array.get(), pos_refs, m_target_column, alloc);
                 subindex.do_delete(obj_key, value, offset + s_index_key_length);
 
                 if (subindex.is_empty()) {
@@ -1296,7 +1296,7 @@ void StringIndex::do_delete(ObjKey obj_key, StringData value, size_t offset)
                 }
             }
             else {
-                IntegerColumn sub(alloc, to_ref(ref)); // Throws
+                IntegerColumn sub(alloc, ref_type(ref)); // Throws
                 sub.set_parent(m_array.get(), pos_refs);
                 size_t r = sub.find_first(obj_key.value);
                 size_t sub_size = sub.size(); // Slow
