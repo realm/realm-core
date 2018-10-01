@@ -141,21 +141,24 @@ ColumnsDescriptor::Sorter::Sorter(std::vector<std::vector<const ColumnBase*>> co
 
         auto& translated_rows = m_columns.back().translated_row;
         auto& is_null = m_columns.back().is_null;
-        translated_rows.resize(rows.size());
-        is_null.resize(rows.size());
+        size_t max_index = std::max_element(rows.begin(), rows.end(),
+                                            [](auto&& a, auto&& b) { return a.index_in_view < b.index_in_view; })->index_in_view;
+        translated_rows.resize(max_index + 1);
+        is_null.resize(max_index + 1);
 
         for (size_t row_ndx = 0; row_ndx < rows.size(); row_ndx++) {
+            size_t index_in_view = rows[row_ndx].index_in_view;
             size_t translated_index = rows[row_ndx].index_in_column;
             for (size_t j = 0; j + 1 < columns[i].size(); ++j) {
                 // type was checked when creating the ColumnsDescriptor
                 auto link_col = static_cast<const LinkColumn*>(columns[i][j]);
                 if (link_col->is_null(translated_index)) {
-                    is_null[row_ndx] = true;
+                    is_null[index_in_view] = true;
                     break;
                 }
                 translated_index = link_col->get_link(translated_index);
             }
-            translated_rows[rows[row_ndx].index_in_view] = translated_index;
+            translated_rows[index_in_view] = translated_index;
         }
     }
 }
