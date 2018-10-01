@@ -26,10 +26,7 @@
 using namespace realm;
 
 namespace {
-struct IndexPair {
-    size_t index_in_column;
-    size_t index_in_view;
-};
+
 } // anonymous namespace
 
 ColumnsDescriptor::ColumnsDescriptor(Table const& table, std::vector<std::vector<size_t>> column_indices)
@@ -101,7 +98,7 @@ void SortDescriptor::merge_with(SortDescriptor&& other)
 class ColumnsDescriptor::Sorter {
 public:
     Sorter(std::vector<std::vector<const ColumnBase*>> const& columns, std::vector<bool> const& ascending,
-           IntegerColumn const& row_indexes);
+           std::vector<IndexPair> const& rows);
     Sorter() {}
 
     bool operator()(IndexPair i, IndexPair j, bool total_ordering = true) const;
@@ -129,11 +126,10 @@ private:
 };
 
 ColumnsDescriptor::Sorter::Sorter(std::vector<std::vector<const ColumnBase*>> const& columns,
-                                 std::vector<bool> const& ascending, IntegerColumn const& row_indexes)
+                                 std::vector<bool> const& ascending, std::vector<IndexPair> const& rows)
 {
     REALM_ASSERT(!columns.empty());
     REALM_ASSERT_EX(columns.size() == ascending.size(), columns.size(), ascending.size());
-    size_t num_rows = row_indexes.size();
 
     m_columns.reserve(columns.size());
     for (size_t i = 0; i < columns.size(); ++i) {
@@ -145,11 +141,11 @@ ColumnsDescriptor::Sorter::Sorter(std::vector<std::vector<const ColumnBase*>> co
 
         auto& translated_rows = m_columns.back().translated_row;
         auto& is_null = m_columns.back().is_null;
-        translated_rows.resize(num_rows);
-        is_null.resize(num_rows);
+        translated_rows.resize(rows.size());
+        is_null.resize(rows.size());
 
-        for (size_t row_ndx = 0; row_ndx < num_rows; row_ndx++) {
-            size_t translated_index = to_size_t(row_indexes.get(row_ndx));
+        for (size_t row_ndx = 0; row_ndx < rows.size(); row_ndx++) {
+            size_t translated_index = rows[row_ndx].index_in_column;
             for (size_t j = 0; j + 1 < columns[i].size(); ++j) {
                 // type was checked when creating the ColumnsDescriptor
                 auto link_col = static_cast<const LinkColumn*>(columns[i][j]);
@@ -159,7 +155,7 @@ ColumnsDescriptor::Sorter::Sorter(std::vector<std::vector<const ColumnBase*>> co
                 }
                 translated_index = link_col->get_link(translated_index);
             }
-            translated_rows[row_ndx] = translated_index;
+            translated_rows[rows[row_ndx].index_in_view] = translated_index;
         }
     }
 }
@@ -245,18 +241,18 @@ std::string ColumnsDescriptor::get_description(TableRef attached_table) const
     return description;
 }
 
-ColumnsDescriptor::Sorter ColumnsDescriptor::sorter(IntegerColumn const& row_indexes) const
+ColumnsDescriptor::Sorter ColumnsDescriptor::sorter(std::vector<IndexPair> const& rows) const
 {
     REALM_ASSERT(!m_columns.empty());
     std::vector<bool> ascending(m_columns.size(), true);
-    return Sorter(m_columns, ascending, row_indexes);
+    return Sorter(m_columns, ascending, rows);
 }
 
 
-SortDescriptor::Sorter SortDescriptor::sorter(IntegerColumn const& row_indexes) const
+SortDescriptor::Sorter SortDescriptor::sorter(std::vector<IndexPair> const& rows) const
 {
     REALM_ASSERT(!m_columns.empty());
-    return Sorter(m_columns, m_ascending, row_indexes);
+    return Sorter(m_columns, m_ascending, rows);
 }
 
 bool SortDescriptor::Sorter::operator()(IndexPair i, IndexPair j, bool total_ordering) const
@@ -491,7 +487,7 @@ void RowIndexes::do_sort(const DescriptorOrdering& ordering) {
 
     // Gather the current rows into a container we can use std algorithms on
     size_t detached_ref_count = 0;
-    std::vector<IndexPair> v;
+    std::vector<ColumnsDescriptor::IndexPair> v;
     v.reserve(sz);
     // always put any detached refs at the end of the sort
     // FIXME: reconsider if this is the right thing to do
@@ -500,7 +496,7 @@ void RowIndexes::do_sort(const DescriptorOrdering& ordering) {
     for (size_t t = 0; t < sz; t++) {
         int64_t ndx = m_row_indexes.get(t);
         if (ndx != detached_ref) {
-            v.push_back(IndexPair{static_cast<size_t>(ndx), t});
+            v.push_back({static_cast<size_t>(ndx), t});
         }
         else
             ++detached_ref_count;
@@ -514,7 +510,7 @@ void RowIndexes::do_sort(const DescriptorOrdering& ordering) {
             case DescriptorType::Sort:
             {
                 const auto* sort_descr = static_cast<const SortDescriptor*>(ordering[desc_ndx]);
-                SortDescriptor::Sorter sort_predicate = sort_descr->sorter(m_row_indexes);
+                SortDescriptor::Sorter sort_predicate = sort_descr->sorter(v);
 
                 std::sort(v.begin(), v.end(), std::ref(sort_predicate));
 
@@ -534,7 +530,7 @@ void RowIndexes::do_sort(const DescriptorOrdering& ordering) {
             case DescriptorType::Distinct:
             {
                 const auto* distinct_descr = static_cast<const DistinctDescriptor*>(ordering[desc_ndx]);
-                auto distinct_predicate = distinct_descr->sorter(m_row_indexes);
+                auto distinct_predicate = distinct_descr->sorter(v);
 
                 // Remove all rows which have a null link along the way to the distinct columns
                 if (distinct_predicate.has_links()) {
