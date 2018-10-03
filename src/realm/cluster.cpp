@@ -1111,12 +1111,12 @@ ref_type Cluster::insert(ObjKey k, const InitValues& init_values, ClusterNode::S
     }
     else {
         sz = size_t(Array::get(s_key_ref_or_size_index)) >> 1; // Size is stored as tagged integer
-        if (size_t(k.value) < sz) {
+        if (k.value < int(sz)) {
             throw InvalidKey("Key already used");
         }
         // Key value is bigger than all other values, should be put last
         ndx = sz;
-        if (size_t(k.value) > sz) {
+        if (k.value > int(sz)) {
             ensure_general_form();
         }
     }
@@ -1163,9 +1163,12 @@ bool Cluster::try_get(ObjKey k, ClusterNode::State& state) const
         return state.index != m_keys.size() && m_keys.get(state.index) == uint64_t(k.value);
     }
     else {
-        state.index = size_t(k.value);
-        return state.index < get_as_ref_or_tagged(0).get_as_int();
+        if (k.value < (Array::get(s_key_ref_or_size_index) >> 1)) {
+            state.index = size_t(k.value);
+            return true;
+        }
     }
+    return false;
 }
 
 ObjKey Cluster::get(size_t ndx, ClusterNode::State& state) const
@@ -1208,10 +1211,10 @@ size_t Cluster::get_ndx(ObjKey k, size_t ndx) const
         }
     }
     else {
-        index = size_t(k.value);
-        if (index >= get_as_ref_or_tagged(0).get_as_int()) {
+        if (k.value >= (Array::get(s_key_ref_or_size_index) >> 1)) {
             throw InvalidKey("Key not found");
         }
+        index = size_t(k.value);
     }
     return index + ndx;
 }

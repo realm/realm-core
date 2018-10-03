@@ -268,7 +268,7 @@ def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmula
                                    find test -type f -name "*.json" -maxdepth 1 -exec adb push {} /data/local/tmp \\;
                                    find test -type f -name "*.realm" -maxdepth 1 -exec adb push {} /data/local/tmp \\;
                                    find test -type f -name "*.txt" -maxdepth 1 -exec adb push {} /data/local/tmp \\;
-                                   adb shell \'cd /data/local/tmp; ./realm-tests || echo __ADB_FAIL__\' | tee adb.log
+                                   adb shell \'cd /data/local/tmp; UNITTEST_PROGRESS=1 ./realm-tests || echo __ADB_FAIL__\' | tee adb.log
                                    ! grep __ADB_FAIL__ adb.log
                                '''
                             } finally {
@@ -523,7 +523,8 @@ def doBuildCoverage() {
           cd ..
           lcov --no-external --capture --initial --directory . --output-file ${workspace}/coverage-base.info
           cd build/test
-          ./realm-tests
+          ulimit -c unlimited
+          UNITTEST_PROGRESS=1 ./realm-tests
           cd ../..
           lcov --no-external --directory . --capture --output-file ${workspace}/coverage-test.info
           lcov --add-tracefile ${workspace}/coverage-base.info --add-tracefile coverage-test.info --output-file ${workspace}/coverage-total.info
