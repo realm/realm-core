@@ -1,3 +1,25 @@
+# NEXT RELEASE
+
+### Bugfixes
+
+* None.
+
+### Breaking changes
+
+* None.
+
+### Enhancements
+
+* None.
+
+-----------
+
+### Internals
+
+* None.
+
+----------------------------------------------
+
 # 6.0.0-alpha.2 Release notes
 
 ### Open issues
