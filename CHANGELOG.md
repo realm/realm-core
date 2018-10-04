@@ -14,6 +14,7 @@
 ### Internals
 
 * Will assert if someone tries to free a null ref.
+  Issue [#254](https://github.com/realm/realm-core-private/issues/254) and the like.
 
 ----------------------------------------------
 
