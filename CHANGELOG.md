@@ -1,7 +1,4 @@
-# NEXT RELEASE
-
-### Enhancements
-* None.
+# 5.10.3 Release notes
 
 ### Fixed
 * When a sort or distinct over links was done on an already-sorted TableView,
@@ -9,9 +6,6 @@
   second sort/distinct being done with the incorrect values.
   PR [#3102](https://github.com/realm/realm-core/pull/3102).
  
-### Breaking changes
-* None.
-
 ### Compatibility
 * File format: ver. 9 (upgrades automatically from previous formats)
 
@@ -19,7 +13,8 @@
 
 ### Internals
 
-* None.
+* Will assert if someone tries to free a null ref.
+  Issue [#254](https://github.com/realm/realm-core-private/issues/254) and the like.
 
 ----------------------------------------------
 
