@@ -1837,8 +1837,7 @@ void SharedGroup::end_read() noexcept
     if (m_transact_stage == transact_Ready)
         return; // Idempotency
 
-    if (m_transact_stage != transact_Reading)
-        throw LogicError(LogicError::wrong_transact_state);
+    REALM_ASSERT(m_transact_stage == transact_Reading);
 
     do_end_read();
 
@@ -1851,8 +1850,7 @@ void SharedGroup::end_read() noexcept
 
 Group& SharedGroup::begin_write()
 {
-    if (m_transact_stage != transact_Ready)
-        throw LogicError(LogicError::wrong_transact_state);
+    REALM_ASSERT(m_transact_stage == transact_Ready);
 
     do_begin_write(); // Throws
     try {
@@ -1947,10 +1945,7 @@ void SharedGroup::rollback() noexcept
     if (m_transact_stage == transact_Ready)
         return; // Idempotency
 
-    // FIXME: Find common/better method for error handling (throw from noexcept, and 
-    // pin_version() asserts instead).
-    if (m_transact_stage != transact_Writing)
-        throw LogicError(LogicError::wrong_transact_state);
+    REALM_ASSERT(m_transact_stage == transact_Writing);
 
     do_end_write();
     do_end_read();

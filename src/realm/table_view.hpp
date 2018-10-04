@@ -732,13 +732,13 @@ inline TableViewBase::TableViewBase(Table* parent)
     allocate_row_indexes();
 }
 
-inline TableViewBase::TableViewBase(Table* parent, Query& query, size_t start, size_t end, size_t limit)
+inline TableViewBase::TableViewBase(Table* parent, Query& query, size_t start, size_t end, size_t lim)
     : RowIndexes(IntegerColumn::unattached_root_tag(), Allocator::get_default()) // Throws
     , m_table(parent->get_table_ref())
     , m_query(query)
     , m_start(start)
     , m_end(end)
-    , m_limit(limit)
+    , m_limit(lim)
     , m_last_seen_version(outside_version())
 {
     allocate_row_indexes();
@@ -1217,8 +1217,8 @@ inline TableView::TableView(Table& parent)
 {
 }
 
-inline TableView::TableView(Table& parent, Query& query, size_t start, size_t end, size_t limit)
-    : TableViewBase(&parent, query, start, end, limit)
+inline TableView::TableView(Table& parent, Query& query, size_t start, size_t end, size_t lim)
+    : TableViewBase(&parent, query, start, end, lim)
 {
 }
 

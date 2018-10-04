@@ -1,18 +1,19 @@
 # NEXT RELEASE
 
-### Bugfixes
-
-* Fix incorrect results when distincting an already-sorted TableView using the
-  values from a linked table.
-  PR [#3102](https://github.com/realm/realm-core/pull/3102).
-
-### Breaking changes
-
-* None.
-
 ### Enhancements
-
 * None.
+
+### Fixed
+* When a sort or distinct over links was done on an already-sorted TableView,
+  the link translation map was done using the unsorted rows, resulting in the
+  second sort/distinct being done with the incorrect values.
+  PR [#3102](https://github.com/realm/realm-core/pull/3102).
+ 
+### Breaking changes
+* None.
+
+### Compatibility
+* File format: ver. 9 (upgrades automatically from previous formats)
 
 -----------
 

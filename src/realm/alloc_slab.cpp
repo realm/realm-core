@@ -606,6 +606,7 @@ void SlabAlloc::do_free(ref_type ref, char* addr) noexcept
             Chunk chunk;
             chunk.ref = ref;
             chunk.size = size;
+            REALM_ASSERT(ref != 0);
             m_free_read_only.push_back(chunk); // Throws
         }
         catch (...) {
