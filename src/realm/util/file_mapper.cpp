@@ -371,6 +371,9 @@ void* mmap_reserve(FileDesc fd, size_t reservation_size, size_t offset_in_file)
     return nullptr;
 #else
     auto addr = ::mmap(0, reservation_size, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (addr == MAP_FAILED) {
+        throw std::runtime_error(get_errno_msg("mmap() failed: ", errno));
+    }
     return addr;
 #endif
 }
