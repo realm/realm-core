@@ -58,8 +58,8 @@ struct DefaultAllocator : AllocatorBase
 {
     static DefaultAllocator& get_default() noexcept;
 
-    void* allocate(std::size_t size, std::size_t align) override final;
-    void free(void* ptr, std::size_t size) noexcept override final;
+    void* allocate(std::size_t size, std::size_t align) final;
+    void free(void* ptr, std::size_t size) noexcept final;
 
 private:
     static DefaultAllocator g_instance;
