@@ -55,7 +55,6 @@ set(REALM_SOURCES
     util/memory_stream.cpp
     util/misc_errors.cpp
     util/serializer.cpp
-    util/string_buffer.cpp
     util/terminate.cpp
     util/thread.cpp
     util/to_string.cpp
