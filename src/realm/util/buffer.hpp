@@ -46,11 +46,7 @@ public:
     {
     }
     explicit Buffer(size_t initial_size, Allocator& alloc = Allocator::get_default());
-    Buffer(Buffer<T>&&) noexcept = default;
-    ~Buffer() noexcept
-    {
-    }
-
+    Buffer(Buffer&&) noexcept = default;
     Buffer<T, Allocator>& operator=(Buffer&&) noexcept = default;
 
     T& operator[](size_t i) noexcept
@@ -130,10 +126,6 @@ template <class T, class Allocator = DefaultAllocator>
 class AppendBuffer {
 public:
     AppendBuffer(Allocator& alloc = Allocator::get_default()) noexcept;
-    ~AppendBuffer() noexcept
-    {
-    }
-
     AppendBuffer(AppendBuffer&&) noexcept = default;
     AppendBuffer& operator=(AppendBuffer&&) noexcept = default;
 
