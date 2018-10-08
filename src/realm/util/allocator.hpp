@@ -190,7 +190,14 @@ auto make_unique(Allocator& allocator, Args&&... args) ->
     std::enable_if_t<!std::is_array<T>::value, std::unique_ptr<T, STLDeleter<T, Allocator>>>
 {
     void* memory = allocator.allocate(sizeof(T), alignof(T)); // Throws
-    T* ptr = new(memory) T{std::forward<Args>(args)...}; // Throws
+    T* ptr;
+    try {
+        ptr = new(memory) T{std::forward<Args>(args)...}; // Throws
+    }
+    catch (...) {
+        allocator.free(memory, sizeof(T));
+        throw;
+    }
     std::unique_ptr<T, STLDeleter<T, Allocator>> result{ptr, STLDeleter<T, Allocator>{sizeof(T), allocator}};
     return result;
 }
@@ -202,7 +209,14 @@ auto make_unique(Allocator& allocator, size_t count) ->
 {
     using T = std::remove_extent_t<Tv>;
     void* memory = allocator.allocate(sizeof(T) * count, alignof(T)); // Throws
-    T* ptr = new(memory) T[count]; // Throws; FIXME: Make exception-safe!
+    T* ptr;
+    try {
+        ptr = new(memory) T[count]; // Throws
+    }
+    catch (...) {
+        allocator.free(memory, sizeof(T) * count);
+        throw;
+    }
     std::unique_ptr<T[], STLDeleter<T[], Allocator>> result{ptr, STLDeleter<T[], Allocator>{count, allocator}};
     return result;
 }
