@@ -16,7 +16,8 @@
 -----------
 
 ### Internals
-* None.
+* Fixed a bug in the use of placement new on MSVC, where the implementation is
+  buggy. This bug only affected version 5.11.0.
 
 ----------------------------------------------
 
