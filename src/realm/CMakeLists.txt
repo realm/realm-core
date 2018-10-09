@@ -43,6 +43,7 @@ set(REALM_SOURCES
     table.cpp
     table_view.cpp
     unicode.cpp
+    util/allocator.cpp
     util/backtrace.cpp
     util/base64.cpp
     util/basic_system_errors.cpp
@@ -54,7 +55,6 @@ set(REALM_SOURCES
     util/memory_stream.cpp
     util/misc_errors.cpp
     util/serializer.cpp
-    util/string_buffer.cpp
     util/terminate.cpp
     util/thread.cpp
     util/to_string.cpp
@@ -168,6 +168,7 @@ set(REALM_INSTALL_IMPL_HEADERS
 )
 
 set(REALM_INSTALL_UTIL_HEADERS
+    util/allocator.hpp
     util/any.hpp
     util/assert.hpp
     util/backtrace.hpp

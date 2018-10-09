@@ -24,6 +24,7 @@
 #include <memory>
 #include <realm/util/file.hpp>
 #include <realm/alloc_slab.hpp>
+#include <realm/util/allocator.hpp>
 
 #include "test.hpp"
 
@@ -380,6 +381,69 @@ TEST(Alloc_ToAndFromRef)
         ref_type back_to_ref = to_ref(ref_as_int);
         CHECK_EQUAL(ref, back_to_ref);
     }
+}
+
+namespace {
+class MyAllocator : public util::AllocatorBase {
+public:
+    static MyAllocator& get_default() noexcept;
+
+    MyAllocator()
+        : ptr(buffer)
+    {
+    }
+    void* allocate(std::size_t size, std::size_t) override
+    {
+        void* p = ptr;
+        ptr += size;
+        return p;
+    }
+    void free(void*, size_t size) noexcept override
+    {
+        freed += size;
+    }
+    bool check()
+    {
+        return ptr - freed == buffer;
+    }
+
+private:
+    char buffer[100];
+    char* ptr;
+    size_t freed = 0;
+};
+
+MyAllocator& MyAllocator::get_default() noexcept
+{
+    static MyAllocator inst;
+    return inst;
+}
+
+template <class T>
+using Alloc = util::STLAllocator<T, MyAllocator>;
+using Vector = std::vector<int, Alloc<int>>;
+}
+
+TEST(Allocator_STLAllocator)
+{
+    {
+        Vector vec;
+        vec.push_back(3);
+    }
+    CHECK(MyAllocator::get_default().check());
+}
+
+TEST(Allocator_MakeUnique)
+{
+    auto& alloc = MyAllocator::get_default();
+    {
+        auto ptr1 = util::make_unique<std::vector<std::string>, MyAllocator>(alloc, 5);
+        CHECK_EQUAL(ptr1->size(), 5);
+        auto ptr2 =
+            util::make_unique<std::vector<int>, MyAllocator>(alloc, std::initializer_list<int>{1, 2, 3, 4, 5});
+        CHECK_EQUAL(ptr2->size(), 5);
+    }
+    CHECK(alloc.check());
 }
 
 #endif // TEST_ALLOC
