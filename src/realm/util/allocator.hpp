@@ -320,11 +320,20 @@ auto make_unique(Allocator& allocator, size_t count)
 {
     using T = std::remove_extent_t<Tv>;
     void* memory = allocator.allocate(sizeof(T) * count, alignof(T)); // Throws
-    T* ptr;
+    T* ptr = reinterpret_cast<T*>(memory);
+    size_t constructed = 0;
     try {
-        ptr = new (memory) T[count]; // Throws
+        // FIXME: Can't use array placement new, because MSVC has a buggy
+        // implementation of it. :-(
+        while (constructed < count) {
+            new (&ptr[constructed]) T; // Throws
+            ++constructed;
+        }
     }
     catch (...) {
+        for (size_t i = 0; i < constructed; ++i) {
+            ptr[i].~T();
+        }
         allocator.free(memory, sizeof(T) * count);
         throw;
     }

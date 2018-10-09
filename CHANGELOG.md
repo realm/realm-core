@@ -4,18 +4,35 @@
 * None.
 
 ### Fixed
+* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * None.
  
 ### Breaking changes
 * None.
 
 ### Compatibility
-* File format: ver. 9 (upgrades automatically from previous formats)
+* File format: ver. 7 (upgrades automatically from previous formats)
 
 -----------
 
 ### Internals
-* Added support for custom heap allocators (PR [#3106](https://github.com/realm/realm-core/pull/3106)).
+* Fixed a bug in the use of placement new on MSVC, where the implementation is
+  buggy. This bug only affected version 5.11.0.
+
+----------------------------------------------
+
+# 5.11.0 Release notes
+
+### Compatibility
+* File format: ver. 9
+  Upgrades automatically from previous formats.
+  Can open realms down to file format version 7 in ReadOnly mode (without upgrade).
+
+-----------
+
+### Internals
+* Added support for custom heap allocators
+  PR [#3106](https://github.com/realm/realm-core/pull/3106).
 
 ----------------------------------------------
 
