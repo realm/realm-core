@@ -18,8 +18,7 @@
 -----------
 
 ### Internals
-
-* None.
+* Added support for custom heap allocators (PR [#3106](https://github.com/realm/realm-core/pull/3106)).
 
 ----------------------------------------------
 
