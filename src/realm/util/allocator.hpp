@@ -51,11 +51,28 @@ struct AllocatorBase {
     virtual void free(void* ptr, size_t size) noexcept = 0;
 };
 
-/// Implementation of AllocatorBase that uses malloc()/free().
-struct DefaultAllocator : AllocatorBase {
+/// Implementation of AllocatorBase that uses `operator new`/`operator delete`.
+///
+/// Using this allocator with standard containers is zero-overhead: No
+/// additional storage is required at any level.
+struct DefaultAllocator final : AllocatorBase {
+    /// Return a reference to a global singleton.
+    ///
+    /// This method is thread-safe.
     static DefaultAllocator& get_default() noexcept;
 
+    /// Allocate memory (using `operator new`).
+    ///
+    /// \a align must not exceed `max_alignment` before C++17.
+    ///
+    /// This method is thread-safe.
     void* allocate(std::size_t size, std::size_t align) final;
+
+    /// Free memory (using `operator delete`).
+    ///
+    /// If \a ptr equals `nullptr`, this is a no-op.
+    ///
+    /// This method is thread-safe.
     void free(void* ptr, std::size_t size) noexcept final;
 
 private:
