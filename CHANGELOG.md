@@ -1,21 +1,15 @@
-# NEXT RELEASE
-
-### Enhancements
-* None.
-
-### Fixed
-* None.
- 
-### Breaking changes
-* None.
+# 5.11.0 Release notes
 
 ### Compatibility
-* File format: ver. 9 (upgrades automatically from previous formats)
+* File format: ver. 9
+  Upgrades automatically from previous formats.
+  Can open realms down to file format version 7 in ReadOnly mode (without upgrade).
 
 -----------
 
 ### Internals
-* Added support for custom heap allocators (PR [#3106](https://github.com/realm/realm-core/pull/3106)).
+* Added support for custom heap allocators
+  PR [#3106](https://github.com/realm/realm-core/pull/3106).
 
 ----------------------------------------------
 
