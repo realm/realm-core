@@ -304,8 +304,17 @@ auto make_unique(Allocator& allocator, Args&&... args)
     return result;
 }
 
+/// make_unique with custom allocator supporting `get_default()`
+/// (non-array-version)
+template <class T, class Allocator = DefaultAllocator, class... Args>
+auto make_unique(Args&&... args)
+    -> std::enable_if_t<!std::is_array<T>::value, std::unique_ptr<T, STLDeleter<T, Allocator>>>
+{
+    return make_unique<T, Allocator>(Allocator::get_default(), std::forward<Args>(args)...);
+}
+
 /// make_unique with custom allocator (array version)
-template <class Tv, class Allocator = DefaultAllocator>
+template <class Tv, class Allocator>
 auto make_unique(Allocator& allocator, size_t count)
     -> std::enable_if_t<std::is_array<Tv>::value, std::unique_ptr<Tv, STLDeleter<Tv, Allocator>>>
 {
@@ -321,6 +330,14 @@ auto make_unique(Allocator& allocator, size_t count)
     }
     std::unique_ptr<T[], STLDeleter<T[], Allocator>> result{ptr, STLDeleter<T[], Allocator>{count, allocator}};
     return result;
+}
+
+/// make_unique with custom allocator supporting `get_default()` (array version)
+template <class Tv, class Allocator = DefaultAllocator>
+auto make_unique(size_t count)
+    -> std::enable_if_t<std::is_array<Tv>::value, std::unique_ptr<Tv, STLDeleter<Tv, Allocator>>>
+{
+    return make_unique<Tv, Allocator>(Allocator::get_default(), count);
 }
 
 
