@@ -387,33 +387,33 @@ namespace {
 class MyAllocator : public util::AllocatorBase {
 public:
     MyAllocator(size_t size = 1000)
-        : size(size)
-        , buffer(new char[size])
-        , ptr(buffer.get())
+        : m_size(size)
+        , m_buffer(new char[size])
+        , m_ptr(m_buffer.get())
     {
     }
     void* allocate(std::size_t sz, std::size_t) override
     {
-        if (ptr + sz > buffer.get() + size)
+        if (m_ptr + sz > m_buffer.get() + m_size)
             throw std::bad_alloc{};
-        void* p = ptr;
-        ptr += sz;
+        void* p = m_ptr;
+        m_ptr += sz;
         return p;
     }
     void free(void*, size_t sz) noexcept override
     {
-        freed += sz;
+        m_freed += sz;
     }
     bool check()
     {
-        return ptr - freed == buffer.get();
+        return m_ptr - m_freed == m_buffer.get();
     }
 
 private:
-    size_t size;
-    std::unique_ptr<char[]> buffer;
-    char* ptr;
-    size_t freed = 0;
+    size_t m_size;
+    std::unique_ptr<char[]> m_buffer;
+    char* m_ptr;
+    size_t m_freed = 0;
 };
 
 template <class T>
