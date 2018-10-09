@@ -386,8 +386,6 @@ TEST(Alloc_ToAndFromRef)
 namespace {
 class MyAllocator : public util::AllocatorBase {
 public:
-    static MyAllocator& get_default() noexcept;
-
     MyAllocator()
         : ptr(buffer)
     {
@@ -413,12 +411,6 @@ private:
     size_t freed = 0;
 };
 
-MyAllocator& MyAllocator::get_default() noexcept
-{
-    static MyAllocator inst;
-    return inst;
-}
-
 template <class T>
 using Alloc = util::STLAllocator<T, MyAllocator>;
 using Vector = std::vector<int, Alloc<int>>;
@@ -426,16 +418,17 @@ using Vector = std::vector<int, Alloc<int>>;
 
 TEST(Allocator_STLAllocator)
 {
+    MyAllocator alloc;
     {
-        Vector vec;
+        Vector vec{alloc};
         vec.push_back(3);
     }
-    CHECK(MyAllocator::get_default().check());
+    CHECK(alloc.check());
 }
 
 TEST(Allocator_MakeUnique)
 {
-    auto& alloc = MyAllocator::get_default();
+    auto alloc = MyAllocator{};
     {
         auto ptr1 = util::make_unique<std::vector<std::string>, MyAllocator>(alloc, 5);
         CHECK_EQUAL(ptr1->size(), 5);
@@ -444,6 +437,50 @@ TEST(Allocator_MakeUnique)
         CHECK_EQUAL(ptr2->size(), 5);
     }
     CHECK(alloc.check());
+}
+
+TEST(Allocator_Polymorphic)
+{
+    struct Foo {
+        virtual ~Foo() {}
+        char buffer1[10];
+    };
+    struct Bar : Foo {
+        char buffer2[10];
+    };
+
+    MyAllocator alloc;
+    {
+        // Instance of std::unique_ptr with pointer to base class allocator.
+        std::unique_ptr<char[], STLDeleter<char[]>> abstract{nullptr, STLDeleter<char[]>{DefaultAllocator::get_default()}};
+
+        // Instance of std::unique_ptr with pointer to base class, and base
+        // class allocator.
+        std::unique_ptr<Foo, STLDeleter<Foo>> abstract2{nullptr, STLDeleter<Foo>{DefaultAllocator::get_default()}};
+
+        {
+            // Instance of std::unique_ptr with pointer to concrete allocator
+            // implementation.
+            auto concrete = util::make_unique<char[]>(alloc, 10);
+            auto concrete2 = util::make_unique<Bar>(alloc);
+
+            // These assignments should replace both pointer and deleter.
+            abstract = std::move(concrete);
+            abstract2 = std::move(concrete2);
+        }
+    }
+    alloc.check();
+
+    MyAllocator alloc2;
+    {
+        std::vector<char, STLAllocator<char>> abstract{DefaultAllocator::get_default()};
+        {
+            std::vector<char, STLAllocator<char>> vec{alloc2};
+            vec.resize(10);
+            abstract = std::move(vec);
+        }
+    }
+    alloc2.check();
 }
 
 #endif // TEST_ALLOC

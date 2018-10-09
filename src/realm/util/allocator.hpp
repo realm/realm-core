@@ -85,6 +85,78 @@ private:
 template <class T, class Allocator = AllocatorBase>
 struct STLDeleter;
 
+namespace detail {
+/// Base class for things that hold a reference to an allocator. The default
+/// implementation carries a pointer to the allocator instance. Singleton
+/// allocators (such as `DefaultAllocator`) may specialize this class such that
+/// no extra storage is needed.
+template <class Allocator>
+struct GetAllocator {
+    GetAllocator() noexcept
+        : m_allocator(&Allocator::get_default())
+    {
+    }
+
+    template <class A>
+    GetAllocator(A& allocator) noexcept
+        : m_allocator(&allocator)
+    {
+    }
+
+    template <class A>
+    GetAllocator& operator=(const GetAllocator<A>& other) noexcept
+    {
+        m_allocator = &other.get_allocator();
+        return *this;
+    }
+
+    Allocator& get_allocator() const noexcept
+    {
+        return *m_allocator;
+    }
+
+    bool operator==(const GetAllocator& other) const noexcept
+    {
+        return m_allocator == other.m_allocator;
+    }
+
+    bool operator!=(const GetAllocator& other) const noexcept
+    {
+        return m_allocator != other.m_allocator;
+    }
+
+    Allocator* m_allocator;
+};
+
+/// Specialization for `DefaultAllocator` that has zero size, i.e. no extra
+/// storage requirements compared with `std::allocator<T>`.
+template <>
+struct GetAllocator<DefaultAllocator> {
+    GetAllocator() noexcept
+    {
+    }
+
+    GetAllocator(DefaultAllocator&) noexcept
+    {
+    }
+
+    DefaultAllocator& get_allocator() const noexcept
+    {
+        return DefaultAllocator::get_default();
+    }
+
+    bool operator==(const GetAllocator&) const noexcept
+    {
+        return true;
+    }
+
+    bool operator!=(const GetAllocator&) const noexcept
+    {
+        return false;
+    }
+};
+} // namespace detail
+
 /// STL-compatible static dispatch bridge to a dynamic implementation of
 /// `AllocatorBase`. Wraps a pointer to an object that adheres to the
 /// `AllocatorBase` interface. It is optional whether the `Allocator` class
@@ -94,52 +166,43 @@ struct STLDeleter;
 /// nearest-known base class of the expected allocator implementations, such
 /// that appropriate devirtualization can take place.
 template <class T, class Allocator = AllocatorBase>
-struct STLAllocator {
+struct STLAllocator : detail::GetAllocator<Allocator> {
     using value_type = T;
     using Deleter = STLDeleter<T, Allocator>;
 
     /// The default constructor is only availble when the static method
     /// `Allocator::get_default()` exists.
     STLAllocator() noexcept
-        : m_allocator(&Allocator::get_default())
     {
     }
 
     constexpr STLAllocator(Allocator& base) noexcept
-        : m_allocator(&base)
+        : detail::GetAllocator<Allocator>(base)
     {
     }
-    template <class U>
-    constexpr STLAllocator(const STLAllocator<U, Allocator>& other) noexcept
-        : m_allocator(other.m_allocator)
+    template <class U, class A>
+    constexpr STLAllocator(const STLAllocator<U, A>& other) noexcept
+        : detail::GetAllocator<Allocator>(other.get_allocator())
     {
     }
+
+    STLAllocator& operator=(const STLAllocator& other) noexcept = default;
 
     T* allocate(std::size_t n)
     {
         static_assert(alignof(T) <= Allocator::max_alignment, "Over-aligned allocation");
-        void* ptr = m_allocator->allocate(sizeof(T) * n, alignof(T));
+        void* ptr = this->get_allocator().allocate(sizeof(T) * n, alignof(T));
         return static_cast<T*>(ptr);
     }
 
     void deallocate(T* ptr, std::size_t n) noexcept
     {
-        m_allocator->free(ptr, sizeof(T) * n);
-    }
-
-    bool operator==(const STLAllocator& other) const
-    {
-        return m_allocator == other.m_allocator;
-    }
-
-    bool operator!=(const STLAllocator& other) const
-    {
-        return m_allocator != other.m_allocator;
+        this->get_allocator().free(ptr, sizeof(T) * n);
     }
 
     operator Allocator&() const
     {
-        return *m_allocator;
+        return this->get_allocator();
     }
 
     template <class U>
@@ -150,64 +213,68 @@ struct STLAllocator {
 private:
     template <class U, class A>
     friend struct STLAllocator;
-    Allocator* m_allocator;
 };
 
 template <class T, class Allocator>
-struct STLDeleter {
+struct STLDeleter : detail::GetAllocator<Allocator> {
+    // The reason for this member is to accurately pass `size` to `free()` when
+    // deallocating. `sizeof(T)` may not be good enough, because the pointer may
+    // have been cast to a relative type of different size.
     size_t m_size;
-    Allocator& m_allocator;
-    explicit STLDeleter(Allocator& allocator)
+
+    explicit STLDeleter(Allocator& allocator) noexcept
         : STLDeleter(0, allocator)
     {
     }
-    explicit STLDeleter(size_t size, Allocator& allocator)
-        : m_size(size)
-        , m_allocator(allocator)
+    explicit STLDeleter(size_t size, Allocator& allocator) noexcept
+        : detail::GetAllocator<Allocator>(allocator)
+        , m_size(size)
     {
     }
 
-    template <class U>
-    STLDeleter(const STLDeleter<U, Allocator>& other)
-        : m_size(other.m_size)
-        , m_allocator(other.m_allocator)
+    template <class U, class A>
+    STLDeleter(const STLDeleter<U, A>& other) noexcept
+        : detail::GetAllocator<Allocator>(other.get_allocator())
+        , m_size(other.m_size)
     {
-    }
-
-    Allocator& get_allocator() const
-    {
-        return *m_allocator;
     }
 
     void operator()(T* ptr)
     {
         ptr->~T();
-        m_allocator.free(ptr, m_size);
+        this->get_allocator().free(ptr, m_size);
     }
 };
 
 template <class T, class Allocator>
-struct STLDeleter<T[], Allocator> {
+struct STLDeleter<T[], Allocator> : detail::GetAllocator<Allocator> {
     // Note: Array-allocated pointers cannot be upcast to base classes, because
     // of array slicing.
     size_t m_count;
-    Allocator* m_allocator;
-    explicit STLDeleter(Allocator& allocator)
+    explicit STLDeleter(Allocator& allocator) noexcept
         : STLDeleter(0, allocator)
     {
     }
-    explicit STLDeleter(size_t count, Allocator& allocator)
-        : m_count(count)
-        , m_allocator(&allocator)
+    explicit STLDeleter(size_t count, Allocator& allocator) noexcept
+        : detail::GetAllocator<Allocator>(allocator)
+        , m_count(count)
     {
     }
 
-    STLDeleter(const STLDeleter& other) = default;
-    STLDeleter& operator=(const STLDeleter&) = default;
-
-    Allocator& get_allocator() const
+    template <class A>
+    STLDeleter(const STLDeleter<T[], A>& other) noexcept
+        : detail::GetAllocator<Allocator>(other.get_allocator())
+        , m_count(other.m_count)
     {
-        return *m_allocator;
+    }
+
+    template <class A>
+    STLDeleter& operator=(const STLDeleter<T[], A>& other) noexcept
+    {
+        static_cast<detail::GetAllocator<Allocator>&>(*this) =
+            static_cast<const detail::GetAllocator<A>&>(other);
+        m_count = other.m_count;
+        return *this;
     }
 
     void operator()(T* ptr)
@@ -215,7 +282,7 @@ struct STLDeleter<T[], Allocator> {
         for (size_t i = 0; i < m_count; ++i) {
             ptr[i].~T();
         }
-        m_allocator->free(ptr, m_count * sizeof(T));
+        this->get_allocator().free(ptr, m_count * sizeof(T));
     }
 };
 
