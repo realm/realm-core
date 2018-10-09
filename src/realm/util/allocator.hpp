@@ -249,15 +249,12 @@ inline DefaultAllocator& DefaultAllocator::get_default() noexcept
 
 inline void* DefaultAllocator::allocate(std::size_t size, std::size_t)
 {
-    void* ptr = std::malloc(size);
-    if (ptr == nullptr)
-        throw util::bad_alloc{};
-    return ptr;
+    return new char[size];
 }
 
 inline void DefaultAllocator::free(void* ptr, std::size_t) noexcept
 {
-    std::free(ptr);
+    delete[] static_cast<char*>(ptr);
 }
 
 } // namespace util
