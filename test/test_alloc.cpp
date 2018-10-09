@@ -386,27 +386,32 @@ TEST(Alloc_ToAndFromRef)
 namespace {
 class MyAllocator : public util::AllocatorBase {
 public:
-    MyAllocator()
-        : ptr(buffer)
+    MyAllocator(size_t size = 1000)
+        : size(size)
+        , buffer(new char[size])
+        , ptr(buffer.get())
     {
     }
-    void* allocate(std::size_t size, std::size_t) override
+    void* allocate(std::size_t sz, std::size_t) override
     {
+        if (ptr + sz > buffer.get() + size)
+            throw std::bad_alloc{};
         void* p = ptr;
-        ptr += size;
+        ptr += sz;
         return p;
     }
-    void free(void*, size_t size) noexcept override
+    void free(void*, size_t sz) noexcept override
     {
-        freed += size;
+        freed += sz;
     }
     bool check()
     {
-        return ptr - freed == buffer;
+        return ptr - freed == buffer.get();
     }
 
 private:
-    char buffer[100];
+    size_t size;
+    std::unique_ptr<char[]> buffer;
     char* ptr;
     size_t freed = 0;
 };
@@ -469,7 +474,7 @@ TEST(Allocator_Polymorphic)
             abstract2 = std::move(concrete2);
         }
     }
-    alloc.check();
+    CHECK(alloc.check());
 
     MyAllocator alloc2;
     {
@@ -480,7 +485,7 @@ TEST(Allocator_Polymorphic)
             abstract = std::move(vec);
         }
     }
-    alloc2.check();
+    CHECK(alloc2.check());
 }
 
 #endif // TEST_ALLOC
