@@ -18,6 +18,10 @@
 ### Internals
 * Fixed a bug in the use of placement new on MSVC, where the implementation is
   buggy. This bug only affected version 5.11.0.
+  PR [#3109](https://github.com/realm/realm-core/pull/3109)
+* Made improvements to the custom allocation interfaces introduced in 5.11.0,
+  which should make them more convenient and use slightly less memory.
+  PR [#3108](https://github.com/realm/realm-core/pull/3108)
 
 ----------------------------------------------
 

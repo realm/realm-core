@@ -386,38 +386,35 @@ TEST(Alloc_ToAndFromRef)
 namespace {
 class MyAllocator : public util::AllocatorBase {
 public:
-    static MyAllocator& get_default() noexcept;
-
-    MyAllocator()
-        : ptr(buffer)
+    MyAllocator(size_t size = 1000)
+        : m_size(size)
+        , m_buffer(new char[size])
+        , m_ptr(m_buffer.get())
     {
     }
-    void* allocate(std::size_t size, std::size_t) override
+    void* allocate(std::size_t sz, std::size_t) override
     {
-        void* p = ptr;
-        ptr += size;
+        if (m_ptr + sz > m_buffer.get() + m_size)
+            throw std::bad_alloc{};
+        void* p = m_ptr;
+        m_ptr += sz;
         return p;
     }
-    void free(void*, size_t size) noexcept override
+    void free(void*, size_t sz) noexcept override
     {
-        freed += size;
+        m_freed += sz;
     }
     bool check()
     {
-        return ptr - freed == buffer;
+        return m_ptr - m_freed == m_buffer.get();
     }
 
 private:
-    char buffer[100];
-    char* ptr;
-    size_t freed = 0;
+    size_t m_size;
+    std::unique_ptr<char[]> m_buffer;
+    char* m_ptr;
+    size_t m_freed = 0;
 };
-
-MyAllocator& MyAllocator::get_default() noexcept
-{
-    static MyAllocator inst;
-    return inst;
-}
 
 template <class T>
 using Alloc = util::STLAllocator<T, MyAllocator>;
@@ -426,16 +423,17 @@ using Vector = std::vector<int, Alloc<int>>;
 
 TEST(Allocator_STLAllocator)
 {
+    MyAllocator alloc;
     {
-        Vector vec;
+        Vector vec{alloc};
         vec.push_back(3);
     }
-    CHECK(MyAllocator::get_default().check());
+    CHECK(alloc.check());
 }
 
 TEST(Allocator_MakeUnique)
 {
-    auto& alloc = MyAllocator::get_default();
+    auto alloc = MyAllocator{};
     {
         auto ptr1 = util::make_unique<std::vector<std::string>, MyAllocator>(alloc, 5);
         CHECK_EQUAL(ptr1->size(), 5);
@@ -444,6 +442,50 @@ TEST(Allocator_MakeUnique)
         CHECK_EQUAL(ptr2->size(), 5);
     }
     CHECK(alloc.check());
+}
+
+TEST(Allocator_Polymorphic)
+{
+    struct Foo {
+        virtual ~Foo() {}
+        char buffer1[10];
+    };
+    struct Bar : Foo {
+        char buffer2[10];
+    };
+
+    MyAllocator alloc;
+    {
+        // Instance of std::unique_ptr with pointer to base class allocator.
+        std::unique_ptr<char[], STLDeleter<char[]>> abstract{nullptr, STLDeleter<char[]>{DefaultAllocator::get_default()}};
+
+        // Instance of std::unique_ptr with pointer to base class, and base
+        // class allocator.
+        std::unique_ptr<Foo, STLDeleter<Foo>> abstract2{nullptr, STLDeleter<Foo>{DefaultAllocator::get_default()}};
+
+        {
+            // Instance of std::unique_ptr with pointer to concrete allocator
+            // implementation.
+            auto concrete = util::make_unique<char[]>(alloc, 10);
+            auto concrete2 = util::make_unique<Bar>(alloc);
+
+            // These assignments should replace both pointer and deleter.
+            abstract = std::move(concrete);
+            abstract2 = std::move(concrete2);
+        }
+    }
+    CHECK(alloc.check());
+
+    MyAllocator alloc2;
+    {
+        std::vector<char, STLAllocator<char>> abstract{DefaultAllocator::get_default()};
+        {
+            std::vector<char, STLAllocator<char>> vec{alloc2};
+            vec.resize(10);
+            abstract = std::move(vec);
+        }
+    }
+    CHECK(alloc2.check());
 }
 
 #endif // TEST_ALLOC
