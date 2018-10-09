@@ -107,9 +107,9 @@ struct STLAllocator {
         return static_cast<T*>(ptr);
     }
 
-    void deallocate(T* ptr, std::size_t size) noexcept
+    void deallocate(T* ptr, std::size_t n) noexcept
     {
-        m_allocator->free(ptr, size);
+        m_allocator->free(ptr, sizeof(T) * n);
     }
 
     bool operator==(const STLAllocator& other) const
@@ -212,7 +212,7 @@ auto make_unique(Allocator& allocator, Args&&... args)
     void* memory = allocator.allocate(sizeof(T), alignof(T)); // Throws
     T* ptr;
     try {
-        ptr = new (memory) T{std::forward<Args>(args)...}; // Throws
+        ptr = new (memory) T(std::forward<Args>(args)...); // Throws
     }
     catch (...) {
         allocator.free(memory, sizeof(T));
