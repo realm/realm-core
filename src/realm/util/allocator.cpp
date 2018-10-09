@@ -3,4 +3,3 @@
 using namespace realm::util;
 
 DefaultAllocator DefaultAllocator::g_instance;
-

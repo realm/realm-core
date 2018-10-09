@@ -54,8 +54,7 @@ struct AllocatorBase {
 };
 
 /// Implementation of AllocatorBase that uses malloc()/free().
-struct DefaultAllocator : AllocatorBase
-{
+struct DefaultAllocator : AllocatorBase {
     static DefaultAllocator& get_default() noexcept;
 
     void* allocate(std::size_t size, std::size_t align) final;
@@ -63,10 +62,13 @@ struct DefaultAllocator : AllocatorBase
 
 private:
     static DefaultAllocator g_instance;
-    DefaultAllocator() {}
+    DefaultAllocator()
+    {
+    }
 };
 
-template <class T, class Allocator = AllocatorBase> struct STLDeleter;
+template <class T, class Allocator = AllocatorBase>
+struct STLDeleter;
 
 /// STL-compatible static dispatch bridge to a dynamic implementation of
 /// `AllocatorBase`. Wraps a pointer to an object that adheres to the
@@ -83,12 +85,20 @@ struct STLAllocator {
 
     /// The default constructor is only availble when the static method
     /// `Allocator::get_default()` exists.
-    STLAllocator() noexcept : m_allocator(&Allocator::get_default()) {}
+    STLAllocator() noexcept
+        : m_allocator(&Allocator::get_default())
+    {
+    }
 
-    constexpr STLAllocator(Allocator& base) noexcept : m_allocator(&base) {}
+    constexpr STLAllocator(Allocator& base) noexcept
+        : m_allocator(&base)
+    {
+    }
     template <class U>
     constexpr STLAllocator(const STLAllocator<U, Allocator>& other) noexcept
-        : m_allocator(other.m_allocator) {}
+        : m_allocator(other.m_allocator)
+    {
+    }
 
     T* allocate(std::size_t n)
     {
@@ -118,10 +128,13 @@ struct STLAllocator {
     }
 
     template <class U>
-    struct rebind { using other = STLAllocator<U, Allocator>; };
+    struct rebind {
+        using other = STLAllocator<U, Allocator>;
+    };
 
 private:
-    template <class U, class A> friend struct STLAllocator;
+    template <class U, class A>
+    friend struct STLAllocator;
     Allocator* m_allocator;
 };
 
@@ -130,17 +143,21 @@ struct STLDeleter {
     size_t m_size;
     Allocator& m_allocator;
     explicit STLDeleter(Allocator& allocator)
-        : STLDeleter(0, allocator) {}
+        : STLDeleter(0, allocator)
+    {
+    }
     explicit STLDeleter(size_t size, Allocator& allocator)
         : m_size(size)
         , m_allocator(allocator)
-    {}
+    {
+    }
 
     template <class U>
     STLDeleter(const STLDeleter<U, Allocator>& other)
         : m_size(other.m_size)
         , m_allocator(other.m_allocator)
-    {}
+    {
+    }
 
     Allocator& get_allocator() const
     {
@@ -161,11 +178,14 @@ struct STLDeleter<T[], Allocator> {
     size_t m_count;
     Allocator* m_allocator;
     explicit STLDeleter(Allocator& allocator)
-        : STLDeleter(0, allocator) {}
+        : STLDeleter(0, allocator)
+    {
+    }
     explicit STLDeleter(size_t count, Allocator& allocator)
         : m_count(count)
         , m_allocator(&allocator)
-    {}
+    {
+    }
 
     STLDeleter(const STLDeleter& other) = default;
     STLDeleter& operator=(const STLDeleter&) = default;
@@ -186,13 +206,13 @@ struct STLDeleter<T[], Allocator> {
 
 /// make_unique with custom allocator (non-array version)
 template <class T, class Allocator = DefaultAllocator, class... Args>
-auto make_unique(Allocator& allocator, Args&&... args) ->
-    std::enable_if_t<!std::is_array<T>::value, std::unique_ptr<T, STLDeleter<T, Allocator>>>
+auto make_unique(Allocator& allocator, Args&&... args)
+    -> std::enable_if_t<!std::is_array<T>::value, std::unique_ptr<T, STLDeleter<T, Allocator>>>
 {
     void* memory = allocator.allocate(sizeof(T), alignof(T)); // Throws
     T* ptr;
     try {
-        ptr = new(memory) T{std::forward<Args>(args)...}; // Throws
+        ptr = new (memory) T{std::forward<Args>(args)...}; // Throws
     }
     catch (...) {
         allocator.free(memory, sizeof(T));
@@ -204,14 +224,14 @@ auto make_unique(Allocator& allocator, Args&&... args) ->
 
 /// make_unique with custom allocator (array version)
 template <class Tv, class Allocator = DefaultAllocator>
-auto make_unique(Allocator& allocator, size_t count) ->
-    std::enable_if_t<std::is_array<Tv>::value, std::unique_ptr<Tv, STLDeleter<Tv, Allocator>>>
+auto make_unique(Allocator& allocator, size_t count)
+    -> std::enable_if_t<std::is_array<Tv>::value, std::unique_ptr<Tv, STLDeleter<Tv, Allocator>>>
 {
     using T = std::remove_extent_t<Tv>;
     void* memory = allocator.allocate(sizeof(T) * count, alignof(T)); // Throws
     T* ptr;
     try {
-        ptr = new(memory) T[count]; // Throws
+        ptr = new (memory) T[count]; // Throws
     }
     catch (...) {
         allocator.free(memory, sizeof(T) * count);
