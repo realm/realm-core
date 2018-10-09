@@ -95,11 +95,7 @@ public:
     void reserve_extra(size_t used_size, size_t min_extra_capacity);
 
     /// Release the internal buffer to the caller.
-    ///
-    /// Note: It is the responsibility of the caller to free the buffer, and it
-    /// is the responsibility of the caller to do so using the appropriate
-    /// allocator, which can be obtained by calling `get_allocator()`.
-    T* release() noexcept;
+    std::unique_ptr<T[], STLDeleter<T[], Allocator>> release() noexcept;
 
     friend void swap(Buffer& a, Buffer& b) noexcept
     {
@@ -233,10 +229,10 @@ inline void Buffer<T, A>::reserve_extra(size_t used_size, size_t min_extra_capac
 }
 
 template <class T, class A>
-inline T* Buffer<T, A>::release() noexcept
+inline std::unique_ptr<T[], STLDeleter<T[], A>> Buffer<T, A>::release() noexcept
 {
     m_size = 0;
-    return m_data.release();
+    return std::move(m_data);
 }
 
 
