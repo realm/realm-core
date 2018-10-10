@@ -52,7 +52,7 @@ jobWrapper {
           parallelExecutors = [checkLinuxRelease   : doCheckInDocker('Release'),
                                checkLinuxDebug     : doCheckInDocker('Debug'),
                                buildLinuxRelAssert : doBuildInDocker('RelWithDebInfo', '', true),
-                               buildLinuxRelAsan   : doBuildInDocker('RelWithDebInfo', 'asan', false),
+                               buildLinuxRelAsan   : doBuildInDocker('RelWithDebInfo', 'address', false),
                                // buildMacOsDebug     : doBuildMacOs('Debug', true),
                                // buildMacOsRelease   : doBuildMacOs('Release', false),
                                // buildWin32Debug     : doBuildWindows('Debug', false, 'Win32'),
@@ -209,17 +209,17 @@ def doBuildInDocker(String buildType, String sanitizeMode='', boolean enableAsse
             }
             def environment = environment()
             def targetBuildType = "${buildType}"
-            def cmakeFlags = ''
+            def cmakeFlags = '-DREALM_BUILD_LIB_ONLY=ON'
             if (sanitizeMode.contains('thread')) {
-                cmakeFlags = '-D REALM_TSAN=ON'
-                targetBuildType = '${targetBuildType}+TSAN'
+                cmakeFlags = ' -D REALM_TSAN=ON'
+                targetBuildType = "${targetBuildType}+TSAN"
             } else if (sanitizeMode.contains('address')) {
-                cmakeFlags = '-D REALM_ASAN=ON'
-                targetBuildType = '${targetBuildType}+ASAN'
+                cmakeFlags = ' -D REALM_ASAN=ON'
+                targetBuildType = "${targetBuildType}+ASAN"
             }
             if (enableAssertions) {
                 cmakeFlags += ' -DREALM_ENABLE_ASSERTIONS=ON'
-                targetBuildType = '${targetBuildType}+Assertions'
+                targetBuildType = "${targetBuildType}+Assertions"
             }
             withEnv(environment) {
                 buildEnv.inside(sanitizeMode == 'address' ? '--privileged' : '') {
