@@ -53,21 +53,21 @@ jobWrapper {
                                checkLinuxDebug     : doCheckInDocker('Debug'),
                                buildLinuxRelAssert : doBuildInDocker('RelWithDebInfo', '', true),
                                buildLinuxRelAsan   : doBuildInDocker('RelWithDebInfo', 'address', false),
-                               // buildMacOsDebug     : doBuildMacOs('Debug', true),
-                               // buildMacOsRelease   : doBuildMacOs('Release', false),
-                               // buildWin32Debug     : doBuildWindows('Debug', false, 'Win32'),
-                               // buildWin32Release   : doBuildWindows('Release', false, 'Win32'),
-                               // buildWin64Debug     : doBuildWindows('Debug', false, 'x64'),
-                               // buildWin64Release   : doBuildWindows('Release', false, 'x64'),
-                               // buildUwpWin32Debug  : doBuildWindows('Debug', true, 'Win32'),
-                               // buildUwpWin32Release: doBuildWindows('Release', true, 'Win32'),
-                               // buildUwpx64Debug    : doBuildWindows('Debug', true, 'x64'),
-                               // buildUwpx64Release  : doBuildWindows('Release', true, 'x64'),
-                               // buildUwpArmDebug    : doBuildWindows('Debug', true, 'ARM'),
-                               // buildUwpArmRelease  : doBuildWindows('Release', true, 'ARM'),
-                               // packageGeneric      : doBuildPackage('generic', 'tgz'),
-                               // threadSanitizer     : doCheckInDocker('Debug', 'thread'),
-                               // addressSanitizer    : doCheckInDocker('Debug', 'address'),
+                               buildMacOsDebug     : doBuildMacOs('Debug', true),
+                               buildMacOsRelease   : doBuildMacOs('Release', false),
+                               buildWin32Debug     : doBuildWindows('Debug', false, 'Win32'),
+                               buildWin32Release   : doBuildWindows('Release', false, 'Win32'),
+                               buildWin64Debug     : doBuildWindows('Debug', false, 'x64'),
+                               buildWin64Release   : doBuildWindows('Release', false, 'x64'),
+                               buildUwpWin32Debug  : doBuildWindows('Debug', true, 'Win32'),
+                               buildUwpWin32Release: doBuildWindows('Release', true, 'Win32'),
+                               buildUwpx64Debug    : doBuildWindows('Debug', true, 'x64'),
+                               buildUwpx64Release  : doBuildWindows('Release', true, 'x64'),
+                               buildUwpArmDebug    : doBuildWindows('Debug', true, 'ARM'),
+                               buildUwpArmRelease  : doBuildWindows('Release', true, 'ARM'),
+                               packageGeneric      : doBuildPackage('generic', 'tgz'),
+                               threadSanitizer     : doCheckInDocker('Debug', 'thread'),
+                               addressSanitizer    : doCheckInDocker('Debug', 'address'),
                                coverage            : doBuildCoverage()
               ]
 
@@ -78,7 +78,7 @@ jobWrapper {
               def abi = androidAbis[i]
               for (def j = 0; j < androidBuildTypes.size(); j++) {
                   def buildType = androidBuildTypes[j]
-                  // parallelExecutors["android-${abi}-${buildType}"] = doAndroidBuildInDocker(abi, buildType, abi == 'armeabi-v7a' && buildType == 'Release')
+                  parallelExecutors["android-${abi}-${buildType}"] = doAndroidBuildInDocker(abi, buildType, abi == 'armeabi-v7a' && buildType == 'Release')
               }
           }
 
@@ -89,12 +89,12 @@ jobWrapper {
               def sdk = appleSdks[i]
               for (def j = 0; j < appleBuildTypes.size(); j++) {
                   def buildType = appleBuildTypes[j]
-                  // parallelExecutors["${sdk}${buildType}"] = doBuildAppleDevice(sdk, buildType)
+                  parallelExecutors["${sdk}${buildType}"] = doBuildAppleDevice(sdk, buildType)
               }
           }
 
           if (env.CHANGE_TARGET) {
-              // parallelExecutors['performance'] = buildPerformance()
+              parallelExecutors['performance'] = buildPerformance()
           }
 
           parallel parallelExecutors
