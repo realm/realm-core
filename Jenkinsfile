@@ -208,18 +208,18 @@ def doBuildInDocker(String buildType, String sanitizeMode='', boolean enableAsse
                 buildEnv = docker.build('realm-core-clang:snapshot', '-f clang.Dockerfile .')
             }
             def environment = environment()
-            def targetBuildType = new String(buildType)
+            def targetBuildType = "${buildType}"
             def cmakeFlags = ''
             if (sanitizeMode.contains('thread')) {
                 cmakeFlags = '-D REALM_TSAN=ON'
-                targetBuildType += '+TSAN'
+                targetBuildType = '${targetBuildType}+TSAN'
             } else if (sanitizeMode.contains('address')) {
                 cmakeFlags = '-D REALM_ASAN=ON'
-                targetBuildType += '+ASAN'
+                targetBuildType = '${targetBuildType}+ASAN'
             }
             if (enableAssertions) {
                 cmakeFlags += ' -DREALM_ENABLE_ASSERTIONS=ON'
-                targetBuildType += '+Assertions'
+                targetBuildType = '${targetBuildType}+Assertions'
             }
             withEnv(environment) {
                 buildEnv.inside(sanitizeMode == 'address' ? '--privileged' : '') {
