@@ -49,8 +49,10 @@ jobWrapper {
       }
 
       stage('check') {
-          parallelExecutors = [checkLinuxRelease   : doBuildInDocker('Release'),
-                               checkLinuxDebug     : doBuildInDocker('Debug'),
+          parallelExecutors = [checkLinuxRelease   : doCheckInDocker('Release'),
+                               checkLinuxDebug     : doCheckInDocker('Debug'),
+                               buildLinuxRelAssert : doBuildInDocker('RelWithDebInfo', '', true),
+                               buildLinuxRelAsan   : doBuildInDocker('RelWithDebInfo', 'address', false),
                                buildMacOsDebug     : doBuildMacOs('Debug', true),
                                buildMacOsRelease   : doBuildMacOs('Release', false),
                                buildWin32Debug     : doBuildWindows('Debug', false, 'Win32'),
@@ -64,8 +66,8 @@ jobWrapper {
                                buildUwpArmDebug    : doBuildWindows('Debug', true, 'ARM'),
                                buildUwpArmRelease  : doBuildWindows('Release', true, 'ARM'),
                                packageGeneric      : doBuildPackage('generic', 'tgz'),
-                               threadSanitizer     : doBuildInDocker('Debug', 'thread'),
-                               addressSanitizer    : doBuildInDocker('Debug', 'address'),
+                               threadSanitizer     : doCheckInDocker('Debug', 'thread'),
+                               addressSanitizer    : doCheckInDocker('Debug', 'address'),
                                coverage            : doBuildCoverage()
               ]
 
@@ -153,7 +155,7 @@ def buildDockerEnv(name) {
     return docker.image(name)
 }
 
-def doBuildInDocker(String buildType, String sanitizeMode='') {
+def doCheckInDocker(String buildType, String sanitizeMode='') {
     return {
         node('docker') {
             getArchive()
@@ -188,6 +190,63 @@ def doBuildInDocker(String buildType, String sanitizeMode='') {
                         """
                     } finally {
                         recordTests("Linux-${buildType}")
+                    }
+                }
+            }
+        }
+    }
+}
+
+def doBuildInDocker(String buildType, String sanitizeMode='', boolean enableAssertions=false) {
+    return {
+        node('docker') {
+            getArchive()
+            def buildEnv
+            if (sanitizeMode == '') {
+                buildEnv = docker.build 'realm-core:snapshot'
+            } else {
+                buildEnv = docker.build('realm-core-clang:snapshot', '-f clang.Dockerfile .')
+            }
+            def environment = environment()
+            def targetBuildType = "${buildType}"
+            def cmakeFlags = '-DREALM_BUILD_LIB_ONLY=ON'
+            if (sanitizeMode.contains('thread')) {
+                cmakeFlags += ' -D REALM_TSAN=ON'
+                targetBuildType = "${targetBuildType}+TSAN"
+            } else if (sanitizeMode.contains('address')) {
+                cmakeFlags += ' -D REALM_ASAN=ON'
+                targetBuildType = "${targetBuildType}+ASAN"
+            }
+            if (enableAssertions) {
+                cmakeFlags += ' -DREALM_ENABLE_ASSERTIONS=ON'
+                targetBuildType = "${targetBuildType}+Assertions"
+            }
+            withEnv(environment) {
+                buildEnv.inside(sanitizeMode == 'address' ? '--privileged' : '') {
+                    sh """
+                        mkdir build-dir
+                        cd build-dir
+                        cmake -D CMAKE_BUILD_TYPE=${buildType} ${cmakeFlags} -G Ninja ..
+                    """
+                    runAndCollectWarnings(script: "cd build-dir && ninja")
+                    sh """
+                        cd build-dir
+                        cpack -G TGZ
+                    """
+                    def files = findFiles(glob: 'build-dir/realm-core-*.tar.gz')
+                    for (file in files) {
+                        def targetFileName = file.name.replace(buildType, targetBuildType)
+                        sh """
+                            cd build-dir
+                            mv ${file.name} ${targetFileName}
+                        """
+                        dir('build-dir') {
+                            archiveArtifacts(targetFileName)
+                        }
+                        stash includes: "build-dir/${targetFileName}", name: targetBuildType
+                        if (gitTag) {
+                            publishingStashes << targetBuildType
+                        }
                     }
                 }
             }

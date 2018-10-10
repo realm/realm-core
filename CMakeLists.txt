@@ -181,13 +181,7 @@ install(EXPORT realm
         COMPONENT devel)
 
 # CPack
-if(APPLE)
-    set(CPACK_GENERATOR "TGZ")
-elseif(ANDROID)
-    set(CPACK_GENERATOR "TGZ")
-else()
-    set(CPACK_GENERATOR "TGZ;RPM;DEB")
-endif()
+set(CPACK_GENERATOR "TGZ")
 set(CPACK_PACKAGE_NAME "realm-core-${CMAKE_BUILD_TYPE}")
 set(CPACK_PACKAGE_VERSION ${REALM_VERSION})
 set(CPACK_PACKAGE_VENDOR "Realm Inc.")
