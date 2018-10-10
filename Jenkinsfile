@@ -78,7 +78,7 @@ jobWrapper {
               def abi = androidAbis[i]
               for (def j = 0; j < androidBuildTypes.size(); j++) {
                   def buildType = androidBuildTypes[j]
-                  parallelExecutors["android-${abi}-${buildType}"] = doAndroidBuildInDocker(abi, buildType, abi == 'armeabi-v7a' && buildType == 'Release')
+                  // parallelExecutors["android-${abi}-${buildType}"] = doAndroidBuildInDocker(abi, buildType, abi == 'armeabi-v7a' && buildType == 'Release')
               }
           }
 
@@ -89,12 +89,12 @@ jobWrapper {
               def sdk = appleSdks[i]
               for (def j = 0; j < appleBuildTypes.size(); j++) {
                   def buildType = appleBuildTypes[j]
-                  parallelExecutors["${sdk}${buildType}"] = doBuildAppleDevice(sdk, buildType)
+                  // parallelExecutors["${sdk}${buildType}"] = doBuildAppleDevice(sdk, buildType)
               }
           }
 
           if (env.CHANGE_TARGET) {
-              parallelExecutors['performance'] = buildPerformance()
+              // parallelExecutors['performance'] = buildPerformance()
           }
 
           parallel parallelExecutors
