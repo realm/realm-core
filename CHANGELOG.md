@@ -11,7 +11,9 @@
 * None.
 
 ### Compatibility
-* File format: ver. 7 (upgrades automatically from previous formats)
+* File format: ver. 9
+  Upgrades automatically from previous formats.
+  Can open realms down to file format version 7 in ReadOnly mode (without upgrade).
 
 -----------
 
