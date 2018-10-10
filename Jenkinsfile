@@ -49,8 +49,8 @@ jobWrapper {
       }
 
       stage('check') {
-          parallelExecutors = [checkLinuxRelease   : doBuildInDocker('Release'),
-                               checkLinuxDebug     : doBuildInDocker('Debug'),
+          parallelExecutors = [checkLinuxRelease   : doCheckInDocker('Release'),
+                               checkLinuxDebug     : doCheckInDocker('Debug'),
                                buildMacOsDebug     : doBuildMacOs('Debug', true),
                                buildMacOsRelease   : doBuildMacOs('Release', false),
                                buildWin32Debug     : doBuildWindows('Debug', false, 'Win32'),
@@ -64,8 +64,8 @@ jobWrapper {
                                buildUwpArmDebug    : doBuildWindows('Debug', true, 'ARM'),
                                buildUwpArmRelease  : doBuildWindows('Release', true, 'ARM'),
                                packageGeneric      : doBuildPackage('generic', 'tgz'),
-                               threadSanitizer     : doBuildInDocker('Debug', 'thread'),
-                               addressSanitizer    : doBuildInDocker('Debug', 'address'),
+                               threadSanitizer     : doCheckInDocker('Debug', 'thread'),
+                               addressSanitizer    : doCheckInDocker('Debug', 'address'),
                                coverage            : doBuildCoverage()
               ]
 
@@ -153,7 +153,7 @@ def buildDockerEnv(name) {
     return docker.image(name)
 }
 
-def doBuildInDocker(String buildType, String sanitizeMode='') {
+def doCheckInDocker(String buildType, String sanitizeMode='') {
     return {
         node('docker') {
             getArchive()
