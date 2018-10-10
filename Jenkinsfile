@@ -211,10 +211,10 @@ def doBuildInDocker(String buildType, String sanitizeMode='', boolean enableAsse
             def targetBuildType = "${buildType}"
             def cmakeFlags = '-DREALM_BUILD_LIB_ONLY=ON'
             if (sanitizeMode.contains('thread')) {
-                cmakeFlags = ' -D REALM_TSAN=ON'
+                cmakeFlags += ' -D REALM_TSAN=ON'
                 targetBuildType = "${targetBuildType}+TSAN"
             } else if (sanitizeMode.contains('address')) {
-                cmakeFlags = ' -D REALM_ASAN=ON'
+                cmakeFlags += ' -D REALM_ASAN=ON'
                 targetBuildType = "${targetBuildType}+ASAN"
             }
             if (enableAssertions) {
