@@ -16,7 +16,9 @@
 -----------
 
 ### Internals
-* None.
+* Releases no longer include RPM and DEB packages.
+* Releases now include RelWithDebInfo+ASAN and RelWithDebInfo+Assertions tarballs for linux.
+  [#3112](https://github.com/realm/realm-core/pull/3112).
 
 ----------------------------------------------
 
