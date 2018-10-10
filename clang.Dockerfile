@@ -22,6 +22,7 @@ RUN apt-get update \
                        libprocps4-dev \
                        libssl-dev \
                        ninja-build \
+                       git \
     && rm -rf /var/lib/apt/lists/*
 
 # Make clang the default compiler
