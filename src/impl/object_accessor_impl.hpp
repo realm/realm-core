@@ -55,11 +55,11 @@ public:
     // property and its index within the ObjectScehma's persisted_properties
     // array.
     util::Optional<util::Any> value_for_property(util::Any& dict,
-                                                 std::string const& prop_name,
+                                                 const Property& prop,
                                                  size_t /* property_index */) const
     {
         auto const& v = any_cast<AnyDict&>(dict);
-        auto it = v.find(prop_name);
+        auto it = v.find(prop.name);
         return it == v.end() ? util::none : util::make_optional(it->second);
     }
 
@@ -70,7 +70,7 @@ public:
     // This implementation does not support default values; see the default
     // value tests for an example of one which does.
     util::Optional<util::Any>
-    default_value_for_property(ObjectSchema const&, std::string const&) const
+    default_value_for_property(ObjectSchema const&, Property const&) const
     {
         return util::none;
     }

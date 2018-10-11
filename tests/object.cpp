@@ -53,12 +53,12 @@ struct TestContext : CppContext {
     { }
 
     util::Optional<util::Any>
-    default_value_for_property(ObjectSchema const& object, std::string const& prop)
+    default_value_for_property(ObjectSchema const& object, Property const& prop)
     {
         auto obj_it = defaults.find(object.name);
         if (obj_it == defaults.end())
             return util::none;
-        auto prop_it = obj_it->second.find(prop);
+        auto prop_it = obj_it->second.find(prop.name);
         if (prop_it == obj_it->second.end())
             return util::none;
         return prop_it->second;

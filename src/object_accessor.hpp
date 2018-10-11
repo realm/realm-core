@@ -194,10 +194,10 @@ Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
     bool skip_primary = true;
     if (auto primary_prop = object_schema.primary_key_property()) {
         // search for existing object based on primary key type
-        auto primary_value = ctx.value_for_property(value, primary_prop->name,
+        auto primary_value = ctx.value_for_property(value, *primary_prop,
                                                     primary_prop - &object_schema.persisted_properties[0]);
         if (!primary_value)
-            primary_value = ctx.default_value_for_property(object_schema, primary_prop->name);
+            primary_value = ctx.default_value_for_property(object_schema, *primary_prop);
         if (!primary_value) {
             if (!is_nullable(primary_prop->type))
                 throw MissingPropertyValueException(object_schema.name, primary_prop->name);
@@ -264,13 +264,13 @@ Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
         if (skip_primary && prop.is_primary)
             continue;
 
-        auto v = ctx.value_for_property(value, prop.name, i);
+        auto v = ctx.value_for_property(value, prop, i);
         if (!created && !v)
             continue;
 
         bool is_default = false;
         if (!v) {
-            v = ctx.default_value_for_property(object_schema, prop.name);
+            v = ctx.default_value_for_property(object_schema, prop);
             is_default = true;
         }
         if ((!v || ctx.is_null(*v)) && !is_nullable(prop.type) && !is_array(prop.type)) {
