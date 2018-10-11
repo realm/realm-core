@@ -32,8 +32,6 @@
 #include "array.hpp"
 
 constexpr const int signature = 0x41414141;
-constexpr const int alt_signature = 41414141;
-constexpr const char* err_txt = "*** Error: ";
 
 struct Header {
     uint64_t m_top_ref[2]; // 2 * 8 bytes
@@ -49,8 +47,6 @@ struct StreamingFooter {
     uint64_t m_top_ref;
     uint64_t m_magic_cookie;
 };
-
-static const uint_fast64_t footer_magic_cookie = 0x3034125237E526C8ULL;
 
 template <class T>
 void consolidate_list(std::vector<T>& list)
@@ -188,7 +184,7 @@ public:
         m_data = realm::Array::get_data_from_header(m_header);
         m_has_refs = has_refs();
     }
-    int64_t get_val(unsigned ndx) const
+    int64_t get_val(size_t ndx) const
     {
         int64_t val = realm::get_direct(m_data, width(), ndx);
 
@@ -199,7 +195,7 @@ public:
         }
         return val;
     }
-    uint64_t get_ref(unsigned ndx) const
+    uint64_t get_ref(size_t ndx) const
     {
         REALM_ASSERT(m_has_refs);
         int64_t val = realm::get_direct(m_data, width(), ndx);
@@ -209,7 +205,7 @@ public:
 
         return uint64_t(val);
     }
-    std::string get_string(unsigned ndx) const
+    std::string get_string(size_t ndx) const
     {
         std::string str;
         if (valid()) {
@@ -250,7 +246,7 @@ public:
     {
         return int(get_val(6));
     }
-    int get_nb_tables() const
+    unsigned get_nb_tables() const
     {
         return m_table_names.size();
     }
@@ -276,7 +272,7 @@ std::ostream& operator<<(std::ostream& ostr, const Group& g)
         ostr << "Free list size: " << g.m_free_list_positions.size() << std::endl;
         ostr << "Tables: " << std::endl;
 
-        for (int i = 0; i < g.get_nb_tables(); i++) {
+        for (unsigned i = 0; i < g.get_nb_tables(); i++) {
             std::cout << "    " << g.m_table_names.get_string(i) << std::endl;
         }
     }
@@ -320,7 +316,7 @@ void Array::get_nodes(realm::Allocator& alloc, uint64_t ref, std::vector<Entry>&
     nodes.emplace_back(ref, arr.size_in_bytes());
     if (arr.has_refs()) {
         auto sz = arr.size();
-        for (size_t i = 0; i < sz; i++) {
+        for (unsigned i = 0; i < sz; i++) {
             uint64_t r = arr.get_ref(i);
             if (r)
                 get_nodes(alloc, r, nodes);
@@ -344,7 +340,7 @@ std::vector<Entry> Group::get_allocated_nodes() const
 
     Array::get_nodes(m_alloc, get_ref(0), all_nodes); // Table names
 
-    for (int i = 0; i < get_nb_tables(); i++) {
+    for (unsigned i = 0; i < get_nb_tables(); i++) {
         get_table_nodes(i, all_nodes);
     }
     if (size() > 8) {
@@ -358,10 +354,10 @@ std::vector<Entry> Group::get_allocated_nodes() const
 std::vector<FreeListEntry> Group::get_free_list() const
 {
     std::vector<FreeListEntry> list;
-    size_t sz = m_free_list_positions.size();
+    unsigned sz = m_free_list_positions.size();
     REALM_ASSERT(sz == m_free_list_sizes.size());
     REALM_ASSERT(sz == m_free_list_versions.size());
-    for (size_t i = 0; i < sz; i++) {
+    for (unsigned i = 0; i < sz; i++) {
         int64_t pos = m_free_list_positions.get_val(i);
         int64_t size = m_free_list_sizes.get_val(i);
         int64_t version = m_free_list_versions.get_val(i);
