@@ -243,9 +243,9 @@ def doBuildInDocker(String buildType, String sanitizeMode='', boolean enableAsse
                         dir('build-dir') {
                             archiveArtifacts(targetFileName)
                         }
-                        stash includes: "build-dir/${targetFileName}", name: targetBuildType
+                        stash includes: "build-dir/${targetFileName}", name: targetFileName
                         if (gitTag) {
-                            publishingStashes << targetBuildType
+                            publishingStashes << targetFileName
                         }
                     }
                 }
