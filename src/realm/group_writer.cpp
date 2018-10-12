@@ -663,7 +663,7 @@ size_t GroupWriter::get_free_space(size_t size)
         // can be done from the beginning
         m_size_map.emplace(rest, chunk_pos + size);
     }
-    REALM_ASSERT((chunk_pos % 8) == 0);
+    REALM_ASSERT_RELEASE_EX((chunk_pos % 8) == 0, chunk_pos);
     return chunk_pos;
 }
 
@@ -794,16 +794,20 @@ void GroupWriter::write(const char* data, size_t size)
     window->encryption_write_barrier(dest_addr, size);
 }
 
+bool inline is_aligned(char* addr) {
+    size_t as_binary = reinterpret_cast<size_t>(addr);
+    return (as_binary & 7) == 0;
+}
 
 ref_type GroupWriter::write_array(const char* data, size_t size, uint32_t checksum)
 {
     // Get position of free space to write in (expanding file if needed)
     size_t pos = get_free_space(size);
-    REALM_ASSERT_3((pos & 0x7), ==, 0); // Write position should always be 64bit aligned
 
     // Write the block
     MapWindow* window = get_window(pos, size);
     char* dest_addr = window->translate(pos);
+    REALM_ASSERT_RELEASE(is_aligned(dest_addr));
     window->encryption_read_barrier(dest_addr, size);
     memcpy(dest_addr, &checksum, 4);
     memcpy(dest_addr + 4, data + 4, size - 4);
@@ -822,7 +826,8 @@ void GroupWriter::write_array_at(MapWindow* window, ref_type ref, const char* da
     REALM_ASSERT_3(pos + size, <=, to_size_t(m_group.m_top.get(2) / 2));
     // REALM_ASSERT_3(pos + size, <=, m_file_map.get_size());
     char* dest_addr = window->translate(pos);
-
+    REALM_ASSERT_RELEASE(is_aligned(dest_addr));
+ 
     uint32_t dummy_checksum = 0x41414141UL; // "AAAA" in ASCII
     memcpy(dest_addr, &dummy_checksum, 4);
     memcpy(dest_addr + 4, data + 4, size - 4);

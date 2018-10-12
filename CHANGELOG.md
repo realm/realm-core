@@ -13,7 +13,9 @@
 -----------
 
 ### Internals
-* None.
+* Improved assertion checking in release mode in order to detect any corruption
+  of our freelist earlier and prevent bogus allocations from a corrupted freelist
+  from leading to subsequent corruption of other parts of the file.
 
 ----------------------------------------------
 
