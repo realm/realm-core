@@ -51,7 +51,7 @@ void Object::set_property_value(ContextType& ctx, StringData prop_name, ValueTyp
     // add a new primary key to a type (or change the property type), but it
     // is otherwise considered the immutable identity of the row
     if (property.is_primary && !m_realm->is_in_migration())
-        throw std::logic_error("Cannot modify primary key after creation");
+        throw ModifyPrimaryKeyException(m_object_schema->name, property.name);
 
     set_property_value_impl(ctx, property, value, try_update);
 }
