@@ -35,6 +35,15 @@ class Object;
 class Realm;
 
 namespace partial_sync {
+
+struct InvalidRealmStateException : public std::logic_error {
+    InvalidRealmStateException(const std::string& msg);
+};
+
+struct ExistingSubscriptionException : public std::runtime_error {
+    ExistingSubscriptionException(const std::string& msg);
+};
+
 enum class SubscriptionState : int8_t;
 
 struct SubscriptionNotificationToken {
@@ -73,26 +82,33 @@ private:
     friend void unsubscribe(Subscription&);
 };
 
-/// Create a partial sync subscription from the query associated with the `Results`.
+/// Create a Query-based subscription from the query associated with the `Results`.
 ///
 /// The subscription is created asynchronously.
 ///
 /// State changes, including runtime errors, are communicated via notifications
 /// registered on the resulting `Subscription` object.
 ///
-/// Programming errors, such as attempting to create a subscription in that is not
-/// partially synced, or subscribing to an unsupported query, will throw an exception.
+/// Programming errors, such as attempting to create a subscription in a Realm that is not
+/// Query-based, or subscribing to an unsupported query, will throw an exception.
 Subscription subscribe(Results const&, util::Optional<std::string> name);
+
+// Create a subscription from the query associated with the `Results`
+//
+// The subscription is created synchronously, so this method should only be called inside
+// a write transaction.
+//
+// Programming errors, such as attempting to create a subscription outside a write transaction or in
+// a Realm that is not Query-based, or subscribing to an unsupported query, will throw an exception.
+//
+// The Row that represents the Subscription in the  __ResultsSets table is returned.
+RowExpr subscribe_blocking(Results const&, util::Optional<std::string> name);
 
 /// Remove a partial sync subscription.
 ///
 /// The operation is performed asynchronously. Completion will be indicated by the
 /// `Subscription` transitioning to the `Invalidated` state.
 void unsubscribe(Subscription&);
-
-// Deprecated
-void register_query(std::shared_ptr<Realm>, const std::string &object_class, const std::string &query,
-					std::function<void (Results, std::exception_ptr)>);
 
 } // namespace partial_sync
 

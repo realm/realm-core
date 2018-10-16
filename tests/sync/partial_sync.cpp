@@ -624,3 +624,59 @@ TEST_CASE("Partial sync error checking", "[sync]") {
         }
     }
 }
+
+TEST_CASE("Creating subscriptions synchronously", "[sync]") {
+    if (!EventLoop::has_implementation())
+        return;
+
+    SyncManager::shared().configure_file_system(tmp_dir(), SyncManager::MetadataMode::NoEncryption);
+
+    SyncServer server;
+    SyncTestFile config(server, "test");
+    config.schema = partial_sync_schema();
+    SyncTestFile partial_config(server, "test", true);
+    partial_config.schema = partial_sync_schema();
+
+    auto realm = Realm::get_shared_realm(partial_config);
+    auto subscription_table = ObjectStore::table_for_object_type(realm->read_group(), "__ResultSets");
+    Results subscriptions(realm, *subscription_table);
+
+    SECTION("Create new unnamed subscription") {
+        CHECK(subscriptions.size() == 0);
+
+        realm->begin_transaction();
+        auto table = ObjectStore::table_for_object_type(realm->read_group(), "object_a");
+        Results user_query(realm, *table);
+        partial_sync::subscribe_blocking(user_query, none);
+        realm->commit_transaction();
+
+        CHECK(subscriptions.size() == 1);
+        CHECK(subscriptions.get(0).get_string(6) == "[object_a] TRUEPREDICATE "); // Name of subscription
+        CHECK(subscriptions.get(0).get_int(3) == static_cast<int64_t>(partial_sync::SubscriptionState::Pending));
+    }
+
+    SECTION("Create existing subscription returns old row") {
+        subscribe_and_wait("truepredicate", partial_config, "object_a", util::Optional<std::string>("sub"), [](Results, std::exception_ptr error) {
+            REQUIRE(!error);
+        });
+
+        CHECK(subscriptions.size() == 6); // Waiting for first subscription also means subscriptions from the server has been downloaded.
+        RowExpr old_sub = subscriptions.get(0);
+
+        realm->begin_transaction();
+        auto table = ObjectStore::table_for_object_type(realm->read_group(), "object_a");
+        Results user_query(realm, *table);
+        RowExpr new_sub = partial_sync::subscribe_blocking(user_query, util::Optional<std::string>("sub"));
+        realm->commit_transaction();
+
+        CHECK(subscriptions.size() == 6);
+        CHECK(old_sub.get_index() == new_sub.get_index());
+    }
+
+    SECTION("Create subscription outside write transaction throws") {
+        auto table = ObjectStore::table_for_object_type(realm->read_group(), "object_a");
+        Results user_query(realm, *table);
+        CHECK_THROWS(partial_sync::subscribe_blocking(user_query, none));
+    }
+}
+

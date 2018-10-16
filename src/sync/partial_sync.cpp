@@ -157,6 +157,14 @@ struct RowHandover {
 
 namespace partial_sync {
 
+InvalidRealmStateException::InvalidRealmStateException(const std::string& msg)
+: std::logic_error(msg)
+{}
+
+ExistingSubscriptionException::ExistingSubscriptionException(const std::string& msg)
+: std::runtime_error(msg)
+{}
+
 namespace {
 
 template<typename F>
@@ -168,28 +176,6 @@ void with_open_shared_group(Realm::Config const& config, F&& function)
     Realm::open_with_config(config, history, sg, read_only_group, nullptr);
 
     function(*sg);
-}
-void update_schema(Group& group, Property matches_property)
-{
-    Schema current_schema;
-    std::string table_name = ObjectStore::table_name_for_object_type(result_sets_type_name);
-    if (group.has_table(table_name))
-        current_schema = {ObjectSchema{group, result_sets_type_name}};
-
-    Schema desired_schema({
-        ObjectSchema(result_sets_type_name, {
-            {"name", PropertyType::String, Property::IsPrimary{false}, Property::IsIndexed{true}},
-            {"matches_property", PropertyType::String},
-            {"query", PropertyType::String},
-            {"status", PropertyType::Int},
-            {"error_message", PropertyType::String},
-            {"query_parse_counter", PropertyType::Int},
-            std::move(matches_property)
-        })
-    });
-    auto required_changes = current_schema.compare(desired_schema);
-    if (!required_changes.empty())
-        ObjectStore::apply_additive_changes(group, required_changes, true);
 }
 
 struct ResultSetsColumns {
@@ -214,26 +200,62 @@ struct ResultSetsColumns {
     size_t matches_property;
 };
 
-bool validate_existing_subscription(Table& table, ResultSetsColumns const& columns, std::string const& name,
-                                    std::string const& query, std::string const& matches_property)
+// Validate the subscription about to be created against existing subscription.
+// If an existing subscription already exists that matches the one  we are about to create, the
+// index of that Subscription is returned. If no current matching subscription exists `npos` is
+// returned.
+size_t validate_existing_subscription(Table& table, ResultSetsColumns const& columns, std::string const& name,
+                                      std::string const& query, std::string const& matches_property)
 {
     auto existing_row_ndx = table.find_first_string(columns.name, name);
     if (existing_row_ndx == npos)
-        return false;
+        return npos;
 
     StringData existing_query = table.get_string(columns.query, existing_row_ndx);
     if (existing_query != query)
-        throw std::runtime_error(util::format("An existing subscription exists with the same name, "
-                                              "but a different query ('%1' vs '%2').",
-                                              existing_query, query));
+        throw ExistingSubscriptionException(util::format("An existing subscription exists with the same name, "
+                                                         "but a different query ('%1' vs '%2').",
+                                                         existing_query, query));
 
     StringData existing_matches_property = table.get_string(columns.matches_property_name, existing_row_ndx);
     if (existing_matches_property != matches_property)
-        throw std::runtime_error(util::format("An existing subscription exists with the same name, "
-                                              "but a different result type ('%1' vs '%2').",
-                                              existing_matches_property, matches_property));
+        throw ExistingSubscriptionException(util::format("An existing subscription exists with the same name, "
+                                                         "but a different result type ('%1' vs '%2').",
+                                                         existing_matches_property, matches_property));
 
-    return true;
+    return existing_row_ndx;
+}
+
+// Performs the logic of actually writing the subscription (if needed) to the Realm and making sure
+// that the `matches_property` field is setup correctly. This method will throw if the query cannot
+// be serialized or the name is already used by another subscription.
+//
+// The row of the resulting subscription is returned. If an old subscription exists that matches
+// the one about to be created, a new subscription is not created, but the old one is returned
+// instead.
+RowExpr write_subscription(std::string const& object_type, std::string const& name, std::string const& query, Group& group)
+{
+    auto matches_property = std::string(object_type) + "_matches";
+
+    auto table = ObjectStore::table_for_object_type(group, result_sets_type_name);
+    ResultSetsColumns columns(*table, matches_property);
+
+    // Update schema if needed.
+    if (columns.matches_property == npos) {
+        auto target_table = ObjectStore::table_for_object_type(group, object_type);
+        columns.matches_property = table->add_column_link(type_LinkList, matches_property, *target_table);
+    } else {
+        // FIXME: Validate that the column type and link target are correct.
+    }
+
+    size_t row_ndx = validate_existing_subscription(*table, columns, name, query, matches_property);
+    if (row_ndx == npos) {
+        row_ndx = sync::create_object(group, *table);
+        table->set_string(columns.name, row_ndx, name);
+        table->set_string(columns.query, row_ndx, query);
+        table->set_string(columns.matches_property_name, row_ndx, matches_property);
+    }
+    return table->get(row_ndx);
 }
 
 void enqueue_registration(Realm& realm, std::string object_type, std::string query, std::string name,
@@ -247,27 +269,7 @@ void enqueue_registration(Realm& realm, std::string object_type, std::string que
         try {
             with_open_shared_group(config, [&](SharedGroup& sg) {
                 _impl::WriteTransactionNotifyingSync write(config, sg);
-
-                auto matches_property = std::string(object_type) + "_matches";
-
-                auto table = ObjectStore::table_for_object_type(write.get_group(), result_sets_type_name);
-                ResultSetsColumns columns(*table, matches_property);
-
-                // Update schema if needed.
-                if (columns.matches_property == npos) {
-                    auto target_table = ObjectStore::table_for_object_type(write.get_group(), object_type);
-                    columns.matches_property = table->add_column_link(type_LinkList, matches_property, *target_table);
-                } else {
-                    // FIXME: Validate that the column type and link target are correct.
-                }
-
-                if (!validate_existing_subscription(*table, columns, name, query, matches_property)) {
-                    auto row_ndx = sync::create_object(write.get_group(), *table);
-                    table->set_string(columns.name, row_ndx, name);
-                    table->set_string(columns.query, row_ndx, query);
-                    table->set_string(columns.matches_property_name, row_ndx, matches_property);
-                }
-
+                write_subscription(object_type, name, query, write.get_group());
                 write.commit();
             });
         } catch (...) {
@@ -318,77 +320,6 @@ std::string default_name_for_query(const std::string& query, const std::string& 
 
 } // unnamed namespace
 
-void register_query(std::shared_ptr<Realm> realm, const std::string &object_class, const std::string &query,
-                    std::function<void (Results, std::exception_ptr)> callback)
-{
-    auto sync_config = realm->config().sync_config;
-    if (!sync_config || !sync_config->is_partial)
-        throw std::logic_error("A partial sync query can only be registered in a partially synced Realm");
-
-    if (realm->schema().find(object_class) == realm->schema().end())
-        throw std::logic_error("A partial sync query can only be registered for a type that exists in the Realm's schema");
-
-    auto matches_property = object_class + "_matches";
-
-    // The object schema must outlive `object` below.
-    std::unique_ptr<ObjectSchema> result_sets_schema;
-    Object raw_object;
-    {
-        realm->begin_transaction();
-        auto cleanup = util::make_scope_exit([&]() noexcept {
-            if (realm->is_in_transaction())
-                realm->cancel_transaction();
-        });
-
-        update_schema(realm->read_group(),
-                      Property(matches_property, PropertyType::Object|PropertyType::Array, object_class));
-
-        result_sets_schema = std::make_unique<ObjectSchema>(realm->read_group(), result_sets_type_name);
-
-        CppContext context;
-        raw_object = Object::create<util::Any>(context, realm, *result_sets_schema,
-                                               AnyDict{
-                                                   {"name", query},
-                                                   {"matches_property", matches_property},
-                                                   {"query", query},
-                                                   {"status", int64_t(0)},
-                                                   {"error_message", std::string()},
-                                                   {"query_parse_counter", int64_t(0)},
-                                               }, false);
-
-        realm->commit_transaction();
-    }
-
-    auto object = std::make_shared<_impl::NotificationWrapper<Object>>(std::move(raw_object));
-
-    // Observe the new object and notify listener when the results are complete (status != 0).
-    auto notification_callback = [object, matches_property,
-                                  result_sets_schema=std::move(result_sets_schema),
-                                  callback=std::move(callback)](CollectionChangeSet, std::exception_ptr error) mutable {
-        if (error) {
-            callback(Results(), error);
-            object.reset();
-            return;
-        }
-
-        CppContext context;
-        auto status = any_cast<int64_t>(object->get_property_value<util::Any>(context, "status"));
-        if (status == 0) {
-            // Still computing...
-            return;
-        } else if (status == 1) {
-            // Finished successfully.
-            auto list = any_cast<List>(object->get_property_value<util::Any>(context, matches_property));
-            callback(list.as_results(), nullptr);
-        } else {
-            // Finished with error.
-            auto message = any_cast<std::string>(object->get_property_value<util::Any>(context, "error_message"));
-            callback(Results(), std::make_exception_ptr(std::runtime_error(std::move(message))));
-        }
-        object.reset();
-    };
-    object->add_notification_callback(std::move(notification_callback));
-}
 
 struct Subscription::Notifier : public _impl::CollectionNotifier {
     enum State {
@@ -492,7 +423,7 @@ Subscription subscribe(Results const& results, util::Optional<std::string> user_
 
     auto sync_config = realm->config().sync_config;
     if (!sync_config || !sync_config->is_partial)
-        throw std::logic_error("A partial sync query can only be registered in a partially synced Realm");
+        throw InvalidRealmStateException("A Subscription can only be created in a Query-based Realm.");
 
     auto query = results.get_query().get_description(); // Throws if the query cannot be serialized.
     query += " " + results.get_descriptor_ordering().get_description(results.get_query().get_table());
@@ -508,6 +439,26 @@ Subscription subscribe(Results const& results, util::Optional<std::string> user_
             notifier->finished_subscribing(error);
     });
     return subscription;
+}
+
+RowExpr subscribe_blocking(Results const& results, util::Optional<std::string> user_provided_name)
+{
+
+    auto realm = results.get_realm();
+    if (!realm->is_in_transaction()) {
+        throw InvalidRealmStateException("The subscription can only be created inside a write transaction.");
+    }
+    auto sync_config = realm->config().sync_config;
+    if (!sync_config || !sync_config->is_partial) {
+        throw InvalidRealmStateException("A Subscription can only be created in a Query-based Realm.");
+    }
+
+    auto query = results.get_query().get_description(); // Throws if the query cannot be serialized.
+    query += " " + results.get_descriptor_ordering().get_description(results.get_query().get_table());
+    std::string name = user_provided_name ? std::move(*user_provided_name)
+                                          : default_name_for_query(query, results.get_object_type());
+
+    return write_subscription(results.get_object_type(), name, query, realm->read_group());
 }
 
 void unsubscribe(Subscription& subscription)
