@@ -64,6 +64,15 @@ public:
     // Flushes any remaining dirty pages from the old mapping
     void set(void* new_addr, size_t new_size, size_t new_file_offset);
 
+    // Mark all pages untouched. Later accesses will mark individual pages as touched again
+    // This is not done under lock, so the validity of the process must be ensured
+    // by waiting for all references to die before reclaiming untouched pages.
+    size_t mark_untouched() noexcept;
+
+    // reclaim any untouched pages - this is thread safe with respect to
+    // concurrent access/touching of pages
+    size_t reclaim_untouched(UniqueLock& lock) noexcept;
+
     bool contains_page(size_t page_in_file) const;
     size_t get_local_index_of_address(const void* addr, size_t offset = 0) const;
 
@@ -80,6 +89,7 @@ private:
     // MUST be of type char because of coherence issues when writing inside mutex and reading outside 
     // it. FIXME: We're investigating if this is good enough, or if we need further mechanisms
     std::vector<char> m_up_to_date_pages;
+    std::vector<char> m_touched;
     std::vector<bool> m_dirty_pages;
 
     File::AccessMode m_access;
@@ -122,6 +132,8 @@ inline void EncryptedFileMapping::read_barrier(const void* addr, size_t size, Un
 
     // make sure the first page is available
     // Checking before taking the lock is important to performance.
+    if (!m_touched[first_accessed_local_page])
+    	m_touched[first_accessed_local_page] = 1;
     if (!m_up_to_date_pages[first_accessed_local_page]) {
         if (!lock.holds_lock())
             lock.lock();
@@ -144,6 +156,8 @@ inline void EncryptedFileMapping::read_barrier(const void* addr, size_t size, Un
     // We already checked first_accessed_local_page above, so we start the loop
     // at first_accessed_local_page + 1 to check the following page.
     for (size_t idx = first_accessed_local_page + 1; idx <= last_idx && idx < up_to_date_pages_size; ++idx) {
+        if (!m_touched[idx])
+        	m_touched[idx] = 1;
         if (!m_up_to_date_pages[idx]) {
             if (!lock.holds_lock())
                 lock.lock();

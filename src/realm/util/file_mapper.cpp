@@ -105,6 +105,25 @@ util::Mutex& mapping_mutex = *new Mutex;
 std::vector<mapping_and_addr>& mappings_by_addr = *new std::vector<mapping_and_addr>;
 std::vector<mappings_for_file>& mappings_by_file = *new std::vector<mappings_for_file>;
 
+size_t mark_all_untouched() {
+	UniqueLock lock(mapping_mutex);
+	size_t sum = 0;
+	for (auto it = mappings_by_addr.begin(); it != mappings_by_addr.end(); ++it) {
+		if (it->mapping != nullptr)
+			sum += it->mapping->mark_untouched();
+	}
+	return sum;
+}
+
+size_t reclaim_all_untouched() {
+	UniqueLock lock(mapping_mutex);
+	size_t sum = 0;
+	for (auto it = mappings_by_addr.begin(); it != mappings_by_addr.end(); ++it) {
+		if (it->mapping != nullptr)
+			sum += it->mapping->reclaim_untouched(lock);
+	}
+	return sum;
+}
 
 mapping_and_addr* find_mapping_for_addr(void* addr, size_t size)
 {

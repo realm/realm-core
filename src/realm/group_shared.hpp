@@ -566,6 +566,7 @@ private:
     class ReadLockUnlockGuard;
 
     // Member variables
+    uint_fast64_t newest_version_at_end_of_marking = 0;
     size_t m_free_space = 0;
     size_t m_used_space = 0;
     Group m_group;

@@ -42,6 +42,8 @@ class EncryptedFileMapping;
 
 #if REALM_ENABLE_ENCRYPTION
 
+size_t mark_all_untouched();
+size_t reclaim_all_untouched();
 
 // This variant allows the caller to obtain direct access to the encrypted file mapping
 // for optimization purposes.
@@ -94,6 +96,17 @@ void inline encryption_write_barrier(const void*, size_t)
 void inline encryption_write_barrier(const void*, size_t, EncryptedFileMapping*)
 {
 }
+
+size_t mark_all_untouched()
+{
+	return 0;
+}
+
+size_t reclaim_all_untouched()
+{
+	return 0;
+}
+
 #endif
 
 // helpers for encrypted Maps

@@ -1823,6 +1823,7 @@ const Group& SharedGroup::begin_read(VersionID version_id)
         throw LogicError(LogicError::wrong_transact_state);
 
     bool writable = false;
+
     do_begin_read(version_id, writable); // Throws
 
     set_transact_stage(transact_Reading);
@@ -1994,9 +1995,19 @@ void SharedGroup::do_begin_read(VersionID version_id, bool writable)
     // begin_read().
 
     grab_read_lock(m_read_lock, version_id); // Throws
-
     ReadLockUnlockGuard g(*this, m_read_lock);
 
+    SharedInfo* r_info = m_reader_map.get_addr();
+    const Ringbuffer::ReadCount& rc = r_info->readers.get_oldest();
+    auto oldest_version = rc.version;
+    if (newest_version_at_end_of_marking < oldest_version) {
+    	std::cout << "Reclaiming encrypted pages " << std::flush;
+    	auto untouched = realm::util::reclaim_all_untouched();
+    	std::cout << untouched << std::endl << "Marking pages untouched " << std::flush;
+    	auto reclaimed = realm::util::mark_all_untouched();
+    	std::cout << reclaimed << std::endl;
+    	newest_version_at_end_of_marking = get_version_of_latest_snapshot();
+    }
     using gf = _impl::GroupFriend;
     gf::attach_shared(m_group, m_read_lock.m_top_ref, m_read_lock.m_file_size, writable); // Throws
 

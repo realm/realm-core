@@ -439,6 +439,7 @@ void EncryptedFileMapping::mark_outdated(size_t local_page_ndx) noexcept
         flush();
 
     m_up_to_date_pages[local_page_ndx] = false;
+    // m_touched[local_page_ndx] = false;
 }
 
 bool EncryptedFileMapping::copy_up_to_date_page(size_t local_page_ndx) noexcept
@@ -539,6 +540,37 @@ void EncryptedFileMapping::validate() noexcept
 #endif
 }
 
+size_t EncryptedFileMapping::mark_untouched() noexcept
+{
+	const size_t num_pages = m_touched.size();
+	size_t untouched = 0;
+	for (size_t page_ndx = 0; page_ndx < num_pages; ++page_ndx) {
+		if (m_touched[page_ndx]) {
+			m_touched[page_ndx] = 0;
+			++untouched;
+		}
+	}
+	return untouched;
+}
+
+size_t EncryptedFileMapping::reclaim_untouched(UniqueLock& lock) noexcept
+{
+	if (!lock.holds_lock())
+		lock.lock();
+	const size_t num_pages = m_touched.size();
+	size_t num_reclaimed = 0;
+	for (size_t page_ndx = 0; page_ndx < num_pages; ++page_ndx) {
+		if (m_touched[page_ndx] == 0 && m_up_to_date_pages[page_ndx] && !m_dirty_pages[page_ndx]) {
+			// must be done after taking the lock - to prevent any other thread from
+			// changing the state of m_up_to_date_pages
+			m_up_to_date_pages[page_ndx] = 0;
+			memset(page_addr(page_ndx), 0, 1 << m_page_shift);
+			num_reclaimed++;
+		}
+	}
+	return num_reclaimed;
+}
+
 void EncryptedFileMapping::flush() noexcept
 {
     const size_t num_dirty_pages = m_dirty_pages.size();
@@ -615,9 +647,11 @@ void EncryptedFileMapping::set(void* new_addr, size_t new_size, size_t new_file_
 
     m_up_to_date_pages.clear();
     m_dirty_pages.clear();
+    m_touched.clear();
 
     m_up_to_date_pages.resize(num_pages, false);
     m_dirty_pages.resize(num_pages, false);
+    m_touched.resize(num_pages, false);
 }
 
 File::SizeType encrypted_size_to_data_size(File::SizeType size) noexcept
