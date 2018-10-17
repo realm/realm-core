@@ -64,6 +64,7 @@ struct SlabAlloc::MappedFile {
 
     util::Mutex m_mutex;
     util::File m_file;
+    util::SharedFileInfo* m_realm_file_info = nullptr;
     util::File::Map<char> m_initial_mapping;
     // additional sections beyond those covered by the initial mapping, are
     // managed as separate mmap allocations, each covering one section.
@@ -1078,8 +1079,15 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
     }
     dg.release();  // Do not detach
     fcg.release(); // Do not close
+    m_file_mappings->m_realm_file_info = util::get_file_info_for_file(m_file_mappings->m_file.get_unique_id());
     m_file_mappings->m_success = true;
     return top_ref;
+}
+
+void SlabAlloc::cleanup_hook(uint64_t newest_version, uint64_t oldest_version)
+{
+	if (m_file_mappings->m_realm_file_info)
+		util::encryption_layer_hook(*m_file_mappings->m_realm_file_info, newest_version, oldest_version);
 }
 
 ref_type SlabAlloc::attach_buffer(const char* data, size_t size)

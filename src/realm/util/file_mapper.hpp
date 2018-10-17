@@ -42,8 +42,8 @@ class EncryptedFileMapping;
 
 #if REALM_ENABLE_ENCRYPTION
 
-size_t mark_all_untouched();
-size_t reclaim_all_untouched();
+size_t encryption_layer_hook(SharedFileInfo& info, uint64_t newest_version, uint64_t oldest_version);
+SharedFileInfo* get_file_info_for_file(File::UniqueID fd);
 
 // This variant allows the caller to obtain direct access to the encrypted file mapping
 // for optimization purposes.
@@ -97,14 +97,8 @@ void inline encryption_write_barrier(const void*, size_t, EncryptedFileMapping*)
 {
 }
 
-size_t mark_all_untouched()
+size_t encryption_layer_hook(SharedFileInfo&, uint64_t, uint64_t)
 {
-	return 0;
-}
-
-size_t reclaim_all_untouched()
-{
-	return 0;
 }
 
 #endif

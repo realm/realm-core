@@ -43,6 +43,7 @@
 #include <sys/stat.h>
 #include <cstring>
 #include <atomic>
+#include <iostream>
 
 #include <realm/util/file.hpp>
 #include <realm/util/errno.hpp>
@@ -105,24 +106,24 @@ util::Mutex& mapping_mutex = *new Mutex;
 std::vector<mapping_and_addr>& mappings_by_addr = *new std::vector<mapping_and_addr>;
 std::vector<mappings_for_file>& mappings_by_file = *new std::vector<mappings_for_file>;
 
-size_t mark_all_untouched() {
+size_t encryption_layer_hook(SharedFileInfo& info, uint64_t newest_version, uint64_t oldest_version)
+{
 	UniqueLock lock(mapping_mutex);
-	size_t sum = 0;
-	for (auto it = mappings_by_addr.begin(); it != mappings_by_addr.end(); ++it) {
-		if (it->mapping != nullptr)
-			sum += it->mapping->mark_untouched();
+	if (info.last_scanned_version < oldest_version) {
+		size_t sum = 0;
+		for (auto it = info.mappings.begin(); it != info.mappings.end(); ++it) {
+			sum += (*it)->reclaim_untouched();
+		}
+		for (auto it = info.mappings.begin(); it != info.mappings.end(); ++it) {
+			(*it)->mark_untouched();
+		}
+		info.last_scanned_version = newest_version;
+		if (sum > 0)
+			std::cout << "Encryption: " << oldest_version << " .. "
+				<< newest_version << " -> reclaimed " << sum << " pages" << std::endl;
+		return sum;
 	}
-	return sum;
-}
-
-size_t reclaim_all_untouched() {
-	UniqueLock lock(mapping_mutex);
-	size_t sum = 0;
-	for (auto it = mappings_by_addr.begin(); it != mappings_by_addr.end(); ++it) {
-		if (it->mapping != nullptr)
-			sum += it->mapping->reclaim_untouched(lock);
-	}
-	return sum;
+	return 0;
 }
 
 mapping_and_addr* find_mapping_for_addr(void* addr, size_t size)
@@ -134,6 +135,26 @@ mapping_and_addr* find_mapping_for_addr(void* addr, size_t size)
     }
 
     return 0;
+}
+
+SharedFileInfo* get_file_info_for_file(File::UniqueID id)
+{
+    LockGuard lock(mapping_mutex);
+
+    std::vector<mappings_for_file>::iterator it;
+    for (it = mappings_by_file.begin(); it != mappings_by_file.end(); ++it) {
+#ifdef _WIN32
+        if (File::is_same_file_static(it->handle, fd))
+            break;
+#else
+        if (it->inode == id.inode && it->device == id.device)
+            break;
+#endif
+    }
+    if (it == mappings_by_file.end())
+    	return nullptr;
+    else
+    	return it->info.get();
 }
 
 EncryptedFileMapping* add_mapping(void* addr, size_t size, FileDesc fd, size_t file_offset, File::AccessMode access,

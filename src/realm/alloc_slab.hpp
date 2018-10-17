@@ -288,6 +288,11 @@ public:
     /// call to SlabAlloc::alloc() corresponds to a mutation event.
     bool is_free_space_clean() const noexcept;
 
+    /// Allow for cleanup activities in the slab allocator and below.
+    /// Currently used to drive reclaim of pages at the encryption layer, if enabled.
+    /// Caller must provide numbers of newest and oldest versions currently accessible
+    void cleanup_hook(uint64_t newest_version, uint64_t oldest_version);
+
     void verify() const override;
 #ifdef REALM_DEBUG
     void enable_debug(bool enable)

@@ -92,6 +92,7 @@ struct SharedFileInfo {
     FileDesc fd;
     AESCryptor cryptor;
     std::vector<EncryptedFileMapping*> mappings;
+    uint64_t last_scanned_version = 0;
 
     SharedFileInfo(const uint8_t* key, FileDesc file_descriptor);
 };

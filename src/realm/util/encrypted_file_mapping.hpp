@@ -65,13 +65,11 @@ public:
     void set(void* new_addr, size_t new_size, size_t new_file_offset);
 
     // Mark all pages untouched. Later accesses will mark individual pages as touched again
-    // This is not done under lock, so the validity of the process must be ensured
-    // by waiting for all references to die before reclaiming untouched pages.
     size_t mark_untouched() noexcept;
 
     // reclaim any untouched pages - this is thread safe with respect to
-    // concurrent access/touching of pages
-    size_t reclaim_untouched(UniqueLock& lock) noexcept;
+    // concurrent access/touching of pages - but must be called with the mutex locked.
+    size_t reclaim_untouched() noexcept;
 
     bool contains_page(size_t page_in_file) const;
     size_t get_local_index_of_address(const void* addr, size_t offset = 0) const;

@@ -553,10 +553,8 @@ size_t EncryptedFileMapping::mark_untouched() noexcept
 	return untouched;
 }
 
-size_t EncryptedFileMapping::reclaim_untouched(UniqueLock& lock) noexcept
+size_t EncryptedFileMapping::reclaim_untouched() noexcept
 {
-	if (!lock.holds_lock())
-		lock.lock();
 	const size_t num_pages = m_touched.size();
 	size_t num_reclaimed = 0;
 	for (size_t page_ndx = 0; page_ndx < num_pages; ++page_ndx) {
