@@ -562,7 +562,16 @@ size_t EncryptedFileMapping::reclaim_untouched() noexcept
 			// must be done after taking the lock - to prevent any other thread from
 			// changing the state of m_up_to_date_pages
 			m_up_to_date_pages[page_ndx] = 0;
+#ifdef _WIN32
 			memset(page_addr(page_ndx), 0, 1 << m_page_shift);
+#else
+			void* addr = page_addr(page_ndx);
+		    void* addr2 = ::mmap(addr, 1 << m_page_shift, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
+		    if (addr == addr2) {
+		        throw std::system_error(errno, std::system_category(),
+		                                std::string("using mmap() to clear page failed"));
+#endif
+		    }
 			num_reclaimed++;
 		}
 	}
