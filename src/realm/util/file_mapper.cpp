@@ -109,8 +109,13 @@ std::vector<mappings_for_file>& mappings_by_file = *new std::vector<mappings_for
 size_t encryption_layer_hook(SharedFileInfo& info, uint64_t newest_version, uint64_t oldest_version)
 {
 	UniqueLock lock(mapping_mutex);
-	if (info.last_scanned_version < oldest_version) {
+	if (info.last_scanned_version + 10 < oldest_version) {
 		size_t sum = 0;
+		size_t touched = 0,updated = 0,dirty = 0,total = 0;
+
+		for (auto it = info.mappings.begin(); it != info.mappings.end(); ++it) {
+			(*it)->count_usage(touched,updated,dirty,total);
+		}
 		for (auto it = info.mappings.begin(); it != info.mappings.end(); ++it) {
 			sum += (*it)->reclaim_untouched();
 		}
@@ -118,9 +123,14 @@ size_t encryption_layer_hook(SharedFileInfo& info, uint64_t newest_version, uint
 			(*it)->mark_untouched();
 		}
 		info.last_scanned_version = newest_version;
-		if (sum > 0)
+		if (sum > 0) {
 			std::cout << "Encryption: " << oldest_version << " .. "
-				<< newest_version << " -> reclaimed " << sum << " pages" << std::endl;
+				<< newest_version << " -> reclaimed " << sum << " pages";
+			std::cout << "    Total: " <<  total
+					<< "    touched: " << touched
+					<< "    up-to-date: " << updated
+					<< "    dirty: " << dirty << std::endl;
+		}
 		return sum;
 	}
 	return 0;

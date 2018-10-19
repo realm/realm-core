@@ -719,5 +719,37 @@ TEST(LangBindHelper_RollbackLinkInsert)
     CHECK_EQUAL(g.get_table(1)->get_link_target(0), g.get_table(0));
 }
 
+ONLY(LangBindHelper_EncryptionGiga)
+{
+    std::string path = "dont_try_this_at_home.realm";
+    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
+
+    std::cout << "Opening..." << std::endl;
+    SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
+    std::cout << "Setup...." << std::endl;
+    {
+    	WriteTransaction wt(sg_w);
+    	Group& g = wt.get_group();
+    	TableRef t = g.get_table("spoink");
+    	if (t.get() == nullptr) {
+    		t = g.add_table("spoink");
+    		t->add_column(type_String,"spoink-column");
+    	}
+    	wt.commit();
+    }
+    std::cout << "Growing..." << std::endl;
+    for (int j = 0; j < 1000; ++j) {
+    	//std::cout << "growth phase " << j << std::endl;
+    	WriteTransaction wt(sg_w);
+        Group& g = wt.get_group();
+        TableRef t = g.get_table("spoink");
+    	for (int k = 0; k < 100000; ++k) {
+    		auto row = t->add_empty_row();
+    		t->set_string(0, row, "yooodle-de-do");
+    	}
+    	//std::cout << "     - commit" << std::endl;
+    	wt.commit();
+    }
+}
 
 #endif // TEST_TRANSACTIONS

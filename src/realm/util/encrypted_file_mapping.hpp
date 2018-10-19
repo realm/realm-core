@@ -71,6 +71,9 @@ public:
     // concurrent access/touching of pages - but must be called with the mutex locked.
     size_t reclaim_untouched() noexcept;
 
+    // Get statistics
+    void count_usage(size_t& touched, size_t& updated, size_t& dirty, size_t& total);
+
     bool contains_page(size_t page_in_file) const;
     size_t get_local_index_of_address(const void* addr, size_t offset = 0) const;
 

@@ -439,7 +439,7 @@ void EncryptedFileMapping::mark_outdated(size_t local_page_ndx) noexcept
         flush();
 
     m_up_to_date_pages[local_page_ndx] = false;
-    // m_touched[local_page_ndx] = false;
+    m_touched[local_page_ndx] = false;
 }
 
 bool EncryptedFileMapping::copy_up_to_date_page(size_t local_page_ndx) noexcept
@@ -545,14 +545,21 @@ size_t EncryptedFileMapping::mark_untouched() noexcept
 	const size_t num_pages = m_touched.size();
 	size_t untouched = 0;
 	for (size_t page_ndx = 0; page_ndx < num_pages; ++page_ndx) {
-		if (m_touched[page_ndx]) {
-			m_touched[page_ndx] = 0;
-			++untouched;
-		}
+		m_touched[page_ndx] = 0;
 	}
 	return untouched;
 }
 
+void EncryptedFileMapping::count_usage(size_t& touched, size_t& updated, size_t& dirty, size_t& total)
+{
+	const size_t num_pages = m_touched.size();
+	total += num_pages;
+	for (size_t page_ndx = 0; page_ndx < num_pages; ++page_ndx) {
+		touched += m_touched[page_ndx];
+		updated += m_up_to_date_pages[page_ndx];
+		dirty += m_dirty_pages[page_ndx];
+	}
+}
 size_t EncryptedFileMapping::reclaim_untouched() noexcept
 {
 	const size_t num_pages = m_touched.size();
@@ -566,12 +573,21 @@ size_t EncryptedFileMapping::reclaim_untouched() noexcept
 			memset(page_addr(page_ndx), 0, 1 << m_page_shift);
 #else
 			void* addr = page_addr(page_ndx);
-		    void* addr2 = ::mmap(addr, 1 << m_page_shift, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
-		    if (addr == addr2) {
-		        throw std::system_error(errno, std::system_category(),
-		                                std::string("using mmap() to clear page failed"));
-#endif
+/*			int stat = ::munmap(addr, 1 << m_page_shift);
+			if (stat) {
+				throw std::system_error(errno, std::system_category(),
+						std::string("unmap() failed"));
+			}
+*/
+		    void* addr2 = ::mmap(addr, 1 << m_page_shift, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE | MAP_FIXED, -1, 0);
+		    if (addr != addr2) {
+		    	if (addr2 == 0)
+		    		throw std::system_error(errno, std::system_category(),
+		    				std::string("using mmap() to clear page failed"));
+		    	else
+		    		throw std::runtime_error("weird stuff");
 		    }
+#endif
 			num_reclaimed++;
 		}
 	}
