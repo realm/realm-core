@@ -39,6 +39,10 @@ public:
             , index_in_view(i)
         {
         }
+        bool operator<(const IndexPair& other) const
+        {
+            return index_in_view < other.index_in_view;
+        }
         ObjKey key_for_object;
         size_t index_in_view;
         Mixed cached_value;
@@ -50,7 +54,7 @@ public:
     class Sorter {
     public:
         Sorter(std::vector<std::vector<ColKey>> const& columns, std::vector<bool> const& ascending,
-               Table const& root_table, KeyColumn const& row_indexes);
+               Table const& root_table, const IndexPairs& indexes);
         Sorter()
         {
         }
@@ -97,7 +101,7 @@ public:
     virtual std::unique_ptr<BaseDescriptor> clone() const = 0;
     virtual DescriptorType get_type() const = 0;
     virtual void collect_dependencies(const Table* table, std::vector<TableKey>& table_keys) const = 0;
-    virtual Sorter sorter(Table const& table, KeyColumn const& row_indexes) const = 0;
+    virtual Sorter sorter(Table const& table, const IndexPairs& indexes) const = 0;
     // Do what you have to do
     virtual void execute(IndexPairs& v, const Sorter& predicate, const BaseDescriptor* next) const = 0;
 };
@@ -143,7 +147,7 @@ public:
         return DescriptorType::Distinct;
     }
 
-    Sorter sorter(Table const& table, KeyColumn const& row_indexes) const override;
+    Sorter sorter(Table const& table, const IndexPairs& indexes) const override;
     void execute(IndexPairs& v, const Sorter& predicate, const BaseDescriptor* next) const override;
 
     std::string get_description(ConstTableRef attached_table) const override;
@@ -167,7 +171,7 @@ public:
 
     void merge_with(SortDescriptor&& other);
 
-    Sorter sorter(Table const& table, KeyColumn const& row_indexes) const override;
+    Sorter sorter(Table const& table, const IndexPairs& indexes) const override;
 
     void execute(IndexPairs& v, const Sorter& predicate, const BaseDescriptor* next) const override;
 
@@ -202,7 +206,7 @@ public:
         return DescriptorType::Limit;
     }
 
-    Sorter sorter(Table const&, KeyColumn const&) const override
+    Sorter sorter(Table const&, const IndexPairs&) const override
     {
         return Sorter();
     }

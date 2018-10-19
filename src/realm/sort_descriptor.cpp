@@ -135,12 +135,11 @@ void SortDescriptor::merge_with(SortDescriptor&& other)
 
 
 BaseDescriptor::Sorter::Sorter(std::vector<std::vector<ColKey>> const& column_lists,
-                               std::vector<bool> const& ascending, Table const& root_table,
-                               KeyColumn const& key_values)
+                               std::vector<bool> const& ascending, Table const& root_table, const IndexPairs& indexes)
 {
     REALM_ASSERT(!column_lists.empty());
     REALM_ASSERT_EX(column_lists.size() == ascending.size(), column_lists.size(), ascending.size());
-    size_t num_objs = key_values.size();
+    size_t translated_size = std::max_element(indexes.begin(), indexes.end())->index_in_view + 1;
 
     m_columns.reserve(column_lists.size());
     for (size_t i = 0; i < column_lists.size(); ++i) {
@@ -167,30 +166,31 @@ BaseDescriptor::Sorter::Sorter(std::vector<std::vector<ColKey>> const& column_li
 
         auto& translated_keys = m_columns.back().translated_keys;
         auto& is_null = m_columns.back().is_null;
-        translated_keys.resize(num_objs);
-        is_null.resize(num_objs);
+        translated_keys.resize(translated_size);
+        is_null.resize(translated_size);
 
-        for (size_t row_ndx = 0; row_ndx < num_objs; row_ndx++) {
-            ObjKey translated_key = ObjKey(key_values.get(row_ndx));
+        for (const auto& index : indexes) {
+            size_t index_in_view = index.index_in_view;
+            ObjKey translated_key = index.key_for_object;
             for (size_t j = 0; j + 1 < sz; ++j) {
                 ConstObj obj = tables[j]->get_object(translated_key);
                 // type was checked when creating the ColumnsDescriptor
                 if (obj.is_null(columns[j])) {
-                    is_null[row_ndx] = true;
+                    is_null[index_in_view] = true;
                     break;
                 }
                 translated_key = obj.get<ObjKey>(columns[j]);
             }
-            translated_keys[row_ndx] = translated_key;
+            translated_keys[index_in_view] = translated_key;
         }
     }
 }
 
-BaseDescriptor::Sorter DistinctDescriptor::sorter(Table const& table, KeyColumn const& row_indexes) const
+BaseDescriptor::Sorter DistinctDescriptor::sorter(Table const& table, const IndexPairs& indexes) const
 {
     REALM_ASSERT(!m_column_keys.empty());
     std::vector<bool> ascending(m_column_keys.size(), true);
-    return Sorter(m_column_keys, ascending, table, row_indexes);
+    return Sorter(m_column_keys, ascending, table, indexes);
 }
 
 void DistinctDescriptor::execute(IndexPairs& v, const Sorter& predicate, const BaseDescriptor* next) const
@@ -219,10 +219,10 @@ void DistinctDescriptor::execute(IndexPairs& v, const Sorter& predicate, const B
     }
 }
 
-BaseDescriptor::Sorter SortDescriptor::sorter(Table const& table, KeyColumn const& row_indexes) const
+BaseDescriptor::Sorter SortDescriptor::sorter(Table const& table, const IndexPairs& indexes) const
 {
     REALM_ASSERT(!m_column_keys.empty());
-    return Sorter(m_column_keys, m_ascending, table, row_indexes);
+    return Sorter(m_column_keys, m_ascending, table, indexes);
 }
 
 void SortDescriptor::execute(IndexPairs& v, const Sorter& predicate, const BaseDescriptor* next) const

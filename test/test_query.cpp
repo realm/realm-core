@@ -4391,6 +4391,35 @@ TEST(Query_DistinctThroughLinks)
             CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results3[results3.size() - 1 - i]);
         }
     }
+
+    {
+        TableView tv = t1->where().less(t1_int_col, 6).find_all();
+
+        // Test distinct after sort
+        tv.sort(SortDescriptor({{t1_link_col, t2_int_col}}, {true}));
+        //  t1_int   link.t2_int
+        //  ====================
+        //  0        0
+        //  3        0
+        //  5        0
+        //  4        1
+        //  2        2
+        //  1        3
+
+        tv.distinct(DistinctDescriptor({{t1_link_col, t2_int_col}}));
+        //  t1_int   link.t2_int
+        //  ====================
+        //  0        0
+        //  4        1
+        //  2        2
+        //  1        3
+
+        std::vector<size_t> results = {0, 4, 2, 1};
+        CHECK_EQUAL(tv.size(), results.size());
+        for (size_t i = 0; i < tv.size(); ++i) {
+            CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results[i]);
+        }
+    }
 }
 
 TEST(Query_Sort_And_Requery_Typed1)

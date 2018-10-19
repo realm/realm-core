@@ -522,7 +522,7 @@ public:
 #ifdef REALM_DEBUG
     void print() const;
     void print_free() const;
-    MemStats stats();
+    MemStats get_stats();
     void enable_mem_diagnostics(bool enable = true)
     {
         m_alloc.enable_debug(enable);

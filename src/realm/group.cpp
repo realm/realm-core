@@ -1784,7 +1784,7 @@ void Group::verify() const
 
 #ifdef REALM_DEBUG
 
-MemStats Group::stats()
+MemStats Group::get_stats()
 {
     MemStats mem_stats;
     m_top.stats(mem_stats);

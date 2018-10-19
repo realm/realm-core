@@ -62,7 +62,7 @@ void ObjList::do_sort(const DescriptorOrdering& ordering)
     for (int desc_ndx = 0; desc_ndx < num_descriptors; ++desc_ndx) {
         const BaseDescriptor* base_descr = ordering[desc_ndx];
         const BaseDescriptor* next = ((desc_ndx + 1) < num_descriptors) ? ordering[desc_ndx + 1] : nullptr;
-        BaseDescriptor::Sorter predicate = base_descr->sorter(get_parent(), *m_key_values);
+        BaseDescriptor::Sorter predicate = base_descr->sorter(get_parent(), index_pairs);
 
         // Sorting can be specified by multiple columns, so that if two entries in the first column are
         // identical, then the rows are ordered according to the second column, and so forth. For the

@@ -114,7 +114,7 @@ void create() noexcept
     int ret = pthread_key_create(&key, &destroy);
     if (REALM_UNLIKELY(ret != 0)) {
         std::error_code ec = util::make_basic_system_error_code(errno);
-        throw std::system_error(ec); // Termination intended
+        REALM_TERMINATE(ec.message().c_str());
     }
 }
 
@@ -124,11 +124,11 @@ PrimeState& get() noexcept
     void* ptr = pthread_getspecific(key);
     PrimeState* prime_state = static_cast<PrimeState*>(ptr);
     if (!prime_state) {
-        prime_state = new PrimeState; // Throws with intended termination
-        int ret = pthread_setspecific(key, prime_state);
+        prime_state = new (std::nothrow) PrimeState; // Throws with intended termination
+        int ret = prime_state ? pthread_setspecific(key, prime_state) : ENOMEM;
         if (REALM_UNLIKELY(ret != 0)) {
             std::error_code ec = util::make_basic_system_error_code(errno);
-            throw std::system_error(ec); // Termination intended
+            REALM_TERMINATE(ec.message().c_str());
         }
     }
     return *prime_state;

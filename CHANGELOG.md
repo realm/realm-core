@@ -20,6 +20,37 @@
 
 ----------------------------------------------
 
+Besides the changes above, this release includes changes introduced by v5.10.2 and up
+until v5.10.3
+
+| # 5.10.3 Release notes
+|
+| ### Fixed
+| * When a sort or distinct over links was done on an already-sorted TableView,
+|   the link translation map was done using the unsorted rows, resulting in the
+|   second sort/distinct being done with the incorrect values.
+|   PR [#3102](https://github.com/realm/realm-core/pull/3102).
+|
+| ### Compatibility
+| * File format: ver. 9 (upgrades automatically from previous formats)
+|
+| -----------
+|
+| ### Internals
+|
+| * Will assert if someone tries to free a null ref.
+|   Issue [#254](https://github.com/realm/realm-core-private/issues/254) and the like.
+|
+| ----------------------------------------------
+|
+| # 5.10.2 Release notes
+|
+| ### Enhancements
+|
+| * Add an arm64_32 slice to the watchOS build.
+
+----------------------------------------------
+
 # 6.0.0-alpha.2 Release notes
 
 ### Open issues

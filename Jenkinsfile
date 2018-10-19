@@ -488,7 +488,8 @@ def doBuildAppleDevice(String sdk, String buildType) {
         node('osx') {
             getArchive()
 
-            withEnv(['DEVELOPER_DIR=/Applications/Xcode-8.3.3.app/Contents/Developer/']) {
+            withEnv(['DEVELOPER_DIR=/Applications/Xcode-8.3.3.app/Contents/Developer/',
+                     'XCODE10_DEVELOPER_DIR=/Applications/Xcode-10.app/Contents/Developer/']) {
                 retry(3) {
                     timeout(time: 15, unit: 'MINUTES') {
                         runAndCollectWarnings(parser:'clang', script: """
