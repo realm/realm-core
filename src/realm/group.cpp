@@ -1041,6 +1041,7 @@ size_t Group::compute_aggregated_byte_size(SizeAggregateControl ctrl) const noex
         m_table_names.stats(stats);
         m_tables.stats(stats);
         used = stats.allocated + m_top.get_byte_size();
+        used += sizeof(SlabAlloc::Header);
     }
     if (ctrl & SizeAggregateControl::size_of_freelists) {
         if (m_top.size() >= 6) {

@@ -407,6 +407,12 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
     }
     LangBindHelper::advance_read(sg);
     group.verify();
+
+    size_t free_space, used_space;
+    sg_w.get_stats(free_space, used_space);
+    auto state_size = group.compute_aggregated_byte_size(Group::SizeAggregateControl::size_of_all);
+    CHECK_EQUAL(used_space, state_size);
+
     CHECK_EQUAL(2, group.size());
     CHECK(foo->is_attached());
     CHECK_EQUAL(2, foo->get_column_count());
@@ -515,6 +521,8 @@ TEST(LangBindHelper_AdvanceReadTransact_CreateManyTables)
     std::unique_ptr<Replication> hist(realm::make_in_realm_history(path));
     SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
     ReadTransaction rt(sg);
+    const Group& group = rt.get_group();
+    size_t free_space, used_space;
 
     {
         std::unique_ptr<Replication> hist_w(realm::make_in_realm_history(path));
@@ -528,9 +536,13 @@ TEST(LangBindHelper_AdvanceReadTransact_CreateManyTables)
             wt.add_table(str);
         }
         wt.commit();
+        sg_w.get_stats(free_space, used_space);
     }
 
     LangBindHelper::advance_read(sg);
+    auto state_size =
+        group.compute_aggregated_byte_size(Group::SizeAggregateControl(Group::SizeAggregateControl::size_of_all));
+    CHECK_EQUAL(used_space, state_size);
 }
 
 
