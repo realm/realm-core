@@ -492,7 +492,7 @@ void EncryptedFileMapping::write_page(size_t local_page_ndx) noexcept
             m->mark_outdated(shadow_local_page_ndx);
         }
     }
-
+    REALM_ASSERT(m_up_to_date_pages[local_page_ndx]);
     m_dirty_pages[local_page_ndx] = true;
 }
 

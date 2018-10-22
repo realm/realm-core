@@ -109,7 +109,7 @@ std::vector<mappings_for_file>& mappings_by_file = *new std::vector<mappings_for
 size_t encryption_layer_hook(SharedFileInfo& info, uint64_t newest_version, uint64_t oldest_version)
 {
 	UniqueLock lock(mapping_mutex);
-	if (info.last_scanned_version + 10 < oldest_version) {
+	if (info.last_scanned_version + 50 < oldest_version) {
 		size_t sum = 0;
 		size_t touched = 0,updated = 0,dirty = 0,total = 0;
 
@@ -142,6 +142,7 @@ mapping_and_addr* find_mapping_for_addr(void* addr, size_t size)
         mapping_and_addr& m = mappings_by_addr[i];
         if (m.addr == addr && m.size == size)
             return &m;
+        REALM_ASSERT(m.addr != addr);
     }
 
     return 0;

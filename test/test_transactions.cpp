@@ -737,6 +737,7 @@ ONLY(LangBindHelper_EncryptionGiga)
     	}
     	wt.commit();
     }
+#if 0
     std::cout << "Growing..." << std::endl;
     for (int j = 0; j < 1000; ++j) {
     	//std::cout << "growth phase " << j << std::endl;
@@ -750,6 +751,24 @@ ONLY(LangBindHelper_EncryptionGiga)
     	//std::cout << "     - commit" << std::endl;
     	wt.commit();
     }
+#else
+    std::cout << "Modifying..." << std::endl;
+    int row = 0;
+    for (int j = 0; j < 1000; ++j) {
+    	//std::cout << "growth phase " << j << std::endl;
+    	WriteTransaction wt(sg_w);
+        Group& g = wt.get_group();
+        TableRef t = g.get_table("spoink");
+        int max = t->size();
+    	for (int k = 0; k < 100000; ++k) {
+    		if (row == max) row = 0;
+    		t->set_string(0, row, "yooodle-yodle");
+    		++row;
+    	}
+    	//std::cout << "     - commit" << std::endl;
+    	wt.commit();
+    }
+#endif
 }
 
 #endif // TEST_TRANSACTIONS
