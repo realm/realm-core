@@ -74,12 +74,14 @@ public:
     template<typename ValueType, typename ContextType>
     static Object create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
                          const ObjectSchema &object_schema, ValueType value,
-                         bool try_update = false, Row* = nullptr);
+                         bool try_update = false, bool update_only_diff = false,
+                         size_t current_row = size_t(-1), Row* = nullptr);
 
     template<typename ValueType, typename ContextType>
     static Object create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
                          StringData object_type, ValueType value,
-                         bool try_update = false, Row* = nullptr);
+                         bool try_update = false, bool update_only_diff = false,
+                         size_t current_row = size_t(-1), Row* = nullptr);
 
     template<typename ValueType, typename ContextType>
     static Object get_for_primary_key(ContextType& ctx,
@@ -104,7 +106,7 @@ private:
 
     template<typename ValueType, typename ContextType>
     void set_property_value_impl(ContextType& ctx, const Property &property,
-                                 ValueType value, bool try_update, bool is_default=false);
+                                 ValueType value, bool try_update, bool update_only_diff, bool is_default);
     template<typename ValueType, typename ContextType>
     ValueType get_property_value_impl(ContextType& ctx, const Property &property);
 

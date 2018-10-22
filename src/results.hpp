@@ -349,7 +349,7 @@ void Results::set_property_value(ContextType& ctx, StringData prop_name, ValueTy
     size_t size = this->size();
     for (size_t i = 0; i < size; ++i) {
         Object obj(m_realm, *m_object_schema, get(i));
-        obj.set_property_value_impl(ctx, *prop, value, true);
+        obj.set_property_value_impl(ctx, *prop, value, true, false, false);
     }
 }
 
