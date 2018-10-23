@@ -405,6 +405,7 @@ EncryptedFileMapping::EncryptedFileMapping(SharedFileInfo& file, size_t file_off
     : m_file(file)
     , m_page_shift(log2(realm::util::page_size()))
     , m_blocks_per_page(static_cast<size_t>(1ULL << m_page_shift) / block_size)
+	, m_work_savings(0)
     , m_access(access)
 #ifdef REALM_DEBUG
     , m_validate_buffer(new char[static_cast<size_t>(1ULL << m_page_shift)])
@@ -435,11 +436,28 @@ void EncryptedFileMapping::mark_outdated(size_t local_page_ndx) noexcept
     if (local_page_ndx >= m_dirty_pages.size())
         return;
 
-    if (m_dirty_pages[local_page_ndx])
+    if (m_dirty_pages[local_page_ndx]) {
         flush();
-
-    m_up_to_date_pages[local_page_ndx] = false;
-    m_touched[local_page_ndx] = false;
+    }
+    /* FIXME
+    if (m_up_to_date_pages[local_page_ndx]) {
+#ifndef _WIN32
+        auto addr = page_addr(local_page_ndx);
+        void* addr2 = ::mmap(addr, 1 << m_page_shift, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE | MAP_FIXED, -1, 0);
+        if (addr != addr2) {
+        	if (addr2 == 0)
+        		throw std::system_error(errno, std::system_category(),
+        				std::string("using mmap() to clear page failed"));
+        	else
+        		throw std::runtime_error("weird stuff");
+        }
+#endif
+        m_up_to_date_pages[local_page_ndx] = false;
+    }
+    */
+    if (m_up_to_date_pages[local_page_ndx] == 1)
+    	m_up_to_date_pages[local_page_ndx] = 2;
+//    m_touched[local_page_ndx] = false;
 }
 
 bool EncryptedFileMapping::copy_up_to_date_page(size_t local_page_ndx) noexcept
@@ -447,7 +465,7 @@ bool EncryptedFileMapping::copy_up_to_date_page(size_t local_page_ndx) noexcept
     REALM_ASSERT_EX(local_page_ndx < m_up_to_date_pages.size(), local_page_ndx, m_up_to_date_pages.size());
     // Precondition: this method must never be called for a page which
     // is already up to date.
-    REALM_ASSERT(!m_up_to_date_pages[local_page_ndx]);
+    REALM_ASSERT(m_up_to_date_pages[local_page_ndx] != 1);
     for (size_t i = 0; i < m_file.mappings.size(); ++i) {
         EncryptedFileMapping* m = m_file.mappings[i];
         size_t page_ndx_in_file = local_page_ndx + m_first_page;
@@ -455,10 +473,11 @@ bool EncryptedFileMapping::copy_up_to_date_page(size_t local_page_ndx) noexcept
             continue;
 
         size_t shadow_mapping_local_ndx = page_ndx_in_file - m->m_first_page;
-        if (m->m_up_to_date_pages[shadow_mapping_local_ndx]) {
+        if (m->m_up_to_date_pages[shadow_mapping_local_ndx] == 1) {
             memcpy(page_addr(local_page_ndx),
                    m->page_addr(shadow_mapping_local_ndx),
                    static_cast<size_t>(1ULL << m_page_shift));
+            m_work_savings++;
             return true;
         }
     }
@@ -475,9 +494,10 @@ void EncryptedFileMapping::refresh_page(size_t local_page_ndx)
         size_t page_ndx_in_file = local_page_ndx + m_first_page;
         m_file.cryptor.read(m_file.fd, off_t(page_ndx_in_file << m_page_shift),
                             addr, static_cast<size_t>(1ULL << m_page_shift));
+        m_work_savings++;
     }
 
-    m_up_to_date_pages[local_page_ndx] = true;
+    m_up_to_date_pages[local_page_ndx] = 1;
 }
 
 void EncryptedFileMapping::write_page(size_t local_page_ndx) noexcept
@@ -492,7 +512,6 @@ void EncryptedFileMapping::write_page(size_t local_page_ndx) noexcept
             m->mark_outdated(shadow_local_page_ndx);
         }
     }
-    REALM_ASSERT(m_up_to_date_pages[local_page_ndx]);
     m_dirty_pages[local_page_ndx] = true;
 }
 
@@ -500,7 +519,7 @@ void EncryptedFileMapping::validate_page(size_t local_page_ndx) noexcept
 {
 #ifdef REALM_DEBUG
     REALM_ASSERT(local_page_ndx < m_up_to_date_pages.size());
-    if (!m_up_to_date_pages[local_page_ndx])
+    if (m_up_to_date_pages[local_page_ndx] != 1)
         return;
 
     const size_t page_ndx_in_file = local_page_ndx + m_first_page;
@@ -556,15 +575,19 @@ void EncryptedFileMapping::count_usage(size_t& touched, size_t& updated, size_t&
 	total += num_pages;
 	for (size_t page_ndx = 0; page_ndx < num_pages; ++page_ndx) {
 		touched += m_touched[page_ndx];
-		updated += m_up_to_date_pages[page_ndx];
+		updated += m_up_to_date_pages[page_ndx] == 1;
 		dirty += m_dirty_pages[page_ndx];
 	}
 }
-size_t EncryptedFileMapping::reclaim_untouched() noexcept
+size_t EncryptedFileMapping::reclaim_untouched(size_t& progress_ptr, size_t& accumulated_savings) noexcept
 {
 	const size_t num_pages = m_touched.size();
+	if (progress_ptr < m_first_page) return 0;
+	if (progress_ptr >= get_end()) return 0;
+
 	size_t num_reclaimed = 0;
-	for (size_t page_ndx = 0; page_ndx < num_pages; ++page_ndx) {
+	size_t next_scan_payment = 4096;
+	for (size_t page_ndx = progress_ptr - m_first_page; page_ndx < num_pages; ++page_ndx) {
 		if (m_touched[page_ndx] == 0 && m_up_to_date_pages[page_ndx] && !m_dirty_pages[page_ndx]) {
 			// must be done after taking the lock - to prevent any other thread from
 			// changing the state of m_up_to_date_pages
@@ -573,12 +596,6 @@ size_t EncryptedFileMapping::reclaim_untouched() noexcept
 			memset(page_addr(page_ndx), 0, 1 << m_page_shift);
 #else
 			void* addr = page_addr(page_ndx);
-/*			int stat = ::munmap(addr, 1 << m_page_shift);
-			if (stat) {
-				throw std::system_error(errno, std::system_category(),
-						std::string("unmap() failed"));
-			}
-*/
 		    void* addr2 = ::mmap(addr, 1 << m_page_shift, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE | MAP_FIXED, -1, 0);
 		    if (addr != addr2) {
 		    	if (addr2 == 0)
@@ -589,8 +606,21 @@ size_t EncryptedFileMapping::reclaim_untouched() noexcept
 		    }
 #endif
 			num_reclaimed++;
+			if (accumulated_savings > 0)
+				accumulated_savings--;
+		}
+		m_touched[page_ndx] = 0;
+		if (page_ndx >= next_scan_payment) {
+			next_scan_payment = page_ndx + 4096;
+			if (accumulated_savings > 0)
+				accumulated_savings--;
+		}
+		if (accumulated_savings == 0) {
+			progress_ptr = page_ndx + m_first_page;
+			return num_reclaimed;
 		}
 	}
+	progress_ptr = get_end();
 	return num_reclaimed;
 }
 
@@ -649,7 +679,7 @@ void EncryptedFileMapping::write_barrier(const void* addr, size_t size) noexcept
     for (size_t idx = first_accessed_local_page; idx <= last_accessed_local_page && idx < up_to_date_pages_size; ++idx) {
         // Pages written must earlier on have been decrypted
         // by a call to read_barrier().
-        REALM_ASSERT(m_up_to_date_pages[idx]);
+        REALM_ASSERT(m_up_to_date_pages[idx] == 1);
         write_page(idx);
     }
 }

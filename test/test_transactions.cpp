@@ -719,6 +719,7 @@ TEST(LangBindHelper_RollbackLinkInsert)
     CHECK_EQUAL(g.get_table(1)->get_link_target(0), g.get_table(0));
 }
 
+#if 1
 ONLY(LangBindHelper_EncryptionGiga)
 {
     std::string path = "dont_try_this_at_home.realm";
@@ -737,38 +738,40 @@ ONLY(LangBindHelper_EncryptionGiga)
     	}
     	wt.commit();
     }
-#if 0
-    std::cout << "Growing..." << std::endl;
-    for (int j = 0; j < 1000; ++j) {
-    	//std::cout << "growth phase " << j << std::endl;
-    	WriteTransaction wt(sg_w);
-        Group& g = wt.get_group();
-        TableRef t = g.get_table("spoink");
-    	for (int k = 0; k < 100000; ++k) {
-    		auto row = t->add_empty_row();
-    		t->set_string(0, row, "yooodle-de-do");
+    for (int r = 0; r < 1; ++r) {
+    	std::cout << "Growing..." << std::endl;
+    	for (int j = 0; j < 1000; ++j) {
+    		//std::cout << "growth phase " << j << std::endl;
+    		WriteTransaction wt(sg_w);
+    		Group& g = wt.get_group();
+    		TableRef t = g.get_table("spoink");
+    		for (int k = 0; k < 50000; ++k) {
+    			auto row = t->add_empty_row();
+    			t->set_string(0, row, "yooodle-de-do");
+    		}
+    		//std::cout << "     - commit" << std::endl;
+    		wt.commit();
     	}
-    	//std::cout << "     - commit" << std::endl;
-    	wt.commit();
-    }
-#else
-    std::cout << "Modifying..." << std::endl;
-    int row = 0;
-    for (int j = 0; j < 1000; ++j) {
-    	//std::cout << "growth phase " << j << std::endl;
-    	WriteTransaction wt(sg_w);
-        Group& g = wt.get_group();
-        TableRef t = g.get_table("spoink");
-        int max = t->size();
-    	for (int k = 0; k < 100000; ++k) {
-    		if (row == max) row = 0;
-    		t->set_string(0, row, "yooodle-yodle");
-    		++row;
+    	std::cout << "Modifying..." << std::endl;
+    	int row = 0;
+    	for (int j = 0; j < 500; ++j) {
+    		//std::cout << "growth phase " << j << std::endl;
+    		WriteTransaction wt(sg_w);
+    		Group& g = wt.get_group();
+    		TableRef t = g.get_table("spoink");
+    		int max = t->size();
+    		for (int k = 0; k < 100000; ++k) {
+    			if (row == max) row = 0;
+    			std::string s("yooodle-");
+    			s = s + to_string(j);
+    			t->set_string(0, row, s);
+    			++row;
+    		}
+    		//std::cout << "     - commit" << std::endl;
+    		wt.commit();
     	}
-    	//std::cout << "     - commit" << std::endl;
-    	wt.commit();
     }
-#endif
 }
+#endif
 
 #endif // TEST_TRANSACTIONS

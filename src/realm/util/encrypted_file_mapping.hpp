@@ -66,10 +66,10 @@ public:
 
     // Mark all pages untouched. Later accesses will mark individual pages as touched again
     size_t mark_untouched() noexcept;
-
+    size_t collect_savings() { size_t res = m_work_savings; m_work_savings = 0; return res; }
     // reclaim any untouched pages - this is thread safe with respect to
     // concurrent access/touching of pages - but must be called with the mutex locked.
-    size_t reclaim_untouched() noexcept;
+    size_t reclaim_untouched(size_t& progress_ptr, size_t& accumulated_savings) noexcept;
 
     // Get statistics
     void count_usage(size_t& touched, size_t& updated, size_t& dirty, size_t& total);
@@ -77,6 +77,7 @@ public:
     bool contains_page(size_t page_in_file) const;
     size_t get_local_index_of_address(const void* addr, size_t offset = 0) const;
 
+    size_t get_end() { return m_first_page + m_touched.size(); }
 private:
     SharedFileInfo& m_file;
 
@@ -86,9 +87,10 @@ private:
     void* m_addr = nullptr;
 
     size_t m_first_page;
+    size_t m_work_savings; // 1 for every page decrypted
 
-    // MUST be of type char because of coherence issues when writing inside mutex and reading outside 
-    // it. FIXME: We're investigating if this is good enough, or if we need further mechanisms
+    // m_up_to_date_pages track the state of each page. It can be
+    // - unused / not up to data (0), up_to_date (1), partially up to date (2)
     std::vector<char> m_up_to_date_pages;
     std::vector<char> m_touched;
     std::vector<bool> m_dirty_pages;
@@ -135,12 +137,12 @@ inline void EncryptedFileMapping::read_barrier(const void* addr, size_t size, Un
     // Checking before taking the lock is important to performance.
     if (!m_touched[first_accessed_local_page])
     	m_touched[first_accessed_local_page] = 1;
-    if (!m_up_to_date_pages[first_accessed_local_page]) {
+    if (m_up_to_date_pages[first_accessed_local_page] != 1) {
         if (!lock.holds_lock())
             lock.lock();
         // after taking the lock, we must repeat the check so that we never
         // call refresh_page() on a page which is already up to date.
-        if (!m_up_to_date_pages[first_accessed_local_page])
+        if (m_up_to_date_pages[first_accessed_local_page] != 1)
             refresh_page(first_accessed_local_page);
     }
 
@@ -159,12 +161,12 @@ inline void EncryptedFileMapping::read_barrier(const void* addr, size_t size, Un
     for (size_t idx = first_accessed_local_page + 1; idx <= last_idx && idx < up_to_date_pages_size; ++idx) {
         if (!m_touched[idx])
         	m_touched[idx] = 1;
-        if (!m_up_to_date_pages[idx]) {
+        if (m_up_to_date_pages[idx] != 1) {
             if (!lock.holds_lock())
                 lock.lock();
             // after taking the lock, we must repeat the check so that we never
             // call refresh_page() on a page which is already up to date.
-            if (!m_up_to_date_pages[idx])
+            if (m_up_to_date_pages[idx] != 1)
                 refresh_page(idx);
         }
     }

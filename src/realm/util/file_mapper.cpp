@@ -109,27 +109,33 @@ std::vector<mappings_for_file>& mappings_by_file = *new std::vector<mappings_for
 size_t encryption_layer_hook(SharedFileInfo& info, uint64_t newest_version, uint64_t oldest_version)
 {
 	UniqueLock lock(mapping_mutex);
+	// FIXME: Far too many magic constants in here
 	if (info.last_scanned_version + 50 < oldest_version) {
 		size_t sum = 0;
-		size_t touched = 0,updated = 0,dirty = 0,total = 0;
-
-		for (auto it = info.mappings.begin(); it != info.mappings.end(); ++it) {
-			(*it)->count_usage(touched,updated,dirty,total);
+		if (info.accumulated_work_savings == 0) {
+			for (auto it = info.mappings.begin(); it != info.mappings.end(); ++it) {
+				info.accumulated_work_savings += (*it)->collect_savings();
+			}
 		}
-		for (auto it = info.mappings.begin(); it != info.mappings.end(); ++it) {
-			sum += (*it)->reclaim_untouched();
+		if (info.accumulated_work_savings < 10)
+			info.accumulated_work_savings = 10;
+		size_t work_limit = 100;
+		if (info.accumulated_work_savings < 100)
+			work_limit = info.accumulated_work_savings;
+		info.accumulated_work_savings -= work_limit;
+		for (auto it = info.mappings.begin(); it != info.mappings.end() && work_limit; ++it) {
+			sum += (*it)->reclaim_untouched(info.progress_ptr, work_limit);
 		}
-		for (auto it = info.mappings.begin(); it != info.mappings.end(); ++it) {
-			(*it)->mark_untouched();
+		info.accumulated_work_savings += work_limit; // add back whatever is left
+		if (info.progress_ptr >= info.mappings.back()->get_end()) { // done
+			info.progress_ptr = 0;
+			info.last_scanned_version = newest_version;
+			info.accumulated_work_savings >>= 1;
 		}
-		info.last_scanned_version = newest_version;
 		if (sum > 0) {
 			std::cout << "Encryption: " << oldest_version << " .. "
-				<< newest_version << " -> reclaimed " << sum << " pages";
-			std::cout << "    Total: " <<  total
-					<< "    touched: " << touched
-					<< "    up-to-date: " << updated
-					<< "    dirty: " << dirty << std::endl;
+				<< newest_version << " -> reclaimed " << sum << " pages    savings = "
+				<< info.accumulated_work_savings << std::endl;
 		}
 		return sum;
 	}
