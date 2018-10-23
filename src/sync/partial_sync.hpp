@@ -60,8 +60,6 @@ public:
     SubscriptionState state() const;
     std::exception_ptr error() const;
 
-    Results results() const;
-
     SubscriptionNotificationToken add_notification_callback(std::function<void()> callback);
 
 private:

@@ -588,16 +588,5 @@ std::exception_ptr Subscription::error() const
     return nullptr;
 }
 
-Results Subscription::results() const
-{
-    auto object = result_set_object();
-    REALM_ASSERT_RELEASE(object);
-
-    CppContext context;
-    auto matches_property = any_cast<std::string>(object->get_property_value<util::Any>(context, "matches_property"));
-    auto list = any_cast<List>(object->get_property_value<util::Any>(context, matches_property));
-    return list.as_results();
-}
-
 } // namespace partial_sync
 } // namespace realm
