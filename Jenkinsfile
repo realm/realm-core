@@ -12,138 +12,165 @@ repo = tokens[tokens.size()-2]
 branch = tokens[tokens.size()-1]
 
 jobWrapper {
-  timeout(time: 5, unit: 'HOURS') {
-      stage('gather-info') {
-          node('docker') {
-              getSourceArchive()
-              stash includes: '**', name: 'core-source', useDefaultExcludes: false
+    timeout(time: 5, unit: 'HOURS') {
+        stage('gather-info') {
+            node('docker') {
+                getSourceArchive()
+                stash includes: '**', name: 'core-source', useDefaultExcludes: false
 
-              dependencies = readProperties file: 'dependencies.list'
-              echo "Version in dependencies.list: ${dependencies.VERSION}"
+                dependencies = readProperties file: 'dependencies.list'
+                echo "Version in dependencies.list: ${dependencies.VERSION}"
 
-              gitTag = readGitTag()
-              gitSha = sh(returnStdout: true, script: 'git rev-parse HEAD').trim().take(8)
-              gitDescribeVersion = sh(returnStdout: true, script: 'git describe --tags').trim()
+                gitTag = readGitTag()
+                gitSha = sh(returnStdout: true, script: 'git rev-parse HEAD').trim().take(8)
+                gitDescribeVersion = sh(returnStdout: true, script: 'git describe --tags').trim()
 
-              echo "Git tag: ${gitTag ?: 'none'}"
-              if (!gitTag) {
-                  echo "No tag given for this build"
-                  setBuildName(gitSha)
-              } else {
-                  if (gitTag != "v${dependencies.VERSION}") {
-                      error "Git tag '${gitTag}' does not match v${dependencies.VERSION}"
-                  } else {
-                      echo "Building release: '${gitTag}'"
-                      setBuildName("Tag ${gitTag}")
-                  }
-              }
-          }
+                echo "Git tag: ${gitTag ?: 'none'}"
+                if (!gitTag) {
+                    echo "No tag given for this build"
+                    setBuildName(gitSha)
+                } else {
+                    if (gitTag != "v${dependencies.VERSION}") {
+                        error "Git tag '${gitTag}' does not match v${dependencies.VERSION}"
+                    } else {
+                        echo "Building release: '${gitTag}'"
+                        setBuildName("Tag ${gitTag}")
+                    }
+                }
+            }
 
-          echo "Publishing Run: ${gitTag ? 'yes' : 'no'}"
+            isPullRequest = !!env.CHANGE_TARGET
+            targetBranch = isPullRequest ? env.CHANGE_TARGET : "none"
+            println "Building branch: ${env.BRANCH_NAME}"
+            println "Target branch: ${targetBranch}"
 
-          if (['master'].contains(env.BRANCH_NAME)) {
-              // If we're on master, instruct the docker image builds to push to the
-              // cache registry
-              env.DOCKER_PUSH = "1"
-          }
-      }
+            releaseTesting = targetBranch.contains('release')
 
-      stage('check') {
-          parallelExecutors = [checkLinuxRelease   : doCheckInDocker('Release'),
-                               checkLinuxDebug     : doCheckInDocker('Debug'),
-                               buildLinuxRelAssert : doBuildInDocker('RelWithDebInfo', '', true),
-                               buildLinuxRelAsan   : doBuildInDocker('RelWithDebInfo', 'address', false),
-                               buildMacOsDebug     : doBuildMacOs('Debug', true),
-                               buildMacOsRelease   : doBuildMacOs('Release', false),
-                               buildWin32Debug     : doBuildWindows('Debug', false, 'Win32'),
-                               buildWin32Release   : doBuildWindows('Release', false, 'Win32'),
-                               buildWin64Debug     : doBuildWindows('Debug', false, 'x64'),
-                               buildWin64Release   : doBuildWindows('Release', false, 'x64'),
-                               buildUwpWin32Debug  : doBuildWindows('Debug', true, 'Win32'),
-                               buildUwpWin32Release: doBuildWindows('Release', true, 'Win32'),
-                               buildUwpx64Debug    : doBuildWindows('Debug', true, 'x64'),
-                               buildUwpx64Release  : doBuildWindows('Release', true, 'x64'),
-                               buildUwpArmDebug    : doBuildWindows('Debug', true, 'ARM'),
-                               buildUwpArmRelease  : doBuildWindows('Release', true, 'ARM'),
-                               packageGeneric      : doBuildPackage('generic', 'tgz'),
-                               threadSanitizer     : doCheckInDocker('Debug', 'thread'),
-                               addressSanitizer    : doCheckInDocker('Debug', 'address'),
-                               coverage            : doBuildCoverage()
-              ]
+            echo "Pull request: ${isPullRequest ? 'yes' : 'no'}"
+            echo "Release Run: ${releaseTesting ? 'yes' : 'no'}"
+            echo "Publishing Run: ${gitTag ? 'yes' : 'no'}"
 
-          androidAbis = ['armeabi-v7a', 'x86', 'mips', 'x86_64', 'arm64-v8a']
-          androidBuildTypes = ['Debug', 'Release']
+            if (['master'].contains(env.BRANCH_NAME)) {
+                // If we're on master, instruct the docker image builds to push to the
+                // cache registry
+                env.DOCKER_PUSH = "1"
+            }
+        }
 
-          for (def i = 0; i < androidAbis.size(); i++) {
-              def abi = androidAbis[i]
-              for (def j = 0; j < androidBuildTypes.size(); j++) {
-                  def buildType = androidBuildTypes[j]
-                  parallelExecutors["android-${abi}-${buildType}"] = doAndroidBuildInDocker(abi, buildType, abi == 'armeabi-v7a' && buildType == 'Release')
-              }
-          }
+        if (isPullRequest) {
+            stage('Fastcheck') {
+                parallel(
+                    checkLinuxDebug     	: doBuildInDocker('Debug', '4'),
+                    checkMacOsRelease   	: doBuildMacOs('Release', true),
+                    checkWin32Debug     	: doBuildWindows('Debug', false, 'Win32'),
+                    checkWin64Release   	: doBuildWindows('Release', false, 'x64'),
+                    iosDebug              : doBuildAppleDevice('ios', 'MinSizeDebug'),
+                    androidArm64Debug   	: doAndroidBuildInDocker('arm64-v8a', 'Debug', false),
+                    threadSanitizer     	: doBuildInDocker('Debug', '1000', 'thread'),
+                    addressSanitizer    	: doBuildInDocker('Debug', '1000', 'address'),
+                )
+            }
+        }
 
-          appleSdks = ['ios', 'tvos', 'watchos']
-          appleBuildTypes = ['MinSizeDebug', 'Release']
+        if (isPullRequest && releaseTesting) {
+            stage('ExtendedCheck') {
+                parallel(
+                		checkLinuxRelease   : doBuildInDocker('Release'),
+                    checkMacOsDebug     : doBuildMacOs('Debug', true),
+                    buildUwpWin32Debug  : doBuildWindows('Debug', true, 'Win32'),
+                    buildUwpx64Debug    : doBuildWindows('Debug', true, 'x64'),
+                    buildUwpArmDebug    : doBuildWindows('Debug', true, 'ARM'),
+                    androidArmeabiRelease	: doAndroidBuildInDocker('armeabi-v7a', 'Release', true),
+                    coverage            : doBuildCoverage(),
+                    performance         : buildPerformance()
+                )
+            }
+        }
 
-          for (def i = 0; i < appleSdks.size(); i++) {
-              def sdk = appleSdks[i]
-              for (def j = 0; j < appleBuildTypes.size(); j++) {
-                  def buildType = appleBuildTypes[j]
-                  parallelExecutors["${sdk}${buildType}"] = doBuildAppleDevice(sdk, buildType)
-              }
-          }
+        if (gitTag && !isPullRequest) {
+            stage('BuildPackages') {
+                parallelExecutors = [
+                                    buildMacOsDebug     : doBuildMacOs('Debug', false),
+                                    buildMacOsRelease   : doBuildMacOs('Release', false),
+                                    buildWin32Debug     : doBuildWindows('Debug', false, 'Win32'),
+                                    buildWin32Release   : doBuildWindows('Release', false, 'Win32'),
+                                    buildWin64Debug     : doBuildWindows('Debug', false, 'x64'),
+                                    buildWin64Release   : doBuildWindows('Release', false, 'x64'),
+                                    buildUwpWin32Debug  : doBuildWindows('Debug', true, 'Win32'),
+                                    buildUwpWin32Release: doBuildWindows('Release', true, 'Win32'),
+                                    buildUwpx64Debug    : doBuildWindows('Debug', true, 'x64'),
+                                    buildUwpx64Release  : doBuildWindows('Release', true, 'x64'),
+                                    buildUwpArmDebug    : doBuildWindows('Debug', true, 'ARM'),
+                                    buildUwpArmRelease  : doBuildWindows('Release', true, 'ARM'),
+                                    packageGeneric      : doBuildPackage('generic', 'tgz'),
+                    ]
 
-          if (env.CHANGE_TARGET) {
-              parallelExecutors['performance'] = buildPerformance()
-          }
+                androidAbis = ['armeabi-v7a', 'x86', 'mips', 'x86_64', 'arm64-v8a']
+                androidBuildTypes = ['Debug', 'Release']
 
-          parallel parallelExecutors
-      }
+                for (def i = 0; i < androidAbis.size(); i++) {
+                    def abi = androidAbis[i]
+                    for (def j = 0; j < androidBuildTypes.size(); j++) {
+                        def buildType = androidBuildTypes[j]
+                        parallelExecutors["android-${abi}-${buildType}"] = doAndroidBuildInDocker(abi, buildType, false)
+                    }
+                }
 
-      stage('Aggregate') {
-          parallel (
-            cocoa: {
-                  node('docker') {
-                      getArchive()
-                      for (int i = 0; i < cocoaStashes.size(); i++) {
-                          unstash name:cocoaStashes[i]
-                      }
-                      sh 'tools/build-cocoa.sh'
-                      archiveArtifacts('realm-core-cocoa*.tar.xz')
-                      if(gitTag) {
-                          def stashName = 'cocoa'
-                          stash includes: 'realm-core-cocoa*.tar.xz', name: stashName
-                          publishingStashes << stashName
-                      }
-                  }
-              },
-            android: {
-                  node('docker') {
-                      getArchive()
-                      for (int i = 0; i < androidStashes.size(); i++) {
-                          unstash name:androidStashes[i]
-                      }
-                      sh 'tools/build-android.sh'
-                      archiveArtifacts('realm-core-android*.tar.gz')
-                      if(gitTag) {
-                          def stashName = 'android'
-                          stash includes: 'realm-core-android*.tar.gz', name: stashName
-                          publishingStashes << stashName
-                      }
-                  }
-              }
-          )
-      }
+                appleSdks = ['ios', 'tvos', 'watchos']
+                appleBuildTypes = ['MinSizeDebug', 'Release']
 
-      if (gitTag) {
-          stage('publish-packages') {
-              parallel(
-                  generic: doPublishGeneric(),
-                  others: doPublishLocalArtifacts()
-              )
-          }
-      }
-  }
+                for (def i = 0; i < appleSdks.size(); i++) {
+                    def sdk = appleSdks[i]
+                    for (def j = 0; j < appleBuildTypes.size(); j++) {
+                        def buildType = appleBuildTypes[j]
+                        parallelExecutors["${sdk}${buildType}"] = doBuildAppleDevice(sdk, buildType)
+                    }
+                }
+                parallel parallelExecutors
+            }
+            stage('Aggregate') {
+                parallel (
+                    cocoa: {
+                        node('docker') {
+                            getArchive()
+                            for (int i = 0; i < cocoaStashes.size(); i++) {
+                                unstash name:cocoaStashes[i]
+                            }
+                            sh 'tools/build-cocoa.sh'
+                            archiveArtifacts('realm-core-cocoa*.tar.xz')
+                            if(gitTag) {
+                                def stashName = 'cocoa'
+                                stash includes: 'realm-core-cocoa*.tar.xz', name: stashName
+                                publishingStashes << stashName
+                            }
+                        }
+                    },
+                    android: {
+                        node('docker') {
+                            getArchive()
+                            for (int i = 0; i < androidStashes.size(); i++) {
+                                unstash name:androidStashes[i]
+                            }
+                            sh 'tools/build-android.sh'
+                            archiveArtifacts('realm-core-android*.tar.gz')
+                            if(gitTag) {
+                                def stashName = 'android'
+                                stash includes: 'realm-core-android*.tar.gz', name: stashName
+                                publishingStashes << stashName
+                            }
+                        }
+                    }
+                )
+            }
+
+            stage('publish-packages') {
+                parallel(
+                    generic: doPublishGeneric(),
+                    others: doPublishLocalArtifacts()
+                )
+            }
+        }
+    }
 }
 
 def buildDockerEnv(name) {
@@ -155,7 +182,7 @@ def buildDockerEnv(name) {
     return docker.image(name)
 }
 
-def doCheckInDocker(String buildType, String sanitizeMode='') {
+def doBuildInDocker(String buildType, String maxBpNodeSize = '1000', String sanitizeMode='') {
     return {
         node('docker') {
             getArchive()
@@ -181,7 +208,7 @@ def doCheckInDocker(String buildType, String sanitizeMode='') {
                         sh """
                            mkdir build-dir
                            cd build-dir
-                           cmake -D CMAKE_BUILD_TYPE=${buildType} ${sanitizeFlags} -G Ninja ..
+                           cmake -D CMAKE_BUILD_TYPE=${buildType} -D REALM_MAX_BPNODE_SIZE=${maxBpNodeSize} ${sanitizeFlags} -G Ninja ..
                         """
                         runAndCollectWarnings(script: "cd build-dir && ninja")
                         sh """
@@ -190,63 +217,6 @@ def doCheckInDocker(String buildType, String sanitizeMode='') {
                         """
                     } finally {
                         recordTests("Linux-${buildType}")
-                    }
-                }
-            }
-        }
-    }
-}
-
-def doBuildInDocker(String buildType, String sanitizeMode='', boolean enableAssertions=false) {
-    return {
-        node('docker') {
-            getArchive()
-            def buildEnv
-            if (sanitizeMode == '') {
-                buildEnv = docker.build 'realm-core:snapshot'
-            } else {
-                buildEnv = docker.build('realm-core-clang:snapshot', '-f clang.Dockerfile .')
-            }
-            def environment = environment()
-            def targetBuildType = "${buildType}"
-            def cmakeFlags = '-DREALM_BUILD_LIB_ONLY=ON'
-            if (sanitizeMode.contains('thread')) {
-                cmakeFlags += ' -D REALM_TSAN=ON'
-                targetBuildType = "${targetBuildType}+TSAN"
-            } else if (sanitizeMode.contains('address')) {
-                cmakeFlags += ' -D REALM_ASAN=ON'
-                targetBuildType = "${targetBuildType}+ASAN"
-            }
-            if (enableAssertions) {
-                cmakeFlags += ' -DREALM_ENABLE_ASSERTIONS=ON'
-                targetBuildType = "${targetBuildType}+Assertions"
-            }
-            withEnv(environment) {
-                buildEnv.inside(sanitizeMode == 'address' ? '--privileged' : '') {
-                    sh """
-                        mkdir build-dir
-                        cd build-dir
-                        cmake -D CMAKE_BUILD_TYPE=${buildType} ${cmakeFlags} -G Ninja ..
-                    """
-                    runAndCollectWarnings(script: "cd build-dir && ninja")
-                    sh """
-                        cd build-dir
-                        cpack -G TGZ
-                    """
-                    def files = findFiles(glob: 'build-dir/realm-core-*.tar.gz')
-                    for (file in files) {
-                        def targetFileName = file.name.replace(buildType, targetBuildType)
-                        sh """
-                            cd build-dir
-                            mv ${file.name} ${targetFileName}
-                        """
-                        dir('build-dir') {
-                            archiveArtifacts(targetFileName)
-                        }
-                        stash includes: "build-dir/${targetFileName}", name: targetFileName
-                        if (gitTag) {
-                            publishingStashes << targetFileName
-                        }
                     }
                 }
             }
@@ -298,7 +268,7 @@ def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmula
                                    find test -type f -name "*.json" -maxdepth 1 -exec adb push {} /data/local/tmp \\;
                                    find test -type f -name "*.realm" -maxdepth 1 -exec adb push {} /data/local/tmp \\;
                                    find test -type f -name "*.txt" -maxdepth 1 -exec adb push {} /data/local/tmp \\;
-                                   adb shell \'cd /data/local/tmp; ./realm-tests || echo __ADB_FAIL__\' | tee adb.log
+                                   adb shell \'cd /data/local/tmp; UNITTEST_PROGRESS=1 ./realm-tests || echo __ADB_FAIL__\' | tee adb.log
                                    ! grep __ADB_FAIL__ adb.log
                                '''
                             } finally {
@@ -554,7 +524,8 @@ def doBuildCoverage() {
           cd ..
           lcov --no-external --capture --initial --directory . --output-file ${workspace}/coverage-base.info
           cd build/test
-          ./realm-tests
+          ulimit -c unlimited
+          UNITTEST_PROGRESS=1 ./realm-tests
           cd ../..
           lcov --no-external --directory . --capture --output-file ${workspace}/coverage-test.info
           lcov --add-tracefile ${workspace}/coverage-base.info --add-tracefile coverage-test.info --output-file ${workspace}/coverage-total.info
