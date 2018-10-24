@@ -75,7 +75,7 @@ jobWrapper {
         if (isPullRequest && releaseTesting) {
             stage('ExtendedCheck') {
                 parallel(
-                		checkLinuxRelease   : doBuildInDocker('Release'),
+                    checkLinuxRelease   : doBuildInDocker('Release'),
                     checkMacOsDebug     : doBuildMacOs('Debug', true),
                     buildUwpWin32Debug  : doBuildWindows('Debug', true, 'Win32'),
                     buildUwpx64Debug    : doBuildWindows('Debug', true, 'x64'),
@@ -102,7 +102,7 @@ jobWrapper {
                                     buildUwpx64Release  : doBuildWindows('Release', true, 'x64'),
                                     buildUwpArmDebug    : doBuildWindows('Debug', true, 'ARM'),
                                     buildUwpArmRelease  : doBuildWindows('Release', true, 'ARM'),
-                                    packageGeneric      : doBuildPackage('generic', 'tgz'),
+                                    packageGeneric      : doBuildPackageGeneric(),
                     ]
 
                 androidAbis = ['armeabi-v7a', 'x86', 'mips', 'x86_64', 'arm64-v8a']
@@ -162,7 +162,6 @@ jobWrapper {
                     }
                 )
             }
-
             stage('publish-packages') {
                 parallel(
                     generic: doPublishGeneric(),
@@ -171,15 +170,6 @@ jobWrapper {
             }
         }
     }
-}
-
-def buildDockerEnv(name) {
-    docker.withRegistry("https://012067661104.dkr.ecr.eu-west-1.amazonaws.com", "ecr:eu-west-1:aws-ci-user") {
-        env.DOCKER_REGISTRY = '012067661104.dkr.ecr.eu-west-1.amazonaws.com'
-        sh "./packaging/docker_build.sh ${name} ."
-    }
-
-    return docker.image(name)
 }
 
 def doBuildInDocker(String buildType, String maxBpNodeSize = '1000', String sanitizeMode='') {
@@ -330,56 +320,6 @@ def doBuildWindows(String buildType, boolean isUWP, String platform) {
     }
 }
 
-def buildDiffCoverage() {
-    return {
-        node('docker') {
-            getArchive()
-
-            def buildEnv = buildDockerEnv('ci/realm-core:snapshot')
-            def environment = environment()
-            environment << 'UNITTEST_PROGRESS=1'
-            withEnv(environment) {
-                buildEnv.inside {
-                    sh '''
-                        mkdir build-dir
-                        cd build-dir
-                        cmake -D CMAKE_BUILD_TYPE=Debug \
-                              -D REALM_COVERAGE=ON \
-                              -G Ninja ..
-                        ninja
-                        cd test
-                        ./realm-tests
-                        gcovr --filter=\'.*src/realm.*\' -x >gcovr.xml
-                        mkdir coverage
-                     '''
-                    def coverageResults = sh(returnStdout: true, script: """
-                        diff-cover build-dir/test/gcovr.xml \\
-                                   --compare-branch=origin/${env.CHANGE_TARGET} \\
-                                   --html-report build-dir/test/coverage/diff-coverage-report.html \\
-                                   | grep Coverage: | head -n 1 > diff-coverage
-                    """).trim()
-
-                    publishHTML(target: [
-                                  allowMissing         : false,
-                                         alwaysLinkToLastBuild: false,
-                                         keepAll              : true,
-                                         reportDir            : 'build-dir/test/coverage',
-                                         reportFiles          : 'diff-coverage-report.html',
-                                         reportName           : 'Diff Coverage'
-                                    ])
-
-                    withCredentials([[$class: 'StringBinding', credentialsId: 'bot-github-token', variable: 'githubToken']]) {
-                        sh """
-                           curl -H \"Authorization: token ${env.githubToken}\" \\
-                                -d '{ \"body\": \"${coverageResults}\\n\\nPlease check your coverage here: ${env.BUILD_URL}Diff_Coverage\"}' \\
-                                \"https://api.github.com/repos/realm/${repo}/issues/${env.CHANGE_ID}/comments\"
-                        """
-                    }
-                }
-            }
-        }
-    }
-}
 
 def buildPerformance() {
   return {
@@ -388,11 +328,10 @@ def buildPerformance() {
     node('docker && brix && exclusive') {
       getSourceArchive()
 
-      def buildEnv = buildDockerEnv('ci/realm-core:snapshot')
       // REALM_BENCH_DIR tells the gen_bench_hist.sh script where to place results
       // REALM_BENCH_MACHID gives the results an id - results are organized by hardware to prevent mixing cached results with runs on different machines
       // MPLCONFIGDIR gives the python matplotlib library a config directory, otherwise it will try to make one on the user home dir which fails in docker
-      buildEnv.inside {
+      docker.build('realm-core:snapshot').inside {
         withEnv(["REALM_BENCH_DIR=${env.WORKSPACE}/test/bench/core-benchmarks", "REALM_BENCH_MACHID=docker-brix","MPLCONFIGDIR=${env.WORKSPACE}/test/bench/config"]) {
           rlmS3Get file: 'core-benchmarks.zip', path: 'downloads/core/core-benchmarks.zip'
           sh 'unzip core-benchmarks.zip -d test/bench/'
@@ -571,37 +510,20 @@ def readGitTag() {
     return sh(returnStdout: true, script: command).trim()
 }
 
-def doBuildPackage(distribution, fileType) {
+def doBuildPackageGeneric() {
     return {
         node('docker') {
             getSourceArchive()
 
             docker.withRegistry("https://012067661104.dkr.ecr.eu-west-1.amazonaws.com", "ecr:eu-west-1:aws-ci-user") {
-                env.DOCKER_REGISTRY = '012067661104.dkr.ecr.eu-west-1.amazonaws.com'
-                withCredentials([[$class: 'StringBinding', credentialsId: 'packagecloud-sync-devel-master-token', variable: 'PACKAGECLOUD_MASTER_TOKEN']]) {
-                    sh "sh packaging/package.sh ${distribution}"
+                withEnv(['DOCKER_REGISTRY=012067661104.dkr.ecr.eu-west-1.amazonaws.com']) {
+                    sh "sh packaging/package.sh generic"
                 }
             }
 
             dir('packaging/out') {
-                archiveArtifacts artifacts: "${distribution}/*.${fileType}"
-                stash includes: "${distribution}/*.${fileType}", name: "packages-${distribution}"
-            }
-        }
-    }
-}
-
-def doPublish(distribution, fileType, distroName, distroVersion) {
-    return {
-        node {
-            getSourceArchive()
-            packaging = load './packaging/publish.groovy'
-
-            dir('packaging/out') {
-                unstash "packages-${distribution}"
-                dir(distribution) {
-                    packaging.uploadPackages('sync-devel', fileType, distroName, distroVersion, "*.${fileType}")
-                }
+                archiveArtifacts artifacts: "generic/*.tgz"
+                stash includes: "generic/*.tgz", name: "packages-generic"
             }
         }
     }
