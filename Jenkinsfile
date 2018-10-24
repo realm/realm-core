@@ -58,52 +58,52 @@ jobWrapper {
         }
 
         if (isPullRequest) {
-            stage('Fastcheck') {
-                parallel(
-                    checkLinuxDebug     	: doBuildInDocker('Debug', '4'),
-                    checkMacOsRelease   	: doBuildMacOs('Release', true),
-                    checkWin32Debug     	: doBuildWindows('Debug', false, 'Win32'),
-                    checkWin64Release   	: doBuildWindows('Release', false, 'x64'),
-                    iosDebug              : doBuildAppleDevice('ios', 'MinSizeDebug'),
-                    androidArm64Debug   	: doAndroidBuildInDocker('arm64-v8a', 'Debug', false),
-                    threadSanitizer     	: doBuildInDocker('Debug', '1000', 'thread'),
-                    addressSanitizer    	: doBuildInDocker('Debug', '1000', 'address'),
-                )
+            stage('Checking') {
+                parallelExecutors = [
+                    checkLinuxDebug         : doCheckInDocker('Debug'),
+                    checkMacOsRelease       : doBuildMacOs('Release', true),
+                    checkWin32Debug         : doBuildWindows('Debug', false, 'Win32', true),
+                    checkWin64Release       : doBuildWindows('Release', false, 'x64', true),
+                    iosDebug                : doBuildAppleDevice('ios', 'MinSizeDebug'),
+                    androidArm64Debug       : doAndroidBuildInDocker('arm64-v8a', 'Debug', false),
+                    threadSanitizer         : doCheckInDocker('Debug', '1000', 'thread'),
+                    addressSanitizer        : doCheckInDocker('Debug', '1000', 'address'),
+                ]
+                if (releaseTesting) {
+                    extendedChecks = [
+                        checkLinuxRelease       : doCheckInDocker('Release'),
+                        checkMacOsDebug         : doBuildMacOs('Debug', true),
+                        buildUwpx64Debug        : doBuildWindows('Debug', true, 'x64', false),
+                        androidArmeabiRelease   : doAndroidBuildInDocker('armeabi-v7a', 'Release', true),
+                        coverage                : doBuildCoverage(),
+                        performance             : buildPerformance()
+                    ]
+                    parallelExecutors.putAll(extendedChecks)
+                }
+                parallel parallelExecutors
             }
         }
 
-        if (isPullRequest && releaseTesting) {
-            stage('ExtendedCheck') {
-                parallel(
-                    checkLinuxRelease   : doBuildInDocker('Release'),
-                    checkMacOsDebug     : doBuildMacOs('Debug', true),
-                    buildUwpWin32Debug  : doBuildWindows('Debug', true, 'Win32'),
-                    buildUwpx64Debug    : doBuildWindows('Debug', true, 'x64'),
-                    buildUwpArmDebug    : doBuildWindows('Debug', true, 'ARM'),
-                    androidArmeabiRelease	: doAndroidBuildInDocker('armeabi-v7a', 'Release', true),
-                    coverage            : doBuildCoverage(),
-                    performance         : buildPerformance()
-                )
-            }
-        }
 
         if (gitTag && !isPullRequest) {
             stage('BuildPackages') {
                 parallelExecutors = [
-                                    buildMacOsDebug     : doBuildMacOs('Debug', false),
-                                    buildMacOsRelease   : doBuildMacOs('Release', false),
-                                    buildWin32Debug     : doBuildWindows('Debug', false, 'Win32'),
-                                    buildWin32Release   : doBuildWindows('Release', false, 'Win32'),
-                                    buildWin64Debug     : doBuildWindows('Debug', false, 'x64'),
-                                    buildWin64Release   : doBuildWindows('Release', false, 'x64'),
-                                    buildUwpWin32Debug  : doBuildWindows('Debug', true, 'Win32'),
-                                    buildUwpWin32Release: doBuildWindows('Release', true, 'Win32'),
-                                    buildUwpx64Debug    : doBuildWindows('Debug', true, 'x64'),
-                                    buildUwpx64Release  : doBuildWindows('Release', true, 'x64'),
-                                    buildUwpArmDebug    : doBuildWindows('Debug', true, 'ARM'),
-                                    buildUwpArmRelease  : doBuildWindows('Release', true, 'ARM'),
-                                    packageGeneric      : doBuildPackageGeneric(),
-                    ]
+                    buildMacOsDebug     : doBuildMacOs('Debug', false),
+                    buildMacOsRelease   : doBuildMacOs('Release', false),
+
+                    buildWin32Debug     : doBuildWindows('Debug', false, 'Win32', false),
+                    buildWin32Release   : doBuildWindows('Release', false, 'Win32', false),
+                    buildWin64Debug     : doBuildWindows('Debug', false, 'x64', false),
+                    buildWin64Release   : doBuildWindows('Release', false, 'x64', false),
+                    buildUwpWin32Debug  : doBuildWindows('Debug', true, 'Win32', false),
+                    buildUwpWin32Release: doBuildWindows('Release', true, 'Win32', false),
+                    buildUwpx64Debug    : doBuildWindows('Debug', true, 'x64', false),
+                    buildUwpx64Release  : doBuildWindows('Release', true, 'x64', false),
+                    buildUwpArmDebug    : doBuildWindows('Debug', true, 'ARM', false),
+                    buildUwpArmRelease  : doBuildWindows('Release', true, 'ARM', false),
+
+                    packageGeneric      : doBuildPackageGeneric(),
+                ]
 
                 androidAbis = ['armeabi-v7a', 'x86', 'mips', 'x86_64', 'arm64-v8a']
                 androidBuildTypes = ['Debug', 'Release']
@@ -138,11 +138,9 @@ jobWrapper {
                             }
                             sh 'tools/build-cocoa.sh'
                             archiveArtifacts('realm-core-cocoa*.tar.xz')
-                            if(gitTag) {
-                                def stashName = 'cocoa'
-                                stash includes: 'realm-core-cocoa*.tar.xz', name: stashName
-                                publishingStashes << stashName
-                            }
+                            def stashName = 'cocoa'
+                            stash includes: 'realm-core-cocoa*.tar.xz', name: stashName
+                            publishingStashes << stashName
                         }
                     },
                     android: {
@@ -153,11 +151,9 @@ jobWrapper {
                             }
                             sh 'tools/build-android.sh'
                             archiveArtifacts('realm-core-android*.tar.gz')
-                            if(gitTag) {
-                                def stashName = 'android'
-                                stash includes: 'realm-core-android*.tar.gz', name: stashName
-                                publishingStashes << stashName
-                            }
+                            def stashName = 'android'
+                            stash includes: 'realm-core-android*.tar.gz', name: stashName
+                            publishingStashes << stashName
                         }
                     }
                 )
@@ -172,7 +168,7 @@ jobWrapper {
     }
 }
 
-def doBuildInDocker(String buildType, String maxBpNodeSize = '1000', String sanitizeMode='') {
+def doCheckInDocker(String buildType, String maxBpNodeSize = '1000', String sanitizeMode='') {
     return {
         node('docker') {
             getArchive()
@@ -277,7 +273,7 @@ def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmula
     }
 }
 
-def doBuildWindows(String buildType, boolean isUWP, String platform) {
+def doBuildWindows(String buildType, boolean isUWP, String platform, boolean runTests) {
     def cmakeDefinitions;
     if (isUWP) {
       cmakeDefinitions = '-DCMAKE_SYSTEM_NAME=WindowsStore -DCMAKE_SYSTEM_VERSION=10.0 -DREALM_BUILD_LIB_ONLY=1'
@@ -302,7 +298,7 @@ def doBuildWindows(String buildType, boolean isUWP, String platform) {
                     publishingStashes << stashName
                 }
             }
-            if(!isUWP) {
+            if (runTests) {
                 def environment = environment() << "TMP=${env.WORKSPACE}\\temp"
                 environment << 'UNITTEST_PROGRESS=1'
                 withEnv(environment) {
@@ -493,7 +489,6 @@ def recordTests(tag) {
 
 def environment() {
     return [
-        "REALM_MAX_BPNODE_SIZE_DEBUG=4",
         "UNITTEST_SHUFFLE=1",
         "UNITTEST_RANDOM_SEED=random",
         "UNITTEST_THREADS=1",
