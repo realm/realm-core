@@ -55,19 +55,21 @@ jobWrapper {
                 // cache registry
                 env.DOCKER_PUSH = "1"
             }
+            isPullRequest = false
+            gitTag = "5.11.4-dev0"
         }
 
         if (isPullRequest) {
             stage('Checking') {
                 parallelExecutors = [
-                    checkLinuxDebug         : doCheckInDocker('Debug'),
-                    checkMacOsRelease   	: doBuildMacOs('Release', true),
-                    checkWin32Debug     	: doBuildWindows('Debug', false, 'Win32', true),
-                    checkWin64Release   	: doBuildWindows('Release', false, 'x64', true),
-                    iosDebug                : doBuildAppleDevice('ios', 'MinSizeDebug'),
-                    androidArm64Debug   	: doAndroidBuildInDocker('arm64-v8a', 'Debug', false),
-                    threadSanitizer     	: doCheckInDocker('Debug', '1000', 'thread'),
-                    addressSanitizer    	: doCheckInDocker('Debug', '1000', 'address'),
+                    checkLinuxDebug     : doCheckInDocker('Debug'),
+                    checkMacOsRelease   : doBuildMacOs('Release', true),
+                    checkWin32Debug     : doBuildWindows('Debug', false, 'Win32', true),
+                    checkWin64Release   : doBuildWindows('Release', false, 'x64', true),
+                    iosDebug            : doBuildAppleDevice('ios', 'MinSizeDebug'),
+                    androidArm64Debug   : doAndroidBuildInDocker('arm64-v8a', 'Debug', false),
+                    threadSanitizer     : doCheckInDocker('Debug', '1000', 'thread'),
+                    addressSanitizer    : doCheckInDocker('Debug', '1000', 'address'),
                 ]
                 if (releaseTesting) {
                     extendedChecks = [
@@ -90,7 +92,7 @@ jobWrapper {
                 parallelExecutors = [
                     buildMacOsDebug     : doBuildMacOs('Debug', false),
                     buildMacOsRelease   : doBuildMacOs('Release', false),
-
+/*
                     buildWin32Debug     : doBuildWindows('Debug', false, 'Win32', false),
                     buildWin32Release   : doBuildWindows('Release', false, 'Win32', false),
                     buildWin64Debug     : doBuildWindows('Debug', false, 'x64', false),
@@ -101,10 +103,10 @@ jobWrapper {
                     buildUwpx64Release  : doBuildWindows('Release', true, 'x64', false),
                     buildUwpArmDebug    : doBuildWindows('Debug', true, 'ARM', false),
                     buildUwpArmRelease  : doBuildWindows('Release', true, 'ARM', false),
-
+*/
                     packageGeneric      : doBuildPackageGeneric(),
                 ]
-
+/*
                 androidAbis = ['armeabi-v7a', 'x86', 'mips', 'x86_64', 'arm64-v8a']
                 androidBuildTypes = ['Debug', 'Release']
 
@@ -126,6 +128,7 @@ jobWrapper {
                         parallelExecutors["${sdk}${buildType}"] = doBuildAppleDevice(sdk, buildType)
                     }
                 }
+*/
                 parallel parallelExecutors
             }
             stage('Aggregate') {
@@ -293,9 +296,9 @@ def doBuildWindows(String buildType, boolean isUWP, String platform, boolean run
                     runAndCollectWarnings(parser: 'msbuild', isWindows: true, script: "\"${tool 'cmake'}\" --build . --config ${buildType}")
                 }
                 bat "\"${tool 'cmake'}\\..\\cpack.exe\" -C ${buildType} -D CPACK_GENERATOR=TGZ"
-                archiveArtifacts('*.tar.gz')
                 if (gitTag) {
                     def stashName = "windows___${platform}___${isUWP?'uwp':'nouwp'}___${buildType}"
+                    archiveArtifacts('*.tar.gz')
                     stash includes:'*.tar.gz', name:stashName
                     publishingStashes << stashName
                 }
@@ -514,7 +517,7 @@ def doBuildPackageGeneric() {
 
             docker.withRegistry("https://012067661104.dkr.ecr.eu-west-1.amazonaws.com", "ecr:eu-west-1:aws-ci-user") {
                 withEnv(['DOCKER_REGISTRY=012067661104.dkr.ecr.eu-west-1.amazonaws.com']) {
-                    sh "sh packaging/package.sh generic"
+                    sh "sh packaging/package_generic.sh"
                 }
             }
 

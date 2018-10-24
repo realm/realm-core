@@ -22,20 +22,18 @@ mkdir build-dir
 cd build-dir
 cmake -DREALM_ENABLE_ENCRYPTION=1 \
       -DREALM_NO_TESTS=1 \
-      -DCMAKE_INSTALL_PREFIX="/dest/${name}" \
       -DCMAKE_BUILD_TYPE=Release \
       -GNinja ..
 ninja
-ninja install/strip
+cpack -G TGZ
 
-rm -rf -- *
-cmake -DREALM_ENABLE_ENCRYPTION=1 \
-      -DREALM_NO_TESTS=1 \
-      -DCMAKE_INSTALL_PREFIX="/dest/${name}" \
-      -DCMAKE_BUILD_TYPE=Debug \
-      -GNinja ..
+cmake -DCMAKE_BUILD_TYPE=Debug .
 ninja
-ninja install
+cpack -G TGZ
 
-cd /dest
-tar -zcf "/out/${name}.tgz" "${name}"
+cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo -DREALM_ENABLE_ASSERTIONS=ON .
+ninja
+cpack -G TGZ
+
+cp *.gz /out
+
