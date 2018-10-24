@@ -102,7 +102,8 @@ jobWrapper {
                     buildUwpArmDebug    : doBuildWindows('Debug', true, 'ARM', false),
                     buildUwpArmRelease  : doBuildWindows('Release', true, 'ARM', false),
 
-                    packageGeneric      : doBuildPackageGeneric(),
+                    buildLinuxDebug     : doBuildLinux('Debug'),
+                    buildLinuxRelease   : doBuildLinux('Release'),
                 ]
 
                 androidAbis = ['armeabi-v7a', 'x86', 'mips', 'x86_64', 'arm64-v8a']
@@ -126,6 +127,7 @@ jobWrapper {
                         parallelExecutors["${sdk}${buildType}"] = doBuildAppleDevice(sdk, buildType)
                     }
                 }
+
                 parallel parallelExecutors
             }
             stage('Aggregate') {
@@ -160,7 +162,6 @@ jobWrapper {
             }
             stage('publish-packages') {
                 parallel(
-                    generic: doPublishGeneric(),
                     others: doPublishLocalArtifacts()
                 )
             }
@@ -205,6 +206,33 @@ def doCheckInDocker(String buildType, String maxBpNodeSize = '1000', String sani
                         recordTests("Linux-${buildType}")
                     }
                 }
+            }
+        }
+    }
+}
+
+def doBuildLinux(String buildType) {
+    return {
+        node('docker') {
+            getSourceArchive()
+            
+            docker.build('realm-core-generic:snapshot', '-f generic.Dockerfile .').inside {
+                sh """
+                   cmake --help
+                   rm -rf build-dir
+                   mkdir build-dir 
+                   cd build-dir
+                   scl enable devtoolset-6 -- cmake -DCMAKE_BUILD_TYPE=${buildType} -DREALM_ENABLE_ENCRYPTION=1 -DREALM_NO_TESTS=1 ..
+                   make -j4
+                   cpack -G TGZ
+                """
+            }
+
+            dir('build-dir') {
+                archiveArtifacts("*.tar.gz")
+                def stashName = "linux___${buildType}"
+                stash includes:"*.tar.gz", name:stashName
+                publishingStashes << stashName
             }
         }
     }
@@ -291,9 +319,9 @@ def doBuildWindows(String buildType, boolean isUWP, String platform, boolean run
                     runAndCollectWarnings(parser: 'msbuild', isWindows: true, script: "\"${tool 'cmake'}\" --build . --config ${buildType}")
                 }
                 bat "\"${tool 'cmake'}\\..\\cpack.exe\" -C ${buildType} -D CPACK_GENERATOR=TGZ"
-                archiveArtifacts('*.tar.gz')
                 if (gitTag) {
                     def stashName = "windows___${platform}___${isUWP?'uwp':'nouwp'}___${buildType}"
+                    archiveArtifacts('*.tar.gz')
                     stash includes:'*.tar.gz', name:stashName
                     publishingStashes << stashName
                 }
@@ -503,42 +531,6 @@ def readGitTag() {
         return null
     }
     return sh(returnStdout: true, script: command).trim()
-}
-
-def doBuildPackageGeneric() {
-    return {
-        node('docker') {
-            getSourceArchive()
-
-            docker.withRegistry("https://012067661104.dkr.ecr.eu-west-1.amazonaws.com", "ecr:eu-west-1:aws-ci-user") {
-                withEnv(['DOCKER_REGISTRY=012067661104.dkr.ecr.eu-west-1.amazonaws.com']) {
-                    sh "sh packaging/package.sh generic"
-                }
-            }
-
-            dir('packaging/out') {
-                archiveArtifacts artifacts: "generic/*.tgz"
-                stash includes: "generic/*.tgz", name: "packages-generic"
-            }
-        }
-    }
-}
-
-def doPublishGeneric() {
-    return {
-        node {
-            getArchive()
-            dir('packaging/out') {
-                unstash 'packages-generic'
-                def files = findFiles(glob: '**/*.tgz')
-                for (file in files) {
-                    rlmS3Put file: file.path, path: "downloads/core/${file.name}"
-                    rlmS3Put file: file.path, path: "downloads/core/${gitDescribeVersion}/linux/${file.name}"
-                }
-            }
-
-        }
-    }
 }
 
 def doPublishLocalArtifacts() {

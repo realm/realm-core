@@ -12,7 +12,12 @@
 * None.
  
 ### Breaking changes
-* None.
+* The way the Linux binaries are delivered is changed. They are now distributed 
+  like the rest of the binaries with two packages (devel/runtime) per build type. 
+  The file names follow this scheme:
+  realm-core-<buildType>-<release>-Linux-{devel|runtime}.tar.gz
+  For Linux the following build types are published: Debug, Release, RelAssert
+  and RelASAN.
 
 -----------
 
