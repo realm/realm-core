@@ -540,9 +540,11 @@ TEST(LangBindHelper_AdvanceReadTransact_CreateManyTables)
     }
 
     LangBindHelper::advance_read(sg);
-    auto state_size =
+    auto size_all =
         group.compute_aggregated_byte_size(Group::SizeAggregateControl(Group::SizeAggregateControl::size_of_all));
-    CHECK_EQUAL(used_space, state_size);
+    CHECK_EQUAL(used_space, size_all);
+    auto used_space1 = group.get_used_space();
+    CHECK_EQUAL(used_space, used_space1);
 }
 
 

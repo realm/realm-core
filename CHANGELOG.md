@@ -1,7 +1,11 @@
 # NEXT RELEASE
 
 ### Enhancements
-* None.
+* Added Group::get_used_space() which will return the size of the data taken up by the current
+  commit. This is in contrast to the number returned by SharedGroup::get_stats() which will
+  return the size of the last commit done in that SharedGroup. If the commits are the same, 
+  the number will of course be the same. 
+  Issue [#259](https://github.com/realm/realm-core-private/issues/259)
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
