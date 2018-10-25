@@ -76,7 +76,7 @@ jobWrapper {
                         checkLinuxRelease       : doCheckInDocker('Release'),
                         checkMacOsDebug         : doBuildMacOs('Debug', true),
                         buildUwpx64Debug        : doBuildWindows('Debug', true, 'x64', false),
-                        androidArmeabiRelease	: doAndroidBuildInDocker('armeabi-v7a', 'Release', true),
+                        androidArmeabiRelease   : doAndroidBuildInDocker('armeabi-v7a', 'Release', true),
                         coverage                : doBuildCoverage(),
                         performance             : buildPerformance()
                     ]
@@ -517,7 +517,7 @@ def doBuildLinux(String buildType) {
         node('docker') {
             getSourceArchive()
             
-			docker.build('realm-core-generic:snapshot', '-f generic.Dockerfile .').inside {
+            docker.build('realm-core-generic:snapshot', '-f generic.Dockerfile .').inside {
                 sh """
                    cmake --help
                    rm -rf build-dir
@@ -527,13 +527,14 @@ def doBuildLinux(String buildType) {
                    make -j4
                    cpack -G TGZ
                 """
-			}
+            }
 
-            archiveArtifacts("build-dir/*.tar.gz")
-
-            def stashName = "linux___${buildType}"
-            stash includes:"build-dir/*.tar.gz", name:stashName
-            publishingStashes << stashName
+            dir('build-dir') {
+                archiveArtifacts("*.tar.gz")
+                def stashName = "linux___${buildType}"
+                stash includes:"*.tar.gz", name:stashName
+                publishingStashes << stashName
+            }
         }
     }
 }
