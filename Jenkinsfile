@@ -104,9 +104,10 @@ jobWrapper {
                     buildUwpArmDebug    : doBuildWindows('Debug', true, 'ARM', false),
                     buildUwpArmRelease  : doBuildWindows('Release', true, 'ARM', false),
 */
-                    packageGeneric      : doBuildPackageGeneric(),
+                    buildLinuxDebug     : doBuildLinux('Debug'),
+                    buildLinuxRelease   : doBuildLinux('Release'),
                 ]
-/*
+
                 androidAbis = ['armeabi-v7a', 'x86', 'mips', 'x86_64', 'arm64-v8a']
                 androidBuildTypes = ['Debug', 'Release']
 
@@ -128,7 +129,7 @@ jobWrapper {
                         parallelExecutors["${sdk}${buildType}"] = doBuildAppleDevice(sdk, buildType)
                     }
                 }
-*/
+
                 parallel parallelExecutors
             }
             stage('Aggregate') {
@@ -510,38 +511,28 @@ def readGitTag() {
     return sh(returnStdout: true, script: command).trim()
 }
 
-def doBuildPackageGeneric() {
+def doBuildLinux(String buildType) {
     return {
         node('docker') {
             getSourceArchive()
+            
+			docker.build('realm-core-generic:snapshot', '-f generic.Dockerfile .').inside {
+                sh """
+                   cmake --help
+                   rm -rf build-dir
+                   mkdir build-dir 
+                   cd build-dir
+                   scl enable devtoolset-6 -- cmake -DCMAKE_BUILD_TYPE=${buildType} -DREALM_ENABLE_ENCRYPTION=1 -DREALM_NO_TESTS=1 ..
+                   make -j4
+                   cpack -G TGZ
+                """
+			}
 
-            docker.withRegistry("https://012067661104.dkr.ecr.eu-west-1.amazonaws.com", "ecr:eu-west-1:aws-ci-user") {
-                withEnv(['DOCKER_REGISTRY=012067661104.dkr.ecr.eu-west-1.amazonaws.com']) {
-                    sh "sh packaging/package_generic.sh"
-                }
-            }
+            archiveArtifacts("build-dir/*.tar.gz")
 
-            dir('packaging/out') {
-                archiveArtifacts artifacts: "generic/*.tgz"
-                stash includes: "generic/*.tgz", name: "packages-generic"
-            }
-        }
-    }
-}
-
-def doPublishGeneric() {
-    return {
-        node {
-            getArchive()
-            dir('packaging/out') {
-                unstash 'packages-generic'
-                def files = findFiles(glob: '**/*.tgz')
-                for (file in files) {
-                    rlmS3Put file: file.path, path: "downloads/core/${file.name}"
-                    rlmS3Put file: file.path, path: "downloads/core/${gitDescribeVersion}/linux/${file.name}"
-                }
-            }
-
+            def stashName = "linux___${buildType}"
+            stash includes:"build-dir/*.tar.gz", name:stashName
+            publishingStashes << stashName
         }
     }
 }
@@ -558,7 +549,6 @@ def doPublishLocalArtifacts() {
                         def files = findFiles(glob: '**')
                         for (file in files) {
                             rlmS3Put file: file.path, path: "downloads/core/${gitDescribeVersion}/${path}/${file.name}"
-                            rlmS3Put file: file.path, path: "downloads/core/${file.name}"
                         }
                         deleteDir()
                     }
