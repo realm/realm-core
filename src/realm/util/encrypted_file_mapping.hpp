@@ -54,7 +54,7 @@ public:
 
     // Make sure that memory in the specified range is synchronized with any
     // changes made globally visible through call to write_barrier
-    void read_barrier(const void* addr, size_t size, UniqueLock& lock, Header_to_size header_to_size);
+    void read_barrier(const void* addr, size_t size, Header_to_size header_to_size);
 
     // Ensures that any changes made to memory in the specified range
     // becomes visible to any later calls to read_barrier()
@@ -66,7 +66,7 @@ public:
 
     // Mark all pages untouched. Later accesses will mark individual pages as touched again
     size_t mark_untouched() noexcept;
-    size_t collect_savings() { size_t res = m_work_savings; m_work_savings = 0; return res; }
+    size_t collect_decryption_count() { return m_num_decrypted; }
     // reclaim any untouched pages - this is thread safe with respect to
     // concurrent access/touching of pages - but must be called with the mutex locked.
     size_t reclaim_untouched(size_t& progress_ptr, size_t& accumulated_savings) noexcept;
@@ -87,7 +87,7 @@ private:
     void* m_addr = nullptr;
 
     size_t m_first_page;
-    size_t m_work_savings; // 1 for every page decrypted
+    size_t m_num_decrypted; // 1 for every page decrypted
 
     // m_up_to_date_pages track the state of each page. It can be
     // - unused / not up to data (0), up_to_date (1), partially up to date (2)
@@ -128,49 +128,7 @@ inline bool EncryptedFileMapping::contains_page(size_t page_in_file) const
     return page_in_file >= m_first_page && page_in_file - m_first_page < m_up_to_date_pages.size();
 }
 
-inline void EncryptedFileMapping::read_barrier(const void* addr, size_t size, UniqueLock& lock,
-                                               Header_to_size header_to_size)
-{
-    size_t first_accessed_local_page = get_local_index_of_address(addr);
 
-    // make sure the first page is available
-    // Checking before taking the lock is important to performance.
-    if (!m_touched[first_accessed_local_page])
-    	m_touched[first_accessed_local_page] = 1;
-    if (m_up_to_date_pages[first_accessed_local_page] != 1) {
-        if (!lock.holds_lock())
-            lock.lock();
-        // after taking the lock, we must repeat the check so that we never
-        // call refresh_page() on a page which is already up to date.
-        if (m_up_to_date_pages[first_accessed_local_page] != 1)
-            refresh_page(first_accessed_local_page);
-    }
-
-    if (header_to_size) {
-
-        // We know it's an array, and array headers are 8-byte aligned, so it is
-        // included in the first page which was handled above.
-        size = header_to_size(static_cast<const char*>(addr));
-    }
-
-    size_t last_idx = get_local_index_of_address(addr, size == 0 ? 0 : size - 1);
-    size_t up_to_date_pages_size = m_up_to_date_pages.size();
-
-    // We already checked first_accessed_local_page above, so we start the loop
-    // at first_accessed_local_page + 1 to check the following page.
-    for (size_t idx = first_accessed_local_page + 1; idx <= last_idx && idx < up_to_date_pages_size; ++idx) {
-        if (!m_touched[idx])
-        	m_touched[idx] = 1;
-        if (m_up_to_date_pages[idx] != 1) {
-            if (!lock.holds_lock())
-                lock.lock();
-            // after taking the lock, we must repeat the check so that we never
-            // call refresh_page() on a page which is already up to date.
-            if (m_up_to_date_pages[idx] != 1)
-                refresh_page(idx);
-        }
-    }
-}
 }
 }
 

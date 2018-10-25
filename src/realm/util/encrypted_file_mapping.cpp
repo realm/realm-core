@@ -405,7 +405,7 @@ EncryptedFileMapping::EncryptedFileMapping(SharedFileInfo& file, size_t file_off
     : m_file(file)
     , m_page_shift(log2(realm::util::page_size()))
     , m_blocks_per_page(static_cast<size_t>(1ULL << m_page_shift) / block_size)
-	, m_work_savings(0)
+	, m_num_decrypted(0)
     , m_access(access)
 #ifdef REALM_DEBUG
     , m_validate_buffer(new char[static_cast<size_t>(1ULL << m_page_shift)])
@@ -439,22 +439,6 @@ void EncryptedFileMapping::mark_outdated(size_t local_page_ndx) noexcept
     if (m_dirty_pages[local_page_ndx]) {
         flush();
     }
-    /* FIXME
-    if (m_up_to_date_pages[local_page_ndx]) {
-#ifndef _WIN32
-        auto addr = page_addr(local_page_ndx);
-        void* addr2 = ::mmap(addr, 1 << m_page_shift, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE | MAP_FIXED, -1, 0);
-        if (addr != addr2) {
-        	if (addr2 == 0)
-        		throw std::system_error(errno, std::system_category(),
-        				std::string("using mmap() to clear page failed"));
-        	else
-        		throw std::runtime_error("weird stuff");
-        }
-#endif
-        m_up_to_date_pages[local_page_ndx] = false;
-    }
-    */
     if (m_up_to_date_pages[local_page_ndx] == 1)
     	m_up_to_date_pages[local_page_ndx] = 2;
 //    m_touched[local_page_ndx] = false;
@@ -477,7 +461,6 @@ bool EncryptedFileMapping::copy_up_to_date_page(size_t local_page_ndx) noexcept
             memcpy(page_addr(local_page_ndx),
                    m->page_addr(shadow_mapping_local_ndx),
                    static_cast<size_t>(1ULL << m_page_shift));
-            m_work_savings++;
             return true;
         }
     }
@@ -494,9 +477,9 @@ void EncryptedFileMapping::refresh_page(size_t local_page_ndx)
         size_t page_ndx_in_file = local_page_ndx + m_first_page;
         m_file.cryptor.read(m_file.fd, off_t(page_ndx_in_file << m_page_shift),
                             addr, static_cast<size_t>(1ULL << m_page_shift));
-        m_work_savings++;
     }
-
+    if (m_up_to_date_pages[local_page_ndx] == 0)
+    	m_num_decrypted++;
     m_up_to_date_pages[local_page_ndx] = 1;
 }
 
@@ -606,6 +589,7 @@ size_t EncryptedFileMapping::reclaim_untouched(size_t& progress_ptr, size_t& acc
 		    }
 #endif
 			num_reclaimed++;
+			m_num_decrypted--;
 			if (accumulated_savings > 0)
 				accumulated_savings--;
 		}
@@ -684,6 +668,39 @@ void EncryptedFileMapping::write_barrier(const void* addr, size_t size) noexcept
     }
 }
 
+void EncryptedFileMapping::read_barrier(const void* addr, size_t size, Header_to_size header_to_size)
+{
+    size_t first_accessed_local_page = get_local_index_of_address(addr);
+
+    // make sure the first page is available
+    if (!m_touched[first_accessed_local_page])
+    	m_touched[first_accessed_local_page] = 1;
+
+    if (m_up_to_date_pages[first_accessed_local_page] != 1) {
+    	refresh_page(first_accessed_local_page);
+    }
+
+    if (header_to_size) {
+
+        // We know it's an array, and array headers are 8-byte aligned, so it is
+        // included in the first page which was handled above.
+        size = header_to_size(static_cast<const char*>(addr));
+    }
+
+    size_t last_idx = get_local_index_of_address(addr, size == 0 ? 0 : size - 1);
+    size_t up_to_date_pages_size = m_up_to_date_pages.size();
+
+    // We already checked first_accessed_local_page above, so we start the loop
+    // at first_accessed_local_page + 1 to check the following page.
+    for (size_t idx = first_accessed_local_page + 1; idx <= last_idx && idx < up_to_date_pages_size; ++idx) {
+        if (!m_touched[idx])
+        	m_touched[idx] = 1;
+        if (m_up_to_date_pages[idx] != 1)
+        	refresh_page(idx);
+    }
+}
+
+
 void EncryptedFileMapping::set(void* new_addr, size_t new_size, size_t new_file_offset)
 {
     REALM_ASSERT(new_file_offset % (1ULL << m_page_shift) == 0);
@@ -698,6 +715,7 @@ void EncryptedFileMapping::set(void* new_addr, size_t new_size, size_t new_file_
     m_first_page = new_file_offset >> m_page_shift;
     size_t num_pages = new_size >> m_page_shift;
 
+    m_num_decrypted = 0;
     m_up_to_date_pages.clear();
     m_dirty_pages.clear();
     m_touched.clear();

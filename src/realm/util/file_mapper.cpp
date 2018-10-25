@@ -110,32 +110,38 @@ size_t encryption_layer_hook(SharedFileInfo& info, uint64_t newest_version, uint
 {
 	UniqueLock lock(mapping_mutex);
 	// FIXME: Far too many magic constants in here
-	if (info.last_scanned_version + 50 < oldest_version) {
+	if (info.last_scanned_version + 1 < oldest_version) {
 		size_t sum = 0;
-		if (info.accumulated_work_savings == 0) {
-			for (auto it = info.mappings.begin(); it != info.mappings.end(); ++it) {
-				info.accumulated_work_savings += (*it)->collect_savings();
-			}
+		info.num_decrypted_pages = 0;
+		for (auto it = info.mappings.begin(); it != info.mappings.end(); ++it) {
+			info.num_decrypted_pages += (*it)->collect_decryption_count();
 		}
-		if (info.accumulated_work_savings < 10)
-			info.accumulated_work_savings = 10;
-		size_t work_limit = 100;
-		if (info.accumulated_work_savings < 100)
-			work_limit = info.accumulated_work_savings;
-		info.accumulated_work_savings -= work_limit;
+		size_t work_limit = 0;
+		size_t potential = info.num_decrypted_pages;
+		size_t target = 100000;
+		size_t increments = target/16;
+		size_t base = target - 4 * increments;
+		size_t divisor;
+		if (potential > target) divisor = 10;
+		else if (potential > target - increments) divisor = 20;
+		else if (potential > target - 2*increments) divisor = 50;
+		else if (potential > target - 3*increments) divisor = 100;
+		else if (potential > base) divisor = 200;
+		else return 0;
+		work_limit = (potential - base) / divisor;
+		if (work_limit == 0)
+			return 0;
 		for (auto it = info.mappings.begin(); it != info.mappings.end() && work_limit; ++it) {
 			sum += (*it)->reclaim_untouched(info.progress_ptr, work_limit);
 		}
-		info.accumulated_work_savings += work_limit; // add back whatever is left
 		if (info.progress_ptr >= info.mappings.back()->get_end()) { // done
 			info.progress_ptr = 0;
 			info.last_scanned_version = newest_version;
-			info.accumulated_work_savings >>= 1;
 		}
 		if (sum > 0) {
 			std::cout << "Encryption: " << oldest_version << " .. "
-				<< newest_version << " -> reclaimed " << sum << " pages    savings = "
-				<< info.accumulated_work_savings << std::endl;
+				<< newest_version << " -> reclaimed " << sum << " pages    pages active = "
+				<< info.num_decrypted_pages << "    \r";
 		}
 		return sum;
 	}

@@ -74,8 +74,8 @@ extern util::Mutex& mapping_mutex;
 inline void do_encryption_read_barrier(const void* addr, size_t size, HeaderToSize header_to_size,
                                        EncryptedFileMapping* mapping)
 {
-    UniqueLock lock(mapping_mutex, defer_lock_tag());
-    mapping->read_barrier(addr, size, lock, header_to_size);
+    UniqueLock lock(mapping_mutex);
+    mapping->read_barrier(addr, size, header_to_size);
 }
 
 inline void do_encryption_write_barrier(const void* addr, size_t size, EncryptedFileMapping* mapping)
@@ -83,7 +83,6 @@ inline void do_encryption_write_barrier(const void* addr, size_t size, Encrypted
     LockGuard lock(mapping_mutex);
     mapping->write_barrier(addr, size);
 }
-
 
 #else
 void inline encryption_read_barrier(const void*, size_t, EncryptedFileMapping*, HeaderToSize header_to_size = nullptr)
