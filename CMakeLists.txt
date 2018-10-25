@@ -35,6 +35,7 @@ if (extended_version)
     list(GET VERSION_LIST 3 CONFIG_VERSION_TWEAK)
 endif()
 
+set(CMAKE_BUILD_TYPE Debug CACHE STRING "")
 project(realm)
 
 # Include general CMake modules
@@ -76,6 +77,11 @@ set_property(DIRECTORY APPEND PROPERTY COMPILE_DEFINITIONS
     $<$<CONFIG:Debug>:REALM_DEBUG=1>
     $<$<CONFIG:MinSizeDebug>:REALM_DEBUG=1>
 )
+
+if (CMAKE_BUILD_TYPE MATCHES "RelAssert")
+    set(REALM_ENABLE_ASSERTIONS ON CACHE BOOL "Build with assertions")
+    set(CMAKE_CXX_FLAGS_RELASSERT ${CMAKE_CXX_FLAGS_RELWITHDEBINFO})
+endif()
 
 set(CMAKE_DEBUG_POSTFIX "-dbg")
 set(CMAKE_MINSIZEDEBUG_POSTFIX "-dbg")

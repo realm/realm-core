@@ -106,6 +106,7 @@ jobWrapper {
 */
                     buildLinuxDebug     : doBuildLinux('Debug'),
                     buildLinuxRelease   : doBuildLinux('Release'),
+                    buildLinuxRelAssert : doBuildLinux('RelAssert'),
                 ]
 
                 androidAbis = ['armeabi-v7a', 'x86', 'mips', 'x86_64', 'arm64-v8a']
