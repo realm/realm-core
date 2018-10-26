@@ -68,7 +68,6 @@ jobWrapper {
                     androidArm64Debug   : doAndroidBuildInDocker('arm64-v8a', 'Debug', false),
                     threadSanitizer     : doCheckSanity('Debug', '1000', 'thread'),
                     addressSanitizer    : doCheckSanity('Debug', '1000', 'address'),
-                    buildLinuxASAN      : doBuildLinuxASAN()
                 ]
                 if (releaseTesting) {
                     extendedChecks = [
@@ -106,6 +105,7 @@ jobWrapper {
                     buildLinuxDebug     : doBuildLinux('Debug'),
                     buildLinuxRelease   : doBuildLinux('Release'),
                     buildLinuxRelAssert : doBuildLinux('RelAssert'),
+                    buildLinuxASAN      : doBuildLinuxASAN()
                 ]
 
                 androidAbis = ['armeabi-v7a', 'x86', 'mips', 'x86_64', 'arm64-v8a']
@@ -172,7 +172,7 @@ jobWrapper {
     }
 }
 
-def doCheckInDocker(String buildType, String maxBpNodeSize = '1000', String sanitizeMode='') {
+def doCheckInDocker(String buildType, String maxBpNodeSize = '1000') {
     return {
         node('docker') {
             getArchive()
@@ -196,6 +196,33 @@ def doCheckInDocker(String buildType, String maxBpNodeSize = '1000', String sani
                         recordTests("Linux-${buildType}")
                     }
                 }
+            }
+        }
+    }
+}
+
+def doBuildLinux(String buildType) {
+    return {
+        node('docker') {
+            getArchive()
+            
+            docker.build('realm-core-generic:snapshot', '-f generic.Dockerfile .').inside {
+                sh """
+                   cmake --help
+                   rm -rf build-dir
+                   mkdir build-dir 
+                   cd build-dir
+                   scl enable devtoolset-6 -- cmake -DCMAKE_BUILD_TYPE=${buildType} -DREALM_NO_TESTS=1 ..
+                   make -j4
+                   cpack -G TGZ
+                """
+            }
+
+            dir('build-dir') {
+                archiveArtifacts("*.tar.gz")
+                def stashName = "linux___${buildType}"
+                stash includes:"*.tar.gz", name:stashName
+                publishingStashes << stashName
             }
         }
     }
@@ -330,6 +357,9 @@ def doBuildWindows(String buildType, boolean isUWP, String platform, boolean run
       cmakeDefinitions = '-DCMAKE_SYSTEM_NAME=WindowsStore -DCMAKE_SYSTEM_VERSION=10.0 -DREALM_BUILD_LIB_ONLY=1'
     } else {
       cmakeDefinitions = '-DCMAKE_SYSTEM_VERSION=8.1'
+    }
+    if (!runTests) {
+      cmakeDefinitions += ' -DREALM_NO_TESTS=1'
     }
 
     return {
@@ -554,33 +584,6 @@ def readGitTag() {
         return null
     }
     return sh(returnStdout: true, script: command).trim()
-}
-
-def doBuildLinux(String buildType) {
-    return {
-        node('docker') {
-            getArchive()
-            
-            docker.build('realm-core-generic:snapshot', '-f generic.Dockerfile .').inside {
-                sh """
-                   cmake --help
-                   rm -rf build-dir
-                   mkdir build-dir 
-                   cd build-dir
-                   scl enable devtoolset-6 -- cmake -DCMAKE_BUILD_TYPE=${buildType} -DREALM_ENABLE_ENCRYPTION=1 -DREALM_NO_TESTS=1 ..
-                   make -j4
-                   cpack -G TGZ
-                """
-            }
-
-            dir('build-dir') {
-                archiveArtifacts("*.tar.gz")
-                def stashName = "linux___${buildType}"
-                stash includes:"*.tar.gz", name:stashName
-                publishingStashes << stashName
-            }
-        }
-    }
 }
 
 def doPublishLocalArtifacts() {
