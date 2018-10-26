@@ -1090,6 +1090,19 @@ void SlabAlloc::cleanup_hook(uint64_t newest_version, uint64_t oldest_version)
 		util::encryption_layer_hook(*m_file_mappings->m_realm_file_info, newest_version, oldest_version);
 }
 
+void SlabAlloc::note_reader_start(void* reader_id)
+{
+	if (m_file_mappings->m_realm_file_info)
+		util::encryption_note_reader_start(*m_file_mappings->m_realm_file_info, reader_id);
+}
+
+void SlabAlloc::note_reader_end(void* reader_id)
+{
+	if (m_file_mappings->m_realm_file_info)
+		util::encryption_note_reader_end(*m_file_mappings->m_realm_file_info, reader_id);
+}
+
+
 ref_type SlabAlloc::attach_buffer(const char* data, size_t size)
 {
     // ExceptionSafety: If this function throws, it must leave the allocator in

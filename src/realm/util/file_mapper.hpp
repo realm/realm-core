@@ -43,6 +43,9 @@ class EncryptedFileMapping;
 #if REALM_ENABLE_ENCRYPTION
 
 size_t encryption_layer_hook(SharedFileInfo& info, uint64_t newest_version, uint64_t oldest_version);
+void encryption_note_reader_start(SharedFileInfo& info, void* reader_id);
+void encryption_note_reader_end(SharedFileInfo& info, void* reader_id);
+
 SharedFileInfo* get_file_info_for_file(File::UniqueID fd);
 
 // This variant allows the caller to obtain direct access to the encrypted file mapping
@@ -97,6 +100,14 @@ void inline encryption_write_barrier(const void*, size_t, EncryptedFileMapping*)
 }
 
 size_t encryption_layer_hook(SharedFileInfo&, uint64_t, uint64_t)
+{
+}
+
+void encryption_note_reader_start(SharedFileInfo&, void*)
+{
+}
+
+void encryption_note_reader_end(SharedFileInfo&, void*)
 {
 }
 

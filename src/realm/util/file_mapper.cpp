@@ -106,9 +106,47 @@ util::Mutex& mapping_mutex = *new Mutex;
 std::vector<mapping_and_addr>& mappings_by_addr = *new std::vector<mapping_and_addr>;
 std::vector<mappings_for_file>& mappings_by_file = *new std::vector<mappings_for_file>;
 
+void encryption_note_reader_start(SharedFileInfo& info, void* reader_id)
+{
+	UniqueLock lock(mapping_mutex);
+	std::vector<ReaderInfo>::iterator j;
+	for (j = info.readers.begin(); j != info.readers.end(); ++j)
+		if (j->reader_ID == reader_id) break;
+	if (j == info.readers.end()) {
+		ReaderInfo i = {reader_id, info.current_version};
+		info.readers.push_back(i);
+	}
+	else {
+		j->version = info.current_version;
+	}
+	++info.current_version;
+}
+
+void encryption_note_reader_end(SharedFileInfo& info, void* reader_id)
+{
+	UniqueLock lock(mapping_mutex);
+	for (auto j = info.readers.begin(); j != info.readers.end(); ++j)
+		if (j->reader_ID == reader_id) {
+			// move last over
+			*j = info.readers.back();
+			info.readers.pop_back();
+			return;
+		}
+
+}
+
 size_t encryption_layer_hook(SharedFileInfo& info, uint64_t newest_version, uint64_t oldest_version)
 {
 	UniqueLock lock(mapping_mutex);
+	if (info.readers.size() == 0)
+		oldest_version = info.current_version; // allow reclaiming to run
+	else {
+		oldest_version = info.current_version;
+		for (auto j = info.readers.begin(); j != info.readers.end(); ++j) {
+			if (j->version < oldest_version)
+				oldest_version = j->version;
+		}
+	}
 	// FIXME: Far too many magic constants in here
 	if (info.last_scanned_version + 1 < oldest_version) {
 		size_t sum = 0;
@@ -118,7 +156,7 @@ size_t encryption_layer_hook(SharedFileInfo& info, uint64_t newest_version, uint
 		}
 		size_t work_limit = 0;
 		size_t potential = info.num_decrypted_pages;
-		size_t target = 100000;
+		size_t target = 50000;
 		size_t increments = target/16;
 		size_t base = target - 4 * increments;
 		size_t divisor;
@@ -136,7 +174,8 @@ size_t encryption_layer_hook(SharedFileInfo& info, uint64_t newest_version, uint
 		}
 		if (info.progress_ptr >= info.mappings.back()->get_end()) { // done
 			info.progress_ptr = 0;
-			info.last_scanned_version = newest_version;
+			info.last_scanned_version = info.current_version;
+			++info.current_version;
 		}
 		if (sum > 0) {
 			std::cout << "Encryption: " << oldest_version << " .. "

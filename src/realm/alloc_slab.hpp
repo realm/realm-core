@@ -292,6 +292,8 @@ public:
     /// Currently used to drive reclaim of pages at the encryption layer, if enabled.
     /// Caller must provide numbers of newest and oldest versions currently accessible
     void cleanup_hook(uint64_t newest_version, uint64_t oldest_version);
+    void note_reader_start(void* reader_id);
+    void note_reader_end(void* reader_id);
 
     void verify() const override;
 #ifdef REALM_DEBUG
