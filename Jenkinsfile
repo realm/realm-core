@@ -55,8 +55,6 @@ jobWrapper {
                 // cache registry
                 env.DOCKER_PUSH = "1"
             }
-            isPullRequest = false
-            gitTag = "5.11.4-dev0"
         }
 
         if (isPullRequest) {
@@ -68,8 +66,8 @@ jobWrapper {
                     checkWin64Release   : doBuildWindows('Release', false, 'x64', true),
                     iosDebug            : doBuildAppleDevice('ios', 'MinSizeDebug'),
                     androidArm64Debug   : doAndroidBuildInDocker('arm64-v8a', 'Debug', false),
-                    threadSanitizer     : doCheckInDocker('Debug', '1000', 'thread'),
-                    addressSanitizer    : doCheckInDocker('Debug', '1000', 'address'),
+                    threadSanitizer     : doCheckSanity('Debug', '1000', 'thread'),
+                    addressSanitizer    : doCheckSanity('Debug', '1000', 'address'),
                 ]
                 if (releaseTesting) {
                     extendedChecks = [
@@ -92,7 +90,7 @@ jobWrapper {
                 parallelExecutors = [
                     buildMacOsDebug     : doBuildMacOs('Debug', false),
                     buildMacOsRelease   : doBuildMacOs('Release', false),
-/*
+
                     buildWin32Debug     : doBuildWindows('Debug', false, 'Win32', false),
                     buildWin32Release   : doBuildWindows('Release', false, 'Win32', false),
                     buildWin64Debug     : doBuildWindows('Debug', false, 'x64', false),
@@ -103,7 +101,7 @@ jobWrapper {
                     buildUwpx64Release  : doBuildWindows('Release', true, 'x64', false),
                     buildUwpArmDebug    : doBuildWindows('Debug', true, 'ARM', false),
                     buildUwpArmRelease  : doBuildWindows('Release', true, 'ARM', false),
-*/
+
                     buildLinuxDebug     : doBuildLinux('Debug'),
                     buildLinuxRelease   : doBuildLinux('Release'),
                     buildLinuxRelAssert : doBuildLinux('RelAssert'),
@@ -163,14 +161,12 @@ jobWrapper {
                     }
                 )
             }
-/*
             stage('publish-packages') {
                 parallel(
                     generic: doPublishGeneric(),
                     others: doPublishLocalArtifacts()
                 )
             }
-*/
         }
     }
 }
@@ -179,24 +175,48 @@ def doCheckInDocker(String buildType, String maxBpNodeSize = '1000', String sani
     return {
         node('docker') {
             getArchive()
-            def buildEnv
-            if (sanitizeMode == '') {
-                buildEnv = docker.build 'realm-core:snapshot'
-            } else {
-                buildEnv = docker.build('realm-core-clang:snapshot', '-f clang.Dockerfile .')
+            def buildEnv = docker.build 'realm-core:snapshot'
+            def environment = environment()
+            environment << 'UNITTEST_PROGRESS=1'
+            withEnv(environment) {
+                buildEnv.inside() {
+                    try {
+                        sh """
+                           mkdir build-dir
+                           cd build-dir
+                           cmake -D CMAKE_BUILD_TYPE=${buildType} -D REALM_MAX_BPNODE_SIZE=${maxBpNodeSize} -G Ninja ..
+                        """
+                        runAndCollectWarnings(script: "cd build-dir && ninja")
+                        sh """
+                           cd build-dir/test
+                           ./realm-tests
+                        """
+                    } finally {
+                        recordTests("Linux-${buildType}")
+                    }
+                }
             }
+        }
+    }
+}
+
+def doCheckSanity(String buildType, String maxBpNodeSize = '1000', String sanitizeMode='') {
+    return {
+        node('docker') {
+            getArchive()
+            def buildEnv = docker.build('realm-core-clang:snapshot', '-f clang.Dockerfile .')
             def environment = environment()
             def sanitizeFlags = ''
+            def privileged = '';
             environment << 'UNITTEST_PROGRESS=1'
             if (sanitizeMode.contains('thread')) {
-                environment << 'UNITTEST_THREADS=1'
                 sanitizeFlags = '-D REALM_TSAN=ON'
             } else if (sanitizeMode.contains('address')) {
-                environment << 'UNITTEST_THREADS=1'
+                privileged = '--privileged'
                 sanitizeFlags = '-D REALM_ASAN=ON'
             }
             withEnv(environment) {
-                buildEnv.inside(sanitizeMode == 'address' ? '--privileged' : '') {
+                buildEnv.inside(privileged) {
                     try {
                         sh """
                            mkdir build-dir
@@ -329,7 +349,7 @@ def buildPerformance() {
     // Select docker-cph-X.  We want docker, metal (brix) and only one executor
     // (exclusive), if the machine changes also change REALM_BENCH_MACHID below
     node('docker && brix && exclusive') {
-      getSourceArchive()
+      getArchive()
 
       // REALM_BENCH_DIR tells the gen_bench_hist.sh script where to place results
       // REALM_BENCH_MACHID gives the results an id - results are organized by hardware to prevent mixing cached results with runs on different machines
@@ -515,7 +535,7 @@ def readGitTag() {
 def doBuildLinux(String buildType) {
     return {
         node('docker') {
-            getSourceArchive()
+            getArchive()
             
             docker.build('realm-core-generic:snapshot', '-f generic.Dockerfile .').inside {
                 sh """
