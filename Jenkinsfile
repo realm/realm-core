@@ -171,28 +171,52 @@ jobWrapper {
     }
 }
 
-def doCheckInDocker(String buildType, String maxBpNodeSize = '1000', String sanitizeMode='') {
+def doCheckInDocker(String buildType, String maxBpNodeSize = '1000') {
     return {
         node('docker') {
             getArchive()
-            def buildEnv
-            if (sanitizeMode == '') {
-                buildEnv = docker.build 'realm-core:snapshot'
-            } else {
-                buildEnv = docker.build('realm-core-clang:snapshot', '-f clang.Dockerfile .')
+            def buildEnv = docker.build 'realm-core:snapshot'
+            def environment = environment()
+            environment << 'UNITTEST_PROGRESS=1'
+            withEnv(environment) {
+                buildEnv.inside() {
+                    try {
+                        sh """
+                           mkdir build-dir
+                           cd build-dir
+                           cmake -D CMAKE_BUILD_TYPE=${buildType} -D REALM_MAX_BPNODE_SIZE=${maxBpNodeSize} -G Ninja ..
+                        """
+                        runAndCollectWarnings(script: "cd build-dir && ninja")
+                        sh """
+                           cd build-dir/test
+                           ./realm-tests
+                        """
+                    } finally {
+                        recordTests("Linux-${buildType}")
+                    }
+                }
             }
+        }
+    }
+}
+
+def doCheckSanity(String buildType, String maxBpNodeSize = '1000', String sanitizeMode='') {
+    return {
+        node('docker') {
+            getArchive()
+            def buildEnv = docker.build('realm-core-clang:snapshot', '-f clang.Dockerfile .')
             def environment = environment()
             def sanitizeFlags = ''
+            def privileged = '';
             environment << 'UNITTEST_PROGRESS=1'
             if (sanitizeMode.contains('thread')) {
-                environment << 'UNITTEST_THREADS=1'
                 sanitizeFlags = '-D REALM_TSAN=ON'
             } else if (sanitizeMode.contains('address')) {
-                environment << 'UNITTEST_THREADS=1'
+                privileged = '--privileged'
                 sanitizeFlags = '-D REALM_ASAN=ON'
             }
             withEnv(environment) {
-                buildEnv.inside(sanitizeMode == 'address' ? '--privileged' : '') {
+                buildEnv.inside(privileged) {
                     try {
                         sh """
                            mkdir build-dir
@@ -375,7 +399,7 @@ def buildPerformance() {
     // Select docker-cph-X.  We want docker, metal (brix) and only one executor
     // (exclusive), if the machine changes also change REALM_BENCH_MACHID below
     node('docker && brix && exclusive') {
-      getSourceArchive()
+      getArchive()
 
       // REALM_BENCH_DIR tells the gen_bench_hist.sh script where to place results
       // REALM_BENCH_MACHID gives the results an id - results are organized by hardware to prevent mixing cached results with runs on different machines
