@@ -105,6 +105,7 @@ struct mapping_and_addr {
 util::Mutex& mapping_mutex = *new Mutex;
 std::vector<mapping_and_addr>& mappings_by_addr = *new std::vector<mapping_and_addr>;
 std::vector<mappings_for_file>& mappings_by_file = *new std::vector<mappings_for_file>;
+unsigned int file_reclaim_ptr = 0;
 
 void encryption_note_reader_start(SharedFileInfo& info, void* reader_id)
 {
@@ -135,40 +136,57 @@ void encryption_note_reader_end(SharedFileInfo& info, void* reader_id)
 
 }
 
-size_t encryption_layer_hook(SharedFileInfo& info, uint64_t newest_version, uint64_t oldest_version)
+size_t collect_total_workload()  // must be called under lock
 {
-	UniqueLock lock(mapping_mutex);
-	if (info.readers.size() == 0)
-		oldest_version = info.current_version; // allow reclaiming to run
-	else {
-		oldest_version = info.current_version;
-		for (auto j = info.readers.begin(); j != info.readers.end(); ++j) {
-			if (j->version < oldest_version)
-				oldest_version = j->version;
-		}
-	}
-	// FIXME: Far too many magic constants in here
-	if (info.last_scanned_version + 1 < oldest_version) {
-		size_t sum = 0;
+	size_t total = 0;
+	for (auto i = mappings_by_file.begin(); i != mappings_by_file.end(); ++i) {
+		SharedFileInfo& info = *i->info;
 		info.num_decrypted_pages = 0;
 		for (auto it = info.mappings.begin(); it != info.mappings.end(); ++it) {
 			info.num_decrypted_pages += (*it)->collect_decryption_count();
 		}
-		size_t work_limit = 0;
-		size_t potential = info.num_decrypted_pages;
-		size_t target = 50000;
-		size_t increments = target/16;
-		size_t base = target - 4 * increments;
-		size_t divisor;
-		if (potential > target) divisor = 10;
-		else if (potential > target - increments) divisor = 20;
-		else if (potential > target - 2*increments) divisor = 50;
-		else if (potential > target - 3*increments) divisor = 100;
-		else if (potential > base) divisor = 200;
-		else return 0;
-		work_limit = (potential - base) / divisor;
-		if (work_limit == 0)
-			return 0;
+		total += info.num_decrypted_pages;
+	}
+	return total;
+}
+
+size_t get_work_limit(size_t potential, size_t target) // must be called under lock
+{
+	// FIXME: Far too many magic constants in here
+	size_t work_limit = 0;
+	size_t increments = target/16;
+	size_t base = target - 4 * increments;
+	size_t divisor;
+	if (potential > target) divisor = 10;
+	else if (potential > target - increments) divisor = 20;
+	else if (potential > target - 2*increments) divisor = 50;
+	else if (potential > target - 3*increments) divisor = 100;
+	else if (potential > base) divisor = 200;
+	else return 0;
+	work_limit = (potential - base) / divisor;
+	return work_limit;
+}
+
+uint64_t get_oldest_version(SharedFileInfo& info) // must be called under lock
+{
+	if (info.readers.size() == 0)
+		return info.current_version; // allow reclaiming to run
+	else {
+		auto oldest_version = info.current_version;
+		for (auto j = info.readers.begin(); j != info.readers.end(); ++j) {
+			if (j->version < oldest_version)
+				oldest_version = j->version;
+		}
+		return oldest_version;
+	}
+}
+
+// return true if "done for now"
+bool reclaim_pages_for_file(SharedFileInfo& info, size_t& work_limit)
+{
+	uint64_t oldest_version = get_oldest_version(info);
+	if (info.last_scanned_version + 1 < oldest_version) {
+		size_t sum = 0;
 		for (auto it = info.mappings.begin(); it != info.mappings.end() && work_limit; ++it) {
 			sum += (*it)->reclaim_untouched(info.progress_ptr, work_limit);
 		}
@@ -176,16 +194,40 @@ size_t encryption_layer_hook(SharedFileInfo& info, uint64_t newest_version, uint
 			info.progress_ptr = 0;
 			info.last_scanned_version = info.current_version;
 			++info.current_version;
+			return true;
 		}
-		if (sum > 0) {
-			std::cout << "Encryption: " << oldest_version << " .. "
-				<< newest_version << " -> reclaimed " << sum << " pages    pages active = "
-				<< info.num_decrypted_pages << "    \r";
-		}
-		return sum;
+		return false;
 	}
+	return true;
+}
+
+void reclaim_pages()
+{
+	UniqueLock lock(mapping_mutex);
+	size_t load = collect_total_workload();
+	size_t work_limit = get_work_limit(load, 50000);
+	if (work_limit == 0)
+		return; // nothing to do
+	if (file_reclaim_ptr >= mappings_by_file.size())
+		file_reclaim_ptr = 0;
+	std::cout << "Encryption: active pages = " << load << "   \r";
+	while (work_limit > 0) {
+		SharedFileInfo& info = *mappings_by_file[file_reclaim_ptr].info;
+		auto done_for_now = reclaim_pages_for_file(info, work_limit);
+		if (done_for_now) {
+			++file_reclaim_ptr;
+			if (file_reclaim_ptr >= mappings_by_file.size())
+				return;
+		}
+	}
+}
+
+size_t encryption_layer_hook(SharedFileInfo& info, uint64_t newest_version, uint64_t oldest_version)
+{
+	reclaim_pages();
 	return 0;
 }
+
 
 mapping_and_addr* find_mapping_for_addr(void* addr, size_t size)
 {

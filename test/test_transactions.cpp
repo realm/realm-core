@@ -720,13 +720,48 @@ TEST(LangBindHelper_RollbackLinkInsert)
 }
 
 #if 1
-ONLY(LangBindHelper_EncryptionGiga)
-{
-    std::string path = "dont_try_this_at_home.realm";
-    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
 
-    std::cout << "Opening..." << std::endl;
-    SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
+void growth_phase(SharedGroup& sg_w)
+{
+	std::cout << "Growing..." << std::endl;
+	for (int j = 0; j < 1000; ++j) {
+		//std::cout << "growth phase " << j << std::endl;
+		WriteTransaction wt(sg_w);
+		Group& g = wt.get_group();
+		TableRef t = g.get_table("spoink");
+		for (int k = 0; k < 50000; ++k) {
+			auto row = t->add_empty_row();
+			t->set_string(0, row, "yooodle-de-do");
+		}
+		//std::cout << "     - commit" << std::endl;
+		wt.commit();
+	}
+}
+
+void modification_phase(SharedGroup& sg_w)
+{
+	std::cout << "Modifying..." << std::endl;
+	int row = 0;
+	for (int j = 0; j < 500; ++j) {
+		//std::cout << "growth phase " << j << std::endl;
+		WriteTransaction wt(sg_w);
+		Group& g = wt.get_group();
+		TableRef t = g.get_table("spoink");
+		int max = t->size();
+		for (int k = 0; k < 100000; ++k) {
+			if (row == max) row = 0;
+			std::string s("yooodle-");
+			s = s + to_string(j);
+			t->set_string(0, row, s);
+			++row;
+		}
+		//std::cout << "     - commit" << std::endl;
+		wt.commit();
+	}
+}
+
+void preparations(SharedGroup& sg_w)
+{
     std::cout << "Setup...." << std::endl;
     {
     	WriteTransaction wt(sg_w);
@@ -738,38 +773,28 @@ ONLY(LangBindHelper_EncryptionGiga)
     	}
     	wt.commit();
     }
-    for (int r = 0; r < 1; ++r) {
-    	std::cout << "Growing..." << std::endl;
-    	for (int j = 0; j < 1000; ++j) {
-    		//std::cout << "growth phase " << j << std::endl;
-    		WriteTransaction wt(sg_w);
-    		Group& g = wt.get_group();
-    		TableRef t = g.get_table("spoink");
-    		for (int k = 0; k < 50000; ++k) {
-    			auto row = t->add_empty_row();
-    			t->set_string(0, row, "yooodle-de-do");
-    		}
-    		//std::cout << "     - commit" << std::endl;
-    		wt.commit();
-    	}
-    	std::cout << "Modifying..." << std::endl;
-    	int row = 0;
-    	for (int j = 0; j < 500; ++j) {
-    		//std::cout << "growth phase " << j << std::endl;
-    		WriteTransaction wt(sg_w);
-    		Group& g = wt.get_group();
-    		TableRef t = g.get_table("spoink");
-    		int max = t->size();
-    		for (int k = 0; k < 100000; ++k) {
-    			if (row == max) row = 0;
-    			std::string s("yooodle-");
-    			s = s + to_string(j);
-    			t->set_string(0, row, s);
-    			++row;
-    		}
-    		//std::cout << "     - commit" << std::endl;
-    		wt.commit();
-    	}
+}
+
+ONLY(LangBindHelper_EncryptionGiga)
+{
+    std::string path1 = "dont_try_this_at_home1.realm";
+    std::unique_ptr<Replication> hist_w1(make_in_realm_history(path1));
+
+    std::cout << "Opening..." << path1 << std::endl;
+    SharedGroup sg_w1(*hist_w1, SharedGroupOptions(crypt_key()));
+    preparations(sg_w1);
+
+    std::string path2 = "dont_try_this_at_home2.realm";
+    std::unique_ptr<Replication> hist_w2(make_in_realm_history(path2));
+
+    std::cout << "Opening..." << path2 << std::endl;
+    SharedGroup sg_w2(*hist_w2, SharedGroupOptions(crypt_key()));
+    preparations(sg_w2);
+    for (int r = 0; r < 2; ++r) {
+    	growth_phase(sg_w1);
+    	growth_phase(sg_w2);
+    	modification_phase(sg_w1);
+    	modification_phase(sg_w2);
     }
 }
 #endif
