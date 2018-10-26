@@ -357,6 +357,9 @@ def doBuildWindows(String buildType, boolean isUWP, String platform, boolean run
     } else {
       cmakeDefinitions = '-DCMAKE_SYSTEM_VERSION=8.1'
     }
+    if (!runTests) {
+      cmakeDefinitions += ' -DREALM_NO_TESTS=1'
+    }
 
     return {
         node('windows') {
@@ -436,6 +439,8 @@ def doBuildMacOs(String buildType, boolean runTests) {
         node('osx') {
             getArchive()
 
+            def buildTests = runTests ? '' : '-DREALM_NO_TESTS=1'
+
             dir("build-macos-${buildType}") {
                 withEnv(['DEVELOPER_DIR=/Applications/Xcode-8.3.3.app/Contents/Developer/']) {
                     // This is a dirty trick to work around a bug in xcode
@@ -448,7 +453,7 @@ def doBuildMacOs(String buildType, boolean runTests) {
                                     cmake -D CMAKE_TOOLCHAIN_FILE=../tools/cmake/macos.toolchain.cmake \\
                                           -D CMAKE_BUILD_TYPE=${buildType} \\
                                           -D REALM_VERSION=${gitDescribeVersion} \\
-                                          -G Xcode ..
+                                          ${buildTests} -G Xcode ..
                                 """
                         }
                     }
