@@ -78,7 +78,11 @@ public:
     void dump();
 #endif
 
-    size_t get_free_space();
+    size_t get_free_space_size()
+    {
+        return m_free_space_size;
+    }
+
 private:
     class MapWindow;
     Group& m_group;
@@ -89,6 +93,7 @@ private:
     uint64_t m_current_version;
     uint64_t m_readlock_version;
     size_t m_window_alignment;
+    size_t m_free_space_size;
 
     struct FreeSpaceEntry {
         FreeSpaceEntry(size_t r, size_t s, uint64_t v)
@@ -110,7 +115,7 @@ private:
     // Merge adjacent chunks
     void merge_adjacent_entries_in_freelist();
     void read_in_freelist();
-    size_t recreate_freelist(size_t reserve_pos);
+    size_t recreate_freelist(size_t reserve_pos, size_t& free_space_size);
     // Currently cached memory mappings. We keep as many as 16 1MB windows
     // open for writing. The allocator will favor sequential allocation
     // from a modest number of windows, depending upon fragmentation, so
