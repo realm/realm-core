@@ -68,6 +68,7 @@ jobWrapper {
                     androidArm64Debug   : doAndroidBuildInDocker('arm64-v8a', 'Debug', false),
                     threadSanitizer     : doCheckSanity('Debug', '1000', 'thread'),
                     addressSanitizer    : doCheckSanity('Debug', '1000', 'address'),
+                    buildLinuxASAN      : doBuildLinuxASAN()
                 ]
                 if (releaseTesting) {
                     extendedChecks = [
@@ -232,6 +233,29 @@ def doCheckSanity(String buildType, String maxBpNodeSize = '1000', String saniti
                         recordTests("Linux-${buildType}")
                     }
                 }
+            }
+        }
+    }
+}
+
+def doBuildLinuxASAN() {
+    return {
+        node('docker') {
+            getArchive()
+            docker.build('realm-core-clang:snapshot', '-f clang.Dockerfile .').inside() {
+                sh """
+                   mkdir build-dir
+                   cd build-dir
+                   cmake -D CMAKE_BUILD_TYPE=RelASAN -DREALM_NO_TESTS=1 -G Ninja ..
+                   ninja
+                   cpack -G TGZ
+                """
+            }
+            dir('build-dir') {
+                archiveArtifacts("*.tar.gz")
+                def stashName = "linux___RelASAN"
+                stash includes:"*.tar.gz", name:stashName
+                publishingStashes << stashName
             }
         }
     }
