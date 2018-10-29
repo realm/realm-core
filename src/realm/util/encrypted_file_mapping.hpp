@@ -93,6 +93,8 @@ private:
     // - unused / not up to data (0), up_to_date (1), partially up to date (2)
     std::vector<char> m_up_to_date_pages;
     std::vector<char> m_touched;
+    // 1K pages form a chunk - this array allows us to skip entire chunks during scanning
+    std::vector<bool> m_chunk_dont_scan;
     std::vector<bool> m_dirty_pages;
 
     File::AccessMode m_access;

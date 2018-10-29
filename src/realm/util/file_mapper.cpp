@@ -44,6 +44,7 @@
 #include <cstring>
 #include <atomic>
 #include <iostream>
+#include <thread>
 
 #include <realm/util/file.hpp>
 #include <realm/util/errno.hpp>
@@ -133,7 +134,6 @@ void encryption_note_reader_end(SharedFileInfo& info, void* reader_id)
 			info.readers.pop_back();
 			return;
 		}
-
 }
 
 size_t collect_total_workload()  // must be called under lock
@@ -169,8 +169,9 @@ size_t get_work_limit(size_t potential, size_t target) // must be called under l
 
 uint64_t get_oldest_version(SharedFileInfo& info) // must be called under lock
 {
-	if (info.readers.size() == 0)
+	if (info.readers.size() == 0) {
 		return info.current_version; // allow reclaiming to run
+	}
 	else {
 		auto oldest_version = info.current_version;
 		for (auto j = info.readers.begin(); j != info.readers.end(); ++j) {
@@ -185,7 +186,7 @@ uint64_t get_oldest_version(SharedFileInfo& info) // must be called under lock
 bool reclaim_pages_for_file(SharedFileInfo& info, size_t& work_limit)
 {
 	uint64_t oldest_version = get_oldest_version(info);
-	if (info.last_scanned_version + 1 < oldest_version) {
+	if (info.readers.size() == 0 || info.last_scanned_version < oldest_version) {
 		size_t sum = 0;
 		for (auto it = info.mappings.begin(); it != info.mappings.end() && work_limit; ++it) {
 			sum += (*it)->reclaim_untouched(info.progress_ptr, work_limit);
@@ -205,12 +206,12 @@ void reclaim_pages()
 {
 	UniqueLock lock(mapping_mutex);
 	size_t load = collect_total_workload();
-	size_t work_limit = get_work_limit(load, 50000);
+	size_t work_limit = get_work_limit(load, 100000);
+	std::cout << "Encryption: active pages = " << load << "   \r";
 	if (work_limit == 0)
 		return; // nothing to do
 	if (file_reclaim_ptr >= mappings_by_file.size())
 		file_reclaim_ptr = 0;
-	std::cout << "Encryption: active pages = " << load << "   \r";
 	while (work_limit > 0) {
 		SharedFileInfo& info = *mappings_by_file[file_reclaim_ptr].info;
 		auto done_for_now = reclaim_pages_for_file(info, work_limit);
@@ -222,9 +223,18 @@ void reclaim_pages()
 	}
 }
 
+void reclaimer_loop()
+{
+	for (;;) {
+		reclaim_pages();
+		sleep(1);
+	}
+}
+
+std::thread reclaimer_thread(reclaimer_loop);
+
 size_t encryption_layer_hook(SharedFileInfo& info, uint64_t newest_version, uint64_t oldest_version)
 {
-	reclaim_pages();
 	return 0;
 }
 

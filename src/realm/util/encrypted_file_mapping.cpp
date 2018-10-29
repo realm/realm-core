@@ -441,7 +441,9 @@ void EncryptedFileMapping::mark_outdated(size_t local_page_ndx) noexcept
     }
     if (m_up_to_date_pages[local_page_ndx] == 1)
     	m_up_to_date_pages[local_page_ndx] = 2;
-//    m_touched[local_page_ndx] = false;
+    size_t chunk_ndx = local_page_ndx >> 10;
+    if (m_chunk_dont_scan[chunk_ndx])
+    	m_chunk_dont_scan[chunk_ndx] = 0;
 }
 
 bool EncryptedFileMapping::copy_up_to_date_page(size_t local_page_ndx) noexcept
@@ -496,6 +498,9 @@ void EncryptedFileMapping::write_page(size_t local_page_ndx) noexcept
         }
     }
     m_dirty_pages[local_page_ndx] = true;
+    size_t chunk_ndx = local_page_ndx >> 10;
+    if (m_chunk_dont_scan[chunk_ndx])
+    	m_chunk_dont_scan[chunk_ndx] = 0;
 }
 
 void EncryptedFileMapping::validate_page(size_t local_page_ndx) noexcept
@@ -570,30 +575,48 @@ size_t EncryptedFileMapping::reclaim_untouched(size_t& progress_ptr, size_t& acc
 
 	size_t num_reclaimed = 0;
 	size_t next_scan_payment = 4096;
+	size_t contiguous_scan_count = 0;
 	for (size_t page_ndx = progress_ptr - m_first_page; page_ndx < num_pages; ++page_ndx) {
-		if (m_touched[page_ndx] == 0 && m_up_to_date_pages[page_ndx] && !m_dirty_pages[page_ndx]) {
-			// must be done after taking the lock - to prevent any other thread from
-			// changing the state of m_up_to_date_pages
-			m_up_to_date_pages[page_ndx] = 0;
+		size_t chunk_ndx = page_ndx >> 10; // 1K per chunk
+		if (m_chunk_dont_scan[chunk_ndx]) {
+			contiguous_scan_count = 0;
+			// skip to end of chunk
+			page_ndx = ((chunk_ndx + 1) << 10) - 1;
+			// postpone next scan payment
+			next_scan_payment += 1024;
+			// go to next chunk, but fall through to accounting code after 'else' on the way
+		} else {
+			++contiguous_scan_count;
+			if (m_touched[page_ndx] == 0 && m_up_to_date_pages[page_ndx] && !m_dirty_pages[page_ndx]) {
+				m_up_to_date_pages[page_ndx] = 0;
 #ifdef _WIN32
-			memset(page_addr(page_ndx), 0, 1 << m_page_shift);
+				memset(page_addr(page_ndx), 0, 1 << m_page_shift);
 #else
-			void* addr = page_addr(page_ndx);
-		    void* addr2 = ::mmap(addr, 1 << m_page_shift, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE | MAP_FIXED, -1, 0);
-		    if (addr != addr2) {
-		    	if (addr2 == 0)
-		    		throw std::system_error(errno, std::system_category(),
-		    				std::string("using mmap() to clear page failed"));
-		    	else
-		    		throw std::runtime_error("weird stuff");
-		    }
+				void* addr = page_addr(page_ndx);
+				void* addr2 = ::mmap(addr, 1 << m_page_shift, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE | MAP_FIXED, -1, 0);
+				if (addr != addr2) {
+					if (addr2 == 0)
+						throw std::system_error(errno, std::system_category(),
+								std::string("using mmap() to clear page failed"));
+					else
+						throw std::runtime_error("weird stuff");
+				}
 #endif
-			num_reclaimed++;
-			m_num_decrypted--;
-			if (accumulated_savings > 0)
-				accumulated_savings--;
+				num_reclaimed++;
+				m_num_decrypted--;
+				if (accumulated_savings > 0)
+					accumulated_savings--;
+			}
+			m_touched[page_ndx] = 0;
+			if (m_up_to_date_pages[page_ndx])
+				contiguous_scan_count = 0;
+			// if we've scanned a full chunk, mark it as not needing scans
+			if (contiguous_scan_count >= 1024 && (page_ndx & 1023) == 1023) {
+				contiguous_scan_count = 0;
+				m_chunk_dont_scan[page_ndx >> 10] = 1;
+			}
 		}
-		m_touched[page_ndx] = 0;
+		// account for work performed:
 		if (page_ndx >= next_scan_payment) {
 			next_scan_payment = page_ndx + 4096;
 			if (accumulated_savings > 0)
@@ -679,6 +702,9 @@ void EncryptedFileMapping::read_barrier(const void* addr, size_t size, Header_to
     if (m_up_to_date_pages[first_accessed_local_page] != 1) {
     	refresh_page(first_accessed_local_page);
     }
+    size_t chunk_ndx = first_accessed_local_page >> 10;
+    if (m_chunk_dont_scan[chunk_ndx])
+    	m_chunk_dont_scan[chunk_ndx] = 0;
 
     if (header_to_size) {
 
@@ -693,6 +719,9 @@ void EncryptedFileMapping::read_barrier(const void* addr, size_t size, Header_to
     // We already checked first_accessed_local_page above, so we start the loop
     // at first_accessed_local_page + 1 to check the following page.
     for (size_t idx = first_accessed_local_page + 1; idx <= last_idx && idx < up_to_date_pages_size; ++idx) {
+        chunk_ndx = idx >> 10;
+        if (m_chunk_dont_scan[chunk_ndx])
+        	m_chunk_dont_scan[chunk_ndx] = 0;
         if (!m_touched[idx])
         	m_touched[idx] = 1;
         if (m_up_to_date_pages[idx] != 1)
@@ -719,10 +748,12 @@ void EncryptedFileMapping::set(void* new_addr, size_t new_size, size_t new_file_
     m_up_to_date_pages.clear();
     m_dirty_pages.clear();
     m_touched.clear();
+    m_chunk_dont_scan.clear();
 
     m_up_to_date_pages.resize(num_pages, false);
     m_dirty_pages.resize(num_pages, false);
     m_touched.resize(num_pages, false);
+    m_chunk_dont_scan.resize((num_pages + 1023) >> 10, false);
 }
 
 File::SizeType encrypted_size_to_data_size(File::SizeType size) noexcept

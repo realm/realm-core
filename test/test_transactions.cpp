@@ -25,6 +25,7 @@
 #include <fstream>
 #include <iostream>
 #include <iomanip>
+#include <unistd.h>
 
 #include <realm/history.hpp>
 #include <realm/lang_bind_helper.hpp>
@@ -738,11 +739,41 @@ void growth_phase(SharedGroup& sg_w)
 	}
 }
 
+void query_phase(SharedGroup& sg_w)
+{
+	std::cout << "Querying..." << std::endl;
+	int row = 0;
+	for (int j = 0; j < 1; ++j) {
+		//std::cout << "growth phase " << j << std::endl;
+		ReadTransaction wt(sg_w);
+		const Group& g = wt.get_group();
+		ConstTableRef t = g.get_table("spoink");
+		int max = t->size();
+		TableView tv = t->where().equal(0,"gylle").find_all();
+	}
+}
+
+void partial_read_phase(SharedGroup& sg_w)
+{
+	std::cout << "Reading..." << std::endl;
+	int row = 0;
+	for (int j = 0; j < 100; ++j) {
+		//std::cout << "growth phase " << j << std::endl;
+		ReadTransaction wt(sg_w);
+		const Group& g = wt.get_group();
+		ConstTableRef t = g.get_table("spoink");
+		int max = t->size();
+		for (int z = 0; z < max/10; ++z) {
+			auto v = t->get_string(0,z);
+		}
+	}
+}
+
 void modification_phase(SharedGroup& sg_w)
 {
 	std::cout << "Modifying..." << std::endl;
 	int row = 0;
-	for (int j = 0; j < 500; ++j) {
+	for (int j = 0; j < 1000; ++j) {
 		//std::cout << "growth phase " << j << std::endl;
 		WriteTransaction wt(sg_w);
 		Group& g = wt.get_group();
@@ -795,6 +826,12 @@ ONLY(LangBindHelper_EncryptionGiga)
     	growth_phase(sg_w2);
     	modification_phase(sg_w1);
     	modification_phase(sg_w2);
+    	partial_read_phase(sg_w1);
+    	partial_read_phase(sg_w2);
+    	query_phase(sg_w1);
+    	query_phase(sg_w2);
+    	std::cout << "Sleeping.." << std::endl;
+    	sleep(20);
     }
 }
 #endif
