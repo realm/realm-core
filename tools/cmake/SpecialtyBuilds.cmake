@@ -4,7 +4,6 @@ if (CMAKE_BUILD_TYPE MATCHES "RelAssert")
 endif()
 
 if (CMAKE_BUILD_TYPE MATCHES "RelASAN")
-    message(STATUS "Kilroy")
     set(REALM_ASAN ON CACHE BOOL "Build with address sanitizer")
     set(CMAKE_CXX_FLAGS_RELASAN "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} -O1")
 endif()

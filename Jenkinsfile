@@ -66,8 +66,8 @@ jobWrapper {
                     checkWin64Release       : doBuildWindows('Release', false, 'x64', true),
                     iosDebug                : doBuildAppleDevice('ios', 'MinSizeDebug'),
                     androidArm64Debug       : doAndroidBuildInDocker('arm64-v8a', 'Debug', false),
-                    threadSanitizer         : doCheckInDocker('Debug', '1000', 'thread'),
-                    addressSanitizer        : doCheckInDocker('Debug', '1000', 'address'),
+                    threadSanitizer         : doCheckSanity('Debug', '1000', 'thread'),
+                    addressSanitizer        : doCheckSanity('Debug', '1000', 'address'),
                 ]
                 if (releaseTesting) {
                     extendedChecks = [
@@ -111,10 +111,8 @@ jobWrapper {
                 androidAbis = ['armeabi-v7a', 'x86', 'mips', 'x86_64', 'arm64-v8a']
                 androidBuildTypes = ['Debug', 'Release']
 
-                for (def i = 0; i < androidAbis.size(); i++) {
-                    def abi = androidAbis[i]
-                    for (def j = 0; j < androidBuildTypes.size(); j++) {
-                        def buildType = androidBuildTypes[j]
+                for (abi in androidAbis) {
+                    for (buildType in androidBuildTypes) {
                         parallelExecutors["android-${abi}-${buildType}"] = doAndroidBuildInDocker(abi, buildType, false)
                     }
                 }
@@ -122,10 +120,8 @@ jobWrapper {
                 appleSdks = ['ios', 'tvos', 'watchos']
                 appleBuildTypes = ['MinSizeDebug', 'Release']
 
-                for (def i = 0; i < appleSdks.size(); i++) {
-                    def sdk = appleSdks[i]
-                    for (def j = 0; j < appleBuildTypes.size(); j++) {
-                        def buildType = appleBuildTypes[j]
+                for (sdk in appleSdks) {
+                    for (buildType in appleBuildTypes) {
                         parallelExecutors["${sdk}${buildType}"] = doBuildAppleDevice(sdk, buildType)
                     }
                 }
@@ -137,8 +133,8 @@ jobWrapper {
                     cocoa: {
                         node('docker') {
                             getArchive()
-                            for (int i = 0; i < cocoaStashes.size(); i++) {
-                                unstash name:cocoaStashes[i]
+                            for (cocoaStash in cocoaStashes) {
+                                unstash name: cocoaStash
                             }
                             sh 'tools/build-cocoa.sh'
                             archiveArtifacts('realm-core-cocoa*.tar.xz')
@@ -150,8 +146,8 @@ jobWrapper {
                     android: {
                         node('docker') {
                             getArchive()
-                            for (int i = 0; i < androidStashes.size(); i++) {
-                                unstash name:androidStashes[i]
+                            for (androidStash in androidStashes) {
+                                unstash name: androidStash
                             }
                             sh 'tools/build-android.sh'
                             archiveArtifacts('realm-core-android*.tar.gz')
@@ -593,7 +589,7 @@ def doPublishLocalArtifacts() {
             deleteDir()
             dir('temp') {
                 withAWS(credentials: 'aws-credentials', region: 'us-east-1') {
-                    for(publishingStash in publishingStashes) {
+                    for (publishingStash in publishingStashes) {
                         unstash name: publishingStash
                         def path = publishingStash.replaceAll('___', '/')
                         def files = findFiles(glob: '**')
