@@ -408,6 +408,10 @@ public:
     {
         return m_ptr - m_freed == m_buffer.get();
     }
+    size_t get_allocated() const noexcept
+    {
+        return m_ptr - m_buffer.get();
+    }
 
 private:
     size_t m_size;
@@ -442,6 +446,19 @@ TEST(Allocator_MakeUnique)
         CHECK_EQUAL(ptr2->size(), 5);
     }
     CHECK(alloc.check());
+}
+
+TEST(Allocator_MoveAssignmentNoCopy)
+{
+    MyAllocator alloc;
+    std::vector<char, STLAllocator<char, MyAllocator>> vec1(1000, char(123), alloc);
+    CHECK_EQUAL(alloc.get_allocated(), 1000);
+    // Move-construction
+    auto vec2 = std::move(vec1);
+    CHECK_EQUAL(alloc.get_allocated(), 1000);
+    std::vector<char, STLAllocator<char, MyAllocator>> vec3(alloc);
+    vec2 = std::move(vec2);
+    CHECK_EQUAL(alloc.get_allocated(), 1000);
 }
 
 TEST(Allocator_Polymorphic)
