@@ -460,7 +460,7 @@ TEST(Allocator_MoveAssignmentNoCopy)
     auto vec2 = std::move(vec1);
     CHECK_EQUAL(alloc.get_allocated(), 1000);
     std::vector<char, STLAllocator<char, MyAllocator>> vec3(alloc);
-    vec2 = std::move(vec2);
+    vec2 = std::move(vec3);
     CHECK_EQUAL(alloc.get_allocated(), 1000);
 }
 
