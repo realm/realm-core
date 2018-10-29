@@ -92,6 +92,8 @@ namespace detail {
 /// no extra storage is needed.
 template <class Allocator>
 struct GetAllocator {
+    // Note: Some allocators may not define get_default(). This is OK, and
+    // this constructor will not be instantiated (SFINAE).
     GetAllocator() noexcept
         : m_allocator(&Allocator::get_default())
     {
@@ -170,6 +172,15 @@ struct STLAllocator : detail::GetAllocator<Allocator> {
     using value_type = T;
     using Deleter = STLDeleter<T, Allocator>;
 
+    // These typedefs are optional, but GCC 4.9 requires them when using the
+    // allocator together with std::map, std::basic_string, etc.
+    using size_type = std::size_t;
+    using difference_type = std::ptrdiff_t;
+    using reference = T&;
+    using const_reference = const T&;
+    using pointer = T*;
+    using const_pointer = const T*;
+
     /// The default constructor is only availble when the static method
     /// `Allocator::get_default()` exists.
     STLAllocator() noexcept
@@ -209,6 +220,20 @@ struct STLAllocator : detail::GetAllocator<Allocator> {
     struct rebind {
         using other = STLAllocator<U, Allocator>;
     };
+
+    // construct() and destroy() are optional, but are required by some
+    // containers under GCC 4.9 (verified for at least std::list).
+    template <class... Args>
+    void construct(T* ptr, Args&&... args)
+    {
+        ::new (ptr) T(std::forward<Args>(args)...);
+    }
+
+    template <class U>
+    void destroy(U* ptr)
+    {
+        ptr->~U();
+    }
 
 private:
     template <class U, class A>
