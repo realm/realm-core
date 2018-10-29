@@ -518,7 +518,7 @@ using MyVector = std::vector<T, STLAllocator<T>>;
 template <class T>
 using MyList = std::list<T, STLAllocator<T>>;
 template <class K, class V>
-using MyUnorderedMap = std::unordered_map<K, V, std::hash<K>, std::equal_to<K>, STLAllocator<char>>;
+using MyUnorderedMap = std::unordered_map<K, V, std::hash<K>, std::equal_to<K>, STLAllocator<std::pair<const K, V>>>;
 } // unnamed namespace
 
 namespace std {
