@@ -812,17 +812,17 @@ public:
 
 } // anonymous namespace
 
+std::string TrivialReplication::get_database_path() const
+{
+    return m_database_file;
+}
+
 void TrivialReplication::apply_changeset(const char* data, size_t size, SharedGroup& target, util::Logger* logger)
 {
     InputStreamImpl in(data, size);
     WriteTransaction wt(target);                              // Throws
     Replication::apply_changeset(in, wt.get_group(), logger); // Throws
     wt.commit();                                              // Throws
-}
-
-std::string TrivialReplication::get_database_path()
-{
-    return m_database_file;
 }
 
 void TrivialReplication::initialize(SharedGroup&)

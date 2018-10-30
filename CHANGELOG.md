@@ -17,7 +17,8 @@
 -----------
 
 ### Internals
-* None.
+* Replication::get_database_path() is made const.
+* TrivialReplication::get_database_path() is made public.
 
 ----------------------------------------------
 
