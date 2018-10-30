@@ -230,8 +230,7 @@ struct CityHash64 {
         }
         uint_least64_t x = load8(data + len - 40);
         uint_least64_t y = load8(data + len - 16) + load8(data + len - 56);
-        uint_least64_t z = z = hash_len_16(load8(data + len - 48) + len,
-                                           load8(data + len - 24));
+        uint_least64_t z = hash_len_16(load8(data + len - 48) + len, load8(data + len - 24));
         pair v = weak_hash_len_32_with_seeds(data + len - 64, len, z);
         pair w = weak_hash_len_32_with_seeds(data + len - 32, y + k1, x);
         x = x * k1 + load8(data);
