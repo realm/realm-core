@@ -17,7 +17,8 @@
 -----------
 
 ### Internals
-* None.
+* Added better compatibility for custom allocators with standard library
+  containers on GCC 4.9.
 
 ----------------------------------------------
 
