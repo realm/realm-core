@@ -454,14 +454,17 @@ TEST(Allocator_MakeUnique)
 TEST(Allocator_MoveAssignmentNoCopy)
 {
     MyAllocator alloc;
-    std::vector<char, STLAllocator<char, MyAllocator>> vec1(1000, char(123), alloc);
-    CHECK_EQUAL(alloc.get_allocated(), 1000);
+    std::vector<char, STLAllocator<char, MyAllocator>> vec1(100, char(123), alloc);
+    // FIXME: This check is weird because MSVC's std::vector apparently
+    // allocates an extra 8 bytes in Debug mode on move-assignment/construction!
+    // Presumably, this is due to debug-iterators.
+    CHECK_LESS(alloc.get_allocated(), 200);
     // Move-construction
     auto vec2 = std::move(vec1);
-    CHECK_EQUAL(alloc.get_allocated(), 1000);
+    CHECK_LESS(alloc.get_allocated(), 200);
     std::vector<char, STLAllocator<char, MyAllocator>> vec3(alloc);
     vec2 = std::move(vec3);
-    CHECK_EQUAL(alloc.get_allocated(), 1000);
+    CHECK_LESS(alloc.get_allocated(), 200);
 }
 
 TEST(Allocator_Polymorphic)
