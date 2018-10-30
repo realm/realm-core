@@ -135,7 +135,7 @@ struct Murmur2OrCityHash;
 
 template <>
 struct Murmur2OrCityHash<8> {
-    size_t operator()(const unsigned char* data, size_t len) const noexcept
+    uint_least64_t operator()(const unsigned char* data, size_t len) const noexcept
     {
         return cityhash_64(data, len);
     }
@@ -143,7 +143,7 @@ struct Murmur2OrCityHash<8> {
 
 template <>
 struct Murmur2OrCityHash<4> {
-    size_t operator()(const unsigned char* data, size_t len) const noexcept
+    uint_least32_t operator()(const unsigned char* data, size_t len) const noexcept
     {
         return murmur2_32(data, len);
     }
@@ -168,7 +168,7 @@ uint_least64_t load8(const unsigned char* data)
 
 size_t realm::murmur2_or_cityhash(const unsigned char* data, size_t len) noexcept
 {
-    return Murmur2OrCityHash<>{}(data, len);
+    return size_t(Murmur2OrCityHash<>{}(data, len));
 }
 
 uint_least32_t realm::murmur2_32(const unsigned char* data, size_t len) noexcept
