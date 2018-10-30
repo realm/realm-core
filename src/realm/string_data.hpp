@@ -400,7 +400,7 @@ inline size_t StringData::hash() const noexcept
 namespace std {
 template <>
 struct hash<::realm::StringData> {
-    size_t operator()(const ::realm::StringData& str) const noexcept
+    inline size_t operator()(const ::realm::StringData& str) const noexcept
     {
         return str.hash();
     }

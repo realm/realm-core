@@ -135,7 +135,7 @@ struct Murmur2OrCityHash;
 
 template <>
 struct Murmur2OrCityHash<8> {
-    uint_least64_t operator()(const unsigned char* data, size_t len) const noexcept
+    inline uint_least64_t operator()(const unsigned char* data, size_t len) const noexcept
     {
         return cityhash_64(data, len);
     }
@@ -143,20 +143,20 @@ struct Murmur2OrCityHash<8> {
 
 template <>
 struct Murmur2OrCityHash<4> {
-    uint_least32_t operator()(const unsigned char* data, size_t len) const noexcept
+    inline uint_least32_t operator()(const unsigned char* data, size_t len) const noexcept
     {
         return murmur2_32(data, len);
     }
 };
 
-uint_least32_t load4(const unsigned char* data)
+inline uint_least32_t load4(const unsigned char* data)
 {
     uint_least32_t word = 0;
     std::memcpy(&word, data, 4);
     return word;
 }
 
-uint_least64_t load8(const unsigned char* data)
+inline uint_least64_t load8(const unsigned char* data)
 {
     uint_least64_t word = 0;
     std::memcpy(&word, data, 8);
