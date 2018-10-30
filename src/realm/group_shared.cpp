@@ -1997,13 +1997,6 @@ void SharedGroup::do_begin_read(VersionID version_id, bool writable)
     grab_read_lock(m_read_lock, version_id); // Throws
     ReadLockUnlockGuard g(*this, m_read_lock);
 
-    SharedInfo* info = m_file_map.get_addr();
-    // FIXME: Unsafe in face of concurrent commit
-    auto newest_version = info->latest_version_number;
-    auto oldest_version = newest_version - info->number_of_versions - 1;
-    if (oldest_version > 0 && newest_version > oldest_version)
-    	m_group.m_alloc.cleanup_hook(newest_version, oldest_version);
-
     m_group.m_alloc.note_reader_start(this);
     using gf = _impl::GroupFriend;
     gf::attach_shared(m_group, m_read_lock.m_top_ref, m_read_lock.m_file_size, writable); // Throws

@@ -42,7 +42,8 @@ class EncryptedFileMapping;
 
 #if REALM_ENABLE_ENCRYPTION
 
-size_t encryption_layer_hook(SharedFileInfo& info, uint64_t newest_version, uint64_t oldest_version);
+typedef size_t (*page_reclaim_governor_t)(size_t);
+void set_page_reclaim_governor(page_reclaim_governor_t governor);
 void encryption_note_reader_start(SharedFileInfo& info, void* reader_id);
 void encryption_note_reader_end(SharedFileInfo& info, void* reader_id);
 
@@ -99,7 +100,8 @@ void inline encryption_write_barrier(const void*, size_t, EncryptedFileMapping*)
 {
 }
 
-size_t encryption_layer_hook(SharedFileInfo&, uint64_t, uint64_t)
+typedef size_t (*page_reclaim_governor_t)(size_t);
+void set_page_reclaim_governor(page_reclaim_governor_t)
 {
 }
 

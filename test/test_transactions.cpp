@@ -725,7 +725,7 @@ TEST(LangBindHelper_RollbackLinkInsert)
 void growth_phase(SharedGroup& sg_w)
 {
 	std::cout << "Growing..." << std::endl;
-	for (int j = 0; j < 1000; ++j) {
+	for (int j = 0; j < 100; ++j) {
 		//std::cout << "growth phase " << j << std::endl;
 		WriteTransaction wt(sg_w);
 		Group& g = wt.get_group();
@@ -742,13 +742,11 @@ void growth_phase(SharedGroup& sg_w)
 void query_phase(SharedGroup& sg_w)
 {
 	std::cout << "Querying..." << std::endl;
-	int row = 0;
 	for (int j = 0; j < 1; ++j) {
 		//std::cout << "growth phase " << j << std::endl;
 		ReadTransaction wt(sg_w);
 		const Group& g = wt.get_group();
 		ConstTableRef t = g.get_table("spoink");
-		int max = t->size();
 		TableView tv = t->where().equal(0,"gylle").find_all();
 	}
 }
@@ -756,7 +754,6 @@ void query_phase(SharedGroup& sg_w)
 void partial_read_phase(SharedGroup& sg_w)
 {
 	std::cout << "Reading..." << std::endl;
-	int row = 0;
 	for (int j = 0; j < 100; ++j) {
 		//std::cout << "growth phase " << j << std::endl;
 		ReadTransaction wt(sg_w);
@@ -773,7 +770,7 @@ void modification_phase(SharedGroup& sg_w)
 {
 	std::cout << "Modifying..." << std::endl;
 	int row = 0;
-	for (int j = 0; j < 1000; ++j) {
+	for (int j = 0; j < 100; ++j) {
 		//std::cout << "growth phase " << j << std::endl;
 		WriteTransaction wt(sg_w);
 		Group& g = wt.get_group();
@@ -806,8 +803,53 @@ void preparations(SharedGroup& sg_w)
     }
 }
 
+
+size_t system_memory_governor(size_t load) {
+	try {
+		auto file = fopen("/proc/meminfo","r");
+		if (file == nullptr)
+			return 0;
+		size_t total, free;
+		int r = fscanf(file,"MemTotal: %ld kB MemFree: %ld kB", &total, &free);
+		if (r != 2)
+			return 0;
+		fclose(file);
+		size_t target;
+		if (free < total * 0.25)
+			target = size_t(load * 0.9);
+		else if (free < total * 0.3)
+			target =  load;
+		else
+			target = size_t(load * 1.2);
+		std::cout << "total: " << total << "   free: " << free
+					<< "   load: " << load << "   target: " << target << "    \r";
+		return target;
+	} catch (...) {
+		return 0;
+	}
+}
+
+size_t file_control_governor(size_t load) {
+	try {
+		auto file = fopen("governor.txt", "r");
+		if (file == nullptr)
+			return system_memory_governor(load);
+		size_t target;
+		int r = fscanf(file, "%ld", &target);
+		if (r != 1)
+			return system_memory_governor(load);
+		fclose(file);
+		std::cout << "Encryption: active data = " << load << "    set target: " << target << "   \r";
+		return target;
+	} catch (...) {
+		return system_memory_governor(load);
+	}
+}
+
+
 ONLY(LangBindHelper_EncryptionGiga)
 {
+	realm::util::set_page_reclaim_governor(file_control_governor);
     std::string path1 = "dont_try_this_at_home1.realm";
     std::unique_ptr<Replication> hist_w1(make_in_realm_history(path1));
 

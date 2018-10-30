@@ -1084,12 +1084,6 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
     return top_ref;
 }
 
-void SlabAlloc::cleanup_hook(uint64_t newest_version, uint64_t oldest_version)
-{
-	if (m_file_mappings->m_realm_file_info)
-		util::encryption_layer_hook(*m_file_mappings->m_realm_file_info, newest_version, oldest_version);
-}
-
 void SlabAlloc::note_reader_start(void* reader_id)
 {
 	if (m_file_mappings->m_realm_file_info)
