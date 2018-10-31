@@ -166,7 +166,7 @@ size_t collect_total_workload()  // must be called under lock
 }
 
 /* Compute the amount of work allowed in an attempt to realize 'potential'.
- * The workload is expressed in pages scanned or reclaimed - roughly
+ * please refer to EncryptedFileMapping::reclaim_untouched() for more details.
  */
 size_t get_work_limit(size_t potential, size_t target) // must be called under lock
 {
@@ -189,7 +189,7 @@ size_t get_work_limit(size_t potential, size_t target) // must be called under l
 uint64_t get_oldest_version(SharedFileInfo& info) // must be called under lock
 {
 	if (info.readers.size() == 0) {
-		return info.current_version; // allow reclaiming to run
+		return info.current_version;
 	}
 	else {
 		auto oldest_version = info.current_version;
@@ -238,7 +238,7 @@ void reclaim_pages()
 	size_t target = (*governor)(load * page_size()) / page_size();
 	{
 		UniqueLock lock(mapping_mutex);
-		if (target == 0) // temporarily disabled
+		if (target == 0) // temporarily disabled by governor returning 0
 			return;
 		size_t work_limit = get_work_limit(load, target);
 		if (work_limit == 0)

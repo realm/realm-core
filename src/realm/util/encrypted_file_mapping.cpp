@@ -436,13 +436,12 @@ void EncryptedFileMapping::mark_outdated(size_t local_page_ndx) noexcept
     if (local_page_ndx >= m_page_state.size())
         return;
 
-    if (m_page_state[local_page_ndx] & PageState::Dirty) {
+    if (is(m_page_state[local_page_ndx], Dirty)) {
         flush();
     }
-    if (m_page_state[local_page_ndx] & PageState::UpToDate) {
+    if (is(m_page_state[local_page_ndx], UpToDate)) {
     	clear(m_page_state[local_page_ndx], UpToDate);
-    	set(m_page_state[local_page_ndx],PartiallyUpToDate);
-    	//m_up_to_date_pages[local_page_ndx] = 2;
+    	set(m_page_state[local_page_ndx], PartiallyUpToDate);
     }
     size_t chunk_ndx = local_page_ndx >> 10;
     if (m_chunk_dont_scan[chunk_ndx])
@@ -454,7 +453,7 @@ bool EncryptedFileMapping::copy_up_to_date_page(size_t local_page_ndx) noexcept
     REALM_ASSERT_EX(local_page_ndx < m_page_state.size(), local_page_ndx, m_page_state.size());
     // Precondition: this method must never be called for a page which
     // is already up to date.
-    REALM_ASSERT((m_page_state[local_page_ndx] & UpToDate) == 0);
+    REALM_ASSERT(is_not(m_page_state[local_page_ndx], UpToDate));
     for (size_t i = 0; i < m_file.mappings.size(); ++i) {
         EncryptedFileMapping* m = m_file.mappings[i];
         size_t page_ndx_in_file = local_page_ndx + m_first_page;
@@ -462,7 +461,7 @@ bool EncryptedFileMapping::copy_up_to_date_page(size_t local_page_ndx) noexcept
             continue;
 
         size_t shadow_mapping_local_ndx = page_ndx_in_file - m->m_first_page;
-        if (m->m_page_state[shadow_mapping_local_ndx] & UpToDate) {
+        if (is(m->m_page_state[shadow_mapping_local_ndx], UpToDate)) {
             memcpy(page_addr(local_page_ndx),
                    m->page_addr(shadow_mapping_local_ndx),
                    static_cast<size_t>(1ULL << m_page_shift));
@@ -524,7 +523,7 @@ void EncryptedFileMapping::validate_page(size_t local_page_ndx) noexcept
         EncryptedFileMapping* m = m_file.mappings[i];
         size_t shadow_mapping_local_ndx = page_ndx_in_file - m->m_first_page;
         if (m != this && m->contains_page(page_ndx_in_file)
-        		&& m->m_page_state[shadow_mapping_local_ndx] & Dirty) {
+        		&& is(m->m_page_state[shadow_mapping_local_ndx], Dirty)) {
             memcpy(m_validate_buffer.get(),
                    m->page_addr(shadow_mapping_local_ndx),
                    static_cast<size_t>(1ULL << m_page_shift));
@@ -551,28 +550,17 @@ void EncryptedFileMapping::validate() noexcept
         validate_page(local_page_ndx);
 #endif
 }
-/*
-size_t EncryptedFileMapping::mark_untouched() noexcept
-{
-	const size_t num_pages = m_touched.size();
-	size_t untouched = 0;
-	for (size_t page_ndx = 0; page_ndx < num_pages; ++page_ndx) {
-		m_touched[page_ndx] = 0;
-	}
-	return untouched;
-}
 
-void EncryptedFileMapping::count_usage(size_t& touched, size_t& updated, size_t& dirty, size_t& total)
-{
-	const size_t num_pages = m_touched.size();
-	total += num_pages;
-	for (size_t page_ndx = 0; page_ndx < num_pages; ++page_ndx) {
-		touched += m_touched[page_ndx];
-		updated += m_up_to_date_pages[page_ndx] == 1;
-		dirty += m_dirty_pages[page_ndx];
-	}
-}
-*/
+/* This functions is a bit convoluted. It reclaims pages, but only does a limited amount of work
+ * each time it's called. It saves the progress in a 'progress_ptr' so that it can resume later
+ * from where it was stopped.
+ *
+ * The workload is composed of workunits, each unit signifying
+ * 1) A scanning of the state of 4K pages
+ * 2) One system call (to mmap to release a page and get a new one)
+ * 3) A scanning of 1K entries in the "don't scan" array (corresponding to 4M pages)
+ * Approximately
+ */
 size_t EncryptedFileMapping::reclaim_untouched(size_t& progress_ptr, size_t& accumulated_savings) noexcept
 {
 	const size_t num_pages = m_page_state.size();
@@ -595,12 +583,17 @@ size_t EncryptedFileMapping::reclaim_untouched(size_t& progress_ptr, size_t& acc
 			++contiguous_scan_count;
 			PageState ps = m_page_state[page_ndx];
 			if (is_not(ps, Touched) && is(ps, UpToDate | PartiallyUpToDate) && is_not(ps,Dirty)) {
-//			if (m_touched[page_ndx] == 0 && m_up_to_date_pages[page_ndx] && !m_dirty_pages[page_ndx]) {
 				clear(m_page_state[page_ndx], UpToDate | PartiallyUpToDate);
-				// m_up_to_date_pages[page_ndx] = 0;
 #ifdef _WIN32
+				// On windows we don't know how to replace a page within a page range with a fresh one.
+				// instead we clear it. If the system runs with same-page-merging, this will reduce
+				// the number of used pages.
 				memset(page_addr(page_ndx), 0, 1 << m_page_shift);
 #else
+				// On Posix compatible, we can request a new page in the middle of an already
+				// requested range, so we request a new one. This releases the backing store for the
+				// old page and gives us a shared zero-page that we can later demand-allocate, thus
+				// reducing the overall amount of dirty pages.
 				void* addr = page_addr(page_ndx);
 				void* addr2 = ::mmap(addr, 1 << m_page_shift, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE | MAP_FIXED, -1, 0);
 				if (addr != addr2) {
@@ -617,8 +610,6 @@ size_t EncryptedFileMapping::reclaim_untouched(size_t& progress_ptr, size_t& acc
 					accumulated_savings--;
 			}
 			clear(m_page_state[page_ndx], Touched);
-			//m_touched[page_ndx] = 0;
-			//if (m_up_to_date_pages[page_ndx])
 			if (is(m_page_state[page_ndx], UpToDate | PartiallyUpToDate))
 				contiguous_scan_count = 0;
 			// if we've scanned a full chunk, mark it as not needing scans
@@ -714,6 +705,8 @@ void EncryptedFileMapping::read_barrier(const void* addr, size_t size, Header_to
     	if (is_not(ps, UpToDate))
     		refresh_page(first_accessed_local_page);
     }
+
+    // force the page reclaimer to look into pages in this chunk:
     size_t chunk_ndx = first_accessed_local_page >> 10;
     if (m_chunk_dont_scan[chunk_ndx])
     	m_chunk_dont_scan[chunk_ndx] = 0;
@@ -731,9 +724,12 @@ void EncryptedFileMapping::read_barrier(const void* addr, size_t size, Header_to
     // We already checked first_accessed_local_page above, so we start the loop
     // at first_accessed_local_page + 1 to check the following page.
     for (size_t idx = first_accessed_local_page + 1; idx <= last_idx && idx < pages_size; ++idx) {
-        chunk_ndx = idx >> 10;
+
+    	// force the page reclaimer to....
+    	chunk_ndx = idx >> 10;
         if (m_chunk_dont_scan[chunk_ndx])
         	m_chunk_dont_scan[chunk_ndx] = 0;
+
         PageState& ps = m_page_state[idx];
         if (is_not(ps, Touched))
         	set(ps, Touched);

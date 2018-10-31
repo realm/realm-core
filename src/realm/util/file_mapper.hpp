@@ -42,8 +42,17 @@ class EncryptedFileMapping;
 
 #if REALM_ENABLE_ENCRYPTION
 
+// Set a page reclaim governor. The governor is a function which will be called periodically
+// and must return a 'target' amount of memory to hold decrypted pages. The page reclaim daemon
+// will then try to release pages to meet the target. The governor is called with the current
+// amount of data used, for the purpose of logging - or possibly for computing the target
+//
+// The governor is called approximately once per second.
+//
+// If no governor is installed, the page reclaim daemon will not start.
 typedef size_t (*page_reclaim_governor_t)(size_t);
 void set_page_reclaim_governor(page_reclaim_governor_t governor);
+
 void encryption_note_reader_start(SharedFileInfo& info, void* reader_id);
 void encryption_note_reader_end(SharedFileInfo& info, void* reader_id);
 

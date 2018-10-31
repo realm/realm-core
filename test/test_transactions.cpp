@@ -720,7 +720,7 @@ TEST(LangBindHelper_RollbackLinkInsert)
     CHECK_EQUAL(g.get_table(1)->get_link_target(0), g.get_table(0));
 }
 
-#if 1
+#if 0
 
 void growth_phase(SharedGroup& sg_w)
 {
@@ -810,7 +810,7 @@ size_t system_memory_governor(size_t load) {
 		if (file == nullptr)
 			return 0;
 		size_t total, free;
-		int r = fscanf(file,"MemTotal: %ld kB MemFree: %ld kB", &total, &free);
+		int r = fscanf(file,"MemTotal: %zu kB MemFree: %zu kB", &total, &free);
 		if (r != 2)
 			return 0;
 		fclose(file);

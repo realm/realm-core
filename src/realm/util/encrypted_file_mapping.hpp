@@ -64,15 +64,10 @@ public:
     // Flushes any remaining dirty pages from the old mapping
     void set(void* new_addr, size_t new_size, size_t new_file_offset);
 
-    // Mark all pages untouched. Later accesses will mark individual pages as touched again
-    size_t mark_untouched() noexcept;
     size_t collect_decryption_count() { return m_num_decrypted; }
     // reclaim any untouched pages - this is thread safe with respect to
     // concurrent access/touching of pages - but must be called with the mutex locked.
     size_t reclaim_untouched(size_t& progress_ptr, size_t& accumulated_savings) noexcept;
-
-    // Get statistics
-    void count_usage(size_t& touched, size_t& updated, size_t& dirty, size_t& total);
 
     bool contains_page(size_t page_in_file) const;
     size_t get_local_index_of_address(const void* addr, size_t offset = 0) const;
@@ -90,11 +85,13 @@ private:
     size_t m_num_decrypted; // 1 for every page decrypted
 
     enum PageState {
-    	Touched = 1,
-    	UpToDate = 2,
-    	PartiallyUpToDate = 4,
-    	Dirty = 8
+    	Touched = 1, // a ref->ptr translation has taken place
+    	UpToDate = 2,// the page is fully up to date
+    	PartiallyUpToDate = 4, // the page is valid for old translations, but requires re-decryption for new
+    	Dirty = 8  // the page has been modified with respect to what's on file.
     };
+    std::vector<PageState> m_page_state;
+    // little helpers:
     inline void clear(PageState& ps, int p)
     {
     	ps = PageState(ps & ~p);
@@ -111,14 +108,8 @@ private:
     {
     	ps = PageState(ps | p);
     }
-    std::vector<PageState> m_page_state;
-    // m_up_to_date_pages track the state of each page. It can be
-    // - unused / not up to data (0), up_to_date (1), partially up to date (2)
-    // std::vector<char> m_up_to_date_pages;
-    // std::vector<char> m_touched;
     // 1K pages form a chunk - this array allows us to skip entire chunks during scanning
     std::vector<bool> m_chunk_dont_scan;
-    // std::vector<bool> m_dirty_pages;
 
     File::AccessMode m_access;
 
