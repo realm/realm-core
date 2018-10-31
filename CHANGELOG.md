@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 5.12.0 Release notes
 
 ### Enhancements
 * Added Group::get_used_space() which will return the size of the data taken up by the current
@@ -8,9 +8,8 @@
   Issue [#259](https://github.com/realm/realm-core-private/issues/259)
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * None.
- 
+
 ### Breaking changes
 * The way the Linux binaries are delivered is changed. They are now distributed 
   like the rest of the binaries with two packages (devel/runtime) per build type. 
