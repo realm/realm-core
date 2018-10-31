@@ -77,7 +77,7 @@ public:
     bool contains_page(size_t page_in_file) const;
     size_t get_local_index_of_address(const void* addr, size_t offset = 0) const;
 
-    size_t get_end() { return m_first_page + m_touched.size(); }
+    size_t get_end() { return m_first_page + m_page_state.size(); }
 private:
     SharedFileInfo& m_file;
 
@@ -89,13 +89,36 @@ private:
     size_t m_first_page;
     size_t m_num_decrypted; // 1 for every page decrypted
 
+    enum PageState {
+    	Touched = 1,
+    	UpToDate = 2,
+    	PartiallyUpToDate = 4,
+    	Dirty = 8
+    };
+    inline void clear(PageState& ps, int p)
+    {
+    	ps = PageState(ps & ~p);
+    }
+    inline bool is_not(PageState& ps, int p)
+    {
+    	return (ps & p) == 0;
+    }
+    inline bool is(PageState& ps, int p)
+    {
+    	return (ps & p) != 0;
+    }
+    inline void set(PageState& ps, int p)
+    {
+    	ps = PageState(ps | p);
+    }
+    std::vector<PageState> m_page_state;
     // m_up_to_date_pages track the state of each page. It can be
     // - unused / not up to data (0), up_to_date (1), partially up to date (2)
-    std::vector<char> m_up_to_date_pages;
-    std::vector<char> m_touched;
+    // std::vector<char> m_up_to_date_pages;
+    // std::vector<char> m_touched;
     // 1K pages form a chunk - this array allows us to skip entire chunks during scanning
     std::vector<bool> m_chunk_dont_scan;
-    std::vector<bool> m_dirty_pages;
+    // std::vector<bool> m_dirty_pages;
 
     File::AccessMode m_access;
 
@@ -119,7 +142,7 @@ inline size_t EncryptedFileMapping::get_local_index_of_address(const void* addr,
     REALM_ASSERT_EX(addr >= m_addr, addr, m_addr);
 
     size_t local_ndx = ((reinterpret_cast<uintptr_t>(addr) - reinterpret_cast<uintptr_t>(m_addr) + offset) >> m_page_shift);
-    REALM_ASSERT_EX(local_ndx < m_up_to_date_pages.size(), local_ndx, m_up_to_date_pages.size());
+    REALM_ASSERT_EX(local_ndx < m_page_state.size(), local_ndx, m_page_state.size());
     return local_ndx;
 }
 
@@ -127,7 +150,7 @@ inline bool EncryptedFileMapping::contains_page(size_t page_in_file) const
 {
     // first check for (page_in_file >= m_first_page) so that the following
     // subtraction using unsigned types never wraps under 0
-    return page_in_file >= m_first_page && page_in_file - m_first_page < m_up_to_date_pages.size();
+    return page_in_file >= m_first_page && page_in_file - m_first_page < m_page_state.size();
 }
 
 

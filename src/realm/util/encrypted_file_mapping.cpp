@@ -427,20 +427,23 @@ EncryptedFileMapping::~EncryptedFileMapping()
 
 char* EncryptedFileMapping::page_addr(size_t local_page_ndx) const noexcept
 {
-    REALM_ASSERT_EX(local_page_ndx < m_up_to_date_pages.size(), local_page_ndx, m_up_to_date_pages.size());
+    REALM_ASSERT_EX(local_page_ndx < m_page_state.size(), local_page_ndx, m_page_state.size());
     return (reinterpret_cast<char*>(local_page_ndx << m_page_shift) + reinterpret_cast<uintptr_t>(m_addr));
 }
 
 void EncryptedFileMapping::mark_outdated(size_t local_page_ndx) noexcept
 {
-    if (local_page_ndx >= m_dirty_pages.size())
+    if (local_page_ndx >= m_page_state.size())
         return;
 
-    if (m_dirty_pages[local_page_ndx]) {
+    if (m_page_state[local_page_ndx] & PageState::Dirty) {
         flush();
     }
-    if (m_up_to_date_pages[local_page_ndx] == 1)
-    	m_up_to_date_pages[local_page_ndx] = 2;
+    if (m_page_state[local_page_ndx] & PageState::UpToDate) {
+    	clear(m_page_state[local_page_ndx], UpToDate);
+    	set(m_page_state[local_page_ndx],PartiallyUpToDate);
+    	//m_up_to_date_pages[local_page_ndx] = 2;
+    }
     size_t chunk_ndx = local_page_ndx >> 10;
     if (m_chunk_dont_scan[chunk_ndx])
     	m_chunk_dont_scan[chunk_ndx] = 0;
@@ -448,10 +451,10 @@ void EncryptedFileMapping::mark_outdated(size_t local_page_ndx) noexcept
 
 bool EncryptedFileMapping::copy_up_to_date_page(size_t local_page_ndx) noexcept
 {
-    REALM_ASSERT_EX(local_page_ndx < m_up_to_date_pages.size(), local_page_ndx, m_up_to_date_pages.size());
+    REALM_ASSERT_EX(local_page_ndx < m_page_state.size(), local_page_ndx, m_page_state.size());
     // Precondition: this method must never be called for a page which
     // is already up to date.
-    REALM_ASSERT(m_up_to_date_pages[local_page_ndx] != 1);
+    REALM_ASSERT((m_page_state[local_page_ndx] & UpToDate) == 0);
     for (size_t i = 0; i < m_file.mappings.size(); ++i) {
         EncryptedFileMapping* m = m_file.mappings[i];
         size_t page_ndx_in_file = local_page_ndx + m_first_page;
@@ -459,7 +462,7 @@ bool EncryptedFileMapping::copy_up_to_date_page(size_t local_page_ndx) noexcept
             continue;
 
         size_t shadow_mapping_local_ndx = page_ndx_in_file - m->m_first_page;
-        if (m->m_up_to_date_pages[shadow_mapping_local_ndx] == 1) {
+        if (m->m_page_state[shadow_mapping_local_ndx] & UpToDate) {
             memcpy(page_addr(local_page_ndx),
                    m->page_addr(shadow_mapping_local_ndx),
                    static_cast<size_t>(1ULL << m_page_shift));
@@ -471,7 +474,7 @@ bool EncryptedFileMapping::copy_up_to_date_page(size_t local_page_ndx) noexcept
 
 void EncryptedFileMapping::refresh_page(size_t local_page_ndx)
 {
-    REALM_ASSERT_EX(local_page_ndx < m_up_to_date_pages.size(), local_page_ndx, m_up_to_date_pages.size());
+    REALM_ASSERT_EX(local_page_ndx < m_page_state.size(), local_page_ndx, m_page_state.size());
 
     char* addr = page_addr(local_page_ndx);
 
@@ -480,9 +483,10 @@ void EncryptedFileMapping::refresh_page(size_t local_page_ndx)
         m_file.cryptor.read(m_file.fd, off_t(page_ndx_in_file << m_page_shift),
                             addr, static_cast<size_t>(1ULL << m_page_shift));
     }
-    if (m_up_to_date_pages[local_page_ndx] == 0)
+    if (is_not(m_page_state[local_page_ndx], UpToDate | PartiallyUpToDate))
     	m_num_decrypted++;
-    m_up_to_date_pages[local_page_ndx] = 1;
+    clear(m_page_state[local_page_ndx], PartiallyUpToDate);
+    set(m_page_state[local_page_ndx], UpToDate);
 }
 
 void EncryptedFileMapping::write_page(size_t local_page_ndx) noexcept
@@ -497,7 +501,7 @@ void EncryptedFileMapping::write_page(size_t local_page_ndx) noexcept
             m->mark_outdated(shadow_local_page_ndx);
         }
     }
-    m_dirty_pages[local_page_ndx] = true;
+    set(m_page_state[local_page_ndx], Dirty);
     size_t chunk_ndx = local_page_ndx >> 10;
     if (m_chunk_dont_scan[chunk_ndx])
     	m_chunk_dont_scan[chunk_ndx] = 0;
@@ -506,8 +510,8 @@ void EncryptedFileMapping::write_page(size_t local_page_ndx) noexcept
 void EncryptedFileMapping::validate_page(size_t local_page_ndx) noexcept
 {
 #ifdef REALM_DEBUG
-    REALM_ASSERT(local_page_ndx < m_up_to_date_pages.size());
-    if (m_up_to_date_pages[local_page_ndx] != 1)
+    REALM_ASSERT(local_page_ndx < m_page_state.size());
+    if (is_not(m_page_state[local_page_ndx], UpToDate))
         return;
 
     const size_t page_ndx_in_file = local_page_ndx + m_first_page;
@@ -519,7 +523,8 @@ void EncryptedFileMapping::validate_page(size_t local_page_ndx) noexcept
     for (size_t i = 0; i < m_file.mappings.size(); ++i) {
         EncryptedFileMapping* m = m_file.mappings[i];
         size_t shadow_mapping_local_ndx = page_ndx_in_file - m->m_first_page;
-        if (m != this && m->contains_page(page_ndx_in_file) && m->m_dirty_pages[shadow_mapping_local_ndx]) {
+        if (m != this && m->contains_page(page_ndx_in_file)
+        		&& m->m_page_state[shadow_mapping_local_ndx] & Dirty) {
             memcpy(m_validate_buffer.get(),
                    m->page_addr(shadow_mapping_local_ndx),
                    static_cast<size_t>(1ULL << m_page_shift));
@@ -529,7 +534,7 @@ void EncryptedFileMapping::validate_page(size_t local_page_ndx) noexcept
 
     if (memcmp(m_validate_buffer.get(), page_addr(local_page_ndx), static_cast<size_t>(1ULL << m_page_shift))) {
         std::cerr << "mismatch " << this << ": fd(" << m_file.fd << ")"
-                  << "page(" << local_page_ndx << "/" << m_up_to_date_pages.size() << ") "
+                  << "page(" << local_page_ndx << "/" << m_page_state.size() << ") "
                   << m_validate_buffer.get() << " " << page_addr(local_page_ndx) << std::endl;
         REALM_TERMINATE("");
     }
@@ -541,12 +546,12 @@ void EncryptedFileMapping::validate_page(size_t local_page_ndx) noexcept
 void EncryptedFileMapping::validate() noexcept
 {
 #ifdef REALM_DEBUG
-    const size_t num_local_pages = m_up_to_date_pages.size();
+    const size_t num_local_pages = m_page_state.size();
     for (size_t local_page_ndx = 0; local_page_ndx < num_local_pages; ++local_page_ndx)
         validate_page(local_page_ndx);
 #endif
 }
-
+/*
 size_t EncryptedFileMapping::mark_untouched() noexcept
 {
 	const size_t num_pages = m_touched.size();
@@ -567,9 +572,10 @@ void EncryptedFileMapping::count_usage(size_t& touched, size_t& updated, size_t&
 		dirty += m_dirty_pages[page_ndx];
 	}
 }
+*/
 size_t EncryptedFileMapping::reclaim_untouched(size_t& progress_ptr, size_t& accumulated_savings) noexcept
 {
-	const size_t num_pages = m_touched.size();
+	const size_t num_pages = m_page_state.size();
 	if (progress_ptr < m_first_page) return 0;
 	if (progress_ptr >= get_end()) return 0;
 
@@ -587,8 +593,11 @@ size_t EncryptedFileMapping::reclaim_untouched(size_t& progress_ptr, size_t& acc
 			// go to next chunk, but fall through to accounting code after 'else' on the way
 		} else {
 			++contiguous_scan_count;
-			if (m_touched[page_ndx] == 0 && m_up_to_date_pages[page_ndx] && !m_dirty_pages[page_ndx]) {
-				m_up_to_date_pages[page_ndx] = 0;
+			PageState ps = m_page_state[page_ndx];
+			if (is_not(ps, Touched) && is(ps, UpToDate | PartiallyUpToDate) && is_not(ps,Dirty)) {
+//			if (m_touched[page_ndx] == 0 && m_up_to_date_pages[page_ndx] && !m_dirty_pages[page_ndx]) {
+				clear(m_page_state[page_ndx], UpToDate | PartiallyUpToDate);
+				// m_up_to_date_pages[page_ndx] = 0;
 #ifdef _WIN32
 				memset(page_addr(page_ndx), 0, 1 << m_page_shift);
 #else
@@ -607,8 +616,10 @@ size_t EncryptedFileMapping::reclaim_untouched(size_t& progress_ptr, size_t& acc
 				if (accumulated_savings > 0)
 					accumulated_savings--;
 			}
-			m_touched[page_ndx] = 0;
-			if (m_up_to_date_pages[page_ndx])
+			clear(m_page_state[page_ndx], Touched);
+			//m_touched[page_ndx] = 0;
+			//if (m_up_to_date_pages[page_ndx])
+			if (is(m_page_state[page_ndx], UpToDate | PartiallyUpToDate))
 				contiguous_scan_count = 0;
 			// if we've scanned a full chunk, mark it as not needing scans
 			if (contiguous_scan_count >= 1024 && (page_ndx & 1023) == 1023) {
@@ -633,9 +644,9 @@ size_t EncryptedFileMapping::reclaim_untouched(size_t& progress_ptr, size_t& acc
 
 void EncryptedFileMapping::flush() noexcept
 {
-    const size_t num_dirty_pages = m_dirty_pages.size();
+    const size_t num_dirty_pages = m_page_state.size();
     for (size_t local_page_ndx = 0; local_page_ndx < num_dirty_pages; ++local_page_ndx) {
-        if (!m_dirty_pages[local_page_ndx]) {
+        if (is_not(m_page_state[local_page_ndx], Dirty)) {
             validate_page(local_page_ndx);
             continue;
         }
@@ -643,7 +654,7 @@ void EncryptedFileMapping::flush() noexcept
         size_t page_ndx_in_file = local_page_ndx + m_first_page;
         m_file.cryptor.write(m_file.fd, off_t(page_ndx_in_file << m_page_shift), page_addr(local_page_ndx),
                              static_cast<size_t>(1ULL << m_page_shift));
-        m_dirty_pages[local_page_ndx] = false;
+        clear(m_page_state[local_page_ndx], Dirty);
     }
 
     validate();
@@ -681,12 +692,12 @@ void EncryptedFileMapping::write_barrier(const void* addr, size_t size) noexcept
 
     size_t first_accessed_local_page = get_local_index_of_address(addr);
     size_t last_accessed_local_page = get_local_index_of_address(addr, size == 0 ? 0 : size - 1);
-    size_t up_to_date_pages_size = m_up_to_date_pages.size();
+    size_t pages_size = m_page_state.size();
 
-    for (size_t idx = first_accessed_local_page; idx <= last_accessed_local_page && idx < up_to_date_pages_size; ++idx) {
+    for (size_t idx = first_accessed_local_page; idx <= last_accessed_local_page && idx < pages_size; ++idx) {
         // Pages written must earlier on have been decrypted
         // by a call to read_barrier().
-        REALM_ASSERT(m_up_to_date_pages[idx] == 1);
+        REALM_ASSERT(is(m_page_state[idx], UpToDate));
         write_page(idx);
     }
 }
@@ -695,12 +706,13 @@ void EncryptedFileMapping::read_barrier(const void* addr, size_t size, Header_to
 {
     size_t first_accessed_local_page = get_local_index_of_address(addr);
 
-    // make sure the first page is available
-    if (!m_touched[first_accessed_local_page])
-    	m_touched[first_accessed_local_page] = 1;
-
-    if (m_up_to_date_pages[first_accessed_local_page] != 1) {
-    	refresh_page(first_accessed_local_page);
+    {
+    	// make sure the first page is available
+    	PageState& ps = m_page_state[first_accessed_local_page];
+    	if (is_not(ps, Touched))
+    		set(ps, Touched);
+    	if (is_not(ps, UpToDate))
+    		refresh_page(first_accessed_local_page);
     }
     size_t chunk_ndx = first_accessed_local_page >> 10;
     if (m_chunk_dont_scan[chunk_ndx])
@@ -714,17 +726,18 @@ void EncryptedFileMapping::read_barrier(const void* addr, size_t size, Header_to
     }
 
     size_t last_idx = get_local_index_of_address(addr, size == 0 ? 0 : size - 1);
-    size_t up_to_date_pages_size = m_up_to_date_pages.size();
+    size_t pages_size = m_page_state.size();
 
     // We already checked first_accessed_local_page above, so we start the loop
     // at first_accessed_local_page + 1 to check the following page.
-    for (size_t idx = first_accessed_local_page + 1; idx <= last_idx && idx < up_to_date_pages_size; ++idx) {
+    for (size_t idx = first_accessed_local_page + 1; idx <= last_idx && idx < pages_size; ++idx) {
         chunk_ndx = idx >> 10;
         if (m_chunk_dont_scan[chunk_ndx])
         	m_chunk_dont_scan[chunk_ndx] = 0;
-        if (!m_touched[idx])
-        	m_touched[idx] = 1;
-        if (m_up_to_date_pages[idx] != 1)
+        PageState& ps = m_page_state[idx];
+        if (is_not(ps, Touched))
+        	set(ps, Touched);
+        if (is_not(ps, UpToDate))
         	refresh_page(idx);
     }
 }
@@ -745,14 +758,10 @@ void EncryptedFileMapping::set(void* new_addr, size_t new_size, size_t new_file_
     size_t num_pages = new_size >> m_page_shift;
 
     m_num_decrypted = 0;
-    m_up_to_date_pages.clear();
-    m_dirty_pages.clear();
-    m_touched.clear();
+    m_page_state.clear();
     m_chunk_dont_scan.clear();
 
-    m_up_to_date_pages.resize(num_pages, false);
-    m_dirty_pages.resize(num_pages, false);
-    m_touched.resize(num_pages, false);
+    m_page_state.resize(num_pages, PageState(0));
     m_chunk_dont_scan.resize((num_pages + 1023) >> 10, false);
 }
 
