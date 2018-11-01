@@ -67,8 +67,9 @@ public:
     static SyncManager& shared();
 
     // Configure the metadata and file management subsystems. This MUST be called upon startup.
-    void configure_file_system(const std::string& base_file_path,
+    void configure(const std::string& base_file_path,
                                MetadataMode metadata_mode=MetadataMode::Encryption,
+                               const std::string& user_agent_application_info = "",
                                util::Optional<std::vector<char>> custom_encryption_key=none,
                                bool reset_metadata_on_error=false);
 
@@ -187,6 +188,10 @@ private:
 
     mutable std::unique_ptr<_impl::SyncClient> m_sync_client;
     bool m_multiplex_sessions = false;
+
+    // Optional information about the application to be added to the user
+    // agent description as sent to the server.
+    std::string m_user_agent_application_info;
 
     // Protects m_file_manager and m_metadata_manager
     mutable std::mutex m_file_system_mutex;

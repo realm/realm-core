@@ -226,7 +226,7 @@ TEST_CASE("Partial sync", "[sync]") {
     if (!EventLoop::has_implementation())
         return;
 
-    SyncManager::shared().configure_file_system(tmp_dir(), SyncManager::MetadataMode::NoEncryption);
+    SyncManager::shared().configure(tmp_dir(), SyncManager::MetadataMode::NoEncryption);
 
     SyncServer server;
     SyncTestFile config(server, "test");
@@ -547,7 +547,7 @@ TEST_CASE("Partial sync", "[sync]") {
 }
 
 TEST_CASE("Partial sync error checking", "[sync]") {
-    SyncManager::shared().configure_file_system(tmp_dir(), SyncManager::MetadataMode::NoEncryption);
+    SyncManager::shared().configure(tmp_dir(), SyncManager::MetadataMode::NoEncryption);
 
     SECTION("API misuse throws an exception from `subscribe`") {
         SECTION("non-synced Realm") {
@@ -629,7 +629,7 @@ TEST_CASE("Creating subscriptions synchronously", "[sync]") {
     if (!EventLoop::has_implementation())
         return;
 
-    SyncManager::shared().configure_file_system(tmp_dir(), SyncManager::MetadataMode::NoEncryption);
+    SyncManager::shared().configure(tmp_dir(), SyncManager::MetadataMode::NoEncryption);
 
     SyncServer server;
     SyncTestFile config(server, "test");
