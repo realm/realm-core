@@ -221,11 +221,18 @@ void set_random_seed()
     }
 }
 
+size_t aggressive_governor(size_t) {
+	return 4096;
+}
+
 void set_always_encrypt()
 {
     const char* str = getenv("UNITTEST_ENCRYPT_ALL");
-    if (str && strlen(str) != 0)
+    if (str && strlen(str) != 0) {
         enable_always_encrypt();
+        // ask for a very aggressive page reclaimer to maxmimize chance of triggering a bug.
+        realm::util::set_page_reclaim_governor(aggressive_governor);
+    }
 }
 
 void display_build_config()
@@ -524,6 +531,8 @@ int test_all(int argc, char* argv[], util::Logger* logger)
     // No need to synchronize file changes to physical medium in the test suite,
     // as that would only make a difference if the entire system crashes,
     // e.g. due to power off.
+    // NOTE: This is not strictly true. If encryption is enabled, a crash of the testsuite
+    // (not the whole platform) may produce corrupt realm files.
     disable_sync_to_disk();
 #endif
 
