@@ -73,6 +73,7 @@ public:
     size_t get_local_index_of_address(const void* addr, size_t offset = 0) const;
 
     size_t get_end() { return m_first_page + m_page_state.size(); }
+
 private:
     SharedFileInfo& m_file;
 

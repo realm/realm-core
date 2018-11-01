@@ -1079,7 +1079,7 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
     }
     dg.release();  // Do not detach
     fcg.release(); // Do not close
-    m_file_mappings->m_realm_file_info = util::get_file_info_for_file(m_file_mappings->m_file.get_unique_id());
+    m_file_mappings->m_realm_file_info = util::get_file_info_for_file(m_file_mappings->m_file);
     m_file_mappings->m_success = true;
     return top_ref;
 }

@@ -288,16 +288,18 @@ mapping_and_addr* find_mapping_for_addr(void* addr, size_t size)
     return 0;
 }
 
-SharedFileInfo* get_file_info_for_file(File::UniqueID id)
+SharedFileInfo* get_file_info_for_file(File& file)
 {
     LockGuard lock(mapping_mutex);
 
     std::vector<mappings_for_file>::iterator it;
     for (it = mappings_by_file.begin(); it != mappings_by_file.end(); ++it) {
 #ifdef _WIN32
+    	auto fd = file.m_fd;
         if (File::is_same_file_static(it->handle, fd))
             break;
 #else
+        File::UniqueID id = file.get_unique_id();
         if (it->inode == id.inode && it->device == id.device)
             break;
 #endif

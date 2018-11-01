@@ -56,7 +56,7 @@ void set_page_reclaim_governor(page_reclaim_governor_t governor);
 void encryption_note_reader_start(SharedFileInfo& info, void* reader_id);
 void encryption_note_reader_end(SharedFileInfo& info, void* reader_id);
 
-SharedFileInfo* get_file_info_for_file(File::UniqueID fd);
+SharedFileInfo* get_file_info_for_file(File& file);
 
 // This variant allows the caller to obtain direct access to the encrypted file mapping
 // for optimization purposes.
