@@ -24,6 +24,7 @@
 #include <cstdlib>
 #include <algorithm>
 #include <stdexcept>
+#include <system_error>
 
 #ifdef REALM_DEBUG
 #include <cstdio>
