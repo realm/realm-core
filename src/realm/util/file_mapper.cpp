@@ -171,27 +171,27 @@ size_t collect_total_workload()  // must be called under lock
 
 struct work_limit_desc { float base; float effort; };
 const std::vector<work_limit_desc> control_table = {
-		{ 0.5, 0.001 },
-		{ 0.75, 0.002 },
-		{ 0.8, 0.003 },
-		{ 0.85, 0.005 },
-		{ 0.9, 0.01 },
-		{ 0.95, 0.03 },
-		{ 1.0, 0.1 },
-		{ 1.5, 0.2 },
-		{ 2.0, 0.3 }
+		{ 0.5f, 0.001f },
+		{ 0.75f, 0.002f },
+		{ 0.8f, 0.003f },
+		{ 0.85f, 0.005f },
+		{ 0.9f, 0.01f },
+		{ 0.95f, 0.03f },
+		{ 1.0f, 0.1f },
+		{ 1.5f, 0.2f },
+		{ 2.0f, 0.3f }
 };
 
 size_t get_work_limit(size_t potential, size_t target)
 {
-	float load = 1.0 * potential / target;
-	float akku = 0.0;
+	float load = 1.0f * potential / target;
+	float akku = 0.0f;
 	for (unsigned j = 0; j < control_table.size(); ++j) {
 		if (load > control_table[j].base) {
 			akku += (load - control_table[j].base) * control_table[j].effort;
 		}
 	}
-	size_t work_limit = target * akku;
+	size_t work_limit = size_t(target * akku);
 	return work_limit;
 }
 
@@ -272,7 +272,7 @@ void reclaimer_loop()
 {
 	for (;;) {
 		reclaim_pages();
-		sleep(1);
+		millisleep(1000);
 	}
 }
 
