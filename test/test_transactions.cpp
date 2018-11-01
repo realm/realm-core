@@ -820,7 +820,7 @@ size_t system_memory_governor(size_t load) {
 		else if (free < total * 0.3)
 			target =  load;
 		else
-			target = size_t(load * 1.2);
+			target = size_t(load * 2.1);
 		std::cout << "total: " << total << "   free: " << free
 					<< "   load: " << load << "   target: " << target << "    \r";
 		return target;
@@ -835,7 +835,7 @@ size_t file_control_governor(size_t load) {
 		if (file == nullptr)
 			return system_memory_governor(load);
 		size_t target;
-		int r = fscanf(file, "%ld", &target);
+		int r = fscanf(file, "%zu", &target);
 		if (r != 1)
 			return system_memory_governor(load);
 		fclose(file);

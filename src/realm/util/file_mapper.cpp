@@ -168,20 +168,30 @@ size_t collect_total_workload()  // must be called under lock
 /* Compute the amount of work allowed in an attempt to realize 'potential'.
  * please refer to EncryptedFileMapping::reclaim_untouched() for more details.
  */
-size_t get_work_limit(size_t potential, size_t target) // must be called under lock
+
+struct work_limit_desc { float base; float effort; };
+const std::vector<work_limit_desc> control_table = {
+		{ 0.5, 0.001 },
+		{ 0.75, 0.002 },
+		{ 0.8, 0.003 },
+		{ 0.85, 0.005 },
+		{ 0.9, 0.01 },
+		{ 0.95, 0.03 },
+		{ 1.0, 0.1 },
+		{ 1.5, 0.2 },
+		{ 2.0, 0.3 }
+};
+
+size_t get_work_limit(size_t potential, size_t target)
 {
-	// FIXME: Far too many magic constants in here
-	size_t work_limit = 0;
-	size_t increments = target/16;
-	size_t base = target - 4 * increments;
-	size_t divisor;
-	if (potential > target) divisor = 10;
-	else if (potential > target - increments) divisor = 20;
-	else if (potential > target - 2*increments) divisor = 50;
-	else if (potential > target - 3*increments) divisor = 100;
-	else if (potential > base) divisor = 200;
-	else return 0;
-	work_limit = (potential - base) / divisor;
+	float load = 1.0 * potential / target;
+	float akku = 0.0;
+	for (unsigned j = 0; j < control_table.size(); ++j) {
+		if (load > control_table[j].base) {
+			akku += (load - control_table[j].base) * control_table[j].effort;
+		}
+	}
+	size_t work_limit = target * akku;
 	return work_limit;
 }
 

@@ -23,6 +23,7 @@
 #if REALM_ENABLE_ENCRYPTION
 #include <cstdlib>
 #include <algorithm>
+#include <stdexcept>
 
 #ifdef REALM_DEBUG
 #include <cstdio>
@@ -601,7 +602,7 @@ size_t EncryptedFileMapping::reclaim_untouched(size_t& progress_ptr, size_t& acc
 						throw std::system_error(errno, std::system_category(),
 								std::string("using mmap() to clear page failed"));
 					else
-						throw std::runtime_error("weird stuff");
+						throw std::runtime_error("internal error in mmap()");
 				}
 #endif
 				num_reclaimed++;
