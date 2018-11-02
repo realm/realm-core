@@ -169,38 +169,33 @@ size_t collect_total_workload()  // must be called under lock
  * please refer to EncryptedFileMapping::reclaim_untouched() for more details.
  */
 
-struct work_limit_desc { float base; float effort; };
-const std::vector<work_limit_desc> control_table = {
-		{ 0.5f, 0.001f },
-		{ 0.75f, 0.002f },
-		{ 0.8f, 0.003f },
-		{ 0.85f, 0.005f },
-		{ 0.9f, 0.01f },
-		{ 0.95f, 0.03f },
-		{ 1.0f, 0.1f },
-		{ 1.5f, 0.2f },
-		{ 2.0f, 0.3f }
+struct work_limit_desc {
+    float base;
+    float effort;
 };
+const std::vector<work_limit_desc> control_table = {{0.5f, 0.001f},  {0.75f, 0.002f}, {0.8f, 0.003f},
+                                                    {0.85f, 0.005f}, {0.9f, 0.01f},   {0.95f, 0.03f},
+                                                    {1.0f, 0.1f},    {1.5f, 0.2f},    {2.0f, 0.3f}};
 
 size_t get_work_limit(size_t potential, size_t target)
 {
-	float load = 1.0f * potential / target;
-	float akku = 0.0f;
-	for (unsigned j = 0; j < control_table.size(); ++j) {
-		if (load > control_table[j].base) {
-			akku += (load - control_table[j].base) * control_table[j].effort;
-		}
-	}
-	size_t work_limit = size_t(target * akku);
-	return work_limit;
+    float load = 1.0f * potential / target;
+    float akku = 0.0f;
+    for (unsigned j = 0; j < control_table.size(); ++j) {
+        if (load > control_table[j].base) {
+            akku += (load - control_table[j].base) * control_table[j].effort;
+        }
+    }
+    size_t work_limit = size_t(target * akku);
+    return work_limit;
 }
 
 /* Find the oldest version that is still of interest to somebody */
 uint64_t get_oldest_version(SharedFileInfo& info) // must be called under lock
 {
 	if (info.readers.size() == 0) {
-		return info.current_version;
-	}
+        return info.current_version;
+    }
 	else {
 		auto oldest_version = info.current_version;
 		for (auto j = info.readers.begin(); j != info.readers.end(); ++j) {
@@ -248,8 +243,8 @@ void reclaim_pages()
 	size_t target = (*governor)(load * page_size()) / page_size();
 	{
 		UniqueLock lock(mapping_mutex);
-		if (target == 0) // temporarily disabled by governor returning 0
-			return;
+        if (target == 0) // temporarily disabled by governor returning 0
+            return;
 		size_t work_limit = get_work_limit(load, target);
 		if (work_limit == 0)
 			return; // nothing to do
@@ -272,8 +267,8 @@ void reclaimer_loop()
 {
 	for (;;) {
 		reclaim_pages();
-		millisleep(1000);
-	}
+        millisleep(1000);
+    }
 }
 
 mapping_and_addr* find_mapping_for_addr(void* addr, size_t size)
@@ -297,7 +292,7 @@ SharedFileInfo* get_file_info_for_file(File& file)
     std::vector<mappings_for_file>::iterator it;
     for (it = mappings_by_file.begin(); it != mappings_by_file.end(); ++it) {
 #ifdef _WIN32
-    	auto fd = file.get_descriptor();
+        auto fd = file.get_descriptor();
         if (File::is_same_file_static(it->handle, fd))
             break;
 #else

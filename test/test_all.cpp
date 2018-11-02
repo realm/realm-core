@@ -221,8 +221,9 @@ void set_random_seed()
     }
 }
 
-size_t aggressive_governor(size_t) {
-	return 4096;
+size_t aggressive_governor(size_t)
+{
+    return 4096;
 }
 
 void set_always_encrypt()

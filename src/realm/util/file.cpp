@@ -1235,7 +1235,7 @@ File::UniqueID File::get_unique_id() const
 
 FileDesc File::get_descriptor() const
 {
-	return m_fd;
+    return m_fd;
 }
 
 bool File::get_unique_id(const std::string& path, File::UniqueID& uid)

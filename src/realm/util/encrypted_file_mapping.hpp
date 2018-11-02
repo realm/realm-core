@@ -72,7 +72,10 @@ public:
     bool contains_page(size_t page_in_file) const;
     size_t get_local_index_of_address(const void* addr, size_t offset = 0) const;
 
-    size_t get_end() { return m_first_page + m_page_state.size(); }
+    size_t get_end()
+    {
+        return m_first_page + m_page_state.size();
+    }
 
 private:
     SharedFileInfo& m_file;
@@ -86,28 +89,28 @@ private:
     size_t m_num_decrypted; // 1 for every page decrypted
 
     enum PageState {
-    	Touched = 1, // a ref->ptr translation has taken place
-    	UpToDate = 2,// the page is fully up to date
-    	PartiallyUpToDate = 4, // the page is valid for old translations, but requires re-decryption for new
-    	Dirty = 8  // the page has been modified with respect to what's on file.
+        Touched = 1,           // a ref->ptr translation has taken place
+        UpToDate = 2,          // the page is fully up to date
+        PartiallyUpToDate = 4, // the page is valid for old translations, but requires re-decryption for new
+        Dirty = 8              // the page has been modified with respect to what's on file.
     };
     std::vector<PageState> m_page_state;
     // little helpers:
     inline void clear(PageState& ps, int p)
     {
-    	ps = PageState(ps & ~p);
+        ps = PageState(ps & ~p);
     }
     inline bool is_not(PageState& ps, int p)
     {
-    	return (ps & p) == 0;
+        return (ps & p) == 0;
     }
     inline bool is(PageState& ps, int p)
     {
-    	return (ps & p) != 0;
+        return (ps & p) != 0;
     }
     inline void set(PageState& ps, int p)
     {
-    	ps = PageState(ps | p);
+        ps = PageState(ps | p);
     }
     // 1K pages form a chunk - this array allows us to skip entire chunks during scanning
     std::vector<bool> m_chunk_dont_scan;
