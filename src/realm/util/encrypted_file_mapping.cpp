@@ -552,6 +552,30 @@ void EncryptedFileMapping::validate() noexcept
 #endif
 }
 
+void EncryptedFileMapping::reclaim_page(size_t page_ndx)
+{
+#ifdef _WIN32
+                // On windows we don't know how to replace a page within a page range with a fresh one.
+                // instead we clear it. If the system runs with same-page-merging, this will reduce
+                // the number of used pages.
+                memset(page_addr(page_ndx), 0, 1 << m_page_shift);
+#else
+                // On Posix compatible, we can request a new page in the middle of an already
+                // requested range, so we request a new one. This releases the backing store for the
+                // old page and gives us a shared zero-page that we can later demand-allocate, thus
+                // reducing the overall amount of dirty pages.
+                void* addr = page_addr(page_ndx);
+				void* addr2 = ::mmap(addr, 1 << m_page_shift, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE | MAP_FIXED, -1, 0);
+				if (addr != addr2) {
+					if (addr2 == 0)
+						throw std::system_error(errno, std::system_category(),
+								std::string("using mmap() to clear page failed"));
+					else
+                        throw std::runtime_error("internal error in mmap()");
+                }
+#endif
+}
+
 /* This functions is a bit convoluted. It reclaims pages, but only does a limited amount of work
  * each time it's called. It saves the progress in a 'progress_ptr' so that it can resume later
  * from where it was stopped.
@@ -585,26 +609,7 @@ size_t EncryptedFileMapping::reclaim_untouched(size_t& progress_ptr, size_t& acc
             PageState ps = m_page_state[page_ndx];
             if (is_not(ps, Touched) && is(ps, UpToDate | PartiallyUpToDate) && is_not(ps, Dirty)) {
                 clear(m_page_state[page_ndx], UpToDate | PartiallyUpToDate);
-#ifdef _WIN32
-                // On windows we don't know how to replace a page within a page range with a fresh one.
-                // instead we clear it. If the system runs with same-page-merging, this will reduce
-                // the number of used pages.
-                memset(page_addr(page_ndx), 0, 1 << m_page_shift);
-#else
-                // On Posix compatible, we can request a new page in the middle of an already
-                // requested range, so we request a new one. This releases the backing store for the
-                // old page and gives us a shared zero-page that we can later demand-allocate, thus
-                // reducing the overall amount of dirty pages.
-                void* addr = page_addr(page_ndx);
-				void* addr2 = ::mmap(addr, 1 << m_page_shift, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE | MAP_FIXED, -1, 0);
-				if (addr != addr2) {
-					if (addr2 == 0)
-						throw std::system_error(errno, std::system_category(),
-								std::string("using mmap() to clear page failed"));
-					else
-                        throw std::runtime_error("internal error in mmap()");
-                }
-#endif
+                reclaim_page(page_ndx);
 				num_reclaimed++;
 				m_num_decrypted--;
 				if (accumulated_savings > 0)
