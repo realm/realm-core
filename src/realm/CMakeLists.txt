@@ -248,6 +248,7 @@ target_compile_definitions(CoreObjects PRIVATE
   "$<$<CXX_COMPILER_ID:MSVC>:_CRT_SECURE_NO_WARNINGS>"
   "$<$<CXX_COMPILER_ID:MSVC>:_SCL_SECURE_NO_WARNINGS>"
 )
+target_compile_features(CoreObjects PUBLIC cxx_std_14)
 
 set(REALM_OBJECT_FILES $<TARGET_OBJECTS:CoreObjects>)
 
@@ -287,22 +288,26 @@ target_compile_definitions(Core PUBLIC
   "$<$<CXX_COMPILER_ID:MSVC>:_CRT_SECURE_NO_WARNINGS>"
   "$<$<CXX_COMPILER_ID:MSVC>:_SCL_SECURE_NO_WARNINGS>"
 )
+target_compile_features(Core PUBLIC cxx_std_14)
 
 # GCC<5.1 does not adhere to the C++11 ABI for std::string but some systems
 # still produce non-compliant C++11 ABI even with newer version of GCC (Centos 6 for example).
 # This performs a linking test and communicates to dependencies built with newer compilers 
 # that the old ABI should be used.
 if(UNIX AND NOT APPLE AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    try_compile(USES_OLD_ABI ${CMAKE_BINARY_DIR}/abitest ${CMAKE_CURRENT_LIST_DIR}/../../tools/cmake/abitest abitest)
+    try_compile(USES_OLD_ABI ${RealmCore_BINARY_DIR}/abitest ${RealmCore_SOURCE_DIR}/tools/cmake/abitest abitest)
     if(USES_OLD_ABI)
         message(WARNING "You are compiling on a system that uses a non-compliant C++11 ABI. Downstream components depending on Realm::Core will be built with _GLIBCXX_USE_CXX11_ABI=0.")
         target_compile_definitions(Core INTERFACE "_GLIBCXX_USE_CXX11_ABI=0")
     endif()
 endif()
 
-target_include_directories(Core INTERFACE
-                           $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src> $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/src>
-                           $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+target_include_directories(Core
+    INTERFACE
+        $<BUILD_INTERFACE:${RealmCore_SOURCE_DIR}/src>
+        $<BUILD_INTERFACE:${RealmCore_BINARY_DIR}/src>
+        $<INSTALL_INTERFACE:include>
+)
 
 target_link_libraries(Core INTERFACE ${REALM_EXTRA_LIBS} ${CMAKE_THREAD_LIBS_INIT})
 
@@ -314,9 +319,12 @@ if(NOT REALM_SKIP_SHARED_LIB)
     add_library(CoreShared SHARED ${REALM_OBJECT_FILES} ${REALM_XCODE_DEPENDENCY})
     add_library(realm-shared ALIAS CoreShared)
 
-    target_include_directories(CoreShared INTERFACE
-                               $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src> $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/src>
-                               $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+    target_include_directories(CoreShared
+        INTERFACE
+            $<BUILD_INTERFACE:${RealmCore_SOURCE_DIR}/src>
+            $<BUILD_INTERFACE:${RealmCore_BINARY_DIR}/src>
+            $<INSTALL_INTERFACE:include>
+    )
 
     set_target_properties(
             CoreShared PROPERTIES
@@ -363,50 +371,50 @@ if(APPLE)
 endif(APPLE)
 
 install(TARGETS Core EXPORT realm
-        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT devel)
+        ARCHIVE DESTINATION lib COMPONENT devel)
 
 # include .pdb files with debug symbols on Windows
 if(CMAKE_GENERATOR MATCHES "^Visual Studio")
     install(FILES ${CMAKE_CURRENT_BINARY_DIR}/CoreObjects.dir/$<CONFIG>/CoreObjects.pdb
-            DESTINATION ${CMAKE_INSTALL_LIBDIR}
+            DESTINATION lib
             COMPONENT devel
             OPTIONAL)
 endif()
 
 install(FILES ${REALM_INSTALL_GENERAL_HEADERS}
-        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/realm
+        DESTINATION include/realm
         COMPONENT devel)
 install(FILES ${REALM_INSTALL_IMPL_HEADERS}
-        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/realm/impl
+        DESTINATION include/realm/impl
         COMPONENT devel)
 install(FILES ${REALM_INSTALL_UTIL_HEADERS}
-        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/realm/util
+        DESTINATION include/realm/util
         COMPONENT devel)
 install(FILES ${REALM_OTHER_UTIL_HEADERS}
-        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/realm/util
+        DESTINATION include/realm/util
         COMPONENT devel)
 install(FILES ${REALM_METRICS_HEADERS}
-        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/realm/metrics
+        DESTINATION include/realm/metrics
         COMPONENT devel)
 install(FILES ${PROJECT_BINARY_DIR}/src/realm/version.hpp
-        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/realm
+        DESTINATION include/realm
         COMPONENT devel)
 install(FILES ${PROJECT_BINARY_DIR}/src/realm/util/config.h
-        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/realm/util
+        DESTINATION include/realm/util
         COMPONENT devel)
 
 if(NOT REALM_SKIP_SHARED_LIB)
     install(TARGETS CoreShared
-            LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT runtime
-            RUNTIME DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT runtime)
+            LIBRARY DESTINATION lib COMPONENT runtime
+            RUNTIME DESTINATION lib COMPONENT runtime)
 endif()
 
 if(ANDROID)
     install(FILES ${CRYPTO_LIB} ${SSL_LIB}
-            DESTINATION ${CMAKE_INSTALL_LIBDIR}
+            DESTINATION lib
             COMPONENT devel)
     install(DIRECTORY ${OPENSSL_INCLUDE_DIR}/openssl
-            DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+            DESTINATION include
             COMPONENT devel)
 endif()
 
@@ -416,24 +424,27 @@ target_link_libraries(QueryParser PUBLIC Core)
 target_include_directories(QueryParser PRIVATE ${PEGTL_INCLUDE_DIR})
 set_target_properties(QueryParser PROPERTIES OUTPUT_NAME "realm-parser")
 install(FILES ${REALM_PARSER_HEADERS}
-        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/realm/parser
+        DESTINATION include/realm/parser
         COMPONENT devel)
 install(TARGETS QueryParser EXPORT realm
-        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT devel)
+        ARCHIVE DESTINATION lib COMPONENT devel)
 if(NOT REALM_SKIP_SHARED_LIB)
     add_library(QueryParserShared SHARED ${REALM_PARSER_SOURCES} ${REALM_PARSER_HEADERS})
     add_dependencies(QueryParserShared CoreShared)
     target_link_libraries(QueryParserShared PRIVATE CoreShared)
     target_include_directories(QueryParserShared PRIVATE ${PEGTL_INCLUDE_DIR})
-    target_include_directories(QueryParserShared INTERFACE
-                               $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src> $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/src>
-                               $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+    target_include_directories(QueryParserShared
+        INTERFACE
+            $<BUILD_INTERFACE:${RealmCore_SOURCE_DIR}/src>
+            $<BUILD_INTERFACE:${RealmCore_BINARY_DIR}/src>
+            $<INSTALL_INTERFACE:include>
+    )
     set_target_properties(QueryParserShared PROPERTIES
                           OUTPUT_NAME "realm-parser"
     )
     install(TARGETS QueryParserShared
-            LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT runtime
-            RUNTIME DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT runtime)
+            LIBRARY DESTINATION lib COMPONENT runtime
+            RUNTIME DESTINATION lib COMPONENT runtime)
 endif()
 
 if(NOT APPLE AND NOT ANDROID AND NOT CMAKE_SYSTEM_NAME MATCHES "^Windows" AND NOT REALM_BUILD_LIB_ONLY)
@@ -456,12 +467,12 @@ if(NOT APPLE AND NOT ANDROID AND NOT CMAKE_SYSTEM_NAME MATCHES "^Windows" AND NO
 
     install(TARGETS RealmConfig RealmImporter
             COMPONENT runtime
-            DESTINATION ${CMAKE_INSTALL_BINDIR})
+            DESTINATION bin)
 
     add_executable(realmd realmd.cpp)
     set_target_properties(realmd PROPERTIES DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX})
     target_link_libraries(realmd Core)
     install(TARGETS realmd
             COMPONENT runtime
-            DESTINATION ${CMAKE_INSTALL_LIBEXECDIR})
+            DESTINATION libexec)
 endif()

@@ -19,12 +19,19 @@ RUN apt-key add /tmp/llvm.key
 RUN apt-get update \
     && apt-get install -y clang-6.0 \
                        clang-format-6.0 \
-                       cmake \
                        libprocps4-dev \
                        libssl-dev \
                        ninja-build \
+                       wget \
                        git \
     && rm -rf /var/lib/apt/lists/*
+
+# Install CMake
+RUN cd /opt \
+    && wget https://cmake.org/files/v3.7/cmake-3.7.2-Linux-x86_64.tar.gz \
+    && tar zxvf cmake-3.7.2-Linux-x86_64.tar.gz
+
+ENV PATH "$PATH:/opt/cmake-3.7.2-Linux-x86_64/bin"
 
 # Make clang the default compiler
 ENV CC /usr/bin/clang-6.0
