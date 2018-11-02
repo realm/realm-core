@@ -114,55 +114,56 @@ page_reclaim_governor_t governor = nullptr;
 
 void set_page_reclaim_governor(page_reclaim_governor_t new_governor)
 {
-	UniqueLock lock(mapping_mutex);
-	// start worker thread if it hasn't been started earlier
-	if (reclaimer_thread == nullptr) {
-		reclaimer_thread.reset(new std::thread(reclaimer_loop));
-		reclaimer_thread->detach();
-	}
-	governor = new_governor;
+    UniqueLock lock(mapping_mutex);
+    // start worker thread if it hasn't been started earlier
+    if (reclaimer_thread == nullptr) {
+        reclaimer_thread.reset(new std::thread(reclaimer_loop));
+        reclaimer_thread->detach();
+    }
+    governor = new_governor;
 }
 
 void encryption_note_reader_start(SharedFileInfo& info, void* reader_id)
 {
-	UniqueLock lock(mapping_mutex);
-	std::vector<ReaderInfo>::iterator j;
-	for (j = info.readers.begin(); j != info.readers.end(); ++j)
-		if (j->reader_ID == reader_id) break;
-	if (j == info.readers.end()) {
-		ReaderInfo i = {reader_id, info.current_version};
-		info.readers.push_back(i);
-	}
-	else {
-		j->version = info.current_version;
-	}
-	++info.current_version;
+    UniqueLock lock(mapping_mutex);
+    std::vector<ReaderInfo>::iterator j;
+    for (j = info.readers.begin(); j != info.readers.end(); ++j)
+        if (j->reader_ID == reader_id)
+            break;
+    if (j == info.readers.end()) {
+        ReaderInfo i = {reader_id, info.current_version};
+        info.readers.push_back(i);
+    }
+    else {
+        j->version = info.current_version;
+    }
+    ++info.current_version;
 }
 
 void encryption_note_reader_end(SharedFileInfo& info, void* reader_id)
 {
-	UniqueLock lock(mapping_mutex);
-	for (auto j = info.readers.begin(); j != info.readers.end(); ++j)
-		if (j->reader_ID == reader_id) {
-			// move last over
-			*j = info.readers.back();
-			info.readers.pop_back();
-			return;
-		}
+    UniqueLock lock(mapping_mutex);
+    for (auto j = info.readers.begin(); j != info.readers.end(); ++j)
+        if (j->reader_ID == reader_id) {
+            // move last over
+            *j = info.readers.back();
+            info.readers.pop_back();
+            return;
+        }
 }
 
-size_t collect_total_workload()  // must be called under lock
+size_t collect_total_workload() // must be called under lock
 {
-	size_t total = 0;
-	for (auto i = mappings_by_file.begin(); i != mappings_by_file.end(); ++i) {
-		SharedFileInfo& info = *i->info;
-		info.num_decrypted_pages = 0;
-		for (auto it = info.mappings.begin(); it != info.mappings.end(); ++it) {
-			info.num_decrypted_pages += (*it)->collect_decryption_count();
-		}
-		total += info.num_decrypted_pages;
-	}
-	return total;
+    size_t total = 0;
+    for (auto i = mappings_by_file.begin(); i != mappings_by_file.end(); ++i) {
+        SharedFileInfo& info = *i->info;
+        info.num_decrypted_pages = 0;
+        for (auto it = info.mappings.begin(); it != info.mappings.end(); ++it) {
+            info.num_decrypted_pages += (*it)->collect_decryption_count();
+        }
+        total += info.num_decrypted_pages;
+    }
+    return total;
 }
 
 /* Compute the amount of work allowed in an attempt to realize 'potential'.
@@ -193,38 +194,38 @@ size_t get_work_limit(size_t potential, size_t target)
 /* Find the oldest version that is still of interest to somebody */
 uint64_t get_oldest_version(SharedFileInfo& info) // must be called under lock
 {
-	if (info.readers.size() == 0) {
+    if (info.readers.size() == 0) {
         return info.current_version;
     }
-	else {
-		auto oldest_version = info.current_version;
-		for (auto j = info.readers.begin(); j != info.readers.end(); ++j) {
-			if (j->version < oldest_version)
-				oldest_version = j->version;
-		}
-		return oldest_version;
-	}
+    else {
+        auto oldest_version = info.current_version;
+        for (auto j = info.readers.begin(); j != info.readers.end(); ++j) {
+            if (j->version < oldest_version)
+                oldest_version = j->version;
+        }
+        return oldest_version;
+    }
 }
 
 // Reclaim pages for ONE file, limited by a given work limit.
 // return true if "done for now"
 bool reclaim_pages_for_file(SharedFileInfo& info, size_t& work_limit)
 {
-	uint64_t oldest_version = get_oldest_version(info);
-	if (info.readers.size() == 0 || info.last_scanned_version < oldest_version) {
-		size_t sum = 0;
-		for (auto it = info.mappings.begin(); it != info.mappings.end() && work_limit; ++it) {
-			sum += (*it)->reclaim_untouched(info.progress_ptr, work_limit);
-		}
-		if (info.progress_ptr >= info.mappings.back()->get_end()) { // done
-			info.progress_ptr = 0;
-			info.last_scanned_version = info.current_version;
-			++info.current_version;
-			return true;
-		}
-		return false;
-	}
-	return true;
+    uint64_t oldest_version = get_oldest_version(info);
+    if (info.readers.size() == 0 || info.last_scanned_version < oldest_version) {
+        size_t sum = 0;
+        for (auto it = info.mappings.begin(); it != info.mappings.end() && work_limit; ++it) {
+            sum += (*it)->reclaim_untouched(info.progress_ptr, work_limit);
+        }
+        if (info.progress_ptr >= info.mappings.back()->get_end()) { // done
+            info.progress_ptr = 0;
+            info.last_scanned_version = info.current_version;
+            ++info.current_version;
+            return true;
+        }
+        return false;
+    }
+    return true;
 }
 
 // Reclaim pages from all files, limited by a work limit that is derived
@@ -232,41 +233,41 @@ bool reclaim_pages_for_file(SharedFileInfo& info, size_t& work_limit)
 // set by the governor function.
 void reclaim_pages()
 {
-	size_t load;
-	{
-		UniqueLock lock(mapping_mutex);
-		if (governor == nullptr)
-			return;
-		load = collect_total_workload();
-	}
-	// callback to governor without mutex held
-	size_t target = (*governor)(load * page_size()) / page_size();
-	{
-		UniqueLock lock(mapping_mutex);
+    size_t load;
+    {
+        UniqueLock lock(mapping_mutex);
+        if (governor == nullptr)
+            return;
+        load = collect_total_workload();
+    }
+    // callback to governor without mutex held
+    size_t target = (*governor)(load * page_size()) / page_size();
+    {
+        UniqueLock lock(mapping_mutex);
         if (target == 0) // temporarily disabled by governor returning 0
             return;
-		size_t work_limit = get_work_limit(load, target);
-		if (work_limit == 0)
-			return; // nothing to do
-		if (file_reclaim_ptr >= mappings_by_file.size())
-			file_reclaim_ptr = 0;
-		while (work_limit > 0) {
-			SharedFileInfo& info = *mappings_by_file[file_reclaim_ptr].info;
-			auto done_for_now = reclaim_pages_for_file(info, work_limit);
-			if (done_for_now) {
-				++file_reclaim_ptr;
-				if (file_reclaim_ptr >= mappings_by_file.size())
-					return;
-			}
-		}
-	}
+        size_t work_limit = get_work_limit(load, target);
+        if (work_limit == 0)
+            return; // nothing to do
+        if (file_reclaim_ptr >= mappings_by_file.size())
+            file_reclaim_ptr = 0;
+        while (work_limit > 0) {
+            SharedFileInfo& info = *mappings_by_file[file_reclaim_ptr].info;
+            auto done_for_now = reclaim_pages_for_file(info, work_limit);
+            if (done_for_now) {
+                ++file_reclaim_ptr;
+                if (file_reclaim_ptr >= mappings_by_file.size())
+                    return;
+            }
+        }
+    }
 }
 
 
 void reclaimer_loop()
 {
-	for (;;) {
-		reclaim_pages();
+    for (;;) {
+        reclaim_pages();
         millisleep(1000);
     }
 }
@@ -301,9 +302,9 @@ SharedFileInfo* get_file_info_for_file(File& file)
 #endif
     }
     if (it == mappings_by_file.end())
-    	return nullptr;
+        return nullptr;
     else
-    	return it->info.get();
+        return it->info.get();
 }
 
 EncryptedFileMapping* add_mapping(void* addr, size_t size, FileDesc fd, size_t file_offset, File::AccessMode access,

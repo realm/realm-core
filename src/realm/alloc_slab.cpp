@@ -1086,14 +1086,14 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
 
 void SlabAlloc::note_reader_start(void* reader_id)
 {
-	if (m_file_mappings->m_realm_file_info)
-		util::encryption_note_reader_start(*m_file_mappings->m_realm_file_info, reader_id);
+    if (m_file_mappings->m_realm_file_info)
+        util::encryption_note_reader_start(*m_file_mappings->m_realm_file_info, reader_id);
 }
 
 void SlabAlloc::note_reader_end(void* reader_id)
 {
-	if (m_file_mappings->m_realm_file_info)
-		util::encryption_note_reader_end(*m_file_mappings->m_realm_file_info, reader_id);
+    if (m_file_mappings->m_realm_file_info)
+        util::encryption_note_reader_end(*m_file_mappings->m_realm_file_info, reader_id);
 }
 
 

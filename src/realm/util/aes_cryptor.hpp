@@ -89,8 +89,8 @@ private:
 };
 
 struct ReaderInfo {
-	void* reader_ID;
-	uint64_t version;
+    void* reader_ID;
+    uint64_t version;
 };
 
 struct SharedFileInfo {

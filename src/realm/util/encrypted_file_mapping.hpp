@@ -64,7 +64,10 @@ public:
     // Flushes any remaining dirty pages from the old mapping
     void set(void* new_addr, size_t new_size, size_t new_file_offset);
 
-    size_t collect_decryption_count() { return m_num_decrypted; }
+    size_t collect_decryption_count()
+    {
+        return m_num_decrypted;
+    }
     // reclaim any untouched pages - this is thread safe with respect to
     // concurrent access/touching of pages - but must be called with the mutex locked.
     size_t reclaim_untouched(size_t& progress_ptr, size_t& accumulated_savings) noexcept;
