@@ -95,7 +95,7 @@ public:
     void reserve_extra(size_t used_size, size_t min_extra_capacity);
 
     /// Release the internal buffer to the caller.
-    std::unique_ptr<T[], STLDeleter<T[], Allocator>> release() noexcept;
+    REALM_NODISCARD std::unique_ptr<T[], STLDeleter<T[], Allocator>> release() noexcept;
 
     friend void swap(Buffer& a, Buffer& b) noexcept
     {
@@ -160,7 +160,7 @@ public:
     /// buffer may be larger than the amount of data appended to this buffer.
     /// Callers should call `size()` prior to releasing the buffer to know the
     /// usable/logical size.
-    Buffer<T, Allocator> release() noexcept;
+    REALM_NODISCARD Buffer<T, Allocator> release() noexcept;
 
 private:
     util::Buffer<T, Allocator> m_buffer;

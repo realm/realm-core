@@ -1042,6 +1042,7 @@ size_t Group::compute_aggregated_byte_size(SizeAggregateControl ctrl) const noex
         m_table_names.stats(stats);
         m_tables.stats(stats);
         used = stats.allocated + m_top.get_byte_size();
+        used += sizeof(SlabAlloc::Header);
     }
     if (ctrl & SizeAggregateControl::size_of_freelists) {
         if (m_top.size() >= 6) {
@@ -1060,6 +1061,17 @@ size_t Group::compute_aggregated_byte_size(SizeAggregateControl ctrl) const noex
         }
     }
     return used;
+}
+
+size_t Group::get_used_space() const noexcept
+{
+    size_t logical_file_size = (size_t(m_top.get(2)) >> 1);
+
+    REALM_ASSERT(m_top.size() > 4);
+    Array free_lengths(const_cast<SlabAlloc&>(m_alloc));
+    free_lengths.init_from_ref(ref_type(m_top.get(4)));
+
+    return logical_file_size - size_t(free_lengths.sum());
 }
 
 

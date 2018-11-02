@@ -160,6 +160,7 @@ GroupWriter::GroupWriter(Group& group)
     , m_free_lengths(m_alloc)
     , m_free_versions(m_alloc)
     , m_current_version(0)
+    , m_free_space_size(0)
 {
     m_map_windows.reserve(num_map_windows);
 #if REALM_IOS
@@ -418,7 +419,7 @@ ref_type GroupWriter::write_group()
     // Now, let's update the realm-style freelists, which will later be written to file.
     // Function returns index of element holding the space reserved for the free
     // lists in the file.
-    size_t reserve_ndx = recreate_freelist(reserve_pos);
+    size_t reserve_ndx = recreate_freelist(reserve_pos, m_free_space_size);
 
 #if REALM_ALLOC_DEBUG
     std::cout << "    Freelist size after merge: " << m_free_positions.size()
@@ -490,6 +491,7 @@ ref_type GroupWriter::write_group()
 
     m_free_positions.set(reserve_ndx, value_8); // Throws
     m_free_lengths.set(reserve_ndx, value_9);   // Throws
+    m_free_space_size += rest;
 
     // The free-list now have their final form, so we can write them to the file
     // char* start_addr = m_file_map.get_addr() + reserve_ref;
@@ -509,17 +511,6 @@ ref_type GroupWriter::write_group()
     return top_ref;
 }
 
-size_t GroupWriter::get_free_space() {
-    if (m_free_lengths.is_attached()) {
-        size_t sum = 0;
-        for (size_t j = 0; j < m_free_lengths.size(); ++j) {
-            sum += to_size_t(m_free_lengths.get(j));
-        }
-        return sum;
-    } else {
-        return 0;
-    }
-}
 
 void GroupWriter::read_in_freelist()
 {
@@ -563,7 +554,7 @@ void GroupWriter::read_in_freelist()
     }
 }
 
-size_t GroupWriter::recreate_freelist(size_t reserve_pos)
+size_t GroupWriter::recreate_freelist(size_t reserve_pos, size_t& free_space_size)
 {
     REALM_ASSERT(m_free_in_file.empty());
 
@@ -591,6 +582,7 @@ size_t GroupWriter::recreate_freelist(size_t reserve_pos)
     size_t reserve_ndx = realm::npos;
     size_t prev_ref = 0;
     size_t prev_size = 0;
+    free_space_size = 0;
     auto limit = m_free_in_file.size();
     for (size_t i = 0; i < limit; ++i) {
         const auto& free_space = m_free_in_file[i];
@@ -598,6 +590,11 @@ size_t GroupWriter::recreate_freelist(size_t reserve_pos)
         REALM_ASSERT_RELEASE_EX(prev_ref + prev_size <= ref, prev_ref, prev_size, ref, i, limit);
         if (reserve_pos == ref) {
             reserve_ndx = i;
+        }
+        else {
+            // The reserved chunk should not be counted in now. We don't know how much of it
+            // will eventually be used.
+            free_space_size += free_space.size;
         }
         m_free_positions.add(free_space.ref);
         m_free_lengths.add(free_space.size);

@@ -51,7 +51,7 @@ public:
     /// in memory.
     ///
     /// Note that this method of gaining early access to the history in a new
-    /// snaphot only gives read access. It does not allow for modifications of
+    /// snapshot only gives read access. It does not allow for modifications of
     /// the history or any other part of the new snapshot. For modifications to
     /// be allowed, `Group::m_top` (the parent of the history) would first have
     /// to be updated to reflect the new snapshot, but at that time we are no
@@ -67,28 +67,28 @@ public:
     virtual void update_from_parent(version_type current_version) = 0;
 
     /// Get all changesets between the specified versions. References to those
-    /// changesets will be made availble in successive entries of `buffer`. The
-    /// number of retreived changesets is exactly `end_version -
+    /// changesets will be made available in successive entries of `buffer`. The
+    /// number of retrieved changesets is exactly `end_version -
     /// begin_version`. If this number is greater than zero, the changeset made
-    /// avaialable in `buffer[0]` is the one that brought the database from
+    /// available in `buffer[0]` is the one that brought the database from
     /// `begin_version` to `begin_version + 1`.
     ///
     /// It is an error to specify a version (for \a begin_version or \a
     /// end_version) that is outside the range [V,W] where V is the version that
     /// immediately precedes the first changeset available in the history as the
     /// history appears in the **latest** available snapshot, and W is the
-    /// versionm that immediately succeeds the last changeset available in the
+    /// version that immediately succeeds the last changeset available in the
     /// history as the history appears in the snapshot bound to the **current**
     /// transaction. This restriction is necessary to allow for different kinds
     /// of implementations of the history (separate standalone history or
     /// history as part of versioned Realm state).
     ///
-    /// The calee retains ownership of the memory referenced by those entries,
+    /// The callee retains ownership of the memory referenced by those entries,
     /// i.e., the memory referenced by `buffer[i].changeset` is **not** handed
     /// over to the caller.
     ///
     /// This function may be called only during a transaction (prior to
-    /// initiation of commit operation), and only after a successfull invocation
+    /// initiation of commit operation), and only after a successful invocation
     /// of update_early_from_top_ref(). In that case, the caller may assume that
     /// the memory references stay valid for the remainder of the transaction
     /// (up until initiation of the commit operation).
@@ -102,7 +102,7 @@ public:
     /// the transaction is finalized (Replication::finalize_commit()) or aborted
     /// (Replication::abort_transact()), but after the initiation of the commit
     /// operation (Replication::prepare_commit()). This allows history
-    /// implementations to add new history entries before triming off old ones,
+    /// implementations to add new history entries before trimming off old ones,
     /// and this, in turn, guarantees that the history never becomes empty,
     /// except in the initial empty Realm state.
     ///
@@ -120,7 +120,7 @@ public:
     /// get_changesets().
     ///
     /// The caller is allowed to pass a version that is less than the version
-    /// passed in a preceeding invocation.
+    /// passed in a preceding invocation.
     ///
     /// This function should be called as late as possible, to maximize the
     /// trimming opportunity, but at a time where the write transaction is still
@@ -128,11 +128,11 @@ public:
     /// of histories are stored inside the Realm file.
     virtual void set_oldest_bound_version(version_type version) = 0;
 
-    /// Get the list of uncommited changes accumulated so far in the current
+    /// Get the list of uncommitted changes accumulated so far in the current
     /// write transaction.
     ///
     /// The callee retains ownership of the referenced memory. The ownership is
-    /// not handed over the the caller.
+    /// not handed over to the caller.
     ///
     /// This function may be called only during a write transaction (prior to
     /// initiation of commit operation). In that case, the caller may assume that the
