@@ -25,7 +25,6 @@
 #include <fstream>
 #include <iostream>
 #include <iomanip>
-#include <unistd.h>
 
 #include <realm/history.hpp>
 #include <realm/lang_bind_helper.hpp>
@@ -720,8 +719,8 @@ TEST(LangBindHelper_RollbackLinkInsert)
     CHECK_EQUAL(g.get_table(1)->get_link_target(0), g.get_table(0));
 }
 
-#if 0
-
+#if 1
+// The following
 void growth_phase(SharedGroup& sg_w)
 {
 	std::cout << "Growing..." << std::endl;
@@ -761,7 +760,7 @@ void partial_read_phase(SharedGroup& sg_w)
 		ConstTableRef t = g.get_table("spoink");
 		int max = t->size();
 		for (int z = 0; z < max/10; ++z) {
-			auto v = t->get_string(0,z);
+			t->get_string(0,z);
 		}
 	}
 }
@@ -873,7 +872,7 @@ ONLY(LangBindHelper_EncryptionGiga)
     	query_phase(sg_w1);
     	query_phase(sg_w2);
     	std::cout << "Sleeping.." << std::endl;
-    	sleep(20);
+    	millisleep(20000);
     }
 }
 #endif
