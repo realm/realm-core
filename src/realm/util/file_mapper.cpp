@@ -297,7 +297,7 @@ SharedFileInfo* get_file_info_for_file(File& file)
         if (File::is_same_file_static(it->handle, fd))
             break;
 #else
-        if (it->inode == id.inode && it->device == id.device)
+        if (it->inode == static_cast<uint64_t>(id.inode) && it->device == id.device)
             break;
 #endif
     }
