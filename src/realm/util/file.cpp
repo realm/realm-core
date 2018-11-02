@@ -1233,6 +1233,11 @@ File::UniqueID File::get_unique_id() const
 #endif
 }
 
+FileDesc File::get_descriptor() const
+{
+	return m_fd;
+}
+
 bool File::get_unique_id(const std::string& path, File::UniqueID& uid)
 {
 #ifdef _WIN32 // Windows version
