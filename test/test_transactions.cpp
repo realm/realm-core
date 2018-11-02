@@ -719,8 +719,9 @@ TEST(LangBindHelper_RollbackLinkInsert)
     CHECK_EQUAL(g.get_table(1)->get_link_target(0), g.get_table(0));
 }
 
-#if 1
-// The following
+#if 0
+// The following code is a longer running test, so disabled when for ordinary testing
+
 void growth_phase(SharedGroup& sg_w)
 {
 	std::cout << "Growing..." << std::endl;
@@ -802,7 +803,7 @@ void preparations(SharedGroup& sg_w)
     }
 }
 
-
+// illustration of possible governor function which takes total system load into account
 size_t system_memory_governor(size_t load) {
 	try {
 		auto file = fopen("/proc/meminfo","r");
