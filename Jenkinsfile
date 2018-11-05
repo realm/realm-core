@@ -224,7 +224,7 @@ def doCheckSanity(String buildType, String maxBpNodeSize = '1000', String saniti
                            cd build-dir
                            cmake -D CMAKE_BUILD_TYPE=${buildType} -D REALM_MAX_BPNODE_SIZE=${maxBpNodeSize} ${sanitizeFlags} -G Ninja ..
                         """
-                        runAndCollectWarnings(script: "cd build-dir && ninja")
+                        runAndCollectWarnings(script: "cd build-dir && ninja -v")
                         sh """
                            cd build-dir/test
                            ./realm-tests
