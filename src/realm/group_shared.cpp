@@ -259,7 +259,7 @@ public:
     {
         // std::cout << "expanding to " << new_entries << std::endl;
         // dump();
-        for (uint_fast32_t i = entries; i < new_entries; i++) {
+        for (uint32_t i = entries; i < new_entries; i++) {
             data[i].version = 1;
             data[i].count.store(1, std::memory_order_relaxed);
             data[i].current_top = 0;
@@ -268,7 +268,7 @@ public:
         }
         data[new_entries - 1].next = old_pos;
         data[put_pos.load(std::memory_order_relaxed)].next = entries;
-        entries = new_entries;
+        entries = uint32_t(new_entries);
         // dump();
     }
 
@@ -346,7 +346,7 @@ public:
     void use_next() noexcept
     {
         atomic_dec(get_next().count); // .store_release(0);
-        put_pos.store(next(), std::memory_order_release);
+        put_pos.store(uint32_t(next()), std::memory_order_release);
     }
 
     void cleanup() noexcept
@@ -434,7 +434,9 @@ struct alignas(8) SharedGroup::SharedInfo {
     /// moved into the realm file. After that it should be feasible to either
     /// handle the error condition properly or preclude it by using a non-robust
     /// mutex for the remaining and much smaller critical section.
-    uint8_t commit_in_critical_phase = 0; // Offset 3
+    ///
+    /// Note that std::atomic<uint8_t> is guaranteed to have standard layout.
+    std::atomic<uint8_t> commit_in_critical_phase = { 0 }; // Offset 3
 
     /// The target Realm file format version for the current session. This
     /// allows all session participants to be in agreement. It can only differ
@@ -592,7 +594,7 @@ SharedGroup::SharedInfo::SharedInfo(Durability dura, Replication::HistoryType ht
                   offsetof(SharedInfo, size_of_condvar) == 2 &&
                   std::is_same<decltype(size_of_condvar), uint8_t>::value &&
                   offsetof(SharedInfo, commit_in_critical_phase) == 3 &&
-                  std::is_same<decltype(commit_in_critical_phase), uint8_t>::value &&
+                  std::is_same<decltype(commit_in_critical_phase), std::atomic<uint8_t>>::value &&
                   offsetof(SharedInfo, file_format_version) == 4 &&
                   std::is_same<decltype(file_format_version), uint8_t>::value &&
                   offsetof(SharedInfo, history_type) == 5 &&
@@ -642,7 +644,7 @@ void spawn_daemon(const std::string& file)
     if (m < 0) {
         if (errno) {
             int err = errno; // Eliminate any risk of clobbering
-            throw std::runtime_error(get_errno_msg("'sysconf(_SC_OPEN_MAX)' failed: ", err));
+            throw std::system_error(err, std::system_category(), "sysconf(_SC_OPEN_MAX) failed");
         }
         throw std::runtime_error("'sysconf(_SC_OPEN_MAX)' failed with no reason");
     }
@@ -823,7 +825,7 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
             // 
             // This will in particular set m_init_complete to 0.
             m_file.resize(0);
-            m_file.resize(sizeof(SharedInfo));
+            m_file.prealloc(sizeof(SharedInfo));
 
             // We can crash anytime during this process. A crash prior to
             // the first resize could allow another thread which could not
@@ -975,7 +977,8 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
 
         m_writemutex.set_shared_part(info->shared_writemutex, m_lockfile_prefix, "write");
 #ifdef REALM_ASYNC_DAEMON
-        m_balancemutex.set_shared_part(info->shared_balancemutex, m_lockfile_prefix, "balance");
+        if (info->durability == static_cast<uint16_t>(Durability::Async))
+            m_balancemutex.set_shared_part(info->shared_balancemutex, m_lockfile_prefix, "balance");
 #endif
         m_controlmutex.set_shared_part(info->shared_controlmutex, m_lockfile_prefix, "control");
 
@@ -1065,8 +1068,11 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
                     break;
             }
 
-            if (REALM_UNLIKELY(!file_format_ok))
-                throw InvalidDatabase("Unsupported Realm file format version", path);
+            if (REALM_UNLIKELY(!file_format_ok)) {
+                std::string msg =
+                    "Unsupported Realm file format version (" + util::to_string(current_file_format_version) + ")";
+                throw InvalidDatabase(msg, path);
+            }
 
             target_file_format_version =
                 gf::get_target_file_format_version_for_session(current_file_format_version,
@@ -1314,7 +1320,7 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
 
 // WARNING / FIXME: compact() should NOT be exposed publicly on Windows because it's not crash safe! It may
 // corrupt your database if something fails
-bool SharedGroup::compact()
+bool SharedGroup::compact(bool bump_version_number, util::Optional<const char*> output_encryption_key)
 {
     // Verify that the database file is attached
     if (is_attached() == false) {
@@ -1326,6 +1332,7 @@ bool SharedGroup::compact()
     }
     Durability dura;
     std::string tmp_path = m_db_path + ".tmp_compaction_space";
+    const char* write_key = bool(output_encryption_key) ? *output_encryption_key : m_key;
     {
         SharedInfo* info = m_file_map.get_addr();
         std::unique_lock<InterprocessMutex> lock(m_controlmutex); // Throws
@@ -1347,7 +1354,8 @@ bool SharedGroup::compact()
         try {
             File file;
             file.open(tmp_path, File::access_ReadWrite, File::create_Must, 0);
-            m_group.write(file, m_key, info->latest_version_number); // Throws
+            int incr = bump_version_number ? 1 : 0;
+            m_group.write(file, write_key, info->latest_version_number + incr); // Throws
             // Data needs to be flushed to the disk before renaming.
             bool disable_sync = get_disable_sync_to_disk();
             if (!disable_sync)
@@ -1385,7 +1393,7 @@ bool SharedGroup::compact()
     }
     SharedGroupOptions new_options;
     new_options.durability = dura;
-    new_options.encryption_key = m_key;
+    new_options.encryption_key = write_key;
     new_options.allow_file_format_upgrade = false;
     do_open(m_db_path, true, false, new_options);
     return true;
@@ -1829,8 +1837,7 @@ void SharedGroup::end_read() noexcept
     if (m_transact_stage == transact_Ready)
         return; // Idempotency
 
-    if (m_transact_stage != transact_Reading)
-        throw LogicError(LogicError::wrong_transact_state);
+    REALM_ASSERT(m_transact_stage == transact_Reading);
 
     do_end_read();
 
@@ -1843,8 +1850,7 @@ void SharedGroup::end_read() noexcept
 
 Group& SharedGroup::begin_write()
 {
-    if (m_transact_stage != transact_Ready)
-        throw LogicError(LogicError::wrong_transact_state);
+    REALM_ASSERT(m_transact_stage == transact_Ready);
 
     do_begin_write(); // Throws
     try {
@@ -1939,10 +1945,7 @@ void SharedGroup::rollback() noexcept
     if (m_transact_stage == transact_Ready)
         return; // Idempotency
 
-    // FIXME: Find common/better method for error handling (throw from noexcept, and 
-    // pin_version() asserts instead).
-    if (m_transact_stage != transact_Writing)
-        throw LogicError(LogicError::wrong_transact_state);
+    REALM_ASSERT(m_transact_stage == transact_Writing);
 
     do_end_write();
     do_end_read();
@@ -2032,7 +2035,7 @@ void SharedGroup::do_begin_write()
     //
     // We use a ticketing scheme to ensure fairness wrt performing write transactions.
     // (But cannot do that on Windows until we have interprocess condition variables there)
-    uint_fast32_t my_ticket = info->next_ticket.fetch_add(1, std::memory_order_relaxed);
+    uint32_t my_ticket = info->next_ticket.fetch_add(1, std::memory_order_relaxed);
     m_writemutex.lock(); // Throws
 
     // allow for comparison even after wrap around of ticket numbering:
@@ -2275,7 +2278,7 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
     out.set_versions(new_version, oldest_version);
     // Recursively write all changed arrays to end of file
     ref_type new_top_ref = out.write_group(); // Throws
-    m_free_space = out.get_free_space();
+    m_free_space = out.get_free_space_size();
     m_used_space = out.get_file_size() - m_free_space;
     // std::cout << "Writing version " << new_version << ", Topptr " << new_top_ref
     //     << " Read lock at version " << oldest_version << std::endl;
@@ -2305,7 +2308,7 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
             entries = entries + 32;
             size_t new_info_size = sizeof(SharedInfo) + r_info->readers.compute_required_space(entries);
             // std::cout << "resizing: " << entries << " = " << new_info_size << std::endl;
-            m_file.prealloc(0, new_info_size);                                       // Throws
+            m_file.prealloc(new_info_size);                                       // Throws
             m_reader_map.remap(m_file, util::File::access_ReadWrite, new_info_size); // Throws
             r_info = m_reader_map.get_addr();
             m_local_max_entry = entries;
@@ -2329,7 +2332,7 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
     }
 }
 
-
+#ifdef REALM_DEBUG
 void SharedGroup::reserve(size_t size)
 {
     REALM_ASSERT(is_attached());
@@ -2341,7 +2344,7 @@ void SharedGroup::reserve(size_t size)
     // the file. This assumption must be verified though.
     m_group.m_alloc.reserve_disk_space(size); // Throws
 }
-
+#endif
 
 std::unique_ptr<SharedGroup::Handover<LinkView>>
 SharedGroup::export_linkview_for_handover(const LinkViewRef& accessor)

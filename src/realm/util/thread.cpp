@@ -18,8 +18,10 @@
 
 #include <cstring>
 #include <stdexcept>
+#include <system_error>
 
 #include <realm/util/thread.hpp>
+#include <realm/util/backtrace.hpp>
 
 #if !defined _WIN32
 #include <unistd.h>
@@ -59,7 +61,7 @@ using namespace realm::util;
 void Thread::join()
 {
     if (!m_joinable)
-        throw std::runtime_error("Thread is not joinable");
+        throw util::runtime_error("Thread is not joinable");
 
 #ifdef _WIN32
     // Returns void; error handling not possible
@@ -88,11 +90,11 @@ void Thread::set_name(const std::string& name)
     pthread_t id = pthread_self();
     int r = pthread_setname_np(id, name_2);
     if (REALM_UNLIKELY(r != 0))
-        throw std::runtime_error("pthread_setname_np() failed.");
+        throw std::system_error(r, std::system_category(), "pthread_setname_np() failed");
 #elif REALM_PLATFORM_APPLE
     int r = pthread_setname_np(name.data());
     if (REALM_UNLIKELY(r != 0))
-        throw std::runtime_error("pthread_setname_np() failed.");
+        throw std::system_error(r, std::system_category(), "pthread_setname_np() failed");
 #else
     static_cast<void>(name);
 #endif
@@ -107,7 +109,7 @@ bool Thread::get_name(std::string& name)
     pthread_t id = pthread_self();
     int r = pthread_getname_np(id, name_2, max);
     if (REALM_UNLIKELY(r != 0))
-        throw std::runtime_error("pthread_getname_np() failed.");
+        throw std::system_error(r, std::system_category(), "pthread_getname_np() failed");
     name_2[max - 1] = '\0';              // Eliminate any risk of buffer overrun in strlen().
     name.assign(name_2, strlen(name_2)); // Throws
     return true;
@@ -153,7 +155,7 @@ void Mutex::init_as_process_shared(bool robust_if_available)
         init_failed(r);
 #else // !REALM_HAVE_PTHREAD_PROCESS_SHARED
     static_cast<void>(robust_if_available);
-    throw std::runtime_error("No support for process-shared mutexes");
+    throw util::runtime_error("No support for process-shared mutexes");
 #endif
 }
 
@@ -161,9 +163,9 @@ REALM_NORETURN void Mutex::init_failed(int err)
 {
     switch (err) {
         case ENOMEM:
-            throw std::bad_alloc();
+            throw util::bad_alloc();
         default:
-            throw std::runtime_error("pthread_mutex_init() failed");
+            throw std::system_error(err, std::system_category(), "pthread_mutex_init() failed");
     }
 }
 
@@ -171,9 +173,9 @@ REALM_NORETURN void Mutex::attr_init_failed(int err)
 {
     switch (err) {
         case ENOMEM:
-            throw std::bad_alloc();
+            throw util::bad_alloc();
         default:
-            throw std::runtime_error("pthread_mutexattr_init() failed");
+            throw std::system_error(err, std::system_category(), "pthread_mutexattr_init() failed");
     }
 }
 
@@ -293,7 +295,7 @@ CondVar::CondVar(process_shared_tag)
     if (REALM_UNLIKELY(r != 0))
         init_failed(r);
 #else
-    throw std::runtime_error("No support for process-shared condition variables");
+    throw util::runtime_error("No support for process-shared condition variables");
 #endif
 }
 
@@ -301,9 +303,9 @@ REALM_NORETURN void CondVar::init_failed(int err)
 {
     switch (err) {
         case ENOMEM:
-            throw std::bad_alloc();
+            throw util::bad_alloc();
         default:
-            throw std::runtime_error("pthread_cond_init() failed");
+            throw std::system_error(err, std::system_category(), "pthread_cond_init() failed");
     }
 }
 
@@ -330,9 +332,9 @@ REALM_NORETURN void CondVar::attr_init_failed(int err)
 {
     switch (err) {
         case ENOMEM:
-            throw std::bad_alloc();
+            throw util::bad_alloc();
         default:
-            throw std::runtime_error("pthread_condattr_init() failed");
+            throw std::system_error(err, std::system_category(), "pthread_condattr_init() failed");
     }
 }
 

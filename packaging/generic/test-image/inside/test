@@ -1,8 +1,0 @@
-#!/bin/bash
-# we should always set proper ownership before exiting, otherwise
-# the created logs will have root:root ownership and we'll be unable
-# to delete them from our host.
-trap 'code=$?; chown -R --reference /inside/test /test-logs/; exit $code' EXIT
-
-set -ex
-

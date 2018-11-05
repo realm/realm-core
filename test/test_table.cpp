@@ -3285,134 +3285,6 @@ TEST(Table_SpecDeleteColumns)
 }
 
 
-TEST(Table_SpecMoveColumns)
-{
-    using df = _impl::DescriptorFriend;
-
-    Group group;
-    TableRef foo = group.add_table("foo");
-    foo->add_column(type_Int, "a");
-    foo->add_column(type_Float, "b");
-    foo->add_column(type_Table, "c");
-    DescriptorRef foo_descriptor = foo->get_descriptor();
-    DescriptorRef c_descriptor = foo_descriptor->get_subdescriptor(2);
-    c_descriptor->add_column(type_Int, "c_a");
-    c_descriptor->add_column(type_Float, "c_b");
-
-    foo->add_empty_row();
-    foo->add_empty_row();
-
-    TableRef subtable0 = foo->get_subtable(2, 0);
-    subtable0->add_empty_row();
-    subtable0->set_int(0, 0, 123);
-
-    df::move_column(*foo_descriptor, 0, 2);
-    CHECK_EQUAL(foo_descriptor->get_column_type(1), type_Table);
-    CHECK_EQUAL(foo_descriptor->get_column_name(1), "c");
-    CHECK(c_descriptor->is_attached());
-    CHECK(subtable0->is_attached());
-    CHECK_EQUAL(123, subtable0->get_int(0, 0));
-
-    TableRef subtable1 = foo->get_subtable(1, 1);
-    subtable1->add_empty_row();
-    subtable1->set_int(0, 0, 456);
-
-    df::move_column(*c_descriptor, 0, 1);
-    CHECK(subtable0->is_attached());
-    CHECK(subtable1->is_attached());
-    CHECK_EQUAL(subtable0->get_int(1, 0), 123);
-    CHECK_EQUAL(subtable1->get_int(1, 0), 456);
-}
-
-
-TEST(Table_SpecMoveLinkColumn)
-{
-    using df = _impl::DescriptorFriend;
-
-    Group group;
-    TableRef target = group.add_table("target");
-    target->add_column(type_Int, "a");
-
-    TableRef origin = group.add_table("origin");
-    origin->add_column_link(type_Link, "a", *target);
-    origin->add_column(type_Int, "b");
-
-    origin->add_empty_row(2);
-    target->add_empty_row(2);
-    origin->set_link(0, 0, 1);
-
-    df::move_column(*origin->get_descriptor(), 0, 1);
-
-    CHECK_EQUAL(origin->get_link(1, 0), 1);
-    CHECK_EQUAL(target->get_backlink_count(0, *origin, 1), 0);
-    CHECK_EQUAL(target->get_backlink_count(1, *origin, 1), 1);
-}
-
-
-TEST(Table_SpecMoveColumnsWithIndexes)
-{
-    using df = _impl::DescriptorFriend;
-    using tf = _impl::TableFriend;
-
-    Group group;
-
-    TableRef foo = group.add_table("foo");
-    DescriptorRef desc = foo->get_descriptor();
-    foo->add_column(type_Int, "a");
-    foo->add_search_index(0);
-    foo->add_column(type_Int, "b");
-    StringIndex* a_index = tf::get_column(*foo, 0).get_search_index();
-    CHECK_EQUAL(1, a_index->get_ndx_in_parent());
-
-    df::move_column(*desc, 0, 1);
-
-    CHECK_EQUAL(2, a_index->get_ndx_in_parent());
-
-    auto& spec = df::get_spec(*desc);
-
-    CHECK(foo->has_search_index(1));
-    CHECK((spec.get_column_attr(1) & col_attr_Indexed));
-    CHECK(!foo->has_search_index(0));
-    CHECK(!(spec.get_column_attr(0) & col_attr_Indexed));
-
-    foo->add_column(type_Int, "c");
-    foo->add_search_index(0);
-    StringIndex* b_index = tf::get_column(*foo, 0).get_search_index();
-    CHECK_EQUAL(1, b_index->get_ndx_in_parent());
-    CHECK_EQUAL(3, a_index->get_ndx_in_parent());
-
-    df::move_column(*desc, 0, 1);
-    CHECK(foo->has_search_index(0));
-    CHECK((spec.get_column_attr(0) & col_attr_Indexed));
-    CHECK(foo->has_search_index(1));
-    CHECK((spec.get_column_attr(1) & col_attr_Indexed));
-    CHECK(!foo->has_search_index(2));
-    CHECK(!(spec.get_column_attr(2) & col_attr_Indexed));
-    CHECK_EQUAL(1, a_index->get_ndx_in_parent());
-    CHECK_EQUAL(3, b_index->get_ndx_in_parent());
-
-    df::move_column(*desc, 2, 0);
-    CHECK(!foo->has_search_index(0));
-    CHECK(!(spec.get_column_attr(0) & col_attr_Indexed));
-    CHECK(foo->has_search_index(1));
-    CHECK((spec.get_column_attr(1) & col_attr_Indexed));
-    CHECK(foo->has_search_index(2));
-    CHECK((spec.get_column_attr(2) & col_attr_Indexed));
-    CHECK_EQUAL(2, a_index->get_ndx_in_parent());
-    CHECK_EQUAL(4, b_index->get_ndx_in_parent());
-
-    df::move_column(*desc, 1, 0);
-    CHECK(foo->has_search_index(0));
-    CHECK((spec.get_column_attr(0) & col_attr_Indexed));
-    CHECK(!foo->has_search_index(1));
-    CHECK(!(spec.get_column_attr(1) & col_attr_Indexed));
-    CHECK(foo->has_search_index(2));
-    CHECK((spec.get_column_attr(2) & col_attr_Indexed));
-    CHECK_EQUAL(1, a_index->get_ndx_in_parent());
-    CHECK_EQUAL(4, b_index->get_ndx_in_parent());
-}
-
-
 TEST(Table_NullInEnum)
 {
     Group group;
@@ -7086,255 +6958,6 @@ TEST(Table_InsertColumnMaintainsBacklinkIndices)
     t1->set_link(0, 0, 0);
 }
 
-
-TEST(Table_MultipleLinkColumnsToSelf)
-{
-    Group g;
-    TableRef t = g.add_table("A");
-    t->insert_column_link(0, type_Link, "e", *t);
-    t->insert_column_link(1, type_LinkList, "f", *t);
-    t->add_empty_row();
-    t->get_linklist(1, 0)->add(0);
-    _impl::TableFriend::move_column(*t->get_descriptor(), 0, 1);
-    g.verify();
-    t->get_linklist(0, 0)->add(0);
-    g.verify();
-}
-
-
-TEST(Table_MultipleLinkColumnsToOther)
-{
-    Group g;
-    TableRef t = g.add_table("A");
-    TableRef t2 = g.add_table("B");
-    t->insert_column_link(0, type_Link, "e", *t2);
-    t->insert_column_link(1, type_LinkList, "f", *t);
-    t->add_empty_row();
-    t->get_linklist(1, 0)->add(0);
-    _impl::TableFriend::move_column(*t->get_descriptor(), 0, 1);
-    g.verify();
-    t->get_linklist(0, 0)->add(0);
-    g.verify();
-}
-
-
-TEST(Table_MultipleLinkColumnsMoveTables)
-{
-    Group g;
-    TableRef t = g.add_table("A");
-    TableRef t2 = g.add_table("B");
-    t->insert_column_link(0, type_Link, "e", *t);
-    t->insert_column_link(1, type_LinkList, "f", *t);
-    t->add_empty_row();
-    t->get_linklist(1, 0)->add(0);
-    _impl::TableFriend::move_column(*t->get_descriptor(), 0, 1);
-    g.verify();
-    t->get_linklist(0, 0)->add(0);
-    g.verify();
-    g.move_table(0, 1);
-    g.verify();
-    g.move_table(1, 0);
-    g.verify();
-}
-
-
-TEST(Table_MultipleLinkColumnsMoveTablesCrossLinks)
-{
-    Group g;
-    TableRef t = g.add_table("A");
-    TableRef t2 = g.add_table("B");
-    t->insert_column_link(0, type_Link, "e", *t2);
-    t->insert_column_link(1, type_LinkList, "f", *t);
-    t->insert_column_link(2, type_Link, "g", *t2);
-    t->add_empty_row();
-    t->get_linklist(1, 0)->add(0);
-    g.move_table(0, 1);
-    g.verify();
-    _impl::TableFriend::move_column(*t->get_descriptor(), 1, 2);
-    g.verify();
-    t->get_linklist(2, 0)->add(0);
-    g.verify();
-    g.move_table(1, 0);
-    g.verify();
-    _impl::TableFriend::move_column(*t->get_descriptor(), 1, 0);
-    g.verify();
-}
-
-
-TEST(Table_MoveEnumColumns)
-{
-    Table t;
-    t.add_column(type_String, "0");
-    t.add_column(type_String, "1");
-    t.add_empty_row(1);
-    t.set_string(0, 0, "hello");
-    t.set_string(1, 0, "world");
-    bool enforce = true;
-    t.optimize(enforce);
-
-    CHECK(t.get_string(0, 0) == "hello");
-    CHECK(t.get_string(1, 0) == "world");
-    t.verify();
-    _impl::TableFriend::move_column(*t.get_descriptor(), 1, 0);
-    CHECK(t.get_string(0, 0) == "world");
-    CHECK(t.get_string(1, 0) == "hello");
-    t.verify();
-    _impl::TableFriend::move_column(*t.get_descriptor(), 0, 1);
-    CHECK(t.get_string(0, 0) == "hello");
-    CHECK(t.get_string(1, 0) == "world");
-    t.verify();
-    _impl::TableFriend::move_column(*t.get_descriptor(), 1, 1);
-    CHECK(t.get_string(0, 0) == "hello");
-    CHECK(t.get_string(1, 0) == "world");
-    t.verify();
-}
-
-
-TEST(LangBindHelper_StringEnumMoveOutOfBounds)
-{
-    Table t;
-    t.add_column(type_String, "str_col");
-    t.add_empty_row(1);
-    bool enforce = true;
-    t.optimize(enforce);
-    t.add_column(type_String, "str_col2");
-    StringData enum_0("enum 0");
-    StringData str_1("string 1");
-    StringData str_2("string 2");
-    StringData enum_1("enum 1");
-    StringData enum_2("enum 2");
-    t.set_string(0, 0, enum_0);
-    t.set_string(1, 0, str_1);
-
-    _impl::TableFriend::move_column(*(t.get_descriptor()), 0, 1);
-    t.verify();
-    CHECK(t.get_string(0, 0) == str_1);
-    CHECK(t.get_string(1, 0) == enum_0);
-
-    _impl::TableFriend::move_column(*(t.get_descriptor()), 1, 1);
-    t.verify();
-    CHECK(t.get_string(0, 0) == str_1);
-    CHECK(t.get_string(1, 0) == enum_0);
-
-    _impl::TableFriend::move_column(*(t.get_descriptor()), 0, 0);
-    t.verify();
-    CHECK(t.get_string(0, 0) == str_1);
-    CHECK(t.get_string(1, 0) == enum_0);
-
-    _impl::TableFriend::move_column(*(t.get_descriptor()), 1, 0);
-    t.verify();
-    CHECK(t.get_string(0, 0) == enum_0);
-    CHECK(t.get_string(1, 0) == str_1);
-
-    _impl::TableFriend::move_column(*(t.get_descriptor()), 1, 0);
-    t.verify();
-    CHECK(t.get_string(0, 0) == str_1);
-    CHECK(t.get_string(1, 0) == enum_0);
-
-    t.optimize(enforce);
-    t.add_column(type_String, "str_col3");
-    t.set_string(0, 0, enum_1);
-    t.set_string(2, 0, str_2);
-
-    _impl::TableFriend::move_column(*(t.get_descriptor()), 2, 1);
-    t.verify();
-    CHECK(t.get_string(0, 0) == enum_1);
-    CHECK(t.get_string(1, 0) == str_2);
-    CHECK(t.get_string(2, 0) == enum_0);
-
-    _impl::TableFriend::move_column(*(t.get_descriptor()), 2, 1);
-    t.verify();
-    CHECK(t.get_string(0, 0) == enum_1);
-    CHECK(t.get_string(1, 0) == enum_0);
-    CHECK(t.get_string(2, 0) == str_2);
-
-    _impl::TableFriend::move_column(*(t.get_descriptor()), 0, 2);
-    t.verify();
-    CHECK(t.get_string(0, 0) == enum_0);
-    CHECK(t.get_string(1, 0) == str_2);
-    CHECK(t.get_string(2, 0) == enum_1);
-
-    _impl::TableFriend::move_column(*(t.get_descriptor()), 0, 2);
-    t.verify();
-    CHECK(t.get_string(0, 0) == str_2);
-    CHECK(t.get_string(1, 0) == enum_1);
-    CHECK(t.get_string(2, 0) == enum_0);
-
-    _impl::TableFriend::move_column(*(t.get_descriptor()), 2, 0);
-    t.verify();
-    CHECK(t.get_string(0, 0) == enum_0);
-    CHECK(t.get_string(1, 0) == str_2);
-    CHECK(t.get_string(2, 0) == enum_1);
-
-    _impl::TableFriend::move_column(*(t.get_descriptor()), 0, 2);
-    t.verify();
-    CHECK(t.get_string(0, 0) == str_2);
-    CHECK(t.get_string(1, 0) == enum_1);
-    CHECK(t.get_string(2, 0) == enum_0);
-
-    t.optimize(enforce);
-    t.set_string(0, 0, enum_2);
-
-    _impl::TableFriend::move_column(*(t.get_descriptor()), 0, 2);
-    t.verify();
-    CHECK(t.get_string(0, 0) == enum_1);
-    CHECK(t.get_string(1, 0) == enum_0);
-    CHECK(t.get_string(2, 0) == enum_2);
-
-    _impl::TableFriend::move_column(*(t.get_descriptor()), 2, 0);
-    t.verify();
-    CHECK(t.get_string(0, 0) == enum_2);
-    CHECK(t.get_string(1, 0) == enum_1);
-    CHECK(t.get_string(2, 0) == enum_0);
-
-    _impl::TableFriend::move_column(*(t.get_descriptor()), 1, 2);
-    t.verify();
-    CHECK(t.get_string(0, 0) == enum_2);
-    CHECK(t.get_string(1, 0) == enum_0);
-    CHECK(t.get_string(2, 0) == enum_1);
-}
-
-
-TEST(Table_MoveSubtables)
-{
-    Group g;
-    TableRef t = g.add_table("A");
-    TableRef t2 = g.add_table("B");
-    {
-        DescriptorRef subdesc;
-
-        t->add_column(type_Table, "sub1", &subdesc);
-        subdesc->add_column(type_Int, "integers");
-
-        t->add_column_link(type_Link, "link", *t2);
-
-        t->add_column(type_Table, "sub2", &subdesc);
-        subdesc->add_column(type_String, "strings");
-    }
-
-    {
-        DescriptorRef sub1 = t->get_subdescriptor(0);
-        DescriptorRef sub2 = t->get_subdescriptor(2);
-        CHECK_EQUAL(sub1->get_column_name(0), "integers");
-        CHECK_EQUAL(sub2->get_column_name(0), "strings");
-    }
-    _impl::TableFriend::move_column(*t->get_descriptor(), 0, 2);
-    {
-        DescriptorRef sub1 = t->get_subdescriptor(2);
-        DescriptorRef sub2 = t->get_subdescriptor(1);
-        CHECK_EQUAL(sub1->get_column_name(0), "integers");
-        CHECK_EQUAL(sub2->get_column_name(0), "strings");
-    }
-    _impl::TableFriend::move_column(*t->get_descriptor(), 2, 0);
-    {
-        DescriptorRef sub1 = t->get_subdescriptor(0);
-        DescriptorRef sub2 = t->get_subdescriptor(2);
-        CHECK_EQUAL(sub1->get_column_name(0), "integers");
-        CHECK_EQUAL(sub2->get_column_name(0), "strings");
-    }
-}
-
-
 TEST(Table_AddColumnWithThreeLevelBptree)
 {
     Table table;
@@ -8408,14 +8031,12 @@ TEST(Table_InsertUniqueDuplicate_LinkedColumns)
     CHECK_EQUAL(t->get_int(1, 1), 42);
     CHECK_EQUAL(t2->get_link(1, 0), 1); // bumped forward by insert at t(0), updated through backlinks
 
-    using df = _impl::DescriptorFriend;
     DescriptorRef t2_descriptor = t2->get_descriptor();
-    df::move_column(*t2_descriptor, 0, 1);
-    CHECK_EQUAL(t2->get_link(0, 0), 1); // unchanged
+    CHECK_EQUAL(t2->get_link(1, 0), 1); // unchanged
     t->insert_empty_row(0);
     t->set_int(1, 0, 4444);
-    CHECK_EQUAL(t2->get_link(0, 0), 2); // bumped forward via backlinks
-    t2->remove_column(1);
+    CHECK_EQUAL(t2->get_link(1, 0), 2); // bumped forward via backlinks
+    t2->remove_column(0);
     CHECK_EQUAL(t2->get_link(0, 0), 2); // unchanged
     t->insert_empty_row(0);             // update through backlinks
     t->set_int(1, 0, 55555);
@@ -8430,13 +8051,12 @@ TEST(Table_InsertUniqueDuplicate_LinkedColumns)
     t->set_int(1, 0, 666666);
     CHECK_EQUAL(t2->get_link(1, 0), 1); // bumped forward via backlinks
 
-    df::move_column(*t2_descriptor, 1, 0); // move backwards
-    CHECK_EQUAL(t2->get_link(0, 0), 1);    // no change
+    CHECK_EQUAL(t2->get_link(1, 0), 1);    // no change
     t->insert_empty_row(0);
     t->set_int(1, 0, 7777777);
-    CHECK_EQUAL(t2->get_link(0, 0), 2); // bumped forward via backlinks
+    CHECK_EQUAL(t2->get_link(1, 0), 2); // bumped forward via backlinks
     t->remove(0);
-    CHECK_EQUAL(t2->get_link(0, 0), 1); // bumped back via backlinks
+    CHECK_EQUAL(t2->get_link(1, 0), 1); // bumped back via backlinks
 }
 
 
@@ -8620,6 +8240,7 @@ TEST(Table_addRowsToTableWithNoColumns)
     CHECK(u->is_null_link(0, 0));
 }
 
+
 TEST(Table_getVersionCounterAfterRowAccessor)
 {
     Table t;
@@ -8740,6 +8361,50 @@ TEST(Table_KeyRow)
     CHECK_EQUAL(i, 0);
     i = table.find_first_int(0, 456);
     CHECK_EQUAL(i, 1);
+}
+
+TEST(Table_KeysRow)
+{
+    Table table;
+    table.add_column(type_Int, "int");
+    table.add_column(type_String, "string", true);
+    table.add_search_index(0);
+    table.add_search_index(1);
+
+    table.add_row_with_keys(0, 123, 1, "Hello, ");
+    table.add_row_with_keys(0, 456, 1, StringData());
+
+    size_t i = table.find_first_int(0, 123);
+    CHECK_EQUAL(i, 0);
+    i = table.find_first_int(0, 456);
+    CHECK_EQUAL(i, 1);
+
+    i = table.find_first_string(1, "Hello, ");
+    CHECK_EQUAL(i, 0);
+    i = table.find_first_string(1, StringData());
+    CHECK_EQUAL(i, 1);
+}
+
+TEST(Table_getLinkType)
+{
+    Group g;
+    TableRef table = g.add_table("table");
+
+    table->add_column(type_Int, "int");
+    table->add_column_link(type_Link, "weak_link", *table);
+    table->add_column_link(type_Link, "strong_link", *table, link_Strong);
+    table->add_column_link(type_LinkList, "weak_list", *table);
+    table->add_column_link(type_LinkList, "strong_list", *table, link_Strong);
+
+    CHECK(link_Weak == table->get_link_type(1));
+    CHECK(link_Strong == table->get_link_type(2));
+    CHECK(link_Weak == table->get_link_type(3));
+    CHECK(link_Strong == table->get_link_type(4));
+
+    CHECK_THROW(table->get_link_type(0), LogicError);
+
+    g.remove_table("table");
+    CHECK_THROW(table->get_link_type(1), LogicError);
 }
 
 #endif // TEST_TABLE

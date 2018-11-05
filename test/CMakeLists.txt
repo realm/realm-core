@@ -42,6 +42,7 @@ set(NORMAL_TESTS
     test_links.cpp
     test_metrics.cpp
     test_optional.cpp
+    test_parser.cpp
     test_priority_queue.cpp
     test_query.cpp
     test_replication.cpp
@@ -56,6 +57,9 @@ set(NORMAL_TESTS
     test_transactions_lasse.cpp
     test_upgrade_database.cpp
     test_utf8.cpp
+    test_util_any.cpp
+    test_util_backtrace.cpp
+    test_util_base64.cpp
     test_util_error.cpp
     test_util_file.cpp
     test_util_inspect.cpp
@@ -116,19 +120,25 @@ if (MSVC)
     set_source_files_properties(test_query.cpp PROPERTIES COMPILE_FLAGS /bigobj)
 endif()
 
-add_executable(realm-tests ${TESTS} ${MAIN_FILE} ${REQUIRED_TEST_FILES} ${REALM_TEST_HEADERS})
+add_executable(CoreTests ${TESTS} ${MAIN_FILE} ${REQUIRED_TEST_FILES} ${REALM_TEST_HEADERS})
+set_target_properties(CoreTests PROPERTIES OUTPUT_NAME "realm-tests")
 
 if(CMAKE_GENERATOR STREQUAL Xcode)
-    set_target_properties(realm-tests PROPERTIES
+    set_target_properties(CoreTests PROPERTIES
                           MACOSX_BUNDLE YES
                           RESOURCE "${REQUIRED_TEST_FILES}")
 endif()
 
-target_link_libraries(realm-tests
-                      test-util ${EXTRA_TEST_LIBS} ${PLATFORM_LIBRARIES}
+target_link_libraries(CoreTests
+                      TestUtil QueryParser ${EXTRA_TEST_LIBS} ${PLATFORM_LIBRARIES}
 )
 
-target_include_directories(realm-tests PUBLIC ${EXTRA_TEST_CFLAGS})
+if(UNIX AND NOT APPLE)
+    # This enables symbols in backtraces
+    target_link_libraries(CoreTests "-rdynamic")
+endif()
+
+target_include_directories(CoreTests PUBLIC ${EXTRA_TEST_CFLAGS})
 
 add_test(NAME RealmTests COMMAND realm-tests)
 

@@ -35,6 +35,7 @@ if (extended_version)
     list(GET VERSION_LIST 3 CONFIG_VERSION_TWEAK)
 endif()
 
+set(CMAKE_BUILD_TYPE Debug CACHE STRING "")
 project(realm)
 
 # Include general CMake modules
@@ -54,6 +55,8 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 if(ANDROID)
     # TODO: Core APIs should always built for internal usage. But there seems to be issues with cocoa. Enable it only for Android for now.
     set(CMAKE_CXX_VISIBILITY_PRESET hidden)
+elseif(APPLE)
+    set(CMAKE_VISIBILITY_INLINES_HIDDEN 1)
 endif()
 
 # Set global warnings settings
@@ -75,6 +78,7 @@ set_property(DIRECTORY APPEND PROPERTY COMPILE_DEFINITIONS
     $<$<CONFIG:MinSizeDebug>:REALM_DEBUG=1>
 )
 
+
 set(CMAKE_DEBUG_POSTFIX "-dbg")
 set(CMAKE_MINSIZEDEBUG_POSTFIX "-dbg")
 
@@ -95,10 +99,22 @@ if(MSVC)
         foreach(flag_var
             CMAKE_CXX_FLAGS CMAKE_CXX_FLAGS_DEBUG CMAKE_CXX_FLAGS_RELEASE
             CMAKE_CXX_FLAGS_MINSIZEREL CMAKE_CXX_FLAGS_RELWITHDEBINFO)
-           if(${flag_var} MATCHES "/MD")
-              string(REGEX REPLACE "/MD" "/MT" ${flag_var} "${${flag_var}}")
-           endif()
+            if(${flag_var} MATCHES "/MD")
+                string(REGEX REPLACE "/MD" "/MT" ${flag_var} "${${flag_var}}")
+            endif()
+
+            # Disable runtime stack bound checks, because these slow down unit tests
+            # disproportionately.
+            if(${flag_var} MATCHES "/RTC")
+                string(REGEX REPLACE "/RTC(su|[1su])" "" ${flag_var} "${${flag_var}}")
+            endif()
         endforeach()
+
+        # Let the compiler optimize debug builds ever so slightly.
+        # /Ob1: This allows the compiler to inline functions marked __inline.
+        # /Oi:  This enables (faster) intrinsic functions.
+        string(REPLACE "/Ob0" "/Ob1" CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}")
+        string(CONCAT CMAKE_CXX_FLAGS_DEBUG "/Oi " "${CMAKE_CXX_FLAGS_DEBUG}")
     endif()
 endif()
 
@@ -138,6 +154,8 @@ if(EXISTS "${DEPRECATED_CONFIG_FILE}")
     message(FATAL_ERROR "${DEPRECATED_CONFIG_FILE} exists in the source directory, and will take precedence over the generated configuration in the build directory. Please remove this file before continuing. Alternatively, you can also clean your realm-core to remove this and other stale files: git clean -xfd")
 endif()
 
+set(PEGTL_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src/external/pegtl/include/tao/)
+
 # Tell the build system where to find the sources (and generated sources)
 include_directories(src)
 include_directories(${CMAKE_CURRENT_BINARY_DIR}/src) # For generated files (like config.h)
@@ -155,22 +173,17 @@ endif()
 install(FILES LICENSE CHANGELOG.md DESTINATION "doc/realm" COMPONENT devel)
 
 # Make the project importable from the build directory
-export(TARGETS realm FILE realm-config.cmake)
+export(TARGETS Core QueryParser NAMESPACE Realm:: FILE realm-config.cmake)
 
 # Make the project importable from the install directory
 install(EXPORT realm
+        NAMESPACE Realm::
         FILE realm-config.cmake
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/realm
         COMPONENT devel)
 
 # CPack
-if(APPLE)
-    set(CPACK_GENERATOR "TGZ")
-elseif(ANDROID)
-    set(CPACK_GENERATOR "TGZ")
-else()
-    set(CPACK_GENERATOR "TGZ;RPM;DEB")
-endif()
+set(CPACK_GENERATOR "TGZ")
 set(CPACK_PACKAGE_NAME "realm-core-${CMAKE_BUILD_TYPE}")
 set(CPACK_PACKAGE_VERSION ${REALM_VERSION})
 set(CPACK_PACKAGE_VENDOR "Realm Inc.")

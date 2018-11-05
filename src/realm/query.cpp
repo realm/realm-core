@@ -252,29 +252,58 @@ void Query::add_expression_node(std::unique_ptr<Expression> expression)
 }
 
 // Binary
-Query& Query::equal(size_t column_ndx, BinaryData b)
+Query& Query::equal(size_t column_ndx, BinaryData b, bool case_sensitive)
 {
-    add_condition<Equal>(column_ndx, b);
+    if (case_sensitive) {
+        add_condition<Equal>(column_ndx, b);
+    } else {
+        add_condition<EqualIns>(column_ndx, b);
+    }
     return *this;
 }
-Query& Query::not_equal(size_t column_ndx, BinaryData b)
+Query& Query::not_equal(size_t column_ndx, BinaryData b, bool case_sensitive)
 {
-    add_condition<NotEqual>(column_ndx, b);
+    if (case_sensitive) {
+        add_condition<NotEqual>(column_ndx, b);
+    } else {
+        add_condition<NotEqualIns>(column_ndx, b);
+    }
     return *this;
 }
-Query& Query::begins_with(size_t column_ndx, BinaryData b)
+Query& Query::begins_with(size_t column_ndx, BinaryData b, bool case_sensitive)
 {
-    add_condition<BeginsWith>(column_ndx, b);
+    if (case_sensitive) {
+        add_condition<BeginsWith>(column_ndx, b);
+    } else {
+        add_condition<BeginsWithIns>(column_ndx, b);
+    }
     return *this;
 }
-Query& Query::ends_with(size_t column_ndx, BinaryData b)
+Query& Query::ends_with(size_t column_ndx, BinaryData b, bool case_sensitive)
 {
-    add_condition<EndsWith>(column_ndx, b);
+    if (case_sensitive) {
+        add_condition<EndsWith>(column_ndx, b);
+    } else {
+        add_condition<EndsWithIns>(column_ndx, b);
+    }
     return *this;
 }
-Query& Query::contains(size_t column_ndx, BinaryData b)
+Query& Query::contains(size_t column_ndx, BinaryData b, bool case_sensitive)
 {
-    add_condition<Contains>(column_ndx, b);
+    if (case_sensitive) {
+        add_condition<Contains>(column_ndx, b);
+    } else {
+        add_condition<ContainsIns>(column_ndx, b);
+    }
+    return *this;
+}
+Query& Query::like(size_t column_ndx, BinaryData b, bool case_sensitive)
+{
+    if (case_sensitive) {
+        add_condition<Like>(column_ndx, b);
+    } else {
+        add_condition<LikeIns>(column_ndx, b);
+    }
     return *this;
 }
 
@@ -1242,8 +1271,7 @@ void Query::handle_pending_not()
 Query& Query::Or()
 {
     auto& current_group = m_groups.back();
-    OrNode* or_node = dynamic_cast<OrNode*>(current_group.m_root_node.get());
-    if (!or_node) {
+    if (current_group.m_state != QueryGroup::State::OrConditionChildren) {
         // Reparent the current group's nodes within an OrNode.
         add_node(std::unique_ptr<ParentNode>(new OrNode(std::move(current_group.m_root_node))));
     }
@@ -1369,13 +1397,8 @@ TableView Query::find_all(size_t start, size_t end, size_t limit)
     return ret;
 }
 
-
-size_t Query::count(size_t start, size_t end, size_t limit) const
+size_t Query::do_count(size_t start, size_t end, size_t limit) const
 {
-#if REALM_METRICS
-    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Count);
-#endif
-
     if (limit == 0 || m_table->is_degenerate())
         return 0;
 
@@ -1413,6 +1436,78 @@ size_t Query::count(size_t start, size_t end, size_t limit) const
     return cnt;
 }
 
+size_t Query::count(size_t start, size_t end, size_t limit) const
+{
+#if REALM_METRICS
+    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Count);
+#endif
+    return do_count(start, end, limit);
+
+}
+
+TableView Query::find_all(const DescriptorOrdering& descriptor)
+{
+#if REALM_METRICS
+    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_FindAll);
+#endif
+    const size_t default_start = 0;
+    const size_t default_end = size_t(-1);
+    const size_t default_limit = size_t(-1);
+
+    if (descriptor.is_empty()) {
+        TableView ret(*m_table, *this, default_start, default_end, default_limit);
+        find_all(ret);
+        return ret;
+    }
+
+    bool only_limit = true;
+    size_t min_limit = size_t(-1);
+    for (size_t i = 0; i < descriptor.size(); ++i) {
+        if (!descriptor.descriptor_is_limit(i)) {
+            only_limit = false;
+            break;
+        } else {
+            const LimitDescriptor* limit = dynamic_cast<const LimitDescriptor*>(descriptor[i]);
+            REALM_ASSERT(limit);
+            min_limit = std::min(min_limit, limit->get_limit());
+        }
+    }
+    if (only_limit) {
+        TableView ret(*m_table, *this, default_start, default_end, min_limit);
+        find_all(ret, default_start, default_end, min_limit);
+        return ret;
+    }
+
+    TableView ret(*m_table, *this, default_start, default_end, default_limit);
+    ret.apply_descriptor_ordering(descriptor);
+    return ret;
+}
+
+size_t Query::count(const DescriptorOrdering& descriptor)
+{
+#if REALM_METRICS
+    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Count);
+#endif
+    realm::util::Optional<size_t> min_limit = descriptor.get_min_limit();
+
+    if ((bool(min_limit) && *min_limit == 0) || m_table->is_degenerate())
+        return 0;
+
+    const size_t start = 0;
+    const size_t end = m_table->size();
+    size_t limit = size_t(-1);
+
+    if (!descriptor.will_apply_distinct()) {
+        if (bool(min_limit)) {
+            limit = *min_limit;
+        }
+        return do_count(start, end, limit);
+    }
+
+    TableView ret(*m_table, *this, start, end, limit);
+    ret.apply_descriptor_ordering(descriptor);
+    return ret.size();
+}
 
 // todo, not sure if start, end and limit could be useful for delete.
 size_t Query::remove()
@@ -1570,12 +1665,23 @@ std::string Query::validate()
     return root_node()->validate(); // errors detected by QueryEngine
 }
 
-std::string Query::get_description() const
+std::string Query::get_description(util::serializer::SerialisationState& state) const
 {
     if (root_node()) {
-        return root_node()->describe_expression();
+        if (m_view) {
+            throw SerialisationError("Serialisation of a query constrianed by a view is not currently supported");
+        }
+        return root_node()->describe_expression(state);
     }
-    return "";
+    // An empty query returns all results and one way to indicate this
+    // is to serialise TRUEPREDICATE which is functionally equivilent
+    return "TRUEPREDICATE";
+}
+
+std::string Query::get_description() const
+{
+    util::serializer::SerialisationState state;
+    return get_description(state);
 }
 
 void Query::init() const
@@ -1700,7 +1806,7 @@ Query Query::operator&&(const Query& q)
 Query Query::operator!()
 {
     if (!root_node())
-        throw std::runtime_error("negation of empty query is not supported");
+        throw util::runtime_error("negation of empty query is not supported");
     Query q(*this->m_table);
     q.Not();
     q.and_query(*this);

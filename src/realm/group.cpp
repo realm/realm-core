@@ -690,76 +690,6 @@ void Group::rename_table(size_t table_ndx, StringData new_name, bool require_uni
 }
 
 
-void Group::move_table(size_t from_table_ndx, size_t to_table_ndx)
-{
-    if (REALM_UNLIKELY(!is_attached()))
-        throw LogicError(LogicError::detached_accessor);
-    REALM_ASSERT_3(m_tables.size(), ==, m_table_names.size());
-    REALM_ASSERT_EX(m_table_accessors.empty() || m_table_accessors.size() == m_tables.size(),
-                    m_table_accessors.size(), m_tables.size());
-    if (from_table_ndx >= m_tables.size())
-        throw LogicError(LogicError::table_index_out_of_range);
-    if (to_table_ndx >= m_tables.size())
-        throw LogicError(LogicError::table_index_out_of_range);
-
-    if (from_table_ndx == to_table_ndx)
-        return;
-
-    // Tables between from_table_ndx and to_table_ndx change their indices, so
-    // link columns have to be adjusted (similar to remove_table).
-
-    // Build a map of all table indices that are going to change:
-    std::map<size_t, size_t> moves; // from -> to
-    moves[from_table_ndx] = to_table_ndx;
-    if (from_table_ndx < to_table_ndx) {
-        // Move up:
-        for (size_t i = from_table_ndx + 1; i <= to_table_ndx; ++i) {
-            moves[i] = i - 1;
-        }
-    }
-    else { // from_table_ndx > to_table_ndx
-        // Move down:
-        for (size_t i = to_table_ndx; i < from_table_ndx; ++i) {
-            moves[i] = i + 1;
-        }
-    }
-
-    // Move entries in internal data structures.
-    m_tables.move_rotate(from_table_ndx, to_table_ndx);
-    m_table_names.move_rotate(from_table_ndx, to_table_ndx);
-
-    // Move accessors.
-    if (!m_table_accessors.empty()) {
-        using iter = decltype(m_table_accessors.begin());
-        iter first, new_first, last;
-        if (from_table_ndx < to_table_ndx) {
-            // Rotate left.
-            first = m_table_accessors.begin() + from_table_ndx;
-            new_first = first + 1;
-            last = m_table_accessors.begin() + to_table_ndx + 1;
-        }
-        else { // from_table_ndx > to_table_ndx
-            // Rotate right.
-            first = m_table_accessors.begin() + to_table_ndx;
-            new_first = m_table_accessors.begin() + from_table_ndx;
-            last = new_first + 1;
-        }
-        std::rotate(first, new_first, last);
-    }
-
-    update_table_indices([&](size_t old_table_ndx) {
-        auto it = moves.find(old_table_ndx);
-        if (it != moves.end()) {
-            return it->second;
-        }
-        return old_table_ndx;
-    });
-
-    if (Replication* repl = m_alloc.get_replication())
-        repl->move_group_level_table(from_table_ndx, to_table_ndx); // Throws
-}
-
-
 class Group::DefaultTableWriter : public Group::TableWriter {
 public:
     DefaultTableWriter(const Group& group)
@@ -779,6 +709,35 @@ public:
         return m_group.m_tables.write(out, deep, only_if_modified); // Throws
     }
 
+    HistoryInfo write_history(_impl::OutputStream& out) override
+    {
+        bool deep = true;                                           // Deep
+        bool only_if_modified = false;                              // Always
+        ref_type history_ref = _impl::GroupFriend::get_history_ref(m_group);
+        HistoryInfo info;
+        if (history_ref) {
+            _impl::History::version_type version;
+            int history_type, history_schema_version;
+            _impl::GroupFriend::get_version_and_history_info(_impl::GroupFriend::get_alloc(m_group),
+                                                             m_group.m_top.get_ref(),
+                                                             version,
+                                                             history_type,
+                                                             history_schema_version);
+            REALM_ASSERT(history_type != Replication::hist_None);
+            if (history_type != Replication::hist_SyncClient && history_type != Replication::hist_SyncServer) {
+                return info; // Only sync history should be preserved when writing to a new file
+            }
+            info.type = history_type;
+            info.version = history_schema_version;
+            // FIXME: It's ugly that we have to instantiate a new array here,
+            // but it isn't obvious that Group should have history as a member.
+            Array history{const_cast<Allocator&>(_impl::GroupFriend::get_alloc(m_group))};
+            history.init_from_ref(history_ref);
+            info.ref = history.write(out, deep, only_if_modified); // Throws
+        }
+        return info;
+    }
+
 private:
     const Group& m_group;
 };
@@ -796,12 +755,7 @@ void Group::write(std::ostream& out, bool pad_for_encryption, uint_fast64_t vers
     write(out, m_file_format_version, table_writer, no_top_array, pad_for_encryption, version_number); // Throws
 }
 
-void Group::write(const std::string& path, const char* encryption_key) const
-{
-    write(path, encryption_key, 0);
-}
-
-void Group::write(const std::string& path, const char* encryption_key, uint_fast64_t version_number) const
+void Group::write(const std::string& path, const char* encryption_key, uint64_t version_number) const
 {
     File file;
     int flags = 0;
@@ -834,7 +788,7 @@ BinaryData Group::write_to_mem() const
 
     char* buffer = static_cast<char*>(malloc(max_size)); // Throws
     if (!buffer)
-        throw std::bad_alloc();
+        throw util::bad_alloc();
     try {
         MemoryOutputStream out; // Throws
         out.set_buffer(buffer, buffer + max_size);
@@ -884,6 +838,7 @@ void Group::write(std::ostream& out, int file_format_version, TableWriter& table
         // into a separate file.
         ref_type names_ref = table_writer.write_names(out_2);   // Throws
         ref_type tables_ref = table_writer.write_tables(out_2); // Throws
+        TableWriter::HistoryInfo history_info = table_writer.write_history(out_2); // Throws
         SlabAlloc new_alloc;
         new_alloc.attach_empty(); // Throws
         Array top(new_alloc);
@@ -917,6 +872,13 @@ void Group::write(std::ostream& out, int file_format_version, TableWriter& table
             top.add(RefOrTagged::make_ref(version_list_ref));  // Throws
             top.add(RefOrTagged::make_tagged(version_number)); // Throws
             top_size = 7;
+
+            if (history_info.type != Replication::hist_None) {
+                top.add(RefOrTagged::make_tagged(history_info.type));
+                top.add(RefOrTagged::make_ref(history_info.ref));
+                top.add(RefOrTagged::make_tagged(history_info.version));
+                top_size = 10;
+            }
         }
         top_ref = out_2.get_ref_of_next_array();
 
@@ -1052,14 +1014,63 @@ bool Group::operator==(const Group& g) const
     return true;
 }
 
+namespace {
 
-size_t Group::compute_aggregated_byte_size() const noexcept
-{
-    if (!is_attached())
+size_t size_of_tree_from_ref(ref_type ref, Allocator& alloc) {
+    if (ref) {
+        Array a(alloc);
+        a.init_from_ref(ref);
+        MemStats stats;
+        a.stats(stats);
+        return stats.allocated;
+    }
+    else
         return 0;
-    MemStats stats_2;
-    m_top.stats(stats_2);
-    return stats_2.allocated;
+}
+
+}
+
+size_t Group::compute_aggregated_byte_size(SizeAggregateControl ctrl) const noexcept
+{
+    SlabAlloc& alloc = *const_cast<SlabAlloc*>(&m_alloc);
+    if (!m_top.is_attached())
+        return 0;
+    size_t used = 0;
+    if (ctrl & SizeAggregateControl::size_of_state) {
+        MemStats stats;
+        m_table_names.stats(stats);
+        m_tables.stats(stats);
+        used = stats.allocated + m_top.get_byte_size();
+        used += sizeof(SlabAlloc::Header);
+    }
+    if (ctrl & SizeAggregateControl::size_of_freelists) {
+        if (m_top.size() >= 6) {
+            auto ref = m_top.get_as_ref_or_tagged(3).get_as_ref();
+            used += size_of_tree_from_ref(ref, alloc);
+            ref = m_top.get_as_ref_or_tagged(4).get_as_ref();
+            used += size_of_tree_from_ref(ref, alloc);
+            ref = m_top.get_as_ref_or_tagged(5).get_as_ref();
+            used += size_of_tree_from_ref(ref, alloc);
+        }
+    }
+    if (ctrl & SizeAggregateControl::size_of_history) {
+        if (m_top.size() >= 9) {
+            auto ref = m_top.get_as_ref_or_tagged(8).get_as_ref();
+            used += size_of_tree_from_ref(ref, alloc);
+        }
+    }
+    return used;
+}
+
+size_t Group::get_used_space() const noexcept
+{
+    size_t logical_file_size = (size_t(m_top.get(2)) >> 1);
+
+    REALM_ASSERT(m_top.size() > 4);
+    Array free_lengths(const_cast<SlabAlloc&>(m_alloc));
+    free_lengths.init_from_ref(ref_type(m_top.get(4)));
+
+    return logical_file_size - size_t(free_lengths.sum());
 }
 
 
@@ -1179,32 +1190,6 @@ private:
     size_t m_col_ndx;
 };
 
-
-class MoveColumnUpdater : public _impl::TableFriend::AccessorUpdater {
-public:
-    MoveColumnUpdater(size_t col_ndx_1, size_t col_ndx_2)
-        : m_col_ndx_1(col_ndx_1)
-        , m_col_ndx_2(col_ndx_2)
-    {
-    }
-
-    void update(Table& table) override
-    {
-        using tf = _impl::TableFriend;
-        tf::adj_move_column(table, m_col_ndx_1, m_col_ndx_2);
-        size_t min_ndx = std::min(m_col_ndx_1, m_col_ndx_2);
-        tf::mark_link_target_tables(table, min_ndx);
-    }
-
-    void update_parent(Table&) override
-    {
-    }
-
-private:
-    size_t m_col_ndx_1;
-    size_t m_col_ndx_2;
-};
-
 } // anonymous namespace
 
 
@@ -1280,42 +1265,6 @@ public:
         // No-op since table names are properties of the group, and the group
         // accessor is always refreshed
         m_schema_changed = true;
-        return true;
-    }
-
-    bool move_group_level_table(size_t from_table_ndx, size_t to_table_ndx) noexcept
-    {
-        REALM_ASSERT(from_table_ndx != to_table_ndx);
-        if (!m_group.m_table_accessors.empty()) {
-            using iter = decltype(m_group.m_table_accessors)::iterator;
-            iter begin, end;
-            if (from_table_ndx < to_table_ndx) {
-                // Left rotation
-                begin = m_group.m_table_accessors.begin() + from_table_ndx;
-                end = m_group.m_table_accessors.begin() + to_table_ndx + 1;
-                Table* table = begin[0];
-                realm::safe_copy_n(begin + 1, to_table_ndx - from_table_ndx, begin);
-                end[-1] = table;
-            }
-            else { // from_table_ndx > to_table_ndx
-                // Right rotation
-                begin = m_group.m_table_accessors.begin() + to_table_ndx;
-                end = m_group.m_table_accessors.begin() + from_table_ndx + 1;
-                Table* table = end[-1];
-                std::copy_backward(begin, end - 1, end);
-                begin[0] = table;
-            }
-            for (iter i = begin; i != end; ++i) {
-                if (Table* table = *i) {
-                    typedef _impl::TableFriend tf;
-                    tf::mark(*table); // FIXME: Not sure this is needed
-                    tf::mark_opposite_link_tables(*table);
-                }
-            }
-        }
-
-        m_schema_changed = true;
-
         return true;
     }
 
@@ -1679,22 +1628,6 @@ public:
         return true; // No-op
     }
 
-    bool move_column(size_t col_ndx_1, size_t col_ndx_2) noexcept
-    {
-        if (m_table) {
-            typedef _impl::TableFriend tf;
-            MoveColumnUpdater updater(col_ndx_1, col_ndx_2);
-            tf::update_accessors(*m_table, m_desc_path_begin, m_desc_path_end, updater);
-        }
-        typedef _impl::DescriptorFriend df;
-        if (m_desc)
-            df::adj_move_column(*m_desc, col_ndx_1, col_ndx_2);
-
-        m_schema_changed = true;
-
-        return true;
-    }
-
     bool add_search_index(size_t) noexcept
     {
         return true; // No-op
@@ -1952,8 +1885,6 @@ void Group::prepare_history_parent(Array& history_root, int history_type,
 
 #ifdef REALM_DEBUG // LCOV_EXCL_START ignore debug functions
 
-namespace {
-
 class MemUsageVerifier : public Array::MemUsageHandler {
 public:
     MemUsageVerifier(ref_type ref_begin, ref_type immutable_ref_end, ref_type mutable_ref_end, ref_type baseline)
@@ -2019,7 +1950,7 @@ public:
             while (++i_2 != end) {
                 ref_type prev_ref_end = i_1->ref + i_1->size;
                 REALM_ASSERT_3(prev_ref_end, <=, i_2->ref);
-                if (i_2->ref == prev_ref_end) {
+                if (i_2->ref == prev_ref_end) { // in-file
                     i_1->size += i_2->size; // Merge
                 }
                 else {
@@ -2052,8 +1983,6 @@ private:
     std::vector<Chunk> m_chunks;
     ref_type m_ref_begin, m_immutable_ref_end, m_mutable_ref_end, m_baseline;
 };
-
-} // anonymous namespace
 
 #endif
 
@@ -2156,11 +2085,11 @@ void Group::verify() const
     mem_usage_1.canonicalize();
     mem_usage_2.clear();
 
-    // Check the concistency of the allocation of the mutable memory that has
+    // Check the consistency of the allocation of the mutable memory that has
     // been marked as free
-    for (const auto& free_block : m_alloc.m_free_space) {
-        mem_usage_2.add_mutable(free_block.ref, free_block.size);
-    }
+    m_alloc.for_all_free_entries(
+    		[&](ref_type ref, int sz) { mem_usage_2.add_mutable(ref, sz); }
+    		);
     mem_usage_2.canonicalize();
     mem_usage_1.add(mem_usage_2);
     mem_usage_1.canonicalize();
@@ -2186,7 +2115,7 @@ void Group::verify() const
 
 #ifdef REALM_DEBUG
 
-MemStats Group::stats()
+MemStats Group::get_stats()
 {
     MemStats mem_stats;
     m_top.stats(mem_stats);

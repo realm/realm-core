@@ -145,8 +145,14 @@ AESCryptor::AESCryptor(const uint8_t* key)
       m_dst_buffer(new char[block_size])
 {
 #if REALM_PLATFORM_APPLE
-    CCCryptorCreate(kCCEncrypt, kCCAlgorithmAES, 0 /* options */, key, kCCKeySizeAES256, 0 /* IV */, &m_encr);
-    CCCryptorCreate(kCCDecrypt, kCCAlgorithmAES, 0 /* options */, key, kCCKeySizeAES256, 0 /* IV */, &m_decr);
+    // A random iv is passed to CCCryptorReset. This iv is *not used* by Realm; we set it manually prior to
+    // each call to BCryptEncrypt() and BCryptDecrypt(). We pass this random iv as an attempt to 
+    // suppress a false encryption security warning from the IBM Bluemix Security Analyzer (PR[#2911])
+    unsigned char u_iv[kCCKeySizeAES256];
+    arc4random_buf(u_iv, kCCKeySizeAES256);
+    void *iv = u_iv;
+    CCCryptorCreate(kCCEncrypt, kCCAlgorithmAES, 0 /* options */, key, kCCKeySizeAES256, iv, &m_encr);
+    CCCryptorCreate(kCCDecrypt, kCCAlgorithmAES, 0 /* options */, key, kCCKeySizeAES256, iv, &m_decr);
 #elif defined(_WIN32)
     BCRYPT_ALG_HANDLE hAesAlg = NULL;
     int ret;
@@ -559,7 +565,7 @@ void EncryptedFileMapping::sync() noexcept
 #ifdef _WIN32
     if (FlushFileBuffers(m_file.fd))
         return;
-    throw std::runtime_error("FlushFileBuffers() failed");
+    throw std::system_error(GetLastError(), std::system_category(), "FlushFileBuffers() failed");
 #else
     fsync(m_file.fd);
     // FIXME: on iOS/OSX fsync may not be enough to ensure crash safety.

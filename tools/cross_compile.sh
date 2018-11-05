@@ -77,23 +77,39 @@ if [ "${OS}" == "android" ]; then
     make -j "${CORES}" -l "${CORES}" VERBOSE=1
     make package
 else
-    mkdir -p "build-${OS}-${BUILD_TYPE}"
-    cd "build-${OS}-${BUILD_TYPE}" || exit 1
     case "${OS}" in
         ios) SDK="iphone";;
         watchos) SDK="watch";;
         tvos) SDK="appletv";;
     esac
-
     [[ "${BUILD_TYPE}" = "Release" ]] && suffix="" || suffix="-dbg"
 
-    cmake -D CMAKE_TOOLCHAIN_FILE="../tools/cmake/${OS}.toolchain.cmake" \
-          -D CMAKE_INSTALL_PREFIX="$(pwd)/install" \
-          -D CMAKE_BUILD_TYPE="${BUILD_TYPE}" \
-          -D REALM_NO_TESTS=1 \
-          -D REALM_VERSION="${VERSION}" \
-          -G Xcode ..
+    function configure_xcode {
+        cmake -D CMAKE_TOOLCHAIN_FILE="../tools/cmake/${OS}.toolchain.cmake" \
+              -D CMAKE_INSTALL_PREFIX="$(pwd)/install" \
+              -D CMAKE_BUILD_TYPE="${BUILD_TYPE}" \
+              -D REALM_NO_TESTS=1 \
+              -D REALM_VERSION="${VERSION}" \
+              -D CPACK_SYSTEM_NAME="${SDK}os" \
+              -G Xcode ..
+    }
 
+    if [ "${OS}" == "watchos" ] && [ -n "${XCODE10_DEVELOPER_DIR}" ]; then
+        mkdir -p "build-${OS}-${BUILD_TYPE}-64"
+        pushd "build-${OS}-${BUILD_TYPE}-64" || exit 1
+        (
+            export DEVELOPER_DIR="$XCODE10_DEVELOPER_DIR"
+            configure_xcode
+            xcodebuild -sdk "${SDK}os" -configuration "${BUILD_TYPE}" ARCHS='arm64_32'
+        )
+        ARM64_32_LIB="$(pwd)/src/realm/${BUILD_TYPE}-${SDK}os/librealm${suffix}.a"
+        popd
+    fi
+
+    mkdir -p "build-${OS}-${BUILD_TYPE}"
+    cd "build-${OS}-${BUILD_TYPE}" || exit 1
+
+    configure_xcode
     xcodebuild -sdk "${SDK}os" \
                -configuration "${BUILD_TYPE}" \
                ONLY_ACTIVE_ARCH=NO
@@ -104,18 +120,11 @@ else
     lipo -create \
          -output "src/realm/${BUILD_TYPE}/librealm${suffix}.a" \
          "src/realm/${BUILD_TYPE}-${SDK}os/librealm${suffix}.a" \
-         "src/realm/${BUILD_TYPE}-${SDK}simulator/librealm${suffix}.a"
-    xcodebuild -sdk "${SDK}os" \
-               -configuration "${BUILD_TYPE}" \
-               -target install \
-               ONLY_ACTIVE_ARCH=NO
-    xcodebuild -sdk "${SDK}simulator" \
-               -configuration "${BUILD_TYPE}" \
-               -target install \
-               ONLY_ACTIVE_ARCH=NO
-    mkdir -p install/lib
-    cp "src/realm/${BUILD_TYPE}/librealm${suffix}.a" install/lib
-    cd install || exit 1
-    tar -cvzf "realm-core-${BUILD_TYPE}-${VERSION}-${SDK}os.tar.gz" lib include
-    mv ./*.tar.gz ..
+         "src/realm/${BUILD_TYPE}-${SDK}simulator/librealm${suffix}.a" \
+         $ARM64_32_LIB
+    lipo -create \
+         -output "src/realm/${BUILD_TYPE}/librealm-parser${suffix}.a" \
+         "src/realm/${BUILD_TYPE}-${SDK}os/librealm-parser${suffix}.a" \
+         "src/realm/${BUILD_TYPE}-${SDK}simulator/librealm-parser${suffix}.a"
+    cpack -C ${BUILD_TYPE} || exit 1
 fi

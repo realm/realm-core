@@ -51,15 +51,6 @@ using namespace realm::util;
 struct EndOfFile {
 };
 
-std::string create_string(size_t length)
-{
-    REALM_ASSERT_3(length, <, 256);
-    char buf[256] = {0};
-    for (size_t i = 0; i < length; i++)
-        buf[i] = 'a' + (rand() % 20);
-    return std::string{buf, length};
-}
-
 enum INS {
     ADD_TABLE,
     INSERT_TABLE,
@@ -77,7 +68,6 @@ enum INS {
     ADD_COLUMN_LINK,
     ADD_COLUMN_LINK_LIST,
     CLEAR_TABLE,
-    MOVE_TABLE,
     INSERT_COLUMN_LINK,
     ADD_SEARCH_INDEX,
     REMOVE_SEARCH_INDEX,
@@ -92,7 +82,6 @@ enum INS {
     COMPACT,
     SWAP_ROWS,
     MOVE_ROWS,
-    MOVE_COLUMN,
     SET_UNIQUE,
     IS_NULL,
     OPTIMIZE_TABLE,
@@ -152,6 +141,14 @@ int32_t get_int32(State& s)
         *(reinterpret_cast<signed char*>(&v) + t) = c;
     }
     return v;
+}
+
+std::string create_string(State& s, size_t length)
+{
+    std::string buf(length, '\0');
+    for (size_t i = 0; i < length; i++)
+        buf[i] = get_next(s);
+    return buf;
 }
 
 std::pair<int64_t, int32_t> get_timestamp_values(State& s) {
@@ -215,7 +212,7 @@ Mixed construct_mixed(State& s, util::Optional<std::ostream&> log, std::string& 
             return Mixed(value);
         }
         case 4: {
-            buffer = create_string(get_next(s));
+            buffer = create_string(s, get_next(s));
             if (log) {
                 *log << "Mixed mixed(StringData(\"" << buffer << "\"));\n";
             }
@@ -247,14 +244,14 @@ Mixed construct_mixed(State& s, util::Optional<std::ostream&> log, std::string& 
 
 std::string create_column_name(State& s)
 {
-    const size_t length = get_next(s) % (Descriptor::max_column_name_length + 1);
-    return create_string(length);
+    const unsigned char length = get_next(s) % (Descriptor::max_column_name_length + 1);
+    return create_string(s, length);
 }
 
 std::string create_table_name(State& s)
 {
-    const size_t length = get_next(s) % (Group::max_table_name_length + 1);
-    return create_string(length);
+    const unsigned char length = get_next(s) % (Group::max_table_name_length + 1);
+    return create_string(s, length);
 }
 
 std::string get_current_time_stamp()
@@ -400,16 +397,6 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 }
                 g.get_table(table_ndx)->clear();
             }
-            else if (instr == MOVE_TABLE && g.size() >= 2) {
-                size_t from_ndx = get_next(s) % g.size();
-                size_t to_ndx = get_next(s) % g.size();
-                if (from_ndx != to_ndx) {
-                    if (log) {
-                        *log << "g.move_table(" << from_ndx << ", " << to_ndx << ");\n";
-                    }
-                    g.move_table(from_ndx, to_ndx);
-                }
-            }
             else if (instr == INSERT_ROW && g.size() > 0) {
                 size_t table_ndx = get_next(s) % g.size();
                 if (g.get_table(table_ndx)->get_column_count() == 0) {
@@ -547,21 +534,6 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                     t->rename_column(col_ndx, name);
                 }
             }
-            else if (instr == MOVE_COLUMN && g.size() > 0) {
-                size_t table_ndx = get_next(s) % g.size();
-                TableRef t = g.get_table(table_ndx);
-                if (t->get_column_count() > 1) {
-                    // There's a chance that we randomly choose to move a column
-                    // index with itself, but that's ok lets test that case too
-                    size_t col_ndx1 = get_next(s) % t->get_column_count();
-                    size_t col_ndx2 = get_next(s) % t->get_column_count();
-                    if (log) {
-                        *log << "_impl::TableFriend::move_column(*(g.get_table(" << table_ndx
-                             << ")->get_descriptor()), " << col_ndx1 << ", " << col_ndx2 << ");\n";
-                    }
-                    _impl::TableFriend::move_column(*(t->get_descriptor()), col_ndx1, col_ndx2);
-                }
-            }
             else if (instr == ADD_SEARCH_INDEX && g.size() > 0) {
                 size_t table_ndx = get_next(s) % g.size();
                 TableRef t = g.get_table(table_ndx);
@@ -678,7 +650,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                     }
                     else {
                         if (type == type_String) {
-                            std::string str = create_string(get_next(s));
+                            std::string str = create_string(s, get_next(s));
                             if (log) {
                                 *log << "g.get_table(" << table_ndx << ")->set_string(" << col_ndx << ", " << row_ndx
                                      << ", \"" << str << "\");\n";
@@ -699,7 +671,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                                 t->set_binary_big(col_ndx, row_ndx, BinaryData(blob));
                             }
                             else {
-                                std::string str = create_string(get_next(s));
+                                std::string str = create_string(s, get_next(s));
                                 if (log) {
                                     *log << "g.get_table(" << table_ndx << ")->set_binary(" << col_ndx << ", " << row_ndx
                                     << ", BinaryData{\"" << str << "\", " << str.size() << "});\n";
@@ -1138,7 +1110,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                                 }
                             }
                             else {
-                                std::string str = create_string(get_next(s));
+                                std::string str = create_string(s, get_next(s));
                                 if (log) {
                                     *log << "try { g.get_table(" << table_ndx << ")->set_string_unique(" << col_ndx
                                          << ", " << row_ndx << ", \"" << str << "\"); } catch (const LogicError& le) "

@@ -23,7 +23,7 @@ using namespace realm;
 
 // LCOV_EXCL_START (LogicError is not a part of the public API, so code may never
 // rely on the contents of these strings, as they are deliberately unspecified.)
-const char* LogicError::what() const noexcept
+const char* LogicError::message() const noexcept
 {
     switch (m_kind) {
         case string_too_big:

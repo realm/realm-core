@@ -22,6 +22,7 @@
 #include <sstream>
 #include <realm/util/features.h>
 #include <realm/util/thread.hpp>
+#include <realm/util/backtrace.hpp>
 
 #if REALM_PLATFORM_APPLE
 
@@ -105,27 +106,18 @@ namespace util {
 // LCOV_EXCL_START
 REALM_NORETURN static void terminate_internal(std::stringstream& ss) noexcept
 {
+    util::Backtrace::capture().print(ss);
 
-#if REALM_PLATFORM_APPLE
-    void* callstack[128];
-    int frames = backtrace(callstack, 128);
-    char** strs = backtrace_symbols(callstack, frames);
-    for (int i = 0; i < frames; ++i) {
-        ss << strs[i] << '\n';
-    }
-    free(strs);
-#endif
-
-    ss << "IMPORTANT: if you see this error, please send this log to help@realm.io.";
-#ifdef REALM_DEBUG
-    std::cerr << ss.rdbuf() << '\n';
-    std::string thread_name;
-    if (Thread::get_name(thread_name))
-        std::cerr << "Thread name: " << thread_name << "\n";
-#endif
-
+    ss << "!!! IMPORTANT: Please send this log and info about Realm SDK version and other relevant reproduction info to help@realm.io.";
     if (termination_notification_callback) {
         termination_notification_callback(ss.str().c_str());
+    }
+    else {
+        std::cerr << ss.rdbuf() << '\n';
+        std::string thread_name;
+        if (Thread::get_name(thread_name))
+            std::cerr << "Thread name: " << thread_name << "\n";
+
     }
 
     please_report_this_error_to_help_at_realm_dot_io();

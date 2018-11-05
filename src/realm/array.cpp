@@ -600,6 +600,21 @@ void Array::add_positive_local(int64_t value)
 }
 */
 
+size_t Array::blob_size() const noexcept
+{
+    if (get_context_flag()) {
+        size_t total_size = 0;
+        for (size_t i = 0; i < size(); ++i) {
+            char* header = m_alloc.translate(Array::get_as_ref(i));
+            total_size += Array::get_size_from_header(header);
+        }
+        return total_size;
+    }
+    else {
+        return m_size;
+    }
+}
+
 void Array::insert(size_t ndx, int_fast64_t value)
 {
     REALM_ASSERT_DEBUG(ndx <= m_size);
@@ -1511,7 +1526,7 @@ size_t Array::calc_aligned_byte_size(size_t size, int width)
         byte_size = header_size + size * bytes_per_elem;
     }
     if (overflow)
-        throw std::runtime_error("Byte size overflow");
+        throw util::overflow_error("Byte size overflow");
     REALM_ASSERT_3(byte_size, >, 0);
     size_t aligned_byte_size = ((byte_size - 1) | 7) + 1; // 8-byte alignment
     return aligned_byte_size;
@@ -1615,8 +1630,7 @@ void Array::do_copy_on_write(size_t minimum_size)
     size_t new_size = std::max(array_size, minimum_size);
     new_size = (new_size + 0x7) & ~size_t(0x7); // 64bit blocks
     // Plus a bit of matchcount room for expansion
-    if (new_size < max_array_payload - 64)
-        new_size += 64;
+    new_size += 64;
 
     // Create new copy of array
     MemRef mref = m_alloc.alloc(new_size); // Throws
@@ -1702,7 +1716,7 @@ void Array::alloc(size_t init_size, size_t width)
     size_t needed_bytes = calc_byte_len(init_size, width);
     // this method is not public and callers must (and currently do) ensure that
     // needed_bytes are never larger than max_array_payload.
-    REALM_ASSERT_3(needed_bytes, <=, max_array_payload);
+    REALM_ASSERT_RELEASE(init_size <= max_array_size);
 
     if (is_read_only())
         do_copy_on_write(needed_bytes);

@@ -3610,7 +3610,75 @@ TEST(Replication_AddRowWithKey)
 }
 
 
-TEST(Replication_RenameGroupLevelTable_MoveGroupLevelTable_RenameColumn_MoveColumn)
+TEST(Replication_AddRowWithKeyNull)
+{
+    SHARED_GROUP_TEST_PATH(path_1);
+    SHARED_GROUP_TEST_PATH(path_2);
+
+    util::Logger& replay_logger = test_context.logger;
+
+    MyTrivialReplication repl(path_1);
+    SharedGroup sg_1(repl);
+    SharedGroup sg_2(path_2);
+
+    {
+        WriteTransaction wt(sg_1);
+        TableRef table1 = wt.add_table("table");
+        table1->add_column(type_Int, "c1", true);
+        table1->add_search_index(0);
+        table1->add_row_with_key(0, 123);
+        table1->add_row_with_key(0, util::none);
+        CHECK_EQUAL(table1->size(), 2);
+        wt.commit();
+    }
+    repl.replay_transacts(sg_2, replay_logger);
+    {
+        ReadTransaction rt(sg_2);
+        ConstTableRef table2 = rt.get_table("table");
+
+        CHECK_EQUAL(table2->find_first_int(0, 123), 0);
+        CHECK_EQUAL(table2->find_first_null(0), 1);
+    }
+}
+
+
+TEST(Replication_AddRowWithKeys)
+{
+    SHARED_GROUP_TEST_PATH(path_1);
+    SHARED_GROUP_TEST_PATH(path_2);
+
+    util::Logger& replay_logger = test_context.logger;
+
+    MyTrivialReplication repl(path_1);
+    SharedGroup sg_1(repl);
+    SharedGroup sg_2(path_2);
+
+    {
+        WriteTransaction wt(sg_1);
+        TableRef table1 = wt.add_table("table");
+        table1->add_column(type_Int, "c1");
+        table1->add_column(type_String, "c2");
+        table1->add_search_index(0);
+        table1->add_search_index(1);
+        table1->add_row_with_keys(0, 123, 1, "abc");
+        table1->add_row_with_keys(0, 456, 1, "def");
+        CHECK_EQUAL(table1->size(), 2);
+        wt.commit();
+    }
+    repl.replay_transacts(sg_2, replay_logger);
+    {
+        ReadTransaction rt(sg_2);
+        ConstTableRef table2 = rt.get_table("table");
+
+        CHECK_EQUAL(table2->find_first_int(0, 123), 0);
+        CHECK_EQUAL(table2->find_first_int(0, 456), 1);
+        CHECK_EQUAL(table2->find_first_string(1, "abc"), 0);
+        CHECK_EQUAL(table2->find_first_string(1, "def"), 1);
+    }
+}
+
+
+TEST(Replication_RenameGroupLevelTable_RenameColumn)
 {
     SHARED_GROUP_TEST_PATH(path_1);
     SHARED_GROUP_TEST_PATH(path_2);
@@ -3634,8 +3702,6 @@ TEST(Replication_RenameGroupLevelTable_MoveGroupLevelTable_RenameColumn_MoveColu
         wt.get_group().rename_table("foo", "bar");
         auto bar = wt.get_table("bar");
         bar->rename_column(0, "b");
-        _impl::TableFriend::move_column(*bar->get_descriptor(), 1, 0);
-        wt.get_group().move_table(1, 0);
         wt.commit();
     }
     repl.replay_transacts(sg_2, replay_logger);
@@ -3645,8 +3711,8 @@ TEST(Replication_RenameGroupLevelTable_MoveGroupLevelTable_RenameColumn_MoveColu
         CHECK(!foo);
         ConstTableRef bar = rt.get_table("bar");
         CHECK(bar);
-        CHECK_EQUAL(1, bar->get_index_in_group());
-        CHECK_EQUAL(1, bar->get_column_index("b"));
+        CHECK_EQUAL(0, bar->get_index_in_group());
+        CHECK_EQUAL(0, bar->get_column_index("b"));
     }
 }
 

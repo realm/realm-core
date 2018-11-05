@@ -506,12 +506,12 @@ uint64_t TableViewBase::outside_version() const
 
     if (m_linkview_source) {
         // m_linkview_source is set when this TableView was created by LinkView::get_as_sorted_view().
-        return m_linkview_source->is_attached() ? m_linkview_source->get_origin_table().m_version : max;
+        return m_linkview_source->is_attached() ? m_linkview_source->get_origin_table().observe_version() : max;
     }
 
     if (m_linked_column) {
         // m_linked_column is set when this TableView was created by Table::get_backlink_view().
-        return m_linked_row ? m_linked_row.get_table()->m_version : max;
+        return m_linked_row ? m_linked_row.get_table()->observe_version() : max;
     }
 
     if (m_query.m_table) {
@@ -519,7 +519,7 @@ uint64_t TableViewBase::outside_version() const
 
         if (auto* view = dynamic_cast<LinkView*>(m_query.m_view)) {
             // This TableView depends on Query that is restricted by a LinkView (with where(&link_view))
-            return view->is_attached() ? view->get_origin_table().m_version : max;
+            return view->is_attached() ? view->get_origin_table().observe_version() : max;
         }
 
         if (auto* view = dynamic_cast<TableView*>(m_query.m_view)) {
@@ -529,7 +529,7 @@ uint64_t TableViewBase::outside_version() const
     }
 
     // This TableView was either created by Table::get_distinct_view(), or a Query that is not restricted to a view.
-    return m_table->m_version;
+    return m_table->observe_version();
 }
 
 bool TableViewBase::is_in_sync() const
@@ -704,10 +704,21 @@ void TableViewBase::distinct(DistinctDescriptor columns)
     do_sync();
 }
 
+void TableViewBase::limit(LimitDescriptor limit)
+{
+    m_descriptor_ordering.append_limit(std::move(limit));
+    do_sync();
+}
+
 void TableViewBase::apply_descriptor_ordering(DescriptorOrdering new_ordering)
 {
     m_descriptor_ordering = new_ordering;
     do_sync();
+}
+
+std::string TableViewBase::get_descriptor_ordering_description() const
+{
+    return m_descriptor_ordering.get_description(m_table);
 }
 
 // Sort according to one column

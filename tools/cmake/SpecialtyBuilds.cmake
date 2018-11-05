@@ -1,3 +1,13 @@
+if (CMAKE_BUILD_TYPE MATCHES "RelAssert")
+    set(REALM_ENABLE_ASSERTIONS ON CACHE BOOL "Build with assertions")
+    set(CMAKE_CXX_FLAGS_RELASSERT ${CMAKE_CXX_FLAGS_RELWITHDEBINFO})
+endif()
+
+if (CMAKE_BUILD_TYPE MATCHES "RelASAN")
+    set(REALM_ASAN ON CACHE BOOL "Build with address sanitizer")
+    set(CMAKE_CXX_FLAGS_RELASAN "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} -O1")
+endif()
+
 # -------------
 # Coverage
 # -------------
@@ -32,6 +42,20 @@ if(REALM_AFL)
         message(FATAL_ERROR "AFL not found!")
     endif()
     set(CMAKE_CXX_COMPILER "${AFL}")
+endif()
+
+# -------------
+# libfuzzer
+# -------------
+option(REALM_LIBFUZZER "Compile with llvm libfuzzer" OFF)
+if(REALM_LIBFUZZER)
+    if(${CMAKE_CXX_COMPILER_ID} MATCHES "Clang")
+        # todo: add the undefined sanitizer here after blacklisting false positives
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=fuzzer,address -fsanitize-coverage=trace-pc-guard")
+    else()
+        message(FATAL_ERROR
+                "Compiling for libfuzzer is only supported with clang")
+    endif()
 endif()
 
 # -------------

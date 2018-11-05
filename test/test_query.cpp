@@ -4247,36 +4247,308 @@ TEST(Query_DescriptorsWillApply)
 
     CHECK(!ordering.will_apply_sort());
     CHECK(!ordering.will_apply_distinct());
+    CHECK(!ordering.will_apply_limit());
+    CHECK(!ordering.will_limit_to_zero());
+    CHECK_EQUAL(ordering.size(), 0);
 
     ordering.append_sort(SortDescriptor());
     CHECK(!ordering.will_apply_sort());
     CHECK(!ordering.will_apply_distinct());
+    CHECK(!ordering.will_apply_limit());
+    CHECK(!ordering.will_limit_to_zero());
+    CHECK_EQUAL(ordering.size(), 0);
 
     ordering.append_distinct(DistinctDescriptor());
     CHECK(!ordering.will_apply_sort());
     CHECK(!ordering.will_apply_distinct());
+    CHECK(!ordering.will_apply_limit());
+    CHECK(!ordering.will_limit_to_zero());
+    CHECK_EQUAL(ordering.size(), 0);
 
     ordering.append_sort(SortDescriptor(*t1, {{t1_int_col}}));
     CHECK(ordering.will_apply_sort());
     CHECK(!ordering.will_apply_distinct());
+    CHECK(!ordering.will_apply_limit());
+    CHECK(!ordering.will_limit_to_zero());
 
     ordering.append_distinct(DistinctDescriptor(*t1, {{t1_int_col}}));
     CHECK(ordering.will_apply_sort());
     CHECK(ordering.will_apply_distinct());
+    CHECK(!ordering.will_apply_limit());
+    CHECK(!ordering.will_limit_to_zero());
 
     ordering.append_distinct(DistinctDescriptor(*t1, {{t1_str_col}}));
     CHECK(ordering.will_apply_sort());
     CHECK(ordering.will_apply_distinct());
+    CHECK(!ordering.will_apply_limit());
+    CHECK(!ordering.will_limit_to_zero());
 
     ordering.append_sort(SortDescriptor(*t1, {{t1_str_col}}));
     CHECK(ordering.will_apply_sort());
     CHECK(ordering.will_apply_distinct());
+    CHECK(!ordering.will_apply_limit());
+    CHECK(!ordering.will_limit_to_zero());
+
+    ordering.append_limit(LimitDescriptor(1));
+    CHECK(ordering.will_apply_sort());
+    CHECK(ordering.will_apply_distinct());
+    CHECK(ordering.will_apply_limit());
+    CHECK(!ordering.will_limit_to_zero());
+
+    CHECK_EQUAL(ordering.size(), 5);
+    CHECK(ordering.descriptor_is_sort(0));
+    CHECK(!ordering.descriptor_is_distinct(0));
+    CHECK(!ordering.descriptor_is_limit(0));
+    CHECK(ordering.get_type(0) == DescriptorType::Sort);
+
+    CHECK(!ordering.descriptor_is_sort(1));
+    CHECK(ordering.descriptor_is_distinct(1));
+    CHECK(!ordering.descriptor_is_limit(1));
+    CHECK(ordering.get_type(1) == DescriptorType::Distinct);
+
+    CHECK(!ordering.descriptor_is_sort(2));
+    CHECK(ordering.descriptor_is_distinct(2));
+    CHECK(!ordering.descriptor_is_limit(2));
+    CHECK(ordering.get_type(2) == DescriptorType::Distinct);
+
+    CHECK(ordering.descriptor_is_sort(3));
+    CHECK(!ordering.descriptor_is_distinct(3));
+    CHECK(!ordering.descriptor_is_limit(3));
+    CHECK(ordering.get_type(3) == DescriptorType::Sort);
+
+    CHECK(!ordering.descriptor_is_sort(4));
+    CHECK(!ordering.descriptor_is_distinct(4));
+    CHECK(ordering.descriptor_is_limit(4));
+    CHECK(ordering.get_type(4) == DescriptorType::Limit);
 
     DescriptorOrdering ordering_copy = ordering;
     CHECK(ordering.will_apply_sort());
     CHECK(ordering.will_apply_distinct());
+    CHECK(ordering.will_apply_limit());
+    CHECK(!ordering.will_limit_to_zero());
     CHECK(ordering_copy.will_apply_sort());
     CHECK(ordering_copy.will_apply_distinct());
+    CHECK(ordering_copy.will_apply_limit());
+    CHECK(!ordering_copy.will_limit_to_zero());
+
+    ordering_copy.append_limit({10});
+    ordering_copy.append_limit({0});
+    CHECK(ordering_copy.will_limit_to_zero());
+}
+
+TEST(Query_FindWithDescriptorOrdering)
+{
+    Group g;
+    TableRef t1 = g.add_table("t1");
+    size_t t1_int_col = t1->add_column(type_Int, "t1_int");
+    size_t t1_str_col = t1->add_column(type_String, "t1_str");
+    t1->add_empty_row(6);
+
+    t1->set_int(0, 0, 1); t1->set_string(1, 0, "A");
+    t1->set_int(0, 1, 1); t1->set_string(1, 1, "A");
+    t1->set_int(0, 2, 1); t1->set_string(1, 2, "B");
+    t1->set_int(0, 3, 2); t1->set_string(1, 3, "B");
+    t1->set_int(0, 4, 2); t1->set_string(1, 4, "A");
+    t1->set_int(0, 5, 2); t1->set_string(1, 5, "A");
+
+    //     T1
+    //   | t1_int   t1_str  |
+    //   ====================
+    // 0 | 1        "A"     |
+    // 1 | 1        "A"     |
+    // 2 | 1        "B"     |
+    // 3 | 2        "B"     |
+    // 4 | 2        "A"     |
+    // 5 | 2        "A"     |
+
+    using ResultList = std::vector<std::pair<size_t, size_t>>; // value, index
+    {   // applying only limit
+        DescriptorOrdering ordering;
+        TableView tv = t1->where().find_all(ordering);
+        CHECK_EQUAL(tv.size(), 6);
+        CHECK_EQUAL(t1->where().count(ordering), 6);
+        ordering.append_limit({2});
+        ResultList expected = {{1, 0}, {1, 1}};
+        tv = t1->where().find_all(ordering);
+        CHECK_EQUAL(tv.size(), expected.size());
+        CHECK_EQUAL(t1->where().count(ordering), expected.size());
+        for (size_t i = 0; i < tv.size(); ++i) {
+            CHECK_EQUAL(tv.get_int(t1_int_col, i), expected[i].first);
+            CHECK_EQUAL(tv.get_source_ndx(i), expected[i].second);
+        }
+        ordering.append_limit({1}); // two limits should apply the minimum limit
+        expected = {{1, 0}};
+        tv = t1->where().find_all(ordering);
+        CHECK_EQUAL(tv.size(), expected.size());
+        CHECK_EQUAL(t1->where().count(ordering), expected.size());
+        for (size_t i = 0; i < tv.size(); ++i) {
+            CHECK_EQUAL(tv.get_int(t1_int_col, i), expected[i].first);
+            CHECK_EQUAL(tv.get_source_ndx(i), expected[i].second);
+        }
+    }
+    {   // applying sort and limit
+        DescriptorOrdering ordering;
+        ordering.append_sort(SortDescriptor(*t1, {{t1_str_col}}, {false}));
+        ordering.append_limit({2});
+        TableView tv = t1->where().find_all(ordering);
+        ResultList expected = {{1, 2}, {2, 3}};
+        CHECK_EQUAL(tv.size(), expected.size());
+        CHECK_EQUAL(t1->where().count(ordering), expected.size());
+        for (size_t i = 0; i < tv.size(); ++i) {
+            CHECK_EQUAL(tv.get_int(t1_int_col, i), expected[i].first);
+            CHECK_EQUAL(tv.get_source_ndx(i), expected[i].second);
+        }
+    }
+    {   // sort limit distinct
+        DescriptorOrdering ordering;
+        ordering.append_sort(SortDescriptor(*t1, {{t1_str_col}}, {false}));
+        ordering.append_limit({3});
+        ordering.append_distinct(DistinctDescriptor(*t1, {{t1_int_col}}));
+        TableView tv = t1->where().find_all(ordering);
+        ResultList expected = {{1, 2}, {2, 3}};
+        CHECK_EQUAL(tv.size(), expected.size());
+        CHECK_EQUAL(t1->where().count(ordering), expected.size());
+        for (size_t i = 0; i < tv.size(); ++i) {
+            CHECK_EQUAL(tv.get_int(t1_int_col, i), expected[i].first);
+            CHECK_EQUAL(tv.get_source_ndx(i), expected[i].second);
+        }
+    }
+    {   // sort distinct limit
+        DescriptorOrdering ordering;
+        ordering.append_sort(SortDescriptor(*t1, {{t1_str_col}}, {false}));
+        ordering.append_distinct(DistinctDescriptor(*t1, {{t1_int_col}}));
+        ordering.append_limit({1});
+        TableView tv = t1->where().find_all(ordering);
+        ResultList expected = {{1, 2}};
+        CHECK_EQUAL(tv.size(), expected.size());
+        CHECK_EQUAL(t1->where().count(ordering), expected.size());
+        for (size_t i = 0; i < tv.size(); ++i) {
+            CHECK_EQUAL(tv.get_int(t1_int_col, i), expected[i].first);
+            CHECK_EQUAL(tv.get_source_ndx(i), expected[i].second);
+        }
+    }
+    {   // limit sort distinct
+        DescriptorOrdering ordering;
+        ordering.append_limit({2});
+        ordering.append_sort(SortDescriptor(*t1, {{t1_str_col}}, {false}));
+        ordering.append_distinct(DistinctDescriptor(*t1, {{t1_int_col}}));
+        TableView tv = t1->where().find_all(ordering);
+        ResultList expected = {{1, 0}};
+        CHECK_EQUAL(tv.size(), expected.size());
+        CHECK_EQUAL(t1->where().count(ordering), expected.size());
+        for (size_t i = 0; i < tv.size(); ++i) {
+            CHECK_EQUAL(tv.get_int(t1_int_col, i), expected[i].first);
+            CHECK_EQUAL(tv.get_source_ndx(i), expected[i].second);
+        }
+    }
+    {   // sort limit sort limit
+        DescriptorOrdering ordering;
+        ordering.append_sort(SortDescriptor(*t1, {{t1_str_col}}, {true}));
+        ordering.append_limit({5});
+        ordering.append_sort(SortDescriptor(*t1, {{t1_int_col}}, {false}));
+        ordering.append_limit({3});
+        TableView tv = t1->where().find_all(ordering);
+        ResultList expected = {{2, 4}, {2, 5}, {1, 0}};
+        CHECK_EQUAL(tv.size(), expected.size());
+        CHECK_EQUAL(t1->where().count(ordering), expected.size());
+        for (size_t i = 0; i < tv.size(); ++i) {
+            CHECK_EQUAL(tv.get_int(t1_int_col, i), expected[i].first);
+            CHECK_EQUAL(tv.get_source_ndx(i), expected[i].second);
+        }
+    }
+}
+
+
+TEST(Query_FindWithDescriptorOrderingOverTableviewSync)
+{
+    Group g;
+    TableRef t1 = g.add_table("t1");
+    size_t t1_int_col = t1->add_column(type_Int, "t1_int");
+    size_t t1_str_col = t1->add_column(type_String, "t1_str");
+
+    auto init_table = [&]() {
+        t1->clear();
+        t1->add_empty_row(6);
+        t1->set_int(t1_int_col, 0, 0); t1->set_string(t1_str_col, 0, "A");
+        t1->set_int(t1_int_col, 1, 1); t1->set_string(t1_str_col, 1, "A");
+        t1->set_int(t1_int_col, 2, 2); t1->set_string(t1_str_col, 2, "B");
+        t1->set_int(t1_int_col, 3, 3); t1->set_string(t1_str_col, 3, "B");
+        t1->set_int(t1_int_col, 4, 4); t1->set_string(t1_str_col, 4, "A");
+        t1->set_int(t1_int_col, 5, 5); t1->set_string(t1_str_col, 5, "A");
+    };
+
+    //     T1
+    //   | t1_int   t1_str  |
+    //   ====================
+    // 0 | 0        "A"     |
+    // 1 | 1        "A"     |
+    // 2 | 2        "B"     |
+    // 3 | 3        "B"     |
+    // 4 | 4        "A"     |
+    // 5 | 5        "A"     |
+
+    using ResultList = std::vector<std::pair<size_t, std::string>>; // t1_int, t1_str
+    {   // applying only limit
+        init_table();
+        DescriptorOrdering ordering;
+        Query base = t1->where().greater(t1_int_col, 2);
+        TableView tv = base.find_all(ordering);
+        CHECK_EQUAL(tv.size(), 3);
+        CHECK_EQUAL(base.count(ordering), 3);
+        ordering.append_limit({2});
+        ResultList expected = {{3, "B"}, {4, "A"}};
+        tv = base.find_all(ordering);
+        CHECK_EQUAL(tv.size(), expected.size());
+        CHECK_EQUAL(base.count(ordering), expected.size());
+        for (size_t i = 0; i < tv.size(); ++i) {
+            CHECK_EQUAL(tv.get_int(t1_int_col, i), expected[i].first);
+            CHECK_EQUAL(tv.get_string(t1_str_col, i), expected[i].second);
+        }
+        size_t new_ndx = t1->add_empty_row();
+        t1->set_int(t1_int_col, new_ndx, 6);
+        t1->set_string(t1_str_col, new_ndx, "C");
+        t1->remove(4);
+        expected = {{3, "B"}, {5, "A"}};
+        CHECK(!tv.is_in_sync());
+        tv.sync_if_needed();
+        CHECK_EQUAL(tv.size(), expected.size());
+        CHECK_EQUAL(base.count(ordering), expected.size());
+        for (size_t i = 0; i < tv.size(); ++i) {
+            CHECK_EQUAL(tv.get_int(t1_int_col, i), expected[i].first);
+            CHECK_EQUAL(tv.get_string(t1_str_col, i), expected[i].second);
+        }
+    }
+    {   // applying sort and limit
+        init_table();
+        DescriptorOrdering ordering;
+        Query base = t1->where().greater(t1_int_col, 2);
+        TableView tv = base.find_all(ordering);
+        CHECK_EQUAL(tv.size(), 3);
+        CHECK_EQUAL(base.count(ordering), 3);
+        ordering.append_sort(SortDescriptor(*t1, {{t1_str_col}}, {true}));
+        ordering.append_limit({2});
+        ResultList expected = {{4, "A"}, {5, "A"}};
+        tv = base.find_all(ordering);
+        CHECK_EQUAL(tv.size(), expected.size());
+        CHECK_EQUAL(base.count(ordering), expected.size());
+        for (size_t i = 0; i < tv.size(); ++i) {
+            CHECK_EQUAL(tv.get_int(t1_int_col, i), expected[i].first);
+            CHECK_EQUAL(tv.get_string(t1_str_col, i), expected[i].second);
+        }
+        size_t new_ndx = t1->add_empty_row();
+        t1->set_int(t1_int_col, new_ndx, 6);
+        t1->set_string(t1_str_col, new_ndx, "C");
+        t1->remove(4);
+        expected = {{5, "A"}, {3, "B"}};
+        CHECK(!tv.is_in_sync());
+        tv.sync_if_needed();
+        CHECK_EQUAL(tv.size(), expected.size());
+        CHECK_EQUAL(base.count(ordering), expected.size());
+        for (size_t i = 0; i < tv.size(); ++i) {
+            CHECK_EQUAL(tv.get_int(t1_int_col, i), expected[i].first);
+            CHECK_EQUAL(tv.get_string(t1_str_col, i), expected[i].second);
+        }
+    }
 }
 
 
@@ -4453,6 +4725,16 @@ TEST(Query_SortDistinctOrderThroughHandover) {
             CHECK_EQUAL(tv.get_string(1, i), results[i].first);
             CHECK_EQUAL(tv.get_source_ndx(i), results[i].second);
         }
+        HandoverPtr hp = sg_w.export_for_handover(tv, ConstSourcePayload::Stay);
+        check_across_handover(results, std::move(hp));
+    }
+    {   // sort descending then distinct then limit
+        TableView tv = t1->where().find_all();
+        ResultList results = {};
+        tv.sort(SortDescriptor(*t1, {{t1_int_col}}, {false}));
+        tv.distinct(DistinctDescriptor(*t1, {{t1_str_col}}));
+        tv.limit(LimitDescriptor(0));
+        CHECK_EQUAL(tv.size(), results.size());
         HandoverPtr hp = sg_w.export_for_handover(tv, ConstSourcePayload::Stay);
         check_across_handover(results, std::move(hp));
     }
@@ -4768,6 +5050,35 @@ TEST(Query_DistinctThroughLinks)
         CHECK_EQUAL(tv.size(), results3.size());
         for (size_t i = 0; i < results3.size(); ++i) {
             CHECK_EQUAL(tv.get_int(t1_int_col, i), results3[results3.size() - 1 - i]);
+        }
+    }
+
+    {
+        TableView tv = t1->where().less(t1_int_col, 6).find_all();
+
+        // Test distinct after sort
+        tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_int_col}}, {true}));
+        //  t1_int   link.t2_int
+        //  ====================
+        //  0        0
+        //  3        0
+        //  5        0
+        //  4        1
+        //  2        2
+        //  1        3
+
+        tv.distinct(DistinctDescriptor(*t1, {{t1_link_col, t2_int_col}}));
+        //  t1_int   link.t2_int
+        //  ====================
+        //  0        0
+        //  4        1
+        //  2        2
+        //  1        3
+
+        std::vector<size_t> results = {0, 4, 2, 1};
+        CHECK_EQUAL(tv.size(), results.size());
+        for (size_t i = 0; i < tv.size(); ++i) {
+            CHECK_EQUAL(tv.get_int(t1_int_col, i), results[i]);
         }
     }
 }
@@ -10965,5 +11276,84 @@ TEST_TYPES(Query_Rover, std::true_type, std::false_type)
     CHECK_EQUAL(tv.size(), 2);
 }
 
+
+TEST(Query_Group_bug)
+{
+    // Tests for a bug in queries with OR nodes at different nesting levels
+
+    Group g;
+    TableRef service_table = g.add_table("service");
+    TableRef profile_table = g.add_table("profile");
+    TableRef person_table = g.add_table("person");
+
+    service_table->add_column(type_String, "id");
+    service_table->add_column_link(type_LinkList, "profiles", *profile_table);
+
+    profile_table->add_column(type_String, "role");
+    profile_table->add_column_link(type_Link, "services", *service_table);
+
+    person_table->add_column(type_String, "id");
+    person_table->add_column_link(type_LinkList, "services", *service_table);
+
+    service_table->add_empty_row(2);
+    service_table->set_string(0, 0, "service_1");
+    service_table->set_string(0, 1, "service_2");
+
+    profile_table->add_empty_row(5);
+    profile_table->set_string(0, 0, "profile_1");
+    profile_table->set_string(0, 1, "profile_2");
+    profile_table->set_string(0, 2, "profile_3");
+    profile_table->set_string(0, 3, "profile_4");
+    profile_table->set_string(0, 4, "profile_5");
+
+    service_table->get_linklist(1, 0)->add(0);
+    service_table->get_linklist(1, 0)->add(1);
+    service_table->get_linklist(1, 1)->add(2);
+    service_table->get_linklist(1, 0)->add(3);
+    service_table->get_linklist(1, 0)->add(4);
+
+    profile_table->set_link(1, 0, 0);
+    profile_table->set_link(1, 1, 0);
+    profile_table->set_link(1, 2, 1);
+    profile_table->set_link(1, 3, 0);
+    profile_table->set_link(1, 4, 0);
+
+    person_table->add_empty_row(5);
+    person_table->set_string(0, 0, "person_1");
+    person_table->set_string(0, 1, "person_2");
+    person_table->set_string(0, 2, "person_3");
+    person_table->set_string(0, 3, "person_4");
+    person_table->set_string(0, 4, "person_5");
+
+    person_table->get_linklist(1, 0)->add(0);
+    person_table->get_linklist(1, 1)->add(0);
+    person_table->get_linklist(1, 2)->add(1);
+    person_table->get_linklist(1, 3)->add(0);
+    person_table->get_linklist(1, 4)->add(0);
+
+    realm::Query q0 = person_table->where()
+        .group()
+
+        .group()
+        .and_query(person_table->link(1).link(1).column<String>(0).equal("profile_1"))
+        .Or()
+        .and_query(person_table->link(1).link(1).column<String>(0).equal("profile_2"))
+        .end_group()
+
+        .group()
+        .and_query(person_table->link(1).column<String>(0).equal("service_1"))
+        .end_group()
+
+        .end_group()
+
+        .Or()
+
+        .group()
+        .equal(0, "person_3")
+        .end_group()
+        ;
+
+    CHECK_EQUAL(5, q0.count());
+}
 
 #endif // TEST_QUERY

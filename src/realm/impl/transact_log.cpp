@@ -54,7 +54,7 @@ void TransactLogConvenientEncoder::record_subtable_path(const Table& table, size
             break;
         size_t new_size = m_subtab_path_buf.size();
         if (util::int_multiply_with_overflow_detect(new_size, 2))
-            throw std::runtime_error("Too many subtable nesting levels");
+            throw util::overflow_error("Too many subtable nesting levels");
         m_subtab_path_buf.set_size(new_size); // Throws
     }
     std::reverse(begin, end);
@@ -108,7 +108,7 @@ void TransactLogConvenientEncoder::do_select_desc(const Descriptor& desc)
             break;
         size_t new_size = m_subtab_path_buf.size();
         if (util::int_multiply_with_overflow_detect(new_size, 2))
-            throw std::runtime_error("Too many table type descriptor nesting levels");
+            throw util::overflow_error("Too many table type descriptor nesting levels");
         m_subtab_path_buf.set_size(new_size); // Throws
     }
 

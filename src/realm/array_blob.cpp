@@ -62,6 +62,58 @@ BinaryData ArrayBlob::get_at(size_t& pos) const noexcept
     }
 }
 
+ref_type Array::blob_replace(size_t begin, size_t end, const char* data, size_t data_size, bool add_zero_term)
+{
+    // The context flag indicates if the array contains references to blobs
+    // holding the actual data.
+    REALM_ASSERT(get_context_flag());
+    size_t sz = blob_size();
+    REALM_ASSERT_3(begin, <=, end);
+    REALM_ASSERT_3(end, <=, sz);
+    REALM_ASSERT(data_size == 0 || data);
+
+    REALM_ASSERT((begin == 0 || begin == sz) && end == sz); // Only append or total replace supported
+    if (begin == sz && end == sz) {
+        // Append
+        // We might have room for more data in the last node
+        ArrayBlob lastNode(m_alloc);
+        lastNode.init_from_ref(get_as_ref(size() - 1));
+        lastNode.set_parent(this, size() - 1);
+
+        size_t space_left = ArrayBlob::max_binary_size - lastNode.size();
+        size_t size_to_copy = std::min(space_left, data_size);
+        lastNode.add(data, size_to_copy);
+        data_size -= space_left;
+        data += space_left;
+
+        while (data_size) {
+            // Create new nodes as required
+            size_to_copy = std::min(size_t(ArrayBlob::max_binary_size), data_size);
+            ArrayBlob new_blob(m_alloc);
+            new_blob.create(); // Throws
+
+            // Copy data
+            ref_type ref = new_blob.add(data, size_to_copy);
+            // Add new node in hosting node
+            add(ref);
+
+            data_size -= size_to_copy;
+            data += size_to_copy;
+        }
+        return get_ref();
+    }
+    else if (begin == 0 && end == sz) {
+        // Replace all. Start from scratch
+        destroy_deep();
+        ArrayBlob new_blob(m_alloc);
+        new_blob.create();                                   // Throws
+        return new_blob.add(data, data_size, add_zero_term); // Throws
+    }
+
+    REALM_UNREACHABLE();
+    return 0;
+}
+
 ref_type ArrayBlob::replace(size_t begin, size_t end, const char* data, size_t data_size, bool add_zero_term)
 {
     size_t sz = blob_size();
@@ -69,111 +121,56 @@ ref_type ArrayBlob::replace(size_t begin, size_t end, const char* data, size_t d
     REALM_ASSERT_3(end, <=, sz);
     REALM_ASSERT(data_size == 0 || data);
 
-    // The context flag indicates if the array contains references to blobs
-    // holding the actual data.
-    if (get_context_flag()) {
-        REALM_ASSERT((begin == 0 || begin == sz) && end == sz); // Only append or total replace supported
-        if (begin == sz && end == sz) {
-            // Append
-            // We might have room for more data in the last node
-            ArrayBlob lastNode(m_alloc);
-            lastNode.init_from_ref(get_as_ref(size() - 1));
-            lastNode.set_parent(this, size() - 1);
+    REALM_ASSERT(!get_context_flag());
+    size_t remove_size = end - begin;
+    size_t add_size = add_zero_term ? data_size + 1 : data_size;
+    size_t new_size = m_size - remove_size + add_size;
 
-            size_t space_left = max_binary_size - lastNode.size();
-            size_t size_to_copy = std::min(space_left, data_size);
-            lastNode.add(data, size_to_copy);
-            data_size -= space_left;
-            data += space_left;
+    // If size of BinaryData is below 'max_binary_size', the data is stored directly
+    // in a single ArrayBlob. If more space is needed, the root blob will just contain
+    // references to child blobs holding the actual data. Context flag will indicate
+    // if blob is split.
+    if (new_size > max_binary_size) {
+        Array new_root(m_alloc);
+        // Create new array with context flag set
+        new_root.create(type_HasRefs, true); // Throws
 
-            while (data_size) {
-                // Create new nodes as required
-                size_to_copy = std::min(size_t(max_binary_size), data_size);
-                ArrayBlob new_blob(m_alloc);
-                new_blob.create(); // Throws
+        // Add current node to the new root
+        new_root.add(get_ref());
+        return new_root.blob_replace(begin, end, data, data_size, add_zero_term);
+    }
 
-                // Copy data
-                ref_type ref = new_blob.add(data, size_to_copy);
-                // Add new node in hosting node
-                Array::add(ref);
+    if (remove_size == add_size && is_read_only() && memcmp(m_data + begin, data, data_size) == 0)
+        return get_ref();
 
-                data_size -= size_to_copy;
-                data += size_to_copy;
-            }
+    // Reallocate if needed - also updates header
+    alloc(new_size, 1); // Throws
+
+    char* modify_begin = m_data + begin;
+
+    // Resize previous space to fit new data
+    // (not needed if we append to end)
+    if (begin != m_size) {
+        const char* old_begin = m_data + end;
+        const char* old_end = m_data + m_size;
+        if (remove_size < add_size) { // expand gap
+            char* new_end = m_data + new_size;
+            std::copy_backward(old_begin, old_end, new_end);
         }
-        else if (begin == 0 && end == sz) {
-            // Replace all. Start from scratch
-            destroy_deep();
-            ArrayBlob new_blob(m_alloc);
-            new_blob.create();                                   // Throws
-            return new_blob.add(data, data_size, add_zero_term); // Throws
+        else if (add_size < remove_size) { // shrink gap
+            char* new_begin = modify_begin + add_size;
+            realm::safe_copy_n(old_begin, old_end - old_begin, new_begin);
         }
     }
-    else {
-        size_t remove_size = end - begin;
-        size_t add_size = add_zero_term ? data_size + 1 : data_size;
-        size_t new_size = m_size - remove_size + add_size;
 
-        // If size of BinaryData is below 'max_binary_size', the data is stored directly
-        // in a single ArrayBlob. If more space is needed, the root blob will just contain
-        // references to child blobs holding the actual data. Context flag will indicate
-        // if blob is split.
-        if (new_size > max_binary_size) {
-            Array new_root(m_alloc);
-            // Create new array with context flag set
-            new_root.create(type_HasRefs, true); // Throws
+    // Insert the data
+    modify_begin = realm::safe_copy_n(data, data_size, modify_begin);
+    if (add_zero_term)
+        *modify_begin = 0;
 
-            // Add current node to the new root
-            new_root.add(get_ref());
-            return reinterpret_cast<ArrayBlob*>(&new_root)->replace(begin, end, data, data_size, add_zero_term);
-        }
+    m_size = new_size;
 
-        if (remove_size == add_size && is_read_only() && memcmp(m_data + begin, data, data_size) == 0)
-            return get_ref();
-
-        // Reallocate if needed - also updates header
-        alloc(new_size, 1); // Throws
-
-        char* modify_begin = m_data + begin;
-
-        // Resize previous space to fit new data
-        // (not needed if we append to end)
-        if (begin != m_size) {
-            const char* old_begin = m_data + end;
-            const char* old_end = m_data + m_size;
-            if (remove_size < add_size) { // expand gap
-                char* new_end = m_data + new_size;
-                std::copy_backward(old_begin, old_end, new_end);
-            }
-            else if (add_size < remove_size) { // shrink gap
-                char* new_begin = modify_begin + add_size;
-                realm::safe_copy_n(old_begin, old_end - old_begin, new_begin);
-            }
-        }
-
-        // Insert the data
-        modify_begin = realm::safe_copy_n(data, data_size, modify_begin);
-        if (add_zero_term)
-            *modify_begin = 0;
-
-        m_size = new_size;
-    }
     return get_ref();
-}
-
-size_t ArrayBlob::blob_size() const noexcept
-{
-    if (get_context_flag()) {
-        size_t total_size = 0;
-        for (size_t i = 0; i < size(); ++i) {
-            char* header = m_alloc.translate(Array::get_as_ref(i));
-            total_size += Array::get_size_from_header(header);
-        }
-        return total_size;
-    }
-    else {
-        return size();
-    }
 }
 
 #ifdef REALM_DEBUG // LCOV_EXCL_START ignore debug functions

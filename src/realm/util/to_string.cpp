@@ -17,7 +17,9 @@
  **************************************************************************/
 
 #include <realm/util/to_string.hpp>
+#include <realm/util/assert.hpp>
 
+#include <cstring>
 #include <iomanip>
 #include <locale>
 #include <sstream>
@@ -79,6 +81,41 @@ std::string Printable::str() const
     print(ss, true);
     return ss.str();
 }
+
+std::string format(const char* fmt, std::initializer_list<Printable> values)
+{
+    std::stringstream ss;
+    while (*fmt) {
+        auto next = strchr(fmt, '%');
+
+        // emit the rest of the format string if there are no more percents
+        if (!next) {
+            ss << fmt;
+            break;
+        }
+
+        // emit everything up to the next percent
+        ss.write(fmt, next - fmt);
+        ++next;
+        REALM_ASSERT(*next);
+
+        // %% produces a single escaped %
+        if (*next == '%') {
+            ss << '%';
+            fmt = next + 1;
+            continue;
+        }
+        REALM_ASSERT(isdigit(*next));
+
+        // The const_cast is safe because stroul does not actually modify
+        // the pointed-to string, but it lacks a const overload
+        auto index = strtoul(next, const_cast<char**>(&fmt), 10) - 1;
+        REALM_ASSERT(index < values.size());
+        (values.begin() + index)->print(ss, false);
+    }
+    return ss.str();
+}
+
 
 } // namespace util
 } // namespace realm
