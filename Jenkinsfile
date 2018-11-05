@@ -68,7 +68,7 @@ jobWrapper {
                     androidArm64Debug       : doAndroidBuildInDocker('arm64-v8a', 'Debug', false),
                     threadSanitizer         : doCheckSanity('Debug', '1000', 'thread'),
                     addressSanitizer        : doCheckSanity('Debug', '1000', 'address'),
-                    memorySanitizer        : doCheckSanity('Debug', '1000', 'memory'),
+                    memorySanitizer         : doCheckSanity('Debug', '1000', 'memory'),
                 ]
                 if (releaseTesting) {
                     extendedChecks = [
@@ -173,8 +173,7 @@ def doCheckInDocker(String buildType, String maxBpNodeSize = '1000') {
         node('docker') {
             getArchive()
 
-            def dockerBuildArgs = sanitizeMode == '' ? '.' : '-f clang.Dockerfile .'
-            def buildEnv = docker.build('realm-core:snapshot', dockerBuildArgs)
+            def buildEnv = docker.build('realm-core:snapshot')
             def environment = environment()
             environment << 'UNITTEST_PROGRESS=1'
             withEnv(environment) {
