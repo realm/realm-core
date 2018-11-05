@@ -227,7 +227,7 @@ def doCheckSanity(String buildType, String maxBpNodeSize = '1000', String saniti
                         runAndCollectWarnings(script: "cd build-dir && ninja -v")
                         sh """
                            cd build-dir/test
-                           ./realm-tests
+                           ./realm-tests | /usr/bin/asan_symbolize-6.0
                         """
                     } finally {
                         recordTests("Linux-${buildType}")
