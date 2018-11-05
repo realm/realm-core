@@ -558,7 +558,7 @@ void EncryptedFileMapping::reclaim_page(size_t page_ndx)
     // On windows we don't know how to replace a page within a page range with a fresh one.
     // instead we clear it. If the system runs with same-page-merging, this will reduce
     // the number of used pages.
-    memset(page_addr(page_ndx), 0, 1 << m_page_shift);
+    memset(page_addr(page_ndx), 0, static_cast<size_t>(1) << m_page_shift);
 #else
     // On Posix compatible, we can request a new page in the middle of an already
     // requested range, so we request a new one. This releases the backing store for the

@@ -544,7 +544,7 @@ public:
 #else
         // NDK r10e has a bug in sys/stat.h dev_t ino_t are 4 bytes,
         // but stat.st_dev and st_ino are 8 bytes. So we just use uint64 instead.
-        uint_fast64_t device;
+        dev_t device;
         uint_fast64_t inode;
 #endif
     };

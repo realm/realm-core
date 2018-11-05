@@ -1227,7 +1227,7 @@ File::UniqueID File::get_unique_id() const
 #else // POSIX version
     struct stat statbuf;
     if (::fstat(m_fd, &statbuf) == 0) {
-        return {static_cast<uint_fast64_t>(statbuf.st_dev), static_cast<uint_fast64_t>(statbuf.st_ino)};
+        return {statbuf.st_dev, statbuf.st_ino};
     }
     throw std::system_error(errno, std::system_category(), "fstat() failed");
 #endif
