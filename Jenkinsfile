@@ -214,6 +214,7 @@ def doCheckSanity(String buildType, String maxBpNodeSize = '1000', String saniti
                 sanitizeFlags = '-D REALM_ASAN=ON'
             } else if (sanitizeMode.contains('memory')) {
                 environment << 'UNITTEST_THREADS=1'
+                environment << 'MSAN_SYMBOLIZER_PATH=/usr/bin/llvm-symbolizer-6.0'
                 sanitizeFlags = '-D REALM_MSAN=ON'
             }
             withEnv(environment) {
@@ -227,7 +228,7 @@ def doCheckSanity(String buildType, String maxBpNodeSize = '1000', String saniti
                         runAndCollectWarnings(script: "cd build-dir && ninja -v")
                         sh """
                            cd build-dir/test
-                           ./realm-tests | /usr/bin/asan_symbolize-6.0
+                           ./realm-tests
                         """
                     } finally {
                         recordTests("Linux-${buildType}")
