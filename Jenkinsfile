@@ -214,7 +214,7 @@ def doCheckSanity(String buildType, String maxBpNodeSize = '1000', String saniti
                 sanitizeFlags = '-D REALM_ASAN=ON'
             } else if (sanitizeMode.contains('memory')) {
                 environment << 'UNITTEST_THREADS=1'
-                environment << 'MSAN_SYMBOLIZER_PATH=/usr/bin/llvm-symbolizer-6.0'
+                environment << 'MSAN_SYMBOLIZER_PATH=/usr/lib/llvm-6.0/bin/llvm-symbolizer'
                 sanitizeFlags = '-D REALM_MSAN=ON'
             }
             withEnv(environment) {
