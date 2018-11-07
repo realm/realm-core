@@ -445,7 +445,7 @@ void EncryptedFileMapping::mark_outdated(size_t local_page_ndx) noexcept
         clear(m_page_state[local_page_ndx], UpToDate);
         set(m_page_state[local_page_ndx], PartiallyUpToDate);
     }
-    size_t chunk_ndx = local_page_ndx >> 10;
+    size_t chunk_ndx = local_page_ndx >> page_to_chunk_shift;
     if (m_chunk_dont_scan[chunk_ndx])
         m_chunk_dont_scan[chunk_ndx] = 0;
 }
@@ -503,7 +503,7 @@ void EncryptedFileMapping::write_page(size_t local_page_ndx) noexcept
         }
     }
     set(m_page_state[local_page_ndx], Dirty);
-    size_t chunk_ndx = local_page_ndx >> 10;
+    size_t chunk_ndx = local_page_ndx >> page_to_chunk_shift;
     if (m_chunk_dont_scan[chunk_ndx])
         m_chunk_dont_scan[chunk_ndx] = 0;
 }
@@ -585,59 +585,62 @@ void EncryptedFileMapping::reclaim_page(size_t page_ndx)
  * 3) A scanning of 1K entries in the "don't scan" array (corresponding to 4M pages)
  * Approximately
  */
-size_t EncryptedFileMapping::reclaim_untouched(size_t& progress_ptr, size_t& accumulated_savings) noexcept
+size_t EncryptedFileMapping::reclaim_untouched(size_t& progress_index, size_t& work_limit) noexcept
 {
+	const auto scan_amount_per_workunit = 4096;
+	auto done_some_work = [&]() { if (work_limit > 0) work_limit--; };
+
     const size_t num_pages = m_page_state.size();
-    if (progress_ptr < m_first_page)
+    if (progress_index < m_first_page)
         return 0;
-    if (progress_ptr >= get_end())
+    if (progress_index >= get_end())
         return 0;
 
     size_t num_reclaimed = 0;
-    size_t next_scan_payment = 4096;
+    size_t next_scan_payment = scan_amount_per_workunit;
     size_t contiguous_scan_count = 0;
-    for (size_t page_ndx = progress_ptr - m_first_page; page_ndx < num_pages; ++page_ndx) {
-        size_t chunk_ndx = page_ndx >> 10; // 1K per chunk
+    for (size_t page_ndx = progress_index - m_first_page; page_ndx < num_pages; ++page_ndx) {
+        size_t chunk_ndx = page_ndx >> page_to_chunk_shift;
         if (m_chunk_dont_scan[chunk_ndx]) {
             contiguous_scan_count = 0;
             // skip to end of chunk
-            page_ndx = ((chunk_ndx + 1) << 10) - 1;
+            page_ndx = ((chunk_ndx + 1) << page_to_chunk_shift) - 1;
             // postpone next scan payment
-            next_scan_payment += 1024;
+            next_scan_payment += page_to_chunk_factor;
             // go to next chunk, but fall through to accounting code after 'else' on the way
         }
         else {
             ++contiguous_scan_count;
             PageState ps = m_page_state[page_ndx];
-            if (is_not(ps, Touched) && is(ps, UpToDate | PartiallyUpToDate) && is_not(ps, Dirty)) {
-                clear(m_page_state[page_ndx], UpToDate | PartiallyUpToDate);
-                reclaim_page(page_ndx);
-                num_reclaimed++;
-                m_num_decrypted--;
-                if (accumulated_savings > 0)
-                    accumulated_savings--;
+            if (is(m_page_state[page_ndx], UpToDate | PartiallyUpToDate)) {
+                if (is_not(ps, Touched) && is_not(ps, Dirty)) {
+                    clear(m_page_state[page_ndx], UpToDate | PartiallyUpToDate);
+                    reclaim_page(page_ndx);
+                    num_reclaimed++;
+                    m_num_decrypted--;
+                    done_some_work();
+                }
+                contiguous_scan_count = 0;
             }
             clear(m_page_state[page_ndx], Touched);
-            if (is(m_page_state[page_ndx], UpToDate | PartiallyUpToDate))
-                contiguous_scan_count = 0;
             // if we've scanned a full chunk, mark it as not needing scans
-            if (contiguous_scan_count >= 1024 && (page_ndx & 1023) == 1023) {
+            auto page_to_chunk_mask = page_to_chunk_factor - 1;
+            if (contiguous_scan_count >= page_to_chunk_factor && (page_ndx & page_to_chunk_mask) == page_to_chunk_mask) {
                 contiguous_scan_count = 0;
-                m_chunk_dont_scan[page_ndx >> 10] = 1;
+                m_chunk_dont_scan[page_ndx >> page_to_chunk_shift] = 1;
             }
         }
         // account for work performed:
         if (page_ndx >= next_scan_payment) {
-            next_scan_payment = page_ndx + 4096;
-            if (accumulated_savings > 0)
-                accumulated_savings--;
+            next_scan_payment = page_ndx + scan_amount_per_workunit;
+            done_some_work();
         }
-        if (accumulated_savings == 0) {
-            progress_ptr = page_ndx + m_first_page;
+        if (work_limit == 0) {
+            progress_index = page_ndx + m_first_page;
             return num_reclaimed;
         }
     }
-    progress_ptr = get_end();
+    progress_index = get_end();
     return num_reclaimed;
 }
 
@@ -715,7 +718,7 @@ void EncryptedFileMapping::read_barrier(const void* addr, size_t size, Header_to
     }
 
     // force the page reclaimer to look into pages in this chunk:
-    size_t chunk_ndx = first_accessed_local_page >> 10;
+    size_t chunk_ndx = first_accessed_local_page >> page_to_chunk_shift;
     if (m_chunk_dont_scan[chunk_ndx])
         m_chunk_dont_scan[chunk_ndx] = 0;
 
@@ -733,8 +736,8 @@ void EncryptedFileMapping::read_barrier(const void* addr, size_t size, Header_to
     // at first_accessed_local_page + 1 to check the following page.
     for (size_t idx = first_accessed_local_page + 1; idx <= last_idx && idx < pages_size; ++idx) {
 
-        // force the page reclaimer to....
-        chunk_ndx = idx >> 10;
+        // force the page reclaimer to look into pages in this chunk
+        chunk_ndx = idx >> page_to_chunk_shift;
         if (m_chunk_dont_scan[chunk_ndx])
             m_chunk_dont_scan[chunk_ndx] = 0;
 
@@ -766,7 +769,7 @@ void EncryptedFileMapping::set(void* new_addr, size_t new_size, size_t new_file_
     m_chunk_dont_scan.clear();
 
     m_page_state.resize(num_pages, PageState(0));
-    m_chunk_dont_scan.resize((num_pages + 1023) >> 10, false);
+    m_chunk_dont_scan.resize((num_pages + page_to_chunk_factor - 1) >> page_to_chunk_shift, false);
 }
 
 File::SizeType encrypted_size_to_data_size(File::SizeType size) noexcept

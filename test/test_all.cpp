@@ -221,10 +221,15 @@ void set_random_seed()
     }
 }
 
-size_t aggressive_governor(size_t)
-{
-    return 4096;
-}
+class AggressiveGovernor : public PageReclaimGovernor {
+public:
+	virtual size_t get_current_target(size_t) override
+	{
+		return 4096;
+	}
+};
+
+AggressiveGovernor aggressive_governor;
 
 void set_always_encrypt()
 {
@@ -232,7 +237,7 @@ void set_always_encrypt()
     if (str && strlen(str) != 0) {
         enable_always_encrypt();
         // ask for a very aggressive page reclaimer to maxmimize chance of triggering a bug.
-        realm::util::set_page_reclaim_governor(aggressive_governor);
+        realm::util::set_page_reclaim_governor(&aggressive_governor);
     }
 }
 

@@ -117,6 +117,8 @@ private:
     }
     // 1K pages form a chunk - this array allows us to skip entire chunks during scanning
     std::vector<bool> m_chunk_dont_scan;
+    const int page_to_chunk_shift = 10;
+    const size_t page_to_chunk_factor = size_t(1) << page_to_chunk_shift;
 
     File::AccessMode m_access;
 

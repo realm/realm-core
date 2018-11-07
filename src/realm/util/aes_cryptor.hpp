@@ -101,7 +101,7 @@ struct SharedFileInfo {
     uint64_t current_version = 0;
     size_t num_decrypted_pages = 0;
     size_t num_reclaimed_pages = 0;
-    size_t progress_ptr = 0;
+    size_t progress_index = 0;
     std::vector<ReaderInfo> readers;
 
     SharedFileInfo(const uint8_t* key, FileDesc file_descriptor);
