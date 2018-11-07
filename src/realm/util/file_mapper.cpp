@@ -126,7 +126,7 @@ void set_page_reclaim_governor(PageReclaimGovernor* new_governor)
 void encryption_note_reader_start(SharedFileInfo& info, void* reader_id)
 {
     UniqueLock lock(mapping_mutex);
-    auto j = std::find_if(info.readers.begin(), info.readers.end(), [=](auto reader) { return reader.reader_ID == reader_id; } );
+    auto j = std::find_if(info.readers.begin(), info.readers.end(), [=](auto& reader) { return reader.reader_ID == reader_id; } );
     if (j == info.readers.end()) {
         ReaderInfo i = {reader_id, info.current_version};
         info.readers.push_back(i);
@@ -196,18 +196,13 @@ size_t get_work_limit(size_t decrypted_pages, size_t target)
 /* Find the oldest version that is still of interest to somebody */
 uint64_t get_oldest_version(SharedFileInfo& info) // must be called under lock
 {
-    if (info.readers.size() == 0) {
-        return info.current_version;
+    auto oldest_version = info.current_version;
+    for (const auto& e : info.readers) {
+    	if (e.version < oldest_version) {
+    		oldest_version = e.version;
+    	}
     }
-    else {
-        auto oldest_version = info.current_version;
-        for (const auto& e : info.readers) {
-        	if (e.version < oldest_version) {
-        		oldest_version = e.version;
-        	}
-        }
-        return oldest_version;
-    }
+    return oldest_version;
 }
 
 // Reclaim pages for ONE file, limited by a given work limit.
@@ -215,7 +210,7 @@ uint64_t get_oldest_version(SharedFileInfo& info) // must be called under lock
 bool reclaim_pages_for_file(SharedFileInfo& info, size_t& work_limit)
 {
     uint64_t oldest_version = get_oldest_version(info);
-    if (info.readers.size() == 0 || info.last_scanned_version < oldest_version) {
+    if (/* info.readers.size() == 0 || */ info.last_scanned_version < oldest_version) {
         size_t sum = 0;
         for (const auto& e : info.mappings) {
         	sum += e->reclaim_untouched(info.progress_index, work_limit);

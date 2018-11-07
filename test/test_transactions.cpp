@@ -732,7 +732,7 @@ void growth_phase(SharedGroup& sg_w)
 		TableRef t = g.get_table("spoink");
 		for (int k = 0; k < 50000; ++k) {
 			auto row = t->add_empty_row();
-			t->set_string(0, row, "yooodle-de-do");
+			t->set_string(0, row, "yooodle-de-do-glabtyligok-pluut");
 		}
 		//std::cout << "     - commit" << std::endl;
 		wt.commit();
@@ -760,7 +760,7 @@ void partial_read_phase(SharedGroup& sg_w)
 		const Group& g = wt.get_group();
 		ConstTableRef t = g.get_table("spoink");
 		int max = t->size();
-		for (int z = 0; z < max/10; ++z) {
+		for (int z = 0; z < max/100; ++z) {
 			t->get_string(0,z);
 		}
 	}
@@ -778,7 +778,7 @@ void modification_phase(SharedGroup& sg_w)
 		int max = t->size();
 		for (int k = 0; k < 100000; ++k) {
 			if (row == max) row = 0;
-			std::string s("yooodle-");
+			std::string s("yooodle-glabtyligok-plut-fnytliandomcrackplaf!");
 			s = s + to_string(j);
 			t->set_string(0, row, s);
 			++row;
@@ -823,6 +823,8 @@ class ExampleGovernor : public util::PageReclaimGovernor {
 				target =  load;
 			else
 				target = size_t(load * 2.1);
+			if (target > total * 768)
+				target = total * 768;
 			std::cout << "total: " << total << "   free: " << free
 						<< "   load: " << load << "   target: " << target << "    \r";
 			return target;
