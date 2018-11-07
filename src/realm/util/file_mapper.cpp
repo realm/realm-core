@@ -186,7 +186,8 @@ size_t get_work_limit(size_t decrypted_pages, size_t target)
     float load = 1.0f * decrypted_pages / target;
     float akku = 0.0f;
     for (const auto& e : control_table) {
-    	akku += (load - e.base) * e.effort;
+    	if (load > e.base)
+    		akku += (load - e.base) * e.effort;
     }
     size_t work_limit = size_t(target * akku);
     return work_limit;
