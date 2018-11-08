@@ -206,22 +206,32 @@ uint64_t get_oldest_version(SharedFileInfo& info) // must be called under lock
 }
 
 // Reclaim pages for ONE file, limited by a given work limit.
-// return true if "done for now"
+// return true if "done for now" with this file, indicating that
+// the caller should move on to the next file.
 bool reclaim_pages_for_file(SharedFileInfo& info, size_t& work_limit)
 {
     uint64_t oldest_version = get_oldest_version(info);
-    if (/* info.readers.size() == 0 || */ info.last_scanned_version < oldest_version) {
-        size_t sum = 0;
-        for (const auto& e : info.mappings) {
-        	sum += e->reclaim_untouched(info.progress_index, work_limit);
-        }
-        if (info.progress_index >= info.mappings.back()->get_end()) { // done
-            info.progress_index = 0;
-            info.last_scanned_version = info.current_version;
-            ++info.current_version;
-            return true;
-        }
-        return false;
+    if (info.last_scanned_version < oldest_version || info.mappings.empty()) {
+		// locate the mapping matching the progress index. No such mapping may
+		// exist, and if so, we'll update the index to the next mapping
+		for (auto it = info.mappings.begin(); it != info.mappings.end(); ++it) {
+			auto start_index = (*it)->get_start_index();
+			if (info.progress_index < start_index) {
+				info.progress_index = start_index;
+			}
+			if (info.progress_index <= (*it)->get_end_index()) {
+				(*it)->reclaim_untouched(info.progress_index, work_limit);
+				if (work_limit == 0)
+					return false;
+			}
+		}
+		if (info.progress_index >= info.mappings.back()->get_end_index()) { // done
+			info.progress_index = 0;
+			info.last_scanned_version = info.current_version;
+			++info.current_version;
+			return true;
+    	} else
+    		return false;
     }
     return true;
 }
@@ -253,8 +263,8 @@ void reclaim_pages()
             file_reclaim_index = 0;
         while (work_limit > 0) {
             SharedFileInfo& info = *mappings_by_file[file_reclaim_index].info;
-            auto done_for_now = reclaim_pages_for_file(info, work_limit);
-            if (done_for_now) {
+            auto should_move_to_next_file = reclaim_pages_for_file(info, work_limit);
+            if (should_move_to_next_file) {
                 ++file_reclaim_index;
                 if (file_reclaim_index >= mappings_by_file.size())
                     return;

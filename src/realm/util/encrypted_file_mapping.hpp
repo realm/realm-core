@@ -70,16 +70,19 @@ public:
     }
     // reclaim any untouched pages - this is thread safe with respect to
     // concurrent access/touching of pages - but must be called with the mutex locked.
-    size_t reclaim_untouched(size_t& progress_ptr, size_t& accumulated_savings) noexcept;
+    void reclaim_untouched(size_t& progress_ptr, size_t& accumulated_savings) noexcept;
 
     bool contains_page(size_t page_in_file) const;
     size_t get_local_index_of_address(const void* addr, size_t offset = 0) const;
 
-    size_t get_end()
+    size_t get_end_index()
     {
         return m_first_page + m_page_state.size();
     }
-
+    size_t get_start_index()
+    {
+    	return m_first_page;
+    }
 private:
     SharedFileInfo& m_file;
 

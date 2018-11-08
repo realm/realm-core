@@ -585,47 +585,62 @@ void EncryptedFileMapping::reclaim_page(size_t page_ndx)
  * 3) A scanning of 1K entries in the "don't scan" array (corresponding to 4M pages)
  * Approximately
  */
-size_t EncryptedFileMapping::reclaim_untouched(size_t& progress_index, size_t& work_limit) noexcept
+void EncryptedFileMapping::reclaim_untouched(size_t& progress_index, size_t& work_limit) noexcept
 {
 	const auto scan_amount_per_workunit = 4096;
-	auto done_some_work = [&]() { if (work_limit > 0) work_limit--; };
-
-    const size_t num_pages = m_page_state.size();
-    if (progress_index < m_first_page)
-        return 0;
-    if (progress_index >= get_end())
-        return 0;
-
-    size_t num_reclaimed = 0;
-    size_t next_scan_payment = scan_amount_per_workunit;
     size_t contiguous_scan_count = 0;
-    for (size_t page_ndx = progress_index - m_first_page; page_ndx < num_pages; ++page_ndx) {
+    size_t next_scan_payment = scan_amount_per_workunit;
+    const size_t last_index = get_end_index();
+
+    auto done_some_work = [&]()
+	{
+		if (work_limit > 0) work_limit--;
+	};
+
+	auto visit_and_potentially_reclaim = [&](size_t page_ndx)
+	{
+        PageState ps = m_page_state[page_ndx];
+        if (is(m_page_state[page_ndx], UpToDate | PartiallyUpToDate)) {
+            if (is_not(ps, Touched) && is_not(ps, Dirty)) {
+                clear(m_page_state[page_ndx], UpToDate | PartiallyUpToDate);
+                reclaim_page(page_ndx);
+                m_num_decrypted--;
+                done_some_work();
+            }
+            contiguous_scan_count = 0;
+        }
+        clear(m_page_state[page_ndx], Touched);
+	};
+
+	auto skip_chunk_if_possible = [&](size_t page_ndx) // update vars corresponding to skipping a chunk if possible
+	{
         size_t chunk_ndx = page_ndx >> page_to_chunk_shift;
         if (m_chunk_dont_scan[chunk_ndx]) {
             contiguous_scan_count = 0;
             // skip to end of chunk
             page_ndx = ((chunk_ndx + 1) << page_to_chunk_shift) - 1;
+            progress_index = m_first_page + page_ndx;
             // postpone next scan payment
             next_scan_payment += page_to_chunk_factor;
-            // go to next chunk, but fall through to accounting code after 'else' on the way
+            return true;
         }
-        else {
+        else
+            return false;
+	};
+
+	auto has_scanned_full_chunk = [&](size_t page_ndx)
+	{
+        auto page_to_chunk_mask = page_to_chunk_factor - 1;
+        return (contiguous_scan_count >= page_to_chunk_factor && (page_ndx & page_to_chunk_mask) == page_to_chunk_mask);
+	};
+
+    while (work_limit > 0 && progress_index < last_index) {
+    	size_t page_ndx = progress_index - m_first_page;
+    	if (!skip_chunk_if_possible(page_ndx)) {
             ++contiguous_scan_count;
-            PageState ps = m_page_state[page_ndx];
-            if (is(m_page_state[page_ndx], UpToDate | PartiallyUpToDate)) {
-                if (is_not(ps, Touched) && is_not(ps, Dirty)) {
-                    clear(m_page_state[page_ndx], UpToDate | PartiallyUpToDate);
-                    reclaim_page(page_ndx);
-                    num_reclaimed++;
-                    m_num_decrypted--;
-                    done_some_work();
-                }
-                contiguous_scan_count = 0;
-            }
-            clear(m_page_state[page_ndx], Touched);
+            visit_and_potentially_reclaim(page_ndx);
             // if we've scanned a full chunk, mark it as not needing scans
-            auto page_to_chunk_mask = page_to_chunk_factor - 1;
-            if (contiguous_scan_count >= page_to_chunk_factor && (page_ndx & page_to_chunk_mask) == page_to_chunk_mask) {
+            if (has_scanned_full_chunk(page_ndx)) {
                 contiguous_scan_count = 0;
                 m_chunk_dont_scan[page_ndx >> page_to_chunk_shift] = 1;
             }
@@ -635,13 +650,9 @@ size_t EncryptedFileMapping::reclaim_untouched(size_t& progress_index, size_t& w
             next_scan_payment = page_ndx + scan_amount_per_workunit;
             done_some_work();
         }
-        if (work_limit == 0) {
-            progress_index = page_ndx + m_first_page;
-            return num_reclaimed;
-        }
+        ++progress_index;
     }
-    progress_index = get_end();
-    return num_reclaimed;
+    return;
 }
 
 void EncryptedFileMapping::flush() noexcept
