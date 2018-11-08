@@ -206,7 +206,7 @@ void Realm::open_with_config(const Config& config,
             translate_file_exception(config.path, config.immutable()); // Throws
 
         // Move the Realm file into the recovery directory.
-        std::string recovery_directory = SyncManager::shared().recovery_directory_path();
+        std::string recovery_directory = SyncManager::shared().recovery_directory_path(config.sync_config ? config.sync_config->recovery_directory : none);
         std::string new_realm_path = util::reserve_unique_file_name(recovery_directory, "synced-realm-XXXXXXX");
         util::File::move(config.path, new_realm_path);
 
