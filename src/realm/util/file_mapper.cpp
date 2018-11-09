@@ -129,8 +129,8 @@ public:
 
 	size_t get_current_target(size_t load) override
 	{
+		static_cast<void>(load);
 		if (m_refresh_count > 0) {
-			std::cout << "\rLoad: " << load << "    target: " << m_target << "          ";
 			--m_refresh_count;
 			return m_target;
 		}
@@ -144,7 +144,6 @@ public:
 			// one of them is zero, just pick the other one
 			target = std::max(from_proc, from_cgroup) * 256;
 		}
-		std::cout << "\rLoad: " << load << "    target: " << target << "          ";
 		m_target = target;
 		m_refresh_count = 60;
 		return target;

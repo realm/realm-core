@@ -236,8 +236,8 @@ void set_always_encrypt()
     const char* str = getenv("UNITTEST_ENCRYPT_ALL");
     if (str && strlen(str) != 0) {
         enable_always_encrypt();
-        // ask for a very aggressive page reclaimer to maxmimize chance of triggering a bug.
-        //realm::util::set_page_reclaim_governor(&aggressive_governor);
+        // ask for a very aggressive page reclaimer to maximize chance of triggering a bug.
+        realm::util::set_page_reclaim_governor(&aggressive_governor);
     }
 }
 
