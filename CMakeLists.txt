@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.4)
+cmake_minimum_required(VERSION 3.11)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/tools/cmake")
 
@@ -44,6 +44,7 @@ include(CheckIncludeFiles)
 include(GetGitRevisionDescription)
 include(Utilities)
 include(SpecialtyBuilds)
+include(FetchContent)
 
 # Get accurate git-describe version
 git_describe(REALM_VERSION)
@@ -139,6 +140,8 @@ option(REALM_ENABLE_ENCRYPTION "Enable encryption." ON)
 option(REALM_ENABLE_MEMDEBUG "Add additional memory checks" OFF)
 option(REALM_VALGRIND "Tell the test suite we are running with valgrind" OFF)
 option(REALM_METRICS "Enable various metric tracking" ON)
+set(REALM_SSL_LIB "default" CACHE STRING "SSL library to use")
+set_property(CACHE REALM_SSL_LIB PROPERTY STRINGS default openssl libressl)
 set(REALM_MAX_BPNODE_SIZE "1000" CACHE STRING "Max B+ tree node size.")
 
 check_include_files(malloc.h HAVE_MALLOC_H)
@@ -163,6 +166,19 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR}/src) # For generated files (like
 # Include additional CMakeLists
 add_subdirectory(src)
 
+if(REALM_SSL_LIB STREQUAL libressl)
+    FetchContent_Declare(
+        libressl
+        URL https://ftp.openbsd.org/pub/OpenBSD/LibreSSL/libressl-2.8.2.tar.gz
+        URL_HASH MD5=be697a71aa17312a1019af9e91147b03
+    )
+    FetchContent_GetProperties(libressl)
+    if(NOT libressl_POPULATED)
+        FetchContent_Populate(libressl)
+        add_subdirectory(${libressl_SOURCE_DIR} ${libressl_BINARY_DIR})
+    endif()
+endif()
+
 # Enable CTest and include unit tests
 if(NOT REALM_BUILD_LIB_ONLY AND NOT REALM_NO_TESTS)
     enable_testing()
@@ -173,14 +189,15 @@ endif()
 install(FILES LICENSE CHANGELOG.md DESTINATION "doc/realm" COMPONENT devel)
 
 # Make the project importable from the build directory
-export(TARGETS Core QueryParser NAMESPACE Realm:: FILE realm-config.cmake)
+#export(TARGETS Core QueryParser NAMESPACE Realm:: FILE realm-config.cmake)
+
 
 # Make the project importable from the install directory
-install(EXPORT realm
-        NAMESPACE Realm::
-        FILE realm-config.cmake
-        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/realm
-        COMPONENT devel)
+#install(EXPORT realm
+#        NAMESPACE Realm::
+#        FILE realm-config.cmake
+#        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/realm
+#        COMPONENT devel)
 
 # CPack
 set(CPACK_GENERATOR "TGZ")
