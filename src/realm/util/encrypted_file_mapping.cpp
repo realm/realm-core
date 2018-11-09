@@ -612,7 +612,7 @@ void EncryptedFileMapping::reclaim_untouched(size_t& progress_index, size_t& wor
         clear(m_page_state[page_ndx], Touched);
 	};
 
-	auto skip_chunk_if_possible = [&](size_t page_ndx) // update vars corresponding to skipping a chunk if possible
+	auto skip_chunk_if_possible = [&](size_t& page_ndx) // update vars corresponding to skipping a chunk if possible
 	{
         size_t chunk_ndx = page_ndx >> page_to_chunk_shift;
         if (m_chunk_dont_scan[chunk_ndx]) {

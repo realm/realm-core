@@ -719,7 +719,7 @@ TEST(LangBindHelper_RollbackLinkInsert)
     CHECK_EQUAL(g.get_table(1)->get_link_target(0), g.get_table(0));
 }
 
-#if 0
+#if 1
 // The following code is a longer running test, so disabled when for ordinary testing
 
 void growth_phase(SharedGroup& sg_w)
@@ -817,6 +817,7 @@ class ExampleGovernor : public util::PageReclaimGovernor {
 				return 0;
 			fclose(file);
 			size_t target;
+			/*
 			if (free < total * 0.25)
 				target = size_t(load * 0.9);
 			else if (free < total * 0.3)
@@ -825,6 +826,8 @@ class ExampleGovernor : public util::PageReclaimGovernor {
 				target = size_t(load * 2.1);
 			if (target > total * 768)
 				target = total * 768;
+				*/
+			target = total * 256;
 			std::cout << "total: " << total << "   free: " << free
 						<< "   load: " << load << "   target: " << target << "    \r";
 			return target;
@@ -875,7 +878,7 @@ ONLY(LangBindHelper_EncryptionGiga)
     std::cout << "Opening..." << path2 << std::endl;
     SharedGroup sg_w2(*hist_w2, SharedGroupOptions(crypt_key()));
     preparations(sg_w2);
-    for (int r = 0; r < 2; ++r) {
+    for (int r = 0; r < 4; ++r) {
     	growth_phase(sg_w1);
     	growth_phase(sg_w2);
     	modification_phase(sg_w1);
@@ -885,8 +888,9 @@ ONLY(LangBindHelper_EncryptionGiga)
     	query_phase(sg_w1);
     	query_phase(sg_w2);
     	std::cout << "Sleeping.." << std::endl;
-    	millisleep(20000);
+    	millisleep(10000);
     }
+    millisleep(100000);
 }
 #endif
 
