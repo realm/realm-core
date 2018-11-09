@@ -108,8 +108,57 @@ std::vector<mapping_and_addr>& mappings_by_addr = *new std::vector<mapping_and_a
 std::vector<mappings_for_file>& mappings_by_file = *new std::vector<mappings_for_file>;
 unsigned int file_reclaim_index = 0;
 
+/* Default reclaim governor
+ *
+ */
+
+class DefaultGovernor : public PageReclaimGovernor {
+public:
+	size_t fetch_value_in_file(const char* fname, const char* scan_pattern)
+	{
+		auto file = fopen(fname,"r");
+		if (file == nullptr)
+			return 0;
+		size_t total;
+		int r = fscanf(file,scan_pattern, &total);
+		if (r != 1)
+			return 0;
+		fclose(file);
+		return total;
+	}
+
+	size_t get_current_target(size_t load) override
+	{
+		if (m_refresh_count > 0) {
+			std::cout << "\rLoad: " << load << "    target: " << m_target << "          ";
+			--m_refresh_count;
+			return m_target;
+		}
+		size_t target;
+		auto from_proc = fetch_value_in_file("/proc/meminfo", "MemTotal: %zu kB");
+		auto from_cgroup = fetch_value_in_file("/sys/fs/cgroup/memory/memory.limit_in_bytes", "%zu");
+		if (from_proc != 0 && from_cgroup != 0) {
+			target = std::min(from_proc, from_cgroup) * 256;
+		}
+		else {
+			// one of them is zero, just pick the other one
+			target = std::max(from_proc, from_cgroup) * 256;
+		}
+		std::cout << "\rLoad: " << load << "    target: " << target << "          ";
+		m_target = target;
+		m_refresh_count = 60;
+		return target;
+	}
+private:
+	size_t m_target;
+	int m_refresh_count = 0;
+};
+
+
 void reclaimer_loop();
+
 std::unique_ptr<std::thread> reclaimer_thread;
+DefaultGovernor default_governor;
 PageReclaimGovernor* governor = nullptr;
 
 void set_page_reclaim_governor(PageReclaimGovernor* new_governor)
@@ -122,6 +171,14 @@ void set_page_reclaim_governor(PageReclaimGovernor* new_governor)
     }
     governor = new_governor;
 }
+
+struct DefaultGovernorInstaller {
+	DefaultGovernorInstaller() {
+		set_page_reclaim_governor(&default_governor);
+	}
+};
+
+DefaultGovernorInstaller default_governor_installer;
 
 void encryption_note_reader_start(SharedFileInfo& info, void* reader_id)
 {
@@ -276,6 +333,7 @@ void reclaimer_loop()
         millisleep(1000);
     }
 }
+
 
 mapping_and_addr* find_mapping_for_addr(void* addr, size_t size)
 {

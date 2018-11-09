@@ -719,7 +719,7 @@ TEST(LangBindHelper_RollbackLinkInsert)
     CHECK_EQUAL(g.get_table(1)->get_link_target(0), g.get_table(0));
 }
 
-#if 1
+#if 0
 // The following code is a longer running test, so disabled when for ordinary testing
 
 void growth_phase(SharedGroup& sg_w)
@@ -864,7 +864,7 @@ ExampleGovernor example_governor;
 
 ONLY(LangBindHelper_EncryptionGiga)
 {
-	realm::util::set_page_reclaim_governor(&example_governor);
+	//realm::util::set_page_reclaim_governor(&example_governor);
     std::string path1 = "dont_try_this_at_home1.realm";
     std::unique_ptr<Replication> hist_w1(make_in_realm_history(path1));
 
