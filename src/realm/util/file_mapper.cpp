@@ -135,14 +135,14 @@ public:
 			return m_target;
 		}
 		size_t target;
-		auto from_proc = fetch_value_in_file("/proc/meminfo", "MemTotal: %zu kB");
+		auto from_proc = fetch_value_in_file("/proc/meminfo", "MemTotal: %zu kB") * 1024;
 		auto from_cgroup = fetch_value_in_file("/sys/fs/cgroup/memory/memory.limit_in_bytes", "%zu");
 		if (from_proc != 0 && from_cgroup != 0) {
-			target = std::min(from_proc, from_cgroup) * 256;
+			target = std::min(from_proc, from_cgroup) / 4;
 		}
 		else {
 			// one of them is zero, just pick the other one
-			target = std::max(from_proc, from_cgroup) * 256;
+			target = std::max(from_proc, from_cgroup) / 4;
 		}
 		m_target = target;
 		m_refresh_count = 60;
