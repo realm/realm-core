@@ -108,25 +108,44 @@ std::vector<mapping_and_addr>& mappings_by_addr = *new std::vector<mapping_and_a
 std::vector<mappings_for_file>& mappings_by_file = *new std::vector<mappings_for_file>;
 unsigned int file_reclaim_index = 0;
 
+// helpers
+bool read_line(FILE* file, char* line)
+{
+	int c;
+	while(1) {
+		c = fgetc(file);
+		if (c==EOF || c=='\n')
+			break;
+		*line++ = c;
+	}
+	*line = 0;
+	return c!=EOF;
+}
+size_t fetch_value_in_file(const char* fname, const char* scan_pattern)
+{
+	char line[100];
+	auto file = fopen(fname,"r");
+	if (file == nullptr)
+		return 0;
+	size_t total;
+	while (read_line(file, line)) {
+		int r = sscanf(line,scan_pattern, &total);
+		if (r == 1) {
+			fclose(file);
+			return total;
+		}
+	}
+	fclose(file);
+	return 0;
+}
+
+
 /* Default reclaim governor
  *
  */
 
 class DefaultGovernor : public PageReclaimGovernor {
 public:
-	size_t fetch_value_in_file(const char* fname, const char* scan_pattern)
-	{
-		auto file = fopen(fname,"r");
-		if (file == nullptr)
-			return 0;
-		size_t total;
-		int r = fscanf(file,scan_pattern, &total);
-		if (r != 1)
-			return 0;
-		fclose(file);
-		return total;
-	}
-
 	size_t get_current_target(size_t load) override
 	{
 		static_cast<void>(load);
@@ -137,6 +156,7 @@ public:
 		size_t target;
 		auto from_proc = fetch_value_in_file("/proc/meminfo", "MemTotal: %zu kB") * 1024;
 		auto from_cgroup = fetch_value_in_file("/sys/fs/cgroup/memory/memory.limit_in_bytes", "%zu");
+		auto cache_use = fetch_value_in_file("/sys/fs/cgroup/memory/memory.stat","cache %zu");
 		if (from_proc != 0 && from_cgroup != 0) {
 			target = std::min(from_proc, from_cgroup) / 4;
 		}
@@ -144,8 +164,10 @@ public:
 			// one of them is zero, just pick the other one
 			target = std::max(from_proc, from_cgroup) / 4;
 		}
+		if (cache_use != 0 && target > cache_use / 2)
+			target = cache_use / 2;
 		m_target = target;
-		m_refresh_count = 60;
+		m_refresh_count = 10; // refresh every 10 seconds
 		return target;
 	}
 private:
