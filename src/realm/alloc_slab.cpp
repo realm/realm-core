@@ -271,10 +271,10 @@ MemRef SlabAlloc::do_alloc(size_t size)
 
     // minimal allocation is sizeof(FreeListEntry)
     if (size < sizeof(FreeBlock))
-    	size = sizeof(FreeBlock);
+        size = sizeof(FreeBlock);
     // align to multipla of 8
     if (size & 0x7)
-    	size = (size + 7) & ~0x7;
+        size = (size + 7) & ~0x7;
 
     FreeBlock* entry = allocate_block(static_cast<int>(size));
     mark_allocated(entry);
@@ -282,7 +282,7 @@ MemRef SlabAlloc::do_alloc(size_t size)
 
 #ifdef REALM_DEBUG
     if (REALM_COVER_NEVER(m_debug_out))
-    	std::cerr << "Alloc ref: " << ref << " size: " << size << "\n";
+        std::cerr << "Alloc ref: " << ref << " size: " << size << "\n";
 #endif
 
     char* addr = reinterpret_cast<char*>(entry);
@@ -300,210 +300,210 @@ MemRef SlabAlloc::do_alloc(size_t size)
 
 SlabAlloc::FreeBlock* SlabAlloc::get_prev_block_if_mergeable(SlabAlloc::FreeBlock* entry)
 {
-	auto bb = bb_before(entry);
-	if (bb->block_before_size <= 0)
-		return nullptr; // no prev block, or it is in use
-	return block_before(bb);
+    auto bb = bb_before(entry);
+    if (bb->block_before_size <= 0)
+        return nullptr; // no prev block, or it is in use
+    return block_before(bb);
 }
 
 SlabAlloc::FreeBlock* SlabAlloc::get_next_block_if_mergeable(SlabAlloc::FreeBlock* entry)
 {
-	auto bb = bb_after(entry);
-	if (bb->block_after_size <= 0)
-		return nullptr; // no next block, or it is in use
-	return block_after(bb);
+    auto bb = bb_after(entry);
+    if (bb->block_after_size <= 0)
+        return nullptr; // no next block, or it is in use
+    return block_after(bb);
 }
 
 SlabAlloc::FreeList SlabAlloc::find(int size)
 {
-	FreeList retval;
-	retval.it = m_block_map.lower_bound(size);
-	if (retval.it != m_block_map.end()) {
-		retval.size = retval.it->first;
-	}
-	else {
-		retval.size = 0;
-	}
-	return retval;
+    FreeList retval;
+    retval.it = m_block_map.lower_bound(size);
+    if (retval.it != m_block_map.end()) {
+        retval.size = retval.it->first;
+    }
+    else {
+        retval.size = 0;
+    }
+    return retval;
 }
 
 SlabAlloc::FreeList SlabAlloc::find_larger(FreeList hint, int size)
 {
-	int needed_size = size + sizeof(BetweenBlocks) + sizeof(FreeBlock);
-	while (hint.it != m_block_map.end() && hint.it->first < needed_size)
-		++hint.it;
-	if (hint.it == m_block_map.end())
-		hint.size = 0; // indicate "not found"
-	return hint;
+    int needed_size = size + sizeof(BetweenBlocks) + sizeof(FreeBlock);
+    while (hint.it != m_block_map.end() && hint.it->first < needed_size)
+        ++hint.it;
+    if (hint.it == m_block_map.end())
+        hint.size = 0; // indicate "not found"
+    return hint;
 }
 
 SlabAlloc::FreeBlock* SlabAlloc::pop_freelist_entry(FreeList list)
 {
-	FreeBlock* retval = list.it->second;
-	FreeBlock* header = retval->next;
-	if (header == retval)
-		m_block_map.erase(list.it);
-	else
-		list.it->second = header;
-	retval->unlink();
-	return retval;
+    FreeBlock* retval = list.it->second;
+    FreeBlock* header = retval->next;
+    if (header == retval)
+        m_block_map.erase(list.it);
+    else
+        list.it->second = header;
+    retval->unlink();
+    return retval;
 }
 
 void SlabAlloc::FreeBlock::unlink()
 {
-	auto _next = next;
-	auto _prev = prev;
-	_next->prev = prev;
-	_prev->next = next;
-	clear_links();
+    auto _next = next;
+    auto _prev = prev;
+    _next->prev = prev;
+    _prev->next = next;
+    clear_links();
 }
 
 void SlabAlloc::remove_freelist_entry(FreeBlock* entry)
 {
-	int size = bb_before(entry)->block_after_size;
-	auto it = m_block_map.find(size);
-	REALM_ASSERT(it != m_block_map.end());
-	auto header = it->second;
-	if (header == entry) {
-		header = entry->next;
-		if (header == entry)
-			m_block_map.erase(it);
-		else
-			it->second = header;
-	}
-	entry->unlink();
+    int size = bb_before(entry)->block_after_size;
+    auto it = m_block_map.find(size);
+    REALM_ASSERT(it != m_block_map.end());
+    auto header = it->second;
+    if (header == entry) {
+        header = entry->next;
+        if (header == entry)
+            m_block_map.erase(it);
+        else
+            it->second = header;
+    }
+    entry->unlink();
 }
 
 void SlabAlloc::push_freelist_entry(FreeBlock* entry)
 {
-	int size = bb_before(entry)->block_after_size;
-	FreeBlock* header;
-	auto it = m_block_map.find(size);
-	if (it != m_block_map.end()) {
-		header = it->second;
-		it->second = entry;
-		entry->next = header;
-		entry->prev = header->prev;
-		entry->prev->next = entry;
-		entry->next->prev = entry;
-	}
-	else {
-		header = nullptr;
-		m_block_map[size] = entry;
-		entry->next = entry->prev = entry;
-	}
+    int size = bb_before(entry)->block_after_size;
+    FreeBlock* header;
+    auto it = m_block_map.find(size);
+    if (it != m_block_map.end()) {
+        header = it->second;
+        it->second = entry;
+        entry->next = header;
+        entry->prev = header->prev;
+        entry->prev->next = entry;
+        entry->next->prev = entry;
+    }
+    else {
+        header = nullptr;
+        m_block_map[size] = entry;
+        entry->next = entry->prev = entry;
+    }
 }
 
 void SlabAlloc::mark_freed(FreeBlock* entry, int size)
 {
-	auto bb = bb_before(entry);
-	REALM_ASSERT(bb->block_after_size < 0);
-	REALM_ASSERT(bb->block_after_size == - size);
-	bb->block_after_size = 0 - bb->block_after_size;
-	bb = bb_after(entry);
-	REALM_ASSERT(bb->block_before_size < 0);
-	REALM_ASSERT(bb->block_before_size == - size);
-	bb->block_before_size = 0 - bb->block_before_size;
+    auto bb = bb_before(entry);
+    REALM_ASSERT(bb->block_after_size < 0);
+    REALM_ASSERT(bb->block_after_size == -size);
+    bb->block_after_size = 0 - bb->block_after_size;
+    bb = bb_after(entry);
+    REALM_ASSERT(bb->block_before_size < 0);
+    REALM_ASSERT(bb->block_before_size == -size);
+    bb->block_before_size = 0 - bb->block_before_size;
 }
 
 void SlabAlloc::mark_allocated(FreeBlock* entry)
 {
-	auto bb = bb_before(entry);
-	REALM_ASSERT(bb->block_after_size > 0);
-	auto bb2 = bb_after(entry);
-	bb->block_after_size = 0 - bb->block_after_size;
-	REALM_ASSERT(bb2->block_before_size > 0);
-	bb2->block_before_size = 0 - bb2->block_before_size;
+    auto bb = bb_before(entry);
+    REALM_ASSERT(bb->block_after_size > 0);
+    auto bb2 = bb_after(entry);
+    bb->block_after_size = 0 - bb->block_after_size;
+    REALM_ASSERT(bb2->block_before_size > 0);
+    bb2->block_before_size = 0 - bb2->block_before_size;
 }
 
 SlabAlloc::FreeBlock* SlabAlloc::allocate_block(int size)
 {
-	FreeList list = find(size);
-	if (list.found_exact(size)) {
-		return pop_freelist_entry(list);
-	}
-	// no exact matches.
-	list = find_larger(list, size);
-	FreeBlock* block;
-	if (list.found_something()) {
-		block = pop_freelist_entry(list);
-	}
-	else {
-		block = grow_slab_for(size);
-	}
-	FreeBlock* remaining = break_block(block, size);
-	if (remaining)
-		push_freelist_entry(remaining);
-	REALM_ASSERT(size_from_block(block) == size);
-	return block;
+    FreeList list = find(size);
+    if (list.found_exact(size)) {
+        return pop_freelist_entry(list);
+    }
+    // no exact matches.
+    list = find_larger(list, size);
+    FreeBlock* block;
+    if (list.found_something()) {
+        block = pop_freelist_entry(list);
+    }
+    else {
+        block = grow_slab_for(size);
+    }
+    FreeBlock* remaining = break_block(block, size);
+    if (remaining)
+        push_freelist_entry(remaining);
+    REALM_ASSERT(size_from_block(block) == size);
+    return block;
 }
 
 SlabAlloc::FreeBlock* SlabAlloc::slab_to_entry(Slab slab, ref_type ref_start)
 {
-	auto bb = reinterpret_cast<BetweenBlocks*>(slab.addr);
-	bb->block_before_size = 0;
-	int block_size = static_cast<int>(slab.ref_end - ref_start - 2 * sizeof(BetweenBlocks));
-	bb->block_after_size = block_size;
-	auto entry = block_after(bb);
-	entry->clear_links();
-	entry->ref = ref_start + sizeof(BetweenBlocks);
-	bb = bb_after(entry);
-	bb->block_before_size = block_size;
-	bb->block_after_size = 0;
-	return entry;
+    auto bb = reinterpret_cast<BetweenBlocks*>(slab.addr);
+    bb->block_before_size = 0;
+    int block_size = static_cast<int>(slab.ref_end - ref_start - 2 * sizeof(BetweenBlocks));
+    bb->block_after_size = block_size;
+    auto entry = block_after(bb);
+    entry->clear_links();
+    entry->ref = ref_start + sizeof(BetweenBlocks);
+    bb = bb_after(entry);
+    bb->block_before_size = block_size;
+    bb->block_after_size = 0;
+    return entry;
 }
 
 void SlabAlloc::clear_freelists()
 {
-	m_block_map.clear();
+    m_block_map.clear();
 }
 
 void SlabAlloc::rebuild_freelists_from_slab()
 {
-	clear_freelists();
-	ref_type ref_start = m_baseline;
-	for (auto e : m_slabs) {
-		FreeBlock* entry = slab_to_entry(e, ref_start);
-		push_freelist_entry(entry);
-		ref_start = e.ref_end;
-	}
+    clear_freelists();
+    ref_type ref_start = m_baseline;
+    for (auto e : m_slabs) {
+        FreeBlock* entry = slab_to_entry(e, ref_start);
+        push_freelist_entry(entry);
+        ref_start = e.ref_end;
+    }
 }
 
 SlabAlloc::FreeBlock* SlabAlloc::break_block(FreeBlock* block, int new_size)
 {
-	int size = size_from_block(block);
-	int remaining_size = size - (new_size + sizeof(BetweenBlocks));
-	if (remaining_size < static_cast<int>(sizeof(FreeBlock)))
-		return nullptr;
-	bb_after(block)->block_before_size = remaining_size;
-	bb_before(block)->block_after_size = new_size;
-	auto bb_between = bb_after(block);
-	bb_between->block_before_size = new_size;
-	bb_between->block_after_size = remaining_size;
-	FreeBlock* remaining_block = block_after(bb_between);
-	remaining_block->ref = block->ref + new_size + sizeof(BetweenBlocks);
-	remaining_block->clear_links();
-	block->clear_links();
-	return remaining_block;
+    int size = size_from_block(block);
+    int remaining_size = size - (new_size + sizeof(BetweenBlocks));
+    if (remaining_size < static_cast<int>(sizeof(FreeBlock)))
+        return nullptr;
+    bb_after(block)->block_before_size = remaining_size;
+    bb_before(block)->block_after_size = new_size;
+    auto bb_between = bb_after(block);
+    bb_between->block_before_size = new_size;
+    bb_between->block_after_size = remaining_size;
+    FreeBlock* remaining_block = block_after(bb_between);
+    remaining_block->ref = block->ref + new_size + sizeof(BetweenBlocks);
+    remaining_block->clear_links();
+    block->clear_links();
+    return remaining_block;
 }
 
 SlabAlloc::FreeBlock* SlabAlloc::merge_blocks(FreeBlock* first, FreeBlock* last)
 {
-	int size_first = size_from_block(first);
-	int size_last = size_from_block(last);
-	int new_size = size_first + size_last + sizeof(BetweenBlocks);
-	bb_before(first)->block_after_size = new_size;
-	bb_after(last)->block_before_size = new_size;
-	return first;
+    int size_first = size_from_block(first);
+    int size_last = size_from_block(last);
+    int new_size = size_first + size_last + sizeof(BetweenBlocks);
+    bb_before(first)->block_after_size = new_size;
+    bb_after(last)->block_before_size = new_size;
+    return first;
 }
 
 SlabAlloc::FreeBlock* SlabAlloc::grow_slab_for(int size)
 {
-	// Make sure that either a) the allocation matches exactly, or
-	// b) there is sufficient room for additional allocation
-	size_t new_size = size + 2 * sizeof(BetweenBlocks); // one at each end.
-	size_t exact_size = new_size;
-	size_t minimal_larger_size = new_size + sizeof(BetweenBlocks) + sizeof(FreeBlock);
+    // Make sure that either a) the allocation matches exactly, or
+    // b) there is sufficient room for additional allocation
+    size_t new_size = size + 2 * sizeof(BetweenBlocks); // one at each end.
+    size_t exact_size = new_size;
+    size_t minimal_larger_size = new_size + sizeof(BetweenBlocks) + sizeof(FreeBlock);
     ref_type ref;
     if (m_slabs.empty()) {
         ref = m_baseline;
@@ -522,15 +522,15 @@ SlabAlloc::FreeBlock* SlabAlloc::grow_slab_for(int size)
 
         // cap allocation at 1GB
         if (new_size > 1 * 1024 * 1024 * 1024)
-        	new_size = 1 * 1024 * 1024 * 1024;
+            new_size = 1 * 1024 * 1024 * 1024;
         ref = curr_ref_end;
     }
 
     // Round upwards to nearest page size
     new_size = ((new_size - 1) | (page_size() - 1)) + 1;
     if (new_size != exact_size && new_size < minimal_larger_size) {
-    	new_size = minimal_larger_size;
-    	// round to next page size, then
+        new_size = minimal_larger_size;
+        // round to next page size, then
         new_size = ((new_size - 1) | (page_size() - 1)) + 1;
     }
 
@@ -552,8 +552,8 @@ SlabAlloc::FreeBlock* SlabAlloc::grow_slab_for(int size)
     REALM_ASSERT(0 < new_size);
     size_t ref_end = ref;
     if (REALM_UNLIKELY(int_add_with_overflow_detect(ref_end, new_size))) {
-        throw MaximumFileSizeExceeded("AllocSlab slab ref_end size overflow: " + util::to_string(ref) + " + "
-                                 + util::to_string(new_size));
+        throw MaximumFileSizeExceeded("AllocSlab slab ref_end size overflow: " + util::to_string(ref) + " + " +
+                                      util::to_string(new_size));
     }
 
     std::unique_ptr<char[]> mem(new char[new_size]); // Throws
@@ -581,9 +581,7 @@ void SlabAlloc::do_free(ref_type ref, char* addr) noexcept
 #endif
 
     // Get size from segment
-    size_t size_ = read_only ? Array::get_byte_size_from_header(addr) : Array::get_capacity_from_header(addr);
-    REALM_ASSERT(size_ < 2UL * 1024 * 1024 * 1024);
-    int size = static_cast<int>(size_);
+    size_t size = read_only ? Array::get_byte_size_from_header(addr) : Array::get_capacity_from_header(addr);
 
 #ifdef REALM_DEBUG
     if (REALM_COVER_NEVER(m_debug_out))
@@ -599,77 +597,77 @@ void SlabAlloc::do_free(ref_type ref, char* addr) noexcept
 
     m_free_space_state = free_space_Dirty;
 
-
     if (read_only) {
         // Free space in read only segment is tracked separately
-    	try {
-            Chunk chunk;
-            chunk.ref = ref;
-            chunk.size = size;
+        try {
             REALM_ASSERT_RELEASE(ref != 0);
-            m_free_read_only.push_back(chunk); // Throws
+            auto next = m_free_read_only.lower_bound(ref);
+            if (next != m_free_read_only.end()) {
+                REALM_ASSERT_RELEASE_EX(ref + size <= next->first, ref, size, next->first, next->second);
+                // See if element can be combined with next element
+                if (ref + size == next->first) {
+                    size += next->second;
+                    next = m_free_read_only.erase(next);
+                }
+            }
+            if (!m_free_read_only.empty() && next != m_free_read_only.begin()) {
+                // There must be a previous element - see if we can merge
+                auto prev = next;
+                prev--;
+
+                REALM_ASSERT_RELEASE_EX(prev->first + prev->second <= ref, ref, size, prev->first, prev->second);
+                // See if element can be combined with previous element
+                // We can do that just by adding the size
+                if (prev->first + prev->second == ref) {
+                    prev->second += size;
+                    return; // Done!
+                }
+                m_free_read_only.emplace_hint(prev, ref, size); // Throws
+            }
+            else {
+                m_free_read_only.emplace(ref, size); // Throws
+            }
         }
         catch (...) {
             m_free_space_state = free_space_Invalid;
         }
     }
     else {
-    	// fixup size to take into account the allocator's need to store a FreeBlock in a freed block
-    	if (size < static_cast<int>(sizeof(FreeBlock)))
-    		size = sizeof(FreeBlock);
-    	// align to multipla of 8
-    	if (size & 0x7)
-    		size = (size + 7) & ~0x7;
+        // fixup size to take into account the allocator's need to store a FreeBlock in a freed block
+        if (size < sizeof(FreeBlock))
+            size = sizeof(FreeBlock);
+        // align to multipla of 8
+        if (size & 0x7)
+            size = (size + 7) & ~0x7;
 
-    	FreeBlock* e = reinterpret_cast<FreeBlock*>(addr);
-    	mark_freed(e, size);
-    	free_block(ref, e);
+        FreeBlock* e = reinterpret_cast<FreeBlock*>(addr);
+        REALM_ASSERT_RELEASE(size < 2UL * 1024 * 1024 * 1024);
+        mark_freed(e, static_cast<int>(size));
+        free_block(ref, e);
     }
 }
 
 void SlabAlloc::free_block(ref_type ref, SlabAlloc::FreeBlock* block)
 {
-	// merge with surrounding blocks if possible
-	block->ref = ref;
-	FreeBlock* prev = get_prev_block_if_mergeable(block);
-	if (prev) {
-		remove_freelist_entry(prev);
-		block = merge_blocks(prev, block);
-	}
-	FreeBlock* next = get_next_block_if_mergeable(block);
-	if (next) {
-		remove_freelist_entry(next);
-		block = merge_blocks(block, next);
-	}
-	push_freelist_entry(block);
+    // merge with surrounding blocks if possible
+    block->ref = ref;
+    FreeBlock* prev = get_prev_block_if_mergeable(block);
+    if (prev) {
+        remove_freelist_entry(prev);
+        block = merge_blocks(prev, block);
+    }
+    FreeBlock* next = get_next_block_if_mergeable(block);
+    if (next) {
+        remove_freelist_entry(next);
+        block = merge_blocks(block, next);
+    }
+    push_freelist_entry(block);
 }
 
 size_t SlabAlloc::consolidate_free_read_only()
 {
     if (REALM_COVER_NEVER(m_free_space_state == free_space_Invalid))
         throw InvalidFreeSpace();
-    if (m_free_read_only.size() > 1) {
-        std::sort(begin(m_free_read_only), end(m_free_read_only), [](Chunk& a, Chunk& b) { return a.ref < b.ref; });
-
-        // Combine any adjacent chunks in the freelist, except for when the chunks
-        // are on the edge of an allocation slab
-        auto prev = m_free_read_only.begin();
-        for (auto it = m_free_read_only.begin() + 1; it != m_free_read_only.end(); ++it) {
-            if (prev->ref + prev->size != it->ref) {
-                prev = it;
-                continue;
-            }
-
-            prev->size += it->size;
-            it->size = 0;
-        }
-
-        // Remove all of the now zero-size chunks from the free list
-        m_free_read_only.erase(std::remove_if(begin(m_free_read_only), end(m_free_read_only),
-                                              [](Chunk& chunk) { return chunk.size == 0; }),
-                               end(m_free_read_only));
-    }
-
     return m_free_read_only.size();
 }
 
@@ -801,7 +799,7 @@ namespace {
 std::map<std::string, std::weak_ptr<SlabAlloc::MappedFile>>& all_files =
     *new std::map<std::string, std::weak_ptr<SlabAlloc::MappedFile>>;
 util::Mutex& all_files_mutex = *new util::Mutex;
-}
+} // namespace
 
 
 ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
@@ -878,7 +876,7 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
             size_t section_index = mapping_index + m_file_mappings->m_first_additional_mapping;
             m_baseline = get_section_base(section_index);
             m_num_local_mappings = m_file_mappings->m_num_global_mappings;
-            m_local_mappings.reset(new std::shared_ptr<const util::File::Map<char>>[ m_num_local_mappings ]);
+            m_local_mappings.reset(new std::shared_ptr<const util::File::Map<char>>[m_num_local_mappings]);
             for (size_t k = 0; k < m_num_local_mappings; ++k) {
                 m_local_mappings[k] = m_file_mappings->m_global_mappings[k];
             }
@@ -1090,7 +1088,7 @@ ref_type SlabAlloc::attach_buffer(const char* data, size_t size)
     REALM_ASSERT(!is_attached());
 
     // Verify the data structures
-    std::string path; // No path
+    std::string path;                  // No path
     validate_buffer(data, size, path); // Throws
 
     ref_type top_ref = get_top_ref(data, size);
@@ -1127,8 +1125,9 @@ void SlabAlloc::attach_empty()
 void SlabAlloc::throw_header_exception(std::string msg, const Header& header, const std::string& path)
 {
     char buf[256];
-    sprintf(buf, ". top_ref[0]: %" PRIX64 ", top_ref[1]: %" PRIX64 ", "
-                 "mnemonic: %X %X %X %X, fmt[0]: %d, fmt[1]: %d, flags: %X",
+    sprintf(buf,
+            ". top_ref[0]: %" PRIX64 ", top_ref[1]: %" PRIX64 ", "
+            "mnemonic: %X %X %X %X, fmt[0]: %d, fmt[1]: %d, flags: %X",
             header.m_top_ref[0], header.m_top_ref[1], header.m_mnemonic[0], header.m_mnemonic[1],
             header.m_mnemonic[2], header.m_mnemonic[3], header.m_file_format[0], header.m_file_format[1],
             header.m_flags);
@@ -1230,7 +1229,7 @@ void SlabAlloc::update_reader_view(size_t file_size)
             m_file_mappings->m_capacity_global_mappings = num_additional_mappings + 128;
             std::unique_ptr<std::shared_ptr<const util::File::Map<char>>[]> new_mappings;
             new_mappings.reset(
-                new std::shared_ptr<const util::File::Map<char>>[ m_file_mappings->m_capacity_global_mappings ]);
+                new std::shared_ptr<const util::File::Map<char>>[m_file_mappings->m_capacity_global_mappings]);
             for (size_t j = 0; j < m_file_mappings->m_num_global_mappings; ++j)
                 new_mappings[j] = m_file_mappings->m_global_mappings[j];
             m_file_mappings->m_global_mappings = std::move(new_mappings);
@@ -1255,7 +1254,7 @@ void SlabAlloc::update_reader_view(size_t file_size)
         // update local cache of mappings, if global mappings have been extended beyond local
         if (num_additional_mappings > m_num_local_mappings) {
             m_num_local_mappings = num_additional_mappings;
-            m_local_mappings.reset(new std::shared_ptr<const util::File::Map<char>>[ m_num_local_mappings ]);
+            m_local_mappings.reset(new std::shared_ptr<const util::File::Map<char>>[m_num_local_mappings]);
             for (size_t k = 0; k < m_num_local_mappings; ++k) {
                 m_local_mappings[k] = m_file_mappings->m_global_mappings[k];
             }
@@ -1264,25 +1263,25 @@ void SlabAlloc::update_reader_view(size_t file_size)
     // Rebase slabs as m_baseline has moved
     size_t ref_displacement = m_baseline - old_baseline;
     for (auto& e : m_slabs) {
-    	e.ref_end += ref_displacement;
+        e.ref_end += ref_displacement;
     }
     // rebuild free list from slabs
     rebuild_freelists_from_slab();
-/*
-    size_t slab_ref = file_size;
-    size_t n = m_free_space.size();
-    REALM_ASSERT(m_slabs.size() == n);
-    for (size_t i = 0; i < n; ++i) {
-        Chunk& free_chunk = m_free_space[i];
-        free_chunk.ref = slab_ref;
-        ref_type slab_ref_end = slab_ref + free_chunk.size;
-        m_slabs[i].ref_end = slab_ref_end;
-        slab_ref = slab_ref_end;
-    }
-    */
+    /*
+        size_t slab_ref = file_size;
+        size_t n = m_free_space.size();
+        REALM_ASSERT(m_slabs.size() == n);
+        for (size_t i = 0; i < n; ++i) {
+            Chunk& free_chunk = m_free_space[i];
+            free_chunk.ref = slab_ref;
+            ref_type slab_ref_end = slab_ref + free_chunk.size;
+            m_slabs[i].ref_end = slab_ref_end;
+            slab_ref = slab_ref_end;
+        }
+        */
 }
 
-const SlabAlloc::chunks& SlabAlloc::get_free_read_only() const
+const SlabAlloc::Chunks& SlabAlloc::get_free_read_only() const
 {
     if (REALM_COVER_NEVER(m_free_space_state == free_space_Invalid))
         throw InvalidFreeSpace();
@@ -1382,8 +1381,8 @@ void SlabAlloc::verify() const
 {
 #ifdef REALM_DEBUG
     // Make sure that all free blocks fit within a slab
-	/* FIXME
-	for (const auto& chunk : m_free_space) {
+    /* FIXME
+    for (const auto& chunk : m_free_space) {
         slabs::const_iterator slab =
             upper_bound(m_slabs.begin(), m_slabs.end(), chunk.ref, &ref_less_than_slab_ref_end);
         REALM_ASSERT(slab != m_slabs.end());
@@ -1400,8 +1399,8 @@ void SlabAlloc::verify() const
 
 bool SlabAlloc::is_all_free() const
 {
-	/*
-	 * FIXME
+    /*
+     * FIXME
     if (m_free_space.size() != m_slabs.size())
         return false;
 
@@ -1424,8 +1423,8 @@ bool SlabAlloc::is_all_free() const
 // LCOV_EXCL_START
 void SlabAlloc::print() const
 {
-	/* FIXME
-	 *
+    /* FIXME
+     *
 
     size_t allocated_for_slabs = m_slabs.empty() ? 0 : m_slabs.back().ref_end - m_baseline;
 
