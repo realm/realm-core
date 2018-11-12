@@ -616,7 +616,7 @@ void SlabAlloc::do_free(ref_type ref, char* addr) noexcept
                 prev--;
 
                 REALM_ASSERT_RELEASE_EX(prev->first + prev->second <= ref, ref, size, prev->first, prev->second);
-                // See if element can be combined with next element
+                // See if element can be combined with previous element
                 // We can do that just by adding the size
                 if (prev->first + prev->second == ref) {
                     prev->second += size;
@@ -641,7 +641,7 @@ void SlabAlloc::do_free(ref_type ref, char* addr) noexcept
             size = (size + 7) & ~0x7;
 
         FreeBlock* e = reinterpret_cast<FreeBlock*>(addr);
-        REALM_ASSERT(size < 2UL * 1024 * 1024 * 1024);
+        REALM_ASSERT_RELEASE(size < 2UL * 1024 * 1024 * 1024);
         mark_freed(e, static_cast<int>(size));
         free_block(ref, e);
     }
