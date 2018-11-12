@@ -37,9 +37,15 @@ int main(int argc, char* argv[])
     SetCurrentDirectoryA(path);
 #else
     char executable[PATH_MAX];
-    realpath(argv[0], executable);
+    if (realpath(argv[0], executable) == nullptr) {
+        fprintf(stderr, "Failed to retrieve path to exectuable.\n");
+        return 1;
+    }
     const char* directory = dirname(executable);
-    chdir(directory);
+    if (chdir(directory) < 0) {
+        fprintf(stderr, "Failed to change directory.\n");
+        return 1;
+    }
 #endif
 
     return test_all(argc, argv);

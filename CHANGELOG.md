@@ -1,10 +1,11 @@
-# NEXT RELEASE
+# 5.12.1 Release notes
 
 ### Enhancements
-* None.
+* Illegal freeing of in-file-memory is now detected when freeing is
+  actually done. This will make it easier to find the root cause of
+  some file corruption issues.
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * None.
  
 ### Breaking changes
