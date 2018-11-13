@@ -404,6 +404,11 @@ struct sync_session_states::Inactive : public SyncSession::State {
     {
         session.m_server_override = SyncSession::ServerOverride{address, port};
     }
+
+    void close(std::unique_lock<std::mutex>& lock, SyncSession& session) const override
+    {
+        session.unregister(lock); // releases lock
+    }
 };
 
 
