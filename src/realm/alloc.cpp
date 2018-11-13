@@ -79,6 +79,7 @@ public:
     {
         char* new_addr = static_cast<char*>(::realloc(const_cast<char*>(addr), new_size));
         if (REALM_UNLIKELY(REALM_COVER_NEVER(!new_addr))) {
+            int x = 7;
             REALM_ASSERT_DEBUG(errno == ENOMEM);
             throw util::bad_alloc();
         }
