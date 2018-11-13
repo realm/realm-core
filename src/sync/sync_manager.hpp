@@ -149,7 +149,7 @@ public:
     std::string path_for_realm(const SyncUser& user, const std::string& raw_realm_url) const;
 
     // Get the path of the recovery directory for backed-up or recovered Realms.
-    std::string recovery_directory_path(util::Optional<std::string> const& custom_dir_name) const;
+    std::string recovery_directory_path(util::Optional<std::string> const& custom_dir_name=none) const;
 
     // Get the unique identifier of this client.
     std::string client_uuid() const;

@@ -97,7 +97,7 @@ public:
         return m_base_path;
     }
 
-    std::string recovery_directory_path(util::Optional<std::string> const& directory) const
+    std::string recovery_directory_path(util::Optional<std::string> const& directory=none) const
     {
         return get_special_directory(directory.value_or(c_recovery_directory));
     }
