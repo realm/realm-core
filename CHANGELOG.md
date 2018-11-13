@@ -5,7 +5,15 @@
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+
+* If encryption was enabled, decrypted pages were never released, causing excessive usage of memory.
+  A page reclaim daemon thread has been added, which will work to release decrypted pages back to
+  the operating system. To control it, a governing function can be installed. The governing function
+  sets the target for the page reclaimer. If no governing function is installed, the system will attempt
+  to keep the memory usage below 1/4 of the memory available. The system will try to determine the amount
+  of memory available from /proc/meminfo or from the cgroup file system. If the amount of memory available
+  cannot be determined, the feature is disabled.
+  ([#3123] https://github.com/realm/realm-core/issues/3123)
  
 ### Breaking changes
 * None.

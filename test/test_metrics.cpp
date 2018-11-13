@@ -830,7 +830,7 @@ TEST(Metrics_TransactionVersions)
     }
     {
         std::unique_ptr<Replication> hist2(make_in_realm_history(path));
-        SharedGroup sg2(*hist2);
+        SharedGroup sg2(*hist2, options);
 
         // Pin this version. Note that since this read transaction is against a different shared group
         // it doesn't get tracked in the transaction metrics of the original shared group.

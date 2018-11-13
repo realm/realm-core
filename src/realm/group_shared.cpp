@@ -1823,6 +1823,7 @@ const Group& SharedGroup::begin_read(VersionID version_id)
         throw LogicError(LogicError::wrong_transact_state);
 
     bool writable = false;
+
     do_begin_read(version_id, writable); // Throws
 
     set_transact_stage(transact_Reading);
@@ -1994,9 +1995,9 @@ void SharedGroup::do_begin_read(VersionID version_id, bool writable)
     // begin_read().
 
     grab_read_lock(m_read_lock, version_id); // Throws
-
     ReadLockUnlockGuard g(*this, m_read_lock);
 
+    m_group.m_alloc.note_reader_start(this);
     using gf = _impl::GroupFriend;
     gf::attach_shared(m_group, m_read_lock.m_top_ref, m_read_lock.m_file_size, writable); // Throws
 
@@ -2010,6 +2011,7 @@ void SharedGroup::do_end_read() noexcept
     release_read_lock(m_read_lock);
     using gf = _impl::GroupFriend;
     gf::detach(m_group);
+    m_group.m_alloc.note_reader_end(this);
 }
 
 

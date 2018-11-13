@@ -288,6 +288,11 @@ public:
     /// call to SlabAlloc::alloc() corresponds to a mutation event.
     bool is_free_space_clean() const noexcept;
 
+    /// Hooks used to keep the encryption layer informed of the start and stop
+    /// of transactions.
+    void note_reader_start(void* reader_id);
+    void note_reader_end(void* reader_id);
+
     void verify() const override;
 #ifdef REALM_DEBUG
     void enable_debug(bool enable)

@@ -961,6 +961,7 @@ void Group::commit()
 
 void Group::update_refs(ref_type top_ref, size_t old_baseline) noexcept
 {
+    old_baseline = 0; // force update of all refs
     // After Group::commit() we will always have free space tracking
     // info.
     REALM_ASSERT_3(m_top.size(), >=, 5);
