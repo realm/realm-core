@@ -267,8 +267,9 @@ size_t get_work_limit(size_t decrypted_pages, size_t target)
     float load = 1.0f * decrypted_pages / target;
     float akku = 0.0f;
     for (const auto& e : control_table) {
-        if (load > e.base)
-            akku += (load - e.base) * e.effort;
+        if (load <= e.base)
+        	break;
+        akku += (load - e.base) * e.effort;
     }
     size_t work_limit = size_t(target * akku);
     return work_limit;
@@ -309,7 +310,6 @@ void reclaim_pages_for_file(SharedFileInfo& info, size_t& work_limit)
         info.last_scanned_version = info.current_version;
         ++info.current_version;
     }
-    return;
 }
 
 // Reclaim pages from all files, limited by a work limit that is derived
