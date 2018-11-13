@@ -587,18 +587,17 @@ void EncryptedFileMapping::reclaim_page(size_t page_ndx)
  */
 void EncryptedFileMapping::reclaim_untouched(size_t& progress_index, size_t& work_limit) noexcept
 {
-	const auto scan_amount_per_workunit = 4096;
+    const auto scan_amount_per_workunit = 4096;
     bool contiguous_scan = false;
     size_t next_scan_payment = scan_amount_per_workunit;
     const size_t last_index = get_end_index();
 
-    auto done_some_work = [&]()
-	{
-		if (work_limit > 0) work_limit--;
-	};
+    auto done_some_work = [&]() {
+        if (work_limit > 0)
+            work_limit--;
+    };
 
-	auto visit_and_potentially_reclaim = [&](size_t page_ndx)
-	{
+    auto visit_and_potentially_reclaim = [&](size_t page_ndx) {
         PageState ps = m_page_state[page_ndx];
         if (is(m_page_state[page_ndx], UpToDate | PartiallyUpToDate)) {
             if (is_not(ps, Touched) && is_not(ps, Dirty)) {
@@ -610,10 +609,10 @@ void EncryptedFileMapping::reclaim_untouched(size_t& progress_index, size_t& wor
             contiguous_scan = false;
         }
         clear(m_page_state[page_ndx], Touched);
-	};
+    };
 
-	auto skip_chunk_if_possible = [&](size_t& page_ndx) // update vars corresponding to skipping a chunk if possible
-	{
+    auto skip_chunk_if_possible = [&](size_t& page_ndx) // update vars corresponding to skipping a chunk if possible
+    {
         size_t chunk_ndx = page_ndx >> page_to_chunk_shift;
         if (m_chunk_dont_scan[chunk_ndx]) {
             // skip to end of chunk
@@ -625,31 +624,29 @@ void EncryptedFileMapping::reclaim_untouched(size_t& progress_index, size_t& wor
         }
         else
             return false;
-	};
+    };
 
-	auto is_last_page_in_chunk = [](size_t page_ndx)
-	{
+    auto is_last_page_in_chunk = [](size_t page_ndx) {
         auto page_to_chunk_mask = page_to_chunk_factor - 1;
         return (page_ndx & page_to_chunk_mask) == page_to_chunk_mask;
-	};
-	auto is_first_page_in_chunk = [](size_t page_ndx)
-	{
+    };
+    auto is_first_page_in_chunk = [](size_t page_ndx) {
         auto page_to_chunk_mask = page_to_chunk_factor - 1;
         return (page_ndx & page_to_chunk_mask) == 0;
-	};
+    };
 
     while (work_limit > 0 && progress_index < last_index) {
-    	size_t page_ndx = progress_index - m_first_page;
-    	if (!skip_chunk_if_possible(page_ndx)) {
+        size_t page_ndx = progress_index - m_first_page;
+        if (!skip_chunk_if_possible(page_ndx)) {
             if (is_first_page_in_chunk(page_ndx)) {
-            	contiguous_scan = true;
+                contiguous_scan = true;
             }
             visit_and_potentially_reclaim(page_ndx);
             // if we've scanned a full chunk contiguously, mark it as not needing scans
             if (is_last_page_in_chunk(page_ndx)) {
-            	if (contiguous_scan) {
-            		m_chunk_dont_scan[page_ndx >> page_to_chunk_shift] = 1;
-            	}
+                if (contiguous_scan) {
+                    m_chunk_dont_scan[page_ndx >> page_to_chunk_shift] = 1;
+                }
                 contiguous_scan = false;
             }
         }

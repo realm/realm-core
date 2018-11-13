@@ -81,8 +81,9 @@ public:
     }
     size_t get_start_index()
     {
-    	return m_first_page;
+        return m_first_page;
     }
+
 private:
     SharedFileInfo& m_file;
 

@@ -111,32 +111,32 @@ unsigned int file_reclaim_index = 0;
 // helpers
 bool read_line(FILE* file, char* line)
 {
-	int c;
-	while(1) {
-		c = fgetc(file);
-		if (c==EOF || c=='\n')
-			break;
-		*line++ = c;
-	}
-	*line = 0;
-	return c!=EOF;
+    int c;
+    while (1) {
+        c = fgetc(file);
+        if (c == EOF || c == '\n')
+            break;
+        *line++ = c;
+    }
+    *line = 0;
+    return c != EOF;
 }
 size_t fetch_value_in_file(const char* fname, const char* scan_pattern)
 {
-	char line[100];
-	auto file = fopen(fname,"r");
-	if (file == nullptr)
-		return 0;
-	size_t total;
-	while (read_line(file, line)) {
-		int r = sscanf(line,scan_pattern, &total);
-		if (r == 1) {
-			fclose(file);
-			return total;
-		}
-	}
-	fclose(file);
-	return 0;
+    char line[100];
+    auto file = fopen(fname, "r");
+    if (file == nullptr)
+        return 0;
+    size_t total;
+    while (read_line(file, line)) {
+        int r = sscanf(line, scan_pattern, &total);
+        if (r == 1) {
+            fclose(file);
+            return total;
+        }
+    }
+    fclose(file);
+    return 0;
 }
 
 
@@ -146,33 +146,34 @@ size_t fetch_value_in_file(const char* fname, const char* scan_pattern)
 
 class DefaultGovernor : public PageReclaimGovernor {
 public:
-	size_t get_current_target(size_t load) override
-	{
-		static_cast<void>(load);
-		if (m_refresh_count > 0) {
-			--m_refresh_count;
-			return m_target;
-		}
-		size_t target;
-		auto from_proc = fetch_value_in_file("/proc/meminfo", "MemTotal: %zu kB") * 1024;
-		auto from_cgroup = fetch_value_in_file("/sys/fs/cgroup/memory/memory.limit_in_bytes", "%zu");
-		auto cache_use = fetch_value_in_file("/sys/fs/cgroup/memory/memory.stat","cache %zu");
-		if (from_proc != 0 && from_cgroup != 0) {
-			target = std::min(from_proc, from_cgroup) / 4;
-		}
-		else {
-			// one of them is zero, just pick the other one
-			target = std::max(from_proc, from_cgroup) / 4;
-		}
-		if (cache_use != 0 && target > cache_use / 2)
-			target = cache_use / 2;
-		m_target = target;
-		m_refresh_count = 10; // refresh every 10 seconds
-		return target;
-	}
+    size_t get_current_target(size_t load) override
+    {
+        static_cast<void>(load);
+        if (m_refresh_count > 0) {
+            --m_refresh_count;
+            return m_target;
+        }
+        size_t target;
+        auto from_proc = fetch_value_in_file("/proc/meminfo", "MemTotal: %zu kB") * 1024;
+        auto from_cgroup = fetch_value_in_file("/sys/fs/cgroup/memory/memory.limit_in_bytes", "%zu");
+        auto cache_use = fetch_value_in_file("/sys/fs/cgroup/memory/memory.stat", "cache %zu");
+        if (from_proc != 0 && from_cgroup != 0) {
+            target = std::min(from_proc, from_cgroup) / 4;
+        }
+        else {
+            // one of them is zero, just pick the other one
+            target = std::max(from_proc, from_cgroup) / 4;
+        }
+        if (cache_use != 0 && target > cache_use / 2)
+            target = cache_use / 2;
+        m_target = target;
+        m_refresh_count = 10; // refresh every 10 seconds
+        return target;
+    }
+
 private:
-	size_t m_target;
-	int m_refresh_count = 0;
+    size_t m_target;
+    int m_refresh_count = 0;
 };
 
 
@@ -194,9 +195,10 @@ void set_page_reclaim_governor(PageReclaimGovernor* new_governor)
 }
 
 struct DefaultGovernorInstaller {
-	DefaultGovernorInstaller() {
-		set_page_reclaim_governor(&default_governor);
-	}
+    DefaultGovernorInstaller()
+    {
+        set_page_reclaim_governor(&default_governor);
+    }
 };
 
 DefaultGovernorInstaller default_governor_installer;
@@ -204,7 +206,8 @@ DefaultGovernorInstaller default_governor_installer;
 void encryption_note_reader_start(SharedFileInfo& info, void* reader_id)
 {
     UniqueLock lock(mapping_mutex);
-    auto j = std::find_if(info.readers.begin(), info.readers.end(), [=](auto& reader) { return reader.reader_ID == reader_id; } );
+    auto j = std::find_if(info.readers.begin(), info.readers.end(),
+                          [=](auto& reader) { return reader.reader_ID == reader_id; });
     if (j == info.readers.end()) {
         ReaderInfo i = {reader_id, info.current_version};
         info.readers.push_back(i);
@@ -264,8 +267,8 @@ size_t get_work_limit(size_t decrypted_pages, size_t target)
     float load = 1.0f * decrypted_pages / target;
     float akku = 0.0f;
     for (const auto& e : control_table) {
-    	if (load > e.base)
-    		akku += (load - e.base) * e.effort;
+        if (load > e.base)
+            akku += (load - e.base) * e.effort;
     }
     size_t work_limit = size_t(target * akku);
     return work_limit;
@@ -276,9 +279,9 @@ uint64_t get_oldest_version(SharedFileInfo& info) // must be called under lock
 {
     auto oldest_version = info.current_version;
     for (const auto& e : info.readers) {
-    	if (e.version < oldest_version) {
-    		oldest_version = e.version;
-    	}
+        if (e.version < oldest_version) {
+            oldest_version = e.version;
+        }
     }
     return oldest_version;
 }
@@ -288,23 +291,23 @@ void reclaim_pages_for_file(SharedFileInfo& info, size_t& work_limit)
 {
     uint64_t oldest_version = get_oldest_version(info);
     if (info.last_scanned_version < oldest_version || info.mappings.empty()) {
-		// locate the mapping matching the progress index. No such mapping may
-		// exist, and if so, we'll update the index to the next mapping
-		for (auto& e : info.mappings) {
-			auto start_index = e->get_start_index();
-			if (info.progress_index < start_index) {
-				info.progress_index = start_index;
-			}
-			if (info.progress_index <= e->get_end_index()) {
-				e->reclaim_untouched(info.progress_index, work_limit);
-				if (work_limit == 0)
-					return;
-			}
-		}
-		// if we get here, all mappings have been considered
-		info.progress_index = 0;
-		info.last_scanned_version = info.current_version;
-		++info.current_version;
+        // locate the mapping matching the progress index. No such mapping may
+        // exist, and if so, we'll update the index to the next mapping
+        for (auto& e : info.mappings) {
+            auto start_index = e->get_start_index();
+            if (info.progress_index < start_index) {
+                info.progress_index = start_index;
+            }
+            if (info.progress_index <= e->get_end_index()) {
+                e->reclaim_untouched(info.progress_index, work_limit);
+                if (work_limit == 0)
+                    return;
+            }
+        }
+        // if we get here, all mappings have been considered
+        info.progress_index = 0;
+        info.last_scanned_version = info.current_version;
+        ++info.current_version;
     }
     return;
 }
@@ -328,7 +331,7 @@ void reclaim_pages()
         if (target == 0) // temporarily disabled by governor returning 0
             return;
         if (mappings_by_file.size() == 0)
-        	return;
+            return;
         size_t work_limit = get_work_limit(load, target);
         if (work_limit == 0)
             return; // nothing to do
