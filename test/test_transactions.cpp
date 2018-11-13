@@ -792,14 +792,14 @@ void preparations(SharedGroup& sg_w)
 {
     std::cout << "Setup...." << std::endl;
     {
-    	WriteTransaction wt(sg_w);
-    	Group& g = wt.get_group();
-    	TableRef t = g.get_table("spoink");
-    	if (t.get() == nullptr) {
-    		t = g.add_table("spoink");
-    		t->add_column(type_String,"spoink-column");
-    	}
-    	wt.commit();
+        WriteTransaction wt(sg_w);
+        Group& g = wt.get_group();
+        TableRef t = g.get_table("spoink");
+        if (t.get() == nullptr) {
+            t = g.add_table("spoink");
+            t->add_column(type_String,"spoink-column");
+        }
+        wt.commit();
     }
 }
 
@@ -879,16 +879,16 @@ ONLY(LangBindHelper_EncryptionGiga)
     SharedGroup sg_w2(*hist_w2, SharedGroupOptions(crypt_key()));
     preparations(sg_w2);
     for (int r = 0; r < 4; ++r) {
-    	growth_phase(sg_w1);
-    	growth_phase(sg_w2);
-    	modification_phase(sg_w1);
-    	modification_phase(sg_w2);
-    	partial_read_phase(sg_w1);
-    	partial_read_phase(sg_w2);
-    	query_phase(sg_w1);
-    	query_phase(sg_w2);
-    	std::cout << "Sleeping.." << std::endl;
-    	millisleep(10000);
+        growth_phase(sg_w1);
+        growth_phase(sg_w2);
+        modification_phase(sg_w1);
+        modification_phase(sg_w2);
+        partial_read_phase(sg_w1);
+        partial_read_phase(sg_w2);
+        query_phase(sg_w1);
+        query_phase(sg_w2);
+        std::cout << "Sleeping.." << std::endl;
+        millisleep(10000);
     }
     millisleep(100000);
 }
