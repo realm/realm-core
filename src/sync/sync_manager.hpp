@@ -69,7 +69,7 @@ public:
     // Configure the metadata and file management subsystems. This MUST be called upon startup.
     void configure(const std::string& base_file_path,
                                MetadataMode metadata_mode=MetadataMode::Encryption,
-                               const std::string& user_agent_application_info = "",
+                               const std::string& user_agent_binding_info = "",
                                util::Optional<std::vector<char>> custom_encryption_key=none,
                                bool reset_metadata_on_error=false);
 
@@ -86,8 +86,17 @@ public:
     // balancer or automatic failover.
     void enable_session_multiplexing();
 
+    // Sets the log level for the Sync Client.
+    // The log level can only be set up until the point the Sync Client is created. This happens when the first Session
+    // is created.
     void set_log_level(util::Logger::Level) noexcept;
     void set_logger_factory(SyncLoggerFactory&) noexcept;
+
+    // Sets the application level user agent string.
+    // This should have the format specified here: https://github.com/realm/realm-sync/blob/develop/src/realm/sync/client.hpp#L126
+    // The user agent can only be set up  until the  point the Sync Client is created. This happens when the first
+    // Session is created.
+    void set_user_agent(std::string user_agent);
 
     /// Ask all valid sync sessions to perform whatever tasks might be necessary to
     /// re-establish connectivity with the Realm Object Server. It is presumed that
@@ -189,8 +198,9 @@ private:
     mutable std::unique_ptr<_impl::SyncClient> m_sync_client;
     bool m_multiplex_sessions = false;
 
-    // Optional information about the application to be added to the user
-    // agent description as sent to the server.
+    // Optional information about the binding/application that is sent as part of the User-Agent
+    // when establishing a connection to the server.
+    std::string m_user_agent_binding_info;
     std::string m_user_agent_application_info;
 
     // Protects m_file_manager and m_metadata_manager
