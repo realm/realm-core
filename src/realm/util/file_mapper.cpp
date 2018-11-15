@@ -112,7 +112,8 @@ std::vector<mappings_for_file>& mappings_by_file = *new std::vector<mappings_for
 unsigned int file_reclaim_index = 0;
 
 // helpers
-size_t fetch_value_in_file(const char* fname, const char* scan_pattern)
+
+int64_t fetch_value_in_file(const char* fname, const char* scan_pattern)
 {
     std::ifstream file(fname);
     if (file) {
@@ -128,7 +129,7 @@ size_t fetch_value_in_file(const char* fname, const char* scan_pattern)
             return strtol(ibuf.c_str(), nullptr, 10);
         }
     }
-    return 0;
+    return PageReclaimGovernor::no_match;
 }
 
 
@@ -138,33 +139,48 @@ size_t fetch_value_in_file(const char* fname, const char* scan_pattern)
 
 class DefaultGovernor : public PageReclaimGovernor {
 public:
-    size_t get_current_target(size_t load) override
+	int64_t get_lowest(int64_t a, int64_t b) {
+		if (a == no_match)
+			return b;
+		if (b == no_match)
+			return a;
+		return std::min(a,b);
+	}
+	int64_t target_if_valid(int64_t source, int64_t target) {
+		if (source == no_match)
+			return no_match;
+		return target;
+	}
+
+	int64_t get_current_target(size_t load) override
     {
         static_cast<void>(load);
+        std::cout << "\rLoad: " << load << "   Target: " << m_target << "       ";
         if (m_refresh_count > 0) {
             --m_refresh_count;
             return m_target;
         }
-        size_t target;
-        auto from_proc = fetch_value_in_file("/proc/meminfo", "MemTotal:[[:space:]]+([[:digit:]]+) kB") * 1024;
-        auto from_cgroup = fetch_value_in_file("/sys/fs/cgroup/memory/memory.limit_in_bytes", "^([[:digit:]]+)");
-        auto cache_use = fetch_value_in_file("/sys/fs/cgroup/memory/memory.stat", "cache ([[:digit:]]+)");
-        if (from_proc != 0 && from_cgroup != 0) {
-            target = std::min(from_proc, from_cgroup) / 4;
+        int64_t target;
+        auto local_spec = fetch_value_in_file("page_governor.cfg", "target ([[:digit:]]+)");
+        if (local_spec != no_match) { // overrides everything!
+            target = local_spec;
         }
         else {
-            // one of them is zero, just pick the other one
-            target = std::max(from_proc, from_cgroup) / 4;
+            // no local spec, try to deduce something reasonable from platform info
+            auto from_proc = fetch_value_in_file("/proc/meminfo", "MemTotal:[[:space:]]+([[:digit:]]+) kB") * 1024;
+            auto from_cgroup = fetch_value_in_file("/sys/fs/cgroup/memory/memory.limit_in_bytes", "^([[:digit:]]+)");
+            auto cache_use = fetch_value_in_file("/sys/fs/cgroup/memory/memory.stat", "cache ([[:digit:]]+)");
+            target = target_if_valid(from_proc, from_proc / 4);
+            target = get_lowest(target, target_if_valid(from_cgroup, from_cgroup / 4));
+            target = get_lowest(target, target_if_valid(cache_use, cache_use / 2));
         }
-        if (cache_use != 0 && target > cache_use / 2)
-            target = cache_use / 2;
         m_target = target;
         m_refresh_count = 10; // refresh every 10 seconds
         return target;
     }
 
 private:
-    size_t m_target;
+    int64_t m_target;
     int m_refresh_count = 0;
 };
 
@@ -189,7 +205,10 @@ void set_page_reclaim_governor(PageReclaimGovernor* new_governor)
 struct DefaultGovernorInstaller {
     DefaultGovernorInstaller()
     {
-        set_page_reclaim_governor(&default_governor);
+    	if (default_governor.get_current_target(0) != PageReclaimGovernor::no_match) {
+    		// only install if the governor is able to compute a target.
+    		set_page_reclaim_governor(&default_governor);
+    	}
     }
 };
 
@@ -317,14 +336,14 @@ void reclaim_pages()
         load = collect_total_workload();
     }
     // callback to governor without mutex held
-    size_t target = governor->get_current_target(load * page_size()) / page_size();
+    int64_t target = governor->get_current_target(load * page_size()) / page_size();
     {
         UniqueLock lock(mapping_mutex);
-        if (target == 0) // temporarily disabled by governor returning 0
+        if (target == PageReclaimGovernor::no_match) // temporarily disabled by governor returning 0
             return;
         if (mappings_by_file.size() == 0)
             return;
-        size_t work_limit = get_work_limit(load, target);
+        size_t work_limit = get_work_limit(load, size_t(target));
         if (work_limit == 0)
             return; // nothing to do
         if (file_reclaim_index >= mappings_by_file.size())

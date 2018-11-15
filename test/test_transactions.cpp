@@ -854,9 +854,9 @@ class ExampleGovernor : public util::PageReclaimGovernor {
 	}
 
 public:
-	virtual size_t get_current_target(size_t load) override
+	int64_t get_current_target(size_t load) override
 	{
-		return file_control_governor(load);
+		return int64_t(file_control_governor(load));
 	}
 };
 

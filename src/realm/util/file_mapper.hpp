@@ -43,8 +43,10 @@ class EncryptedFileMapping;
 class PageReclaimGovernor {
 public:
     // Called by the page reclaimer with the current load (in bytes) and
-    // must return the target load (also in bytes)
-    virtual size_t get_current_target(size_t current_load) = 0;
+    // must return the target load (also in bytes). Returns no_match if no
+	// target can be set
+	static constexpr int64_t no_match = -1;
+    virtual int64_t get_current_target(size_t current_load) = 0;
 };
 
 
