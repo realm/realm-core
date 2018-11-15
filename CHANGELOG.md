@@ -14,8 +14,9 @@
         * 1/4 of physical memory available on the platform as reported by "/proc/meminfo"
         * 1/4 of allowed memory available as indicated by "/sys/fs/cgroup/memory/memory_limit_in_bytes"
         * 1/2 of what is used by the buffer cache as indicated by "/sys/fs/cgroup/memory/memory.stat"
-        * A target directly specified as "target <number of bytes>" in a local file "page_governor.cfg"
-  if none of the above is available, or if a target of 0 is given, the feature is disabled.
+        * A target directly specified as "target <number of bytes>" in a local file. The name of the
+          file must be published in the an environment variable named REALM_PAGE_GOVENOR_FILE.
+  if none of the above is available, or if 'target' is not found in cfg file, the feature is disabled.
   ([#3123] https://github.com/realm/realm-core/issues/3123)
  
 ### Breaking changes
