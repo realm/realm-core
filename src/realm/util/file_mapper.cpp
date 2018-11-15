@@ -44,6 +44,9 @@
 #include <cstring>
 #include <atomic>
 #include <iostream>
+#include <fstream>
+#include <sstream>
+#include <regex>
 #include <thread>
 
 #include <realm/util/file.hpp>
@@ -109,33 +112,22 @@ std::vector<mappings_for_file>& mappings_by_file = *new std::vector<mappings_for
 unsigned int file_reclaim_index = 0;
 
 // helpers
-bool read_line(FILE* file, char* line)
-{
-    int c;
-    while (1) {
-        c = fgetc(file);
-        if (c == EOF || c == '\n')
-            break;
-        *line++ = c;
-    }
-    *line = 0;
-    return c != EOF;
-}
 size_t fetch_value_in_file(const char* fname, const char* scan_pattern)
 {
-    char line[100];
-    auto file = fopen(fname, "r");
-    if (file == nullptr)
-        return 0;
-    size_t total;
-    while (read_line(file, line)) {
-        int r = sscanf(line, scan_pattern, &total);
-        if (r == 1) {
-            fclose(file);
-            return total;
+    std::ifstream file(fname);
+    if (file) {
+        std::stringstream buffer;
+        buffer << file.rdbuf();
+
+        std::string s = buffer.str();
+        std::smatch m;
+        std::regex e(scan_pattern);
+
+        if (std::regex_search(s, m, e)) {
+            std::string ibuf = m[1];
+            return strtol(ibuf.c_str(), nullptr, 10);
         }
     }
-    fclose(file);
     return 0;
 }
 
@@ -154,9 +146,9 @@ public:
             return m_target;
         }
         size_t target;
-        auto from_proc = fetch_value_in_file("/proc/meminfo", "MemTotal: %zu kB") * 1024;
-        auto from_cgroup = fetch_value_in_file("/sys/fs/cgroup/memory/memory.limit_in_bytes", "%zu");
-        auto cache_use = fetch_value_in_file("/sys/fs/cgroup/memory/memory.stat", "cache %zu");
+        auto from_proc = fetch_value_in_file("/proc/meminfo", "MemTotal:[[:space:]]+([[:digit:]]+) kB") * 1024;
+        auto from_cgroup = fetch_value_in_file("/sys/fs/cgroup/memory/memory.limit_in_bytes", "^([[:digit:]]+)");
+        auto cache_use = fetch_value_in_file("/sys/fs/cgroup/memory/memory.stat", "cache ([[:digit:]]+)");
         if (from_proc != 0 && from_cgroup != 0) {
             target = std::min(from_proc, from_cgroup) / 4;
         }
