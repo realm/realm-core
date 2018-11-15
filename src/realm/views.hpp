@@ -154,6 +154,12 @@ public:
     void append_sort(SortDescriptor sort);
     void append_distinct(DistinctDescriptor distinct);
     void append_limit(LimitDescriptor limit);
+
+    /// Remove all LIMIT statements from this descriptor ordering, returning the
+    /// minimum LIMIT value that existed. If there was no LIMIT statement,
+    /// returns `none`.
+    util::Optional<size_t> remove_all_limits();
+
     bool descriptor_is_sort(size_t index) const;
     bool descriptor_is_distinct(size_t index) const;
     bool descriptor_is_limit(size_t index) const;
