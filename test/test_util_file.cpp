@@ -131,17 +131,17 @@ TEST(Utils_File_resolve)
     res = File::resolve("file\\", "dir");
     CHECK_EQUAL(res, "dir\\file\\");
 #else
-	res = File::resolve("/foo/bar", "dir");
-	CHECK_EQUAL(res, "/foo/bar");
+    res = File::resolve("/foo/bar", "dir");
+    CHECK_EQUAL(res, "/foo/bar");
 
-	res = File::resolve("foo/bar", "");
-	CHECK_EQUAL(res, "foo/bar");
+    res = File::resolve("foo/bar", "");
+    CHECK_EQUAL(res, "foo/bar");
 
-	res = File::resolve("file", "dir");
-	CHECK_EQUAL(res, "dir/file");
+    res = File::resolve("file", "dir");
+    CHECK_EQUAL(res, "dir/file");
 
-	res = File::resolve("file/", "dir");
-	CHECK_EQUAL(res, "dir/file/");
+    res = File::resolve("file/", "dir");
+    CHECK_EQUAL(res, "dir/file/");
 #endif
 
     /* Function does not work as specified - but not used

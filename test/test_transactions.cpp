@@ -724,68 +724,68 @@ TEST(LangBindHelper_RollbackLinkInsert)
 
 void growth_phase(SharedGroup& sg_w)
 {
-	std::cout << "Growing..." << std::endl;
-	for (int j = 0; j < 100; ++j) {
-		//std::cout << "growth phase " << j << std::endl;
-		WriteTransaction wt(sg_w);
-		Group& g = wt.get_group();
-		TableRef t = g.get_table("spoink");
-		for (int k = 0; k < 50000; ++k) {
-			auto row = t->add_empty_row();
-			t->set_string(0, row, "yooodle-de-do-glabtyligok-pluut");
-		}
-		//std::cout << "     - commit" << std::endl;
-		wt.commit();
-	}
+    std::cout << "Growing..." << std::endl;
+    for (int j = 0; j < 100; ++j) {
+        //std::cout << "growth phase " << j << std::endl;
+        WriteTransaction wt(sg_w);
+        Group& g = wt.get_group();
+        TableRef t = g.get_table("spoink");
+        for (int k = 0; k < 50000; ++k) {
+            auto row = t->add_empty_row();
+            t->set_string(0, row, "yooodle-de-do-glabtyligok-pluut");
+        }
+        //std::cout << "     - commit" << std::endl;
+        wt.commit();
+    }
 }
 
 void query_phase(SharedGroup& sg_w)
 {
-	std::cout << "Querying..." << std::endl;
-	for (int j = 0; j < 1; ++j) {
-		//std::cout << "growth phase " << j << std::endl;
-		ReadTransaction wt(sg_w);
-		const Group& g = wt.get_group();
-		ConstTableRef t = g.get_table("spoink");
-		TableView tv = t->where().equal(0,"gylle").find_all();
-	}
+    std::cout << "Querying..." << std::endl;
+    for (int j = 0; j < 1; ++j) {
+        //std::cout << "growth phase " << j << std::endl;
+        ReadTransaction wt(sg_w);
+        const Group& g = wt.get_group();
+        ConstTableRef t = g.get_table("spoink");
+        TableView tv = t->where().equal(0,"gylle").find_all();
+    }
 }
 
 void partial_read_phase(SharedGroup& sg_w)
 {
-	std::cout << "Reading..." << std::endl;
-	for (int j = 0; j < 100; ++j) {
-		//std::cout << "growth phase " << j << std::endl;
-		ReadTransaction wt(sg_w);
-		const Group& g = wt.get_group();
-		ConstTableRef t = g.get_table("spoink");
-		int max = t->size();
-		for (int z = 0; z < max/100; ++z) {
-			t->get_string(0,z);
-		}
-	}
+    std::cout << "Reading..." << std::endl;
+    for (int j = 0; j < 100; ++j) {
+        //std::cout << "growth phase " << j << std::endl;
+        ReadTransaction wt(sg_w);
+        const Group& g = wt.get_group();
+        ConstTableRef t = g.get_table("spoink");
+        int max = t->size();
+        for (int z = 0; z < max/100; ++z) {
+            t->get_string(0,z);
+        }
+    }
 }
 
 void modification_phase(SharedGroup& sg_w)
 {
-	std::cout << "Modifying..." << std::endl;
-	int row = 0;
-	for (int j = 0; j < 100; ++j) {
-		//std::cout << "growth phase " << j << std::endl;
-		WriteTransaction wt(sg_w);
-		Group& g = wt.get_group();
-		TableRef t = g.get_table("spoink");
-		int max = t->size();
-		for (int k = 0; k < 100000; ++k) {
-			if (row == max) row = 0;
-			std::string s("yooodle-glabtyligok-plut-fnytliandomcrackplaf!");
-			s = s + to_string(j);
-			t->set_string(0, row, s);
-			++row;
-		}
-		//std::cout << "     - commit" << std::endl;
-		wt.commit();
-	}
+    std::cout << "Modifying..." << std::endl;
+    int row = 0;
+    for (int j = 0; j < 100; ++j) {
+        //std::cout << "growth phase " << j << std::endl;
+        WriteTransaction wt(sg_w);
+        Group& g = wt.get_group();
+        TableRef t = g.get_table("spoink");
+        int max = t->size();
+        for (int k = 0; k < 100000; ++k) {
+            if (row == max) row = 0;
+            std::string s("yooodle-glabtyligok-plut-fnytliandomcrackplaf!");
+            s = s + to_string(j);
+            t->set_string(0, row, s);
+            ++row;
+        }
+        //std::cout << "     - commit" << std::endl;
+        wt.commit();
+    }
 }
 
 void preparations(SharedGroup& sg_w)
@@ -803,68 +803,68 @@ void preparations(SharedGroup& sg_w)
     }
 }
 
+// illustration of possible governor function which takes total system load into account
 class ExampleGovernor : public util::PageReclaimGovernor {
-
-	// illustration of possible governor function which takes total system load into account
-	size_t system_memory_governor(size_t load) {
-		try {
-			auto file = fopen("/proc/meminfo","r");
-			if (file == nullptr)
-				return 0;
-			size_t total, free;
-			int r = fscanf(file,"MemTotal: %zu kB MemFree: %zu kB", &total, &free);
-			if (r != 2)
-				return 0;
-			fclose(file);
-			size_t target;
-			/*
-			if (free < total * 0.25)
-				target = size_t(load * 0.9);
-			else if (free < total * 0.3)
-				target =  load;
-			else
-				target = size_t(load * 2.1);
-			if (target > total * 768)
-				target = total * 768;
-				*/
-			target = total * 256;
-			std::cout << "total: " << total << "   free: " << free
-						<< "   load: " << load << "   target: " << target << "    \r";
-			return target;
-		} catch (...) {
-			return 0;
-		}
-	}
-
-	size_t file_control_governor(size_t load) {
-		try {
-			auto file = fopen("governor.txt", "r");
-			if (file == nullptr)
-				return system_memory_governor(load);
-			size_t target;
-			int r = fscanf(file, "%zu", &target);
-			if (r != 1)
-				return system_memory_governor(load);
-			fclose(file);
-			std::cout << "Encryption: active data = " << load << "    set target: " << target << "   \r";
-			return target;
-		} catch (...) {
-			return system_memory_governor(load);
-		}
-	}
-
 public:
-	int64_t get_current_target(size_t load) override
-	{
-		return int64_t(file_control_governor(load));
-	}
+    size_t get_current_target(size_t load) override
+    {
+        return file_control_governor(load);
+    }
+
+private:
+    size_t system_memory_governor(size_t load) {
+        try {
+            auto file = fopen("/proc/meminfo","r");
+            if (file == nullptr)
+                return 0;
+            size_t total, free;
+            int r = fscanf(file,"MemTotal: %zu kB MemFree: %zu kB", &total, &free);
+            if (r != 2)
+                return 0;
+            fclose(file);
+            size_t target;
+            /*
+            if (free < total * 0.25)
+                target = size_t(load * 0.9);
+            else if (free < total * 0.3)
+                target =  load;
+            else
+                target = size_t(load * 2.1);
+            if (target > total * 768)
+                target = total * 768;
+                */
+            target = total * 256;
+            std::cout << "total: " << total << "   free: " << free
+                        << "   load: " << load << "   target: " << target << "    \r";
+            return target;
+        } catch (...) {
+            return 0;
+        }
+    }
+
+    size_t file_control_governor(size_t load) {
+        try {
+            auto file = fopen("governor.txt", "r");
+            if (file == nullptr)
+                return system_memory_governor(load);
+            size_t target;
+            int r = fscanf(file, "%zu", &target);
+            if (r != 1)
+                return system_memory_governor(load);
+            fclose(file);
+            std::cout << "Encryption: active data = " << load << "    set target: " << target << "   \r";
+            return target;
+        } catch (...) {
+            return system_memory_governor(load);
+        }
+    }
 };
 
 ExampleGovernor example_governor;
 
 ONLY(LangBindHelper_EncryptionGiga)
 {
-	//realm::util::set_page_reclaim_governor(&example_governor);
+    //realm::util::set_page_reclaim_governor(&example_governor);
     std::string path1 = "dont_try_this_at_home1.realm";
     std::unique_ptr<Replication> hist_w1(make_in_realm_history(path1));
 

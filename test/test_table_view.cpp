@@ -1058,7 +1058,7 @@ TEST(TableView_FindAllStacked)
 {
     TestTable table;
     table.add_column(type_Int, "1");
-    table.add_column(type_Int, "2");	
+    table.add_column(type_Int, "2");
 
     add(table, 0, 1);
     add(table, 0, 2);
@@ -1333,7 +1333,7 @@ TEST(TableView_ToString)
 {
     TestTable tbl;
     tbl.add_column(type_Int, "first");
-    tbl.add_column(type_Int, "second");	
+    tbl.add_column(type_Int, "second");
 
     add(tbl, 2, 123456);
     add(tbl, 4, 1234567);
