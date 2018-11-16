@@ -113,7 +113,7 @@ unsigned int file_reclaim_index = 0;
 
 // helpers
 
-int64_t fetch_value_in_file(std::string fname, const char* scan_pattern)
+int64_t fetch_value_in_file(const std::string& fname, const char* scan_pattern)
 {
     std::ifstream file(fname);
     if (file) {
@@ -139,18 +139,18 @@ int64_t fetch_value_in_file(std::string fname, const char* scan_pattern)
 
 class DefaultGovernor : public PageReclaimGovernor {
 public:
-	int64_t pick_lowest_valid(int64_t a, int64_t b) {
-		if (a == no_match)
-			return b;
-		if (b == no_match)
-			return a;
-		return std::min(a,b);
-	}
-	int64_t pick_if_valid(int64_t source, int64_t target) {
-		if (source == no_match)
-			return no_match;
-		return target;
-	}
+    int64_t pick_lowest_valid(int64_t a, int64_t b) {
+        if (a == no_match)
+            return b;
+        if (b == no_match)
+            return a;
+        return std::min(a,b);
+    }
+    int64_t pick_if_valid(int64_t source, int64_t target) {
+        if (source == no_match)
+            return no_match;
+        return target;
+    }
 
 	int64_t get_current_target(size_t load) override
     {
@@ -178,14 +178,14 @@ public:
         return target;
     }
     DefaultGovernor() {
-    	auto cfg_name = getenv("REALM_PAGE_GOVERNOR_CFG");
-    	if (cfg_name) {
-    		m_cfg_file_name = cfg_name;
-    	}
+        auto cfg_name = getenv("REALM_PAGE_GOVERNOR_CFG");
+        if (cfg_name) {
+            m_cfg_file_name = cfg_name;
+        }
     }
 private:
     std::string m_cfg_file_name;
-    int64_t m_target;
+    int64_t m_target = 0;
     int m_refresh_count = 0;
 };
 
