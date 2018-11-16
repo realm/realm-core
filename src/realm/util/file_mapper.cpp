@@ -113,7 +113,7 @@ unsigned int file_reclaim_index = 0;
 
 // helpers
 
-int64_t fetch_value_in_file(const char* fname, const char* scan_pattern)
+int64_t fetch_value_in_file(std::string fname, const char* scan_pattern)
 {
     std::ifstream file(fname);
     if (file) {
@@ -139,14 +139,14 @@ int64_t fetch_value_in_file(const char* fname, const char* scan_pattern)
 
 class DefaultGovernor : public PageReclaimGovernor {
 public:
-	int64_t get_lowest(int64_t a, int64_t b) {
+	int64_t pick_lowest_valid(int64_t a, int64_t b) {
 		if (a == no_match)
 			return b;
 		if (b == no_match)
 			return a;
 		return std::min(a,b);
 	}
-	int64_t target_if_valid(int64_t source, int64_t target) {
+	int64_t pick_if_valid(int64_t source, int64_t target) {
 		if (source == no_match)
 			return no_match;
 		return target;
@@ -155,13 +155,12 @@ public:
 	int64_t get_current_target(size_t load) override
     {
         static_cast<void>(load);
-        std::cout << "\rLoad: " << load << "   Target: " << m_target << "       ";
         if (m_refresh_count > 0) {
             --m_refresh_count;
             return m_target;
         }
         int64_t target;
-        auto local_spec = fetch_value_in_file("page_governor.cfg", "target ([[:digit:]]+)");
+        auto local_spec = fetch_value_in_file(m_cfg_file_name, "target ([[:digit:]]+)");
         if (local_spec != no_match) { // overrides everything!
             target = local_spec;
         }
@@ -170,16 +169,22 @@ public:
             auto from_proc = fetch_value_in_file("/proc/meminfo", "MemTotal:[[:space:]]+([[:digit:]]+) kB") * 1024;
             auto from_cgroup = fetch_value_in_file("/sys/fs/cgroup/memory/memory.limit_in_bytes", "^([[:digit:]]+)");
             auto cache_use = fetch_value_in_file("/sys/fs/cgroup/memory/memory.stat", "cache ([[:digit:]]+)");
-            target = target_if_valid(from_proc, from_proc / 4);
-            target = get_lowest(target, target_if_valid(from_cgroup, from_cgroup / 4));
-            target = get_lowest(target, target_if_valid(cache_use, cache_use / 2));
+            target = pick_if_valid(from_proc, from_proc / 4);
+            target = pick_lowest_valid(target, pick_if_valid(from_cgroup, from_cgroup / 4));
+            target = pick_lowest_valid(target, pick_if_valid(cache_use, cache_use / 2));
         }
         m_target = target;
         m_refresh_count = 10; // refresh every 10 seconds
         return target;
     }
-
+    DefaultGovernor() {
+    	auto cfg_name = getenv("REALM_PAGE_GOVERNOR_CFG");
+    	if (cfg_name) {
+    		m_cfg_file_name = cfg_name;
+    	}
+    }
 private:
+    std::string m_cfg_file_name;
     int64_t m_target;
     int m_refresh_count = 0;
 };
@@ -344,8 +349,6 @@ void reclaim_pages()
         if (mappings_by_file.size() == 0)
             return;
         size_t work_limit = get_work_limit(load, size_t(target));
-        if (work_limit == 0)
-            return; // nothing to do
         if (file_reclaim_index >= mappings_by_file.size())
             file_reclaim_index = 0;
         while (work_limit > 0) {
