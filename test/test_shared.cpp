@@ -3948,11 +3948,11 @@ TEST_IF(Shared_DecryptExisting, REALM_ENABLE_ENCRYPTION)
         File::try_remove(path);
         SharedGroup db(path, false, SharedGroupOptions(crypt_key(true)));
         Group& group = db.begin_write();
-		TableRef table = group.add_table("table");
-		table->add_column(type_String, "string");
-		table->add_empty_row();
-		std::string s = std::string(size_t(1.5 * page_size()), 'a');
-		table->set_string(0, 0, s);
+        TableRef table = group.add_table("table");
+        table->add_column(type_String, "string");
+        table->add_empty_row();
+        std::string s = std::string(size_t(1.5 * page_size()), 'a');
+        table->set_string(0, 0, s);
         db.commit();
     }
 #else
@@ -3961,11 +3961,11 @@ TEST_IF(Shared_DecryptExisting, REALM_ENABLE_ENCRYPTION)
         File::copy(path, temp_copy);
         SharedGroup sg(temp_copy, true, SharedGroupOptions(crypt_key(true)));
         const Group& group = sg.begin_read();
-		ConstTableRef table = group.get_table("table");
-		std::string s1 = table->get_string(0, 0);
-		std::string s2 = std::string(size_t(1.5 * page_size()), 'a');
-		CHECK_EQUAL(s1, s2);
-		group.verify();
+        ConstTableRef table = group.get_table("table");
+        std::string s1 = table->get_string(0, 0);
+        std::string s2 = std::string(size_t(1.5 * page_size()), 'a');
+        CHECK_EQUAL(s1, s2);
+        group.verify();
     }
 #endif
 }
