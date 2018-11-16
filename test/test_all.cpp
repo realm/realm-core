@@ -223,7 +223,7 @@ void set_random_seed()
 
 class AggressiveGovernor : public PageReclaimGovernor {
 public:
-    virtual size_t get_current_target(size_t) override
+    int64_t get_current_target(size_t) override
     {
         return 4096;
     }

@@ -44,6 +44,9 @@
 #include <cstring>
 #include <atomic>
 #include <iostream>
+#include <fstream>
+#include <sstream>
+#include <regex>
 #include <thread>
 
 #include <realm/util/file.hpp>
@@ -109,34 +112,24 @@ std::vector<mappings_for_file>& mappings_by_file = *new std::vector<mappings_for
 unsigned int file_reclaim_index = 0;
 
 // helpers
-bool read_line(FILE* file, char* line)
+
+int64_t fetch_value_in_file(const std::string& fname, const char* scan_pattern)
 {
-    int c;
-    while (1) {
-        c = fgetc(file);
-        if (c == EOF || c == '\n')
-            break;
-        *line++ = c;
-    }
-    *line = 0;
-    return c != EOF;
-}
-size_t fetch_value_in_file(const char* fname, const char* scan_pattern)
-{
-    char line[100];
-    auto file = fopen(fname, "r");
-    if (file == nullptr)
-        return 0;
-    size_t total;
-    while (read_line(file, line)) {
-        int r = sscanf(line, scan_pattern, &total);
-        if (r == 1) {
-            fclose(file);
-            return total;
+    std::ifstream file(fname);
+    if (file) {
+        std::stringstream buffer;
+        buffer << file.rdbuf();
+
+        std::string s = buffer.str();
+        std::smatch m;
+        std::regex e(scan_pattern);
+
+        if (std::regex_search(s, m, e)) {
+            std::string ibuf = m[1];
+            return strtol(ibuf.c_str(), nullptr, 10);
         }
     }
-    fclose(file);
-    return 0;
+    return PageReclaimGovernor::no_match;
 }
 
 
@@ -146,33 +139,53 @@ size_t fetch_value_in_file(const char* fname, const char* scan_pattern)
 
 class DefaultGovernor : public PageReclaimGovernor {
 public:
-    size_t get_current_target(size_t load) override
+    int64_t pick_lowest_valid(int64_t a, int64_t b) {
+        if (a == no_match)
+            return b;
+        if (b == no_match)
+            return a;
+        return std::min(a,b);
+    }
+    int64_t pick_if_valid(int64_t source, int64_t target) {
+        if (source == no_match)
+            return no_match;
+        return target;
+    }
+
+	int64_t get_current_target(size_t load) override
     {
         static_cast<void>(load);
         if (m_refresh_count > 0) {
             --m_refresh_count;
             return m_target;
         }
-        size_t target;
-        auto from_proc = fetch_value_in_file("/proc/meminfo", "MemTotal: %zu kB") * 1024;
-        auto from_cgroup = fetch_value_in_file("/sys/fs/cgroup/memory/memory.limit_in_bytes", "%zu");
-        auto cache_use = fetch_value_in_file("/sys/fs/cgroup/memory/memory.stat", "cache %zu");
-        if (from_proc != 0 && from_cgroup != 0) {
-            target = std::min(from_proc, from_cgroup) / 4;
+        int64_t target;
+        auto local_spec = fetch_value_in_file(m_cfg_file_name, "target ([[:digit:]]+)");
+        if (local_spec != no_match) { // overrides everything!
+            target = local_spec;
         }
         else {
-            // one of them is zero, just pick the other one
-            target = std::max(from_proc, from_cgroup) / 4;
+            // no local spec, try to deduce something reasonable from platform info
+            auto from_proc = fetch_value_in_file("/proc/meminfo", "MemTotal:[[:space:]]+([[:digit:]]+) kB") * 1024;
+            auto from_cgroup = fetch_value_in_file("/sys/fs/cgroup/memory/memory.limit_in_bytes", "^([[:digit:]]+)");
+            auto cache_use = fetch_value_in_file("/sys/fs/cgroup/memory/memory.stat", "cache ([[:digit:]]+)");
+            target = pick_if_valid(from_proc, from_proc / 4);
+            target = pick_lowest_valid(target, pick_if_valid(from_cgroup, from_cgroup / 4));
+            target = pick_lowest_valid(target, pick_if_valid(cache_use, cache_use / 2));
         }
-        if (cache_use != 0 && target > cache_use / 2)
-            target = cache_use / 2;
         m_target = target;
         m_refresh_count = 10; // refresh every 10 seconds
         return target;
     }
-
+    DefaultGovernor() {
+        auto cfg_name = getenv("REALM_PAGE_GOVERNOR_CFG");
+        if (cfg_name) {
+            m_cfg_file_name = cfg_name;
+        }
+    }
 private:
-    size_t m_target;
+    std::string m_cfg_file_name;
+    int64_t m_target = 0;
     int m_refresh_count = 0;
 };
 
@@ -197,7 +210,10 @@ void set_page_reclaim_governor(PageReclaimGovernor* new_governor)
 struct DefaultGovernorInstaller {
     DefaultGovernorInstaller()
     {
-        set_page_reclaim_governor(&default_governor);
+    	if (default_governor.get_current_target(0) != PageReclaimGovernor::no_match) {
+    		// only install if the governor is able to compute a target.
+    		set_page_reclaim_governor(&default_governor);
+    	}
     }
 };
 
@@ -325,16 +341,14 @@ void reclaim_pages()
         load = collect_total_workload();
     }
     // callback to governor without mutex held
-    size_t target = governor->get_current_target(load * page_size()) / page_size();
+    int64_t target = governor->get_current_target(load * page_size()) / page_size();
     {
         UniqueLock lock(mapping_mutex);
-        if (target == 0) // temporarily disabled by governor returning 0
+        if (target == PageReclaimGovernor::no_match) // temporarily disabled by governor returning 0
             return;
         if (mappings_by_file.size() == 0)
             return;
-        size_t work_limit = get_work_limit(load, target);
-        if (work_limit == 0)
-            return; // nothing to do
+        size_t work_limit = get_work_limit(load, size_t(target));
         if (file_reclaim_index >= mappings_by_file.size())
             file_reclaim_index = 0;
         while (work_limit > 0) {
