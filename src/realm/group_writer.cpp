@@ -571,7 +571,7 @@ size_t GroupWriter::recreate_freelist(size_t reserve_pos, size_t& free_space_siz
         m_free_in_file.emplace_back(free_space.ref, free_space.size, free_space.released_at_version);
     }
 
-	auto& new_free_space = m_group.m_alloc.get_free_read_only(); // Throws
+    auto& new_free_space = m_group.m_alloc.get_free_read_only(); // Throws
     for (const auto& free_space : new_free_space) {
         m_free_in_file.emplace_back(free_space.first, free_space.second, m_current_version);
     }

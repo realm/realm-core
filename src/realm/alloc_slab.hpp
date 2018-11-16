@@ -375,15 +375,18 @@ private:
     // Each slab (area obtained from the underlying system) has a terminating BetweenBlocks
     // at the beginning and at the end of the Slab.
     struct FreeBlock {
-    	ref_type ref; // ref for this entry. Saves a reverse translate / representing links as refs
-    	FreeBlock* prev; // circular doubly linked list
-    	FreeBlock* next;
-    	void clear_links() { prev = next = nullptr; }
-    	void unlink();
+        ref_type ref;    // ref for this entry. Saves a reverse translate / representing links as refs
+        FreeBlock* prev; // circular doubly linked list
+        FreeBlock* next;
+        void clear_links()
+        {
+            prev = next = nullptr;
+        }
+        void unlink();
     };
     struct BetweenBlocks { // stores sizes and used/free status of blocks before and after.
-    	int32_t block_before_size; // negated if block is in use,
-    	int32_t block_after_size;  // positive if block is free - and zero at end
+        int32_t block_before_size; // negated if block is in use,
+        int32_t block_after_size;  // positive if block is free - and zero at end
     };
 
     using FreeListMap = std::map<int, FreeBlock*>;  // log(N) addressing for larger blocks
@@ -392,35 +395,42 @@ private:
     // abstract notion of a freelist - used to hide whether a freelist
     // is residing in the small blocks or the large blocks structures.
     struct FreeList {
-    	int size = 0; // size of every element in the list, 0 if not found
-    	FreeListMap::iterator it;
-    	bool found_something() { return size != 0; }
-    	bool found_exact(int sz) { return size == sz; }
+        int size = 0; // size of every element in the list, 0 if not found
+        FreeListMap::iterator it;
+        bool found_something()
+        {
+            return size != 0;
+        }
+        bool found_exact(int sz)
+        {
+            return size == sz;
+        }
     };
 
     // simple helper functions for accessing/navigating blocks and betweenblocks (TM)
     BetweenBlocks* bb_before(FreeBlock* entry) const {
-    	return reinterpret_cast<BetweenBlocks*>(entry) - 1;
+        return reinterpret_cast<BetweenBlocks*>(entry) - 1;
     }
     BetweenBlocks* bb_after(FreeBlock* entry) const {
-    	auto bb = bb_before(entry);
-    	size_t sz = bb->block_after_size;
-    	char* addr = reinterpret_cast<char*>(entry) + sz;
-    	return reinterpret_cast<BetweenBlocks*>(addr);
+        auto bb = bb_before(entry);
+        size_t sz = bb->block_after_size;
+        char* addr = reinterpret_cast<char*>(entry) + sz;
+        return reinterpret_cast<BetweenBlocks*>(addr);
     }
     FreeBlock* block_before(BetweenBlocks* bb) const {
-    	size_t sz = bb->block_before_size;
-    	if (sz <= 0) return nullptr; // only blocks that are not in use
-    	char* addr = reinterpret_cast<char*>(bb) - sz;
-    	return reinterpret_cast<FreeBlock*>(addr);
+        size_t sz = bb->block_before_size;
+        if (sz <= 0)
+            return nullptr; // only blocks that are not in use
+        char* addr = reinterpret_cast<char*>(bb) - sz;
+        return reinterpret_cast<FreeBlock*>(addr);
     }
     FreeBlock* block_after(BetweenBlocks* bb) const {
-    	if (bb->block_after_size <= 0)
-    		return nullptr;
-    	return reinterpret_cast<FreeBlock*>(bb + 1);
+        if (bb->block_after_size <= 0)
+            return nullptr;
+        return reinterpret_cast<FreeBlock*>(bb + 1);
     }
     int size_from_block(FreeBlock* entry) const {
-    	return bb_before(entry)->block_after_size;
+        return bb_before(entry)->block_after_size;
     }
     void mark_allocated(FreeBlock* entry);
     // mark the entry freed in bordering BetweenBlocks. Also validate size.
@@ -670,28 +680,28 @@ inline size_t SlabAlloc::get_section_base(size_t index) const noexcept
 template<typename Func>
 void SlabAlloc::for_all_free_entries(Func f) const
 {
-	ref_type ref = m_baseline;
-	for (auto& e : m_slabs) {
-		BetweenBlocks* bb = reinterpret_cast<BetweenBlocks*>(e.addr);
-		REALM_ASSERT(bb->block_before_size == 0);
-		while (1) {
-			int size = bb->block_after_size;
-			f(ref, sizeof(BetweenBlocks));
-			ref += sizeof(BetweenBlocks);
-			if (size == 0) {
-				break;
-			}
-			if (size > 0) { // freeblock.
-				f(ref, size);
-				bb = reinterpret_cast<BetweenBlocks*>(reinterpret_cast<char*>(bb) + sizeof(BetweenBlocks) + size);
-				ref += size;
-			}
-			else {
-				bb = reinterpret_cast<BetweenBlocks*>(reinterpret_cast<char*>(bb) + sizeof(BetweenBlocks) - size);
-				ref -= size;
-			}
-		}
-	}
+    ref_type ref = m_baseline;
+    for (auto& e : m_slabs) {
+        BetweenBlocks* bb = reinterpret_cast<BetweenBlocks*>(e.addr);
+        REALM_ASSERT(bb->block_before_size == 0);
+        while (1) {
+            int size = bb->block_after_size;
+            f(ref, sizeof(BetweenBlocks));
+            ref += sizeof(BetweenBlocks);
+            if (size == 0) {
+                break;
+            }
+            if (size > 0) { // freeblock.
+                f(ref, size);
+                bb = reinterpret_cast<BetweenBlocks*>(reinterpret_cast<char*>(bb) + sizeof(BetweenBlocks) + size);
+                ref += size;
+            }
+            else {
+                bb = reinterpret_cast<BetweenBlocks*>(reinterpret_cast<char*>(bb) + sizeof(BetweenBlocks) - size);
+                ref -= size;
+            }
+        }
+    }
 }
 
 } // namespace realm

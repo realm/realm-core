@@ -2860,10 +2860,10 @@ TEST(Query_GA_Crash)
         Group g;
         TableRef t = g.add_table("firstevents");
         t->add_column(type_String, "1");
-    	t->add_column(type_String, "2");
-	    t->add_column(type_String, "3");
-	    t->add_column(type_Int, "4");
-	    t->add_column(type_Int, "5");
+        t->add_column(type_String, "2");
+        t->add_column(type_String, "3");
+        t->add_column(type_Int, "4");
+        t->add_column(type_Int, "5");
 
         for (size_t i = 0; i < 100; ++i) {
             int64_t r1 = random.draw_int_mod(100);
@@ -3028,8 +3028,8 @@ TEST(Query_JavaMinimumCrash)
     TestTable ttt;
 
     ttt.add_column(type_String, "1");
-	ttt.add_column(type_String, "2");
-	ttt.add_column(type_Int, "3");
+    ttt.add_column(type_String, "2");
+    ttt.add_column(type_Int, "3");
 
     add(ttt, "Joe", "John", 1);
     add(ttt, "Jane", "Doe", 2);
@@ -3350,19 +3350,19 @@ TEST(Query_FindAllContains2_2)
 TEST(Query_SumNewAggregates)
 {
     // test the new ACTION_FIND_PATTERN() method in array
-	Table t;
-	t.add_column(type_Int, "1");
+    Table t;
+    t.add_column(type_Int, "1");
     for (size_t i = 0; i < 1000; i++) {
-		t.add_empty_row();
+        t.add_empty_row();
         t.set_int(0, t.size() - 1, 1);
 
-		t.add_empty_row();
+        t.add_empty_row();
         t.set_int(0, t.size() - 1, 2);
 
-		t.add_empty_row();
+        t.add_empty_row();
         t.set_int(0, t.size() - 1, 4);
 
-		t.add_empty_row();
+        t.add_empty_row();
         t.set_int(0, t.size() - 1, 6);
     }
     size_t c = t.where().equal(0, 2).count();
@@ -3375,21 +3375,21 @@ TEST(Query_SumNewAggregates)
 
 TEST(Query_SumMinMaxAvgForeignCol)
 {
-	Table t;
-	t.add_column(type_Int, "1");
-	t.add_column(type_Int, "2");
-	t.add_empty_row(4);
-	t.set_int(0, 0, 1);
-	t.set_int(1, 0, 10);
+    Table t;
+    t.add_column(type_Int, "1");
+    t.add_column(type_Int, "2");
+    t.add_empty_row(4);
+    t.set_int(0, 0, 1);
+    t.set_int(1, 0, 10);
 
-	t.set_int(0, 1, 2);
-	t.set_int(1, 1, 20);
+    t.set_int(0, 1, 2);
+    t.set_int(1, 1, 20);
 
-	t.set_int(0, 2, 2);
-	t.set_int(1, 2, 30);
+    t.set_int(0, 2, 2);
+    t.set_int(1, 2, 30);
 
-	t.set_int(0, 3, 4);
-	t.set_int(1, 3, 40);
+    t.set_int(0, 3, 4);
+    t.set_int(1, 3, 40);
 
     CHECK_EQUAL(50, t.where().equal(0, 2).sum_int(1));
 }
@@ -3397,25 +3397,25 @@ TEST(Query_SumMinMaxAvgForeignCol)
 
 TEST(Query_AggregateSingleCond)
 {
-	Table t;
-	t.add_column(type_Int, "1");
+    Table t;
+    t.add_column(type_Int, "1");
 
-	t.add_empty_row();
+    t.add_empty_row();
     t.set_int(0, t.size() - 1, 1);
 
-	t.add_empty_row();
+    t.add_empty_row();
     t.set_int(0, t.size() - 1, 2);
 
-	t.add_empty_row();
+    t.add_empty_row();
     t.set_int(0, t.size() - 1, 2);
 
-	t.add_empty_row();
+    t.add_empty_row();
     t.set_int(0, t.size() - 1, 3);
 
-	t.add_empty_row();
+    t.add_empty_row();
     t.set_int(0, t.size() - 1, 3);
 
-	t.add_empty_row();
+    t.add_empty_row();
     t.set_int(0, t.size() - 1, 4);
 
     int64_t s = t.where().equal(0, 2).sum_int(0);

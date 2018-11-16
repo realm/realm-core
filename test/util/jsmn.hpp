@@ -12,10 +12,10 @@ extern "C" {
 
 /**
  * JSON type identifier. Basic types are:
- * 	o Object
- * 	o Array
- * 	o String
- * 	o Other primitive: number, boolean (true/false) or null
+ *  o Object
+ *  o Array
+ *  o String
+ *  o Other primitive: number, boolean (true/false) or null
  */
 typedef enum { JSMN_UNDEFINED = 0, JSMN_OBJECT = 1, JSMN_ARRAY = 2, JSMN_STRING = 3, JSMN_PRIMITIVE = 4 } jsmntype_t;
 
@@ -30,9 +30,9 @@ enum jsmnerr {
 
 /**
  * JSON token description.
- * @param		type	type (object, array, string etc.)
- * @param		start	start position in JSON data string
- * @param		end		end position in JSON data string
+ * @param       type    type (object, array, string etc.)
+ * @param       start   start position in JSON data string
+ * @param       end     end position in JSON data string
  */
 typedef struct {
     jsmntype_t type;
