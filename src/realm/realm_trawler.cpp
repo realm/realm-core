@@ -305,7 +305,8 @@ void Node::init(realm::Allocator& alloc, uint64_t ref)
     if (memcmp(m_header, &signature, 4)) {
     }
     else {
-        m_size = (m_header[5] << 16) + (m_header[6] << 8) + m_header[7];
+        unsigned char* u = reinterpret_cast<unsigned char*>(m_header);
+        m_size = (u[5] << 16) + (u[6] << 8) + u[7];
         m_valid = true;
     }
 }
@@ -374,7 +375,7 @@ RealmFile::RealmFile(const std::string& file_path, const char* encryption_key)
     config.read_only = true;
     config.no_create = true;
     m_top_ref = m_alloc.attach_file(file_path, config);
-
+    m_start_pos = 24;
     m_group = std::make_unique<Group>(m_alloc, m_top_ref);
     m_file_format_version = m_alloc.get_committed_file_format_version();
     std::cout << "Top ref: 0x" << std::hex << m_top_ref << std::dec << std::endl;
@@ -390,27 +391,30 @@ void RealmFile::node_scan()
         auto free_list = m_group->get_free_list();
         auto free_entry = free_list.begin();
         bool searching = false;
-        while (ref < m_group->get_file_size()) {
-            while (ref == free_entry->start) {
+        auto end = m_group->get_file_size();
+        while (ref < end) {
+            if (ref == free_entry->start) {
                 ref += free_entry->length;
                 ++free_entry;
             }
-            Node n(m_alloc, ref);
-            if (n.valid()) {
-                if (searching) {
-                    std::cerr << "Resuming from ref: " << ref << std::endl;
-                    searching = false;
-                }
-                auto size_in_bytes = n.size_in_bytes();
-                sizes[size_in_bytes]++;
-                ref += size_in_bytes;
-            }
             else {
-                if (!searching) {
-                    std::cerr << "Invalid ref: " << ref << std::endl;
-                    searching = true;
+                Node n(m_alloc, ref);
+                if (n.valid()) {
+                    if (searching) {
+                        std::cerr << "Resuming from ref: " << ref << std::endl;
+                        searching = false;
+                    }
+                    auto size_in_bytes = n.size_in_bytes();
+                    sizes[size_in_bytes]++;
+                    ref += size_in_bytes;
                 }
-                ref += 8;
+                else {
+                    if (!searching) {
+                        std::cerr << "Invalid ref: " << ref << std::endl;
+                        searching = true;
+                    }
+                    ref += 8;
+                }
             }
         }
         std::cout << "Allocated space:" << std::endl;
