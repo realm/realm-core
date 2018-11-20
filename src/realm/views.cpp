@@ -354,6 +354,23 @@ void DescriptorOrdering::append_limit(LimitDescriptor limit)
     m_descriptors.emplace_back(new LimitDescriptor(std::move(limit)));
 }
 
+util::Optional<size_t> DescriptorOrdering::remove_all_limits()
+{
+    size_t min_limit = size_t(-1);
+    for (auto it = m_descriptors.begin(); it != m_descriptors.end();) {
+        if ((*it)->get_type() == DescriptorType::Limit) {
+            const LimitDescriptor* limit = static_cast<const LimitDescriptor*>(it->get());
+            if (limit->get_limit() < min_limit) {
+                min_limit = limit->get_limit();
+            }
+            it = m_descriptors.erase(it);
+        } else {
+            ++it;
+        }
+    }
+    return min_limit == size_t(-1) ? util::none : util::some<size_t>(min_limit);
+}
+
 bool DescriptorOrdering::descriptor_is_sort(size_t index) const
 {
     REALM_ASSERT(index < m_descriptors.size());
