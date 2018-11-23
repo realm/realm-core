@@ -819,7 +819,8 @@ void GroupWriter::write(const char* data, size_t size)
     window->encryption_write_barrier(dest_addr, size);
 }
 
-bool inline is_aligned(char* addr) {
+bool inline is_aligned(char* addr)
+{
     size_t as_binary = reinterpret_cast<size_t>(addr);
     return (as_binary & 7) == 0;
 }
@@ -852,7 +853,7 @@ void GroupWriter::write_array_at(MapWindow* window, ref_type ref, const char* da
     // REALM_ASSERT_3(pos + size, <=, m_file_map.get_size());
     char* dest_addr = window->translate(pos);
     REALM_ASSERT_RELEASE(is_aligned(dest_addr));
- 
+
     uint32_t dummy_checksum = 0x41414141UL; // "AAAA" in ASCII
     memcpy(dest_addr, &dummy_checksum, 4);
     memcpy(dest_addr + 4, data + 4, size - 4);

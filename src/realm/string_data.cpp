@@ -222,10 +222,12 @@ struct CityHash64 {
         if (len <= 32) {
             if (len <= 16) {
                 return hash_len_0_to_16(data, len);
-            } else {
+            }
+            else {
                 return hash_len_17_to_32(data, len);
             }
-        } else if (len <= 64) {
+        }
+        else if (len <= 64) {
             return hash_len_33_to_64(data, len);
         }
         uint_least64_t x = load8(data + len - 40);
@@ -245,15 +247,13 @@ struct CityHash64 {
             y += v.first + load8(data + 40);
             z = rotate(z + w.first, 33) * k1;
             v = weak_hash_len_32_with_seeds(data, v.second * k1, x + w.first);
-            w = weak_hash_len_32_with_seeds(data + 32, z + w.second,
-                                            y + load8(data + 16));
+            w = weak_hash_len_32_with_seeds(data + 32, z + w.second, y + load8(data + 16));
             std::swap(z, x);
             data += 64;
             len -= 64;
         } while (len != 0);
-        return hash_len_16(
-            hash_len_16(v.first, w.first) + shift_mix(y) * k1 + z,
-            hash_len_16(v.second, w.second) + x);
+        return hash_len_16(hash_len_16(v.first, w.first) + shift_mix(y) * k1 + z,
+                           hash_len_16(v.second, w.second) + x);
     }
 
     static uint_least64_t hash_len_0_to_16(const unsigned char* data, size_t len) noexcept
@@ -272,11 +272,9 @@ struct CityHash64 {
             const auto a = data[0];
             const auto b = data[len >> 1];
             const auto c = data[len - 1];
-            const auto y = static_cast<uint_least32_t>(a) + 
-                (static_cast<uint_least32_t>(b) << 8);
-            const auto z = static_cast<uint_least32_t>(len) +
-                (static_cast<uint_least32_t>(c) << 2);
-            return shift_mix(y * k2 ^z * k3) * k2;
+            const auto y = static_cast<uint_least32_t>(a) + (static_cast<uint_least32_t>(b) << 8);
+            const auto z = static_cast<uint_least32_t>(len) + (static_cast<uint_least32_t>(c) << 2);
+            return shift_mix(y * k2 ^ z * k3) * k2;
         }
         return k2;
     }
@@ -287,8 +285,7 @@ struct CityHash64 {
         const auto b = load8(data + 8);
         const auto c = load8(data + len - 8) * k2;
         const auto d = load8(data + len - 16) * k0;
-        return hash_len_16(rotate(a - b, 43) + rotate(c, 30) + d,
-                           a + rotate(b ^ k3, 20) - c + len);
+        return hash_len_16(rotate(a - b, 43) + rotate(c, 30) + d, a + rotate(b ^ k3, 20) - c + len);
     }
 
     static uint_least64_t hash_len_33_to_64(const unsigned char* data, size_t len) noexcept
@@ -326,8 +323,7 @@ struct CityHash64 {
         return b;
     }
 
-    static pair weak_hash_len_32_with_seeds(uint_least64_t w, uint_least64_t x,
-                                            uint_least64_t y, uint_least64_t z,
+    static pair weak_hash_len_32_with_seeds(uint_least64_t w, uint_least64_t x, uint_least64_t y, uint_least64_t z,
                                             uint_least64_t a, uint_least64_t b) noexcept
     {
         a += w;
@@ -339,12 +335,9 @@ struct CityHash64 {
         return pair{a + z, b + c};
     }
 
-    static pair weak_hash_len_32_with_seeds(const unsigned char* data,
-                                            uint_least64_t a, uint_least64_t b) noexcept
+    static pair weak_hash_len_32_with_seeds(const unsigned char* data, uint_least64_t a, uint_least64_t b) noexcept
     {
-        return weak_hash_len_32_with_seeds(load8(data), load8(data + 8),
-                                           load8(data + 16), load8(data + 24),
-                                           a, b);
+        return weak_hash_len_32_with_seeds(load8(data), load8(data + 8), load8(data + 16), load8(data + 24), a, b);
     }
 
     static inline uint_least64_t rotate(uint_least64_t val, int shift) noexcept
@@ -368,4 +361,3 @@ uint_least64_t realm::cityhash_64(const unsigned char* data, size_t len) noexcep
 {
     return CityHash64{}(data, len);
 }
-

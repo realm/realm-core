@@ -395,7 +395,7 @@ private:
 template <class T>
 using Alloc = util::STLAllocator<T, MyAllocator>;
 using Vector = std::vector<int, Alloc<int>>;
-}
+} // namespace
 
 TEST(Allocator_STLAllocator)
 {
@@ -449,7 +449,8 @@ TEST(Allocator_Polymorphic)
     MyAllocator alloc;
     {
         // Instance of std::unique_ptr with pointer to base class allocator.
-        std::unique_ptr<char[], STLDeleter<char[]>> abstract{nullptr, STLDeleter<char[]>{DefaultAllocator::get_default()}};
+        std::unique_ptr<char[], STLDeleter<char[]>> abstract{nullptr,
+                                                             STLDeleter<char[]>{DefaultAllocator::get_default()}};
 
         // Instance of std::unique_ptr with pointer to base class, and base
         // class allocator.
@@ -501,7 +502,7 @@ struct hash<MyString> {
         return std::hash<std::string>{}(std::string{str.c_str(), str.size()});
     }
 };
-}
+} // namespace std
 
 TEST(Allocator_StandardContainers)
 {

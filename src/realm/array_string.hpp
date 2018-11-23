@@ -101,6 +101,7 @@ private:
         std::aligned_storage<sizeof(ArrayStringShort), alignof(ArrayStringShort)>::type m_string_short;
         std::aligned_storage<sizeof(ArraySmallBlobs), alignof(ArraySmallBlobs)>::type m_string_long;
         std::aligned_storage<sizeof(ArrayBigBlobs), alignof(ArrayBigBlobs)>::type m_big_blobs;
+        std::aligned_storage<sizeof(ArrayInteger), alignof(ArrayInteger)>::type m_enum;
     };
     enum class Type { small_strings, medium_strings, big_strings, enum_strings };
 

@@ -402,6 +402,7 @@ public:
     }
 
     std::string get_database_path() const override;
+
 protected:
     typedef Replication::version_type version_type;
     Group* m_group = nullptr;

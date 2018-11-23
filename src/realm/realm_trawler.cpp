@@ -106,9 +106,7 @@ struct FreeListEntry : public Entry {
 
 class Node {
 public:
-    Node()
-    {
-    }
+    Node() {}
     Node(realm::Allocator& alloc, uint64_t ref)
     {
         init(alloc, ref);
@@ -170,9 +168,7 @@ protected:
 
 class Array : public Node {
 public:
-    Array()
-    {
-    }
+    Array() {}
     Array(realm::Allocator& alloc, uint64_t ref)
         : Node(alloc, ref)
     {
