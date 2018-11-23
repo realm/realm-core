@@ -21,8 +21,104 @@
 ----------------------------------------------
 
 Besides the changes above, this release includes changes introduced by v5.10.2 and up
-until v5.10.3
+until v5.12.0
 
+| # 5.12.0 Release notes
+| 
+| ### Enhancements
+| * Added Group::get_used_space() which will return the size of the data taken up by the current
+|   commit. This is in contrast to the number returned by SharedGroup::get_stats() which will
+|   return the size of the last commit done in that SharedGroup. If the commits are the same, 
+|   the number will of course be the same. 
+|   Issue [#259](https://github.com/realm/realm-core-private/issues/259)
+| 
+| ### Fixed
+| * None.
+| 
+| ### Breaking changes
+| * The way the Linux binaries are delivered is changed. They are now distributed 
+|   like the rest of the binaries with two packages (devel/runtime) per build type. 
+|   The file names follow this scheme:
+|   realm-core-<buildType>-<release>-Linux-{devel|runtime}.tar.gz
+|   For Linux the following build types are published: Debug, Release, RelAssert
+|   and RelASAN.
+| 
+| -----------
+| 
+| ### Internals
+| * Replication::get_database_path() is made const.
+| * TrivialReplication::get_database_path() is made public.
+| * Added better compatibility for custom allocators with standard library
+|   containers on GCC 4.9.
+| 
+| ----------------------------------------------
+| 
+| # 5.11.3 Release notes
+| 
+| ### Compatibility
+| * File format: ver. 9
+|   Upgrades automatically from previous formats.
+|   Can open realms down to file format version 7 in ReadOnly mode (without upgrade).
+| 
+| -----------
+| 
+| ### Internals
+| * Improved assertion checking in release mode in order to detect any corruption
+|   of our freelist earlier and prevent bogus allocations from a corrupted freelist
+|   from leading to subsequent corruption of other parts of the file.
+| 
+| ----------------------------------------------
+| 
+| # 5.11.2 Release notes
+| 
+| ### Compatibility
+| * File format: ver. 9
+|   Upgrades automatically from previous formats.
+|   Can open realms down to file format version 7 in ReadOnly mode (without upgrade).
+| 
+| -----------
+| 
+| ### Internals
+| * Releases no longer include RPM and DEB packages.
+| * Releases now include RelWithDebInfo+ASAN and RelWithDebInfo+Assertions tarballs for linux.
+|   [#3112](https://github.com/realm/realm-core/pull/3112).
+| 
+| ----------------------------------------------
+| 
+| # 5.11.1 Release notes
+| 
+| ### Compatibility
+| * File format: ver. 9
+|   Upgrades automatically from previous formats.
+|   Can open realms down to file format version 7 in ReadOnly mode (without upgrade).
+| 
+| -----------
+| 
+| ### Internals
+| * Fixed a bug in the use of placement new on MSVC, where the implementation is
+|   buggy. This bug only affected version 5.11.0.
+|   PR [#3109](https://github.com/realm/realm-core/pull/3109)
+| * Made improvements to the custom allocation interfaces introduced in 5.11.0,
+|   which should make them more convenient and use slightly less memory.
+|   PR [#3108](https://github.com/realm/realm-core/pull/3108)
+| 
+| ----------------------------------------------
+| 
+| # 5.11.0 Release notes
+| 
+| ### Compatibility
+| * File format: ver. 9
+|   Upgrades automatically from previous formats.
+|   Can open realms down to file format version 7 in ReadOnly mode (without upgrade).
+| 
+| -----------
+| 
+| ### Internals
+| * Added support for custom heap allocators
+|   PR [#3106](https://github.com/realm/realm-core/pull/3106).
+| 
+| ----------------------------------------------
+| 
 | # 5.10.3 Release notes
 |
 | ### Fixed

@@ -40,6 +40,7 @@ set(REALM_SOURCES
     table_view.cpp
     sort_descriptor.cpp
     unicode.cpp
+    util/allocator.cpp
     util/backtrace.cpp
     util/base64.cpp
     util/basic_system_errors.cpp
@@ -51,7 +52,6 @@ set(REALM_SOURCES
     util/memory_stream.cpp
     util/misc_errors.cpp
     util/serializer.cpp
-    util/string_buffer.cpp
     util/terminate.cpp
     util/thread.cpp
     util/to_string.cpp
@@ -159,6 +159,7 @@ set(REALM_INSTALL_IMPL_HEADERS
 )
 
 set(REALM_INSTALL_UTIL_HEADERS
+    util/allocator.hpp
     util/any.hpp
     util/assert.hpp
     util/backtrace.hpp
@@ -438,10 +439,11 @@ if(NOT APPLE AND NOT ANDROID AND NOT CMAKE_SYSTEM_NAME MATCHES "^Windows" AND NO
     #     DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX})
     # target_link_libraries(RealmImporter realm)
 
-    add_executable(RealmTrawler realm_trawler.cpp util/backtrace.cpp)
+    add_executable(RealmTrawler realm_trawler.cpp )
     set_target_properties(RealmTrawler PROPERTIES
         OUTPUT_NAME "realm-trawler"
         DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX})
+    target_link_libraries(RealmTrawler realm)
 
     install(TARGETS RealmConfig # RealmImporter
             COMPONENT runtime

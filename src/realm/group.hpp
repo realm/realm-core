@@ -517,6 +517,11 @@ public:
     /// If this group accessor is the detached state, this function returns
     /// zero.
     size_t compute_aggregated_byte_size(SizeAggregateControl ctrl = SizeAggregateControl::size_of_all) const noexcept;
+    /// Return the size taken up by the current snapshot. This is in contrast to
+    /// the number returned by SharedGroup::get_stats() which will return the
+    /// size of the last snapshot done in that SharedGroup. If the snapshots are
+    /// identical, the numbers will of course be equal.
+    size_t get_used_space() const noexcept;
 
     void verify() const;
 #ifdef REALM_DEBUG

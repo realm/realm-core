@@ -59,7 +59,7 @@ public:
     class Interrupted; // Exception
     class SimpleIndexTranslator;
 
-    virtual std::string get_database_path() = 0;
+    virtual std::string get_database_path() const = 0;
 
     /// Called during construction of the associated SharedGroup object.
     ///
@@ -401,6 +401,7 @@ public:
     {
     }
 
+    std::string get_database_path() const override;
 protected:
     typedef Replication::version_type version_type;
     Group* m_group = nullptr;
@@ -414,7 +415,6 @@ protected:
 
     BinaryData get_uncommitted_changes() const noexcept override;
 
-    std::string get_database_path() override;
     void initialize(DB&) override;
     void do_initiate_transact(Group& group, version_type, bool) override;
     version_type do_prepare_commit(version_type orig_version) override;

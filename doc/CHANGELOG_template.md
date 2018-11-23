@@ -10,9 +10,6 @@
 ### Breaking changes
 * None.
 
-### Compatibility
-* File format: ver. 7 (upgrades automatically from previous formats)
-
 -----------
 
 ### Internals

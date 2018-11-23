@@ -188,6 +188,16 @@
 #endif
 
 
+// FIXME: Change this to use [[nodiscard]] in C++17.
+#if defined(__GNUC__) || defined(__HP_aCC)
+#define REALM_NODISCARD __attribute__((warn_unused_result))
+#elif defined(_MSC_VER)
+#define REALM_NODISCARD _Check_return_
+#else
+#define REALM_NODISCARD
+#endif
+
+
 /* Thread specific data (only for POD types) */
 #if defined __clang__
 #define REALM_THREAD_LOCAL __thread

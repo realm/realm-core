@@ -18,12 +18,16 @@ RUN apt-key add /tmp/llvm.key
 # Install clang and everything needed to build core
 RUN apt-get update \
     && apt-get install -y clang-6.0 \
+                       clang-format-6.0 \
                        cmake \
                        libprocps4-dev \
                        libssl-dev \
                        ninja-build \
+                       git \
     && rm -rf /var/lib/apt/lists/*
 
 # Make clang the default compiler
 ENV CC /usr/bin/clang-6.0
 ENV CXX /usr/bin/clang++-6.0
+RUN ln -s /usr/bin/clang-format-6.0 /usr/bin/clang-format \
+ && ln -s /usr/bin/git-clang-format-6.0 /usr/bin/git-clang-format

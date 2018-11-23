@@ -170,6 +170,32 @@
 			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId=""/>
 		</scannerConfigBuildInfo>
 	</storageModule>
-	<storageModule moduleId="org.eclipse.cdt.make.core.buildtargets"/>
-	<storageModule moduleId="org.eclipse.cdt.internal.ui.text.commentOwnerProjectMappings"/>
+	<storageModule moduleId="org.eclipse.cdt.make.core.buildtargets">
+		<buildTargets>
+			<target name="CoreTests" path="" targetID="org.eclipse.cdt.build.MakeTargetBuilder">
+				<buildCommand>ninja</buildCommand>
+				<buildArguments/>
+				<buildTarget>CoreTests</buildTarget>
+				<stopOnError>true</stopOnError>
+				<useDefaultCommand>true</useDefaultCommand>
+				<runAllBuilders>true</runAllBuilders>
+			</target>
+			<target name="RealmTrawler" path="" targetID="org.eclipse.cdt.build.MakeTargetBuilder">
+				<buildCommand>ninja</buildCommand>
+				<buildArguments/>
+				<buildTarget>RealmTrawler</buildTarget>
+				<stopOnError>true</stopOnError>
+				<useDefaultCommand>true</useDefaultCommand>
+				<runAllBuilders>true</runAllBuilders>
+			</target>
+			<target name="RealmBenchmarkCommonTasks" path="" targetID="org.eclipse.cdt.build.MakeTargetBuilder">
+				<buildCommand>ninja</buildCommand>
+				<buildArguments/>
+				<buildTarget>realm-benchmark-common-tasks</buildTarget>
+				<stopOnError>true</stopOnError>
+				<useDefaultCommand>true</useDefaultCommand>
+				<runAllBuilders>true</runAllBuilders>
+			</target>
+		</buildTargets>
+	</storageModule>
 </cproject>
