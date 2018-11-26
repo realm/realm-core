@@ -50,7 +50,7 @@ void ArrayString::init_from_mem(MemRef mem) noexcept
             m_type = Type::small_strings;
         }
         else {
-            auto arr = new (&m_storage.m_string_short) ArrayInteger(m_alloc);
+            auto arr = new (&m_storage.m_enum) ArrayInteger(m_alloc);
             arr->init_from_mem(mem);
             m_string_enum_values = std::make_unique<ArrayString>(m_alloc);
             ArrayParent* p;
@@ -393,7 +393,7 @@ ArrayString::Type ArrayString::upgrade_leaf(size_t value_size)
         auto ndx_in_parent = string_short->get_ndx_in_parent();
         string_short->destroy();
 
-        auto arr = new (&m_storage.m_string_short) ArraySmallBlobs(m_alloc);
+        auto arr = new (&m_storage.m_string_long) ArraySmallBlobs(m_alloc);
         arr->init_from_mem(string_long.get_mem());
         arr->set_parent(parent, ndx_in_parent);
         arr->update_parent();

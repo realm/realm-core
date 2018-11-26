@@ -20,10 +20,14 @@
 #ifdef TEST_ALLOC
 
 #include <string>
+#include <map>
+#include <unordered_map>
+#include <list>
+#include <vector>
 
-#include <memory>
 #include <realm/util/file.hpp>
 #include <realm/alloc_slab.hpp>
+#include <realm/util/allocator.hpp>
 
 #include "test.hpp"
 
@@ -349,6 +353,166 @@ TEST(Alloc_ToAndFromRef)
         ref_type back_to_ref = to_ref(ref_as_int);
         CHECK_EQUAL(ref, back_to_ref);
     }
+}
+
+namespace {
+class MyAllocator : public util::AllocatorBase {
+public:
+    MyAllocator(size_t size = 1000)
+        : m_size(size)
+        , m_buffer(new char[size])
+        , m_ptr(m_buffer.get())
+    {
+    }
+    void* allocate(std::size_t sz, std::size_t) override
+    {
+        if (m_ptr + sz > m_buffer.get() + m_size)
+            throw std::bad_alloc{};
+        void* p = m_ptr;
+        m_ptr += sz;
+        return p;
+    }
+    void free(void*, size_t sz) noexcept override
+    {
+        m_freed += sz;
+    }
+    bool check()
+    {
+        return m_ptr - m_freed == m_buffer.get();
+    }
+    size_t get_allocated() const noexcept
+    {
+        return m_ptr - m_buffer.get();
+    }
+
+private:
+    size_t m_size;
+    std::unique_ptr<char[]> m_buffer;
+    char* m_ptr;
+    size_t m_freed = 0;
+};
+
+template <class T>
+using Alloc = util::STLAllocator<T, MyAllocator>;
+using Vector = std::vector<int, Alloc<int>>;
+} // namespace
+
+TEST(Allocator_STLAllocator)
+{
+    MyAllocator alloc;
+    {
+        Vector vec{alloc};
+        vec.push_back(3);
+    }
+    CHECK(alloc.check());
+}
+
+TEST(Allocator_MakeUnique)
+{
+    auto alloc = MyAllocator{};
+    {
+        auto ptr1 = util::make_unique<std::vector<std::string>, MyAllocator>(alloc, 5);
+        CHECK_EQUAL(ptr1->size(), 5);
+        auto ptr2 =
+            util::make_unique<std::vector<int>, MyAllocator>(alloc, std::initializer_list<int>{1, 2, 3, 4, 5});
+        CHECK_EQUAL(ptr2->size(), 5);
+    }
+    CHECK(alloc.check());
+}
+
+TEST(Allocator_MoveAssignmentNoCopy)
+{
+    MyAllocator alloc;
+    std::vector<char, STLAllocator<char, MyAllocator>> vec1(100, char(123), alloc);
+    // FIXME: This check is weird because MSVC's std::vector apparently
+    // allocates an extra 8 bytes in Debug mode on move-assignment/construction!
+    // Presumably, this is due to debug-iterators.
+    CHECK_LESS(alloc.get_allocated(), 200);
+    // Move-construction
+    auto vec2 = std::move(vec1);
+    CHECK_LESS(alloc.get_allocated(), 200);
+    std::vector<char, STLAllocator<char, MyAllocator>> vec3(alloc);
+    vec2 = std::move(vec3);
+    CHECK_LESS(alloc.get_allocated(), 200);
+}
+
+TEST(Allocator_Polymorphic)
+{
+    struct Foo {
+        virtual ~Foo() {}
+        char buffer1[10];
+    };
+    struct Bar : Foo {
+        char buffer2[10];
+    };
+
+    MyAllocator alloc;
+    {
+        // Instance of std::unique_ptr with pointer to base class allocator.
+        std::unique_ptr<char[], STLDeleter<char[]>> abstract{nullptr,
+                                                             STLDeleter<char[]>{DefaultAllocator::get_default()}};
+
+        // Instance of std::unique_ptr with pointer to base class, and base
+        // class allocator.
+        std::unique_ptr<Foo, STLDeleter<Foo>> abstract2{nullptr, STLDeleter<Foo>{DefaultAllocator::get_default()}};
+
+        {
+            // Instance of std::unique_ptr with pointer to concrete allocator
+            // implementation.
+            auto concrete = util::make_unique<char[]>(alloc, 10);
+            auto concrete2 = util::make_unique<Bar>(alloc);
+
+            // These assignments should replace both pointer and deleter.
+            abstract = std::move(concrete);
+            abstract2 = std::move(concrete2);
+        }
+    }
+    CHECK(alloc.check());
+
+    MyAllocator alloc2;
+    {
+        std::vector<char, STLAllocator<char>> abstract{DefaultAllocator::get_default()};
+        {
+            std::vector<char, STLAllocator<char>> vec{alloc2};
+            vec.resize(10);
+            abstract = std::move(vec);
+        }
+    }
+    CHECK(alloc2.check());
+}
+
+namespace {
+// Test that STLAllocator can be used as the allocator in common STL types.
+using MyString = std::basic_string<char, std::char_traits<char>, STLAllocator<char, DefaultAllocator>>;
+template <class K, class V>
+using MyMap = std::map<K, V, std::less<>, STLAllocator<std::pair<const K, V>>>;
+template <class T>
+using MyVector = std::vector<T, STLAllocator<T>>;
+template <class T>
+using MyList = std::list<T, STLAllocator<T>>;
+template <class K, class V>
+using MyUnorderedMap = std::unordered_map<K, V, std::hash<K>, std::equal_to<K>, STLAllocator<std::pair<const K, V>>>;
+} // unnamed namespace
+
+namespace std {
+template <>
+struct hash<MyString> {
+    size_t operator()(const MyString& str) const
+    {
+        return std::hash<std::string>{}(std::string{str.c_str(), str.size()});
+    }
+};
+} // namespace std
+
+TEST(Allocator_StandardContainers)
+{
+    auto& alloc = DefaultAllocator::get_default();
+    MyMap<MyString, MyVector<MyString>> m{alloc};
+    MyVector<MyString> vec{10, MyString{"bar", alloc}, alloc};
+    m.emplace(MyString{"foo", alloc}, std::move(vec));
+    MyList<MyString> list{10, MyString{"baz", alloc}, alloc};
+    MyUnorderedMap<MyString, MyString> m2{alloc};
+    m2.emplace(MyString{"foo", alloc}, MyString{"bar", alloc});
 }
 
 #endif // TEST_ALLOC

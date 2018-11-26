@@ -35,6 +35,7 @@ if (extended_version)
     list(GET VERSION_LIST 3 CONFIG_VERSION_TWEAK)
 endif()
 
+set(CMAKE_BUILD_TYPE Debug CACHE STRING "")
 project(realm)
 
 # Include general CMake modules
@@ -76,6 +77,7 @@ set_property(DIRECTORY APPEND PROPERTY COMPILE_DEFINITIONS
     $<$<CONFIG:Debug>:REALM_DEBUG=1>
     $<$<CONFIG:MinSizeDebug>:REALM_DEBUG=1>
 )
+
 
 set(CMAKE_DEBUG_POSTFIX "-dbg")
 set(CMAKE_MINSIZEDEBUG_POSTFIX "-dbg")
@@ -181,13 +183,7 @@ install(EXPORT realm
         COMPONENT devel)
 
 # CPack
-if(APPLE)
-    set(CPACK_GENERATOR "TGZ")
-elseif(ANDROID)
-    set(CPACK_GENERATOR "TGZ")
-else()
-    set(CPACK_GENERATOR "TGZ;RPM;DEB")
-endif()
+set(CPACK_GENERATOR "TGZ")
 set(CPACK_PACKAGE_NAME "realm-core-${CMAKE_BUILD_TYPE}")
 set(CPACK_PACKAGE_VERSION ${REALM_VERSION})
 set(CPACK_PACKAGE_VENDOR "Realm Inc.")

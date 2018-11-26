@@ -411,6 +411,12 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
     }
     rt->advance_read();
     rt->verify();
+
+    size_t free_space, used_space;
+    sg_w->get_stats(free_space, used_space);
+    auto state_size = rt->compute_aggregated_byte_size(Group::SizeAggregateControl::size_of_all);
+    CHECK_EQUAL(used_space, state_size);
+
     CHECK_EQUAL(2, rt->size());
     CHECK(foo);
     CHECK_EQUAL(2, foo->get_column_count());
@@ -518,6 +524,7 @@ TEST(LangBindHelper_AdvanceReadTransact_CreateManyTables)
     std::unique_ptr<Replication> hist(realm::make_in_realm_history(path));
     DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
     TransactionRef rt = sg->start_read();
+    size_t free_space, used_space;
 
     {
         std::unique_ptr<Replication> hist_w(realm::make_in_realm_history(path));
@@ -531,9 +538,15 @@ TEST(LangBindHelper_AdvanceReadTransact_CreateManyTables)
             wt.add_table(str);
         }
         wt.commit();
+        sg_w->get_stats(free_space, used_space);
     }
 
     rt->advance_read();
+    auto size_all =
+        rt->compute_aggregated_byte_size(Group::SizeAggregateControl(Group::SizeAggregateControl::size_of_all));
+    CHECK_EQUAL(used_space, size_all);
+    auto used_space1 = rt->get_used_space();
+    CHECK_EQUAL(used_space, used_space1);
 }
 
 

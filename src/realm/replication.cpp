@@ -97,7 +97,7 @@ void Replication::set(const Table* table, ColKey col_key, ObjKey key, Mixed valu
     }
 }
 
-std::string TrivialReplication::get_database_path()
+std::string TrivialReplication::get_database_path() const
 {
     return m_database_file;
 }

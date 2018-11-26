@@ -1,3 +1,13 @@
+if (CMAKE_BUILD_TYPE MATCHES "RelAssert")
+    set(REALM_ENABLE_ASSERTIONS ON CACHE BOOL "Build with assertions")
+    set(CMAKE_CXX_FLAGS_RELASSERT ${CMAKE_CXX_FLAGS_RELWITHDEBINFO})
+endif()
+
+if (CMAKE_BUILD_TYPE MATCHES "RelASAN")
+    set(REALM_ASAN ON CACHE BOOL "Build with address sanitizer")
+    set(CMAKE_CXX_FLAGS_RELASAN "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} -O1")
+endif()
+
 # -------------
 # Coverage
 # -------------
