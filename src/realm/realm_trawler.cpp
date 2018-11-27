@@ -135,12 +135,17 @@ public:
         unsigned width_type = (unsigned(m_header[4]) & 0x18) >> 3;
         return calc_byte_size(width_type, m_size, width());
     }
+    uint64_t ref() const
+    {
+        return m_ref;
+    }
     uint64_t size_in_bytes() const
     {
         return 8 + length();
     }
 
 protected:
+    uint64_t m_ref = 0;
     char* m_header;
     unsigned m_size = 0;
     bool m_valid = false;
@@ -250,7 +255,6 @@ public:
     {
         return m_table_names.size();
     }
-    void get_table_nodes(size_t ndx, std::vector<Entry>& nodes) const;
     std::vector<Entry> get_allocated_nodes() const;
     std::vector<FreeListEntry> get_free_list() const;
 
@@ -300,6 +304,7 @@ private:
 
 void Node::init(realm::Allocator& alloc, uint64_t ref)
 {
+    m_ref = ref;
     m_header = alloc.translate(ref);
 
     if (memcmp(m_header, &signature, 4)) {
@@ -325,25 +330,22 @@ void Array::get_nodes(realm::Allocator& alloc, uint64_t ref, std::vector<Entry>&
     }
 }
 
-void Group::get_table_nodes(size_t ndx, std::vector<Entry>& nodes) const
-{
-    Array table_refs(m_alloc, get_ref(1));
-    auto ref = table_refs.get_val(ndx);
-
-    Array::get_nodes(m_alloc, ref, nodes);
-
-    consolidate_list(nodes);
-}
-
 std::vector<Entry> Group::get_allocated_nodes() const
 {
     std::vector<Entry> all_nodes;
+    all_nodes.emplace_back(0, 24);                  // Header area
+    all_nodes.emplace_back(m_ref, size_in_bytes()); // Top array itself
 
     Array::get_nodes(m_alloc, get_ref(0), all_nodes); // Table names
+    Array::get_nodes(m_alloc, get_ref(1), all_nodes); // Tables
+    consolidate_list(all_nodes);
 
-    for (unsigned i = 0; i < get_nb_tables(); i++) {
-        get_table_nodes(i, all_nodes);
-    }
+    all_nodes.emplace_back(m_free_list_positions.ref(), m_free_list_positions.size_in_bytes()); // Top array itself
+    all_nodes.emplace_back(m_free_list_sizes.ref(), m_free_list_sizes.size_in_bytes());         // Top array itself
+    all_nodes.emplace_back(m_free_list_versions.ref(), m_free_list_versions.size_in_bytes());   // Top array itself
+
+    consolidate_list(all_nodes);
+
     if (size() > 8) {
         Array::get_nodes(m_alloc, get_ref(8), all_nodes);
     }
@@ -432,6 +434,23 @@ void RealmFile::memory_leaks()
             nodes.emplace_back(entry.start, entry.length);
         }
         consolidate_list(nodes);
+        auto it = nodes.begin();
+        if (nodes.size() > 1) {
+            std::cout << "Memory leaked:" << std::endl;
+            auto prev = it;
+            ++it;
+            while (it != nodes.end()) {
+                auto leak_start = prev->start + prev->length;
+                auto sz = it->start - leak_start;
+                std::cout << "    0x" << std::hex << leak_start << ": " << std::dec << sz << std::endl;
+                prev = it;
+                ++it;
+            }
+        }
+        else {
+            REALM_ASSERT(it->length == m_group->get_file_size());
+            std::cout << "No memory leaks" << std::endl;
+        }
     }
 }
 
