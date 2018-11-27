@@ -13,7 +13,8 @@
 -----------
 
 ### Internals
-* None.
+* Fixed warnings reported by GCC 8.
+* Replaced call to the deprecated `readdir_r()` with `readdir()`.
 
 ----------------------------------------------
 
