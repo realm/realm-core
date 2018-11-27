@@ -299,22 +299,36 @@ void Group::attach(ref_type top_ref, bool create_group_when_missing)
     if (top_ref != 0) {
         m_top.init_from_ref(top_ref);
         size_t top_size = m_top.size();
-        static_cast<void>(top_size);
 
-        if (top_size < 8) {
-            REALM_ASSERT_EX(top_size == 3 || top_size == 5 || top_size == 7, top_size);
-        }
-        else {
-            REALM_ASSERT_EX(top_size == 9 || top_size == 10, top_size);
-        }
+        switch (top_size) {
+            // These are the valid sizes
+            case 3:
+            case 5:
+            case 7:
+            case 9:
+            case 10: {
+                ref_type table_names_ref = m_top.get_as_ref_or_tagged(0).get_as_ref();
+                ref_type tables_ref = m_top.get_as_ref_or_tagged(1).get_as_ref();
+                auto logical_file_size = m_top.get_as_ref_or_tagged(2).get_as_int();
 
+                // Logical file size must never exceed actual file size.
+                REALM_ASSERT_RELEASE_EX(logical_file_size <= m_alloc.get_baseline(), top_ref, logical_file_size);
+                // First two entries must be valid refs pointing inside the file
+                REALM_ASSERT_RELEASE_EX(table_names_ref > 0 && table_names_ref < logical_file_size &&
+                                            (table_names_ref & 7) == 0,
+                                        top_ref, table_names_ref);
+                REALM_ASSERT_RELEASE_EX(tables_ref > 0 && tables_ref < logical_file_size && (tables_ref & 7) == 0,
+                                        top_ref, tables_ref);
+                break;
+            }
+            default:
+                REALM_ASSERT_RELEASE_EX(!"Invalid top array size", top_ref, top_size);
+                break;
+        }
         m_table_names.init_from_parent();
         m_tables.init_from_parent();
-
-        // The 3rd slot in m_top is
-        // `RefOrTagged::make_tagged(logical_file_size)`, and the logical file
-        // size must never exceed actual file size.
-        REALM_ASSERT_3(m_top.get_as_ref_or_tagged(2).get_as_int(), <=, m_alloc.get_baseline());
+        REALM_ASSERT_RELEASE_EX(m_table_names.size() == m_tables.size(), top_ref, m_table_names.size(),
+                                m_tables.size());
     }
     else if (create_group_when_missing) {
         create_empty_group(); // Throws
