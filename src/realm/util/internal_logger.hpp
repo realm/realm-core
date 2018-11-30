@@ -21,66 +21,84 @@
 
 #include <cstring>
 #include <iostream>
+#include <vector>
 #include <thread>
 
 namespace realm {
 namespace util {
 
 
-struct LogEntry {
-    size_t event_nr;
+class LogEntry {
+public:
+    size_t event_nr = 0;
+    bool partial = true;
     std::thread::id thread_id;
-    const char* op;
+    const char* op = "empty";
     static size_t next_event;
     virtual std::ostream& print(std::ostream& os) = 0;
+    virtual ~LogEntry() { };
+protected:
+    LogEntry() {}
 };
 
-struct LogRef : public LogEntry {
+class LogRef : public LogEntry {
+public:
     size_t ref;
     static constexpr int end = 16;
-    static LogRef buffer[end];
+    static std::vector<LogRef> buffer;
     static int next;
     std::ostream& print(std::ostream& os) override;
+    virtual ~LogRef() {};
+    LogRef() {}
 };
 
-struct LogSlab : public LogEntry {
+class LogSlab : public LogEntry {
+public:
     size_t request;
     size_t ref;
     static constexpr int end = 64;
-    static LogSlab buffer[end];
+    static std::vector<LogSlab> buffer;
     static int next;
     std::ostream& print(std::ostream& os) override;
+    virtual ~LogSlab() { };
+    LogSlab() {}
 };
 
-struct LogFileAlloc : public LogEntry {
+class LogFileAlloc : public LogEntry {
+public:
     size_t request;
     size_t ref;
     static constexpr int end = 64;
-    static LogFileAlloc buffer[end];
+    static std::vector<LogFileAlloc> buffer;
     static int next;
     std::ostream& print(std::ostream& os) override;
+    virtual ~LogFileAlloc() { };
+    LogFileAlloc() {};
 };
 
 struct LogFileOpen : public LogEntry {
     char name[32]; // suffix of name
     static constexpr int end = 4;
-    static LogFileOpen buffer[];
+    static std::vector<LogFileOpen> buffer;
     static int next;
     void set_name(const char* nm);
     std::ostream& print(std::ostream& os) override;
+    virtual ~LogFileOpen() { };
+    LogFileOpen() {}
 };
 
 std::ostream& operator<<(std::ostream& os, LogEntry& e);
 
 template <typename Type, typename Func> void log_internal(const char* op_name, Func func) {
-    Type& e = Type::buffer[Type::next++];
-    memset(&e, 0, sizeof(e));
+    Type& e = *(Type::buffer.begin() + Type::next++);
     if (Type::next == Type::end)
         Type::next = 0;
+    e.partial = true;
     e.event_nr = LogEntry::next_event++;
     e.op = op_name;
     e.thread_id = std::this_thread::get_id();
     func(e);
+    e.partial = false;
 }
 
 void dump_internal_logs(std::ostream&);

@@ -1440,6 +1440,10 @@ void SharedGroup::close_internal(std::unique_lock<InterprocessMutex> lock) noexc
             break;
     }
     m_group.detach();
+    log_internal<util::LogFileOpen>("close",[&](util::LogFileOpen& e)
+        {
+            e.set_name(m_db_path.c_str());
+        });
     set_transact_stage(transact_Ready);
     SharedInfo* info = m_file_map.get_addr();
     {
@@ -1955,6 +1959,11 @@ void SharedGroup::rollback() noexcept
         return; // Idempotency
 
     REALM_ASSERT(m_transact_stage == transact_Writing);
+
+    log_internal<util::LogRef>("rollback",[&](util::LogRef& e)
+        {
+            e.ref = 0;
+        });
 
     do_end_write();
     do_end_read();

@@ -24,10 +24,10 @@ namespace util {
 
 size_t LogEntry::next_event = 1;
 
-LogSlab LogSlab::buffer[LogSlab::end];
-LogRef LogRef::buffer[LogRef::end];
-LogFileAlloc LogFileAlloc::buffer[LogFileAlloc::end];
-LogFileOpen LogFileOpen::buffer[LogFileOpen::end];
+std::vector<LogRef> LogRef::buffer(LogRef::end);
+std::vector<LogSlab> LogSlab::buffer(LogSlab::end);
+std::vector<LogFileAlloc> LogFileAlloc::buffer(LogFileAlloc::end);
+std::vector<LogFileOpen> LogFileOpen::buffer(LogFileOpen::end);
 
 int LogSlab::next = 0;
 int LogRef::next = 0;
@@ -43,7 +43,7 @@ void LogFileOpen::set_name(const char* fname)
         strncpy(name, fname, 31);
 }
 
-LogEntry* entries[LogSlab::end + LogRef::end + LogFileAlloc::end + LogFileOpen::end];
+std::vector<LogEntry*> entries(LogSlab::end + LogRef::end + LogFileAlloc::end + LogFileOpen::end);
 
 void dump_internal_logs(std::ostream& os)
 {
@@ -56,23 +56,24 @@ void dump_internal_logs(std::ostream& os)
         if (e.event_nr) entries[nr++] = &e;
     for (auto& e : LogFileAlloc::buffer)
         if (e.event_nr) entries[nr++] = &e;
-    std::sort(entries, entries + nr, [](auto& a, auto&b) { return a->event_nr > b->event_nr; });
+    std::sort(entries.begin(), entries.begin() + nr, [](auto& a, auto&b) { return a->event_nr < b->event_nr; });
     os << std::endl << "Internal logs:" << std::endl;
     size_t prev_event_nr = 0;
     for (int i = 0; i < nr; ++i) {
         if (prev_event_nr + 1 < entries[i]->event_nr) os << "    ..." << std::endl;
-        os << "    " << *(entries[i]) << std::endl;
+        LogEntry& e = *(entries[i]);
+        os << e;
         prev_event_nr = entries[i]->event_nr;
     }
 }
 
 std::ostream& operator<<(std::ostream& os, LogEntry& e)
 {
-    if (e.event_nr == 0)
-        os << e.thread_id << " " << e.event_nr << ": empty";
-    else {
+    if (e.event_nr) {
+    	os << "    ";
+    	if (e.partial) os << "<incomplete:> ";
         os << e.thread_id << " " << e.event_nr << ": " << e.op << "(";
-        e.print(os) << ")";
+        e.print(os) << ")" << std::endl;
     }
     return os;
 }
