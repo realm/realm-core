@@ -30,6 +30,7 @@
 #include <realm/util/errno.hpp>
 #include <realm/util/safe_int_ops.hpp>
 #include <realm/util/thread.hpp>
+#include <realm/util/internal_logger.hpp>
 #include <realm/group_writer.hpp>
 #include <realm/group_shared.hpp>
 #include <realm/group_writer.hpp>
@@ -766,7 +767,10 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
     if (options.durability == Durability::Async)
         throw std::runtime_error("Async mode not yet supported on Windows, iOS and watchOS");
 #endif
-
+    log_internal<util::LogFileOpen>("open",[&](util::LogFileOpen& e)
+        {
+            e.set_name(path.c_str());
+        });
     m_db_path = path;
     m_coordination_dir = path + ".management";
     m_lockfile_path = path + ".lock";
@@ -1413,6 +1417,10 @@ SharedGroup::~SharedGroup() noexcept
 
 void SharedGroup::close() noexcept
 {
+    log_internal<util::LogFileOpen>("close",[&](util::LogFileOpen& e)
+        {
+            e.set_name(m_db_path.c_str());
+        });
     close_internal(std::unique_lock<InterprocessMutex>(m_controlmutex, std::defer_lock));
 }
 
@@ -1999,6 +2007,13 @@ void SharedGroup::do_begin_read(VersionID version_id, bool writable)
 
     m_group.m_alloc.note_reader_start(this);
     using gf = _impl::GroupFriend;
+    if (writable) {
+        // only log when inside a write transaction, as the internal logger is not thread safe
+        log_internal<util::LogRef>("write_tr",[&](util::LogRef& e)
+            {
+                e.ref = m_read_lock.m_top_ref;
+            });
+    }
     gf::attach_shared(m_group, m_read_lock.m_top_ref, m_read_lock.m_file_size, writable); // Throws
 
     g.release();
@@ -2325,6 +2340,11 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
     // At this point, the ringbuffer has been succesfully updated, and the next writer
     // can safely proceed once the writemutex has been lifted.
     info->commit_in_critical_phase = 0;
+    // only log when inside a write transaction, as the internal logger is not thread safe
+    log_internal<util::LogRef>("commit_done",[&](util::LogRef& e)
+        {
+            e.ref = new_top_ref;
+        });
     {
         std::lock_guard<InterprocessMutex> lock(m_controlmutex);
         info->number_of_versions = new_version - oldest_version + 1;
@@ -2332,6 +2352,7 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
 
         m_new_commit_available.notify_all();
     }
+    REALM_ASSERT(false);
 }
 
 #ifdef REALM_DEBUG

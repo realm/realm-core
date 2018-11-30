@@ -52,6 +52,7 @@ set(REALM_SOURCES
     util/file_mapper.cpp
     util/interprocess_condvar.cpp
     util/logger.cpp
+    util/internal_logger.cpp
     util/memory_stream.cpp
     util/misc_errors.cpp
     util/serializer.cpp

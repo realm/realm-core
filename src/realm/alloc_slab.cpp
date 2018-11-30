@@ -36,6 +36,7 @@
 #include <realm/util/miscellaneous.hpp>
 #include <realm/util/terminate.hpp>
 #include <realm/util/thread.hpp>
+#include <realm/util/internal_logger.hpp>
 #include <realm/array.hpp>
 #include <realm/alloc_slab.hpp>
 
@@ -296,6 +297,10 @@ MemRef SlabAlloc::do_alloc(size_t size)
     malloc_debug_map[ref] = malloc(1);
 #endif
     REALM_ASSERT_EX(ref >= m_baseline, ref, m_baseline);
+    log_internal<util::LogSlab>("alloc_mem", [&](LogSlab& e) {
+        e.ref = ref;
+        e.request = size;
+    });
     return MemRef(addr, ref, *this);
 }
 
@@ -599,6 +604,10 @@ void SlabAlloc::do_free(ref_type ref, char* addr) noexcept
     m_free_space_state = free_space_Dirty;
 
     if (read_only) {
+        log_internal<util::LogFileAlloc>("free-in-file", [&](LogFileAlloc& e) {
+            e.ref = ref;
+            e.request = size;
+        });
         // Free space in read only segment is tracked separately
         try {
             REALM_ASSERT_RELEASE(ref != 0);
@@ -634,6 +643,10 @@ void SlabAlloc::do_free(ref_type ref, char* addr) noexcept
         }
     }
     else {
+        log_internal<util::LogSlab>("free_mem", [&](LogSlab& e) {
+            e.ref = ref;
+            e.request = size;
+        });
         // fixup size to take into account the allocator's need to store a FreeBlock in a freed block
         if (size < sizeof(FreeBlock))
             size = sizeof(FreeBlock);

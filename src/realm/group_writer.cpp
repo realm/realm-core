@@ -24,6 +24,7 @@
 
 #include <realm/util/miscellaneous.hpp>
 #include <realm/util/safe_int_ops.hpp>
+#include <realm/util/internal_logger.hpp>
 #include <realm/group_writer.hpp>
 #include <realm/group_shared.hpp>
 #include <realm/alloc_slab.hpp>
@@ -782,6 +783,10 @@ void GroupWriter::write(const char* data, size_t size)
 {
     // Get position of free space to write in (expanding file if needed)
     size_t pos = get_free_space(size);
+    log_internal<util::LogFileAlloc>("write", [&](LogFileAlloc& e) {
+        e.ref = pos;
+        e.request = size;
+    });
     REALM_ASSERT_3((pos & 0x7), ==, 0); // Write position should always be 64bit aligned
 
     // Write the block
@@ -801,6 +806,10 @@ ref_type GroupWriter::write_array(const char* data, size_t size, uint32_t checks
 {
     // Get position of free space to write in (expanding file if needed)
     size_t pos = get_free_space(size);
+    log_internal<util::LogFileAlloc>("write_arr", [&](LogFileAlloc& e) {
+        e.ref = pos;
+        e.request = size;
+    });
 
     // Write the block
     MapWindow* window = get_window(pos, size);
@@ -820,6 +829,10 @@ ref_type GroupWriter::write_array(const char* data, size_t size, uint32_t checks
 void GroupWriter::write_array_at(MapWindow* window, ref_type ref, const char* data, size_t size)
 {
     size_t pos = size_t(ref);
+    log_internal<util::LogFileAlloc>("write_at", [&](LogFileAlloc& e) {
+        e.ref = ref;
+        e.request = size;
+    });
 
     REALM_ASSERT_3(pos + size, <=, to_size_t(m_group.m_top.get(2) / 2));
     // REALM_ASSERT_3(pos + size, <=, m_file_map.get_size());

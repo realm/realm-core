@@ -23,6 +23,7 @@
 #include <realm/util/features.h>
 #include <realm/util/thread.hpp>
 #include <realm/util/backtrace.hpp>
+#include <realm/util/internal_logger.hpp>
 
 #if REALM_PLATFORM_APPLE
 
@@ -107,6 +108,7 @@ namespace util {
 REALM_NORETURN static void terminate_internal(std::stringstream& ss) noexcept
 {
     util::Backtrace::capture().print(ss);
+    util::dump_internal_logs(ss);
 
     ss << "!!! IMPORTANT: Please send this log and info about Realm SDK version and other relevant reproduction info to help@realm.io.";
     if (termination_notification_callback) {
