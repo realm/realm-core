@@ -31,6 +31,7 @@
 #include "array_direct.hpp"
 #include "alloc_slab.hpp"
 #include "array.hpp"
+#include "column_type.hpp"
 
 constexpr const int signature = 0x41414141;
 
@@ -230,6 +231,78 @@ private:
     bool m_has_refs = false;
 };
 
+class Group;
+class Table : public Array {
+public:
+    Table(realm::Allocator& alloc, uint64_t ref)
+        : Array(alloc, ref)
+    {
+        if (valid()) {
+            Array spec(alloc, get_ref(0));
+            m_column_types.init(alloc, spec.get_ref(0));
+            m_column_names.init(alloc, spec.get_ref(1));
+            m_column_attributes.init(alloc, spec.get_ref(2));
+            if (spec.size() > 3) {
+                m_column_subspecs.init(alloc, spec.get_ref(3));
+            }
+        }
+    }
+    void print_columns(const Group&) const;
+
+private:
+    std::string type_to_string(realm::ColumnType type) const
+    {
+        switch (type) {
+            case realm::col_type_Int:
+                return "int";
+            case realm::col_type_Bool:
+                return "bool";
+            case realm::col_type_String:
+            case realm::col_type_StringEnum:
+                return "string";
+            case realm::col_type_Binary:
+                return "data";
+            case realm::col_type_Table:
+                return "List";
+            case realm::col_type_Timestamp:
+                return "date";
+            case realm::col_type_Float:
+                return "float";
+            case realm::col_type_Double:
+                return "double";
+            case realm::col_type_Link:
+                return "Link";
+            case realm::col_type_LinkList:
+                return "LinkList";
+            default:
+                break;
+        }
+        return "Unknown";
+    }
+    size_t get_subspec_ndx_after(size_t column_ndx) const noexcept
+    {
+        REALM_ASSERT(column_ndx <= m_column_names.size());
+        // The m_subspecs array only keep info for subtables so we need to
+        // count up to it's position
+        size_t subspec_ndx = 0;
+        for (size_t i = 0; i != column_ndx; ++i) {
+            auto type = realm::ColumnType(m_column_types.get_val(i));
+            if (type == realm::col_type_Table || type == realm::col_type_Link || type == realm::col_type_LinkList) {
+                subspec_ndx += 1; // index of dest column
+            }
+            else if (type == realm::col_type_BackLink) {
+                subspec_ndx += 2; // index of table and index of linked column
+            }
+        }
+        return subspec_ndx;
+    }
+
+    Array m_column_types;
+    Array m_column_names;
+    Array m_column_attributes;
+    Array m_column_subspecs;
+};
+
 class Group : public Array {
 public:
     Group(realm::Allocator& alloc, uint64_t ref)
@@ -238,6 +311,7 @@ public:
     {
         if (valid()) {
             m_table_names.init(alloc, get_ref(0));
+            m_tables.init(alloc, get_ref(1));
             m_file_size = get_val(2);
             m_free_list_positions.init(alloc, get_ref(3));
             m_free_list_sizes.init(alloc, get_ref(4));
@@ -284,6 +358,10 @@ public:
     {
         return m_table_names.size();
     }
+    std::string get_table_name(size_t i) const
+    {
+        return m_table_names.get_string(i);
+    }
     std::vector<Entry> get_allocated_nodes() const;
     std::vector<FreeListEntry> get_free_list() const;
     void print_schema() const;
@@ -293,9 +371,27 @@ private:
     realm::Allocator& m_alloc;
     uint64_t m_file_size;
     Array m_table_names;
+    Array m_tables;
     Array m_free_list_positions;
     Array m_free_list_sizes;
     Array m_free_list_versions;
+};
+
+class RealmFile {
+public:
+    RealmFile(const std::string& file_path, const char* encryption_key);
+    // Walk the file and check that it consists of valid nodes
+    void node_scan();
+    void schema_info();
+    void memory_leaks();
+    void free_list_info() const;
+
+private:
+    uint64_t m_top_ref;
+    uint64_t m_start_pos;
+    int m_file_format_version;
+    std::unique_ptr<Group> m_group;
+    realm::SlabAlloc m_alloc;
 };
 
 std::string human_readable(uint64_t val)
@@ -337,33 +433,42 @@ std::ostream& operator<<(std::ostream& ostr, const Group& g)
     return ostr;
 }
 
+void Table::print_columns(const Group& group) const
+{
+    for (unsigned i = 0; i < m_column_names.size(); i++) {
+        auto type = realm::ColumnType(m_column_types.get_val(i));
+        auto attr = realm::ColumnAttr(m_column_attributes.get_val(i));
+        std::string type_str;
+        if (type == realm::col_type_Link || type == realm::col_type_LinkList) {
+            size_t target_table_ndx = size_t(m_column_subspecs.get_val(get_subspec_ndx_after(i)));
+            type_str = group.get_table_name(target_table_ndx);
+            if (type == realm::col_type_LinkList) {
+                type_str += "[]";
+            }
+        }
+        else {
+            type_str = type_to_string(type);
+            if (attr & realm::col_attr_Nullable)
+                type_str += "?";
+            if (attr & realm::col_attr_Indexed)
+                type_str += " (indexed)";
+        }
+        std::cout << "        " << m_column_names.get_string(i) << ": " << type_str << std::endl;
+    }
+}
+
 void Group::print_schema() const
 {
     if (valid()) {
         std::cout << "Tables: " << std::endl;
 
         for (unsigned i = 0; i < get_nb_tables(); i++) {
-            std::cout << "    " << m_table_names.get_string(i) << std::endl;
+            std::cout << "    " << get_table_name(i) << std::endl;
+            Table table(m_alloc, m_tables.get_ref(i));
+            table.print_columns(*this);
         }
     }
 }
-
-class RealmFile {
-public:
-    RealmFile(const std::string& file_path, const char* encryption_key);
-    // Walk the file and check that it consists of valid nodes
-    void node_scan();
-    void schema_info();
-    void memory_leaks();
-    void free_list_info() const;
-
-private:
-    uint64_t m_top_ref;
-    uint64_t m_start_pos;
-    int m_file_format_version;
-    std::unique_ptr<Group> m_group;
-    realm::SlabAlloc m_alloc;
-};
 
 void Node::init(realm::Allocator& alloc, uint64_t ref)
 {
