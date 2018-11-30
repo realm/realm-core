@@ -1,11 +1,11 @@
-# NEXT RELEASE
+# 5.12.3 Release notes
 
 ### Enhancements
 * None.
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Added assertions around use of invalid refs and sizes. Helps in narrowing down the causes for
+  asserts like `ref != 0` and `(chunk_pos % 8) == 0`
  
 ### Breaking changes
 * None.
