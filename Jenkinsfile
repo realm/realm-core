@@ -41,14 +41,19 @@ jobWrapper {
 
             isPullRequest = !!env.CHANGE_TARGET
             targetBranch = isPullRequest ? env.CHANGE_TARGET : "none"
-            println "Building branch: ${env.BRANCH_NAME}"
+            currentBranch = env.BRANCH_NAME
+            println "Building branch: ${currentBranch}"
             println "Target branch: ${targetBranch}"
 
             releaseTesting = targetBranch.contains('release')
+            isPublishingRun = false
+            if (gitTag) {
+                isPublishingRun = currentBranch.contains('release')
+            }
 
             echo "Pull request: ${isPullRequest ? 'yes' : 'no'}"
             echo "Release Run: ${releaseTesting ? 'yes' : 'no'}"
-            echo "Publishing Run: ${gitTag ? 'yes' : 'no'}"
+            echo "Publishing Run: ${isPublishingRun ? 'yes' : 'no'}"
 
             if (['master'].contains(env.BRANCH_NAME)) {
                 // If we're on master, instruct the docker image builds to push to the
@@ -57,35 +62,32 @@ jobWrapper {
             }
         }
 
-        if (isPullRequest) {
-            stage('Checking') {
-                parallelExecutors = [
-                    checkLinuxDebug         : doCheckInDocker('Debug'),
-                    checkMacOsRelease       : doBuildMacOs('Release', true),
-                    checkWin32Debug         : doBuildWindows('Debug', false, 'Win32', true),
-                    checkWin64Release       : doBuildWindows('Release', false, 'x64', true),
-                    iosDebug                : doBuildAppleDevice('ios', 'MinSizeDebug'),
-                    androidArm64Debug       : doAndroidBuildInDocker('arm64-v8a', 'Debug', false),
-                    threadSanitizer         : doCheckSanity('Debug', '1000', 'thread'),
-                    addressSanitizer        : doCheckSanity('Debug', '1000', 'address'),
+        stage('Checking') {
+            parallelExecutors = [
+                checkLinuxDebug         : doCheckInDocker('Debug'),
+                checkMacOsRelease       : doBuildMacOs('Release', true),
+                checkWin32Debug         : doBuildWindows('Debug', false, 'Win32', true),
+                checkWin64Release       : doBuildWindows('Release', false, 'x64', true),
+                iosDebug                : doBuildAppleDevice('ios', 'MinSizeDebug'),
+                androidArm64Debug       : doAndroidBuildInDocker('arm64-v8a', 'Debug', false),
+                threadSanitizer         : doCheckSanity('Debug', '1000', 'thread'),
+                addressSanitizer        : doCheckSanity('Debug', '1000', 'address'),
+            ]
+            if (releaseTesting) {
+                extendedChecks = [
+                    checkLinuxRelease       : doCheckInDocker('Release'),
+                    checkMacOsDebug         : doBuildMacOs('Debug', true),
+                    buildUwpx64Debug        : doBuildWindows('Debug', true, 'x64', false),
+                    androidArmeabiRelease   : doAndroidBuildInDocker('armeabi-v7a', 'Release', true),
+                    coverage                : doBuildCoverage(),
+                    performance             : buildPerformance()
                 ]
-                if (releaseTesting) {
-                    extendedChecks = [
-                        checkLinuxRelease       : doCheckInDocker('Release'),
-                        checkMacOsDebug         : doBuildMacOs('Debug', true),
-                        buildUwpx64Debug        : doBuildWindows('Debug', true, 'x64', false),
-                        androidArmeabiRelease   : doAndroidBuildInDocker('armeabi-v7a', 'Release', true),
-                        coverage                : doBuildCoverage(),
-                        performance             : buildPerformance()
-                    ]
-                    parallelExecutors.putAll(extendedChecks)
-                }
-                parallel parallelExecutors
+                parallelExecutors.putAll(extendedChecks)
             }
+            parallel parallelExecutors
         }
 
-
-        if (gitTag && !isPullRequest) {
+        if (isPublishingRun) {
             stage('BuildPackages') {
                 parallelExecutors = [
                     buildMacOsDebug     : doBuildMacOs('Debug', false),

@@ -17,6 +17,25 @@
 
 ----------------------------------------------
 
+# 5.12.3 Release notes
+
+### Enhancements
+* None.
+
+### Fixed
+* Added assertions around use of invalid refs and sizes. Helps in narrowing down the causes for
+  asserts like `ref != 0` and `(chunk_pos % 8) == 0`
+ 
+### Breaking changes
+* None.
+
+-----------
+
+### Internals
+* None.
+
+----------------------------------------------
+
 # 5.12.2 Release notes
 
 ### Enhancements

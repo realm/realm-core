@@ -611,6 +611,7 @@ void SlabAlloc::do_free(ref_type ref, char* addr) noexcept
         // Free space in read only segment is tracked separately
         try {
             REALM_ASSERT_RELEASE(ref != 0);
+            REALM_ASSERT_RELEASE_EX(!(ref & 7), ref);
             auto next = m_free_read_only.lower_bound(ref);
             if (next != m_free_read_only.end()) {
                 REALM_ASSERT_RELEASE_EX(ref + size <= next->first, ref, size, next->first, next->second);
