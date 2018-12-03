@@ -38,13 +38,13 @@ void LogFileOp::set_name(const std::string& fname)
 {
     auto len = fname.size();
     auto end_pos = suffix_size - 1;
-    if (len > end_pos) {
+    if (len >= end_pos) {
         strncpy(name, fname.c_str() + (len - end_pos), end_pos);
         name[0] = name[1] = '.';
         name[end_pos] = 0;
     }
     else {
-        strncpy(name, fname.c_str(), len);
+        strncpy(name, fname.c_str(), len + 1);
         name[len] = 0;
     }
 }
