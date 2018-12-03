@@ -33,13 +33,10 @@
 #include <realm/lang_bind_helper.hpp>
 #include <realm/util/scope_exit.hpp>
 
-namespace {
-constexpr const char* result_sets_type_name = "__ResultSets";
-}
-
 namespace realm {
 
 namespace _impl {
+using namespace ::realm::partial_sync;
 
 void initialize_schema(Group& group)
 {
@@ -505,6 +502,18 @@ void unsubscribe(Subscription& subscription)
             REALM_ASSERT(false);
             break;
     }
+}
+
+void unsubscribe(Object&& subscription)
+{
+    REALM_ASSERT(subscription.get_object_schema().name == result_sets_type_name);
+    auto realm = subscription.realm();
+    enqueue_unregistration(std::move(subscription), [=] {
+        // The partial sync worker thread bypasses the normal machinery which
+        // would trigger notifications since it does its own notification things
+        // in the other cases, so manually trigger it here.
+        _impl::PartialSyncHelper::get_coordinator(*realm).wake_up_notifier_worker();
+    });
 }
 
 Subscription::Subscription(std::string name, std::string object_type, std::shared_ptr<Realm> realm)

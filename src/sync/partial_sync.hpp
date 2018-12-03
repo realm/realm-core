@@ -35,6 +35,7 @@ class Object;
 class Realm;
 
 namespace partial_sync {
+static constexpr const char* result_sets_type_name = "__ResultSets";
 
 struct InvalidRealmStateException : public std::logic_error {
     InvalidRealmStateException(const std::string& msg);
@@ -107,6 +108,7 @@ RowExpr subscribe_blocking(Results const&, util::Optional<std::string> name);
 /// The operation is performed asynchronously. Completion will be indicated by the
 /// `Subscription` transitioning to the `Invalidated` state.
 void unsubscribe(Subscription&);
+void unsubscribe(Object&&);
 
 } // namespace partial_sync
 
