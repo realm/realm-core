@@ -297,7 +297,7 @@ MemRef SlabAlloc::do_alloc(size_t size)
     malloc_debug_map[ref] = malloc(1);
 #endif
     REALM_ASSERT_EX(ref >= m_baseline, ref, m_baseline);
-    log_internal<util::LogSlab>("alloc_mem", [&](LogSlab& e) {
+    log_internal<util::LogSlabOp>("slab_alloc", [&](LogSlabOp& e) {
         e.ref = ref;
         e.request = size;
     });
@@ -604,7 +604,7 @@ void SlabAlloc::do_free(ref_type ref, char* addr) noexcept
     m_free_space_state = free_space_Dirty;
 
     if (read_only) {
-        log_internal<util::LogFileAlloc>("free-in-file", [&](LogFileAlloc& e) {
+        log_internal<util::LogFileStorageOp>("file_free", [&](LogFileStorageOp& e) {
             e.ref = ref;
             e.request = size;
         });
@@ -643,7 +643,7 @@ void SlabAlloc::do_free(ref_type ref, char* addr) noexcept
         }
     }
     else {
-        log_internal<util::LogSlab>("free_mem", [&](LogSlab& e) {
+        log_internal<util::LogSlabOp>("slab_free", [&](LogSlabOp& e) {
             e.ref = ref;
             e.request = size;
         });

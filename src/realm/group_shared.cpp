@@ -767,9 +767,9 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
     if (options.durability == Durability::Async)
         throw std::runtime_error("Async mode not yet supported on Windows, iOS and watchOS");
 #endif
-    log_internal<util::LogFileOpen>("open",[&](util::LogFileOpen& e)
+    log_internal<util::LogFileOp>("file_open",[&](util::LogFileOp& e)
         {
-            e.set_name(path.c_str());
+            e.set_name(path);
         });
     m_db_path = path;
     m_coordination_dir = path + ".management";
@@ -1417,10 +1417,6 @@ SharedGroup::~SharedGroup() noexcept
 
 void SharedGroup::close() noexcept
 {
-    log_internal<util::LogFileOpen>("close",[&](util::LogFileOpen& e)
-        {
-            e.set_name(m_db_path.c_str());
-        });
     close_internal(std::unique_lock<InterprocessMutex>(m_controlmutex, std::defer_lock));
 }
 
@@ -1440,7 +1436,7 @@ void SharedGroup::close_internal(std::unique_lock<InterprocessMutex> lock) noexc
             break;
     }
     m_group.detach();
-    log_internal<util::LogFileOpen>("close",[&](util::LogFileOpen& e)
+    log_internal<util::LogFileOp>("file_close",[&](util::LogFileOp& e)
         {
             e.set_name(m_db_path.c_str());
         });
@@ -1960,7 +1956,7 @@ void SharedGroup::rollback() noexcept
 
     REALM_ASSERT(m_transact_stage == transact_Writing);
 
-    log_internal<util::LogRef>("rollback",[&](util::LogRef& e)
+    log_internal<util::LogRef>("tr_rollback",[&](util::LogRef& e)
         {
             e.ref = 0;
         });
@@ -2018,7 +2014,7 @@ void SharedGroup::do_begin_read(VersionID version_id, bool writable)
     using gf = _impl::GroupFriend;
     if (writable) {
         // only log when inside a write transaction, as the internal logger is not thread safe
-        log_internal<util::LogRef>("write_tr",[&](util::LogRef& e)
+        log_internal<util::LogRef>("tr_write",[&](util::LogRef& e)
             {
                 e.ref = m_read_lock.m_top_ref;
             });
@@ -2350,7 +2346,7 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
     // can safely proceed once the writemutex has been lifted.
     info->commit_in_critical_phase = 0;
     // only log when inside a write transaction, as the internal logger is not thread safe
-    log_internal<util::LogRef>("commit_done",[&](util::LogRef& e)
+    log_internal<util::LogRef>("tr_commit_done",[&](util::LogRef& e)
         {
             e.ref = new_top_ref;
         });
@@ -2361,7 +2357,6 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
 
         m_new_commit_available.notify_all();
     }
-    REALM_ASSERT(false);
 }
 
 #ifdef REALM_DEBUG

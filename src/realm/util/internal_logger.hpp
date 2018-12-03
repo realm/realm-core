@@ -41,10 +41,10 @@ protected:
     LogEntry() {}
 };
 
-class LogRef : public LogEntry {
+class LogRef : public LogEntry { // currently used for write transaction start/end
 public:
     size_t ref;
-    static constexpr int end = 16;
+    static constexpr int end = 32;
     static std::vector<LogRef> buffer;
     static int next;
     std::ostream& print(std::ostream& os) override;
@@ -52,39 +52,40 @@ public:
     LogRef() {}
 };
 
-class LogSlab : public LogEntry {
+class LogSlabOp : public LogEntry {
 public:
     size_t request;
     size_t ref;
     static constexpr int end = 64;
-    static std::vector<LogSlab> buffer;
+    static std::vector<LogSlabOp> buffer;
     static int next;
     std::ostream& print(std::ostream& os) override;
-    virtual ~LogSlab() { };
-    LogSlab() {}
+    virtual ~LogSlabOp() { };
+    LogSlabOp() {}
 };
 
-class LogFileAlloc : public LogEntry {
+class LogFileStorageOp : public LogEntry {
 public:
     size_t request;
     size_t ref;
     static constexpr int end = 64;
-    static std::vector<LogFileAlloc> buffer;
+    static std::vector<LogFileStorageOp> buffer;
     static int next;
     std::ostream& print(std::ostream& os) override;
-    virtual ~LogFileAlloc() { };
-    LogFileAlloc() {};
+    virtual ~LogFileStorageOp() { };
+    LogFileStorageOp() {};
 };
 
-struct LogFileOpen : public LogEntry {
-    char name[32]; // suffix of name
-    static constexpr int end = 4;
-    static std::vector<LogFileOpen> buffer;
+struct LogFileOp : public LogEntry {
+    static constexpr int suffix_size = 64;
+    char name[suffix_size]; // suffix of name
+    static constexpr int end = 16;
+    static std::vector<LogFileOp> buffer;
     static int next;
-    void set_name(const char* nm);
+    void set_name(const std::string& nm);
     std::ostream& print(std::ostream& os) override;
-    virtual ~LogFileOpen() { };
-    LogFileOpen() {}
+    virtual ~LogFileOp() { };
+    LogFileOp() {}
 };
 
 std::ostream& operator<<(std::ostream& os, LogEntry& e);

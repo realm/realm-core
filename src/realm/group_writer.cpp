@@ -500,13 +500,33 @@ ref_type GroupWriter::write_group()
     char* start_addr = window->translate(reserve_ref);
     window->encryption_read_barrier(start_addr, used);
     write_array_at(window, free_positions_ref, m_free_positions.get_header(), free_positions_size); // Throws
+    log_internal<util::LogFileStorageOp>("file_write_free_pos", [&](LogFileStorageOp& e) {
+        e.ref = free_positions_ref;
+        e.request = free_positions_size;
+    });
+
     write_array_at(window, free_sizes_ref, m_free_lengths.get_header(), free_sizes_size);           // Throws
+    log_internal<util::LogFileStorageOp>("file_write_free_sizes", [&](LogFileStorageOp& e) {
+        e.ref = free_sizes_ref;
+        e.request = free_sizes_size;
+    });
+
     if (is_shared) {
         write_array_at(window, free_versions_ref, m_free_versions.get_header(), free_versions_size); // Throws
+        log_internal<util::LogFileStorageOp>("file_write_free_versions", [&](LogFileStorageOp& e) {
+            e.ref = free_versions_ref;
+            e.request = free_versions_size;
+        });
+
     }
 
     // Write top
     write_array_at(window, top_ref, top.get_header(), top_byte_size); // Throws
+    log_internal<util::LogFileStorageOp>("file_write_top", [&](LogFileStorageOp& e) {
+        e.ref = top_ref;
+        e.request = top_byte_size;
+    });
+
     window->encryption_write_barrier(start_addr, used);
     // Return top_ref so that it can be saved in lock file used for coordination
     return top_ref;
@@ -755,6 +775,11 @@ GroupWriter::FreeListElement GroupWriter::extend_free_space(size_t requested_siz
     REALM_ASSERT_3(new_file_size % 8, ==, 0);
     REALM_ASSERT_3(logical_file_size, <, new_file_size);
 
+    log_internal<util::LogFileStorageOp>("file_resize", [&](LogFileStorageOp& e) {
+        e.ref = new_file_size;
+        e.request = requested_size;
+    });
+
     // Note: resize_file() will call File::prealloc() which may misbehave under
     // race conditions (see documentation of File::prealloc()). Fortunately, no
     // race conditions can occur, because in transactional mode we hold a write
@@ -783,7 +808,7 @@ void GroupWriter::write(const char* data, size_t size)
 {
     // Get position of free space to write in (expanding file if needed)
     size_t pos = get_free_space(size);
-    log_internal<util::LogFileAlloc>("write", [&](LogFileAlloc& e) {
+    log_internal<util::LogFileStorageOp>("file_write2", [&](LogFileStorageOp& e) {
         e.ref = pos;
         e.request = size;
     });
@@ -806,10 +831,11 @@ ref_type GroupWriter::write_array(const char* data, size_t size, uint32_t checks
 {
     // Get position of free space to write in (expanding file if needed)
     size_t pos = get_free_space(size);
-    log_internal<util::LogFileAlloc>("write_arr", [&](LogFileAlloc& e) {
-        e.ref = pos;
-        e.request = size;
-    });
+
+    log_internal<util::LogFileStorageOp>("file_write", [&](LogFileStorageOp& e) {
+         e.ref = pos;
+         e.request = size;
+     });
 
     // Write the block
     MapWindow* window = get_window(pos, size);
@@ -829,10 +855,6 @@ ref_type GroupWriter::write_array(const char* data, size_t size, uint32_t checks
 void GroupWriter::write_array_at(MapWindow* window, ref_type ref, const char* data, size_t size)
 {
     size_t pos = size_t(ref);
-    log_internal<util::LogFileAlloc>("write_at", [&](LogFileAlloc& e) {
-        e.ref = ref;
-        e.request = size;
-    });
 
     REALM_ASSERT_3(pos + size, <=, to_size_t(m_group.m_top.get(2) / 2));
     // REALM_ASSERT_3(pos + size, <=, m_file_map.get_size());

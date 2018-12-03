@@ -25,36 +25,42 @@ namespace util {
 size_t LogEntry::next_event = 1;
 
 std::vector<LogRef> LogRef::buffer(LogRef::end);
-std::vector<LogSlab> LogSlab::buffer(LogSlab::end);
-std::vector<LogFileAlloc> LogFileAlloc::buffer(LogFileAlloc::end);
-std::vector<LogFileOpen> LogFileOpen::buffer(LogFileOpen::end);
+std::vector<LogSlabOp> LogSlabOp::buffer(LogSlabOp::end);
+std::vector<LogFileStorageOp> LogFileStorageOp::buffer(LogFileStorageOp::end);
+std::vector<LogFileOp> LogFileOp::buffer(LogFileOp::end);
 
-int LogSlab::next = 0;
+int LogSlabOp::next = 0;
 int LogRef::next = 0;
-int LogFileAlloc::next = 0;
-int LogFileOpen::next = 0;
+int LogFileStorageOp::next = 0;
+int LogFileOp::next = 0;
 
-void LogFileOpen::set_name(const char* fname)
+void LogFileOp::set_name(const std::string& fname)
 {
-    int len = strlen(fname);
-    if (len > 31)
-        strncpy(name, fname + (len - 31), 31);
-    else
-        strncpy(name, fname, 31);
+    int len = fname.size();
+    int end_pos = suffix_size - 1;
+    if (len > end_pos) {
+        strncpy(name, fname.c_str() + (len - end_pos), end_pos);
+        name[0] = name[1] = '.';
+        name[end_pos] = 0;
+    }
+    else {
+        strncpy(name, fname.c_str(), len);
+        name[len] = 0;
+    }
 }
 
-std::vector<LogEntry*> entries(LogSlab::end + LogRef::end + LogFileAlloc::end + LogFileOpen::end);
+std::vector<LogEntry*> entries(LogSlabOp::end + LogRef::end + LogFileStorageOp::end + LogFileOp::end);
 
 void dump_internal_logs(std::ostream& os)
 {
     int nr = 0;
-    for (auto& e : LogFileOpen::buffer)
+    for (auto& e : LogFileOp::buffer)
         if (e.event_nr) entries[nr++] = &e;
-    for (auto& e : LogSlab::buffer)
+    for (auto& e : LogSlabOp::buffer)
         if (e.event_nr) entries[nr++] = &e;
     for (auto& e : LogRef::buffer)
         if (e.event_nr) entries[nr++] = &e;
-    for (auto& e : LogFileAlloc::buffer)
+    for (auto& e : LogFileStorageOp::buffer)
         if (e.event_nr) entries[nr++] = &e;
     std::sort(entries.begin(), entries.begin() + nr, [](auto& a, auto&b) { return a->event_nr < b->event_nr; });
     os << std::endl << "Internal logs:" << std::endl;
@@ -78,7 +84,7 @@ std::ostream& operator<<(std::ostream& os, LogEntry& e)
     return os;
 }
 
-std::ostream& LogFileOpen::print(std::ostream& os) {
+std::ostream& LogFileOp::print(std::ostream& os) {
     return os << name;
 }
 
@@ -86,11 +92,11 @@ std::ostream& LogRef::print(std::ostream& os) {
     return os << ref;
 }
 
-std::ostream& LogFileAlloc::print(std::ostream& os) {
+std::ostream& LogFileStorageOp::print(std::ostream& os) {
     return os << ref << ", " << request;
 }
 
-std::ostream& LogSlab::print(std::ostream& os) {
+std::ostream& LogSlabOp::print(std::ostream& os) {
     return os << ref << ", " << request;
 }
 
