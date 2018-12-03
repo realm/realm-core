@@ -77,7 +77,7 @@ public:
 };
 
 struct LogFileOp : public LogEntry {
-    static constexpr int suffix_size = 64;
+    static constexpr unsigned int suffix_size = 64;
     char name[suffix_size]; // suffix of name
     static constexpr int end = 16;
     static std::vector<LogFileOp> buffer;

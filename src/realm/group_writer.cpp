@@ -808,20 +808,6 @@ GroupWriter::FreeListElement GroupWriter::extend_free_space(size_t requested_siz
     return it;
 }
 
-
-void GroupWriter::write(const char* data, size_t size)
-{
-    // Get position of free space to write in (expanding file if needed)
-    size_t pos = get_free_space(size);
-    log_internal<util::LogFileStorageOp>("file_write2", [&](LogFileStorageOp& e) {
-        e.ref = pos;
-        e.request = size;
-    });
-    REALM_ASSERT_3((pos & 0x7), ==, 0); // Write position should always be 64bit aligned
-
-    return it;
-}
-
 bool inline is_aligned(char* addr) {
     size_t as_binary = reinterpret_cast<size_t>(addr);
     return (as_binary & 7) == 0;
