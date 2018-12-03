@@ -4,8 +4,8 @@
 * None.
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Trying to get the used space from a virgin realm file (with no commits) leads to a segmentation fault
+  ([#3182](https://github.com/realm/realm-core/issues/3282), since v5.12.0)
  
 ### Breaking changes
 * None.
