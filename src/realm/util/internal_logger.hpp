@@ -36,7 +36,7 @@ public:
     const char* op = "empty";
     static size_t next_event;
     virtual std::ostream& print(std::ostream& os) = 0;
-    virtual ~LogEntry() { };
+    virtual ~LogEntry() { }
 protected:
     LogEntry() {}
 };
@@ -48,7 +48,7 @@ public:
     static std::vector<LogRef> buffer;
     static int next;
     std::ostream& print(std::ostream& os) override;
-    virtual ~LogRef() {};
+    virtual ~LogRef() {}
     LogRef() {}
 };
 
@@ -60,7 +60,7 @@ public:
     static std::vector<LogSlabOp> buffer;
     static int next;
     std::ostream& print(std::ostream& os) override;
-    virtual ~LogSlabOp() { };
+    virtual ~LogSlabOp() { }
     LogSlabOp() {}
 };
 
@@ -72,8 +72,8 @@ public:
     static std::vector<LogFileStorageOp> buffer;
     static int next;
     std::ostream& print(std::ostream& os) override;
-    virtual ~LogFileStorageOp() { };
-    LogFileStorageOp() {};
+    virtual ~LogFileStorageOp() { }
+    LogFileStorageOp() {}
 };
 
 struct LogFileOp : public LogEntry {
@@ -84,7 +84,7 @@ struct LogFileOp : public LogEntry {
     static int next;
     void set_name(const std::string& nm);
     std::ostream& print(std::ostream& os) override;
-    virtual ~LogFileOp() { };
+    virtual ~LogFileOp() { }
     LogFileOp() {}
 };
 
