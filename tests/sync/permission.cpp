@@ -97,6 +97,7 @@ static void subscribe_to_all(std::shared_ptr<Realm> const& r)
         {"status", int64_t(0)},
         {"error_message", ""s},
         {"query_parse_counter", int64_t(0)},
+        {"matches_count", int64_t(0)},
     }, false);
 
     r->commit_transaction();
