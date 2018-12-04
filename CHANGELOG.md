@@ -1,18 +1,15 @@
-# NEXT RELEASE
+# 5.12.4 Release notes
 
 ### Enhancements
 * None.
 
 ### Fixed
-* Trying to get the used space from a virgin realm file (with no commits) leads to a segmentation fault
-  ([#3182](https://github.com/realm/realm-core/issues/3282), since v5.12.0)
+* A segmentation fault would occur when calling Group:get_used_space() for a realm file
+  with no commits. This method would usually only be called from sync/ROS to calculate
+  and report state size.
+  ([#3182](https://github.com/realm/realm-core/issues/3182), since v5.12.0)
  
 ### Breaking changes
-* None.
-
------------
-
-### Internals
 * None.
 
 ----------------------------------------------
