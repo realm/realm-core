@@ -23,7 +23,6 @@
 #include <iostream>
 #include <vector>
 #include <thread>
-#include <mutex>
 
 namespace realm {
 namespace util {
@@ -35,7 +34,7 @@ public:
     bool partial = true;
     std::thread::id thread_id;
     const char* op = "empty";
-    static size_t next_event;
+    static thread_local size_t next_event;
     virtual std::ostream& print(std::ostream& os) = 0;
     virtual ~LogEntry() { }
     static void enter() {}
@@ -48,8 +47,8 @@ class LogRef : public LogEntry { // currently used for write transaction start/e
 public:
     size_t ref;
     static constexpr int end = 32;
-    static std::vector<LogRef> buffer;
-    static int next;
+    static thread_local std::vector<LogRef> buffer;
+    static thread_local int next;
     std::ostream& print(std::ostream& os) override;
     virtual ~LogRef() {}
     LogRef() {}
@@ -60,8 +59,8 @@ public:
     size_t request;
     size_t ref;
     static constexpr int end = 64;
-    static std::vector<LogSlabOp> buffer;
-    static int next;
+    static thread_local std::vector<LogSlabOp> buffer;
+    static thread_local int next;
     std::ostream& print(std::ostream& os) override;
     virtual ~LogSlabOp() { }
     LogSlabOp() {}
@@ -72,8 +71,8 @@ public:
     size_t request;
     size_t ref;
     static constexpr int end = 64;
-    static std::vector<LogFileStorageOp> buffer;
-    static int next;
+    static thread_local std::vector<LogFileStorageOp> buffer;
+    static thread_local int next;
     std::ostream& print(std::ostream& os) override;
     virtual ~LogFileStorageOp() { }
     LogFileStorageOp() {}
@@ -83,15 +82,12 @@ struct LogFileOp : public LogEntry {
     static constexpr unsigned int suffix_size = 64;
     char name[suffix_size]; // suffix of name
     static constexpr int end = 16;
-    static std::vector<LogFileOp> buffer;
-    static int next;
+    static thread_local std::vector<LogFileOp> buffer;
+    static thread_local int next;
     void set_name(const std::string& nm);
     std::ostream& print(std::ostream& os) override;
     virtual ~LogFileOp() { }
     LogFileOp() {}
-    static std::mutex mutex;
-    static void enter() { mutex.lock(); }
-    static void leave() { mutex.unlock(); }
 };
 
 std::ostream& operator<<(std::ostream& os, LogEntry& e);
@@ -101,7 +97,6 @@ std::ostream& operator<<(std::ostream& os, LogEntry& e);
 // loging of file operations (open, close) are protected, though, and thus can
 // be done concurrently from all threads.
 template <typename Type, typename Func> void log_internal(const char* op_name, Func func) {
-    Type::enter();
     Type& e = *(Type::buffer.begin() + Type::next++);
     if (Type::next == Type::end)
         Type::next = 0;
@@ -111,7 +106,6 @@ template <typename Type, typename Func> void log_internal(const char* op_name, F
     e.thread_id = std::this_thread::get_id();
     func(e);
     e.partial = false;
-    Type::leave();
 }
 
 void dump_internal_logs(std::ostream&);

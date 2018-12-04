@@ -22,19 +22,18 @@
 namespace realm {
 namespace util {
 
-size_t LogEntry::next_event = 1;
+thread_local size_t LogEntry::next_event = 1;
 
-std::vector<LogRef> LogRef::buffer(LogRef::end);
-std::vector<LogSlabOp> LogSlabOp::buffer(LogSlabOp::end);
-std::vector<LogFileStorageOp> LogFileStorageOp::buffer(LogFileStorageOp::end);
-std::vector<LogFileOp> LogFileOp::buffer(LogFileOp::end);
+thread_local std::vector<LogRef> LogRef::buffer(LogRef::end);
+thread_local std::vector<LogSlabOp> LogSlabOp::buffer(LogSlabOp::end);
+thread_local std::vector<LogFileStorageOp> LogFileStorageOp::buffer(LogFileStorageOp::end);
+thread_local std::vector<LogFileOp> LogFileOp::buffer(LogFileOp::end);
 
-std::mutex LogFileOp::mutex;
 
-int LogSlabOp::next = 0;
-int LogRef::next = 0;
-int LogFileStorageOp::next = 0;
-int LogFileOp::next = 0;
+thread_local int LogSlabOp::next = 0;
+thread_local int LogRef::next = 0;
+thread_local int LogFileStorageOp::next = 0;
+thread_local int LogFileOp::next = 0;
 
 void LogFileOp::set_name(const std::string& fname)
 {
