@@ -23,6 +23,7 @@
 #include <iostream>
 #include <vector>
 #include <thread>
+#include <mutex>
 
 namespace realm {
 namespace util {
@@ -37,6 +38,8 @@ public:
     static size_t next_event;
     virtual std::ostream& print(std::ostream& os) = 0;
     virtual ~LogEntry() { }
+    static void enter() {}
+    static void leave() {}
 protected:
     LogEntry() {}
 };
@@ -86,11 +89,19 @@ struct LogFileOp : public LogEntry {
     std::ostream& print(std::ostream& os) override;
     virtual ~LogFileOp() { }
     LogFileOp() {}
+    static std::mutex mutex;
+    static void enter() { mutex.lock(); }
+    static void leave() { mutex.unlock(); }
 };
 
 std::ostream& operator<<(std::ostream& os, LogEntry& e);
 
+// in general the logs are not protected by locks. yes. sounds funny.
+// so logging should be done only from threads within a write transaction.
+// loging of file operations (open, close) are protected, though, and thus can
+// be done concurrently from all threads.
 template <typename Type, typename Func> void log_internal(const char* op_name, Func func) {
+    Type::enter();
     Type& e = *(Type::buffer.begin() + Type::next++);
     if (Type::next == Type::end)
         Type::next = 0;
@@ -100,6 +111,7 @@ template <typename Type, typename Func> void log_internal(const char* op_name, F
     e.thread_id = std::this_thread::get_id();
     func(e);
     e.partial = false;
+    Type::leave();
 }
 
 void dump_internal_logs(std::ostream&);

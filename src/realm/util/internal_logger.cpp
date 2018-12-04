@@ -29,6 +29,8 @@ std::vector<LogSlabOp> LogSlabOp::buffer(LogSlabOp::end);
 std::vector<LogFileStorageOp> LogFileStorageOp::buffer(LogFileStorageOp::end);
 std::vector<LogFileOp> LogFileOp::buffer(LogFileOp::end);
 
+std::mutex LogFileOp::mutex;
+
 int LogSlabOp::next = 0;
 int LogRef::next = 0;
 int LogFileStorageOp::next = 0;
