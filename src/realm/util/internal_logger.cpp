@@ -24,10 +24,10 @@ namespace util {
 
 thread_local size_t LogEntry::next_event = 1;
 
-thread_local std::vector<LogRef> LogRef::buffer(LogRef::end);
-thread_local std::vector<LogSlabOp> LogSlabOp::buffer(LogSlabOp::end);
-thread_local std::vector<LogFileStorageOp> LogFileStorageOp::buffer(LogFileStorageOp::end);
-thread_local std::vector<LogFileOp> LogFileOp::buffer(LogFileOp::end);
+thread_local std::vector<LogRef>* LogRef::buffer = 0;
+thread_local std::vector<LogSlabOp>* LogSlabOp::buffer = 0;
+thread_local std::vector<LogFileStorageOp>* LogFileStorageOp::buffer = 0;
+thread_local std::vector<LogFileOp>* LogFileOp::buffer = 0;
 
 
 thread_local int LogSlabOp::next = 0;
@@ -55,14 +55,18 @@ std::vector<LogEntry*> entries(LogSlabOp::end + LogRef::end + LogFileStorageOp::
 void dump_internal_logs(std::ostream& os)
 {
     int nr = 0;
-    for (auto& e : LogFileOp::buffer)
-        if (e.event_nr) entries[nr++] = &e;
-    for (auto& e : LogSlabOp::buffer)
-        if (e.event_nr) entries[nr++] = &e;
-    for (auto& e : LogRef::buffer)
-        if (e.event_nr) entries[nr++] = &e;
-    for (auto& e : LogFileStorageOp::buffer)
-        if (e.event_nr) entries[nr++] = &e;
+    if (LogFileOp::buffer)
+    	for (auto& e : *LogFileOp::buffer)
+    		if (e.event_nr) entries[nr++] = &e;
+    if (LogSlabOp::buffer)
+    	for (auto& e : *LogSlabOp::buffer)
+    		if (e.event_nr) entries[nr++] = &e;
+    if (LogRef::buffer)
+    	for (auto& e : *LogRef::buffer)
+    		if (e.event_nr) entries[nr++] = &e;
+    if (LogFileStorageOp::buffer)
+    	for (auto& e : *LogFileStorageOp::buffer)
+    		if (e.event_nr) entries[nr++] = &e;
     std::sort(entries.begin(), entries.begin() + nr, [](auto& a, auto&b) { return a->event_nr < b->event_nr; });
     os << std::endl << "Internal logs:" << std::endl;
     size_t prev_event_nr = 0;

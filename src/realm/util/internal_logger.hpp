@@ -47,7 +47,7 @@ class LogRef : public LogEntry { // currently used for write transaction start/e
 public:
     size_t ref;
     static constexpr int end = 32;
-    static thread_local std::vector<LogRef> buffer;
+    static thread_local std::vector<LogRef>* buffer;
     static thread_local int next;
     std::ostream& print(std::ostream& os) override;
     virtual ~LogRef() {}
@@ -59,7 +59,7 @@ public:
     size_t request;
     size_t ref;
     static constexpr int end = 64;
-    static thread_local std::vector<LogSlabOp> buffer;
+    static thread_local std::vector<LogSlabOp>* buffer;
     static thread_local int next;
     std::ostream& print(std::ostream& os) override;
     virtual ~LogSlabOp() { }
@@ -71,7 +71,7 @@ public:
     size_t request;
     size_t ref;
     static constexpr int end = 64;
-    static thread_local std::vector<LogFileStorageOp> buffer;
+    static thread_local std::vector<LogFileStorageOp>* buffer;
     static thread_local int next;
     std::ostream& print(std::ostream& os) override;
     virtual ~LogFileStorageOp() { }
@@ -82,7 +82,7 @@ struct LogFileOp : public LogEntry {
     static constexpr unsigned int suffix_size = 64;
     char name[suffix_size]; // suffix of name
     static constexpr int end = 16;
-    static thread_local std::vector<LogFileOp> buffer;
+    static thread_local std::vector<LogFileOp>* buffer;
     static thread_local int next;
     void set_name(const std::string& nm);
     std::ostream& print(std::ostream& os) override;
@@ -97,7 +97,9 @@ std::ostream& operator<<(std::ostream& os, LogEntry& e);
 // loging of file operations (open, close) are protected, though, and thus can
 // be done concurrently from all threads.
 template <typename Type, typename Func> void log_internal(const char* op_name, Func func) {
-    Type& e = *(Type::buffer.begin() + Type::next++);
+	if (Type::buffer == 0)
+		Type::buffer = new std::vector<Type>(Type::end);
+    Type& e = *(Type::buffer->begin() + Type::next++);
     if (Type::next == Type::end)
         Type::next = 0;
     e.partial = true;
