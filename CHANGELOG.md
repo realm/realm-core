@@ -13,6 +13,23 @@
 -----------
 
 ### Internals
+* Fixed warnings reported by GCC 8.
+* Replaced call to the deprecated `readdir_r()` with `readdir()`.
+
+----------------------------------------------
+
+# 5.12.4 Release notes
+
+### Enhancements
+* None.
+
+### Fixed
+* A segmentation fault would occur when calling Group:get_used_space() for a realm file
+  with no commits. This method would usually only be called from sync/ROS to calculate
+  and report state size.
+  ([#3182](https://github.com/realm/realm-core/issues/3182), since v5.12.0)
+ 
+### Breaking changes
 * None.
 
 ----------------------------------------------

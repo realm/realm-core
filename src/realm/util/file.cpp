@@ -1391,16 +1391,21 @@ bool DirScanner::next(std::string& name)
     if (!m_dirp)
         return false;
 
-    const size_t min_dirent_size = offsetof(struct dirent, d_name) + NAME_MAX + 1;
-    union {
-        struct dirent m_dirent;
-        char m_strut[min_dirent_size];
-    } u;
-    struct dirent* dirent;
     for (;;) {
-        int err = readdir_r(m_dirp, &u.m_dirent, &dirent);
-        if (err != 0) {
-            throw std::system_error(err, std::system_category(), "readdir_r() failed");
+        // Note: readdir_r() is deprecated. However, all implementations
+        // implement readdir() to be thread-safe when operating on separate
+        // directory streams.
+        // More information: lwn.net/Articles/696475/
+
+        struct dirent* dirent;
+        do {
+            // readdir() does not seem to set errno=0 on success. The manpage
+            // recommends manually zeroing errno before calling it.
+            errno = 0;
+            dirent = readdir(m_dirp);
+        } while (errno == EAGAIN);
+        if (errno != 0) {
+            throw std::system_error(errno, std::system_category(), "readdir() failed");
         }
         if (!dirent)
             return false; // End of stream

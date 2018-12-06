@@ -71,6 +71,8 @@
 
 #if REALM_HAS_CPP_ATTRIBUTE(clang::fallthrough)
 #define REALM_FALLTHROUGH [[clang::fallthrough]]
+#elif REALM_HAS_CPP_ATTRIBUTE(gnu::fallthrough)
+#define REALM_FALLTHROUGH [[gnu::fallthrough]]
 #elif REALM_HAS_CPP_ATTRIBUTE(fallthrough)
 #define REALM_FALLTHROUGH [[fallthrough]]
 #else

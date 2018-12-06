@@ -105,8 +105,7 @@ struct mapping_and_addr {
     size_t size;
 };
 
-// prevent destruction at exit (which can lead to races if other threads are still running)
-util::Mutex& mapping_mutex = *new Mutex;
+util::Mutex mapping_mutex;
 std::vector<mapping_and_addr>& mappings_by_addr = *new std::vector<mapping_and_addr>;
 std::vector<mappings_for_file>& mappings_by_file = *new std::vector<mappings_for_file>;
 unsigned int file_reclaim_index = 0;
@@ -189,12 +188,13 @@ private:
     int m_refresh_count = 0;
 };
 
-
-void reclaimer_loop();
-
 std::unique_ptr<std::thread> reclaimer_thread;
+std::atomic<bool> reclaimer_shutdown(false);
 DefaultGovernor default_governor;
 PageReclaimGovernor* governor = nullptr;
+
+
+void reclaimer_loop();
 
 void set_page_reclaim_governor(PageReclaimGovernor* new_governor)
 {
@@ -202,7 +202,6 @@ void set_page_reclaim_governor(PageReclaimGovernor* new_governor)
     // start worker thread if it hasn't been started earlier
     if (reclaimer_thread == nullptr) {
         reclaimer_thread.reset(new std::thread(reclaimer_loop));
-        reclaimer_thread->detach();
     }
     governor = new_governor;
 }
@@ -213,6 +212,12 @@ struct DefaultGovernorInstaller {
     	if (default_governor.get_current_target(0) != PageReclaimGovernor::no_match) {
     		// only install if the governor is able to compute a target.
     		set_page_reclaim_governor(&default_governor);
+    	}
+    }
+    ~DefaultGovernorInstaller() {
+    	if (reclaimer_thread) {
+    		reclaimer_shutdown = true;
+    		reclaimer_thread->join();
     	}
     }
 };
@@ -366,7 +371,7 @@ void reclaim_pages()
 
 void reclaimer_loop()
 {
-    for (;;) {
+    while (!reclaimer_shutdown) {
         reclaim_pages();
         millisleep(1000);
     }

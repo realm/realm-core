@@ -31,11 +31,11 @@
 using namespace realm;
 using namespace realm::util;
 
-StringEnumColumn::StringEnumColumn(Allocator& alloc, ref_type ref, ref_type keys_ref, bool nullable,
+StringEnumColumn::StringEnumColumn(Allocator& alloc, ref_type ref, ref_type keys_ref, bool is_nullable,
                                    size_t column_ndx)
     : IntegerColumn(alloc, ref, column_ndx)         // Throws
-    , m_keys(alloc, keys_ref, nullable, column_ndx) // Throws
-    , m_nullable(nullable)
+    , m_keys(alloc, keys_ref, is_nullable, column_ndx) // Throws
+    , m_nullable(is_nullable)
 {
 }
 

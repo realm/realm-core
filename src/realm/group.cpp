@@ -1079,13 +1079,18 @@ size_t Group::compute_aggregated_byte_size(SizeAggregateControl ctrl) const noex
 
 size_t Group::get_used_space() const noexcept
 {
-    size_t logical_file_size = (size_t(m_top.get(2)) >> 1);
+    if (!m_top.is_attached())
+        return 0;
 
-    REALM_ASSERT(m_top.size() > 4);
-    Array free_lengths(const_cast<SlabAlloc&>(m_alloc));
-    free_lengths.init_from_ref(ref_type(m_top.get(4)));
+    size_t used_space = (size_t(m_top.get(2)) >> 1);
 
-    return logical_file_size - size_t(free_lengths.sum());
+    if (m_top.size() > 4) {
+        Array free_lengths(const_cast<SlabAlloc&>(m_alloc));
+        free_lengths.init_from_ref(ref_type(m_top.get(4)));
+        used_space -= size_t(free_lengths.sum());
+    }
+
+    return used_space;
 }
 
 

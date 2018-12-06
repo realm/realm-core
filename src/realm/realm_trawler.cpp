@@ -20,6 +20,7 @@
 
 #include <iostream>
 #include <fstream>
+#include <sstream>
 #include <vector>
 #include <set>
 #include <map>
@@ -30,6 +31,7 @@
 #include "array_direct.hpp"
 #include "alloc_slab.hpp"
 #include "array.hpp"
+#include "column_type.hpp"
 
 constexpr const int signature = 0x41414141;
 
@@ -229,6 +231,78 @@ private:
     bool m_has_refs = false;
 };
 
+class Group;
+class Table : public Array {
+public:
+    Table(realm::Allocator& alloc, uint64_t ref)
+        : Array(alloc, ref)
+    {
+        if (valid()) {
+            Array spec(alloc, get_ref(0));
+            m_column_types.init(alloc, spec.get_ref(0));
+            m_column_names.init(alloc, spec.get_ref(1));
+            m_column_attributes.init(alloc, spec.get_ref(2));
+            if (spec.size() > 3) {
+                m_column_subspecs.init(alloc, spec.get_ref(3));
+            }
+        }
+    }
+    void print_columns(const Group&) const;
+
+private:
+    std::string type_to_string(realm::ColumnType type) const
+    {
+        switch (type) {
+            case realm::col_type_Int:
+                return "int";
+            case realm::col_type_Bool:
+                return "bool";
+            case realm::col_type_String:
+            case realm::col_type_StringEnum:
+                return "string";
+            case realm::col_type_Binary:
+                return "data";
+            case realm::col_type_Table:
+                return "List";
+            case realm::col_type_Timestamp:
+                return "date";
+            case realm::col_type_Float:
+                return "float";
+            case realm::col_type_Double:
+                return "double";
+            case realm::col_type_Link:
+                return "Link";
+            case realm::col_type_LinkList:
+                return "LinkList";
+            default:
+                break;
+        }
+        return "Unknown";
+    }
+    size_t get_subspec_ndx_after(size_t column_ndx) const noexcept
+    {
+        REALM_ASSERT(column_ndx <= m_column_names.size());
+        // The m_subspecs array only keep info for subtables so we need to
+        // count up to it's position
+        size_t subspec_ndx = 0;
+        for (size_t i = 0; i != column_ndx; ++i) {
+            auto type = realm::ColumnType(m_column_types.get_val(i));
+            if (type == realm::col_type_Table || type == realm::col_type_Link || type == realm::col_type_LinkList) {
+                subspec_ndx += 1; // index of dest column
+            }
+            else if (type == realm::col_type_BackLink) {
+                subspec_ndx += 2; // index of table and index of linked column
+            }
+        }
+        return subspec_ndx;
+    }
+
+    Array m_column_types;
+    Array m_column_names;
+    Array m_column_attributes;
+    Array m_column_subspecs;
+};
+
 class Group : public Array {
 public:
     Group(realm::Allocator& alloc, uint64_t ref)
@@ -237,6 +311,7 @@ public:
     {
         if (valid()) {
             m_table_names.init(alloc, get_ref(0));
+            m_tables.init(alloc, get_ref(1));
             m_file_size = get_val(2);
             m_free_list_positions.init(alloc, get_ref(3));
             m_free_list_sizes.init(alloc, get_ref(4));
@@ -247,50 +322,67 @@ public:
     {
         return m_file_size;
     }
+    uint64_t get_free_space_size() const
+    {
+        uint64_t sz = 0;
+        for (size_t i = 0; i < m_free_list_sizes.size(); i++) {
+            sz += m_free_list_sizes.get_val(i);
+        }
+        return sz;
+    }
     int get_current_version() const
     {
         return int(get_val(6));
+    }
+    std::string get_history_type() const
+    {
+        switch (int(get_val(7))) {
+            case 0:
+                return "None";
+            case 1:
+                return "OutOfRealm";
+            case 2:
+                return "InRealm";
+            case 3:
+                return "SyncClient";
+            case 4:
+                return "SyncServer";
+        }
+        return "Unknown";
+    }
+    int get_history_schema_version() const
+    {
+        return int(get_val(9));
     }
     unsigned get_nb_tables() const
     {
         return m_table_names.size();
     }
+    std::string get_table_name(size_t i) const
+    {
+        return m_table_names.get_string(i);
+    }
     std::vector<Entry> get_allocated_nodes() const;
     std::vector<FreeListEntry> get_free_list() const;
+    void print_schema() const;
 
 private:
     friend std::ostream& operator<<(std::ostream& ostr, const Group& g);
     realm::Allocator& m_alloc;
     uint64_t m_file_size;
     Array m_table_names;
+    Array m_tables;
     Array m_free_list_positions;
     Array m_free_list_sizes;
     Array m_free_list_versions;
 };
-
-std::ostream& operator<<(std::ostream& ostr, const Group& g)
-{
-    if (g.valid()) {
-        ostr << "File size: " << g.get_file_size() << std::endl;
-        ostr << "Current version: " << g.get_current_version() << std::endl;
-        ostr << "Free list size: " << g.m_free_list_positions.size() << std::endl;
-        ostr << "Tables: " << std::endl;
-
-        for (unsigned i = 0; i < g.get_nb_tables(); i++) {
-            std::cout << "    " << g.m_table_names.get_string(i) << std::endl;
-        }
-    }
-    else {
-        ostr << "Invalid group" << std::endl;
-    }
-    return ostr;
-}
 
 class RealmFile {
 public:
     RealmFile(const std::string& file_path, const char* encryption_key);
     // Walk the file and check that it consists of valid nodes
     void node_scan();
+    void schema_info();
     void memory_leaks();
     void free_list_info() const;
 
@@ -301,6 +393,82 @@ private:
     std::unique_ptr<Group> m_group;
     realm::SlabAlloc m_alloc;
 };
+
+std::string human_readable(uint64_t val)
+{
+    std::ostringstream out;
+    out.precision(3);
+    if (val < 1024) {
+        out << val;
+    }
+    else if (val < 1024 * 1024) {
+        out << (double(val) / 1024) << "K";
+    }
+    else if (val < 1024 * 1024 * 1024) {
+        out << (double(val) / (1024 * 1024)) << "M";
+    }
+    else {
+        out << (double(val) / (1024 * 1024 * 1024)) << "G";
+    }
+    return out.str();
+}
+
+std::ostream& operator<<(std::ostream& ostr, const Group& g)
+{
+    if (g.valid()) {
+        ostr << "File size: " << human_readable(g.get_file_size()) << std::endl;
+        if (g.size() > 6) {
+            ostr << "Current version: " << g.get_current_version() << std::endl;
+            ostr << "Free list size: " << g.m_free_list_positions.size() << std::endl;
+            ostr << "Free space size: " << human_readable(g.get_free_space_size()) << std::endl;
+        }
+        if (g.size() > 8) {
+            ostr << "History type: " << g.get_history_type() << std::endl;
+            ostr << "History schema version: " << g.get_history_schema_version() << std::endl;
+        }
+    }
+    else {
+        ostr << "Invalid group" << std::endl;
+    }
+    return ostr;
+}
+
+void Table::print_columns(const Group& group) const
+{
+    for (unsigned i = 0; i < m_column_names.size(); i++) {
+        auto type = realm::ColumnType(m_column_types.get_val(i));
+        auto attr = realm::ColumnAttr(m_column_attributes.get_val(i));
+        std::string type_str;
+        if (type == realm::col_type_Link || type == realm::col_type_LinkList) {
+            size_t target_table_ndx = size_t(m_column_subspecs.get_val(get_subspec_ndx_after(i)));
+            type_str = group.get_table_name(target_table_ndx);
+            if (type == realm::col_type_LinkList) {
+                type_str += "[]";
+            }
+        }
+        else {
+            type_str = type_to_string(type);
+            if (attr & realm::col_attr_Nullable)
+                type_str += "?";
+            if (attr & realm::col_attr_Indexed)
+                type_str += " (indexed)";
+        }
+        std::cout << "        " << m_column_names.get_string(i) << ": " << type_str << std::endl;
+    }
+}
+
+void Group::print_schema() const
+{
+    if (valid()) {
+        std::cout << "Tables: " << std::endl;
+
+        for (unsigned i = 0; i < get_nb_tables(); i++) {
+            std::cout << "    " << get_table_name(i) << std::endl;
+            Table table(m_alloc, m_tables.get_ref(i));
+            table.print_columns(*this);
+        }
+    }
+}
 
 void Node::init(realm::Allocator& alloc, uint64_t ref)
 {
@@ -382,7 +550,7 @@ RealmFile::RealmFile(const std::string& file_path, const char* encryption_key)
     m_file_format_version = m_alloc.get_committed_file_format_version();
     std::cout << "Top ref: 0x" << std::hex << m_top_ref << std::dec << std::endl;
     std::cout << "File format version: " << m_file_format_version << std::endl;
-    std::cout << *m_group << std::endl;
+    std::cout << *m_group;
 }
 
 void RealmFile::node_scan()
@@ -425,6 +593,12 @@ void RealmFile::node_scan()
         }
     }
 }
+
+void RealmFile::schema_info()
+{
+    m_group->print_schema();
+}
+
 void RealmFile::memory_leaks()
 {
     if (m_group->valid()) {
@@ -493,30 +667,39 @@ int main (int argc, const char* argv[])
 {
     if (argc > 1) {
         try {
-            int curr_arg = 1;
             const char* key_ptr = nullptr;
             char key[64];
-            if (strcmp(argv[curr_arg], "--key") == 0) {
-                std::ifstream key_file(argv[curr_arg + 1]);
-                key_file.read(key, sizeof(key));
-                key_ptr = key;
-                curr_arg += 2;
-            }
-            RealmFile rf(argv[curr_arg], key_ptr);
-            curr_arg++;
-            if (argc > curr_arg) {
-                for (const char* command = argv[curr_arg]; *command != '\0'; command++) {
-                    switch (*command) {
-                        case 'f':
-                            rf.free_list_info();
-                            break;
-                        case 'm':
-                            rf.memory_leaks();
-                            break;
-                        case 'w':
-                            rf.node_scan();
-                            break;
+            char flags[10];
+            for (int curr_arg = 1; curr_arg < argc; curr_arg++) {
+                if (strcmp(argv[curr_arg], "--key") == 0) {
+                    std::ifstream key_file(argv[curr_arg + 1]);
+                    key_file.read(key, sizeof(key));
+                    key_ptr = key;
+                    curr_arg++;
+                }
+                else if (argv[curr_arg][0] == '-') {
+                    strcpy(flags, argv[curr_arg] + 1);
+                }
+                else {
+                    std::cout << "File name: " << argv[curr_arg] << std::endl;
+                    RealmFile rf(argv[curr_arg], key_ptr);
+                    for (const char* command = flags; *command != '\0'; command++) {
+                        switch (*command) {
+                            case 'f':
+                                rf.free_list_info();
+                                break;
+                            case 'm':
+                                rf.memory_leaks();
+                                break;
+                            case 's':
+                                rf.schema_info();
+                                break;
+                            case 'w':
+                                rf.node_scan();
+                                break;
+                        }
                     }
+                    std::cout << std::endl;
                 }
             }
         }
@@ -525,7 +708,11 @@ int main (int argc, const char* argv[])
         }
     }
     else {
-        std::cerr << "Usage: realm-trawler <realmfile>" << std::endl;
+        std::cerr << "Usage: realm-trawler [-fmsw] [--key crypt_key] <realmfile>" << std::endl;
+        std::cerr << "   f : free list analysis" << std::endl;
+        std::cerr << "   m : memory leak check" << std::endl;
+        std::cerr << "   s : schema dump" << std::endl;
+        std::cerr << "   w : node walk" << std::endl;
     }
 
     return 0;
