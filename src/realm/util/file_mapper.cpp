@@ -203,7 +203,6 @@ void set_page_reclaim_governor(PageReclaimGovernor* new_governor)
     // start worker thread if it hasn't been started earlier
     if (reclaimer_thread == nullptr) {
         reclaimer_thread.reset(new std::thread(reclaimer_loop));
-        //reclaimer_thread->detach();
     }
     governor = new_governor;
 }
