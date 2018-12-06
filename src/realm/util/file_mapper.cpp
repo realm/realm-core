@@ -105,7 +105,6 @@ struct mapping_and_addr {
     size_t size;
 };
 
-// prevent destruction at exit (which can lead to races if other threads are still running)
 util::Mutex mapping_mutex;
 std::vector<mapping_and_addr>& mappings_by_addr = *new std::vector<mapping_and_addr>;
 std::vector<mappings_for_file>& mappings_by_file = *new std::vector<mappings_for_file>;
@@ -189,13 +188,13 @@ private:
     int m_refresh_count = 0;
 };
 
-
-void reclaimer_loop();
-
 std::unique_ptr<std::thread> reclaimer_thread;
 std::atomic<bool> reclaimer_shutdown(false);
 DefaultGovernor default_governor;
 PageReclaimGovernor* governor = nullptr;
+
+
+void reclaimer_loop();
 
 void set_page_reclaim_governor(PageReclaimGovernor* new_governor)
 {
