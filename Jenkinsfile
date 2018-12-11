@@ -379,6 +379,7 @@ def doBuildWindows(String buildType, boolean isUWP, String platform, boolean run
             if (runTests) {
                 def environment = environment() << "TMP=${env.WORKSPACE}\\temp"
                 environment << 'UNITTEST_PROGRESS=1'
+                environment << 'UNITTEST_ENCRYPT_ALL=1'
                 withEnv(environment) {
                     dir("build-dir/test/${buildType}") {
                         bat '''
