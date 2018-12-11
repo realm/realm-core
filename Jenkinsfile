@@ -239,12 +239,12 @@ def doBuildLinux(String buildType) {
     return {
         node('docker') {
             getSourceArchive()
-            
+
             docker.build('realm-core-generic:snapshot', '-f generic.Dockerfile .').inside {
                 sh """
                    cmake --help
                    rm -rf build-dir
-                   mkdir build-dir 
+                   mkdir build-dir
                    cd build-dir
                    scl enable devtoolset-6 -- cmake -DCMAKE_BUILD_TYPE=${buildType} -DREALM_ENABLE_ENCRYPTION=1 -DREALM_NO_TESTS=1 ..
                    make -j4
@@ -364,7 +364,7 @@ def doBuildWindows(String buildType, boolean isUWP, String platform, boolean run
             getArchive()
 
             dir('build-dir') {
-                bat "\"${tool 'cmake'}\" ${cmakeDefinitions} -D CMAKE_GENERATOR_PLATFORM=${platform} -D CPACK_SYSTEM_NAME=${isUWP?'UWP':'Windows'}-${platform} -D CMAKE_BUILD_TYPE=${buildType} .."
+                bat "\"${tool 'cmake'}\" ${cmakeDefinitions} -D CMAKE_GENERATOR_PLATFORM=${platform} -D CPACK_SYSTEM_NAME=${isUWP?'UWP':'Windows'}-${platform} -D CMAKE_BUILD_TYPE=${buildType} -D REALM_ENABLE_ENCRYPTION=1 .."
                 withEnv(["_MSPDBSRV_ENDPOINT_=${UUID.randomUUID().toString()}"]) {
                     runAndCollectWarnings(parser: 'msbuild', isWindows: true, script: "\"${tool 'cmake'}\" --build . --config ${buildType}")
                 }
