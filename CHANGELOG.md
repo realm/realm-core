@@ -1,12 +1,13 @@
-# NEXT RELEASE
+# 5.12.5 Release notes
 
 ### Enhancements
 * None.
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
- 
+* When loading the realm binary from within the realm-js SDK, core could hang on Windows as described in
+  https://github.com/realm/realm-js/issues/2169.
+  ([#3188](https://github.com/realm/realm-core/pull/3188, since 5.12.2)
+
 ### Breaking changes
 * None.
 
@@ -15,6 +16,7 @@
 ### Internals
 * Fixed warnings reported by GCC 8.
 * Replaced call to the deprecated `readdir_r()` with `readdir()`.
+* Compilation without encryption now possible
 
 ----------------------------------------------
 
@@ -28,7 +30,7 @@
   with no commits. This method would usually only be called from sync/ROS to calculate
   and report state size.
   ([#3182](https://github.com/realm/realm-core/issues/3182), since v5.12.0)
- 
+
 ### Breaking changes
 * None.
 
@@ -42,7 +44,7 @@
 ### Fixed
 * Added assertions around use of invalid refs and sizes. Helps in narrowing down the causes for
   asserts like `ref != 0` and `(chunk_pos % 8) == 0`
- 
+
 ### Breaking changes
 * None.
 
@@ -59,13 +61,13 @@
 * None
 
 ### Fixed
-* If encryption was enabled, decrypted pages were not released until the file was closed, causing 
+* If encryption was enabled, decrypted pages were not released until the file was closed, causing
   excessive usage of memory.
   A page reclaim daemon thread has been added, which will work to release decrypted pages back to
   the operating system. To control it, a governing function can be installed. The governing function
   sets the target for the page reclaimer. If no governing function is installed, the system will attempt
   to keep the memory usage below any of the following:
-  
+
         - 1/4 of physical memory available on the platform as reported by "/proc/meminfo"
         - 1/4 of allowed memory available as indicated by "/sys/fs/cgroup/memory/memory_limit_in_bytes"
         - 1/2 of what is used by the buffer cache as indicated by "/sys/fs/cgroup/memory/memory.stat"
@@ -90,7 +92,7 @@
 
 ### Fixed
 * None.
- 
+
 ### Breaking changes
 * None.
 
@@ -106,16 +108,16 @@
 ### Enhancements
 * Added Group::get_used_space() which will return the size of the data taken up by the current
   commit. This is in contrast to the number returned by SharedGroup::get_stats() which will
-  return the size of the last commit done in that SharedGroup. If the commits are the same, 
-  the number will of course be the same. 
+  return the size of the last commit done in that SharedGroup. If the commits are the same,
+  the number will of course be the same.
   Issue [#259](https://github.com/realm/realm-core-private/issues/259)
 
 ### Fixed
 * None.
 
 ### Breaking changes
-* The way the Linux binaries are delivered is changed. They are now distributed 
-  like the rest of the binaries with two packages (devel/runtime) per build type. 
+* The way the Linux binaries are delivered is changed. They are now distributed
+  like the rest of the binaries with two packages (devel/runtime) per build type.
   The file names follow this scheme:
   realm-core-<buildType>-<release>-Linux-{devel|runtime}.tar.gz
   For Linux the following build types are published: Debug, Release, RelAssert
@@ -204,7 +206,7 @@
   the link translation map was done using the unsorted rows, resulting in the
   second sort/distinct being done with the incorrect values.
   PR [#3102](https://github.com/realm/realm-core/pull/3102).
- 
+
 ### Compatibility
 * File format: ver. 9 (upgrades automatically from previous formats)
 
@@ -768,7 +770,7 @@
     - Applying an empty sort or distinct descriptor is now a no-op, this
       could previously be used to clear a sort or distinct operation.
   PR [#2644](https://github.com/realm/realm-core/pull/2644)
-* Support for size query on LinkedList removed. This is perhaps not so 
+* Support for size query on LinkedList removed. This is perhaps not so
   breaking after all since it is probably not used.
   PR [#2532](https://github.com/realm/realm-core/pull/2532).
 * Replication interface changed. The search index functions now operate
@@ -975,7 +977,7 @@
 * Fix missing symbols for some overloads of Table::find_first
   in some configurations.
   PR [#2624](https://github.com/realm/realm-core/pull/2624).
-  
+
 ----------------------------------------------
 
 # 2.8.0 Release notes
@@ -1163,7 +1165,7 @@
 
 ### Bugfixes
 
-* Fixes a bug in chuncked binary column returning null value. 
+* Fixes a bug in chuncked binary column returning null value.
   PR [#2416](https://github.com/realm/realm-core/pull/2416).
   Fixes issue [#2418](https://github.com/realm/realm-core/issues/2418).
 * Possibly fixed some cases of extreme file size growth, by preventing starvation
@@ -1196,7 +1198,7 @@
 * Support handover of TableViews and Queries based on SubTables.
   PR [#2470](https://github.com/realm/realm-core/pull/2470).
 * Enable reading and writing of big blobs via Table interface.
-  Only to be used by Sync. The old interface still has a check on 
+  Only to be used by Sync. The old interface still has a check on
   the size of the binary blob.
   PR [#2416](https://github.com/realm/realm-core/pull/2416).
 
@@ -1291,7 +1293,7 @@
 
 ### Enhancements
 * Windows 10 UWP support. Use the new "UWP" configurations in Visual Studio to
-  compile core as a static .lib library for that platform. Also see sample App 
+  compile core as a static .lib library for that platform. Also see sample App
   in the uwp_demo directory that uses the static library (compile the .lib first).
   Note that it is currently just an internal preview with lots of limitations; see
   https://github.com/realm/realm-core/issues/2059
@@ -1469,7 +1471,7 @@
 * Fixed a crash related to queries that was introduced in rc7. (#2186)
 * Fixed a bug triggered through set unique of primary keys through
   the ROS. (#2180)
-  
+
 -----------
 
 ### Internals
@@ -1559,12 +1561,12 @@
 
 * Refactored the `SharedGroup` constructors and open methods to use a new
   `SharedGroupOptions` parameter which stores all options together.
-* BREAKING! Until now, a Query would return indexes into a restricting view if such was 
+* BREAKING! Until now, a Query would return indexes into a restricting view if such was
   present (a view given in the `.where(&view) method`, or it would return indexes into the
-  Table if no restricting view was present. This would make query results useless if you did 
-  not know whether or not a restricting view was present. This fix make it *always* return 
-  indexes into the Table in all cases. Also, any `begin` and `end` arguments could point into 
-  eitherthe View or the Table. These now always point into the Table. Also see 
+  Table if no restricting view was present. This would make query results useless if you did
+  not know whether or not a restricting view was present. This fix make it *always* return
+  indexes into the Table in all cases. Also, any `begin` and `end` arguments could point into
+  eitherthe View or the Table. These now always point into the Table. Also see
   https://github.com/realm/realm-core/issues/1565
 
 ### Enhancements
@@ -1575,7 +1577,7 @@
 
 ### Internals
 
-* When creating a `SharedGroup`, optionally allow setting the temporary 
+* When creating a `SharedGroup`, optionally allow setting the temporary
   directory to when making named pipes fails. This is to fix a bug
   involving mkfifo on recent android devices (#1959).
 * Bug fixed in test harness: In some cases some tests and checks would be
@@ -2148,7 +2150,7 @@ about the size of the list in question prior to carrying out the instruction.
 * S: Misbehavior of empty asynchronous write in POSIX networking API.
 * S: Access dangling pointer while handling canceled asynchronous accept
   in POSIX networking API.
-* Changed group operator== to take table names into account.  
+* Changed group operator== to take table names into account.
 
 ### Enhancements:
 
