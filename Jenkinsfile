@@ -65,6 +65,7 @@ jobWrapper {
         stage('Checking') {
             parallelExecutors = [
                 checkLinuxDebug         : doCheckInDocker('Debug'),
+                checkLinuxDebugNoEncryp : doCheckInDocker('Debug', '4', 'OFF'),
                 checkMacOsRelease       : doBuildMacOs('Release', true),
                 checkWin32Debug         : doBuildWindows('Debug', false, 'Win32', true),
                 checkWin64Release       : doBuildWindows('Release', false, 'x64', true),
@@ -169,7 +170,7 @@ jobWrapper {
     }
 }
 
-def doCheckInDocker(String buildType, String maxBpNodeSize = '1000') {
+def doCheckInDocker(String buildType, String maxBpNodeSize = '1000', String enableEncryption = 'ON') {
     return {
         node('docker') {
             getArchive()
@@ -182,7 +183,7 @@ def doCheckInDocker(String buildType, String maxBpNodeSize = '1000') {
                         sh """
                            mkdir build-dir
                            cd build-dir
-                           cmake -D CMAKE_BUILD_TYPE=${buildType} -D REALM_MAX_BPNODE_SIZE=${maxBpNodeSize} -G Ninja ..
+                           cmake -D CMAKE_BUILD_TYPE=${buildType} -D REALM_MAX_BPNODE_SIZE=${maxBpNodeSize} -DREALM_ENABLE_ENCRYPTION=${enableEncryption} -G Ninja ..
                         """
                         runAndCollectWarnings(script: "cd build-dir && ninja")
                         sh """
@@ -239,14 +240,14 @@ def doBuildLinux(String buildType) {
     return {
         node('docker') {
             getSourceArchive()
-            
+
             docker.build('realm-core-generic:snapshot', '-f generic.Dockerfile .').inside {
                 sh """
                    cmake --help
                    rm -rf build-dir
-                   mkdir build-dir 
+                   mkdir build-dir
                    cd build-dir
-                   scl enable devtoolset-6 -- cmake -DCMAKE_BUILD_TYPE=${buildType} -DREALM_ENABLE_ENCRYPTION=1 -DREALM_NO_TESTS=1 ..
+                   scl enable devtoolset-6 -- cmake -DCMAKE_BUILD_TYPE=${buildType} -DREALM_NO_TESTS=1 ..
                    make -j4
                    cpack -G TGZ
                 """
