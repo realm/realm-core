@@ -193,28 +193,29 @@ std::atomic<bool> reclaimer_shutdown(false);
 DefaultGovernor default_governor;
 PageReclaimGovernor* governor = nullptr;
 
-
 void reclaimer_loop();
+
+void inline ensure_reclaimer_thread_runs() {
+    if (reclaimer_thread == nullptr) {
+        if (governor == nullptr)
+            governor = &default_governor;
+        reclaimer_thread.reset(new std::thread(reclaimer_loop));
+    }
+}
 
 void set_page_reclaim_governor(PageReclaimGovernor* new_governor)
 {
     UniqueLock lock(mapping_mutex);
-    // start worker thread if it hasn't been started earlier
-    if (reclaimer_thread == nullptr) {
-        reclaimer_thread.reset(new std::thread(reclaimer_loop));
-    }
     governor = new_governor;
+    ensure_reclaimer_thread_runs();
 }
 
-struct DefaultGovernorInstaller {
-    DefaultGovernorInstaller()
+struct ReclaimerThreadStopper {
+    ReclaimerThreadStopper()
     {
-    	if (default_governor.get_current_target(0) != PageReclaimGovernor::no_match) {
-    		// only install if the governor is able to compute a target.
-    		set_page_reclaim_governor(&default_governor);
-    	}
     }
-    ~DefaultGovernorInstaller() {
+    ~ReclaimerThreadStopper()
+    {
     	if (reclaimer_thread) {
     		reclaimer_shutdown = true;
     		reclaimer_thread->join();
@@ -222,11 +223,12 @@ struct DefaultGovernorInstaller {
     }
 };
 
-DefaultGovernorInstaller default_governor_installer;
+ReclaimerThreadStopper reclaimer_thread_stopper;
 
 void encryption_note_reader_start(SharedFileInfo& info, void* reader_id)
 {
     UniqueLock lock(mapping_mutex);
+    ensure_reclaimer_thread_runs();
     auto j = std::find_if(info.readers.begin(), info.readers.end(),
                           [=](auto& reader) { return reader.reader_ID == reader_id; });
     if (j == info.readers.end()) {
