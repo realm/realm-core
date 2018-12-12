@@ -64,7 +64,9 @@ struct SlabAlloc::MappedFile {
 
     util::Mutex m_mutex;
     util::File m_file;
+#if REALM_ENABLE_ENCRYPTION
     util::SharedFileInfo* m_realm_file_info = nullptr;
+#endif
     util::File::Map<char> m_initial_mapping;
     // additional sections beyond those covered by the initial mapping, are
     // managed as separate mmap allocations, each covering one section.
@@ -1078,21 +1080,31 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
     }
     dg.release();  // Do not detach
     fcg.release(); // Do not close
+#if REALM_ENABLE_ENCRYPTION
     m_file_mappings->m_realm_file_info = util::get_file_info_for_file(m_file_mappings->m_file);
+#endif
     m_file_mappings->m_success = true;
     return top_ref;
 }
 
 void SlabAlloc::note_reader_start(void* reader_id)
 {
+#if REALM_ENABLE_ENCRYPTION
     if (m_file_mappings->m_realm_file_info)
         util::encryption_note_reader_start(*m_file_mappings->m_realm_file_info, reader_id);
+#else
+    static_cast<void>(reader_id);
+#endif
 }
 
 void SlabAlloc::note_reader_end(void* reader_id)
 {
+#if REALM_ENABLE_ENCRYPTION
     if (m_file_mappings->m_realm_file_info)
         util::encryption_note_reader_end(*m_file_mappings->m_realm_file_info, reader_id);
+#else
+    static_cast<void>(reader_id);
+#endif
 }
 
 

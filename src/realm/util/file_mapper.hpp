@@ -49,9 +49,6 @@ public:
     virtual int64_t get_current_target(size_t current_load) = 0;
 };
 
-
-#if REALM_ENABLE_ENCRYPTION
-
 // Set a page reclaim governor. The governor is an object with a method which will be called periodically
 // and must return a 'target' amount of memory to hold decrypted pages. The page reclaim daemon
 // will then try to release pages to meet the target. The governor is called with the current
@@ -61,6 +58,8 @@ public:
 //
 // If no governor is installed, the page reclaim daemon will not start.
 void set_page_reclaim_governor(PageReclaimGovernor* governor);
+
+#if REALM_ENABLE_ENCRYPTION
 
 void encryption_note_reader_start(SharedFileInfo& info, void* reader_id);
 void encryption_note_reader_end(SharedFileInfo& info, void* reader_id);
@@ -107,26 +106,20 @@ inline void do_encryption_write_barrier(const void* addr, size_t size, Encrypted
 }
 
 #else
-void inline encryption_read_barrier(const void*, size_t, EncryptedFileMapping*, HeaderToSize header_to_size = nullptr)
+
+void inline set_page_reclaim_governor(PageReclaimGovernor*)
 {
-    static_cast<void>(header_to_size);
 }
+
+void inline encryption_read_barrier(const void*, size_t, EncryptedFileMapping*, HeaderToSize = nullptr)
+{
+}
+
 void inline encryption_write_barrier(const void*, size_t)
 {
 }
+
 void inline encryption_write_barrier(const void*, size_t, EncryptedFileMapping*)
-{
-}
-
-void set_page_reclaim_governor(PageReclaimGovernor*)
-{
-}
-
-void encryption_note_reader_start(SharedFileInfo&, void*)
-{
-}
-
-void encryption_note_reader_end(SharedFileInfo&, void*)
 {
 }
 
