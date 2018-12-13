@@ -207,6 +207,8 @@ GroupWriter::GroupWriter(Group& group)
 
     if (ref_type ref = m_free_lengths.get_ref_from_parent()) {
         m_free_lengths.init_from_ref(ref);
+        REALM_ASSERT_RELEASE_EX(m_free_positions.size() == m_free_lengths.size(), top.get_ref(),
+                                m_free_positions.size(), m_free_lengths.size());
     }
     else {
         m_free_lengths.create(Array::type_Normal); // Throws
@@ -230,6 +232,8 @@ GroupWriter::GroupWriter(Group& group)
 
         if (ref_type ref = m_free_versions.get_ref_from_parent()) {
             m_free_versions.init_from_ref(ref);
+            REALM_ASSERT_RELEASE_EX(m_free_versions.size() == m_free_lengths.size(), top.get_ref(),
+                                    m_free_versions.size(), m_free_lengths.size());
         }
         else {
             int_fast64_t value = int_fast64_t(initial_version); // FIXME: Problematic unsigned -> signed conversion
@@ -515,10 +519,10 @@ ref_type GroupWriter::write_group()
 void GroupWriter::read_in_freelist()
 {
     bool is_shared = m_group.m_is_shared;
-    REALM_ASSERT_3(m_free_positions.size(), ==, m_free_lengths.size());
-    REALM_ASSERT(!is_shared || m_free_versions.size() == m_free_lengths.size());
-
     size_t limit = m_free_lengths.size();
+    REALM_ASSERT_RELEASE_EX(m_free_positions.size() == limit, limit, m_free_positions.size());
+    REALM_ASSERT_RELEASE_EX(!is_shared || m_free_versions.size() == limit, limit, m_free_versions.size());
+
     if (limit) {
         auto limit_version = is_shared ? m_readlock_version : 0;
         for (size_t idx = 0; idx < limit; ++idx) {
