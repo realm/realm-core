@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 5.12.6 Release notes
 
 ### Enhancements
 * None.
@@ -14,7 +14,7 @@
 -----------
 
 ### Internals
-* Upgrade pegtl to 2.7.1.
+* None.
 
 ----------------------------------------------
 
