@@ -4,8 +4,9 @@
 * None.
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* On AWS Lambda we may throw an "Operation not permitted" exception when calling posix_fallocate().
+  A slower workaround has been supplied.
+  ([#3193](https://github.com/realm/realm-core/issues/3293))
  
 ### Breaking changes
 * None.
