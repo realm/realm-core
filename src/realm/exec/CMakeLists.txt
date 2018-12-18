@@ -21,10 +21,27 @@ if(NOT APPLE AND NOT ANDROID AND NOT CMAKE_SYSTEM_NAME MATCHES "^Windows" AND NO
     install(TARGETS realmd
             COMPONENT runtime
             DESTINATION ${CMAKE_INSTALL_LIBEXECDIR})
-
-    add_executable(RealmTrawler realm_trawler.cpp )
-    set_target_properties(RealmTrawler PROPERTIES
-        OUTPUT_NAME "realm-trawler"
-        DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX})
-    target_link_libraries(RealmTrawler realm)
 endif()
+
+add_executable(RealmTrawler EXCLUDE_FROM_ALL realm_trawler.cpp )
+set_target_properties(RealmTrawler PROPERTIES
+    OUTPUT_NAME "realm-trawler"
+    DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX}
+)
+target_link_libraries(RealmTrawler Core)
+
+add_executable(RealmBrowser EXCLUDE_FROM_ALL realm_browser.cpp )
+set_target_properties(RealmBrowser PROPERTIES
+    OUTPUT_NAME "realm-browser"
+    DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX}
+)
+target_link_libraries(RealmBrowser Core)
+
+add_executable(RealmDump EXCLUDE_FROM_ALL realm_dump.c)
+set_target_properties(RealmDump PROPERTIES
+    OUTPUT_NAME "realm-dump"
+    DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX}
+)
+target_compile_definitions(RealmDump PRIVATE
+    "$<$<CXX_COMPILER_ID:MSVC>:_CRT_SECURE_NO_WARNINGS>"
+)
