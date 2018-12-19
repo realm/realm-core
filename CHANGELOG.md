@@ -13,7 +13,7 @@
 -----------
 
 ### Internals
-* Improved performance on `find_first` for small (< 64 byte) string arrays.
+* Improved performance on `find_first` for small (< 16 byte) string arrays.
 
 ----------------------------------------------
 
