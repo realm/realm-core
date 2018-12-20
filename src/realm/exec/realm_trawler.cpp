@@ -18,20 +18,14 @@
  * table tree should cover the whole file. Any leaked areas are reported.
  */
 
+#include <realm/array_direct.hpp>
+#include <realm/alloc_slab.hpp>
+#include <realm/array.hpp>
+#include <realm/column_type.hpp>
+
 #include <iostream>
 #include <fstream>
 #include <sstream>
-#include <vector>
-#include <set>
-#include <map>
-#include <memory>
-#include <algorithm>
-#include <cassert>
-#include <cstring>
-#include "array_direct.hpp"
-#include "alloc_slab.hpp"
-#include "array.hpp"
-#include "column_type.hpp"
 
 constexpr const int signature = 0x41414141;
 
@@ -108,9 +102,7 @@ struct FreeListEntry : public Entry {
 
 class Node {
 public:
-    Node()
-    {
-    }
+    Node() {}
     Node(realm::Allocator& alloc, uint64_t ref)
     {
         init(alloc, ref);
@@ -177,9 +169,7 @@ protected:
 
 class Array : public Node {
 public:
-    Array()
-    {
-    }
+    Array() {}
     Array(realm::Allocator& alloc, uint64_t ref)
         : Node(alloc, ref)
     {
@@ -663,7 +653,7 @@ void RealmFile::free_list_info() const
     std::cout << "Pinned free space size: " << pinned_free_list_size << std::endl;
 }
 
-int main (int argc, const char* argv[])
+int main(int argc, const char* argv[])
 {
     if (argc > 1) {
         try {

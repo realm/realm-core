@@ -13,7 +13,7 @@
 -----------
 
 ### Internals
-* None.
+* Upgrade pegtl to 2.6.1. Several issues fixed.
 
 ----------------------------------------------
 
