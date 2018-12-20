@@ -64,15 +64,8 @@ jobWrapper {
 
         stage('Checking') {
             parallelExecutors = [
-                checkLinuxDebug         : doCheckInDocker('Debug'),
+                buildLinuxRelease       : doBuildLinux('Release'),
                 checkLinuxDebugNoEncryp : doCheckInDocker('Debug', '4', 'OFF'),
-                checkMacOsRelease       : doBuildMacOs('Release', true),
-                checkWin32Debug         : doBuildWindows('Debug', false, 'Win32', true),
-                checkWin64Release       : doBuildWindows('Release', false, 'x64', true),
-                iosDebug                : doBuildAppleDevice('ios', 'MinSizeDebug'),
-                androidArm64Debug       : doAndroidBuildInDocker('arm64-v8a', 'Debug', false),
-                threadSanitizer         : doCheckSanity('Debug', '1000', 'thread'),
-                addressSanitizer        : doCheckSanity('Debug', '1000', 'address'),
             ]
             if (releaseTesting) {
                 extendedChecks = [
@@ -243,12 +236,13 @@ def doBuildLinux(String buildType) {
 
             docker.build('realm-core-generic:snapshot', '-f generic.Dockerfile .').inside {
                 sh """
-                   cmake --help
                    rm -rf build-dir
                    mkdir build-dir
                    cd build-dir
+                   scl enable devtoolset-6 -- g++ --version
                    scl enable devtoolset-6 -- cmake -DCMAKE_BUILD_TYPE=${buildType} -DREALM_NO_TESTS=1 ..
-                   make -j4
+                   /opt/rh/devtoolset-6/root/usr/bin/c++ -I../src -I./src -DNDEBUG -std=c++14 -E -o alloc.cpp.i ../src/realm/alloc.cpp
+                   make -j4 VERBOSE=1
                    cpack -G TGZ
                 """
             }
