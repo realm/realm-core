@@ -13,7 +13,8 @@
 -----------
 
 ### Internals
-* Improved performance on `find_first` for small (< 16 byte) string arrays.
+* Improved performance on `find_first` for small string arrays (ArrayString). This will improve the table name lookup
+  performance.
 
 ----------------------------------------------
 
