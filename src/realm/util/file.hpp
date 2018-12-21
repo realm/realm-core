@@ -26,6 +26,7 @@
 #include <stdexcept>
 #include <string>
 #include <streambuf>
+#include <iostream>
 
 #ifndef _WIN32
 #include <dirent.h> // POSIX.1-2001
@@ -874,7 +875,6 @@ private:
     void flush();
 };
 
-
 /// Used for any I/O related exception. Note the derived exception
 /// types that are used for various specific types of errors.
 class File::AccessError : public std::runtime_error {
@@ -885,8 +885,17 @@ public:
     /// no associated file system path, or if the file system path is unknown.
     std::string get_path() const;
 
+    const char* what() const noexcept
+    {
+        m_buffer = std::runtime_error::what();
+        if (m_path.size() > 0)
+            m_buffer += (std::string(" Path: ") + m_path);
+        return m_buffer.c_str();
+    }
+
 private:
     std::string m_path;
+    mutable std::string m_buffer;
 };
 
 
