@@ -299,6 +299,7 @@ public:
         : Array(alloc, ref)
         , m_alloc(alloc)
     {
+        m_valid &= (size() <= 10);
         if (valid()) {
             m_table_names.init(alloc, get_ref(0));
             m_tables.init(alloc, get_ref(1));
@@ -369,7 +370,7 @@ private:
 
 class RealmFile {
 public:
-    RealmFile(const std::string& file_path, const char* encryption_key);
+    RealmFile(const std::string& file_path, const char* encryption_key, bool alternate_top);
     // Walk the file and check that it consists of valid nodes
     void node_scan();
     void schema_info();
@@ -406,7 +407,7 @@ std::string human_readable(uint64_t val)
 std::ostream& operator<<(std::ostream& ostr, const Group& g)
 {
     if (g.valid()) {
-        ostr << "File size: " << human_readable(g.get_file_size()) << std::endl;
+        ostr << "Logical file size: " << human_readable(g.get_file_size()) << std::endl;
         if (g.size() > 6) {
             ostr << "Current version: " << g.get_current_version() << std::endl;
             ostr << "Free list size: " << g.m_free_list_positions.size() << std::endl;
@@ -418,7 +419,7 @@ std::ostream& operator<<(std::ostream& ostr, const Group& g)
         }
     }
     else {
-        ostr << "Invalid group" << std::endl;
+        ostr << "*** Invalid group ***" << std::endl;
     }
     return ostr;
 }
@@ -515,71 +516,88 @@ std::vector<Entry> Group::get_allocated_nodes() const
 std::vector<FreeListEntry> Group::get_free_list() const
 {
     std::vector<FreeListEntry> list;
-    unsigned sz = m_free_list_positions.size();
-    REALM_ASSERT(sz == m_free_list_sizes.size());
-    REALM_ASSERT(sz == m_free_list_versions.size());
-    for (unsigned i = 0; i < sz; i++) {
-        int64_t pos = m_free_list_positions.get_val(i);
-        int64_t size = m_free_list_sizes.get_val(i);
-        int64_t version = m_free_list_versions.get_val(i);
-        list.emplace_back(pos, size, version);
+    if (valid()) {
+        unsigned sz = m_free_list_positions.size();
+        REALM_ASSERT(sz == m_free_list_sizes.size());
+        REALM_ASSERT(sz == m_free_list_versions.size());
+        for (unsigned i = 0; i < sz; i++) {
+            int64_t pos = m_free_list_positions.get_val(i);
+            int64_t size = m_free_list_sizes.get_val(i);
+            int64_t version = m_free_list_versions.get_val(i);
+            list.emplace_back(pos, size, version);
+        }
+        consolidate_list(list);
     }
-    consolidate_list(list);
     return list;
 }
 
-RealmFile::RealmFile(const std::string& file_path, const char* encryption_key)
+RealmFile::RealmFile(const std::string& file_path, const char* encryption_key, bool alternate_top)
 {
     realm::SlabAlloc::Config config;
     config.encryption_key = encryption_key;
     config.read_only = true;
     config.no_create = true;
     m_top_ref = m_alloc.attach_file(file_path, config);
+    if (alternate_top) {
+        m_top_ref = m_alloc.get_alternate_top_ref();
+    }
     m_start_pos = 24;
     m_group = std::make_unique<Group>(m_alloc, m_top_ref);
     m_file_format_version = m_alloc.get_committed_file_format_version();
     std::cout << "Top ref: 0x" << std::hex << m_top_ref << std::dec << std::endl;
     std::cout << "File format version: " << m_file_format_version << std::endl;
+    std::cout << "File size: " << m_alloc.get_baseline() << std::endl;
     std::cout << *m_group;
 }
 
 void RealmFile::node_scan()
 {
-    if (m_group->valid()) {
-        std::map<uint64_t, unsigned> sizes;
-        uint64_t ref = m_start_pos;
-        auto free_list = m_group->get_free_list();
-        auto free_entry = free_list.begin();
-        bool searching = false;
-        auto end = m_group->get_file_size();
-        while (ref < end) {
-            if (ref == free_entry->start) {
-                ref += free_entry->length;
-                ++free_entry;
+    std::map<uint64_t, unsigned> sizes;
+    std::vector<Entry> bad_blocks;
+    uint64_t ref = m_start_pos;
+    auto free_list = m_group->get_free_list();
+    auto free_entry = free_list.begin();
+    auto end = m_alloc.get_baseline();
+    uint64_t bad_ref = 0;
+    if (free_list.empty()) {
+        std::cout << "*** No free list - results may be unreliable ***" << std::endl;
+    }
+    while (ref < end) {
+        if (free_entry != free_list.end() && ref == free_entry->start) {
+            ref += free_entry->length;
+            ++free_entry;
+        }
+        else {
+            Node n(m_alloc, ref);
+            if (n.valid()) {
+                if (bad_ref) {
+                    bad_blocks.emplace_back(bad_ref, ref - bad_ref);
+                    bad_ref = 0;
+                }
+                auto size_in_bytes = n.size_in_bytes();
+                sizes[size_in_bytes]++;
+                ref += size_in_bytes;
             }
             else {
-                Node n(m_alloc, ref);
-                if (n.valid()) {
-                    if (searching) {
-                        std::cerr << "Resuming from ref: " << ref << std::endl;
-                        searching = false;
-                    }
-                    auto size_in_bytes = n.size_in_bytes();
-                    sizes[size_in_bytes]++;
-                    ref += size_in_bytes;
+                if (!bad_ref) {
+                    bad_ref = ref;
                 }
-                else {
-                    if (!searching) {
-                        std::cerr << "Invalid ref: " << ref << std::endl;
-                        searching = true;
-                    }
-                    ref += 8;
-                }
+                ref += 8;
             }
         }
-        std::cout << "Allocated space:" << std::endl;
-        for (auto s : sizes) {
-            std::cout << "    Size: " << s.first << " count: " << s.second << std::endl;
+    }
+    if (bad_ref) {
+        bad_blocks.emplace_back(bad_ref, ref - bad_ref);
+        bad_ref = 0;
+    }
+    std::cout << "Allocated space:" << std::endl;
+    for (auto s : sizes) {
+        std::cout << "    Size: " << s.first << " count: " << s.second << std::endl;
+    }
+    if (!bad_blocks.empty()) {
+        std::cout << "Bad space:" << std::endl;
+        for (auto b : bad_blocks) {
+            std::cout << "    Start: 0x" << std::hex << b.start << " length: " << std::dec << b.length << std::endl;
         }
     }
 }
@@ -657,9 +675,13 @@ int main(int argc, const char* argv[])
 {
     if (argc > 1) {
         try {
+            bool free_list_info = false;
+            bool memory_leaks = false;
+            bool schema_info = false;
+            bool node_scan = false;
+            bool alternate_top = false;
             const char* key_ptr = nullptr;
             char key[64];
-            char flags[10];
             for (int curr_arg = 1; curr_arg < argc; curr_arg++) {
                 if (strcmp(argv[curr_arg], "--key") == 0) {
                     std::ifstream key_file(argv[curr_arg + 1]);
@@ -668,26 +690,40 @@ int main(int argc, const char* argv[])
                     curr_arg++;
                 }
                 else if (argv[curr_arg][0] == '-') {
-                    strcpy(flags, argv[curr_arg] + 1);
+                    for (const char* command = argv[curr_arg] + 1; *command != '\0'; command++) {
+                        switch (*command) {
+                            case 'a':
+                                alternate_top = true;
+                                break;
+                            case 'f':
+                                free_list_info = true;
+                                break;
+                            case 'm':
+                                memory_leaks = true;
+                                break;
+                            case 's':
+                                schema_info = true;
+                                break;
+                            case 'w':
+                                node_scan = true;
+                                break;
+                        }
+                    }
                 }
                 else {
                     std::cout << "File name: " << argv[curr_arg] << std::endl;
-                    RealmFile rf(argv[curr_arg], key_ptr);
-                    for (const char* command = flags; *command != '\0'; command++) {
-                        switch (*command) {
-                            case 'f':
-                                rf.free_list_info();
-                                break;
-                            case 'm':
-                                rf.memory_leaks();
-                                break;
-                            case 's':
-                                rf.schema_info();
-                                break;
-                            case 'w':
-                                rf.node_scan();
-                                break;
-                        }
+                    RealmFile rf(argv[curr_arg], key_ptr, alternate_top);
+                    if (free_list_info) {
+                        rf.free_list_info();
+                    }
+                    if (memory_leaks) {
+                        rf.memory_leaks();
+                    }
+                    if (schema_info) {
+                        rf.schema_info();
+                    }
+                    if (node_scan) {
+                        rf.node_scan();
                     }
                     std::cout << std::endl;
                 }
@@ -698,7 +734,8 @@ int main(int argc, const char* argv[])
         }
     }
     else {
-        std::cerr << "Usage: realm-trawler [-fmsw] [--key crypt_key] <realmfile>" << std::endl;
+        std::cerr << "Usage: realm-trawler [-afmsw] [--key crypt_key] <realmfile>" << std::endl;
+        std::cerr << "   a : use alternative top ref" << std::endl;
         std::cerr << "   f : free list analysis" << std::endl;
         std::cerr << "   m : memory leak check" << std::endl;
         std::cerr << "   s : schema dump" << std::endl;
