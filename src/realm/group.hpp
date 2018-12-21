@@ -796,6 +796,7 @@ private:
     void set_history_schema_version(int version);
     void set_history_parent(Array& history_root) noexcept;
     void prepare_history_parent(Array& history_root, int history_type, int history_schema_version);
+    static void validate_top_array(const Array& arr, const SlabAlloc& alloc);
 
     friend class Table;
     friend class GroupWriter;

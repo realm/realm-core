@@ -1031,6 +1031,9 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
             ref_type top_ref;
             try {
                 top_ref = alloc.attach_file(path, cfg); // Throws
+                Array top{alloc};
+                top.init_from_ref(top_ref);
+                Group::validate_top_array(top, alloc);
             }
             catch (SlabAlloc::Retry&) {
                 continue;
