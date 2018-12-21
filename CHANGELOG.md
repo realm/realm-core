@@ -1,7 +1,8 @@
 # NEXT RELEASE
 
 ### Enhancements
-* None.
+* Instead of asserting, an `InvalidDatabase` exception is thrown when a realm file is opened 
+  with an invalid top ref.
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
