@@ -29,13 +29,25 @@
 #include <realm/impl/input_stream.hpp>
 #include <realm/util/base64.hpp>
 
+#include <json.hpp>
 #include <unordered_map>
 #include <unordered_set>
 
+namespace {
+// This needs to appear before `using namespace realm`. After that,
+// realm::Schema's operator== becomes a candidate function to call for the
+// comparison of array values within json. This occurs in a SFINAE context
+// and so should simply be discarded as a candidate, but VC++ 2017 incorrectly
+// considers it a hard error.
+bool equals(nlohmann::json const& a, nlohmann::json const& b) {
+    return a == b;
+}
+} // anonymous namespace
+
 using namespace realm;
 
-using ObjectID = realm::sync::ObjectID;
-using Instruction = realm::sync::Instruction;
+using ObjectID = sync::ObjectID;
+using Instruction = sync::Instruction;
 
 namespace {
 static PropertyType from_core_type(DataType type)
@@ -56,24 +68,29 @@ static PropertyType from_core_type(DataType type)
     }
 }
 
-class ChangesetCookerInstructionHandler : public sync::InstructionHandler {
+class ChangesetCookerInstructionHandler final : public sync::InstructionHandler {
 public:
     friend Adapter;
 
-    ChangesetCookerInstructionHandler(const Group &group)
+    ChangesetCookerInstructionHandler(const Group &group, util::Logger& logger, util::AppendBuffer<char>& out_buffer)
     : m_group(group)
-    , m_schema(ObjectStore::schema_from_group(m_group))
+    , m_table_info(m_group)
+    , m_logger(logger)
+    , m_out_buffer(out_buffer)
     {
     }
 
     const Group &m_group;
-    Schema m_schema;
+    sync::TableInfoCache m_table_info;
+    util::Logger& m_logger;
+    util::AppendBuffer<char>& m_out_buffer;
+    std::unordered_map<std::string, ObjectSchema> m_schema;
 
     std::unordered_map<std::string, std::unordered_map<ObjectID, int64_t>> m_int_primaries;
     std::unordered_map<std::string, std::unordered_map<ObjectID, std::string>> m_string_primaries;
     std::unordered_map<std::string, std::unordered_set<ObjectID>> m_null_primaries;
 
-    nlohmann::json m_json_instructions;
+    nlohmann::json m_pending_instruction = nullptr;
 
     std::string m_selected_object_type;
     ConstTableRef m_selected_table;
@@ -87,7 +104,25 @@ public:
     ObjectSchema *m_list_target_object_schema = nullptr;
     Property *m_list_target_primary = nullptr;
 
-    bool m_last_is_collapsible = false;
+    void flush() {
+        if (m_pending_instruction.is_null())
+            return;
+        if (m_out_buffer.size())
+            m_out_buffer.append(",", 1);
+        else
+            m_out_buffer.append("[", 1);
+        auto str = m_pending_instruction.dump();
+        m_out_buffer.append(str.data(), str.size());
+        m_pending_instruction = nullptr;
+    }
+
+    bool finish() {
+        flush();
+        if (!m_out_buffer.size())
+            return false;
+        m_out_buffer.append("]", 1);
+        return true;
+    }
 
     void add_instruction(Adapter::InstructionType type,
                          nlohmann::json &&inst = {}, bool collapsible = false,
@@ -95,20 +130,22 @@ public:
         if (!object_type && !m_selected_object_schema) {
             return; // FIXME: support objects without schemas
         }
+        flush();
+
         inst["type"] = Adapter::instruction_type_string(type);
         inst["object_type"] = object_type ? *object_type : m_selected_object_schema->name;
-        m_json_instructions.push_back(std::move(inst));
-
-        m_last_is_collapsible = collapsible;
+        m_pending_instruction = std::move(inst);
+        if (!collapsible)
+            flush();
     }
 
     void add_set_instruction(ObjectID row, StringData column, nlohmann::json &&value) {
         nlohmann::json identity = get_identity(row, *m_selected_table, m_selected_primary);
 
         // collapse values if inserting/setting values for the last object
-        if (m_last_is_collapsible) {
-            nlohmann::json &last = m_json_instructions.back();
-            if (identity == last["identity"] && m_selected_object_schema && m_selected_object_schema->name == last["object_type"].get<std::string>()) {
+        if (!m_pending_instruction.is_null()) {
+            nlohmann::json &last = m_pending_instruction;
+            if (equals(identity, last["identity"]) && m_selected_object_schema && m_selected_object_schema->name == last["object_type"].get<std::string>()) {
                 last["values"][column] = value;
                 return;
             }
@@ -122,8 +159,8 @@ public:
     }
 
     void add_column_instruction(std::string object_type, std::string prop_name, nlohmann::json &&prop) {
-        if (m_json_instructions.size()) {
-            nlohmann::json &last = m_json_instructions.back();
+        if (!m_pending_instruction.is_null()) {
+            nlohmann::json &last = m_pending_instruction;
             if (last["object_type"].get<std::string>() == object_type && (
                 last["type"].get<std::string>() == "ADD_TYPE" ||
                 last["type"].get<std::string>() == "ADD_PROPERTIES"))
@@ -135,7 +172,7 @@ public:
 
         add_instruction(Adapter::InstructionType::AddProperties, {{"properties",
             {{prop_name, prop}}
-        }}, false, object_type);
+        }}, true, object_type);
     }
 
     nlohmann::json get_identity(ObjectID object_id, const Table& table, Property *primary_key) {
@@ -156,7 +193,7 @@ public:
                     return it->second;
                 }
 
-                size_t row = sync::row_for_object_id(m_group, table, object_id);
+                size_t row = sync::row_for_object_id(m_table_info, table, object_id);
                 REALM_ASSERT(row != npos);
                 if (is_nullable(primary_key->type) && table.is_null(primary_key->table_column, row)) {
                     return nullptr;
@@ -170,7 +207,7 @@ public:
                     return it->second;
                 }
 
-                size_t row = sync::row_for_object_id(m_group, table, object_id);
+                size_t row = sync::row_for_object_id(m_table_info, table, object_id);
                 REALM_ASSERT(row != npos);
                 StringData value = table.get_string(primary_key->table_column, row);
                 if (value.is_null())
@@ -182,19 +219,29 @@ public:
         return object_id.to_string();
     }
 
-    void select(std::string &object_type, ObjectSchema *&out_object_schema, ConstTableRef &out_table, Property *&out_primary) {
+    void select(std::string const& object_type, ObjectSchema *&out_object_schema, ConstTableRef &out_table, Property *&out_primary) {
         out_object_schema = nullptr;
         out_primary = nullptr;
         out_table = ConstTableRef();
 
-        if (object_type.size()) {
-            auto object_schema = m_schema.find(object_type);
-            if (object_schema != m_schema.end()) {
-                out_object_schema = &*object_schema;
-                out_table = ObjectStore::table_for_object_type(m_group, object_type);
-                out_primary = out_object_schema->primary_key_property();
-            }
+        if (object_type.empty()) {
+            return;
         }
+        auto it = m_schema.find(object_type);
+        if (it == m_schema.end()) {
+            out_table = ObjectStore::table_for_object_type(m_group, object_type);
+            if (!out_table) {
+                return;
+            }
+            it = m_schema.emplace(std::piecewise_construct,
+                                  std::forward_as_tuple(object_type),
+                                  std::forward_as_tuple(m_group, object_type, out_table->get_index_in_group())).first;
+        }
+
+        out_object_schema = &it->second;
+        if (!out_table)
+            out_table = ObjectStore::table_for_object_type(m_group, object_type);
+        out_primary = it->second.primary_key_property();
     }
 
     std::unordered_map<uint32_t, sync::StringBufferRange> m_interned_strings;
@@ -255,7 +302,7 @@ public:
                 };
             }
             add_instruction(Adapter::InstructionType::AddType, std::move(dict),
-                            false, object_type);
+                            true, object_type);
         }
     }
 
@@ -267,8 +314,10 @@ public:
     // Must have table selected:
     void operator()(const Instruction::CreateObject& instr)
     {
-        if (!m_selected_object_schema)
+        if (!m_selected_object_schema) {
+            m_logger.warn("Adapter: Ignoring CreateObject instruction with no object schema");
             return; // FIXME: Support objects without schemas
+        }
 
         nlohmann::json identity;
         nlohmann::json values;
@@ -304,8 +353,10 @@ public:
 
     void operator()(const Instruction::EraseObject& instr)
     {
-        if (!m_selected_object_schema)
+        if (!m_selected_object_schema) {
+            m_logger.warn("Adapter: Ignoring EraseObject instruction with no object schema");
             return; // FIXME: Support objects without schemas
+        }
 
         add_instruction(Adapter::InstructionType::Delete, {
             {"identity", get_identity(instr.object, *m_selected_table, m_selected_primary)}
@@ -325,8 +376,10 @@ public:
 
     void operator()(const Instruction::Set& instr)
     {
-        if (!m_selected_object_schema)
+        if (!m_selected_object_schema) {
+            m_logger.warn("Adapter: Ignoring Set instruction with no object schema");
             return; // FIXME: Support objects without schemas
+        }
 
         StringData field = get_string(instr.field);
 
@@ -428,8 +481,10 @@ public:
     // Must have linklist selected:
     void operator()(const Instruction::ArraySet& instr)
     {
-        if (!m_list_property_name.size())
+        if (!m_list_property_name.size()) {
+            m_logger.warn("Adapter: Ignoring ArraySet instruction on unknown list property");
             return; // FIXME
+        }
 
         // FIXME: Support arrays of primitives
 
@@ -443,8 +498,10 @@ public:
 
     void operator()(const Instruction::ArrayInsert& instr)
     {
-        if (!m_list_property_name.size())
+        if (!m_list_property_name.size()) {
+            m_logger.warn("Adapter: Ignoring ArrayInsert instruction on unknown list property");
             return; // FIXME
+        }
 
 
         // FIXME: Support arrays of primitives
@@ -502,24 +559,34 @@ public:
     }
 };
 
-class ChangesetCooker: public realm::sync::ClientHistory::ChangesetCooker {
+class ChangesetCooker final : public sync::ClientHistory::ChangesetCooker {
 public:
+    ChangesetCooker(util::Logger& logger) : m_logger(logger) { }
+
     bool cook_changeset(const Group& group, const char* changeset,
                         std::size_t changeset_size,
                         util::AppendBuffer<char>& out_buffer) override {
-        _impl::SimpleNoCopyInputStream stream_2(changeset, changeset_size);
-        sync::Changeset c;
-        sync::parse_changeset(stream_2, c);
-
         _impl::SimpleNoCopyInputStream stream(changeset, changeset_size);
-        sync::ChangesetParser parser;
-        ChangesetCookerInstructionHandler cooker_handler(group);
-        parser.parse(stream, cooker_handler);
-        std::string out_string = cooker_handler.m_json_instructions.dump();
-        out_buffer.append(out_string.c_str(), out_string.size()); // Throws
-        return true;
+        ChangesetCookerInstructionHandler cooker_handler(group, m_logger, out_buffer);
+        sync::ChangesetParser().parse(stream, cooker_handler);
+        return cooker_handler.finish();
     }
+
+private:
+    util::Logger& m_logger;
 };
+
+static SyncLoggerFactory* s_logger_factory;
+std::unique_ptr<util::Logger> make_logger()
+{
+    auto log_level = SyncManager::shared().log_level();
+    if (s_logger_factory) {
+        return s_logger_factory->make_logger(log_level); // Throws
+    }
+    auto logger = std::make_unique<util::StderrLogger>(); // Throws
+    logger->set_level_threshold(log_level);
+    return std::unique_ptr<util::Logger>(logger.release());
+}
 
 } // anonymous namespace
 
@@ -541,10 +608,12 @@ private:
     const std::string m_server_base_url;
     std::shared_ptr<SyncUser> m_user;
     std::function<SyncBindSessionHandler> m_bind_callback;
-    std::shared_ptr<ChangesetCooker> m_transformer;
 
-    std::function<void(std::string)> m_realm_changed;
-    std::regex m_regex;
+    const std::unique_ptr<util::Logger> m_logger;
+    const std::shared_ptr<ChangesetCooker> m_transformer;
+
+    const std::function<void(std::string)> m_realm_changed;
+    const std::regex m_regex;
 
     std::vector<std::shared_ptr<_impl::RealmCoordinator>> m_realms;
 
@@ -553,7 +622,8 @@ private:
 Adapter::Impl::Impl(std::function<void(std::string)> realm_changed, std::regex regex,
                     std::string local_root_dir, SyncConfig sync_config_template)
 : AdminRealmListener(std::move(local_root_dir), std::move(sync_config_template))
-, m_transformer(std::make_shared<ChangesetCooker>())
+, m_logger(make_logger())
+, m_transformer(std::make_shared<ChangesetCooker>(*m_logger))
 , m_realm_changed(std::move(realm_changed))
 , m_regex(std::move(regex))
 {
@@ -591,33 +661,36 @@ Adapter::Adapter(std::function<void(std::string)> realm_changed, std::regex rege
     m_impl->start();
 }
 
-util::Optional<Adapter::ChangeSet> Adapter::current(std::string realm_path) {
-    auto realm = realm::Realm::get_shared_realm(m_impl->get_config(realm_path, util::none));
+void Adapter::set_logger_factory(SyncLoggerFactory* factory)
+{
+    s_logger_factory = factory;
+}
 
-    REALM_ASSERT(dynamic_cast<sync::ClientHistory *>(realm->history()));
-    auto sync_history = static_cast<sync::ClientHistory *>(realm->history());
-    auto progress = sync_history->get_cooked_progress();
+util::Optional<util::AppendBuffer<char>> Adapter::current(std::string realm_path) {
+    auto history = realm::sync::make_client_history(get_config(realm_path, util::none).path);
+    SharedGroup sg(*history);
 
-    if (progress.changeset_index >= sync_history->get_num_cooked_changesets()) {
+    auto progress = history->get_cooked_progress();
+    if (progress.changeset_index >= history->get_num_cooked_changesets()) {
         return util::none;
     }
 
     util::AppendBuffer<char> buffer;
-    sync_history->get_cooked_changeset(progress.changeset_index, buffer);
-    return ChangeSet{nlohmann::json::parse(buffer.data(), buffer.data() + buffer.size()), std::move(realm)};
+    history->get_cooked_changeset(progress.changeset_index, buffer);
+    return buffer;
 }
 
 void Adapter::advance(std::string realm_path) {
-    auto realm = realm::Realm::get_shared_realm(m_impl->get_config(realm_path, util::none));
-    auto sync_history = static_cast<sync::ClientHistory *>(realm->history());
-    auto progress = sync_history->get_cooked_progress();
-    if (progress.changeset_index < sync_history->get_num_cooked_changesets()) {
+    auto history = realm::sync::make_client_history(get_config(realm_path, util::none).path);
+    SharedGroup sg(*history);
+
+    auto progress = history->get_cooked_progress();
+    if (progress.changeset_index < history->get_num_cooked_changesets()) {
         progress.changeset_index++;
-        sync_history->set_cooked_progress(progress);
+        history->set_cooked_progress(progress);
     }
-    realm->invalidate();
 }
 
-realm::Realm::Config Adapter::get_config(std::string path, util::Optional<Schema> schema) {
+Realm::Config Adapter::get_config(std::string path, util::Optional<Schema> schema) {
     return m_impl->get_config(path, std::move(schema));
 }

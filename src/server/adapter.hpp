@@ -22,12 +22,12 @@
 #include "shared_realm.hpp"
 #include "sync/sync_config.hpp"
 
-#include <json.hpp>
 #include <regex>
 
 namespace realm {
 
 class SyncUser;
+class SyncLoggerFactory;
 
 class Adapter {
 public:
@@ -62,17 +62,14 @@ public:
         }
     }
 
-    struct ChangeSet {
-        const nlohmann::json json;
-        const SharedRealm realm;
-    };
-
-    util::Optional<ChangeSet> current(std::string realm_path);
+    util::Optional<util::AppendBuffer<char>> current(std::string realm_path);
     void advance(std::string realm_path);
 
     Realm::Config get_config(std::string path, util::Optional<Schema> schema = util::none);
 
     void close() { m_impl.reset(); }
+
+    static void set_logger_factory(SyncLoggerFactory* factory);
 
 private:
     class Impl;
