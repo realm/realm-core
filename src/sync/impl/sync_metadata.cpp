@@ -88,7 +88,6 @@ SyncMetadataManager::SyncMetadataManager(std::string path,
 
     Realm::Config config;
     config.automatic_change_notifications = false;
-    config.cache = false;
     config.path = path;
     config.schema = make_schema();
     config.schema_version = SCHEMA_VERSION;
