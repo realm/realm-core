@@ -30,12 +30,11 @@ while getopts ":o:a:t:v:" opt; do
             ;;
         a)
             ARCH=${OPTARG}
-            [ "${ARCH}" == "armeabi" ] ||
             [ "${ARCH}" == "armeabi-v7a" ] ||
             [ "${ARCH}" == "x86" ] ||
-            [ "${ARCH}" == "mips" ] ||
             [ "${ARCH}" == "x86_64" ] ||
             [ "${ARCH}" == "arm64-v8a" ] || usage
+            [[ $ARCH == *64* ]] && API_VERSION=21 || API_VERSION=16
             ;;
         t)
             BUILD_TYPE=${OPTARG}
@@ -65,10 +64,11 @@ fi
 if [ "${OS}" == "android" ]; then
     mkdir -p "build-android-${ARCH}-${BUILD_TYPE}"
     cd "build-android-${ARCH}-${BUILD_TYPE}" || exit 1
-    cmake -D CMAKE_TOOLCHAIN_FILE=../tools/cmake/android.toolchain.cmake \
+    cmake -D CMAKE_SYSTEM_NAME=Android \
+          -D CMAKE_SYSTEM_VERSION="${API_VERSION}" \
           -D CMAKE_INSTALL_PREFIX=install \
           -D CMAKE_BUILD_TYPE="${BUILD_TYPE}" \
-          -D ANDROID_ABI="${ARCH}" \
+          -D CMAKE_ANDROID_ARCH_ABI="${ARCH}" \
           -D REALM_ENABLE_ENCRYPTION=1 \
           -D REALM_VERSION="${VERSION}" \
           -D CPACK_SYSTEM_NAME="Android-${ARCH}" \

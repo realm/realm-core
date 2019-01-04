@@ -111,7 +111,7 @@ jobWrapper {
                     buildLinuxASAN      : doBuildLinuxASAN()
                 ]
 
-                androidAbis = ['armeabi-v7a', 'x86', 'mips', 'x86_64', 'arm64-v8a']
+                androidAbis = ['armeabi-v7a', 'x86', 'x86_64', 'arm64-v8a']
                 androidBuildTypes = ['Debug', 'Release']
 
                 for (abi in androidAbis) {
