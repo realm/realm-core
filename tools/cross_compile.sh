@@ -9,7 +9,7 @@ SCRIPT=$(basename "${BASH_SOURCE[0]}")
 CORES=$(getconf _NPROCESSORS_ONLN)
 
 function usage {
-    echo "$Usage: ${SCRIPT} -t <build_type> -o <target_os> -v <version> [-a <android_abi>]"
+    echo "Usage: ${SCRIPT} -t <build_type> -o <target_os> -v <version> [-a <android_abi>]"
     echo ""
     echo "Arguments:"
     echo "   build_type=<Release|Debug|MinSizeDebug>"
@@ -127,5 +127,5 @@ else
          -output "src/realm/parser/${BUILD_TYPE}/librealm-parser${suffix}.a" \
          "src/realm/parser/${BUILD_TYPE}-${SDK}os/librealm-parser${suffix}.a" \
          "src/realm/parser/${BUILD_TYPE}-${SDK}simulator/librealm-parser${suffix}.a"
-    cpack -C ${BUILD_TYPE} || exit 1
+    cpack -C "${BUILD_TYPE}" || exit 1
 fi

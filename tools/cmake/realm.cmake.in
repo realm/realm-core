@@ -1,35 +1,39 @@
 if(REALM_ENABLE_ENCRYPTION AND NOT APPLE)
     if(ANDROID)
         string(TOLOWER "${CMAKE_BUILD_TYPE}" BUILD_TYPE)
-        set(OPENSSL_FILENAME "openssl-${BUILD_TYPE}-@ANDROID_SYSROOT@-Android-${ANDROID_ABI}")
-        set(OPENSSL_URL  "http://static.realm.io/downloads/openssl/@ANDROID_SYSROOT@/Android/${ANDROID_ABI}/${OPENSSL_FILENAME}.tar.gz")
+        set(OPENSSL_URL "http://static.realm.io/downloads/openssl/${ANDROID_OPENSSL_VERSION}/Android/${ANDROID_ABI}/openssl.tgz")
 
         message(STATUS "Downloading OpenSSL...")
-        file(DOWNLOAD "${OPENSSL_URL}" "${CMAKE_BINARY_DIR}/${OPENSSL_FILENAME}.tar.gz")
+        file(DOWNLOAD "${OPENSSL_URL}" "${CMAKE_BINARY_DIR}/openssl/openssl.tgz" STATUS download_status)
+
+        list(GET download_status 0 status_code)
+        if (NOT "${status_code}" STREQUAL "0")
+            message(FATAL_ERROR "Downloading ${url}... Failed. Status: ${download_status}")
+        endif()
 
         message(STATUS "Uncompressing OpenSSL...")
-        execute_process(COMMAND ${CMAKE_COMMAND} -E tar xfz "${OPENSSL_FILENAME}.tar.gz")
+        execute_process(
+            COMMAND ${CMAKE_COMMAND} -E tar xfz "openssl.tgz"
+            WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/openssl"
+        )
 
         message(STATUS "Importing OpenSSL...")
-        include(${CMAKE_BINARY_DIR}/${OPENSSL_FILENAME}/openssl.cmake)
+        set(OpenSSL_DIR "${CMAKE_BINARY_DIR}/openssl/lib/cmake/OpenSSL")
+        find_package(OpenSSL REQUIRED CONFIG)
     else()
-        include(FindOpenSSL)
-        target_link_libraries(realm ${OPENSSL_LIBRARIES})
+        find_package(OpenSSL)
     endif()
+    target_link_libraries(realm ${OPENSSL_LIBRARIES})
 endif()
 
 set(CURRENT_DIR "${CMAKE_CURRENT_LIST_DIR}")
 
-add_library(realm STATIC IMPORTED)
-set_target_properties(realm PROPERTIES
+add_library(RealmCore::Core STATIC IMPORTED)
+set_target_properties(RealmCore::Core PROPERTIES
                       IMPORTED_LOCATION "${CURRENT_DIR}/lib/librealm.a"
                       INTERFACE_INCLUDE_DIRECTORIES "${CURRENT_DIR}/include")
 
-if(ANDROID AND REALM_ENABLE_ENCRYPTION)
-    set_target_properties(realm PROPERTIES INTERFACE_LINK_LIBRARIES crypto)
-endif()
-
 if(APPLE)
     find_library(Foundation Foundation)
-    target_link_libraries(realm ${Foundation})
+    target_link_libraries(RealmCore::Core ${Foundation})
 endif(APPLE)
