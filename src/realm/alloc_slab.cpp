@@ -797,12 +797,6 @@ ref_type SlabAlloc::get_top_ref(const char* buffer, size_t len)
     }
 }
 
-ref_type SlabAlloc::get_alternate_top_ref()
-{
-    const Header& header = reinterpret_cast<const Header&>(*m_data);
-    int slot_selector = ((header.m_flags & SlabAlloc::flags_SelectBit) != 0 ? 0 : 1);
-    return to_ref(header.m_top_ref[slot_selector]);
-}
 
 namespace {
 
