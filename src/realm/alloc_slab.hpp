@@ -148,8 +148,6 @@ public:
     /// an attached file.
     util::File& get_file();
 
-    ref_type get_alternate_top_ref();
-
     /// Attach this allocator to the specified memory buffer.
     ///
     /// It is an error to call this function on an attached
