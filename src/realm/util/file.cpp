@@ -1396,11 +1396,9 @@ bool DirScanner::next(std::string& name)
 
         struct dirent* dirent;
         do {
-            // readdir() does not seem to set errno=0 on success. The manpage
-            // recommends manually zeroing errno before calling it.
-            errno = 0;
             dirent = readdir(m_dirp);
-        } while (errno == EAGAIN);
+        }
+        while (!dirent && errno == EAGAIN);
         if (errno != 0) {
             throw std::system_error(errno, std::system_category(), "readdir() failed");
         }
