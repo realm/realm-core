@@ -1396,6 +1396,12 @@ bool DirScanner::next(std::string& name)
 
         struct dirent* dirent;
         do {
+            // readdir() signals both errors and end-of-stream by returning a
+            // null pointer. To distinguish between end-of-stream and errors,
+            // the manpage recommends setting errno specifically to 0 before
+            // calling it...
+            errno = 0;
+
             dirent = readdir(m_dirp);
         }
         while (!dirent && errno == EAGAIN);
