@@ -1385,6 +1385,10 @@ DirScanner::~DirScanner() noexcept
 
 bool DirScanner::next(std::string& name)
 {
+#if !defined(__linux__) && !REALM_PLATFORM_APPLE && !REALM_WINDOWS && !REALM_UWP && !REALM_ANDROID
+#error "readdir() is not known to be thread-safe on this platform"
+#endif
+
     if (!m_dirp)
         return false;
 
