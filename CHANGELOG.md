@@ -15,6 +15,9 @@
 
 ### Internals
 * Upgrade pegtl to 2.6.1. Several issues fixed.
+* A bug was fixed in `realm::util::DirScanner` that could cause it to sometimes
+  skip directory entries due to faulty error handling around `readdir()`. Since
+  5.12.5.
 
 ----------------------------------------------
 
