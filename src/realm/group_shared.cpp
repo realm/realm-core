@@ -2289,7 +2289,7 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
     m_group.update_num_objects();
 #endif // REALM_METRICS
     // info->readers.dump();
-    GroupWriter out(m_group); // Throws
+    GroupWriter out(m_group, Durability(info->durability)); // Throws
     out.set_versions(new_version, oldest_version);
     // Recursively write all changed arrays to end of file
     ref_type new_top_ref = out.write_group(); // Throws
@@ -2299,6 +2299,7 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
     //     << " Read lock at version " << oldest_version << std::endl;
     switch (Durability(info->durability)) {
         case Durability::Full:
+        case Durability::Unsafe:
             out.commit(new_top_ref); // Throws
             break;
         case Durability::MemOnly:

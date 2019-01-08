@@ -153,7 +153,7 @@ void GroupWriter::MapWindow::encryption_write_barrier(void* start_addr, size_t s
 }
 
 
-GroupWriter::GroupWriter(Group& group)
+GroupWriter::GroupWriter(Group& group, Durability dura)
     : m_group(group)
     , m_alloc(group.m_alloc)
     , m_free_positions(m_alloc)
@@ -161,6 +161,7 @@ GroupWriter::GroupWriter(Group& group)
     , m_free_versions(m_alloc)
     , m_current_version(0)
     , m_free_space_size(0)
+    , m_durability(dura)
 {
     m_map_windows.reserve(num_map_windows);
 #if REALM_IOS
@@ -264,6 +265,8 @@ size_t GroupWriter::get_file_size() const noexcept
 
 void GroupWriter::sync_all_mappings()
 {
+    if (m_durability == Durability::Unsafe)
+        return;
     for (const auto& window : m_map_windows) {
         window->sync();
     }
@@ -285,7 +288,8 @@ GroupWriter::MapWindow* GroupWriter::get_window(ref_type start_ref, size_t size)
     }
     // no window found, make room for a new one at the top
     if (m_map_windows.size() == num_map_windows) {
-        m_map_windows.back()->sync();
+        if (m_durability != Durability::Unsafe)
+            m_map_windows.back()->sync();
         m_map_windows.pop_back();
     }
     auto new_window = std::make_unique<MapWindow>(m_window_alignment, m_alloc.get_file(), start_ref, size);
@@ -847,7 +851,7 @@ void GroupWriter::commit(ref_type new_top_ref)
     file_header.m_file_format[slot_selector] = type_1(file_format_version);
 
     // When running the test suite, device synchronization is disabled
-    bool disable_sync = get_disable_sync_to_disk();
+    bool disable_sync = get_disable_sync_to_disk() || m_durability == Durability::Unsafe;
 
 #if REALM_METRICS
     std::unique_ptr<MetricTimer> fsync_timer = Metrics::report_fsync_time(m_group);
