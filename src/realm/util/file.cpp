@@ -1407,8 +1407,7 @@ bool DirScanner::next(std::string& name)
             errno = 0;
 
             dirent = readdir(m_dirp);
-        }
-        while (!dirent && errno == EAGAIN);
+        } while (!dirent && errno == EAGAIN);
 
         if (!dirent) {
             if (errno != 0)
