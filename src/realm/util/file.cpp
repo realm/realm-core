@@ -1385,6 +1385,10 @@ DirScanner::~DirScanner() noexcept
 
 bool DirScanner::next(std::string& name)
 {
+#if !defined(__linux__) && !REALM_PLATFORM_APPLE && !REALM_WINDOWS && !REALM_UWP && !REALM_ANDROID
+#error "readdir() is not known to be thread-safe on this platform"
+#endif
+
     if (!m_dirp)
         return false;
 
@@ -1396,16 +1400,20 @@ bool DirScanner::next(std::string& name)
 
         struct dirent* dirent;
         do {
-            // readdir() does not seem to set errno=0 on success. The manpage
-            // recommends manually zeroing errno before calling it.
+            // readdir() signals both errors and end-of-stream by returning a
+            // null pointer. To distinguish between end-of-stream and errors,
+            // the manpage recommends setting errno specifically to 0 before
+            // calling it...
             errno = 0;
+
             dirent = readdir(m_dirp);
-        } while (errno == EAGAIN);
-        if (errno != 0) {
-            throw std::system_error(errno, std::system_category(), "readdir() failed");
-        }
-        if (!dirent)
+        } while (!dirent && errno == EAGAIN);
+
+        if (!dirent) {
+            if (errno != 0)
+                throw std::system_error(errno, std::generic_category(), "readdir() failed");
             return false; // End of stream
+        }
         const char* name_1 = dirent->d_name;
         std::string name_2 = name_1;
         if (name_2 != "." && name_2 != "..") {
