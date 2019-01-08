@@ -35,10 +35,10 @@ RUN DEBIAN_FRONTEND=noninteractive dpkg --add-architecture i386 \
 
 # Install CMake
 RUN cd /opt \
-    && wget https://cmake.org/files/v3.7/cmake-3.7.2-Linux-x86_64.tar.gz \
-    && tar zxvf cmake-3.7.2-Linux-x86_64.tar.gz
+    && wget https://github.com/Kitware/CMake/releases/download/v3.13.2/cmake-3.13.2-Linux-x86_64.tar.gz \
+    && tar zxvf cmake-3.13.2-Linux-x86_64.tar.gz
 
-ENV PATH "$PATH:/opt/cmake-3.7.2-Linux-x86_64/bin"
+ENV PATH "$PATH:/opt/cmake-3.13.2-Linux-x86_64/bin"
 
 # Install the NDK
 RUN cd /opt \
