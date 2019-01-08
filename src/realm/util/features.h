@@ -208,7 +208,7 @@
 #endif
 
 
-#if defined ANDROID
+#if defined ANDROID || defined __ANDROID_API__
 #define REALM_ANDROID 1
 #else
 #define REALM_ANDROID 0
