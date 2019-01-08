@@ -147,6 +147,7 @@ struct contains : string_token_t("contains") {};
 struct begins : string_token_t("beginswith") {};
 struct ends : string_token_t("endswith") {};
 struct like : string_token_t("like") {};
+struct between : string_token_t("between") {};
 
 struct sort_prefix : seq< string_token_t("sort"), star< blank >, one< '(' > > {};
 struct distinct_prefix : seq< string_token_t("distinct"), star< blank >, one< '(' > > {};
@@ -163,7 +164,7 @@ struct predicate_suffix_modifier : sor< sort, distinct, limit > {};
 
 struct string_oper : seq< sor< contains, begins, ends, like>, star< blank >, opt< case_insensitive > > {};
 // "=" is equality and since other operators can start with "=" we must check equal last
-struct symbolic_oper : sor< noteq, lteq, lt, gteq, gt, eq, in > {};
+struct symbolic_oper : sor< noteq, lteq, lt, gteq, gt, eq, in, between > {};
 
 // predicates
 struct comparison_pred : seq< expr, pad< sor< string_oper, symbolic_oper >, blank >, expr > {};
@@ -641,6 +642,16 @@ OPERATOR_ACTION(begins, Predicate::Operator::BeginsWith)
 OPERATOR_ACTION(ends, Predicate::Operator::EndsWith)
 OPERATOR_ACTION(contains, Predicate::Operator::Contains)
 OPERATOR_ACTION(like, Predicate::Operator::Like)
+
+template<> struct action< between >
+{
+    template< typename Input >
+    static void apply(const Input& in, ParserState&)
+    {
+        const static std::string message = "Invalid Predicate. The 'between' operator is not supported yet, please rewrite the expression using '>' and '<'.";
+        throw tao::pegtl::parse_error(message, in);
+    }
+};
 
 template<> struct action< case_insensitive >
 {

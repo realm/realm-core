@@ -14,6 +14,8 @@
 
 ### Internals
 * For convenience, `parser::parse` now accepts a `StringData` type instead of just `std::string`.
+* Parsing a query which uses the 'between' operator now gives a better error message indicating
+  that support is not yet implemented.
 
 ----------------------------------------------
 
