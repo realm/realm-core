@@ -138,17 +138,25 @@ if(NOT REALM_BUILD_LIB_ONLY AND NOT REALM_NO_TESTS)
 endif()
 
 # Install the licence and changelog files
-install(FILES LICENSE CHANGELOG.md DESTINATION "doc/realm" COMPONENT devel)
+install(FILES LICENSE CHANGELOG.md 
+        DESTINATION "doc/realm" 
+        COMPONENT devel
+)
 
 # Make the project importable from the build directory
-export(TARGETS Core QueryParser NAMESPACE Realm:: FILE realm-config.cmake)
+export(TARGETS Core QueryParser NAMESPACE RealmCore:: FILE RealmCoreTargets.cmake)
 
 # Make the project importable from the install directory
 install(EXPORT realm
-        NAMESPACE Realm::
-        FILE realm-config.cmake
-        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/realm
+        NAMESPACE RealmCore::
+        FILE RealmCoreTargets.cmake
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/RealmCore
         COMPONENT devel)
+
+install(FILES tools/cmake/RealmCore-config.cmake 
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/RealmCore 
+        COMPONENT devel
+)
 
 # CPack
 set(CPACK_GENERATOR "TGZ")
