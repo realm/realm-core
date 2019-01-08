@@ -1,14 +1,13 @@
-# NEXT RELEASE
+# 5.12.7 Release notes
 
 ### Enhancements
 * Instead of asserting, an `InvalidDatabase` exception is thrown when a realm file is opened 
-  with an invalid top ref.
+  with an invalid top ref. Name of problematic file is included in exception message.
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * A bug was fixed in `realm::util::DirScanner` that could cause it to sometimes
-  skip directory entries due to faulty error handling around `readdir()`. Since
-  5.12.5. Issue [realm/realm-sync#2699](https://github.com/realm/realm-sync/issues/2699).
+  skip directory entries due to faulty error handling around `readdir()`.
+  (Issue [realm-sync#2699](https://github.com/realm/realm-sync/issues/2699), since 5.12.5).
  
 ### Breaking changes
 * None.
