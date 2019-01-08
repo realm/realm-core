@@ -7,8 +7,7 @@
 ### Fixed
 * A bug was fixed in `realm::util::DirScanner` that could cause it to sometimes
   skip directory entries due to faulty error handling around `readdir()`.
-  Issue [realm/realm-sync#2699](https://github.com/realm/realm-sync/issues/2699).
-  Since 5.12.5.
+  (Issue [realm-sync#2699](https://github.com/realm/realm-sync/issues/2699), since 5.12.5).
  
 ### Breaking changes
 * None.
