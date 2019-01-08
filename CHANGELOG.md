@@ -13,7 +13,7 @@
 -----------
 
 ### Internals
-* None.
+* For convenience, `parser::parse` now accepts a `StringData` type instead of just `std::string`.
 
 ----------------------------------------------
 

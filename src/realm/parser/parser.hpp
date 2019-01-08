@@ -22,6 +22,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <realm/string_data.hpp>
 
 namespace realm {
 
@@ -130,7 +131,9 @@ struct ParserResult
     DescriptorOrderingState ordering;
 };
 
-ParserResult parse(const std::string &query);
+ParserResult parse(const char* query); // assumes c-style null termination
+ParserResult parse(const std::string& query);
+ParserResult parse(const realm::StringData& query);
 
 // run the analysis tool to check for cycles in the grammar
 // returns the number of problems found and prints some info to std::cout

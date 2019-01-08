@@ -701,7 +701,19 @@ const std::string error_message_control< chars >::error_message = "Invalid chara
 template< typename Rule>
 const std::string error_message_control< Rule >::error_message = "Invalid predicate.";
 
-ParserResult parse(const std::string &query)
+ParserResult parse(const char* query)
+{
+    StringData sd(query); // assumes c-style null termination
+    return parse(sd);
+}
+
+ParserResult parse(const std::string& query)
+{
+    StringData sd(query);
+    return parse(sd);
+}
+
+ParserResult parse(const StringData& query)
 {
     DEBUG_PRINT_TOKEN(query);
 
@@ -710,7 +722,8 @@ ParserResult parse(const std::string &query)
     ParserState state;
     state.group_stack.push_back(&out_predicate);
 
-    tao::pegtl::memory_input<> input(query, query);
+    // pegtl::memory_input does not make a copy, it operates on pointers to the contiguous data
+    tao::pegtl::memory_input<> input(query.data(), query.size(), query);
     tao::pegtl::parse< must< pred, eof >, action, error_message_control >(input, state);
     if (out_predicate.type == Predicate::Type::And && out_predicate.cpnd.sub_predicates.size() == 1) {
         return ParserResult{ std::move(out_predicate.cpnd.sub_predicates.back()), state.ordering_state };
