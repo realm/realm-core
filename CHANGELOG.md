@@ -16,6 +16,8 @@
 -----------
 
 ### Internals
+* Improved performance on `find_first` for small string arrays (ArrayString). This will improve the table name lookup
+  performance.
 * Upgrade pegtl to 2.6.1. Several issues fixed.
 
 ----------------------------------------------
