@@ -72,10 +72,11 @@ if [ "${OS}" == "android" ]; then
           -D REALM_ENABLE_ENCRYPTION=1 \
           -D REALM_VERSION="${VERSION}" \
           -D CPACK_SYSTEM_NAME="Android-${ARCH}" \
+          -G Ninja \
           ..
 
-    make -j "${CORES}" -l "${CORES}" VERBOSE=1
-    make package
+    ninja -v
+    ninja package
 else
     case "${OS}" in
         ios) SDK="iphone";;
