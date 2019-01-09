@@ -809,6 +809,7 @@ util::Mutex& all_files_mutex = *new util::Mutex;
 
 ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
 {
+    m_cfg = cfg;
     // ExceptionSafety: If this function throws, it must leave the allocator in
     // the detached state.
 
@@ -943,7 +944,7 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
         size_t initial_size = m_initial_section_size;
         m_file_mappings->m_file.prealloc(initial_size); // Throws
 
-        bool disable_sync = get_disable_sync_to_disk();
+        bool disable_sync = get_disable_sync_to_disk() || cfg.disable_sync;
         if (!disable_sync)
             m_file_mappings->m_file.sync(); // Throws
 
@@ -1387,7 +1388,7 @@ void SlabAlloc::resize_file(size_t new_file_size)
     REALM_ASSERT(matches_section_boundary(new_file_size));
     m_file_mappings->m_file.prealloc(new_file_size); // Throws
 
-    bool disable_sync = get_disable_sync_to_disk();
+    bool disable_sync = get_disable_sync_to_disk() || m_cfg.disable_sync;
     if (!disable_sync)
         m_file_mappings->m_file.sync(); // Throws
 }
@@ -1400,7 +1401,7 @@ void SlabAlloc::reserve_disk_space(size_t size)
         size = get_upper_section_boundary(size);
     m_file_mappings->m_file.prealloc(size); // Throws
 
-    bool disable_sync = get_disable_sync_to_disk();
+    bool disable_sync = get_disable_sync_to_disk() || m_cfg.disable_sync;
     if (!disable_sync)
         m_file_mappings->m_file.sync(); // Throws
 }
