@@ -299,7 +299,7 @@ def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmula
             withEnv(environment) {
                 if(!runTestsInEmulator) {
                     buildEnv.inside {
-                        runAndCollectWarnings(script: "tools/cross_compile.sh -o android -a ${abi} -t ${buildType} -v ${gitDescribeVersion}")
+                        sh "tools/cross_compile.sh -o android -a ${abi} -t ${buildType} -v ${gitDescribeVersion}"
                         dir(buildDir) {
                             archiveArtifacts('realm-*.tar.gz')
                         }
@@ -508,10 +508,10 @@ def doBuildAppleDevice(String sdk, String buildType) {
                      'XCODE10_DEVELOPER_DIR=/Applications/Xcode-10.app/Contents/Developer/']) {
                 retry(3) {
                     timeout(time: 15, unit: 'MINUTES') {
-                        runAndCollectWarnings(parser:'clang', script: """
-                                rm -rf build-*
-                                tools/cross_compile.sh -o ${sdk} -t ${buildType} -v ${gitDescribeVersion}
-                            """)
+                        sh """
+                            rm -rf build-*
+                            tools/cross_compile.sh -o ${sdk} -t ${buildType} -v ${gitDescribeVersion}
+                        """
                     }
                 }
             }
