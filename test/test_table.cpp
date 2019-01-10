@@ -4385,27 +4385,27 @@ template<typename T> void test_lists(TestContext& test_context, DBRef sg, const 
     Obj o = table->create_object();
     Lst<T> lst = o.get_list<T>(col);
     std::vector<managed<T>> reference;
-    for (int j = 0; j < 10000; ++j) {
+    for (int j = 0; j < 1000; ++j) {
         managed<T> value = generator<T>::get(optional);
         lst.add(value.value);
         reference.push_back(value);
     }
     check_values(test_context, lst, reference);
-    for (int j = 0; j < 1000; ++j) {
+    for (int j = 0; j < 100; ++j) {
         managed<T> value = generator<T>::get(optional);
-        lst.insert(4993, value.value);
+        lst.insert(493, value.value);
         value = generator<T>::get(optional);
-        lst.set(4993, value.value);
-        reference.insert(reference.begin() + 4993, value);
+        lst.set(493, value.value);
+        reference.insert(reference.begin() + 493, value);
     }
     check_values(test_context, lst, reference);
-    for (int j = 0; j < 1000; ++j) {
-        lst.remove(1452);
-        reference.erase(reference.begin() + 1452);
+    for (int j = 0; j < 100; ++j) {
+        lst.remove(142);
+        reference.erase(reference.begin() + 142);
     }
     check_values(test_context, lst, reference);
     for (int disp = 0; disp < 4; ++disp) {
-        for (int j = 2500 + disp; j > 500; j -= 3) {
+        for (int j = 250 + disp; j > 50; j -= 3) {
             lst.remove(j);
             reference.erase(reference.begin() + j);
         }
@@ -4416,7 +4416,7 @@ template<typename T> void test_lists(TestContext& test_context, DBRef sg, const 
         CHECK(value == it->value);
         ++it;
     }
-    for (size_t j = lst.size(); j >= 1000; --j) {
+    for (size_t j = lst.size(); j >= 100; --j) {
         lst.remove(j - 1);
         reference.pop_back();
     }
