@@ -144,7 +144,7 @@ REALM_NOINLINE static void translate_file_exception(StringData path, bool immuta
 static bool is_nonupgradable_history(IncompatibleHistories const& ex)
 {
     // FIXME: Replace this with a proper specific exception type once Core adds support for it.
-    return ex.what() == std::string("Incompatible histories. Nonupgradable history schema");
+    return std::string(ex.what()).find(std::string("Incompatible histories. Nonupgradable history schema")) != npos;
 }
 #endif
 
