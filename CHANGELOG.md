@@ -1,7 +1,8 @@
 # NEXT RELEASE
 
 ### Enhancements
-* None.
+* The parser now supports readable timestamps with a 'T' separator in addition to the originally supported "@" separator.
+  For example: "startDate > 1981-11-01T23:59:59:1". ([#3198](https://github.com/realm/realm-core/issues/3198)).
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
@@ -13,7 +14,9 @@
 -----------
 
 ### Internals
-* None.
+* For convenience, `parser::parse` now accepts a `StringData` type instead of just `std::string`.
+* Parsing a query which uses the 'between' operator now gives a better error message indicating
+  that support is not yet implemented. ([#3198](https://github.com/realm/realm-core/issues/3198)).
 
 ----------------------------------------------
 
