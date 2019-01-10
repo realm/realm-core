@@ -1176,6 +1176,11 @@ public:
         return Group::get_history_ref(group.m_top);
     }
 
+    static int get_file_format_version(const Group& group) noexcept
+    {
+        return group.get_file_format_version();
+    }
+
     static void get_version_and_history_info(const Allocator& alloc, ref_type top_ref,
                                              _impl::History::version_type& version,
                                              int& history_type,
