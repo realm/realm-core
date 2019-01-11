@@ -180,11 +180,11 @@ public:
 
     //@}
 
-    /// Get the list of uncommited changes accumulated so far in the current
+    /// Get the list of uncommitted changes accumulated so far in the current
     /// write transaction.
     ///
     /// The callee retains ownership of the referenced memory. The ownership is
-    /// not handed over the the caller.
+    /// not handed over to the caller.
     ///
     /// This function may be called only during a write transaction (prior to
     /// initiation of commit operation). In that case, the caller may assume that the

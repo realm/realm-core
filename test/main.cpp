@@ -17,8 +17,36 @@
  **************************************************************************/
 
 #include "test_all.hpp"
+#ifdef _MSC_VER
+#include <Shlwapi.h>
+#pragma comment(lib, "Shlwapi.lib")
+#else
+#include <unistd.h>
+#include <libgen.h>
+#endif
 
 int main(int argc, char* argv[])
 {
+#ifdef _MSC_VER
+    char path[MAX_PATH];
+    if (GetModuleFileNameA(NULL, path, sizeof(path)) == 0) {
+        fprintf(stderr, "Failed to retrieve path to exectuable.\n");
+        return 1;
+    }
+    PathRemoveFileSpecA(path);
+    SetCurrentDirectoryA(path);
+#else
+    char executable[PATH_MAX];
+    if (realpath(argv[0], executable) == nullptr) {
+        fprintf(stderr, "Failed to retrieve path to exectuable.\n");
+        return 1;
+    }
+    const char* directory = dirname(executable);
+    if (chdir(directory) < 0) {
+        fprintf(stderr, "Failed to change directory.\n");
+        return 1;
+    }
+#endif
+
     return test_all(argc, argv);
 }

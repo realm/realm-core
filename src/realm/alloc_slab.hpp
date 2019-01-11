@@ -600,16 +600,16 @@ private:
     FeeeSpaceState m_free_space_state = free_space_Clean;
 
     typedef std::vector<Slab> slabs;
-    typedef std::vector<Chunk> chunks;
+    using Chunks = std::map<ref_type, size_t>;
     slabs m_slabs;
-    chunks m_free_read_only;
+    Chunks m_free_read_only;
 
     bool m_debug_out = false;
 
     /// Throws if free-lists are no longer valid.
     size_t consolidate_free_read_only();
     /// Throws if free-lists are no longer valid.
-    const chunks& get_free_read_only() const;
+    const Chunks& get_free_read_only() const;
 
     /// Throws InvalidDatabase if the file is not a Realm file, if the file is
     /// corrupted, or if the specified encryption key is incorrect. This

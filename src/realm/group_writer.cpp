@@ -562,9 +562,7 @@ size_t GroupWriter::recreate_freelist(size_t reserve_pos, size_t& free_space_siz
 {
     REALM_ASSERT(m_free_in_file.empty());
 
-    const SlabAlloc::chunks& new_free_space = m_group.m_alloc.get_free_read_only(); // Throws
     bool is_shared = m_group.m_is_shared;
-
     auto entry = m_size_map.begin();
     auto end = m_size_map.end();
     while (entry != end) {
@@ -576,8 +574,10 @@ size_t GroupWriter::recreate_freelist(size_t reserve_pos, size_t& free_space_siz
     for (const auto& free_space : m_not_free_in_file) {
         m_free_in_file.emplace_back(free_space.ref, free_space.size, free_space.released_at_version);
     }
+
+    auto& new_free_space = m_group.m_alloc.get_free_read_only(); // Throws
     for (const auto& free_space : new_free_space) {
-        m_free_in_file.emplace_back(free_space.ref, free_space.size, m_current_version);
+        m_free_in_file.emplace_back(free_space.first, free_space.second, m_current_version);
     }
 
     sort_freelist();

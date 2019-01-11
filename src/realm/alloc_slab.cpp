@@ -505,8 +505,8 @@ SlabAlloc::FreeBlock* SlabAlloc::grow_slab()
 
     size_t ref_end = ref;
     if (REALM_UNLIKELY(int_add_with_overflow_detect(ref_end, new_size))) {
-        throw MaximumFileSizeExceeded("AllocSlab slab ref_end size overflow: " + util::to_string(ref) + " + "
-                                 + util::to_string(new_size));
+        throw MaximumFileSizeExceeded("AllocSlab slab ref_end size overflow: " + util::to_string(ref) + " + " +
+                                      util::to_string(new_size));
     }
 
     REALM_ASSERT(matches_section_boundary(ref));
@@ -541,10 +541,8 @@ void SlabAlloc::do_free(ref_type ref, char* addr)
 #endif
 
     // Get size from segment
-    size_t size_ =
+    size_t size =
         read_only ? NodeHeader::get_byte_size_from_header(addr) : NodeHeader::get_capacity_from_header(addr);
-    REALM_ASSERT(size_ < 2UL * 1024 * 1024 * 1024);
-    int size = static_cast<int>(size_);
 
 #ifdef REALM_DEBUG
     if (REALM_COVER_NEVER(m_debug_out))
@@ -560,15 +558,36 @@ void SlabAlloc::do_free(ref_type ref, char* addr)
 
     m_free_space_state = free_space_Dirty;
 
-
     if (read_only) {
         // Free space in read only segment is tracked separately
         try {
-            Chunk chunk;
-            chunk.ref = ref;
-            chunk.size = size;
-            REALM_ASSERT(ref != 0);
-            m_free_read_only.push_back(chunk); // Throws
+            REALM_ASSERT_RELEASE(ref != 0);
+            auto next = m_free_read_only.lower_bound(ref);
+            if (next != m_free_read_only.end()) {
+                REALM_ASSERT_RELEASE_EX(ref + size <= next->first, ref, size, next->first, next->second);
+                // See if element can be combined with next element
+                if (ref + size == next->first) {
+                    size += next->second;
+                    next = m_free_read_only.erase(next);
+                }
+            }
+            if (!m_free_read_only.empty() && next != m_free_read_only.begin()) {
+                // There must be a previous element - see if we can merge
+                auto prev = next;
+                prev--;
+
+                REALM_ASSERT_RELEASE_EX(prev->first + prev->second <= ref, ref, size, prev->first, prev->second);
+                // See if element can be combined with previous element
+                // We can do that just by adding the size
+                if (prev->first + prev->second == ref) {
+                    prev->second += size;
+                    return; // Done!
+                }
+                m_free_read_only.emplace_hint(prev, ref, size); // Throws
+            }
+            else {
+                m_free_read_only.emplace(ref, size); // Throws
+            }
         }
         catch (...) {
             m_free_space_state = free_space_Invalid;
@@ -576,14 +595,15 @@ void SlabAlloc::do_free(ref_type ref, char* addr)
     }
     else {
         // fixup size to take into account the allocator's need to store a FreeBlock in a freed block
-        if (size < static_cast<int>(sizeof(FreeBlock)))
+        if (size < sizeof(FreeBlock))
             size = sizeof(FreeBlock);
         // align to multipla of 8
         if (size & 0x7)
             size = (size + 7) & ~0x7;
 
         FreeBlock* e = reinterpret_cast<FreeBlock*>(addr);
-        mark_freed(e, size);
+        REALM_ASSERT_RELEASE(size < 2UL * 1024 * 1024 * 1024);
+        mark_freed(e, static_cast<int>(size));
         free_block(ref, e);
     }
 }
@@ -610,28 +630,6 @@ size_t SlabAlloc::consolidate_free_read_only()
     CriticalSection cs(changes);
     if (REALM_COVER_NEVER(m_free_space_state == free_space_Invalid))
         throw InvalidFreeSpace();
-    if (m_free_read_only.size() > 1) {
-        std::sort(begin(m_free_read_only), end(m_free_read_only), [](Chunk& a, Chunk& b) { return a.ref < b.ref; });
-
-        // Combine any adjacent chunks in the freelist, except for when the chunks
-        // are on the edge of an allocation slab
-        auto prev = m_free_read_only.begin();
-        for (auto it = m_free_read_only.begin() + 1; it != m_free_read_only.end(); ++it) {
-            if (prev->ref + prev->size != it->ref) {
-                prev = it;
-                continue;
-            }
-
-            prev->size += it->size;
-            it->size = 0;
-        }
-
-        // Remove all of the now zero-size chunks from the free list
-        m_free_read_only.erase(std::remove_if(begin(m_free_read_only), end(m_free_read_only),
-                                              [](Chunk& chunk) { return chunk.size == 0; }),
-                               end(m_free_read_only));
-    }
-
     return m_free_read_only.size();
 }
 
@@ -993,8 +991,9 @@ void SlabAlloc::attach_empty()
 void SlabAlloc::throw_header_exception(std::string msg, const Header& header, const std::string& path)
 {
     char buf[256];
-    sprintf(buf, ". top_ref[0]: %" PRIX64 ", top_ref[1]: %" PRIX64 ", "
-                 "mnemonic: %X %X %X %X, fmt[0]: %d, fmt[1]: %d, flags: %X",
+    sprintf(buf,
+            ". top_ref[0]: %" PRIX64 ", top_ref[1]: %" PRIX64 ", "
+            "mnemonic: %X %X %X %X, fmt[0]: %d, fmt[1]: %d, flags: %X",
             header.m_top_ref[0], header.m_top_ref[1], header.m_mnemonic[0], header.m_mnemonic[1],
             header.m_mnemonic[2], header.m_mnemonic[3], header.m_file_format[0], header.m_file_format[1],
             header.m_flags);
@@ -1371,7 +1370,7 @@ void SlabAlloc::purge_old_mappings(uint64_t oldest_live_version, uint64_t younge
 }
 
 
-const SlabAlloc::chunks& SlabAlloc::get_free_read_only() const
+const SlabAlloc::Chunks& SlabAlloc::get_free_read_only() const
 {
     if (REALM_COVER_NEVER(m_free_space_state == free_space_Invalid))
         throw InvalidFreeSpace();
@@ -1421,17 +1420,17 @@ void SlabAlloc::verify() const
 {
 #ifdef REALM_DEBUG
     // Make sure that all free blocks fit within a slab
-/* FIXME
-for (const auto& chunk : m_free_space) {
-    slabs::const_iterator slab =
-        upper_bound(m_slabs.begin(), m_slabs.end(), chunk.ref, &ref_less_than_slab_ref_end);
-    REALM_ASSERT(slab != m_slabs.end());
+    /* FIXME
+    for (const auto& chunk : m_free_space) {
+        slabs::const_iterator slab =
+            upper_bound(m_slabs.begin(), m_slabs.end(), chunk.ref, &ref_less_than_slab_ref_end);
+        REALM_ASSERT(slab != m_slabs.end());
 
-    ref_type slab_ref_end = slab->ref_end;
-    ref_type chunk_ref_end = chunk.ref + chunk.size;
-    REALM_ASSERT_3(chunk_ref_end, <=, slab_ref_end);
-}
-*/
+        ref_type slab_ref_end = slab->ref_end;
+        ref_type chunk_ref_end = chunk.ref + chunk.size;
+        REALM_ASSERT_3(chunk_ref_end, <=, slab_ref_end);
+    }
+    */
 #endif
 }
 

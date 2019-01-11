@@ -15,7 +15,28 @@
 ### Internals
 * None.
 
-----------------------------------------------
+Besides the changes above, this release includes changes introduced by v5.12.1 and up
+until v5.12.1
+
+| # 5.12.1 Release notes
+| 
+| ### Enhancements
+| * Illegal freeing of in-file-memory is now detected when freeing is
+|   actually done. This will make it easier to find the root cause of
+|   some file corruption issues.
+| 
+| ### Fixed
+| * None.
+|  
+| ### Breaking changes
+| * None.
+| 
+| -----------
+| 
+| ### Internals
+| * None.
+| 
+| ----------------------------------------------
 
 # 6.0.0-alpha.3 Release notes
 

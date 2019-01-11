@@ -398,8 +398,8 @@ inline size_t StringData::hash() const noexcept
 {
     if (is_null())
         return 0;
-    auto data = reinterpret_cast<const unsigned char*>(m_data);
-    return murmur2_or_cityhash(data, m_size);
+    auto unsigned_data = reinterpret_cast<const unsigned char*>(m_data);
+    return murmur2_or_cityhash(unsigned_data, m_size);
 }
 
 } // namespace realm

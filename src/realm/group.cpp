@@ -1762,7 +1762,7 @@ void Group::verify() const
     // Check the concistency of the allocation of the immutable memory that has
     // been marked as free after the file was opened
     for (const auto& free_block : m_alloc.m_free_read_only) {
-        mem_usage_2.add_immutable(free_block.ref, free_block.size);
+        mem_usage_2.add_immutable(free_block.first, free_block.second);
     }
     mem_usage_2.canonicalize();
     mem_usage_1.add(mem_usage_2);
