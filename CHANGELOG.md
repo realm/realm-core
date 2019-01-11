@@ -1,27 +1,6 @@
-# NEXT RELEASE
+# 6.0.0-alpha.3 Release notes
 
-### Bugfixes
-
-* None.
-
-### Breaking changes
-
-* None.
-
-### Enhancements
-
-* None.
-
------------
-
-### Internals
-
-* None.
-
-----------------------------------------------
-
-Besides the changes above, this release includes changes introduced by v5.10.2 and up
-until v5.12.0
+This release includes only changes introduced by v5.10.2 and up until v5.12.0
 
 | # 5.12.0 Release notes
 | 
