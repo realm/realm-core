@@ -4757,13 +4757,14 @@ TEST(LangBindHelper_HandoverFuzzyTest)
     size_t numberOfOwner = 100;
     size_t numberOfDogsPerOwner = 20;
 
+    std::atomic<bool> end_signal(false);
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
+
     std::vector<TransactionRef> vids;
     std::vector<std::unique_ptr<Query>> qs;
     std::mutex vector_mutex;
 
-    std::atomic<bool> end_signal(false);
-    std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
     ColKey c0, c1, c2, c3;
     {
         auto rt = sg->start_write();
