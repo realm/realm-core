@@ -1540,4 +1540,18 @@ TEST(Array_Large)
     c.destroy();
 }
 
+TEST(Array_Sum)
+{
+    Array c(Allocator::get_default());
+    c.create(Array::type_Normal);
+
+    CHECK_EQUAL(c.sum(), 0);
+
+    c.add(42);
+    c.add(58);
+    CHECK_EQUAL(c.sum(), 100);
+
+    c.destroy();
+}
+
 #endif // TEST_ARRAY
