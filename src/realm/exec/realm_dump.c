@@ -4,6 +4,12 @@
 #include <stdint.h>
 #include <assert.h>
 
+#ifdef _WIN64
+#define do_seek _fseeki64
+#else
+#define do_seek fseek
+#endif
+
 typedef struct _Header {
     uint64_t m_top_ref[2]; // 2 * 8 bytes
     // Info-block 8-bytes
@@ -19,7 +25,7 @@ char to_print(unsigned char ch)
     return (ch >= 0x20 && ch <= 0x7e) ? (char)ch : '.';
 }
 
-void dump_buffer(unsigned char* buffer, unsigned long addr, size_t sz)
+void dump_buffer(unsigned char* buffer, uint64_t addr, size_t sz)
 {
     char printable[20];
     size_t index = 0;
@@ -49,32 +55,46 @@ void dump_buffer(unsigned char* buffer, unsigned long addr, size_t sz)
     }
 }
 
-void dump(FILE* fp, long offset, size_t sz)
+void dump(FILE* fp, int64_t offset, size_t sz)
 {
     if (sz) {
-        fseek(fp, offset, SEEK_SET);
+        do_seek(fp, offset, SEEK_SET);
         unsigned char* buffer = malloc(sz);
         size_t actual = fread(buffer, 1, sz, fp);
+        if (actual != sz) {
+            if (feof(fp)) {
+                printf("*** Unexpected EOF\n");
+            }
+            else {
+                int err = ferror(fp);
+                printf("*** Read error code: %d\n", err);
+            }
+        }
         dump_buffer(buffer, offset, actual);
         free(buffer);
     }
 }
 
-size_t dump_header(FILE* fp, long offset)
+size_t dump_header(FILE* fp, int64_t offset)
 {
     unsigned char header[8];
-    fseek(fp, offset, SEEK_SET);
+    do_seek(fp, offset, SEEK_SET);
     size_t actual = fread(header, 1, 8, fp);
     if (strncmp(header, "AAAA", 4) != 0) {
-        printf("Ref '0x%lx' does not point to an array\n", (unsigned long)(offset));
+        printf("Ref '0x%zx' does not point to an array\n", offset);
         dump(fp, offset, 64);
         return 0;
     }
+    /* dump_buffer(header, offset, 8); */
+
     size_t size = (header[5] << 16) + (header[6] << 8) + header[7];
 
     unsigned flags = header[4];
     unsigned wtype = (flags & 0x18) >> 3;
     unsigned width = (1 << (flags & 0x07)) >> 1;
+    int is_inner = (flags & 0x80) ? 1 : 0;
+    int has_refs = (flags & 0x40) ? 1 : 0;
+    int context = (flags & 0x20) ? 1 : 0;
 
     size_t num_bytes = 0;
     const char* type = "";
@@ -96,7 +116,12 @@ size_t dump_header(FILE* fp, long offset)
             break;
     }
 
-    printf("Ref: %lx, Size: %zd, width: %d %s \n", offset, size, width, type);
+    if (is_inner && has_refs) {
+        printf("Ref: %zx, Size: %zd, width: %d %s Inner B+tree node\n", offset, size, width, type);
+    }
+    else {
+        printf("Ref: %zx, Size: %zd, width: %d %s, hasRefs: %d\n", offset, size, width, type, has_refs);
+    }
 
     return num_bytes;
 }
@@ -104,7 +129,7 @@ size_t dump_header(FILE* fp, long offset)
 void dump_file_header(FILE* fp)
 {
     Header header;
-    fseek(fp, 0, SEEK_SET);
+    do_seek(fp, 0, SEEK_SET);
     size_t actual = fread(&header, sizeof(Header), 1, fp);
     dump_buffer((unsigned char*)&header, 0, 24);
     size_t sz = dump_header(fp, header.m_top_ref[0]);
@@ -125,17 +150,17 @@ int main(int argc, const char* argv[])
         usage();
     }
 
-    FILE* fp = fopen(argv[1], "r");
+    FILE* fp = fopen(argv[1], "rb");
     if (!fp) {
         printf("File '%s' not found\n", argv[1]);
         exit(1);
     }
 
     printf("File: '%s'\n", argv[1]);
-    long ref = 0;
+    int64_t ref = 0;
     if (argc == 3) {
         char* end;
-        ref = strtol(argv[2], &end, 0);
+        ref = strtoll(argv[2], &end, 0);
         if (*end != '\0') {
             printf("'%s' is not a number\n", argv[2]);
             exit(1);

@@ -46,8 +46,10 @@ struct StreamingFooter {
 };
 
 template <class T>
-void consolidate_list(std::vector<T>& list)
+void consolidate_lists(std::vector<T>& list, std::vector<T>& list2)
 {
+    list.insert(list.end(), list2.begin(), list2.end());
+    list2.clear();
     if (list.size() > 1) {
         std::sort(begin(list), end(list), [](T& a, T& b) { return a.start < b.start; });
 
@@ -55,11 +57,13 @@ void consolidate_list(std::vector<T>& list)
         for (auto it = list.begin() + 1; it != list.end(); ++it) {
             if (prev->start + prev->length != it->start) {
                 if (prev->start + prev->length > it->start) {
-                    std::cerr << "*** Overlapping entries:" << std::endl;
-                    std::cerr << std::hex;
-                    std::cerr << "    0x" << prev->start << "..0x" << prev->start + prev->length << std::endl;
-                    std::cerr << "    0x" << it->start << "..0x" << it->start + it->length << std::endl;
-                    std::cerr << std::dec;
+                    std::cout << "*** Overlapping entries:" << std::endl;
+                    std::cout << std::hex;
+                    std::cout << "    0x" << prev->start << "..0x" << prev->start + prev->length << std::endl;
+                    std::cout << "    0x" << it->start << "..0x" << it->start + it->length << std::endl;
+                    std::cout << std::dec;
+                    // Remove new entry from list
+                    it->length = 0;
                 }
                 prev = it;
                 continue;
@@ -203,12 +207,12 @@ public:
         int64_t val = realm::get_direct(m_data, width(), ndx);
 
         if (val & 1)
-            val = 0;
+            return 0;
 
         uint64_t ref = uint64_t(val);
         if (ref > current_logical_file_size || (ref & 7)) {
-            std::cerr << "*** Invalid ref: 0x" << std::hex << ref << std::dec << std::endl;
-            val = 0;
+            std::cout << "*** Invalid ref: 0x" << std::hex << ref << std::dec << std::endl;
+            return 0;
         }
 
         return ref;
@@ -225,7 +229,7 @@ public:
         return str;
     }
 
-    static void get_nodes(realm::Allocator& alloc, uint64_t ref, std::vector<Entry>&);
+    static std::vector<Entry> get_nodes(realm::Allocator& alloc, uint64_t ref);
 
 private:
     char* m_data;
@@ -416,6 +420,13 @@ std::string human_readable(uint64_t val)
     return out.str();
 }
 
+uint64_t get_size(const std::vector<Entry>& list)
+{
+    uint64_t sz = 0;
+    std::for_each(list.begin(), list.end(), [&](const Entry& e) { sz += e.length; });
+    return sz;
+}
+
 std::ostream& operator<<(std::ostream& ostr, const Group& g)
 {
     if (g.valid()) {
@@ -487,20 +498,27 @@ void Node::init(realm::Allocator& alloc, uint64_t ref)
     }
 }
 
-void Array::get_nodes(realm::Allocator& alloc, uint64_t ref, std::vector<Entry>& nodes)
+std::vector<Entry> Array::get_nodes(realm::Allocator& alloc, uint64_t ref)
 {
+    std::vector<Entry> nodes;
     if (ref != 0) {
         Array arr(alloc, ref);
+        if (!arr.valid()) {
+            return {};
+        }
         nodes.emplace_back(ref, arr.size_in_bytes());
         if (arr.has_refs()) {
             auto sz = arr.size();
             for (unsigned i = 0; i < sz; i++) {
                 uint64_t r = arr.get_ref(i);
-                if (r)
-                    get_nodes(alloc, r, nodes);
+                if (r) {
+                    auto sub_nodes = get_nodes(alloc, r);
+                    consolidate_lists(nodes, sub_nodes);
+                }
             }
         }
     }
+    return nodes;
 }
 
 std::vector<Entry> Group::get_allocated_nodes() const
@@ -509,21 +527,25 @@ std::vector<Entry> Group::get_allocated_nodes() const
     all_nodes.emplace_back(0, 24);                  // Header area
     all_nodes.emplace_back(m_ref, size_in_bytes()); // Top array itself
 
-    Array::get_nodes(m_alloc, get_ref(0), all_nodes); // Table names
-    Array::get_nodes(m_alloc, get_ref(1), all_nodes); // Tables
-    consolidate_list(all_nodes);
+    auto table_name_nodes = Array::get_nodes(m_alloc, get_ref(0)); // Table names
+    consolidate_lists(all_nodes, table_name_nodes);
+    auto table_nodes = Array::get_nodes(m_alloc, get_ref(1)); // Tables
+    consolidate_lists(all_nodes, table_nodes);
+    std::cout << "State size: " << human_readable(get_size(all_nodes)) << std::endl;
 
-    all_nodes.emplace_back(m_free_list_positions.ref(), m_free_list_positions.size_in_bytes()); // Top array itself
-    all_nodes.emplace_back(m_free_list_sizes.ref(), m_free_list_sizes.size_in_bytes());         // Top array itself
-    all_nodes.emplace_back(m_free_list_versions.ref(), m_free_list_versions.size_in_bytes());   // Top array itself
+    std::vector<Entry> free_lists;
+    free_lists.emplace_back(m_free_list_positions.ref(), m_free_list_positions.size_in_bytes()); // Top array itself
+    free_lists.emplace_back(m_free_list_sizes.ref(), m_free_list_sizes.size_in_bytes());         // Top array itself
+    free_lists.emplace_back(m_free_list_versions.ref(), m_free_list_versions.size_in_bytes());   // Top array itself
 
-    consolidate_list(all_nodes);
-
+    consolidate_lists(all_nodes, free_lists);
+    std::vector<Entry> history;
     if (size() > 8) {
-        Array::get_nodes(m_alloc, get_ref(8), all_nodes);
+        history = Array::get_nodes(m_alloc, get_ref(8));
+        std::cout << "History size: " << human_readable(get_size(history)) << std::endl;
     }
 
-    consolidate_list(all_nodes);
+    consolidate_lists(all_nodes, history);
     return all_nodes;
 }
 
@@ -569,25 +591,32 @@ RealmFile::RealmFile(const std::string& file_path, const char* encryption_key, u
 void RealmFile::node_scan()
 {
     std::map<uint64_t, unsigned> sizes;
-    std::vector<Entry> bad_blocks;
     uint64_t ref = m_start_pos;
     auto free_list = m_group->get_free_list();
     auto free_entry = free_list.begin();
     auto end = m_alloc.get_baseline();
     uint64_t bad_ref = 0;
     if (free_list.empty()) {
-        std::cerr << "*** No free list - results may be unreliable ***" << std::endl;
+        std::cout << "*** No free list - results may be unreliable ***" << std::endl;
     }
+    std::cout << std::hex;
     while (ref < end) {
         if (free_entry != free_list.end() && ref == free_entry->start) {
             ref += free_entry->length;
             ++free_entry;
         }
         else {
+            while (free_entry != free_list.end() && ref > free_entry->start) {
+                std::cout << "*** Bad free list entry: "
+                          << "Start: 0x" << free_entry->start << "..0x" << free_entry->start + free_entry->length
+                          << std::endl;
+                ++free_entry;
+            }
             Node n(m_alloc, ref);
             if (n.valid()) {
                 if (bad_ref) {
-                    bad_blocks.emplace_back(bad_ref, ref - bad_ref);
+                    std::cout << "*** Unaccounted space: "
+                              << "Start: 0x" << bad_ref << "..0x" << ref << std::endl;
                     bad_ref = 0;
                 }
                 auto size_in_bytes = n.size_in_bytes();
@@ -603,20 +632,13 @@ void RealmFile::node_scan()
         }
     }
     if (bad_ref) {
-        bad_blocks.emplace_back(bad_ref, ref - bad_ref);
-        bad_ref = 0;
+        std::cout << "*** Unaccounted space: "
+                  << "Start: 0x" << bad_ref << "..0x" << end << std::endl;
     }
+    std::cout << std::dec;
     std::cout << "Allocated space:" << std::endl;
     for (auto s : sizes) {
         std::cout << "    Size: " << s.first << " count: " << s.second << std::endl;
-    }
-    if (!bad_blocks.empty()) {
-        std::cout << "Bad space:" << std::endl;
-        std::cout << std::hex;
-        for (auto b : bad_blocks) {
-            std::cout << "    Start: 0x" << b.start << "..0x" << b.start + b.length << std::endl;
-        }
-        std::cout << std::dec;
     }
 }
 
@@ -630,10 +652,11 @@ void RealmFile::memory_leaks()
     if (m_group->valid()) {
         auto nodes = m_group->get_allocated_nodes();
         auto free_list = m_group->get_free_list();
+        std::vector<Entry> free_blocks;
         for (auto& entry : free_list) {
-            nodes.emplace_back(entry.start, entry.length);
+            free_blocks.emplace_back(entry.start, entry.length);
         }
-        consolidate_list(nodes);
+        consolidate_lists(nodes, free_blocks);
         auto it = nodes.begin();
         if (nodes.size() > 1) {
             std::cout << "Memory leaked:" << std::endl;
