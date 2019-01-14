@@ -6,7 +6,8 @@
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* If, in debug mode, you try to compute the used space on a newly created realm (with empty free list), the program will
+  abort. ([#1171](https://github.com/realm/realm-sync/issues/2724), since v5.12.0)
  
 ### Breaking changes
 * None.
