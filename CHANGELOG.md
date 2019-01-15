@@ -1,12 +1,11 @@
-# NEXT RELEASE
+# 5.13.0 Release notes
 
 ### Enhancements
 * The parser now supports readable timestamps with a 'T' separator in addition to the originally supported "@" separator.
   For example: "startDate > 1981-11-01T23:59:59:1". ([#3198](https://github.com/realm/realm-core/issues/3198)).
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* If, in debug mode, you try to compute the used space on a newly created realm (with empty free list), the program will
+* If, in debug mode, you try to compute the used space on a newly compacted realm (with empty free list), the program will
   abort. ([#1171](https://github.com/realm/realm-sync/issues/2724), since v5.12.0)
  
 ### Breaking changes
