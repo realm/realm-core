@@ -440,7 +440,7 @@ void TableViewBase::to_json(std::ostream& out) const
     out << "]";
 }
 
-void TableViewBase::to_string(std::ostream& out, size_t limit) const
+void TableViewBase::to_string(std::ostream& out, size_t lim) const
 {
     check_cookie();
 
@@ -450,7 +450,7 @@ void TableViewBase::to_string(std::ostream& out, size_t limit) const
 
     // Set limit=-1 to print all rows, otherwise only print to limit
     const size_t row_count = num_attached_rows();
-    const size_t out_count = (limit == size_t(-1)) ? row_count : (row_count < limit) ? row_count : limit;
+    const size_t out_count = (lim == size_t(-1)) ? row_count : (row_count < lim) ? row_count : lim;
 
     // Print rows
     size_t i = 0;
@@ -704,9 +704,9 @@ void TableViewBase::distinct(DistinctDescriptor columns)
     do_sync();
 }
 
-void TableViewBase::limit(LimitDescriptor limit)
+void TableViewBase::limit(LimitDescriptor lim)
 {
-    m_descriptor_ordering.append_limit(std::move(limit));
+    m_descriptor_ordering.append_limit(std::move(lim));
     do_sync();
 }
 
