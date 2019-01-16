@@ -307,6 +307,11 @@ public:
     /// call to SlabAlloc::alloc() corresponds to a mutation event.
     bool is_free_space_clean() const noexcept;
 
+    /// Hooks used to keep the encryption layer informed of the start and stop
+    /// of transactions.
+    void note_reader_start(void* reader_id);
+    void note_reader_end(void* reader_id);
+
     void verify() const override;
 #ifdef REALM_DEBUG
     void enable_debug(bool enable)
@@ -564,6 +569,7 @@ private:
     uint64_t m_youngest_live_version = 1;
     std::mutex m_mapping_mutex;
     util::File m_file;
+    util::SharedFileInfo* m_realm_file_info = nullptr;
     // vectors where old mappings, are held from deletion to ensure translations are
     // kept open and ref->ptr translations work for other threads..
     std::vector<OldMapping> m_old_mappings;

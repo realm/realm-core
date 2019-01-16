@@ -232,6 +232,10 @@ public:
     void append_distinct(DistinctDescriptor distinct);
     void append_limit(LimitDescriptor limit);
     realm::util::Optional<size_t> get_min_limit() const;
+    /// Remove all LIMIT statements from this descriptor ordering, returning the
+    /// minimum LIMIT value that existed. If there was no LIMIT statement,
+    /// returns `none`.
+    util::Optional<size_t> remove_all_limits();
     bool will_limit_to_zero() const;
     DescriptorType get_type(size_t index) const;
     bool is_empty() const

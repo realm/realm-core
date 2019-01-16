@@ -182,7 +182,7 @@ namespace {
 
 std::vector<ColKey> test_table_add_columns(TableRef t)
 {
-	std::vector<ColKey> res;
+    std::vector<ColKey> res;
     res.push_back(t->add_column(type_Int, "first"));
     res.push_back(t->add_column(type_Int, "second"));
     res.push_back(t->add_column(type_Bool, "third"));
@@ -196,7 +196,7 @@ void writer(DBRef sg, uint64_t id)
 {
     // std::cerr << "Started writer " << std::endl;
     try {
-    	auto tr = sg->start_read();
+        auto tr = sg->start_read();
         bool done = false;
         // std::cerr << "Opened sg " << std::endl;
         for (int i = 0; !done; ++i) {
@@ -3649,11 +3649,11 @@ TEST_IF(Shared_DecryptExisting, REALM_ENABLE_ENCRYPTION)
         auto db = DB::create(path, false, DBOptions(crypt_key(true)));
         auto rt = db->start_write();
         //Group& group = db.begin_write();
-		TableRef table = rt->add_table("table");
-		auto c0 = table->add_column(type_String, "string");
-		auto o1 = table->create_object();
-		std::string s = std::string(size_t(1.5 * page_size()), 'a');
-		o1.set(c0, s);
+        TableRef table = rt->add_table("table");
+        auto c0 = table->add_column(type_String, "string");
+        auto o1 = table->create_object();
+        std::string s = std::string(size_t(1.5 * page_size()), 'a');
+        o1.set(c0, s);
         rt->commit();
     }
 #else
@@ -3668,7 +3668,7 @@ TEST_IF(Shared_DecryptExisting, REALM_ENABLE_ENCRYPTION)
         auto o1 = *table->begin();
         std::string s1 = o1.get<StringData>(table->get_column_key("string"));
         std::string s2 = std::string(size_t(1.5 * page_size()), 'a');
-		CHECK_EQUAL(s1, s2);
+        CHECK_EQUAL(s1, s2);
         rt->verify();
     }
 #endif

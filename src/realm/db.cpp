@@ -2247,6 +2247,7 @@ Transaction::Transaction(DBRef _db, SlabAlloc* alloc, DB::ReadLockInfo& rli, DB:
     m_transact_stage = DB::transact_Ready;
     set_metrics(db->m_metrics);
     set_transact_stage(stage);
+    m_alloc.note_reader_start(this);
     attach_shared(m_read_lock.m_top_ref, m_read_lock.m_file_size, writable);
 }
 
@@ -2273,6 +2274,7 @@ void Transaction::do_end_read() noexcept
 {
     detach();
     db->release_read_lock(m_read_lock);
+    m_alloc.note_reader_end(this);
     set_transact_stage(DB::transact_Ready);
     // reset the std::shared_ptr to allow the DB object to release resources
     // as early as possible.

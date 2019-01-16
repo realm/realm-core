@@ -16,8 +16,36 @@
 * None.
 
 Besides the changes above, this release includes changes introduced by v5.12.1 and up
-until v5.12.1
+until v5.12.2
 
+| # 5.12.2 Release notes
+| 
+| ### Enhancements
+| * None
+| 
+| ### Fixed
+| * If encryption was enabled, decrypted pages were not released until the file was closed, causing 
+|   excessive usage of memory.
+|   A page reclaim daemon thread has been added, which will work to release decrypted pages back to
+|   the operating system. To control it, a governing function can be installed. The governing function
+|   sets the target for the page reclaimer. If no governing function is installed, the system will attempt
+|   to keep the memory usage below any of the following:
+|   
+|         - 1/4 of physical memory available on the platform as reported by "/proc/meminfo"
+|         - 1/4 of allowed memory available as indicated by "/sys/fs/cgroup/memory/memory_limit_in_bytes"
+|         - 1/2 of what is used by the buffer cache as indicated by "/sys/fs/cgroup/memory/memory.stat"
+|         - A target directly specified as "target <number of bytes>" in a configuration file specified
+|           by the environment variable REALM_PAGE_GOVERNOR_CFG.
+|   if none of the above is available, or if a target of -1 is given, the feature is disabled.
+|   ([#3123](https://github.com/realm/realm-core/issues/3123))
+| 
+| -----------
+| 
+| ### Internals
+| * None.
+| 
+| ----------------------------------------------
+| 
 | # 5.12.1 Release notes
 | 
 | ### Enhancements

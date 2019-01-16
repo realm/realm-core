@@ -473,14 +473,31 @@ bool DescriptorOrdering::will_apply_limit() const
 realm::util::Optional<size_t> DescriptorOrdering::get_min_limit() const
 {
     realm::util::Optional<size_t> min_limit;
-    for (size_t i = 0; i < m_descriptors.size(); ++i) {
-        if (m_descriptors[i]->get_type() == DescriptorType::Limit) {
-            const LimitDescriptor* limit = static_cast<const LimitDescriptor*>(m_descriptors[i].get());
+    for (auto it = m_descriptors.begin(); it != m_descriptors.end(); it++) {
+        if ((*it)->get_type() == DescriptorType::Limit) {
+            const LimitDescriptor* limit = static_cast<const LimitDescriptor*>(it->get());
             REALM_ASSERT(limit);
             min_limit = bool(min_limit) ? std::min(*min_limit, limit->get_limit()) : limit->get_limit();
         }
     }
     return min_limit;
+}
+
+util::Optional<size_t> DescriptorOrdering::remove_all_limits()
+{
+    size_t min_limit = size_t(-1);
+    for (auto it = m_descriptors.begin(); it != m_descriptors.end();) {
+        if ((*it)->get_type() == DescriptorType::Limit) {
+            const LimitDescriptor* limit = static_cast<const LimitDescriptor*>(it->get());
+            if (limit->get_limit() < min_limit) {
+                min_limit = limit->get_limit();
+            }
+            it = m_descriptors.erase(it);
+        } else {
+            ++it;
+        }
+    }
+    return min_limit == size_t(-1) ? util::none : util::some<size_t>(min_limit);
 }
 
 bool DescriptorOrdering::will_limit_to_zero() const

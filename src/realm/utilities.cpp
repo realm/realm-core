@@ -317,8 +317,8 @@ void process_mem_usage(double& vm_usage, double& resident_set)
 #ifdef _WIN32
 int gettimeofday(struct timeval * tp, struct timezone * tzp)
 {
-    FILETIME	file_time;
-    SYSTEMTIME	system_time;
+    FILETIME file_time;
+    SYSTEMTIME system_time;
     ULARGE_INTEGER ularge;
 
     GetSystemTime(&system_time);
@@ -336,15 +336,15 @@ int64_t platform_timegm(tm time)
 {
 #ifdef _WIN32
     // limitation of _mktime64 on windows is January 1, 1970, UTC to 23:59:59, December 31, 3000, UTC
-	return static_cast<int64_t>(_mkgmtime64(&time));
+    return static_cast<int64_t>(_mkgmtime64(&time));
 #elif REALM_ANDROID
     // Android-9 as well as others don't have timegm support
     time_t t = mktime(&time);
     return int64_t(static_cast<int32_t>(t + localtime(&t)->tm_gmtoff));
 #else
     // limitation of a 32 bit timegm (UTC) is December 13, 1901 @ 12:45:53 to January 19 2038 @ 03:14:07
-	time_t unix_time = timegm(&time);
-	return int64_t(static_cast<int32_t>(unix_time)); // unix_time comes as a int32_t
+    time_t unix_time = timegm(&time);
+    return int64_t(static_cast<int32_t>(unix_time)); // unix_time comes as a int32_t
 #endif
 }
 

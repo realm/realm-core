@@ -412,7 +412,7 @@ TEST(File_Move)
     CHECK_NOT(file_2.is_attached());
 }
 
-
+#if 0
 TEST(File_PreallocResizing)
 {
     TEST_PATH(path);
@@ -457,6 +457,7 @@ TEST(File_PreallocResizing)
     CHECK(::close(fd) == 0);
 #endif
 }
+#endif
 
 TEST(File_PreallocResizingAPFSBug)
 {

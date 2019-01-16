@@ -630,6 +630,7 @@ size_t SlabAlloc::consolidate_free_read_only()
     CriticalSection cs(changes);
     if (REALM_COVER_NEVER(m_free_space_state == free_space_Invalid))
         throw InvalidFreeSpace();
+
     return m_free_read_only.size();
 }
 
@@ -917,6 +918,7 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
     REALM_ASSERT(m_mappings.size());
     dg.release();  // Do not detach
     fcg.release(); // Do not close
+    m_realm_file_info = util::get_file_info_for_file(m_file);
     return top_ref;
 }
 
@@ -930,6 +932,18 @@ void SlabAlloc::setup_compatibility_mapping(size_t file_size)
     // even though the compatibility mapping may extend further.
     m_baseline = get_section_base(m_sections_in_compatibility_mapping);
     update_reader_view(file_size);
+}
+
+void SlabAlloc::note_reader_start(void* reader_id)
+{
+    if (m_realm_file_info)
+        util::encryption_note_reader_start(*m_realm_file_info, reader_id);
+}
+
+void SlabAlloc::note_reader_end(void* reader_id)
+{
+    if (m_realm_file_info)
+        util::encryption_note_reader_end(*m_realm_file_info, reader_id);
 }
 
 ref_type SlabAlloc::attach_buffer(const char* data, size_t size)

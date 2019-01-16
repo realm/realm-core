@@ -88,10 +88,21 @@ private:
     iv_table& get_iv_table(FileDesc fd, off_t data_pos) noexcept;
 };
 
+struct ReaderInfo {
+    void* reader_ID;
+    uint64_t version;
+};
+
 struct SharedFileInfo {
     FileDesc fd;
     AESCryptor cryptor;
     std::vector<EncryptedFileMapping*> mappings;
+    uint64_t last_scanned_version = 0;
+    uint64_t current_version = 0;
+    size_t num_decrypted_pages = 0;
+    size_t num_reclaimed_pages = 0;
+    size_t progress_index = 0;
+    std::vector<ReaderInfo> readers;
 
     SharedFileInfo(const uint8_t* key, FileDesc file_descriptor);
 };

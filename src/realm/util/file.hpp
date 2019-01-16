@@ -548,13 +548,15 @@ public:
 #else
         // NDK r10e has a bug in sys/stat.h dev_t ino_t are 4 bytes,
         // but stat.st_dev and st_ino are 8 bytes. So we just use uint64 instead.
-        uint_fast64_t device;
+        dev_t device;
         uint_fast64_t inode;
 #endif
     };
     // Return the unique id for the current opened file descriptor.
     // Same UniqueID means they are the same file.
     UniqueID get_unique_id() const;
+    // Return the file descriptor for the file
+    FileDesc get_descriptor() const;
     // Return false if the file doesn't exist. Otherwise uid will be set.
     static bool get_unique_id(const std::string& path, UniqueID& uid);
 
