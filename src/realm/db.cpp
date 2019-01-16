@@ -1402,6 +1402,7 @@ bool DB::compact(bool bump_version_number, util::Optional<const char*> output_en
         // We need to release any shared mapping *before* releasing the control mutex.
         // When someone attaches to the new database file, they *must* *not* see and
         // reuse any existing memory mapping of the stale file.
+        tr->close();
         m_alloc.detach();
 
 #ifdef _WIN32
@@ -1409,7 +1410,6 @@ bool DB::compact(bool bump_version_number, util::Optional<const char*> output_en
 #else
         util::File::move(tmp_path, m_db_path);
 #endif
-        tr->close();
         if (auto repl = m_alloc.get_replication())
             repl->initialize(*this);
 
