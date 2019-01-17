@@ -120,6 +120,17 @@ if(REALM_ENABLE_SYNC)
     list(APPEND INCLUDE_DIRS ${ZLIB_INCLUDE_DIRS})
 endif()
 
+if(REALM_ENABLE_SERVER)
+    list(APPEND HEADERS
+        server/adapter.hpp
+        server/admin_realm.hpp
+        server/global_notifier.hpp)
+    list(APPEND SOURCES
+        server/adapter.cpp
+        server/admin_realm.cpp
+        server/global_notifier.cpp)
+endif()
+
 add_library(realm-object-store STATIC ${SOURCES} ${HEADERS})
 set_target_properties(realm-object-store PROPERTIES POSITION_INDEPENDENT_CODE 1)
 target_compile_definitions(realm-object-store PRIVATE ${PLATFORM_DEFINES})
