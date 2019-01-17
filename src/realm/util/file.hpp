@@ -543,6 +543,16 @@ public:
 #ifdef _WIN32 // Windows version
 // FIXME: This is not implemented for Windows
 #else
+        UniqueID()
+            : device(0)
+            , inode(0)
+        {
+        }
+        UniqueID(dev_t d, ino_t i)
+            : device(d)
+            , inode(i)
+        {
+        }
         // NDK r10e has a bug in sys/stat.h dev_t ino_t are 4 bytes,
         // but stat.st_dev and st_ino are 8 bytes. So we just use uint64 instead.
         dev_t device;
