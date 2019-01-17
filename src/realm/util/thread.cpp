@@ -44,10 +44,10 @@
 #if !defined _WIN32 // 'robust' not supported by our windows pthreads port
 #if _POSIX_THREADS >= 200809L
 #ifdef __GNU_LIBRARY__
-#if __GLIBC__ >= 2 && __GLIBC_MINOR__ >= 12
+#if __GLIBC__ >= 2 && __GLIBC_MINOR__ >= 12 && !REALM_ANDROID
 #define REALM_HAVE_ROBUST_PTHREAD_MUTEX
 #endif
-#else
+#elif !REALM_ANDROID
 #define REALM_HAVE_ROBUST_PTHREAD_MUTEX
 #endif
 #endif

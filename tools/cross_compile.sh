@@ -9,7 +9,7 @@ SCRIPT=$(basename "${BASH_SOURCE[0]}")
 CORES=$(getconf _NPROCESSORS_ONLN)
 
 function usage {
-    echo "$Usage: ${SCRIPT} -t <build_type> -o <target_os> -v <version> [-a <android_abi>]"
+    echo "Usage: ${SCRIPT} -t <build_type> -o <target_os> -v <version> [-a <android_abi>]"
     echo ""
     echo "Arguments:"
     echo "   build_type=<Release|Debug|MinSizeDebug>"
@@ -30,12 +30,11 @@ while getopts ":o:a:t:v:" opt; do
             ;;
         a)
             ARCH=${OPTARG}
-            [ "${ARCH}" == "armeabi" ] ||
             [ "${ARCH}" == "armeabi-v7a" ] ||
             [ "${ARCH}" == "x86" ] ||
-            [ "${ARCH}" == "mips" ] ||
             [ "${ARCH}" == "x86_64" ] ||
             [ "${ARCH}" == "arm64-v8a" ] || usage
+            [[ $ARCH == *64* ]] && API_VERSION=21 || API_VERSION=16
             ;;
         t)
             BUILD_TYPE=${OPTARG}
@@ -65,17 +64,19 @@ fi
 if [ "${OS}" == "android" ]; then
     mkdir -p "build-android-${ARCH}-${BUILD_TYPE}"
     cd "build-android-${ARCH}-${BUILD_TYPE}" || exit 1
-    cmake -D CMAKE_TOOLCHAIN_FILE=../tools/cmake/android.toolchain.cmake \
+    cmake -D CMAKE_SYSTEM_NAME=Android \
+          -D CMAKE_SYSTEM_VERSION="${API_VERSION}" \
           -D CMAKE_INSTALL_PREFIX=install \
           -D CMAKE_BUILD_TYPE="${BUILD_TYPE}" \
-          -D ANDROID_ABI="${ARCH}" \
+          -D CMAKE_ANDROID_ARCH_ABI="${ARCH}" \
           -D REALM_ENABLE_ENCRYPTION=1 \
           -D REALM_VERSION="${VERSION}" \
           -D CPACK_SYSTEM_NAME="Android-${ARCH}" \
+          -G Ninja \
           ..
 
-    make -j "${CORES}" -l "${CORES}" VERBOSE=1
-    make package
+    ninja -v
+    ninja package
 else
     case "${OS}" in
         ios) SDK="iphone";;
@@ -127,5 +128,5 @@ else
          -output "src/realm/parser/${BUILD_TYPE}/librealm-parser${suffix}.a" \
          "src/realm/parser/${BUILD_TYPE}-${SDK}os/librealm-parser${suffix}.a" \
          "src/realm/parser/${BUILD_TYPE}-${SDK}simulator/librealm-parser${suffix}.a"
-    cpack -C ${BUILD_TYPE} || exit 1
+    cpack -C "${BUILD_TYPE}" || exit 1
 fi

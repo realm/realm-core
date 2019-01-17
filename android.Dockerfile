@@ -6,11 +6,6 @@ ENV LANG "en_US.UTF-8"
 ENV LANGUAGE "en_US.UTF-8"
 ENV LC_ALL "en_US.UTF-8"
 
-# Set the environment variables
-ENV ANDROID_NDK_HOME /opt/android-ndk
-ENV ANDROID_NDK /opt/android-ndk
-ENV PATH ${PATH}:${NDK_HOME}
-
 # The 32 bit binaries because aapt requires it
 # `file` is need by the script that creates NDK toolchains
 # Keep the packages in alphabetical order to make it easy to avoid duplication
@@ -38,18 +33,19 @@ RUN DEBIAN_FRONTEND=noninteractive dpkg --add-architecture i386 \
                           zip \
     && apt-get clean
 
+# Install CMake
 RUN cd /opt \
-    && wget https://cmake.org/files/v3.7/cmake-3.7.2-Linux-x86_64.tar.gz \
-    && tar zxvf cmake-3.7.2-Linux-x86_64.tar.gz
+    && wget https://github.com/Kitware/CMake/releases/download/v3.13.2/cmake-3.13.2-Linux-x86_64.tar.gz \
+    && tar zxvf cmake-3.13.2-Linux-x86_64.tar.gz
 
-ENV PATH "$PATH:/opt/cmake-3.7.2-Linux-x86_64/bin"
+ENV PATH "$PATH:/opt/cmake-3.13.2-Linux-x86_64/bin"
 
 # Install the NDK
-RUN mkdir /opt/android-ndk-tmp && \
-    cd /opt/android-ndk-tmp && \
-    wget -q http://dl.google.com/android/ndk/android-ndk-r10e-linux-x86_64.bin -O android-ndk.bin && \
-    chmod a+x ./android-ndk.bin && \
-    ./android-ndk.bin && \
-    mv android-ndk-r10e /opt/android-ndk && \
-    rm -rf /opt/android-ndk-tmp && \
-    chmod -R a+rX /opt/android-ndk
+RUN cd /opt \
+    && wget https://dl.google.com/android/repository/android-ndk-r18b-linux-x86_64.zip \
+    && unzip android-ndk-r18b-linux-x86_64.zip \
+    && rm -f android-ndk-r18b-linux-x86_64.zip
+
+ENV ANDROID_NDK_ROOT "/opt/android-ndk-r18b"
+ENV ANDROID_NDK_HOME "/opt/android-ndk-r18b"
+ENV ANDROID_NDK "/opt/android-ndk-r18b"
