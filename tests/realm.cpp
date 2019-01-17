@@ -1580,7 +1580,7 @@ TEST_CASE("Statistics on Realms") {
     });
 
     SECTION("compute_size") {
-        auto s = r->compute_size();
+        auto s = r->read_group().compute_aggregated_byte_size();
         REQUIRE(s > 0);
     }
 }

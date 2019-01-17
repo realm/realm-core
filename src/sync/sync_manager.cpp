@@ -415,11 +415,11 @@ std::string SyncManager::path_for_realm(const SyncUser& user, const std::string&
     return m_file_manager->path(user.local_identity(), raw_realm_url);
 }
 
-std::string SyncManager::recovery_directory_path() const
+std::string SyncManager::recovery_directory_path(util::Optional<std::string> const& custom_dir_name) const
 {
     std::lock_guard<std::mutex> lock(m_file_system_mutex);
     REALM_ASSERT(m_file_manager);
-    return m_file_manager->recovery_directory_path();
+    return m_file_manager->recovery_directory_path(custom_dir_name);
 }
 
 std::shared_ptr<SyncSession> SyncManager::get_existing_active_session(const std::string& path) const

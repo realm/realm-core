@@ -196,6 +196,7 @@ std::shared_ptr<Realm> RealmCoordinator::get_realm(Realm::Config config)
     auto schema = std::move(config.schema);
     auto migration_function = std::move(config.migration_function);
     auto initialization_function = std::move(config.initialization_function);
+    auto audit_factory = std::move(config.audit_factory);
     config.schema = {};
 
     if (config.cache) {
@@ -238,6 +239,9 @@ std::shared_ptr<Realm> RealmCoordinator::get_realm(Realm::Config config)
 
     if (realm->config().sync_config)
         create_sync_session();
+
+    if (!m_audit_context && audit_factory)
+        m_audit_context = audit_factory();
 
     if (schema) {
         lock.unlock();
