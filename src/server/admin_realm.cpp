@@ -18,10 +18,10 @@
 
 #include "admin_realm.hpp"
 
-#include "event_loop_dispatcher.hpp"
 #include "object_store.hpp"
 #include "results.hpp"
 #include "object_schema.hpp"
+#include "util/event_loop_dispatcher.hpp"
 
 #include "sync/sync_config.hpp"
 #include "sync/sync_manager.hpp"
@@ -84,7 +84,7 @@ void AdminRealmListener::start()
 
     std::weak_ptr<AdminRealmListener> weak_self = shared_from_this();
 
-    m_config.sync_config->error_handler = EventLoopDispatcher<void(std::shared_ptr<SyncSession>, SyncError)>([weak_self, this](std::shared_ptr<SyncSession>, SyncError e) {
+    m_config.sync_config->error_handler = util::EventLoopDispatcher<void(std::shared_ptr<SyncSession>, SyncError)>([weak_self, this](std::shared_ptr<SyncSession>, SyncError e) {
         auto self = weak_self.lock();
         if (!self)
             return;
@@ -92,7 +92,7 @@ void AdminRealmListener::start()
         m_download_session.reset();
     });
 
-    EventLoopDispatcher<void(std::error_code)> download_callback([weak_self, this](std::error_code ec) {
+    util::EventLoopDispatcher<void(std::error_code)> download_callback([weak_self, this](std::error_code ec) {
         auto self = weak_self.lock();
         if (!self)
             return;

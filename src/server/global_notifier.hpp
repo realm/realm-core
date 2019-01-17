@@ -19,7 +19,7 @@
 #ifndef REALM_OBJECT_STORE_GLOBAL_NOTIFIER_HPP
 #define REALM_OBJECT_STORE_GLOBAL_NOTIFIER_HPP
 
-#include "collection_notifier.hpp"
+#include "impl/collection_notifier.hpp"
 #include "shared_realm.hpp"
 #include "sync/sync_config.hpp"
 

@@ -24,8 +24,8 @@
 #include "impl/transact_log_handler.hpp"
 #include "object_schema.hpp"
 #include "object_store.hpp"
-#include "event_loop_dispatcher.hpp"
 #include "results.hpp"
+#include "util/event_loop_dispatcher.hpp"
 #include "util/event_loop_signal.hpp"
 
 #include "sync/sync_manager.hpp"

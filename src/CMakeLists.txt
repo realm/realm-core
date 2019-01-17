@@ -64,6 +64,7 @@ set(HEADERS
 
     util/aligned_union.hpp
     util/atomic_shared_ptr.hpp
+    util/event_loop_dispatcher.hpp
     util/event_loop_signal.hpp
     util/fifo.hpp
     util/tagged_bool.hpp
