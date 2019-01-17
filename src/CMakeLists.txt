@@ -130,6 +130,7 @@ if(REALM_ENABLE_SERVER)
         server/adapter.cpp
         server/admin_realm.cpp
         server/global_notifier.cpp)
+    list(APPEND INCLUDE_DIRS ../external/json)
 endif()
 
 add_library(realm-object-store STATIC ${SOURCES} ${HEADERS})
