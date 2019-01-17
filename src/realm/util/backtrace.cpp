@@ -29,7 +29,9 @@
 
 using namespace realm::util;
 
+#if REALM_PLATFORM_APPLE || (defined(__linux__) && !REALM_ANDROID)
 static const size_t g_backtrace_depth = 128;
+#endif
 static const char* g_backtrace_error = "<error calculating backtrace>";
 static const char* g_backtrace_alloc_error = "<error allocating backtrace>";
 static const char* g_backtrace_symbolicate_error = "<error symbolicating backtrace>";
