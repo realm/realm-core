@@ -14,7 +14,7 @@ function usage {
     echo "Arguments:"
     echo "   build_type=<Release|Debug|MinSizeDebug>"
     echo "   target_os=<android|ios|watchos|tvos>"
-    echo "   android_abi=<armeabi|armeabi-v7a|x86|mips|x86_64|arm64-v8a>"
+    echo "   android_abi=<armeabi|armeabi-v7a|x86|x86_64|arm64-v8a>"
     exit 1;
 }
 
