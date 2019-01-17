@@ -376,19 +376,19 @@ public:
         }
     }
 
-    void operator()(const Instruction::AddInteger& instr)
+    void operator()(const Instruction::AddInteger&)
     {
         // FIXME
         REALM_TERMINATE("AddInteger not supported by adapter.");
     }
 
-    void operator()(const Instruction::InsertSubstring& instr)
+    void operator()(const Instruction::InsertSubstring&)
     {
         // FIXME
         REALM_TERMINATE("InsertSubstring not supported by adapter.");
     }
 
-    void operator()(const Instruction::EraseSubstring& instr)
+    void operator()(const Instruction::EraseSubstring&)
     {
         // FIXME
         REALM_TERMINATE("EraseSubstring not supported by adapter.");
@@ -420,7 +420,7 @@ public:
         }
     }
 
-    void operator()(const Instruction::EraseColumn& instr)
+    void operator()(const Instruction::EraseColumn&)
     {
         REALM_TERMINATE("EraseColumn not supported by adapter.");
     }
@@ -523,7 +523,7 @@ public:
 
 } // anonymous namespace
 
-class Adapter::Impl : public AdminRealmListener {
+class Adapter::Impl final : public AdminRealmListener {
 public:
     Impl(std::function<void(std::string)> realm_changed, std::regex regex,
          std::string local_root_dir, SyncConfig sync_config_template);

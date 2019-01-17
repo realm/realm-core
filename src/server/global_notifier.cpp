@@ -50,22 +50,22 @@ using namespace realm;
 using namespace realm::_impl;
 
 namespace realm {
-void to_json(nlohmann::json& j, VersionID v)
+static void to_json(nlohmann::json& j, VersionID v)
 {
     j = {{"version", v.version}, {"index", v.index}};
 }
-void from_json(nlohmann::json const& j, VersionID& v)
+static void from_json(nlohmann::json const& j, VersionID& v)
 {
     v.version = j["version"];
     v.index = j["index"];
 }
 
 namespace sync {
-void to_json(nlohmann::json& j, ObjectID id)
+static void to_json(nlohmann::json& j, ObjectID id)
 {
     j = id.to_string();
 }
-void from_json(nlohmann::json const& j, ObjectID& v)
+static void from_json(nlohmann::json const& j, ObjectID& v)
 {
     std::string str = j;
     v = ObjectID::from_string(str);
@@ -87,7 +87,7 @@ std::unique_ptr<util::Logger> make_logger()
 }
 }
 
-class GlobalNotifier::Impl : public AdminRealmListener {
+class GlobalNotifier::Impl final : public AdminRealmListener {
 public:
     Impl(std::unique_ptr<Callback>,
          std::string local_root_dir, SyncConfig sync_config_template);
