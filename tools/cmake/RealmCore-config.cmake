@@ -28,4 +28,4 @@ elseif(UNIX)
     find_dependency(OpenSSL REQUIRED)
 endif()
 
-include(RealmCoreTargets.cmake)
+include("${CMAKE_CURRENT_LIST_DIR}/RealmCoreTargets.cmake")
