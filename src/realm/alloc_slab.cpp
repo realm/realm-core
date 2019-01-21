@@ -710,6 +710,7 @@ MemRef SlabAlloc::do_realloc(size_t ref, char* addr, size_t old_size, size_t new
 char* SlabAlloc::do_translate(ref_type ref) const noexcept
 {
     REALM_ASSERT_DEBUG(is_attached());
+    REALM_ASSERT_RELEASE_EX(!(ref & 7), ref);
 
     const char* addr = nullptr;
 
