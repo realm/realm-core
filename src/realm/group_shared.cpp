@@ -1017,6 +1017,7 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
             cfg.is_shared = true;
             cfg.read_only = false;
             cfg.skip_validate = !begin_new_session;
+            cfg.disable_sync = options.durability == Durability::MemOnly || options.durability == Durability::Unsafe;
 
             // only the session initiator is allowed to create the database, all other
             // must assume that it already exists.
@@ -1343,11 +1344,11 @@ bool SharedGroup::compact(bool bump_version_number, util::Optional<const char*> 
     if (m_transact_stage != transact_Ready) {
         throw std::runtime_error(m_db_path + ": compact is not supported whithin a transaction");
     }
-    Durability dura;
+    SharedInfo* info = m_file_map.get_addr();
+    Durability dura = Durability(info->durability);
     std::string tmp_path = m_db_path + ".tmp_compaction_space";
     const char* write_key = bool(output_encryption_key) ? *output_encryption_key : m_key;
     {
-        SharedInfo* info = m_file_map.get_addr();
         std::unique_lock<InterprocessMutex> lock(m_controlmutex); // Throws
         if (info->num_participants > 1)
             return false;
@@ -1371,7 +1372,7 @@ bool SharedGroup::compact(bool bump_version_number, util::Optional<const char*> 
             m_group.write(file, write_key, info->latest_version_number + incr); // Throws
             // Data needs to be flushed to the disk before renaming.
             bool disable_sync = get_disable_sync_to_disk();
-            if (!disable_sync)
+            if (!disable_sync && dura != Durability::Unsafe)
                 file.sync(); // Throws
         }
         catch (...)
@@ -1390,7 +1391,6 @@ bool SharedGroup::compact(bool bump_version_number, util::Optional<const char*> 
             static_cast<void>(rc); // rc unused if ENABLE_ASSERTION is unset
         }
         end_read();
-        dura = Durability(info->durability);
         // We need to release any shared mapping *before* releasing the control mutex.
         // When someone attaches to the new database file, they *must* *not* see and
         // reuse any existing memory mapping of the stale file.
@@ -2289,7 +2289,7 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
     m_group.update_num_objects();
 #endif // REALM_METRICS
     // info->readers.dump();
-    GroupWriter out(m_group); // Throws
+    GroupWriter out(m_group, Durability(info->durability)); // Throws
     out.set_versions(new_version, oldest_version);
     // Recursively write all changed arrays to end of file
     ref_type new_top_ref = out.write_group(); // Throws
@@ -2299,6 +2299,7 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
     //     << " Read lock at version " << oldest_version << std::endl;
     switch (Durability(info->durability)) {
         case Durability::Full:
+        case Durability::Unsafe:
             out.commit(new_top_ref); // Throws
             break;
         case Durability::MemOnly:
