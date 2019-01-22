@@ -150,7 +150,7 @@ install(FILES LICENSE CHANGELOG.md
 
 # Make the project importable from the build directory
 export(TARGETS Core QueryParser NAMESPACE RealmCore:: FILE RealmCoreTargets.cmake)
-file(COPY ${CMAKE_CURRENT_LIST_DIR}/tools/cmake/RealmCoreConfig.cmake DESTINATION ${CMAKE_BINARY_DIR})
+configure_file(${CMAKE_CURRENT_LIST_DIR}/tools/cmake/RealmCoreConfig.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/RealmCoreConfig.cmake @ONLY)
 
 # Make the project importable from the install directory
 install(EXPORT realm
@@ -159,7 +159,7 @@ install(EXPORT realm
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/RealmCore
         COMPONENT devel)
 
-install(FILES tools/cmake/RealmCoreConfig.cmake 
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/RealmCoreConfig.cmake 
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/RealmCore 
         COMPONENT devel
 )

@@ -1,11 +1,8 @@
 include(CMakeFindDependencyMacro)
 
-if(APPLE)
-    find_library(Foundation Foundation)
-    target_link_libraries(RealmCore::Core ${Foundation})
-elseif(ANDROID)
+if(ANDROID)
     string(TOLOWER "${CMAKE_BUILD_TYPE}" BUILD_TYPE)
-    set(OPENSSL_URL "http://static.realm.io/downloads/openssl/${ANDROID_OPENSSL_VERSION}/Android/${ANDROID_ABI}/openssl.tgz")
+    set(OPENSSL_URL "http://static.realm.io/downloads/openssl/@ANDROID_OPENSSL_VERSION@/Android/${ANDROID_ABI}/openssl.tgz")
 
     message(STATUS "Downloading OpenSSL...")
     file(DOWNLOAD "${OPENSSL_URL}" "${CMAKE_BINARY_DIR}/openssl/openssl.tgz" STATUS download_status)
@@ -24,7 +21,7 @@ elseif(ANDROID)
     message(STATUS "Importing OpenSSL...")
     set(OpenSSL_DIR "${CMAKE_BINARY_DIR}/openssl/lib/cmake/OpenSSL")
     find_dependency(OpenSSL REQUIRED CONFIG)
-else() # Unix systems and Windows
+elseif(NOT APPLE) # Unix systems and Windows
     find_dependency(OpenSSL REQUIRED)
 endif()
 
