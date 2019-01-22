@@ -24,7 +24,7 @@ elseif(ANDROID)
     message(STATUS "Importing OpenSSL...")
     set(OpenSSL_DIR "${CMAKE_BINARY_DIR}/openssl/lib/cmake/OpenSSL")
     find_dependency(OpenSSL REQUIRED CONFIG)
-elseif(UNIX)
+else() # Unix systems and Windows
     find_dependency(OpenSSL REQUIRED)
 endif()
 
