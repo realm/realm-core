@@ -370,3 +370,26 @@ TEST(ArrayIntNull_MinMaxOfNegativeIntegers)
 
     a.destroy();
 }
+
+TEST(ArrayRef_Basic)
+{
+    ArrayRef a(Allocator::get_default());
+    a.create();
+    CHECK(a.has_refs());
+
+    ref_type ref = 8;
+    a.insert(0, ref);
+    CHECK_EQUAL(a.get(0), ref);
+    a.insert(0, 16);
+    CHECK_EQUAL(a.get(0), 16);
+    CHECK_EQUAL(a.get(1), ref);
+    a.set(0, 32);
+    CHECK_EQUAL(a.get(0), 32);
+    CHECK_EQUAL(a.get(1), ref);
+    a.add(16);
+    CHECK_EQUAL(a.get(0), 32);
+    CHECK_EQUAL(a.get(1), ref);
+    CHECK_EQUAL(a.get(2), 16);
+
+    a.destroy();
+}
