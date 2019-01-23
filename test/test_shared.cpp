@@ -3452,6 +3452,12 @@ TEST_IF(Shared_CompactEncrypt, REALM_ENABLE_ENCRYPTION)
         SharedGroup sg(path, false, SharedGroupOptions(key1));
         Group& g = sg.begin_write();
         TableRef t = g.add_table("table");
+        auto col = t->add_column(type_String, "Strings");
+        t->add_empty_row(10000);
+        for (size_t i = 0; i < 10000; i++) {
+            std::string str = "Shared_CompactEncrypt" + util::to_string(i);
+            t->set_string(col, i, StringData(str));
+        }
         sg.commit();
 
         CHECK(sg.compact());
