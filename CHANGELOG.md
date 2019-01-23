@@ -5,7 +5,8 @@
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Compacting a realm into an encrypted file could take a really long time. The process is now optimized.
+  ([#2754](https://github.com/realm/realm-sync/issues/2754))
  
 ### Breaking changes
 * None.

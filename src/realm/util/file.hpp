@@ -864,7 +864,7 @@ public:
     Streambuf& operator=(const Streambuf&) = delete;
 
 private:
-    static const size_t buffer_size = 4096;
+    static const size_t buffer_size = 1024 * 1024;
 
     File& m_file;
     std::unique_ptr<char[]> const m_buffer;
