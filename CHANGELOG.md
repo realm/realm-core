@@ -5,7 +5,8 @@
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* Compacting a realm into an encrypted file could take a really long time. The process is now optimized.
+* Compacting a realm into an encrypted file could take a really long time. The process is now optimized by adjusting the write
+  buffer size relative to the used space in the realm.
   ([#2754](https://github.com/realm/realm-sync/issues/2754))
  
 ### Breaking changes
@@ -14,7 +15,7 @@
 -----------
 
 ### Internals
-* None.
+* The buffer size used by util::File::Streambuf is now configurable in construction.
 
 ----------------------------------------------
 
