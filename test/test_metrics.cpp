@@ -928,32 +928,6 @@ TEST(Metrics_MaxNumQueriesIsNotExceeded)
     CHECK_EQUAL(metrics->num_query_metrics(), options.metrics_buffer_size);
 }
 
-TEST(Metrics_NumDecryptedPagesWithoutEncryption)
-{
-    SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    SharedGroupOptions options(nullptr);
-    options.enable_metrics = true;
-    options.metrics_buffer_size = 10;
-    SharedGroup sg(*hist, options);
-    populate(sg);
-
-    sg.begin_read();
-    sg.end_read();
-
-    std::shared_ptr<Metrics> metrics = sg.get_metrics();
-    CHECK(metrics);
-
-    CHECK_EQUAL(metrics->num_transaction_metrics(), 2);
-    std::unique_ptr<Metrics::TransactionInfoList> transactions = metrics->take_transactions();
-    CHECK(transactions);
-    CHECK_EQUAL(transactions->size(), 2);
-    CHECK_EQUAL(transactions->at(0).get_transaction_type(), realm::metrics::TransactionInfo::TransactionType::write_transaction);
-    CHECK_EQUAL(transactions->at(0).get_num_decrypted_pages(), 0);
-    CHECK_EQUAL(transactions->at(1).get_transaction_type(), realm::metrics::TransactionInfo::TransactionType::read_transaction);
-    CHECK_EQUAL(transactions->at(1).get_num_decrypted_pages(), 0);
-}
-
 // The number of decrypted pages is updated periodically by the governor.
 // To test this, we need our own governor implementation which does not reclaim pages but runs at least once.
 class NoPageReclaimGovernor : public realm::util::PageReclaimGovernor {
@@ -971,7 +945,46 @@ public:
     std::promise<void> will_run;
 };
 
-TEST_IF(Metrics_NumDecryptedPagesWithEncryption, REALM_ENABLE_ENCRYPTION)
+// this test relies on the global state of the number of decrypted pages and therefore must be run in isolation
+NONCONCURRENT_TEST(Metrics_NumDecryptedPagesWithoutEncryption)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    SharedGroupOptions options(nullptr);
+    options.enable_metrics = true;
+    options.metrics_buffer_size = 10;
+    SharedGroup sg(*hist, options);
+
+    Group& g = sg.begin_write();
+    auto table = g.add_table("table");
+
+    // we need this here because other unit tests might be using encryption and we need a guarantee
+    // that the global pages are from this shared group only.
+    NoPageReclaimGovernor gov;
+    realm::util::set_page_reclaim_governor(&gov);
+    CHECK(gov.has_run_once.valid());
+    gov.has_run_once.wait_for(std::chrono::seconds(2));
+
+    sg.commit();
+
+    sg.begin_read();
+    sg.end_read();
+
+    std::shared_ptr<Metrics> metrics = sg.get_metrics();
+    CHECK(metrics);
+
+    CHECK_EQUAL(metrics->num_transaction_metrics(), 2);
+    std::unique_ptr<Metrics::TransactionInfoList> transactions = metrics->take_transactions();
+    CHECK(transactions);
+    CHECK_EQUAL(transactions->size(), 2);
+    CHECK_EQUAL(transactions->at(0).get_transaction_type(), realm::metrics::TransactionInfo::TransactionType::write_transaction);
+    CHECK_EQUAL(transactions->at(0).get_num_decrypted_pages(), 0);
+    CHECK_EQUAL(transactions->at(1).get_transaction_type(), realm::metrics::TransactionInfo::TransactionType::read_transaction);
+    CHECK_EQUAL(transactions->at(1).get_num_decrypted_pages(), 0);
+}
+
+// this test relies on the global state of the number of decrypted pages and therefore must be run in isolation
+NONCONCURRENT_TEST_IF(Metrics_NumDecryptedPagesWithEncryption, REALM_ENABLE_ENCRYPTION)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
