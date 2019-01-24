@@ -790,7 +790,15 @@ void Group::write(File& file, const char* encryption_key, uint_fast64_t version_
     REALM_ASSERT(file.get_size() == 0);
 
     file.set_encryption_key(encryption_key);
-    File::Streambuf streambuf(&file);
+
+    // The aim is that the buffer size should be at least 1/256 of needed size
+    size_t min_space = get_used_space() >> 8;
+    size_t buffer_size = 4096;
+    while (buffer_size < min_space) {
+        buffer_size <<= 1;
+    }
+    File::Streambuf streambuf(&file, buffer_size);
+
     std::ostream out(&streambuf);
     out.exceptions(std::ios_base::failbit | std::ios_base::badbit);
     write(out, encryption_key != 0, version_number);
