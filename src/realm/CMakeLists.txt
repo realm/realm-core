@@ -310,28 +310,28 @@ endif()
 
 if(REALM_ENABLE_ENCRYPTION AND UNIX AND NOT APPLE)
     if(ANDROID)
-        string(TOLOWER "${CMAKE_BUILD_TYPE}" BUILD_TYPE)
-        set(OPENSSL_URL "http://static.realm.io/downloads/openssl/${ANDROID_OPENSSL_VERSION}/Android/${CMAKE_ANDROID_ARCH_ABI}/openssl.tgz")
-
-        file(DOWNLOAD "${OPENSSL_URL}" "${CMAKE_BINARY_DIR}/openssl/openssl.tgz" STATUS download_status)
-
-        list(GET download_status 0 status_code)
-        if (NOT "${status_code}" STREQUAL "0")
-            message(FATAL_ERROR "Downloading ${url}... Failed. Status: ${download_status}")
-        endif()
-
-        message(STATUS "Uncompressing OpenSSL...")
-        execute_process(
-            COMMAND ${CMAKE_COMMAND} -E tar xfz "openssl.tgz"
-            WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/openssl"
-        )
-
-        set(OpenSSL_DIR "${CMAKE_BINARY_DIR}/openssl/lib/cmake/OpenSSL")
-        find_package(OpenSSL REQUIRED CONFIG)
-        get_target_property(OPENSSL_INCLUDE_DIR OpenSSL::Crypto INTERFACE_INCLUDE_DIRECTORIES)
+        set(OPENSSL_URL "http://static.realm.io/downloads/openssl/${OPENSSL_VERSION}/Android/${CMAKE_ANDROID_ARCH_ABI}/openssl.tgz")
     else()
-        find_package(OpenSSL REQUIRED)
+        set(OPENSSL_URL "http://static.realm.io/downloads/openssl/${OPENSSL_VERSION}/Linux/x86_64/openssl.tgz")
     endif()
+
+    file(DOWNLOAD "${OPENSSL_URL}" "${CMAKE_CURRENT_BINARY_DIR}/openssl/openssl.tgz" STATUS download_status)
+
+    list(GET download_status 0 status_code)
+    if (NOT "${status_code}" STREQUAL "0")
+        message(FATAL_ERROR "Downloading ${url}... Failed. Status: ${download_status}")
+    endif()
+
+    message(STATUS "Uncompressing OpenSSL...")
+    execute_process(
+        COMMAND ${CMAKE_COMMAND} -E tar xfz "openssl.tgz"
+        WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/openssl"
+    )
+
+    set(OpenSSL_DIR "${CMAKE_CURRENT_BINARY_DIR}/openssl/lib/cmake/OpenSSL")
+    find_package(OpenSSL REQUIRED CONFIG)
+    get_target_property(OPENSSL_INCLUDE_DIR OpenSSL::Crypto INTERFACE_INCLUDE_DIRECTORIES)
+
     target_include_directories(CoreObjects PUBLIC ${OPENSSL_INCLUDE_DIR})
     target_link_libraries(Core PUBLIC OpenSSL::Crypto)
     if(NOT REALM_SKIP_SHARED_LIB)
