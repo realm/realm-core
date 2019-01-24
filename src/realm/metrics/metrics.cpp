@@ -24,7 +24,9 @@
 using namespace realm;
 using namespace realm::metrics;
 
-Metrics::Metrics()
+Metrics::Metrics(size_t max_history_size)
+: m_max_num_queries(max_history_size)
+, m_max_num_transactions(max_history_size)
 {
     m_query_info = std::make_unique<QueryInfoList>();
     m_transaction_info = std::make_unique<TransactionInfoList>();
@@ -47,12 +49,18 @@ size_t Metrics::num_transaction_metrics() const
 void Metrics::add_query(QueryInfo info)
 {
     REALM_ASSERT_DEBUG(m_query_info);
+    if (m_query_info->size() >= m_max_num_queries && m_max_num_queries > 0) {
+        m_query_info->erase(m_query_info->begin());
+    }
     m_query_info->push_back(info);
 }
 
 void Metrics::add_transaction(TransactionInfo info)
 {
     REALM_ASSERT_DEBUG(m_transaction_info);
+    if (m_transaction_info->size() >= m_max_num_transactions && m_max_num_transactions > 0) {
+        m_transaction_info->erase(m_transaction_info->begin());
+    }
     m_transaction_info->push_back(info);
 }
 
@@ -74,7 +82,7 @@ void Metrics::end_read_transaction(size_t total_size, size_t free_space, size_t 
     if (m_pending_read) {
         m_pending_read->update_stats(total_size, free_space, num_objects, num_versions);
         m_pending_read->finish_timer();
-        m_transaction_info->push_back(*m_pending_read);
+        add_transaction(*m_pending_read);
         m_pending_read.reset(nullptr);
     }
 }
@@ -85,7 +93,7 @@ void Metrics::end_write_transaction(size_t total_size, size_t free_space, size_t
     if (m_pending_write) {
         m_pending_write->update_stats(total_size, free_space, num_objects, num_versions);
         m_pending_write->finish_timer();
-        m_transaction_info->push_back(*m_pending_write);
+        add_transaction(*m_pending_write);
         m_pending_write.reset(nullptr);
     }
 }

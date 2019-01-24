@@ -862,6 +862,70 @@ TEST(Metrics_TransactionVersions)
     }
 }
 
+TEST(Metrics_MaxNumTransactionsIsNotExceeded)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    SharedGroupOptions options(crypt_key());
+    options.enable_metrics = true;
+    options.metrics_buffer_size = 10;
+    SharedGroup sg(*hist, options);
+    populate(sg);                   // 1
+    {
+        ReadTransaction rt(sg);     // 2
+    }
+    {
+        WriteTransaction wt(sg);    // 3
+        TableRef t0 = wt.get_table(0);
+        TableRef t1 = wt.get_table(1);
+        t0->add_empty_row(3);
+        t1->add_empty_row(7);
+        wt.commit();
+    }
+
+    for (size_t i = 0; i < options.metrics_buffer_size; ++i) {
+        ReadTransaction rt(sg);
+    }
+
+    std::shared_ptr<Metrics> metrics = sg.get_metrics();
+    CHECK(metrics);
+
+    CHECK_EQUAL(metrics->num_query_metrics(), 0);
+    CHECK_EQUAL(metrics->num_transaction_metrics(), options.metrics_buffer_size);
+    std::unique_ptr<Metrics::TransactionInfoList> transactions = metrics->take_transactions();
+    CHECK(transactions);
+    for (auto transaction : *transactions) {
+        CHECK_EQUAL(transaction.get_transaction_type(), realm::metrics::TransactionInfo::TransactionType::read_transaction);
+    }
+}
+
+TEST(Metrics_MaxNumQueriesIsNotExceeded)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    SharedGroupOptions options(crypt_key());
+    options.enable_metrics = true;
+    options.metrics_buffer_size = 10;
+    SharedGroup sg(*hist, options);
+
+    Group& g = sg.begin_write();
+    auto table = g.add_table("table");
+    size_t int_col = table->add_column(type_Int, "col_int");
+    table->add_empty_row(10);
+    sg.commit();
+
+    sg.begin_read();
+    table = g.get_table("table");
+    CHECK(bool(table));
+    Query query = table->column<int64_t>(int_col) == 0;
+    for (size_t i = 0; i < 2 * options.metrics_buffer_size; ++i) {
+        query.find();
+    }
+
+    std::shared_ptr<Metrics> metrics = sg.get_metrics();
+    CHECK(metrics);
+    CHECK_EQUAL(metrics->num_query_metrics(), options.metrics_buffer_size);
+}
 
 
 #endif // REALM_METRICS

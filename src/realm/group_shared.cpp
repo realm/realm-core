@@ -777,7 +777,7 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
 
 #if REALM_METRICS
     if (options.enable_metrics) {
-        m_metrics = std::make_shared<Metrics>();
+        m_metrics = std::make_shared<Metrics>(options.metrics_buffer_size);
         m_group.set_metrics(m_metrics);
     }
 #endif // REALM_METRICS

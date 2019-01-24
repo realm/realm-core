@@ -92,6 +92,7 @@ void TransactionInfo::update_stats(size_t disk_size, size_t free_space, size_t t
     m_total_objects = total_objects;
     m_num_versions = available_versions;
 }
+
 void TransactionInfo::finish_timer()
 {
     m_transaction_time.report_seconds(m_transact_timer.get_elapsed_time());

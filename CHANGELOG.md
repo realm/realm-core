@@ -3,6 +3,9 @@
 ### Enhancements
 * Add assertion to prevent translating a ref value that is not 8 byte aligned. This will allow
   us to detect file corruptions at an earlier stage.
+* Metrics history is now capped to a configurable buffer size with a default of 10000 entries.
+  If this is exceeded without being consumed, only the most recent entries are stored. This
+  prevents excessive memory growth if users turn on metrics but don't use it.
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)

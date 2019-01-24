@@ -36,7 +36,7 @@ namespace metrics {
 
 class Metrics {
 public:
-    Metrics();
+    Metrics(size_t max_history_size);
     ~Metrics() noexcept;
     size_t num_query_metrics() const;
     size_t num_transaction_metrics() const;
@@ -63,6 +63,9 @@ private:
 
     std::unique_ptr<TransactionInfo> m_pending_read;
     std::unique_ptr<TransactionInfo> m_pending_write;
+
+    size_t m_max_num_queries;
+    size_t m_max_num_transactions;
 };
 
 
