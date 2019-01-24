@@ -6,6 +6,7 @@
 * Metrics history is now capped to a configurable buffer size with a default of 10000 entries.
   If this is exceeded without being consumed, only the most recent entries are stored. This
   prevents excessive memory growth if users turn on metrics but don't use it.
+* Metrics transaction objects now store the number of decrypted pages currently in memory.
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)

@@ -1008,5 +1008,33 @@ TEST_IF(Metrics_NumDecryptedPagesWithEncryption, REALM_ENABLE_ENCRYPTION)
     realm::util::set_page_reclaim_governor(nullptr); // reset the governor so that the default one is used again
 }
 
+TEST(Metrics_MemoryChecks)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    SharedGroupOptions options(nullptr);
+    options.enable_metrics = true;
+    options.metrics_buffer_size = 10;
+    SharedGroup sg(*hist, options);
+    populate(sg);
+
+    sg.begin_read();
+    sg.end_read();
+
+    std::shared_ptr<Metrics> metrics = sg.get_metrics();
+    CHECK(metrics);
+
+    CHECK_EQUAL(metrics->num_transaction_metrics(), 2);
+    std::unique_ptr<Metrics::TransactionInfoList> transactions = metrics->take_transactions();
+    CHECK(transactions);
+
+    for (auto transaction : *transactions) {
+        CHECK_GREATER(transaction.get_disk_size(), 0);
+        CHECK_GREATER(transaction.get_free_space(), 0);
+    }
+}
+
+
+
 #endif // REALM_METRICS
 #endif // TEST_METRICS
