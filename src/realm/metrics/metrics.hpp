@@ -46,8 +46,8 @@ public:
 
     void start_read_transaction();
     void start_write_transaction();
-    void end_read_transaction(size_t total_size, size_t free_space, size_t num_objects, size_t num_versions);
-    void end_write_transaction(size_t total_size, size_t free_space, size_t num_objects, size_t num_versions);
+    void end_read_transaction(size_t total_size, size_t free_space, size_t num_objects, size_t num_versions, size_t num_decrypted_pages);
+    void end_write_transaction(size_t total_size, size_t free_space, size_t num_objects, size_t num_versions, size_t num_decrypted_pages);
     static std::unique_ptr<MetricTimer> report_fsync_time(const Group& g);
     static std::unique_ptr<MetricTimer> report_write_time(const Group& g);
 

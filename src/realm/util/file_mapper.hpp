@@ -59,6 +59,9 @@ public:
 // If no governor is installed, the page reclaim daemon will not start.
 void set_page_reclaim_governor(PageReclaimGovernor* governor);
 
+// Retrieves the number of in memory decrypted pages, across all open files.
+size_t get_num_decrypted_pages();
+
 #if REALM_ENABLE_ENCRYPTION
 
 void encryption_note_reader_start(SharedFileInfo& info, void* reader_id);

@@ -76,22 +76,24 @@ void Metrics::start_write_transaction()
     m_pending_write = std::make_unique<TransactionInfo>(TransactionInfo::write_transaction);
 }
 
-void Metrics::end_read_transaction(size_t total_size, size_t free_space, size_t num_objects, size_t num_versions)
+void Metrics::end_read_transaction(size_t total_size, size_t free_space, size_t num_objects, size_t num_versions,
+                                   size_t num_decrypted_pages)
 {
     REALM_ASSERT_DEBUG(m_transaction_info);
     if (m_pending_read) {
-        m_pending_read->update_stats(total_size, free_space, num_objects, num_versions);
+        m_pending_read->update_stats(total_size, free_space, num_objects, num_versions, num_decrypted_pages);
         m_pending_read->finish_timer();
         add_transaction(*m_pending_read);
         m_pending_read.reset(nullptr);
     }
 }
 
-void Metrics::end_write_transaction(size_t total_size, size_t free_space, size_t num_objects, size_t num_versions)
+void Metrics::end_write_transaction(size_t total_size, size_t free_space, size_t num_objects, size_t num_versions,
+                                    size_t num_decrypted_pages)
 {
     REALM_ASSERT_DEBUG(m_transaction_info);
     if (m_pending_write) {
-        m_pending_write->update_stats(total_size, free_space, num_objects, num_versions);
+        m_pending_write->update_stats(total_size, free_space, num_objects, num_versions, num_decrypted_pages);
         m_pending_write->finish_timer();
         add_transaction(*m_pending_write);
         m_pending_write.reset(nullptr);
