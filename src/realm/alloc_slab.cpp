@@ -179,6 +179,14 @@ private:
     ref_type m_ref;
 };
 
+inline SlabAlloc::Slab::Slab(ref_type r, size_t s)
+    : ref_end(r)
+    , size(s)
+{
+    addr = new char[size];
+    std::fill(addr, addr + size, 0);
+}
+
 
 void SlabAlloc::detach() noexcept
 {
@@ -204,9 +212,6 @@ void SlabAlloc::detach() noexcept
     // Release all allocated memory - this forces us to create new
     // slabs after re-attaching thereby ensuring that the slabs are
     // placed correctly (logically) after the end of the file.
-    for (auto& slab : m_slabs) {
-        delete[] slab.addr;
-    }
     m_slabs.clear();
     clear_freelists();
 
@@ -424,7 +429,7 @@ SlabAlloc::FreeBlock* SlabAlloc::allocate_block(int size)
     return block;
 }
 
-SlabAlloc::FreeBlock* SlabAlloc::slab_to_entry(Slab slab, ref_type ref_start)
+SlabAlloc::FreeBlock* SlabAlloc::slab_to_entry(const Slab& slab, ref_type ref_start)
 {
     auto bb = reinterpret_cast<BetweenBlocks*>(slab.addr);
     bb->block_before_size = 0;
@@ -448,7 +453,7 @@ void SlabAlloc::rebuild_freelists_from_slab()
 {
     clear_freelists();
     ref_type ref_start = m_baseline;
-    for (auto e : m_slabs) {
+    for (const auto& e : m_slabs) {
         FreeBlock* entry = slab_to_entry(e, ref_start);
         push_freelist_entry(entry);
         ref_start = e.ref_end;
@@ -527,18 +532,11 @@ SlabAlloc::FreeBlock* SlabAlloc::grow_slab_for(int size)
                                       util::to_string(new_size));
     }
 
-    std::unique_ptr<char[]> mem(new char[new_size]); // Throws
-    std::fill(mem.get(), mem.get() + new_size, 0);
-
-    // Add to list of slabs
-    Slab slab;
-    slab.addr = mem.get();
-    slab.ref_end = ref_end;
-    m_slabs.push_back(slab); // Throws
-    mem.release();
+    // Create new slab and add to list of slabs
+    m_slabs.emplace_back(ref_end, new_size); // Throws
 
     // build a single block from that entry
-    return slab_to_entry(slab, ref);
+    return slab_to_entry(m_slabs.back(), ref);
 }
 
 
@@ -723,7 +721,7 @@ char* SlabAlloc::do_translate(ref_type ref) const noexcept
         }
     }
     else {
-        typedef slabs::const_iterator iter;
+        typedef Slabs::const_iterator iter;
         iter i = upper_bound(m_slabs.begin(), m_slabs.end(), ref, &ref_less_than_slab_ref_end);
         REALM_ASSERT_DEBUG(i != m_slabs.end());
 
