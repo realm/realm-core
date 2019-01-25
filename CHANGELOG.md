@@ -3,6 +3,7 @@
 ### Enhancements
 * Add assertion to prevent translating a ref value that is not 8 byte aligned. This will allow
   us to detect file corruptions at an earlier stage.
+* You can now get size of the commit being built and the size of currently allocated slab area.
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)

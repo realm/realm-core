@@ -289,6 +289,15 @@ public:
     /// call to SlabAlloc::alloc() corresponds to a mutation event.
     bool is_free_space_clean() const noexcept;
 
+    /// Returns the amount of memory requested by calls to SlabAlloc::alloc().
+    size_t get_commit_size() const
+    {
+        return m_commit_size;
+    }
+
+    /// Returns the total amount of memory currently allocated in slab area
+    size_t get_allocated_size() const noexcept;
+
     /// Hooks used to keep the encryption layer informed of the start and stop
     /// of transactions.
     void note_reader_start(void* reader_id);
@@ -556,6 +565,7 @@ private:
     using Chunks = std::map<ref_type, size_t>;
     Slabs m_slabs;
     Chunks m_free_read_only;
+    size_t m_commit_size = 0;
 
     bool m_debug_out = false;
     struct hash_entry {

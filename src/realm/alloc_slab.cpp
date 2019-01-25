@@ -259,6 +259,7 @@ MemRef SlabAlloc::do_alloc(size_t size)
         throw InvalidFreeSpace();
 
     m_free_space_state = free_space_Dirty;
+    m_commit_size += size;
 
     // minimal allocation is sizeof(FreeListEntry)
     if (size < sizeof(FreeBlock))
@@ -603,6 +604,8 @@ void SlabAlloc::do_free(ref_type ref, char* addr) noexcept
         }
     }
     else {
+        m_commit_size -= size;
+
         // fixup size to take into account the allocator's need to store a FreeBlock in a freed block
         if (size < sizeof(FreeBlock))
             size = sizeof(FreeBlock);
@@ -1194,6 +1197,7 @@ void SlabAlloc::reset_free_space_tracking()
     clear_freelists();
     rebuild_freelists_from_slab();
     m_free_space_state = free_space_Clean;
+    m_commit_size = 0;
 }
 
 
@@ -1276,6 +1280,14 @@ void SlabAlloc::update_reader_view(size_t file_size)
             slab_ref = slab_ref_end;
         }
         */
+}
+
+size_t SlabAlloc::get_allocated_size() const noexcept
+{
+    size_t sz = 0;
+    for (const auto& s : m_slabs)
+        sz += s.size;
+    return sz;
 }
 
 const SlabAlloc::Chunks& SlabAlloc::get_free_read_only() const
