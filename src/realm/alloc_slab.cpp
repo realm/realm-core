@@ -243,23 +243,6 @@ SlabAlloc::~SlabAlloc() noexcept
 
 MemRef SlabAlloc::do_alloc(size_t size)
 {
-#ifdef REALM_SLAB_ALLOC_TUNE
-    static int64_t memstat_requested = 0;
-    static int64_t memstat_slab_size = 0;
-    static int64_t memstat_slabs = 0;
-    static int64_t memstat_rss = 0;
-    static int64_t memstat_rss_ctr = 0;
-
-    {
-        double vm;
-        double res;
-        process_mem_usage(vm, res);
-        memstat_rss += res;
-        memstat_rss_ctr += 1;
-        memstat_requested += size;
-    }
-#endif
-
     REALM_ASSERT(0 < size);
     REALM_ASSERT((size & 0x7) == 0); // only allow sizes that are multiples of 8
     REALM_ASSERT(is_attached());
@@ -536,21 +519,6 @@ SlabAlloc::FreeBlock* SlabAlloc::grow_slab_for(int size)
         // round to next page size, then
         new_size = ((new_size - 1) | (page_size() - 1)) + 1;
     }
-
-#ifdef REALM_SLAB_ALLOC_TUNE
-    {
-        const size_t update = 5000000;
-        if ((memstat_slab_size + new_size) / update > memstat_slab_size / update) {
-            std::cerr << "Size of all allocated slabs:    " << (memstat_slab_size + new_size) / 1024 << " KB\n"
-                      << "Sum of size for do_alloc(size): " << memstat_requested / 1024 << " KB\n"
-                      << "Average physical memory usage:  " << memstat_rss / memstat_rss_ctr / 1024 << " KB\n"
-                      << "Page size:                      " << page_size() / 1024 << " KB\n"
-                      << "Number of all allocated slabs:  " << memstat_slabs << "\n\n";
-        }
-        memstat_slab_size += new_size;
-        memstat_slabs += 1;
-    }
-#endif
 
     REALM_ASSERT(0 < new_size);
     size_t ref_end = ref;
