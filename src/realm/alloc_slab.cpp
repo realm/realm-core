@@ -491,11 +491,8 @@ SlabAlloc::FreeBlock* SlabAlloc::merge_blocks(FreeBlock* first, FreeBlock* last)
 
 SlabAlloc::FreeBlock* SlabAlloc::grow_slab_for(int size)
 {
-    // Make sure that either a) the allocation matches exactly, or
-    // b) there is sufficient room for additional allocation
-    size_t new_size = size + 2 * sizeof(BetweenBlocks); // one at each end.
-    size_t exact_size = new_size;
-    size_t minimal_larger_size = new_size + sizeof(BetweenBlocks) + sizeof(FreeBlock);
+    // Make sure that there is sufficient room for additional allocation of a block of the same size
+    size_t new_size = 2 * size + 3 * sizeof(BetweenBlocks) + sizeof(FreeBlock);
     ref_type ref;
     if (m_slabs.empty()) {
         ref = m_baseline;
@@ -518,15 +515,9 @@ SlabAlloc::FreeBlock* SlabAlloc::grow_slab_for(int size)
         ref = curr_ref_end;
     }
 
-    // Round upwards to nearest page size
-    new_size = ((new_size - 1) | (page_size() - 1)) + 1;
-    if (new_size != exact_size && new_size < minimal_larger_size) {
-        new_size = minimal_larger_size;
-        // round to next page size, then
-        new_size = ((new_size - 1) | (page_size() - 1)) + 1;
-    }
+    // Round upwards to nearest 64k
+    new_size = ((new_size - 1) | (0xFFFF)) + 1;
 
-    REALM_ASSERT(0 < new_size);
     size_t ref_end = ref;
     if (REALM_UNLIKELY(int_add_with_overflow_detect(ref_end, new_size))) {
         throw MaximumFileSizeExceeded("AllocSlab slab ref_end size overflow: " + util::to_string(ref) + " + " +
@@ -1194,7 +1185,10 @@ void SlabAlloc::reset_free_space_tracking()
     // been commited to persistent space)
     m_free_read_only.clear();
 
-    clear_freelists();
+    while (m_slabs.size() > 1) {
+        m_slabs.pop_back();
+    }
+
     rebuild_freelists_from_slab();
     m_free_space_state = free_space_Clean;
     m_commit_size = 0;
