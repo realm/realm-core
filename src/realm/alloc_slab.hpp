@@ -365,27 +365,14 @@ private:
     // extend the amount of space available for database node
     // storage. Inter-node references are represented as file offsets
     // (a.k.a. "refs"), and each slab creates an apparently seamless extension
-    // of this file offset addressable space. Slabes are stored as rows in the
+    // of this file offset addressable space. Slabs are stored as rows in the
     // Slabs table in order of ascending file offsets.
     struct Slab {
         ref_type ref_end;
-        char* addr;
+        std::unique_ptr<char[]> addr;
         size_t size;
 
         Slab(ref_type r, size_t s);
-
-        ~Slab()
-        {
-            delete[] addr;
-        }
-
-        Slab(Slab&& other)
-            : ref_end(other.ref_end)
-            , size(other.size)
-        {
-            addr = other.addr;
-            other.addr = nullptr;
-        }
     };
 
     struct Chunk { // describes a freed in-file block
@@ -711,7 +698,7 @@ void SlabAlloc::for_all_free_entries(Func f) const
 {
     ref_type ref = m_baseline;
     for (auto& e : m_slabs) {
-        BetweenBlocks* bb = reinterpret_cast<BetweenBlocks*>(e.addr);
+        BetweenBlocks* bb = reinterpret_cast<BetweenBlocks*>(e.addr.get());
         REALM_ASSERT(bb->block_before_size == 0);
         while (1) {
             int size = bb->block_after_size;

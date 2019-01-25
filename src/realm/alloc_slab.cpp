@@ -181,10 +181,10 @@ private:
 
 inline SlabAlloc::Slab::Slab(ref_type r, size_t s)
     : ref_end(r)
+    , addr(new char[s])
     , size(s)
 {
-    addr = new char[size];
-    std::fill(addr, addr + size, 0);
+    std::fill(addr.get(), addr.get() + size, 0);
 }
 
 
@@ -432,7 +432,7 @@ SlabAlloc::FreeBlock* SlabAlloc::allocate_block(int size)
 
 SlabAlloc::FreeBlock* SlabAlloc::slab_to_entry(const Slab& slab, ref_type ref_start)
 {
-    auto bb = reinterpret_cast<BetweenBlocks*>(slab.addr);
+    auto bb = reinterpret_cast<BetweenBlocks*>(slab.addr.get());
     bb->block_before_size = 0;
     int block_size = static_cast<int>(slab.ref_end - ref_start - 2 * sizeof(BetweenBlocks));
     bb->block_after_size = block_size;
@@ -720,7 +720,7 @@ char* SlabAlloc::do_translate(ref_type ref) const noexcept
         REALM_ASSERT_DEBUG(i != m_slabs.end());
 
         ref_type slab_ref = i == m_slabs.begin() ? m_baseline : (i - 1)->ref_end;
-        addr = i->addr + (ref - slab_ref);
+        addr = i->addr.get() + (ref - slab_ref);
     }
     cache[cache_index].addr = addr;
     cache[cache_index].ref = ref;
