@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 5.14.0 Release notes
 
 ### Enhancements
 * Add assertion to prevent translating a ref value that is not 8 byte aligned. This will allow
@@ -7,7 +7,6 @@
 * The amount of memory held by SharedGroup is minimized as most of it will be freed after each commit.
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Compacting a realm into an encrypted file could take a really long time. The process is now optimized by adjusting the write
   buffer size relative to the used space in the realm.
   ([#2754](https://github.com/realm/realm-sync/issues/2754))
