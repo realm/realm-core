@@ -289,6 +289,15 @@ public:
     /// call to SlabAlloc::alloc() corresponds to a mutation event.
     bool is_free_space_clean() const noexcept;
 
+    /// Returns the amount of memory requested by calls to SlabAlloc::alloc().
+    size_t get_commit_size() const
+    {
+        return m_commit_size;
+    }
+
+    /// Returns the total amount of memory currently allocated in slab area
+    size_t get_allocated_size() const noexcept;
+
     /// Hooks used to keep the encryption layer informed of the start and stop
     /// of transactions.
     void note_reader_start(void* reader_id);
@@ -356,12 +365,16 @@ private:
     // extend the amount of space available for database node
     // storage. Inter-node references are represented as file offsets
     // (a.k.a. "refs"), and each slab creates an apparently seamless extension
-    // of this file offset addressable space. Slabes are stored as rows in the
+    // of this file offset addressable space. Slabs are stored as rows in the
     // Slabs table in order of ascending file offsets.
     struct Slab {
         ref_type ref_end;
-        char* addr;
+        std::unique_ptr<char[]> addr;
+        size_t size;
+
+        Slab(ref_type r, size_t s);
     };
+
     struct Chunk { // describes a freed in-file block
         ref_type ref;
         size_t size;
@@ -461,7 +474,7 @@ private:
     // create a single free chunk with "BetweenBlocks" at both ends and a
     // single free chunk between them. This free chunk will be of size:
     //   slab_size - 2 * sizeof(BetweenBlocks)
-    FreeBlock* slab_to_entry(Slab slab, ref_type ref_start);
+    FreeBlock* slab_to_entry(const Slab& slab, ref_type ref_start);
 
     // breaking/merging of blocks
     FreeBlock* get_prev_block_if_mergeable(FreeBlock* block);
@@ -535,10 +548,11 @@ private:
     /// less padding between members due to alignment requirements.
     FeeeSpaceState m_free_space_state = free_space_Clean;
 
-    typedef std::vector<Slab> slabs;
+    typedef std::vector<Slab> Slabs;
     using Chunks = std::map<ref_type, size_t>;
-    slabs m_slabs;
+    Slabs m_slabs;
     Chunks m_free_read_only;
+    size_t m_commit_size = 0;
 
     bool m_debug_out = false;
     struct hash_entry {
@@ -684,7 +698,7 @@ void SlabAlloc::for_all_free_entries(Func f) const
 {
     ref_type ref = m_baseline;
     for (auto& e : m_slabs) {
-        BetweenBlocks* bb = reinterpret_cast<BetweenBlocks*>(e.addr);
+        BetweenBlocks* bb = reinterpret_cast<BetweenBlocks*>(e.addr.get());
         REALM_ASSERT(bb->block_before_size == 0);
         while (1) {
             int size = bb->block_after_size;
