@@ -9,7 +9,9 @@
 * Compacting a realm into an encrypted file could take a really long time. The process is now optimized by adjusting the write
   buffer size relative to the used space in the realm.
   ([#2754](https://github.com/realm/realm-sync/issues/2754))
- 
+* Creating an object after creating an object with the int primary key of "null" would hit an assertion failure.
+  ([#3227](https://github.com/realm/realm-core/pull/3227)).
+
 ### Breaking changes
 * None.
 
