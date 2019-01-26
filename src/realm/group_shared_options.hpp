@@ -59,6 +59,7 @@ struct SharedGroupOptions {
         , upgrade_callback(std::function<void(int, int)>())
         , temp_dir(sys_tmp_dir)
         , enable_metrics(false)
+        , metrics_buffer_size(10000)
     {
     }
 
