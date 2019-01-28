@@ -20,7 +20,6 @@
 #define REALM_METRICS_HPP
 
 #include <memory>
-#include <vector>
 
 #include <realm/metrics/query_info.hpp>
 #include <realm/metrics/transaction_info.hpp>

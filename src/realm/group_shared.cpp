@@ -27,6 +27,7 @@
 #include <random>
 
 #include <realm/util/features.h>
+#include <realm/util/file_mapper.hpp>
 #include <realm/util/errno.hpp>
 #include <realm/util/safe_int_ops.hpp>
 #include <realm/util/thread.hpp>
