@@ -28,8 +28,8 @@ Metrics::Metrics(size_t max_history_size)
 : m_max_num_queries(max_history_size)
 , m_max_num_transactions(max_history_size)
 {
-    m_query_info = std::make_unique<QueryInfoList>();
-    m_transaction_info = std::make_unique<TransactionInfoList>();
+    m_query_info = std::make_unique<QueryInfoList>(max_history_size);
+    m_transaction_info = std::make_unique<TransactionInfoList>(max_history_size);
 }
 
 Metrics::~Metrics() noexcept
@@ -49,19 +49,13 @@ size_t Metrics::num_transaction_metrics() const
 void Metrics::add_query(QueryInfo info)
 {
     REALM_ASSERT_DEBUG(m_query_info);
-    if (m_query_info->size() >= m_max_num_queries && m_max_num_queries > 0) {
-        m_query_info->erase(m_query_info->begin());
-    }
-    m_query_info->push_back(info);
+    m_query_info->insert(info);
 }
 
 void Metrics::add_transaction(TransactionInfo info)
 {
     REALM_ASSERT_DEBUG(m_transaction_info);
-    if (m_transaction_info->size() >= m_max_num_transactions && m_max_num_transactions > 0) {
-        m_transaction_info->erase(m_transaction_info->begin());
-    }
-    m_transaction_info->push_back(info);
+    m_transaction_info->insert(info);
 }
 
 void Metrics::start_read_transaction()
@@ -130,14 +124,14 @@ std::unique_ptr<MetricTimer> Metrics::report_write_time(const Group& g)
 std::unique_ptr<Metrics::QueryInfoList> Metrics::take_queries()
 {
 
-    std::unique_ptr<QueryInfoList> values = std::make_unique<QueryInfoList>();
+    std::unique_ptr<QueryInfoList> values = std::make_unique<QueryInfoList>(m_max_num_queries);
     values.swap(m_query_info);
     return values;
 }
 
 std::unique_ptr<Metrics::TransactionInfoList> Metrics::take_transactions()
 {
-    std::unique_ptr<TransactionInfoList> values = std::make_unique<TransactionInfoList>();
+    std::unique_ptr<TransactionInfoList> values = std::make_unique<TransactionInfoList>(m_max_num_transactions);
     values.swap(m_transaction_info);
     return values;
 }

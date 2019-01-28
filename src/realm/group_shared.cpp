@@ -1419,6 +1419,20 @@ uint_fast64_t SharedGroup::get_number_of_versions()
     return info->number_of_versions;
 }
 
+size_t SharedGroup::get_commit_size() const
+{
+    size_t sz = 0;
+    if (m_transact_stage == transact_Writing) {
+        sz = m_group.m_alloc.get_commit_size();
+    }
+    return sz;
+}
+
+size_t SharedGroup::get_allocated_size() const
+{
+    return m_group.m_alloc.get_allocated_size();
+}
+
 SharedGroup::~SharedGroup() noexcept
 {
     close();

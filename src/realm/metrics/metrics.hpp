@@ -24,6 +24,7 @@
 
 #include <realm/metrics/query_info.hpp>
 #include <realm/metrics/transaction_info.hpp>
+#include <realm/util/circular_buffer.hpp>
 #include <realm/util/features.h>
 
 namespace realm {
@@ -51,8 +52,8 @@ public:
     static std::unique_ptr<MetricTimer> report_fsync_time(const Group& g);
     static std::unique_ptr<MetricTimer> report_write_time(const Group& g);
 
-    using QueryInfoList = std::vector<QueryInfo>;
-    using TransactionInfoList = std::vector<TransactionInfo>;
+    using QueryInfoList = util::CircularBuffer<QueryInfo>;
+    using TransactionInfoList = util::CircularBuffer<TransactionInfo>;
 
     // Get the list of metric objects tracked since the last take
     std::unique_ptr<QueryInfoList> take_queries();
