@@ -92,7 +92,7 @@ TEST(Utils_CircularBuffer_Basics)
     try {
         CircularBuffer<std::string> str_buf(0);
     }
-    catch (const std::exception& e) {
+    catch (const std::exception&) {
         ok = true;
     }
     CHECK(ok);
