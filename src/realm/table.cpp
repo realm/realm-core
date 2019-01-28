@@ -275,7 +275,34 @@ bool TableVersions::operator==(const TableVersions& other) const
     return true;
 }
 
-// fixme, we need to gather all these typetraits definitions to just 1 single
+namespace realm {
+const char* get_data_type_name(DataType type) noexcept
+{
+    switch (type) {
+        case type_Int:
+            return "int";
+        case type_Bool:
+            return "bool";
+        case type_Float:
+            return "float";
+        case type_Double:
+            return "double";
+        case type_String:
+            return "string";
+        case type_Binary:
+            return "binary";
+        case type_Timestamp:
+            return "timestamp";
+        case type_Link:
+            return "link";
+        case type_LinkList:
+            return "linklist";
+        default:
+            return "unknown";
+    }
+    return "";
+}
+} // namespace realm
 
 // -- Table ---------------------------------------------------------------------------------
 
