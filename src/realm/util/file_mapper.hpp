@@ -118,6 +118,15 @@ void inline set_page_reclaim_governor(PageReclaimGovernor*)
 {
 }
 
+void inline set_page_reclaim_governor_to_default()
+{
+}
+
+size_t inline get_num_decrypted_pages()
+{
+    return 0;
+}
+
 void inline encryption_read_barrier(const void*, size_t, EncryptedFileMapping*, HeaderToSize = nullptr)
 {
 }
