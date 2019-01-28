@@ -1,8 +1,6 @@
 # NEXT RELEASE
 
 ### Enhancements
-* Add assertion to prevent translating a ref value that is not 8 byte aligned. This will allow
-  us to detect file corruptions at an earlier stage.
 * Metrics history is now capped to a configurable buffer size with a default of 10000 entries.
   If this is exceeded without being consumed, only the most recent entries are stored. This
   prevents excessive memory growth if users turn on metrics but don't use it.
@@ -10,10 +8,33 @@
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* None.
+ 
+### Breaking changes
+* None.
+
+-----------
+
+### Internals
+* None.
+
+----------------------------------------------
+
+# 5.14.0 Release notes
+
+### Enhancements
+* Add assertion to prevent translating a ref value that is not 8 byte aligned. This will allow
+  us to detect file corruptions at an earlier stage.
+* You can now get size of the commit being built and the size of currently allocated slab area.
+* The amount of memory held by SharedGroup is minimized as most of it will be freed after each commit.
+
+### Fixed
 * Compacting a realm into an encrypted file could take a really long time. The process is now optimized by adjusting the write
   buffer size relative to the used space in the realm.
   ([#2754](https://github.com/realm/realm-sync/issues/2754))
- 
+* Creating an object after creating an object with the int primary key of "null" would hit an assertion failure.
+  ([#3227](https://github.com/realm/realm-core/pull/3227)).
+
 ### Breaking changes
 * None.
 
