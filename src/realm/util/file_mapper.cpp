@@ -205,6 +205,13 @@ void inline ensure_reclaimer_thread_runs() {
     }
 }
 
+void set_page_reclaim_governor_to_default()
+{
+    UniqueLock lock(mapping_mutex);
+    governor = &default_governor;
+    ensure_reclaimer_thread_runs();
+}
+
 void set_page_reclaim_governor(PageReclaimGovernor* new_governor)
 {
     UniqueLock lock(mapping_mutex);

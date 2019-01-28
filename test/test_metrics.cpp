@@ -981,6 +981,8 @@ NONCONCURRENT_TEST(Metrics_NumDecryptedPagesWithoutEncryption)
     CHECK_EQUAL(transactions->at(0).get_num_decrypted_pages(), 0);
     CHECK_EQUAL(transactions->at(1).get_transaction_type(), realm::metrics::TransactionInfo::TransactionType::read_transaction);
     CHECK_EQUAL(transactions->at(1).get_num_decrypted_pages(), 0);
+
+    realm::util::set_page_reclaim_governor_to_default(); // the remainder of the test suite should use the default
 }
 
 // this test relies on the global state of the number of decrypted pages and therefore must be run in isolation
@@ -1018,7 +1020,7 @@ NONCONCURRENT_TEST_IF(Metrics_NumDecryptedPagesWithEncryption, REALM_ENABLE_ENCR
     CHECK_EQUAL(transactions->at(1).get_transaction_type(), realm::metrics::TransactionInfo::TransactionType::read_transaction);
     CHECK_EQUAL(transactions->at(1).get_num_decrypted_pages(), 1);
 
-    realm::util::set_page_reclaim_governor(nullptr); // reset the governor so that the default one is used again
+    realm::util::set_page_reclaim_governor_to_default(); // the remainder of the test suite should use the default
 }
 
 TEST(Metrics_MemoryChecks)

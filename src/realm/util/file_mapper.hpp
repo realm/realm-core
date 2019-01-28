@@ -59,6 +59,10 @@ public:
 // If no governor is installed, the page reclaim daemon will not start.
 void set_page_reclaim_governor(PageReclaimGovernor* governor);
 
+// Use the default governor. The default governor is used automatically if nothing else is set, so
+// this funciton is mostly useful for tests where changing back to the default could be desirable.
+void set_page_reclaim_governor_to_default();
+
 // Retrieves the number of in memory decrypted pages, across all open files.
 size_t get_num_decrypted_pages();
 
