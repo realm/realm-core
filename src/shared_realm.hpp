@@ -189,6 +189,11 @@ public:
         // User-supplied encryption key. Must be either empty or 64 bytes.
         std::vector<char> encryption_key;
 
+        // Core and Object Store will in some cases need to create named pipes alongside the Realm file.
+        // But on some filesystems this can be a problem (e.g. external storage on Android that uses FAT32).
+        // In order to work around this, a separate path can be specified for these files.
+        std::string fifo_files_fallback_path;
+
         bool in_memory = false;
         SchemaMode schema_mode = SchemaMode::Automatic;
 

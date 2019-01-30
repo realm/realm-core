@@ -26,6 +26,7 @@
 
 #include "sync_test_utils.hpp"
 #include "util/test_file.hpp"
+#include "util/test_utils.hpp"
 #include <unistd.h>
 
 using namespace realm;

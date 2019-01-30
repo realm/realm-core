@@ -21,6 +21,7 @@
 #include "sync/sync_config.hpp"
 #include "sync/sync_manager.hpp"
 #include "sync/sync_user.hpp"
+#include "util/test_utils.hpp"
 #include <realm/util/logger.hpp>
 #include <realm/util/scope_exit.hpp>
 

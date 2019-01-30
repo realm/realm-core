@@ -38,6 +38,7 @@
 
 #include "util/event_loop.hpp"
 #include "util/test_file.hpp"
+#include "util/test_utils.hpp"
 #include <realm/parser/parser.hpp>
 #include <realm/parser/query_builder.hpp>
 #include <realm/util/optional.hpp>

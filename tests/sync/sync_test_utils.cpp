@@ -20,23 +20,6 @@
 
 namespace realm {
 
-bool create_dummy_realm(std::string path) {
-    Realm::Config config;
-    config.path = path;
-    try {
-        Realm::make_shared_realm(config);
-        REQUIRE_REALM_EXISTS(path);
-        return true;
-    } catch (std::exception&) {
-        return false;
-    }
-}
-
-void reset_test_directory(const std::string& base_path) {
-    try_remove_dir_recursive(base_path);
-    util::make_dir(base_path);
-}
-
 bool results_contains_user(SyncUserMetadataResults& results, const std::string& identity, const std::string& auth_server) {
     for (size_t i = 0; i < results.size(); i++) {
         auto this_result = results.get(i);
@@ -54,26 +37,6 @@ bool results_contains_original_name(SyncFileActionMetadataResults& results, cons
         }
     }
     return false;
-}
-
-std::string tmp_dir() {
-    const char* dir = getenv("TMPDIR");
-    if (dir && *dir)
-        return dir;
-#if REALM_ANDROID
-    return "/data/local/tmp/";
-#else
-    return "/tmp/";
-#endif
-}
-
-std::vector<char> make_test_encryption_key(const char start) {
-    std::vector<char> vector;
-    vector.reserve(64);
-    for (int i=0; i<64; i++) {
-        vector.emplace_back((start + i) % 128);
-    }
-    return vector;
 }
 
 }

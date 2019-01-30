@@ -28,6 +28,7 @@
 
 #include "util/event_loop.hpp"
 #include "util/templated_test_case.hpp"
+#include "util/test_utils.hpp"
 
 #include <realm/util/scope_exit.hpp>
 #include <realm/util/time.hpp>

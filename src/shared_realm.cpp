@@ -21,6 +21,7 @@
 #include "impl/collection_notifier.hpp"
 #include "impl/realm_coordinator.hpp"
 #include "impl/transact_log_handler.hpp"
+#include "util/fifo.hpp"
 
 #include "audit.hpp"
 #include "binding_context.hpp"
@@ -181,6 +182,8 @@ void Realm::open_with_config(const Config& config,
             SharedGroupOptions options;
             options.durability = config.in_memory ? SharedGroupOptions::Durability::MemOnly :
                                                     SharedGroupOptions::Durability::Full;
+
+            options.temp_dir = util::normalize_dir(config.fifo_files_fallback_path);
             options.encryption_key = config.encryption_key.data();
             options.allow_file_format_upgrade = !config.disable_format_upgrade &&
                                                 config.schema_mode != SchemaMode::ResetFile;
