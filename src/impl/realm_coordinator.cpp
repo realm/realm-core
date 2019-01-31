@@ -325,18 +325,18 @@ RealmCoordinator::~RealmCoordinator()
 
 void RealmCoordinator::unregister_realm(Realm* realm)
 {
-    {
-        std::lock_guard<std::mutex> lock(m_realm_mutex);
-        auto new_end = remove_if(begin(m_weak_realm_notifiers), end(m_weak_realm_notifiers),
-                                 [=](auto& notifier) { return notifier.expired() || notifier.is_for_realm(realm); });
-        m_weak_realm_notifiers.erase(new_end, end(m_weak_realm_notifiers));
-    }
     // Normally results notifiers are cleaned up by the background worker thread
     // but if that's disabled we need to ensure that any notifiers from this
     // Realm get cleaned up
     if (!m_config.automatic_change_notifications) {
         std::unique_lock<std::mutex> lock(m_notifier_mutex);
         clean_up_dead_notifiers();
+    }
+    {
+        std::lock_guard<std::mutex> lock(m_realm_mutex);
+        auto new_end = remove_if(begin(m_weak_realm_notifiers), end(m_weak_realm_notifiers),
+                                 [=](auto& notifier) { return notifier.expired() || notifier.is_for_realm(realm); });
+        m_weak_realm_notifiers.erase(new_end, end(m_weak_realm_notifiers));
     }
 }
 
