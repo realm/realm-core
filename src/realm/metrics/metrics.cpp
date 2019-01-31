@@ -24,10 +24,12 @@
 using namespace realm;
 using namespace realm::metrics;
 
-Metrics::Metrics()
+Metrics::Metrics(size_t max_history_size)
+: m_max_num_queries(max_history_size)
+, m_max_num_transactions(max_history_size)
 {
-    m_query_info = std::make_unique<QueryInfoList>();
-    m_transaction_info = std::make_unique<TransactionInfoList>();
+    m_query_info = std::make_unique<QueryInfoList>(max_history_size);
+    m_transaction_info = std::make_unique<TransactionInfoList>(max_history_size);
 }
 
 Metrics::~Metrics() noexcept
@@ -47,13 +49,13 @@ size_t Metrics::num_transaction_metrics() const
 void Metrics::add_query(QueryInfo info)
 {
     REALM_ASSERT_DEBUG(m_query_info);
-    m_query_info->push_back(info);
+    m_query_info->insert(info);
 }
 
 void Metrics::add_transaction(TransactionInfo info)
 {
     REALM_ASSERT_DEBUG(m_transaction_info);
-    m_transaction_info->push_back(info);
+    m_transaction_info->insert(info);
 }
 
 void Metrics::start_read_transaction()
@@ -68,24 +70,26 @@ void Metrics::start_write_transaction()
     m_pending_write = std::make_unique<TransactionInfo>(TransactionInfo::write_transaction);
 }
 
-void Metrics::end_read_transaction(size_t total_size, size_t free_space, size_t num_objects, size_t num_versions)
+void Metrics::end_read_transaction(size_t total_size, size_t free_space, size_t num_objects, size_t num_versions,
+                                   size_t num_decrypted_pages)
 {
     REALM_ASSERT_DEBUG(m_transaction_info);
     if (m_pending_read) {
-        m_pending_read->update_stats(total_size, free_space, num_objects, num_versions);
+        m_pending_read->update_stats(total_size, free_space, num_objects, num_versions, num_decrypted_pages);
         m_pending_read->finish_timer();
-        m_transaction_info->push_back(*m_pending_read);
+        add_transaction(*m_pending_read);
         m_pending_read.reset(nullptr);
     }
 }
 
-void Metrics::end_write_transaction(size_t total_size, size_t free_space, size_t num_objects, size_t num_versions)
+void Metrics::end_write_transaction(size_t total_size, size_t free_space, size_t num_objects, size_t num_versions,
+                                    size_t num_decrypted_pages)
 {
     REALM_ASSERT_DEBUG(m_transaction_info);
     if (m_pending_write) {
-        m_pending_write->update_stats(total_size, free_space, num_objects, num_versions);
+        m_pending_write->update_stats(total_size, free_space, num_objects, num_versions, num_decrypted_pages);
         m_pending_write->finish_timer();
-        m_transaction_info->push_back(*m_pending_write);
+        add_transaction(*m_pending_write);
         m_pending_write.reset(nullptr);
     }
 }
@@ -120,14 +124,14 @@ std::unique_ptr<MetricTimer> Metrics::report_write_time(const Group& g)
 std::unique_ptr<Metrics::QueryInfoList> Metrics::take_queries()
 {
 
-    std::unique_ptr<QueryInfoList> values = std::make_unique<QueryInfoList>();
+    std::unique_ptr<QueryInfoList> values = std::make_unique<QueryInfoList>(m_max_num_queries);
     values.swap(m_query_info);
     return values;
 }
 
 std::unique_ptr<Metrics::TransactionInfoList> Metrics::take_transactions()
 {
-    std::unique_ptr<TransactionInfoList> values = std::make_unique<TransactionInfoList>();
+    std::unique_ptr<TransactionInfoList> values = std::make_unique<TransactionInfoList>(m_max_num_transactions);
     values.swap(m_transaction_info);
     return values;
 }

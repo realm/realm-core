@@ -38,6 +38,7 @@
 #include <realm/util/encrypted_file_mapping.hpp>
 #include <realm/util/aes_cryptor.hpp>
 
+#include <atomic>
 #include <memory>
 #include <csignal>
 #include <sys/stat.h>
@@ -109,6 +110,7 @@ util::Mutex mapping_mutex;
 std::vector<mapping_and_addr>& mappings_by_addr = *new std::vector<mapping_and_addr>;
 std::vector<mappings_for_file>& mappings_by_file = *new std::vector<mappings_for_file>;
 unsigned int file_reclaim_index = 0;
+std::atomic<size_t> num_decrypted_pages(0); // this is for statistical purposes
 
 // helpers
 
@@ -203,11 +205,23 @@ void inline ensure_reclaimer_thread_runs() {
     }
 }
 
+void set_page_reclaim_governor_to_default()
+{
+    UniqueLock lock(mapping_mutex);
+    governor = &default_governor;
+    ensure_reclaimer_thread_runs();
+}
+
 void set_page_reclaim_governor(PageReclaimGovernor* new_governor)
 {
     UniqueLock lock(mapping_mutex);
     governor = new_governor;
     ensure_reclaimer_thread_runs();
+}
+
+size_t get_num_decrypted_pages()
+{
+    return num_decrypted_pages.load();
 }
 
 struct ReclaimerThreadStopper {
@@ -346,6 +360,7 @@ void reclaim_pages()
         if (governor == nullptr)
             return;
         load = collect_total_workload();
+        num_decrypted_pages = load;
     }
     // callback to governor without mutex held
     int64_t target = governor->get_current_target(load * page_size()) / page_size();
