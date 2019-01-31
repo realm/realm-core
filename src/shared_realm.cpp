@@ -884,7 +884,7 @@ bool Realm::refresh()
 
 bool Realm::can_deliver_notifications() const noexcept
 {
-    if (m_config.immutable()) {
+    if (m_config.immutable() || !m_config.automatic_change_notifications) {
         return false;
     }
 
