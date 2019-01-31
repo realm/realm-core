@@ -877,11 +877,10 @@ void RealmCoordinator::process_available_async(Realm& realm)
     if (notifiers.empty())
         return;
 
-    if (realm.m_binding_context)
-        realm.m_binding_context->will_send_notifications();
-
     if (auto error = m_async_error) {
         lock.unlock();
+        if (realm.m_binding_context)
+            realm.m_binding_context->will_send_notifications();
         for (auto& notifier : notifiers)
             notifier->deliver_error(m_async_error);
         if (realm.m_binding_context)
@@ -891,18 +890,24 @@ void RealmCoordinator::process_available_async(Realm& realm)
 
     bool in_read = realm.is_in_read_transaction();
     auto& sg = Realm::Internal::get_shared_group(realm);
-    if (!sg) // i.e. the Realm was closed in a callback above
-        return;
     auto version = sg->get_version_of_current_transaction();
     auto package = [&](auto& notifier) {
         return !(notifier->has_run() && (!in_read || notifier->version() == version) && notifier->package_for_delivery());
     };
     notifiers.erase(std::remove_if(begin(notifiers), end(notifiers), package), end(notifiers));
+    if (notifiers.empty())
+        return;
     lock.unlock();
 
     // no before advance because the Realm is already at the given version,
     // because we're either sending initial notifications or the write was
     // done on this Realm instance
+
+    if (realm.m_binding_context) {
+        realm.m_binding_context->will_send_notifications();
+        if (!sg) // i.e. the Realm was closed in the callback above
+            return;
+    }
 
     // Skip delivering if the Realm isn't in a read transaction
     if (in_read) {
