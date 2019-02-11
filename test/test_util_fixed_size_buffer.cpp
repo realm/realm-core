@@ -16,9 +16,9 @@
  *
  **************************************************************************/
 #include "testsettings.hpp"
-#ifdef TEST_UTIL_CIRCULAR_BUFFER
+#ifdef TEST_UTIL_FIXED_SIZE_BUFFER
 
-#include <realm/util/circular_buffer.hpp>
+#include <realm/util/fixed_size_buffer.hpp>
 #include "test.hpp"
 
 using namespace realm;
@@ -53,9 +53,9 @@ using namespace realm::util;
 // `experiments/testcase.cpp` and then run `sh build.sh
 // check-testcase` (or one of its friends) from the command line.
 
-TEST(Utils_CircularBuffer_Basics)
+TEST(Utils_FixedSizeBuffer_Basics)
 {
-    CircularBuffer<int> buffer(10);
+    FixedSizeBuffer<int> buffer(10);
     std::vector<int> vec;
 
     for (int i = 0; i < 5; i++) {
@@ -90,14 +90,14 @@ TEST(Utils_CircularBuffer_Basics)
 
     bool ok = false;
     try {
-        CircularBuffer<std::string> str_buf(0);
+        FixedSizeBuffer<std::string> str_buf(0);
     }
     catch (const std::exception&) {
         ok = true;
     }
     CHECK(ok);
 
-    CircularBuffer<std::string> str_buf(1);
+    FixedSizeBuffer<std::string> str_buf(1);
     str_buf.insert("Foo");
     str_buf.insert("Bar");
     CHECK_EQUAL(str_buf[0], "Bar");
