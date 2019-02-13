@@ -5,6 +5,7 @@
   If this is exceeded without being consumed, only the most recent entries are stored. This
   prevents excessive memory growth if users turn on metrics but don't use it.
 * Metrics transaction objects now store the number of decrypted pages currently in memory.
+* SharedGroup::get_stats includes an optional parameter to get size of currently locked memory.
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)

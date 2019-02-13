@@ -159,8 +159,6 @@ GroupWriter::GroupWriter(Group& group, Durability dura)
     , m_free_positions(m_alloc)
     , m_free_lengths(m_alloc)
     , m_free_versions(m_alloc)
-    , m_current_version(0)
-    , m_free_space_size(0)
     , m_durability(dura)
 {
     m_map_windows.reserve(num_map_windows);
@@ -579,13 +577,19 @@ size_t GroupWriter::recreate_freelist(size_t reserve_pos)
         free_in_file.emplace_back(entry.second, entry.first, 0);
     }
 
-    REALM_ASSERT_RELEASE(m_not_free_in_file.empty() || is_shared);
-    for (const auto& pinned : m_not_free_in_file) {
-        free_in_file.emplace_back(pinned.ref, pinned.size, pinned.released_at_version);
-    }
+    {
+        size_t locked_space_size = 0;
+        REALM_ASSERT_RELEASE(m_not_free_in_file.empty() || is_shared);
+        for (const auto& locked : m_not_free_in_file) {
+            free_in_file.emplace_back(locked.ref, locked.size, locked.released_at_version);
+            locked_space_size += locked.size;
+        }
 
-    for (const auto& free_space : new_free_space) {
-        free_in_file.emplace_back(free_space.first, free_space.second, m_current_version);
+        for (const auto& free_space : new_free_space) {
+            free_in_file.emplace_back(free_space.first, free_space.second, m_current_version);
+            locked_space_size += free_space.second;
+        }
+        m_locked_space_size = locked_space_size;
     }
 
     REALM_ASSERT(free_in_file.size() == nb_elements);

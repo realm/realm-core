@@ -77,9 +77,14 @@ public:
     void dump();
 #endif
 
-    size_t get_free_space_size()
+    size_t get_free_space_size() const
     {
         return m_free_space_size;
+    }
+
+    size_t get_locked_space_size() const
+    {
+        return m_locked_space_size;
     }
 
 private:
@@ -89,10 +94,11 @@ private:
     ArrayInteger m_free_positions; // 4th slot in Group::m_top
     ArrayInteger m_free_lengths;   // 5th slot in Group::m_top
     ArrayInteger m_free_versions;  // 6th slot in Group::m_top
-    uint64_t m_current_version;
+    uint64_t m_current_version = 0;
     uint64_t m_readlock_version;
     size_t m_window_alignment;
-    size_t m_free_space_size;
+    size_t m_free_space_size = 0;
+    size_t m_locked_space_size = 0;
     Durability m_durability;
 
     struct FreeSpaceEntry {
