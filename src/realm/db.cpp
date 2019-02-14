@@ -1410,8 +1410,6 @@ bool DB::compact(bool bump_version_number, util::Optional<const char*> output_en
 #else
         util::File::move(tmp_path, m_db_path);
 #endif
-        if (auto repl = m_alloc.get_replication())
-            repl->initialize(*this);
 
         SlabAlloc::Config cfg;
         cfg.session_initiator = true;
