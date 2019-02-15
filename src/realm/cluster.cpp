@@ -1720,8 +1720,13 @@ Obj ClusterTree::insert(ObjKey k, const FieldValues& values)
 
     if (Replication* repl = get_alloc().get_replication()) {
         repl->create_object(table, k);
-        for (auto v : values) {
-            repl->set(table, v.col_key, k, v.value, _impl::instr_Set);
+        for (const auto& v : values) {
+            if (v.value.is_null()) {
+                repl->set_null(table, v.col_key, k, _impl::instr_Set);
+            }
+            else {
+                repl->set(table, v.col_key, k, v.value, _impl::instr_Set);
+            }
         }
     }
 
