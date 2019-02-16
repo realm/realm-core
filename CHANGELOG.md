@@ -6,6 +6,7 @@
   prevents excessive memory growth if users turn on metrics but don't use it.
 * Metrics transaction objects now store the number of decrypted pages currently in memory.
 * SharedGroup::get_stats includes an optional parameter to get size of currently locked memory.
+* Metrics now exposes the table name of queries which have been run.
 
 ### Fixed
 * In cases where the main thread would exit before other threads, we could destroy a mutex
