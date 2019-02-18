@@ -224,6 +224,11 @@ size_t get_num_decrypted_pages()
     return num_decrypted_pages.load();
 }
 
+size_t get_decrypted_memory_size()
+{
+    return num_decrypted_pages.load() * page_size();
+}
+
 struct ReclaimerThreadStopper {
     ReclaimerThreadStopper()
     {

@@ -23,6 +23,7 @@
 #include <memory>
 #include <mutex>
 #include <map>
+#include <atomic>
 
 #ifdef REALM_DEBUG
 #include <iostream>
@@ -56,6 +57,8 @@ public:
         return "Free space tracking was lost due to out-of-memory";
     }
 };
+
+std::atomic<size_t> total_slab_allocated(0);
 
 } // anonymous namespace
 
@@ -184,9 +187,14 @@ inline SlabAlloc::Slab::Slab(ref_type r, size_t s)
     , addr(new char[s])
     , size(s)
 {
+    total_slab_allocated += s;
     std::fill(addr.get(), addr.get() + size, 0);
 }
 
+inline SlabAlloc::Slab::~Slab()
+{
+    total_slab_allocated -= size;
+}
 
 void SlabAlloc::detach() noexcept
 {
