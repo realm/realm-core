@@ -54,6 +54,10 @@ void print_objects(ConstTableRef table, size_t begin, size_t end)
     for (size_t row = begin; row < end; row++) {
         printf("%5zu ", row);
         for (size_t col = 0; col < table->get_column_count(); col++) {
+            if (table->is_null(col, row)) {
+                printf("                 null");
+                continue;
+            }
             switch (table->get_column_type(col)) {
                 case type_Int:
                     printf(" %20ld", table->get_int(col, row));
