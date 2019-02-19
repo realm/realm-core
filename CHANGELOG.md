@@ -13,6 +13,9 @@
   while it was still in use on other threads. This would cause a crash during shutdown.
   This bug was introduced by https://github.com/realm/realm-core/pull/3185, which was part
   of release 5.12.5
+* Fix a race between the encryption page reclaim governor running and setting a governor.
+  This only affects applications which actually set the governor to something custom (likely none).
+  ([#3239](https://github.com/realm/realm-core/issues/3239), since v5.12.2)
 
 ### Breaking changes
 * None.

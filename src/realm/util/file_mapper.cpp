@@ -140,28 +140,24 @@ int64_t fetch_value_in_file(const std::string& fname, const char* scan_pattern)
 
 class DefaultGovernor : public PageReclaimGovernor {
 public:
-    int64_t pick_lowest_valid(int64_t a, int64_t b) {
-        if (a == no_match)
+    static int64_t pick_lowest_valid(int64_t a, int64_t b) {
+        if (a == PageReclaimGovernor::no_match)
             return b;
-        if (b == no_match)
+        if (b == PageReclaimGovernor::no_match)
             return a;
         return std::min(a,b);
     }
-    int64_t pick_if_valid(int64_t source, int64_t target) {
-        if (source == no_match)
-            return no_match;
+
+    static int64_t pick_if_valid(int64_t source, int64_t target) {
+        if (source == PageReclaimGovernor::no_match)
+            return PageReclaimGovernor::no_match;
         return target;
     }
 
-	int64_t get_current_target(size_t load) override
+    static int64_t get_target_from_system(std::string cfg_file_name)
     {
-        static_cast<void>(load);
-        if (m_refresh_count > 0) {
-            --m_refresh_count;
-            return m_target;
-        }
         int64_t target;
-        auto local_spec = fetch_value_in_file(m_cfg_file_name, "target ([[:digit:]]+)");
+        auto local_spec = fetch_value_in_file(cfg_file_name, "target ([[:digit:]]+)");
         if (local_spec != no_match) { // overrides everything!
             target = local_spec;
         }
@@ -174,10 +170,27 @@ public:
             target = pick_lowest_valid(target, pick_if_valid(from_cgroup, from_cgroup / 4));
             target = pick_lowest_valid(target, pick_if_valid(cache_use, cache_use / 2));
         }
-        m_target = target;
-        m_refresh_count = 10; // refresh every 10 seconds
         return target;
     }
+
+    std::function<int64_t()> current_target_getter(size_t load) override
+    {
+        static_cast<void>(load);
+        if (m_refresh_count > 0) {
+            --m_refresh_count;
+            return std::bind([](int64_t target_copy){ return target_copy; }, m_target);
+        }
+        return std::bind(get_target_from_system, m_cfg_file_name);
+    }
+
+    void report_target_result(int64_t target) override
+    {
+        m_target = target;
+        if (m_refresh_count == 0) {
+            m_refresh_count = 10; // refresh every 10 seconds
+        }
+    }
+
     DefaultGovernor() {
         auto cfg_name = getenv("REALM_PAGE_GOVERNOR_CFG");
         if (cfg_name) {
@@ -355,17 +368,25 @@ void reclaim_pages_for_file(SharedFileInfo& info, size_t& work_limit)
 void reclaim_pages()
 {
     size_t load;
+    std::function<int64_t()> runnable;
     {
         UniqueLock lock(mapping_mutex);
         if (governor == nullptr)
             return;
         load = collect_total_workload();
         num_decrypted_pages = load;
+        runnable = governor->current_target_getter(load * page_size());
     }
-    // callback to governor without mutex held
-    int64_t target = governor->get_current_target(load * page_size()) / page_size();
+    // callback to governor defined function without mutex held
+    int64_t target = PageReclaimGovernor::no_match;
+    if (runnable) {
+        target = runnable() / page_size();
+    }
     {
         UniqueLock lock(mapping_mutex);
+        if (governor) {
+            governor->report_target_result(target);
+        }
         if (target == PageReclaimGovernor::no_match) // temporarily disabled by governor returning 0
             return;
         if (mappings_by_file.size() == 0)

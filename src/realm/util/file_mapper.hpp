@@ -24,6 +24,8 @@
 #include <realm/util/thread.hpp>
 #include <realm/util/encrypted_file_mapping.hpp>
 
+#include <functional>
+
 namespace realm {
 namespace util {
 
@@ -46,7 +48,8 @@ public:
     // must return the target load (also in bytes). Returns no_match if no
 	// target can be set
 	static constexpr int64_t no_match = -1;
-    virtual int64_t get_current_target(size_t current_load) = 0;
+    virtual std::function<int64_t()> current_target_getter(size_t load) = 0;
+    virtual void report_target_result(int64_t) = 0;
 };
 
 // Set a page reclaim governor. The governor is an object with a method which will be called periodically
