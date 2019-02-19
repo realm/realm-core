@@ -106,7 +106,7 @@ struct mapping_and_addr {
     size_t size;
 };
 
-util::Mutex mapping_mutex;
+util::Mutex& mapping_mutex = *(new util::Mutex);
 std::vector<mapping_and_addr>& mappings_by_addr = *new std::vector<mapping_and_addr>;
 std::vector<mappings_for_file>& mappings_by_file = *new std::vector<mappings_for_file>;
 unsigned int file_reclaim_index = 0;
