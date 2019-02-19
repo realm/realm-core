@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 5.15.0 Release notes
 
 ### Enhancements
 * Metrics history is now capped to a configurable buffer size with a default of 10000 entries.
@@ -8,19 +8,10 @@
 * SharedGroup::get_stats includes an optional parameter to get size of currently locked memory.
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * In cases where the main thread would exit before other threads, we could destroy a mutex
   while it was still in use on other threads. This would cause a crash during shutdown.
   This bug was introduced by https://github.com/realm/realm-core/pull/3185, which was part
   of release 5.12.5
-
-### Breaking changes
-* None.
-
------------
-
-### Internals
-* None.
 
 ----------------------------------------------
 
