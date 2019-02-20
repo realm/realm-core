@@ -936,11 +936,16 @@ public:
     {
         has_run_once = will_run.get_future();
     }
-    int64_t get_current_target(size_t)
+    std::function<int64_t()> current_target_getter(size_t) override
+    {
+        return []() { return realm::util::PageReclaimGovernor::no_match; };
+    }
+
+    void report_target_result(int64_t) override
     {
         will_run.set_value();
-        return no_match;
     }
+
     std::future<void> has_run_once;
     std::promise<void> will_run;
 };
