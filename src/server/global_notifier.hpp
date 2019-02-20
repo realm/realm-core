@@ -25,7 +25,6 @@
 
 namespace realm {
 class SyncUser;
-class SyncLoggerFactory;
 namespace sync {
 struct ObjectID;
 }
@@ -46,8 +45,6 @@ public:
 
     class ChangeNotification;
     util::Optional<ChangeNotification> next_changed_realm();
-
-    static void set_logger_factory(SyncLoggerFactory* factory);
 
 private:
     class Impl;

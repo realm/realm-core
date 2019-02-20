@@ -576,18 +576,6 @@ private:
     util::Logger& m_logger;
 };
 
-static SyncLoggerFactory* s_logger_factory;
-std::unique_ptr<util::Logger> make_logger()
-{
-    auto log_level = SyncManager::shared().log_level();
-    if (s_logger_factory) {
-        return s_logger_factory->make_logger(log_level); // Throws
-    }
-    auto logger = std::make_unique<util::StderrLogger>(); // Throws
-    logger->set_level_threshold(log_level);
-    return std::unique_ptr<util::Logger>(logger.release());
-}
-
 } // anonymous namespace
 
 class Adapter::Impl final : public AdminRealmListener {
@@ -622,7 +610,7 @@ private:
 Adapter::Impl::Impl(std::function<void(std::string)> realm_changed, std::regex regex,
                     std::string local_root_dir, SyncConfig sync_config_template)
 : AdminRealmListener(std::move(local_root_dir), std::move(sync_config_template))
-, m_logger(make_logger())
+, m_logger(SyncManager::shared().make_logger())
 , m_transformer(std::make_shared<ChangesetCooker>(*m_logger))
 , m_realm_changed(std::move(realm_changed))
 , m_regex(std::move(regex))
@@ -659,11 +647,6 @@ Adapter::Adapter(std::function<void(std::string)> realm_changed, std::regex rege
                                          std::move(local_root_dir), std::move(sync_config_template)))
 {
     m_impl->start();
-}
-
-void Adapter::set_logger_factory(SyncLoggerFactory* factory)
-{
-    s_logger_factory = factory;
 }
 
 util::Optional<util::AppendBuffer<char>> Adapter::current(std::string realm_path) {

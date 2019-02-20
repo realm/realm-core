@@ -73,20 +73,6 @@ static void from_json(nlohmann::json const& j, ObjectID& v)
 }
 }
 
-namespace {
-static SyncLoggerFactory* s_logger_factory;
-std::unique_ptr<util::Logger> make_logger()
-{
-    auto log_level = SyncManager::shared().log_level();
-    if (s_logger_factory) {
-        return s_logger_factory->make_logger(log_level); // Throws
-    }
-    auto logger = std::make_unique<util::StderrLogger>(); // Throws
-    logger->set_level_threshold(log_level);
-    return std::unique_ptr<util::Logger>(logger.release());
-}
-}
-
 class GlobalNotifier::Impl final : public AdminRealmListener {
 public:
     Impl(std::unique_ptr<Callback>,
@@ -141,7 +127,7 @@ public:
 GlobalNotifier::Impl::Impl(std::unique_ptr<Callback> async_target,
                            std::string local_root_dir, SyncConfig sync_config_template)
 : AdminRealmListener(local_root_dir, std::move(sync_config_template))
-, m_logger(make_logger())
+, m_logger(SyncManager::shared().make_logger())
 , m_target(std::move(async_target))
 {
 }
@@ -304,11 +290,6 @@ util::Optional<GlobalNotifier::ChangeNotification> GlobalNotifier::next_changed_
 GlobalNotifier::Callback& GlobalNotifier::target()
 {
     return *m_impl->m_target;
-}
-
-void GlobalNotifier::set_logger_factory(SyncLoggerFactory* factory)
-{
-    s_logger_factory = factory;
 }
 
 GlobalNotifier::ChangeNotification::ChangeNotification(std::shared_ptr<GlobalNotifier::Impl> notifier,

@@ -69,8 +69,6 @@ public:
 
     void close() { m_impl.reset(); }
 
-    static void set_logger_factory(SyncLoggerFactory* factory);
-
 private:
     class Impl;
     std::shared_ptr<Impl> m_impl;
