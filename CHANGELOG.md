@@ -12,8 +12,10 @@
 * When shutting down the server you could sometimes experience a crash with "realm::util::Mutex::lock_failed"
   in the stacktrace.
   ([#3237](https://github.com/realm/realm-core/pull/3237), since v5.12.5)
+
+### Internal
 * Fix a race between the encryption page reclaim governor running and setting a governor.
-  This only affects applications which actually set the governor to something custom (likely none).
+  This only affects applications which actually set the governor to something custom which no one does yet.
   ([#3239](https://github.com/realm/realm-core/issues/3239), since v5.12.2)
 
 ----------------------------------------------
