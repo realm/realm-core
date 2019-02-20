@@ -203,32 +203,23 @@ private:
     int m_refresh_count = 0;
 };
 
-std::unique_ptr<std::thread> reclaimer_thread;
-std::atomic<bool> reclaimer_shutdown(false);
-DefaultGovernor default_governor;
-PageReclaimGovernor* governor = nullptr;
+static std::unique_ptr<std::thread> reclaimer_thread;
+static std::atomic<bool> reclaimer_shutdown(false);
+static DefaultGovernor default_governor;
+static PageReclaimGovernor* governor = &default_governor;
 
 void reclaimer_loop();
 
 void inline ensure_reclaimer_thread_runs() {
     if (reclaimer_thread == nullptr) {
-        if (governor == nullptr)
-            governor = &default_governor;
         reclaimer_thread.reset(new std::thread(reclaimer_loop));
     }
-}
-
-void set_page_reclaim_governor_to_default()
-{
-    UniqueLock lock(mapping_mutex);
-    governor = &default_governor;
-    ensure_reclaimer_thread_runs();
 }
 
 void set_page_reclaim_governor(PageReclaimGovernor* new_governor)
 {
     UniqueLock lock(mapping_mutex);
-    governor = new_governor;
+    governor = new_governor ? new_governor : &default_governor;
     ensure_reclaimer_thread_runs();
 }
 
@@ -371,8 +362,6 @@ void reclaim_pages()
     std::function<int64_t()> runnable;
     {
         UniqueLock lock(mapping_mutex);
-        if (governor == nullptr)
-            return;
         load = collect_total_workload();
         num_decrypted_pages = load;
         runnable = governor->current_target_getter(load * page_size());
@@ -384,16 +373,21 @@ void reclaim_pages()
     }
     {
         UniqueLock lock(mapping_mutex);
-        if (governor) {
-            governor->report_target_result(target);
-        }
+
+        // Putting the target back into the govenor object will allow the govenor
+        // to return a getter producing this value again next time it is called
+        governor->report_target_result(target);
+
         if (target == PageReclaimGovernor::no_match) // temporarily disabled by governor returning 0
             return;
+
         if (mappings_by_file.size() == 0)
             return;
+
         size_t work_limit = get_work_limit(load, size_t(target));
         if (file_reclaim_index >= mappings_by_file.size())
             file_reclaim_index = 0;
+
         while (work_limit > 0) {
             SharedFileInfo& info = *mappings_by_file[file_reclaim_index].info;
             reclaim_pages_for_file(info, work_limit);
