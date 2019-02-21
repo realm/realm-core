@@ -220,9 +220,9 @@ std::string SortDescriptor::get_description(TableRef attached_table) const
     return description;
 }
 
-std::string ColumnsDescriptor::get_description(TableRef attached_table) const
+std::string ColumnsDescriptor::description_for_prefix(std::string prefix, TableRef attached_table) const
 {
-    std::string description = "DISTINCT(";
+    std::string description = prefix + "(";
     for (size_t i = 0; i < m_columns.size(); ++i) {
         const size_t chain_size = m_columns[i].size();
         TableRef cur_link_table = attached_table;
@@ -242,6 +242,12 @@ std::string ColumnsDescriptor::get_description(TableRef attached_table) const
     }
     description += ")";
     return description;
+}
+
+
+std::string ColumnsDescriptor::get_description(TableRef attached_table) const
+{
+    return description_for_prefix("DISTINCT", attached_table);
 }
 
 ColumnsDescriptor::Sorter ColumnsDescriptor::sorter(std::vector<IndexPair> const& rows) const
@@ -310,6 +316,28 @@ DescriptorExport LimitDescriptor::export_for_handover() const
     return out;
 }
 
+IncludeDescriptor::IncludeDescriptor(Table const& table, std::vector<std::vector<size_t>> column_indices)
+: ColumnsDescriptor(table, column_indices)
+{
+}
+
+std::string IncludeDescriptor::get_description(TableRef attached_table) const
+{
+    return description_for_prefix("INCLUDE", attached_table);
+}
+
+std::unique_ptr<BaseDescriptor> IncludeDescriptor::clone() const
+{
+    return std::unique_ptr<BaseDescriptor>(new IncludeDescriptor(*this));
+}
+
+DescriptorExport IncludeDescriptor::export_for_handover() const
+{
+    DescriptorExport out = ColumnsDescriptor::export_for_handover();
+    out.type = DescriptorType::Include;
+    return out;
+}
+
 DescriptorOrdering::DescriptorOrdering(const DescriptorOrdering& other)
 {
     for (const auto& d : other.m_descriptors) {
@@ -354,6 +382,13 @@ void DescriptorOrdering::append_limit(LimitDescriptor limit)
     m_descriptors.emplace_back(new LimitDescriptor(std::move(limit)));
 }
 
+void DescriptorOrdering::append_include(IncludeDescriptor include)
+{
+    if (include.is_valid()) {
+        m_descriptors.emplace_back(new IncludeDescriptor(std::move(include)));
+    }
+}
+
 util::Optional<size_t> DescriptorOrdering::remove_all_limits()
 {
     size_t min_limit = size_t(-1);
@@ -389,6 +424,12 @@ bool DescriptorOrdering::descriptor_is_limit(size_t index) const
     return m_descriptors[index]->get_type() == DescriptorType::Limit;
 }
 
+bool DescriptorOrdering::descriptor_is_include(size_t index) const
+{
+    REALM_ASSERT(index < m_descriptors.size());
+    return m_descriptors[index]->get_type() == DescriptorType::Include;
+}
+
 DescriptorType DescriptorOrdering::get_type(size_t index) const
 {
     REALM_ASSERT(index < m_descriptors.size());
@@ -421,6 +462,14 @@ bool DescriptorOrdering::will_apply_limit() const
     return std::any_of(m_descriptors.begin(), m_descriptors.end(), [](const std::unique_ptr<BaseDescriptor>& desc) {
         REALM_ASSERT(desc.get()->is_valid());
         return desc->get_type() == DescriptorType::Limit;
+    });
+}
+
+bool DescriptorOrdering::will_apply_include() const
+{
+    return std::any_of(m_descriptors.begin(), m_descriptors.end(), [](const std::unique_ptr<BaseDescriptor>& desc) {
+        REALM_ASSERT(desc.get()->is_valid());
+        return desc->get_type() == DescriptorType::Include;
     });
 }
 
@@ -488,6 +537,9 @@ DescriptorOrdering DescriptorOrdering::create_from_and_consume_patch(HandoverPat
                     break;
                 case DescriptorType::Limit:
                     ordering.append_limit(LimitDescriptor(single.limit));
+                    break;
+                case DescriptorType::Include:
+                    ordering.append_include(IncludeDescriptor(table, std::move(single.columns)));
                     break;
             }
         }
@@ -586,6 +638,11 @@ void RowIndexes::do_sort(const DescriptorOrdering& ordering) {
                     m_limit_count += v.size() - limit;
                     v.erase(v.begin() + limit, v.end());
                 }
+                break;
+            }
+            case DescriptorType::Include:
+            {
+                // Include descriptors have no effect on core queries; they only operate at the sync level
                 break;
             }
         }

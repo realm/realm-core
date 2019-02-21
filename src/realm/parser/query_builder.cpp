@@ -779,6 +779,7 @@ void apply_ordering(DescriptorOrdering& ordering, ConstTableRef target, const pa
             ordering.append_limit(cur_ordering.limit);
         } else {
             bool is_distinct = cur_ordering.type == DescriptorOrderingState::SingleOrderingState::DescriptorType::Distinct;
+            bool is_include = cur_ordering.type == DescriptorOrderingState::SingleOrderingState::DescriptorType::Include;
             std::vector<std::vector<size_t>> property_indices;
             std::vector<bool> ascendings;
             for (const DescriptorOrderingState::PropertyState& cur_property : cur_ordering.properties) {
@@ -790,7 +791,8 @@ void apply_ordering(DescriptorOrdering& ordering, ConstTableRef target, const pa
                     if (col_ndx == realm::not_found) {
                         throw std::runtime_error(
                             util::format("No property '%1' found on object type '%2' specified in '%3' clause",
-                                path[ndx_in_path], cur_table->get_name(), is_distinct ? "distinct" : "sort"));
+                                path[ndx_in_path], cur_table->get_name(),
+                                         is_distinct ? "distinct" : (is_include ? "include" : "sort")));
                     }
                     indices.push_back(col_ndx);
                     if (ndx_in_path < path.size() - 1) {
@@ -803,6 +805,8 @@ void apply_ordering(DescriptorOrdering& ordering, ConstTableRef target, const pa
 
             if (is_distinct) {
                 ordering.append_distinct(DistinctDescriptor{*target.get(), property_indices});
+            } else if (is_include) {
+                ordering.append_include(IncludeDescriptor{*target.get(), property_indices});
             } else {
                 ordering.append_sort(SortDescriptor{*target.get(), property_indices, ascendings});
             }

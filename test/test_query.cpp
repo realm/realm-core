@@ -4227,11 +4227,41 @@ TEST(Query_EmptyDescriptors)
         tv.sort(SortDescriptor(*t1, {}));
         tv.sort(SortDescriptor(*t1, {{t1_int_col}}));
         tv.sort(SortDescriptor(*t1, {}));
+        tv.include(IncludeDescriptor(*t1, {}));
         results = {2, 3, 3, 4};
         for (size_t i = 0; i < results.size(); ++i) {
             CHECK_EQUAL(tv.get_int(t1_int_col, i), results[i]);
         }
     }
+}
+
+
+TEST(Query_AllowEmptyDescriptors)
+{
+    Group g;
+    TableRef t1 = g.add_table("t1");
+    t1->add_column(type_Int, "t1_int");
+    t1->add_column(type_String, "t1_str");
+    t1->add_empty_row(1);
+
+    DescriptorOrdering ordering;
+
+    CHECK(!ordering.will_apply_sort());
+    CHECK(!ordering.will_apply_distinct());
+    CHECK(!ordering.will_apply_limit());
+    CHECK(!ordering.will_apply_include());
+    CHECK(!ordering.will_limit_to_zero());
+    CHECK_EQUAL(ordering.size(), 0);
+
+    ordering.append_sort(SortDescriptor(*t1, {}));
+    ordering.append_distinct(DistinctDescriptor(*t1, {}));
+    ordering.append_include(IncludeDescriptor(*t1, {}));
+    CHECK(!ordering.will_apply_sort());
+    CHECK(!ordering.will_apply_distinct());
+    CHECK(!ordering.will_apply_limit());
+    CHECK(!ordering.will_apply_include());
+    CHECK(!ordering.will_limit_to_zero());
+    CHECK_EQUAL(ordering.size(), 0);
 }
 
 
@@ -4248,6 +4278,7 @@ TEST(Query_DescriptorsWillApply)
     CHECK(!ordering.will_apply_sort());
     CHECK(!ordering.will_apply_distinct());
     CHECK(!ordering.will_apply_limit());
+    CHECK(!ordering.will_apply_include());
     CHECK(!ordering.will_limit_to_zero());
     CHECK_EQUAL(ordering.size(), 0);
 
@@ -4255,6 +4286,7 @@ TEST(Query_DescriptorsWillApply)
     CHECK(!ordering.will_apply_sort());
     CHECK(!ordering.will_apply_distinct());
     CHECK(!ordering.will_apply_limit());
+    CHECK(!ordering.will_apply_include());
     CHECK(!ordering.will_limit_to_zero());
     CHECK_EQUAL(ordering.size(), 0);
 
@@ -4262,6 +4294,7 @@ TEST(Query_DescriptorsWillApply)
     CHECK(!ordering.will_apply_sort());
     CHECK(!ordering.will_apply_distinct());
     CHECK(!ordering.will_apply_limit());
+    CHECK(!ordering.will_apply_include());
     CHECK(!ordering.will_limit_to_zero());
     CHECK_EQUAL(ordering.size(), 0);
 
@@ -4269,66 +4302,91 @@ TEST(Query_DescriptorsWillApply)
     CHECK(ordering.will_apply_sort());
     CHECK(!ordering.will_apply_distinct());
     CHECK(!ordering.will_apply_limit());
+    CHECK(!ordering.will_apply_include());
     CHECK(!ordering.will_limit_to_zero());
 
     ordering.append_distinct(DistinctDescriptor(*t1, {{t1_int_col}}));
     CHECK(ordering.will_apply_sort());
     CHECK(ordering.will_apply_distinct());
     CHECK(!ordering.will_apply_limit());
+    CHECK(!ordering.will_apply_include());
     CHECK(!ordering.will_limit_to_zero());
 
     ordering.append_distinct(DistinctDescriptor(*t1, {{t1_str_col}}));
     CHECK(ordering.will_apply_sort());
     CHECK(ordering.will_apply_distinct());
     CHECK(!ordering.will_apply_limit());
+    CHECK(!ordering.will_apply_include());
     CHECK(!ordering.will_limit_to_zero());
 
     ordering.append_sort(SortDescriptor(*t1, {{t1_str_col}}));
     CHECK(ordering.will_apply_sort());
     CHECK(ordering.will_apply_distinct());
     CHECK(!ordering.will_apply_limit());
+    CHECK(!ordering.will_apply_include());
     CHECK(!ordering.will_limit_to_zero());
 
     ordering.append_limit(LimitDescriptor(1));
     CHECK(ordering.will_apply_sort());
     CHECK(ordering.will_apply_distinct());
     CHECK(ordering.will_apply_limit());
+    CHECK(!ordering.will_apply_include());
     CHECK(!ordering.will_limit_to_zero());
 
-    CHECK_EQUAL(ordering.size(), 5);
+    ordering.append_include(IncludeDescriptor(*t1, {{t1_str_col}}));
+    CHECK(ordering.will_apply_sort());
+    CHECK(ordering.will_apply_distinct());
+    CHECK(ordering.will_apply_limit());
+    CHECK(ordering.will_apply_include());
+    CHECK(!ordering.will_limit_to_zero());
+
+    CHECK_EQUAL(ordering.size(), 6);
     CHECK(ordering.descriptor_is_sort(0));
     CHECK(!ordering.descriptor_is_distinct(0));
     CHECK(!ordering.descriptor_is_limit(0));
+    CHECK(!ordering.descriptor_is_include(0));
     CHECK(ordering.get_type(0) == DescriptorType::Sort);
 
     CHECK(!ordering.descriptor_is_sort(1));
     CHECK(ordering.descriptor_is_distinct(1));
     CHECK(!ordering.descriptor_is_limit(1));
+    CHECK(!ordering.descriptor_is_include(1));
     CHECK(ordering.get_type(1) == DescriptorType::Distinct);
 
     CHECK(!ordering.descriptor_is_sort(2));
     CHECK(ordering.descriptor_is_distinct(2));
     CHECK(!ordering.descriptor_is_limit(2));
+    CHECK(!ordering.descriptor_is_include(2));
     CHECK(ordering.get_type(2) == DescriptorType::Distinct);
 
     CHECK(ordering.descriptor_is_sort(3));
     CHECK(!ordering.descriptor_is_distinct(3));
     CHECK(!ordering.descriptor_is_limit(3));
+    CHECK(!ordering.descriptor_is_include(3));
     CHECK(ordering.get_type(3) == DescriptorType::Sort);
 
     CHECK(!ordering.descriptor_is_sort(4));
     CHECK(!ordering.descriptor_is_distinct(4));
     CHECK(ordering.descriptor_is_limit(4));
+    CHECK(!ordering.descriptor_is_include(4));
     CHECK(ordering.get_type(4) == DescriptorType::Limit);
+
+    CHECK(!ordering.descriptor_is_sort(5));
+    CHECK(!ordering.descriptor_is_distinct(5));
+    CHECK(!ordering.descriptor_is_limit(5));
+    CHECK(ordering.descriptor_is_include(5));
+    CHECK(ordering.get_type(5) == DescriptorType::Include);
 
     DescriptorOrdering ordering_copy = ordering;
     CHECK(ordering.will_apply_sort());
     CHECK(ordering.will_apply_distinct());
     CHECK(ordering.will_apply_limit());
+    CHECK(ordering.will_apply_include());
     CHECK(!ordering.will_limit_to_zero());
     CHECK(ordering_copy.will_apply_sort());
     CHECK(ordering_copy.will_apply_distinct());
     CHECK(ordering_copy.will_apply_limit());
+    CHECK(ordering_copy.will_apply_include());
     CHECK(!ordering_copy.will_limit_to_zero());
 
     ordering_copy.append_limit({10});
@@ -4734,6 +4792,17 @@ TEST(Query_SortDistinctOrderThroughHandover) {
         tv.sort(SortDescriptor(*t1, {{t1_int_col}}, {false}));
         tv.distinct(DistinctDescriptor(*t1, {{t1_str_col}}));
         tv.limit(LimitDescriptor(0));
+        CHECK_EQUAL(tv.size(), results.size());
+        HandoverPtr hp = sg_w.export_for_handover(tv, ConstSourcePayload::Stay);
+        check_across_handover(results, std::move(hp));
+    }
+    {   // sort descending then distinct then limit and include
+        TableView tv = t1->where().find_all();
+        ResultList results = {};
+        tv.sort(SortDescriptor(*t1, {{t1_int_col}}, {false}));
+        tv.distinct(DistinctDescriptor(*t1, {{t1_str_col}}));
+        tv.limit(LimitDescriptor(0));
+        tv.include(IncludeDescriptor(*t1, {{t1_str_col}}));
         CHECK_EQUAL(tv.size(), results.size());
         HandoverPtr hp = sg_w.export_for_handover(tv, ConstSourcePayload::Stay);
         check_across_handover(results, std::move(hp));

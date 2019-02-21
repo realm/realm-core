@@ -90,7 +90,21 @@ public:
     std::string get_description(TableRef attached_table) const override;
 
 protected:
+    std::string description_for_prefix(std::string prefix, TableRef attached_table) const;
+
     std::vector<std::vector<const ColumnBase*>> m_columns;
+};
+
+class IncludeDescriptor : public ColumnsDescriptor {
+public:
+    IncludeDescriptor(Table const& table, std::vector<std::vector<size_t>> column_indices);
+    std::string get_description(TableRef attached_table) const override;
+    std::unique_ptr<BaseDescriptor> clone() const override;
+    DescriptorExport export_for_handover() const override;
+    DescriptorType get_type() const override
+    {
+        return DescriptorType::Include;
+    }
 };
 
 class SortDescriptor : public ColumnsDescriptor {
@@ -154,6 +168,7 @@ public:
     void append_sort(SortDescriptor sort);
     void append_distinct(DistinctDescriptor distinct);
     void append_limit(LimitDescriptor limit);
+    void append_include(IncludeDescriptor include);
 
     /// Remove all LIMIT statements from this descriptor ordering, returning the
     /// minimum LIMIT value that existed. If there was no LIMIT statement,
@@ -163,6 +178,8 @@ public:
     bool descriptor_is_sort(size_t index) const;
     bool descriptor_is_distinct(size_t index) const;
     bool descriptor_is_limit(size_t index) const;
+    bool descriptor_is_include(size_t index) const;
+
     DescriptorType get_type(size_t index) const;
     bool is_empty() const { return m_descriptors.empty(); }
     size_t size() const { return m_descriptors.size(); }
@@ -170,6 +187,7 @@ public:
     bool will_apply_sort() const;
     bool will_apply_distinct() const;
     bool will_apply_limit() const;
+    bool will_apply_include() const;
     realm::util::Optional<size_t> get_min_limit() const;
     bool will_limit_to_zero() const;
     std::string get_description(TableRef target_table) const;

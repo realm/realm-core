@@ -301,6 +301,7 @@ public:
     void distinct(size_t column);
     void distinct(DistinctDescriptor columns);
     void limit(LimitDescriptor limit);
+    void include(IncludeDescriptor include);
 
     // Replace the order of sort and distinct operations, bypassing manually
     // calling sort and distinct. This is a convenience method for bindings.

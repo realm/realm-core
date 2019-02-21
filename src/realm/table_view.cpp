@@ -710,6 +710,12 @@ void TableViewBase::limit(LimitDescriptor lim)
     do_sync();
 }
 
+void TableViewBase::include(IncludeDescriptor include)
+{
+    m_descriptor_ordering.append_include(std::move(include));
+    do_sync();
+}
+
 void TableViewBase::apply_descriptor_ordering(DescriptorOrdering new_ordering)
 {
     m_descriptor_ordering = new_ordering;

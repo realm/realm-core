@@ -60,7 +60,8 @@ struct QueryHandoverPatch {
 enum class DescriptorType {
     Sort,
     Distinct,
-    Limit
+    Limit,
+    Include
 };
 
 struct DescriptorExport {
