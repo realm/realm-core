@@ -210,6 +210,19 @@ static std::vector<std::string> valid_queries = {
     "a=b LIMIT(5) && c=d LIMIT(2)",
     "a=b LIMIT(5) SORT(age ASC) DISTINCT(name) LIMIT(2)",
 
+    // include
+    "a=b INCLUDE(c)",
+    "a=b include(c,d)",
+    "a=b INCLUDE(c.d)",
+    "a=b INCLUDE(c.d.e, f.g, h)",
+    "a=b INCLUDE ( c )",
+    "a=b INCLUDE(d, e, f    , g )",
+    "a=b INCLUDE(c) && d=f",
+    "a=b INCLUDE(c) INCLUDE(d)",
+    "a=b && c=d || e=f INCLUDE(g)",
+    "a=b LIMIT(5) SORT(age ASC) DISTINCT(name) INCLUDE(links1, links2)",
+    "a=b INCLUDE(links1, links2) LIMIT(5) SORT(age ASC) DISTINCT(name)",
+
     // subquery expression
     "SUBQUERY(items, $x, $x.name == 'Tom').@size > 0",
     "SUBQUERY(items, $x, $x.name == 'Tom').@count > 0",
@@ -305,6 +318,19 @@ static std::vector<std::string> invalid_queries = {
     "a=b LIMIT(word)", // non numeric limit
     "a=b LIMIT(11asdf)", // non numeric limit
     "a=b LIMIT(1, 1)", // only accept one input
+
+    // include
+    "INCLUDE(a)", // no query conditions
+    "a=b INCLUDE", // no parameters
+    "a=b INCLUDE()", // empty params
+    "a=b INCLUDE(a", // missing end paren
+    "a=b INCLUDEb)", // missing open paren
+    "a=b INCLUDE(1)", // numeric input
+    "a=b INCLUDE(a,)", // missing param
+    "a=b INCLUDE(,a)", // missing param
+    "a=b INCLUDE(a.)", // incomplete keypath
+    "a=b INCLUDE(a b)", // missing comma
+    "a=b INCLUDE(a < b)", // parameters should not be a predicate
 
     // subquery
     "SUBQUERY(items, $x, $x.name == 'Tom') > 0", // missing .@count

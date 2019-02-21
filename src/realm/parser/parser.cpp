@@ -161,7 +161,8 @@ struct distinct_param : seq< star< blank >, descriptor_property, star< blank > >
 struct distinct : seq < distinct_prefix, distinct_param, star< seq< one< ',' >, distinct_param > >, one< ')' > > {};
 struct limit_param : disable < int_num > {};
 struct limit : seq < string_token_t("limit"), star< blank >, one< '(' >, star< blank >, limit_param, star < blank >, one < ')' > > {};
-struct predicate_suffix_modifier : sor< sort, distinct, limit > {};
+struct include : seq < string_token_t("include"), star< blank >, one< '(' >, list< seq< star< blank >, descriptor_property, star< blank > >, one< ',' > >, one< ')' > > {};
+struct predicate_suffix_modifier : sor< sort, distinct, limit, include > {};
 
 struct string_oper : seq< sor< contains, begins, ends, like>, star< blank >, opt< case_insensitive > > {};
 // "=" is equality and since other operators can start with "=" we must check equal last
@@ -472,6 +473,18 @@ template<> struct action< distinct >
     {
         DEBUG_PRINT_TOKEN(in.string());
         state.temp_ordering.type = DescriptorOrderingState::SingleOrderingState::DescriptorType::Distinct;
+        state.ordering_state.orderings.push_back(state.temp_ordering);
+        state.temp_ordering.properties.clear();
+    }
+};
+
+template<> struct action< include >
+{
+    template< typename Input >
+    static void apply(const Input& in, ParserState & state)
+    {
+        DEBUG_PRINT_TOKEN(in.string());
+        state.temp_ordering.type = DescriptorOrderingState::SingleOrderingState::DescriptorType::Include;
         state.ordering_state.orderings.push_back(state.temp_ordering);
         state.temp_ordering.properties.clear();
     }
