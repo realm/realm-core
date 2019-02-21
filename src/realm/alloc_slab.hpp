@@ -370,15 +370,13 @@ private:
     // (a.k.a. "refs"), and each slab creates an apparently seamless extension
     // of this file offset addressable space. Slabs are stored as rows in the
     // Slabs table in order of ascending file offsets.
-    class Slab {
-    public:
+    struct Slab {
         ref_type ref_end;
         std::unique_ptr<char[]> addr;
-        //char* addr;
         size_t size;
 
         Slab(ref_type r, size_t s);
-        Slab(const Slab&) = delete;
+        Slab(Slab&& slab) : ref_end(slab.ref_end), addr(std::move(slab.addr)), size(slab.size) {};
         ~Slab();
     };
 
