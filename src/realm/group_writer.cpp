@@ -159,8 +159,6 @@ GroupWriter::GroupWriter(Group& group, Durability dura)
     , m_free_positions(m_alloc)
     , m_free_lengths(m_alloc)
     , m_free_versions(m_alloc)
-    , m_current_version(0)
-    , m_free_space_size(0)
     , m_durability(dura)
 {
     m_map_windows.reserve(num_map_windows);
@@ -313,10 +311,6 @@ ref_type GroupWriter::write_group()
 #endif
 
     read_in_freelist();
-    merge_adjacent_entries_in_freelist();
-    // Previous step produces - potentially - some entries with size of zero. These
-    // entries will be skipped in the next step.
-    move_free_in_file_to_size_map();
     // Now, 'm_size_map' holds all free elements candidate for recycling
 
     Array& top = m_group.m_top;
@@ -427,7 +421,7 @@ ref_type GroupWriter::write_group()
     // Now, let's update the realm-style freelists, which will later be written to file.
     // Function returns index of element holding the space reserved for the free
     // lists in the file.
-    size_t reserve_ndx = recreate_freelist(reserve_pos, m_free_space_size);
+    size_t reserve_ndx = recreate_freelist(reserve_pos);
 
 #if REALM_ALLOC_DEBUG
     std::cout << "    Freelist size after merge: " << m_free_positions.size()
@@ -522,6 +516,8 @@ ref_type GroupWriter::write_group()
 
 void GroupWriter::read_in_freelist()
 {
+    FreeList free_in_file;
+
     bool is_shared = m_group.m_is_shared;
     size_t limit = m_free_lengths.size();
     REALM_ASSERT_RELEASE_EX(m_free_positions.size() == limit, limit, m_free_positions.size());
@@ -542,7 +538,7 @@ void GroupWriter::read_in_freelist()
                 }
             }
 
-            m_free_in_file.emplace_back(ref, size, 0);
+            free_in_file.emplace_back(ref, size, 0);
         }
 
         // This will imply a copy-on-write
@@ -560,72 +556,84 @@ void GroupWriter::read_in_freelist()
         if (is_shared)
             m_free_versions.copy_on_write();
     }
+
+    free_in_file.merge_adjacent_entries_in_freelist();
+    // Previous step produces - potentially - some entries with size of zero. These
+    // entries will be skipped in the next step.
+    free_in_file.move_free_in_file_to_size_map(m_size_map);
 }
 
-size_t GroupWriter::recreate_freelist(size_t reserve_pos, size_t& free_space_size)
+size_t GroupWriter::recreate_freelist(size_t reserve_pos)
 {
-    REALM_ASSERT(m_free_in_file.empty());
-
-    bool is_shared = m_group.m_is_shared;
-    auto entry = m_size_map.begin();
-    auto end = m_size_map.end();
-    while (entry != end) {
-        m_free_in_file.emplace_back(entry->second, entry->first, 0);
-        ++entry;
-    }
-
-    REALM_ASSERT_RELEASE(m_not_free_in_file.empty() || is_shared);
-    for (const auto& free_space : m_not_free_in_file) {
-        m_free_in_file.emplace_back(free_space.ref, free_space.size, free_space.released_at_version);
-    }
-
+    std::vector<FreeSpaceEntry> free_in_file;
     auto& new_free_space = m_group.m_alloc.get_free_read_only(); // Throws
-    for (const auto& free_space : new_free_space) {
-        m_free_in_file.emplace_back(free_space.first, free_space.second, m_current_version);
-    }
+    auto nb_elements = m_size_map.size() + m_not_free_in_file.size() + new_free_space.size();
+    free_in_file.reserve(nb_elements);
 
-    sort_freelist();
-
-    // Copy into arrays while checking consistency
     size_t reserve_ndx = realm::npos;
-    size_t prev_ref = 0;
-    size_t prev_size = 0;
-    free_space_size = 0;
-    auto limit = m_free_in_file.size();
-    for (size_t i = 0; i < limit; ++i) {
-        const auto& free_space = m_free_in_file[i];
-        auto ref = free_space.ref;
-        REALM_ASSERT_RELEASE_EX(prev_ref + prev_size <= ref, prev_ref, prev_size, ref, i, limit);
-        if (reserve_pos == ref) {
-            reserve_ndx = i;
-        }
-        else {
-            // The reserved chunk should not be counted in now. We don't know how much of it
-            // will eventually be used.
-            free_space_size += free_space.size;
-        }
-        m_free_positions.add(free_space.ref);
-        m_free_lengths.add(free_space.size);
-        if (is_shared)
-            m_free_versions.add(free_space.released_at_version);
-        prev_ref = free_space.ref;
-        prev_size = free_space.size;
+    bool is_shared = m_group.m_is_shared;
+
+    for (const auto& entry : m_size_map) {
+        free_in_file.emplace_back(entry.second, entry.first, 0);
     }
-    REALM_ASSERT_RELEASE(reserve_ndx != realm::npos);
+
+    {
+        size_t locked_space_size = 0;
+        REALM_ASSERT_RELEASE(m_not_free_in_file.empty() || is_shared);
+        for (const auto& locked : m_not_free_in_file) {
+            free_in_file.emplace_back(locked.ref, locked.size, locked.released_at_version);
+            locked_space_size += locked.size;
+        }
+
+        for (const auto& free_space : new_free_space) {
+            free_in_file.emplace_back(free_space.first, free_space.second, m_current_version);
+            locked_space_size += free_space.second;
+        }
+        m_locked_space_size = locked_space_size;
+    }
+
+    REALM_ASSERT(free_in_file.size() == nb_elements);
+    std::sort(begin(free_in_file), end(free_in_file), [](auto& a, auto& b) { return a.ref < b.ref; });
+
+    {
+        // Copy into arrays while checking consistency
+        size_t prev_ref = 0;
+        size_t prev_size = 0;
+        size_t free_space_size = 0;
+        auto limit = free_in_file.size();
+        for (size_t i = 0; i < limit; ++i) {
+            const auto& free_space = free_in_file[i];
+            auto ref = free_space.ref;
+            REALM_ASSERT_RELEASE_EX(prev_ref + prev_size <= ref, prev_ref, prev_size, ref, i, limit);
+            if (reserve_pos == ref) {
+                reserve_ndx = i;
+            }
+            else {
+                // The reserved chunk should not be counted in now. We don't know how much of it
+                // will eventually be used.
+                free_space_size += free_space.size;
+            }
+            m_free_positions.add(free_space.ref);
+            m_free_lengths.add(free_space.size);
+            if (is_shared)
+                m_free_versions.add(free_space.released_at_version);
+            prev_ref = free_space.ref;
+            prev_size = free_space.size;
+        }
+        REALM_ASSERT_RELEASE(reserve_ndx != realm::npos);
+
+        m_free_space_size = free_space_size;
+    }
+
     return reserve_ndx;
 }
 
-void GroupWriter::sort_freelist()
+void GroupWriter::FreeList::merge_adjacent_entries_in_freelist()
 {
-    std::sort(begin(m_free_in_file), end(m_free_in_file), [](auto& a, auto& b) { return a.ref < b.ref; });
-}
-
-void GroupWriter::merge_adjacent_entries_in_freelist()
-{
-    if (m_free_in_file.size() > 1) {
+    if (size() > 1) {
         // Combine any adjacent chunks in the freelist
-        auto prev = m_free_in_file.begin();
-        for (auto it = m_free_in_file.begin() + 1; it != m_free_in_file.end(); ++it) {
+        auto prev = begin();
+        for (auto it = begin() + 1; it != end(); ++it) {
             REALM_ASSERT(it->ref > prev->ref);
             if (prev->ref + prev->size == it->ref) {
                 prev->size += it->size;
@@ -638,17 +646,16 @@ void GroupWriter::merge_adjacent_entries_in_freelist()
     }
 }
 
-void GroupWriter::move_free_in_file_to_size_map()
+void GroupWriter::FreeList::move_free_in_file_to_size_map(std::multimap<size_t, size_t>& size_map)
 {
-    for (auto& elem : m_free_in_file) {
+    for (auto& elem : *this) {
         // Skip elements merged in 'merge_adjacent_entries_in_freelist'
         if (elem.size) {
             REALM_ASSERT_RELEASE_EX(!(elem.size & 7), elem.size);
             REALM_ASSERT_RELEASE_EX(!(elem.ref & 7), elem.ref);
-            m_size_map.emplace(elem.size, elem.ref);
+            size_map.emplace(elem.size, elem.ref);
         }
     }
-    m_free_in_file.clear();
 }
 
 size_t GroupWriter::get_free_space(size_t size)

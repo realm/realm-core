@@ -5,11 +5,15 @@
   If this is exceeded without being consumed, only the most recent entries are stored. This
   prevents excessive memory growth if users turn on metrics but don't use it.
 * Metrics transaction objects now store the number of decrypted pages currently in memory.
+* SharedGroup::get_stats includes an optional parameter to get size of currently locked memory.
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
- 
+* In cases where the main thread would exit before other threads, we could destroy a mutex
+  while it was still in use on other threads. This would cause a crash during shutdown.
+  This bug was introduced by https://github.com/realm/realm-core/pull/3185, which was part
+  of release 5.12.5
+
 ### Breaking changes
 * None.
 

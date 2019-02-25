@@ -77,9 +77,14 @@ public:
     void dump();
 #endif
 
-    size_t get_free_space_size()
+    size_t get_free_space_size() const
     {
         return m_free_space_size;
+    }
+
+    size_t get_locked_space_size() const
+    {
+        return m_locked_space_size;
     }
 
 private:
@@ -89,10 +94,11 @@ private:
     ArrayInteger m_free_positions; // 4th slot in Group::m_top
     ArrayInteger m_free_lengths;   // 5th slot in Group::m_top
     ArrayInteger m_free_versions;  // 6th slot in Group::m_top
-    uint64_t m_current_version;
+    uint64_t m_current_version = 0;
     uint64_t m_readlock_version;
     size_t m_window_alignment;
-    size_t m_free_space_size;
+    size_t m_free_space_size = 0;
+    size_t m_locked_space_size = 0;
     Durability m_durability;
 
     struct FreeSpaceEntry {
@@ -106,16 +112,21 @@ private:
         size_t size;
         uint64_t released_at_version;
     };
-    std::vector<FreeSpaceEntry> m_free_in_file;
+    class FreeList : public std::vector<FreeSpaceEntry> {
+    public:
+        FreeList() = default;
+        // Merge adjacent chunks
+        void merge_adjacent_entries_in_freelist();
+        // Copy free space entries to structure where entries are sorted by size
+        void move_free_in_file_to_size_map(std::multimap<size_t, size_t>& size_map);
+    };
+    //  m_free_in_file;
     std::vector<FreeSpaceEntry> m_not_free_in_file;
     std::multimap<size_t, size_t> m_size_map;
     using FreeListElement = std::multimap<size_t, size_t>::iterator;
 
-    void sort_freelist();
-    // Merge adjacent chunks
-    void merge_adjacent_entries_in_freelist();
     void read_in_freelist();
-    size_t recreate_freelist(size_t reserve_pos, size_t& free_space_size);
+    size_t recreate_freelist(size_t reserve_pos);
     // Currently cached memory mappings. We keep as many as 16 1MB windows
     // open for writing. The allocator will favor sequential allocation
     // from a modest number of windows, depending upon fragmentation, so
@@ -132,9 +143,6 @@ private:
 
     // Sync all cached memory mappings
     void sync_all_mappings();
-
-    // Copy free space entries to structure where entries are sorted by size
-    void move_free_in_file_to_size_map();
 
     /// Allocate a chunk of free space of the specified size. The
     /// specified size must be 8-byte aligned. Extend the file if
