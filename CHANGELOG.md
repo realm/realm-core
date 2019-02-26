@@ -1,3 +1,12 @@
+# 5.14.0-hotfix.0 Release notes
+
+### Enhancement
+* Improved performance of encryption and decryption significantly by utilizing hardware optimized encryption functions.
+  ([#293](https://github.com/realm/realm-core-private/issues/293))
+
+### Fixed
+* None
+
 # 5.14.0 Release notes
 
 ### Enhancements
