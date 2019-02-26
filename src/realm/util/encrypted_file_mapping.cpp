@@ -168,8 +168,12 @@ AESCryptor::AESCryptor(const uint8_t* key)
     ret = BCryptGenerateSymmetricKey(hAesAlg, &m_aes_key_handle, nullptr, 0, (PBYTE)key, 32, 0);
     REALM_ASSERT_RELEASE_EX(ret == 0 && "BCryptGenerateSymmetricKey()", ret);
 #else
-    AES_set_encrypt_key(key, 256 /* key size in bits */, &m_ectx);
-    AES_set_decrypt_key(key, 256 /* key size in bits */, &m_dctx);
+    m_ctx = EVP_CIPHER_CTX_new();
+
+    if (!m_ctx)
+        handle_error();
+
+    memcpy(m_aesKey, key, 32);
 #endif
     memcpy(m_hmacKey, key + 32, 32);
 }
@@ -179,7 +183,16 @@ AESCryptor::~AESCryptor() noexcept
 #if REALM_PLATFORM_APPLE
     CCCryptorRelease(m_encr);
     CCCryptorRelease(m_decr);
+#elif defined(_WIN32)
+#else
+    EVP_CIPHER_CTX_cleanup(m_ctx);
+    EVP_CIPHER_CTX_free(m_ctx);
 #endif
+}
+
+void AESCryptor::handle_error()
+{
+    throw std::runtime_error("Error occurred in encryption layer");
 }
 
 void AESCryptor::set_file_size(off_t new_size)
@@ -354,8 +367,20 @@ void AESCryptor::crypt(EncryptionMode mode, off_t pos, char* dst, const char* sr
     }
 
 #else
-    AES_cbc_encrypt(reinterpret_cast<const uint8_t*>(src), reinterpret_cast<uint8_t*>(dst), block_size,
-                    mode == mode_Encrypt ? &m_ectx : &m_dctx, iv, mode);
+    if (!EVP_CipherInit_ex(m_ctx, EVP_aes_256_cbc(), NULL, m_aesKey, iv, mode))
+        handle_error();
+
+    int len;
+    // Use zero padding - we always write a whole page
+    EVP_CIPHER_CTX_set_padding(m_ctx, 0);
+
+    if (!EVP_CipherUpdate(m_ctx, reinterpret_cast<uint8_t*>(dst), &len, reinterpret_cast<const uint8_t*>(src),
+                          block_size))
+        handle_error();
+
+    // Finalize the encryption. Should not output further data.
+    if (!EVP_CipherFinal_ex(m_ctx, reinterpret_cast<uint8_t*>(dst) + len, &len))
+        handle_error();
 #endif
 }
 
