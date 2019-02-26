@@ -23,6 +23,7 @@
 #include <memory>
 #include <mutex>
 #include <map>
+#include <atomic>
 
 #ifdef REALM_DEBUG
 #include <iostream>
@@ -57,8 +58,14 @@ public:
     }
 };
 
+std::atomic<size_t> total_slab_allocated(0);
+
 } // anonymous namespace
 
+size_t SlabAlloc::get_total_slab_size() noexcept
+{
+    return total_slab_allocated;
+}
 
 struct SlabAlloc::MappedFile {
 
@@ -184,9 +191,14 @@ inline SlabAlloc::Slab::Slab(ref_type r, size_t s)
     , addr(new char[s])
     , size(s)
 {
+    total_slab_allocated.fetch_add(s, std::memory_order_relaxed);
     std::fill(addr.get(), addr.get() + size, 0);
 }
 
+inline SlabAlloc::Slab::~Slab()
+{
+    total_slab_allocated.fetch_sub(size, std::memory_order_relaxed);
+}
 
 void SlabAlloc::detach() noexcept
 {

@@ -72,6 +72,9 @@ inline void set_page_reclaim_governor_to_default()
 // Retrieves the number of in memory decrypted pages, across all open files.
 size_t get_num_decrypted_pages();
 
+// Retrieves the amount of memory used for decrypted pages, across all open files.
+size_t get_decrypted_memory_size();
+
 #if REALM_ENABLE_ENCRYPTION
 
 void encryption_note_reader_start(SharedFileInfo& info, void* reader_id);

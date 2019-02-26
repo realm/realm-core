@@ -111,7 +111,6 @@ std::vector<mapping_and_addr>& mappings_by_addr = *new std::vector<mapping_and_a
 std::vector<mappings_for_file>& mappings_by_file = *new std::vector<mappings_for_file>;
 unsigned int file_reclaim_index = 0;
 std::atomic<size_t> num_decrypted_pages(0); // this is for statistical purposes
-
 // helpers
 
 int64_t fetch_value_in_file(const std::string& fname, const char* scan_pattern)
@@ -168,7 +167,7 @@ public:
             auto cache_use = fetch_value_in_file("/sys/fs/cgroup/memory/memory.stat", "cache ([[:digit:]]+)");
             target = pick_if_valid(from_proc, from_proc / 4);
             target = pick_lowest_valid(target, pick_if_valid(from_cgroup, from_cgroup / 4));
-            target = pick_lowest_valid(target, pick_if_valid(cache_use, cache_use / 2));
+            target = pick_lowest_valid(target, pick_if_valid(cache_use, cache_use));
         }
         return target;
     }
@@ -226,6 +225,11 @@ void set_page_reclaim_governor(PageReclaimGovernor* new_governor)
 size_t get_num_decrypted_pages()
 {
     return num_decrypted_pages.load();
+}
+
+size_t get_decrypted_memory_size()
+{
+    return num_decrypted_pages.load() * page_size();
 }
 
 struct ReclaimerThreadStopper {
