@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 5.15.1-tsan-test Release notes
 
 ### Enhancements
 * Improved performance of encryption and decryption significantly by utilizing hardware optimized encryption functions.
@@ -25,6 +25,7 @@
   and we recommend monitoring and explicitly setting a better target in cases where we reclaim
   more memory than nescessary.
   (also [3240] https://github.com/realm/realm-core/pull/3240)
+* Now publishing a TSAN compatible linux build.
 
 ----------------------------------------------
 
