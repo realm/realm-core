@@ -376,7 +376,12 @@ private:
         size_t size;
 
         Slab(ref_type r, size_t s);
-        Slab(Slab&& slab) : ref_end(slab.ref_end), addr(std::move(slab.addr)), size(slab.size) {}
+        Slab(Slab&& slab)
+            : ref_end(slab.ref_end)
+            , addr(std::move(slab.addr))
+            , size(slab.size)
+        {
+        }
         ~Slab();
     };
 

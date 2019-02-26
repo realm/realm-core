@@ -62,7 +62,10 @@ std::atomic<size_t> total_slab_allocated(0);
 
 } // anonymous namespace
 
-size_t SlabAlloc::get_total_slab_size() noexcept { return total_slab_allocated; }
+size_t SlabAlloc::get_total_slab_size() noexcept
+{
+    return total_slab_allocated;
+}
 
 struct SlabAlloc::MappedFile {
 
