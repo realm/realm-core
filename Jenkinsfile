@@ -108,7 +108,8 @@ jobWrapper {
                     buildLinuxDebug     : doBuildLinux('Debug'),
                     buildLinuxRelease   : doBuildLinux('Release'),
                     buildLinuxRelAssert : doBuildLinux('RelAssert'),
-                    buildLinuxASAN      : doBuildLinuxASAN()
+                    buildLinuxASAN      : doBuildLinuxASAN(),
+                    buildLinuxTSAN      : doBuildLinuxTSAN()
                 ]
 
                 androidAbis = ['armeabi-v7a', 'x86', 'mips', 'x86_64', 'arm64-v8a']
@@ -285,6 +286,30 @@ def doBuildLinuxASAN() {
         }
     }
 }
+
+def doBuildLinuxTSAN() {
+    return {
+        node('docker') {
+            getArchive()
+            docker.build('realm-core-clang:snapshot', '-f clang.Dockerfile .').inside() {
+                sh """
+                   mkdir build-dir
+                   cd build-dir
+                   cmake -D CMAKE_BUILD_TYPE=RelWithDebInfo -D REALM_TSAN=ON -D REALM_NO_TESTS=1 -G Ninja ..
+                   ninja
+                   cpack -G TGZ
+                """
+            }
+            dir('build-dir') {
+                archiveArtifacts("*.tar.gz")
+                def stashName = "linux___RelTSAN"
+                stash includes:"*.tar.gz", name:stashName
+                publishingStashes << stashName
+            }
+        }
+    }
+}
+
 
 def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmulator) {
     def cores = 4
