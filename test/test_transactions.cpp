@@ -806,13 +806,16 @@ void preparations(SharedGroup& sg_w)
 // illustration of possible governor function which takes total system load into account
 class ExampleGovernor : public util::PageReclaimGovernor {
 public:
-    size_t get_current_target(size_t load) override
+    std::function<int64_t()> current_target_getter(size_t load) override
     {
-        return file_control_governor(load);
+        return std::bind(file_control_governor, load);
+    }
+    void report_target_result(int64_t) override
+    {
     }
 
 private:
-    size_t system_memory_governor(size_t load) {
+    static size_t system_memory_governor(size_t load) {
         try {
             auto file = fopen("/proc/meminfo","r");
             if (file == nullptr)
@@ -842,7 +845,7 @@ private:
         }
     }
 
-    size_t file_control_governor(size_t load) {
+    static size_t file_control_governor(size_t load) {
         try {
             auto file = fopen("governor.txt", "r");
             if (file == nullptr)

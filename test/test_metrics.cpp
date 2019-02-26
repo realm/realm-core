@@ -316,8 +316,10 @@ TEST(Metrics_QueryEqual)
 
     for (size_t i = 0; i < 7; ++i) {
         std::string description = queries->at(i).get_description();
+        std::string table_name = queries->at(i).get_table_name();
         CHECK_EQUAL(find_count(description, column_names[i]), 1);
         CHECK_GREATER_EQUAL(find_count(description, query_search_term), 1);
+        CHECK_EQUAL(table_name, "person");
     }
 }
 
@@ -936,11 +938,16 @@ public:
     {
         has_run_once = will_run.get_future();
     }
-    int64_t get_current_target(size_t)
+    std::function<int64_t()> current_target_getter(size_t) override
+    {
+        return []() { return realm::util::PageReclaimGovernor::no_match; };
+    }
+
+    void report_target_result(int64_t) override
     {
         will_run.set_value();
-        return no_match;
     }
+
     std::future<void> has_run_once;
     std::promise<void> will_run;
 };
