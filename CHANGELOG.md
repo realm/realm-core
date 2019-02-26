@@ -18,6 +18,12 @@
   values independently from transactions start or end (the metrics system is only updated
   at transaction boundaries).
   ([3240] https://github.com/realm/realm-core/pull/3240)
+* Default heuristic for reclaiming pages holding decrypted data has been changed, now
+  limiting amount to same as current use of the buffer cache. Previously the limit was
+  half of buffer cache usage. This heuristic may still not be good enough for some scenarios
+  and we recommend monitoring and explicitly setting a better target in cases where we reclaim
+  more memory than nescessary.
+  (also [3240] https://github.com/realm/realm-core/pull/3240)
 
 ----------------------------------------------
 
