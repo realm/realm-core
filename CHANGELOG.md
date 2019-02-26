@@ -13,7 +13,11 @@
 -----------
 
 ### Internals
-* None.
+* Size of decrypted memory and of currently reserved slab is now available outside of the
+  metrics system (to which they were added in 5.15.0). This allows us to get the current
+  values independently from transactions start or end (the metrics system is only updated
+  at transaction boundaries).
+  ([3240] https://github.com/realm/realm-core/pull/3240)
 
 ----------------------------------------------
 
