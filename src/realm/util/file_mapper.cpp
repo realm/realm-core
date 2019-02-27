@@ -111,6 +111,8 @@ std::vector<mapping_and_addr>& mappings_by_addr = *new std::vector<mapping_and_a
 std::vector<mappings_for_file>& mappings_by_file = *new std::vector<mappings_for_file>;
 unsigned int file_reclaim_index = 0;
 std::atomic<size_t> num_decrypted_pages(0); // this is for statistical purposes
+std::atomic<size_t> reclaimer_target(0);    // do.
+std::atomic<size_t> reclaimer_workload(0);  // do.
 // helpers
 
 int64_t fetch_value_in_file(const std::string& fname, const char* scan_pattern)
@@ -227,9 +229,11 @@ size_t get_num_decrypted_pages()
     return num_decrypted_pages.load();
 }
 
-size_t get_decrypted_memory_size()
+void get_decrypted_memory_stats(size_t& memory_size, size_t& _reclaimer_target, size_t& _reclaimer_workload)
 {
-    return num_decrypted_pages.load() * page_size();
+    memory_size = num_decrypted_pages.load() * page_size();
+    _reclaimer_target = ::reclaimer_target.load() * page_size();
+    _reclaimer_workload = ::reclaimer_workload.load() * page_size();
 }
 
 struct ReclaimerThreadStopper {
@@ -377,18 +381,21 @@ void reclaim_pages()
     }
     {
         UniqueLock lock(mapping_mutex);
+        reclaimer_workload = 0;
+        reclaimer_target = target;
 
         // Putting the target back into the govenor object will allow the govenor
         // to return a getter producing this value again next time it is called
         governor->report_target_result(target);
 
-        if (target == PageReclaimGovernor::no_match) // temporarily disabled by governor returning 0
+        if (target == PageReclaimGovernor::no_match) // temporarily disabled by governor returning no_match
             return;
 
         if (mappings_by_file.size() == 0)
             return;
 
         size_t work_limit = get_work_limit(load, size_t(target));
+        reclaimer_workload = work_limit;
         if (file_reclaim_index >= mappings_by_file.size())
             file_reclaim_index = 0;
 
