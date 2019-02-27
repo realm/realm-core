@@ -295,7 +295,7 @@ def doBuildLinuxTSAN() {
                 sh """
                    mkdir build-dir
                    cd build-dir
-                   cmake -D CMAKE_BUILD_TYPE=RelWithDebInfo -D REALM_TSAN=ON -D REALM_NO_TESTS=1 -G Ninja ..
+                   cmake -D CMAKE_BUILD_TYPE=RelTSAN -D REALM_NO_TESTS=1 -G Ninja ..
                    ninja
                    cpack -G TGZ
                 """
