@@ -3,6 +3,8 @@
 ### Enhancements
 * Improved performance of encryption and decryption significantly by utilizing hardware optimized encryption functions.
   ([#293](https://github.com/realm/realm-core-private/issues/293))
+* Added the ability to write a Group with the history stripped.
+  ([#3245](https://github.com/realm/realm-core/pull/3245))
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
