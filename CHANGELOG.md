@@ -21,6 +21,8 @@
   values independently from transactions start or end (the metrics system is only updated
   at transaction boundaries).
   ([3240] https://github.com/realm/realm-core/pull/3240)
+* Current target and workload set for the page reclaimer is now also available from `get_decrypted_memory_stats()`
+  ([3246] https://github.com/realm/realm-core/pull/3246)
 * Default heuristic for reclaiming pages holding decrypted data has been changed, now
   limiting amount to same as current use of the buffer cache. Previously the limit was
   half of buffer cache usage. This heuristic may still not be good enough for some scenarios
