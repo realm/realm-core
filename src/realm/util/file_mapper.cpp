@@ -384,7 +384,7 @@ void reclaim_pages()
     {
         UniqueLock lock(mapping_mutex);
         reclaimer_workload = 0;
-        reclaimer_target = target;
+        reclaimer_target = size_t(target);
 
         // Putting the target back into the govenor object will allow the govenor
         // to return a getter producing this value again next time it is called
