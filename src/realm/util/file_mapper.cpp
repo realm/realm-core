@@ -155,7 +155,7 @@ public:
 
     static int64_t get_target_from_system(std::string cfg_file_name)
     {
-        int64_t target;
+        int64_t target = no_match;
         auto local_spec = fetch_value_in_file(cfg_file_name, "target ([[:digit:]]+)");
         if (local_spec != no_match) { // overrides everything!
             target = local_spec;
