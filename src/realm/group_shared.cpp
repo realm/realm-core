@@ -1370,7 +1370,7 @@ bool SharedGroup::compact(bool bump_version_number, util::Optional<const char*> 
             File file;
             file.open(tmp_path, File::access_ReadWrite, File::create_Must, 0);
             int incr = bump_version_number ? 1 : 0;
-            m_group.write(file, write_key, info->latest_version_number + incr); // Throws
+            m_group.write(file, write_key, info->latest_version_number + incr, true); // Throws
             // Data needs to be flushed to the disk before renaming.
             bool disable_sync = get_disable_sync_to_disk();
             if (!disable_sync && dura != Durability::Unsafe)
