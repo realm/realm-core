@@ -64,9 +64,15 @@ enum class DescriptorType {
     Include
 };
 
+struct DescriptorLinkPath
+{
+    size_t col_ndx;
+    size_t table_ndx;
+};
+
 struct DescriptorExport {
     DescriptorType type;
-    std::vector<std::vector<size_t>> columns;
+    std::vector<std::vector<DescriptorLinkPath>> columns;
     std::vector<bool> ordering;
     size_t limit;
 };

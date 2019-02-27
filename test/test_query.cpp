@@ -4271,6 +4271,7 @@ TEST(Query_DescriptorsWillApply)
     TableRef t1 = g.add_table("t1");
     size_t t1_int_col = t1->add_column(type_Int, "t1_int");
     size_t t1_str_col = t1->add_column(type_String, "t1_str");
+    size_t t1_link_col = t1->add_column_link(type_Link, "t1_link", *t1);
     t1->add_empty_row(1);
 
     DescriptorOrdering ordering;
@@ -4333,7 +4334,7 @@ TEST(Query_DescriptorsWillApply)
     CHECK(!ordering.will_apply_include());
     CHECK(!ordering.will_limit_to_zero());
 
-    ordering.append_include(IncludeDescriptor(*t1, {{t1_str_col}}));
+    ordering.append_include(IncludeDescriptor(*t1, {{LinkPathPart{t1_link_col, t1}}}));
     CHECK(ordering.will_apply_sort());
     CHECK(ordering.will_apply_distinct());
     CHECK(ordering.will_apply_limit());
@@ -4735,6 +4736,7 @@ TEST(Query_SortDistinctOrderThroughHandover) {
     TableRef t1 = g.add_table("t1");
     size_t t1_int_col = t1->add_column(type_Int, "t1_int");
     size_t t1_str_col = t1->add_column(type_String, "t1_str");
+    size_t t1_link_col = t1->add_column_link(type_Link, "t1_link", *t1);
     t1->add_empty_row(5);
     t1->set_int(0, 0, 100); t1->set_string(1, 0, "A");
     t1->set_int(0, 1, 200); t1->set_string(1, 1, "A");
@@ -4802,7 +4804,7 @@ TEST(Query_SortDistinctOrderThroughHandover) {
         tv.sort(SortDescriptor(*t1, {{t1_int_col}}, {false}));
         tv.distinct(DistinctDescriptor(*t1, {{t1_str_col}}));
         tv.limit(LimitDescriptor(0));
-        tv.include(IncludeDescriptor(*t1, {{t1_str_col}}));
+        tv.include(IncludeDescriptor(*t1, {{{t1_link_col, t1}}}));
         CHECK_EQUAL(tv.size(), results.size());
         HandoverPtr hp = sg_w.export_for_handover(tv, ConstSourcePayload::Stay);
         check_across_handover(results, std::move(hp));
@@ -5148,6 +5150,96 @@ TEST(Query_DistinctThroughLinks)
         CHECK_EQUAL(tv.size(), results.size());
         for (size_t i = 0; i < tv.size(); ++i) {
             CHECK_EQUAL(tv.get_int(t1_int_col, i), results[i]);
+        }
+    }
+}
+
+
+ONLY(Query_IncludeDescriptor)
+{
+    Group g;
+    TableRef t1 = g.add_table("t1");
+    TableRef t2 = g.add_table("t2");
+    TableRef t3 = g.add_table("t3");
+
+    size_t t1_int_col = t1->add_column(type_Int, "t1_int");
+    size_t t1_link_col = t1->add_column_link(type_Link, "t1_link_t2", *t2);
+    size_t t2_int_col = t2->add_column(type_Int, "t2_int");
+    size_t t2_link_col = t2->add_column_link(type_Link, "t2_link_t3", *t3);
+    size_t t3_int_col = t3->add_column(type_Int, "t3_int", true);
+    size_t t3_str_col = t3->add_column(type_String, "t3_str");
+
+    t1->add_empty_row(7);
+    t2->add_empty_row(6);
+    t3->add_empty_row(4);
+
+    t1->set_int(t1_int_col, 0, 99);
+    for (size_t i = 0; i < t2->size(); i++) {
+        t1->set_int(t1_int_col, i + 1, i);
+        t2->set_int(t2_int_col, i, t2->size() - i - 1);
+    }
+    t2->set_int(t2_int_col, 0, 0);
+    t2->set_int(t2_int_col, 1, 0);
+
+    t1->set_link(t1_link_col, 0, 1);
+    t1->set_link(t1_link_col, 1, 0);
+    t1->set_link(t1_link_col, 2, 2);
+    t1->set_link(t1_link_col, 3, 3);
+    t1->set_link(t1_link_col, 4, 5);
+    t1->set_link(t1_link_col, 5, 4);
+    t1->set_link(t1_link_col, 6, 1);
+
+    t2->set_link(t2_link_col, 0, 3);
+    t2->set_link(t2_link_col, 1, 2);
+    t2->set_link(t2_link_col, 2, 0);
+    t2->set_link(t2_link_col, 3, 1);
+    t2->nullify_link(t2_link_col, 4);
+    t2->nullify_link(t2_link_col, 5);
+
+    t3->set_null(t3_int_col, 0);
+    t3->set_int(t3_int_col, 1, 4);
+    t3->set_int(t3_int_col, 2, 7);
+    t3->set_int(t3_int_col, 3, 3);
+    t3->set_string(t3_str_col, 0, "b");
+    t3->set_string(t3_str_col, 1, "a");
+    t3->set_string(t3_str_col, 2, "c");
+    t3->set_string(t3_str_col, 3, "k");
+
+    //  T1                       T2                     T3
+    //  t1_int   t1_link_t2  |   t2_int  t2_link_t3 |   t3_int  t3_str
+    //  ==============================================================
+    //  99       1           |   0       3          |   null    "b"
+    //  0        0           |   0       2          |   4       "a"
+    //  1        2           |   3       0          |   7       "c"
+    //  2        3           |   2       1          |   3       "k"
+    //  3        5           |   1       null       |
+    //  4        4           |   0       null       |
+    //  5        1           |                      |
+
+    {
+        TableView tv = t1->where().less(t1_int_col, 6).find_all();
+        tv.include(IncludeDescriptor(*t2, {{{t1_link_col, t1}}}));
+        // Test original funcionality through chain class
+        std::vector<size_t> results1 = {0, 1, 2, 3, 4, 5};
+        tv.distinct(DistinctDescriptor(*t1, {{t1_int_col}}));
+        CHECK_EQUAL(tv.size(), results1.size());
+        for (size_t i = 0; i < tv.size(); ++i) {
+            CHECK_EQUAL(tv.get_int(t1_int_col, i), results1[i]);
+        }
+        tv = t1->where().less(t1_int_col, 6).find_all();
+        tv.distinct(DistinctDescriptor(*t1, {{t1_int_col}}));
+        for (size_t i = 0; i < tv.size(); ++i) {
+            CHECK_EQUAL(tv.get_int(t1_int_col, i), results1[i]); // results haven't been sorted
+        }
+        tv = t1->where().less(t1_int_col, 6).find_all();
+        tv.sort(SortDescriptor(*t1, {{t1_int_col}}, {true}));
+        for (size_t i = 0; i < tv.size(); ++i) {
+            CHECK_EQUAL(tv.get_int(t1_int_col, i), results1[i]); // still same order here by conincidence
+        }
+        tv = t1->where().less(t1_int_col, 6).find_all();
+        tv.sort(SortDescriptor(*t1, {{t1_int_col}}, {false}));
+        for (size_t i = 0; i < tv.size(); ++i) {
+            CHECK_EQUAL(tv.get_int(t1_int_col, i), results1[results1.size() - 1 - i]); // now its reversed
         }
     }
 }

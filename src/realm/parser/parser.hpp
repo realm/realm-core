@@ -111,6 +111,7 @@ struct DescriptorOrderingState
     struct PropertyState
     {
         std::string key_path;
+        std::string table_name;
         bool ascending;
     };
     struct SingleOrderingState

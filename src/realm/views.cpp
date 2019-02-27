@@ -19,6 +19,7 @@
 #include <realm/views.hpp>
 
 #include <realm/column_link.hpp>
+#include <realm/group.hpp>
 #include <realm/table.hpp>
 
 #include <typeinfo>
@@ -165,13 +166,13 @@ ColumnsDescriptor::Sorter::Sorter(std::vector<std::vector<const ColumnBase*>> co
 
 DescriptorExport ColumnsDescriptor::export_for_handover() const
 {
-    std::vector<std::vector<size_t>> column_indices;
+    std::vector<std::vector<DescriptorLinkPath>> column_indices;
     column_indices.reserve(m_columns.size());
     for (auto& cols : m_columns) {
-        std::vector<size_t> indices;
+        std::vector<DescriptorLinkPath> indices;
         indices.reserve(cols.size());
         for (const ColumnBase* col : cols)
-            indices.push_back(col->get_column_index());
+            indices.push_back({col->get_column_index(), realm::npos});
         column_indices.push_back(indices);
     }
     DescriptorExport out;
@@ -316,9 +317,57 @@ DescriptorExport LimitDescriptor::export_for_handover() const
     return out;
 }
 
-IncludeDescriptor::IncludeDescriptor(Table const& table, std::vector<std::vector<size_t>> column_indices)
-: ColumnsDescriptor(table, column_indices)
+IncludeDescriptor::IncludeDescriptor(Table const& table, std::vector<std::vector<LinkPathPart>> column_links)
+: ColumnsDescriptor()
 {
+    if (table.is_degenerate()) {
+        // We need access to the column acessors and that's not available in a
+        // degenerate table. Since inclusion on an empty table is a noop just return.
+        return;
+    }
+    using tf = _impl::TableFriend;
+    m_columns.resize(column_links.size());
+    for (size_t i = 0; i < m_columns.size(); ++i) {
+        auto& columns = m_columns[i];
+        auto& links = column_links[i];
+        REALM_ASSERT(!column_links.empty());
+
+        columns.reserve(links.size());
+        const Table* cur_table = &table;
+        for (auto link : links) {
+            if (bool(link.from)) { // backlink
+                REALM_ASSERT(cur_table == link.from->get_link_target(link.column_ndx));
+                auto& col = tf::get_column(*link.from, link.column_ndx);
+                columns.push_back(&col);
+                if (auto link_col = dynamic_cast<const LinkColumnBase*>(&col)) { // LinkColumn and ListColumn
+                    if (link_col->get_target_table() != *cur_table) {
+                        // the link does not point to the last table in the chain
+                        throw LogicError(LogicError::type_mismatch);
+                    }
+                    cur_table = link.from.get();
+                }
+                else {
+                    throw LogicError(LogicError::type_mismatch); // must be a link or list column
+                }
+            }
+            else { // forward link/list
+                auto& col = tf::get_column(*cur_table, link.column_ndx);
+                columns.push_back(&col);
+                if (auto link_col = dynamic_cast<const LinkColumnBase*>(&col)) { // LinkColumn and ListColumn
+                    if (columns.size() == links.size()) {
+                        // An inclusion must end with a backlink column, link/list columns are included automatically
+                        // FIXME: make a special logic error for bindings?
+                        throw LogicError(LogicError::type_mismatch);
+                    }
+                    cur_table = &link_col->get_target_table();
+                }
+                else {
+                    // An inclusion chain must consist entirely of link/list/backlink columns
+                    throw LogicError(LogicError::type_mismatch);
+                }
+            }
+        }
+    }
 }
 
 std::string IncludeDescriptor::get_description(TableRef attached_table) const
@@ -337,6 +386,33 @@ DescriptorExport IncludeDescriptor::export_for_handover() const
     out.type = DescriptorType::Include;
     return out;
 }
+
+void IncludeDescriptor::append(const IncludeDescriptor& other)
+{
+    for (size_t i = 0; i < other.m_columns.size(); ++i) {
+        this->m_columns.push_back(other.m_columns[i]);
+    }
+}
+
+void IncludeDescriptor::report_included_backlinks(const Table* origin, size_t row_ndx,
+                               std::function<void(const Table*, size_t)> reporter) const
+{
+    REALM_ASSERT_DEBUG(origin);
+    REALM_ASSERT_DEBUG(row_ndx < origin->size());
+
+    for (size_t i = 0; i < m_columns.size(); ++i) {
+        const Table* table = origin;
+        for (size_t j = 0; j < m_columns[i].size(); ++j) {
+//            ColumnType type = table->get_column_type(m_columns[i][j]->get_column_index());
+
+//            m_columns[i][j]->
+
+
+        }
+    }
+
+}
+
 
 DescriptorOrdering::DescriptorOrdering(const DescriptorOrdering& other)
 {
@@ -495,6 +571,18 @@ bool DescriptorOrdering::will_limit_to_zero() const
     });
 }
 
+IncludeDescriptor DescriptorOrdering::compile_included_backlinks() const
+{
+    IncludeDescriptor includes;
+    for (auto it = m_descriptors.begin(); it != m_descriptors.end(); ++it) {
+        REALM_ASSERT_DEBUG(bool(*it));
+        if ((*it)->get_type() == DescriptorType::Include) {
+            includes.append(*static_cast<const IncludeDescriptor*>(it->get()));
+        }
+    }
+    return includes; // this might be empty: see is_valid()
+}
+
 std::string DescriptorOrdering::get_description(TableRef target_table) const
 {
     std::string description = "";
@@ -522,24 +610,56 @@ void DescriptorOrdering::generate_patch(DescriptorOrdering const& descriptors, H
     }
 }
 
+std::vector<std::vector<size_t>> generate_forward_paths(const DescriptorExport& single) {
+    std::vector<std::vector<size_t>> paths;
+    for (size_t i = 0; i < single.columns.size(); ++i) {
+        std::vector<size_t> path;
+        for (size_t j = 0; j < single.columns[i].size(); ++j) {
+            path.push_back(single.columns[i][j].col_ndx);
+        }
+        paths.emplace_back(std::move(path));
+    }
+    return paths;
+}
+
+std::vector<std::vector<LinkPathPart>> generate_bidirectional_paths(const DescriptorExport& single, Table const& start) {
+    REALM_ASSERT(start.is_group_level());
+    using tf = _impl::TableFriend;
+
+    Group* g = tf::get_parent_group(start);
+    REALM_ASSERT(g);
+    std::vector<std::vector<LinkPathPart>> paths;
+    for (size_t i = 0; i < single.columns.size(); ++i) {
+        std::vector<LinkPathPart> path;
+        for (size_t j = 0; j < single.columns[i].size(); ++j) {
+            REALM_ASSERT_EX(g->size() > single.columns[i][j].table_ndx, g->size(), single.columns[i][j].table_ndx, i, j);
+            TableRef linked_table = g->get_table(single.columns[i][j].table_ndx);
+            path.push_back(LinkPathPart(single.columns[i][j].col_ndx, linked_table));
+        }
+        paths.emplace_back(std::move(path));
+    }
+    return paths;
+}
+
 DescriptorOrdering DescriptorOrdering::create_from_and_consume_patch(HandoverPatch& patch, Table const& table)
 {
     DescriptorOrdering ordering;
     if (patch) {
         for (size_t desc_ndx = 0; desc_ndx < patch->descriptors.size(); ++desc_ndx) {
             DescriptorExport single = patch->descriptors[desc_ndx];
+
             switch (single.type) {
                 case DescriptorType::Sort:
-                    ordering.append_sort(SortDescriptor(table, std::move(single.columns), std::move(single.ordering)));
+                    ordering.append_sort(SortDescriptor(table, generate_forward_paths(single), std::move(single.ordering)));
                     break;
                 case DescriptorType::Distinct:
-                    ordering.append_distinct(DistinctDescriptor(table, std::move(single.columns)));
+                    ordering.append_distinct(DistinctDescriptor(table, generate_forward_paths(single)));
                     break;
                 case DescriptorType::Limit:
                     ordering.append_limit(LimitDescriptor(single.limit));
                     break;
                 case DescriptorType::Include:
-                    ordering.append_include(IncludeDescriptor(table, std::move(single.columns)));
+                    ordering.append_include(IncludeDescriptor(table, generate_bidirectional_paths(single, table)));
                     break;
             }
         }

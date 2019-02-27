@@ -21,7 +21,6 @@
 
 #include <realm/column.hpp>
 #include <realm/handover_defs.hpp>
-
 #include <realm/util/optional.hpp>
 
 #include <vector>
@@ -45,6 +44,21 @@ public:
 
 // Forward declaration needed for deleted ColumnsDescriptor constructor
 class SortDescriptor;
+
+struct LinkPathPart
+{
+    LinkPathPart(size_t col_ndx)
+    : column_ndx(col_ndx) {}
+
+    LinkPathPart(size_t col_ndx, ConstTableRef source)
+    : column_ndx(col_ndx)
+    , from(source) {}
+
+    size_t column_ndx;
+    // "from" is omitted for forward links, if it is valid then
+    // this path describes a backlink originating from the column from[column_ndx]
+    ConstTableRef from;
+};
 
 // ColumnsDescriptor encapsulates a reference to a set of columns (possibly over
 // links), which is used to indicate the criteria columns for sort and distinct.
@@ -97,7 +111,9 @@ protected:
 
 class IncludeDescriptor : public ColumnsDescriptor {
 public:
-    IncludeDescriptor(Table const& table, std::vector<std::vector<size_t>> column_indices);
+    IncludeDescriptor() = default;
+    IncludeDescriptor(Table const& table, std::vector<std::vector<LinkPathPart>> column_indices);
+    ~IncludeDescriptor() = default;
     std::string get_description(TableRef attached_table) const override;
     std::unique_ptr<BaseDescriptor> clone() const override;
     DescriptorExport export_for_handover() const override;
@@ -105,6 +121,9 @@ public:
     {
         return DescriptorType::Include;
     }
+    void append(const IncludeDescriptor& other);
+    void report_included_backlinks(const Table* origin, size_t row_ndx,
+                                   std::function<void(const Table*, size_t)> reporter) const;
 };
 
 class SortDescriptor : public ColumnsDescriptor {
@@ -190,6 +209,7 @@ public:
     bool will_apply_include() const;
     realm::util::Optional<size_t> get_min_limit() const;
     bool will_limit_to_zero() const;
+    IncludeDescriptor compile_included_backlinks() const;
     std::string get_description(TableRef target_table) const;
 
     // handover support
