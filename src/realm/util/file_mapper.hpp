@@ -76,7 +76,13 @@ size_t get_num_decrypted_pages();
 // - amount of memory used for decrypted pages, across all open files.
 // - current target for the reclaimer (desired number of decrypted pages)
 // - current workload size for the reclaimer, across all open files.
-void get_decrypted_memory_stats(size_t& memory_size, size_t& reclaimer_target, size_t& reclaimer_workload);
+struct decrypted_memory_stats_t {
+    size_t memory_size;
+    size_t reclaimer_target;
+    size_t reclaimer_workload;
+};
+
+decrypted_memory_stats_t get_decrypted_memory_stats();
 
 #if REALM_ENABLE_ENCRYPTION
 

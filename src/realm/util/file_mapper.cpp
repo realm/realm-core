@@ -109,10 +109,10 @@ struct mapping_and_addr {
 util::Mutex& mapping_mutex = *(new util::Mutex);
 std::vector<mapping_and_addr>& mappings_by_addr = *new std::vector<mapping_and_addr>;
 std::vector<mappings_for_file>& mappings_by_file = *new std::vector<mappings_for_file>;
-unsigned int file_reclaim_index = 0;
-std::atomic<size_t> num_decrypted_pages(0); // this is for statistical purposes
-std::atomic<size_t> reclaimer_target(0);    // do.
-std::atomic<size_t> reclaimer_workload(0);  // do.
+static unsigned int file_reclaim_index = 0;
+static std::atomic<size_t> num_decrypted_pages(0); // this is for statistical purposes
+static std::atomic<size_t> reclaimer_target(0);    // do.
+static std::atomic<size_t> reclaimer_workload(0);  // do.
 // helpers
 
 int64_t fetch_value_in_file(const std::string& fname, const char* scan_pattern)
@@ -229,11 +229,13 @@ size_t get_num_decrypted_pages()
     return num_decrypted_pages.load();
 }
 
-void get_decrypted_memory_stats(size_t& memory_size, size_t& _reclaimer_target, size_t& _reclaimer_workload)
+decrypted_memory_stats_t get_decrypted_memory_stats()
 {
-    memory_size = num_decrypted_pages.load() * page_size();
-    _reclaimer_target = ::reclaimer_target.load() * page_size();
-    _reclaimer_workload = ::reclaimer_workload.load() * page_size();
+    decrypted_memory_stats_t retval;
+    retval.memory_size = num_decrypted_pages.load() * page_size();
+    retval.reclaimer_target = reclaimer_target.load() * page_size();
+    retval.reclaimer_workload = reclaimer_workload.load() * page_size();
+    return retval;
 }
 
 struct ReclaimerThreadStopper {
