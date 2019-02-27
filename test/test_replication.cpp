@@ -4007,4 +4007,33 @@ TEST(Replication_HistorySchemaVersionUpgrade)
     SharedGroup sg_2(repl);
 }
 
+TEST(Replication_WriteWithoutHistory)
+{
+    SHARED_GROUP_TEST_PATH(path_1);
+    SHARED_GROUP_TEST_PATH(path_2);
+
+    ReplSyncClient repl(path_1, 1);
+    SharedGroup sg(repl);
+    {
+        // Do an empty commit to force the file format version to be established.
+        WriteTransaction wt(sg);
+        wt.add_table("Table");
+        wt.commit();
+    }
+
+    {
+        ReadTransaction rt(sg);
+        rt.get_group().write(path_2, nullptr, rt.get_version(), false);
+    }
+    // Make sure the realm can be opened without history
+    SharedGroup sg_2(path_2);
+    {
+        WriteTransaction wt(sg_2);
+        auto table = wt.get_table("Table");
+        CHECK(table);
+        table->add_column(type_Int, "int");
+        wt.commit();
+    }
+}
+
 #endif // TEST_REPLICATION
