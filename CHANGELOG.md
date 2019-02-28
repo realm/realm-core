@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 5.16.0 Release notes
 
 ### Enhancements
 * Improved performance of encryption and decryption significantly by utilizing hardware optimized encryption functions.
@@ -7,11 +7,7 @@
   ([#3245](https://github.com/realm/realm-core/pull/3245))
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
- 
-### Breaking changes
-* None.
+* Nothing
 
 -----------
 
@@ -29,7 +25,7 @@
   and we recommend monitoring and explicitly setting a better target in cases where we reclaim
   more memory than nescessary.
   (also [3240] https://github.com/realm/realm-core/pull/3240)
-
+* Now publishing a TSAN compatible linux build.
 ----------------------------------------------
 
 # 5.15.0 Release notes
