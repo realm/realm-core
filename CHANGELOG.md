@@ -6,6 +6,9 @@
 * Added the ability to write a Group with the history stripped.
   ([#3245](https://github.com/realm/realm-core/pull/3245))
 
+### Fixed
+* Nothing
+
 -----------
 
 ### Internals
