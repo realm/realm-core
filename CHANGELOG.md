@@ -22,7 +22,7 @@
   and we recommend monitoring and explicitly setting a better target in cases where we reclaim
   more memory than nescessary.
   (also [3240] https://github.com/realm/realm-core/pull/3240)
-
+* Now publishing a TSAN compatible linux build.
 ----------------------------------------------
 
 # 5.15.0 Release notes
