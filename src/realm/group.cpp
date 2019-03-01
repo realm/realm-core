@@ -2057,7 +2057,7 @@ void Group::verify() const
             int history_schema_version = 0;
             get_version_and_history_info(m_top, version, history_type, history_schema_version);
             REALM_ASSERT(history_type != Replication::hist_None || history_schema_version == 0);
-            hist->update_from_parent(version);
+            hist->update_from_ref_and_version(get_history_ref(m_top), version);
             hist->verify();
         }
     }

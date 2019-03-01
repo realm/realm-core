@@ -13,7 +13,10 @@
 -----------
 
 ### Internals
-* None.
+* The protocol for updating Replication/History is changed. The Replication object will be initialized
+  in every transaction. A new parameter will tell if it is a write- or readtransaction. A new function -
+  History::ensure_updated can be called in places where the history object needs to be up-to-date. The 
+  function will use a flag to ensure that the object is only updated once per transaction.
 
 ----------------------------------------------
 

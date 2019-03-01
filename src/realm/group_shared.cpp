@@ -1859,6 +1859,12 @@ const Group& SharedGroup::begin_read(VersionID version_id)
 
     do_begin_read(version_id, writable); // Throws
 
+    if (Replication* repl = m_group.get_replication()) {
+        version_type current_version = m_read_lock.m_version;
+        bool history_updated = false;
+        repl->initiate_transact(Replication::TransactionType::trans_Read, current_version, history_updated); // Throws
+    }
+
     set_transact_stage(transact_Reading);
     return m_group;
 }
@@ -1898,7 +1904,8 @@ Group& SharedGroup::begin_write()
         if (Replication* repl = m_group.get_replication()) {
             version_type current_version = m_read_lock.m_version;
             bool history_updated = false;
-            repl->initiate_transact(current_version, history_updated); // Throws
+            repl->initiate_transact(Replication::TransactionType::trans_Write, current_version,
+                                    history_updated); // Throws
         }
     }
     catch (...) {
@@ -1928,7 +1935,8 @@ bool SharedGroup::try_begin_write(Group* &group)
         if (Replication* repl = m_group.get_replication()) {
             version_type current_version = m_read_lock.m_version;
             bool history_updated = false;
-            repl->initiate_transact(current_version, history_updated); // Throws
+            repl->initiate_transact(Replication::TransactionType::trans_Write, current_version,
+                                    history_updated); // Throws
         }
     }
     catch (...) {
@@ -2216,6 +2224,12 @@ SharedGroup::version_type SharedGroup::commit_and_continue_as_read()
 
     // Remap file if it has grown, and update refs in underlying node structure
     gf::remap_and_update_refs(m_group, m_read_lock.m_top_ref, m_read_lock.m_file_size); // Throws
+
+    if (Replication* repl = m_group.get_replication()) {
+        version_type current_version = m_read_lock.m_version;
+        bool history_updated = false;
+        repl->initiate_transact(Replication::TransactionType::trans_Read, current_version, history_updated); // Throws
+    }
 
     set_transact_stage(transact_Reading);
 

@@ -200,7 +200,7 @@ public:
         REALM_ASSERT(false);
     }
 
-    void update_early_from_top_ref(version_type, size_t, ref_type) override
+    void update_from_ref_and_version(ref_type, version_type) override
     {
         // No-op
     }
