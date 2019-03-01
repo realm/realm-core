@@ -227,9 +227,7 @@ public:
     {
         return []() { return 4096; };
     }
-    void report_target_result(int64_t) override
-    {
-    }
+    void report_target_result(int64_t) override {}
 };
 
 AggressiveGovernor aggressive_governor;

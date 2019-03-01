@@ -873,12 +873,12 @@ TEST(Metrics_MaxNumTransactionsIsNotExceeded)
     options.enable_metrics = true;
     options.metrics_buffer_size = 10;
     SharedGroup sg(*hist, options);
-    populate(sg);                   // 1
+    populate(sg); // 1
     {
-        ReadTransaction rt(sg);     // 2
+        ReadTransaction rt(sg); // 2
     }
     {
-        WriteTransaction wt(sg);    // 3
+        WriteTransaction wt(sg); // 3
         TableRef t0 = wt.get_table(0);
         TableRef t1 = wt.get_table(1);
         t0->add_empty_row(3);
@@ -898,7 +898,8 @@ TEST(Metrics_MaxNumTransactionsIsNotExceeded)
     std::unique_ptr<Metrics::TransactionInfoList> transactions = metrics->take_transactions();
     CHECK(transactions);
     for (auto transaction : *transactions) {
-        CHECK_EQUAL(transaction.get_transaction_type(), realm::metrics::TransactionInfo::TransactionType::read_transaction);
+        CHECK_EQUAL(transaction.get_transaction_type(),
+                    realm::metrics::TransactionInfo::TransactionType::read_transaction);
     }
 }
 
@@ -984,9 +985,11 @@ NONCONCURRENT_TEST(Metrics_NumDecryptedPagesWithoutEncryption)
     std::unique_ptr<Metrics::TransactionInfoList> transactions = metrics->take_transactions();
     CHECK(transactions);
     CHECK_EQUAL(transactions->size(), 2);
-    CHECK_EQUAL(transactions->at(0).get_transaction_type(), realm::metrics::TransactionInfo::TransactionType::write_transaction);
+    CHECK_EQUAL(transactions->at(0).get_transaction_type(),
+                realm::metrics::TransactionInfo::TransactionType::write_transaction);
     CHECK_EQUAL(transactions->at(0).get_num_decrypted_pages(), 0);
-    CHECK_EQUAL(transactions->at(1).get_transaction_type(), realm::metrics::TransactionInfo::TransactionType::read_transaction);
+    CHECK_EQUAL(transactions->at(1).get_transaction_type(),
+                realm::metrics::TransactionInfo::TransactionType::read_transaction);
     CHECK_EQUAL(transactions->at(1).get_num_decrypted_pages(), 0);
 
     realm::util::set_page_reclaim_governor_to_default(); // the remainder of the test suite should use the default
@@ -1022,9 +1025,11 @@ NONCONCURRENT_TEST_IF(Metrics_NumDecryptedPagesWithEncryption, REALM_ENABLE_ENCR
     std::unique_ptr<Metrics::TransactionInfoList> transactions = metrics->take_transactions();
     CHECK(transactions);
     CHECK_EQUAL(transactions->size(), 2);
-    CHECK_EQUAL(transactions->at(0).get_transaction_type(), realm::metrics::TransactionInfo::TransactionType::write_transaction);
+    CHECK_EQUAL(transactions->at(0).get_transaction_type(),
+                realm::metrics::TransactionInfo::TransactionType::write_transaction);
     CHECK_EQUAL(transactions->at(0).get_num_decrypted_pages(), 1);
-    CHECK_EQUAL(transactions->at(1).get_transaction_type(), realm::metrics::TransactionInfo::TransactionType::read_transaction);
+    CHECK_EQUAL(transactions->at(1).get_transaction_type(),
+                realm::metrics::TransactionInfo::TransactionType::read_transaction);
     CHECK_EQUAL(transactions->at(1).get_num_decrypted_pages(), 1);
 
     realm::util::set_page_reclaim_governor_to_default(); // the remainder of the test suite should use the default
@@ -1055,7 +1060,6 @@ TEST(Metrics_MemoryChecks)
         CHECK_GREATER(transaction.get_free_space(), 0);
     }
 }
-
 
 
 #endif // REALM_METRICS

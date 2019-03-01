@@ -141,7 +141,8 @@ int64_t fetch_value_in_file(const std::string& fname, const char* scan_pattern)
 
 class DefaultGovernor : public PageReclaimGovernor {
 public:
-    static int64_t pick_lowest_valid(int64_t a, int64_t b) {
+    static int64_t pick_lowest_valid(int64_t a, int64_t b)
+    {
         if (a == PageReclaimGovernor::no_match)
             return b;
         if (b == PageReclaimGovernor::no_match)
@@ -149,7 +150,8 @@ public:
         return std::min(a,b);
     }
 
-    static int64_t pick_if_valid(int64_t source, int64_t target) {
+    static int64_t pick_if_valid(int64_t source, int64_t target)
+    {
         if (source == PageReclaimGovernor::no_match)
             return PageReclaimGovernor::no_match;
         return target;
@@ -179,7 +181,7 @@ public:
         static_cast<void>(load);
         if (m_refresh_count > 0) {
             --m_refresh_count;
-            return std::bind([](int64_t target_copy){ return target_copy; }, m_target);
+            return std::bind([](int64_t target_copy) { return target_copy; }, m_target);
         }
         return std::bind(get_target_from_system, m_cfg_file_name);
     }
