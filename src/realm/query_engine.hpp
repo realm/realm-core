@@ -113,9 +113,11 @@ AggregateState      State of the aggregate - contains a state variable that stor
 #include <realm/util/miscellaneous.hpp>
 #include <realm/util/serializer.hpp>
 #include <realm/util/shared_ptr.hpp>
+#include <realm/util/string_buffer.hpp>
 #include <realm/utilities.hpp>
 
 #include <map>
+#include <unordered_set>
 
 #if REALM_X86_OR_X64_TRUE && defined(_MSC_FULL_VER) && _MSC_FULL_VER >= 160040219
 #include <immintrin.h>
@@ -1301,7 +1303,6 @@ public:
         StringNodeBase::init();
     }
 
-
     size_t find_first_local(size_t start, size_t end) override
     {
         TConditionFunction cond;
@@ -1537,9 +1538,9 @@ protected:
     size_t m_last_start;
 };
 
-
 // Specialization for Equal condition on Strings - we specialize because we can utilize indexes (if they exist) for
-// Equal.
+// Equal. This specialisation also supports combining other StringNode<Equal> conditions into itself in order to
+// optimise the non-indexed linear search that can be happen when many conditions are OR'd together in an "IN" query.
 // Future optimization: make specialization for greater, notequal, etc
 template <>
 class StringNode<Equal> : public StringNodeEqualBase {
@@ -1548,13 +1549,22 @@ public:
 
     void _search_index_init() override;
 
+    bool try_consume_condition(StringNode<Equal>* other);
+
     std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches* patches) const override
     {
         return std::unique_ptr<ParentNode>(new StringNode<Equal>(*this, patches));
     }
 
+    virtual std::string describe(util::serializer::SerialisationState& state) const override;
+
 private:
+    template<class ArrayType, class ElementType>
+    size_t find_first_in(ArrayType& array, size_t begin, size_t end);
+
     size_t _find_first_local(size_t start, size_t end) override;
+    std::unordered_set<StringData> m_needles;
+    std::vector<StringBuffer> m_needle_storage;
 };
 
 
@@ -1603,7 +1613,6 @@ private:
     size_t _find_first_local(size_t start, size_t end) override;
 };
 
-
 // OR node contains at least two node pointers: Two or more conditions to OR
 // together in m_conditions, and the next AND condition (if any) in m_child.
 //
@@ -1641,11 +1650,9 @@ public:
             condition->verify_column();
         }
     }
+
     std::string describe(util::serializer::SerialisationState& state) const override
     {
-        if (m_conditions.size() >= 2) {
-
-        }
         std::string s;
         for (size_t i = 0; i < m_conditions.size(); ++i) {
             if (m_conditions[i]) {
@@ -1661,12 +1668,27 @@ public:
         return s;
     }
 
-
     void init() override
     {
         ParentNode::init();
 
         m_dD = 10.0;
+
+        StringNode<Equal>* first = nullptr;
+        StringNode<Equal>* advance = nullptr;
+        for (auto it = m_conditions.begin(); it != m_conditions.end(); ++it) {
+            if (bool(*it) && (first = dynamic_cast<StringNode<Equal>*>(it->get()))) {
+                for (auto next = it + 1; next != m_conditions.end(); ) {
+                    if ((advance = dynamic_cast<StringNode<Equal>*>(next->get()))) {
+                        if (first->try_consume_condition(advance)) {
+                            next = m_conditions.erase(next);
+                            continue;
+                        }
+                    }
+                    ++next;
+                }
+            }
+        }
 
         m_start.clear();
         m_start.resize(m_conditions.size(), 0);
