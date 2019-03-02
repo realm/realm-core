@@ -112,6 +112,11 @@ public:
     std::shared_ptr<SyncSession> get_existing_session(const std::string& path) const;
     std::shared_ptr<SyncSession> get_existing_active_session(const std::string& path) const;
 
+    // Returns `true` if the SyncManager still contains any existing sessions not yet fully cleaned up.
+    // This will return true as long as there is an external reference to a session object, no matter
+    // the state of that session.
+    bool has_existing_sessions();
+
     // If the metadata manager is configured, perform an update. Returns `true` iff the code was run.
     bool perform_metadata_update(std::function<void(const SyncMetadataManager&)> update_function) const;
 
@@ -215,6 +220,10 @@ private:
     // Sessions remove themselves from this map by calling `unregister_session` once they're
     // inactive and have performed any necessary cleanup work.
     std::unordered_map<std::string, std::shared_ptr<SyncSession>> m_sessions;
+
+    // Internal method returning `true` if the SyncManager still contains sessions not yet fully closed.
+    // Callers of this method should hold the `m_session_mutex` themselves.
+    bool do_has_existing_sessions();
 
     // The unique identifier of this client.
     util::Optional<std::string> m_client_uuid;

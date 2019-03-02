@@ -21,6 +21,8 @@
 #include "sync/sync_config.hpp"
 #include "sync/sync_manager.hpp"
 #include "sync/sync_user.hpp"
+#include "sync/session/session_util.hpp"
+#include "util/event_loop.hpp"
 #include "util/test_utils.hpp"
 #include <realm/util/logger.hpp>
 #include <realm/util/scope_exit.hpp>
@@ -519,5 +521,44 @@ TEST_CASE("sync_manager: metadata") {
                                                     "",
                                                     make_test_encryption_key(1),
                                                     true);
+    }
+}
+
+TEST_CASE("sync_manager: has_active_sessions", "[active_sessions]") {
+    auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
+    reset_test_directory(base_path);
+    SyncManager::shared().configure(base_path, SyncManager::MetadataMode::NoMetadata, "Test/1.2.3");
+
+    SECTION("no active sessions") {
+        REQUIRE(!SyncManager::shared().has_existing_sessions());
+    }
+
+    SyncServer server(false);
+    auto schema = Schema{
+            {"object", {
+                               {"value", PropertyType::Int},
+                       }},
+    };
+
+    std::atomic<bool> error_handler_invoked(false);
+    Realm::Config config;
+    auto user = SyncManager::shared().get_user({"user-name", "https://realm.example.org"}, "not_a_real_token");
+    auto create_session = [&](SyncSessionStopPolicy stop_policy) {
+        std::shared_ptr<SyncSession> session = sync_session(server, user, "/test-dying-state",
+                                    [](const auto&, const auto&) { return s_test_token; },
+                                    [&](auto, auto) { error_handler_invoked = true; },
+                                    stop_policy, nullptr, schema, &config);
+        EventLoop::main().run_until([&] { return sessions_are_active(*session); });
+        return session;
+    };
+
+    SECTION("active sessions") {
+        {
+            auto session = create_session(SyncSessionStopPolicy::Immediately);
+            REQUIRE(SyncManager::shared().has_existing_sessions());
+            session->close();
+        }
+        EventLoop::main().run_until([&] { return !SyncManager::shared().has_existing_sessions(); });
+        REQUIRE(!SyncManager::shared().has_existing_sessions());
     }
 }
