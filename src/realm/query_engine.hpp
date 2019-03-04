@@ -1685,7 +1685,7 @@ public:
         auto it = m_conditions.begin();
         while (it != m_conditions.end()) {
             // Only try to optimize on StringNode<Equal> conditions without search index
-            if (bool(*it) && (first = dynamic_cast<StringNode<Equal>*>(it->get())) && !first->has_search_index()) {
+            if ((first = dynamic_cast<StringNode<Equal>*>(it->get())) && !first->has_search_index()) {
                 auto col_ndx = first->m_condition_column_idx;
                 auto next = it + 1;
                 while (next != m_conditions.end() && (*next)->m_condition_column_idx == col_ndx) {
