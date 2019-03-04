@@ -2770,7 +2770,7 @@ TEST(Parser_ChainedStringEqualQueries)
     rd.shuffle(populated_data.begin(), populated_data.end());
     std::string query;
     bool first = true;
-    size_t column_to_query = 0;
+    char column_to_query = 0;
     for (auto s : populated_data) {
         std::string column_name(1, 'a' + column_to_query);
         query += (first ? "" : " or " ) + column_name + " == '" + s + "'";

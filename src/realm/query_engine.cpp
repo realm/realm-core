@@ -326,7 +326,7 @@ void StringNode<Equal>::_search_index_init()
     }
 }
 
-bool StringNode<Equal>::try_consume_condition(StringNode<Equal>* other)
+void StringNode<Equal>::consume_condition(StringNode<Equal>* other)
 {
     // If a search index is present, don't try to combine conditions since index search is most likely faster.
     // Assuming N elements to search and M conditions to check:
@@ -334,22 +334,19 @@ bool StringNode<Equal>::try_consume_condition(StringNode<Equal>* other)
     // 2) no search index, combine conditions:      O(N)
     // 3) no search index, conditions not combined: O(N*M)
     // In practice N is much larger than M, so if we have a search index, choose 1, otherwise if possible choose 2.
-    if (!m_condition_column->has_search_index() && m_condition_column == other->m_condition_column) {
-        REALM_ASSERT(other->m_needles.empty());
-        if (m_needles.empty()) {
-            m_needles.insert(bool(m_value) ? StringData(*m_value) : StringData());
-        }
-        if (bool(other->m_value)) {
-            m_needle_storage.push_back(StringBuffer());
-            m_needle_storage.back().append(*other->m_value);
-            m_needles.insert(StringData(m_needle_storage.back().data(), m_needle_storage.back().size()));
-        }
-        else {
-            m_needles.insert(StringData());
-        }
-        return true;
+    REALM_ASSERT(m_condition_column == other->m_condition_column);
+    REALM_ASSERT(other->m_needles.empty());
+    if (m_needles.empty()) {
+        m_needles.insert(bool(m_value) ? StringData(*m_value) : StringData());
     }
-    return false;
+    if (bool(other->m_value)) {
+        m_needle_storage.push_back(StringBuffer());
+        m_needle_storage.back().append(*other->m_value);
+        m_needles.insert(StringData(m_needle_storage.back().data(), m_needle_storage.back().size()));
+    }
+    else {
+        m_needles.insert(StringData());
+    }
 }
 
 // Requirements of template types:

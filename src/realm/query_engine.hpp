@@ -1186,6 +1186,11 @@ public:
         do_verify_column(m_condition_column);
     }
 
+    bool has_search_index() const
+    {
+        return m_condition_column->has_search_index();
+    }
+
     void init() override
     {
         ParentNode::init();
@@ -1549,7 +1554,7 @@ public:
 
     void _search_index_init() override;
 
-    bool try_consume_condition(StringNode<Equal>* other);
+    void consume_condition(StringNode<Equal>* other);
 
     std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches* patches) const override
     {
@@ -1675,18 +1680,27 @@ public:
         m_dD = 10.0;
 
         StringNode<Equal>* first = nullptr;
-        StringNode<Equal>* advance = nullptr;
-        for (auto it = m_conditions.begin(); it != m_conditions.end(); ++it) {
-            if (bool(*it) && (first = dynamic_cast<StringNode<Equal>*>(it->get()))) {
-                for (auto next = it + 1; next != m_conditions.end(); ) {
-                    if ((advance = dynamic_cast<StringNode<Equal>*>(next->get()))) {
-                        if (first->try_consume_condition(advance)) {
-                            next = m_conditions.erase(next);
-                            continue;
-                        }
+        std::sort(m_conditions.begin(), m_conditions.end(),
+                  [](auto& a, auto& b) { return a->m_condition_column_idx < b->m_condition_column_idx; });
+        auto it = m_conditions.begin();
+        while (it != m_conditions.end()) {
+            // Only try to optimize on StringNode<Equal> conditions without search index
+            if (bool(*it) && (first = dynamic_cast<StringNode<Equal>*>(it->get())) && !first->has_search_index()) {
+                auto col_ndx = first->m_condition_column_idx;
+                auto next = it + 1;
+                while (next != m_conditions.end() && (*next)->m_condition_column_idx == col_ndx) {
+                    if (auto advance = dynamic_cast<StringNode<Equal>*>(next->get())) {
+                        first->consume_condition(advance);
+                        next = m_conditions.erase(next);
                     }
-                    ++next;
+                    else {
+                        ++next;
+                    }
                 }
+                it = next;
+            }
+            else {
+                ++it;
             }
         }
 
