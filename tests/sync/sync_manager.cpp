@@ -98,7 +98,7 @@ TEST_CASE("sync_manager: `path_for_realm` API", "[sync]") {
     reset_test_directory(base_path);
     const std::string auth_server_url = "https://realm.example.org";
     const std::string raw_url = "realms://realm.example.org/a/b/~/123456/xyz";
-    
+
     SECTION("should work properly without metadata") {
         SyncManager::shared().configure(base_path, SyncManager::MetadataMode::NoMetadata);
         // Get a sync user
@@ -270,7 +270,7 @@ TEST_CASE("sync_manager: persistent user state management", "[sync]") {
         const std::string identity_1 = "foo-2";
         const std::string identity_2 = "bar-2";
         const std::string identity_3 = "baz-2";
-        
+
         // Create the user metadata.
         auto u1 = manager.get_or_make_user_metadata(identity_1, auth_url);
         u1->mark_for_removal();
@@ -510,17 +510,17 @@ TEST_CASE("sync_manager: metadata") {
 
     SECTION("should be reset in case of decryption error") {
         SyncManager::shared().configure(base_path,
-                                                    SyncManager::MetadataMode::Encryption,
-                                                    "",
-                                                    make_test_encryption_key());
+                                        SyncManager::MetadataMode::Encryption,
+                                        "",
+                                        make_test_encryption_key());
 
         SyncManager::shared().reset_for_testing();
 
         SyncManager::shared().configure(base_path,
-                                                    SyncManager::MetadataMode::Encryption,
-                                                    "",
-                                                    make_test_encryption_key(1),
-                                                    true);
+                                        SyncManager::MetadataMode::Encryption,
+                                        "",
+                                        make_test_encryption_key(1),
+                                        true);
     }
 }
 
@@ -535,9 +535,9 @@ TEST_CASE("sync_manager: has_active_sessions", "[active_sessions]") {
 
     SyncServer server(false);
     auto schema = Schema{
-            {"object", {
-                               {"value", PropertyType::Int},
-                       }},
+        {"object", {
+            {"value", PropertyType::Int},
+        }},
     };
 
     std::atomic<bool> error_handler_invoked(false);

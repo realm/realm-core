@@ -255,6 +255,17 @@ void SyncManager::set_logger_factory(SyncLoggerFactory& factory) noexcept
     m_logger_factory = &factory;
 }
 
+std::unique_ptr<util::Logger> SyncManager::make_logger() const
+{
+    if (m_logger_factory) {
+        return m_logger_factory->make_logger(m_log_level); // Throws
+    }
+
+    auto stderr_logger = std::make_unique<util::StderrLogger>(); // Throws
+    stderr_logger->set_level_threshold(m_log_level);
+    return std::unique_ptr<util::Logger>(stderr_logger.release());
+}
+
 void SyncManager::set_user_agent(std::string user_agent)
 {
     std::lock_guard<std::mutex> lock(m_mutex);
@@ -518,18 +529,7 @@ SyncClient& SyncManager::get_sync_client() const
 std::unique_ptr<SyncClient> SyncManager::create_sync_client() const
 {
     REALM_ASSERT(!m_mutex.try_lock());
-
-    std::unique_ptr<util::Logger> logger;
-    if (m_logger_factory) {
-        logger = m_logger_factory->make_logger(m_log_level); // Throws
-    }
-    else {
-        auto stderr_logger = std::make_unique<util::StderrLogger>(); // Throws
-        stderr_logger->set_level_threshold(m_log_level);
-        logger = std::move(stderr_logger);
-    }
-
-    return std::make_unique<SyncClient>(std::move(logger), m_client_reconnect_mode, m_multiplex_sessions,
+    return std::make_unique<SyncClient>(make_logger(), m_client_reconnect_mode, m_multiplex_sessions,
                                         util::format("%1 %2", m_user_agent_binding_info, m_user_agent_application_info));
 }
 

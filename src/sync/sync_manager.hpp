@@ -92,6 +92,9 @@ public:
     void set_log_level(util::Logger::Level) noexcept;
     void set_logger_factory(SyncLoggerFactory&) noexcept;
 
+    // Create a new logger of the type which will be used by the sync client
+    std::unique_ptr<util::Logger> make_logger() const;
+
     // Sets the application level user agent string.
     // This should have the format specified here: https://github.com/realm/realm-sync/blob/develop/src/realm/sync/client.hpp#L126
     // The user agent can only be set up  until the  point the Sync Client is created. This happens when the first
