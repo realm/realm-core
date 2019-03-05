@@ -365,11 +365,28 @@ size_t StringNode<Equal>::find_first_in(ArrayType& array, size_t begin, size_t e
     REALM_ASSERT_3(begin, <=, end);
 
     const auto not_in_set = m_needles.end();
-    for (size_t i = begin; i < end; ++i) {
-        ElementType element = array.get(i);
-        StringData value_2{element.data(), element.size()};
-        if (m_needles.find(value_2) != not_in_set)
-            return i;
+    // For a small number of conditions it is faster to cycle through
+    // and check them individually. The threshold depends on how fast
+    // our hashing of StringData is (see `StringData.hash()`). The
+    // number 20 was found empirically when testing small strings
+    // with N==100k
+    if (m_needles.size() < 20) {
+        for (size_t i = begin; i < end; ++i) {
+            ElementType element = array.get(i);
+            StringData value_2{element.data(), element.size()};
+            for (auto it = m_needles.begin(); it != not_in_set; ++it) {
+                if (*it == value_2)
+                return i;
+            }
+        }
+    }
+    else {
+        for (size_t i = begin; i < end; ++i) {
+            ElementType element = array.get(i);
+            StringData value_2{element.data(), element.size()};
+            if (m_needles.find(value_2) != not_in_set)
+                return i;
+        }
     }
 
     return not_found;
