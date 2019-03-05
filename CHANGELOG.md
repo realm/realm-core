@@ -5,7 +5,8 @@
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Making a query that compares two integer properties could cause a segmentation fault on the server.
+  ([#3253](https://github.com/realm/realm-core/issues/3253))
  
 ### Breaking changes
 * None.
