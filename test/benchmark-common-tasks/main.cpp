@@ -389,7 +389,7 @@ struct BenchmarkQueryChainedOrStrings : BenchmarkWithStringsTable {
             auto s = ss.str();
             t->set_string(0, i, s);
         }
-        //t->add_search_index(0);
+        // t->add_search_index(0);
         for (size_t i = 0; i < num_queried_matches; ++i) {
             size_t ndx_to_match = (num_rows / num_queried_matches) * i;
             values_to_query.push_back(t->get_string(0, ndx_to_match));
@@ -406,7 +406,8 @@ struct BenchmarkQueryChainedOrStrings : BenchmarkWithStringsTable {
             query.Or().equal(0, values_to_query[i]);
         }
         TableView results = query.find_all();
-        REALM_ASSERT_EX(results.size() == num_queried_matches, results.size(), num_queried_matches, values_to_query.size());
+        REALM_ASSERT_EX(results.size() == num_queried_matches, results.size(), num_queried_matches,
+                        values_to_query.size());
         static_cast<void>(results);
     }
 };

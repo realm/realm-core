@@ -2748,7 +2748,7 @@ TEST(Parser_ChainedStringEqualQueries)
     for (size_t i = 0; i < table->size(); ++i) {
         ss.str({});
         ss << i;
-        std::string sd (ss.str());
+        std::string sd(ss.str());
         populated_data.push_back(sd);
         table->set_string(a_col_ndx, i, sd);
         table->set_string(b_col_ndx, i, sd);
@@ -2759,12 +2759,16 @@ TEST(Parser_ChainedStringEqualQueries)
 
     verify_query(test_context, table, "a == '0' or a == '1' or a == '2'", 3);
     verify_query(test_context, table, "a == '0' or b == '2' or a == '3' or b == '4'", 4);
-    verify_query(test_context, table, "(a == '0' or b == '2' or a == '3' or b == '4') and (c == '0' or d == '2' or c == '3' or d == '4')", 4);
+    verify_query(test_context, table,
+                 "(a == '0' or b == '2' or a == '3' or b == '4') and (c == '0' or d == '2' or c == '3' or d == '4')",
+                 4);
     verify_query(test_context, table, "a == '' or a == null", 1);
     verify_query(test_context, table, "b == '' or b == null", 1);
     verify_query(test_context, table, "c == '' or c == null", 1);
     verify_query(test_context, table, "d == '' or d == null", 1);
-    verify_query(test_context, table, "(a == null or a == '') and (b == null or b == '') and (c == null or c == '') and (d == null or d == '')", 1);
+    verify_query(
+        test_context, table,
+        "(a == null or a == '') and (b == null or b == '') and (c == null or c == '') and (d == null or d == '')", 1);
 
     Random rd;
     rd.shuffle(populated_data.begin(), populated_data.end());
@@ -2773,7 +2777,7 @@ TEST(Parser_ChainedStringEqualQueries)
     char column_to_query = 0;
     for (auto s : populated_data) {
         std::string column_name(1, 'a' + column_to_query);
-        query += (first ? "" : " or " ) + column_name + " == '" + s + "'";
+        query += (first ? "" : " or ") + column_name + " == '" + s + "'";
         first = false;
         column_to_query = (column_to_query + 1) % 4;
     }

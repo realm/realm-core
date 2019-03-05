@@ -72,7 +72,7 @@ inline void set_page_reclaim_governor_to_default()
 // Retrieves the number of in memory decrypted pages, across all open files.
 size_t get_num_decrypted_pages();
 
-// Retrieves the 
+// Retrieves the
 // - amount of memory used for decrypted pages, across all open files.
 // - current target for the reclaimer (desired number of decrypted pages)
 // - current workload size for the reclaimer, across all open files.

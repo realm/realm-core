@@ -352,7 +352,7 @@ void StringNode<Equal>::consume_condition(StringNode<Equal>* other)
 // Requirements of template types:
 // ArrayType must support: size() -> size_t, and get(size_t) -> ElementType
 // ElementType must be convertable to a StringData via data() and size()
-template<class ArrayType, class ElementType>
+template <class ArrayType, class ElementType>
 size_t StringNode<Equal>::find_first_in(ArrayType& array, size_t begin, size_t end)
 {
     if (m_needles.empty())
@@ -376,7 +376,7 @@ size_t StringNode<Equal>::find_first_in(ArrayType& array, size_t begin, size_t e
             StringData value_2{element.data(), element.size()};
             for (auto it = m_needles.begin(); it != not_in_set; ++it) {
                 if (*it == value_2)
-                return i;
+                    return i;
             }
         }
     }
@@ -415,11 +415,14 @@ size_t StringNode<Equal>::_find_first_local(size_t start, size_t end)
 
         if (multi_target_search) {
             if (m_leaf_type == StringColumn::leaf_type_Small)
-                s = find_first_in<const ArrayString&, StringData>(static_cast<const ArrayString&>(*m_leaf), s - m_leaf_start, end2);
+                s = find_first_in<const ArrayString&, StringData>(static_cast<const ArrayString&>(*m_leaf),
+                                                                  s - m_leaf_start, end2);
             else if (m_leaf_type == StringColumn::leaf_type_Medium)
-                s = find_first_in<const ArrayStringLong&, StringData>(static_cast<const ArrayStringLong&>(*m_leaf), s - m_leaf_start, end2);
+                s = find_first_in<const ArrayStringLong&, StringData>(static_cast<const ArrayStringLong&>(*m_leaf),
+                                                                      s - m_leaf_start, end2);
             else
-                s = find_first_in<const ArrayBigBlobs&, BinaryData>(static_cast<const ArrayBigBlobs&>(*m_leaf), s - m_leaf_start, end2);
+                s = find_first_in<const ArrayBigBlobs&, BinaryData>(static_cast<const ArrayBigBlobs&>(*m_leaf),
+                                                                    s - m_leaf_start, end2);
         }
         else {
             if (m_leaf_type == StringColumn::leaf_type_Small)
@@ -451,9 +454,9 @@ std::string StringNode<Equal>::describe(util::serializer::SerialisationState& st
     bool is_first = true;
     for (auto it : m_needles) {
         StringData sd(it.data(), it.size());
-        desc += (is_first ? "" : " or ")
-            + state.describe_column(ParentNode::m_table, m_condition_column->get_column_index())
-            + " " + Equal::description() + " " + util::serializer::print_value(sd);
+        desc += (is_first ? "" : " or ") +
+                state.describe_column(ParentNode::m_table, m_condition_column->get_column_index()) + " " +
+                Equal::description() + " " + util::serializer::print_value(sd);
         is_first = false;
     }
     if (!is_first) {

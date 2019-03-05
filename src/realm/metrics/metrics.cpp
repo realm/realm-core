@@ -25,8 +25,8 @@ using namespace realm;
 using namespace realm::metrics;
 
 Metrics::Metrics(size_t max_history_size)
-: m_max_num_queries(max_history_size)
-, m_max_num_transactions(max_history_size)
+    : m_max_num_queries(max_history_size)
+    , m_max_num_transactions(max_history_size)
 {
     m_query_info = std::make_unique<QueryInfoList>(max_history_size);
     m_transaction_info = std::make_unique<TransactionInfoList>(max_history_size);

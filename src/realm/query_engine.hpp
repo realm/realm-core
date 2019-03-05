@@ -1564,7 +1564,7 @@ public:
     virtual std::string describe(util::serializer::SerialisationState& state) const override;
 
 private:
-    template<class ArrayType, class ElementType>
+    template <class ArrayType, class ElementType>
     size_t find_first_in(ArrayType& array, size_t begin, size_t end);
 
     size_t _find_first_local(size_t start, size_t end) override;
