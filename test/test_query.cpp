@@ -11365,4 +11365,31 @@ TEST(Query_Group_bug)
     CHECK_EQUAL(5, q0.count());
 }
 
+TEST(Query_TwoColumnUnaligned)
+{
+    Group g;
+    TableRef table = g.add_table("table");
+    size_t a_col_ndx = table->add_column(type_Int, "a");
+    size_t b_col_ndx = table->add_column(type_Int, "b");
+
+    // Adding 1001 rows causes arrays in the 2 columns to be aligned differently
+    // (on a 0 and on an 8 address resp)
+    table->add_empty_row(1001);
+    auto matches = 0;
+    for (size_t i = 0; i < table->size(); ++i) {
+        table->set_int(a_col_ndx, i, i);
+        if (i % 88) {
+            table->set_int(b_col_ndx, i, i + 5);
+        }
+        else {
+            table->set_int(b_col_ndx, i, i);
+            matches++;
+        }
+    }
+
+    Query q = table->column<Int>(a_col_ndx) == table->column<Int>(b_col_ndx);
+    size_t cnt = q.count();
+    CHECK_EQUAL(cnt, matches);
+}
+
 #endif // TEST_QUERY
