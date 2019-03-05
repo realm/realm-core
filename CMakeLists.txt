@@ -60,6 +60,9 @@ if(MSVC)
     add_compile_options(
         /MP # Enable multi-processor compilation
     )
+    add_definitions(
+        /D_DISABLE_EXTENDED_ALIGNED_STORAGE #https://developercommunity.visualstudio.com/comments/279328/view.html
+    )
     if(NOT WINDOWS_STORE)
         # Statically link the run-time library
         # https://docs.microsoft.com/bg-bg/cpp/build/reference/md-mt-ld-use-run-time-library
