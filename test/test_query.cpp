@@ -5895,6 +5895,7 @@ TEST(Query_FindAllOr)
     add(ttt, 5, "a");
     add(ttt, 6, "a");
     add(ttt, 7, "X");
+    add(ttt, 8, "z");
 
     // first == 5 || second == X
     Query q1 = ttt.where().equal(0, 5).Or().equal(1, "X");
@@ -5903,6 +5904,14 @@ TEST(Query_FindAllOr)
     CHECK_EQUAL(2, tv1.get_source_ndx(0));
     CHECK_EQUAL(4, tv1.get_source_ndx(1));
     CHECK_EQUAL(6, tv1.get_source_ndx(2));
+
+    // second == X || second == b || second == z || first == -1
+    Query q2 = ttt.where().equal(1, "X").Or().equal(1, "b").Or().equal(1, "z").Or().equal(0, -1);
+    TableView tv2 = q2.find_all();
+    CHECK_EQUAL(3, tv2.size());
+    CHECK_EQUAL(2, tv2.get_source_ndx(0));
+    CHECK_EQUAL(6, tv2.get_source_ndx(1));
+    CHECK_EQUAL(7, tv2.get_source_ndx(2));
 }
 
 
