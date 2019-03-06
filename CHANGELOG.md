@@ -1,15 +1,8 @@
-# NEXT RELEASE
-
-### Enhancements
-* None.
+# 5.14.0-hotfix.1 Release notes
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * None.
  
-### Breaking changes
-* None.
-
 -----------
 
 ### Internals
