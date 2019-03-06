@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 5.17.0 Release notes
 
 ### Enhancements
 * Improved query performance for unindexed string columns when the query has a chain of OR conditions.
@@ -6,13 +6,9 @@
   ([PR #3250](https://github.com/realm/realm-core/pull/3250).
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Making a query that compares two integer properties could cause a segmentation fault on the server.
   ([#3253](https://github.com/realm/realm-core/issues/3253))
  
-### Breaking changes
-* None.
-
 -----------
 
 ### Internals
