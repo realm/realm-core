@@ -205,7 +205,7 @@ public:
         auto version = m_shared_group->commit();
         m_shared_group = nullptr;
 
-        auto session = SyncManager::shared().get_session(m_config.path, *m_config.sync_config);
+        auto session = SyncManager::shared().get_session(m_config.path, *m_config.sync_config, false);
         SyncSession::Internal::nonsync_transact_notify(*session, version);
         return version;
     }
