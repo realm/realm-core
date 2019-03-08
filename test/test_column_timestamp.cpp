@@ -736,29 +736,29 @@ TEST_TYPES(Timestamp_factory_methods, std::true_type, std::false_type)
 TEST_TYPES(Timestamp_modifier_methods, std::true_type, std::false_type)
 {
     // Seconds
-//    CHECK(Timestamp::max().add_seconds(1) == Timestamp::max());
-//    CHECK(Timestamp::min().add_seconds(-1) == Timestamp::min());
-//    CHECK(Timestamp::epoch().add_seconds(0) == Timestamp::epoch());
-//    CHECK(Timestamp::epoch().add_seconds(1) == Timestamp(1, 0));
-//    CHECK(Timestamp::epoch().add_seconds(-1) == Timestamp(-1, 0));
-//
-//    // Milliseconds
-//    CHECK(Timestamp::max().add_milliseconds(1) == Timestamp::max());
-//    CHECK(Timestamp::min().add_milliseconds(-1) == Timestamp::min());
-//    CHECK(Timestamp::epoch().add_milliseconds(0) == Timestamp::epoch());
-//    CHECK(Timestamp::epoch().add_milliseconds(1100) == Timestamp(1, 100000000));
-//    CHECK(Timestamp::epoch().add_milliseconds(-1100) == Timestamp( -1, -100000000));
-//
-//    // Nanoseconds
+    CHECK(Timestamp::max().add_seconds(1) == Timestamp::max());
+    CHECK(Timestamp::min().add_seconds(-1) == Timestamp::min());
+    CHECK(Timestamp::epoch().add_seconds(0) == Timestamp::epoch());
+    CHECK(Timestamp::epoch().add_seconds(1) == Timestamp(1, 0));
+    CHECK(Timestamp::epoch().add_seconds(-1) == Timestamp(-1, 0));
+
+    // Milliseconds
+    CHECK(Timestamp::max().add_milliseconds(1) == Timestamp::max());
+    CHECK(Timestamp::min().add_milliseconds(-1) == Timestamp::min());
+    CHECK(Timestamp::epoch().add_milliseconds(0) == Timestamp::epoch());
+    CHECK(Timestamp::epoch().add_milliseconds(1100) == Timestamp(1, 100000000));
+    CHECK(Timestamp::epoch().add_milliseconds(-1100) == Timestamp( -1, -100000000));
+
+    // Nanoseconds
     CHECK(Timestamp::max().add_nanoseconds(1) == Timestamp::max());
-//    CHECK(Timestamp::min().add_nanoseconds(-1) == Timestamp::min());
-//    CHECK(Timestamp::epoch().add_nanoseconds(0) == Timestamp::epoch());
-//    CHECK(Timestamp::epoch().add_nanoseconds(1100000000) == Timestamp(1, 100000000));
-//    CHECK(Timestamp::epoch().add_nanoseconds(-1100000000) == Timestamp( -1, -100000000));
-//    CHECK(Timestamp(0, Timestamp::nanoseconds_per_second - 1).add_nanoseconds(1) == Timestamp(1, 0));
-//    CHECK(Timestamp(0, -Timestamp::nanoseconds_per_second + 1).add_nanoseconds(-1) == Timestamp(-1, 0));
-//    CHECK(Timestamp(INT64_MAX, Timestamp::nanoseconds_per_second - 1).add_nanoseconds(1) == Timestamp::max());
-//    CHECK(Timestamp(INT64_MIN, -Timestamp::nanoseconds_per_second + 1).add_nanoseconds(-1) == Timestamp::min());
+    CHECK(Timestamp::min().add_nanoseconds(-1) == Timestamp::min());
+    CHECK(Timestamp::epoch().add_nanoseconds(0) == Timestamp::epoch());
+    CHECK(Timestamp::epoch().add_nanoseconds(1100000000) == Timestamp(1, 100000000));
+    CHECK(Timestamp::epoch().add_nanoseconds(-1100000000) == Timestamp( -1, -100000000));
+    CHECK(Timestamp(0, Timestamp::nanoseconds_per_second - 1).add_nanoseconds(1) == Timestamp(1, 0));
+    CHECK(Timestamp(0, -Timestamp::nanoseconds_per_second + 1).add_nanoseconds(-1) == Timestamp(-1, 0));
+    CHECK(Timestamp(INT64_MAX, Timestamp::nanoseconds_per_second - 1).add_nanoseconds(1) == Timestamp::max());
+    CHECK(Timestamp(INT64_MIN, -Timestamp::nanoseconds_per_second + 1).add_nanoseconds(-1) == Timestamp::min());
 }
 
 TEST_TYPES(Timestamp_conversion_methods, std::true_type, std::false_type)
