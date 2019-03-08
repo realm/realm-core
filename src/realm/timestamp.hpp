@@ -19,6 +19,7 @@
 #ifndef REALM_TIMESTAMP_HPP
 #define REALM_TIMESTAMP_HPP
 
+#include <chrono>
 #include <cstdint>
 #include <ostream>
 #include <realm/util/assert.hpp>
