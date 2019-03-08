@@ -22,6 +22,7 @@
 #include <cstdint>
 #include <ostream>
 #include <realm/util/assert.hpp>
+#include <realm/util/safe_int_ops.hpp>
 #include <realm/null.hpp>
 
 namespace realm {
@@ -79,6 +80,111 @@ public:
     Timestamp()
         : Timestamp(null{})
     {
+    }
+
+    // Creates a timestamp representing `now` as defined by the system clock.
+    static Timestamp now()
+    {
+        auto now = std::chrono::system_clock::now();
+        int64_t ns_since_epoch = std::chrono::duration_cast<std::chrono::nanoseconds>(now.time_since_epoch()).count();
+        int64_t s_arg = ns_since_epoch / static_cast<int64_t>(realm::Timestamp::nanoseconds_per_second);
+        int32_t ns_arg = ns_since_epoch % Timestamp::nanoseconds_per_second;
+        return Timestamp(s_arg, ns_arg);
+    }
+
+    // Returns a timestamp representing the UNIX Epoch.
+    static inline Timestamp epoch() {
+        return Timestamp(0, 0);
+    }
+
+    // Convert milliseconds from UNIX epoch to a Timestamp.
+    static Timestamp from_milliseconds(int64_t ms)
+    {
+        return epoch().add_milliseconds(ms);
+    }
+
+    // Creates lowest possible date expressible.
+    static inline Timestamp min()
+    {
+        return Timestamp(INT64_MIN, -nanoseconds_per_second + 1);
+    }
+
+    // Creates highest possible date expressible.
+    static inline Timestamp max()
+    {
+        return Timestamp(INT64_MAX, nanoseconds_per_second - 1);
+    }
+
+
+    // Return a copy of this timestamp that has been adjusted by the given number of seconds. If the Timestamp
+    // overflows in a positive direction it clamps to Timestamp::max(). If it overflows in negative direction it clamps
+    // to Timestamp::min().
+    Timestamp add_seconds(int64_t s)
+    {
+        int64_t seconds = m_seconds;
+        if (util::int_add_with_overflow_detect(seconds, s)) {
+            return (s < 0) ? min() : max();
+        }
+        else {
+            return Timestamp(seconds, m_nanoseconds);
+        }
+    }
+
+    // Return a copy of this timestamp that has been adjusted by the given number of nanoseconds. If the Timestamp
+    // overflows in a positive direction it clamps to Timestamp::max(). If it overflows in negative direction it clamps
+    // to Timestamp::min().
+    Timestamp add_nanoseconds(int64_t ns)
+    {
+        int64_t extra_seconds = ns / static_cast<int64_t>(nanoseconds_per_second);
+        int32_t extra_nanoseconds = ns % Timestamp::nanoseconds_per_second; // Restrict ns to [-999.999.999, 999.999.999]
+
+        // The nano-second part can never overflow the int32_t type itself as the maximum result
+        // is `999.999.999ns + 999.999.999ns`, but we need to handle the case where it
+        // exceeds `nanoseconds_pr_second`
+        int32_t final_nanoseconds = extra_nanoseconds + m_nanoseconds;
+        if (final_nanoseconds <= -nanoseconds_per_second) {
+            extra_seconds--;
+            final_nanoseconds += nanoseconds_per_second;
+        } else if (final_nanoseconds >= nanoseconds_per_second) {
+            extra_seconds++;
+            final_nanoseconds -= nanoseconds_per_second;
+        }
+
+        // Adjust seconds while also checking for overflow since the combined nanosecond value could also cause
+        // overflow in the seconds field.
+        int64_t final_seconds = m_seconds;
+        if (util::int_add_with_overflow_detect(final_seconds, extra_seconds)) {
+            return (extra_seconds < 0) ? min() : max();
+        }
+
+        return Timestamp(final_seconds, final_nanoseconds);
+    }
+
+    // Return a copy of this timestamp that has been adjusted by the given number of milliseconds. If the Timestamp
+    // overflows in a positive direction it clamps to Timestamp::max(). If it overflows in negative direction it clamps
+    // to Timestamp::min().
+    Timestamp add_milliseconds(int64_t ms)
+    {
+        int64_t seconds = ms/1000;
+        int32_t nanoseconds = (ms % 1000) * 1000000;
+        return add_seconds(seconds).add_nanoseconds(nanoseconds);
+    }
+
+    // Converts this timestamp to milliseconds from UNIX epoch. If the Timestamp overflows in a positive direction it
+    // returns INT64_MAX. If it overflows in negative direction it returns INT64_MIN.
+    int64_t to_milliseconds() const
+    {
+        if (m_seconds > INT64_MAX/1000) {
+            return INT64_MAX;
+        }
+        if (m_seconds < INT64_MIN/1000) {
+            return INT64_MIN;
+        }
+        int64_t ms = m_seconds * 1000; // This will never overflow
+        if (util::int_add_with_overflow_detect(ms, m_nanoseconds/1000000))
+            return (ms < 0) ? INT64_MIN : INT64_MAX;
+
+        return ms;
     }
 
     bool is_null() const

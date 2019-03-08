@@ -1,7 +1,11 @@
 # NEXT RELEASE
 
 ### Enhancements
-* None.
+* Added `Timestamp::now()`, `Timestamp::epoch()`, `Timestamp::min()`, `Timestamp::max()`, 
+  `Timestamp::from_milliseconds()` as factory methods for creating timestamps.
+* Added `Timestamp::add_seconds(int64_t)`, `Timestamp::add_milliseconds(int64_t)` and 
+  `Timestamp::add_nanoseconds(int64_t)` and `Timestamp::to_milliseconds()` as helper methods
+  when working with timestamps. 
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)

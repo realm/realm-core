@@ -676,29 +676,6 @@ TEST(Table_DistinctTimestamp)
     CHECK_EQUAL(3, view.size());
 }
 
-
-namespace {
-// Since C++11, modulo with negative operands is well-defined
-
-// "Reference implementations" for conversions to and from milliseconds
-Timestamp milliseconds_to_timestamp(int64_t milliseconds)
-{
-    int64_t seconds = milliseconds / 1000;
-    int32_t nanoseconds = (milliseconds % 1000) * 1000000;
-    return Timestamp(seconds, nanoseconds);
-}
-
-int64_t timestamp_to_milliseconds(const Timestamp& ts)
-{
-    const int64_t seconds = ts.get_seconds();
-    const int32_t nanoseconds = ts.get_nanoseconds();
-    const int64_t milliseconds = seconds * 1000 + nanoseconds / 1000000; // This may overflow
-    return milliseconds;
-}
-
-} // unnamed namespace
-
-
 TEST_TYPES(Timestamp_Conversions, std::true_type, std::false_type)
 {
     constexpr bool nullable_toggle = TEST_TYPE::value;
@@ -710,18 +687,94 @@ TEST_TYPES(Timestamp_Conversions, std::true_type, std::false_type)
 
     for (size_t i = 0; i < num_millis; ++i) {
         const int64_t milliseconds = millis[i];
-        const Timestamp ts = milliseconds_to_timestamp(milliseconds);
+        const Timestamp ts = Timestamp::from_milliseconds(milliseconds);
         c.add(ts);
     }
 
     for (size_t i = 0; i < num_millis; ++i) {
         const Timestamp ts = c.get(i);
-        const int64_t milliseconds = timestamp_to_milliseconds(ts);
+        const int64_t milliseconds = ts.to_milliseconds();
         CHECK_EQUAL(milliseconds, millis[i]);
     }
 
     c.destroy();
 }
+
+TEST_TYPES(Timestamp_factory_methods, std::true_type, std::false_type)
+{
+
+    auto epoch = Timestamp::epoch();
+    CHECK(epoch.get_seconds() == 0);
+    CHECK(epoch.get_nanoseconds() == 0);
+
+    auto max = Timestamp::max();
+    CHECK(max.get_seconds() == INT64_MAX);
+    CHECK(max.get_nanoseconds() == Timestamp::nanoseconds_per_second - 1);
+
+    auto min = Timestamp::min();
+    CHECK(min.get_seconds() == INT64_MIN);
+    CHECK(min.get_nanoseconds() == -Timestamp::nanoseconds_per_second + 1);
+
+    // Fuzzy check
+    auto now = std::chrono::system_clock::now();
+    int64_t now_ms_since_epoch = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
+    int64_t ts_now = Timestamp::now().to_milliseconds();
+    CHECK(now_ms_since_epoch <= ts_now);
+    CHECK(ts_now <= now_ms_since_epoch + 5);
+
+    CHECK(Timestamp::from_milliseconds(0) == Timestamp::epoch());
+
+    auto ms_neg = Timestamp::from_milliseconds(-1100);
+    CHECK(ms_neg.get_seconds() == -1);
+    CHECK(ms_neg.get_nanoseconds() == -100000000);
+
+    auto ms_pos = Timestamp::from_milliseconds(1100);
+    CHECK(ms_pos.get_seconds() == 1);
+    CHECK(ms_pos.get_nanoseconds() == 100000000);
+}
+
+TEST_TYPES(Timestamp_modifier_methods, std::true_type, std::false_type)
+{
+    // Seconds
+//    CHECK(Timestamp::max().add_seconds(1) == Timestamp::max());
+//    CHECK(Timestamp::min().add_seconds(-1) == Timestamp::min());
+//    CHECK(Timestamp::epoch().add_seconds(0) == Timestamp::epoch());
+//    CHECK(Timestamp::epoch().add_seconds(1) == Timestamp(1, 0));
+//    CHECK(Timestamp::epoch().add_seconds(-1) == Timestamp(-1, 0));
+//
+//    // Milliseconds
+//    CHECK(Timestamp::max().add_milliseconds(1) == Timestamp::max());
+//    CHECK(Timestamp::min().add_milliseconds(-1) == Timestamp::min());
+//    CHECK(Timestamp::epoch().add_milliseconds(0) == Timestamp::epoch());
+//    CHECK(Timestamp::epoch().add_milliseconds(1100) == Timestamp(1, 100000000));
+//    CHECK(Timestamp::epoch().add_milliseconds(-1100) == Timestamp( -1, -100000000));
+//
+//    // Nanoseconds
+    CHECK(Timestamp::max().add_nanoseconds(1) == Timestamp::max());
+//    CHECK(Timestamp::min().add_nanoseconds(-1) == Timestamp::min());
+//    CHECK(Timestamp::epoch().add_nanoseconds(0) == Timestamp::epoch());
+//    CHECK(Timestamp::epoch().add_nanoseconds(1100000000) == Timestamp(1, 100000000));
+//    CHECK(Timestamp::epoch().add_nanoseconds(-1100000000) == Timestamp( -1, -100000000));
+//    CHECK(Timestamp(0, Timestamp::nanoseconds_per_second - 1).add_nanoseconds(1) == Timestamp(1, 0));
+//    CHECK(Timestamp(0, -Timestamp::nanoseconds_per_second + 1).add_nanoseconds(-1) == Timestamp(-1, 0));
+//    CHECK(Timestamp(INT64_MAX, Timestamp::nanoseconds_per_second - 1).add_nanoseconds(1) == Timestamp::max());
+//    CHECK(Timestamp(INT64_MIN, -Timestamp::nanoseconds_per_second + 1).add_nanoseconds(-1) == Timestamp::min());
+}
+
+TEST_TYPES(Timestamp_conversion_methods, std::true_type, std::false_type)
+{
+    CHECK(Timestamp::max().to_milliseconds() == INT64_MAX);
+    CHECK(Timestamp::min().to_milliseconds() == INT64_MIN);
+    CHECK(Timestamp::epoch().to_milliseconds() == 0);
+    CHECK(Timestamp((INT64_MAX/1000) + 1, 0).to_milliseconds() == INT64_MAX);
+    CHECK(Timestamp((INT64_MIN/1000) - 1, 0).to_milliseconds() == INT64_MIN);
+    CHECK(Timestamp(1, 500000 /* 5 microsec.*/).to_milliseconds() == 1000);
+    CHECK(Timestamp(1, 500001 /* ~5 microsec.*/).to_milliseconds() == 1000);
+    CHECK(Timestamp(-1, -500000 /* 5 microsec.*/).to_milliseconds() == -1000);
+    CHECK(Timestamp(-1, -500001 /* ~5 microsec.*/).to_milliseconds() == -1000);
+
+}
+
 
 
 #endif // TEST_COLUMN_TIMESTAMP
