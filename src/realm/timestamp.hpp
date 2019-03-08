@@ -146,7 +146,8 @@ public:
         if (final_nanoseconds <= -nanoseconds_per_second) {
             extra_seconds--;
             final_nanoseconds += nanoseconds_per_second;
-        } else if (final_nanoseconds >= nanoseconds_per_second) {
+        }
+        else if (final_nanoseconds >= nanoseconds_per_second) {
             extra_seconds++;
             final_nanoseconds -= nanoseconds_per_second;
         }
@@ -154,9 +155,8 @@ public:
         // Adjust seconds while also checking for overflow since the combined nanosecond value could also cause
         // overflow in the seconds field.
         int64_t final_seconds = m_seconds;
-        if (util::int_add_with_overflow_detect(final_seconds, extra_seconds)) {
+        if (util::int_add_with_overflow_detect(final_seconds, extra_seconds))
             return (extra_seconds < 0) ? min() : max();
-        }
 
         return Timestamp(final_seconds, final_nanoseconds);
     }
@@ -175,12 +175,10 @@ public:
     // returns INT64_MAX. If it overflows in negative direction it returns INT64_MIN.
     int64_t to_milliseconds() const
     {
-        if (m_seconds > INT64_MAX/1000) {
+        if (m_seconds > INT64_MAX/1000)
             return INT64_MAX;
-        }
-        if (m_seconds < INT64_MIN/1000) {
+        if (m_seconds < INT64_MIN/1000)
             return INT64_MIN;
-        }
         int64_t ms = m_seconds * 1000; // This will never overflow
         if (util::int_add_with_overflow_detect(ms, m_nanoseconds/1000000))
             return (ms < 0) ? INT64_MIN : INT64_MAX;
