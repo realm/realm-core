@@ -702,7 +702,6 @@ TEST_TYPES(Timestamp_Conversions, std::true_type, std::false_type)
 
 TEST_TYPES(Timestamp_factory_methods, std::true_type, std::false_type)
 {
-
     auto epoch = Timestamp::epoch();
     CHECK(epoch.get_seconds() == 0);
     CHECK(epoch.get_nanoseconds() == 0);
@@ -772,7 +771,6 @@ TEST_TYPES(Timestamp_conversion_methods, std::true_type, std::false_type)
     CHECK(Timestamp(1, 500001 /* ~5 microsec.*/).to_milliseconds() == 1000);
     CHECK(Timestamp(-1, -500000 /* 5 microsec.*/).to_milliseconds() == -1000);
     CHECK(Timestamp(-1, -500001 /* ~5 microsec.*/).to_milliseconds() == -1000);
-
 }
 
 
