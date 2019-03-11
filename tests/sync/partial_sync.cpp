@@ -529,13 +529,13 @@ TEST_CASE("Query-based Sync", "[sync]") {
             using SubscriptionState = partial_sync::SubscriptionState;
 
             switch (subscription.state()) {
+                case SubscriptionState::Complete:
                 case SubscriptionState::Creating:
                     partial_sync::unsubscribe(subscription);
                     break;
 
                 case SubscriptionState::Pending:
                 case SubscriptionState::Error:
-                case SubscriptionState::Complete:
                     break;
 
                 case SubscriptionState::Invalidated:

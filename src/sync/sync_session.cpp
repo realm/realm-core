@@ -490,6 +490,20 @@ void SyncSession::handle_error(SyncError error)
         }
     }
 
+    if (error.is_client_reset_requested()) {
+        switch (m_config.client_reset_mode) {
+            case ClientResetHandling::Manual:
+                break;
+            case ClientResetHandling::DiscardLocal:
+            case ClientResetHandling::Recover: {
+                m_force_client_reset = true;
+                log_out();
+                revive_if_needed();
+                return;
+            }
+        }
+    }
+
     if (error_code.category() == realm::sync::protocol_error_category()) {
         using ProtocolError = realm::sync::ProtocolError;
         switch (static_cast<ProtocolError>(error_code.value())) {
@@ -674,6 +688,8 @@ void SyncSession::create_sync_session()
 
         sync::Session::Config::ClientReset config;
         config.metadata_dir = metadata_dir;
+        if (m_config.client_reset_mode != ClientResetHandling::Recover)
+            config.recover_local_changes = false;
         session_config.client_reset_config = config;
     }
 

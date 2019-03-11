@@ -736,3 +736,104 @@ TEST_CASE("sync: Migration from Sync 1.x to Sync 2.x", "[sync]") {
     }
 }
 
+TEST_CASE("sync: client reset") {
+    using namespace std::literals::chrono_literals;
+    if (!EventLoop::has_implementation())
+        return;
+
+    SyncManager::shared().configure(tmp_dir(), SyncManager::MetadataMode::NoMetadata);
+
+    SyncServer server;
+    SyncTestFile config(server, "default");
+    config.schema = Schema{
+        {"object", {
+            {"value", PropertyType::Int},
+        }},
+    };
+    SyncTestFile config2(server, "default");
+
+    auto trigger_client_reset = [&]() -> std::shared_ptr<Realm> {
+        auto realm = Realm::get_shared_realm(config);
+        auto session = SyncManager::shared().get_session(realm->config().path, *realm->config().sync_config);
+        {
+            realm->begin_transaction();
+            auto table = ObjectStore::table_for_object_type(realm->read_group(), "object");
+            size_t row = sync::create_object(realm->read_group(), *table);
+            table->set_int(1, row, 1);
+            table->set_int(1, row, 2);
+            table->set_int(1, row, 3);
+            realm->commit_transaction();
+
+            wait_for_upload(*realm);
+            session->log_out();
+
+            // Make a change while offline so that log compaction will cause a
+            // client reset
+            realm->begin_transaction();
+            table->set_int(1, row, 4);
+            realm->commit_transaction();
+        }
+
+        // Make writes from another client while advancing the time so that
+        // the server performs log compaction
+        {
+            auto realm2 = Realm::get_shared_realm(config2);
+
+            for (int i = 0; i < 2; ++i) {
+                wait_for_download(*realm2);
+                realm2->begin_transaction();
+                auto table = ObjectStore::table_for_object_type(realm2->read_group(), "object");
+                table->set_int(1, 0, i + 5);
+                realm2->commit_transaction();
+                wait_for_upload(*realm2);
+                server.advance_clock(10s);
+            }
+            realm2->close();
+        }
+
+        // Resuming sync on the first realm should now result in a client reset
+        session->revive_if_needed();
+        return realm;
+    };
+
+    SECTION("should trigger error callback when mode is manual") {
+        config.sync_config->client_reset_mode = ClientResetHandling::Manual;
+        std::atomic<bool> called{false};
+        config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
+            REQUIRE(error.is_client_reset_requested());
+            called = true;
+        };
+
+        auto realm = trigger_client_reset();
+
+        EventLoop::main().run_until([&] { return called.load(); });
+    }
+
+    SECTION("should discard local changeset when mode is discard") {
+        config.sync_config->client_reset_mode = ClientResetHandling::DiscardLocal;
+        config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError) {
+            FAIL("Error handler should not have been called");
+        };
+
+        auto realm = trigger_client_reset();
+        sleep(1);
+        wait_for_download(*realm);
+        realm->refresh();
+
+        CHECK(ObjectStore::table_for_object_type(realm->read_group(), "object")->get_int(1, 0) == 6);
+    }
+
+    SECTION("should recover local changeset when mode is recover") {
+        config.sync_config->client_reset_mode = ClientResetHandling::Recover;
+        config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError) {
+            FAIL("Error handler should not have been called");
+        };
+
+        auto realm = trigger_client_reset();
+        sleep(1);
+        wait_for_download(*realm);
+        realm->refresh();
+
+        CHECK(ObjectStore::table_for_object_type(realm->read_group(), "object")->get_int(1, 0) == 4);
+    }
+}
