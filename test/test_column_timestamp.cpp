@@ -723,5 +723,18 @@ TEST_TYPES(Timestamp_Conversions, std::true_type, std::false_type)
     c.destroy();
 }
 
+TEST(Timestamp_ChronoConvertions)
+{
+    Timestamp t(1, 0);
+    auto tp = t.get_time_point();
+    CHECK_EQUAL(std::chrono::duration_cast<std::chrono::milliseconds>(tp.time_since_epoch()).count(), 1000);
+    Timestamp t2(tp + std::chrono::milliseconds(500));
+    CHECK_EQUAL(t2, Timestamp(1, 500 * 1000 * 1000));
+
+    auto now = std::chrono::system_clock::now();
+    Timestamp t3(now);
+    tp = t3.get_time_point();
+    CHECK_EQUAL(tp, now);
+}
 
 #endif // TEST_COLUMN_TIMESTAMP

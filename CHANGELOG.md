@@ -1,7 +1,8 @@
 # NEXT RELEASE
 
 ### Enhancements
-* None.
+* Added the ability to convert a std::chrono::time_point to a Timestamp and
+  vice versa. This allows us to make calculations using std::chrono::duration.
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
