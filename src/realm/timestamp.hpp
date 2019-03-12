@@ -87,10 +87,9 @@ public:
     static Timestamp now()
     {
         auto now = std::chrono::system_clock::now();
-        int64_t ns_since_epoch = std::chrono::duration_cast<std::chrono::nanoseconds>(now.time_since_epoch()).count();
-        int64_t s_arg = ns_since_epoch / static_cast<int64_t>(realm::Timestamp::nanoseconds_per_second);
-        int32_t ns_arg = ns_since_epoch % Timestamp::nanoseconds_per_second;
-        return Timestamp(s_arg, ns_arg);
+        auto sec = std::chrono::time_point_cast<std::chrono::seconds>(now);
+        auto ns = static_cast<int32_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(now - sec).count());
+        return {sec.time_since_epoch().count(), ns};
     }
 
     // Returns a timestamp representing the UNIX Epoch.
