@@ -168,8 +168,7 @@ void AdminRealmListener::start()
         m_notification_token = m_results.add_notification_callback(Handler(std::move(weak_self)));
     });
     m_download_session = SyncManager::shared().get_session(m_config.path, *m_config.sync_config);
-    bool result = m_download_session->wait_for_download_completion(std::move(download_callback));
-    REALM_ASSERT_RELEASE(result);
+    m_download_session->wait_for_download_completion(std::move(download_callback));
 }
 
 Realm::Config AdminRealmListener::get_config(StringData virtual_path, StringData id) const {

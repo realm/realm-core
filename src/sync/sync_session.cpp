@@ -109,12 +109,7 @@ struct SyncSession::State {
 
     // Register a handler to wait for sync session uploads, downloads, or synchronization.
     // PRECONDITION: the session state lock must be held at the time this method is called, until after it returns.
-    // Returns true iff the handler was registered, either immediately or placed in a queue for later registration.
-    virtual bool wait_for_completion(SyncSession&,
-                                     std::function<void(std::error_code)>,
-                                     SessionWaiterPointer) const {
-        return false;
-    }
+    virtual void wait_for_completion(SyncSession&, _impl::SyncProgressNotifier::NotifierType) const { }
 
     virtual void override_server(std::unique_lock<std::mutex>&, SyncSession&, std::string, int) const { }
 
@@ -151,12 +146,6 @@ struct sync_session_states::WaitingForAccessToken : public SyncSession::State {
 
         if (session.m_server_override)
             session.m_session->override_server(session.m_server_override->address, session.m_server_override->port);
-
-        // Register all the pending wait-for-completion blocks.
-        for (auto& package : session.m_completion_wait_packages) {
-            (*session.m_session.*package.waiter)(std::move(package.callback));
-        }
-        session.m_completion_wait_packages.clear();
 
         // Handle any deferred commit notification.
         if (session.m_deferred_commit_notification) {
@@ -212,14 +201,6 @@ struct sync_session_states::WaitingForAccessToken : public SyncSession::State {
         }
     }
 
-    bool wait_for_completion(SyncSession& session,
-                             std::function<void(std::error_code)> callback,
-                             SessionWaiterPointer waiter) const override
-    {
-        session.m_completion_wait_packages.push_back({ waiter, std::move(callback) });
-        return true;
-    }
-
     void override_server(std::unique_lock<std::mutex>&, SyncSession& session,
                          std::string address, int port) const override
     {
@@ -228,6 +209,17 @@ struct sync_session_states::WaitingForAccessToken : public SyncSession::State {
 };
 
 struct sync_session_states::Active : public SyncSession::State {
+    void enter_state(std::unique_lock<std::mutex>&, SyncSession& session) const override
+    {
+        // Register all the pending wait-for-completion blocks. This can
+        // potentially add a redundant callback if we're coming from the Dying
+        // state, but that's okay (we won't call the user callbacks twice).
+        if (!session.m_upload_completion_callbacks.empty())
+            session.add_completion_callback(_impl::SyncProgressNotifier::NotifierType::upload);
+        if (!session.m_download_completion_callbacks.empty())
+            session.add_completion_callback(_impl::SyncProgressNotifier::NotifierType::download);
+    }
+
     void refresh_access_token(std::unique_lock<std::mutex>&, SyncSession& session,
                               std::string access_token,
                               const util::Optional<std::string>&) const override
@@ -276,13 +268,10 @@ struct sync_session_states::Active : public SyncSession::State {
         }
     }
 
-    bool wait_for_completion(SyncSession& session,
-                             std::function<void(std::error_code)> callback,
-                             SessionWaiterPointer waiter) const override
+    void wait_for_completion(SyncSession& session, _impl::SyncProgressNotifier::NotifierType direction) const override
     {
         REALM_ASSERT(session.m_session);
-        (*session.m_session.*waiter)(std::move(callback));
-        return true;
+        session.add_completion_callback(direction);
     }
 
     void handle_reconnect(std::unique_lock<std::mutex>&, SyncSession& session) const override
@@ -344,13 +333,10 @@ struct sync_session_states::Dying : public SyncSession::State {
         session.advance_state(lock, inactive);
     }
 
-    bool wait_for_completion(SyncSession& session,
-                             std::function<void(std::error_code)> callback,
-                             SessionWaiterPointer waiter) const override
+    void wait_for_completion(SyncSession& session, _impl::SyncProgressNotifier::NotifierType direction) const override
     {
         REALM_ASSERT(session.m_session);
-        (*session.m_session.*waiter)(std::move(callback));
-        return true;
+        session.add_completion_callback(direction);
     }
 
     void override_server(std::unique_lock<std::mutex>&, SyncSession& session,
@@ -370,8 +356,11 @@ struct sync_session_states::Inactive : public SyncSession::State {
         auto old_state = session.m_connection_state;
         auto new_state = session.m_connection_state = SyncSession::ConnectionState::Disconnected;
 
-        auto completion_wait_packages = std::move(session.m_completion_wait_packages);
-        session.m_completion_wait_packages.clear();
+        auto download_waits = std::move(session.m_download_completion_callbacks);
+        auto upload_waits = std::move(session.m_upload_completion_callbacks);
+        session.m_download_completion_callbacks.clear();
+        session.m_upload_completion_callbacks.clear();
+
         session.m_session = nullptr;
         session.unregister(lock); // releases lock
 
@@ -381,21 +370,15 @@ struct sync_session_states::Inactive : public SyncSession::State {
         }
 
         // Inform any queued-up completion handlers that they were cancelled.
-        for (auto& package : completion_wait_packages)
-            package.callback(util::error::operation_aborted);
+        for (auto& callback : download_waits)
+            callback(util::error::operation_aborted);
+        for (auto& callback : upload_waits)
+            callback(util::error::operation_aborted);
     }
 
     bool revive_if_needed(std::unique_lock<std::mutex>& lock, SyncSession& session) const override
     {
         session.advance_state(lock, waiting_for_access_token);
-        return true;
-    }
-
-    bool wait_for_completion(SyncSession& session,
-                             std::function<void(std::error_code)> callback,
-                             SessionWaiterPointer waiter) const override
-    {
-        session.m_completion_wait_packages.push_back({ waiter, std::move(callback) });
         return true;
     }
 
@@ -496,8 +479,19 @@ void SyncSession::handle_error(SyncError error)
                 break;
             case ClientResetHandling::DiscardLocal:
             case ClientResetHandling::Recover: {
-                m_force_client_reset = true;
-                log_out();
+                {
+                    std::unique_lock<std::mutex> lock(m_state_mutex);
+                    m_force_client_reset = true;
+
+                    ++m_completion_counter;
+                    auto download_handlers = std::move(m_download_completion_callbacks);
+                    auto upload_handlers = std::move(m_upload_completion_callbacks);
+
+                    advance_state(lock, State::inactive);
+
+                    m_download_completion_callbacks = std::move(download_handlers);
+                    m_upload_completion_callbacks = std::move(upload_handlers);
+                }
                 revive_if_needed();
                 return;
             }
@@ -643,13 +637,15 @@ void SyncSession::handle_error(SyncError error)
 
 void SyncSession::cancel_pending_waits(std::unique_lock<std::mutex>& lock)
 {
-    auto packages = std::move(m_completion_wait_packages);
+    auto download = std::move(m_download_completion_callbacks);
+    auto upload = std::move(m_upload_completion_callbacks);
     lock.unlock();
 
     // Inform any queued-up completion handlers that they were cancelled.
-    for (auto& package : packages) {
-        package.callback(util::error::operation_aborted);
-    }
+    for (auto& callback : download)
+        callback(util::error::operation_aborted);
+    for (auto& callback : upload)
+        callback(util::error::operation_aborted);
 }
 
 void SyncSession::handle_progress_update(uint64_t downloaded, uint64_t downloadable,
@@ -806,16 +802,42 @@ void SyncSession::unregister(std::unique_lock<std::mutex>& lock)
     SyncManager::shared().unregister_session(m_realm_path);
 }
 
-bool SyncSession::wait_for_upload_completion(std::function<void(std::error_code)> callback)
+void SyncSession::add_completion_callback(_impl::SyncProgressNotifier::NotifierType direction)
 {
-    std::unique_lock<std::mutex> lock(m_state_mutex);
-    return m_state->wait_for_completion(*this, std::move(callback), &sync::Session::async_wait_for_upload_completion);
+    bool is_download = direction == _impl::SyncProgressNotifier::NotifierType::download;
+
+    int age_counter = m_completion_counter;
+    std::weak_ptr<SyncSession> weak_self = shared_from_this();
+    auto waiter = is_download ? &sync::Session::async_wait_for_download_completion
+                              : &sync::Session::async_wait_for_upload_completion;
+    (m_session.get()->*waiter)([age_counter, weak_self, is_download](std::error_code ec) {
+        auto self = weak_self.lock();
+        if (!self)
+            return;
+        std::unique_lock<std::mutex> lock(self->m_state_mutex);
+        if (age_counter != self->m_completion_counter)
+            return;
+        auto callbacks = std::move(is_download ? self->m_download_completion_callbacks : self->m_upload_completion_callbacks);
+        lock.unlock();
+        for (auto& callback : callbacks)
+            callback(ec);
+    });
 }
 
-bool SyncSession::wait_for_download_completion(std::function<void(std::error_code)> callback)
+void SyncSession::wait_for_upload_completion(std::function<void(std::error_code)> callback)
 {
     std::unique_lock<std::mutex> lock(m_state_mutex);
-    return m_state->wait_for_completion(*this, std::move(callback), &sync::Session::async_wait_for_download_completion);
+    if (m_upload_completion_callbacks.empty())
+        m_state->wait_for_completion(*this, _impl::SyncProgressNotifier::NotifierType::upload);
+    m_upload_completion_callbacks.push_back(std::move(callback));
+}
+
+void SyncSession::wait_for_download_completion(std::function<void(std::error_code)> callback)
+{
+    std::unique_lock<std::mutex> lock(m_state_mutex);
+    if (m_download_completion_callbacks.empty())
+        m_state->wait_for_completion(*this, _impl::SyncProgressNotifier::NotifierType::download);
+    m_download_completion_callbacks.push_back(std::move(callback));
 }
 
 uint64_t SyncSession::register_progress_notifier(std::function<SyncProgressNotifierCallback> notifier,

@@ -136,17 +136,12 @@ public:
 
     // Register a callback that will be called when all pending uploads have completed.
     // The callback is run asynchronously, and upon whatever thread the underlying sync client
-    // chooses to run it on. The method returns immediately with true if the callback was
-    // successfully registered, false otherwise. If the method returns false the callback will
-    // never be run.
-    // This method will return true if the completion handler was registered, either immediately
-    // or placed in a queue. If it returns true the completion handler will always be called
-    // at least once, except in the case where a logged-out session is never logged back in.
-    bool wait_for_upload_completion(std::function<void(std::error_code)> callback);
+    // chooses to run it on.
+    void wait_for_upload_completion(std::function<void(std::error_code)> callback);
 
     // Register a callback that will be called when all pending downloads have been completed.
     // Works the same way as `wait_for_upload_completion()`.
-    bool wait_for_download_completion(std::function<void(std::error_code)> callback);
+    void wait_for_download_completion(std::function<void(std::error_code)> callback);
 
     using NotifierType = _impl::SyncProgressNotifier::NotifierType;
     // Register a notifier that updates the app regarding progress.
@@ -347,6 +342,8 @@ private:
     void unregister(std::unique_lock<std::mutex>& lock);
     void did_drop_external_reference();
 
+    void add_completion_callback(_impl::SyncProgressNotifier::NotifierType direction);
+
     std::function<SyncSessionTransactCallback> m_sync_transact_callback;
 
     mutable std::mutex m_state_mutex;
@@ -365,12 +362,9 @@ private:
     std::string m_realm_path;
     _impl::SyncClient& m_client;
 
-    // For storing wait-for-completion requests if the session isn't yet ready to handle them.
-    struct CompletionWaitPackage {
-        void(sync::Session::*waiter)(std::function<void(std::error_code)>);
-        std::function<void(std::error_code)> callback;
-    };
-    std::vector<CompletionWaitPackage> m_completion_wait_packages;
+    std::vector<std::function<void(std::error_code)>> m_download_completion_callbacks;
+    std::vector<std::function<void(std::error_code)>> m_upload_completion_callbacks;
+    int m_completion_counter = 0;
 
     struct ServerOverride {
         std::string address;

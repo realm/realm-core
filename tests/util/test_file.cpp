@@ -194,7 +194,7 @@ std::string SyncServer::url_for_realm(StringData realm_name) const
     return util::format("%1/%2", m_url, realm_name);
 }
 
-static void wait_for_session(Realm& realm, bool (SyncSession::*fn)(std::function<void(std::error_code)>))
+static void wait_for_session(Realm& realm, void (SyncSession::*fn)(std::function<void(std::error_code)>))
 {
     std::condition_variable cv;
     std::mutex wait_mutex;
