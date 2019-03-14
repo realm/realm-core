@@ -24,6 +24,7 @@
 #include <realm/util/optional.hpp>
 
 #include <vector>
+#include <unordered_set>
 
 namespace realm {
 
@@ -36,7 +37,7 @@ public:
     BaseDescriptor() = default;
     virtual ~BaseDescriptor() = default;
     virtual bool is_valid() const noexcept = 0;
-    virtual std::string get_description(TableRef attached_table) const = 0;
+    virtual std::string get_description(ConstTableRef attached_table) const = 0;
     virtual std::unique_ptr<BaseDescriptor> clone() const = 0;
     virtual DescriptorExport export_for_handover() const = 0;
     virtual DescriptorType get_type() const = 0;
@@ -101,10 +102,10 @@ public:
     // handover support
     DescriptorExport export_for_handover() const override;
 
-    std::string get_description(TableRef attached_table) const override;
+    std::string get_description(ConstTableRef attached_table) const override;
 
 protected:
-    std::string description_for_prefix(std::string prefix, TableRef attached_table) const;
+    std::string description_for_prefix(std::string prefix, ConstTableRef attached_table) const;
 
     std::vector<std::vector<const ColumnBase*>> m_columns;
 };
@@ -114,7 +115,7 @@ public:
     IncludeDescriptor() = default;
     IncludeDescriptor(Table const& table, std::vector<std::vector<LinkPathPart>> column_indices);
     ~IncludeDescriptor() = default;
-    std::string get_description(TableRef attached_table) const override;
+    std::string get_description(ConstTableRef attached_table) const override;
     std::unique_ptr<BaseDescriptor> clone() const override;
     DescriptorExport export_for_handover() const override;
     DescriptorType get_type() const override
@@ -123,7 +124,9 @@ public:
     }
     void append(const IncludeDescriptor& other);
     void report_included_backlinks(const Table* origin, size_t row_ndx,
-                                   std::function<void(const Table*, size_t)> reporter) const;
+                                   std::function<void(const Table*, const std::unordered_set<size_t>&)> reporter) const;
+private:
+    std::vector<std::vector<LinkPathPart>> m_include_columns;
 };
 
 class SortDescriptor : public ColumnsDescriptor {
@@ -148,7 +151,7 @@ public:
 
     // handover support
     DescriptorExport export_for_handover() const override;
-    std::string get_description(TableRef attached_table) const override;
+    std::string get_description(ConstTableRef attached_table) const override;
 
 private:
     std::vector<bool> m_ascending;
@@ -159,7 +162,7 @@ public:
     LimitDescriptor(size_t limit);
     virtual ~LimitDescriptor() = default;
     bool is_valid() const noexcept override { return true; }
-    std::string get_description(TableRef attached_table) const override;
+    std::string get_description(ConstTableRef attached_table) const override;
     std::unique_ptr<BaseDescriptor> clone() const override;
     DescriptorExport export_for_handover() const override;
     size_t get_limit() const noexcept { return m_limit; }
@@ -210,7 +213,7 @@ public:
     realm::util::Optional<size_t> get_min_limit() const;
     bool will_limit_to_zero() const;
     IncludeDescriptor compile_included_backlinks() const;
-    std::string get_description(TableRef target_table) const;
+    std::string get_description(ConstTableRef target_table) const;
 
     // handover support
     using HandoverPatch = std::unique_ptr<DescriptorOrderingHandoverPatch>;

@@ -68,6 +68,7 @@ struct DescriptorLinkPath
 {
     size_t col_ndx;
     size_t table_ndx;
+    bool is_backlink = false;
 };
 
 struct DescriptorExport {

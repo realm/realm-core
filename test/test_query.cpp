@@ -5164,6 +5164,7 @@ ONLY(Query_IncludeDescriptor)
 
     size_t t1_int_col = t1->add_column(type_Int, "t1_int");
     size_t t1_link_col = t1->add_column_link(type_Link, "t1_link_t2", *t2);
+    size_t t1_link_self_col = t1->add_column_link(type_Link, "t1_link_self", *t1);
     size_t t2_int_col = t2->add_column(type_Int, "t2_int");
     size_t t2_link_col = t2->add_column_link(type_Link, "t2_link_t3", *t3);
     size_t t3_int_col = t3->add_column(type_Int, "t3_int", true);
@@ -5189,6 +5190,14 @@ ONLY(Query_IncludeDescriptor)
     t1->set_link(t1_link_col, 5, 4);
     t1->set_link(t1_link_col, 6, 1);
 
+    t1->set_link(t1_link_self_col, 0, 1);
+    t1->set_link(t1_link_self_col, 1, 2);
+    t1->set_link(t1_link_self_col, 2, 3);
+    t1->set_link(t1_link_self_col, 3, 4);
+    t1->set_link(t1_link_self_col, 4, 5);
+    t1->set_link(t1_link_self_col, 5, 6);
+    t1->set_link(t1_link_self_col, 6, 0);
+
     t2->set_link(t2_link_col, 0, 3);
     t2->set_link(t2_link_col, 1, 2);
     t2->set_link(t2_link_col, 2, 0);
@@ -5205,42 +5214,58 @@ ONLY(Query_IncludeDescriptor)
     t3->set_string(t3_str_col, 2, "c");
     t3->set_string(t3_str_col, 3, "k");
 
-    //  T1                       T2                     T3
-    //  t1_int   t1_link_t2  |   t2_int  t2_link_t3 |   t3_int  t3_str
-    //  ==============================================================
-    //  99       1           |   0       3          |   null    "b"
-    //  0        0           |   0       2          |   4       "a"
-    //  1        2           |   3       0          |   7       "c"
-    //  2        3           |   2       1          |   3       "k"
-    //  3        5           |   1       null       |
-    //  4        4           |   0       null       |
-    //  5        1           |                      |
+    //  T1                                   T2                     T3
+    //  t1_int   t1_link_t2  t1_link_self  |   t2_int  t2_link_t3 |   t3_int  t3_str
+    //  ============================================================================
+    //  99       1            1            |   0       3          |   null    "b"
+    //  0        0            2            |   0       2          |   4       "a"
+    //  1        2            3            |   3       0          |   7       "c"
+    //  2        3            4            |   2       1          |   3       "k"
+    //  3        5            5            |   1       null       |
+    //  4        4            6            |   0       null       |
+    //  5        1            0            |                      |
 
     {
         TableView tv = t1->where().less(t1_int_col, 6).find_all();
-        tv.include(IncludeDescriptor(*t2, {{{t1_link_col, t1}}}));
-        // Test original funcionality through chain class
-        std::vector<size_t> results1 = {0, 1, 2, 3, 4, 5};
-        tv.distinct(DistinctDescriptor(*t1, {{t1_int_col}}));
-        CHECK_EQUAL(tv.size(), results1.size());
+        tv.sort(t1_int_col);
+        tv.include(IncludeDescriptor(*t1, {{{t1_link_self_col, t1}}}));
+
+        IncludeDescriptor includes = tv.get_include_descriptors();
+        std::vector<size_t> expected_rows;
+        auto reporter = [&](const Table* table, std::unordered_set<size_t> rows) {
+            CHECK(table == t1);
+            CHECK_EQUAL(expected_rows.size(), rows.size());
+            for (auto row : rows) {
+                CHECK(std::find(expected_rows.begin(), expected_rows.end(), row) != expected_rows.end());
+            }
+        };
+        CHECK_EQUAL(tv.size(), 6);
         for (size_t i = 0; i < tv.size(); ++i) {
-            CHECK_EQUAL(tv.get_int(t1_int_col, i), results1[i]);
+            expected_rows = { (tv.get_source_ndx(i) + 5) % 6 }; // linked to by the previous row
+            includes.report_included_backlinks(t1.get(), tv.get_source_ndx(i), reporter);
         }
-        tv = t1->where().less(t1_int_col, 6).find_all();
-        tv.distinct(DistinctDescriptor(*t1, {{t1_int_col}}));
-        for (size_t i = 0; i < tv.size(); ++i) {
-            CHECK_EQUAL(tv.get_int(t1_int_col, i), results1[i]); // results haven't been sorted
-        }
-        tv = t1->where().less(t1_int_col, 6).find_all();
-        tv.sort(SortDescriptor(*t1, {{t1_int_col}}, {true}));
-        for (size_t i = 0; i < tv.size(); ++i) {
-            CHECK_EQUAL(tv.get_int(t1_int_col, i), results1[i]); // still same order here by conincidence
-        }
-        tv = t1->where().less(t1_int_col, 6).find_all();
-        tv.sort(SortDescriptor(*t1, {{t1_int_col}}, {false}));
-        for (size_t i = 0; i < tv.size(); ++i) {
-            CHECK_EQUAL(tv.get_int(t1_int_col, i), results1[results1.size() - 1 - i]); // now its reversed
-        }
+//        // Test original funcionality through chain class
+//        std::vector<size_t> results1 = {0, 1, 2, 3, 4, 5};
+//        tv.distinct(DistinctDescriptor(*t1, {{t1_int_col}}));
+//        CHECK_EQUAL(tv.size(), results1.size());
+//        for (size_t i = 0; i < tv.size(); ++i) {
+//            CHECK_EQUAL(tv.get_int(t1_int_col, i), results1[i]);
+//        }
+//        tv = t1->where().less(t1_int_col, 6).find_all();
+//        tv.distinct(DistinctDescriptor(*t1, {{t1_int_col}}));
+//        for (size_t i = 0; i < tv.size(); ++i) {
+//            CHECK_EQUAL(tv.get_int(t1_int_col, i), results1[i]); // results haven't been sorted
+//        }
+//        tv = t1->where().less(t1_int_col, 6).find_all();
+//        tv.sort(SortDescriptor(*t1, {{t1_int_col}}, {true}));
+//        for (size_t i = 0; i < tv.size(); ++i) {
+//            CHECK_EQUAL(tv.get_int(t1_int_col, i), results1[i]); // still same order here by conincidence
+//        }
+//        tv = t1->where().less(t1_int_col, 6).find_all();
+//        tv.sort(SortDescriptor(*t1, {{t1_int_col}}, {false}));
+//        for (size_t i = 0; i < tv.size(); ++i) {
+//            CHECK_EQUAL(tv.get_int(t1_int_col, i), results1[results1.size() - 1 - i]); // now its reversed
+//        }
     }
 }
 
