@@ -459,9 +459,9 @@ void IncludeDescriptor::report_included_backlinks(const Table* origin, size_t ro
                 const Table& from_table = *m_include_columns[i][j].from.get();
                 size_t from_col_ndx = m_include_columns[i][j].column_ndx;
                 for (auto row_to_explore : rows_to_explore) {
-                    size_t num_backlinks = origin->get_backlink_count(row_to_explore, from_table, from_col_ndx);
+                    size_t num_backlinks = table->get_backlink_count(row_to_explore, from_table, from_col_ndx);
                     for (size_t backlink_ndx = 0; backlink_ndx < num_backlinks; ++backlink_ndx) {
-                        results_of_next_table.insert(origin->get_backlink(row_to_explore, from_table, from_col_ndx, backlink_ndx));
+                        results_of_next_table.insert(table->get_backlink(row_to_explore, from_table, from_col_ndx, backlink_ndx));
                     }
                 }
                 reporter(&from_table, results_of_next_table); // only report backlinks
@@ -479,7 +479,12 @@ void IncludeDescriptor::report_included_backlinks(const Table* origin, size_t ro
                     }
                 }
                 else if (col_type == type_LinkList) {
-                    // FIXME
+                    for (auto row_to_explore : rows_to_explore) {
+                        ConstLinkViewRef links = table->get_linklist(col_ndx, row_to_explore);
+                        for (size_t link_ndx = 0; link_ndx < links->size(); ++link_ndx) {
+                            results_of_next_table.insert(links->get(link_ndx).get_index());
+                        }
+                    }
                 }
                 else {
                     // unexpected column type, type checking already happened
