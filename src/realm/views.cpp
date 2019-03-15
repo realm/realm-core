@@ -454,21 +454,42 @@ void IncludeDescriptor::report_included_backlinks(const Table* origin, size_t ro
         std::unordered_set<size_t> rows_to_explore;
         rows_to_explore.insert(row_ndx);
         for (size_t j = 0; j < m_columns[i].size(); ++j) {
+            std::unordered_set<size_t> results_of_next_table;
             if (bool(m_include_columns[i][j].from)) { // backlink
-                std::unordered_set<size_t> backlinked_rows;
                 const Table& from_table = *m_include_columns[i][j].from.get();
                 size_t from_col_ndx = m_include_columns[i][j].column_ndx;
                 for (auto row_to_explore : rows_to_explore) {
                     size_t num_backlinks = origin->get_backlink_count(row_to_explore, from_table, from_col_ndx);
                     for (size_t backlink_ndx = 0; backlink_ndx < num_backlinks; ++backlink_ndx) {
-                        backlinked_rows.insert(origin->get_backlink(row_to_explore, from_table, from_col_ndx, backlink_ndx));
+                        results_of_next_table.insert(origin->get_backlink(row_to_explore, from_table, from_col_ndx, backlink_ndx));
                     }
                 }
-                reporter(&from_table, backlinked_rows);
+                reporter(&from_table, results_of_next_table); // only report backlinks
+                table = &from_table;
             }
             else {
-                REALM_UNREACHABLE(); // implement
+                size_t col_ndx = m_columns[i][j]->get_column_index();
+                DataType col_type = table->get_column_type(col_ndx);
+                if (col_type == type_Link) {
+                    for (auto row_to_explore : rows_to_explore) {
+                        size_t link_translation = table->get_link(col_ndx, row_to_explore);
+                        if (link_translation != realm::npos) { // null links terminate a chain
+                            results_of_next_table.insert(link_translation);
+                        }
+                    }
+                }
+                else if (col_type == type_LinkList) {
+                    // FIXME
+                }
+                else {
+                    // unexpected column type, type checking already happened
+                    // in the IncludeDescriptor constructor so this should never happen
+                    REALM_UNREACHABLE();
+                }
+                ConstTableRef linked_table = table->get_link_target(col_ndx);
+                table = linked_table.get();
             }
+            rows_to_explore = results_of_next_table;
         }
     }
 }

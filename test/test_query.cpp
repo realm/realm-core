@@ -5155,7 +5155,7 @@ TEST(Query_DistinctThroughLinks)
 }
 
 
-ONLY(Query_IncludeDescriptor)
+TEST(Query_IncludeDescriptor)
 {
     Group g;
     TableRef t1 = g.add_table("t1");
@@ -5190,7 +5190,7 @@ ONLY(Query_IncludeDescriptor)
     t1->set_link(t1_link_col, 5, 4);
     t1->set_link(t1_link_col, 6, 1);
 
-    t1->set_link(t1_link_self_col, 0, 1);
+    // first link is null
     t1->set_link(t1_link_self_col, 1, 2);
     t1->set_link(t1_link_self_col, 2, 3);
     t1->set_link(t1_link_self_col, 3, 4);
@@ -5217,7 +5217,7 @@ ONLY(Query_IncludeDescriptor)
     //  T1                                   T2                     T3
     //  t1_int   t1_link_t2  t1_link_self  |   t2_int  t2_link_t3 |   t3_int  t3_str
     //  ============================================================================
-    //  99       1            1            |   0       3          |   null    "b"
+    //  99       1            null         |   0       3          |   null    "b"
     //  0        0            2            |   0       2          |   4       "a"
     //  1        2            3            |   3       0          |   7       "c"
     //  2        3            4            |   2       1          |   3       "k"
@@ -5225,7 +5225,7 @@ ONLY(Query_IncludeDescriptor)
     //  4        4            6            |   0       null       |
     //  5        1            0            |                      |
 
-    {
+    {   // test single backlink path from the same table: INCLUDE(@links.T1.t1_link_self)
         TableView tv = t1->where().less(t1_int_col, 6).find_all();
         tv.sort(t1_int_col);
         tv.include(IncludeDescriptor(*t1, {{{t1_link_self_col, t1}}}));
@@ -5241,31 +5241,59 @@ ONLY(Query_IncludeDescriptor)
         };
         CHECK_EQUAL(tv.size(), 6);
         for (size_t i = 0; i < tv.size(); ++i) {
-            expected_rows = { (tv.get_source_ndx(i) + 5) % 6 }; // linked to by the previous row
+            if (i == 0) {
+                expected_rows = {}; // first result has no backlinks
+            }
+            else {
+                expected_rows = { (tv.get_source_ndx(i) + 5) % 6 }; // linked to by the previous row
+            }
             includes.report_included_backlinks(t1.get(), tv.get_source_ndx(i), reporter);
         }
-//        // Test original funcionality through chain class
-//        std::vector<size_t> results1 = {0, 1, 2, 3, 4, 5};
-//        tv.distinct(DistinctDescriptor(*t1, {{t1_int_col}}));
-//        CHECK_EQUAL(tv.size(), results1.size());
-//        for (size_t i = 0; i < tv.size(); ++i) {
-//            CHECK_EQUAL(tv.get_int(t1_int_col, i), results1[i]);
-//        }
-//        tv = t1->where().less(t1_int_col, 6).find_all();
-//        tv.distinct(DistinctDescriptor(*t1, {{t1_int_col}}));
-//        for (size_t i = 0; i < tv.size(); ++i) {
-//            CHECK_EQUAL(tv.get_int(t1_int_col, i), results1[i]); // results haven't been sorted
-//        }
-//        tv = t1->where().less(t1_int_col, 6).find_all();
-//        tv.sort(SortDescriptor(*t1, {{t1_int_col}}, {true}));
-//        for (size_t i = 0; i < tv.size(); ++i) {
-//            CHECK_EQUAL(tv.get_int(t1_int_col, i), results1[i]); // still same order here by conincidence
-//        }
-//        tv = t1->where().less(t1_int_col, 6).find_all();
-//        tv.sort(SortDescriptor(*t1, {{t1_int_col}}, {false}));
-//        for (size_t i = 0; i < tv.size(); ++i) {
-//            CHECK_EQUAL(tv.get_int(t1_int_col, i), results1[results1.size() - 1 - i]); // now its reversed
-//        }
+    }
+    {   // test a backlink chain of size two from the same table: INCLUDE(t1_link_self.@links.T1.t1_link_self)
+        TableView tv = t1->where().less(t1_int_col, 6).find_all();
+        tv.sort(t1_int_col);
+        tv.include(IncludeDescriptor(*t1, {{{t1_link_self_col}, {t1_link_self_col, t1}}}));
+
+        IncludeDescriptor includes = tv.get_include_descriptors();
+        std::vector<size_t> expected_rows;
+        auto reporter = [&](const Table* table, std::unordered_set<size_t> rows) {
+            CHECK(table == t1);
+            CHECK_EQUAL(expected_rows.size(), rows.size());
+            for (auto row : rows) {
+                CHECK(std::find(expected_rows.begin(), expected_rows.end(), row) != expected_rows.end());
+            }
+        };
+        CHECK_EQUAL(tv.size(), 6);
+        for (size_t i = 0; i < tv.size(); ++i) {
+            expected_rows = { tv.get_source_ndx(i) }; // following a single link gives this row as a backlink
+            includes.report_included_backlinks(t1.get(), tv.get_source_ndx(i), reporter);
+        }
+    }
+    {   // test a backlink chain of size three from the same table: INCLUDE(t1_link_self.t1_link_self.@links.T1.t1_link_self)
+        TableView tv = t1->where().less(t1_int_col, 6).find_all();
+        tv.sort(t1_int_col);
+        tv.include(IncludeDescriptor(*t1, {{{t1_link_self_col}, {t1_link_self_col}, {t1_link_self_col, t1}}}));
+
+        IncludeDescriptor includes = tv.get_include_descriptors();
+        std::vector<size_t> expected_rows;
+        auto reporter = [&](const Table* table, std::unordered_set<size_t> rows) {
+            CHECK(table == t1);
+            CHECK_EQUAL(expected_rows.size(), rows.size());
+            for (auto row : rows) {
+                CHECK(std::find(expected_rows.begin(), expected_rows.end(), row) != expected_rows.end());
+            }
+        };
+        CHECK_EQUAL(tv.size(), 6);
+        for (size_t i = 0; i < tv.size(); ++i) {
+            if (i == 5) {
+                expected_rows = {}; // nullified by the second link
+            }
+            else {
+                expected_rows = { tv.get_source_ndx(i) + 1 }; // linked to by the next row in the chain (ndx + 1)
+            }
+            includes.report_included_backlinks(t1.get(), tv.get_source_ndx(i), reporter);
+        }
     }
 }
 
