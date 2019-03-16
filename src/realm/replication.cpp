@@ -830,12 +830,13 @@ void TrivialReplication::initialize(SharedGroup&)
     // Nothing needs to be done here
 }
 
-void TrivialReplication::do_initiate_transact(version_type, bool history_updated)
+void TrivialReplication::do_initiate_transact(TransactionType type, version_type)
 {
-    char* data = m_transact_log_buffer.data();
-    size_t size = m_transact_log_buffer.size();
-    set_buffer(data, data + size);
-    m_history_updated = history_updated;
+    if (type == TransactionType::trans_Write) {
+        char* data = m_transact_log_buffer.data();
+        size_t size = m_transact_log_buffer.size();
+        set_buffer(data, data + size);
+    }
 }
 
 Replication::version_type TrivialReplication::do_prepare_commit(version_type orig_version)

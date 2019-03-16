@@ -980,11 +980,14 @@ inline void SharedGroup::advance_read(O* observer, VersionID version_id)
     if (version_id.version < m_read_lock.m_version)
         throw LogicError(LogicError::bad_version);
 
-    _impl::History* hist = get_history(); // Throws
+    Replication* repl = m_group.get_replication();
+    _impl::History* hist = repl ? repl->get_history() : nullptr; // Throws
+
     if (!hist)
         throw LogicError(LogicError::no_history);
 
-    do_advance_read(observer, version_id, *hist); // Throws
+    bool hist_updated = do_advance_read(observer, version_id, *hist); // Throws
+    repl->initiate_transact(Replication::TransactionType::trans_Read, version_id.version, hist_updated);
 }
 
 template <class O>
@@ -1005,7 +1008,8 @@ inline void SharedGroup::promote_to_write(O* observer)
         Replication* repl = m_group.get_replication();
         REALM_ASSERT(repl); // Presence of `repl` follows from the presence of `hist`
         version_type current_version = m_read_lock.m_version;
-        repl->initiate_transact(current_version, history_updated); // Throws
+        repl->initiate_transact(Replication::TransactionType::trans_Write, current_version,
+                                history_updated); // Throws
 
         // If the group has no top array (top_ref == 0), create a new node
         // structure for an empty group now, to be ready for modifications. See
@@ -1073,7 +1077,7 @@ inline bool SharedGroup::do_advance_read(O* observer, VersionID version_id, _imp
     REALM_ASSERT(new_read_lock.m_version >= m_read_lock.m_version);
     if (new_read_lock.m_version == m_read_lock.m_version) {
         release_read_lock(new_read_lock);
-        // _impl::History::update_early_from_top_ref() was not called
+        // _impl::History::update_from_ref() was not called
         return false;
     }
 
@@ -1081,13 +1085,13 @@ inline bool SharedGroup::do_advance_read(O* observer, VersionID version_id, _imp
     {
         version_type new_version = new_read_lock.m_version;
         size_t new_file_size = new_read_lock.m_file_size;
-        ref_type new_top_ref = new_read_lock.m_top_ref;
 
         // Synchronize readers view of the file
         SlabAlloc& alloc = m_group.m_alloc;
         alloc.update_reader_view(new_file_size);
 
-        hist.update_early_from_top_ref(new_version, new_file_size, new_top_ref); // Throws
+        ref_type hist_ref = _impl::GroupFriend::get_history_ref(alloc, new_read_lock.m_top_ref);
+        hist.update_from_ref_and_version(hist_ref, new_version); // Throws
     }
 
     if (observer) {

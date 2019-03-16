@@ -19,6 +19,7 @@
 #include <realm/query_engine.hpp>
 
 #include <realm/query_expression.hpp>
+#include <realm/utilities.hpp>
 
 using namespace realm;
 
@@ -325,8 +326,75 @@ void StringNode<Equal>::_search_index_init()
     }
 }
 
+void StringNode<Equal>::consume_condition(StringNode<Equal>* other)
+{
+    // If a search index is present, don't try to combine conditions since index search is most likely faster.
+    // Assuming N elements to search and M conditions to check:
+    // 1) search index present:                     O(log(N)*M)
+    // 2) no search index, combine conditions:      O(N)
+    // 3) no search index, conditions not combined: O(N*M)
+    // In practice N is much larger than M, so if we have a search index, choose 1, otherwise if possible choose 2.
+    REALM_ASSERT(m_condition_column == other->m_condition_column);
+    REALM_ASSERT(other->m_needles.empty());
+    if (m_needles.empty()) {
+        m_needles.insert(bool(m_value) ? StringData(*m_value) : StringData());
+    }
+    if (bool(other->m_value)) {
+        m_needle_storage.push_back(StringBuffer());
+        m_needle_storage.back().append(*other->m_value);
+        m_needles.insert(StringData(m_needle_storage.back().data(), m_needle_storage.back().size()));
+    }
+    else {
+        m_needles.insert(StringData());
+    }
+}
+
+// Requirements of template types:
+// ArrayType must support: size() -> size_t, and get(size_t) -> ElementType
+// ElementType must be convertable to a StringData via data() and size()
+template <class ArrayType, class ElementType>
+size_t StringNode<Equal>::find_first_in(ArrayType& array, size_t begin, size_t end)
+{
+    if (m_needles.empty())
+        return not_found;
+
+    size_t n = array.size();
+    if (end == npos)
+        end = n;
+    REALM_ASSERT_7(begin, <=, n, &&, end, <=, n);
+    REALM_ASSERT_3(begin, <=, end);
+
+    const auto not_in_set = m_needles.end();
+    // For a small number of conditions it is faster to cycle through
+    // and check them individually. The threshold depends on how fast
+    // our hashing of StringData is (see `StringData.hash()`). The
+    // number 20 was found empirically when testing small strings
+    // with N==100k
+    if (m_needles.size() < 20) {
+        for (size_t i = begin; i < end; ++i) {
+            ElementType element = array.get(i);
+            StringData value_2{element.data(), element.size()};
+            for (auto it = m_needles.begin(); it != not_in_set; ++it) {
+                if (*it == value_2)
+                    return i;
+            }
+        }
+    }
+    else {
+        for (size_t i = begin; i < end; ++i) {
+            ElementType element = array.get(i);
+            StringData value_2{element.data(), element.size()};
+            if (m_needles.find(value_2) != not_in_set)
+                return i;
+        }
+    }
+
+    return not_found;
+}
+
 size_t StringNode<Equal>::_find_first_local(size_t start, size_t end)
 {
+    const bool multi_target_search = !m_needles.empty();
     // Normal string column, with long or short leaf
     for (size_t s = start; s < end; ++s) {
         const StringColumn* asc = static_cast<const StringColumn*>(m_condition_column);
@@ -345,14 +413,26 @@ size_t StringNode<Equal>::_find_first_local(size_t start, size_t end)
         }
         size_t end2 = (end > m_leaf_end ? m_leaf_end - m_leaf_start : end - m_leaf_start);
 
-        if (m_leaf_type == StringColumn::leaf_type_Small)
-            s = static_cast<const ArrayString&>(*m_leaf).find_first(m_value, s - m_leaf_start, end2);
-        else if (m_leaf_type == StringColumn::leaf_type_Medium)
-            s = static_cast<const ArrayStringLong&>(*m_leaf).find_first(m_value, s - m_leaf_start, end2);
-        else
-            s = static_cast<const ArrayBigBlobs&>(*m_leaf).find_first(str_to_bin(m_value), true, s - m_leaf_start,
-                                                                      end2);
-
+        if (multi_target_search) {
+            if (m_leaf_type == StringColumn::leaf_type_Small)
+                s = find_first_in<const ArrayString&, StringData>(static_cast<const ArrayString&>(*m_leaf),
+                                                                  s - m_leaf_start, end2);
+            else if (m_leaf_type == StringColumn::leaf_type_Medium)
+                s = find_first_in<const ArrayStringLong&, StringData>(static_cast<const ArrayStringLong&>(*m_leaf),
+                                                                      s - m_leaf_start, end2);
+            else
+                s = find_first_in<const ArrayBigBlobs&, BinaryData>(static_cast<const ArrayBigBlobs&>(*m_leaf),
+                                                                    s - m_leaf_start, end2);
+        }
+        else {
+            if (m_leaf_type == StringColumn::leaf_type_Small)
+                s = static_cast<const ArrayString&>(*m_leaf).find_first(m_value, s - m_leaf_start, end2);
+            else if (m_leaf_type == StringColumn::leaf_type_Medium)
+                s = static_cast<const ArrayStringLong&>(*m_leaf).find_first(m_value, s - m_leaf_start, end2);
+            else
+                s = static_cast<const ArrayBigBlobs&>(*m_leaf).find_first(str_to_bin(m_value), true, s - m_leaf_start,
+                                                                          end2);
+        }
         if (s == not_found)
             s = m_leaf_end - 1;
         else
@@ -361,6 +441,30 @@ size_t StringNode<Equal>::_find_first_local(size_t start, size_t end)
 
     return not_found;
 }
+
+std::string StringNode<Equal>::describe(util::serializer::SerialisationState& state) const
+{
+    if (m_needles.empty()) {
+        return StringNodeEqualBase::describe(state);
+    }
+
+    // FIXME: once the parser supports it, print something like "column IN {s1, s2, s3}"
+    REALM_ASSERT(m_condition_column != nullptr);
+    std::string desc;
+    bool is_first = true;
+    for (auto it : m_needles) {
+        StringData sd(it.data(), it.size());
+        desc += (is_first ? "" : " or ") +
+                state.describe_column(ParentNode::m_table, m_condition_column->get_column_index()) + " " +
+                Equal::description() + " " + util::serializer::print_value(sd);
+        is_first = false;
+    }
+    if (!is_first) {
+        desc = "(" + desc + ")";
+    }
+    return desc;
+}
+
 
 void StringNode<EqualIns>::_search_index_init()
 {

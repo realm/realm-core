@@ -298,6 +298,9 @@ public:
     /// Returns the total amount of memory currently allocated in slab area
     size_t get_allocated_size() const noexcept;
 
+    /// Returns total amount of slab for all slab allocators
+    static size_t get_total_slab_size() noexcept;
+
     /// Hooks used to keep the encryption layer informed of the start and stop
     /// of transactions.
     void note_reader_start(void* reader_id);
@@ -373,6 +376,13 @@ private:
         size_t size;
 
         Slab(ref_type r, size_t s);
+        Slab(Slab&& slab)
+            : ref_end(slab.ref_end)
+            , addr(std::move(slab.addr))
+            , size(slab.size)
+        {
+        }
+        ~Slab();
     };
 
     struct Chunk { // describes a freed in-file block

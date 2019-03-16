@@ -316,8 +316,10 @@ TEST(Metrics_QueryEqual)
 
     for (size_t i = 0; i < 7; ++i) {
         std::string description = queries->at(i).get_description();
+        std::string table_name = queries->at(i).get_table_name();
         CHECK_EQUAL(find_count(description, column_names[i]), 1);
         CHECK_GREATER_EQUAL(find_count(description, query_search_term), 1);
+        CHECK_EQUAL(table_name, "person");
     }
 }
 
@@ -871,12 +873,12 @@ TEST(Metrics_MaxNumTransactionsIsNotExceeded)
     options.enable_metrics = true;
     options.metrics_buffer_size = 10;
     SharedGroup sg(*hist, options);
-    populate(sg);                   // 1
+    populate(sg); // 1
     {
-        ReadTransaction rt(sg);     // 2
+        ReadTransaction rt(sg); // 2
     }
     {
-        WriteTransaction wt(sg);    // 3
+        WriteTransaction wt(sg); // 3
         TableRef t0 = wt.get_table(0);
         TableRef t1 = wt.get_table(1);
         t0->add_empty_row(3);
@@ -896,7 +898,8 @@ TEST(Metrics_MaxNumTransactionsIsNotExceeded)
     std::unique_ptr<Metrics::TransactionInfoList> transactions = metrics->take_transactions();
     CHECK(transactions);
     for (auto transaction : *transactions) {
-        CHECK_EQUAL(transaction.get_transaction_type(), realm::metrics::TransactionInfo::TransactionType::read_transaction);
+        CHECK_EQUAL(transaction.get_transaction_type(),
+                    realm::metrics::TransactionInfo::TransactionType::read_transaction);
     }
 }
 
@@ -936,11 +939,16 @@ public:
     {
         has_run_once = will_run.get_future();
     }
-    int64_t get_current_target(size_t)
+    std::function<int64_t()> current_target_getter(size_t) override
+    {
+        return []() { return realm::util::PageReclaimGovernor::no_match; };
+    }
+
+    void report_target_result(int64_t) override
     {
         will_run.set_value();
-        return no_match;
     }
+
     std::future<void> has_run_once;
     std::promise<void> will_run;
 };
@@ -977,9 +985,11 @@ NONCONCURRENT_TEST(Metrics_NumDecryptedPagesWithoutEncryption)
     std::unique_ptr<Metrics::TransactionInfoList> transactions = metrics->take_transactions();
     CHECK(transactions);
     CHECK_EQUAL(transactions->size(), 2);
-    CHECK_EQUAL(transactions->at(0).get_transaction_type(), realm::metrics::TransactionInfo::TransactionType::write_transaction);
+    CHECK_EQUAL(transactions->at(0).get_transaction_type(),
+                realm::metrics::TransactionInfo::TransactionType::write_transaction);
     CHECK_EQUAL(transactions->at(0).get_num_decrypted_pages(), 0);
-    CHECK_EQUAL(transactions->at(1).get_transaction_type(), realm::metrics::TransactionInfo::TransactionType::read_transaction);
+    CHECK_EQUAL(transactions->at(1).get_transaction_type(),
+                realm::metrics::TransactionInfo::TransactionType::read_transaction);
     CHECK_EQUAL(transactions->at(1).get_num_decrypted_pages(), 0);
 
     realm::util::set_page_reclaim_governor_to_default(); // the remainder of the test suite should use the default
@@ -1015,9 +1025,11 @@ NONCONCURRENT_TEST_IF(Metrics_NumDecryptedPagesWithEncryption, REALM_ENABLE_ENCR
     std::unique_ptr<Metrics::TransactionInfoList> transactions = metrics->take_transactions();
     CHECK(transactions);
     CHECK_EQUAL(transactions->size(), 2);
-    CHECK_EQUAL(transactions->at(0).get_transaction_type(), realm::metrics::TransactionInfo::TransactionType::write_transaction);
+    CHECK_EQUAL(transactions->at(0).get_transaction_type(),
+                realm::metrics::TransactionInfo::TransactionType::write_transaction);
     CHECK_EQUAL(transactions->at(0).get_num_decrypted_pages(), 1);
-    CHECK_EQUAL(transactions->at(1).get_transaction_type(), realm::metrics::TransactionInfo::TransactionType::read_transaction);
+    CHECK_EQUAL(transactions->at(1).get_transaction_type(),
+                realm::metrics::TransactionInfo::TransactionType::read_transaction);
     CHECK_EQUAL(transactions->at(1).get_num_decrypted_pages(), 1);
 
     realm::util::set_page_reclaim_governor_to_default(); // the remainder of the test suite should use the default
@@ -1048,7 +1060,6 @@ TEST(Metrics_MemoryChecks)
         CHECK_GREATER(transaction.get_free_space(), 0);
     }
 }
-
 
 
 #endif // REALM_METRICS

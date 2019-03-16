@@ -108,7 +108,8 @@ jobWrapper {
                     buildLinuxDebug     : doBuildLinux('Debug'),
                     buildLinuxRelease   : doBuildLinux('Release'),
                     buildLinuxRelAssert : doBuildLinux('RelAssert'),
-                    buildLinuxASAN      : doBuildLinuxASAN()
+                    buildLinuxASAN      : doBuildLinuxClang("RelASAN"),
+                    buildLinuxTSAN      : doBuildLinuxClang("RelTSAN")
                 ]
 
                 androidAbis = ['armeabi-v7a', 'x86', 'mips', 'x86_64', 'arm64-v8a']
@@ -263,7 +264,7 @@ def doBuildLinux(String buildType) {
     }
 }
 
-def doBuildLinuxASAN() {
+def doBuildLinuxClang(String buildType) {
     return {
         node('docker') {
             getArchive()
@@ -271,14 +272,14 @@ def doBuildLinuxASAN() {
                 sh """
                    mkdir build-dir
                    cd build-dir
-                   cmake -D CMAKE_BUILD_TYPE=RelASAN -DREALM_NO_TESTS=1 -G Ninja ..
+                   cmake -D CMAKE_BUILD_TYPE=${buildType} -DREALM_NO_TESTS=1 -G Ninja ..
                    ninja
                    cpack -G TGZ
                 """
             }
             dir('build-dir') {
                 archiveArtifacts("*.tar.gz")
-                def stashName = "linux___RelASAN"
+                def stashName = "linux___${buildType}"
                 stash includes:"*.tar.gz", name:stashName
                 publishingStashes << stashName
             }
