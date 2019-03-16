@@ -827,10 +827,11 @@ void apply_ordering(DescriptorOrdering& ordering, ConstTableRef target, const pa
                 while (index < path.size()) {
                     KeyPathElement element = mapping.process_next_path(cur_table, path, index); // throws if invalid
                     // backlinks use type_LinkList since list operations apply to them (and is_backlink is set)
-                    realm_precondition(element.col_type == type_Link || element.col_type == type_LinkList,
-                                       util::format("Property '%1' is not a link in object of type '%2' in 'INCLUDE' clause",
-                                                    element.table->get_column_name(element.col_ndx),
-                                                    get_printable_table_name(*element.table)));
+                    if (element.col_type != type_Link && element.col_type != type_LinkList) {
+                        throw InvalidPathError(util::format("Property '%1' is not a link in object of type '%2' in 'INCLUDE' clause",
+                                                        element.table->get_column_name(element.col_ndx),
+                                                        get_printable_table_name(*element.table)));
+                   }
                     if (element.table == cur_table) {
                         if (element.col_ndx == realm::npos) {
                             cur_table = element.table;

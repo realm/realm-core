@@ -19,6 +19,7 @@
 #include <realm/views.hpp>
 
 #include <realm/column_link.hpp>
+#include <realm/exceptions.hpp>
 #include <realm/group.hpp>
 #include <realm/table.hpp>
 #include <realm/table_view.hpp>
@@ -320,7 +321,6 @@ DescriptorExport LimitDescriptor::export_for_handover() const
 
 IncludeDescriptor::IncludeDescriptor(Table const& table, std::vector<std::vector<LinkPathPart>> column_links)
 : ColumnsDescriptor()
-, m_include_columns(column_links)
 {
     if (table.is_degenerate()) {
         // We need access to the column acessors and that's not available in a
@@ -329,45 +329,59 @@ IncludeDescriptor::IncludeDescriptor(Table const& table, std::vector<std::vector
     }
     using tf = _impl::TableFriend;
     m_columns.resize(column_links.size());
+    m_backlink_sources.resize(column_links.size());
     for (size_t i = 0; i < m_columns.size(); ++i) {
         auto& columns = m_columns[i];
         auto& links = column_links[i];
+        auto& backlink_source = m_backlink_sources[i];
         REALM_ASSERT(!column_links.empty());
 
         columns.reserve(links.size());
+        backlink_source.reserve(links.size());
         const Table* cur_table = &table;
+        size_t link_ndx = 0;
         for (auto link : links) {
             if (bool(link.from)) { // backlink
                 REALM_ASSERT(cur_table == link.from->get_link_target(link.column_ndx));
                 auto& col = tf::get_column(*link.from, link.column_ndx);
                 columns.push_back(&col);
+                backlink_source.push_back(link.from);
                 if (auto link_col = dynamic_cast<const LinkColumnBase*>(&col)) { // LinkColumn and ListColumn
                     if (link_col->get_target_table() != *cur_table) {
                         // the link does not point to the last table in the chain
-                        throw LogicError(LogicError::type_mismatch);
+                        throw InvalidPathError(util::format("Invalid INCLUDE path at [%1, %2]: this link does not "
+                                                            "connect to the previous table ('%3').",
+                                                            i, link_ndx, cur_table->get_name()));
                     }
                     cur_table = link.from.get();
                 }
                 else {
-                    throw LogicError(LogicError::type_mismatch); // must be a link or list column
+                    throw InvalidPathError(util::format("Invalid INCLUDE path at [%1, %2]: a backlink was denoted "
+                                                        "but this column ('%3') is not a link.",
+                                                        i, link_ndx, cur_table->get_column_name(link.column_ndx)));
                 }
             }
             else { // forward link/list
                 auto& col = tf::get_column(*cur_table, link.column_ndx);
                 columns.push_back(&col);
+                backlink_source.push_back(TableRef());
                 if (auto link_col = dynamic_cast<const LinkColumnBase*>(&col)) { // LinkColumn and ListColumn
                     if (columns.size() == links.size()) {
                         // An inclusion must end with a backlink column, link/list columns are included automatically
-                        // FIXME: make a special logic error for bindings?
-                        throw LogicError(LogicError::type_mismatch);
+                        throw InvalidPathError(util::format("Invalid INCLUDE path at [%1, %2]: the last part of an "
+                                                            "included path must be a backlink column.", i, link_ndx));
                     }
                     cur_table = &link_col->get_target_table();
                 }
                 else {
                     // An inclusion chain must consist entirely of link/list/backlink columns
-                    throw LogicError(LogicError::type_mismatch);
+                    throw InvalidPathError(util::format("Invalid INCLUDE path at [%1, %2]: all columns in the path "
+                                                        "must be a link/list/backlink type but this column ('%3') "
+                                                        "is a different type.",
+                                                        i, link_ndx, cur_table->get_column_name(link.column_ndx)));
                 }
             }
+            ++link_ndx;
         }
     }
 }
@@ -384,11 +398,11 @@ std::string IncludeDescriptor::get_description(ConstTableRef attached_table) con
                 description += realm::util::serializer::value_separator;
             }
             size_t col_ndx = m_columns[i][j]->get_column_index();
-            if (bool(m_include_columns[i][j].from)) { // backlink
-                REALM_ASSERT_DEBUG(col_ndx < m_include_columns[i][j].from->get_column_count());
-                REALM_ASSERT_DEBUG(m_include_columns[i][j].from->get_link_target(col_ndx) == cur_link_table);
-                description += basic_serialiser.get_backlink_column_name(m_include_columns[i][j].from, col_ndx);
-                cur_link_table = m_include_columns[i][j].from;
+            if (bool(m_backlink_sources[i][j])) { // backlink
+                REALM_ASSERT_DEBUG(col_ndx < m_backlink_sources[i][j]->get_column_count());
+                REALM_ASSERT_DEBUG(m_backlink_sources[i][j]->get_link_target(col_ndx) == cur_link_table);
+                description += basic_serialiser.get_backlink_column_name(m_backlink_sources[i][j], col_ndx);
+                cur_link_table = m_backlink_sources[i][j];
             }
             else {
                 REALM_ASSERT_DEBUG(col_ndx < cur_link_table->get_column_count());
@@ -415,15 +429,17 @@ DescriptorExport IncludeDescriptor::export_for_handover() const
 {
     std::vector<std::vector<DescriptorLinkPath>> column_indices;
     column_indices.reserve(m_columns.size());
-    for (auto& path : m_include_columns) {
+    REALM_ASSERT_EX(m_backlink_sources.size() == m_columns.size(), m_backlink_sources.size(), m_columns.size());
+    for (size_t i = 0; i < m_columns.size(); ++i) {
         std::vector<DescriptorLinkPath> indices;
-        indices.reserve(path.size());
-        for (auto& path_part : path) {
-            if (bool(path_part.from)) {
-                indices.push_back({path_part.column_ndx, path_part.from->get_index_in_group(), true});
+        indices.reserve(m_columns[i].size());
+        REALM_ASSERT_EX(m_backlink_sources[i].size() == m_columns[i].size(), m_backlink_sources[i].size(), m_columns[i].size());
+        for (size_t j = 0; j < m_columns[i].size(); ++j) {
+            if (bool(m_backlink_sources[i][j])) {
+                indices.push_back({m_columns[i][j]->get_column_index(), m_backlink_sources[i][j]->get_index_in_group(), true});
             }
             else {
-                indices.push_back({path_part.column_ndx, realm::npos, false});
+                indices.push_back({m_columns[i][j]->get_column_index(), realm::npos, false});
             }
         }
         column_indices.push_back(indices);
@@ -436,10 +452,10 @@ DescriptorExport IncludeDescriptor::export_for_handover() const
 
 void IncludeDescriptor::append(const IncludeDescriptor& other)
 {
-    REALM_ASSERT_DEBUG(other.m_include_columns.size() == other.m_columns.size());
+    REALM_ASSERT_DEBUG(other.m_backlink_sources.size() == other.m_columns.size());
     for (size_t i = 0; i < other.m_columns.size(); ++i) {
         this->m_columns.push_back(other.m_columns[i]);
-        this->m_include_columns.push_back(other.m_include_columns[i]);
+        this->m_backlink_sources.push_back(other.m_backlink_sources[i]);
     }
 }
 
@@ -455,9 +471,9 @@ void IncludeDescriptor::report_included_backlinks(const Table* origin, size_t ro
         rows_to_explore.insert(row_ndx);
         for (size_t j = 0; j < m_columns[i].size(); ++j) {
             std::unordered_set<size_t> results_of_next_table;
-            if (bool(m_include_columns[i][j].from)) { // backlink
-                const Table& from_table = *m_include_columns[i][j].from.get();
-                size_t from_col_ndx = m_include_columns[i][j].column_ndx;
+            if (bool(m_backlink_sources[i][j])) { // backlink
+                const Table& from_table = *m_backlink_sources[i][j].get();
+                size_t from_col_ndx = m_columns[i][j]->get_column_index();
                 for (auto row_to_explore : rows_to_explore) {
                     size_t num_backlinks = table->get_backlink_count(row_to_explore, from_table, from_col_ndx);
                     for (size_t backlink_ndx = 0; backlink_ndx < num_backlinks; ++backlink_ndx) {

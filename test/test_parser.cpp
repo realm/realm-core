@@ -2017,6 +2017,189 @@ TEST(Parser_Limit)
 }
 
 
+TEST(Parser_IncludeDescriptor)
+{
+
+
+    Group g;
+    TableRef people = g.add_table("person");
+    TableRef accounts = g.add_table("account");
+
+    size_t name_col = people->add_column(type_String, "name");
+    size_t age_col = people->add_column(type_Int, "age");
+    size_t account_col = people->add_column_link(type_Link, "account", *accounts);
+
+    size_t balance_col = accounts->add_column(type_Double, "balance");
+    size_t transaction_col = accounts->add_column(type_Int, "num_transactions");
+
+    accounts->add_empty_row(3);
+    accounts->set_double(balance_col, 0, 50.55);
+    accounts->set_int(transaction_col, 0, 2);
+    accounts->set_double(balance_col, 1, 50.55);
+    accounts->set_int(transaction_col, 1, 73);
+    accounts->set_double(balance_col, 2, 98.92);
+    accounts->set_int(transaction_col, 2, 17);
+
+    people->add_empty_row(3);
+    people->set_string(name_col, 0, "Adam");
+    people->set_int(age_col, 0, 28);
+    people->set_link(account_col, 0, 0);
+    people->set_string(name_col, 1, "Frank");
+    people->set_int(age_col, 1, 30);
+    people->set_link(account_col, 1, 1);
+    people->set_string(name_col, 2, "Ben");
+    people->set_int(age_col, 2, 28);
+    people->set_link(account_col, 2, 2);
+
+    // person:                      | account:
+    // name     age     account     | balance       num_transactions
+    // Adam     28      0 ->        | 50.55         2
+    // Frank    30      1 ->        | 50.55         73
+    // Ben      28      2 ->        | 98.92         17
+
+    // include serialisation
+    TableView tv = get_sorted_view(accounts, "balance > 0 SORT(num_transactions ASC) INCLUDE(@links.person.account)");
+    IncludeDescriptor includes = tv.get_include_descriptors();
+    CHECK(includes.is_valid());
+    CHECK_EQUAL(tv.size(), 3);
+
+    CHECK_EQUAL(tv.get_int(transaction_col, 0), 2);
+    CHECK_EQUAL(tv.get_int(transaction_col, 1), 17);
+    CHECK_EQUAL(tv.get_int(transaction_col, 2), 73);
+
+    std::vector<std::string> expected_include_names;
+    auto reporter = [&](const Table* table, const std::unordered_set<size_t>& rows) {
+        CHECK(table == people);
+        CHECK_EQUAL(expected_include_names.size(), rows.size());
+        for (auto row : rows) {
+            std::string row_value = table->get_string(name_col, row);
+            CHECK(std::find(expected_include_names.begin(), expected_include_names.end(), row_value) != expected_include_names.end());
+        }
+    };
+
+    expected_include_names = {"Adam"};
+    includes.report_included_backlinks(accounts.get(), tv.get_source_ndx(0), reporter);
+    expected_include_names = {"Ben"};
+    includes.report_included_backlinks(accounts.get(), tv.get_source_ndx(1), reporter);
+    expected_include_names = {"Frank"};
+    includes.report_included_backlinks(accounts.get(), tv.get_source_ndx(2), reporter);
+
+    // Error checking
+    std::string message;
+    CHECK_THROW_ANY_GET_MESSAGE(get_sorted_view(people, "age > 0 INCLUDE(account)"), message);
+    CHECK_EQUAL(message, "Invalid INCLUDE path at [0, 0]: the last part of an included path must be a backlink column.");
+    CHECK_THROW_ANY_GET_MESSAGE(get_sorted_view(people, "age > 0 INCLUDE(age)"), message);
+    CHECK_EQUAL(message, "Property 'age' is not a link in object of type 'person' in 'INCLUDE' clause");
+    CHECK_THROW_ANY_GET_MESSAGE(get_sorted_view(accounts, "balance > 0 INCLUDE(bad_property_name)"), message);
+    CHECK_EQUAL(message, "No property 'bad_property_name' on object of type 'account'");
+    CHECK_THROW_ANY_GET_MESSAGE(get_sorted_view(people, "age > 0 INCLUDE(@links.person.account)"), message);
+    CHECK_EQUAL(message, "No property 'account' found in type 'person' which links to type 'person'");
+}
+
+
+TEST(Parser_IncludeDescriptorMultiple)
+{
+    Group g;
+    TableRef people = g.add_table("person");
+    TableRef accounts = g.add_table("account");
+    TableRef banks = g.add_table("bank");
+    TableRef languages = g.add_table("language");
+
+    size_t name_col = people->add_column(type_String, "name");
+    size_t account_col = people->add_column_link(type_Link, "account", *accounts);
+
+    size_t balance_col = accounts->add_column(type_Double, "balance");
+    size_t transaction_col = accounts->add_column(type_Int, "num_transactions");
+    size_t account_bank_col = accounts->add_column_link(type_Link, "bank", *banks);
+
+    size_t bank_name_col = banks->add_column(type_String, "name");
+
+    size_t language_name_col = languages->add_column(type_String, "name");
+    size_t language_available_col = languages->add_column_link(type_LinkList, "available_from", *banks);
+
+    banks->add_empty_row(2);
+    banks->set_string(bank_name_col, 0, "Danske Bank");
+    banks->set_string(bank_name_col, 1, "RBC");
+
+    languages->add_empty_row(3);
+    languages->set_string(language_name_col, 0, "English");
+    languages->set_string(language_name_col, 1, "Danish");
+    languages->set_string(language_name_col, 2, "French");
+    LinkViewRef list0 = languages->get_linklist(language_available_col, 0);
+    list0->add(0);
+    list0->add(1);
+    LinkViewRef list1 = languages->get_linklist(language_available_col, 1);
+    list1->add(0);
+    LinkViewRef list2 = languages->get_linklist(language_available_col, 2);
+    list2->add(1);
+
+    accounts->add_empty_row(3);
+    accounts->set_double(balance_col, 0, 50.55);
+    accounts->set_int(transaction_col, 0, 2);
+    accounts->set_link(account_bank_col, 0, 1);
+    accounts->set_double(balance_col, 1, 50.55);
+    accounts->set_int(transaction_col, 1, 73);
+    accounts->set_link(account_bank_col, 1, 0);
+    accounts->set_double(balance_col, 2, 98.92);
+    accounts->set_int(transaction_col, 2, 17);
+    accounts->set_link(account_bank_col, 2, 1);
+
+    people->add_empty_row(3);
+    people->set_string(name_col, 0, "Adam");
+    people->set_link(account_col, 0, 0);
+    people->set_string(name_col, 1, "Frank");
+    people->set_link(account_col, 1, 1);
+    people->set_string(name_col, 2, "Ben");
+    people->set_link(account_col, 2, 2);
+
+    // person:             | account:                              | bank:        | languages:
+    // name    account     | balance       num_transactions  bank  | name         | name      available_from
+    // Adam    0 ->        | 50.55         2                 1     | Danske Bank  | English    {0, 1}
+    // Frank   1 ->        | 50.55         73                0     | RBC          | Danish     {0}
+    // Ben     2 ->        | 98.92         17                1     |              | French     {1}
+
+    // include serialisation
+    TableView tv = get_sorted_view(accounts, "balance > 0 SORT(num_transactions ASC) INCLUDE(@links.person.account, bank.@links.language.available_from)");
+    IncludeDescriptor includes = tv.get_include_descriptors();
+    CHECK(includes.is_valid());
+    CHECK_EQUAL(tv.size(), 3);
+
+    CHECK_EQUAL(tv.get_int(transaction_col, 0), 2);
+    CHECK_EQUAL(tv.get_int(transaction_col, 1), 17);
+    CHECK_EQUAL(tv.get_int(transaction_col, 2), 73);
+
+    std::vector<std::string> expected_people_names;
+    std::vector<std::string> expected_language_names;
+    auto reporter = [&](const Table* table, const std::unordered_set<size_t>& rows) {
+        CHECK(table == people || table == languages);
+        if (table == people) {
+            CHECK_EQUAL(expected_people_names.size(), rows.size());
+            for (auto row : rows) {
+                std::string row_value = table->get_string(name_col, row);
+                CHECK(std::find(expected_people_names.begin(), expected_people_names.end(), row_value) != expected_people_names.end());
+            }
+        }
+        else if (table == languages) {
+            CHECK_EQUAL(expected_language_names.size(), rows.size());
+            for (auto row : rows) {
+                std::string row_value = table->get_string(language_name_col, row);
+                CHECK(std::find(expected_language_names.begin(), expected_language_names.end(), row_value) != expected_language_names.end());
+            }
+        }
+    };
+
+    expected_people_names = {"Adam"};
+    expected_language_names = {"English", "French"};
+    includes.report_included_backlinks(accounts.get(), tv.get_source_ndx(0), reporter);
+    expected_people_names = {"Ben"};
+    expected_language_names = {"English", "French"};
+    includes.report_included_backlinks(accounts.get(), tv.get_source_ndx(1), reporter);
+    expected_people_names = {"Frank"};
+    expected_language_names = {"Danish", "English"};
+    includes.report_included_backlinks(accounts.get(), tv.get_source_ndx(2), reporter);
+}
+
+
 TEST(Parser_Backlinks)
 {
     Group g;

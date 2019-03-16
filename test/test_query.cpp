@@ -5483,12 +5483,12 @@ TEST(Query_IncludeDescriptorLinkAndListTranslation)
     //  4       0          |   5     empty      | 5       |  5      2
     //  5       null       |                    | 6       |  6      3
 
-    {   // test link.list.backlink path: INCLUDE(t1_link_t2.t2_list_t3.@links.t4.t4_link_t3)
+    auto check_include = [&](DescriptorOrdering descriptor) {
+        // test link.list.backlink path: INCLUDE(t1_link_t2.t2_list_t3.@links.t4.t4_link_t3)
         TableView tv = t1->where().less(t1_int_col, 6).find_all();
-        tv.sort(t1_int_col);
-        tv.include(IncludeDescriptor(*t1, {{{t1_link_t2_col}, {t2_list_t3_col}, {t4_link_t3_col, t4}}}));
-
+        tv.apply_descriptor_ordering(descriptor);
         IncludeDescriptor includes = tv.get_include_descriptors();
+
         std::vector<size_t> expected_t4_values;
         auto reporter = [&](const Table* table, std::unordered_set<size_t> rows) {
             CHECK(table == t4);
@@ -5512,7 +5512,17 @@ TEST(Query_IncludeDescriptorLinkAndListTranslation)
         includes.report_included_backlinks(t1.get(), tv.get_source_ndx(4), reporter);
         expected_t4_values = {}; // nullified path by null link in t1
         includes.report_included_backlinks(t1.get(), tv.get_source_ndx(5), reporter);
-    }
+    };
+
+    DescriptorOrdering ordering;
+    ordering.append_include(IncludeDescriptor(*t1, {{{t1_link_t2_col}, {t2_list_t3_col}, {t4_link_t3_col, t4}}}));
+    ordering.append_sort(SortDescriptor(*t1, {{t1_int_col}}));
+    check_include(ordering);
+
+    DescriptorOrdering::HandoverPatch patch;
+    DescriptorOrdering::generate_patch(ordering, patch);
+    DescriptorOrdering transferred = DescriptorOrdering::create_from_and_consume_patch(patch, *t1);
+    check_include(transferred);
 }
 
 
