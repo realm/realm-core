@@ -2160,8 +2160,6 @@ TEST(Parser_IncludeDescriptorMultiple)
 
     // include serialisation
     TableView tv = get_sorted_view(accounts, "balance > 0 SORT(num_transactions ASC) INCLUDE(@links.person.account, bank.@links.language.available_from)");
-    IncludeDescriptor includes = tv.get_include_descriptors();
-    CHECK(includes.is_valid());
     CHECK_EQUAL(tv.size(), 3);
 
     CHECK_EQUAL(tv.get_int(transaction_col, 0), 2);
@@ -2188,15 +2186,47 @@ TEST(Parser_IncludeDescriptorMultiple)
         }
     };
 
-    expected_people_names = {"Adam"};
-    expected_language_names = {"English", "French"};
-    includes.report_included_backlinks(accounts.get(), tv.get_source_ndx(0), reporter);
-    expected_people_names = {"Ben"};
-    expected_language_names = {"English", "French"};
-    includes.report_included_backlinks(accounts.get(), tv.get_source_ndx(1), reporter);
-    expected_people_names = {"Frank"};
-    expected_language_names = {"Danish", "English"};
-    includes.report_included_backlinks(accounts.get(), tv.get_source_ndx(2), reporter);
+    {
+        IncludeDescriptor includes = tv.get_include_descriptors();
+        CHECK(includes.is_valid());
+        expected_people_names = {"Adam"};
+        expected_language_names = {"English", "French"};
+        includes.report_included_backlinks(accounts.get(), tv.get_source_ndx(0), reporter);
+        expected_people_names = {"Ben"};
+        expected_language_names = {"English", "French"};
+        includes.report_included_backlinks(accounts.get(), tv.get_source_ndx(1), reporter);
+        expected_people_names = {"Frank"};
+        expected_language_names = {"Danish", "English"};
+        includes.report_included_backlinks(accounts.get(), tv.get_source_ndx(2), reporter);
+    }
+    {
+        parser::KeyPathMapping mapping;
+        // disable parsing backlink queries, INCLUDE still allows backlinks
+        mapping.set_allow_backlinks(false);
+        // include supports backlink mappings
+        mapping.add_mapping(accounts, "account_owner", "@links.person.account");
+        mapping.add_mapping(banks, "service_languages", "@links.language.available_from");
+        query_builder::NoArguments args;
+
+        Query query = accounts->where();
+        realm::parser::ParserResult result = realm::parser::parse("balance > 0 SORT(num_transactions ASC) INCLUDE(account_owner, bank.service_languages)");
+        realm::query_builder::apply_predicate(query, result.predicate, args, mapping);
+        DescriptorOrdering ordering;
+        realm::query_builder::apply_ordering(ordering, accounts, result.ordering, args, mapping);
+        CHECK_EQUAL(query.count(), 3);
+        IncludeDescriptor includes = ordering.compile_included_backlinks();
+        CHECK(includes.is_valid());
+
+        expected_people_names = {"Adam"};
+        expected_language_names = {"English", "French"};
+        includes.report_included_backlinks(accounts.get(), tv.get_source_ndx(0), reporter);
+        expected_people_names = {"Ben"};
+        expected_language_names = {"English", "French"};
+        includes.report_included_backlinks(accounts.get(), tv.get_source_ndx(1), reporter);
+        expected_people_names = {"Frank"};
+        expected_language_names = {"Danish", "English"};
+        includes.report_included_backlinks(accounts.get(), tv.get_source_ndx(2), reporter);
+    }
 }
 
 

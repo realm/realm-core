@@ -817,6 +817,10 @@ void apply_ordering(DescriptorOrdering& ordering, ConstTableRef target, const pa
             Group* g = tf::get_parent_group(*target);
             REALM_ASSERT(g);
 
+            // by definition, included paths contain at least one backlink
+            bool backlink_paths_allowed = mapping.backlinks_allowed();
+            mapping.set_allow_backlinks(true);
+
             std::vector<std::vector<LinkPathPart>> properties;
             for (const DescriptorOrderingState::PropertyState& cur_property : cur_ordering.properties) {
                 KeyPath path = key_path_from_string(cur_property.key_path);
@@ -850,6 +854,7 @@ void apply_ordering(DescriptorOrdering& ordering, ConstTableRef target, const pa
                 properties.emplace_back(std::move(links));
             }
             ordering.append_include(IncludeDescriptor{*target.get(), properties});
+            mapping.set_allow_backlinks(backlink_paths_allowed);
         }
         else {
             REALM_UNREACHABLE();
