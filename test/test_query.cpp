@@ -11838,4 +11838,77 @@ TEST(Query_TwoColumnUnaligned)
     CHECK_EQUAL(cnt, matches);
 }
 
+TEST(Query_Permissions)
+{
+    Group g;
+
+    TableRef user = g.add_table("user");
+    size_t user_id = user->add_column(type_String, "id");
+
+    TableRef role = g.add_table("role");
+    size_t role_name = role->add_column(type_String, "name");
+    size_t role_members = role->add_column_link(type_LinkList, "members", *user);
+
+    TableRef permission = g.add_table("permission");
+    size_t permission_role = permission->add_column_link(type_Link, "role", *role);
+    size_t permission_read = permission->add_column(type_Bool, "canRead");
+
+    auto everyone = role->add_empty_row();
+    role->set_string(role_name, everyone, "everyone");
+    auto users = role->add_empty_row();
+    role->set_string(role_name, users, "users");
+    auto poweruser = role->add_empty_row();
+    role->set_string(role_name, poweruser, "poweruser");
+
+    auto add_user = [=](const char* username, const char* rolename) {
+        auto u = user->add_empty_row();
+        user->set_string(user_id, u, username);
+
+        auto ndx = role->find_first_string(role_name, rolename);
+        role->get_linklist(role_members, ndx)->add(u);
+        ndx = role->find_first_string(role_name, "everyone");
+        role->get_linklist(role_members, ndx)->add(u);
+    };
+
+    add_user("John", "poweruser");
+    add_user("Eric", "users");
+
+    TableRef table = g.add_table("table");
+    size_t int_col_ndx = table->add_column(type_Int, "int");
+    size_t str_col_ndx = table->add_column(type_String, "string");
+    size_t permissions_col_ndx = table->add_column_link(type_LinkList, "permissions", *permission);
+
+    auto add_obj = [=](const char* rolename, int64_t int_val, StringData str_val) {
+        auto obj = table->add_empty_row();
+        table->set_int(int_col_ndx, obj, int_val);
+        table->set_string(str_col_ndx, obj, str_val);
+        {
+            auto perm = permission->add_empty_row();
+            auto ndx = role->find_first_string(role_name, rolename);
+            permission->set_link(permission_role, perm, ndx);
+            permission->set_bool(permission_read, perm, true);
+            table->get_linklist(permissions_col_ndx, obj)->add(perm);
+        }
+        {
+            auto perm = permission->add_empty_row();
+            auto ndx = role->find_first_string(role_name, "everyone");
+            permission->set_link(permission_role, perm, ndx);
+            permission->set_bool(permission_read, perm, false);
+            table->get_linklist(permissions_col_ndx, obj)->add(perm);
+        }
+    };
+
+    add_obj("poweruser", 1, "hello");
+
+    Query q;
+    q = table->column<Int>(int_col_ndx) == 1;
+    q.has_read_permission(permissions_col_ndx, "John");
+    CHECK_EQUAL(q.count(), 1);
+    q = table->column<String>(str_col_ndx) == "hello";
+    q = q.and_query(table->where().has_read_permission(permissions_col_ndx, "Eric"));
+    CHECK_EQUAL(q.count(), 0);
+    add_obj("users", 2, "hello");
+    CHECK_EQUAL(q.count(), 1);
+}
+
 #endif // TEST_QUERY

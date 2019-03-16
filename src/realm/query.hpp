@@ -240,6 +240,8 @@ public:
     Query& contains(size_t column_ndx, BinaryData value, bool case_sensitive = true);
     Query& like(size_t column_ndx, BinaryData b, bool case_sensitive = true);
 
+    // Permissions
+    Query& has_read_permission(size_t acl_col_ndx, StringData user_id);
     // Negation
     Query& Not();
 

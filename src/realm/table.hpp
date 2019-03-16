@@ -1608,6 +1608,7 @@ private:
     friend struct util::serializer::SerialisationState;
     friend class RowBase;
     friend class LinksToNode;
+    friend class ReadAccessNode;
     friend class LinkMap;
     friend class LinkView;
     friend class Group;

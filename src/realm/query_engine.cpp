@@ -19,6 +19,8 @@
 #include <realm/query_engine.hpp>
 
 #include <realm/query_expression.hpp>
+#include <realm/group.hpp>
+#include <realm/table_view.hpp>
 #include <realm/utilities.hpp>
 
 using namespace realm;
@@ -683,4 +685,62 @@ ExpressionNode::ExpressionNode(const ExpressionNode& from, QueryNodeHandoverPatc
 : ParentNode(from, patches)
 , m_expression(from.m_expression->clone(patches))
 {
+}
+
+ReadAccessNode::ReadAccessNode(size_t acl_column_index, StringData user_id)
+    : m_acl_column(acl_column_index)
+    , m_user_id(user_id)
+{
+    m_dD = 10.0;
+    m_dT = 50.0;
+}
+
+void ReadAccessNode::table_changed()
+{
+    REALM_ASSERT(m_table->get_column_type(m_acl_column) == type_LinkList);
+    m_column = &m_table->get_column_link_list(m_acl_column);
+
+    m_permissions_table = const_cast<Table*>(m_table->get_link_target(m_acl_column).get());
+    m_read_col_ndx = m_permissions_table->get_column_index("canRead");
+    REALM_ASSERT(m_permissions_table->get_column_type(m_read_col_ndx) == type_Bool);
+    m_role_col_ndx = m_permissions_table->get_column_index("role");
+    REALM_ASSERT(m_permissions_table->get_column_type(m_role_col_ndx) == type_Link);
+
+    auto roles = m_permissions_table->get_link_target(m_role_col_ndx).get();
+    auto col_members = roles->get_column_index("members");
+    REALM_ASSERT(roles->get_column_type(col_members) == type_LinkList);
+
+    // Lookup user
+    auto users = roles->get_link_target(col_members).get();
+    auto col_id = users->get_column_index("id");
+    REALM_ASSERT(users->get_column_type(col_id) == type_String);
+    auto user_ndx = users->find_first_string(col_id, m_user_id);
+
+    if (user_ndx != realm::npos) {
+        // Get references to all roles this user can assume
+        auto tv = users->get_backlink_view(user_ndx, roles, col_members);
+        auto sz = tv.size();
+        for (size_t i = 0; i < sz; i++) {
+            m_role_ndxs.push_back(tv.get_source_ndx(i));
+        }
+    }
+}
+
+size_t ReadAccessNode::find_first_local(size_t start, size_t end)
+{
+    for (size_t i = start; i < end; i++) {
+        auto lv = m_table->get_linklist(m_acl_column, i);
+        auto sz = lv->size();
+        for (size_t j = 0; j < sz; j++) {
+            auto ndx = lv->m_row_indexes.get(j);
+            if (m_permissions_table->get_bool(m_read_col_ndx, ndx)) {
+                auto role_ndx = m_permissions_table->get_link(m_role_col_ndx, ndx);
+                for (auto n : m_role_ndxs) {
+                    if (n == role_ndx)
+                        return i;
+                }
+            }
+        }
+    }
+    return not_found;
 }

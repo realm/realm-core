@@ -2084,13 +2084,13 @@ public:
         do_verify_column(m_column, m_origin_column);
     }
 
-    virtual std::string describe(util::serializer::SerialisationState&) const override
+    std::string describe(util::serializer::SerialisationState&) const override
     {
         throw SerialisationError("Serialising a query which links to an object is currently unsupported.");
         // We can do something like the following when core gets stable keys
         //return describe_column() + " " + describe_condition() + " " + util::serializer::print_value(m_target_row.get_index());
     }
-    virtual std::string describe_condition() const override
+    std::string describe_condition() const override
     {
         return "links to";
     }
@@ -2154,6 +2154,45 @@ private:
         ConstRow::generate_patch(source.m_target_row, patch->m_target_row);
         patches->push_back(std::move(patch));
     }
+};
+
+class ReadAccessNode : public ParentNode {
+public:
+    ReadAccessNode(size_t acl_column_index, StringData user_id);
+
+    void table_changed() override;
+
+    void verify_column() const override
+    {
+        do_verify_column(m_column, m_acl_column);
+    }
+
+    std::string describe(util::serializer::SerialisationState&) const override
+    {
+        throw SerialisationError("Serialising a permission query.");
+        return {};
+    }
+
+    std::string describe_condition() const override
+    {
+        return "hasReadAccess to";
+    }
+
+    size_t find_first_local(size_t, size_t) override;
+
+    std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches*) const override
+    {
+        return std::unique_ptr<ParentNode>(new ReadAccessNode(*this));
+    }
+
+private:
+    size_t m_acl_column = npos;
+    StringData m_user_id;
+    Table* m_permissions_table = nullptr;
+    const LinkListColumn* m_column = nullptr;
+    std::vector<size_t> m_role_ndxs;
+    size_t m_read_col_ndx = npos;
+    size_t m_role_col_ndx = npos;
 };
 
 } // namespace realm

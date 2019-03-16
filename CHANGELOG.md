@@ -5,6 +5,8 @@
   on a TableView. Applying this to a TableView does not modify the results, but gives
   users the ability to use the reporting method to find rows in a different table that
   are connected by backlinks. This is intened for sync subscriptions.
+* A new function, Query::has_read_permission() has been added. The function produces a query
+  that finds the objects that the user has read access to. This can be and'ed with other queries.
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)

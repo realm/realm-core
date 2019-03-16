@@ -1241,6 +1241,13 @@ Query& Query::end_group()
     return *this;
 }
 
+Query& Query::has_read_permission(size_t acl_col_ndx, StringData user_id)
+{
+    auto node = std::unique_ptr<ParentNode>(new ReadAccessNode(acl_col_ndx, user_id));
+    add_node(std::move(node));
+    return *this;
+}
+
 // Not creates an implicit group to capture the term that we want to negate.
 Query& Query::Not()
 {
