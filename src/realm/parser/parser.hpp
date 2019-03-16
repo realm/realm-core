@@ -136,6 +136,8 @@ ParserResult parse(const char* query); // assumes c-style null termination
 ParserResult parse(const std::string& query);
 ParserResult parse(const realm::StringData& query);
 
+DescriptorOrderingState parse_include_path(const realm::StringData& path);
+
 // run the analysis tool to check for cycles in the grammar
 // returns the number of problems found and prints some info to std::cout
 size_t analyze_grammar();

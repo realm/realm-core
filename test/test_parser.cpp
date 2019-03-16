@@ -2227,6 +2227,55 @@ TEST(Parser_IncludeDescriptorMultiple)
         expected_language_names = {"Danish", "English"};
         includes.report_included_backlinks(accounts.get(), tv.get_source_ndx(2), reporter);
     }
+    {
+        parser::KeyPathMapping mapping;
+        mapping.set_allow_backlinks(false);
+        mapping.add_mapping(banks, "service_languages", "@links.language.available_from");
+        query_builder::NoArguments args;
+
+        Query query = accounts->where();
+        realm::parser::ParserResult result = realm::parser::parse("balance > 0 SORT(num_transactions ASC)");
+        realm::query_builder::apply_predicate(query, result.predicate, args, mapping);
+        DescriptorOrdering ordering;
+        realm::query_builder::apply_ordering(ordering, accounts, result.ordering, args, mapping);
+        CHECK_EQUAL(ordering.compile_included_backlinks().is_valid(), false); // nothing included yet
+
+        DescriptorOrdering parsed_ordering_1;
+        realm::parser::DescriptorOrderingState include_1 = realm::parser::parse_include_path("@links.person.account");
+        realm::query_builder::apply_ordering(parsed_ordering_1, accounts, include_1, args, mapping);
+        CHECK(parsed_ordering_1.compile_included_backlinks().is_valid());
+        DescriptorOrdering parsed_ordering_2;
+        realm::parser::DescriptorOrderingState include_2 = realm::parser::parse_include_path("bank.service_languages");
+        realm::query_builder::apply_ordering(parsed_ordering_2, accounts, include_2, args, mapping);
+        CHECK(parsed_ordering_2.compile_included_backlinks().is_valid());
+
+        ordering.append_include(parsed_ordering_1.compile_included_backlinks());
+        CHECK(ordering.compile_included_backlinks().is_valid());
+        ordering.append_include(parsed_ordering_2.compile_included_backlinks());
+        CHECK(ordering.compile_included_backlinks().is_valid());
+
+        CHECK_EQUAL(query.count(), 3);
+        IncludeDescriptor includes = ordering.compile_included_backlinks();
+        CHECK(includes.is_valid());
+
+        expected_people_names = {"Adam"};
+        expected_language_names = {"English", "French"};
+        includes.report_included_backlinks(accounts.get(), tv.get_source_ndx(0), reporter);
+        expected_people_names = {"Ben"};
+        expected_language_names = {"English", "French"};
+        includes.report_included_backlinks(accounts.get(), tv.get_source_ndx(1), reporter);
+        expected_people_names = {"Frank"};
+        expected_language_names = {"Danish", "English"};
+        includes.report_included_backlinks(accounts.get(), tv.get_source_ndx(2), reporter);
+
+        std::string message;
+        CHECK_THROW_ANY_GET_MESSAGE(realm::parser::parse_include_path(""), message);
+        CHECK(message.find("Invalid syntax encountered while parsing key path for 'INCLUDE'.") != std::string::npos);
+        CHECK_THROW_ANY_GET_MESSAGE(realm::parser::parse_include_path("2"), message);
+        CHECK(message.find("Invalid syntax encountered while parsing key path for 'INCLUDE'.") != std::string::npos);
+        CHECK_THROW_ANY_GET_MESSAGE(realm::parser::parse_include_path("something with spaces"), message);
+        CHECK(message.find("Invalid syntax encountered while parsing key path for 'INCLUDE'.") != std::string::npos);
+    }
 }
 
 
