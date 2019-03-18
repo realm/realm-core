@@ -174,7 +174,7 @@ DescriptorExport ColumnsDescriptor::export_for_handover() const
         std::vector<DescriptorLinkPath> indices;
         indices.reserve(cols.size());
         for (const ColumnBase* col : cols)
-            indices.push_back({col->get_column_index(), realm::npos, false});
+            indices.push_back(DescriptorLinkPath{col->get_column_index(), realm::npos, false});
         column_indices.push_back(indices);
     }
     DescriptorExport out;
@@ -439,7 +439,7 @@ DescriptorExport IncludeDescriptor::export_for_handover() const
                 indices.push_back({m_columns[i][j]->get_column_index(), m_backlink_sources[i][j]->get_index_in_group(), true});
             }
             else {
-                indices.push_back({m_columns[i][j]->get_column_index(), realm::npos, false});
+                indices.push_back(DescriptorLinkPath{m_columns[i][j]->get_column_index(), realm::npos, false});
             }
         }
         column_indices.push_back(indices);

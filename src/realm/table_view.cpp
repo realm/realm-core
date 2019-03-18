@@ -710,9 +710,9 @@ void TableViewBase::limit(LimitDescriptor lim)
     do_sync();
 }
 
-void TableViewBase::include(IncludeDescriptor include)
+void TableViewBase::include(IncludeDescriptor include_paths)
 {
-    m_descriptor_ordering.append_include(std::move(include));
+    m_descriptor_ordering.append_include(std::move(include_paths));
     do_sync();
 }
 

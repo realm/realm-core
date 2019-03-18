@@ -2019,8 +2019,6 @@ TEST(Parser_Limit)
 
 TEST(Parser_IncludeDescriptor)
 {
-
-
     Group g;
     TableRef people = g.add_table("person");
     TableRef accounts = g.add_table("account");
