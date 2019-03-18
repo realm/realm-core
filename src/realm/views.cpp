@@ -436,7 +436,7 @@ DescriptorExport IncludeDescriptor::export_for_handover() const
         REALM_ASSERT_EX(m_backlink_sources[i].size() == m_columns[i].size(), m_backlink_sources[i].size(), m_columns[i].size());
         for (size_t j = 0; j < m_columns[i].size(); ++j) {
             if (bool(m_backlink_sources[i][j])) {
-                indices.push_back({m_columns[i][j]->get_column_index(), m_backlink_sources[i][j]->get_index_in_group(), true});
+                indices.push_back(DescriptorLinkPath{m_columns[i][j]->get_column_index(), m_backlink_sources[i][j]->get_index_in_group(), true});
             }
             else {
                 indices.push_back(DescriptorLinkPath{m_columns[i][j]->get_column_index(), realm::npos, false});
