@@ -700,28 +700,41 @@ void ReadAccessNode::table_changed()
     REALM_ASSERT(m_table->get_column_type(m_acl_column) == type_LinkList);
     m_column = &m_table->get_column_link_list(m_acl_column);
 
-    m_permissions_table = const_cast<Table*>(m_table->get_link_target(m_acl_column).get());
-    m_read_col_ndx = m_permissions_table->get_column_index("canRead");
-    REALM_ASSERT(m_permissions_table->get_column_type(m_read_col_ndx) == type_Bool);
-    m_role_col_ndx = m_permissions_table->get_column_index("role");
-    REALM_ASSERT(m_permissions_table->get_column_type(m_role_col_ndx) == type_Link);
+    m_permissions = const_cast<Table*>(m_table->get_link_target(m_acl_column).get());
 
-    auto roles = m_permissions_table->get_link_target(m_role_col_ndx).get();
-    auto col_members = roles->get_column_index("members");
-    REALM_ASSERT(roles->get_column_type(col_members) == type_LinkList);
+    m_read_col_ndx = m_permissions->get_column_index("canRead");
+    if (m_read_col_ndx == realm::npos || m_permissions->get_column_type(m_read_col_ndx) != type_Bool) {
+        throw LogicError(LogicError::column_does_not_exist);
+    }
 
+    m_role_col_ndx = m_permissions->get_column_index("role");
+    if (m_role_col_ndx == realm::npos || m_permissions->get_column_type(m_role_col_ndx) != type_Link) {
+        throw LogicError(LogicError::column_does_not_exist);
+    }
+
+    m_roles = m_permissions->get_link_target(m_role_col_ndx).get();
+
+    m_col_members = m_roles->get_column_index("members");
+    if (m_col_members == realm::npos || m_roles->get_column_type(m_col_members) != type_LinkList) {
+        throw LogicError(LogicError::column_does_not_exist);
+    }
+
+    m_users = m_roles->get_link_target(m_col_members).get();
+}
+
+void ReadAccessNode::init()
+{
+    ParentNode::init();
     // Lookup user
-    auto users = roles->get_link_target(col_members).get();
-    auto col_id = users->get_column_index("id");
-    REALM_ASSERT(users->get_column_type(col_id) == type_String);
-    auto user_ndx = users->find_first_string(col_id, m_user_id);
+    auto col_id = m_users->get_column_index("id");
+    REALM_ASSERT(m_users->get_column_type(col_id) == type_String);
+    auto user_ndx = m_users->find_first_string(col_id, m_user_id);
 
     if (user_ndx != realm::npos) {
         // Get references to all roles this user can assume
-        auto tv = users->get_backlink_view(user_ndx, roles, col_members);
-        auto sz = tv.size();
-        for (size_t i = 0; i < sz; i++) {
-            m_role_ndxs.push_back(tv.get_source_ndx(i));
+        auto cnt = m_users->get_backlink_count(user_ndx, *m_roles, m_col_members);
+        for (size_t i = 0; i < cnt; i++) {
+            m_role_ndxs.push_back(m_users->get_backlink(user_ndx, *m_roles, m_col_members, i));
         }
     }
 }
@@ -729,12 +742,12 @@ void ReadAccessNode::table_changed()
 size_t ReadAccessNode::find_first_local(size_t start, size_t end)
 {
     for (size_t i = start; i < end; i++) {
-        auto lv = m_table->get_linklist(m_acl_column, i);
+        auto lv = m_column->get(i);
         auto sz = lv->size();
         for (size_t j = 0; j < sz; j++) {
-            auto ndx = lv->m_row_indexes.get(j);
-            if (m_permissions_table->get_bool(m_read_col_ndx, ndx)) {
-                auto role_ndx = m_permissions_table->get_link(m_role_col_ndx, ndx);
+            auto ndx = size_t(lv->m_row_indexes.get(j));
+            if (m_permissions->get_bool(m_read_col_ndx, ndx)) {
+                auto role_ndx = m_permissions->get_link(m_role_col_ndx, ndx);
                 for (auto n : m_role_ndxs) {
                     if (n == role_ndx)
                         return i;

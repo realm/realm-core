@@ -2167,6 +2167,8 @@ public:
         do_verify_column(m_column, m_acl_column);
     }
 
+    void init() override;
+
     std::string describe(util::serializer::SerialisationState&) const override
     {
         throw SerialisationError("Serialising a permission query.");
@@ -2180,19 +2182,39 @@ public:
 
     size_t find_first_local(size_t, size_t) override;
 
-    std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches*) const override
+    std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches* patches) const override
     {
-        return std::unique_ptr<ParentNode>(new ReadAccessNode(*this));
+        return std::unique_ptr<ParentNode>(new ReadAccessNode(*this, patches));
     }
 
 private:
-    size_t m_acl_column = npos;
-    StringData m_user_id;
-    Table* m_permissions_table = nullptr;
     const LinkListColumn* m_column = nullptr;
+    size_t m_acl_column = npos;
+    std::string m_user_id;
+
+    Table* m_permissions = nullptr;
+    Table* m_roles = nullptr;
+    Table* m_users = nullptr;
     std::vector<size_t> m_role_ndxs;
     size_t m_read_col_ndx = npos;
     size_t m_role_col_ndx = npos;
+    size_t m_col_members = npos;
+
+    ReadAccessNode(const ReadAccessNode& from, QueryNodeHandoverPatches* patches)
+        : ParentNode(from, patches)
+        , m_column(from.m_column)
+        , m_user_id(from.m_user_id)
+        , m_permissions(from.m_permissions)
+        , m_roles(from.m_roles)
+        , m_users(from.m_users)
+        , m_role_ndxs(from.m_role_ndxs)
+        , m_read_col_ndx(from.m_read_col_ndx)
+        , m_role_col_ndx(from.m_role_col_ndx)
+        , m_col_members(from.m_col_members)
+    {
+        if (m_column && patches)
+            m_acl_column = m_column->get_column_index();
+    }
 };
 
 } // namespace realm

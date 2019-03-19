@@ -11901,14 +11901,17 @@ TEST(Query_Permissions)
     add_obj("poweruser", 1, "hello");
 
     Query q;
-    q = table->column<Int>(int_col_ndx) == 1;
-    q.has_read_permission(permissions_col_ndx, "John");
+    q = (table->column<Int>(int_col_ndx) == 1) && table->where().has_read_permission(permissions_col_ndx, "John");
     CHECK_EQUAL(q.count(), 1);
-    q = table->column<String>(str_col_ndx) == "hello";
-    q = q.and_query(table->where().has_read_permission(permissions_col_ndx, "Eric"));
+    q = (table->column<String>(str_col_ndx) == "hello") &&
+        table->where().has_read_permission(permissions_col_ndx, "Eric");
     CHECK_EQUAL(q.count(), 0);
     add_obj("users", 2, "hello");
+    add_obj("users", 1, "godbye");
     CHECK_EQUAL(q.count(), 1);
+    q = ((table->column<String>(str_col_ndx) == "hello") || (table->column<Int>(int_col_ndx) == 1)) &&
+        table->where().has_read_permission(permissions_col_ndx, "Eric");
+    CHECK_EQUAL(q.count(), 2);
 }
 
 #endif // TEST_QUERY
