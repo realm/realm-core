@@ -4798,7 +4798,7 @@ TEST(Query_SortDistinctOrderThroughHandover) {
         HandoverPtr hp = sg_w.export_for_handover(tv, ConstSourcePayload::Stay);
         check_across_handover(results, std::move(hp));
     }
-    {   // sort descending then distinct then limit and include
+    { // sort descending then distinct then limit and include
         TableView tv = t1->where().find_all();
         ResultList results = {};
         tv.sort(SortDescriptor(*t1, {{t1_int_col}}, {false}));
@@ -5189,7 +5189,7 @@ TEST(Query_IncludeDescriptorSelfLinks)
     //  4        6
     //  5        0
 
-    {   // test single backlink path from the same table: INCLUDE(@links.t1.t1_link_self)
+    { // test single backlink path from the same table: INCLUDE(@links.t1.t1_link_self)
         TableView tv = t1->where().less(t1_int_col, 6).find_all();
         tv.sort(t1_int_col);
         tv.include(IncludeDescriptor(*t1, {{{t1_link_self_col, t1}}}));
@@ -5210,12 +5210,12 @@ TEST(Query_IncludeDescriptorSelfLinks)
                 expected_values = {}; // first result has no backlinks
             }
             else {
-                expected_values = { i - 1 }; // linked to by the previous row
+                expected_values = {i - 1}; // linked to by the previous row
             }
             includes.report_included_backlinks(t1.get(), tv.get_source_ndx(i), reporter);
         }
     }
-    {   // test a backlink chain of size two from the same table: INCLUDE(t1_link_self.@links.t1.t1_link_self)
+    { // test a backlink chain of size two from the same table: INCLUDE(t1_link_self.@links.t1.t1_link_self)
         TableView tv = t1->where().less(t1_int_col, 6).find_all();
         tv.sort(t1_int_col);
         tv.include(IncludeDescriptor(*t1, {{{t1_link_self_col}, {t1_link_self_col, t1}}}));
@@ -5232,11 +5232,12 @@ TEST(Query_IncludeDescriptorSelfLinks)
         };
         CHECK_EQUAL(tv.size(), 6);
         for (size_t i = 0; i < tv.size(); ++i) {
-            expected_values = { i }; // following a single link gives this row as a backlink
+            expected_values = {i}; // following a single link gives this row as a backlink
             includes.report_included_backlinks(t1.get(), tv.get_source_ndx(i), reporter);
         }
     }
-    {   // test a backlink chain of size three from the same table: INCLUDE(t1_link_self.t1_link_self.@links.t1.t1_link_self)
+    { // test a backlink chain of size three from the same table:
+      // INCLUDE(t1_link_self.t1_link_self.@links.t1.t1_link_self)
         TableView tv = t1->where().less(t1_int_col, 6).find_all();
         tv.sort(t1_int_col);
         tv.include(IncludeDescriptor(*t1, {{{t1_link_self_col}, {t1_link_self_col}, {t1_link_self_col, t1}}}));
@@ -5257,7 +5258,7 @@ TEST(Query_IncludeDescriptorSelfLinks)
                 expected_values = {}; // nullified by the second link
             }
             else {
-                expected_values = { i + 1 }; // linked to by the next row in the chain (ndx + 1)
+                expected_values = {i + 1}; // linked to by the next row in the chain (ndx + 1)
             }
             includes.report_included_backlinks(t1.get(), tv.get_source_ndx(i), reporter);
         }
@@ -5303,7 +5304,7 @@ TEST(Query_IncludeDescriptorOtherLinks)
     //  4      |   5       null       |
     //  5      |                      |
 
-    {   // test single backlink path from t2: INCLUDE(@links.t2.t2_link_t1)
+    { // test single backlink path from t2: INCLUDE(@links.t2.t2_link_t1)
         TableView tv = t1->where().less(t1_int_col, 6).find_all();
         tv.sort(t1_int_col);
         tv.include(IncludeDescriptor(*t1, {{{t2_link_t1_col, t2}}}));
@@ -5315,7 +5316,8 @@ TEST(Query_IncludeDescriptorOtherLinks)
             CHECK_EQUAL(expected_t2_values.size(), rows.size());
             for (auto row : rows) {
                 int64_t row_value = table->get_int(t2_int_col, row);
-                CHECK(std::find(expected_t2_values.begin(), expected_t2_values.end(), row_value) != expected_t2_values.end());
+                CHECK(std::find(expected_t2_values.begin(), expected_t2_values.end(), row_value) !=
+                      expected_t2_values.end());
             }
         };
         CHECK_EQUAL(tv.size(), 6);
@@ -5382,7 +5384,7 @@ TEST(Query_IncludeDescriptorOtherLists)
     //  4      |   5       empty      |
     //  5      |                      |
 
-    {   // test single backlink path from t2 list: INCLUDE(@links.t2.t2_list_t1_col)
+    { // test single backlink path from t2 list: INCLUDE(@links.t2.t2_list_t1_col)
         TableView tv = t1->where().less(t1_int_col, 6).find_all();
         tv.sort(t1_int_col);
         tv.include(IncludeDescriptor(*t1, {{{t2_list_t1_col, t2}}}));
@@ -5394,7 +5396,8 @@ TEST(Query_IncludeDescriptorOtherLists)
             CHECK_EQUAL(expected_t2_values.size(), rows.size());
             for (auto row : rows) {
                 int64_t row_value = table->get_int(t2_int_col, row);
-                CHECK(std::find(expected_t2_values.begin(), expected_t2_values.end(), row_value) != expected_t2_values.end());
+                CHECK(std::find(expected_t2_values.begin(), expected_t2_values.end(), row_value) !=
+                      expected_t2_values.end());
             }
         };
         CHECK_EQUAL(tv.size(), 6);
@@ -5495,7 +5498,8 @@ TEST(Query_IncludeDescriptorLinkAndListTranslation)
             CHECK_EQUAL(expected_t4_values.size(), rows.size());
             for (auto row : rows) {
                 int64_t row_value = table->get_int(t4_int_col, row);
-                CHECK(std::find(expected_t4_values.begin(), expected_t4_values.end(), row_value) != expected_t4_values.end());
+                CHECK(std::find(expected_t4_values.begin(), expected_t4_values.end(), row_value) !=
+                      expected_t4_values.end());
             }
         };
         CHECK_EQUAL(tv.size(), 6);

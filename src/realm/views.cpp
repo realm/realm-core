@@ -320,7 +320,7 @@ DescriptorExport LimitDescriptor::export_for_handover() const
 }
 
 IncludeDescriptor::IncludeDescriptor(const Table& table, const std::vector<std::vector<LinkPathPart>>& column_links)
-: ColumnsDescriptor()
+    : ColumnsDescriptor()
 {
     if (table.is_degenerate()) {
         // We need access to the column acessors and that's not available in a
@@ -369,7 +369,8 @@ IncludeDescriptor::IncludeDescriptor(const Table& table, const std::vector<std::
                     if (columns.size() == links.size()) {
                         // An inclusion must end with a backlink column, link/list columns are included automatically
                         throw InvalidPathError(util::format("Invalid INCLUDE path at [%1, %2]: the last part of an "
-                                                            "included path must be a backlink column.", i, link_ndx));
+                                                            "included path must be a backlink column.",
+                                                            i, link_ndx));
                     }
                     cur_table = &link_col->get_target_table();
                 }
@@ -436,10 +437,12 @@ DescriptorExport IncludeDescriptor::export_for_handover() const
     for (size_t i = 0; i < m_columns.size(); ++i) {
         std::vector<DescriptorLinkPath> indices;
         indices.reserve(m_columns[i].size());
-        REALM_ASSERT_EX(m_backlink_sources[i].size() == m_columns[i].size(), m_backlink_sources[i].size(), m_columns[i].size());
+        REALM_ASSERT_EX(m_backlink_sources[i].size() == m_columns[i].size(), m_backlink_sources[i].size(),
+                        m_columns[i].size());
         for (size_t j = 0; j < m_columns[i].size(); ++j) {
             if (bool(m_backlink_sources[i][j])) {
-                indices.push_back(DescriptorLinkPath{m_columns[i][j]->get_column_index(), m_backlink_sources[i][j]->get_index_in_group(), true});
+                indices.push_back(DescriptorLinkPath{m_columns[i][j]->get_column_index(),
+                                                     m_backlink_sources[i][j]->get_index_in_group(), true});
             }
             else {
                 indices.push_back(DescriptorLinkPath{m_columns[i][j]->get_column_index(), realm::npos, false});
@@ -462,8 +465,9 @@ void IncludeDescriptor::append(const IncludeDescriptor& other)
     }
 }
 
-void IncludeDescriptor::report_included_backlinks(const Table* origin, size_t row_ndx,
-                          std::function<void(const Table*, const std::unordered_set<size_t>&)> reporter) const
+void IncludeDescriptor::report_included_backlinks(
+    const Table* origin, size_t row_ndx,
+    std::function<void(const Table*, const std::unordered_set<size_t>&)> reporter) const
 {
     REALM_ASSERT_DEBUG(origin);
     REALM_ASSERT_DEBUG(row_ndx < origin->size());
@@ -480,7 +484,8 @@ void IncludeDescriptor::report_included_backlinks(const Table* origin, size_t ro
                 for (auto row_to_explore : rows_to_explore) {
                     size_t num_backlinks = table->get_backlink_count(row_to_explore, from_table, from_col_ndx);
                     for (size_t backlink_ndx = 0; backlink_ndx < num_backlinks; ++backlink_ndx) {
-                        results_of_next_table.insert(table->get_backlink(row_to_explore, from_table, from_col_ndx, backlink_ndx));
+                        results_of_next_table.insert(
+                            table->get_backlink(row_to_explore, from_table, from_col_ndx, backlink_ndx));
                     }
                 }
                 reporter(&from_table, results_of_next_table); // only report backlinks
@@ -716,7 +721,8 @@ void DescriptorOrdering::generate_patch(DescriptorOrdering const& descriptors, H
     }
 }
 
-std::vector<std::vector<size_t>> generate_forward_paths(const DescriptorExport& single) {
+std::vector<std::vector<size_t>> generate_forward_paths(const DescriptorExport& single)
+{
     std::vector<std::vector<size_t>> paths;
     for (size_t i = 0; i < single.columns.size(); ++i) {
         std::vector<size_t> path;
@@ -728,7 +734,9 @@ std::vector<std::vector<size_t>> generate_forward_paths(const DescriptorExport& 
     return paths;
 }
 
-std::vector<std::vector<LinkPathPart>> generate_bidirectional_paths(const DescriptorExport& single, Table const& start) {
+std::vector<std::vector<LinkPathPart>> generate_bidirectional_paths(const DescriptorExport& single,
+                                                                    Table const& start)
+{
     REALM_ASSERT(start.is_group_level());
     using tf = _impl::TableFriend;
 
@@ -739,7 +747,8 @@ std::vector<std::vector<LinkPathPart>> generate_bidirectional_paths(const Descri
         std::vector<LinkPathPart> path;
         for (size_t j = 0; j < single.columns[i].size(); ++j) {
             if (single.columns[i][j].is_backlink) {
-                REALM_ASSERT_EX(g->size() > single.columns[i][j].table_ndx, g->size(), single.columns[i][j].table_ndx, i, j);
+                REALM_ASSERT_EX(g->size() > single.columns[i][j].table_ndx, g->size(), single.columns[i][j].table_ndx,
+                                i, j);
                 TableRef from_table = g->get_table(single.columns[i][j].table_ndx);
                 path.push_back(LinkPathPart(single.columns[i][j].col_ndx, from_table));
             }
@@ -761,7 +770,8 @@ DescriptorOrdering DescriptorOrdering::create_from_and_consume_patch(HandoverPat
 
             switch (single.type) {
                 case DescriptorType::Sort:
-                    ordering.append_sort(SortDescriptor(table, generate_forward_paths(single), std::move(single.ordering)));
+                    ordering.append_sort(
+                        SortDescriptor(table, generate_forward_paths(single), std::move(single.ordering)));
                     break;
                 case DescriptorType::Distinct:
                     ordering.append_distinct(DistinctDescriptor(table, generate_forward_paths(single)));
@@ -871,8 +881,7 @@ void RowIndexes::do_sort(const DescriptorOrdering& ordering) {
                 }
                 break;
             }
-            case DescriptorType::Include:
-            {
+            case DescriptorType::Include: {
                 // Include descriptors have no effect on core queries; they only operate at the sync level
                 break;
             }

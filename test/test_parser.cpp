@@ -161,8 +161,8 @@ static std::vector<std::string> valid_queries = {
     "! 0=0",
     "!(0=0)",
     "! (0=0)",
-    "NOT0=0",   // keypath NOT0
-    "NOT0.a=0", // keypath NOT0
+    "NOT0=0",    // keypath NOT0
+    "NOT0.a=0",  // keypath NOT0
     "NOT0a.b=0", // keypath NOT0a
     "not-1=1",
     "not 0=0",
@@ -195,7 +195,8 @@ static std::vector<std::string> valid_queries = {
     "a == b sort(a ASC, b DESC) DISTINCT(p)",
     "a == b sort(a ASC, b DESC) DISTINCT(p) sort(c ASC, d DESC) DISTINCT(q.r)",
     "a == b and c==d sort(a ASC, b DESC) DISTINCT(p) sort(c ASC, d DESC) DISTINCT(q.r)",
-    "a == b  sort(     a   ASC  ,  b DESC) and c==d   DISTINCT(   p )  sort(   c   ASC  ,  d   DESC  )  DISTINCT(   q.r ,   p)   ",
+    "a == b  sort(     a   ASC  ,  b DESC) and c==d   DISTINCT(   p )  sort(   c   ASC  ,  d   DESC  )  DISTINCT(   "
+    "q.r ,   p)   ",
 
     // limit
     "a=b LIMIT(1)",
@@ -236,7 +237,7 @@ static std::vector<std::string> valid_queries = {
 
 static std::vector<std::string> invalid_queries = {
     "predicate",
-    "'\\a' = ''",        // invalid escape
+    "'\\a' = ''", // invalid escape
 
     // invalid unicode
     "'\\u0' = ''",
@@ -287,61 +288,61 @@ static std::vector<std::string> invalid_queries = {
     "truepredicate & truepredicate",
 
     // sort/distinct
-    "SORT(p ASCENDING)",  // no query conditions
-    "a=b SORT(p)",        // no asc/desc
-    "a=b SORT(0 Descending)", // bad keypath
-    "a=b sort()",             // missing condition
-    "a=b sort",      // no target property
-    "distinct(p)",           // no query condition
-    "a=b DISTINCT()",      // no target property
-    "a=b Distinct",      // no target property
-    "sort(a ASC b, DESC) a == b", // before query condition
+    "SORT(p ASCENDING)",                      // no query conditions
+    "a=b SORT(p)",                            // no asc/desc
+    "a=b SORT(0 Descending)",                 // bad keypath
+    "a=b sort()",                             // missing condition
+    "a=b sort",                               // no target property
+    "distinct(p)",                            // no query condition
+    "a=b DISTINCT()",                         // no target property
+    "a=b Distinct",                           // no target property
+    "sort(a ASC b, DESC) a == b",             // before query condition
     "sort(a ASC b, DESC) a == b sort(c ASC)", // before query condition
-    "a=bDISTINCT(p)", // bad spacing
-    "a=b sort p.q desc", // no braces
-    "a=b sort(p.qDESC)", // bad spacing
-    "a=b DISTINCT p", // no braces
-    "a=b SORT(p ASC", // bad braces
-    "a=b DISTINCT(p", // no braces
-    "a=b sort(p.q DESC a ASC)", // missing comma
-    "a=b DISTINCT(p q)", // missing comma
+    "a=bDISTINCT(p)",                         // bad spacing
+    "a=b sort p.q desc",                      // no braces
+    "a=b sort(p.qDESC)",                      // bad spacing
+    "a=b DISTINCT p",                         // no braces
+    "a=b SORT(p ASC",                         // bad braces
+    "a=b DISTINCT(p",                         // no braces
+    "a=b sort(p.q DESC a ASC)",               // missing comma
+    "a=b DISTINCT(p q)",                      // missing comma
 
     // limit
-    "LIMIT(1)", // no query conditions
-    "a=b LIMIT", // no params
-    "a=b LIMIT()", // no params
-    "a=b LIMIT(2", // missing end paren
-    "a=b LIMIT2)", // missing open paren
-    "a=b LIMIT(-1)", // negative limit
-    "a=b LIMIT(2.7)", // input must be an integer
+    "LIMIT(1)",          // no query conditions
+    "a=b LIMIT",         // no params
+    "a=b LIMIT()",       // no params
+    "a=b LIMIT(2",       // missing end paren
+    "a=b LIMIT2)",       // missing open paren
+    "a=b LIMIT(-1)",     // negative limit
+    "a=b LIMIT(2.7)",    // input must be an integer
     "a=b LIMIT(0xFFEE)", // input must be an integer
-    "a=b LIMIT(word)", // non numeric limit
+    "a=b LIMIT(word)",   // non numeric limit
     "a=b LIMIT(11asdf)", // non numeric limit
-    "a=b LIMIT(1, 1)", // only accept one input
+    "a=b LIMIT(1, 1)",   // only accept one input
 
     // include
-    "INCLUDE(a)", // no query conditions
-    "a=b INCLUDE", // no parameters
-    "a=b INCLUDE()", // empty params
-    "a=b INCLUDE(a", // missing end paren
-    "a=b INCLUDEb)", // missing open paren
-    "a=b INCLUDE(1)", // numeric input
-    "a=b INCLUDE(a,)", // missing param
-    "a=b INCLUDE(,a)", // missing param
-    "a=b INCLUDE(a.)", // incomplete keypath
-    "a=b INCLUDE(a b)", // missing comma
+    "INCLUDE(a)",         // no query conditions
+    "a=b INCLUDE",        // no parameters
+    "a=b INCLUDE()",      // empty params
+    "a=b INCLUDE(a",      // missing end paren
+    "a=b INCLUDEb)",      // missing open paren
+    "a=b INCLUDE(1)",     // numeric input
+    "a=b INCLUDE(a,)",    // missing param
+    "a=b INCLUDE(,a)",    // missing param
+    "a=b INCLUDE(a.)",    // incomplete keypath
+    "a=b INCLUDE(a b)",   // missing comma
     "a=b INCLUDE(a < b)", // parameters should not be a predicate
 
     // subquery
-    "SUBQUERY(items, $x, $x.name == 'Tom') > 0", // missing .@count
-    "SUBQUERY(items, $x, $x.name == 'Tom').@min > 0", // @min not yet supported
-    "SUBQUERY(items, $x, $x.name == 'Tom').@max > 0", // @max not yet supported
-    "SUBQUERY(items, $x, $x.name == 'Tom').@sum > 0", // @sum not yet supported
-    "SUBQUERY(items, $x, $x.name == 'Tom').@avg > 0", // @avg not yet supported
+    "SUBQUERY(items, $x, $x.name == 'Tom') > 0",        // missing .@count
+    "SUBQUERY(items, $x, $x.name == 'Tom').@min > 0",   // @min not yet supported
+    "SUBQUERY(items, $x, $x.name == 'Tom').@max > 0",   // @max not yet supported
+    "SUBQUERY(items, $x, $x.name == 'Tom').@sum > 0",   // @sum not yet supported
+    "SUBQUERY(items, $x, $x.name == 'Tom').@avg > 0",   // @avg not yet supported
     "SUBQUERY(items, var, var.name == 'Tom').@avg > 0", // variable must start with '$'
-    "SUBQUERY(, $x, $x.name == 'Tom').@avg > 0", // a target keypath is required
-    "SUBQUERY(items, , name == 'Tom').@avg > 0", // a variable name is required
-    "SUBQUERY(items, $x, ).@avg > 0", // the subquery is required
+    "SUBQUERY(, $x, $x.name == 'Tom').@avg > 0",        // a target keypath is required
+    "SUBQUERY(items, , name == 'Tom').@avg > 0",        // a variable name is required
+    "SUBQUERY(items, $x, ).@avg > 0",                   // the subquery is required
 
     // no @ allowed in keypaths except for keyword '@links'
     "@prop > 2",
@@ -2071,7 +2072,8 @@ TEST(Parser_IncludeDescriptor)
         CHECK_EQUAL(expected_include_names.size(), rows.size());
         for (auto row : rows) {
             std::string row_value = table->get_string(name_col, row);
-            CHECK(std::find(expected_include_names.begin(), expected_include_names.end(), row_value) != expected_include_names.end());
+            CHECK(std::find(expected_include_names.begin(), expected_include_names.end(), row_value) !=
+                  expected_include_names.end());
         }
     };
 
@@ -2085,7 +2087,8 @@ TEST(Parser_IncludeDescriptor)
     // Error checking
     std::string message;
     CHECK_THROW_ANY_GET_MESSAGE(get_sorted_view(people, "age > 0 INCLUDE(account)"), message);
-    CHECK_EQUAL(message, "Invalid INCLUDE path at [0, 0]: the last part of an included path must be a backlink column.");
+    CHECK_EQUAL(message,
+                "Invalid INCLUDE path at [0, 0]: the last part of an included path must be a backlink column.");
     CHECK_THROW_ANY_GET_MESSAGE(get_sorted_view(people, "age > 0 INCLUDE(age)"), message);
     CHECK_EQUAL(message, "Property 'age' is not a link in object of type 'person' in 'INCLUDE' clause");
     CHECK_THROW_ANY_GET_MESSAGE(get_sorted_view(accounts, "balance > 0 INCLUDE(bad_property_name)"), message);
@@ -2157,7 +2160,9 @@ TEST(Parser_IncludeDescriptorMultiple)
     // Ben     2 ->        | 98.92         17                1     |              | French     {1}
 
     // include serialisation
-    TableView tv = get_sorted_view(accounts, "balance > 0 SORT(num_transactions ASC) INCLUDE(@links.person.account, bank.@links.language.available_from)");
+    TableView tv = get_sorted_view(
+        accounts,
+        "balance > 0 SORT(num_transactions ASC) INCLUDE(@links.person.account, bank.@links.language.available_from)");
     CHECK_EQUAL(tv.size(), 3);
 
     CHECK_EQUAL(tv.get_int(transaction_col, 0), 2);
@@ -2172,14 +2177,16 @@ TEST(Parser_IncludeDescriptorMultiple)
             CHECK_EQUAL(expected_people_names.size(), rows.size());
             for (auto row : rows) {
                 std::string row_value = table->get_string(name_col, row);
-                CHECK(std::find(expected_people_names.begin(), expected_people_names.end(), row_value) != expected_people_names.end());
+                CHECK(std::find(expected_people_names.begin(), expected_people_names.end(), row_value) !=
+                      expected_people_names.end());
             }
         }
         else if (table == languages) {
             CHECK_EQUAL(expected_language_names.size(), rows.size());
             for (auto row : rows) {
                 std::string row_value = table->get_string(language_name_col, row);
-                CHECK(std::find(expected_language_names.begin(), expected_language_names.end(), row_value) != expected_language_names.end());
+                CHECK(std::find(expected_language_names.begin(), expected_language_names.end(), row_value) !=
+                      expected_language_names.end());
             }
         }
     };
@@ -2207,7 +2214,8 @@ TEST(Parser_IncludeDescriptorMultiple)
         query_builder::NoArguments args;
 
         Query query = accounts->where();
-        realm::parser::ParserResult result = realm::parser::parse("balance > 0 SORT(num_transactions ASC) INCLUDE(account_owner, bank.service_languages)");
+        realm::parser::ParserResult result = realm::parser::parse(
+            "balance > 0 SORT(num_transactions ASC) INCLUDE(account_owner, bank.service_languages)");
         realm::query_builder::apply_predicate(query, result.predicate, args, mapping);
         DescriptorOrdering ordering;
         realm::query_builder::apply_ordering(ordering, accounts, result.ordering, args, mapping);
@@ -2243,7 +2251,8 @@ TEST(Parser_IncludeDescriptorMultiple)
         realm::query_builder::apply_ordering(parsed_ordering_1, accounts, include_1, args, mapping);
         CHECK(parsed_ordering_1.compile_included_backlinks().is_valid());
         DescriptorOrdering parsed_ordering_2;
-        realm::parser::DescriptorOrderingState include_2 = realm::parser::parse_include_path("bank.service_languages");
+        realm::parser::DescriptorOrderingState include_2 =
+            realm::parser::parse_include_path("bank.service_languages");
         realm::query_builder::apply_ordering(parsed_ordering_2, accounts, include_2, args, mapping);
         CHECK(parsed_ordering_2.compile_included_backlinks().is_valid());
 

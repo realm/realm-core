@@ -46,14 +46,17 @@ public:
 // Forward declaration needed for deleted ColumnsDescriptor constructor
 class SortDescriptor;
 
-struct LinkPathPart
-{
+struct LinkPathPart {
     LinkPathPart(size_t col_ndx)
-    : column_ndx(col_ndx) {}
+        : column_ndx(col_ndx)
+    {
+    }
 
     LinkPathPart(size_t col_ndx, ConstTableRef source)
-    : column_ndx(col_ndx)
-    , from(source) {}
+        : column_ndx(col_ndx)
+        , from(source)
+    {
+    }
 
     size_t column_ndx;
     // "from" is omitted for forward links, if it is valid then
@@ -114,7 +117,8 @@ class IncludeDescriptor : public ColumnsDescriptor {
 public:
     IncludeDescriptor() = default;
     // This constructor may throw an InvalidPathError exception if the path is not valid.
-    // A valid path consists of any number of connected link/list/backlink paths and always ends with a backlink column.
+    // A valid path consists of any number of connected link/list/backlink paths and always ends with a backlink
+    // column.
     IncludeDescriptor(const Table& table, const std::vector<std::vector<LinkPathPart>>& column_indices);
     ~IncludeDescriptor() = default;
     std::string get_description(ConstTableRef attached_table) const override;
@@ -125,8 +129,10 @@ public:
         return DescriptorType::Include;
     }
     void append(const IncludeDescriptor& other);
-    void report_included_backlinks(const Table* origin, size_t row_ndx,
-                                   std::function<void(const Table*, const std::unordered_set<size_t>&)> reporter) const;
+    void
+    report_included_backlinks(const Table* origin, size_t row_ndx,
+                              std::function<void(const Table*, const std::unordered_set<size_t>&)> reporter) const;
+
 private:
     std::vector<std::vector<ConstTableRef>> m_backlink_sources; // stores a detached TableRef for non-backlink columns
 };

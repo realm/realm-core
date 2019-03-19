@@ -312,7 +312,7 @@ inline SerialisationError::SerialisationError(const std::string& msg)
 }
 
 inline InvalidPathError::InvalidPathError(const std::string& msg)
-: runtime_error(msg)
+    : runtime_error(msg)
 {
 }
 
