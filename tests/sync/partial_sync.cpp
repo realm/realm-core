@@ -540,6 +540,30 @@ TEST_CASE("Query-based Sync", "[sync]") {
         EventLoop::main().run_until([&] { return partial_sync_done; });
     }
 
+    SECTION("named query can be unsubscribed while in creating state without holding a strong reference to the subscription") {
+        // Hold the write lock on the Realm so that the subscription can't actually be created
+        auto config2 = partial_config;
+        config2.cache = false;
+        auto realm = Realm::get_shared_realm(config2);
+        realm->begin_transaction();
+        {
+            // Create and immediately unsubscribe from the query
+            auto subscription = subscription_with_query("number > 1", partial_config, "object_a", "subscription"s);
+            partial_sync::unsubscribe(subscription);
+        }
+        realm->cancel_transaction();
+
+        // Create another subscription with the same name but a different query
+        // to verify that the first subscription was actually removed
+        auto subscription2 = subscription_with_query("number > 2", partial_config, "object_a", "subscription"s);
+        bool partial_sync_done = false;
+        auto token = subscription2.add_notification_callback([&] {
+            if (subscription2.state() != partial_sync::SubscriptionState::Creating)
+                partial_sync_done = true;
+        });
+        EventLoop::main().run_until([&] { return partial_sync_done; });
+    }
+
     SECTION("named query can be unsubscribed by looking up the object in the Realm") {
         auto subscription = subscription_with_query("number != 1", partial_config, "object_a", "query"s);
         EventLoop::main().run_until([&] { return subscription.state() == partial_sync::SubscriptionState::Complete; });
