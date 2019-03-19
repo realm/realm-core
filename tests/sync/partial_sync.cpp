@@ -42,6 +42,7 @@
 #include <realm/parser/parser.hpp>
 #include <realm/parser/query_builder.hpp>
 #include <realm/util/optional.hpp>
+#include <sync/partial_sync.hpp>
 
 using namespace realm;
 using namespace std::string_literals;
@@ -607,6 +608,144 @@ TEST_CASE("Query-based Sync", "[sync]") {
             REQUIRE(results_contains(results, {1, 10, "partial"}));
             REQUIRE(results_contains(results, {2, 2, "partial"}));
         });
+    }
+
+    SECTION("Updating a subscriptions query will download new data and remove old data") {
+        auto realm = Realm::get_shared_realm(partial_config);
+        subscribe_and_wait("truepredicate", partial_config, "object_a", "query"s, [&](Results, std::exception_ptr error) {
+           REQUIRE(!error);
+           auto table = ObjectStore::table_for_object_type(realm->read_group(), "object_a");
+           REQUIRE(table->size() == 3);
+        });
+
+        subscribe_and_wait("number = 3", partial_config, "object_a", "query"s, none, true, [&](Results, std::exception_ptr error) {
+            REQUIRE(!error);
+            auto table = ObjectStore::table_for_object_type(realm->read_group(), "object_a");
+            REQUIRE(table->size() == 1);
+        });
+    }
+
+    SECTION("The same subscription state should not be reported twice until the Complete state ") {
+        auto results = results_for_query("number > 1", partial_config, "object_a");
+        auto subscription = partial_sync::subscribe(results, "sub"s);
+        bool partial_sync_done = false;
+        std::exception_ptr exception;
+        util::Optional<partial_sync::SubscriptionState> last_state = none;
+        auto token = subscription.add_notification_callback([&] {
+            auto new_state = subscription.state();
+            if (last_state) {
+                REQUIRE(last_state.value() != new_state);
+            }
+            last_state = new_state;
+            switch (new_state) {
+                case partial_sync::SubscriptionState::Creating:
+                case partial_sync::SubscriptionState::Pending:
+                case partial_sync::SubscriptionState::Error:
+                case partial_sync::SubscriptionState::Invalidated:
+                    break;
+                case partial_sync::SubscriptionState::Complete:
+                    partial_sync_done = true;
+                    break;
+                default:
+                    throw std::logic_error(util::format("Unexpected state: %1", static_cast<uint8_t>(subscription.state())));
+            }
+        });
+
+        // Also create the same subscription on the UI thread to force the subscription notifications to run.
+        // This could potentially trigger the Pending state twice if this isn't prevented by the notification
+        // handling.
+        auto realm = Realm::get_shared_realm(partial_config);
+        realm->begin_transaction();
+        partial_sync::subscribe_blocking(results, "sub"s);
+        realm->commit_transaction();
+
+        EventLoop::main().run_until([&] { return partial_sync_done; });
+    }
+
+    SECTION("Manually deleting a Subscription also triggers the Invalidated state") {
+        auto results = results_for_query("number > 1", partial_config, "object_a");
+        auto subscription = partial_sync::subscribe(results, "sub"s);
+        bool subscription_created = false;
+        bool subscription_deleted = false;
+        std::exception_ptr exception;
+        util::Optional<partial_sync::SubscriptionState> last_state = none;
+        auto token = subscription.add_notification_callback([&] {
+            if (subscription_created)
+                // Next state after creating the subscription should be that it is deleted
+                REQUIRE(subscription.state() == partial_sync::SubscriptionState::Invalidated);
+
+            switch (subscription.state()) {
+                case partial_sync::SubscriptionState::Creating:
+                case partial_sync::SubscriptionState::Pending:
+                case partial_sync::SubscriptionState::Error:
+                    break;
+                case partial_sync::SubscriptionState::Complete:
+                    subscription_created = true;
+                    break;
+                case partial_sync::SubscriptionState::Invalidated:
+                    subscription_deleted = true;
+                    break;
+                default:
+                    throw std::logic_error(util::format("Unexpected state: %1", static_cast<uint8_t>(subscription.state())));
+            }
+        });
+
+        EventLoop::main().run_until([&] { return subscription_created; });
+
+        auto realm = Realm::get_shared_realm(partial_config);
+        realm->begin_transaction();
+        Results subs = results_for_query("name = 'sub'", partial_config, partial_sync::result_sets_type_name);
+        subs.clear();
+        realm->commit_transaction();
+
+        EventLoop::main().run_until([&] { return subscription_deleted; });
+    }
+
+    SECTION("Updating a subscription will not report Complete from a previous subscription") {
+        // Due to the asynchronous nature of updating subscriptions and listening to changes
+        // in the query that returns the subscription there is a small chance that the query
+        // returns before the update does. In that case, the previous state of the subscription
+        // will be returned, i.e you might see `Complete` before it goes into `Pending`.
+        // This test
+        auto realm = Realm::get_shared_realm(partial_config);
+
+        // Create initial subscription
+        subscribe_and_wait("number > 1", partial_config, "object_a", "query"s, [&](Results, std::exception_ptr error) {
+            REQUIRE(!error);
+            auto table = ObjectStore::table_for_object_type(realm->read_group(), "object_a");
+            REQUIRE(table->size() == 2);
+        });
+
+        // Start an update and verify that Complete is not called before Pending
+        // Note: This is racy, so not 100% reproducible
+        for (size_t i = 0; i < 100; ++i) {
+            auto results = results_for_query((i % 2 == 0) ? "truepredicate" : "falsepredicate", partial_config, "object_a");
+            auto subscription = partial_sync::subscribe(results, "query"s, none, true);
+            bool seen_completed_state = false;
+            bool seen_pending_state = false;
+            bool seen_complete_before_pending = false;
+            auto token = subscription.add_notification_callback([&] {
+                switch (subscription.state()) {
+                    case partial_sync::SubscriptionState::Creating:
+                    case partial_sync::SubscriptionState::Error:
+                    case partial_sync::SubscriptionState::Invalidated:
+                        break;
+                    case partial_sync::SubscriptionState::Pending:
+                        seen_complete_before_pending = seen_completed_state;
+                        seen_pending_state = true;
+                        break;
+                    case partial_sync::SubscriptionState::Complete:
+                        seen_completed_state = true;
+                        break;
+                    default:
+                        throw std::logic_error(util::format("Unexpected state: %1", static_cast<uint8_t>(subscription.state())));
+                }
+            });
+            EventLoop::main().run_until([&] { return seen_pending_state; });
+            REQUIRE(!seen_complete_before_pending);
+            EventLoop::main().run_until([&] { return seen_completed_state; });
+            REQUIRE(results.size() == ((i % 2 == 0) ? 3 : 0));
+        }
     }
 }
 

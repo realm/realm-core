@@ -300,6 +300,12 @@ struct ResultSetsColumns {
         query = table.get_column_index(property_query);
         REALM_ASSERT(query != npos);
 
+        error_message = table.get_column_index(property_error_message);
+        REALM_ASSERT(error_message != npos);
+
+        status = table.get_column_index(property_status);
+        REALM_ASSERT(status != npos);
+
         this->matches_property_name = table.get_column_index(property_matches_property_name);
         REALM_ASSERT(this->matches_property_name != npos);
 
@@ -321,6 +327,8 @@ struct ResultSetsColumns {
 
     size_t name;
     size_t query;
+    size_t error_message;
+    size_t status;
     size_t matches_property_name;
     size_t matches_property;
     size_t created_at;
@@ -376,6 +384,11 @@ Row write_subscription(std::string const& object_type, std::string const& name, 
         // TODO: Consider how Binding API's are going to use this. It might make sense to disallow
         // updating TTL using this API and instead require updates to TTL to go through a managed Subscription.
         if (update) {
+            // If the query changed we must reset state to force the server to re-evaluate the subscription.
+            if (table->get_string(columns.query, row_ndx) != query) {
+                table->set_string(columns.error_message, row_ndx, "");
+                table->set_int(columns.status, row_ndx, 0);
+            }
             table->set_string(columns.query, row_ndx, query);
             table->set(columns.time_to_live, row_ndx, time_to_live_ms);
         }
@@ -684,6 +697,7 @@ Subscription::Subscription(std::string name, std::string object_type, std::share
 
     auto matches_property = std::string(object_type) + "_matches";
 
+    m_wrapper_created_at = timestamp_now();
     TableRef table = ObjectStore::table_for_object_type(realm->read_group(), result_sets_type_name);
     Query query = table->where();
     query.equal(m_object_schema.property_for_name("name")->table_column, name);
@@ -697,12 +711,14 @@ Subscription& Subscription::operator=(Subscription&&) = default;
 
 SubscriptionNotificationToken Subscription::add_notification_callback(std::function<void ()> callback)
 {
-    auto result_sets_token = m_result_sets.add_notification_callback([callback] (CollectionChangeSet, std::exception_ptr) {
-        callback();
+    auto callback_wrapper = std::make_shared<SubscriptionCallbackWrapper>(SubscriptionCallbackWrapper{callback, none});
+    auto result_sets_token = m_result_sets.add_notification_callback([this, callback_wrapper] (CollectionChangeSet, std::exception_ptr) {
+        run_callback(*callback_wrapper);
     });
-    NotificationToken registration_token(m_notifier, m_notifier->add_callback([callback] (CollectionChangeSet, std::exception_ptr) {
-        callback();
+    NotificationToken registration_token(m_notifier, m_notifier->add_callback([this, callback_wrapper] (CollectionChangeSet, std::exception_ptr) {
+        run_callback(*callback_wrapper);
     }));
+
     return SubscriptionNotificationToken{std::move(registration_token), std::move(result_sets_token)};
 }
 
@@ -716,8 +732,68 @@ util::Optional<Object> Subscription::result_set_object() const
     return util::none;
 }
 
+void Subscription::run_callback(SubscriptionCallbackWrapper& callback_wrapper) {
+    // Store reference to underlying subscription object the first time we encounter it.
+    // Used to track if anyone is later deleting it.
+    if (!m_result_sets_object && m_result_sets.size() > 0) {
+        auto row = m_result_sets.first().value();
+        m_result_sets_object = util::Optional<Row>(row);
+    }
+
+    // Verify this is a state change we actually want to report to the user
+    auto new_state = state();
+    if (callback_wrapper.last_state && callback_wrapper.last_state.value() == new_state)
+        return;
+
+    callback_wrapper.last_state = util::Optional<SubscriptionState>(new_state);
+
+    // Finally trigger callback
+    callback_wrapper.callback();
+}
+
 SubscriptionState Subscription::state() const
 {
+    // State transitions are complex due to multiple source being able to create and modify the subscriptions.
+    // This means that there are unavoidable race conditions with regard to the states and we just make
+    // a best effort to provide a sensible experience for the end user.
+    //
+    // In particular this means the following:
+    //
+    // - There is no guarantee that a user will see all the states from `Creating -> Pending -> Complete`
+    //   They might only see `Pending -> Complete` or `Complete`
+    //
+    // What we do guarantee is:
+    //
+    // - States will never be reported twice in a row for the same callback. This could e.g. happen if some property
+    //   like `updated_at` was updated while the status was still `Pending`, but these properties are not important
+    //   until the subscription is actually created. So we intentionally swallow all duplicated state notifications.
+    //
+    // - When calling `subscribe()` with `update = true` we will never report `Complete` until the updated subscription
+    //   reaches that state.
+
+    // Errors take precedence over all other notifications
+    if (m_notifier->error())
+        return SubscriptionState::Error;
+
+    // In some cases the subscription already exists. In that case we just report the state of the __ResultSets object.
+    if (auto object = result_set_object()) {
+        CppContext context;
+        auto state = static_cast<SubscriptionState>(any_cast<int64_t>(object->get_property_value<util::Any>(context, property_status)));
+        auto updated_at = any_cast<Timestamp>(object->get_property_value<util::Any>(context, property_updated_at));
+
+        if (updated_at < m_wrapper_created_at) {
+            // If the `updated_at` property on an existing subscription wasn't updated after the wrapper was created,
+            // it meant the query callback triggered before the async write completed. In that case we don't want
+            // to return the state associated with the subscription before it was updated. So we override the state
+            // in the actual subscription and return the expected state after the update.
+            return partial_sync::SubscriptionState::Pending;
+        } else {
+            return state;
+        }
+    }
+
+    // If no existing subscription exist, we can use the state of the Notifier as an indication of the underlying
+    // progress.
     switch (m_notifier->state()) {
         case Notifier::Creating:
             return SubscriptionState::Creating;
@@ -727,13 +803,10 @@ SubscriptionState Subscription::state() const
             break;
     }
 
-    if (m_notifier->error())
-        return SubscriptionState::Error;
-
-    if (auto object = result_set_object()) {
-        CppContext context;
-        auto value = any_cast<int64_t>(object->get_property_value<util::Any>(context, "status"));
-        return (SubscriptionState)value;
+    // If we previously had a reference to the subscription and that is now gone, we interpret that as
+    // someone deleted the subscription (without using the explict unsubscribe API).
+    if (m_result_sets_object && !m_result_sets_object->is_attached()) {
+        return SubscriptionState::Invalidated;
     }
 
     // We may not have an object even if the subscription has completed if the completion callback fired

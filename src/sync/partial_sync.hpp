@@ -66,6 +66,11 @@ struct SubscriptionNotificationToken {
     NotificationToken result_sets_token;
 };
 
+struct SubscriptionCallbackWrapper {
+    std::function<void()> callback;
+    util::Optional<SubscriptionState> last_state;
+};
+
 class Subscription {
 public:
     ~Subscription();
@@ -83,16 +88,27 @@ private:
     util::Optional<Object> result_set_object() const;
 
     void error_occurred(std::exception_ptr);
+    void run_callback(SubscriptionCallbackWrapper& callback_wrapper);
 
     ObjectSchema m_object_schema;
 
     mutable Results m_result_sets;
+
+    // Timestamp indicating when the subscription wrapper is created. This is used when checking the Results notifications
+    // By comparing this timestamp against the real subscriptions `created_at` and `updated_at` fields we can determine
+    // whether the subscription is in progress of being updated or created.
+    Timestamp m_wrapper_created_at;
+
+    // Track the actual underlying subscription object once it is available. This is used to better track
+    // unsubscriptions.
+    util::Optional<Row> m_result_sets_object = none;
 
     struct Notifier;
     _impl::CollectionNotifier::Handle<Notifier> m_notifier;
 
     friend Subscription subscribe(Results const&, util::Optional<std::string>, util::Optional<int64_t> time_to_live, bool update);
     friend void unsubscribe(Subscription&);
+
 };
 
 /// Create a Query-based subscription from the query associated with the `Results`.
