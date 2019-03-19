@@ -319,7 +319,7 @@ DescriptorExport LimitDescriptor::export_for_handover() const
     return out;
 }
 
-IncludeDescriptor::IncludeDescriptor(Table const& table, std::vector<std::vector<LinkPathPart>> column_links)
+IncludeDescriptor::IncludeDescriptor(const Table& table, const std::vector<std::vector<LinkPathPart>>& column_links)
 : ColumnsDescriptor()
 {
     if (table.is_degenerate()) {
@@ -391,18 +391,21 @@ std::string IncludeDescriptor::get_description(ConstTableRef attached_table) con
     realm::util::serializer::SerialisationState basic_serialiser;
     std::string description = "INCLUDE(";
     for (size_t i = 0; i < m_columns.size(); ++i) {
-        const size_t chain_size = m_columns[i].size();
+        auto chain = m_columns[i];
+        const size_t chain_size = chain.size();
         ConstTableRef cur_link_table = attached_table;
         for (size_t j = 0; j < chain_size; ++j) {
             if (j != 0) {
                 description += realm::util::serializer::value_separator;
             }
-            size_t col_ndx = m_columns[i][j]->get_column_index();
-            if (bool(m_backlink_sources[i][j])) { // backlink
-                REALM_ASSERT_DEBUG(col_ndx < m_backlink_sources[i][j]->get_column_count());
-                REALM_ASSERT_DEBUG(m_backlink_sources[i][j]->get_link_target(col_ndx) == cur_link_table);
-                description += basic_serialiser.get_backlink_column_name(m_backlink_sources[i][j], col_ndx);
-                cur_link_table = m_backlink_sources[i][j];
+
+            size_t col_ndx = chain[j]->get_column_index();
+            ConstTableRef from_table = m_backlink_sources[i][j];
+            if (bool(from_table)) { // backlink
+                REALM_ASSERT_DEBUG(col_ndx < from_table->get_column_count());
+                REALM_ASSERT_DEBUG(from_table->get_link_target(col_ndx) == cur_link_table);
+                description += basic_serialiser.get_backlink_column_name(from_table, col_ndx);
+                cur_link_table = from_table;
             }
             else {
                 REALM_ASSERT_DEBUG(col_ndx < cur_link_table->get_column_count());
@@ -497,7 +500,8 @@ void IncludeDescriptor::report_included_backlinks(const Table* origin, size_t ro
                 else if (col_type == type_LinkList) {
                     for (auto row_to_explore : rows_to_explore) {
                         ConstLinkViewRef links = table->get_linklist(col_ndx, row_to_explore);
-                        for (size_t link_ndx = 0; link_ndx < links->size(); ++link_ndx) {
+                        const size_t num_links = links->size();
+                        for (size_t link_ndx = 0; link_ndx < num_links; ++link_ndx) {
                             results_of_next_table.insert(links->get(link_ndx).get_index());
                         }
                     }

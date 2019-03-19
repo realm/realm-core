@@ -115,7 +115,7 @@ public:
     IncludeDescriptor() = default;
     // This constructor may throw an InvalidPathError exception if the path is not valid.
     // A valid path consists of any number of connected link/list/backlink paths and always ends with a backlink column.
-    IncludeDescriptor(Table const& table, std::vector<std::vector<LinkPathPart>> column_indices);
+    IncludeDescriptor(const Table& table, const std::vector<std::vector<LinkPathPart>>& column_indices);
     ~IncludeDescriptor() = default;
     std::string get_description(ConstTableRef attached_table) const override;
     std::unique_ptr<BaseDescriptor> clone() const override;
