@@ -401,8 +401,7 @@ std::string IncludeDescriptor::get_description(ConstTableRef attached_table) con
             }
 
             size_t col_ndx = chain[j]->get_column_index();
-            ConstTableRef from_table = m_backlink_sources[i][j];
-            if (bool(from_table)) { // backlink
+            if (ConstTableRef from_table = m_backlink_sources[i][j]) { // backlink
                 REALM_ASSERT_DEBUG(col_ndx < from_table->get_column_count());
                 REALM_ASSERT_DEBUG(from_table->get_link_target(col_ndx) == cur_link_table);
                 description += basic_serialiser.get_backlink_column_name(from_table, col_ndx);
@@ -436,16 +435,16 @@ DescriptorExport IncludeDescriptor::export_for_handover() const
     REALM_ASSERT_EX(m_backlink_sources.size() == m_columns.size(), m_backlink_sources.size(), m_columns.size());
     for (size_t i = 0; i < m_columns.size(); ++i) {
         std::vector<DescriptorLinkPath> indices;
-        indices.reserve(m_columns[i].size());
-        REALM_ASSERT_EX(m_backlink_sources[i].size() == m_columns[i].size(), m_backlink_sources[i].size(),
-                        m_columns[i].size());
-        for (size_t j = 0; j < m_columns[i].size(); ++j) {
-            if (bool(m_backlink_sources[i][j])) {
-                indices.push_back(DescriptorLinkPath{m_columns[i][j]->get_column_index(),
-                                                     m_backlink_sources[i][j]->get_index_in_group(), true});
+        const size_t chain_size = m_columns[i].size();
+        indices.reserve(chain_size);
+        REALM_ASSERT_EX(m_backlink_sources[i].size() == chain_size, m_backlink_sources[i].size(), chain_size);
+        for (size_t j = 0; j < chain_size; ++j) {
+            auto col_ndx = m_columns[i][j]->get_column_index();
+            if (ConstTableRef from_table = m_backlink_sources[i][j]) {
+                indices.push_back(DescriptorLinkPath{col_ndx, from_table->get_index_in_group(), true});
             }
             else {
-                indices.push_back(DescriptorLinkPath{m_columns[i][j]->get_column_index(), realm::npos, false});
+                indices.push_back(DescriptorLinkPath{col_ndx, realm::npos, false});
             }
         }
         column_indices.push_back(indices);
