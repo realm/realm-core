@@ -648,6 +648,12 @@ Query& Query::links_to(size_t origin_column, const ConstRow& target_row)
     return *this;
 }
 
+Query& Query::links_to(size_t origin_column, const std::vector<ConstRow>& target_rows)
+{
+    add_node(std::unique_ptr<ParentNode>(new LinksToNode(origin_column, target_rows)));
+    return *this;
+}
+
 // int64 constant vs column
 Query& Query::equal(size_t column_ndx, int64_t value)
 {
