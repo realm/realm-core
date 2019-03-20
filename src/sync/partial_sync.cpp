@@ -487,7 +487,8 @@ void enqueue_unregistration(Results const& result_set, std::shared_ptr<Notifier>
     auto config = realm->config();
     auto& work_queue = _impl::PartialSyncHelper::get_coordinator(*realm).partial_sync_work_queue();
 
-    // Export a reference to the __ResultSets row so we can hand it to the worker thread.
+    // Export a reference to the query which will match the __ResultSets row
+    // once it's created so we can hand it to the worker thread
     Query q = result_set.get_query();
     auto handover = _impl::export_for_handover(*realm, q, MutableSourcePayload::Move);
 
@@ -496,8 +497,9 @@ void enqueue_unregistration(Results const& result_set, std::shared_ptr<Notifier>
         with_open_shared_group(config, [&](SharedGroup& sg) {
             Query query = _impl::import_from_handover(sg, *handover);
 
-            // If we failed to create the subscription don't try to unsubscribe
-            // from it (or we might unsubscribe from someone else's subscription)
+            // If creating the subscription failed there might be another
+            // pre-existing subscription which matches our query, so we need to
+            // not remove that
             if (notifier->failed())
                 return;
 
@@ -508,6 +510,8 @@ void enqueue_unregistration(Results const& result_set, std::shared_ptr<Notifier>
                 write.commit();
             }
             else {
+                // If unsubscribe() is called twice before the subscription is
+                // even created the row might already be gone
                 write.rollback();
             }
         });
