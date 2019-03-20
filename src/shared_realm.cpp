@@ -182,8 +182,9 @@ void Realm::open_with_config(const Config& config,
             SharedGroupOptions options;
             options.durability = config.in_memory ? SharedGroupOptions::Durability::MemOnly :
                                                     SharedGroupOptions::Durability::Full;
-
-            options.temp_dir = util::normalize_dir(config.fifo_files_fallback_path);
+            if (!config.fifo_files_fallback_path.empty()) {
+                options.temp_dir = util::normalize_dir(config.fifo_files_fallback_path);
+            }
             options.encryption_key = config.encryption_key.data();
             options.allow_file_format_upgrade = !config.disable_format_upgrade &&
                                                 config.schema_mode != SchemaMode::ResetFile;
