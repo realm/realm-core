@@ -2058,7 +2058,7 @@ private:
 
 
 struct LinksToNodeHandoverPatch : public QueryNodeHandoverPatch {
-    std::unique_ptr<RowBaseHandoverPatch> m_target_row;
+    std::vector<std::unique_ptr<RowBaseHandoverPatch>> m_target_rows;
     size_t m_origin_column;
 };
 
@@ -2066,7 +2066,15 @@ class LinksToNode : public ParentNode {
 public:
     LinksToNode(size_t origin_column_index, const ConstRow& target_row)
         : m_origin_column(origin_column_index)
-        , m_target_row(target_row)
+        , m_target_rows(1, target_row)
+    {
+        m_dD = 10.0;
+        m_dT = 50.0;
+    }
+
+    LinksToNode(size_t origin_column_index, const std::vector<ConstRow>& target_rows)
+        : m_origin_column(origin_column_index)
+        , m_target_rows(target_rows)
     {
         m_dD = 10.0;
         m_dT = 50.0;
@@ -2099,21 +2107,29 @@ public:
     size_t find_first_local(size_t start, size_t end) override
     {
         REALM_ASSERT(m_column);
-        if (!m_target_row.is_attached())
-            return not_found;
-
         if (m_column_type == type_Link) {
             LinkColumn& cl = static_cast<LinkColumn&>(*m_column);
-            return cl.find_first(m_target_row.get_index() + 1, start,
-                                 end); // LinkColumn stores link to row N as the integer N + 1
+            for (auto& row : m_target_rows) {
+                if (row.is_attached()) {
+                    // LinkColumn stores link to row N as the integer N + 1
+                    auto pos = cl.find_first(row.get_index() + 1, start, end);
+                    if (pos != realm::npos) {
+                        return pos;
+                    }
+                }
+            }
         }
         else if (m_column_type == type_LinkList) {
             LinkListColumn& cll = static_cast<LinkListColumn&>(*m_column);
 
             for (size_t i = start; i < end; i++) {
                 LinkViewRef lv = cll.get(i);
-                if (lv->find(m_target_row.get_index()) != not_found)
-                    return i;
+                for (auto& row : m_target_rows) {
+                    if (row.is_attached()) {
+                        if (lv->find(row.get_index()) != not_found)
+                            return i;
+                    }
+                }
             }
         }
 
@@ -2135,14 +2151,18 @@ public:
         REALM_ASSERT(patch);
 
         m_origin_column = patch->m_origin_column;
-        m_target_row.apply_and_consume_patch(patch->m_target_row, group);
+        auto sz = patch->m_target_rows.size();
+        m_target_rows.resize(sz);
+        for (size_t i = 0; i < sz; i++) {
+            m_target_rows[i].apply_and_consume_patch(patch->m_target_rows[i], group);
+        }
 
         ParentNode::apply_handover_patch(patches, group);
     }
 
 private:
     size_t m_origin_column = npos;
-    ConstRow m_target_row;
+    std::vector<ConstRow> m_target_rows;
     LinkColumnBase* m_column = nullptr;
     DataType m_column_type;
 
@@ -2151,7 +2171,11 @@ private:
     {
         auto patch = std::make_unique<LinksToNodeHandoverPatch>();
         patch->m_origin_column = source.m_column->get_column_index();
-        ConstRow::generate_patch(source.m_target_row, patch->m_target_row);
+        auto sz = source.m_target_rows.size();
+        patch->m_target_rows.resize(sz);
+        for (size_t i = 0; i < sz; i++) {
+            ConstRow::generate_patch(source.m_target_rows[i], patch->m_target_rows[i]);
+        }
         patches->push_back(std::move(patch));
     }
 };
