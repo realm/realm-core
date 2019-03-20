@@ -243,24 +243,25 @@ public:
     }
 };
 
-struct RowHandover {
-    RowHandover(Realm& realm, Row row)
-    : source_shared_group(*PartialSyncHelper::get_shared_group(realm))
-    , row(source_shared_group.export_for_handover(std::move(row)))
-    , version(source_shared_group.pin_version())
-    {
-    }
+template<typename... Args>
+static auto export_for_handover(Realm& realm, Args&&... args)
+{
+    auto& sg = *PartialSyncHelper::get_shared_group(realm);
+    sg.pin_version();
+    auto handover = sg.export_for_handover(std::forward<Args>(args)...);
+    // We need to store the handover object in a shared_ptr because it's captured
+    // in a std::function<>, which requires copyable objects
+    return std::make_shared<decltype(handover)>(std::move(handover));
+}
 
-    ~RowHandover()
-    {
-        // If the row isn't already null we've not been imported and the version pin will leak.
-        REALM_ASSERT(!row);
-    }
-
-    SharedGroup& source_shared_group;
-    std::unique_ptr<SharedGroup::Handover<Row>> row;
-    VersionID version;
-};
+template<typename T>
+static auto import_from_handover(SharedGroup& sg, std::unique_ptr<SharedGroup::Handover<T>>& handover)
+{
+    sg.begin_read(handover->version);
+    auto obj = sg.import_from_handover(std::move(handover));
+    sg.unpin_version(sg.get_version_of_current_transaction());
+    return *obj;
+}
 
 } // namespace _impl
 
@@ -428,14 +429,15 @@ Row write_subscription(std::string const& object_type, std::string const& name, 
     return subscription;
 }
 
-void enqueue_registration(Realm& realm, std::string object_type, std::string query, std::string name, util::Optional<int64_t> time_to_live,
-        bool update, std::function<void(std::exception_ptr)> callback)
+void enqueue_registration(Realm& realm, std::string object_type, std::string query, std::string name,
+                          util::Optional<int64_t> time_to_live, bool update,
+                          std::function<void(std::exception_ptr)> callback)
 {
     auto config = realm.config();
 
     auto& work_queue = _impl::PartialSyncHelper::get_coordinator(realm).partial_sync_work_queue();
     work_queue.enqueue([object_type=std::move(object_type), query=std::move(query), name=std::move(name),
-                        callback=std::move(callback), config=std::move(config), time_to_live=std::move(time_to_live), update=update] {
+                        callback=std::move(callback), config=std::move(config), time_to_live=time_to_live, update=update] {
         try {
             with_open_shared_group(config, [&](SharedGroup& sg) {
                 _impl::WriteTransactionNotifyingSync write(config, sg);
@@ -458,24 +460,58 @@ void enqueue_unregistration(Object result_set, std::function<void()> callback)
     auto& work_queue = _impl::PartialSyncHelper::get_coordinator(*realm).partial_sync_work_queue();
 
     // Export a reference to the __ResultSets row so we can hand it to the worker thread.
-    // We store it in a shared_ptr as it would otherwise prevent the lambda from being copyable,
-    // which `std::function` requires.
-    auto handover = std::make_shared<_impl::RowHandover>(*realm, result_set.row());
+    auto handover = _impl::export_for_handover(*realm, Row(result_set.row()));
 
     work_queue.enqueue([handover=std::move(handover), callback=std::move(callback),
                         config=std::move(config)] () {
         with_open_shared_group(config, [&](SharedGroup& sg) {
-            // Import handed-over object.
-            sg.begin_read(handover->version);
-            Row row = *sg.import_from_handover(std::move(handover->row));
-            sg.unpin_version(handover->version);
-
+            Row row = _impl::import_from_handover(sg, *handover);
             _impl::WriteTransactionNotifyingSync write(config, sg);
             if (row.is_attached()) {
                 row.move_last_over();
                 write.commit();
             }
             else {
+                write.rollback();
+            }
+        });
+        callback();
+    });
+}
+
+template<typename Notifier>
+void enqueue_unregistration(Results const& result_set, std::shared_ptr<Notifier> notifier,
+                            std::function<void()> callback)
+{
+    auto realm = result_set.get_realm();
+    auto config = realm->config();
+    auto& work_queue = _impl::PartialSyncHelper::get_coordinator(*realm).partial_sync_work_queue();
+
+    // Export a reference to the query which will match the __ResultSets row
+    // once it's created so we can hand it to the worker thread
+    Query q = result_set.get_query();
+    auto handover = _impl::export_for_handover(*realm, q, MutableSourcePayload::Move);
+
+    work_queue.enqueue([handover=std::move(handover), callback=std::move(callback),
+                        config=std::move(config), notifier=std::move(notifier)] () {
+        with_open_shared_group(config, [&](SharedGroup& sg) {
+            Query query = _impl::import_from_handover(sg, *handover);
+
+            // If creating the subscription failed there might be another
+            // pre-existing subscription which matches our query, so we need to
+            // not remove that
+            if (notifier->failed())
+                return;
+
+            _impl::WriteTransactionNotifyingSync write(config, sg);
+            size_t row = query.find();
+            if (row != npos) {
+                query.get_table()->move_last_over(row);
+                write.commit();
+            }
+            else {
+                // If unsubscribe() is called twice before the subscription is
+                // even created the row might already be gone
                 write.rollback();
             }
         });
@@ -532,6 +568,7 @@ struct Subscription::Notifier : public _impl::CollectionNotifier {
             m_pending_error = error;
             m_pending_state = Complete;
             m_has_results_to_deliver = true;
+            m_failed = error != nullptr;
         }
 
         // Trigger processing of change notifications.
@@ -563,6 +600,12 @@ struct Subscription::Notifier : public _impl::CollectionNotifier {
         return m_state;
     }
 
+    bool failed() const
+    {
+        std::unique_lock<std::mutex> lock(m_mutex);
+        return m_failed;
+    }
+
 private:
     void do_attach_to(SharedGroup&) override { }
     void do_detach_from(SharedGroup&) override { }
@@ -582,12 +625,14 @@ private:
     std::exception_ptr m_pending_error = nullptr;
     std::exception_ptr m_error = nullptr;
     bool m_has_results_to_deliver = false;
+    bool m_failed = false;
 
     State m_state = Creating;
     State m_pending_state = Creating;
 };
 
-Subscription subscribe(Results const& results, util::Optional<std::string> user_provided_name, util::Optional<int64_t> time_to_live_ms, bool update)
+Subscription subscribe(Results const& results, util::Optional<std::string> user_provided_name,
+                       util::Optional<int64_t> time_to_live_ms, bool update)
 {
     auto realm = results.get_realm();
 
@@ -611,7 +656,8 @@ Subscription subscribe(Results const& results, util::Optional<std::string> user_
     return subscription;
 }
 
-Row subscribe_blocking(Results const& results, util::Optional<std::string> user_provided_name, util::Optional<int64_t> time_to_live_ms, bool update)
+Row subscribe_blocking(Results const& results, util::Optional<std::string> user_provided_name,
+                       util::Optional<int64_t> time_to_live_ms, bool update)
 {
 
     auto realm = results.get_realm();
@@ -645,15 +691,10 @@ void unsubscribe(Subscription& subscription)
     switch (subscription.state()) {
         case SubscriptionState::Creating: {
             // The result set object is in the process of being created. Try unsubscribing again once it exists.
-            auto token = std::make_shared<SubscriptionNotificationToken>();
-            *token = subscription.add_notification_callback([token, &subscription] () {
-                if (subscription.state() == SubscriptionState::Creating)
-                    return;
-
-                unsubscribe(subscription);
-
-                // Invalidate the notification token so we do not receive further callbacks.
-                *token = SubscriptionNotificationToken();
+            std::weak_ptr<Subscription::Notifier> weak_notifier = subscription.m_notifier;
+            enqueue_unregistration(subscription.m_result_sets, subscription.m_notifier, [weak_notifier=std::move(weak_notifier)]() {
+                if (auto notifier = weak_notifier.lock())
+                    notifier->finished_unsubscribing();
             });
             return;
         }
