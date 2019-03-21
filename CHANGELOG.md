@@ -4,8 +4,8 @@
 * Adds support for a new IncludeDescriptor type which describes arbitrary link paths
   on a TableView. Applying this to a TableView does not modify the results, but gives
   users the ability to use the reporting method to find rows in a different table that
-  are connected by backlinks. This is intened for sync subscriptions.
-* Enhaces LinksToNode so that it can check links to multiple targets. This can be utilized
+  are connected by backlinks. This is intended for sync subscriptions.
+* Enhances LinksToNode so that it can check links to multiple targets. This can be utilized
   in permissions check in sync.
 
 ### Fixed
