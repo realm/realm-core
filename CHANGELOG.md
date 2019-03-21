@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 5.18.0 Release notes
 
 ### Enhancements
 * Adds support for a new IncludeDescriptor type which describes arbitrary link paths
@@ -9,12 +9,8 @@
   in permissions check in sync.
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * None.
  
-### Breaking changes
-* None.
-
 -----------
 
 ### Internals
