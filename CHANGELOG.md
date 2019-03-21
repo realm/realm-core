@@ -18,7 +18,7 @@
 -----------
 
 ### Internals
-* None.
+* The release binaries for Apple platforms are now built with Xcode 9.2 (up from 8.3.3).
 
 ----------------------------------------------
 
