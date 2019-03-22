@@ -229,8 +229,6 @@ public:
         return str;
     }
 
-    static std::vector<Entry> get_nodes(realm::Allocator& alloc, uint64_t ref);
-
 private:
     char* m_data;
     bool m_has_refs = false;
@@ -467,7 +465,7 @@ void Table::print_columns(const Group& group) const
             if (attr & realm::col_attr_Indexed)
                 type_str += " (indexed)";
         }
-        std::cout << "        " << m_column_names.get_string(i) << ": " << type_str << std::endl;
+        std::cout << "        " << i << ": " << m_column_names.get_string(i) << ": " << type_str << std::endl;
     }
 }
 
@@ -477,7 +475,7 @@ void Group::print_schema() const
         std::cout << "Tables: " << std::endl;
 
         for (unsigned i = 0; i < get_nb_tables(); i++) {
-            std::cout << "    " << get_table_name(i) << std::endl;
+            std::cout << "    " << i << ": " << get_table_name(i) << std::endl;
             Table table(m_alloc, m_tables.get_ref(i));
             table.print_columns(*this);
         }
@@ -498,24 +496,41 @@ void Node::init(realm::Allocator& alloc, uint64_t ref)
     }
 }
 
-std::vector<Entry> Array::get_nodes(realm::Allocator& alloc, uint64_t ref)
+std::vector<unsigned> path;
+
+std::string print_path()
+{
+    std::string ret = "[" + std::to_string(path[0]);
+    for (auto it = path.begin() + 1; it != path.end(); ++it) {
+        ret += ", ";
+        ret += std::to_string(*it);
+    }
+    return ret + "]";
+}
+
+std::vector<Entry> get_nodes(realm::Allocator& alloc, uint64_t ref)
 {
     std::vector<Entry> nodes;
     if (ref != 0) {
         Array arr(alloc, ref);
         if (!arr.valid()) {
+            std::cout << "Not and array: 0x" << std::hex << ref << std::dec << ", path: " << print_path()
+                      << std::endl;
             return {};
         }
         nodes.emplace_back(ref, arr.size_in_bytes());
         if (arr.has_refs()) {
             auto sz = arr.size();
+            path.push_back(0);
             for (unsigned i = 0; i < sz; i++) {
                 uint64_t r = arr.get_ref(i);
                 if (r) {
+                    path.back() = i;
                     auto sub_nodes = get_nodes(alloc, r);
                     consolidate_lists(nodes, sub_nodes);
                 }
             }
+            path.pop_back();
         }
     }
     return nodes;
@@ -527,9 +542,11 @@ std::vector<Entry> Group::get_allocated_nodes() const
     all_nodes.emplace_back(0, 24);                  // Header area
     all_nodes.emplace_back(m_ref, size_in_bytes()); // Top array itself
 
-    auto table_name_nodes = Array::get_nodes(m_alloc, get_ref(0)); // Table names
+    path.push_back(0);
+    auto table_name_nodes = get_nodes(m_alloc, get_ref(0)); // Table names
     consolidate_lists(all_nodes, table_name_nodes);
-    auto table_nodes = Array::get_nodes(m_alloc, get_ref(1)); // Tables
+    path.back() = 1;
+    auto table_nodes = get_nodes(m_alloc, get_ref(1)); // Tables
     consolidate_lists(all_nodes, table_nodes);
     std::cout << "State size: " << human_readable(get_size(all_nodes)) << std::endl;
 
@@ -541,7 +558,7 @@ std::vector<Entry> Group::get_allocated_nodes() const
     consolidate_lists(all_nodes, free_lists);
     std::vector<Entry> history;
     if (size() > 8) {
-        history = Array::get_nodes(m_alloc, get_ref(8));
+        history = get_nodes(m_alloc, get_ref(8));
         std::cout << "History size: " << human_readable(get_size(history)) << std::endl;
     }
 
