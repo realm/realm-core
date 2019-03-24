@@ -318,9 +318,11 @@ public:
             current_logical_file_size = m_file_size;
             m_table_names.init(alloc, get_ref(0));
             m_tables.init(alloc, get_ref(1));
-            m_free_list_positions.init(alloc, get_ref(3));
-            m_free_list_sizes.init(alloc, get_ref(4));
-            m_free_list_versions.init(alloc, get_ref(5));
+            if (size() > 3) {
+                m_free_list_positions.init(alloc, get_ref(3));
+                m_free_list_sizes.init(alloc, get_ref(4));
+                m_free_list_versions.init(alloc, get_ref(5));
+            }
         }
     }
     uint64_t get_file_size() const
@@ -550,19 +552,21 @@ std::vector<Entry> Group::get_allocated_nodes() const
     consolidate_lists(all_nodes, table_nodes);
     std::cout << "State size: " << human_readable(get_size(all_nodes)) << std::endl;
 
-    std::vector<Entry> free_lists;
-    free_lists.emplace_back(m_free_list_positions.ref(), m_free_list_positions.size_in_bytes()); // Top array itself
-    free_lists.emplace_back(m_free_list_sizes.ref(), m_free_list_sizes.size_in_bytes());         // Top array itself
-    free_lists.emplace_back(m_free_list_versions.ref(), m_free_list_versions.size_in_bytes());   // Top array itself
-
-    consolidate_lists(all_nodes, free_lists);
-    std::vector<Entry> history;
-    if (size() > 8) {
-        history = get_nodes(m_alloc, get_ref(8));
-        std::cout << "History size: " << human_readable(get_size(history)) << std::endl;
+    if (size() > 3) {
+        std::vector<Entry> free_lists;
+        free_lists.emplace_back(m_free_list_positions.ref(), m_free_list_positions.size_in_bytes());
+        free_lists.emplace_back(m_free_list_sizes.ref(), m_free_list_sizes.size_in_bytes());
+        free_lists.emplace_back(m_free_list_versions.ref(), m_free_list_versions.size_in_bytes());
+        consolidate_lists(all_nodes, free_lists);
     }
 
-    consolidate_lists(all_nodes, history);
+    if (size() > 8) {
+        std::vector<Entry> history;
+        history = get_nodes(m_alloc, get_ref(8));
+        std::cout << "History size: " << human_readable(get_size(history)) << std::endl;
+        consolidate_lists(all_nodes, history);
+    }
+
     return all_nodes;
 }
 
@@ -612,6 +616,9 @@ void RealmFile::node_scan()
     auto free_list = m_group->get_free_list();
     auto free_entry = free_list.begin();
     auto end = m_alloc.get_baseline();
+    if (m_alloc.is_file_on_streaming_form()) {
+        end -= 16; // sizeof(StreamingFooter)
+    }
     uint64_t bad_ref = 0;
     if (free_list.empty()) {
         std::cout << "*** No free list - results may be unreliable ***" << std::endl;

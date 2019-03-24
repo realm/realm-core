@@ -165,6 +165,12 @@ public:
     /// transaction.
     int get_committed_file_format_version() const noexcept;
 
+    bool is_file_on_streaming_form() const
+    {
+        const Header& header = *reinterpret_cast<const Header*>(m_data);
+        return is_file_on_streaming_form(header);
+    }
+
     /// Attach this allocator to an empty buffer.
     ///
     /// It is an error to call this function on an attached
