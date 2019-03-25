@@ -5,7 +5,8 @@
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Writing a snapshot to file via Group::write() could produce a file with some parts not
+  reachable from top array (a memory leak). ([#2911](https://github.com/realm/realm-sync/issues/2911))
  
 ### Breaking changes
 * None.
