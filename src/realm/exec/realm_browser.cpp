@@ -1,5 +1,6 @@
 #include <realm.hpp>
 #include <iostream>
+#include <ctime>
 
 using namespace realm;
 
@@ -70,19 +71,44 @@ void print_objects(ConstTableRef table, size_t begin, size_t end)
                 case type_Double:
                     break;
                 case type_String: {
-                    auto str = table->get_string(col, row);
-                    auto sz = str.size();
-                    if (sz > 200) {
-                        printf("  String sz: %8zu", sz);
+                    std::string str = table->get_string(col, row);
+                    if (str.size() > 20) {
+                        str = str.substr(0, 17) + "...";
                     }
-                    else {
-                        printf(" %20s", str.data());
-                    }
+                    printf(" %20s", str.c_str());
                     break;
                 }
-                case type_Timestamp:
-                    printf(" %20ld", table->get_timestamp(col, row).get_seconds());
+                case type_Timestamp: {
+                    auto value = table->get_timestamp(col, row);
+                    auto seconds = value.get_seconds();
+                    auto tm = gmtime(&seconds);
+                    printf("  %4d-%02d-%02d %02d:%02d:%02d", tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday,
+                           tm->tm_hour, tm->tm_min, tm->tm_sec);
                     break;
+                }
+                case type_Link: {
+                    std::string link = "[" + std::to_string(table->get_link(col, row)) + "]";
+                    printf(" %20s", link.c_str());
+                    break;
+                }
+                case type_LinkList: {
+                    std::string links = "[";
+                    auto lv = table->get_linklist(col, row);
+                    auto sz = lv->size();
+                    if (sz > 0) {
+                        links += std::to_string(lv->m_row_indexes.get(0));
+                        for (size_t i = 1; i < sz; i++) {
+                            links += ("," + std::to_string(lv->m_row_indexes.get(i)));
+                        }
+                    }
+                    links += "]";
+                    if (links.size() > 20) {
+                        links = links.substr(0, 17) + "...";
+                    }
+
+                    printf(" %20s", links.c_str());
+                    break;
+                }
                 default:
                     printf(" ********************");
                     break;
@@ -96,6 +122,7 @@ int main(int argc, char const* argv[])
 {
     if (argc > 1) {
         Group g(argv[1]);
+        g.verify();
         auto nb_tables = g.size();
         for (size_t i = 0; i < nb_tables; i++) {
             std::cout << i << ". " << g.get_table_name(i) << " ";
