@@ -73,6 +73,7 @@ jobWrapper {
                 androidArm64Debug       : doAndroidBuildInDocker('arm64-v8a', 'Debug', false),
                 threadSanitizer         : doCheckSanity('Debug', '1000', 'thread'),
                 addressSanitizer        : doCheckSanity('Debug', '1000', 'address'),
+                coverage                : doBuildCoverage(),
             ]
             if (releaseTesting) {
                 extendedChecks = [
@@ -80,7 +81,6 @@ jobWrapper {
                     checkMacOsDebug         : doBuildMacOs('Debug', true),
                     buildUwpx64Debug        : doBuildWindows('Debug', true, 'x64', false),
                     androidArmeabiRelease   : doAndroidBuildInDocker('armeabi-v7a', 'Release', true),
-                    coverage                : doBuildCoverage(),
                     performance             : buildPerformance()
                 ]
                 parallelExecutors.putAll(extendedChecks)
@@ -534,24 +534,15 @@ def doBuildCoverage() {
       docker.build('realm-core:snapshot').inside {
         def workspace = pwd()
         sh """
-          mkdir build
-          cd build
-          cmake -G Ninja -D REALM_COVERAGE=ON ..
-          ninja
-          cd ..
-          lcov --no-external --capture --initial --directory . --output-file ${workspace}/coverage-base.info
-          cd build/test
+          rm -f lcov-base.info
           ulimit -c unlimited
-          UNITTEST_PROGRESS=1 ./realm-tests
-          cd ../..
-          lcov --no-external --directory . --capture --output-file ${workspace}/coverage-test.info
-          lcov --add-tracefile ${workspace}/coverage-base.info --add-tracefile coverage-test.info --output-file ${workspace}/coverage-total.info
-          lcov --remove ${workspace}/coverage-total.info '/usr/*' '${workspace}/test/*' --output-file ${workspace}/coverage-filtered.info
-          rm coverage-base.info coverage-test.info coverage-total.info
+          UNITTEST_PROGRESS=1 tools/coverage.sh
+          rm -f lcov*.info
         """
         withCredentials([[$class: 'StringBinding', credentialsId: 'codecov-token-core', variable: 'CODECOV_TOKEN']]) {
           sh '''
-            curl -s https://codecov.io/bash | bash
+            curl -s https://codecov.io/bash > codecov.sh
+            bash codecov.sh -X gcov
           '''
         }
       }
