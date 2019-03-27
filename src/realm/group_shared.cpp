@@ -1034,6 +1034,8 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
             try {
                 top_ref = alloc.attach_file(path, cfg); // Throws
                 if (top_ref) {
+                    alloc.note_reader_start(this);
+                    _impl::On_scope_exit reader_end_guard( [this]() { m_group.m_alloc.note_reader_end(this); });
                     Array top{alloc};
                     top.init_from_ref(top_ref);
                     Group::validate_top_array(top, alloc);
@@ -1057,6 +1059,9 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
             // situations, where the database has been re-initialised (e.g. through
             // compact()). This could render the mappings (partially) undefined.
             SlabAlloc::DetachGuard alloc_detach_guard(alloc);
+            alloc.note_reader_start(this);
+            // must come after the alloc detach guard
+            _impl::On_scope_exit reader_end_guard( [this] { m_group.m_alloc.note_reader_end(this); } );
 
             // Determine target file format version for session (upgrade
             // required if greater than file format version of attached file).
