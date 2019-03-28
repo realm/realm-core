@@ -7,7 +7,12 @@
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Writing a snapshot to file via Group::write() could produce a file with some parts not
   reachable from top array (a memory leak). ([#2911](https://github.com/realm/realm-sync/issues/2911))
- 
+* SharedGroup::open() could fail with indications of a file corruption due to a race with the page reclaimer.
+  The error is timing dependent and not easily reproduced. If inspected the realm file would not actually be corrupted.
+  Encryption would have to be enabled to trigger the bug.
+  The page reclaimer must be active, which requires Core 5.12.2 or later.
+  ([#3267](https://github.com/realm/realm-core/issues/3267))
+
 ### Breaking changes
 * None.
 
