@@ -3080,7 +3080,7 @@ TEST(Parser_ChainedStringEqualQueries)
     verify_query(test_context, table, query, populated_data.size());
 }
 
-ONLY(Query_Fastenal)
+TEST(Query_ManyOrIntEqual)
 {
     auto hist = make_in_realm_history("fastenal.realm");
     SharedGroup sg(*hist);
