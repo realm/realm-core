@@ -68,6 +68,7 @@
 #include <thread>
 #include <utility>
 #include <vector>
+#include <set>
 
 using namespace realm;
 using namespace realm::metrics;
@@ -3077,6 +3078,78 @@ TEST(Parser_ChainedStringEqualQueries)
         column_to_query = (column_to_query + 1) % 4;
     }
     verify_query(test_context, table, query, populated_data.size());
+}
+
+ONLY(Query_Fastenal)
+{
+    auto hist = make_in_realm_history("fastenal.realm");
+    SharedGroup sg(*hist);
+    std::set<int> search_items;
+    Random random(random_int<unsigned long>()); // Seed from slow global generator
+    {
+        WriteTransaction wt(sg);
+
+        bool was_added;
+        auto table = wt.get_or_add_table("table", &was_added);
+        if (was_added) {
+            auto col_optype = table->add_column(type_String, "optype");
+            auto col_active = table->add_column(type_Bool, "active");
+            auto col_id = table->add_column(type_Int, "id");
+
+            for (int i = 0; i < 10000000; i++) {
+                auto ndx = table->add_empty_row();
+                table->set_string(col_optype, ndx, "CREATE");
+                table->set_bool(col_active, ndx, (i % 10000) != 0);
+                int val = random.draw_int_max(std::numeric_limits<int>::max());
+                table->set_int(col_id, ndx, val);
+            }
+            wt.commit();
+        }
+    }
+
+    {
+        WriteTransaction wt(sg);
+        auto table = wt.get_table("table");
+        auto col_id = table->get_column_index("id");
+        table->remove_search_index(col_id);
+        wt.commit();
+    }
+
+    {
+        ReadTransaction rt(sg);
+        auto table = rt.get_table("table");
+        auto col_id = table->get_column_index("id");
+        for (int i = 0; i < 150; i++) {
+            size_t ndx = random.draw_int_mod(table->size());
+            search_items.insert(table->get_int(col_id, ndx));
+        }
+    }
+
+    {
+        ReadTransaction rt(sg);
+        auto t = rt.get_table("table");
+        std::string query_string = "optype != \"DELETE\" and active == 1 and (";
+        bool first = true;
+        for (auto i : search_items) {
+            if (!first)
+                query_string += " or ";
+            query_string += ("id == " + std::to_string(i));
+            first = false;
+        }
+        query_string += ")";
+        Query q = t->where();
+        realm::query_builder::NoArguments args;
+
+        parser::ParserResult res = realm::parser::parse(query_string);
+        realm::query_builder::apply_predicate(q, res.predicate, args);
+
+        auto before = std::chrono::steady_clock().now();
+        auto tv = q.find_all();
+        auto after = std::chrono::steady_clock().now();
+        std::cout << tv.size() << " took "
+                  << std::chrono::duration_cast<std::chrono::milliseconds>(after - before).count() << " ms"
+                  << std::endl;
+    }
 }
 
 #endif // TEST_PARSER

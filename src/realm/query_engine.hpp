@@ -876,6 +876,74 @@ protected:
     }
 };
 
+template <>
+class IntegerNode<IntegerColumn, Equal> : public ParentNode {
+public:
+    IntegerNode(Int value, size_t column_ndx)
+        : m_value(value)
+    {
+        m_condition_column_idx = column_ndx;
+    }
+    void table_changed() override
+    {
+        m_condition_column = &get_column<IntegerColumn>(m_condition_column_idx);
+    }
+
+    void verify_column() const override
+    {
+        do_verify_column(m_condition_column);
+    }
+
+    void consume_condition(IntegerNode<IntegerColumn, Equal>* other)
+    {
+        if (m_needles.empty()) {
+            m_needles.insert(m_value);
+        }
+        m_needles.insert(other->m_value);
+    }
+
+    bool has_search_index() const
+    {
+        return m_condition_column->has_search_index();
+    }
+
+    size_t find_first_local(size_t start, size_t end) override
+    {
+        if (!m_needles.empty()) {
+            const auto not_in_set = m_needles.end();
+            for (size_t i = start; i < end; ++i) {
+                auto val = m_condition_column->get(i);
+                if (m_needles.find(val) != not_in_set)
+                    return i;
+            }
+            return realm::npos;
+        }
+        return m_condition_column->find_first(m_value, start, end);
+    }
+    std::string describe(util::serializer::SerialisationState& state) const override
+    {
+        return state.describe_column(ParentNode::m_table, m_condition_column->get_column_index()) +
+               " == " + util::serializer::print_value(m_value);
+    }
+    std::unique_ptr<realm::ParentNode> clone(realm::QueryNodeHandoverPatches* patches) const override
+    {
+        return std::unique_ptr<ParentNode>(new IntegerNode<IntegerColumn, Equal>(*this, patches));
+    }
+
+private:
+    IntegerNode(const IntegerNode& from, QueryNodeHandoverPatches* patches)
+        : ParentNode(from, patches)
+        , m_value(from.m_value)
+        , m_condition_column(from.m_condition_column)
+    {
+        if (m_condition_column && patches)
+            m_condition_column_idx = m_condition_column->get_column_index();
+    }
+
+    int64_t m_value;
+    const IntegerColumn* m_condition_column = nullptr;
+    std::unordered_set<Int> m_needles;
+};
 
 // This node is currently used for floats and doubles only
 template <class ColType, class TConditionFunction>
@@ -1679,18 +1747,35 @@ public:
 
         m_dD = 10.0;
 
-        StringNode<Equal>* first = nullptr;
+        StringNode<Equal>* first_str_equal = nullptr;
+        IntegerNode<IntegerColumn, Equal>* first_int_equal = nullptr;
         std::sort(m_conditions.begin(), m_conditions.end(),
                   [](auto& a, auto& b) { return a->m_condition_column_idx < b->m_condition_column_idx; });
         auto it = m_conditions.begin();
         while (it != m_conditions.end()) {
             // Only try to optimize on StringNode<Equal> conditions without search index
-            if ((first = dynamic_cast<StringNode<Equal>*>(it->get())) && !first->has_search_index()) {
-                auto col_ndx = first->m_condition_column_idx;
+            if ((first_str_equal = dynamic_cast<StringNode<Equal>*>(it->get())) &&
+                !first_str_equal->has_search_index()) {
+                auto col_ndx = first_str_equal->m_condition_column_idx;
                 auto next = it + 1;
                 while (next != m_conditions.end() && (*next)->m_condition_column_idx == col_ndx) {
                     if (auto advance = dynamic_cast<StringNode<Equal>*>(next->get())) {
-                        first->consume_condition(advance);
+                        first_str_equal->consume_condition(advance);
+                        next = m_conditions.erase(next);
+                    }
+                    else {
+                        ++next;
+                    }
+                }
+                it = next;
+            }
+            else if ((first_int_equal = dynamic_cast<IntegerNode<IntegerColumn, Equal>*>(it->get())) &&
+                     !first_int_equal->has_search_index()) {
+                auto col_ndx = first_int_equal->m_condition_column_idx;
+                auto next = it + 1;
+                while (next != m_conditions.end() && (*next)->m_condition_column_idx == col_ndx) {
+                    if (auto advance = dynamic_cast<IntegerNode<IntegerColumn, Equal>*>(next->get())) {
+                        first_int_equal->consume_condition(advance);
                         next = m_conditions.erase(next);
                     }
                     else {
