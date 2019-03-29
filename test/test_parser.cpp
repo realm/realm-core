@@ -3084,7 +3084,7 @@ ONLY(Query_Fastenal)
 {
     auto hist = make_in_realm_history("fastenal.realm");
     SharedGroup sg(*hist);
-    std::set<int> search_items;
+    std::set<size_t> search_items;
     Random random(random_int<unsigned long>()); // Seed from slow global generator
     {
         WriteTransaction wt(sg);
