@@ -1904,11 +1904,14 @@ private:
         while (it != m_conditions.end()) {
             // Only try to optimize on StringNode<Equal> conditions without search index
             if ((first_match = dynamic_cast<QueryNodeType*>(it->get())) &&
-                !first_match->has_search_index()) {
+                !first_match->has_search_index()) { // FIXME: don't combine this one if it has children
                 auto col_ndx = first_match->m_condition_column_idx;
                 auto next = it + 1;
                 while (next != m_conditions.end() && (*next)->m_condition_column_idx == col_ndx) {
-                    if (auto advance = dynamic_cast<QueryNodeType*>(next->get())) {
+                    if (next->get()->m_child != nullptr) {
+                        ++next;
+                    }
+                    else if (auto advance = dynamic_cast<QueryNodeType*>(next->get())) {
                         first_match->consume_condition(advance);
                         next = m_conditions.erase(next);
                     }
