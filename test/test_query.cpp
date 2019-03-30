@@ -11840,4 +11840,57 @@ TEST(Query_TwoColumnUnaligned)
     CHECK_EQUAL(cnt, matches);
 }
 
+
+TEST(Query_IntOrQueryOptimisation)
+{
+    Group g;
+    TableRef table = g.add_table("table");
+    size_t ints_col_ndx = table->add_column(type_Int, "ints");
+    size_t nullable_ints_col_ndx = table->add_column(type_Int, "nullable_ints", true);
+
+    const size_t null_frequency = 1000;
+    size_t num_nulls_added = 0;
+    table->add_empty_row(100000);
+    for (size_t i = 0; i < table->size(); ++i) {
+        table->set_int(ints_col_ndx, i, i);
+        if (i % null_frequency == 0) {
+            table->set_null(nullable_ints_col_ndx, i);
+            ++num_nulls_added;
+        }
+        else {
+            table->set_int(nullable_ints_col_ndx, i, i);
+        }
+    }
+
+    auto run_queries = [&]() {
+        size_t num_matches = table->size() / 10;
+        Query q_ints = table->column<Int>(ints_col_ndx) == -1;
+        Query q_nullables = (table->column<Int>(nullable_ints_col_ndx) == -1).Or().equal(nullable_ints_col_ndx, realm::null());
+        for (size_t i = 0; i < num_matches; ++i) {
+            q_ints = q_ints.Or().equal(ints_col_ndx, int64_t(i));
+            q_nullables = q_nullables.Or().equal(nullable_ints_col_ndx, int64_t(i));
+        }
+
+        auto before = std::chrono::steady_clock().now();
+        size_t ints_count = q_ints.count();
+        auto after = std::chrono::steady_clock().now();
+        std::cout << "ints count: " << std::chrono::duration_cast<std::chrono::milliseconds>(after - before).count() << " ms" << std::endl;
+
+        before = std::chrono::steady_clock().now();
+        size_t nullable_ints_count = q_nullables.count();
+        after = std::chrono::steady_clock().now();
+        std::cout << "nullable ints count: " << std::chrono::duration_cast<std::chrono::milliseconds>(after - before).count() << " ms" << std::endl;
+
+        size_t expected_nullable_query_count = (num_matches - (num_matches / null_frequency)) + (num_nulls_added);
+        CHECK_EQUAL(ints_count, num_matches);
+        CHECK_EQUAL(nullable_ints_count, expected_nullable_query_count);
+    };
+
+    run_queries();
+//    table->add_search_index(ints_col_ndx);
+//    table->add_search_index(nullable_ints_col_ndx);
+//    run_queries();
+}
+
+
 #endif // TEST_QUERY
