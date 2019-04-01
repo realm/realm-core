@@ -11843,6 +11843,9 @@ TEST(Query_TwoColumnUnaligned)
 
 TEST(Query_IntOrQueryOptimisation)
 {
+    using std::chrono::duration_cast;
+    using std::chrono::milliseconds;
+
     Group g;
     TableRef table = g.add_table("table");
     size_t ints_col_ndx = table->add_column(type_Int, "ints");
@@ -11862,10 +11865,11 @@ TEST(Query_IntOrQueryOptimisation)
         }
     }
 
-    auto run_queries = [&]() {
-        size_t num_matches = table->size() / 10;
+    auto run_queries = [&](size_t num_matches) {
+        // std::cout << "num_matches: " << num_matches << std::endl;
         Query q_ints = table->column<Int>(ints_col_ndx) == -1;
-        Query q_nullables = (table->column<Int>(nullable_ints_col_ndx) == -1).Or().equal(nullable_ints_col_ndx, realm::null());
+        Query q_nullables =
+            (table->column<Int>(nullable_ints_col_ndx) == -1).Or().equal(nullable_ints_col_ndx, realm::null());
         for (size_t i = 0; i < num_matches; ++i) {
             q_ints = q_ints.Or().equal(ints_col_ndx, int64_t(i));
             q_nullables = q_nullables.Or().equal(nullable_ints_col_ndx, int64_t(i));
@@ -11874,22 +11878,38 @@ TEST(Query_IntOrQueryOptimisation)
         auto before = std::chrono::steady_clock().now();
         size_t ints_count = q_ints.count();
         auto after = std::chrono::steady_clock().now();
-        std::cout << "ints count: " << std::chrono::duration_cast<std::chrono::milliseconds>(after - before).count() << " ms" << std::endl;
+        // std::cout << "ints count: " << duration_cast<milliseconds>(after - before).count() << " ms" << std::endl;
 
         before = std::chrono::steady_clock().now();
         size_t nullable_ints_count = q_nullables.count();
         after = std::chrono::steady_clock().now();
-        std::cout << "nullable ints count: " << std::chrono::duration_cast<std::chrono::milliseconds>(after - before).count() << " ms" << std::endl;
+        // std::cout << "nullable ints count: " << duration_cast<milliseconds>(after - before).count() << " ms"
+        //           << std::endl;
 
-        size_t expected_nullable_query_count = (num_matches - (num_matches / null_frequency)) + (num_nulls_added);
+        size_t expected_nullable_query_count =
+            num_matches + num_nulls_added - (((num_matches - 1) / null_frequency) + 1);
         CHECK_EQUAL(ints_count, num_matches);
         CHECK_EQUAL(nullable_ints_count, expected_nullable_query_count);
     };
 
-    run_queries();
-//    table->add_search_index(ints_col_ndx);
-//    table->add_search_index(nullable_ints_col_ndx);
-//    run_queries();
+    // run_queries(1);
+    // run_queries(2);
+    // run_queries(4);
+    // run_queries(8);
+    // run_queries(16);
+    // run_queries(32);
+    // run_queries(64);
+    // run_queries(128);
+    // run_queries(256);
+    // run_queries(512);
+    // run_queries(1024);
+    run_queries(2048);
+    // run_queries(4196);
+    // run_queries(8392);
+
+    //    table->add_search_index(ints_col_ndx);
+    //    table->add_search_index(nullable_ints_col_ndx);
+    //    run_queries();
 }
 
 
