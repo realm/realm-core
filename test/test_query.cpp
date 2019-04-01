@@ -11973,7 +11973,8 @@ TEST(Query_IntFindInNextLeaf)
     TableRef table = g.add_table("table");
     auto col_id = table->add_column(type_Int, "id");
 
-    constexpr size_t num_misses = REALM_MAX_BPNODE_SIZE * 2 + 10;
+    // num_misses > MAX_BPNODE_SIZE to check results on other leafs
+    constexpr size_t num_misses = 1000 * 2 + 10;
     table->add_empty_row(num_misses);
     for (size_t i = 0; i < num_misses; i++) {
         table->set_int(col_id, i, i % 10);
