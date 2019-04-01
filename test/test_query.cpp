@@ -11843,6 +11843,38 @@ TEST(Query_TwoColumnUnaligned)
 
 TEST(Query_IntOrQueryOptimisation)
 {
+    Group g;
+    TableRef table = g.add_table("table");
+    auto col_optype = table->add_column(type_String, "optype");
+    auto col_active = table->add_column(type_Bool, "active");
+    auto col_id = table->add_column(type_Int, "id");
+
+    for (int i = 0; i < 100; i++) {
+        auto ndx = table->add_empty_row();
+        table->set_bool(col_active, ndx, (i % 10) != 0);
+        table->set_int(col_id, ndx, i);
+    }
+    table->set_string(col_optype, 0, "CREATE");
+    table->set_string(col_optype, 1, "DELETE");
+    table->set_string(col_optype, 2, "CREATE");
+
+    auto optype = table->column<String>(col_optype);
+    auto active = table->column<Bool>(col_active);
+    auto id = table->column<Int>(col_id);
+
+    Query q;
+    q = (id == 0 && optype == "CREATE") || id == 1;
+    CHECK_EQUAL(q.count(), 2);
+
+    q = id == 1 || (id == 0 && optype == "DELETE");
+    CHECK_EQUAL(q.count(), 1);
+
+    q = table->where().equal(col_id, 1).Or().equal(col_id, 0).Or().equal(col_id, 2);
+    CHECK_EQUAL(q.count(), 3);
+}
+
+TEST(Query_IntOrQueryPerformance)
+{
     using std::chrono::duration_cast;
     using std::chrono::milliseconds;
 

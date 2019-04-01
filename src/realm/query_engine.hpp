@@ -1916,19 +1916,18 @@ private:
     template<class QueryNodeType>
     void combine_conditions() {
         QueryNodeType* first_match = nullptr;
+        QueryNodeType* advance = nullptr;
         auto it = m_conditions.begin();
         while (it != m_conditions.end()) {
             // Only try to optimize on QueryNodeType conditions without search index
             auto node = it->get();
-            if ((first_match = dynamic_cast<QueryNodeType*>(node)) &&
-                !first_match->has_search_index()) { // FIXME: don't combine this one if it has children
+            if ((first_match = dynamic_cast<QueryNodeType*>(node)) && first_match->m_child == nullptr &&
+                !first_match->has_search_index()) {
                 auto col_ndx = first_match->m_condition_column_idx;
                 auto next = it + 1;
                 while (next != m_conditions.end() && (*next)->m_condition_column_idx == col_ndx) {
-                    if (next->get()->m_child != nullptr) {
-                        ++next;
-                    }
-                    else if (auto advance = dynamic_cast<QueryNodeType*>(next->get())) {
+                    auto next_node = next->get();
+                    if ((advance = dynamic_cast<QueryNodeType*>(next_node)) && next_node->m_child == nullptr) {
                         first_match->consume_condition(advance);
                         next = m_conditions.erase(next);
                     }
