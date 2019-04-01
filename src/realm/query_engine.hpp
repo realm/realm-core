@@ -795,13 +795,13 @@ public:
         return not_found;
     }
 
-    virtual std::string describe(util::serializer::SerialisationState& state) const override
+    std::string describe(util::serializer::SerialisationState& state) const override
     {
         return state.describe_column(ParentNode::m_table, IntegerNodeBase<ColType>::m_condition_column->get_column_index())
             + " " + describe_condition() + " " + util::serializer::print_value(IntegerNodeBase<ColType>::m_value);
     }
 
-    virtual std::string describe_condition() const override
+    std::string describe_condition() const override
     {
         return TConditionFunction::description();
     }
@@ -1058,13 +1058,13 @@ public:
             return find(false);
     }
 
-    virtual std::string describe(util::serializer::SerialisationState& state) const override
+    std::string describe(util::serializer::SerialisationState& state) const override
     {
         REALM_ASSERT(m_condition_column.m_column != nullptr);
         return state.describe_column(ParentNode::m_table, m_condition_column.m_column->get_column_index())
             + " " + describe_condition() + " " + util::serializer::print_value(FloatDoubleNode::m_value);
     }
-    virtual std::string describe_condition() const override
+    std::string describe_condition() const override
     {
         return TConditionFunction::description();
     }
@@ -1684,7 +1684,7 @@ public:
         return std::unique_ptr<ParentNode>(new StringNode<Equal>(*this, patches));
     }
 
-    virtual std::string describe(util::serializer::SerialisationState& state) const override;
+    std::string describe(util::serializer::SerialisationState& state) const override;
 
     StringNode<Equal>(const StringNode& from, QueryNodeHandoverPatches* patches)
     : StringNodeEqualBase(from, patches)
@@ -1700,6 +1700,7 @@ public:
             }
         }
     }
+
 private:
     template <class ArrayType, class ElementType>
     size_t find_first_in(ArrayType& array, size_t begin, size_t end);
@@ -1912,7 +1913,6 @@ public:
     std::vector<std::unique_ptr<ParentNode>> m_conditions;
 
 private:
-
     template<class QueryNodeType>
     void combine_conditions() {
         QueryNodeType* first_match = nullptr;
