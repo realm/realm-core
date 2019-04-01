@@ -6,6 +6,7 @@
   ([PR #2888](https://github.com/realm/realm-sync/issues/2888).
 * Use search index in queries on integer columns (equality only). This will improve performance of
   queries on integer primary key properties for example. ([PR #3272](https://github.com/realm/realm-core/pull/3272)).
+* Number of 8 byte blocks in freelist is minimized. This will result in a shorter freelist.
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
