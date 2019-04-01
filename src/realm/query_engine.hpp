@@ -885,6 +885,27 @@ public:
         : BaseType(value, column_ndx)
     {
     }
+    ~IntegerNode()
+    {
+        if (m_result.is_attached()) {
+            m_result.destroy();
+        }
+    }
+
+    void init() override
+    {
+        BaseType::init();
+        m_nb_needles = m_needles.size();
+
+        if (has_search_index()) {
+            ref_type ref = IntegerColumn::create(Allocator::get_default());
+            m_result.init_from_ref(Allocator::get_default(), ref);
+
+            IntegerNodeBase<ColType>::m_condition_column->find_all(m_result, this->m_value, 0, realm::npos);
+            m_index_get = 0;
+            m_index_end = m_result.size();
+        }
+    }
 
     void consume_condition(IntegerNode<ColType, Equal>* other)
     {
@@ -904,7 +925,22 @@ public:
     size_t find_first_local(size_t start, size_t end) override
     {
         REALM_ASSERT(this->m_table);
-        size_t nb_needles = m_needles.size();
+
+        if (has_search_index()) {
+            while (m_index_get < m_index_end) {
+                // m_results are stored in sorted ascending order, guaranteed by the string index
+                size_t ndx = size_t(m_result.get(m_index_get));
+                if (ndx >= end) {
+                    break;
+                }
+                m_index_get++;
+                if (ndx >= start) {
+                    return ndx;
+                }
+            }
+            return not_found;
+        }
+
 
         while (start < end) {
             // Cache internal leaves
@@ -918,28 +954,8 @@ public:
 
             auto start2 = start - this->m_leaf_start;
             size_t s = realm::npos;
-            if (nb_needles) {
-                const auto not_in_set = m_needles.end();
-                bool search = nb_needles < 22;
-                auto cmp_fn = [this, search, not_in_set](const auto& v) {
-                    if (search) {
-                        for (auto it = m_needles.begin(); it != not_in_set; ++it) {
-                            if (*it == v)
-                                return true;
-                        }
-                        return false;
-                    }
-                    else {
-                        return (m_needles.find(v) != not_in_set);
-                    }
-                };
-                for (size_t i = start2; i < end2; ++i) {
-                    auto val = this->m_leaf_ptr->get(i);
-                    if (cmp_fn(val)) {
-                        s = i;
-                        break;
-                    }
-                }
+            if (m_nb_needles) {
+                s = find_first_haystack(start2, end2);
             }
             else if (end2 - start2 == 1) {
                 if (this->m_leaf_ptr->get(start2) == this->m_value) {
@@ -991,11 +1007,41 @@ public:
 
 private:
     std::unordered_set<TConditionValue> m_needles;
+    IntegerColumn m_result;
+    size_t m_nb_needles = 0;
+    size_t m_index_get = 0;
+    size_t m_index_end = 0;
 
     IntegerNode(const IntegerNode<ColType, Equal>& from, QueryNodeHandoverPatches* patches)
         : BaseType(from, patches)
         , m_needles(from.m_needles)
     {
+    }
+    size_t find_first_haystack(size_t start, size_t end)
+    {
+        const auto not_in_set = m_needles.end();
+        // for a small number of conditions, it is faster to do a linear search than to compute the hash
+        // the decision threshold was determined experimentally to be 22 conditions
+        bool search = m_nb_needles < 22;
+        auto cmp_fn = [this, search, not_in_set](const auto& v) {
+            if (search) {
+                for (auto it = m_needles.begin(); it != not_in_set; ++it) {
+                    if (*it == v)
+                        return true;
+                }
+                return false;
+            }
+            else {
+                return (m_needles.find(v) != not_in_set);
+            }
+        };
+        for (size_t i = start; i < end; ++i) {
+            auto val = this->m_leaf_ptr->get(i);
+            if (cmp_fn(val)) {
+                return i;
+            }
+        }
+        return realm::npos;
     }
 };
 
