@@ -11924,20 +11924,8 @@ TEST(Query_IntOrQueryPerformance)
         CHECK_EQUAL(nullable_ints_count, expected_nullable_query_count);
     };
 
-    // run_queries(1);
-    // run_queries(2);
-    // run_queries(4);
-    // run_queries(8);
-    // run_queries(16);
-    // run_queries(32);
-    // run_queries(64);
-    // run_queries(128);
-    // run_queries(256);
-    // run_queries(512);
-    // run_queries(1024);
+    run_queries(2);
     run_queries(2048);
-    // run_queries(4196);
-    // run_queries(8392);
 
     //    table->add_search_index(ints_col_ndx);
     //    table->add_search_index(nullable_ints_col_ndx);
