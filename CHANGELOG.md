@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 5.19.0 Release notes
 
 ### Enhancements
 * Improved query performance for unindexed integer columns when the query has a chain of OR conditions.
@@ -8,7 +8,6 @@
   queries on integer primary key properties for example. ([PR #3272](https://github.com/realm/realm-core/pull/3272)).
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Writing a snapshot to file via Group::write() could produce a file with some parts not
   reachable from top array (a memory leak). ([#2911](https://github.com/realm/realm-sync/issues/2911))
 * Fixed a bug in queries on a string column with more than two "or" equality conditions when the last condition also had an
