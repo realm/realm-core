@@ -11931,7 +11931,7 @@ TEST(Query_IntOrQueryPerformance)
     table->add_search_index(nullable_ints_col_ndx);
 
     run_queries(2);
-    run_queries(1024);
+    run_queries(2048);
 }
 
 TEST(Query_IntIndexed)
@@ -11949,5 +11949,50 @@ TEST(Query_IntIndexed)
     Query q = table->where().equal(col_id, 1);
     CHECK_EQUAL(q.count(), 10);
 }
+
+TEST(Query_IntIndexedUnordered)
+{
+    Group g;
+    TableRef table = g.add_table("table");
+    auto col_id = table->add_column(type_Int, "id");
+    table->add_search_index(col_id);
+    table->add_empty_row(4);
+    table->set_int(col_id, 0, 1);
+    table->set_int(col_id, 2, 1);
+    table->set_int(col_id, 1, 1);
+    table->set_int(col_id, 3, 2);
+    table->move_last_over(1);
+
+    Query q = table->where().equal(col_id, 1) || table->where().equal(col_id, 2);
+    CHECK_EQUAL(q.count(), 3);
+}
+
+TEST(Query_IntFindInNextLeaf)
+{
+    Group g;
+    TableRef table = g.add_table("table");
+    auto col_id = table->add_column(type_Int, "id");
+
+    constexpr size_t num_misses = REALM_MAX_BPNODE_SIZE * 2 + 10;
+    table->add_empty_row(num_misses);
+    for (size_t i = 0; i < num_misses; i++) {
+        table->set_int(col_id, i, i % 10);
+    }
+    size_t last_row_ndx = table->add_empty_row();
+    table->set_int(col_id, last_row_ndx, 20);
+
+    auto check_results = [&]() {
+        for (size_t i = 0; i < 10; ++i) {
+            Query qi = table->where().equal(col_id, int64_t(i));
+            CHECK_EQUAL(qi.count(), num_misses / 10);
+        }
+        Query q20 = table->where().equal(col_id, 20);
+        CHECK_EQUAL(q20.count(), 1);
+    };
+    check_results();
+    table->add_search_index(col_id);
+    check_results();
+}
+
 
 #endif // TEST_QUERY

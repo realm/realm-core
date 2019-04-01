@@ -928,6 +928,7 @@ public:
 
         if (has_search_index()) {
             while (m_index_get < m_index_end) {
+                // m_results are stored in sorted ascending order, guaranteed by the string index
                 size_t ndx = size_t(m_result.get(m_index_get));
                 if (ndx >= end) {
                     break;
@@ -1019,6 +1020,8 @@ private:
     size_t find_first_haystack(size_t start, size_t end)
     {
         const auto not_in_set = m_needles.end();
+        // for a small number of conditions, it is faster to do a linear search than to compute the hash
+        // the decision threshold was determined experimentally to be 22 conditions
         bool search = m_nb_needles < 22;
         auto cmp_fn = [this, search, not_in_set](const auto& v) {
             if (search) {
