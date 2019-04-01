@@ -11876,7 +11876,7 @@ TEST(Query_IntOrQueryOptimisation)
 TEST(Query_IntOrQueryPerformance)
 {
     using std::chrono::duration_cast;
-    using std::chrono::milliseconds;
+    using std::chrono::microseconds;
 
     Group g;
     TableRef table = g.add_table("table");
@@ -11910,12 +11910,12 @@ TEST(Query_IntOrQueryPerformance)
         auto before = std::chrono::steady_clock().now();
         size_t ints_count = q_ints.count();
         auto after = std::chrono::steady_clock().now();
-        // std::cout << "ints count: " << duration_cast<milliseconds>(after - before).count() << " ms" << std::endl;
+        // std::cout << "ints count: " << duration_cast<microseconds>(after - before).count() << " us" << std::endl;
 
         before = std::chrono::steady_clock().now();
         size_t nullable_ints_count = q_nullables.count();
         after = std::chrono::steady_clock().now();
-        // std::cout << "nullable ints count: " << duration_cast<milliseconds>(after - before).count() << " ms"
+        // std::cout << "nullable ints count: " << duration_cast<microseconds>(after - before).count() << " us"
         //           << std::endl;
 
         size_t expected_nullable_query_count =
@@ -11927,10 +11927,27 @@ TEST(Query_IntOrQueryPerformance)
     run_queries(2);
     run_queries(2048);
 
-    //    table->add_search_index(ints_col_ndx);
-    //    table->add_search_index(nullable_ints_col_ndx);
-    //    run_queries();
+    table->add_search_index(ints_col_ndx);
+    table->add_search_index(nullable_ints_col_ndx);
+
+    run_queries(2);
+    run_queries(1024);
 }
 
+TEST(Query_IntIndexed)
+{
+    Group g;
+    TableRef table = g.add_table("table");
+    auto col_id = table->add_column(type_Int, "id");
+
+    table->add_empty_row(100);
+    for (int i = 0; i < 100; i++) {
+        table->set_int(col_id, i, i % 10);
+    }
+
+    table->add_search_index(col_id);
+    Query q = table->where().equal(col_id, 1);
+    CHECK_EQUAL(q.count(), 10);
+}
 
 #endif // TEST_QUERY
