@@ -9353,6 +9353,7 @@ TEST(LangBindHelper_ImplicitTransactions_NoExtremeFileSpaceLeaks)
 
 // the miminum filesize (after a commit) is one or two pages, depending on the
 // page size.
+// FIXME: Due to the rather pessimistic calculation of the max_free_space_needed in
 #if REALM_ENABLE_ENCRYPTION
     if (crypt_key())
         // Encrypted files are always at least a 4096 byte header plus payload

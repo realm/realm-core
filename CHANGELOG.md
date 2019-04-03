@@ -5,7 +5,8 @@
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Freelist would keep growing with a decreased commit performance as a result.
+  ([2927](https://github.com/realm/realm-sync/issues/2927))
  
 ### Breaking changes
 * None.
