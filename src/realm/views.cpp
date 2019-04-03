@@ -403,7 +403,7 @@ std::string IncludeDescriptor::get_description(ConstTableRef attached_table) con
             size_t col_ndx = chain[j]->get_column_index();
             if (ConstTableRef from_table = m_backlink_sources[i][j]) { // backlink
                 REALM_ASSERT_DEBUG(col_ndx < from_table->get_column_count());
-                REALM_ASSERT_DEBUG(from_table->get_link_target(col_ndx) == cur_link_table);
+                REALM_ASSERT_DEBUG(from_table->get_link_target(col_ndx)->get_name() == cur_link_table->get_name());
                 description += basic_serialiser.get_backlink_column_name(from_table, col_ndx);
                 cur_link_table = from_table;
             }
