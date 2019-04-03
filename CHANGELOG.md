@@ -1,22 +1,10 @@
-# NEXT RELEASE
-
-### Enhancements
-* None.
+# 5.19.1 Release notes
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Freelist would keep growing with a decreased commit performance as a result.
   ([2927](https://github.com/realm/realm-sync/issues/2927))
 * Fixed an incorrect debug mode assertion which could be triggered when generating the description of an IncludeDescriptor.
   ([PR #3276](https://github.com/realm/realm-core/pull/3276) since v5.18.0). 
-
-### Breaking changes
-* None.
-
------------
-
-### Internals
-* None.
 
 ----------------------------------------------
 
