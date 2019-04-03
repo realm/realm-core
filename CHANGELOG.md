@@ -5,7 +5,7 @@
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Fixed an incorrect debug mode assertion which could be triggered when generating the description of an IncludeDescriptor.
  
 ### Breaking changes
 * None.
