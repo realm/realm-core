@@ -394,11 +394,10 @@ ref_type GroupWriter::write_group()
     // at the most 5x16 = 80 extension steps, each adding one entry to the free list.
     // (a smaller upper bound could likely be derived here, but it's not that important)
     max_free_list_size += 80;
-    // Try to make the guess a bit less pessimistic in case of young databases
-    int max_size_per_entry =
-        (m_alloc.m_baseline < 0x10000 ? 8 : 16) + (is_shared ? (m_current_version < 0x10000 ? 2 : 8) : 0);
+
+    int num_free_lists = is_shared ? 3 : 2;
     size_t max_free_space_needed =
-        Array::get_max_byte_size(top.size()) + Array::header_size + max_free_list_size * max_size_per_entry;
+        Array::get_max_byte_size(top.size()) + num_free_lists * Array::get_max_byte_size(max_free_list_size);
 
 #if REALM_ALLOC_DEBUG
     std::cout << "    Allocating file space for freelists:" << std::endl;

@@ -9354,14 +9354,15 @@ TEST(LangBindHelper_ImplicitTransactions_NoExtremeFileSpaceLeaks)
 // the miminum filesize (after a commit) is one or two pages, depending on the
 // page size.
 // FIXME: Due to the rather pessimistic calculation of the max_free_space_needed in
+// the file now grows to 4 * page_size
 #if REALM_ENABLE_ENCRYPTION
     if (crypt_key())
         // Encrypted files are always at least a 4096 byte header plus payload
-        CHECK_LESS_EQUAL(File(path).get_size(), 2 * page_size() + 4096);
+        CHECK_LESS_EQUAL(File(path).get_size(), 4 * page_size() + 4096);
     else
-        CHECK_LESS_EQUAL(File(path).get_size(), 2 * page_size());
+        CHECK_LESS_EQUAL(File(path).get_size(), 4 * page_size());
 #else
-    CHECK_LESS_EQUAL(File(path).get_size(), 2 * page_size());
+    CHECK_LESS_EQUAL(File(path).get_size(), 4 * page_size());
 #endif // REALM_ENABLE_ENCRYPTION
 }
 
