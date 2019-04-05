@@ -107,17 +107,23 @@ public:
         REALM_ASSERT(false);
     }
 
-    _impl::History* get_history_write() override
+    _impl::History* _get_history_write() override
     {
         return nullptr;
     }
 
-    std::unique_ptr<_impl::History> get_history_read() override
+    std::unique_ptr<_impl::History> _create_history_read() override
     {
-        return nullptr;
+        return {};
     }
 
-private:
+    void do_initiate_transact(Group& group, version_type version, bool hist_updated) override
+    {
+        TrivialReplication::do_initiate_transact(group, version, hist_updated);
+        m_group = &group;
+    }
+
+protected:
     version_type prepare_changeset(const char* data, size_t size, version_type orig_version) override
     {
         m_incoming_changeset = Buffer<char>(size); // Throws
@@ -138,6 +144,7 @@ private:
 
     Buffer<char> m_incoming_changeset;
     std::vector<Buffer<char>> m_changesets;
+    Group* m_group;
 };
 
 class ReplSyncClient : public MyTrivialReplication {

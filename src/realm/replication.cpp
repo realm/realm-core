@@ -107,13 +107,11 @@ void TrivialReplication::initialize(DB&)
     // Nothing needs to be done here
 }
 
-void TrivialReplication::do_initiate_transact(Group& group, version_type, bool history_updated)
+void TrivialReplication::do_initiate_transact(Group&, version_type, bool)
 {
-    m_group = &group;
     char* data = m_stream.get_data();
     size_t size = m_stream.get_size();
     set_buffer(data, data + size);
-    m_history_updated = history_updated;
 }
 
 Replication::version_type TrivialReplication::do_prepare_commit(version_type orig_version)

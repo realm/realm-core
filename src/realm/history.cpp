@@ -54,19 +54,29 @@ public:
         return m_alloc;
     }
 
-    void set_group(Group* group)
+    void set_group(Group* group, bool updated) override
     {
-        m_group = group;
+        _impl::History::set_group(group, updated);
         if (m_changesets)
             _impl::GroupFriend::set_history_parent(*m_group, *m_changesets);
     }
 
+    void prepare_for_write()
+    {
+        if (!m_changesets) {
+            using gf = _impl::GroupFriend;
+            m_changesets = std::make_unique<BinaryColumn>(*m_alloc); // Throws
+            gf::prepare_history_parent(*m_group, *m_changesets, Replication::hist_InRealm,
+                                       g_history_schema_version); // Throws
+            m_changesets->create();
+        }
+    }
     /// Must never be called more than once per transaction. Returns the version
     /// produced by the added changeset.
     version_type add_changeset(BinaryData);
 
-    void init_from_parent(version_type);
-    void update_from_ref(ref_type, version_type) override;
+    void update_from_parent(version_type) override;
+    void update_from_ref_and_version(ref_type, version_type) override;
     // void update_early_from_top_ref(version_type, size_t, ref_type) override;
     // void update_from_parent(version_type) override;
     void get_changesets(version_type, version_type, BinaryIterator*) const noexcept override;
@@ -76,7 +86,6 @@ public:
 
 private:
     Allocator* m_alloc = nullptr;
-    Group* m_group = nullptr;
     /// Version on which the first changeset in the history is based, or if the
     /// history is empty, the version associatede with currently bound
     /// snapshot. In general, the version associatede with currently bound
@@ -106,7 +115,7 @@ private:
 
 InRealmHistory::version_type InRealmHistory::add_changeset(BinaryData changeset)
 {
-    REALM_ASSERT(m_changesets);
+    prepare_for_write();
 
     // FIXME: BinaryColumn::set() currently interprets BinaryData{} as
     // null. It should probably be changed such that BinaryData{} is always
@@ -167,26 +176,14 @@ void InRealmHistory::verify() const
 #endif
 }
 
-void InRealmHistory::init_from_parent(version_type version)
+void InRealmHistory::update_from_parent(version_type version)
 {
-    if (!m_changesets) {
-        using gf = _impl::GroupFriend;
-        REALM_ASSERT(m_group);
-        Allocator& alloc = gf::get_alloc(*m_group);
-        m_changesets = std::make_unique<BinaryColumn>(alloc); // Throws
-        // Note: gf::prepare_history_parent() also ensures the the root array
-        // has a slot for the history ref.
-        gf::prepare_history_parent(*m_group, *m_changesets, Replication::hist_InRealm,
-                                   g_history_schema_version); // Throws
-    }
-    if (!m_changesets->init_from_parent()) {
-        m_changesets->create();
-    }
-    m_size = m_changesets->size();
-    m_base_version = version - m_size;
+    using gf = _impl::GroupFriend;
+    ref_type ref = gf::get_history_ref(*m_group);
+    update_from_ref_and_version(ref, version); // Throws
 }
 
-void InRealmHistory::update_from_ref(ref_type ref, version_type version)
+void InRealmHistory::update_from_ref_and_version(ref_type ref, version_type version)
 {
     if (ref == 0) {
         // No history
@@ -195,11 +192,12 @@ void InRealmHistory::update_from_ref(ref_type ref, version_type version)
         m_changesets = nullptr;
     }
     else {
-        if (REALM_UNLIKELY(!m_changesets)) {
+        if (!m_changesets) {
+            using gf = _impl::GroupFriend;
             m_changesets = std::make_unique<BinaryColumn>(*m_alloc); // Throws
+            gf::set_history_parent(*m_group, *m_changesets);
         }
-        m_changesets->init_from_ref(ref); // Throws
-        // gf::set_history_parent(*m_group, *m_changesets);
+        m_changesets->init_from_ref(ref);
         m_size = m_changesets->size();
         m_base_version = version - m_size;
     }
@@ -231,17 +229,10 @@ public:
     {
         // No-op
     }
-    void do_initiate_transact(Group& group, version_type version, bool history_updated) override
-    {
-        TrivialReplication::do_initiate_transact(group, version, history_updated);
-        m_history.set_group(&group);
-    }
 
     version_type prepare_changeset(const char* data, size_t size, version_type orig_version) override
     {
-        if (!is_history_updated()) {
-            m_history.init_from_parent(orig_version); // Throws
-        }
+        m_history.ensure_updated(orig_version);
         BinaryData changeset(data, size);
         version_type new_version = m_history.add_changeset(changeset); // Throws
         return new_version;
@@ -278,12 +269,12 @@ public:
         REALM_ASSERT(false);
     }
 
-    _impl::History* get_history_write() override
+    _impl::History* _get_history_write() override
     {
         return &m_history;
     }
 
-    std::unique_ptr<_impl::History> get_history_read() override
+    std::unique_ptr<_impl::History> _create_history_read() override
     {
         auto hist = std::make_unique<InRealmHistory>();
         hist->initialize(m_history.get_alloc());

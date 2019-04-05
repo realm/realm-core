@@ -119,6 +119,11 @@ TEST(Transactions_Frozen)
 
 class MyHistory : public _impl::History {
 public:
+    MyHistory(const MyHistory&) = delete;
+    explicit MyHistory(MyHistory* write_history = nullptr)
+        : m_write_history(write_history)
+    {
+    }
     std::vector<char> m_incoming_changeset;
     version_type m_incoming_version;
     struct ChangeSet {
@@ -126,10 +131,16 @@ public:
         bool finalized = false;
     };
     std::map<uint_fast64_t, ChangeSet> m_changesets;
+    MyHistory* m_write_history = nullptr;
 
-    void update_from_ref(ref_type, version_type) override
+    void update_from_ref_and_version(ref_type, version_type version) override
     {
-        // No-op
+        update_from_parent(version);
+    }
+    void update_from_parent(version_type) override
+    {
+        if (m_write_history)
+            m_changesets = m_write_history->m_changesets;
     }
     version_type add_changeset(const char* data, size_t size, version_type orig_version)
     {
@@ -207,16 +218,14 @@ public:
         return hist_InRealm;
     }
 
-    _impl::History* get_history_write() override
+    _impl::History* _get_history_write() override
     {
         return &m_history;
     }
 
-    std::unique_ptr<_impl::History> get_history_read() override
+    std::unique_ptr<_impl::History> _create_history_read() override
     {
-        auto hist = std::make_unique<MyHistory>();
-        *hist = m_history;
-        return std::move(hist);
+        return std::make_unique<MyHistory>(&m_history);
     }
 
     int get_history_schema_version() const noexcept override

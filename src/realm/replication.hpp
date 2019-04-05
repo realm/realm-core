@@ -329,7 +329,7 @@ public:
     ///
     /// This function must return null when, and only when get_history_type()
     /// returns \ref hist_None.
-    virtual _impl::History* get_history_write() = 0;
+    virtual _impl::History* _get_history_write() = 0;
 
     /// Returns an object that gives access to the history of changesets in a
     /// way that allows for continuous transactions to work. All readers must
@@ -338,7 +338,7 @@ public:
     ///
     /// This function must return null when, and only when get_history_type()
     /// returns \ref hist_None.
-    virtual std::unique_ptr<_impl::History> get_history_read() = 0;
+    virtual std::unique_ptr<_impl::History> _create_history_read() = 0;
 
     /// Returns false by default, but must return true if, and only if this
     /// history object represents a session participant that is a sync
@@ -405,14 +405,11 @@ public:
 
 protected:
     typedef Replication::version_type version_type;
-    Group* m_group = nullptr;
 
     TrivialReplication(const std::string& database_file);
 
     virtual version_type prepare_changeset(const char* data, size_t size, version_type orig_version) = 0;
     virtual void finalize_changeset() noexcept = 0;
-
-    bool is_history_updated() const noexcept;
 
     BinaryData get_uncommitted_changes() const noexcept override;
 
@@ -426,7 +423,6 @@ protected:
 
 private:
     const std::string m_database_file;
-    bool m_history_updated = false;
     _impl::TransactLogBufferStream m_stream;
 
     size_t transact_log_size();
@@ -442,6 +438,9 @@ inline Replication::Replication(_impl::TransactLogStream& stream)
 
 inline void Replication::initiate_transact(Group& group, version_type current_version, bool history_updated)
 {
+    if (auto hist = _get_history_write()) {
+        hist->set_group(&group, history_updated);
+    }
     do_initiate_transact(group, current_version, history_updated);
     reset_selection_caches();
 }
@@ -539,11 +538,6 @@ inline TrivialReplication::TrivialReplication(const std::string& database_file)
     : Replication(m_stream)
     , m_database_file(database_file)
 {
-}
-
-inline bool TrivialReplication::is_history_updated() const noexcept
-{
-    return m_history_updated;
 }
 
 inline BinaryData TrivialReplication::get_uncommitted_changes() const noexcept
