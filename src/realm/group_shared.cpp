@@ -31,6 +31,7 @@
 #include <realm/util/errno.hpp>
 #include <realm/util/safe_int_ops.hpp>
 #include <realm/util/thread.hpp>
+#include <realm/util/scope_exit.hpp>
 #include <realm/group_writer.hpp>
 #include <realm/group_shared.hpp>
 #include <realm/group_writer.hpp>
@@ -1034,6 +1035,11 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
             try {
                 top_ref = alloc.attach_file(path, cfg); // Throws
                 if (top_ref) {
+                    alloc.note_reader_start(this);
+                    auto handler = [this]() noexcept {
+                        m_group.m_alloc.note_reader_end(this);
+                    };
+                    auto reader_end_guard = make_scope_exit(handler);
                     Array top{alloc};
                     top.init_from_ref(top_ref);
                     Group::validate_top_array(top, alloc);
@@ -1057,6 +1063,10 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
             // situations, where the database has been re-initialised (e.g. through
             // compact()). This could render the mappings (partially) undefined.
             SlabAlloc::DetachGuard alloc_detach_guard(alloc);
+            alloc.note_reader_start(this);
+            // must come after the alloc detach guard
+            auto handler = [this]() noexcept { m_group.m_alloc.note_reader_end(this); };
+            auto reader_end_guard = make_scope_exit( handler );
 
             // Determine target file format version for session (upgrade
             // required if greater than file format version of attached file).
