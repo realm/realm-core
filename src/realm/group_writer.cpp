@@ -397,8 +397,7 @@ ref_type GroupWriter::write_group()
 
     int num_free_lists = is_shared ? 3 : 2;
     size_t max_free_space_needed =
-        Array::get_max_byte_size(top.size()) +
-        num_free_lists * Array::get_max_byte_size(max_free_list_size);
+        Array::get_max_byte_size(top.size()) + num_free_lists * Array::get_max_byte_size(max_free_list_size);
 
 #if REALM_ALLOC_DEBUG
     std::cout << "    Allocating file space for freelists:" << std::endl;
@@ -722,10 +721,20 @@ GroupWriter::FreeListElement GroupWriter::search_free_space_in_free_list_element
 
 GroupWriter::FreeListElement GroupWriter::search_free_space_in_part_of_freelist(size_t size)
 {
-    for (auto it = m_size_map.lower_bound(size); it != m_size_map.end(); ++it) {
-        auto ret = search_free_space_in_free_list_element(it, size);
-        if (ret != m_size_map.end()) {
-            return ret;
+    auto it = m_size_map.lower_bound(size);
+    while (it != m_size_map.end()) {
+        // Accept either a perfect match or a block that is twice the size. Tests have shown
+        // that this is a good strategy.
+        if (it->first == size || it->first >= 2 * size) {
+            auto ret = search_free_space_in_free_list_element(it, size);
+            if (ret != m_size_map.end()) {
+                return ret;
+            }
+            ++it;
+        }
+        else {
+            // If block was too small, search for the first that is at least twice as big.
+            it = m_size_map.lower_bound(2 * size);
         }
     }
     // No match

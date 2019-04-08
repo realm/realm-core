@@ -23,13 +23,15 @@
 #include <initializer_list>
 #include <limits>
 #include <vector>
+#include <set>
+#include <chrono>
 
 #include <realm.hpp>
 #include <realm/lang_bind_helper.hpp>
 #include <realm/column.hpp>
 #include <realm/history.hpp>
 #include <realm/query_expression.hpp>
-
+#include <realm/query_expression.hpp>
 #include "test.hpp"
 #include "test_table_helper.hpp"
 
@@ -11837,5 +11839,161 @@ TEST(Query_TwoColumnUnaligned)
     size_t cnt = q.count();
     CHECK_EQUAL(cnt, matches);
 }
+
+
+TEST(Query_IntOrQueryOptimisation)
+{
+    Group g;
+    TableRef table = g.add_table("table");
+    auto col_optype = table->add_column(type_String, "optype");
+    auto col_active = table->add_column(type_Bool, "active");
+    auto col_id = table->add_column(type_Int, "id");
+
+    for (int i = 0; i < 100; i++) {
+        auto ndx = table->add_empty_row();
+        table->set_bool(col_active, ndx, (i % 10) != 0);
+        table->set_int(col_id, ndx, i);
+    }
+    table->set_string(col_optype, 0, "CREATE");
+    table->set_string(col_optype, 1, "DELETE");
+    table->set_string(col_optype, 2, "CREATE");
+
+    auto optype = table->column<String>(col_optype);
+    auto active = table->column<Bool>(col_active);
+    auto id = table->column<Int>(col_id);
+
+    Query q;
+    q = (id == 0 && optype == "CREATE") || id == 1;
+    CHECK_EQUAL(q.count(), 2);
+
+    q = id == 1 || (id == 0 && optype == "DELETE");
+    CHECK_EQUAL(q.count(), 1);
+
+    q = table->where().equal(col_id, 1).Or().equal(col_id, 0).Or().equal(col_id, 2);
+    CHECK_EQUAL(q.count(), 3);
+}
+
+TEST(Query_IntOrQueryPerformance)
+{
+    using std::chrono::duration_cast;
+    using std::chrono::microseconds;
+
+    Group g;
+    TableRef table = g.add_table("table");
+    size_t ints_col_ndx = table->add_column(type_Int, "ints");
+    size_t nullable_ints_col_ndx = table->add_column(type_Int, "nullable_ints", true);
+
+    const size_t null_frequency = 1000;
+    size_t num_nulls_added = 0;
+    table->add_empty_row(100000);
+    for (size_t i = 0; i < table->size(); ++i) {
+        table->set_int(ints_col_ndx, i, i);
+        if (i % null_frequency == 0) {
+            table->set_null(nullable_ints_col_ndx, i);
+            ++num_nulls_added;
+        }
+        else {
+            table->set_int(nullable_ints_col_ndx, i, i);
+        }
+    }
+
+    auto run_queries = [&](size_t num_matches) {
+        // std::cout << "num_matches: " << num_matches << std::endl;
+        Query q_ints = table->column<Int>(ints_col_ndx) == -1;
+        Query q_nullables =
+            (table->column<Int>(nullable_ints_col_ndx) == -1).Or().equal(nullable_ints_col_ndx, realm::null());
+        for (size_t i = 0; i < num_matches; ++i) {
+            q_ints = q_ints.Or().equal(ints_col_ndx, int64_t(i));
+            q_nullables = q_nullables.Or().equal(nullable_ints_col_ndx, int64_t(i));
+        }
+
+        auto before = std::chrono::steady_clock().now();
+        size_t ints_count = q_ints.count();
+        auto after = std::chrono::steady_clock().now();
+        // std::cout << "ints count: " << duration_cast<microseconds>(after - before).count() << " us" << std::endl;
+
+        before = std::chrono::steady_clock().now();
+        size_t nullable_ints_count = q_nullables.count();
+        after = std::chrono::steady_clock().now();
+        // std::cout << "nullable ints count: " << duration_cast<microseconds>(after - before).count() << " us"
+        //           << std::endl;
+
+        size_t expected_nullable_query_count =
+            num_matches + num_nulls_added - (((num_matches - 1) / null_frequency) + 1);
+        CHECK_EQUAL(ints_count, num_matches);
+        CHECK_EQUAL(nullable_ints_count, expected_nullable_query_count);
+    };
+
+    run_queries(2);
+    run_queries(2048);
+
+    table->add_search_index(ints_col_ndx);
+    table->add_search_index(nullable_ints_col_ndx);
+
+    run_queries(2);
+    run_queries(2048);
+}
+
+TEST(Query_IntIndexed)
+{
+    Group g;
+    TableRef table = g.add_table("table");
+    auto col_id = table->add_column(type_Int, "id");
+
+    table->add_empty_row(100);
+    for (int i = 0; i < 100; i++) {
+        table->set_int(col_id, i, i % 10);
+    }
+
+    table->add_search_index(col_id);
+    Query q = table->where().equal(col_id, 1);
+    CHECK_EQUAL(q.count(), 10);
+}
+
+TEST(Query_IntIndexedUnordered)
+{
+    Group g;
+    TableRef table = g.add_table("table");
+    auto col_id = table->add_column(type_Int, "id");
+    table->add_search_index(col_id);
+    table->add_empty_row(4);
+    table->set_int(col_id, 0, 1);
+    table->set_int(col_id, 2, 1);
+    table->set_int(col_id, 1, 1);
+    table->set_int(col_id, 3, 2);
+    table->move_last_over(1);
+
+    Query q = table->where().equal(col_id, 1) || table->where().equal(col_id, 2);
+    CHECK_EQUAL(q.count(), 3);
+}
+
+TEST(Query_IntFindInNextLeaf)
+{
+    Group g;
+    TableRef table = g.add_table("table");
+    auto col_id = table->add_column(type_Int, "id");
+
+    // num_misses > MAX_BPNODE_SIZE to check results on other leafs
+    constexpr size_t num_misses = 1000 * 2 + 10;
+    table->add_empty_row(num_misses);
+    for (size_t i = 0; i < num_misses; i++) {
+        table->set_int(col_id, i, i % 10);
+    }
+    size_t last_row_ndx = table->add_empty_row();
+    table->set_int(col_id, last_row_ndx, 20);
+
+    auto check_results = [&]() {
+        for (size_t i = 0; i < 10; ++i) {
+            Query qi = table->where().equal(col_id, int64_t(i));
+            CHECK_EQUAL(qi.count(), num_misses / 10);
+        }
+        Query q20 = table->where().equal(col_id, 20);
+        CHECK_EQUAL(q20.count(), 1);
+    };
+    check_results();
+    table->add_search_index(col_id);
+    check_results();
+}
+
 
 #endif // TEST_QUERY

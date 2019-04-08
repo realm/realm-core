@@ -727,7 +727,6 @@ protected:
 };
 
 
-// FIXME: Add specialization that uses index for TConditionFunction = Equal
 template <class ColType, class TConditionFunction>
 class IntegerNode : public IntegerNodeBase<ColType> {
     using BaseType = IntegerNodeBase<ColType>;
@@ -796,13 +795,13 @@ public:
         return not_found;
     }
 
-    virtual std::string describe(util::serializer::SerialisationState& state) const override
+    std::string describe(util::serializer::SerialisationState& state) const override
     {
         return state.describe_column(ParentNode::m_table, IntegerNodeBase<ColType>::m_condition_column->get_column_index())
             + " " + describe_condition() + " " + util::serializer::print_value(IntegerNodeBase<ColType>::m_value);
     }
 
-    virtual std::string describe_condition() const override
+    std::string describe_condition() const override
     {
         return TConditionFunction::description();
     }
@@ -876,6 +875,176 @@ protected:
     }
 };
 
+template <class ColType>
+class IntegerNode<ColType, Equal> : public IntegerNodeBase<ColType> {
+public:
+    using BaseType = IntegerNodeBase<ColType>;
+    using TConditionValue = typename BaseType::TConditionValue;
+
+    IntegerNode(TConditionValue value, size_t column_ndx)
+        : BaseType(value, column_ndx)
+    {
+    }
+    ~IntegerNode()
+    {
+        if (m_result.is_attached()) {
+            m_result.destroy();
+        }
+    }
+
+    void init() override
+    {
+        BaseType::init();
+        m_nb_needles = m_needles.size();
+
+        if (has_search_index()) {
+            ref_type ref = IntegerColumn::create(Allocator::get_default());
+            m_result.init_from_ref(Allocator::get_default(), ref);
+
+            IntegerNodeBase<ColType>::m_condition_column->find_all(m_result, this->m_value, 0, realm::npos);
+            m_index_get = 0;
+            m_index_end = m_result.size();
+        }
+    }
+
+    void consume_condition(IntegerNode<ColType, Equal>* other)
+    {
+        REALM_ASSERT(this->m_condition_column == other->m_condition_column);
+        REALM_ASSERT(other->m_needles.empty());
+        if (m_needles.empty()) {
+            m_needles.insert(this->m_value);
+        }
+        m_needles.insert(other->m_value);
+    }
+
+    bool has_search_index() const
+    {
+        return IntegerNodeBase<ColType>::m_condition_column->has_search_index();
+    }
+
+    size_t find_first_local(size_t start, size_t end) override
+    {
+        REALM_ASSERT(this->m_table);
+
+        if (has_search_index()) {
+            while (m_index_get < m_index_end) {
+                // m_results are stored in sorted ascending order, guaranteed by the string index
+                size_t ndx = size_t(m_result.get(m_index_get));
+                if (ndx >= end) {
+                    break;
+                }
+                m_index_get++;
+                if (ndx >= start) {
+                    return ndx;
+                }
+            }
+            return not_found;
+        }
+
+
+        while (start < end) {
+            // Cache internal leaves
+            this->cache_leaf(start);
+
+            size_t end2;
+            if (end > this->m_leaf_end)
+                end2 = this->m_leaf_end - this->m_leaf_start;
+            else
+                end2 = end - this->m_leaf_start;
+
+            auto start2 = start - this->m_leaf_start;
+            size_t s = realm::npos;
+            if (m_nb_needles) {
+                s = find_first_haystack(start2, end2);
+            }
+            else if (end2 - start2 == 1) {
+                if (this->m_leaf_ptr->get(start2) == this->m_value) {
+                    s = start2;
+                }
+            }
+            else {
+                s = this->m_leaf_ptr->template find_first<Equal>(this->m_value, start2, end2);
+            }
+
+            if (s == not_found) {
+                start = this->m_leaf_end;
+                continue;
+            }
+            else
+                return s + this->m_leaf_start;
+        }
+
+        return not_found;
+    }
+
+    std::string describe(util::serializer::SerialisationState& state) const override
+    {
+        REALM_ASSERT(this->m_condition_column != nullptr);
+        std::string col_descr = state.describe_column(this->m_table, this->m_condition_column->get_column_index());
+
+        if (m_needles.empty()) {
+            return col_descr + " " + Equal::description() + " " +
+                   util::serializer::print_value(IntegerNodeBase<ColType>::m_value);
+        }
+
+        // FIXME: once the parser supports it, print something like "column IN {n1, n2, n3}"
+        std::string desc = "(";
+        bool is_first = true;
+        for (auto it : m_needles) {
+            if (!is_first)
+                desc += " or ";
+            desc +=
+                col_descr + " " + Equal::description() + " " + util::serializer::print_value(it); // "it" may be null
+            is_first = false;
+        }
+        desc += ")";
+        return desc;
+    }
+    std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches* patches) const override
+    {
+        return std::unique_ptr<ParentNode>(new IntegerNode<ColType, Equal>(*this, patches));
+    }
+
+private:
+    std::unordered_set<TConditionValue> m_needles;
+    IntegerColumn m_result;
+    size_t m_nb_needles = 0;
+    size_t m_index_get = 0;
+    size_t m_index_end = 0;
+
+    IntegerNode(const IntegerNode<ColType, Equal>& from, QueryNodeHandoverPatches* patches)
+        : BaseType(from, patches)
+        , m_needles(from.m_needles)
+    {
+    }
+    size_t find_first_haystack(size_t start, size_t end)
+    {
+        const auto not_in_set = m_needles.end();
+        // for a small number of conditions, it is faster to do a linear search than to compute the hash
+        // the decision threshold was determined experimentally to be 22 conditions
+        bool search = m_nb_needles < 22;
+        auto cmp_fn = [this, search, not_in_set](const auto& v) {
+            if (search) {
+                for (auto it = m_needles.begin(); it != not_in_set; ++it) {
+                    if (*it == v)
+                        return true;
+                }
+                return false;
+            }
+            else {
+                return (m_needles.find(v) != not_in_set);
+            }
+        };
+        for (size_t i = start; i < end; ++i) {
+            auto val = this->m_leaf_ptr->get(i);
+            if (cmp_fn(val)) {
+                return i;
+            }
+        }
+        return realm::npos;
+    }
+};
+
 
 // This node is currently used for floats and doubles only
 template <class ColType, class TConditionFunction>
@@ -935,13 +1104,13 @@ public:
             return find(false);
     }
 
-    virtual std::string describe(util::serializer::SerialisationState& state) const override
+    std::string describe(util::serializer::SerialisationState& state) const override
     {
         REALM_ASSERT(m_condition_column.m_column != nullptr);
         return state.describe_column(ParentNode::m_table, m_condition_column.m_column->get_column_index())
             + " " + describe_condition() + " " + util::serializer::print_value(FloatDoubleNode::m_value);
     }
-    virtual std::string describe_condition() const override
+    std::string describe_condition() const override
     {
         return TConditionFunction::description();
     }
@@ -1561,7 +1730,22 @@ public:
         return std::unique_ptr<ParentNode>(new StringNode<Equal>(*this, patches));
     }
 
-    virtual std::string describe(util::serializer::SerialisationState& state) const override;
+    std::string describe(util::serializer::SerialisationState& state) const override;
+
+    StringNode<Equal>(const StringNode& from, QueryNodeHandoverPatches* patches)
+    : StringNodeEqualBase(from, patches)
+    {
+        for (auto it = from.m_needles.begin(); it != from.m_needles.end(); ++it) {
+            if (it->data() == nullptr && it->size() == 0) {
+                m_needles.insert(StringData()); // nulls
+            }
+            else {
+                m_needle_storage.emplace_back(StringBuffer());
+                m_needle_storage.back().append(it->data(), it->size());
+                m_needles.insert(StringData(m_needle_storage.back().data(), m_needle_storage.back().size()));
+            }
+        }
+    }
 
 private:
     template <class ArrayType, class ElementType>
@@ -1679,30 +1863,12 @@ public:
 
         m_dD = 10.0;
 
-        StringNode<Equal>* first = nullptr;
         std::sort(m_conditions.begin(), m_conditions.end(),
                   [](auto& a, auto& b) { return a->m_condition_column_idx < b->m_condition_column_idx; });
-        auto it = m_conditions.begin();
-        while (it != m_conditions.end()) {
-            // Only try to optimize on StringNode<Equal> conditions without search index
-            if ((first = dynamic_cast<StringNode<Equal>*>(it->get())) && !first->has_search_index()) {
-                auto col_ndx = first->m_condition_column_idx;
-                auto next = it + 1;
-                while (next != m_conditions.end() && (*next)->m_condition_column_idx == col_ndx) {
-                    if (auto advance = dynamic_cast<StringNode<Equal>*>(next->get())) {
-                        first->consume_condition(advance);
-                        next = m_conditions.erase(next);
-                    }
-                    else {
-                        ++next;
-                    }
-                }
-                it = next;
-            }
-            else {
-                ++it;
-            }
-        }
+
+        combine_conditions<StringNode<Equal>>();
+        combine_conditions<IntegerNode<IntegerColumn, Equal>>();
+        combine_conditions<IntegerNode<IntNullColumn, Equal>>();
 
         m_start.clear();
         m_start.resize(m_conditions.size(), 0);
@@ -1793,6 +1959,36 @@ public:
     std::vector<std::unique_ptr<ParentNode>> m_conditions;
 
 private:
+    template<class QueryNodeType>
+    void combine_conditions() {
+        QueryNodeType* first_match = nullptr;
+        QueryNodeType* advance = nullptr;
+        auto it = m_conditions.begin();
+        while (it != m_conditions.end()) {
+            // Only try to optimize on QueryNodeType conditions without search index
+            auto node = it->get();
+            if ((first_match = dynamic_cast<QueryNodeType*>(node)) && first_match->m_child == nullptr &&
+                !first_match->has_search_index()) {
+                auto col_ndx = first_match->m_condition_column_idx;
+                auto next = it + 1;
+                while (next != m_conditions.end() && (*next)->m_condition_column_idx == col_ndx) {
+                    auto next_node = next->get();
+                    if ((advance = dynamic_cast<QueryNodeType*>(next_node)) && next_node->m_child == nullptr) {
+                        first_match->consume_condition(advance);
+                        next = m_conditions.erase(next);
+                    }
+                    else {
+                        ++next;
+                    }
+                }
+                it = next;
+            }
+            else {
+                ++it;
+            }
+        }
+    }
+
     // start index of the last find for each cond
     std::vector<size_t> m_start;
     // last looked at index of the lasft find for each cond
