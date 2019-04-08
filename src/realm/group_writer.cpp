@@ -383,30 +383,32 @@ ref_type GroupWriter::write_group()
     // We reserve room for the worst case scenario, which is as follows:
     // If the database has *max* theoretical fragmentation, it'll need one
     // entry in the free list for every 16 bytes, because both allocated and
-    // free chunks are at least 8 bytes in size. In the worst case each
-    // free list entry requires 24 bytes (8 for the position, 8 for the version
-    // and 8 for the size). The worst case scenario thus needs access
-    // to a contiguous address range of 24/16 * the existing database size.
-    // The memory mapping grows with one contiguous memory range at a time,
-    // each of these being at least 1/16 of the existing database size.
-    // To be sure to get a contiguous range of 24/16 of the current database
-    // size, the database itself would have to grow x24. This growth requires
-    // at the most 5x16 = 80 extension steps, each adding one entry to the free list.
-    // (a smaller upper bound could likely be derived here, but it's not that important)
-    max_free_list_size += 80;
+    // free chunks are at least 8 bytes in size. For databases smaller than 2Gb
+    // each free list entry requires 16 bytes (4 for the position, 4 for the
+    // size and 8 for the version). The worst case scenario thus needs access
+    // to a contiguous address range equal to existing database size.
+    // This growth requires at the most 8 extension steps, each adding one entry
+    // to the free list. The worst case occurs when you will have to expand the
+    // size to over 2 GB where each entry suddenly requires 24 bytes. In this
+    // case you will need 2 extra steps.
+    // Another limit is due to the fact than an array holds less than 0x1000000
+    // entries, so the total free list size will be less than 0x16000000. So for
+    // bigger databases the space required for free lists will be relatively less.
+    max_free_list_size += 10;
 
-    int num_free_lists = is_shared ? 3 : 2;
-    size_t max_free_space_needed =
-        Array::get_max_byte_size(top.size()) + num_free_lists * Array::get_max_byte_size(max_free_list_size);
+    // If current size is less than 128 MB, the database need not expand above 2 GB
+    // which means that the positions and sizes can still be in 32 bit.
+    int size_per_entry = ((top.get(2) >> 1) < 0x8000000 ? 8 : 16) + (is_shared ? 8 : 0);
+    size_t max_free_space_needed = Array::get_max_byte_size(top.size()) + size_per_entry * max_free_list_size;
 
 #if REALM_ALLOC_DEBUG
     std::cout << "    Allocating file space for freelists:" << std::endl;
 #endif
-    // Reserve space for remaining arrays. We ask for one extra byte beyond the
+    // Reserve space for remaining arrays. We ask for some extra bytes beyond the
     // maximum number that is required. This ensures that even if we end up
     // using the maximum size possible, we still do not end up with a zero size
     // free-space chunk as we deduct the actually used size from it.
-    auto reserve = reserve_free_space(max_free_space_needed + 1); // Throws
+    auto reserve = reserve_free_space(max_free_space_needed + 8); // Throws
     size_t reserve_pos = reserve->second;
     size_t reserve_size = reserve->first;
 
