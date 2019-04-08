@@ -25,7 +25,9 @@
   ([2927](https://github.com/realm/realm-sync/issues/2927))
 * Fixed an incorrect debug mode assertion which could be triggered when generating the description of an IncludeDescriptor.
   ([PR #3276](https://github.com/realm/realm-core/pull/3276) since v5.18.0). 
-
+* When opening an encrypted file via SharedGroup::open(), it could wrongly fail and indicate a file corruption
+  although the file was ok.
+  ([#3267](https://github.com/realm/realm-core/issues/3267), since core v5.12.2)
 ----------------------------------------------
 
 # 5.19.0 Release notes
@@ -41,11 +43,6 @@
 ### Fixed
 * Writing a snapshot to file via Group::write() could produce a file with some parts not
   reachable from top array (a memory leak). ([#2911](https://github.com/realm/realm-sync/issues/2911))
-* SharedGroup::open() could fail with indications of a file corruption due to a race with the page reclaimer.
-  The error is timing dependent and not easily reproduced. If inspected the realm file would not actually be corrupted.
-  Encryption would have to be enabled to trigger the bug.
-  The page reclaimer must be active, which requires Core 5.12.2 or later.
-  ([#3267](https://github.com/realm/realm-core/issues/3267))
 * Fixed a bug in queries on a string column with more than two "or" equality conditions when the last condition also had an
   "and" clause. For example: `first == "a" || (first == "b" && second == 1)` would be incorrectly evaluated as
   `(first == "a" || first == "b")`. ([#3271](https://github.com/realm/realm-core/pull/3271), since v5.17.0)
