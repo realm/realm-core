@@ -310,7 +310,7 @@ public:
     /// Hooks used to keep the encryption layer informed of the start and stop
     /// of transactions.
     void note_reader_start(const void* reader_id);
-    void note_reader_end(const void* reader_id);
+    void note_reader_end(const void* reader_id) noexcept;
 
     void verify() const override;
 #ifdef REALM_DEBUG

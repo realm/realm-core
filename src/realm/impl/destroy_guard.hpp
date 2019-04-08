@@ -106,16 +106,6 @@ private:
     Allocator& m_alloc;
 };
 
-struct On_scope_exit {
-    On_scope_exit() : m_f( [](){} ) {} // <--- gotta love C++ syntax :-D
-    On_scope_exit(std::function<void()> f) : m_f(f) {}
-    On_scope_exit(On_scope_exit&& f) { m_f = f.m_f; f.m_f = []() {}; }
-    void operator=(On_scope_exit&& f) { m_f = f.m_f; f.m_f = []() {}; }
-    ~On_scope_exit() { m_f(); }
-    std::function<void()> m_f;
-};
-
-
 
 // Implementation:
 

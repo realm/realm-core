@@ -271,7 +271,7 @@ void encryption_note_reader_start(SharedFileInfo& info, const void* reader_id)
     ++info.current_version;
 }
 
-void encryption_note_reader_end(SharedFileInfo& info, const void* reader_id)
+void encryption_note_reader_end(SharedFileInfo& info, const void* reader_id) noexcept
 {
     UniqueLock lock(mapping_mutex);
     for (auto j = info.readers.begin(); j != info.readers.end(); ++j)

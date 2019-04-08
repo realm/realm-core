@@ -37,7 +37,7 @@
 #include <realm/util/miscellaneous.hpp>
 #include <realm/util/terminate.hpp>
 #include <realm/util/thread.hpp>
-#include <realm/impl/destroy_guard.hpp>
+#include <realm/util/scope_exit.hpp>
 #include <realm/array.hpp>
 #include <realm/alloc_slab.hpp>
 
@@ -924,12 +924,9 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
         size = initial_size;
     }
     ref_type top_ref;
-    realm::_impl::On_scope_exit reader_end_guard;
     try {
         File::Map<char> map(m_file_mappings->m_file, File::access_ReadOnly, size); // Throws
         note_reader_start(this);
-        realm::_impl::On_scope_exit eg( [this]() { note_reader_end(this); } );
-        reader_end_guard = std::move(eg);
         // we'll read header and (potentially) footer
         realm::util::encryption_read_barrier(map, 0, sizeof(Header));
         realm::util::encryption_read_barrier(map, size - sizeof(Header), sizeof(Header));
@@ -952,6 +949,12 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
         note_reader_end(this);
         throw InvalidDatabase("Realm file decryption failed", path);
     }
+    catch (...) {
+        note_reader_end(this);
+        throw;
+    }
+    auto handler = [this]() noexcept { note_reader_end(this); };
+    auto reader_end_guard = make_scope_exit(handler);
     // make sure that any call to begin_read cause any slab to be placed in free
     // lists correctly
     m_free_space_state = free_space_Invalid;
@@ -1077,7 +1080,7 @@ void SlabAlloc::note_reader_start(const void* reader_id)
 #endif
 }
 
-void SlabAlloc::note_reader_end(const void* reader_id)
+void SlabAlloc::note_reader_end(const void* reader_id) noexcept
 {
 #if REALM_ENABLE_ENCRYPTION
     if (m_file_mappings->m_realm_file_info)
