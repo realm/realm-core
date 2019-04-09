@@ -6,7 +6,9 @@
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* When opening an encrypted file via SharedGroup::open(), it could wrongly fail and indicate a file corruption
+  although the file was ok.
+  ([#3267](https://github.com/realm/realm-core/issues/3267), since core v5.12.2)
  
 ### Breaking changes
 * None.
@@ -25,9 +27,6 @@
   ([2927](https://github.com/realm/realm-sync/issues/2927))
 * Fixed an incorrect debug mode assertion which could be triggered when generating the description of an IncludeDescriptor.
   ([PR #3276](https://github.com/realm/realm-core/pull/3276) since v5.18.0). 
-* When opening an encrypted file via SharedGroup::open(), it could wrongly fail and indicate a file corruption
-  although the file was ok.
-  ([#3267](https://github.com/realm/realm-core/issues/3267), since core v5.12.2)
 ----------------------------------------------
 
 # 5.19.0 Release notes
