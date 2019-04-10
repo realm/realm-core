@@ -203,7 +203,7 @@ void ClusterNode::IteratorState::clear()
 
 void ClusterNode::get(ObjKey k, ClusterNode::State& state) const
 {
-    if (!try_get(k, state)) {
+    if (!k || !try_get(k, state)) {
         throw InvalidKey("Key not found");
     }
 }
@@ -1264,10 +1264,16 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
         values.nullify_fwd_links(ndx, state);
     }
 
+    ObjKey real_key = get_real_key(ndx);
+    auto table = m_tree_top.get_owner();
     if (state.notification_handler()) {
         Group::CascadeNotification notifications;
-        notifications.rows.emplace_back(m_tree_top.get_owner()->get_key(), get_real_key(ndx));
+        notifications.rows.emplace_back(table->get_key(), real_key);
         state.send_notifications(notifications);
+    }
+
+    if (Replication* repl = m_alloc.get_replication()) {
+        repl->remove_object(table, real_key);
     }
 
     for (size_t col_ndx = 0; col_ndx < num_cols; col_ndx++) {
@@ -1789,10 +1795,6 @@ void ClusterTree::erase(ObjKey k, CascadeState& state)
     }
 
     size_t root_size = m_root->erase(k, state);
-
-    if (Replication* repl = get_alloc().get_replication()) {
-        repl->remove_object(get_owner(), k);
-    }
 
     bump_content_version();
     bump_storage_version();
