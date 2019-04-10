@@ -1,5 +1,6 @@
 #include <realm.hpp>
 #include <iostream>
+#include <ctime>
 
 using namespace realm;
 
@@ -57,7 +58,16 @@ void print_objects(ConstTableRef table, size_t begin, size_t end)
         ConstObj obj = table->get_object(row);
         printf(" %20zx", obj.get_key().value);
         for (auto col : col_keys) {
-            switch (table->get_column_type(col)) {
+            auto col_type = table->get_column_type(col);
+            if (table->get_column_attr(col).test(col_attr_Nullable) && obj.is_null(col)) {
+                printf("               <null>");
+                continue;
+            }
+            if (table->get_column_attr(col).test(col_attr_List) && col_type != type_LinkList) {
+                printf("               <list>");
+                continue;
+            }
+            switch (col_type) {
                 case type_Int:
                     printf(" %20ld", obj.get<Int>(col));
                     break;
@@ -65,23 +75,59 @@ void print_objects(ConstTableRef table, size_t begin, size_t end)
                     printf(" %20s", obj.get<Bool>(col) ? "true" : "false");
                     break;
                 case type_Float:
+                    printf(" %20f", obj.get<Float>(col));
                     break;
                 case type_Double:
+                    printf(" %20f", obj.get<Double>(col));
                     break;
                 case type_String: {
-                    auto str = obj.get<String>(col);
-                    auto sz = str.size();
-                    if (sz > 200) {
-                        printf("  String sz: %8zu", sz);
+                    std::string str = obj.get<String>(col);
+                    if (str.size() == 0) {
+                        str = "<empty>";
                     }
-                    else {
-                        printf(" %20s", str.data());
+                    if (str.size() > 20) {
+                        str = str.substr(0, 17) + "...";
                     }
+                    printf(" %20s", str.c_str());
                     break;
                 }
-                case type_Timestamp:
-                    printf(" %20ld", obj.get<Timestamp>(col).get_seconds());
+                case type_Binary: {
+                    auto bin = obj.get<Binary>(col);
+                    printf("   bin size: %8zu", bin.size());
                     break;
+                }
+                case type_Timestamp: {
+                    auto value = obj.get<Timestamp>(col);
+                    auto seconds = value.get_seconds();
+                    auto tm = gmtime(&seconds);
+                    printf("  %4d-%02d-%02d %02d:%02d:%02d", tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday,
+                           tm->tm_hour, tm->tm_min, tm->tm_sec);
+                    break;
+                }
+                case type_Link: {
+                    printf("      -> %12zx", obj.get<ObjKey>(col).value);
+                    break;
+                }
+                case type_LinkList: {
+                    std::stringstream links;
+                    links << "[" << std::hex;
+                    auto lv = obj.get_linklist(col);
+                    auto sz = lv.size();
+                    if (sz > 0) {
+                        links << lv.get(0).value;
+                        for (size_t i = 1; i < sz; i++) {
+                            links << "," << lv.get(i).value;
+                        }
+                    }
+                    links << "]" << std::dec;
+                    std::string str = links.str();
+                    if (str.size() > 20) {
+                        str = str.substr(0, 17) + "...";
+                    }
+
+                    printf(" %20s", str.c_str());
+                    break;
+                }
                 default:
                     printf(" ********************");
                     break;
