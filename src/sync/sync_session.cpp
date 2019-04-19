@@ -811,7 +811,6 @@ void SyncSession::set_multiplex_identifier(std::string multiplex_identity)
     m_multiplex_identity = std::move(multiplex_identity);
 }
 
-
 SyncSession::PublicState SyncSession::get_public_state() const
 {
     if (m_state == nullptr) {
@@ -828,7 +827,6 @@ SyncSession::PublicState SyncSession::get_public_state() const
     REALM_UNREACHABLE();
 }
 
-
 SyncSession::PublicState SyncSession::state() const
 {
     std::unique_lock<std::mutex> lock(m_state_mutex);
@@ -838,12 +836,32 @@ SyncSession::PublicState SyncSession::state() const
 SyncSession::ConnectionState SyncSession::connection_state() const
 {
     switch (m_connection_state) {
-        case realm::sync::Session::ConnectionState::disconnected: return ConnectionState::Disconnected;
-        case realm::sync::Session::ConnectionState::connecting: return ConnectionState::Connecting;
-        case realm::sync::Session::ConnectionState::connected: return ConnectionState::Connected;
+        case sync::Session::ConnectionState::disconnected: return ConnectionState::Disconnected;
+        case sync::Session::ConnectionState::connecting: return ConnectionState::Connecting;
+        case sync::Session::ConnectionState::connected: return ConnectionState::Connected;
         default:
             REALM_UNREACHABLE();
     }
+}
+
+void SyncSession::update_configuration(SyncConfig new_config)
+{
+    while (true) {
+        std::unique_lock<std::mutex> lock(m_state_mutex);
+        if (m_state != &State::inactive) {
+            advance_state(lock, State::inactive); // releases lock
+            continue;
+        }
+
+        REALM_ASSERT(m_state == &State::inactive);
+        REALM_ASSERT(!m_session);
+        REALM_ASSERT(m_config.user == new_config.user);
+        REALM_ASSERT(m_config.reference_realm_url == new_config.reference_realm_url);
+        REALM_ASSERT(m_config.is_partial == new_config.is_partial);
+        m_config = std::move(new_config);
+        break;
+    }
+    revive_if_needed();
 }
 
 // Represents a reference to the SyncSession from outside of the sync subsystem.

@@ -227,6 +227,11 @@ public:
     // object store team before using it.
     void override_server(std::string address, int port);
 
+    // Update the sync configuration used for this session. The new configuration must have the
+    // same user and reference realm url as the old configuration. The session will immediately
+    // disconnect (if it was active), and then attempt to connect using the new configuration.
+    void update_configuration(SyncConfig new_config);
+
     // An object representing the user who owns the Realm this `SyncSession` represents.
     std::shared_ptr<SyncUser> user() const
     {
