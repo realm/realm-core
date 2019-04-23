@@ -849,7 +849,12 @@ void SyncSession::update_configuration(SyncConfig new_config)
     while (true) {
         std::unique_lock<std::mutex> lock(m_state_mutex);
         if (m_state != &State::inactive) {
-            advance_state(lock, State::inactive); // releases lock
+            // Changing the state releases the lock, which means that by the
+            // time we reacquire the lock the state may have changed again
+            // (either due to one of the callbacks being invoked or another
+            // thread coincidentally doing something). We just attempt to keep
+            // switching it to inactive until it stays there.
+            advance_state(lock, State::inactive);
             continue;
         }
 

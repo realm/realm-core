@@ -311,6 +311,45 @@ TEST_CASE("SyncSession: close() API", "[sync]") {
     }
 }
 
+TEST_CASE("SyncSession: update_configuration()", "[sync]") {
+    SyncManager::shared().configure(tmp_dir(), SyncManager::MetadataMode::NoMetadata);
+
+    SyncServer server{false};
+
+    auto user = SyncManager::shared().get_user({"userid", dummy_auth_url}, "not_a_real_token");
+    auto session =  sync_session_with_bind_handler(server, user, "/update_configuration",
+                                                   [](const auto&, const auto&, auto) { },
+                                                   [](auto, auto) { },
+                                                   SyncSessionStopPolicy::AfterChangesUploaded);
+
+    SECTION("updates reported configuration") {
+        auto config = session->config();
+        REQUIRE(config.client_validate_ssl);
+        config.client_validate_ssl = false;
+        session->update_configuration(std::move(config));
+        REQUIRE_FALSE(session->config().client_validate_ssl);
+    }
+
+    SECTION("handles reconnects while it's trying to deactivate session") {
+        bool wait_called = false;
+        session->wait_for_download_completion([&](std::error_code ec) {
+            REQUIRE(ec == util::error::operation_aborted);
+            REQUIRE(session->config().client_validate_ssl);
+            REQUIRE(session->state() == SyncSession::PublicState::Inactive);
+
+            wait_called = true;
+            session->revive_if_needed();
+
+            REQUIRE(session->state() != SyncSession::PublicState::Inactive);
+        });
+
+        auto config = session->config();
+        config.client_validate_ssl = false;
+        session->update_configuration(std::move(config));
+        REQUIRE(wait_called);
+    }
+}
+
 TEST_CASE("sync: error handling", "[sync]") {
     auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
     using ProtocolError = realm::sync::ProtocolError;
@@ -481,6 +520,18 @@ TEMPLATE_TEST_CASE("sync: stop policy behavior", RegularUser, AdminTokenUser) {
             REQUIRE(session->state() == SyncSession::PublicState::Dying);
             CHECK(!error_handler_invoked);
         }
+    }
+
+    SECTION("can change to Immediately after opening the session") {
+        auto session = create_session(SyncSessionStopPolicy::AfterChangesUploaded);
+        REQUIRE(session->state() == SyncSession::PublicState::Active);
+
+        auto config = session->config();
+        config.stop_policy = SyncSessionStopPolicy::Immediately;
+        session->update_configuration(std::move(config));
+
+        session->close();
+        REQUIRE(sessions_are_inactive(*session));
     }
 }
 
