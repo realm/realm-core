@@ -18,7 +18,7 @@
 
 // Work-around for GCC bug: See https://stackoverflow.com/a/3233069/1389357
 // Must be defined at top of file
-#define __STDC_LIMIT_MACROS 
+#define __STDC_LIMIT_MACROS
 
 #include "sync/partial_sync.hpp"
 
@@ -125,19 +125,26 @@ void initialize_schema(Group& group)
     if (!table) {
         // Create the schema required by Sync
         table = sync::create_table(group, result_sets_table_name);
-        table->add_column(type_String, property_query);
-        table->add_column(type_String, property_matches_property_name);
-        table->add_column(type_Int, property_status);
-        table->add_column(type_String, property_error_message);
-        table->add_column(type_Int, property_query_parse_counter);
     }
-    else {
-        // The table already existed, so it should have all of the columns that are in the shared schema.
-        REALM_ASSERT(table->get_column_index(property_query) != npos);
-        REALM_ASSERT(table->get_column_index(property_matches_property_name) != npos);
-        REALM_ASSERT(table->get_column_index(property_status) != npos);
-        REALM_ASSERT(table->get_column_index(property_error_message) != npos);
-        REALM_ASSERT(table->get_column_index(property_query_parse_counter) != npos);
+
+    if (table->get_column_index(property_query) == npos) {
+        table->add_column(type_String, property_query);
+    }
+
+    if (table->get_column_index(property_matches_property_name) == npos) {
+        table->add_column(type_String, property_matches_property_name);
+    }
+
+    if (table->get_column_index(property_status) == npos) {
+        table->add_column(type_Int, property_status);
+    }
+
+    if (table->get_column_index(property_error_message) == npos) {
+        table->add_column(type_String, property_error_message);
+    }
+
+    if (table->get_column_index(property_query_parse_counter) == npos) {
+        table->add_column(type_Int, property_query_parse_counter);
     }
 
     // Add columns not required by Sync, but used by the bindings to offer better tracking of subscriptions.
