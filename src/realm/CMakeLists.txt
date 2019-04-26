@@ -284,16 +284,18 @@ target_compile_definitions(Core PUBLIC
 # This performs a linking test and communicates to dependencies built with newer compilers 
 # that the old ABI should be used.
 if(UNIX AND NOT APPLE AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    try_compile(USES_OLD_ABI ${CMAKE_BINARY_DIR}/abitest ${CMAKE_CURRENT_LIST_DIR}/../../tools/cmake/abitest abitest)
+    try_compile(USES_OLD_ABI ${RealmCore_BINARY_DIR}/abitest ${RealmCore_SOURCE_DIR}/tools/cmake/abitest abitest)
     if(USES_OLD_ABI)
         message(WARNING "You are compiling on a system that uses a non-compliant C++11 ABI. Downstream components depending on Realm::Core will be built with _GLIBCXX_USE_CXX11_ABI=0.")
         target_compile_definitions(Core INTERFACE "_GLIBCXX_USE_CXX11_ABI=0")
     endif()
 endif()
 
-target_include_directories(Core INTERFACE
-                           $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src> $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/src>
-                           $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+target_include_directories(Core
+    INTERFACE
+        $<BUILD_INTERFACE:${RealmCore_SOURCE_DIR}/src>
+        $<BUILD_INTERFACE:${RealmCore_BINARY_DIR}/src>
+        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 
 target_link_libraries(Core INTERFACE ${REALM_EXTRA_LIBS} ${CMAKE_THREAD_LIBS_INIT})
 
@@ -305,9 +307,11 @@ if(NOT REALM_SKIP_SHARED_LIB)
     add_library(CoreShared SHARED ${REALM_OBJECT_FILES} ${REALM_XCODE_DEPENDENCY})
     add_library(realm-shared ALIAS CoreShared)
 
-    target_include_directories(CoreShared INTERFACE
-                               $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src> $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/src>
-                               $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+    target_include_directories(CoreShared
+        INTERFACE
+            $<BUILD_INTERFACE:${RealmCore_SOURCE_DIR}/src>
+            $<BUILD_INTERFACE:${RealmCore_BINARY_DIR}/src>
+            $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 
     set_target_properties(
             CoreShared PROPERTIES
@@ -416,9 +420,11 @@ if(NOT REALM_SKIP_SHARED_LIB)
     add_dependencies(QueryParserShared CoreShared)
     target_link_libraries(QueryParserShared PRIVATE CoreShared)
     target_include_directories(QueryParserShared PRIVATE ${PEGTL_INCLUDE_DIR})
-    target_include_directories(QueryParserShared INTERFACE
-                               $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src> $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/src>
-                               $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+    target_include_directories(QueryParserShared
+        INTERFACE
+            $<BUILD_INTERFACE:${RealmCore_SOURCE_DIR}/src>
+            $<BUILD_INTERFACE:${RealmCore_BINARY_DIR}/src>
+            $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
     set_target_properties(QueryParserShared PROPERTIES
                           OUTPUT_NAME "realm-parser"
     )

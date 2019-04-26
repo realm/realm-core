@@ -194,8 +194,10 @@ uint_least32_t realm::murmur2_32(const unsigned char* data, size_t len) noexcept
     switch (len) {
         case 3:
             h ^= data[2] << 16;
+            REALM_FALLTHROUGH;
         case 2:
             h ^= data[1] << 8;
+            REALM_FALLTHROUGH;
         case 1:
             h ^= data[0];
             h *= m;

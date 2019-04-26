@@ -294,8 +294,8 @@ TEST_IF(Shared_PipelinedWritesWithKills, false)
     CHECK(RobustMutex::is_robust_on_this_platform());
     const int num_processes = 50;
     SHARED_GROUP_TEST_PATH(path);
+    DBRef sg = DB::create(path, false, DBOptions(crypt_key()));
     {
-        DBRef sg = DB::create(path, false, DBOptions(crypt_key()));
         // Create table entries
         WriteTransaction wt(sg);
         auto t1 = wt.add_table("test");
@@ -310,7 +310,7 @@ TEST_IF(Shared_PipelinedWritesWithKills, false)
         REALM_TERMINATE("fork() failed");
     if (pid == 0) {
         // first writer!
-        writer(path, 0);
+        writer(sg, 0);
         _Exit(0);
     }
     else {
@@ -320,7 +320,7 @@ TEST_IF(Shared_PipelinedWritesWithKills, false)
             if (pid == pid_t(-1))
                 REALM_TERMINATE("fork() failed");
             if (pid == 0) {
-                writer(path, k);
+                writer(sg, k);
                 _Exit(0);
             }
             else {
@@ -3826,7 +3826,7 @@ TEST(Shared_UpgradeBinArray)
 }
 
 #if !REALM_ANDROID // FIXME
-TEST(Shared_MoreVersionsInUse)
+TEST_IF(Shared_MoreVersionsInUse, REALM_ENABLE_ENCRYPTION)
 {
     SHARED_GROUP_TEST_PATH(path);
     const char* key = "1234567890123456789012345678901123456789012345678901234567890123";
@@ -3877,9 +3877,9 @@ TEST(Shared_MoreVersionsInUse)
     }
 }
 
-TEST(Shared_LinksToSameCluster)
+TEST_IF(Shared_LinksToSameCluster, REALM_ENABLE_ENCRYPTION)
 {
-    // There was a problem when a link referred an object livind in the same
+    // There was a problem when a link referred an object living in the same
     // Cluster as the origin object.
     SHARED_GROUP_TEST_PATH(path);
     const char* key = "1234567890123456789012345678901123456789012345678901234567890123";

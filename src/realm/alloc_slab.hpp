@@ -38,6 +38,9 @@ namespace realm {
 class Group;
 class GroupWriter;
 
+namespace util {
+struct SharedFileInfo;
+}
 
 /// Thrown by Group and SharedGroup constructors if the specified file
 /// (or memory buffer) does not appear to contain a valid Realm

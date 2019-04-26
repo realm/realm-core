@@ -211,6 +211,8 @@ GroupWriter::GroupWriter(Group& group)
 
     if (ref_type ref = m_free_lengths.get_ref_from_parent()) {
         m_free_lengths.init_from_ref(ref);
+        REALM_ASSERT_RELEASE_EX(m_free_positions.size() == m_free_lengths.size(), top.get_ref(),
+                                m_free_positions.size(), m_free_lengths.size());
     }
     else {
         m_free_lengths.create(Array::type_Normal); // Throws
@@ -234,6 +236,8 @@ GroupWriter::GroupWriter(Group& group)
 
         if (ref_type ref = m_free_versions.get_ref_from_parent()) {
             m_free_versions.init_from_ref(ref);
+            REALM_ASSERT_RELEASE_EX(m_free_versions.size() == m_free_lengths.size(), top.get_ref(),
+                                    m_free_versions.size(), m_free_lengths.size());
         }
         else {
             int_fast64_t value = int_fast64_t(initial_version); // FIXME: Problematic unsigned -> signed conversion
@@ -520,10 +524,10 @@ ref_type GroupWriter::write_group()
 void GroupWriter::read_in_freelist()
 {
     bool is_shared = m_group.m_is_shared;
-    REALM_ASSERT_3(m_free_positions.size(), ==, m_free_lengths.size());
-    REALM_ASSERT(!is_shared || m_free_versions.size() == m_free_lengths.size());
-
     size_t limit = m_free_lengths.size();
+    REALM_ASSERT_RELEASE_EX(m_free_positions.size() == limit, limit, m_free_positions.size());
+    REALM_ASSERT_RELEASE_EX(!is_shared || m_free_versions.size() == limit, limit, m_free_versions.size());
+
     if (limit) {
         auto limit_version = is_shared ? m_readlock_version : 0;
         for (size_t idx = 0; idx < limit; ++idx) {
@@ -639,8 +643,11 @@ void GroupWriter::move_free_in_file_to_size_map()
 {
     for (auto& elem : m_free_in_file) {
         // Skip elements merged in 'merge_adjacent_entries_in_freelist'
-        if (elem.size)
+        if (elem.size) {
+            REALM_ASSERT_RELEASE_EX(!(elem.size & 7), elem.size);
+            REALM_ASSERT_RELEASE_EX(!(elem.ref & 7), elem.ref);
             m_size_map.emplace(elem.size, elem.ref);
+        }
     }
     m_free_in_file.clear();
 }
@@ -655,7 +662,8 @@ size_t GroupWriter::get_free_space(size_t size)
     size_t chunk_pos = p->second;
     size_t chunk_size = p->first;
     REALM_ASSERT_3(chunk_size, >=, size);
-    REALM_ASSERT((chunk_size % 8) == 0);
+    REALM_ASSERT_RELEASE_EX(!(chunk_pos & 7), chunk_pos);
+    REALM_ASSERT_RELEASE_EX(!(chunk_size & 7), chunk_size);
 
     size_t rest = chunk_size - size;
     m_size_map.erase(p);
@@ -666,7 +674,6 @@ size_t GroupWriter::get_free_space(size_t size)
         // can be done from the beginning
         m_size_map.emplace(rest, chunk_pos + size);
     }
-    REALM_ASSERT_RELEASE_EX((chunk_pos % 8) == 0, chunk_pos);
     return chunk_pos;
 }
 
@@ -678,6 +685,7 @@ inline GroupWriter::FreeListElement GroupWriter::split_freelist_chunk(FreeListEl
     m_size_map.erase(it);
     REALM_ASSERT_RELEASE_EX(alloc_pos > start_pos, alloc_pos, start_pos);
 
+    REALM_ASSERT_RELEASE_EX(!(alloc_pos & 7), alloc_pos);
     size_t size_first = alloc_pos - start_pos;
     size_t size_second = chunk_size - size_first;
     m_size_map.emplace(size_first, start_pos);
@@ -778,7 +786,7 @@ GroupWriter::FreeListElement GroupWriter::extend_free_space(size_t requested_siz
     }
     // The size must be a multiple of 8. This is guaranteed as long as
     // the initial size is a multiple of 8.
-    REALM_ASSERT_3(new_file_size % 8, ==, 0);
+    REALM_ASSERT_RELEASE_EX(!(new_file_size & 7), new_file_size);
     REALM_ASSERT_3(logical_file_size, <, new_file_size);
 
     // Note: resize_file() will call File::prealloc() which may misbehave under
@@ -794,30 +802,15 @@ GroupWriter::FreeListElement GroupWriter::extend_free_space(size_t requested_siz
 
     // as new_file_size is larger than logical_file_size, but known to
     // be representable in a size_t, so is the result:
-    size_t chunk_size = new_file_size - static_cast<size_t>(logical_file_size);
-    REALM_ASSERT_3(chunk_size % 8, ==, 0); // 8-byte alignment
+    size_t chunk_size = new_file_size - logical_file_size;
+    REALM_ASSERT_RELEASE_EX(!(chunk_size & 7), chunk_size);
+    REALM_ASSERT_RELEASE(chunk_size != 0);
     auto it = m_size_map.emplace(chunk_size, logical_file_size);
 
     // Update the logical file size
     m_group.m_top.set(2, 1 + 2 * uint64_t(new_file_size)); // Throws
-    REALM_ASSERT(chunk_size != 0);
-    REALM_ASSERT((chunk_size % 8) == 0);
+
     return it;
-}
-
-
-void GroupWriter::write(const char* data, size_t size)
-{
-    // Get position of free space to write in (expanding file if needed)
-    size_t pos = get_free_space(size);
-    REALM_ASSERT_3((pos & 0x7), ==, 0); // Write position should always be 64bit aligned
-
-    // Write the block
-    MapWindow* window = get_window(pos, size);
-    char* dest_addr = window->translate(pos);
-    window->encryption_read_barrier(dest_addr, size);
-    realm::safe_copy_n(data, size, dest_addr);
-    window->encryption_write_barrier(dest_addr, size);
 }
 
 bool inline is_aligned(char* addr)

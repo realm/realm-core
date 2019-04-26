@@ -865,9 +865,9 @@ NONCONCURRENT_TEST(Thread_CondvarNotifyAllWakeup)
     std::mutex control_mutex;
     std::condition_variable control_cv;
 
-    const int num_waiters = 10;
+    const size_t num_waiters = 10;
     Thread waiters[num_waiters];
-    for (int i = 0; i < num_waiters; ++i) {
+    for (size_t i = 0; i < num_waiters; ++i) {
         waiters[i].start(std::bind(waiter, &mutex, &changed, &control_mutex, &control_cv, &num_threads_holding_lock));
     }
     {
@@ -880,7 +880,7 @@ NONCONCURRENT_TEST(Thread_CondvarNotifyAllWakeup)
     changed.notify_all();
     mutex.unlock();
 
-    for (int i = 0; i < num_waiters; ++i) {
+    for (size_t i = 0; i < num_waiters; ++i) {
         waiters[i].join();
     }
     changed.release_shared_part();

@@ -562,6 +562,7 @@ void SlabAlloc::do_free(ref_type ref, char* addr)
         // Free space in read only segment is tracked separately
         try {
             REALM_ASSERT_RELEASE(ref != 0);
+            REALM_ASSERT_RELEASE_EX(!(ref & 7), ref);
             auto next = m_free_read_only.lower_bound(ref);
             if (next != m_free_read_only.end()) {
                 REALM_ASSERT_RELEASE_EX(ref + size <= next->first, ref, size, next->first, next->second);
@@ -918,7 +919,9 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
     REALM_ASSERT(m_mappings.size());
     dg.release();  // Do not detach
     fcg.release(); // Do not close
+#if REALM_ENABLE_ENCRYPTION
     m_realm_file_info = util::get_file_info_for_file(m_file);
+#endif
     return top_ref;
 }
 
@@ -936,14 +939,22 @@ void SlabAlloc::setup_compatibility_mapping(size_t file_size)
 
 void SlabAlloc::note_reader_start(void* reader_id)
 {
+#if REALM_ENABLE_ENCRYPTION
     if (m_realm_file_info)
         util::encryption_note_reader_start(*m_realm_file_info, reader_id);
+#else
+    static_cast<void>(reader_id);
+#endif
 }
 
 void SlabAlloc::note_reader_end(void* reader_id)
 {
+#if REALM_ENABLE_ENCRYPTION
     if (m_realm_file_info)
         util::encryption_note_reader_end(*m_realm_file_info, reader_id);
+#else
+    static_cast<void>(reader_id);
+#endif
 }
 
 ref_type SlabAlloc::attach_buffer(const char* data, size_t size)

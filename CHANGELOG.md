@@ -16,8 +16,85 @@
 * The release binaries for Apple platforms are now built with Xcode 9.2 (up from 8.3.3).
 
 Besides the changes above, this release includes changes introduced by v5.12.1 and up
-until v5.12.2
+until v5.12.6
 
+| # 5.12.6 Release notes
+| 
+| ### Enhancements
+| * None.
+| 
+| ### Fixed
+| * On AWS Lambda we may throw an "Operation not permitted" exception when calling posix_fallocate().
+|   A slower workaround has been supplied.
+|   ([#3193](https://github.com/realm/realm-core/issues/3293))
+|  
+| ### Breaking changes
+| * None.
+| 
+| -----------
+| 
+| ### Internals
+| * None.
+| 
+| ----------------------------------------------
+| 
+| # 5.12.5 Release notes
+| 
+| ### Enhancements
+| * None.
+| 
+| ### Fixed
+| * When loading the realm binary from within the realm-js SDK, core could hang on Windows as described in
+|   https://github.com/realm/realm-js/issues/2169.
+|   ([#3188](https://github.com/realm/realm-core/pull/3188, since 5.12.2)
+| 
+| ### Breaking changes
+| * None.
+| 
+| -----------
+| 
+| ### Internals
+| * Fixed warnings reported by GCC 8.
+| * Replaced call to the deprecated `readdir_r()` with `readdir()`.
+| * Compilation without encryption now possible
+| 
+| ----------------------------------------------
+| 
+| # 5.12.4 Release notes
+| 
+| ### Enhancements
+| * None.
+| 
+| ### Fixed
+| * A segmentation fault would occur when calling Group:get_used_space() for a realm file
+|   with no commits. This method would usually only be called from sync/ROS to calculate
+|   and report state size.
+|   ([#3182](https://github.com/realm/realm-core/issues/3182), since v5.12.0)
+| 
+| ### Breaking changes
+| * None.
+| 
+| ----------------------------------------------
+| 
+| # 5.12.3 Release notes
+| 
+| ### Enhancements
+| * None.
+| 
+| ### Fixed
+| * Added assertions around use of invalid refs and sizes. Helps in narrowing down the causes for
+|   asserts like `ref != 0` and `(chunk_pos % 8) == 0`
+| 
+| ### Breaking changes
+| * None.
+| 
+| -----------
+| 
+| ### Internals
+| * None.
+| 
+| ----------------------------------------------
+| 
 | # 5.12.2 Release notes
 | 
 | ### Enhancements
@@ -55,7 +132,7 @@ until v5.12.2
 | 
 | ### Fixed
 | * None.
-|  
+| 
 | ### Breaking changes
 | * None.
 | 
@@ -75,16 +152,16 @@ This release includes only changes introduced by v5.10.2 and up until v5.12.0
 | ### Enhancements
 | * Added Group::get_used_space() which will return the size of the data taken up by the current
 |   commit. This is in contrast to the number returned by SharedGroup::get_stats() which will
-|   return the size of the last commit done in that SharedGroup. If the commits are the same, 
-|   the number will of course be the same. 
+|   return the size of the last commit done in that SharedGroup. If the commits are the same,
+|   the number will of course be the same.
 |   Issue [#259](https://github.com/realm/realm-core-private/issues/259)
 | 
 | ### Fixed
 | * None.
 | 
 | ### Breaking changes
-| * The way the Linux binaries are delivered is changed. They are now distributed 
-|   like the rest of the binaries with two packages (devel/runtime) per build type. 
+| * The way the Linux binaries are delivered is changed. They are now distributed
+|   like the rest of the binaries with two packages (devel/runtime) per build type.
 |   The file names follow this scheme:
 |   realm-core-<buildType>-<release>-Linux-{devel|runtime}.tar.gz
 |   For Linux the following build types are published: Debug, Release, RelAssert
@@ -848,7 +925,7 @@ up until v5.8.0
     - Applying an empty sort or distinct descriptor is now a no-op, this
       could previously be used to clear a sort or distinct operation.
   PR [#2644](https://github.com/realm/realm-core/pull/2644)
-* Support for size query on LinkedList removed. This is perhaps not so 
+* Support for size query on LinkedList removed. This is perhaps not so
   breaking after all since it is probably not used.
   PR [#2532](https://github.com/realm/realm-core/pull/2532).
 * Replication interface changed. The search index functions now operate
@@ -1243,7 +1320,7 @@ up until v5.8.0
 
 ### Bugfixes
 
-* Fixes a bug in chuncked binary column returning null value. 
+* Fixes a bug in chuncked binary column returning null value.
   PR [#2416](https://github.com/realm/realm-core/pull/2416).
   Fixes issue [#2418](https://github.com/realm/realm-core/issues/2418).
 * Possibly fixed some cases of extreme file size growth, by preventing starvation
@@ -1276,7 +1353,7 @@ up until v5.8.0
 * Support handover of TableViews and Queries based on SubTables.
   PR [#2470](https://github.com/realm/realm-core/pull/2470).
 * Enable reading and writing of big blobs via Table interface.
-  Only to be used by Sync. The old interface still has a check on 
+  Only to be used by Sync. The old interface still has a check on
   the size of the binary blob.
   PR [#2416](https://github.com/realm/realm-core/pull/2416).
 

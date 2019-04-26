@@ -1,42 +1,9 @@
 cmake_minimum_required(VERSION 3.4)
 
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/tools/cmake")
-
-file(STRINGS "${CMAKE_SOURCE_DIR}/dependencies.list" DEPENDENCIES)
-message("Dependencies: ${DEPENDENCIES}")
-foreach(LINE IN LISTS DEPENDENCIES)
-    string(REGEX MATCHALL "([^=]+)" KEY_VALUE ${LINE})
-    list(GET KEY_VALUE 0 KEY)
-    list(GET KEY_VALUE 1 VALUE)
-    set(DEP_${KEY} ${VALUE})
-endforeach()
-
-if(${CMAKE_EXTRA_GENERATOR} MATCHES "Eclipse CDT4")
-    set(CMAKE_CXX_COMPILER_ARG1 "-std=c++14" CACHE STRING "C++ version for eclipse" FORCE)
-    set(CMAKE_ECLIPSE_VERSION "4.6.2" CACHE STRING "Eclipse version" FORCE)
-endif()
-
-#check version format
-string(REGEX MATCH "^[0-9]+\.[0-9]+\.[0-9]+$" CONFIG_VERSION ${DEP_VERSION})
-if (NOT CONFIG_VERSION)
-    string(REGEX MATCH "^[0-9]+\.[0-9]+\.[0-9]+-.+$" CONFIG_VERSION ${DEP_VERSION})
-    if (NOT CONFIG_VERSION)
-        message(FATAL_ERROR "Wrong version number format: ${DEP_VERSION}.")
-    endif()
-    set(extended_version 1)
-endif()
-
-# Split "x.y.z-t" into a list x;y;z;t
-string(REGEX MATCHALL "[^.-]+" VERSION_LIST ${CONFIG_VERSION})
-list(GET VERSION_LIST 0 CONFIG_VERSION_MAJOR)
-list(GET VERSION_LIST 1 CONFIG_VERSION_MINOR)
-list(GET VERSION_LIST 2 CONFIG_VERSION_PATCH)
-if (extended_version)
-    list(GET VERSION_LIST 3 CONFIG_VERSION_TWEAK)
-endif()
-
 set(CMAKE_BUILD_TYPE Debug CACHE STRING "")
-project(realm)
+project(RealmCore)
+
+list(APPEND CMAKE_MODULE_PATH "${RealmCore_SOURCE_DIR}/tools/cmake")
 
 # Include general CMake modules
 include(GNUInstallDirs)
@@ -44,6 +11,7 @@ include(CheckIncludeFiles)
 include(GetGitRevisionDescription)
 include(Utilities)
 include(SpecialtyBuilds)
+include(GetVersion)
 
 # Get accurate git-describe version
 git_describe(REALM_VERSION)
@@ -149,7 +117,7 @@ configure_file(src/realm/util/config.h.in src/realm/util/config.h)
 # Configure source code to use right version number
 configure_file(src/realm/version.hpp.in src/realm/version.hpp)
 
-set(DEPRECATED_CONFIG_FILE "${CMAKE_SOURCE_DIR}/src/realm/util/config.h")
+set(DEPRECATED_CONFIG_FILE "${RealmCore_SOURCE_DIR}/src/realm/util/config.h")
 if(EXISTS "${DEPRECATED_CONFIG_FILE}")
     message(FATAL_ERROR "${DEPRECATED_CONFIG_FILE} exists in the source directory, and will take precedence over the generated configuration in the build directory. Please remove this file before continuing. Alternatively, you can also clean your realm-core to remove this and other stale files: git clean -xfd")
 endif()
@@ -186,17 +154,6 @@ install(EXPORT realm
 set(CPACK_GENERATOR "TGZ")
 set(CPACK_PACKAGE_NAME "realm-core-${CMAKE_BUILD_TYPE}")
 set(CPACK_PACKAGE_VERSION ${REALM_VERSION})
-set(CPACK_PACKAGE_VENDOR "Realm Inc.")
-set(CPACK_PACKAGE_CONTACT "Realm <help@realm.io>")
-set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
-set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Realm is a mobile database: a replacement for Core Data & SQLite")
-set(CPACK_RPM_POST_INSTALL_SCRIPT_FILE "${CMAKE_SOURCE_DIR}/tools/cmake/run_ldconfig.sh")
-set(CPACK_RPM_POST_UNINSTALL_SCRIPT_FILE "${CMAKE_SOURCE_DIR}/tools/cmake/run_ldconfig.sh")
-set(CPACK_RPM_COMPONENT_INSTALL ON)
-set(CPACK_DEBIAN_POST_INSTALL_SCRIPT_FILE "${CMAKE_SOURCE_DIR}/tools/cmake/run_ldconfig.sh")
-set(CPACK_DEBIAN_POST_UNINSTALL_SCRIPT_FILE "${CMAKE_SOURCE_DIR}/tools/cmake/run_ldconfig.sh")
-set(CPACK_DEB_COMPONENT_INSTALL ON)
-set(CPACK_DEBIAN_FILE_NAME DEB-DEFAULT)
 set(CPACK_ARCHIVE_COMPONENT_INSTALL ON)
 include(CPack)
 cpack_add_component(runtime DEPENDS runtime)

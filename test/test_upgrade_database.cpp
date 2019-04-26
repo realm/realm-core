@@ -609,11 +609,13 @@ TEST_IF(Upgrade_Database_Strings_With_NUL, REALM_MAX_BPNODE_SIZE == 4 || REALM_M
         switch (test_num) {
             case 0:
                 t->set_string(0, reserved_row_index, StringData("12345678901234567890")); // length == 20
+                break;
             case 1:
                 t->set_string(
                     0, reserved_row_index,
                     StringData(
                         "1234567890123456789012345678901234567890123456789012345678901234567890")); // length == 70
+                break;
             default:
                 break;
         }

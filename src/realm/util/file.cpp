@@ -682,12 +682,6 @@ void File::prealloc(size_t size)
 {
     REALM_ASSERT_RELEASE(is_attached());
 
-#if defined(_POSIX_C_SOURCE) && _POSIX_C_SOURCE >= 200112L // POSIX.1-2001 version
-    // Mostly Linux only
-    prealloc_if_supported(0, size);
-
-#else // Non-atomic fallback
-
     if (size <= to_size_t(get_size())) {
         return;
     }
@@ -714,6 +708,12 @@ void File::prealloc(size_t size)
         }
     };
 
+#if defined(_POSIX_C_SOURCE) && _POSIX_C_SOURCE >= 200112L // POSIX.1-2001 version
+    // Mostly Linux only
+    if (!prealloc_if_supported(0, new_size)) {
+        manually_consume_space();
+    }
+#else // Non-atomic fallback
 #if REALM_PLATFORM_APPLE
     // posix_fallocate() is not supported on MacOS or iOS, so use a combination of fcntl(F_PREALLOCATE) and
     // ftruncate().
@@ -788,7 +788,7 @@ void File::prealloc(size_t size)
 }
 
 
-void File::prealloc_if_supported(SizeType offset, size_t size)
+bool File::prealloc_if_supported(SizeType offset, size_t size)
 {
     REALM_ASSERT_RELEASE(is_attached());
 
@@ -796,33 +796,29 @@ void File::prealloc_if_supported(SizeType offset, size_t size)
 
     REALM_ASSERT_RELEASE(is_prealloc_supported());
 
-    if (m_encryption_key)
-        size = data_size_to_encrypted_size(size);
-
-    off_t size2;
-    if (int_cast_with_overflow_detect(size, size2))
-        throw util::overflow_error("File size overflow");
-
-    if (size2 == 0) {
+    if (size == 0) {
         // calling posix_fallocate with a size of 0 will cause a return of EINVAL
         // since this is a meaningless operation anyway, we just return early here
-        return;
+        return true;
     }
 
     // posix_fallocate() does not set errno, it returns the error (if any) or zero.
     // It is also possible for it to be interrupted by EINTR according to some man pages (ex fedora 24)
     int status;
     do {
-        status = ::posix_fallocate(m_fd, offset, size2);
+        status = ::posix_fallocate(m_fd, offset, size);
     } while (status == EINTR);
 
     if (REALM_LIKELY(status == 0)) {
-        return;
+        return true;
     }
 
     if (status == ENOSPC || status == EDQUOT) {
         std::string msg = get_errno_msg("posix_fallocate() failed: ", status);
         throw OutOfDiskSpace(msg);
+    }
+    if (status == EINVAL) {
+        return false; // Retry with non-atomic version
     }
     throw std::system_error(status, std::system_category(), "posix_fallocate() failed");
 
@@ -842,6 +838,7 @@ void File::prealloc_if_supported(SizeType offset, size_t size)
     REALM_ASSERT_RELEASE(!is_prealloc_supported());
 
 #endif
+    return false;
 }
 
 
@@ -1556,16 +1553,21 @@ bool DirScanner::next(std::string& name)
     if (!m_dirp)
         return false;
 
-    const size_t min_dirent_size = offsetof(struct dirent, d_name) + NAME_MAX + 1;
-    union {
-        struct dirent m_dirent;
-        char m_strut[min_dirent_size];
-    } u;
-    struct dirent* dirent;
     for (;;) {
-        int err = readdir_r(m_dirp, &u.m_dirent, &dirent);
-        if (err != 0) {
-            throw std::system_error(err, std::system_category(), "readdir_r() failed");
+        // Note: readdir_r() is deprecated. However, all implementations
+        // implement readdir() to be thread-safe when operating on separate
+        // directory streams.
+        // More information: lwn.net/Articles/696475/
+
+        struct dirent* dirent;
+        do {
+            // readdir() does not seem to set errno=0 on success. The manpage
+            // recommends manually zeroing errno before calling it.
+            errno = 0;
+            dirent = readdir(m_dirp);
+        } while (errno == EAGAIN);
+        if (errno != 0) {
+            throw std::system_error(errno, std::system_category(), "readdir() failed");
         }
         if (!dirent)
             return false; // End of stream

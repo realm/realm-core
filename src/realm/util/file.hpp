@@ -300,7 +300,7 @@ public:
     ///
     /// \sa prealloc()
     /// \sa is_prealloc_supported()
-    void prealloc_if_supported(SizeType offset, size_t size);
+    bool prealloc_if_supported(SizeType offset, size_t size);
 
     /// See prealloc_if_supported().
     static bool is_prealloc_supported();

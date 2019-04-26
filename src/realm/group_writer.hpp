@@ -69,9 +69,6 @@ public:
 
     size_t get_file_size() const noexcept;
 
-    /// Write the specified chunk into free space.
-    void write(const char* data, size_t size);
-
     ref_type write_array(const char*, size_t, uint32_t) override;
 
 #ifdef REALM_DEBUG
