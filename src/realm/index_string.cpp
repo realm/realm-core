@@ -1099,7 +1099,7 @@ bool StringIndex::leaf_insert(ObjKey obj_key, key_type key, size_t offset, Strin
 
     // If there already is a list of matches, we see if we fit there
     // or it has to be split into a subindex
-    ref_type ref = slot_value;
+    ref_type ref = ref_type(slot_value);
     char* header = alloc.translate(ref);
     if (!Array::get_context_flag_from_header(header)) {
         IntegerColumn sub(alloc, ref); // Throws

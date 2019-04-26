@@ -100,8 +100,8 @@ class ArrayRef : public ArrayInteger {
 public:
     using value_type = ref_type;
 
-    explicit ArrayRef(Allocator& alloc) noexcept
-        : ArrayInteger(alloc)
+    explicit ArrayRef(Allocator& allocator) noexcept
+        : ArrayInteger(allocator)
     {
     }
 
