@@ -106,6 +106,8 @@ void RealmCoordinator::create_sync_session(bool force_client_reset)
                 self->m_notifier->notify_others();
         }
     });
+#else
+    static_cast<void>(force_client_reset);
 #endif
 }
 
@@ -263,34 +265,37 @@ void RealmCoordinator::do_get_realm(Realm::Config config, std::shared_ptr<Realm>
 void RealmCoordinator::get_realm(Realm::Config config,
                                  std::function<void(std::shared_ptr<Realm>, std::exception_ptr)> callback)
 {
-    if (!config.sync_config) {
-        std::shared_ptr<Realm> realm;
-        try {
-            realm = get_realm(std::move(config));
-        }
-        catch (...) {
-            return callback(nullptr, std::current_exception());
-        }
-        return callback(realm, nullptr);
+#if REALM_ENABLE_SYNC
+    if (config.sync_config) {
+        std::unique_lock<std::mutex> lock(m_realm_mutex);
+        set_config(config);
+        create_sync_session(!File::exists(m_config.path));
+        m_sync_session->wait_for_download_completion([callback, self = shared_from_this()](std::error_code ec) {
+            if (ec)
+                callback(nullptr, std::make_exception_ptr(std::system_error(ec)));
+            else {
+                std::shared_ptr<Realm> realm;
+                try {
+                    realm = self->get_realm();
+                }
+                catch (...) {
+                    return callback(nullptr, std::current_exception());
+                }
+                callback(realm, nullptr);
+            }
+        });
+        return;
     }
+#endif
 
-    std::unique_lock<std::mutex> lock(m_realm_mutex);
-    set_config(config);
-    create_sync_session(!File::exists(m_config.path));
-    m_sync_session->wait_for_download_completion([callback, self = shared_from_this()](std::error_code ec) {
-        if (ec)
-            callback(nullptr, std::make_exception_ptr(std::system_error(ec)));
-        else {
-            std::shared_ptr<Realm> realm;
-            try {
-                realm = self->get_realm();
-            }
-            catch (...) {
-                return callback(nullptr, std::current_exception());
-            }
-            callback(realm, nullptr);
-        }
-    });
+    std::shared_ptr<Realm> realm;
+    try {
+        realm = get_realm(std::move(config));
+    }
+    catch (...) {
+        return callback(nullptr, std::current_exception());
+    }
+    callback(realm, nullptr);
 }
 
 std::shared_ptr<Realm> RealmCoordinator::get_realm()
