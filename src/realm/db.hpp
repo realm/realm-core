@@ -451,7 +451,7 @@ private:
     /// return true if write transaction can commence, false otherwise.
     bool do_try_begin_write();
     void do_begin_write();
-    version_type do_commit(Group&);
+    version_type do_commit(Transaction&);
     void do_end_write() noexcept;
 
     // make sure the given index is within the currently mapped area.
@@ -460,19 +460,13 @@ private:
 
     // Must be called only by someone that has a lock on the write
     // mutex.
-    void low_level_commit(uint_fast64_t new_version, Group& group);
+    void low_level_commit(uint_fast64_t new_version, Transaction& transaction);
 
     void do_async_commits();
 
     /// Upgrade file format and/or history schema
     void upgrade_file_format(bool allow_file_format_upgrade, int target_file_format_version,
                              int current_hist_schema_version, int target_hist_schema_version);
-
-    /// If there is an associated \ref Replication object, then this function
-    /// returns `repl->get_history()` where `repl` is that Replication object,
-    /// otherwise this function returns null.
-    _impl::History* get_history_write();
-    std::unique_ptr<_impl::History> get_history_read();
 
     int get_file_format_version() const noexcept;
 
@@ -539,6 +533,8 @@ public:
     TransactionRef freeze();
     TransactionRef duplicate();
 
+    _impl::History* get_history() const;
+
     // direct handover of accessor instances
     Obj import_copy_of(const ConstObj& original); // slicing is OK for Obj/ConstObj
     TableRef import_copy_of(const TableRef original);
@@ -574,6 +570,9 @@ private:
     void do_end_read() noexcept;
 
     DBRef db;
+    mutable std::unique_ptr<_impl::History> m_history_read;
+    mutable _impl::History* m_history = nullptr;
+
     DB::ReadLockInfo m_read_lock;
     DB::TransactStage m_transact_stage = DB::transact_Ready;
 
@@ -767,7 +766,7 @@ inline void Transaction::advance_read(O* observer, VersionID version_id)
     if (version_id.version < m_read_lock.m_version)
         throw LogicError(LogicError::bad_version);
 
-    auto hist = db->get_history_read(); // Throws
+    auto hist = get_history(); // Throws
     if (!hist)
         throw LogicError(LogicError::no_history);
 
@@ -780,6 +779,7 @@ inline bool Transaction::promote_to_write(O* observer, bool nonblocking)
     if (m_transact_stage != DB::transact_Reading)
         throw LogicError(LogicError::wrong_transact_state);
 
+    m_history = nullptr;
     if (nonblocking) {
         bool succes = db->do_try_begin_write();
         if (!succes) {
@@ -790,12 +790,13 @@ inline bool Transaction::promote_to_write(O* observer, bool nonblocking)
         db->do_begin_write(); // Throws
     }
     try {
+        set_transact_stage(DB::transact_Writing);
         Replication* repl = db->get_replication();
         if (!repl)
             throw LogicError(LogicError::no_history);
 
         VersionID version = VersionID();                                              // Latest
-        bool history_updated = internal_advance_read(observer, version, *repl->get_history_write(), true); // Throws
+        bool history_updated = internal_advance_read(observer, version, *get_history(), true); // Throws
 
         REALM_ASSERT(repl); // Presence of `repl` follows from the presence of `hist`
         DB::version_type current_version = m_read_lock.m_version;
@@ -812,7 +813,6 @@ inline bool Transaction::promote_to_write(O* observer, bool nonblocking)
         throw;
     }
 
-    set_transact_stage(DB::transact_Writing);
     return true;
 }
 
@@ -854,6 +854,7 @@ inline void Transaction::rollback_and_continue_as_read(O* observer)
 
     repl->abort_transact();
 
+    m_history = nullptr;
     set_transact_stage(DB::transact_Reading);
 }
 
@@ -885,7 +886,7 @@ inline bool Transaction::internal_advance_read(O* observer, VersionID version_id
         // remap(new_file_size); // Throws
         ref_type hist_ref = gf::get_history_ref(alloc, new_top_ref);
 
-        hist.update_from_ref(hist_ref, new_version);
+        hist.update_from_ref_and_version(hist_ref, new_version);
     }
 
     if (observer) {
@@ -922,20 +923,6 @@ inline bool Transaction::internal_advance_read(O* observer, VersionID version_id
     m_read_lock = new_read_lock;
 
     return true; // _impl::History::update_early_from_top_ref() was called
-}
-
-inline _impl::History* DB::get_history_write()
-{
-    if (Replication* repl = m_alloc.get_replication())
-        return repl->get_history_write();
-    return nullptr;
-}
-
-inline std::unique_ptr<_impl::History> DB::get_history_read()
-{
-    if (Replication* repl = m_alloc.get_replication())
-        return repl->get_history_read();
-    return {};
 }
 
 inline int DB::get_file_format_version() const noexcept

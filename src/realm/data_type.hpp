@@ -60,6 +60,8 @@ enum LinkType {
     link_Weak,
 };
 
+const char* get_data_type_name(DataType type) noexcept;
+
 } // namespace realm
 
 #endif // REALM_DATA_TYPE_HPP

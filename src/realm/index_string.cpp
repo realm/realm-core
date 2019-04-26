@@ -1052,12 +1052,12 @@ bool StringIndex::leaf_insert(ObjKey obj_key, key_type key, size_t offset, Strin
 
     // This leaf already has a slot for for the key
 
-    int_fast64_t slot_value = m_array->get(ins_pos_refs);
+    uint64_t slot_value = uint64_t(m_array->get(ins_pos_refs));
     size_t suboffset = offset + s_index_key_length;
 
     // Single match (lowest bit set indicates literal row_ndx)
     if ((slot_value & 1) != 0) {
-        ObjKey obj_key2 = ObjKey(slot_value >> 1);
+        ObjKey obj_key2 = ObjKey(int64_t(slot_value >> 1));
         // The buffer is needed for when this is an integer index.
         StringConversionBuffer buffer;
         StringData v2 = get(obj_key2, buffer);
@@ -1099,7 +1099,7 @@ bool StringIndex::leaf_insert(ObjKey obj_key, key_type key, size_t offset, Strin
 
     // If there already is a list of matches, we see if we fit there
     // or it has to be split into a subindex
-    ref_type ref = to_ref(slot_value);
+    ref_type ref = ref_type(slot_value);
     char* header = alloc.translate(ref);
     if (!Array::get_context_flag_from_header(header)) {
         IntegerColumn sub(alloc, ref); // Throws

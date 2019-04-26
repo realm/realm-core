@@ -1689,14 +1689,15 @@ void Group::verify() const
 
     // Verify history if present
     if (Replication* repl = m_alloc.get_replication()) {
-        if (auto hist = repl->get_history_read()) {
+        if (auto hist = repl->_create_history_read()) {
+            hist->set_group(const_cast<Group*>(this), false);
             _impl::History::version_type version = 0;
             int history_type = 0;
             int history_schema_version = 0;
             get_version_and_history_info(m_top, version, history_type, history_schema_version);
             REALM_ASSERT(history_type != Replication::hist_None || history_schema_version == 0);
             ref_type hist_ref = get_history_ref(m_top);
-            hist->update_from_ref(hist_ref, version);
+            hist->update_from_ref_and_version(hist_ref, version);
             hist->verify();
         }
     }

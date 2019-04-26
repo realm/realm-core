@@ -753,15 +753,15 @@ void Obj::nullify_link(ColKey origin_col_key, ObjKey target_key)
 
         REALM_ASSERT(ndx != realm::npos); // There has to be one
 
+        if (Replication* repl = alloc.get_replication()) {
+            repl->link_list_nullify(link_list, ndx); // Throws
+        }
+
         // We cannot just call 'remove' on link_list as it would produce the wrong
         // replication instruction and also attempt an update on the backlinks from
         // the object that we in the process of removing.
         BPlusTree<ObjKey>& tree = const_cast<BPlusTree<ObjKey>&>(link_list.get_tree());
         tree.erase(ndx);
-
-        if (Replication* repl = alloc.get_replication()) {
-            repl->link_list_nullify(link_list, ndx); // Throws
-        }
     }
     else {
         ArrayKey links(alloc);

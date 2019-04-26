@@ -96,6 +96,41 @@ private:
     bool minmax(size_t from, size_t to, uint64_t maxdiff, int64_t* min, int64_t* max) const;
 };
 
+class ArrayRef : public ArrayInteger {
+public:
+    using value_type = ref_type;
+
+    explicit ArrayRef(Allocator& allocator) noexcept
+        : ArrayInteger(allocator)
+    {
+    }
+
+    void create()
+    {
+        ArrayInteger::create(type_HasRefs);
+    }
+
+    void add(ref_type value)
+    {
+        Array::add(from_ref(value));
+    }
+
+    void set(size_t ndx, ref_type value)
+    {
+        Array::set(ndx, from_ref(value));
+    }
+
+    void insert(size_t ndx, ref_type value)
+    {
+        Array::insert(ndx, from_ref(value));
+    }
+
+    ref_type get(size_t ndx) const noexcept
+    {
+        return to_ref(Array::get(ndx));
+    }
+};
+
 class ArrayIntNull : public Array, public ArrayPayload {
 public:
     using value_type = util::Optional<int64_t>;

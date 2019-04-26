@@ -35,6 +35,7 @@ class ArrayStringShort;
 class ArrayBinary;
 class ArrayTimestamp;
 class ArrayInteger;
+class ArrayRef;
 class ArrayIntNull;
 class ArrayBool;
 class ArrayBoolNull;
@@ -72,6 +73,13 @@ struct ColumnTypeTraits<int64_t> {
     static const DataType id = type_Int;
     static const ColumnType column_id = col_type_Int;
     static const ColumnType real_column_type = col_type_Int;
+};
+
+template <>
+struct ColumnTypeTraits<ref_type> {
+    using cluster_leaf_type = ArrayRef;
+    static const DataType id = type_Int;
+    static const ColumnType column_id = col_type_Int;
 };
 
 template <>

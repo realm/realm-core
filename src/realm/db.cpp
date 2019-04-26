@@ -1410,8 +1410,6 @@ bool DB::compact(bool bump_version_number, util::Optional<const char*> output_en
 #else
         util::File::move(tmp_path, m_db_path);
 #endif
-        if (auto repl = m_alloc.get_replication())
-            repl->initialize(*this);
 
         SlabAlloc::Config cfg;
         cfg.session_initiator = true;
@@ -1948,7 +1946,7 @@ void DB::do_end_write() noexcept
 }
 
 
-Replication::version_type DB::do_commit(Group& group)
+Replication::version_type DB::do_commit(Transaction& transaction)
 {
     version_type current_version;
     {
@@ -1965,7 +1963,7 @@ Replication::version_type DB::do_commit(Group& group)
         // must call Replication::abort_transact().
         new_version = repl->prepare_commit(current_version); // Throws
         try {
-            low_level_commit(new_version, group); // Throws
+            low_level_commit(new_version, transaction); // Throws
         }
         catch (...) {
             repl->abort_transact();
@@ -1974,7 +1972,7 @@ Replication::version_type DB::do_commit(Group& group)
         repl->finalize_commit();
     }
     else {
-        low_level_commit(new_version, group); // Throws
+        low_level_commit(new_version, transaction); // Throws
     }
     return new_version;
 }
@@ -2062,7 +2060,7 @@ DB::version_type DB::get_version_of_latest_snapshot()
 }
 
 
-void DB::low_level_commit(uint_fast64_t new_version, Group& group)
+void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction)
 {
     SharedInfo* info = m_file_map.get_addr();
 
@@ -2085,7 +2083,7 @@ void DB::low_level_commit(uint_fast64_t new_version, Group& group)
 
         // Allow for trimming of the history. Some types of histories do not
         // need store changesets prior to the oldest bound snapshot.
-        if (auto hist = get_history_write())
+        if (auto hist = transaction.get_history())
             hist->set_oldest_bound_version(oldest_version); // Throws
 
         // Cleanup any stale mappings
@@ -2095,11 +2093,11 @@ void DB::low_level_commit(uint_fast64_t new_version, Group& group)
     // Do the actual commit
     REALM_ASSERT(oldest_version <= new_version);
 #if REALM_METRICS
-    group.update_num_objects();
+    transaction.update_num_objects();
 #endif // REALM_METRICS
 
     // info->readers.dump();
-    GroupWriter out(group); // Throws
+    GroupWriter out(transaction); // Throws
     out.set_versions(new_version, oldest_version);
     ref_type new_top_ref;
     // Recursively write all changed arrays to end of file
@@ -2298,6 +2296,29 @@ TransactionRef Transaction::duplicate()
         return db->start_frozen(version);
 
     throw LogicError(LogicError::wrong_transact_state);
+}
+
+_impl::History* Transaction::get_history() const
+{
+    if (!m_history) {
+        if (auto repl = db->get_replication()) {
+            switch (m_transact_stage) {
+                case DB::transact_Reading:
+                case DB::transact_Frozen:
+                    if (!m_history_read)
+                        m_history_read = repl->_create_history_read();
+                    m_history = m_history_read.get();
+                    m_history->set_group(const_cast<Transaction*>(this), false);
+                    break;
+                case DB::transact_Writing:
+                    m_history = repl->_get_history_write();
+                    break;
+                case DB::transact_Ready:
+                    break;
+            }
+        }
+    }
+    return m_history;
 }
 
 void Transaction::rollback()

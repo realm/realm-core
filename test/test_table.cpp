@@ -1952,7 +1952,7 @@ TEST(Table_DateAndBinary)
     for (size_t i = 0; i < size; ++i)
         data[i] = static_cast<char>(i);
     t.create_object().set_all(Timestamp(8, 0), BinaryData(data, size));
-    Obj& obj = *t.begin();
+    Obj obj = *t.begin();
     CHECK_EQUAL(obj.get<Timestamp>(col_date), Timestamp(8, 0));
     BinaryData bin = obj.get<Binary>(col_bin);
     CHECK_EQUAL(bin.size(), size);
