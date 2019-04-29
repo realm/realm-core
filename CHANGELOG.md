@@ -1,19 +1,20 @@
-# NEXT RELEASE
+# 6.0.0-alpha.4 Release notes
 
 ### Enhancements
 * None.
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* I lot of small fixes in order to make sync test pass.
  
-### Breaking changes
-* None.
-
 -----------
 
 ### Internals
 * The release binaries for Apple platforms are now built with Xcode 9.2 (up from 8.3.3).
+* A new function - History::ensure_updated can be called in places where the history object
+  needs to be up-to-date. The function will use a flag to ensure that the object is only
+  updated once per transaction.
+* All read transactions will have a separate history object. Read transactions
+  use the object stored in the Replication object.
 
 Besides the changes above, this release includes changes introduced by v5.12.1 and up
 until v5.12.6
