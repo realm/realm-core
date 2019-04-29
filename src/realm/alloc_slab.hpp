@@ -387,6 +387,7 @@ private:
             , addr(std::move(slab.addr))
             , size(slab.size)
         {
+            slab.size = 0;
         }
         ~Slab();
     };
