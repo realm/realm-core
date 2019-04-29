@@ -100,10 +100,10 @@ public:
 
     SubscriptionNotificationToken add_notification_callback(std::function<void()> callback);
 
+    util::Optional<Object> result_set_object() const;
+
 private:
     Subscription(std::string name, std::string object_type, std::shared_ptr<Realm>);
-
-    util::Optional<Object> result_set_object() const;
 
     void error_occurred(std::exception_ptr);
     void run_callback(SubscriptionCallbackWrapper& callback_wrapper);
