@@ -6,6 +6,7 @@
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* Slab usage was reported wrong ([#3284](https://github.com/realm/realm-core/pull/3284)
 * When opening an encrypted file via SharedGroup::open(), it could wrongly fail and indicate a file corruption
   although the file was ok.
   ([#3267](https://github.com/realm/realm-core/issues/3267), since core v5.12.2)
