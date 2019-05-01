@@ -710,6 +710,16 @@ ref_type SlabAlloc::get_top_ref(const char* buffer, size_t len)
     }
 }
 
+
+namespace {
+
+// prevent destruction at exit (which can lead to races if other threads are still running)
+std::map<std::string, std::weak_ptr<SlabAlloc::MappedFile>>& all_files =
+    *new std::map<std::string, std::weak_ptr<SlabAlloc::MappedFile>>;
+util::Mutex& all_files_mutex = *new util::Mutex;
+} // namespace
+
+
 ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
 {
     // ExceptionSafety: If this function throws, it must leave the allocator in

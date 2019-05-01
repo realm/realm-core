@@ -804,6 +804,7 @@ private:
     void prepare_top_for_history(int history_type, int history_schema_version);
     template <class Accessor>
     void prepare_history_parent(Accessor& history_root, int history_type, int history_schema_version);
+    static void validate_top_array(const Array& arr, const SlabAlloc& alloc);
 
     size_t find_table_index(StringData name) const noexcept;
     TableKey ndx2key(size_t ndx) const;

@@ -1012,9 +1012,23 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
             ref_type top_ref;
             try {
                 top_ref = alloc.attach_file(path, cfg); // Throws
+                if (top_ref) {
+                    Array top{alloc};
+                    top.init_from_ref(top_ref);
+                    Group::validate_top_array(top, alloc);
+                }
             }
-            catch (SlabAlloc::Retry&) {
+            catch (const SlabAlloc::Retry&) {
                 continue;
+            }
+            catch (const InvalidDatabase& e) {
+                if (e.get_path().size() == 0) {
+                    std::string msg = e.what();
+                    throw InvalidDatabase(msg, path);
+                }
+                else {
+                    throw e;
+                }
             }
             // If we fail in any way, we must detach the allocator. Failure to do so
             // will retain memory mappings in the mmap cache shared between allocators.
@@ -1091,8 +1105,7 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
                         break;
                 }
 
-                REALM_ASSERT(stored_hist_schema_version >= 0 &&
-                             stored_hist_schema_version <= openers_hist_schema_version);
+                REALM_ASSERT(stored_hist_schema_version >= 0);
                 if (stored_hist_schema_version > openers_hist_schema_version)
                     throw IncompatibleHistories("Unexpected future history schema version", path);
                 bool need_hist_schema_upgrade =

@@ -237,17 +237,18 @@ size_t ArrayStringShort::find_first(StringData value, size_t begin, size_t end) 
             return value.size() == 0 && begin < m_size ? begin : npos;
     }
 
+    const size_t value_size = value.size();
     // A string can never be wider than the column width
-    if (m_width <= value.size())
+    if (m_width <= value_size)
         return size_t(-1);
 
-    if (m_nullable ? value.is_null() : value.size() == 0) {
+    if (m_nullable ? value.is_null() : value_size == 0) {
         for (size_t i = begin; i != end; ++i) {
             if (m_nullable ? is_null(i) : get(i).size() == 0)
                 return i;
         }
     }
-    else if (value.size() == 0) {
+    else if (value_size == 0) {
         const char* data = m_data + (m_width - 1);
         for (size_t i = begin; i != end; ++i) {
             size_t data_i_size = (m_width - 1) - data[i * m_width];
@@ -259,16 +260,10 @@ size_t ArrayStringShort::find_first(StringData value, size_t begin, size_t end) 
     else {
         for (size_t i = begin; i != end; ++i) {
             const char* data = m_data + (i * m_width);
-            size_t j = 0;
-            for (;;) {
-                if (REALM_LIKELY(data[j] != value[j]))
-                    break;
-                ++j;
-                if (REALM_UNLIKELY(j == value.size())) {
-                    size_t data_size = (m_width - 1) - data[m_width - 1];
-                    if (REALM_LIKELY(data_size == value.size()))
-                        return i;
-                    break;
+            if (memcmp(data, value.data(), value_size) == 0) {
+                size_t data_size = (m_width - 1) - data[m_width - 1];
+                if (data_size == value_size) {
+                    return i;
                 }
             }
         }

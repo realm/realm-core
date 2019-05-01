@@ -13,7 +13,33 @@
 -----------
 
 ### Internals
-* None.
+* realm-browser now able to read Core-6 files and print values for even more columns
+
+Besides the changes above, this release includes changes introduced by v5.12.7 and up
+until v5.12.7
+
+| # 5.12.7 Release notes
+| 
+| ### Enhancements
+| * Instead of asserting, an `InvalidDatabase` exception is thrown when a realm file is opened 
+|   with an invalid top ref. Name of problematic file is included in exception message.
+| 
+| ### Fixed
+| * A bug was fixed in `realm::util::DirScanner` that could cause it to sometimes
+|   skip directory entries due to faulty error handling around `readdir()`.
+|   (Issue [realm-sync#2699](https://github.com/realm/realm-sync/issues/2699), since 5.12.5).
+|  
+| ### Breaking changes
+| * None.
+| 
+| -----------
+| 
+| ### Internals
+| * Improved performance on `find_first` for small string arrays (ArrayString). This will improve the table name lookup
+|   performance.
+| * Upgrade pegtl to 2.6.1. Several issues fixed.
+| * Introduced Durability::Unsafe, which disables sync'ing to disk. Using this option, 
+|   a platform crash may corrupt the realm file. Use only, if you'r OK with this.
 
 ----------------------------------------------
 
