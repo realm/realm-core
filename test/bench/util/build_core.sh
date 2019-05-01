@@ -98,8 +98,8 @@ clean () {
   if [ "$build_system" = "cmake" ]; then
     mkdir -p build
     cd build || exit 1
-    cmake ..
-    make clean
+    cmake -DCMAKE_BUILD_TYPE=Release -G Ninja ..
+    ninja clean
     cd .. || exit 1
   elif [ "$build_system" = "shell" ]; then
     sh build.sh clean
@@ -124,7 +124,7 @@ build () {
   if [ "$build_system" = "cmake" ]; then
     mkdir -p build
     cd build || exit 1
-    make
+    ninja
     cd .. || exit 1
   elif [ "$build_system" = "shell" ]; then
     sh build.sh build

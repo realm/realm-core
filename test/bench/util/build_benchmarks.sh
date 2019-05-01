@@ -70,8 +70,8 @@ if [ "$build_system" = "cmake" ]; then
   mkdir -p build
   cd build || exit 1
   # for consistency with pre cmake builds we don't benchmark with encryption
-  cmake -D REALM_ENABLE_ENCRYPTION=OFF -D CMAKE_BUILD_TYPE=Release ..
-  make realm-benchmark-common-tasks
+  cmake -D REALM_ENABLE_ENCRYPTION=OFF -D CMAKE_BUILD_TYPE=Release -G Ninja ..
+  ninja realm-benchmark-common-tasks
   # -x flag checks if the file exists and is executable
   if [ -x ./test/benchmark-common-tasks/realm-benchmark-common-tasks ]; then
     cd test/benchmark-common-tasks || exit 1
@@ -82,7 +82,7 @@ if [ "$build_system" = "cmake" ]; then
     pwd
     exit 1
   fi
-  make realm-benchmark-crud
+  ninja realm-benchmark-crud
   if [ -x ./test/benchmark-crud/realm-benchmark-crud ]; then
     cd test/benchmark-crud || exit 1
     ./realm-benchmark-crud
@@ -91,7 +91,7 @@ if [ "$build_system" = "cmake" ]; then
     echo "Could not run benchmark-crud!"
     exit 1
   fi
-  make realm-stats
+  ninja realm-stats
   if [ -x ./test/benchmark-common-tasks/realm-stats ]; then
     cd test/benchmark-common-tasks/ || exit 1
     python collect_stats.py --build-root-dir "../../" --source-root-dir "../../../"

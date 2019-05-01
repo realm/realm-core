@@ -728,66 +728,78 @@ TEST(Parser_Timestamps)
     t->get_object(keys[2]).set(link_col, keys[0]);
 
     Query q = t->where();
-    verify_query(test_context, t, "T399 == NULL", 1);
-    verify_query(test_context, t, "T399 != NULL", 4);
-    verify_query(test_context, t, "linked.T399 == NULL", 4); // null links count as a match for null here
-    verify_query(test_context, t, "linked != NULL && linked.T399 == NULL", 1);
-    verify_query(test_context, t, "linked.T399 != NULL", 1);
-    verify_query(test_context, t, "linked != NULL && linked.T399 != NULL", 1);
-    verify_query(test_context, t, "T399 == T399:0", 0);
-    verify_query(test_context, t, "linked.T399 == T399:0", 0);
-    verify_query(test_context, t, "T399 == 2017-12-04@0:0:0", 0);
+    auto verify_with_format = [&](const char* separator) {
+        verify_query(test_context, t, "T399 == NULL", 1);
+        verify_query(test_context, t, "T399 != NULL", 4);
+        verify_query(test_context, t, "linked.T399 == NULL", 4); // null links count as a match for null here
+        verify_query(test_context, t, "linked != NULL && linked.T399 == NULL", 1);
+        verify_query(test_context, t, "linked.T399 != NULL", 1);
+        verify_query(test_context, t, "linked != NULL && linked.T399 != NULL", 1);
+        verify_query(test_context, t, "T399 == T399:0", 0);
+        verify_query(test_context, t, "linked.T399 == T399:0", 0);
+        verify_query(test_context, t, std::string("T399 == 2017-12-04") + separator + "0:0:0", 0);
 
-    verify_query(test_context, t, "T2017-12-04 == NULL", 3);
-    verify_query(test_context, t, "T2017-12-04 != NULL", 2);
-    verify_query(test_context, t, "T2017-12-04 != NIL", 2);
-    verify_query(test_context, t, "linked.T2017-12-04 == NULL", 3); // null links count as a match for null here
-    verify_query(test_context, t, "linked != NULL && linked.T2017-12-04 == NULL", 0);
-    verify_query(test_context, t, "linked.T2017-12-04 != NULL", 2);
-    verify_query(test_context, t, "linked != NULL && linked.T2017-12-04 != NULL", 2);
-    verify_query(test_context, t, "T2017-12-04 == T399:0", 0);
-    verify_query(test_context, t, "linked.T2017-12-04 == T399:0", 0);
-    verify_query(test_context, t, "T2017-12-04 == 2017-12-04@0:0:0", 0);
+        verify_query(test_context, t, "T2017-12-04 == NULL", 3);
+        verify_query(test_context, t, "T2017-12-04 != NULL", 2);
+        verify_query(test_context, t, "T2017-12-04 != NIL", 2);
+        verify_query(test_context, t, "linked.T2017-12-04 == NULL", 3); // null links count as a match for null here
+        verify_query(test_context, t, "linked != NULL && linked.T2017-12-04 == NULL", 0);
+        verify_query(test_context, t, "linked.T2017-12-04 != NULL", 2);
+        verify_query(test_context, t, "linked != NULL && linked.T2017-12-04 != NULL", 2);
+        verify_query(test_context, t, "T2017-12-04 == T399:0", 0);
+        verify_query(test_context, t, "linked.T2017-12-04 == T399:0", 0);
+        verify_query(test_context, t, "T2017-12-04 == 2017-12-04@0:0:0", 0);
 
-    verify_query(test_context, t, "birthday == NULL", 0);
-    verify_query(test_context, t, "birthday == NIL", 0);
-    verify_query(test_context, t, "birthday != NULL", 5);
-    verify_query(test_context, t, "birthday != NIL", 5);
-    verify_query(test_context, t, "birthday == T0:0", 3);
-    verify_query(test_context, t, "birthday == 1970-1-1@0:0:0:0", 3); // epoch is default non-null Timestamp
+        verify_query(test_context, t, "birthday == NULL", 0);
+        verify_query(test_context, t, "birthday == NIL", 0);
+        verify_query(test_context, t, "birthday != NULL", 5);
+        verify_query(test_context, t, "birthday != NIL", 5);
+        verify_query(test_context, t, "birthday == T0:0", 3);
+        verify_query(test_context, t, std::string("birthday == 1970-1-1") + separator + "0:0:0:0", 3); // epoch is default non-null Timestamp
 
 #ifndef _WIN32 // windows native functions do not support pre epoch conversions, other platforms stop at ~1901
-    verify_query(test_context, t, "birthday == 1969-12-31@23:59:59:1", 1); // just before epoch
-    verify_query(test_context, t, "birthday > 1905-12-31@23:59:59", 5);
-    verify_query(test_context, t, "birthday > 1905-12-31@23:59:59:2020", 5);
+        verify_query(test_context, t, std::string("birthday == 1969-12-31") + separator + "23:59:59:1", 1); // just before epoch
+        verify_query(test_context, t, std::string("birthday > 1905-12-31") + separator + "23:59:59", 5);
+        verify_query(test_context, t, std::string("birthday > 1905-12-31") + separator + "23:59:59:2020", 5);
 #endif
 
-    // two column timestamps
-    verify_query(test_context, t, "birthday == T399", 1); // a null entry matches
+        // two column timestamps
+        verify_query(test_context, t, "birthday == T399", 1); // a null entry matches
 
-    // dates pre 1900 are not supported by functions like timegm
-    CHECK_THROW_ANY(verify_query(test_context, t, "birthday > 1800-12-31@23:59:59", 0));
-    CHECK_THROW_ANY(verify_query(test_context, t, "birthday > 1800-12-31@23:59:59:2020", 4));
+        // dates pre 1900 are not supported by functions like timegm
+        CHECK_THROW_ANY(verify_query(test_context, t, std::string("birthday > 1800-12-31") + separator + "23:59:59", 0));
+        CHECK_THROW_ANY(verify_query(test_context, t, std::string("birthday > 1800-12-31") + separator + "23:59:59:2020", 4));
 
-    // negative nanoseconds are not allowed
-    CHECK_THROW_ANY(verify_query(test_context, t, "birthday == T-1:1", 0));
-    CHECK_THROW_ANY(verify_query(test_context, t, "birthday == T1:-1", 0));
-    CHECK_THROW_ANY(verify_query(test_context, t, "birthday == 1970-1-1@0:0:1:-1", 0));
-    CHECK_THROW_ANY(verify_query(test_context, t, "birthday == 1969-12-31@23:59:59:-1", 1));
-    CHECK_THROW_ANY(verify_query(test_context, t, "birthday == 1970-1-1@0:0:0:-1", 1));
+        // negative nanoseconds are not allowed
+        CHECK_THROW_ANY(verify_query(test_context, t, "birthday == T-1:1", 0));
+        CHECK_THROW_ANY(verify_query(test_context, t, "birthday == T1:-1", 0));
+        CHECK_THROW_ANY(verify_query(test_context, t, std::string("birthday == 1970-1-1") + separator + "0:0:1:-1", 0));
+        CHECK_THROW_ANY(verify_query(test_context, t, std::string("birthday == 1969-12-31") + separator + "23:59:59:-1", 1));
+        CHECK_THROW_ANY(verify_query(test_context, t, std::string("birthday == 1970-1-1") + separator + "0:0:0:-1", 1));
 
-    // Invalid predicate
-    CHECK_THROW_ANY(verify_query(test_context, t, "birthday == T1:", 0));
-    CHECK_THROW_ANY(verify_query(test_context, t, "birthday == T:1", 0));
-    CHECK_THROW_ANY(verify_query(test_context, t, "birthday == 1970-1-1", 0));
-    CHECK_THROW_ANY(verify_query(test_context, t, "birthday == 1970-1-1@", 0));
-    CHECK_THROW_ANY(verify_query(test_context, t, "birthday == 1970-1-1@0", 0));
-    CHECK_THROW_ANY(verify_query(test_context, t, "birthday == 1970-1-1@0:", 0));
-    CHECK_THROW_ANY(verify_query(test_context, t, "birthday == 1970-1-1@0:0", 0));
-    CHECK_THROW_ANY(verify_query(test_context, t, "birthday == 1970-1-1@0:0:", 0));
-    CHECK_THROW_ANY(verify_query(test_context, t, "birthday == 1970-1-1@0:0:0:", 0));
-    CHECK_THROW_ANY(verify_query(test_context, t, "birthday == 1970-1-1@0:0:0:0:", 0));
-    CHECK_THROW_ANY(verify_query(test_context, t, "birthday == 1970-1-1@0:0:0:0:0", 0));
+        // Invalid predicate
+        CHECK_THROW_ANY(verify_query(test_context, t, "birthday == T1:", 0));
+        CHECK_THROW_ANY(verify_query(test_context, t, "birthday == T:1", 0));
+        CHECK_THROW_ANY(verify_query(test_context, t, "birthday == 1970-1-1", 0));
+        CHECK_THROW_ANY(verify_query(test_context, t, std::string("birthday == 1970-1-1") + separator, 0));
+        CHECK_THROW_ANY(verify_query(test_context, t, std::string("birthday == 1970-1-1") + separator + "0", 0));
+        CHECK_THROW_ANY(verify_query(test_context, t, std::string("birthday == 1970-1-1") + separator + "0:", 0));
+        CHECK_THROW_ANY(verify_query(test_context, t, std::string("birthday == 1970-1-1") + separator + "0:0", 0));
+        CHECK_THROW_ANY(verify_query(test_context, t, std::string("birthday == 1970-1-1") + separator + "0:0:", 0));
+        CHECK_THROW_ANY(verify_query(test_context, t, std::string("birthday == 1970-1-1") + separator + "0:0:0:", 0));
+        CHECK_THROW_ANY(verify_query(test_context, t, std::string("birthday == 1970-1-1") + separator + "0:0:0:0:", 0));
+        CHECK_THROW_ANY(verify_query(test_context, t, std::string("birthday == 1970-1-1") + separator + "0:0:0:0:0", 0));
+    };
+
+    // both versions are allowed
+    verify_with_format("@");
+    verify_with_format("T");
+
+    // using both separators at the same time is an error
+    CHECK_THROW_ANY(verify_query(test_context, t, "birthday == 1970-1-1T@0:0:0:0", 3));
+    CHECK_THROW_ANY(verify_query(test_context, t, "birthday == 1970-1-1@T0:0:0:0", 3));
+    // omitting the separator is an error
+    CHECK_THROW_ANY(verify_query(test_context, t, "birthday == 1970-1-10:0:0:0:0", 0));
 }
 
 
@@ -2833,6 +2845,27 @@ TEST(Parser_Object)
     CHECK_EQUAL(q1.count(), 2);
 
     CHECK_THROW_ANY(verify_query(test_context, table, "link == link", 3));
+}
+
+TEST(Parser_Between)
+{
+    Group g;
+    TableRef table = g.add_table("table");
+    auto int_col_key = table->add_column(type_Int, "age", true);
+    auto between_col_key = table->add_column(type_Int, "between", true);
+    for (int i = 0; i < 3; ++i) {
+        table->create_object().set(int_col_key, i + 24).set(between_col_key, i);
+    }
+
+    // normal querying on a property named "between" is allowed.
+    verify_query(test_context, table, "between == 0", 1);
+    verify_query(test_context, table, "between > 0", 2);
+    verify_query(test_context, table, "between <= 3", 3);
+
+    // operator between is not supported yet, but we at least use a friendly error message.
+    std::string message;
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, table, "age between {20, 25}", 1), message);
+    CHECK(message.find("Invalid Predicate. The 'between' operator is not supported yet, please rewrite the expression using '>' and '<'.") != std::string::npos);
 }
 
 #endif // TEST_PARSER

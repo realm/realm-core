@@ -78,8 +78,9 @@ struct first_timestamp_number : disable< timestamp_number > {};
 struct internal_timestamp : seq< one< 'T' >, first_timestamp_number, one< ':' >, timestamp_number > {};
 // T2017-09-28@23:12:60:288833
 // YYYY-MM-DD@HH:MM:SS:NANOS nanos optional
+// or the above with 'T' in place of '@'
 struct readable_timestamp : seq< first_timestamp_number, one< '-' >, timestamp_number, one< '-' >,
-    timestamp_number, one< '@' >, timestamp_number, one< ':' >, timestamp_number, one< ':' >,
+    timestamp_number, one< '@', 'T' >, timestamp_number, one< ':' >, timestamp_number, one< ':' >,
     timestamp_number, opt< seq< one< ':' >, timestamp_number > > > {};
 struct timestamp : sor< internal_timestamp, readable_timestamp > {};
 
@@ -173,6 +174,7 @@ struct contains : string_token_t("contains") {};
 struct begins : string_token_t("beginswith") {};
 struct ends : string_token_t("endswith") {};
 struct like : string_token_t("like") {};
+struct between : string_token_t("between") {};
 
 struct sort_prefix : seq< string_token_t("sort"), star< blank >, one< '(' > > {};
 struct distinct_prefix : seq< string_token_t("distinct"), star< blank >, one< '(' > > {};
@@ -192,8 +194,7 @@ struct predicate_suffix_modifier : sor<sort, distinct, limit> {
 
 struct string_oper : seq< sor< contains, begins, ends, like>, star< blank >, opt< case_insensitive > > {};
 // "=" is equality and since other operators can start with "=" we must check equal last
-struct symbolic_oper : sor<noteq, lteq, lt, gteq, gt, eq, in> {
-};
+struct symbolic_oper : sor< noteq, lteq, lt, gteq, gt, eq, in, between > {};
 
 // predicates
 struct comparison_pred : seq< expr, pad< sor< string_oper, symbolic_oper >, blank >, expr > {};
@@ -698,6 +699,16 @@ OPERATOR_ACTION(ends, Predicate::Operator::EndsWith)
 OPERATOR_ACTION(contains, Predicate::Operator::Contains)
 OPERATOR_ACTION(like, Predicate::Operator::Like)
 
+template<> struct action< between >
+{
+    template< typename Input >
+    static void apply(const Input& in, ParserState&)
+    {
+        const static std::string message = "Invalid Predicate. The 'between' operator is not supported yet, please rewrite the expression using '>' and '<'.";
+        throw tao::pegtl::parse_error(message, in);
+    }
+};
+
 template<> struct action< case_insensitive >
 {
     template< typename Input >
@@ -757,7 +768,19 @@ const std::string error_message_control< chars >::error_message = "Invalid chara
 template< typename Rule>
 const std::string error_message_control< Rule >::error_message = "Invalid predicate.";
 
-ParserResult parse(const std::string &query)
+ParserResult parse(const char* query)
+{
+    StringData sd(query); // assumes c-style null termination
+    return parse(sd);
+}
+
+ParserResult parse(const std::string& query)
+{
+    StringData sd(query);
+    return parse(sd);
+}
+
+ParserResult parse(const StringData& query)
 {
     DEBUG_PRINT_TOKEN(query);
 
@@ -766,7 +789,8 @@ ParserResult parse(const std::string &query)
     ParserState state;
     state.group_stack.push_back(&out_predicate);
 
-    tao::pegtl::memory_input<> input(query, query);
+    // pegtl::memory_input does not make a copy, it operates on pointers to the contiguous data
+    tao::pegtl::memory_input<> input(query.data(), query.size(), query);
     tao::pegtl::parse< must< pred, eof >, action, error_message_control >(input, state);
     if (out_predicate.type == Predicate::Type::And && out_predicate.cpnd.sub_predicates.size() == 1) {
         return ParserResult{ std::move(out_predicate.cpnd.sub_predicates.back()), state.ordering_state };

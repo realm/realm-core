@@ -1005,9 +1005,9 @@ int64_t Array::sum(size_t start, size_t end) const
 {
     if (end == size_t(-1))
         end = m_size;
-    REALM_ASSERT_11(start, <, m_size, &&, end, <=, m_size, &&, start, <, end);
+    REALM_ASSERT_EX(end <= m_size && start <= end, start, end, m_size);
 
-    if (w == 0)
+    if (w == 0 || start == end)
         return 0;
 
     int64_t s = 0;

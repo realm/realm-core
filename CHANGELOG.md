@@ -16,8 +16,30 @@
 * realm-browser now able to read Core-6 files and print values for even more columns
 
 Besides the changes above, this release includes changes introduced by v5.12.7 and up
-until v5.12.7
+until v5.13.0
 
+| # 5.13.0 Release notes
+| 
+| ### Enhancements
+| * The parser now supports readable timestamps with a 'T' separator in addition to the originally supported "@" separator.
+|   For example: "startDate > 1981-11-01T23:59:59:1". ([#3198](https://github.com/realm/realm-core/issues/3198)).
+| 
+| ### Fixed
+| * If, in debug mode, you try to compute the used space on a newly compacted realm (with empty free list), the program will
+|   abort. ([#1171](https://github.com/realm/realm-sync/issues/2724), since v5.12.0)
+|  
+| ### Breaking changes
+| * None.
+| 
+| -----------
+| 
+| ### Internals
+| * For convenience, `parser::parse` now accepts a `StringData` type instead of just `std::string`.
+| * Parsing a query which uses the 'between' operator now gives a better error message indicating
+|   that support is not yet implemented. ([#3198](https://github.com/realm/realm-core/issues/3198)).
+| 
+| ----------------------------------------------
+| 
 | # 5.12.7 Release notes
 | 
 | ### Enhancements
