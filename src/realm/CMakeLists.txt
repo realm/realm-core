@@ -125,29 +125,6 @@ set(REALM_INSTALL_GENERAL_HEADERS
     version_id.hpp
 ) # REALM_INSTALL_GENERAL_HEADERS
 
-set(REALM_PARSER_SOURCES
-    parser/expression_container.cpp
-    parser/keypath_mapping.cpp
-    parser/parser.cpp
-    parser/parser_utils.cpp
-    parser/property_expression.cpp
-    parser/query_builder.cpp
-    parser/subquery_expression.cpp
-    parser/value_expression.cpp
-) # REALM_PARSER_SOURCES
-
-set(REALM_PARSER_HEADERS
-    parser/collection_operator_expression.hpp
-    parser/expression_container.hpp
-    parser/keypath_mapping.hpp
-    parser/parser.hpp
-    parser/parser_utils.hpp
-    parser/property_expression.hpp
-    parser/query_builder.hpp
-    parser/subquery_expression.hpp
-    parser/value_expression.hpp
-) # REALM_PARSER_HEADERS
-
 set(REALM_INSTALL_IMPL_HEADERS
     impl/array_writer.hpp
     impl/cont_transact_hist.hpp
@@ -405,60 +382,5 @@ if(ANDROID)
             COMPONENT devel)
 endif()
 
-add_library(QueryParser STATIC ${REALM_PARSER_SOURCES} ${REALM_PARSER_HEADERS})
-add_library(realm-parser ALIAS QueryParser)
-target_link_libraries(QueryParser PUBLIC Core)
-target_include_directories(QueryParser PRIVATE ${PEGTL_INCLUDE_DIR})
-set_target_properties(QueryParser PROPERTIES OUTPUT_NAME "realm-parser")
-install(FILES ${REALM_PARSER_HEADERS}
-        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/realm/parser
-        COMPONENT devel)
-install(TARGETS QueryParser EXPORT realm
-        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT devel)
-if(NOT REALM_SKIP_SHARED_LIB)
-    add_library(QueryParserShared SHARED ${REALM_PARSER_SOURCES} ${REALM_PARSER_HEADERS})
-    add_dependencies(QueryParserShared CoreShared)
-    target_link_libraries(QueryParserShared PRIVATE CoreShared)
-    target_include_directories(QueryParserShared PRIVATE ${PEGTL_INCLUDE_DIR})
-    target_include_directories(QueryParserShared
-        INTERFACE
-            $<BUILD_INTERFACE:${RealmCore_SOURCE_DIR}/src>
-            $<BUILD_INTERFACE:${RealmCore_BINARY_DIR}/src>
-            $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
-    set_target_properties(QueryParserShared PROPERTIES
-                          OUTPUT_NAME "realm-parser"
-    )
-    install(TARGETS QueryParserShared
-            LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT runtime
-            RUNTIME DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT runtime)
-endif()
-
-if(NOT APPLE AND NOT ANDROID AND NOT CMAKE_SYSTEM_NAME MATCHES "^Windows" AND NOT REALM_BUILD_LIB_ONLY)
-    add_executable(RealmConfig config_tool.cpp)
-    set_target_properties(RealmConfig PROPERTIES
-        OUTPUT_NAME "realm-config"
-        DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX})
-
-    # FIXME add_executable(RealmImporter importer_tool.cpp importer.cpp importer.hpp)
-    # set_target_properties(RealmImporter PROPERTIES
-    #     OUTPUT_NAME "realm-importer"
-    #     DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX})
-    # target_link_libraries(RealmImporter realm)
-
-    add_executable(RealmTrawler realm_trawler.cpp )
-    set_target_properties(RealmTrawler PROPERTIES
-        OUTPUT_NAME "realm-trawler"
-        DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX})
-    target_link_libraries(RealmTrawler realm)
-
-    install(TARGETS RealmConfig # RealmImporter
-            COMPONENT runtime
-            DESTINATION ${CMAKE_INSTALL_BINDIR})
-
-    add_executable(realmd realmd.cpp)
-    set_target_properties(realmd PROPERTIES DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX})
-    target_link_libraries(realmd Core)
-    install(TARGETS realmd
-            COMPONENT runtime
-            DESTINATION ${CMAKE_INSTALL_LIBEXECDIR})
-endif()
+add_subdirectory(parser)
+add_subdirectory(exec)

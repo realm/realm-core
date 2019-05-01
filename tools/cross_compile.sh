@@ -117,14 +117,15 @@ else
                -configuration "${BUILD_TYPE}" \
                ONLY_ACTIVE_ARCH=NO
     mkdir -p "src/realm/${BUILD_TYPE}"
+    mkdir -p "src/realm/parser/${BUILD_TYPE}"
     lipo -create \
          -output "src/realm/${BUILD_TYPE}/librealm${suffix}.a" \
          "src/realm/${BUILD_TYPE}-${SDK}os/librealm${suffix}.a" \
          "src/realm/${BUILD_TYPE}-${SDK}simulator/librealm${suffix}.a" \
          $ARM64_32_LIB
     lipo -create \
-         -output "src/realm/${BUILD_TYPE}/librealm-parser${suffix}.a" \
-         "src/realm/${BUILD_TYPE}-${SDK}os/librealm-parser${suffix}.a" \
-         "src/realm/${BUILD_TYPE}-${SDK}simulator/librealm-parser${suffix}.a"
+         -output "src/realm/parser/${BUILD_TYPE}/librealm-parser${suffix}.a" \
+         "src/realm/parser/${BUILD_TYPE}-${SDK}os/librealm-parser${suffix}.a" \
+         "src/realm/parser/${BUILD_TYPE}-${SDK}simulator/librealm-parser${suffix}.a"
     cpack -C ${BUILD_TYPE} || exit 1
 fi

@@ -18,20 +18,15 @@
  * table tree should cover the whole file. Any leaked areas are reported.
  */
 
+#include <realm/array_direct.hpp>
+#include <realm/alloc_slab.hpp>
+#include <realm/array.hpp>
+#include <realm/column_type.hpp>
+#include <realm/data_type.hpp>
+
 #include <iostream>
 #include <fstream>
 #include <sstream>
-#include <vector>
-#include <set>
-#include <map>
-#include <memory>
-#include <algorithm>
-#include <cassert>
-#include <cstring>
-#include "array_direct.hpp"
-#include "alloc_slab.hpp"
-#include "array.hpp"
-#include "column_type.hpp"
 
 constexpr const int signature = 0x41414141;
 
@@ -246,36 +241,6 @@ public:
     void print_columns(const Group&) const;
 
 private:
-    std::string type_to_string(realm::ColumnType type) const
-    {
-        switch (type) {
-            case realm::col_type_Int:
-                return "int";
-            case realm::col_type_Bool:
-                return "bool";
-            case realm::col_type_String:
-                return "string";
-            case realm::col_type_Binary:
-                return "data";
-            case realm::col_type_OldTable:
-                return "subtable";
-            case realm::col_type_OldDateTime:
-                return "datetime";
-            case realm::col_type_Timestamp:
-                return "date";
-            case realm::col_type_Float:
-                return "float";
-            case realm::col_type_Double:
-                return "double";
-            case realm::col_type_Link:
-                return "Link";
-            case realm::col_type_LinkList:
-                return "LinkList";
-            default:
-                break;
-        }
-        return "Unknown";
-    }
     size_t get_subspec_ndx_after(size_t column_ndx) const noexcept
     {
         REALM_ASSERT(column_ndx <= m_column_names.size());
@@ -284,8 +249,7 @@ private:
         size_t subspec_ndx = 0;
         for (size_t i = 0; i != column_ndx; ++i) {
             auto type = realm::ColumnType(m_column_types.get_val(i));
-            if (type == realm::col_type_OldTable || type == realm::col_type_Link ||
-                type == realm::col_type_LinkList) {
+            if (type == realm::col_type_Link || type == realm::col_type_LinkList) {
                 subspec_ndx += 1; // index of dest column
             }
             else if (type == realm::col_type_BackLink) {
@@ -445,7 +409,7 @@ void Table::print_columns(const Group& group) const
             }
         }
         else {
-            type_str = type_to_string(type);
+            type_str = get_data_type_name(realm::DataType(type));
             if (attr & realm::col_attr_Nullable)
                 type_str += "?";
             if (attr & realm::col_attr_Indexed)
@@ -661,7 +625,7 @@ void RealmFile::free_list_info() const
     std::cout << "Pinned free space size: " << pinned_free_list_size << std::endl;
 }
 
-int main (int argc, const char* argv[])
+int main(int argc, const char* argv[])
 {
     if (argc > 1) {
         try {
