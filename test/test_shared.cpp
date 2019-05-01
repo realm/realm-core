@@ -3080,6 +3080,11 @@ TEST_IF(Shared_CompactEncrypt, REALM_ENABLE_ENCRYPTION)
         auto db = DB::create(path, false, DBOptions(key1));
         auto tr = db->start_write();
         TableRef t = tr->add_table("table");
+        auto col = t->add_column(type_String, "Strings");
+        for (size_t i = 0; i < 10000; i++) {
+            std::string str = "Shared_CompactEncrypt" + util::to_string(i);
+            t->create_object().set(col, StringData(str));
+        }
         tr->commit();
 
         CHECK(db->compact());

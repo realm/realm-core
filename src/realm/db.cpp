@@ -998,6 +998,7 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
             cfg.is_shared = true;
             cfg.read_only = false;
             cfg.skip_validate = !begin_new_session;
+            cfg.disable_sync = options.durability == Durability::MemOnly || options.durability == Durability::Unsafe;
 
             // only the session initiator is allowed to create the database, all other
             // must assume that it already exists.
@@ -1358,9 +1359,10 @@ bool DB::compact(bool bump_version_number, util::Optional<const char*> output_en
     if (is_attached() == false) {
         throw std::runtime_error(m_db_path + ": compact must be done on an open/attached DB");
     }
+    SharedInfo* info = m_file_map.get_addr();
+    Durability dura = Durability(info->durability);
     const char* write_key = bool(output_encryption_key) ? *output_encryption_key : m_key;
     {
-        SharedInfo* info = m_file_map.get_addr();
         std::unique_lock<InterprocessMutex> lock(m_controlmutex); // Throws
 
         // We must be the ONLY DB object attached if we're to do compaction
@@ -1395,7 +1397,7 @@ bool DB::compact(bool bump_version_number, util::Optional<const char*> output_en
             tr->write(file, write_key, info->latest_version_number + incr); // Throws
             // Data needs to be flushed to the disk before renaming.
             bool disable_sync = get_disable_sync_to_disk();
-            if (!disable_sync)
+            if (!disable_sync && dura != Durability::Unsafe)
                 file.sync(); // Throws
         }
         catch (...) {
@@ -2110,7 +2112,7 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction)
 #endif // REALM_METRICS
 
     // info->readers.dump();
-    GroupWriter out(transaction); // Throws
+    GroupWriter out(transaction, Durability(info->durability)); // Throws
     out.set_versions(new_version, oldest_version);
     ref_type new_top_ref;
     // Recursively write all changed arrays to end of file
@@ -2128,6 +2130,7 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction)
         //     << " Read lock at version " << oldest_version << std::endl;
         switch (Durability(info->durability)) {
             case Durability::Full:
+            case Durability::Unsafe:
                 out.commit(new_top_ref); // Throws
                 break;
             case Durability::MemOnly:

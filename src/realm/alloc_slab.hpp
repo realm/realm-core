@@ -112,6 +112,7 @@ public:
         bool skip_validate = false;
         bool session_initiator = false;
         bool clear_file = false;
+        bool disable_sync = false;
         const char* encryption_key = nullptr;
     };
 
@@ -400,6 +401,7 @@ private:
         int32_t block_after_size;  // positive if block is free - and zero at end
     };
 
+    Config m_cfg;
     using FreeListMap = std::map<int, FreeBlock*>; // log(N) addressing for larger blocks
     FreeListMap m_block_map;
 

@@ -214,22 +214,6 @@ SlabAlloc::~SlabAlloc() noexcept
 
 MemRef SlabAlloc::do_alloc(size_t size)
 {
-#ifdef REALM_SLAB_ALLOC_TUNE
-    static int64_t memstat_requested = 0;
-    static int64_t memstat_slab_size = 0;
-    static int64_t memstat_slabs = 0;
-    static int64_t memstat_rss = 0;
-    static int64_t memstat_rss_ctr = 0;
-
-    {
-        double vm;
-        double res;
-        process_mem_usage(vm, res);
-        memstat_rss += res;
-        memstat_rss_ctr += 1;
-        memstat_requested += size;
-    }
-#endif
     CriticalSection cs(changes);
     REALM_ASSERT(0 < size);
     REALM_ASSERT((size & 0x7) == 0); // only allow sizes that are multiples of 8
@@ -488,21 +472,6 @@ SlabAlloc::FreeBlock* SlabAlloc::grow_slab()
         ref = curr_ref_end;
     }
 
-#ifdef REALM_SLAB_ALLOC_TUNE
-    {
-        const size_t update = 5000000;
-        if ((memstat_slab_size + new_size) / update > memstat_slab_size / update) {
-            std::cerr << "Size of all allocated slabs:    " << (memstat_slab_size + new_size) / 1024 << " KB\n"
-                      << "Sum of size for do_alloc(size): " << memstat_requested / 1024 << " KB\n"
-                      << "Average physical memory usage:  " << memstat_rss / memstat_rss_ctr / 1024 << " KB\n"
-                      << "Page size:                      " << page_size() / 1024 << " KB\n"
-                      << "Number of all allocated slabs:  " << memstat_slabs << "\n\n";
-        }
-        memstat_slab_size += new_size;
-        memstat_slabs += 1;
-    }
-#endif
-
     size_t ref_end = ref;
     if (REALM_UNLIKELY(int_add_with_overflow_detect(ref_end, new_size))) {
         throw MaximumFileSizeExceeded("AllocSlab slab ref_end size overflow: " + util::to_string(ref) + " + " +
@@ -722,6 +691,7 @@ util::Mutex& all_files_mutex = *new util::Mutex;
 
 ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
 {
+    m_cfg = cfg;
     // ExceptionSafety: If this function throws, it must leave the allocator in
     // the detached state.
 
@@ -793,7 +763,7 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
         size_t initial_size = page_size(); // m_initial_section_size;
         m_file.prealloc(initial_size);     // Throws
 
-        bool disable_sync = get_disable_sync_to_disk();
+        bool disable_sync = get_disable_sync_to_disk() || cfg.disable_sync;
         if (!disable_sync)
             m_file.sync(); // Throws
 
@@ -1433,7 +1403,7 @@ void SlabAlloc::resize_file(size_t new_file_size)
     REALM_ASSERT(new_file_size == round_up_to_page_size(new_file_size));
     m_file.prealloc(new_file_size); // Throws
 
-    bool disable_sync = get_disable_sync_to_disk();
+    bool disable_sync = get_disable_sync_to_disk() || m_cfg.disable_sync;
     if (!disable_sync)
         m_file.sync(); // Throws
 }
@@ -1445,7 +1415,7 @@ void SlabAlloc::reserve_disk_space(size_t size)
         size = round_up_to_page_size(size);
     m_file.prealloc(size); // Throws
 
-    bool disable_sync = get_disable_sync_to_disk();
+    bool disable_sync = get_disable_sync_to_disk() || m_cfg.disable_sync;
     if (!disable_sync)
         m_file.sync(); // Throws
 }
