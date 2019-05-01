@@ -372,6 +372,20 @@ private:
     struct Slab {
         ref_type ref_end;
         char* addr;
+        size_t size;
+
+        Slab(ref_type r, size_t s);
+        ~Slab();
+
+        Slab(const Slab&) = delete;
+        Slab(Slab&& other) noexcept
+            : ref_end(other.ref_end)
+            , size(other.size)
+        {
+            addr = other.addr;
+            other.addr = nullptr;
+            other.size = 0;
+        }
     };
     struct Chunk { // describes a freed in-file block
         ref_type ref;
@@ -477,7 +491,7 @@ private:
     // create a single free chunk with "BetweenBlocks" at both ends and a
     // single free chunk between them. This free chunk will be of size:
     //   slab_size - 2 * sizeof(BetweenBlocks)
-    FreeBlock* slab_to_entry(Slab slab, ref_type ref_start);
+    FreeBlock* slab_to_entry(const Slab& slab, ref_type ref_start);
 
     // breaking/merging of blocks
     FreeBlock* get_prev_block_if_mergeable(FreeBlock* block);
@@ -610,9 +624,9 @@ private:
     /// less padding between members due to alignment requirements.
     FeeeSpaceState m_free_space_state = free_space_Clean;
 
-    typedef std::vector<Slab> slabs;
+    typedef std::vector<Slab> Slabs;
     using Chunks = std::map<ref_type, size_t>;
-    slabs m_slabs;
+    Slabs m_slabs;
     Chunks m_free_read_only;
 
     bool m_debug_out = false;

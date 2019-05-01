@@ -143,6 +143,21 @@ private:
     ref_type m_ref;
 };
 
+inline SlabAlloc::Slab::Slab(ref_type r, size_t s)
+    : ref_end(r)
+    , size(s)
+{
+    addr = static_cast<char*>(util::mmap_anon(size));
+#if REALM_ENABLE_ALLOC_SET_ZERO
+    std::fill(addr, addr + size, 0);
+#endif
+}
+
+SlabAlloc::Slab::~Slab()
+{
+    if (addr)
+        util::munmap(addr, 1UL << section_shift);
+}
 
 void SlabAlloc::detach() noexcept
 {
@@ -175,9 +190,6 @@ void SlabAlloc::detach() noexcept
     // Release all allocated memory - this forces us to create new
     // slabs after re-attaching thereby ensuring that the slabs are
     // placed correctly (logically) after the end of the file.
-    for (auto& slab : m_slabs) {
-        util::munmap(slab.addr, 1UL << section_shift);
-    }
     m_slabs.clear();
     clear_freelists();
 
@@ -396,7 +408,7 @@ SlabAlloc::FreeBlock* SlabAlloc::allocate_block(int size)
     return block;
 }
 
-SlabAlloc::FreeBlock* SlabAlloc::slab_to_entry(Slab slab, ref_type ref_start)
+SlabAlloc::FreeBlock* SlabAlloc::slab_to_entry(const Slab& slab, ref_type ref_start)
 {
     auto bb = reinterpret_cast<BetweenBlocks*>(slab.addr);
     bb->block_before_size = 0;
@@ -420,7 +432,7 @@ void SlabAlloc::rebuild_freelists_from_slab()
 {
     clear_freelists();
     ref_type ref_start = align_size_to_section_boundary(m_baseline.load(std::memory_order_relaxed));
-    for (auto e : m_slabs) {
+    for (const auto& e : m_slabs) {
         FreeBlock* entry = slab_to_entry(e, ref_start);
         push_freelist_entry(entry);
         ref_start = e.ref_end;
@@ -480,19 +492,12 @@ SlabAlloc::FreeBlock* SlabAlloc::grow_slab()
 
     REALM_ASSERT(matches_section_boundary(ref));
     REALM_ASSERT(matches_section_boundary(ref_end));
-    char* mem = static_cast<char*>(util::mmap_anon(new_size));
-#if REALM_ENABLE_ALLOC_SET_ZERO
-    std::fill(mem.get(), mem.get() + new_size, 0);
-#endif
-    // Add to list of slabs
-    Slab slab;
-    slab.addr = mem;
-    slab.ref_end = ref_end;
 
     std::lock_guard<std::mutex> lock(m_mapping_mutex);
-    // FIXME: Leaks if push_back throws
-    m_slabs.push_back(slab); // Throws
-    extend_fast_mapping_with_slab(mem);
+    // Create new slab and add to list of slabs
+    m_slabs.emplace_back(ref_end, new_size); // Throws
+    const Slab& slab = m_slabs.back();
+    extend_fast_mapping_with_slab(slab.addr);
 
     // build a single block from that entry
     return slab_to_entry(slab, ref);
