@@ -891,20 +891,24 @@ TEST(Metrics_MaxNumTransactionsIsNotExceeded)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    SharedGroupOptions options(crypt_key());
+    DBOptions options(crypt_key());
     options.enable_metrics = true;
     options.metrics_buffer_size = 10;
-    SharedGroup sg(*hist, options);
+    auto sg = DB::create(*hist, options);
     populate(sg); // 1
     {
         ReadTransaction rt(sg); // 2
     }
     {
         WriteTransaction wt(sg); // 3
-        TableRef t0 = wt.get_table(0);
-        TableRef t1 = wt.get_table(1);
-        t0->add_empty_row(3);
-        t1->add_empty_row(7);
+        TableRef t0 = wt.get_table("person");
+        TableRef t1 = wt.get_table("pet");
+        for (int i = 0; i < 3; i++) {
+            t0->create_object();
+        }
+        for (int i = 0; i < 7; i++) {
+            t1->create_object();
+        }
         wt.commit();
     }
 
@@ -912,7 +916,7 @@ TEST(Metrics_MaxNumTransactionsIsNotExceeded)
         ReadTransaction rt(sg);
     }
 
-    std::shared_ptr<Metrics> metrics = sg.get_metrics();
+    std::shared_ptr<Metrics> metrics = sg->get_metrics();
     CHECK(metrics);
 
     CHECK_EQUAL(metrics->num_query_metrics(), 0);
@@ -929,26 +933,32 @@ TEST(Metrics_MaxNumQueriesIsNotExceeded)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    SharedGroupOptions options(crypt_key());
+    DBOptions options(crypt_key());
     options.enable_metrics = true;
     options.metrics_buffer_size = 10;
-    SharedGroup sg(*hist, options);
+    auto sg = DB::create(*hist, options);
 
-    Group& g = sg.begin_write();
-    auto table = g.add_table("table");
-    size_t int_col = table->add_column(type_Int, "col_int");
-    table->add_empty_row(10);
-    sg.commit();
-
-    sg.begin_read();
-    table = g.get_table("table");
-    CHECK(bool(table));
-    Query query = table->column<int64_t>(int_col) == 0;
-    for (size_t i = 0; i < 2 * options.metrics_buffer_size; ++i) {
-        query.find();
+    {
+        auto tr = sg->start_write();
+        auto table = tr->add_table("table");
+        table->add_column(type_Int, "col_int");
+        for (int i = 0; i < 10; i++) {
+            table->create_object();
+        }
+        tr->commit();
     }
 
-    std::shared_ptr<Metrics> metrics = sg.get_metrics();
+    {
+        auto rt = sg->start_read();
+        auto table = rt->get_table("table");
+        auto int_col = table->get_column_key("col_int");
+        CHECK(bool(table));
+        Query query = table->column<int64_t>(int_col) == 0;
+        for (size_t i = 0; i < 2 * options.metrics_buffer_size; ++i) {
+            query.find();
+        }
+    }
+    std::shared_ptr<Metrics> metrics = sg->get_metrics();
     CHECK(metrics);
     CHECK_EQUAL(metrics->num_query_metrics(), options.metrics_buffer_size);
 }
@@ -975,27 +985,30 @@ NONCONCURRENT_TEST(Metrics_NumDecryptedPagesWithoutEncryption)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    SharedGroupOptions options(nullptr);
+    DBOptions options(nullptr);
     options.enable_metrics = true;
     options.metrics_buffer_size = 10;
-    SharedGroup sg(*hist, options);
+    auto sg = DB::create(*hist, options);
 
-    Group& g = sg.begin_write();
-    auto table = g.add_table("table");
+    {
+        auto tr = sg->start_write();
+        auto table = tr->add_table("table");
 
-    // we need this here because other unit tests might be using encryption and we need a guarantee
-    // that the global pages are from this shared group only.
-    NoPageReclaimGovernor gov;
-    realm::util::set_page_reclaim_governor(&gov);
-    CHECK(gov.has_run_once.valid());
-    gov.has_run_once.wait_for(std::chrono::seconds(2));
+        // we need this here because other unit tests might be using encryption and we need a guarantee
+        // that the global pages are from this shared group only.
+        NoPageReclaimGovernor gov;
+        realm::util::set_page_reclaim_governor(&gov);
+        CHECK(gov.has_run_once.valid());
+        gov.has_run_once.wait_for(std::chrono::seconds(2));
 
-    sg.commit();
+        tr->commit();
+    }
 
-    sg.begin_read();
-    sg.end_read();
+    {
+        auto rt = sg->start_read();
+    }
 
-    std::shared_ptr<Metrics> metrics = sg.get_metrics();
+    std::shared_ptr<Metrics> metrics = sg->get_metrics();
     CHECK(metrics);
 
     CHECK_EQUAL(metrics->num_transaction_metrics(), 2);
@@ -1017,25 +1030,28 @@ NONCONCURRENT_TEST_IF(Metrics_NumDecryptedPagesWithEncryption, REALM_ENABLE_ENCR
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    SharedGroupOptions options(crypt_key(true));
+    DBOptions options(crypt_key(true));
     options.enable_metrics = true;
     options.metrics_buffer_size = 10;
-    SharedGroup sg(*hist, options);
+    auto sg = DB::create(*hist, options);
 
-    Group& g = sg.begin_write();
-    auto table = g.add_table("table");
+    {
+        auto tr = sg->start_write();
+        auto table = tr->add_table("table");
 
-    NoPageReclaimGovernor gov;
-    realm::util::set_page_reclaim_governor(&gov);
-    CHECK(gov.has_run_once.valid());
-    gov.has_run_once.wait_for(std::chrono::seconds(2));
+        NoPageReclaimGovernor gov;
+        realm::util::set_page_reclaim_governor(&gov);
+        CHECK(gov.has_run_once.valid());
+        gov.has_run_once.wait_for(std::chrono::seconds(2));
 
-    sg.commit();
+        tr->commit();
+    }
 
-    sg.begin_read();
-    sg.end_read();
+    {
+        auto rt = sg->start_read();
+    }
 
-    std::shared_ptr<Metrics> metrics = sg.get_metrics();
+    std::shared_ptr<Metrics> metrics = sg->get_metrics();
     CHECK(metrics);
 
     CHECK_EQUAL(metrics->num_transaction_metrics(), 2);
@@ -1056,16 +1072,17 @@ TEST(Metrics_MemoryChecks)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    SharedGroupOptions options(nullptr);
+    DBOptions options(nullptr);
     options.enable_metrics = true;
     options.metrics_buffer_size = 10;
-    SharedGroup sg(*hist, options);
+    auto sg = DB::create(*hist, options);
     populate(sg);
 
-    sg.begin_read();
-    sg.end_read();
+    {
+        auto rt = sg->start_read();
+    }
 
-    std::shared_ptr<Metrics> metrics = sg.get_metrics();
+    std::shared_ptr<Metrics> metrics = sg->get_metrics();
     CHECK(metrics);
 
     CHECK_EQUAL(metrics->num_transaction_metrics(), 2);
