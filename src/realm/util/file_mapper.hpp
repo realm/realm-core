@@ -63,6 +63,13 @@ public:
 // If no governor is installed, the page reclaim daemon will not start.
 void set_page_reclaim_governor(PageReclaimGovernor* governor);
 
+// Use the default governor. The default governor is used automatically if nothing else is set, so
+// this funciton is mostly useful for tests where changing back to the default could be desirable.
+void set_page_reclaim_governor_to_default();
+
+// Retrieves the number of in memory decrypted pages, across all open files.
+size_t get_num_decrypted_pages();
+
 #if REALM_ENABLE_ENCRYPTION
 
 void encryption_note_reader_start(SharedFileInfo& info, void* reader_id);
@@ -118,6 +125,13 @@ inline void do_encryption_write_barrier(const void* addr, size_t size, Encrypted
 
 void inline set_page_reclaim_governor(PageReclaimGovernor*)
 {
+}
+
+void inline set_page_reclaim_governor_to_default() {}
+
+size_t inline get_num_decrypted_pages()
+{
+    return 0;
 }
 
 void inline encryption_read_barrier(const void*, size_t, EncryptedFileMapping*, HeaderToSize = nullptr)

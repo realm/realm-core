@@ -28,6 +28,7 @@
 #include <random>
 
 #include <realm/util/features.h>
+#include <realm/util/file_mapper.hpp>
 #include <realm/util/errno.hpp>
 #include <realm/util/safe_int_ops.hpp>
 #include <realm/util/thread.hpp>
@@ -761,7 +762,7 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
 
 #if REALM_METRICS
     if (options.enable_metrics) {
-        m_metrics = std::make_shared<Metrics>();
+        m_metrics = std::make_shared<Metrics>(options.metrics_buffer_size);
     }
 #endif // REALM_METRICS
 
@@ -1570,22 +1571,27 @@ void Transaction::set_transact_stage(DB::TransactStage stage) noexcept
         size_t free_space = db->m_free_space;
         size_t num_objects = m_total_rows;
         size_t num_available_versions = static_cast<size_t>(db->get_number_of_versions());
+        size_t num_decrypted_pages = realm::util::get_num_decrypted_pages();
 
         if (stage == DB::transact_Reading) {
             if (m_transact_stage == DB::transact_Writing) {
-                m_metrics->end_write_transaction(total_size, free_space, num_objects, num_available_versions);
+                m_metrics->end_write_transaction(total_size, free_space, num_objects, num_available_versions,
+                                                 num_decrypted_pages);
             }
             m_metrics->start_read_transaction();
         }
         else if (stage == DB::transact_Writing) {
             if (m_transact_stage == DB::transact_Reading) {
-                m_metrics->end_read_transaction(total_size, free_space, num_objects, num_available_versions);
+                m_metrics->end_read_transaction(total_size, free_space, num_objects, num_available_versions,
+                                                num_decrypted_pages);
             }
             m_metrics->start_write_transaction();
         }
         else if (stage == DB::transact_Ready) {
-            m_metrics->end_read_transaction(total_size, free_space, num_objects, num_available_versions);
-            m_metrics->end_write_transaction(total_size, free_space, num_objects, num_available_versions);
+            m_metrics->end_read_transaction(total_size, free_space, num_objects, num_available_versions,
+                                            num_decrypted_pages);
+            m_metrics->end_write_transaction(total_size, free_space, num_objects, num_available_versions,
+                                             num_decrypted_pages);
         }
     }
 #endif

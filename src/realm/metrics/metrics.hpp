@@ -20,10 +20,10 @@
 #define REALM_METRICS_HPP
 
 #include <memory>
-#include <vector>
 
 #include <realm/metrics/query_info.hpp>
 #include <realm/metrics/transaction_info.hpp>
+#include <realm/util/circular_buffer.hpp>
 #include <realm/util/features.h>
 
 namespace realm {
@@ -36,7 +36,7 @@ namespace metrics {
 
 class Metrics {
 public:
-    Metrics();
+    Metrics(size_t max_history_size);
     ~Metrics() noexcept;
     size_t num_query_metrics() const;
     size_t num_transaction_metrics() const;
@@ -46,13 +46,15 @@ public:
 
     void start_read_transaction();
     void start_write_transaction();
-    void end_read_transaction(size_t total_size, size_t free_space, size_t num_objects, size_t num_versions);
-    void end_write_transaction(size_t total_size, size_t free_space, size_t num_objects, size_t num_versions);
+    void end_read_transaction(size_t total_size, size_t free_space, size_t num_objects, size_t num_versions,
+                              size_t num_decrypted_pages);
+    void end_write_transaction(size_t total_size, size_t free_space, size_t num_objects, size_t num_versions,
+                               size_t num_decrypted_pages);
     static std::unique_ptr<MetricTimer> report_fsync_time(const Group& g);
     static std::unique_ptr<MetricTimer> report_write_time(const Group& g);
 
-    using QueryInfoList = std::vector<QueryInfo>;
-    using TransactionInfoList = std::vector<TransactionInfo>;
+    using QueryInfoList = util::CircularBuffer<QueryInfo>;
+    using TransactionInfoList = util::CircularBuffer<TransactionInfo>;
 
     // Get the list of metric objects tracked since the last take
     std::unique_ptr<QueryInfoList> take_queries();
@@ -64,6 +66,9 @@ private:
 
     std::unique_ptr<TransactionInfo> m_pending_read;
     std::unique_ptr<TransactionInfo> m_pending_write;
+
+    size_t m_max_num_queries;
+    size_t m_max_num_transactions;
 };
 
 
