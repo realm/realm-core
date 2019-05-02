@@ -328,7 +328,12 @@ TEST(Metrics_QueryEqual)
         std::string table_name = queries->at(i).get_table_name();
         CHECK_EQUAL(find_count(description, column_names[i]), 1);
         CHECK_GREATER_EQUAL(find_count(description, query_search_term), 1);
-        CHECK_EQUAL(table_name, "person");
+        if (i < 8) {
+            CHECK_EQUAL(table_name, "person");
+        }
+        else {
+            CHECK_EQUAL(table_name, "pet");
+        }
     }
 }
 

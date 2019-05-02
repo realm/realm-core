@@ -562,69 +562,64 @@ TEST(LangBindHelper_AdvanceReadTransact_CreateManyTables)
 TEST(LangBindHelper_AdvanceReadTransact_PinnedSize)
 {
     SHARED_GROUP_TEST_PATH(path);
-    constexpr size_t num_rows = 1000;
-    constexpr size_t iterations = 10;
-    constexpr size_t rows_per_iteration = num_rows / iterations;
+    constexpr int num_rows = 1000;
+    constexpr int iterations = 10;
+    constexpr int rows_per_iteration = num_rows / iterations;
+
+    std::unique_ptr<Replication> hist(realm::make_in_realm_history(path));
+    auto sg = DB::create(*hist, DBOptions(crypt_key()));
+    ObjKeys keys;
 
     // Create some data
     {
-        std::unique_ptr<Replication> hist_w(realm::make_in_realm_history(path));
-        SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
         {
-            WriteTransaction wt(sg_w);
+            WriteTransaction wt(sg);
             auto table = wt.add_table("table");
             table->add_column(type_Int, "int");
             wt.commit();
         }
         for (size_t i = 0; i < iterations; i++) {
-            WriteTransaction wt(sg_w);
+            WriteTransaction wt(sg);
             auto table = wt.get_table("table");
-            auto col = table->get_column_index("int");
-            for (size_t j = 0; j < rows_per_iteration; j++) {
-                auto ndx = table->add_empty_row();
-                table->set_int(col, ndx, ndx);
+            auto col = table->get_column_key("int");
+            for (int j = 0; j < rows_per_iteration; j++) {
+                auto k = table->create_object().set(col, j).get_key();
+                keys.push_back(k);
             }
             wt.commit();
         }
     }
 
     // Pin this version
-    std::unique_ptr<Replication> hist(realm::make_in_realm_history(path));
-    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
-    ReadTransaction rt(sg);
+    auto rt = sg->start_read();
     size_t free_space, used_space, locked_space;
 
     // Make some more versions
     {
-        std::unique_ptr<Replication> hist_w(realm::make_in_realm_history(path));
-        SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
-        for (size_t i = 0; i < iterations; i++) {
-            WriteTransaction wt(sg_w);
+        for (int i = 0; i < iterations; i++) {
+            WriteTransaction wt(sg);
             auto table = wt.get_table("table");
-            auto col = table->get_column_index("int");
-            for (size_t j = 0; j < rows_per_iteration; j++) {
-                size_t ndx = rows_per_iteration * i + j;
-                table->set_int(col, ndx, 2 * ndx);
+            auto col = table->get_column_key("int");
+            for (int j = 0; j < rows_per_iteration; j++) {
+                int ndx = rows_per_iteration * i + j;
+                table->get_object(keys[ndx]).set(col, 2 * ndx);
             }
             wt.commit();
         }
-        sg_w.get_stats(free_space, used_space, locked_space);
+        sg->get_stats(free_space, used_space, locked_space);
     }
 
     CHECK_GREATER(locked_space, 0);
     CHECK_LESS(locked_space, free_space);
 
     // Move to latest version
-    LangBindHelper::advance_read(sg);
+    rt->advance_read();
     size_t new_locked_space;
     {
-        std::unique_ptr<Replication> hist_w(realm::make_in_realm_history(path));
-        SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
-
-        WriteTransaction wt(sg_w);
+        WriteTransaction wt(sg);
         wt.commit();
-        sg_w.get_stats(free_space, used_space, new_locked_space);
     }
+    sg->get_stats(free_space, used_space, new_locked_space);
 
     // Some space must have been released
     CHECK_LESS(new_locked_space, locked_space);
