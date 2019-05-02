@@ -238,6 +238,7 @@ MemRef SlabAlloc::do_alloc(size_t size)
         throw InvalidFreeSpace();
 
     m_free_space_state = free_space_Dirty;
+    m_commit_size += size;
 
     // minimal allocation is sizeof(FreeListEntry)
     if (size < sizeof(FreeBlock))
@@ -569,6 +570,8 @@ void SlabAlloc::do_free(ref_type ref, char* addr)
         }
     }
     else {
+        m_commit_size -= size;
+
         // fixup size to take into account the allocator's need to store a FreeBlock in a freed block
         if (size < sizeof(FreeBlock))
             size = sizeof(FreeBlock);
@@ -1070,9 +1073,13 @@ void SlabAlloc::reset_free_space_tracking()
     // been commited to persistent space)
     m_free_read_only.clear();
 
-    clear_freelists();
+    while (m_slabs.size() > 1) {
+        m_slabs.pop_back();
+    }
+
     rebuild_freelists_from_slab();
     m_free_space_state = free_space_Clean;
+    m_commit_size = 0;
 }
 
 inline bool randomly_false_in_debug(bool x)
@@ -1289,6 +1296,14 @@ void SlabAlloc::update_reader_view(size_t file_size)
     // scheduling queue.
     //
     rebuild_translations(requires_new_translation, old_num_sections);
+}
+
+size_t SlabAlloc::get_allocated_size() const noexcept
+{
+    size_t sz = 0;
+    for (const auto& s : m_slabs)
+        sz += s.size;
+    return sz;
 }
 
 void SlabAlloc::extend_fast_mapping_with_slab(char* address)

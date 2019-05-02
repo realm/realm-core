@@ -16,8 +16,25 @@
 * realm-browser now able to read Core-6 files and print values for even more columns
 
 Besides the changes above, this release includes changes introduced by v5.12.7 and up
-until v5.13.0
+until v5.14.0
 
+| # 5.14.0 Release notes
+| 
+| ### Enhancements
+| * Add assertion to prevent translating a ref value that is not 8 byte aligned. This will allow
+|   us to detect file corruptions at an earlier stage.
+| * You can now get size of the commit being built and the size of currently allocated slab area.
+| * The amount of memory held by SharedGroup is minimized as most of it will be freed after each commit.
+| 
+| ### Fixed
+| * Compacting a realm into an encrypted file could take a really long time. The process is now optimized by adjusting the write
+|   buffer size relative to the used space in the realm.
+|   ([#2754](https://github.com/realm/realm-sync/issues/2754))
+| * Creating an object after creating an object with the int primary key of "null" would hit an assertion failure.
+|   ([#3227](https://github.com/realm/realm-core/pull/3227)).
+| 
+| ----------------------------------------------
+| 
 | # 5.13.0 Release notes
 | 
 | ### Enhancements
@@ -28,9 +45,6 @@ until v5.13.0
 | * If, in debug mode, you try to compute the used space on a newly compacted realm (with empty free list), the program will
 |   abort. ([#1171](https://github.com/realm/realm-sync/issues/2724), since v5.12.0)
 |  
-| ### Breaking changes
-| * None.
-| 
 | -----------
 | 
 | ### Internals

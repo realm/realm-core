@@ -311,6 +311,15 @@ public:
     /// call to SlabAlloc::alloc() corresponds to a mutation event.
     bool is_free_space_clean() const noexcept;
 
+    /// Returns the amount of memory requested by calls to SlabAlloc::alloc().
+    size_t get_commit_size() const
+    {
+        return m_commit_size;
+    }
+
+    /// Returns the total amount of memory currently allocated in slab area
+    size_t get_allocated_size() const noexcept;
+
     /// Hooks used to keep the encryption layer informed of the start and stop
     /// of transactions.
     void note_reader_start(void* reader_id);
@@ -367,7 +376,7 @@ private:
     // extend the amount of space available for database node
     // storage. Inter-node references are represented as file offsets
     // (a.k.a. "refs"), and each slab creates an apparently seamless extension
-    // of this file offset addressable space. Slabes are stored as rows in the
+    // of this file offset addressable space. Slabs are stored as rows in the
     // Slabs table in order of ascending file offsets.
     struct Slab {
         ref_type ref_end;
@@ -628,6 +637,7 @@ private:
     using Chunks = std::map<ref_type, size_t>;
     Slabs m_slabs;
     Chunks m_free_read_only;
+    size_t m_commit_size = 0;
 
     bool m_debug_out = false;
 
@@ -759,7 +769,7 @@ template <typename Func>
 void SlabAlloc::for_all_free_entries(Func f) const
 {
     ref_type ref = align_size_to_section_boundary(m_baseline.load(std::memory_order_relaxed));
-    for (auto& e : m_slabs) {
+    for (const auto& e : m_slabs) {
         BetweenBlocks* bb = reinterpret_cast<BetweenBlocks*>(e.addr);
         REALM_ASSERT(bb->block_before_size == 0);
         while (1) {

@@ -3924,4 +3924,35 @@ TEST_IF(Shared_LinksToSameCluster, REALM_ENABLE_ENCRYPTION)
     }
 }
 #endif
+
+// Not much of a test. Mostly to exercise the code paths.
+TEST(Shared_GetCommitSize)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    DBRef db = DB::create(path, false, DBOptions(crypt_key()));
+    size_t size_before;
+    size_t commit_size;
+    {
+        auto wt = db->start_write();
+        size_before = wt->get_used_space();
+        auto t = wt->add_table("foo");
+        auto col_int = t->add_column(type_Int, "Integers");
+        auto col_string = t->add_column(type_String, "Strings");
+        for (int i = 0; i < 10000; i++) {
+            std::string str = "Shared_CompactEncrypt" + util::to_string(i);
+            t->create_object().set(col_int, i + 0x10000).set(col_string, StringData(str));
+        }
+        commit_size = wt->get_commit_size();
+        auto allocated_size = db->get_allocated_size();
+        CHECK_LESS(commit_size, allocated_size);
+        wt->commit();
+    }
+    {
+        ReadTransaction rt(db);
+        auto size_after = rt.get_group().get_used_space();
+        // Commit size will always be bigger than actual size
+        CHECK_LESS(size_after - size_before, commit_size);
+    }
+}
+
 #endif // TEST_SHARED

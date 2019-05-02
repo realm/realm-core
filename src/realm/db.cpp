@@ -1452,6 +1452,11 @@ uint_fast64_t DB::get_number_of_versions()
     return info->number_of_versions;
 }
 
+size_t DB::get_allocated_size() const
+{
+    return m_alloc.get_allocated_size();
+}
+
 DB::~DB() noexcept
 {
     close();
@@ -2351,6 +2356,15 @@ void Transaction::rollback()
         repl->abort_transact();
 
     do_end_read();
+}
+
+size_t Transaction::get_commit_size() const
+{
+    size_t sz = 0;
+    if (m_transact_stage == DB::transact_Writing) {
+        sz = m_alloc.get_commit_size();
+    }
+    return sz;
 }
 
 DB::version_type Transaction::commit()

@@ -215,6 +215,9 @@ public:
     /// a read transaction will not immediately release any versions.
     uint_fast64_t get_number_of_versions();
 
+    /// Get the size of the currently allocated slab area
+    size_t get_allocated_size() const;
+
     /// Compact the database file.
     /// - The method will throw if called inside a transaction.
     /// - The method will throw if called in unattached state.
@@ -504,9 +507,17 @@ public:
         return db->get_version_of_latest_snapshot();
     }
     void close();
+
+    /// Get the approximate size of the data that would be written to the file if
+    /// a commit were done at this point. The reported size will always be bigger
+    /// than what will eventually be needed as we reserve a bit more memory that
+    /// will be needed.
+    size_t get_commit_size() const;
+
     DB::version_type commit();
     void rollback();
     void end_read();
+
     // Live transactions state changes, often taking an observer functor:
     DB::version_type commit_and_continue_as_read();
     template <class O>
