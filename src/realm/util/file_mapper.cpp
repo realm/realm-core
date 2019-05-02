@@ -169,6 +169,7 @@ public:
             auto from_proc = fetch_value_in_file("/proc/meminfo", "MemTotal:[[:space:]]+([[:digit:]]+) kB") * 1024;
             auto from_cgroup = fetch_value_in_file("/sys/fs/cgroup/memory/memory.limit_in_bytes", "^([[:digit:]]+)");
             auto cache_use = fetch_value_in_file("/sys/fs/cgroup/memory/memory.stat", "cache ([[:digit:]]+)");
+            std::cout << " -< " << from_proc << " : " << from_cgroup << " : " << cache_use << " >-" << std::endl;
             target = pick_if_valid(from_proc, from_proc / 4);
             target = pick_lowest_valid(target, pick_if_valid(from_cgroup, from_cgroup / 4));
             target = pick_lowest_valid(target, pick_if_valid(cache_use, cache_use));
@@ -177,21 +178,24 @@ public:
     }
 
     std::function<int64_t()> current_target_getter(size_t load) override
-    {
+    {/*
         static_cast<void>(load);
         if (m_refresh_count > 0) {
             --m_refresh_count;
             return std::bind([](int64_t target_copy) { return target_copy; }, m_target);
         }
+        m_refresh_count = 10;
+     */
         return std::bind(get_target_from_system, m_cfg_file_name);
     }
 
     void report_target_result(int64_t target) override
     {
-        m_target = target;
+        m_target = target;/*
         if (m_refresh_count == 0) {
             m_refresh_count = 10; // refresh every 10 seconds
         }
+                          */
     }
 
     DefaultGovernor() {
@@ -382,6 +386,7 @@ void reclaim_pages()
     int64_t target = PageReclaimGovernor::no_match;
     if (runnable) {
         target = runnable() / page_size();
+        std::cout << " -- " << load << " - " << target << std::endl;
     }
     {
         UniqueLock lock(mapping_mutex);
