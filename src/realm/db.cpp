@@ -2017,10 +2017,14 @@ DB::version_type Transaction::commit_and_continue_as_read()
     // As this is done under lock, along with the addition above of the newest commit,
     // we know for certain that the read lock we will grab WILL refer to our own newly
     // completed commit.
-    db->release_read_lock(m_read_lock);
 
+    DB::ReadLockInfo new_read_lock;
     VersionID version_id = VersionID();          // Latest available snapshot
-    db->grab_read_lock(m_read_lock, version_id); // Throws
+    // Grabbing the new lock before releasing the old one prevents m_transaction_count
+    // from going shortly to zero
+    db->grab_read_lock(new_read_lock, version_id); // Throws
+    db->release_read_lock(m_read_lock);
+    m_read_lock = new_read_lock;
 
     db->do_end_write();
 
