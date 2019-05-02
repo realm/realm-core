@@ -316,7 +316,7 @@ const std::vector<work_limit_desc> control_table = {{0.5f, 0.001f},  {0.75f, 0.0
 
 size_t get_work_limit(size_t decrypted_pages, size_t target)
 {
-    if (target < 1)
+    if (target == 0)
         target = 1;
     float load = 1.0f * decrypted_pages / target;
     float akku = 0.0f;
