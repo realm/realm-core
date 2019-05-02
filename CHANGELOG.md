@@ -6,7 +6,7 @@
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* Slab usage was reported wrong ([#3284](https://github.com/realm/realm-core/pull/3284)
+* Slab usage was reported wrong by SlabAlloc::get_total_slab_size() ([#3284](https://github.com/realm/realm-core/pull/3284)
 * The control of the page reclaimer did not limit the page reclaimers workload correctly. This could lead
   to the reclaimer not running as much as intended. It also caused reporting of odd metrics for the reclaimer.
   ([#3285](https://github.com/realm/realm-core/pull/3285))
