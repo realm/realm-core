@@ -169,7 +169,6 @@ public:
             auto from_proc = fetch_value_in_file("/proc/meminfo", "MemTotal:[[:space:]]+([[:digit:]]+) kB") * 1024;
             auto from_cgroup = fetch_value_in_file("/sys/fs/cgroup/memory/memory.limit_in_bytes", "^([[:digit:]]+)");
             auto cache_use = fetch_value_in_file("/sys/fs/cgroup/memory/memory.stat", "cache ([[:digit:]]+)");
-            std::cout << " -< " << from_proc << " : " << from_cgroup << " : " << cache_use << " >-" << std::endl;
             target = pick_if_valid(from_proc, from_proc / 4);
             target = pick_lowest_valid(target, pick_if_valid(from_cgroup, from_cgroup / 4));
             target = pick_lowest_valid(target, pick_if_valid(cache_use, cache_use));
@@ -387,7 +386,6 @@ void reclaim_pages()
         UniqueLock lock(mapping_mutex);
         reclaimer_workload = 0;
         reclaimer_target = size_t(target / page_size());
-
         // Putting the target back into the govenor object will allow the govenor
         // to return a getter producing this value again next time it is called
         governor->report_target_result(target);
