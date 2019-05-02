@@ -199,8 +199,11 @@ public:
     // by compact(). This may not correspond to the space which is free
     // at the point where get_stats() is called, since that will include
     // memory required to hold older versions of data, which still
-    // needs to be available.
-    void get_stats(size_t& free_space, size_t& used_space);
+    // needs to be available. The locked space is the amount of memory
+    // that is free in current version, but being used in still live versions.
+    // Notice that we will always have two live versions - the current and the
+    // previous.
+    void get_stats(size_t& free_space, size_t& used_space, util::Optional<size_t&> locked_space = util::none) const;
     //@}
 
     enum TransactStage {
@@ -343,6 +346,7 @@ private:
 
     // Member variables
     size_t m_free_space = 0;
+    size_t m_locked_space = 0;
     size_t m_used_space = 0;
     uint_fast32_t m_local_max_entry = 0;
     util::File m_file;
@@ -485,10 +489,13 @@ private:
     friend class Transaction;
 };
 
-inline void DB::get_stats(size_t& free_space, size_t& used_space)
+inline void DB::get_stats(size_t& free_space, size_t& used_space, util::Optional<size_t&> locked_space) const
 {
     free_space = m_free_space;
     used_space = m_used_space;
+    if (locked_space) {
+        *locked_space = m_locked_space;
+    }
 }
 
 

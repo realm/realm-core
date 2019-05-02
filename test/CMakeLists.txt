@@ -66,7 +66,7 @@ set(NORMAL_TESTS
     test_util_stringbuffer.cpp
     test_util_to_string.cpp
     test_util_type_list.cpp
-    test_util_circular_buffer.cpp
+    test_util_fixed_size_buffer.cpp
     test_version.cpp)
 
 if (REALM_ENABLE_ENCRYPTION)

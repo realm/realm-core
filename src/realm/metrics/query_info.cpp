@@ -36,6 +36,7 @@ QueryInfo::QueryInfo(const Query* query, QueryType type)
     REALM_ASSERT(group);
 
     m_description = query->get_description();
+    m_table_name = query->m_table->get_name();
 }
 
 QueryInfo::~QueryInfo() noexcept
@@ -45,6 +46,11 @@ QueryInfo::~QueryInfo() noexcept
 std::string QueryInfo::get_description() const
 {
     return m_description;
+}
+
+std::string QueryInfo::get_table_name() const
+{
+    return m_table_name;
 }
 
 QueryInfo::QueryType QueryInfo::get_type() const

@@ -2136,6 +2136,7 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction)
         // protect access to shared variables and m_reader_mapping from here
         std::lock_guard<std::recursive_mutex> lock_guard(m_mutex);
         m_free_space = out.get_free_space_size();
+        m_locked_space = out.get_locked_space_size();
         m_used_space = out.get_file_size() - m_free_space;
         // std::cout << "Writing version " << new_version << ", Topptr " << new_top_ref
         //     << " Read lock at version " << oldest_version << std::endl;

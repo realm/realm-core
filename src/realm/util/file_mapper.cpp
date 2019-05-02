@@ -112,7 +112,7 @@ struct mapping_and_addr {
     size_t size;
 };
 
-util::Mutex mapping_mutex;
+util::Mutex& mapping_mutex = *(new util::Mutex);
 std::vector<mapping_and_addr>& mappings_by_addr = *new std::vector<mapping_and_addr>;
 std::vector<mappings_for_file>& mappings_by_file = *new std::vector<mappings_for_file>;
 unsigned int file_reclaim_index = 0;
@@ -146,30 +146,26 @@ int64_t fetch_value_in_file(const std::string& fname, const char* scan_pattern)
 
 class DefaultGovernor : public PageReclaimGovernor {
 public:
-    int64_t pick_lowest_valid(int64_t a, int64_t b)
+    static int64_t pick_lowest_valid(int64_t a, int64_t b)
     {
-        if (a == no_match)
+        if (a == PageReclaimGovernor::no_match)
             return b;
-        if (b == no_match)
+        if (b == PageReclaimGovernor::no_match)
             return a;
         return std::min(a, b);
     }
-    int64_t pick_if_valid(int64_t source, int64_t target)
+
+    static int64_t pick_if_valid(int64_t source, int64_t target)
     {
-        if (source == no_match)
-            return no_match;
+        if (source == PageReclaimGovernor::no_match)
+            return PageReclaimGovernor::no_match;
         return target;
     }
 
-    int64_t get_current_target(size_t load) override
+    static int64_t get_target_from_system(std::string cfg_file_name)
     {
-        static_cast<void>(load);
-        if (m_refresh_count > 0) {
-            --m_refresh_count;
-            return m_target;
-        }
         int64_t target;
-        auto local_spec = fetch_value_in_file(m_cfg_file_name, "target ([[:digit:]]+)");
+        auto local_spec = fetch_value_in_file(cfg_file_name, "target ([[:digit:]]+)");
         if (local_spec != no_match) { // overrides everything!
             target = local_spec;
         }
@@ -182,10 +178,27 @@ public:
             target = pick_lowest_valid(target, pick_if_valid(from_cgroup, from_cgroup / 4));
             target = pick_lowest_valid(target, pick_if_valid(cache_use, cache_use / 2));
         }
-        m_target = target;
-        m_refresh_count = 10; // refresh every 10 seconds
         return target;
     }
+
+    std::function<int64_t()> current_target_getter(size_t load) override
+    {
+        static_cast<void>(load);
+        if (m_refresh_count > 0) {
+            --m_refresh_count;
+            return std::bind([](int64_t target_copy) { return target_copy; }, m_target);
+        }
+        return std::bind(get_target_from_system, m_cfg_file_name);
+    }
+
+    void report_target_result(int64_t target) override
+    {
+        m_target = target;
+        if (m_refresh_count == 0) {
+            m_refresh_count = 10; // refresh every 10 seconds
+        }
+    }
+
     DefaultGovernor()
     {
         auto cfg_name = getenv("REALM_PAGE_GOVERNOR_CFG");
@@ -200,32 +213,23 @@ private:
     int m_refresh_count = 0;
 };
 
-std::unique_ptr<std::thread> reclaimer_thread;
-std::atomic<bool> reclaimer_shutdown(false);
-DefaultGovernor default_governor;
-PageReclaimGovernor* governor = nullptr;
+static std::unique_ptr<std::thread> reclaimer_thread;
+static std::atomic<bool> reclaimer_shutdown(false);
+static DefaultGovernor default_governor;
+static PageReclaimGovernor* governor = &default_governor;
 
 void reclaimer_loop();
 
 void inline ensure_reclaimer_thread_runs() {
     if (reclaimer_thread == nullptr) {
-        if (governor == nullptr)
-            governor = &default_governor;
         reclaimer_thread.reset(new std::thread(reclaimer_loop));
     }
-}
-
-void set_page_reclaim_governor_to_default()
-{
-    UniqueLock lock(mapping_mutex);
-    governor = &default_governor;
-    ensure_reclaimer_thread_runs();
 }
 
 void set_page_reclaim_governor(PageReclaimGovernor* new_governor)
 {
     UniqueLock lock(mapping_mutex);
-    governor = new_governor;
+    governor = new_governor ? new_governor : &default_governor;
     ensure_reclaimer_thread_runs();
 }
 
@@ -365,24 +369,35 @@ void reclaim_pages_for_file(SharedFileInfo& info, size_t& work_limit)
 void reclaim_pages()
 {
     size_t load;
+    std::function<int64_t()> runnable;
     {
         UniqueLock lock(mapping_mutex);
-        if (governor == nullptr)
-            return;
         load = collect_total_workload();
         num_decrypted_pages = load;
+        runnable = governor->current_target_getter(load * page_size());
     }
-    // callback to governor without mutex held
-    int64_t target = governor->get_current_target(load * page_size()) / page_size();
+    // callback to governor defined function without mutex held
+    int64_t target = PageReclaimGovernor::no_match;
+    if (runnable) {
+        target = runnable() / page_size();
+    }
     {
         UniqueLock lock(mapping_mutex);
+
+        // Putting the target back into the govenor object will allow the govenor
+        // to return a getter producing this value again next time it is called
+        governor->report_target_result(target);
+
         if (target == PageReclaimGovernor::no_match) // temporarily disabled by governor returning 0
             return;
+
         if (mappings_by_file.size() == 0)
             return;
+
         size_t work_limit = get_work_limit(load, size_t(target));
         if (file_reclaim_index >= mappings_by_file.size())
             file_reclaim_index = 0;
+
         while (work_limit > 0) {
             SharedFileInfo& info = *mappings_by_file[file_reclaim_index].info;
             reclaim_pages_for_file(info, work_limit);

@@ -16,8 +16,8 @@
  *
  **************************************************************************/
 
-#ifndef REALM_UTIL_CIRCULAR_BUFFER_HPP
-#define REALM_UTIL_CIRCULAR_BUFFER_HPP
+#ifndef REALM_UTIL_FIXED_SIZE_BUFFER_HPP
+#define REALM_UTIL_FIXED_SIZE_BUFFER_HPP
 
 #include <vector>
 #include <cstddef>
@@ -26,51 +26,19 @@
 namespace realm {
 namespace util {
 
+/// This is a buffer with a fixed size. You can only insert elements.
+/// When the number of elements inserted matches the size of the buffer,
+/// additional insertions will overwrite the oldest elements.
 template <class T>
-class CircularBuffer;
-
-template <class T>
-class CircularBufferIterator {
+class FixedSizeBuffer {
 public:
-    typedef std::forward_iterator_tag iterator_category;
-    typedef T value_type;
-    typedef ptrdiff_t difference_type;
-    typedef T* pointer;
-    typedef T& reference;
+    class iterator;
 
-    CircularBufferIterator(CircularBuffer<T>& b, size_t ndx)
-        : m_cb(b)
-        , m_ndx(ndx)
-    {
-    }
-    pointer operator->()
-    {
-        return &m_cb[m_ndx];
-    }
-    reference operator*()
-    {
-        return m_cb[m_ndx];
-    }
-    CircularBufferIterator& operator++();
-    CircularBufferIterator operator++(int);
-    bool operator!=(const CircularBufferIterator& rhs);
-    bool operator==(const CircularBufferIterator& rhs);
-
-private:
-    CircularBuffer<T>& m_cb;
-    size_t m_ndx;
-};
-
-template <class T>
-class CircularBuffer {
-public:
-    using iterator = CircularBufferIterator<T>;
-
-    CircularBuffer(size_t sz)
+    FixedSizeBuffer(size_t sz)
         : m_size(sz)
     {
         if (sz == 0)
-            throw std::runtime_error("CircularBuffer size cannot be 0");
+            throw std::runtime_error("FixedSizeBuffer size cannot be 0");
         m_buffer.reserve(sz);
     }
     size_t size()
@@ -108,41 +76,60 @@ public:
     }
 
 private:
-    friend class CircularBufferIterator<T>;
     std::vector<T> m_buffer;
     size_t m_size;
     size_t m_oldest = 0;
 };
 
 template <class T>
-CircularBufferIterator<T>& CircularBufferIterator<T>::operator++()
-{
-    ++m_ndx;
-    return *this;
-}
+class FixedSizeBuffer<T>::iterator {
+public:
+    typedef std::forward_iterator_tag iterator_category;
+    typedef T value_type;
+    typedef ptrdiff_t difference_type;
+    typedef T* pointer;
+    typedef T& reference;
 
-template <class T>
-CircularBufferIterator<T> CircularBufferIterator<T>::operator++(int)
-{
-    CircularBufferIterator tmp(*this);
-    operator++();
-    return tmp;
-}
+    iterator(FixedSizeBuffer<T>& b, size_t ndx)
+        : m_cb(b)
+        , m_ndx(ndx)
+    {
+    }
+    pointer operator->()
+    {
+        return &m_cb[m_ndx];
+    }
+    reference operator*()
+    {
+        return m_cb[m_ndx];
+    }
+    iterator& operator++()
+    {
+        ++m_ndx;
+        return *this;
+    }
+    iterator operator++(int)
+    {
+        iterator tmp(*this);
+        operator++();
+        return tmp;
+    }
+    bool operator!=(const iterator& rhs)
+    {
+        return m_ndx != rhs.m_ndx;
+    }
+    bool operator==(const iterator& rhs)
+    {
+        return m_ndx == rhs.m_ndx;
+    }
 
-template <class T>
-bool CircularBufferIterator<T>::operator!=(const CircularBufferIterator& rhs)
-{
-    return m_ndx != rhs.m_ndx;
-}
-
-template <class T>
-bool CircularBufferIterator<T>::operator==(const CircularBufferIterator& rhs)
-{
-    return m_ndx == rhs.m_ndx;
-}
+private:
+    FixedSizeBuffer<T>& m_cb;
+    size_t m_ndx;
+};
 
 } // namespace util
 } // namespace realm
 
 
-#endif /* REALM_UTIL_CIRCULAR_BUFFER_HPP */
+#endif /* REALM_UTIL_FIXED_SIZE_BUFFER_HPP */

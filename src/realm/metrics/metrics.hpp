@@ -23,8 +23,8 @@
 
 #include <realm/metrics/query_info.hpp>
 #include <realm/metrics/transaction_info.hpp>
-#include <realm/util/circular_buffer.hpp>
 #include <realm/util/features.h>
+#include "realm/util/fixed_size_buffer.hpp"
 
 namespace realm {
 
@@ -53,8 +53,8 @@ public:
     static std::unique_ptr<MetricTimer> report_fsync_time(const Group& g);
     static std::unique_ptr<MetricTimer> report_write_time(const Group& g);
 
-    using QueryInfoList = util::CircularBuffer<QueryInfo>;
-    using TransactionInfoList = util::CircularBuffer<TransactionInfo>;
+    using QueryInfoList = util::FixedSizeBuffer<QueryInfo>;
+    using TransactionInfoList = util::FixedSizeBuffer<TransactionInfo>;
 
     // Get the list of metric objects tracked since the last take
     std::unique_ptr<QueryInfoList> take_queries();
