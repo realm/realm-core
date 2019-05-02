@@ -5,9 +5,8 @@
   vice versa. This allows us to make calculations using std::chrono::duration.
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Slab usage was reported wrong by SlabAlloc::get_total_slab_size() ([#3284](https://github.com/realm/realm-core/pull/3284)
-  This caused ROS to report "18 exabytes" of memory used for slab.
+  This caused ROS to incorectly report "exabytes" of memory used for slab.
 * The control of the page reclaimer did not limit the page reclaimers workload correctly. This could lead
   to the reclaimer not running as much as intended. This is not believed to have been visible to end users.
   This bug also caused ROS to occasionally report odd metrics for the reclaimer.
