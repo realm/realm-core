@@ -1074,7 +1074,12 @@ void SlabAlloc::reset_free_space_tracking()
     m_free_read_only.clear();
 
     while (m_slabs.size() > 1) {
-        m_slabs.pop_back();
+        if (reduce_fast_mapping_with_slab(m_slabs.back().addr)) {
+            m_slabs.pop_back();
+        }
+        else {
+            break;
+        }
     }
 
     rebuild_freelists_from_slab();
@@ -1320,6 +1325,16 @@ void SlabAlloc::extend_fast_mapping_with_slab(char* address)
     new_fast_mapping[m_translation_table_size - 1] = {address};
 #endif
     m_ref_translation_ptr = new_fast_mapping;
+}
+
+bool SlabAlloc::reduce_fast_mapping_with_slab(char* address)
+{
+    bool ret = false;
+    if (m_ref_translation_ptr[m_translation_table_size - 1].mapping_addr == address) {
+        --m_translation_table_size;
+        ret = true;
+    }
+    return ret;
 }
 
 void SlabAlloc::rebuild_translations(bool requires_new_translation, size_t old_num_sections)

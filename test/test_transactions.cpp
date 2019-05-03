@@ -78,31 +78,42 @@ TEST(Transactions_LargeMappingChange)
     DBRef sg = DB::create(path);
     int data_size = 12 * 1024 * 1024;
     {
-        TransactionRef g = sg->start_write();
-        TableRef tr = g->add_table("test");
-        auto col = tr->add_column(type_Binary, "binary");
+        TransactionRef tr = sg->start_write();
+        TableRef table = tr->add_table("test");
+        auto col = table->add_column(type_Binary, "binary");
+        char c = 'A';
+        for (int i = 0; i < 20; ++i) {
+            std::string str(data_size, c);
+            table->create_object().set(col, BinaryData(str));
+            c++;
+        }
+        tr->commit();
+    }
+    {
+        TransactionRef tr = sg->start_write();
+        TableRef table = tr->get_table("test");
+        auto col = table->get_column_key("binary");
         char* data = new char[data_size];
         for (int i = 0; i < data_size; i += 721) {
             data[i] = i & 0xFF;
         }
-        for (int i = 0; i < 20; ++i) {
-            auto obj = tr->create_object();
-            obj.set(col, BinaryData(data, data_size));
-            auto data2 = obj.get<BinaryData>(col);
+        for (Obj& o : *table) {
+            o.set(col, BinaryData(data, data_size));
+            auto data2 = o.get<BinaryData>(col);
             for (int k = 0; k < data_size; k += 721) {
                 const char* p = data2.data();
                 CHECK_EQUAL((p[k] & 0xFF), (k & 0xFF));
             }
         }
         delete[] data;
-        g->commit();
+        tr->commit();
     }
     {
-        TransactionRef g = sg->start_read();
-        ConstTableRef tr = g->get_table("test");
-        auto col = tr->get_column_key("binary");
-        for (auto it = tr->begin(); it != tr->end(); ++it) {
-            auto data = it->get<BinaryData>(col);
+        TransactionRef tr = sg->start_read();
+        ConstTableRef table = tr->get_table("test");
+        auto col = table->get_column_key("binary");
+        for (auto& o : *table) {
+            auto data = o.get<BinaryData>(col);
             for (int i = 0; i < data_size; i += 721) {
                 const char* p = data.data();
                 CHECK_EQUAL((p[i] & 0xFF), (i & 0xFF));

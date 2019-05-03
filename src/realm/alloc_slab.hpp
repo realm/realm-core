@@ -610,6 +610,9 @@ private:
     // Add a translation covering a new section in the slab area. The translation is always
     // added at the end.
     void extend_fast_mapping_with_slab(char* address);
+    // Remove last entry from mapping. It is assumed that it will contain the address given.
+    // if this is not the case, the mapping will not be removed and false will be returned
+    bool reduce_fast_mapping_with_slab(char* address);
     // Prepare the initial mapping for a file which requires use of the compatibility mapping
     void setup_compatibility_mapping(size_t file_size);
 
