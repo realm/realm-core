@@ -664,7 +664,10 @@ void SyncSession::create_sync_session()
     if (m_force_client_reset) {
         std::string metadata_dir = SyncManager::shared().m_file_manager->get_state_directory();
         util::try_make_dir(metadata_dir);
-        session_config.client_reset_config = sync::Session::Config::ClientReset{metadata_dir};
+        
+        sync::Session::Config::ClientReset config;
+        config.metadata_dir = metadata_dir;
+        session_config.client_reset_config = config;
     }
 
     m_session = m_client.make_session(m_realm_path, std::move(session_config));
