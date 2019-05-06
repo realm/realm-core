@@ -51,10 +51,7 @@ DataType ClusterColumn::get_data_type() const
 
 bool ClusterColumn::is_nullable() const
 {
-    const Table* table = m_cluster_tree->get_owner();
-    const Spec& spec = m_cluster_tree->get_spec();
-    size_t col_ndx = table->colkey2ndx(m_column_key);
-    return spec.get_column_attr(col_ndx).test(col_attr_Nullable);
+    return m_column_key.get_attrs().test(col_attr_Nullable);
 }
 
 StringData ClusterColumn::get_index_data(ObjKey key, StringConversionBuffer& buffer) const

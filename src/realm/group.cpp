@@ -345,6 +345,17 @@ void Transaction::upgrade_file_format(int target_file_format_version)
             commit_and_continue_as_read();
             promote_to_write();
         }
+        // we must do convert_columns() above to have all attributes
+        // correct before column key conversion.
+        changes = false;
+        for (auto k : table_keys) {
+            auto table = get_table(k);
+            changes |= table->convert_column_keys(this);
+        }
+        if (changes) {
+            commit_and_continue_as_read();
+            promote_to_write();
+        }
 
         for (auto k : table_keys) {
             auto table = get_table(k);
@@ -853,7 +864,7 @@ void Group::remove_table(size_t table_ndx, TableKey key)
     // information for Group::TransactAdvancer to handle them.
     size_t n = table->get_column_count();
     for (size_t i = n; i > 0; --i) {
-        ColKey col_key = table->ndx2colkey(i - 1);
+        ColKey col_key = table->spec_ndx2colkey(i - 1);
         table->remove_column(col_key);
     }
 

@@ -121,6 +121,7 @@ public:
         return is_null(get_column_key(col_name));
     }
     bool has_backlinks(bool only_strong_links) const;
+    size_t get_backlink_count(size_t) const;
     size_t get_backlink_count(bool only_strong_links = false) const;
     size_t get_backlink_count(const Table& origin, ColKey origin_col_key) const;
     ObjKey get_backlink(const Table& origin, ColKey origin_col_key, size_t backlink_ndx) const;
@@ -138,6 +139,7 @@ public:
     }
 
 protected:
+    friend class ColumnListBase;
     friend class ConstLstBase;
     friend class ConstLnkLst;
     friend class LnkLst;
@@ -156,7 +158,7 @@ protected:
     bool update() const;
     bool update_if_needed() const;
     template <class T>
-    bool do_is_null(size_t col_ndx) const;
+    bool do_is_null(ColKey::Idx col_ndx) const;
 
     const ClusterTree* get_tree_top() const;
     ColKey get_column_key(StringData col_name) const;
@@ -165,13 +167,13 @@ protected:
     const Spec& get_spec() const;
 
     template <typename U>
-    U _get(size_t col_ndx) const;
+    U _get(ColKey::Idx col_ndx) const;
 
     template <class T>
-    int cmp(const ConstObj& other, size_t col_ndx) const;
-    int cmp(const ConstObj& other, size_t col_ndx) const;
-    size_t get_backlink_count(size_t backlink_col_ndx) const;
-    ObjKey get_backlink(size_t backlink_col_ndx, size_t backlink_ndx) const;
+    int cmp(const ConstObj& other, ColKey::Idx col_ndx) const;
+    int cmp(const ConstObj& other, ColKey::Idx col_ndx) const;
+    size_t get_backlink_count(ColKey backlink_col) const;
+    ObjKey get_backlink(ColKey backlink_col, size_t backlink_ndx) const;
 };
 
 
@@ -248,12 +250,12 @@ private:
     Obj& _set(size_t col_ndx, Val v);
     template <class Head, class... Tail>
     Obj& _set(size_t col_ndx, Head v, Tail... tail);
-    ColKey ndx2colkey(size_t col_ndx);
+    ColKey spec_ndx2colkey(size_t col_ndx);
     bool ensure_writeable();
     void bump_content_version();
     void bump_both_versions();
     template <class T>
-    void do_set_null(size_t col_ndx);
+    void do_set_null(ColKey col_key);
 
     void set_int(ColKey col_key, int64_t value);
     void add_backlink(ColKey backlink_col, ObjKey origin_key);
@@ -370,13 +372,13 @@ std::vector<U> Obj::get_list_values(ColKey col_key) const
 template <class Val>
 inline Obj& Obj::_set(size_t col_ndx, Val v)
 {
-    return set(ndx2colkey(col_ndx), v);
+    return set(spec_ndx2colkey(col_ndx), v);
 }
 
 template <class Head, class... Tail>
 inline Obj& Obj::_set(size_t col_ndx, Head v, Tail... tail)
 {
-    set(ndx2colkey(col_ndx), v);
+    set(spec_ndx2colkey(col_ndx), v);
     return _set(col_ndx + 1, tail...);
 }
 

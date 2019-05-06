@@ -1161,13 +1161,13 @@ TEST(TableView_SortOverLink)
     TableRef origin = g.add_table("origin");
     auto col_link = origin->add_column_link(type_Link, "link", *target);
     auto col_int = origin->add_column(type_Int, "int");
-
     auto col_str = target->add_column(type_String, "s", true);
 
     target->create_object().set(col_str, StringData("bravo"));
     target->create_object().set(col_str, StringData("alfa"));
     target->create_object().set(col_str, StringData("delta"));
     Obj obj = target->create_object().set(col_str, StringData("charley"));
+
 
     int64_t i = 0;
     for (auto it : *target) {
@@ -1181,7 +1181,6 @@ TEST(TableView_SortOverLink)
     CHECK_EQUAL(tv.size(), 2);
     CHECK_EQUAL(tv[0].get<Int>(col_int), 2);
     CHECK_EQUAL(tv[1].get<Int>(col_int), 3);
-
     std::vector<std::vector<ColKey>> v = {{col_link, col_str}};
     std::vector<bool> a = {true};
     tv.sort(SortDescriptor{v, a});
@@ -1529,7 +1528,7 @@ TEST(TableView_IsInTableOrder)
     TableRef target = g.add_table("target");
 
     auto col_link = source->add_column_link(type_LinkList, "link", *target);
-    auto col_name = source->add_column(type_String, "name");
+    source->add_column(type_String, "name");
     auto col_id = target->add_column(type_Int, "id");
     target->add_search_index(col_id);
 
@@ -1564,7 +1563,7 @@ TEST(TableView_IsInTableOrder)
 
     // Views derived from a LinkView are not guaranteed to be in table order.
     auto ll = src_obj.get_linklist_ptr(col_link);
-    tv = ll->get_sorted_view(col_name);
+    tv = ll->get_sorted_view(col_id);
     CHECK_EQUAL(false, tv.is_in_table_order());
 
     tv = target->get_distinct_view(col_id);
@@ -2800,7 +2799,7 @@ TEST(TableView_RemoveColumnsAfterSort)
     }
 
     SortDescriptor desc({{col_int}}, {false}); // sort by the one column in descending order
-
+    table.create_object();
     table.remove_column(col_str0);
     auto tv = table.get_sorted_view(desc);
     CHECK_EQUAL(tv.get(0).get<Int>(col_int), 9);

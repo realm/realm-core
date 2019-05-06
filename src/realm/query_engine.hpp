@@ -512,7 +512,7 @@ protected:
         m_array_ptr = nullptr;
         // Create new Leaf
         m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) LeafType(m_table->get_alloc()));
-        m_cluster->init_leaf(m_table->colkey2ndx(this->m_condition_column_key), m_array_ptr.get());
+        m_cluster->init_leaf(this->m_condition_column_key, m_array_ptr.get());
         m_leaf_ptr = m_array_ptr.get();
     }
 
@@ -701,7 +701,7 @@ public:
         m_array_ptr = nullptr;
         // Create new Leaf
         m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) LeafType(m_table->get_alloc()));
-        m_cluster->init_leaf(m_table->colkey2ndx(this->m_condition_column_key), m_array_ptr.get());
+        m_cluster->init_leaf(this->m_condition_column_key, m_array_ptr.get());
         m_leaf_ptr = m_array_ptr.get();
     }
 
@@ -782,7 +782,7 @@ public:
         // the object has the same address. (As in this case)
         m_array_ptr = nullptr;
         m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) LeafType(m_table->get_alloc()));
-        m_cluster->init_leaf(m_table->colkey2ndx(this->m_condition_column_key), m_array_ptr.get());
+        m_cluster->init_leaf(this->m_condition_column_key, m_array_ptr.get());
         m_leaf_ptr = m_array_ptr.get();
     }
 
@@ -846,7 +846,7 @@ public:
         // the object has the same address. (As in this case)
         m_array_ptr = nullptr;
         m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) ArrayList(m_table->get_alloc()));
-        m_cluster->init_leaf(m_table->colkey2ndx(this->m_condition_column_key), m_array_ptr.get());
+        m_cluster->init_leaf(this->m_condition_column_key, m_array_ptr.get());
         m_leaf_ptr = m_array_ptr.get();
     }
 
@@ -917,7 +917,7 @@ public:
     {
         m_array_ptr = nullptr;
         m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) ArrayBinary(m_table->get_alloc()));
-        m_cluster->init_leaf(m_table->colkey2ndx(this->m_condition_column_key), m_array_ptr.get());
+        m_cluster->init_leaf(this->m_condition_column_key, m_array_ptr.get());
         m_leaf_ptr = m_array_ptr.get();
     }
 
@@ -987,7 +987,7 @@ public:
     {
         m_array_ptr = nullptr;
         m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) ArrayBoolNull(m_table->get_alloc()));
-        m_cluster->init_leaf(m_table->colkey2ndx(this->m_condition_column_key), m_array_ptr.get());
+        m_cluster->init_leaf(this->m_condition_column_key, m_array_ptr.get());
         m_leaf_ptr = m_array_ptr.get();
     }
 
@@ -1051,7 +1051,7 @@ public:
     {
         m_array_ptr = nullptr;
         m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) ArrayTimestamp(m_table->get_alloc()));
-        m_cluster->init_leaf(m_table->colkey2ndx(this->m_condition_column_key), m_array_ptr.get());
+        m_cluster->init_leaf(this->m_condition_column_key, m_array_ptr.get());
         m_leaf_ptr = m_array_ptr.get();
     }
 
@@ -1127,7 +1127,7 @@ public:
         m_array_ptr = nullptr;
         // Create new Leaf
         m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) ArrayString(m_table->get_alloc()));
-        m_cluster->init_leaf(m_table->colkey2ndx(this->m_condition_column_key), m_array_ptr.get());
+        m_cluster->init_leaf(this->m_condition_column_key, m_array_ptr.get());
         m_leaf_ptr = m_array_ptr.get();
     }
 
@@ -1796,12 +1796,12 @@ public:
     {
         m_array_ptr1 = nullptr;
         m_array_ptr1 = LeafPtr(new (&m_leaf_cache_storage1) LeafType(m_table->get_alloc()));
-        this->m_cluster->init_leaf(m_table->colkey2ndx(this->m_condition_column_key1), m_array_ptr1.get());
+        this->m_cluster->init_leaf(this->m_condition_column_key1, m_array_ptr1.get());
         m_leaf_ptr1 = m_array_ptr1.get();
 
         m_array_ptr2 = nullptr;
         m_array_ptr2 = LeafPtr(new (&m_leaf_cache_storage2) LeafType(m_table->get_alloc()));
-        this->m_cluster->init_leaf(m_table->colkey2ndx(this->m_condition_column_key2), m_array_ptr2.get());
+        this->m_cluster->init_leaf(this->m_condition_column_key2, m_array_ptr2.get());
         m_leaf_ptr2 = m_array_ptr2.get();
     }
 
@@ -1943,7 +1943,7 @@ public:
         else if (m_column_type == type_LinkList) {
             m_array_ptr = LeafPtr(new (&m_storage.m_linklist) ArrayList(m_table->get_alloc()));
         }
-        m_cluster->init_leaf(m_table->colkey2ndx(this->m_condition_column_key), m_array_ptr.get());
+        m_cluster->init_leaf(this->m_condition_column_key, m_array_ptr.get());
         m_leaf_ptr = m_array_ptr.get();
     }
 

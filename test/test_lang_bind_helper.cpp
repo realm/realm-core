@@ -428,11 +428,13 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
 
     CHECK_EQUAL(2, rt->size());
     CHECK(foo);
+    cols = foo->get_column_keys();
     CHECK_EQUAL(2, foo->get_column_count());
     CHECK_EQUAL(type_Int, foo->get_column_type(cols[0]));
     CHECK_EQUAL(type_String, foo->get_column_type(cols[1]));
     CHECK_EQUAL(0, foo->size());
     CHECK(bar);
+    cols = bar->get_column_keys();
     CHECK_EQUAL(3, bar->get_column_count());
     CHECK_EQUAL(type_Int, bar->get_column_type(cols[0]));
     CHECK_EQUAL(type_Float, bar->get_column_type(cols[1]));

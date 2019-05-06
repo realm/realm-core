@@ -35,7 +35,7 @@ void LinkMap::set_base_table(const Table* table)
 
     for (size_t i = 0; i < m_link_column_keys.size(); i++) {
         ColKey link_column_key = m_link_column_keys[i];
-        size_t link_column_ndx = m_tables[i]->colkey2ndx(link_column_key);
+        size_t link_column_ndx = m_tables[i]->colkey2spec_ndx(link_column_key);
         // Link column can be either LinkList or single Link
         const Table* t = m_tables.back();
         const Spec& spec = _impl::TableFriend::get_spec(*t);
@@ -106,10 +106,9 @@ void LinkMap::map_links(size_t column, ObjKey key, LinkMapFunction& lm)
     }
     else if (type == col_type_BackLink) {
         auto backlink_column = m_link_column_keys[column];
-        size_t backlink_column_ndx = m_tables[column]->colkey2ndx(backlink_column);
-        size_t sz = obj.get_backlink_count(backlink_column_ndx);
+        size_t sz = obj.get_backlink_count(backlink_column);
         for (size_t t = 0; t < sz; t++) {
-            ObjKey k = obj.get_backlink(backlink_column_ndx, t);
+            ObjKey k = obj.get_backlink(backlink_column, t);
             if (last) {
                 bool continue2 = lm.consume(k);
                 if (!continue2)
@@ -204,8 +203,7 @@ void ColumnListBase::set_cluster(const Cluster* cluster)
     else {
         // Create new Leaf
         m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) ArrayList(m_link_map.get_base_table()->get_alloc()));
-        size_t column_ndx = m_link_map.get_target_table()->colkey2ndx(m_column_key);
-        cluster->init_leaf(column_ndx, m_array_ptr.get());
+        cluster->init_leaf(m_column_key, m_array_ptr.get());
         m_leaf_ptr = m_array_ptr.get();
     }
 }
@@ -228,7 +226,7 @@ void ColumnListBase::get_lists(size_t index, Value<ref_type>& destination, size_
             destination.init(true, sz);
             for (size_t t = 0; t < sz; t++) {
                 ConstObj obj = m_link_map.get_target_table()->get_object(links[t]);
-                ref_type val = to_ref(obj.get<int64_t>(m_column_key));
+                ref_type val = to_ref(obj._get<int64_t>(m_column_key.get_index()));
                 destination.m_storage.set(t, val);
             }
         }

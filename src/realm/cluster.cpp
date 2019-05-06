@@ -103,9 +103,9 @@ public:
     int64_t get_last_key_value() const override;
 
     void ensure_general_form() override;
-    void insert_column(size_t ndx) override;
-    void remove_column(size_t ndx) override;
-    ref_type insert(ObjKey k, const InitValues& init_values, State& state) override;
+    void insert_column(ColKey col) override;
+    void remove_column(ColKey col) override;
+    ref_type insert(ObjKey k, const FieldValues& init_values, State& state) override;
     bool try_get(ObjKey k, State& state) const override;
     ObjKey get(size_t ndx, State& state) const override;
     size_t get_ndx(ObjKey key, size_t ndx) const override;
@@ -294,7 +294,7 @@ MemRef ClusterNodeInner::ensure_writeable(ObjKey key)
         key, [](ClusterNode* node, ChildInfo& child_info) { return node->ensure_writeable(child_info.key); });
 }
 
-ref_type ClusterNodeInner::insert(ObjKey key, const InitValues& init_values, ClusterNode::State& state)
+ref_type ClusterNodeInner::insert(ObjKey key, const FieldValues& init_values, ClusterNode::State& state)
 {
     return recurse<ref_type>(key, [this, &state, &init_values](ClusterNode* node, ChildInfo& child_info) {
         ref_type new_sibling_ref = node->insert(child_info.key, init_values, state);
@@ -491,25 +491,25 @@ void ClusterNodeInner::ensure_general_form()
     }
 }
 
-void ClusterNodeInner::insert_column(size_t ndx)
+void ClusterNodeInner::insert_column(ColKey col)
 {
     size_t sz = node_size();
     for (size_t i = 0; i < sz; i++) {
         ref_type child_ref = _get_child_ref(i);
         std::shared_ptr<ClusterNode> node = m_tree_top.get_node(child_ref);
         node->set_parent(this, i + s_first_node_index);
-        node->insert_column(ndx);
+        node->insert_column(col);
     }
 }
 
-void ClusterNodeInner::remove_column(size_t ndx)
+void ClusterNodeInner::remove_column(ColKey col)
 {
     size_t sz = node_size();
     for (size_t i = 0; i < sz; i++) {
         ref_type child_ref = _get_child_ref(i);
         std::shared_ptr<ClusterNode> node = m_tree_top.get_node(child_ref);
         node->set_parent(this, i + s_first_node_index);
-        node->remove_column(ndx);
+        node->remove_column(col);
     }
 }
 
@@ -710,73 +710,78 @@ int64_t ClusterNodeInner::get_last_key_value() const
 /********************************* Cluster ***********************************/
 
 template <class T>
-inline void Cluster::do_create(size_t col_ndx)
+inline void Cluster::do_create(ColKey col)
 {
     T arr(m_alloc);
     arr.create();
-    arr.set_parent(this, col_ndx + s_first_col_index);
+    auto col_ndx = col.get_index();
+    arr.set_parent(this, col_ndx.val + s_first_col_index);
     arr.update_parent();
 }
 
-void Cluster::create(size_t nb_columns)
+void Cluster::create(size_t nb_leaf_columns)
 {
     // Create array with the required size
-    Array::create(type_HasRefs, false, nb_columns + s_first_col_index);
+    Array::create(type_HasRefs, false, nb_leaf_columns + s_first_col_index);
     Array::set(0, RefOrTagged::make_tagged(0));
-    for (size_t col_ndx = 0; col_ndx < nb_columns; col_ndx++) {
-        ColumnAttrMask attr = m_tree_top.get_spec().get_column_attr(col_ndx);
-
+    auto table = m_tree_top.get_owner();
+    auto column_initialize = [this](ColKey col_key) {
+        auto col_ndx = col_key.get_index();
+        auto type = col_key.get_type();
+        auto attr = col_key.get_attrs();
         if (attr.test(col_attr_List)) {
             ArrayInteger arr(m_alloc);
             arr.create(type_HasRefs);
-            arr.set_parent(this, col_ndx + s_first_col_index);
+            arr.set_parent(this, col_ndx.val + s_first_col_index);
             arr.update_parent();
-
-            continue;
+            return;
         }
-        switch (m_tree_top.get_spec().get_column_type(col_ndx)) {
+        switch (type) {
             case col_type_Int:
                 if (attr.test(col_attr_Nullable)) {
-                    do_create<ArrayIntNull>(col_ndx);
+                    do_create<ArrayIntNull>(col_key);
                 }
                 else {
-                    do_create<ArrayInteger>(col_ndx);
+                    do_create<ArrayInteger>(col_key);
                 }
                 break;
             case col_type_Bool:
-                do_create<ArrayBoolNull>(col_ndx);
+                do_create<ArrayBoolNull>(col_key);
                 break;
             case col_type_Float:
-                do_create<ArrayFloatNull>(col_ndx);
+                do_create<ArrayFloatNull>(col_key);
                 break;
             case col_type_Double:
-                do_create<ArrayDoubleNull>(col_ndx);
+                do_create<ArrayDoubleNull>(col_key);
                 break;
-            case col_type_String:
-                if (m_tree_top.get_spec().is_string_enum_type(col_ndx)) {
-                    do_create<ArrayInteger>(col_ndx);
+            case col_type_String: {
+                size_t spec_ndx = m_tree_top.get_owner()->leaf_ndx2spec_ndx(col_ndx);
+                if (m_tree_top.get_spec().is_string_enum_type(spec_ndx)) {
+                    do_create<ArrayInteger>(col_key);
                 }
                 else {
-                    do_create<ArrayString>(col_ndx);
+                    do_create<ArrayString>(col_key);
                 }
                 break;
+            }
             case col_type_Binary:
-                do_create<ArrayBinary>(col_ndx);
+                do_create<ArrayBinary>(col_key);
                 break;
             case col_type_Timestamp:
-                do_create<ArrayTimestamp>(col_ndx);
+                do_create<ArrayTimestamp>(col_key);
                 break;
             case col_type_Link:
-                do_create<ArrayKey>(col_ndx);
+                do_create<ArrayKey>(col_key);
                 break;
             case col_type_BackLink:
-                do_create<ArrayBacklink>(col_ndx);
+                do_create<ArrayBacklink>(col_key);
                 break;
             default:
                 throw LogicError(LogicError::illegal_type);
                 break;
         }
-    }
+    };
+    table->for_each_and_every_column(column_initialize);
 }
 
 void Cluster::init(MemRef mem)
@@ -810,13 +815,15 @@ MemRef Cluster::ensure_writeable(ObjKey)
 }
 
 template <class T>
-inline void Cluster::do_insert_row(size_t ndx, size_t col_ndx, Mixed init_val, bool nullable)
+inline void Cluster::do_insert_row(size_t ndx, ColKey col, Mixed init_val, bool nullable)
 {
     using U = typename util::RemoveOptional<typename T::value_type>::type;
 
     T arr(m_alloc);
-    arr.set_parent(this, col_ndx + s_first_col_index);
-    arr.set_spec(const_cast<Spec*>(&m_tree_top.get_spec()), col_ndx);
+    auto col_ndx = col.get_index();
+    arr.set_parent(this, col_ndx.val + s_first_col_index);
+    auto spec_ndx = m_tree_top.get_owner()->leaf_ndx2spec_ndx(col_ndx);
+    arr.set_spec(const_cast<Spec*>(&m_tree_top.get_spec()), spec_ndx);
     arr.init_from_parent();
     if (init_val.is_null()) {
         arr.insert(ndx, T::default_value(nullable));
@@ -826,11 +833,12 @@ inline void Cluster::do_insert_row(size_t ndx, size_t col_ndx, Mixed init_val, b
     }
 }
 
-inline void Cluster::do_insert_key(size_t ndx, size_t col_ndx, Mixed init_val, ObjKey origin_key)
+inline void Cluster::do_insert_key(size_t ndx, ColKey col_key, Mixed init_val, ObjKey origin_key)
 {
     ObjKey key = init_val.is_null() ? ObjKey{} : init_val.get<ObjKey>();
     ArrayKey arr(m_alloc);
-    arr.set_parent(this, col_ndx + s_first_col_index);
+    auto col_ndx = col_key.get_index();
+    arr.set_parent(this, col_ndx.val + s_first_col_index);
     arr.init_from_parent();
     arr.insert(ndx, key);
 
@@ -839,20 +847,19 @@ inline void Cluster::do_insert_key(size_t ndx, size_t col_ndx, Mixed init_val, O
         const Table* origin_table = m_tree_top.get_owner();
 
         // Find target table
-        ColKey origin_col_key = origin_table->ndx2colkey(col_ndx);
-        TableRef target_table = _impl::TableFriend::get_opposite_link_table(*origin_table, origin_col_key);
+        TableRef target_table = _impl::TableFriend::get_opposite_link_table(*origin_table, col_key);
 
         // Find actual backlink column
         const Spec& target_table_spec = _impl::TableFriend::get_spec(*target_table);
-        size_t backlink_col = target_table_spec.find_backlink_column(origin_table->get_key(), origin_col_key);
-        ColKey backlink_col_key = target_table->ndx2colkey(backlink_col);
+        size_t backlink_col = target_table_spec.find_backlink_column(origin_table->get_key(), col_key);
+        ColKey backlink_col_key = target_table->spec_ndx2colkey(backlink_col);
 
         Obj target_obj = target_table->get_object(key);
         target_obj.add_backlink(backlink_col_key, origin_key);
     }
 }
 
-void Cluster::insert_row(size_t ndx, ObjKey k, const InitValues& init_values)
+void Cluster::insert_row(size_t ndx, ObjKey k, const FieldValues& init_values)
 {
     if (m_keys.is_attached()) {
         m_keys.insert(ndx, k.value);
@@ -861,59 +868,62 @@ void Cluster::insert_row(size_t ndx, ObjKey k, const InitValues& init_values)
         Array::set(s_key_ref_or_size_index, Array::get(s_key_ref_or_size_index) + 2); // Increments size by 1
     }
 
-    size_t nb_columns = size() - 1;
     auto val = init_values.begin();
-    for (size_t col_ndx = 0; col_ndx < nb_columns; col_ndx++) {
-        ColumnAttrMask attr = m_tree_top.get_spec().get_column_attr(col_ndx);
+    auto table = m_tree_top.get_owner();
+    auto insert_in_column = [&](ColKey col_key) {
+        auto col_ndx = col_key.get_index();
+        auto attr = col_key.get_attrs();
         Mixed init_value;
-        if (val != init_values.end() && val->first == col_ndx) {
-            init_value = val->second;
+        // init_values must be sorted in col_ndx order - this is ensured by ClustTree::insert()
+        if (val != init_values.end() && val->col_key.get_index().val == col_ndx.val) {
+            init_value = val->value;
             ++val;
         }
 
         if (attr.test(col_attr_List)) {
             REALM_ASSERT(init_value.is_null());
             ArrayInteger arr(m_alloc);
-            arr.set_parent(this, col_ndx + s_first_col_index);
+            arr.set_parent(this, col_ndx.val + s_first_col_index);
             arr.init_from_parent();
             arr.insert(ndx, 0);
-            continue;
+            return;
         }
 
         bool nullable = attr.test(col_attr_Nullable);
-        switch (m_tree_top.get_spec().get_column_type(col_ndx)) {
+        auto type = col_key.get_type();
+        switch (type) {
             case col_type_Int:
                 if (attr.test(col_attr_Nullable)) {
-                    do_insert_row<ArrayIntNull>(ndx, col_ndx, init_value, nullable);
+                    do_insert_row<ArrayIntNull>(ndx, col_key, init_value, nullable);
                 }
                 else {
-                    do_insert_row<ArrayInteger>(ndx, col_ndx, init_value, nullable);
+                    do_insert_row<ArrayInteger>(ndx, col_key, init_value, nullable);
                 }
                 break;
             case col_type_Bool:
-                do_insert_row<ArrayBoolNull>(ndx, col_ndx, init_value, nullable);
+                do_insert_row<ArrayBoolNull>(ndx, col_key, init_value, nullable);
                 break;
             case col_type_Float:
-                do_insert_row<ArrayFloatNull>(ndx, col_ndx, init_value, nullable);
+                do_insert_row<ArrayFloatNull>(ndx, col_key, init_value, nullable);
                 break;
             case col_type_Double:
-                do_insert_row<ArrayDoubleNull>(ndx, col_ndx, init_value, nullable);
+                do_insert_row<ArrayDoubleNull>(ndx, col_key, init_value, nullable);
                 break;
             case col_type_String:
-                do_insert_row<ArrayString>(ndx, col_ndx, init_value, nullable);
+                do_insert_row<ArrayString>(ndx, col_key, init_value, nullable);
                 break;
             case col_type_Binary:
-                do_insert_row<ArrayBinary>(ndx, col_ndx, init_value, nullable);
+                do_insert_row<ArrayBinary>(ndx, col_key, init_value, nullable);
                 break;
             case col_type_Timestamp:
-                do_insert_row<ArrayTimestamp>(ndx, col_ndx, init_value, nullable);
+                do_insert_row<ArrayTimestamp>(ndx, col_key, init_value, nullable);
                 break;
             case col_type_Link:
-                do_insert_key(ndx, col_ndx, init_value, ObjKey(k.value + get_offset()));
+                do_insert_key(ndx, col_key, init_value, ObjKey(k.value + get_offset()));
                 break;
             case col_type_BackLink: {
                 ArrayBacklink arr(m_alloc);
-                arr.set_parent(this, col_ndx + s_first_col_index);
+                arr.set_parent(this, col_ndx.val + s_first_col_index);
                 arr.init_from_parent();
                 arr.insert(ndx, 0);
                 break;
@@ -922,18 +932,20 @@ void Cluster::insert_row(size_t ndx, ObjKey k, const InitValues& init_values)
                 REALM_ASSERT(false);
                 break;
         }
-    }
+    };
+    table->for_each_and_every_column(insert_in_column);
 }
 
 template <class T>
-inline void Cluster::do_move(size_t ndx, size_t col_ndx, Cluster* to)
+inline void Cluster::do_move(size_t ndx, ColKey col_key, Cluster* to)
 {
+    auto col_ndx = col_key.get_index().val + s_first_col_index;
     T src(m_alloc);
-    src.set_parent(this, col_ndx + s_first_col_index);
+    src.set_parent(this, col_ndx);
     src.init_from_parent();
 
     T dst(m_alloc);
-    dst.set_parent(to, col_ndx + s_first_col_index);
+    dst.set_parent(to, col_ndx);
     dst.init_from_parent();
 
     src.move(dst, ndx);
@@ -943,58 +955,60 @@ void Cluster::move(size_t ndx, ClusterNode* new_node, int64_t offset)
 {
     auto new_leaf = static_cast<Cluster*>(new_node);
 
-    size_t nb_columns = size() - 1;
-    for (size_t col_ndx = 0; col_ndx < nb_columns; col_ndx++) {
-        const Spec& spec = m_tree_top.get_spec();
-        ColumnAttrMask attr = spec.get_column_attr(col_ndx);
+    auto move_from_column = [&](ColKey col_key) {
+        auto attr = col_key.get_attrs();
+        auto type = col_key.get_type();
 
         if (attr.test(col_attr_List)) {
-            do_move<ArrayInteger>(ndx, col_ndx, new_leaf);
-            continue;
+            do_move<ArrayInteger>(ndx, col_key, new_leaf);
+            return;
         }
 
-        switch (spec.get_column_type(col_ndx)) {
+        switch (type) {
             case col_type_Int:
                 if (attr.test(col_attr_Nullable)) {
-                    do_move<ArrayIntNull>(ndx, col_ndx, new_leaf);
+                    do_move<ArrayIntNull>(ndx, col_key, new_leaf);
                 }
                 else {
-                    do_move<ArrayInteger>(ndx, col_ndx, new_leaf);
+                    do_move<ArrayInteger>(ndx, col_key, new_leaf);
                 }
                 break;
             case col_type_Bool:
-                do_move<ArrayBoolNull>(ndx, col_ndx, new_leaf);
+                do_move<ArrayBoolNull>(ndx, col_key, new_leaf);
                 break;
             case col_type_Float:
-                do_move<ArrayFloat>(ndx, col_ndx, new_leaf);
+                do_move<ArrayFloat>(ndx, col_key, new_leaf);
                 break;
             case col_type_Double:
-                do_move<ArrayDouble>(ndx, col_ndx, new_leaf);
+                do_move<ArrayDouble>(ndx, col_key, new_leaf);
                 break;
-            case col_type_String:
-                if (spec.is_string_enum_type(col_ndx))
-                    do_move<ArrayInteger>(ndx, col_ndx, new_leaf);
+            case col_type_String: {
+                const Spec& spec = m_tree_top.get_spec();
+                size_t spec_ndx = m_tree_top.get_owner()->leaf_ndx2spec_ndx(col_key.get_index());
+                if (spec.is_string_enum_type(spec_ndx))
+                    do_move<ArrayInteger>(ndx, col_key, new_leaf);
                 else
-                    do_move<ArrayString>(ndx, col_ndx, new_leaf);
+                    do_move<ArrayString>(ndx, col_key, new_leaf);
                 break;
+            }
             case col_type_Binary:
-                do_move<ArrayBinary>(ndx, col_ndx, new_leaf);
+                do_move<ArrayBinary>(ndx, col_key, new_leaf);
                 break;
             case col_type_Timestamp:
-                do_move<ArrayTimestamp>(ndx, col_ndx, new_leaf);
+                do_move<ArrayTimestamp>(ndx, col_key, new_leaf);
                 break;
             case col_type_Link:
-                do_move<ArrayKey>(ndx, col_ndx, new_leaf);
+                do_move<ArrayKey>(ndx, col_key, new_leaf);
                 break;
             case col_type_BackLink:
-                do_move<ArrayBacklink>(ndx, col_ndx, new_leaf);
+                do_move<ArrayBacklink>(ndx, col_key, new_leaf);
                 break;
             default:
                 REALM_ASSERT(false);
                 break;
         }
-    }
-
+    };
+    m_tree_top.get_owner()->for_each_and_every_column(move_from_column);
     for (size_t i = ndx; i < m_keys.size(); i++) {
         new_leaf->m_keys.add(m_keys.get(i) - offset);
     }
@@ -1018,7 +1032,7 @@ void Cluster::ensure_general_form()
 }
 
 template <class T>
-inline void Cluster::do_insert_column(size_t col_ndx, bool nullable)
+inline void Cluster::do_insert_column(ColKey col_key, bool nullable)
 {
     size_t sz = node_size();
 
@@ -1028,54 +1042,64 @@ inline void Cluster::do_insert_column(size_t col_ndx, bool nullable)
     for (size_t i = 0; i < sz; i++) {
         arr.add(val);
     }
-    Array::insert(col_ndx + s_first_col_index, from_ref(arr.get_ref()));
+    auto col_ndx = col_key.get_index();
+    unsigned ndx = col_ndx.val + s_first_col_index;
+    if (ndx == size())
+        Array::insert(ndx, from_ref(arr.get_ref()));
+    else
+        Array::set(ndx, from_ref(arr.get_ref()));
 }
 
-void Cluster::insert_column(size_t col_ndx)
+void Cluster::insert_column(ColKey col_key)
 {
-    ColumnAttrMask attr = m_tree_top.get_spec().get_column_attr(col_ndx);
+    auto attr = col_key.get_attrs();
     if (attr.test(col_attr_List)) {
         size_t sz = node_size();
 
         ArrayInteger arr(m_alloc);
         arr.Array::create(type_HasRefs, false, sz, 0);
-        Array::insert(col_ndx + s_first_col_index, from_ref(arr.get_ref()));
+        auto col_ndx = col_key.get_index();
+        unsigned idx = col_ndx.val + s_first_col_index;
+        if (idx == size())
+            Array::insert(idx, from_ref(arr.get_ref()));
+        else
+            Array::set(idx, from_ref(arr.get_ref()));
         return;
     }
     bool nullable = attr.test(col_attr_Nullable);
-
-    switch (m_tree_top.get_spec().get_column_type(col_ndx)) {
+    auto type = col_key.get_type();
+    switch (type) {
         case col_type_Int:
             if (nullable) {
-                do_insert_column<ArrayIntNull>(col_ndx, nullable);
+                do_insert_column<ArrayIntNull>(col_key, nullable);
             }
             else {
-                do_insert_column<ArrayInteger>(col_ndx, nullable);
+                do_insert_column<ArrayInteger>(col_key, nullable);
             }
             break;
         case col_type_Bool:
-            do_insert_column<ArrayBoolNull>(col_ndx, nullable);
+            do_insert_column<ArrayBoolNull>(col_key, nullable);
             break;
         case col_type_Float:
-            do_insert_column<ArrayFloatNull>(col_ndx, nullable);
+            do_insert_column<ArrayFloatNull>(col_key, nullable);
             break;
         case col_type_Double:
-            do_insert_column<ArrayDoubleNull>(col_ndx, nullable);
+            do_insert_column<ArrayDoubleNull>(col_key, nullable);
             break;
         case col_type_String:
-            do_insert_column<ArrayString>(col_ndx, nullable);
+            do_insert_column<ArrayString>(col_key, nullable);
             break;
         case col_type_Binary:
-            do_insert_column<ArrayBinary>(col_ndx, nullable);
+            do_insert_column<ArrayBinary>(col_key, nullable);
             break;
         case col_type_Timestamp:
-            do_insert_column<ArrayTimestamp>(col_ndx, nullable);
+            do_insert_column<ArrayTimestamp>(col_key, nullable);
             break;
         case col_type_Link:
-            do_insert_column<ArrayKey>(col_ndx, nullable);
+            do_insert_column<ArrayKey>(col_key, nullable);
             break;
         case col_type_BackLink:
-            do_insert_column<ArrayBacklink>(col_ndx, nullable);
+            do_insert_column<ArrayBacklink>(col_key, nullable);
             break;
         default:
             throw LogicError(LogicError::illegal_type);
@@ -1083,17 +1107,21 @@ void Cluster::insert_column(size_t col_ndx)
     }
 }
 
-void Cluster::remove_column(size_t col_ndx)
+void Cluster::remove_column(ColKey col_key)
 {
-    col_ndx++;
-    ref_type ref = to_ref(Array::get(col_ndx));
+    auto col_ndx = col_key.get_index();
+    unsigned idx = col_ndx.val + s_first_col_index;
+    ref_type ref = to_ref(Array::get(idx));
     if (ref != 0) {
         Array::destroy_deep(ref, m_alloc);
     }
-    Array::erase(col_ndx);
+    if (idx == size() - 1)
+        Array::erase(idx);
+    else
+        Array::set(idx, 0);
 }
 
-ref_type Cluster::insert(ObjKey k, const InitValues& init_values, ClusterNode::State& state)
+ref_type Cluster::insert(ObjKey k, const FieldValues& init_values, ClusterNode::State& state)
 {
     int64_t current_key_value = -1;
     size_t sz;
@@ -1179,24 +1207,27 @@ ObjKey Cluster::get(size_t ndx, ClusterNode::State& state) const
 }
 
 template <class T>
-inline void Cluster::do_erase(size_t ndx, size_t col_ndx)
+inline void Cluster::do_erase(size_t ndx, ColKey col_key)
 {
+    auto col_ndx = col_key.get_index();
     T values(m_alloc);
-    values.set_parent(this, col_ndx + s_first_col_index);
-    values.set_spec(const_cast<Spec*>(&m_tree_top.get_spec()), col_ndx);
+    values.set_parent(this, col_ndx.val + s_first_col_index);
+    size_t spec_ndx = m_tree_top.get_owner()->colkey2spec_ndx(col_key);
+    values.set_spec(const_cast<Spec*>(&m_tree_top.get_spec()), spec_ndx);
     values.init_from_parent();
     values.erase(ndx);
 }
 
-inline void Cluster::do_erase_key(size_t ndx, size_t col_ndx, CascadeState& state)
+inline void Cluster::do_erase_key(size_t ndx, ColKey col_key, CascadeState& state)
 {
     ArrayKey values(m_alloc);
-    values.set_parent(this, col_ndx + s_first_col_index);
+    auto col_ndx = col_key.get_index();
+    values.set_parent(this, col_ndx.val + s_first_col_index);
     values.init_from_parent();
 
     ObjKey key = values.get(ndx);
     if (key != null_key) {
-        remove_backlinks(get_real_key(ndx), col_ndx, {key}, state);
+        remove_backlinks(get_real_key(ndx), col_key, {key}, state);
     }
     values.erase(ndx);
 }
@@ -1248,10 +1279,14 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
     // the Replication object may need a consistent view of the row (not including
     // link columns). Therefore we first nullify links to this object, then
     // generate the instruction, and then delete the row in the remaining columns.
+
     for (size_t col_ndx = num_public_cols; col_ndx < num_cols; col_ndx++) {
-        REALM_ASSERT(spec.get_column_type(col_ndx) == col_type_BackLink);
+        ColKey col_key = m_tree_top.get_owner()->spec_ndx2colkey(col_ndx);
+        ColKey::Idx leaf_ndx = col_key.get_index();
+        auto type = col_key.get_type();
+        REALM_ASSERT(type == col_type_BackLink);
         ArrayBacklink values(m_alloc);
-        values.set_parent(this, col_ndx + s_first_col_index);
+        values.set_parent(this, leaf_ndx.val + s_first_col_index);
         values.init_from_parent();
         // Ensure that Cluster is writable and able to hold references to nodes in
         // the slab area before nullifying or deleting links. These operation may
@@ -1276,12 +1311,13 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
         repl->remove_object(table, real_key);
     }
 
-    for (size_t col_ndx = 0; col_ndx < num_cols; col_ndx++) {
-        auto col_type = spec.get_column_type(col_ndx);
-        ColumnAttrMask attr = spec.get_column_attr(col_ndx);
+    auto erase_in_column = [&](ColKey col_key) {
+        auto col_type = col_key.get_type();
+        auto col_ndx = col_key.get_index();
+        auto attr = col_key.get_attrs();
         if (attr.test(col_attr_List)) {
             ArrayInteger values(m_alloc);
-            values.set_parent(this, col_ndx + s_first_col_index);
+            values.set_parent(this, col_ndx.val + s_first_col_index);
             values.init_from_parent();
             ref_type ref = values.get_as_ref(ndx);
 
@@ -1290,7 +1326,7 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
                     BPlusTree<ObjKey> links(m_alloc);
                     links.init_from_ref(ref);
                     if (links.size() > 0) {
-                        remove_backlinks(ObjKey(key.value + m_offset), col_ndx, links.get_all(), state);
+                        remove_backlinks(ObjKey(key.value + m_offset), col_key, links.get_all(), state);
                     }
                 }
                 Array::destroy_deep(ref, m_alloc);
@@ -1298,47 +1334,48 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
 
             values.erase(ndx);
 
-            continue;
+            return;
         }
 
         switch (col_type) {
             case col_type_Int:
                 if (attr.test(col_attr_Nullable)) {
-                    do_erase<ArrayIntNull>(ndx, col_ndx);
+                    do_erase<ArrayIntNull>(ndx, col_key);
                 }
                 else {
-                    do_erase<ArrayInteger>(ndx, col_ndx);
+                    do_erase<ArrayInteger>(ndx, col_key);
                 }
                 break;
             case col_type_Bool:
-                do_erase<ArrayBoolNull>(ndx, col_ndx);
+                do_erase<ArrayBoolNull>(ndx, col_key);
                 break;
             case col_type_Float:
-                do_erase<ArrayFloatNull>(ndx, col_ndx);
+                do_erase<ArrayFloatNull>(ndx, col_key);
                 break;
             case col_type_Double:
-                do_erase<ArrayDoubleNull>(ndx, col_ndx);
+                do_erase<ArrayDoubleNull>(ndx, col_key);
                 break;
             case col_type_String:
-                do_erase<ArrayString>(ndx, col_ndx);
+                do_erase<ArrayString>(ndx, col_key);
                 break;
             case col_type_Binary:
-                do_erase<ArrayBinary>(ndx, col_ndx);
+                do_erase<ArrayBinary>(ndx, col_key);
                 break;
             case col_type_Timestamp:
-                do_erase<ArrayTimestamp>(ndx, col_ndx);
+                do_erase<ArrayTimestamp>(ndx, col_key);
                 break;
             case col_type_Link:
-                do_erase_key(ndx, col_ndx, state);
+                do_erase_key(ndx, col_key, state);
                 break;
             case col_type_BackLink:
-                do_erase<ArrayBacklink>(ndx, col_ndx);
+                do_erase<ArrayBacklink>(ndx, col_key);
                 break;
             default:
                 REALM_ASSERT(false);
                 break;
         }
-    }
+    };
+    m_tree_top.get_owner()->for_each_and_every_column(erase_in_column);
 
     if (m_keys.is_attached()) {
         m_keys.erase(ndx);
@@ -1358,12 +1395,13 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
     return node_size();
 }
 
-void Cluster::upgrade_string_to_enum(size_t col_ndx, ArrayString& keys)
+void Cluster::upgrade_string_to_enum(ColKey col_key, ArrayString& keys)
 {
+    auto col_ndx = col_key.get_index();
     ArrayInteger indexes(m_alloc);
     indexes.create(Array::type_Normal, false);
     ArrayString values(m_alloc);
-    ref_type ref = Array::get_as_ref(col_ndx + s_first_col_index);
+    ref_type ref = Array::get_as_ref(col_ndx.val + s_first_col_index);
     values.init_from_ref(ref);
     size_t sz = values.size();
     for (size_t i = 0; i < sz; i++) {
@@ -1372,22 +1410,29 @@ void Cluster::upgrade_string_to_enum(size_t col_ndx, ArrayString& keys)
         REALM_ASSERT_3(pos, !=, keys.size());
         indexes.add(pos);
     }
-    Array::set(col_ndx + s_first_col_index, indexes.get_ref());
+    Array::set(col_ndx.val + s_first_col_index, indexes.get_ref());
     Array::destroy_deep(ref, m_alloc);
 }
 
-void Cluster::init_leaf(size_t col_ndx, ArrayPayload* leaf) const noexcept
+void Cluster::init_leaf(ColKey col_key, ArrayPayload* leaf) const
 {
-    ref_type ref = to_ref(Array::get(col_ndx + 1));
-    leaf->set_spec(const_cast<Spec*>(&m_tree_top.get_spec()), col_ndx);
+    auto col_ndx = col_key.get_index();
+    // FIXME: Move this validation into callers.
+    // Currently, the query subsystem may call with an unvalidated key.
+    // once fixed, reintroduce the noexcept declaration :-D
+    m_tree_top.get_owner()->report_invalid_key(col_key);
+    ref_type ref = to_ref(Array::get(col_ndx.val + 1));
+    size_t spec_ndx = m_tree_top.get_owner()->leaf_ndx2spec_ndx(col_ndx);
+    leaf->set_spec(const_cast<Spec*>(&m_tree_top.get_spec()), spec_ndx);
     leaf->init_from_ref(ref);
-    leaf->set_parent(const_cast<Cluster*>(this), col_ndx + 1);
+    leaf->set_parent(const_cast<Cluster*>(this), col_ndx.val + 1);
 }
 
-void Cluster::add_leaf(size_t col_ndx, ref_type ref)
+void Cluster::add_leaf(ColKey col_key, ref_type ref)
 {
-    REALM_ASSERT((col_ndx + 1) == size());
-    Array::insert(col_ndx + 1, from_ref(ref));
+    auto col_ndx = col_key.get_index();
+    REALM_ASSERT((col_ndx.val + 1) == size());
+    Array::insert(col_ndx.val + 1, from_ref(ref));
 }
 
 // LCOV_EXCL_START
@@ -1500,20 +1545,19 @@ void Cluster::dump_objects(int64_t key_offset, std::string lead) const
 }
 // LCOV_EXCL_STOP
 
-void Cluster::remove_backlinks(ObjKey origin_key, size_t origin_col_ndx, const std::vector<ObjKey>& keys,
+void Cluster::remove_backlinks(ObjKey origin_key, ColKey origin_col_key, const std::vector<ObjKey>& keys,
                                CascadeState& state) const
 {
     const Table* origin_table = m_tree_top.get_owner();
 
     // Find target table
-    ColKey origin_col_key = origin_table->ndx2colkey(origin_col_ndx);
     TableRef target_table = _impl::TableFriend::get_opposite_link_table(*origin_table, origin_col_key);
     TableKey target_table_key = target_table->get_key();
 
     // Find actual backlink column
     const Spec& target_table_spec = _impl::TableFriend::get_spec(*target_table);
     size_t backlink_col = target_table_spec.find_backlink_column(origin_table->get_key(), origin_col_key);
-    ColKey backlink_col_key = target_table->ndx2colkey(backlink_col);
+    ColKey backlink_col_key = target_table->spec_ndx2colkey(backlink_col);
 
     CascadeState::Mode mode = state.m_mode;
     bool strong_links = (origin_table->get_link_type(origin_col_key) == link_Strong);
@@ -1621,7 +1665,7 @@ void ClusterTree::clear()
 {
     size_t num_cols = get_spec().get_public_column_count();
     for (size_t col_ndx = 0; col_ndx < num_cols; col_ndx++) {
-        auto col_key = m_owner->ndx2colkey(col_ndx);
+        auto col_key = m_owner->spec_ndx2colkey(col_ndx);
         if (StringIndex* index = m_owner->get_search_index(col_key)) {
             index->clear();
         }
@@ -1637,7 +1681,7 @@ void ClusterTree::clear()
     m_size = 0;
 }
 
-void ClusterTree::insert_fast(ObjKey k, const InitValues& init_values, ClusterNode::State& state)
+void ClusterTree::insert_fast(ObjKey k, const FieldValues& init_values, ClusterNode::State& state)
 {
     ref_type new_sibling_ref = m_root->insert(k, init_values, state);
     if (REALM_UNLIKELY(new_sibling_ref)) {
@@ -1656,36 +1700,30 @@ void ClusterTree::insert_fast(ObjKey k, const InitValues& init_values, ClusterNo
 Obj ClusterTree::insert(ObjKey k, const FieldValues& values)
 {
     ClusterNode::State state;
-    InitValues init_values;
+    FieldValues init_values(values);
     const Table* table = get_owner();
 
-    if (!values.empty()) {
-        // Translate ColKey to index
-        for (auto& v : values) {
-            size_t col_ndx = table->colkey2ndx(v.col_key);
-            init_values.emplace_back(col_ndx, v.value);
-        }
-        // And sort according to index
-        std::sort(init_values.begin(), init_values.end(), [](auto& a, auto& b) { return a.first < b.first; });
-    }
+    // Sort ColKey according to index
+    std::sort(init_values.begin(), init_values.end(),
+              [](auto& a, auto& b) { return a.col_key.get_index().val < b.col_key.get_index().val; });
 
     insert_fast(k, init_values, state);
 
     // Update index
-    const Spec& spec = get_spec();
-    size_t num_cols = spec.get_public_column_count();
     auto value = init_values.begin();
-    for (size_t col_ndx = 0; col_ndx < num_cols; col_ndx++) {
+    auto insert_in_column = [&](ColKey col_key) {
         // Check if initial value is provided
         Mixed init_value;
-        if (value != init_values.end() && value->first == col_ndx) {
-            init_value = value->second;
+        if (value != init_values.end() && value->col_key.get_index().val == col_key.get_index().val) {
+            init_value = value->value;
             ++value;
         }
 
-        if (StringIndex* index = table->get_search_index(col_ndx)) {
-            bool nullable = spec.get_column_attr(col_ndx).test(col_attr_Nullable);
-            switch (spec.get_column_type(col_ndx)) {
+        if (StringIndex* index = table->get_search_index(col_key)) {
+            auto type = col_key.get_type();
+            auto attr = col_key.get_attrs();
+            bool nullable = attr.test(col_attr_Nullable);
+            switch (type) {
                 case col_type_Int:
                     if (init_value.is_null()) {
                         index->insert(k, ArrayIntNull::default_value(nullable));
@@ -1722,7 +1760,8 @@ Obj ClusterTree::insert(ObjKey k, const FieldValues& values)
                     break;
             }
         }
-    }
+    };
+    get_owner()->for_each_public_column(insert_in_column);
 
     if (Replication* repl = get_alloc().get_replication()) {
         repl->create_object(table, k);
@@ -1788,7 +1827,7 @@ void ClusterTree::erase(ObjKey k, CascadeState& state)
 {
     size_t num_cols = get_spec().get_public_column_count();
     for (size_t col_ndx = 0; col_ndx < num_cols; col_ndx++) {
-        auto col_key = m_owner->ndx2colkey(col_ndx);
+        auto col_key = m_owner->spec_ndx2colkey(col_ndx);
         if (StringIndex* index = m_owner->get_search_index(col_key)) {
             index->erase(k);
         }
@@ -1853,7 +1892,7 @@ void ClusterTree::update(UpdateFunction& func)
     }
 }
 
-void ClusterTree::enumerate_string_column(size_t col_ndx)
+void ClusterTree::enumerate_string_column(ColKey col_key)
 {
     Allocator& alloc = get_alloc();
 
@@ -1861,8 +1900,8 @@ void ClusterTree::enumerate_string_column(size_t col_ndx)
     ArrayString leaf(alloc);
     keys.create();
 
-    ClusterTree::TraverseFunction collect_strings = [col_ndx, &leaf, &keys](const Cluster* cluster) {
-        cluster->init_leaf(col_ndx, &leaf);
+    ClusterTree::TraverseFunction collect_strings = [col_key, &leaf, &keys](const Cluster* cluster) {
+        cluster->init_leaf(col_key, &leaf);
         size_t sz = leaf.size();
         size_t key_size = keys.size();
         for (size_t i = 0; i < sz; i++) {
@@ -1877,15 +1916,16 @@ void ClusterTree::enumerate_string_column(size_t col_ndx)
         return false; // Continue
     };
 
-    ClusterTree::UpdateFunction upgrade = [col_ndx, &keys](Cluster* cluster) {
-        cluster->upgrade_string_to_enum(col_ndx, keys);
+    ClusterTree::UpdateFunction upgrade = [col_key, &keys](Cluster* cluster) {
+        cluster->upgrade_string_to_enum(col_key, keys);
     };
 
     // Populate 'keys' array
     traverse(collect_strings);
 
     // Store key strings in spec
-    const_cast<Spec*>(&get_spec())->upgrade_string_to_enum(col_ndx, keys.get_ref());
+    size_t spec_ndx = get_owner()->colkey2spec_ndx(col_key);
+    const_cast<Spec*>(&get_spec())->upgrade_string_to_enum(spec_ndx, keys.get_ref());
 
     // Replace column in all clusters
     update(upgrade);
@@ -1926,45 +1966,47 @@ void ClusterTree::remove_links()
     CascadeState state(CascadeState::Mode::strong);
     state.m_group = m_owner->get_parent_group();
     Allocator& alloc = get_alloc();
+    auto table = get_owner();
     // This function will add objects that should be deleted to 'state'
-    ClusterTree::TraverseFunction func = [&spec, &state, &alloc](const Cluster* cluster) {
-        size_t num_cols = spec.get_column_count();
-        for (size_t col_ndx = 0; col_ndx != num_cols; ++col_ndx) {
-            auto col_type = spec.get_column_type(col_ndx);
+    ClusterTree::TraverseFunction func = [this, &spec, &state, &alloc, table](const Cluster* cluster) {
+        auto remove_link_from_column = [&](ColKey col_key) {
+            auto col_type = col_key.get_type();
             if (col_type == col_type_Link) {
                 ArrayKey values(alloc);
-                cluster->init_leaf(col_ndx, &values);
+                cluster->init_leaf(col_key, &values);
                 size_t sz = values.size();
                 for (size_t i = 0; i < sz; i++) {
                     if (ObjKey key = values.get(i)) {
-                        cluster->remove_backlinks(cluster->get_real_key(i), col_ndx, {key}, state);
+                        cluster->remove_backlinks(cluster->get_real_key(i), col_key, {key}, state);
                     }
                 }
             }
             else if (col_type == col_type_LinkList) {
                 ArrayInteger values(alloc);
-                cluster->init_leaf(col_ndx, &values);
+                cluster->init_leaf(col_key, &values);
                 size_t sz = values.size();
                 for (size_t i = 0; i < sz; i++) {
                     if (ref_type ref = values.get_as_ref(i)) {
                         BPlusTree<ObjKey> links(alloc);
                         links.init_from_ref(ref);
                         if (links.size() > 0) {
-                            cluster->remove_backlinks(cluster->get_real_key(i), col_ndx, links.get_all(), state);
+                            cluster->remove_backlinks(cluster->get_real_key(i), col_key, links.get_all(), state);
                         }
                     }
                 }
             }
             else if (col_type == col_type_BackLink) {
                 ArrayBacklink values(alloc);
-                cluster->init_leaf(col_ndx, &values);
-                values.set_parent(const_cast<Cluster*>(cluster), col_ndx + Cluster::s_first_col_index);
+                cluster->init_leaf(col_key, &values);
+                values.set_parent(const_cast<Cluster*>(cluster),
+                                  col_key.get_index().val + Cluster::s_first_col_index);
                 size_t sz = values.size();
                 for (size_t i = 0; i < sz; i++) {
                     values.nullify_fwd_links(i, state);
                 }
             }
-        }
+        };
+        get_owner()->for_each_and_every_column(remove_link_from_column);
         // Continue
         return false;
     };

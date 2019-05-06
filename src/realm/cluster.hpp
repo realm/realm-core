@@ -42,7 +42,6 @@ struct FieldValue {
 };
 
 using FieldValues = std::vector<FieldValue>;
-using InitValues = std::vector<std::pair<size_t, Mixed>>;
 
 class ClusterNode : public Array {
 public:
@@ -112,13 +111,13 @@ public:
     /// This will update all parents accordingly
     virtual MemRef ensure_writeable(ObjKey k) = 0;
 
-    /// Insert a column at position 'ndx'
-    virtual void insert_column(size_t ndx) = 0;
-    /// Remove a column at position 'ndx'
-    virtual void remove_column(size_t ndx) = 0;
+    /// Init and potentially Insert a column
+    virtual void insert_column(ColKey col) = 0;
+    /// Clear and potentially Remove a column
+    virtual void remove_column(ColKey col) = 0;
     /// Create a new object identified by 'key' and update 'state' accordingly
     /// Return reference to new node created (if any)
-    virtual ref_type insert(ObjKey k, const InitValues& init_values, State& state) = 0;
+    virtual ref_type insert(ObjKey k, const FieldValues& init_values, State& state) = 0;
     /// Locate object identified by 'key' and update 'state' accordingly
     void get(ObjKey key, State& state) const;
     /// Locate object identified by 'key' and update 'state' accordingly
@@ -173,7 +172,7 @@ public:
     }
     ~Cluster() override;
 
-    void create(size_t nb_columns);
+    void create(size_t nb_leaf_columns); // Note: leaf columns - may include holes
     void init(MemRef mem) override;
     bool update_from_parent(size_t old_baseline) noexcept override;
     bool is_writeable() const
@@ -222,17 +221,17 @@ public:
     }
 
     void ensure_general_form() override;
-    void insert_column(size_t ndx) override;
-    void remove_column(size_t ndx) override;
-    ref_type insert(ObjKey k, const InitValues& init_values, State& state) override;
+    void insert_column(ColKey col) override; // Does not move columns!
+    void remove_column(ColKey col) override; // Does not move columns - may leave a 'hole'
+    ref_type insert(ObjKey k, const FieldValues& init_values, State& state) override;
     bool try_get(ObjKey k, State& state) const override;
     ObjKey get(size_t, State& state) const override;
     size_t get_ndx(ObjKey key, size_t ndx) const override;
     size_t erase(ObjKey k, CascadeState& state) override;
-    void upgrade_string_to_enum(size_t col_ndx, ArrayString& keys);
+    void upgrade_string_to_enum(ColKey col, ArrayString& keys);
 
-    void init_leaf(size_t col_ndx, ArrayPayload* leaf) const noexcept;
-    void add_leaf(size_t col_ndx, ref_type ref);
+    void init_leaf(ColKey col, ArrayPayload* leaf) const;
+    void add_leaf(ColKey col, ref_type ref);
 
     void dump_objects(int64_t key_offset, std::string lead) const override;
 
@@ -245,22 +244,21 @@ private:
         return size_t(Array::get(s_key_ref_or_size_index)) >> 1; // Size is stored as tagged value
     }
     friend class ClusterTree;
-    void insert_row(size_t ndx, ObjKey k, const InitValues& init_values);
+    void insert_row(size_t ndx, ObjKey k, const FieldValues& init_values);
     void move(size_t ndx, ClusterNode* new_node, int64_t key_adj) override;
     template <class T>
-    void do_create(size_t col_ndx);
+    void do_create(ColKey col);
     template <class T>
-    void do_insert_column(size_t col_ndx, bool nullable);
+    void do_insert_column(ColKey col, bool nullable);
     template <class T>
-    void do_insert_row(size_t ndx, size_t col_ndx, Mixed init_val, bool nullable);
+    void do_insert_row(size_t ndx, ColKey col, Mixed init_val, bool nullable);
     template <class T>
-    void do_move(size_t ndx, size_t col_ndx, Cluster* to);
+    void do_move(size_t ndx, ColKey col, Cluster* to);
     template <class T>
-    void do_erase(size_t ndx, size_t col_ndx);
-    void remove_backlinks(ObjKey origin_key, size_t col_ndx, const std::vector<ObjKey>& keys,
-                          CascadeState& state) const;
-    void do_erase_key(size_t ndx, size_t col_ndx, CascadeState& state);
-    void do_insert_key(size_t ndx, size_t col_ndx, Mixed init_val, ObjKey origin_key);
+    void do_erase(size_t ndx, ColKey col);
+    void remove_backlinks(ObjKey origin_key, ColKey col, const std::vector<ObjKey>& keys, CascadeState& state) const;
+    void do_erase_key(size_t ndx, ColKey col, CascadeState& state);
+    void do_insert_key(size_t ndx, ColKey col, Mixed init_val, ObjKey origin_key);
 };
 
 }

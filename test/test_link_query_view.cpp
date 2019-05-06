@@ -122,7 +122,7 @@ TEST(LinkList_Basic1)
     // table2->set_string(1, 0, "A");
     // table2->set_string(1, 1, "A");
 
-    Query q4 = table2->link(col_link2).column<String>(c1).contains(table2->column<String>(c1), false);
+    Query q4 = table2->link(col_link2).column<String>(c1).contains(table2->column<String>(c22), false);
     TableView tv4 = q4.find_all();
     CHECK_EQUAL(tv4.size(), 1);
     CHECK_EQUAL(tv4[0].get_key(), o1.get_key()); // "bar" contained an "A"
@@ -168,7 +168,7 @@ TEST(LinkList_Basic2)
     TableRef table2 = group.add_table("table2");
 
     // add some more columns to table1 and table2
-    auto c0 = table1->add_column(type_Int, "col1");
+    table1->add_column(type_Int, "col1");
     auto c1 = table1->add_column(type_String, "str1");
 
     auto c2 = table2->add_column(type_Int, "col1");
@@ -197,7 +197,7 @@ TEST(LinkList_Basic2)
 
     ObjKey match;
 
-    match = (table1->link(col_link2).column<Int>(c0) > 550).find();
+    match = (table1->link(col_link2).column<Int>(c2) > 550).find();
     CHECK_EQUAL(o11.get_key(), match);
 
 
@@ -207,23 +207,23 @@ TEST(LinkList_Basic2)
     match = (table2->column<Int>(c2) == 500).find();
     CHECK_EQUAL(o21.get_key(), match);
 
-    match = (table1->link(col_link2).column<String>(c1) == "!").find();
+    match = (table1->link(col_link2).column<String>(c3) == "!").find();
     CHECK_EQUAL(o11.get_key(), match);
 
-    match = (table1->link(col_link2).column<Int>(c0) == 600).find();
+    match = (table1->link(col_link2).column<Int>(c2) == 600).find();
     CHECK_EQUAL(o11.get_key(), match);
 
-    match = (table1->link(col_link2).column<String>(c1) == "world").find();
+    match = (table1->link(col_link2).column<String>(c3) == "world").find();
     CHECK_EQUAL(o10.get_key(), match);
 
-    match = (table1->link(col_link2).column<Int>(c0) == 500).find();
+    match = (table1->link(col_link2).column<Int>(c2) == 500).find();
     CHECK_EQUAL(o10.get_key(), match);
 
     // Test link lists with 0 entries (3'rd row has no links)
-    match = (table1->link(col_link2).column<String>(c1) == "foobar").find();
+    match = (table1->link(col_link2).column<String>(c3) == "foobar").find();
     CHECK_EQUAL(ObjKey(), match);
 
-    match = (table1->link(col_link2).column<String>(c1) == table1->column<String>(c1)).find();
+    match = (table1->link(col_link2).column<String>(c3) == table1->column<String>(c1)).find();
     CHECK_EQUAL(o11.get_key(), match);
 }
 
@@ -920,19 +920,19 @@ TEST(LinkList_FindNotNullLink)
 
     // This is how the Cocoa bindings do it normally:
     Query q0 = ll.get_target_table().where(ll);
-    q0.and_query(q0.get_table()->column<Link>(col_linklist).is_null());
+    q0.and_query(q0.get_table()->column<Link>(col_link).is_null());
     CHECK_EQUAL(0, q0.find_all().size());
 
     // This is the "correct" way to do the "Not":
     Query q2 = items->where(ll);
     q2.Not();
-    q2.and_query(items->column<Link>(col_linklist).is_null());
+    q2.and_query(items->column<Link>(col_link).is_null());
     CHECK_EQUAL(6, q2.find_all().size());
 
     // This is how the Cocoa bindings to the "Not":
     Query q1 = ll.get_target_table().where(ll);
     q1.Not();
-    q1.and_query(q1.get_table()->column<Link>(col_linklist).is_null());
+    q1.and_query(q1.get_table()->column<Link>(col_link).is_null());
     CHECK_EQUAL(6, q1.find_all().size());
 }
 

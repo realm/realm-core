@@ -32,11 +32,10 @@ R Table::aggregate(ColKey column_key, T value, size_t* resultcount, ObjKey* retu
     bool nullable = is_nullable(column_key);
     QueryState<ResultType> st(action);
     LeafType leaf(get_alloc());
-    size_t column_ndx = colkey2ndx(column_key);
 
-    ClusterTree::TraverseFunction f = [value, &leaf, column_ndx, &st, nullable](const Cluster* cluster) {
+    ClusterTree::TraverseFunction f = [value, &leaf, column_key, &st, nullable](const Cluster* cluster) {
         // direct aggregate on the leaf
-        cluster->init_leaf(column_ndx, &leaf);
+        cluster->init_leaf(column_key, &leaf);
         Aggregate<action, T> aggr(leaf, nullable);
         st.m_key_offset = cluster->get_offset();
         st.m_key_values = cluster->get_key_array();

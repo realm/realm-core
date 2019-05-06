@@ -30,38 +30,7 @@
 namespace realm {
 
 class Table;
-
-class ColumnAttrMask {
-public:
-    ColumnAttrMask()
-        : m_value(0)
-    {
-    }
-    bool test(ColumnAttr prop)
-    {
-        return (m_value & prop) != 0;
-    }
-    void set(ColumnAttr prop)
-    {
-        m_value |= prop;
-    }
-    void reset(ColumnAttr prop)
-    {
-        m_value &= ~prop;
-    }
-    bool operator==(const ColumnAttrMask& other) const
-    {
-        return m_value == other.m_value;
-    }
-
-private:
-    friend class Spec;
-    int m_value;
-    ColumnAttrMask(int64_t val)
-        : m_value(int(val))
-    {
-    }
-};
+class Group;
 
 class Spec {
 public:
@@ -71,13 +40,13 @@ public:
 
     bool has_strong_link_columns() noexcept;
 
+    // insert column at index
     void insert_column(size_t column_ndx, ColKey column_key, ColumnType type, StringData name,
                        int attr = col_attr_None);
     ColKey get_key(size_t column_ndx) const;
     void rename_column(size_t column_ndx, StringData new_name);
 
-    /// Erase the column at the specified index, and move columns at
-    /// succeeding indexes to the next lower index.
+    /// Erase the column at the specified index.
     ///
     /// This function is guaranteed to *never* throw if the spec is
     /// used in a non-transactional context, or if the spec has
@@ -181,7 +150,10 @@ private:
 
     // Convert columns to new list format
     bool convert_column(size_t column_ndx);
+    bool convert_column_key(size_t column_ndx, Group* group);
 
+    // Generate a column key only from state in the spec.
+    ColKey generate_converted_colkey(size_t column_ndx);
     /// Construct an empty spec and return just the reference to the
     /// underlying memory.
     static MemRef create_empty_spec(Allocator&);

@@ -553,9 +553,10 @@ void ConstTableView::do_sync()
             const Spec& spec = _impl::TableFriend::get_spec(*m_linked_table);
             size_t backlink_col_ndx = spec.find_backlink_column(origin_table_key, m_source_column_key);
             if (backlink_col_ndx != realm::npos) {
-                size_t backlink_count = m_linked_obj.get_backlink_count(backlink_col_ndx);
+                ColKey backlink_col = m_linked_table->spec_ndx2colkey(backlink_col_ndx);
+                size_t backlink_count = m_linked_obj.get_backlink_count(backlink_col);
                 for (size_t i = 0; i < backlink_count; i++)
-                    m_key_values->add(m_linked_obj.get_backlink(backlink_col_ndx, i));
+                    m_key_values->add(m_linked_obj.get_backlink(backlink_col, i));
             }
         }
     }
@@ -571,7 +572,6 @@ void ConstTableView::do_sync()
 
         if (m_query.m_view)
             m_query.m_view->sync_if_needed();
-
         m_query.find_all(*const_cast<ConstTableView*>(this), m_start, m_end, m_limit);
     }
 

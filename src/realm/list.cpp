@@ -110,7 +110,7 @@ ConstLstBase::~ConstLstBase()
 ref_type ConstLstBase::get_child_ref(size_t) const noexcept
 {
     try {
-        return to_ref(m_const_obj->get<int64_t>(m_col_key));
+        return to_ref(m_const_obj->_get<int64_t>(m_col_key.get_index()));
     }
     catch (const InvalidKey&) {
         return ref_type(0);

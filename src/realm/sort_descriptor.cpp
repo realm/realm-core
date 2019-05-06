@@ -155,7 +155,8 @@ BaseDescriptor::Sorter::Sorter(std::vector<std::vector<ColKey>> const& column_li
         std::vector<const Table*> tables = {&root_table};
         tables.resize(sz);
         for (size_t j = 0; j + 1 < sz; ++j) {
-            if (tables[j]->get_column_type(columns[j]) != type_Link) {
+            tables[j]->report_invalid_key(columns[j]);
+            if (columns[j].get_type() != col_type_Link) {
                 // Only last column in link chain is allowed to be non-link
                 throw LogicError(LogicError::type_mismatch);
             }

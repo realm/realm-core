@@ -1813,8 +1813,8 @@ public:
             default:
                 break;
         }
-        size_t col_ndx = m_tables[0]->colkey2ndx(m_link_column_keys[0]);
-        cluster->init_leaf(col_ndx, m_array_ptr.get());
+        // m_tables[0]->report_invalid_key(m_link_column_keys[0]);
+        cluster->init_leaf(m_link_column_keys[0], m_array_ptr.get());
         m_leaf_ptr = m_array_ptr.get();
     }
 
@@ -1962,8 +1962,7 @@ public:
         else {
             // Create new Leaf
             m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) LeafType(m_link_map.get_base_table()->get_alloc()));
-            size_t column_ndx = get_base_table()->colkey2ndx(m_column_key);
-            cluster->init_leaf(column_ndx, m_array_ptr.get());
+            cluster->init_leaf(m_column_key, m_array_ptr.get());
             m_leaf_ptr = m_array_ptr.get();
         }
     }
@@ -3009,8 +3008,7 @@ public:
         else {
             // Create new Leaf
             m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) LeafType(get_base_table()->get_alloc()));
-            size_t column_ndx = get_base_table()->colkey2ndx(m_column_key);
-            cluster->init_leaf(column_ndx, m_array_ptr.get());
+            cluster->init_leaf(m_column_key, m_array_ptr.get());
             m_leaf_ptr = m_array_ptr.get();
         }
     }
