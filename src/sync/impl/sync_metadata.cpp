@@ -206,23 +206,6 @@ SyncFileActionMetadataResults SyncMetadataManager::all_pending_actions() const
     return SyncFileActionMetadataResults(std::move(results), std::move(realm), m_file_action_schema);
 }
 
-bool SyncMetadataManager::delete_metadata_action(const std::string& original_name) const
-{
-    auto shared_realm = Realm::get_shared_realm(m_metadata_config);
-
-    // Retrieve the row for this object.
-    TableRef table = ObjectStore::table_for_object_type(shared_realm->read_group(), c_sync_fileActionMetadata);
-    shared_realm->begin_transaction();
-    size_t row_idx = table->find_first_string(m_file_action_schema.idx_original_name, original_name);
-    if (row_idx == not_found) {
-        shared_realm->cancel_transaction();
-        return false;
-    }
-    table->move_last_over(row_idx);
-    shared_realm->commit_transaction();
-    return true;
-}
-
 util::Optional<SyncUserMetadata> SyncMetadataManager::get_or_make_user_metadata(const std::string& identity,
                                                                                 const std::string& url,
                                                                                 bool make_if_absent) const
@@ -287,14 +270,12 @@ util::Optional<SyncUserMetadata> SyncMetadataManager::get_or_make_user_metadata(
     return SyncUserMetadata(schema, std::move(realm), std::move(*row));
 }
 
-SyncFileActionMetadata SyncMetadataManager::make_file_action_metadata(const std::string &original_name,
-                                                                      const std::string &url,
-                                                                      const std::string &local_uuid,
-                                                                      SyncFileActionMetadata::Action action,
-                                                                      util::Optional<std::string> new_name) const
+void SyncMetadataManager::make_file_action_metadata(StringData original_name,
+                                                    StringData url,
+                                                    StringData local_uuid,
+                                                    SyncFileActionMetadata::Action action,
+                                                    StringData new_name) const
 {
-    size_t raw_action = static_cast<size_t>(action);
-
     // Open the Realm.
     auto realm = Realm::get_shared_realm(m_metadata_config);
     auto& schema = m_file_action_schema;
@@ -308,14 +289,13 @@ SyncFileActionMetadata SyncMetadataManager::make_file_action_metadata(const std:
         table->set_string(schema.idx_original_name, row_idx, original_name);
     }
     table->set_string(schema.idx_new_name, row_idx, new_name);
-    table->set_int(schema.idx_action, row_idx, raw_action);
+    table->set_int(schema.idx_action, row_idx, static_cast<int64_t>(action));
     table->set_string(schema.idx_url, row_idx, url);
     table->set_string(schema.idx_user_identity, row_idx, local_uuid);
     realm->commit_transaction();
-    return SyncFileActionMetadata(schema, std::move(realm), table->get(row_idx));
 }
 
-util::Optional<SyncFileActionMetadata> SyncMetadataManager::get_file_action_metadata(const std::string& original_name) const
+util::Optional<SyncFileActionMetadata> SyncMetadataManager::get_file_action_metadata(StringData original_name) const
 {
     auto realm = Realm::get_shared_realm(m_metadata_config);
     auto schema = m_file_action_schema;

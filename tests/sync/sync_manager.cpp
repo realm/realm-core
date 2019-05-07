@@ -332,9 +332,9 @@ TEST_CASE("sync_manager: file actions", "[sync]") {
 
     SECTION("Action::DeleteRealm") {
         // Create some file actions
-        auto a1 = manager.make_file_action_metadata(realm_path_1, realm_url, "user1", Action::DeleteRealm);
-        auto a2 = manager.make_file_action_metadata(realm_path_2, realm_url, "user2", Action::DeleteRealm);
-        auto a3 = manager.make_file_action_metadata(realm_path_3, realm_url, "user3", Action::DeleteRealm);
+        manager.make_file_action_metadata(realm_path_1, realm_url, "user1", Action::DeleteRealm);
+        manager.make_file_action_metadata(realm_path_2, realm_url, "user2", Action::DeleteRealm);
+        manager.make_file_action_metadata(realm_path_3, realm_url, "user3", Action::DeleteRealm);
 
         SECTION("should properly delete the Realm") {
             // Create some Realms
@@ -383,9 +383,9 @@ TEST_CASE("sync_manager: file actions", "[sync]") {
         const std::string recovery_1 = util::file_path_by_appending_component(recovery_dir, "recovery-1");
         const std::string recovery_2 = util::file_path_by_appending_component(recovery_dir, "recovery-2");
         const std::string recovery_3 = util::file_path_by_appending_component(recovery_dir, "recovery-3");
-        auto a1 = manager.make_file_action_metadata(realm_path_1, realm_url, "user1", Action::BackUpThenDeleteRealm, recovery_1);
-        auto a2 = manager.make_file_action_metadata(realm_path_2, realm_url, "user2", Action::BackUpThenDeleteRealm, recovery_2);
-        auto a3 = manager.make_file_action_metadata(realm_path_3, realm_url, "user3", Action::BackUpThenDeleteRealm, recovery_3);
+        manager.make_file_action_metadata(realm_path_1, realm_url, "user1", Action::BackUpThenDeleteRealm, recovery_1);
+        manager.make_file_action_metadata(realm_path_2, realm_url, "user2", Action::BackUpThenDeleteRealm, recovery_2);
+        manager.make_file_action_metadata(realm_path_3, realm_url, "user3", Action::BackUpThenDeleteRealm, recovery_3);
 
         SECTION("should properly copy the Realm file and delete the Realm") {
             // Create some Realms
@@ -415,7 +415,7 @@ TEST_CASE("sync_manager: file actions", "[sync]") {
             REQUIRE_REALM_EXISTS(realm_base_path);
             REQUIRE(!File::exists(recovery_path));
             // Manually create a file action metadata entry to simulate a client reset.
-            auto a = manager.make_file_action_metadata(realm_base_path, realm_url, identity, Action::BackUpThenDeleteRealm, recovery_path);
+            manager.make_file_action_metadata(realm_base_path, realm_url, identity, Action::BackUpThenDeleteRealm, recovery_path);
             auto pending_actions = manager.all_pending_actions();
             REQUIRE(pending_actions.size() == 4);
 
@@ -453,7 +453,7 @@ TEST_CASE("sync_manager: file actions", "[sync]") {
             // Add a file action after the system is configured.
             REQUIRE_REALM_EXISTS(realm_path_4);
             REQUIRE(File::exists(file_manager.recovery_directory_path()));
-            auto a4 = manager.make_file_action_metadata(realm_path_4, realm_url, "user4", Action::BackUpThenDeleteRealm, recovery_1);
+            manager.make_file_action_metadata(realm_path_4, realm_url, "user4", Action::BackUpThenDeleteRealm, recovery_1);
             CHECK(pending_actions.size() == 1);
             // Force the recovery. (In a real application, the user would have closed the files by now.)
             REQUIRE(SyncManager::shared().immediately_run_file_actions(realm_path_4));
