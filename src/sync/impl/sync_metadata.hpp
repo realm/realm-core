@@ -218,6 +218,8 @@ private:
     SyncFileActionMetadata::Schema m_file_action_schema;
     SyncClientMetadata::Schema m_client_schema;
     std::string m_client_uuid;
+
+    std::shared_ptr<Realm> get_realm() const;
 };
 
 }

@@ -448,20 +448,18 @@ TEST_CASE("sync_manager: file actions", "[sync]") {
             create_dummy_realm(realm_path_4);
             // Configure the system
             SyncManager::shared().configure(base_path, SyncManager::MetadataMode::NoEncryption);
-            auto pending_actions = manager.all_pending_actions();
-            REQUIRE(pending_actions.size() == 0);
+            REQUIRE(manager.all_pending_actions().size() == 0);
             // Add a file action after the system is configured.
             REQUIRE_REALM_EXISTS(realm_path_4);
             REQUIRE(File::exists(file_manager.recovery_directory_path()));
             manager.make_file_action_metadata(realm_path_4, realm_url, "user4", Action::BackUpThenDeleteRealm, recovery_1);
-            CHECK(pending_actions.size() == 1);
+            REQUIRE(manager.all_pending_actions().size() == 1);
             // Force the recovery. (In a real application, the user would have closed the files by now.)
             REQUIRE(SyncManager::shared().immediately_run_file_actions(realm_path_4));
             // There should be recovery files.
             REQUIRE_REALM_DOES_NOT_EXIST(realm_path_4);
             CHECK(File::exists(recovery_1));
-            pending_actions = manager.all_pending_actions();
-            CHECK(pending_actions.size() == 0);
+            REQUIRE(manager.all_pending_actions().size() == 0);
         }
 
         SECTION("should fail gracefully if there is already a file at the destination") {
