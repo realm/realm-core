@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 5.20.0 Release notes
 
 ### Enhancements
 * Added the ability to convert a std::chrono::time_point to a Timestamp and
@@ -15,14 +15,6 @@
   although the file was ok.
   ([#3267](https://github.com/realm/realm-core/issues/3267), since core v5.12.2)
  
-### Breaking changes
-* None.
-
------------
-
-### Internals
-* None.
-
 ----------------------------------------------
 
 # 5.19.1 Release notes
