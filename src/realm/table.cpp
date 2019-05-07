@@ -40,6 +40,7 @@
 #include <realm/array_string.hpp>
 #include <realm/array_timestamp.hpp>
 #include <realm/table_tpl.hpp>
+#include <realm/object_id.hpp>
 
 /// \page AccessorConsistencyLevels
 ///
