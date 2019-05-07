@@ -1466,22 +1466,22 @@ TEST(LangBindHelper_AdvanceReadTransact_CascadeRemove_ColumnLinkList)
 
 
     // Break link by clearing list
-    perform_change([=](Table& origin) { origin.get_object(1).get_linklist(col).clear(); });
+    perform_change([&](Table& origin) { origin.get_object(1).get_linklist(col).clear(); });
     CHECK(target_obj0.is_valid() && !target_obj1.is_valid());
     CHECK_EQUAL(target->size(), 1);
 
     // Break link by removal from list
-    perform_change([=](Table& origin) { origin.get_object(1).get_linklist(col).remove(1); });
+    perform_change([&](Table& origin) { origin.get_object(1).get_linklist(col).remove(1); });
     CHECK(target_obj0.is_valid() && !target_obj1.is_valid());
     CHECK_EQUAL(target->size(), 1);
 
     // Break link by reassign
-    perform_change([=](Table& origin) { origin.get_object(1).get_linklist(col).set(1, target_key0); });
+    perform_change([&](Table& origin) { origin.get_object(1).get_linklist(col).set(1, target_key0); });
     CHECK(target_obj0.is_valid() && !target_obj1.is_valid());
     CHECK_EQUAL(target->size(), 1);
 
     // Avoid breaking link by reassigning self
-    perform_change([=](Table& origin) { origin.get_object(1).get_linklist(col).set(1, target_key1); });
+    perform_change([&](Table& origin) { origin.get_object(1).get_linklist(col).set(1, target_key1); });
     // Should not delete anything
     CHECK(target_obj0.is_valid() && target_obj1.is_valid());
     CHECK_EQUAL(target->size(), 2);

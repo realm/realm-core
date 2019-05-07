@@ -295,6 +295,17 @@ int Group::get_target_file_format_version_for_session(int /* current_file_format
     return 10;
 }
 
+uint64_t Group::get_sync_file_id() const noexcept
+{
+    if (m_top.is_attached() && m_top.size() > s_sync_file_id_ndx) {
+        return uint64_t(m_top.get_as_ref_or_tagged(s_sync_file_id_ndx).get_as_int());
+    }
+    auto repl = get_replication();
+    if (repl && repl->get_history_type() == Replication::hist_SyncServer) {
+        return 1;
+    }
+    return 0;
+}
 
 void Transaction::upgrade_file_format(int target_file_format_version)
 {
@@ -496,10 +507,11 @@ void Group::validate_top_array(const Array& arr, const SlabAlloc& alloc)
         case 5:
         case 7:
         case 9:
-        case 10: {
-            ref_type table_names_ref = arr.get_as_ref_or_tagged(0).get_as_ref();
-            ref_type tables_ref = arr.get_as_ref_or_tagged(1).get_as_ref();
-            auto logical_file_size = arr.get_as_ref_or_tagged(2).get_as_int();
+        case 10:
+        case 11: {
+            ref_type table_names_ref = arr.get_as_ref_or_tagged(s_table_name_ndx).get_as_ref();
+            ref_type tables_ref = arr.get_as_ref_or_tagged(s_table_refs_ndx).get_as_ref();
+            auto logical_file_size = arr.get_as_ref_or_tagged(s_file_size_ndx).get_as_int();
 
             // Logical file size must never exceed actual file size.
             // First two entries must be valid refs pointing inside the file
@@ -982,6 +994,7 @@ public:
             history.init_from_ref(history_ref);
             info.ref = history.write(out, deep, only_if_modified); // Throws
         }
+        info.sync_file_id = m_group.get_sync_file_id();
         return info;
     }
 
@@ -1130,7 +1143,8 @@ void Group::write(std::ostream& out, int file_format_version, TableWriter& table
                 top.add(RefOrTagged::make_tagged(history_info.type));
                 top.add(RefOrTagged::make_ref(history_info.ref));
                 top.add(RefOrTagged::make_tagged(history_info.version));
-                top_size = 10;
+                top.add(RefOrTagged::make_tagged(history_info.sync_file_id));
+                top_size = s_group_max_size;
             }
         }
         top_ref = out_2.get_ref_of_next_array();
@@ -1600,28 +1614,29 @@ void Group::advance_transact(ref_type new_top_ref, size_t new_file_size, _impl::
         send_schema_change_notification();
 }
 
-void Group::prepare_top_for_history(int history_type, int history_schema_version)
+void Group::prepare_top_for_history(int history_type, int history_schema_version, uint64_t file_ident)
 {
     REALM_ASSERT(m_file_format_version >= 7);
-    if (m_top.size() < 10) {
-        REALM_ASSERT(m_top.size() <= 7);
-        while (m_top.size() < 7) {
+    if (m_top.size() < s_group_max_size) {
+        REALM_ASSERT(m_top.size() <= s_hist_type_ndx);
+        while (m_top.size() < s_hist_type_ndx) {
             m_top.add(0); // Throws
         }
         ref_type history_ref = 0; // No history yet
         m_top.add(RefOrTagged::make_tagged(history_type)); // Throws
         m_top.add(RefOrTagged::make_ref(history_ref)); // Throws
         m_top.add(RefOrTagged::make_tagged(history_schema_version)); // Throws
+        m_top.add(RefOrTagged::make_tagged(file_ident));             // Throws
     }
     else {
-        int stored_history_type = int(m_top.get_as_ref_or_tagged(7).get_as_int());
-        int stored_history_schema_version = int(m_top.get_as_ref_or_tagged(9).get_as_int());
+        int stored_history_type = int(m_top.get_as_ref_or_tagged(s_hist_type_ndx).get_as_int());
+        int stored_history_schema_version = int(m_top.get_as_ref_or_tagged(s_hist_version_ndx).get_as_int());
         if (stored_history_type != Replication::hist_None) {
             REALM_ASSERT(stored_history_type == history_type);
             REALM_ASSERT(stored_history_schema_version == history_schema_version);
         }
-        m_top.set(7, RefOrTagged::make_tagged(history_type)); // Throws
-        m_top.set(9, RefOrTagged::make_tagged(history_schema_version)); // Throws
+        m_top.set(s_hist_type_ndx, RefOrTagged::make_tagged(history_type));              // Throws
+        m_top.set(s_hist_version_ndx, RefOrTagged::make_tagged(history_schema_version)); // Throws
     }
 }
 
@@ -1784,24 +1799,24 @@ void Group::verify() const
     // marked as free before the file was opened.
     MemUsageVerifier mem_usage_2(ref_begin, immutable_ref_end, mutable_ref_end, baseline);
     {
-        REALM_ASSERT_EX(m_top.size() == 3 || m_top.size() == 5 || m_top.size() == 7 ||
-                        m_top.size() == 10, m_top.size());
+        REALM_ASSERT_EX(m_top.size() == 3 || m_top.size() == 5 || m_top.size() == 7 || m_top.size() == 10 ||
+                            m_top.size() == 11,
+                        m_top.size());
         Allocator& alloc = m_top.get_alloc();
         ArrayInteger pos(alloc), len(alloc), ver(alloc);
-        size_t pos_ndx = 3, len_ndx = 4, ver_ndx = 5;
-        pos.set_parent(const_cast<Array*>(&m_top), pos_ndx);
-        len.set_parent(const_cast<Array*>(&m_top), len_ndx);
-        ver.set_parent(const_cast<Array*>(&m_top), ver_ndx);
-        if (m_top.size() > pos_ndx) {
-            if (ref_type ref = m_top.get_as_ref(pos_ndx))
+        pos.set_parent(const_cast<Array*>(&m_top), s_free_pos_ndx);
+        len.set_parent(const_cast<Array*>(&m_top), s_free_size_ndx);
+        ver.set_parent(const_cast<Array*>(&m_top), s_free_version_ndx);
+        if (m_top.size() > s_free_pos_ndx) {
+            if (ref_type ref = m_top.get_as_ref(s_free_pos_ndx))
                 pos.init_from_ref(ref);
         }
-        if (m_top.size() > len_ndx) {
-            if (ref_type ref = m_top.get_as_ref(len_ndx))
+        if (m_top.size() > s_free_size_ndx) {
+            if (ref_type ref = m_top.get_as_ref(s_free_size_ndx))
                 len.init_from_ref(ref);
         }
-        if (m_top.size() > ver_ndx) {
-            if (ref_type ref = m_top.get_as_ref(ver_ndx))
+        if (m_top.size() > s_free_version_ndx) {
+            if (ref_type ref = m_top.get_as_ref(s_free_version_ndx))
                 ver.init_from_ref(ref);
         }
         REALM_ASSERT(pos.is_attached() == len.is_attached());
@@ -1879,20 +1894,19 @@ void Group::print_free() const
 {
     Allocator& alloc = m_top.get_alloc();
     ArrayInteger pos(alloc), len(alloc), ver(alloc);
-    size_t pos_ndx = 3, len_ndx = 4, ver_ndx = 5;
-    pos.set_parent(const_cast<Array*>(&m_top), pos_ndx);
-    len.set_parent(const_cast<Array*>(&m_top), len_ndx);
-    ver.set_parent(const_cast<Array*>(&m_top), ver_ndx);
-    if (m_top.size() > pos_ndx) {
-        if (ref_type ref = m_top.get_as_ref(pos_ndx))
+    pos.set_parent(const_cast<Array*>(&m_top), s_free_pos_ndx);
+    len.set_parent(const_cast<Array*>(&m_top), s_free_size_ndx);
+    ver.set_parent(const_cast<Array*>(&m_top), s_free_version_ndx);
+    if (m_top.size() > s_free_pos_ndx) {
+        if (ref_type ref = m_top.get_as_ref(s_free_pos_ndx))
             pos.init_from_ref(ref);
     }
-    if (m_top.size() > len_ndx) {
-        if (ref_type ref = m_top.get_as_ref(len_ndx))
+    if (m_top.size() > s_free_size_ndx) {
+        if (ref_type ref = m_top.get_as_ref(s_free_size_ndx))
             len.init_from_ref(ref);
     }
-    if (m_top.size() > ver_ndx) {
-        if (ref_type ref = m_top.get_as_ref(ver_ndx))
+    if (m_top.size() > s_free_version_ndx) {
+        if (ref_type ref = m_top.get_as_ref(s_free_version_ndx))
             ver.init_from_ref(ref);
     }
 

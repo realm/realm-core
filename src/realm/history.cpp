@@ -66,8 +66,8 @@ public:
         if (!m_changesets) {
             using gf = _impl::GroupFriend;
             m_changesets = std::make_unique<BinaryColumn>(*m_alloc); // Throws
-            gf::prepare_history_parent(*m_group, *m_changesets, Replication::hist_InRealm,
-                                       g_history_schema_version); // Throws
+            gf::prepare_history_parent(*m_group, *m_changesets, Replication::hist_InRealm, g_history_schema_version,
+                                       0); // Throws
             m_changesets->create();
         }
     }

@@ -232,6 +232,13 @@ public:
         return *get_repl();
     }
 
+    /// The sync file id is set when a client synchronizes with the server for the
+    /// first time. It is used when generating ObjecIDs for tables without a primary
+    /// key, where it is used as the "hi" part. This ensures global uniqueness of
+    /// ObjectIDs.
+    uint64_t get_sync_file_id() const noexcept;
+    void set_sync_file_id(uint64_t id);
+
     /// Returns the keys for all tables in this group.
     TableKeys get_table_keys() const;
 
@@ -627,6 +634,20 @@ private:
         }
     };
 
+    static constexpr size_t s_table_name_ndx = 0;
+    static constexpr size_t s_table_refs_ndx = 1;
+    static constexpr size_t s_file_size_ndx = 2;
+    static constexpr size_t s_free_pos_ndx = 3;
+    static constexpr size_t s_free_size_ndx = 4;
+    static constexpr size_t s_free_version_ndx = 5;
+    static constexpr size_t s_version_ndx = 6;
+    static constexpr size_t s_hist_type_ndx = 7;
+    static constexpr size_t s_hist_ref_ndx = 8;
+    static constexpr size_t s_hist_version_ndx = 9;
+    static constexpr size_t s_sync_file_id_ndx = 10;
+
+    static constexpr size_t s_group_max_size = 11;
+
     // We use the classic approach to construct a FIFO from two LIFO's,
     // insertion is done into recycler_1, removal is done from recycler_2,
     // and when recycler_2 is empty, recycler_1 is reversed into recycler_2.
@@ -810,9 +831,10 @@ private:
     void set_history_schema_version(int version);
     template <class Accessor>
     void set_history_parent(Accessor& history_root) noexcept;
-    void prepare_top_for_history(int history_type, int history_schema_version);
+    void prepare_top_for_history(int history_type, int history_schema_version, uint64_t file_ident);
     template <class Accessor>
-    void prepare_history_parent(Accessor& history_root, int history_type, int history_schema_version);
+    void prepare_history_parent(Accessor& history_root, int history_type, int history_schema_version,
+                                uint64_t file_ident);
     static void validate_top_array(const Array& arr, const SlabAlloc& alloc);
 
     size_t find_table_index(StringData name) const noexcept;
@@ -1044,16 +1066,12 @@ inline void Group::get_version_and_history_info(const Array& top, _impl::History
     int history_type_2 = 0;
     int history_schema_version_2 = 0;
     if (top.is_attached()) {
-        if (top.size() >= 6) {
-            REALM_ASSERT(top.size() >= 7);
-            version_2 = version_type(top.get_as_ref_or_tagged(6).get_as_int());
+        if (top.size() > s_version_ndx) {
+            version_2 = version_type(top.get_as_ref_or_tagged(s_version_ndx).get_as_int());
         }
-        if (top.size() >= 8) {
-            REALM_ASSERT(top.size() >= 9);
-            history_type_2           = int(top.get_as_ref_or_tagged(7).get_as_int());
-        }
-        if (top.size() >= 10) {
-            history_schema_version_2 = int(top.get_as_ref_or_tagged(9).get_as_int());
+        if (top.size() > s_hist_version_ndx) {
+            history_type_2 = int(top.get_as_ref_or_tagged(s_hist_type_ndx).get_as_int());
+            history_schema_version_2 = int(top.get_as_ref_or_tagged(s_hist_version_ndx).get_as_int());
         }
     }
     // Version 0 is not a legal initial version, so it has to be set to 1
@@ -1067,24 +1085,31 @@ inline void Group::get_version_and_history_info(const Array& top, _impl::History
 
 inline ref_type Group::get_history_ref(const Array& top) noexcept
 {
-    bool has_history = (top.is_attached() && top.size() >= 8);
+    bool has_history = (top.is_attached() && top.size() > s_hist_type_ndx);
     if (has_history) {
         // This function is only used is shared mode (from SharedGroup)
-        REALM_ASSERT(top.size() >= 10);
-        return top.get_as_ref(8);
+        REALM_ASSERT(top.size() > s_hist_version_ndx);
+        return top.get_as_ref(s_hist_ref_ndx);
     }
     return 0;
 }
 
 inline int Group::get_history_schema_version() noexcept
 {
-    bool has_history = (m_top.is_attached() && m_top.size() >= 8);
+    bool has_history = (m_top.is_attached() && m_top.size() > s_hist_type_ndx);
     if (has_history) {
         // This function is only used is shared mode (from SharedGroup)
-        REALM_ASSERT(m_top.size() >= 10);
-        return int(m_top.get_as_ref_or_tagged(9).get_as_int());
+        REALM_ASSERT(m_top.size() > s_hist_version_ndx);
+        return int(m_top.get_as_ref_or_tagged(s_hist_version_ndx).get_as_int());
     }
     return 0;
+}
+
+inline void Group::set_sync_file_id(uint64_t id)
+{
+    while (m_top.size() < s_sync_file_id_ndx + 1)
+        m_top.add(0);
+    m_top.set(s_sync_file_id_ndx, RefOrTagged::make_tagged(id));
 }
 
 inline void Group::set_history_schema_version(int version)
@@ -1101,9 +1126,10 @@ inline void Group::set_history_parent(Accessor& history_root) noexcept
 }
 
 template <class Accessor>
-void Group::prepare_history_parent(Accessor& history_root, int history_type, int history_schema_version)
+void Group::prepare_history_parent(Accessor& history_root, int history_type, int history_schema_version,
+                                   uint64_t file_ident)
 {
-    prepare_top_for_history(history_type, history_schema_version);
+    prepare_top_for_history(history_type, history_schema_version, file_ident);
     set_history_parent(history_root);
 }
 
@@ -1113,6 +1139,7 @@ public:
         ref_type ref = 0;
         int type = 0;
         int version = 0;
+        uint64_t sync_file_id = 0;
     };
 
     virtual ref_type write_names(_impl::OutputStream&) = 0;
@@ -1207,9 +1234,15 @@ public:
 
     template <class Accessor>
     static void prepare_history_parent(Group& group, Accessor& history_root, int history_type,
-                                       int history_schema_version)
+                                       int history_schema_version, uint64_t file_ident = 0)
     {
-        group.prepare_history_parent(history_root, history_type, history_schema_version); // Throws
+        group.prepare_history_parent(history_root, history_type, history_schema_version, file_ident); // Throws
+    }
+
+    // This is used by upgrade functions in Sync
+    static Table* get_table_by_ndx(Group& group, size_t ndx)
+    {
+        return group.do_get_table(ndx);
     }
 };
 

@@ -284,7 +284,7 @@ public:
         : Array(alloc, ref)
         , m_alloc(alloc)
     {
-        m_valid &= (size() <= 10);
+        m_valid &= (size() <= 11);
         if (valid()) {
             m_file_size = get_val(2);
             current_logical_file_size = m_file_size;
@@ -332,6 +332,10 @@ public:
     int get_history_schema_version() const
     {
         return int(get_val(9));
+    }
+    int get_file_ident() const
+    {
+        return int(get_val(10));
     }
     unsigned get_nb_tables() const
     {
@@ -411,6 +415,9 @@ std::ostream& operator<<(std::ostream& ostr, const Group& g)
         if (g.size() > 8) {
             ostr << "History type: " << g.get_history_type() << std::endl;
             ostr << "History schema version: " << g.get_history_schema_version() << std::endl;
+        }
+        if (g.size() > 10) {
+            ostr << "File ident: " << g.get_file_ident() << std::endl;
         }
     }
     else {

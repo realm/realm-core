@@ -2823,11 +2823,6 @@ TEST(Table_object_basic)
     CHECK_THROW(y.get<int64_t>(intnull_col), InvalidKey);
 
     CHECK(table.get_object(ObjKey(8)).is_null(intnull_col));
-
-    ObjKey k11 = table.create_object().get_key();
-    ObjKey k12 = table.create_object().get_key();
-    CHECK_EQUAL(k11.value, 11);
-    CHECK_EQUAL(k12.value, 12);
 }
 
 

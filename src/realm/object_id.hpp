@@ -127,56 +127,7 @@ public:
                                                           ObjectID colliding_id, ObjKey colliding_local_id) = 0;
     virtual void free_local_id_after_hash_collision(Transaction&, TableKey table_ndx, ObjectID object_id) = 0;
 
-    /// Some Object IDs are generated as a tuple of the client_file_ident and a
-    /// local sequence number. This function takes the next number in the
-    /// sequence for the given table and returns an appropriate globally unique
-    /// ObjectID.
-    virtual ObjectID allocate_object_id_squeezed(Transaction&, TableKey table_ndx) = 0;
-
     virtual void table_erased(Transaction&, TableKey) = 0;
-
-    virtual uint64_t get_client_file_ident(const Transaction&) const = 0;
-
-    /*************************************************************************/
-
-    ObjKey global_to_local_object_id_squeezed(ObjectID object_id, const Transaction& tr)
-    {
-        REALM_ASSERT(object_id.hi() <= 0x3fffffff);
-        REALM_ASSERT(object_id.lo() <= std::numeric_limits<uint32_t>::max());
-
-        auto hi = object_id.hi();
-        if (hi == uint64_t(get_client_file_ident(tr)))
-            hi = 0;
-        uint64_t a = object_id.lo() & 0xff;
-        uint64_t b = (hi & 0xff) << 8;
-        uint64_t c = (object_id.lo() & 0xffffff00) << 8;
-        uint64_t d = (hi & 0x3fffff00) << 32;
-        union {
-            uint64_t u;
-            int64_t s;
-        } bitcast;
-        bitcast.u = a | b | c | d;
-        return ObjKey(bitcast.s);
-    }
-
-    ObjectID local_to_global_object_id_squeezed(ObjKey squeezed, const Transaction& tr)
-    {
-        union {
-            uint64_t u;
-            int64_t s;
-        } bitcast;
-        bitcast.s = squeezed.value;
-
-        uint64_t u = bitcast.u;
-
-        uint64_t lo = (u & 0xff) | ((u & 0xffffff0000) >> 8);
-        uint64_t hi = ((u & 0xff00) >> 8) | ((u & 0xffffff0000000000) >> 32);
-        if (hi == 0)
-            hi = get_client_file_ident(tr);
-        return ObjectID{hi, lo};
-    }
-
-    /*************************************************************************/
 
     /// Calculate optimistic local ID that may collide with others. It is up to
     /// the caller to ensure that collisions are detected and that

@@ -166,7 +166,7 @@ public:
             using gf = _impl::GroupFriend;
             Allocator& alloc = gf::get_alloc(*m_group);
             m_arr = std::make_unique<BinaryColumn>(alloc);
-            gf::prepare_history_parent(*m_group, *m_arr, hist_SyncClient, m_history_schema_version);
+            gf::prepare_history_parent(*m_group, *m_arr, hist_SyncClient, m_history_schema_version, 0);
             m_arr->create();
             m_arr->add(BinaryData("Changeset"));
         }
@@ -228,11 +228,16 @@ TEST(Replication_HistorySchemaVersionDuringWT)
         wt.commit();
     }
 
-    WriteTransaction wt(sg_1);
+    auto wt = sg_1->start_write();
+    wt->set_sync_file_id(2);
 
     // It should be possible to open a second db at the same path
     // while a WriteTransaction is active via another SharedGroup.
     DBRef sg_2 = DB::create(repl);
+    wt->commit();
+
+    auto rt = sg_2->start_read();
+    CHECK_EQUAL(rt->get_sync_file_id(), 2);
 }
 
 

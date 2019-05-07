@@ -272,6 +272,44 @@ constexpr char g_class_name_prefix[] = "class_";
 constexpr size_t g_class_name_prefix_len = 6;
 constexpr ColKey g_pk_table{0x20000};
 constexpr ColKey g_pk_property{0x40020001};
+
+inline ObjKey global_to_local_object_id_squeezed(ObjectID object_id, uint64_t sync_file_id)
+{
+    REALM_ASSERT(object_id.hi() <= 0x3fffffff);
+    REALM_ASSERT(object_id.lo() <= std::numeric_limits<uint32_t>::max());
+
+    auto hi = object_id.hi();
+    if (hi == sync_file_id)
+        hi = 0;
+    uint64_t a = object_id.lo() & 0xff;
+    uint64_t b = (hi & 0xff) << 8;
+    uint64_t c = (object_id.lo() & 0xffffff00) << 8;
+    uint64_t d = (hi & 0x3fffff00) << 32;
+    union {
+        uint64_t u;
+        int64_t s;
+    } bitcast;
+    bitcast.u = a | b | c | d;
+    return ObjKey(bitcast.s);
+}
+
+inline ObjectID local_to_global_object_id_squeezed(ObjKey squeezed, uint64_t sync_file_id)
+{
+    union {
+        uint64_t u;
+        int64_t s;
+    } bitcast;
+    bitcast.s = squeezed.value;
+
+    uint64_t u = bitcast.u;
+
+    uint64_t lo = (u & 0xff) | ((u & 0xffffff0000) >> 8);
+    uint64_t hi = ((u & 0xff00) >> 8) | ((u & 0xffffff0000000000) >> 32);
+    if (hi == 0)
+        hi = sync_file_id;
+    return ObjectID{hi, lo};
+}
+
 } // namespace
 
 bool TableVersions::operator==(const TableVersions& other) const
@@ -796,7 +834,6 @@ void Table::detach() noexcept
 
 void Table::fully_detach() noexcept
 {
-    m_next_key_value = -1; // trigger recomputation on next use
     m_spec.detach();
     m_top.detach();
     for (auto& index : m_index_accessors) {
@@ -1507,8 +1544,8 @@ ref_type Table::create_empty_table(Allocator& alloc, TableKey key)
         dg_2.release();
     }
     rot = RefOrTagged::make_tagged(0);
-    top.add(rot);
-    top.add(rot);
+    top.add(rot); // Column key
+    top.add(rot); // Version
     dg.release();
     // Opposite keys (table and column)
     {
@@ -1528,6 +1565,7 @@ ref_type Table::create_empty_table(Allocator& alloc, TableKey key)
             dg_2.release();
         }
     }
+    top.add(0); // Sequence number
     return top.get_ref();
 }
 
@@ -1587,6 +1625,11 @@ Group* Table::get_parent_group() const noexcept
     return static_cast<Group*>(parent);
 }
 
+inline uint64_t Table::get_sync_file_id() const noexcept
+{
+    Group* g = get_parent_group();
+    return g ? g->get_sync_file_id() : 0;
+}
 
 size_t Table::get_index_in_group() const noexcept
 {
@@ -1601,6 +1644,21 @@ size_t Table::get_index_in_group() const noexcept
 TableKey Table::get_key() const noexcept
 {
     return m_key;
+}
+
+uint64_t Table::allocate_sequence_number()
+{
+    RefOrTagged rot = m_top.get_as_ref_or_tagged(top_position_for_sequence_number);
+    uint64_t sn = rot.is_tagged() ? rot.get_as_int() : 0;
+    rot = RefOrTagged::make_tagged(sn + 1);
+    m_top.set(top_position_for_sequence_number, rot);
+
+    return sn;
+}
+
+void Table::set_sequence_number(uint64_t seq)
+{
+    m_top.set(top_position_for_sequence_number, RefOrTagged::make_tagged(seq));
 }
 
 TableRef Table::get_link_target(ColKey col_key) noexcept
@@ -2385,16 +2443,10 @@ void Table::dump_node_structure(std::ostream& out, int level) const
 Obj Table::create_object(ObjKey key, const FieldValues& values)
 {
     if (key == null_key) {
-        auto repl = get_repl();
-        if (auto oid_p = dynamic_cast<ObjectIDProvider*>(repl)) {
-            auto tr = static_cast<Transaction*>(get_parent_group());
-            ObjectID object_id = oid_p->allocate_object_id_squeezed(*tr, get_key());
-            key = oid_p->global_to_local_object_id_squeezed(object_id, *tr);
+        ObjectID object_id = allocate_object_id_squeezed();
+        key = global_to_local_object_id_squeezed(object_id, get_sync_file_id());
+        if (auto repl = get_repl())
             repl->create_object(this, object_id);
-        }
-        else {
-            key = get_next_key();
-        }
     }
 
     REALM_ASSERT(key.value >= 0);
@@ -2408,14 +2460,10 @@ Obj Table::create_object(ObjKey key, const FieldValues& values)
 
 Obj Table::create_object(ObjectID object_id, const FieldValues& values)
 {
-    auto repl = get_repl();
-    auto oid_p = dynamic_cast<ObjectIDProvider*>(repl);
-    auto tr = static_cast<Transaction*>(get_parent_group());
+    ObjKey key = global_to_local_object_id_squeezed(object_id, get_sync_file_id());
 
-    REALM_ASSERT(oid_p); // FIXME: Exception
-
-    ObjKey key = oid_p->global_to_local_object_id_squeezed(object_id, *tr);
-    repl->create_object(this, object_id);
+    if (auto repl = get_repl())
+        repl->create_object(this, object_id);
 
     bump_content_version();
     bump_storage_version();
@@ -2503,7 +2551,7 @@ ObjKey Table::get_obj_key(ObjectID id) const
         else {
             uint32_t max = std::numeric_limits<uint32_t>::max();
             if (id.hi() <= max && id.lo() <= max) {
-                key = oid_p->global_to_local_object_id_squeezed(id, *tr);
+                key = global_to_local_object_id_squeezed(id, get_sync_file_id());
                 if (!is_valid(key)) {
                     key = realm::null_key;
                 }
@@ -2516,20 +2564,25 @@ ObjKey Table::get_obj_key(ObjectID id) const
 ObjectID Table::get_object_id(ObjKey key) const
 {
     ObjectID id;
-    auto oid_p = dynamic_cast<ObjectIDProvider*>(get_repl());
-    auto tr = static_cast<Transaction*>(get_parent_group());
-    if (oid_p && tr) {
-        auto col = get_primary_key_column();
-        if (col) {
-            ConstObj obj = get_object(key);
-            auto val = obj.get_any(col);
-            id = object_id_for_primary_key(val);
-        }
-        else {
-            id = oid_p->local_to_global_object_id_squeezed(key, *tr);
-        }
+    auto col = get_primary_key_column();
+    if (col) {
+        ConstObj obj = get_object(key);
+        auto val = obj.get_any(col);
+        id = object_id_for_primary_key(val);
+    }
+    else {
+        id = local_to_global_object_id_squeezed(key, get_sync_file_id());
     }
     return id;
+}
+
+ObjectID Table::allocate_object_id_squeezed()
+{
+    // m_client_file_ident will be zero if we haven't been in contact with
+    // the server yet.
+    auto peer_id = get_sync_file_id();
+    auto sequence = allocate_sequence_number();
+    return ObjectID{peer_id, sequence};
 }
 
 void Table::create_objects(size_t number, std::vector<ObjKey>& keys)
@@ -2772,10 +2825,8 @@ void Table::remove_primary_key_column() const
 
 ObjKey Table::get_next_key()
 {
-    if (m_next_key_value == -1 || is_valid(ObjKey(m_next_key_value))) {
-        m_next_key_value = m_clusters.get_last_key_value() + 1;
-    }
-    return ObjKey(m_next_key_value++);
+    auto next_key_value = allocate_sequence_number();
+    return ObjKey(next_key_value);
 }
 
 namespace {

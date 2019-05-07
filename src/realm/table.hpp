@@ -351,6 +351,11 @@ public:
     /// index of this table within the group. Otherwise it returns realm::npos.
     size_t get_index_in_group() const noexcept;
     TableKey get_key() const noexcept;
+
+    uint64_t allocate_sequence_number();
+    // Used by upgrade
+    void set_sequence_number(uint64_t seq);
+
     // Get the key of this table directly, without needing a Table accessor.
     static TableKey get_key_direct(Allocator& alloc, ref_type top_ref);
 
@@ -672,7 +677,6 @@ private:
     }
     Spec m_spec;            // 1st slot in m_top
     ClusterTree m_clusters; // 3rd slot in m_top
-    int64_t m_next_key_value = -1;
     TableKey m_key;     // 4th slot in m_top
     Array m_index_refs; // 5th slot in m_top
     Array m_opposite_table;  // 7th slot in m_top
@@ -750,6 +754,11 @@ private:
     void remove_primary_key_column() const;
 
     ObjKey get_next_key();
+    /// Some Object IDs are generated as a tuple of the client_file_ident and a
+    /// local sequence number. This function takes the next number in the
+    /// sequence for the given table and returns an appropriate globally unique
+    /// ObjectID.
+    ObjectID allocate_object_id_squeezed();
 
     /// Called in the context of Group::commit() to ensure that
     /// attached table accessors stay valid across a commit. Please
@@ -768,6 +777,7 @@ private:
     /// If this table is a group-level table, the parent group is returned,
     /// otherwise null is returned.
     Group* get_parent_group() const noexcept;
+    uint64_t get_sync_file_id() const noexcept;
 
     static size_t get_size_from_ref(ref_type top_ref, Allocator&) noexcept;
     static size_t get_size_from_ref(ref_type spec_ref, ref_type columns_ref, Allocator&) noexcept;
@@ -907,7 +917,8 @@ private:
     static constexpr int top_position_for_version = 6;
     static constexpr int top_position_for_opposite_table = 7;
     static constexpr int top_position_for_opposite_column = 8;
-    static constexpr int top_array_size = 9;
+    static constexpr int top_position_for_sequence_number = 9;
+    static constexpr int top_array_size = 10;
 
     friend class SubtableNode;
     friend class _impl::TableFriend;
