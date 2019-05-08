@@ -417,9 +417,10 @@ const SyncSession::State& SyncSession::State::active = Active();
 const SyncSession::State& SyncSession::State::dying = Dying();
 const SyncSession::State& SyncSession::State::inactive = Inactive();
 
-SyncSession::SyncSession(SyncClient& client, std::string realm_path, SyncConfig config)
+SyncSession::SyncSession(SyncClient& client, std::string realm_path, SyncConfig config, bool force_client_reset)
 : m_state(&State::inactive)
 , m_config(std::move(config))
+, m_force_client_reset(force_client_reset)
 , m_realm_path(std::move(realm_path))
 , m_client(client)
 {
@@ -546,11 +547,15 @@ void SyncSession::handle_error(SyncError error)
                 update_error_and_mark_file_for_deletion(error, ShouldBackup::no);
                 break;
             }
+            case ProtocolError::bad_client_file:
+            case ProtocolError::bad_client_file_ident:
             case ProtocolError::bad_origin_file_ident:
             case ProtocolError::bad_server_file_ident:
-            case ProtocolError::bad_client_file_ident:
             case ProtocolError::bad_server_version:
+            case ProtocolError::client_file_blacklisted:
             case ProtocolError::diverging_histories:
+            case ProtocolError::server_file_deleted:
+            case ProtocolError::user_blacklisted:
                 next_state = NextStateAfterError::inactive;
                 update_error_and_mark_file_for_deletion(error, ShouldBackup::yes);
                 break;
@@ -562,27 +567,32 @@ void SyncSession::handle_error(SyncError error)
             case ClientError::pong_timeout:
                 // Not real errors, don't need to be reported to the binding.
                 return;
-            case ClientError::bad_timestamp:
-            case ClientError::connect_timeout:
-            case ClientError::unknown_message:
-            case ClientError::bad_syntax:
-            case ClientError::limits_exceeded:
-            case ClientError::bad_session_ident:
-            case ClientError::bad_message_order:
-            case ClientError::bad_progress:
+            case ClientError::bad_changeset:
             case ClientError::bad_changeset_header_syntax:
             case ClientError::bad_changeset_size:
-            case ClientError::bad_origin_file_ident:
-            case ClientError::bad_server_version:
-            case ClientError::bad_changeset:
-            case ClientError::bad_request_ident:
-            case ClientError::bad_error_code:
-            case ClientError::bad_compression:
-            case ClientError::bad_client_version:
-            case ClientError::ssl_server_cert_rejected:
-            case ClientError::bad_file_ident:
             case ClientError::bad_client_file_ident:
             case ClientError::bad_client_file_ident_salt:
+            case ClientError::bad_client_version:
+            case ClientError::bad_compression:
+            case ClientError::bad_error_code:
+            case ClientError::bad_file_ident:
+            case ClientError::bad_message_order:
+            case ClientError::bad_origin_file_ident:
+            case ClientError::bad_progress:
+            case ClientError::bad_protocol_from_server:
+            case ClientError::bad_request_ident:
+            case ClientError::bad_server_version:
+            case ClientError::bad_session_ident:
+            case ClientError::bad_state_message:
+            case ClientError::bad_syntax:
+            case ClientError::bad_timestamp:
+            case ClientError::client_too_new_for_server:
+            case ClientError::client_too_old_for_server:
+            case ClientError::connect_timeout:
+            case ClientError::limits_exceeded:
+            case ClientError::protocol_mismatch:
+            case ClientError::ssl_server_cert_rejected:
+            case ClientError::unknown_message:
                 // Don't do anything special for these errors.
                 // Future functionality may require special-case handling for existing
                 // errors, or newly introduced error codes.
@@ -649,6 +659,15 @@ void SyncSession::create_sync_session()
 
     if (m_config.url_prefix) {
         session_config.url_prefix = *m_config.url_prefix;
+    }
+
+    if (m_force_client_reset) {
+        std::string metadata_dir = SyncManager::shared().m_file_manager->get_state_directory();
+        util::try_make_dir(metadata_dir);
+        
+        sync::Session::Config::ClientReset config;
+        config.metadata_dir = metadata_dir;
+        session_config.client_reset_config = config;
     }
 
     m_session = m_client.make_session(m_realm_path, std::move(session_config));
