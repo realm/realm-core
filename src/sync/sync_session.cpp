@@ -465,12 +465,11 @@ void SyncSession::update_error_and_mark_file_for_deletion(SyncError& error, Shou
     }
     using Action = SyncFileActionMetadata::Action;
     auto action = should_backup == ShouldBackup::yes ? Action::BackUpThenDeleteRealm : Action::DeleteRealm;
-    SyncManager::shared().perform_metadata_update([this,
-                                                   action,
+    SyncManager::shared().perform_metadata_update([this, action,
                                                    original_path=std::move(original_path),
                                                    recovery_path=std::move(recovery_path)](const auto& manager) {
-        manager.make_file_action_metadata(original_path, m_config.realm_url(), m_config.user->identity(),
-                                          action, std::move(recovery_path));
+        auto realm_url = m_config.realm_url();
+        manager.make_file_action_metadata(original_path, realm_url, m_config.user->identity(), action, recovery_path);
     });
 }
 
