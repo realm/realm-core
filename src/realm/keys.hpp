@@ -96,7 +96,7 @@ struct ColKey {
         : value(uint64_t(-1) >> 1) // free top bit
     {
     }
-    explicit ColKey(int64_t val)
+    constexpr explicit ColKey(int64_t val)
         : value(val)
     {
     }

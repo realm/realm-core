@@ -264,6 +264,16 @@ const int_fast64_t realm::Table::max_integer;
 const int_fast64_t realm::Table::min_integer;
 Replication* Table::g_dummy_replication = nullptr;
 
+namespace {
+constexpr char g_primary_key_table_name[] = "pk";
+constexpr char g_primary_key_class_column_name[] = "pk_table";
+constexpr char g_primary_key_property_column_name[] = "pk_property";
+constexpr char g_class_name_prefix[] = "class_";
+constexpr size_t g_class_name_prefix_len = 6;
+constexpr ColKey g_pk_table{0x20000};
+constexpr ColKey g_pk_property{0x40020001};
+} // namespace
+
 bool TableVersions::operator==(const TableVersions& other) const
 {
     if (size() != other.size())
@@ -366,7 +376,7 @@ void Table::remove_recursive(CascadeState& cascade_state)
 
 ColKey Table::insert_column(ColKey col_key, DataType type, StringData name, bool nullable)
 {
-    if (REALM_UNLIKELY(col_key && !valid_column(col_key)))
+    if (REALM_UNLIKELY(col_key && valid_column(col_key)))
         throw InvalidKey("Requested key in use");
     if (REALM_UNLIKELY(is_link_type(ColumnType(type))))
         throw LogicError(LogicError::illegal_type);
@@ -484,6 +494,8 @@ void Table::init(ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent, bo
     }
     else
         m_in_file_version_at_transaction_boundary = rot_version.get_as_int();
+
+    this->m_primary_key_col = null();
 }
 
 
@@ -696,7 +708,7 @@ ColKey Table::do_insert_root_column(ColKey col_key, ColumnType type, StringData 
         col_key = generate_col_key(type, attr);
     }
     else {
-        REALM_ASSERT(false); // FIXME
+        REALM_ASSERT(col_key.get_attrs() == attr); // FIXME
     }
 
     m_spec.insert_column(spec_ndx, col_key, type, name, attr); // Throws
@@ -823,8 +835,9 @@ bool Table::has_search_index(ColKey col_key) const noexcept
 void Table::migrate_column_info(std::function<void()> commit_and_continue)
 {
     bool changes = false;
+    TableKey tk = (get_name() == "pk") ? TableKey(0) : get_key();
     changes |= m_spec.convert_column_attributes();
-    changes |= m_spec.convert_column_keys(get_key());
+    changes |= m_spec.convert_column_keys(tk);
 
     if (changes) {
         build_column_mapping();
@@ -2551,6 +2564,78 @@ Table::BacklinkOrigin Table::find_backlink_origin(ColKey backlink_col) const noe
         // backlink column not found, returning empty optional
     }
     return {};
+}
+
+ColKey Table::get_primary_key_column() const
+{
+    if (!m_primary_key_col) {
+        StringData table_name = get_name();
+        if (table_name == g_primary_key_table_name) {
+            // The column "pk_table" is the "primary key" of the pk table.
+            m_primary_key_col = g_pk_table;
+        }
+        else {
+            m_primary_key_col = ColKey();
+
+            if (auto pk = get_parent_group()->get_table(g_primary_key_table_name)) {
+                if (table_name.begins_with(g_class_name_prefix)) {
+                    // Only tables created by the Object Store can have primary keys.
+                    StringData class_name = table_name.substr(g_class_name_prefix_len);
+
+                    if (ObjKey entry = pk->find_first_string(g_pk_table, class_name)) {
+                        StringData pk_column_name = pk->get_object(entry).get<StringData>(g_pk_property);
+                        m_primary_key_col = get_column_key(pk_column_name);
+                    }
+                }
+            }
+        }
+    }
+
+    return *m_primary_key_col;
+}
+
+void Table::set_primary_key_column(ColKey col_key) const
+{
+    TableRef pk = get_parent_group()->get_table(g_primary_key_table_name);
+
+    if (!pk) {
+        pk = get_parent_group()->add_table(g_primary_key_table_name);
+        pk->insert_column(g_pk_table, type_String, g_primary_key_class_column_name);
+        pk->insert_column(g_pk_property, type_String, g_primary_key_property_column_name);
+        pk->add_search_index(g_pk_table);
+    }
+
+    auto table_name = get_name();
+    if (!table_name.begins_with(g_class_name_prefix)) {
+        REALM_TERMINATE("Only Object Store tables can have primary keys (must begin with 'class_').");
+    }
+
+    StringData class_name = table_name.substr(g_class_name_prefix_len);
+    StringData column_name = get_column_name(col_key);
+
+    ObjKey row = pk->find_first_string(g_pk_table, class_name);
+    if (!row) {
+        // Schema-breaking change; if this was illegal, it should have been detected
+        // by checks at higher levels. Here we let it through.
+        pk->create_object().set(g_pk_table, class_name).set(g_pk_property, column_name);
+    }
+    else {
+        pk->get_object(row).set(g_pk_property, column_name);
+    }
+}
+
+void Table::remove_primary_key_column() const
+{
+    auto table_name = get_name();
+    REALM_ASSERT(table_name.begins_with(g_class_name_prefix));
+    StringData class_name = table_name.substr(g_class_name_prefix_len);
+    TableRef pk = get_parent_group()->get_table(g_primary_key_table_name);
+    if (pk) {
+        ObjKey row = pk->find_first_string(g_pk_table, class_name);
+        if (row) {
+            pk->remove_object(row);
+        }
+    }
 }
 
 namespace {

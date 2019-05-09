@@ -2055,4 +2055,20 @@ TEST(Group_RemoveRecursive)
     CHECK_EQUAL(target->size(), 0);
 }
 
+TEST(Group_PrimaryKeyCol)
+{
+    Group g;
+    TableRef table = g.add_table_with_primary_key("class_foo", type_Int, "primary");
+    ColKey primary_key_column = table->get_primary_key_column();
+    CHECK(primary_key_column);
+    CHECK(table->has_search_index(primary_key_column));
+    auto pk = g.get_table("pk");
+    auto pk_table = pk->get_column_key("pk_table");
+    auto pk_property = pk->get_column_key("pk_property");
+    CHECK_EQUAL(pk->begin()->get<String>(pk_table), "foo");
+    CHECK_EQUAL(pk->begin()->get<String>(pk_property), "primary");
+    g.remove_table(table->get_key());
+    CHECK_EQUAL(pk->size(), 0);
+}
+
 #endif // TEST_GROUP

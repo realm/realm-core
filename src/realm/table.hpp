@@ -120,6 +120,9 @@ public:
     BacklinkOrigin find_backlink_origin(ColKey backlink_col) const noexcept;
     //@}
 
+    // Primary key columns
+    ColKey get_primary_key_column() const;
+
     //@{
     /// Convenience functions for manipulating the dynamic table type.
     ///
@@ -668,6 +671,7 @@ private:
     Array m_opposite_table;  // 7th slot in m_top
     Array m_opposite_column; // 8th slot in m_top
     std::vector<StringIndex*> m_index_accessors;
+    mutable util::Optional<ColKey> m_primary_key_col;
     Replication* const* m_repl;
     static Replication* g_dummy_replication;
 
@@ -734,6 +738,10 @@ private:
     void erase_backlink_column(ColKey backlink_col_key);
 
     void set_opposite_column(ColKey col_key, TableKey opposite_table, ColKey opposite_column);
+
+    void set_primary_key_column(ColKey col) const;
+    void remove_primary_key_column() const;
+
     /// Called in the context of Group::commit() to ensure that
     /// attached table accessors stay valid across a commit. Please
     /// note that this works only for non-transactional commits. Table

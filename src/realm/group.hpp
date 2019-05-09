@@ -330,6 +330,7 @@ public:
     ConstTableRef get_table(StringData name) const;
 
     TableRef add_table(StringData name, bool require_unique_name = true);
+    TableRef add_table_with_primary_key(StringData name, DataType pk_type, StringData pk_name, bool nullable = false);
     TableRef get_or_add_table(StringData name, bool* was_added = nullptr);
 
     void remove_table(TableKey key);
@@ -696,16 +697,13 @@ private:
     static void write(std::ostream&, int file_format_version, TableWriter&, bool no_top_array,
                       bool pad_for_encryption, uint_fast64_t version_number);
 
-    typedef void (*DescSetter)(Table&);
-    typedef bool (*DescMatcher)(const Spec&);
+    Table* do_get_table(size_t ndx);
+    const Table* do_get_table(size_t ndx) const;
+    Table* do_get_table(StringData name);
+    const Table* do_get_table(StringData name) const;
+    Table* do_add_table(StringData name, bool require_unique_name);
 
-    Table* do_get_table(size_t ndx, DescMatcher desc_matcher);
-    const Table* do_get_table(size_t ndx, DescMatcher desc_matcher) const;
-    Table* do_get_table(StringData name, DescMatcher desc_matcher);
-    const Table* do_get_table(StringData name, DescMatcher desc_matcher) const;
-    Table* do_add_table(StringData name, DescSetter desc_setter, bool require_unique_name);
-
-    Table* do_get_or_add_table(StringData name, DescMatcher desc_matcher, DescSetter setter, bool* was_added);
+    Table* do_get_or_add_table(StringData name, bool* was_added);
 
     void create_and_insert_table(TableKey key, StringData name);
     Table* create_table_accessor(size_t table_ndx);
@@ -939,10 +937,9 @@ inline TableRef Group::get_table(TableKey key)
 {
     if (!is_attached())
         throw LogicError(LogicError::detached_accessor);
-    DescMatcher desc_matcher = nullptr;                   // Do not check descriptor
     std::lock_guard<std::mutex> lock(m_accessor_mutex);
     auto ndx = key2ndx_checked(key);
-    Table* table = do_get_table(ndx, desc_matcher); // Throws
+    Table* table = do_get_table(ndx); // Throws
     return TableRef(table);
 }
 
@@ -950,10 +947,9 @@ inline ConstTableRef Group::get_table(TableKey key) const
 {
     if (!is_attached())
         throw LogicError(LogicError::detached_accessor);
-    DescMatcher desc_matcher = nullptr;                         // Do not check descriptor
     std::lock_guard<std::mutex> lock(m_accessor_mutex);
     auto ndx = key2ndx_checked(key);
-    const Table* table = do_get_table(ndx, desc_matcher); // Throws
+    const Table* table = do_get_table(ndx); // Throws
     return ConstTableRef(table);
 }
 
@@ -961,9 +957,8 @@ inline TableRef Group::get_table(StringData name)
 {
     if (!is_attached())
         throw LogicError(LogicError::detached_accessor);
-    DescMatcher desc_matcher = nullptr;              // Do not check descriptor
     std::lock_guard<std::mutex> lock(m_accessor_mutex);
-    Table* table = do_get_table(name, desc_matcher); // Throws
+    Table* table = do_get_table(name); // Throws
     return TableRef(table);
 }
 
@@ -971,9 +966,8 @@ inline ConstTableRef Group::get_table(StringData name) const
 {
     if (!is_attached())
         throw LogicError(LogicError::detached_accessor);
-    DescMatcher desc_matcher = nullptr;                    // Do not check descriptor
     std::lock_guard<std::mutex> lock(m_accessor_mutex);
-    const Table* table = do_get_table(name, desc_matcher); // Throws
+    const Table* table = do_get_table(name); // Throws
     return ConstTableRef(table);
 }
 
@@ -981,8 +975,7 @@ inline TableRef Group::add_table(StringData name, bool require_unique_name)
 {
     if (!is_attached())
         throw LogicError(LogicError::detached_accessor);
-    DescSetter desc_setter = nullptr;                                    // Do not add any columns
-    Table* table = do_add_table(name, desc_setter, require_unique_name); // Throws
+    Table* table = do_add_table(name, require_unique_name); // Throws
     return TableRef(table);
 }
 
@@ -990,9 +983,7 @@ inline TableRef Group::get_or_add_table(StringData name, bool* was_added)
 {
     if (!is_attached())
         throw LogicError(LogicError::detached_accessor);
-    DescMatcher desc_matcher = nullptr;                                             // Do not check descriptor
-    DescSetter desc_setter = nullptr;                                               // Do not add any columns
-    Table* table = do_get_or_add_table(name, desc_matcher, desc_setter, was_added); // Throws
+    Table* table = do_get_or_add_table(name, was_added); // Throws
     return TableRef(table);
 }
 
@@ -1132,14 +1123,14 @@ public:
     }
 };
 
-inline const Table* Group::do_get_table(size_t ndx, DescMatcher desc_matcher) const
+inline const Table* Group::do_get_table(size_t ndx) const
 {
-    return const_cast<Group*>(this)->do_get_table(ndx, desc_matcher); // Throws
+    return const_cast<Group*>(this)->do_get_table(ndx); // Throws
 }
 
-inline const Table* Group::do_get_table(StringData name, DescMatcher desc_matcher) const
+inline const Table* Group::do_get_table(StringData name) const
 {
-    return const_cast<Group*>(this)->do_get_table(name, desc_matcher); // Throws
+    return const_cast<Group*>(this)->do_get_table(name); // Throws
 }
 
 inline void Group::reset_free_space_tracking()

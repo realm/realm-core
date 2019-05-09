@@ -649,7 +649,7 @@ void Group::create_empty_group()
 }
 
 
-Table* Group::do_get_table(size_t table_ndx, DescMatcher desc_matcher)
+Table* Group::do_get_table(size_t table_ndx)
 {
     REALM_ASSERT(m_table_accessors.size() == m_tables.size());
     // Get table accessor from cache if it exists, else create
@@ -657,17 +657,11 @@ Table* Group::do_get_table(size_t table_ndx, DescMatcher desc_matcher)
     if (!table)
         table = create_table_accessor(table_ndx); // Throws
 
-    if (desc_matcher) {
-        typedef _impl::TableFriend tf;
-        if (desc_matcher && !(*desc_matcher)(tf::get_spec(*table)))
-            throw DescriptorMismatch();
-    }
-
     return table;
 }
 
 
-Table* Group::do_get_table(StringData name, DescMatcher desc_matcher)
+Table* Group::do_get_table(StringData name)
 {
     if (!m_table_names.is_attached())
         return 0;
@@ -675,12 +669,39 @@ Table* Group::do_get_table(StringData name, DescMatcher desc_matcher)
     if (table_ndx == not_found)
         return 0;
 
-    Table* table = do_get_table(table_ndx, desc_matcher); // Throws
+    Table* table = do_get_table(table_ndx); // Throws
     return table;
 }
 
+TableRef Group::add_table_with_primary_key(StringData name, DataType pk_type, StringData pk_name, bool nullable)
+{
+    if (!is_attached())
+        throw LogicError(LogicError::detached_accessor);
+    auto table = do_get_table(name);
+    if (!table) {
+        if (Replication* repl = *get_repl())
+            repl->add_class_with_primary_key(name, pk_type, pk_name, nullable);
 
-Table* Group::do_add_table(StringData name, DescSetter desc_setter, bool require_unique_name)
+        table = do_add_table(name, true);
+
+        ColKey pk_col = table->add_column(pk_type, pk_name, nullable);
+        table->add_search_index(pk_col);
+        table->set_primary_key_column(pk_col);
+    }
+    else {
+#ifdef REALM_DEBUG
+        ColKey pk_col = table->get_primary_key_column();
+        REALM_ASSERT(pk_col != ColKey{});
+        REALM_ASSERT(table->get_column_name(pk_col) == pk_name);
+        REALM_ASSERT(table->get_column_type(pk_col) == pk_type);
+        REALM_ASSERT(table->is_nullable(pk_col) == nullable);
+#endif // REALM_DEBUG
+    }
+
+    return TableRef(table);
+}
+
+Table* Group::do_add_table(StringData name, bool require_unique_name)
 {
     if (!m_is_writable)
         throw LogicError(LogicError::wrong_transact_state);
@@ -692,6 +713,7 @@ Table* Group::do_add_table(StringData name, DescSetter desc_setter, bool require
         if (table_ndx != not_found)
             throw TableNameInUse();
     }
+
     // find first empty spot:
     // FIXME: Optimize with rowing ptr or free list of some sort
     size_t j;
@@ -706,23 +728,26 @@ Table* Group::do_add_table(StringData name, DescSetter desc_setter, bool require
     TableKey key = TableKey((tag << 16) | j);
     create_and_insert_table(key, name);
     Table* table = create_table_accessor(j);
-    if (desc_setter)
-        (*desc_setter)(*table);
+
     return table;
 }
 
 
-Table* Group::do_get_or_add_table(StringData name, DescMatcher desc_matcher, DescSetter desc_setter, bool* was_added)
+Table* Group::do_get_or_add_table(StringData name, bool* was_added)
 {
     REALM_ASSERT(m_table_names.is_attached());
-    auto table = do_get_table(name, desc_matcher);
+    auto table = do_get_table(name);
     if (table) {
         if (was_added)
             *was_added = false;
         return table;
     }
     else {
-        table = do_add_table(name, desc_setter, false);
+        if (Replication* repl = *get_repl())
+            repl->add_class(name);
+
+
+        table = do_add_table(name, false);
         if (was_added)
             *was_added = true;
         return table;
@@ -847,6 +872,10 @@ void Group::remove_table(size_t table_ndx, TableKey key)
     if (table->is_cross_table_link_target())
         throw CrossTableLinkTarget();
 
+    if (table->get_primary_key_column()) {
+        table->remove_primary_key_column();
+    }
+
     // There is no easy way for Group::TransactAdvancer to handle removal of
     // tables that contain foreign target table link columns, because that
     // involves removal of the corresponding backlink columns. For that reason,
@@ -907,7 +936,6 @@ void Group::rename_table(TableKey key, StringData new_name, bool require_unique_
     if (Replication* repl = *get_repl())
         repl->rename_group_level_table(key, new_name); // Throws
 }
-
 
 class Group::DefaultTableWriter : public Group::TableWriter {
 public:

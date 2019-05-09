@@ -26,6 +26,12 @@ TransactLogConvenientEncoder::TransactLogConvenientEncoder(TransactLogStream& st
 {
 }
 
+TransactLogConvenientEncoder::~TransactLogConvenientEncoder() {}
+
+void TransactLogConvenientEncoder::add_class(StringData) {}
+
+void TransactLogConvenientEncoder::add_class_with_primary_key(StringData, DataType, StringData, bool) {}
+
 bool TransactLogEncoder::select_table(TableKey key)
 {
     size_t levels = 0;
