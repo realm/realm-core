@@ -678,10 +678,17 @@ private:
     size_t do_set_link(ColKey col_key, size_t row_ndx, size_t target_row_ndx);
 
     void populate_search_index(ColKey col_key);
-    bool convert_columns();
-    bool convert_column_keys(Group* group);
-    bool create_objects();
-    bool copy_content_from_columns(size_t spec_ndx);
+
+    // Migration support
+    void migrate_column_info(std::function<void()>);
+    void migrate_indexes(std::function<void()>);
+    void migrate_subspec(std::function<void()>);
+    void convert_links_from_ndx_to_key(std::function<void()>);
+    ref_type get_oid_column_ref() const;
+    void create_columns(std::function<void()>);
+    void migrate_objects(std::function<void()>);
+    void migrate_links(std::function<void()>);
+    void finalize_migration();
 
     /// Disable copying assignment.
     ///
@@ -882,6 +889,7 @@ private:
     static constexpr int top_position_for_version = 6;
     static constexpr int top_position_for_opposite_table = 7;
     static constexpr int top_position_for_opposite_column = 8;
+    static constexpr int top_array_size = 9;
 
     friend class SubtableNode;
     friend class _impl::TableFriend;

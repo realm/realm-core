@@ -1760,12 +1760,8 @@ void DB::upgrade_file_format(bool allow_file_format_upgrade, int target_file_for
                 m_upgrade_callback(current_file_format_version_2, target_file_format_version); // Throws
             dirty = true;
         }
-        else {
-            // If somebody else has already performed the upgrade, we still need
-            // to inform the rest of the core library about the new file format
-            // of the attached file.
-            wt->set_file_format_version(target_file_format_version);
-        }
+        wt->set_file_format_version(target_file_format_version);
+        m_file_format_version = target_file_format_version;
 
         // History schema upgrade
         int current_hist_schema_version_2 = wt->get_history_schema_version();

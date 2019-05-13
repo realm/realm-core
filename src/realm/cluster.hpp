@@ -37,6 +37,11 @@ class ColumnAttrMask;
 class CascadeState;
 
 struct FieldValue {
+    FieldValue(ColKey k, Mixed val)
+        : col_key(k)
+        , value(val)
+    {
+    }
     ColKey col_key;
     Mixed value;
 };
@@ -115,6 +120,11 @@ public:
     virtual void insert_column(ColKey col) = 0;
     /// Clear and potentially Remove a column
     virtual void remove_column(ColKey col) = 0;
+    /// Return number of columns created. To be used by upgrade logic
+    virtual size_t nb_columns() const
+    {
+        return realm::npos;
+    }
     /// Create a new object identified by 'key' and update 'state' accordingly
     /// Return reference to new node created (if any)
     virtual ref_type insert(ObjKey k, const FieldValues& init_values, State& state) = 0;
@@ -223,6 +233,10 @@ public:
     void ensure_general_form() override;
     void insert_column(ColKey col) override; // Does not move columns!
     void remove_column(ColKey col) override; // Does not move columns - may leave a 'hole'
+    size_t nb_columns() const override
+    {
+        return size() - s_first_col_index;
+    }
     ref_type insert(ObjKey k, const FieldValues& init_values, State& state) override;
     bool try_get(ObjKey k, State& state) const override;
     ObjKey get(size_t, State& state) const override;
