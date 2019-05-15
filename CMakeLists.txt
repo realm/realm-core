@@ -99,7 +99,6 @@ endif()
 if(APPLE)
     find_library(Foundation Foundation)
 elseif(ANDROID)
-    set(ANDROID_OPENSSL_BUILD_NUMBER "1")
     list(APPEND PLATFORM_LIBRARIES log android)
 endif()
 
