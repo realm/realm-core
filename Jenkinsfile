@@ -108,7 +108,8 @@ jobWrapper {
                     buildLinuxDebug     : doBuildLinux('Debug'),
                     buildLinuxRelease   : doBuildLinux('Release'),
                     buildLinuxRelAssert : doBuildLinux('RelAssert'),
-                    buildLinuxASAN      : doBuildLinuxASAN()
+                    buildLinuxASAN      : doBuildLinuxClang("RelASAN"),
+                    buildLinuxTSAN      : doBuildLinuxClang("RelTSAN")
                 ]
 
                 androidAbis = ['armeabi-v7a', 'x86', 'x86_64', 'arm64-v8a']
@@ -263,7 +264,7 @@ def doBuildLinux(String buildType) {
     }
 }
 
-def doBuildLinuxASAN() {
+def doBuildLinuxClang(String buildType) {
     return {
         node('docker') {
             getArchive()
@@ -271,14 +272,14 @@ def doBuildLinuxASAN() {
                 sh """
                    mkdir build-dir
                    cd build-dir
-                   cmake -D CMAKE_BUILD_TYPE=RelASAN -DREALM_NO_TESTS=1 -G Ninja ..
+                   cmake -D CMAKE_BUILD_TYPE=${buildType} -DREALM_NO_TESTS=1 -G Ninja ..
                    ninja
                    cpack -G TGZ
                 """
             }
             dir('build-dir') {
                 archiveArtifacts("*.tar.gz")
-                def stashName = "linux___RelASAN"
+                def stashName = "linux___${buildType}"
                 stash includes:"*.tar.gz", name:stashName
                 publishingStashes << stashName
             }
@@ -441,7 +442,7 @@ def doBuildMacOs(String buildType, boolean runTests) {
             def buildTests = runTests ? '' : '-DREALM_NO_TESTS=1'
 
             dir("build-macos-${buildType}") {
-                withEnv(['DEVELOPER_DIR=/Applications/Xcode-8.3.3.app/Contents/Developer/']) {
+                withEnv(['DEVELOPER_DIR=/Applications/Xcode-9.2.app/Contents/Developer/']) {
                     // This is a dirty trick to work around a bug in xcode
                     // It will hang if launched on the same project (cmake trying the compiler out)
                     // in parallel.
@@ -504,7 +505,7 @@ def doBuildAppleDevice(String sdk, String buildType) {
         node('osx') {
             getArchive()
 
-            withEnv(['DEVELOPER_DIR=/Applications/Xcode-8.3.3.app/Contents/Developer/',
+            withEnv(['DEVELOPER_DIR=/Applications/Xcode-9.2.app/Contents/Developer/',
                      'XCODE10_DEVELOPER_DIR=/Applications/Xcode-10.app/Contents/Developer/']) {
                 retry(3) {
                     timeout(time: 15, unit: 'MINUTES') {

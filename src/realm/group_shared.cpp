@@ -27,9 +27,11 @@
 #include <random>
 
 #include <realm/util/features.h>
+#include <realm/util/file_mapper.hpp>
 #include <realm/util/errno.hpp>
 #include <realm/util/safe_int_ops.hpp>
 #include <realm/util/thread.hpp>
+#include <realm/util/scope_exit.hpp>
 #include <realm/group_writer.hpp>
 #include <realm/group_shared.hpp>
 #include <realm/group_writer.hpp>
@@ -777,7 +779,7 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
 
 #if REALM_METRICS
     if (options.enable_metrics) {
-        m_metrics = std::make_shared<Metrics>();
+        m_metrics = std::make_shared<Metrics>(options.metrics_buffer_size);
         m_group.set_metrics(m_metrics);
     }
 #endif // REALM_METRICS
@@ -1017,6 +1019,7 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
             cfg.is_shared = true;
             cfg.read_only = false;
             cfg.skip_validate = !begin_new_session;
+            cfg.disable_sync = options.durability == Durability::MemOnly || options.durability == Durability::Unsafe;
 
             // only the session initiator is allowed to create the database, all other
             // must assume that it already exists.
@@ -1032,6 +1035,11 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
             try {
                 top_ref = alloc.attach_file(path, cfg); // Throws
                 if (top_ref) {
+                    alloc.note_reader_start(this);
+                    auto handler = [this]() noexcept {
+                        m_group.m_alloc.note_reader_end(this);
+                    };
+                    auto reader_end_guard = make_scope_exit(handler);
                     Array top{alloc};
                     top.init_from_ref(top_ref);
                     Group::validate_top_array(top, alloc);
@@ -1055,6 +1063,10 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
             // situations, where the database has been re-initialised (e.g. through
             // compact()). This could render the mappings (partially) undefined.
             SlabAlloc::DetachGuard alloc_detach_guard(alloc);
+            alloc.note_reader_start(this);
+            // must come after the alloc detach guard
+            auto handler = [this]() noexcept { m_group.m_alloc.note_reader_end(this); };
+            auto reader_end_guard = make_scope_exit( handler );
 
             // Determine target file format version for session (upgrade
             // required if greater than file format version of attached file).
@@ -1343,11 +1355,11 @@ bool SharedGroup::compact(bool bump_version_number, util::Optional<const char*> 
     if (m_transact_stage != transact_Ready) {
         throw std::runtime_error(m_db_path + ": compact is not supported whithin a transaction");
     }
-    Durability dura;
+    SharedInfo* info = m_file_map.get_addr();
+    Durability dura = Durability(info->durability);
     std::string tmp_path = m_db_path + ".tmp_compaction_space";
     const char* write_key = bool(output_encryption_key) ? *output_encryption_key : m_key;
     {
-        SharedInfo* info = m_file_map.get_addr();
         std::unique_lock<InterprocessMutex> lock(m_controlmutex); // Throws
         if (info->num_participants > 1)
             return false;
@@ -1368,10 +1380,10 @@ bool SharedGroup::compact(bool bump_version_number, util::Optional<const char*> 
             File file;
             file.open(tmp_path, File::access_ReadWrite, File::create_Must, 0);
             int incr = bump_version_number ? 1 : 0;
-            m_group.write(file, write_key, info->latest_version_number + incr); // Throws
+            m_group.write(file, write_key, info->latest_version_number + incr, true); // Throws
             // Data needs to be flushed to the disk before renaming.
             bool disable_sync = get_disable_sync_to_disk();
-            if (!disable_sync)
+            if (!disable_sync && dura != Durability::Unsafe)
                 file.sync(); // Throws
         }
         catch (...)
@@ -1390,7 +1402,6 @@ bool SharedGroup::compact(bool bump_version_number, util::Optional<const char*> 
             static_cast<void>(rc); // rc unused if ENABLE_ASSERTION is unset
         }
         end_read();
-        dura = Durability(info->durability);
         // We need to release any shared mapping *before* releasing the control mutex.
         // When someone attaches to the new database file, they *must* *not* see and
         // reuse any existing memory mapping of the stale file.
@@ -1417,6 +1428,20 @@ uint_fast64_t SharedGroup::get_number_of_versions()
     SharedInfo* info = m_file_map.get_addr();
     std::lock_guard<InterprocessMutex> lock(m_controlmutex); // Throws
     return info->number_of_versions;
+}
+
+size_t SharedGroup::get_commit_size() const
+{
+    size_t sz = 0;
+    if (m_transact_stage == transact_Writing) {
+        sz = m_group.m_alloc.get_commit_size();
+    }
+    return sz;
+}
+
+size_t SharedGroup::get_allocated_size() const
+{
+    return m_group.m_alloc.get_allocated_size();
 }
 
 SharedGroup::~SharedGroup() noexcept
@@ -1539,20 +1564,25 @@ void SharedGroup::set_transact_stage(SharedGroup::TransactStage stage) noexcept
         size_t free_space = m_free_space;
         size_t num_objects = m_group.m_total_rows;
         size_t num_available_versions = static_cast<size_t>(get_number_of_versions());
+        size_t num_decrypted_pages = realm::util::get_num_decrypted_pages();
 
         if (stage == transact_Reading) {
             if (m_transact_stage == transact_Writing) {
-                m_metrics->end_write_transaction(total_size, free_space, num_objects, num_available_versions);
+                m_metrics->end_write_transaction(total_size, free_space, num_objects, num_available_versions,
+                                                 num_decrypted_pages);
             }
             m_metrics->start_read_transaction();
         } else if (stage == transact_Writing) {
             if (m_transact_stage == transact_Reading) {
-                m_metrics->end_read_transaction(total_size, free_space, num_objects, num_available_versions);
+                m_metrics->end_read_transaction(total_size, free_space, num_objects, num_available_versions,
+                                                num_decrypted_pages);
             }
             m_metrics->start_write_transaction();
         } else if (stage == transact_Ready) {
-            m_metrics->end_read_transaction(total_size, free_space, num_objects, num_available_versions);
-            m_metrics->end_write_transaction(total_size, free_space, num_objects, num_available_versions);
+            m_metrics->end_read_transaction(total_size, free_space, num_objects, num_available_versions,
+                                            num_decrypted_pages);
+            m_metrics->end_write_transaction(total_size, free_space, num_objects, num_available_versions,
+                                             num_decrypted_pages);
         }
     }
 #endif
@@ -1839,6 +1869,12 @@ const Group& SharedGroup::begin_read(VersionID version_id)
 
     do_begin_read(version_id, writable); // Throws
 
+    if (Replication* repl = m_group.get_replication()) {
+        version_type current_version = m_read_lock.m_version;
+        bool history_updated = false;
+        repl->initiate_transact(Replication::TransactionType::trans_Read, current_version, history_updated); // Throws
+    }
+
     set_transact_stage(transact_Reading);
     return m_group;
 }
@@ -1878,7 +1914,8 @@ Group& SharedGroup::begin_write()
         if (Replication* repl = m_group.get_replication()) {
             version_type current_version = m_read_lock.m_version;
             bool history_updated = false;
-            repl->initiate_transact(current_version, history_updated); // Throws
+            repl->initiate_transact(Replication::TransactionType::trans_Write, current_version,
+                                    history_updated); // Throws
         }
     }
     catch (...) {
@@ -1908,7 +1945,8 @@ bool SharedGroup::try_begin_write(Group* &group)
         if (Replication* repl = m_group.get_replication()) {
             version_type current_version = m_read_lock.m_version;
             bool history_updated = false;
-            repl->initiate_transact(current_version, history_updated); // Throws
+            repl->initiate_transact(Replication::TransactionType::trans_Write, current_version,
+                                    history_updated); // Throws
         }
     }
     catch (...) {
@@ -2197,6 +2235,12 @@ SharedGroup::version_type SharedGroup::commit_and_continue_as_read()
     // Remap file if it has grown, and update refs in underlying node structure
     gf::remap_and_update_refs(m_group, m_read_lock.m_top_ref, m_read_lock.m_file_size); // Throws
 
+    if (Replication* repl = m_group.get_replication()) {
+        version_type current_version = m_read_lock.m_version;
+        bool history_updated = false;
+        repl->initiate_transact(Replication::TransactionType::trans_Read, current_version, history_updated); // Throws
+    }
+
     set_transact_stage(transact_Reading);
 
     return version;
@@ -2289,16 +2333,18 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
     m_group.update_num_objects();
 #endif // REALM_METRICS
     // info->readers.dump();
-    GroupWriter out(m_group); // Throws
+    GroupWriter out(m_group, Durability(info->durability)); // Throws
     out.set_versions(new_version, oldest_version);
     // Recursively write all changed arrays to end of file
     ref_type new_top_ref = out.write_group(); // Throws
     m_free_space = out.get_free_space_size();
+    m_locked_space = out.get_locked_space_size();
     m_used_space = out.get_file_size() - m_free_space;
     // std::cout << "Writing version " << new_version << ", Topptr " << new_top_ref
     //     << " Read lock at version " << oldest_version << std::endl;
     switch (Durability(info->durability)) {
         case Durability::Full:
+        case Durability::Unsafe:
             out.commit(new_top_ref); // Throws
             break;
         case Durability::MemOnly:

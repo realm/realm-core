@@ -167,6 +167,15 @@ std::string SerialisationState::get_column_name(ConstTableRef table, size_t col_
     return "";
 }
 
+std::string SerialisationState::get_backlink_column_name(ConstTableRef from, size_t col_ndx)
+{
+    ColumnType col_type = from->get_real_column_type(col_ndx);
+    REALM_ASSERT_EX(col_type == col_type_Link || col_type == col_type_LinkList, col_type);
+    const LinkColumnBase& forward = from->get_column_link_base(col_ndx);
+    size_t backlink_col_ndx = forward.get_backlink_column().get_column_index();
+    return get_column_name(forward.get_target_table().get_table_ref(), backlink_col_ndx);
+}
+
 std::string SerialisationState::describe_column(ConstTableRef table, size_t col_ndx)
 {
     if (table && col_ndx != npos) {

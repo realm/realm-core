@@ -229,8 +229,6 @@ public:
         return str;
     }
 
-    static std::vector<Entry> get_nodes(realm::Allocator& alloc, uint64_t ref);
-
 private:
     char* m_data;
     bool m_has_refs = false;
@@ -320,9 +318,11 @@ public:
             current_logical_file_size = m_file_size;
             m_table_names.init(alloc, get_ref(0));
             m_tables.init(alloc, get_ref(1));
-            m_free_list_positions.init(alloc, get_ref(3));
-            m_free_list_sizes.init(alloc, get_ref(4));
-            m_free_list_versions.init(alloc, get_ref(5));
+            if (size() > 3) {
+                m_free_list_positions.init(alloc, get_ref(3));
+                m_free_list_sizes.init(alloc, get_ref(4));
+                m_free_list_versions.init(alloc, get_ref(5));
+            }
         }
     }
     uint64_t get_file_size() const
@@ -467,7 +467,7 @@ void Table::print_columns(const Group& group) const
             if (attr & realm::col_attr_Indexed)
                 type_str += " (indexed)";
         }
-        std::cout << "        " << m_column_names.get_string(i) << ": " << type_str << std::endl;
+        std::cout << "        " << i << ": " << m_column_names.get_string(i) << ": " << type_str << std::endl;
     }
 }
 
@@ -477,7 +477,7 @@ void Group::print_schema() const
         std::cout << "Tables: " << std::endl;
 
         for (unsigned i = 0; i < get_nb_tables(); i++) {
-            std::cout << "    " << get_table_name(i) << std::endl;
+            std::cout << "    " << i << ": " << get_table_name(i) << std::endl;
             Table table(m_alloc, m_tables.get_ref(i));
             table.print_columns(*this);
         }
@@ -498,24 +498,41 @@ void Node::init(realm::Allocator& alloc, uint64_t ref)
     }
 }
 
-std::vector<Entry> Array::get_nodes(realm::Allocator& alloc, uint64_t ref)
+std::vector<unsigned> path;
+
+std::string print_path()
+{
+    std::string ret = "[" + std::to_string(path[0]);
+    for (auto it = path.begin() + 1; it != path.end(); ++it) {
+        ret += ", ";
+        ret += std::to_string(*it);
+    }
+    return ret + "]";
+}
+
+std::vector<Entry> get_nodes(realm::Allocator& alloc, uint64_t ref)
 {
     std::vector<Entry> nodes;
     if (ref != 0) {
         Array arr(alloc, ref);
         if (!arr.valid()) {
+            std::cout << "Not and array: 0x" << std::hex << ref << std::dec << ", path: " << print_path()
+                      << std::endl;
             return {};
         }
         nodes.emplace_back(ref, arr.size_in_bytes());
         if (arr.has_refs()) {
             auto sz = arr.size();
+            path.push_back(0);
             for (unsigned i = 0; i < sz; i++) {
                 uint64_t r = arr.get_ref(i);
                 if (r) {
+                    path.back() = i;
                     auto sub_nodes = get_nodes(alloc, r);
                     consolidate_lists(nodes, sub_nodes);
                 }
             }
+            path.pop_back();
         }
     }
     return nodes;
@@ -527,25 +544,29 @@ std::vector<Entry> Group::get_allocated_nodes() const
     all_nodes.emplace_back(0, 24);                  // Header area
     all_nodes.emplace_back(m_ref, size_in_bytes()); // Top array itself
 
-    auto table_name_nodes = Array::get_nodes(m_alloc, get_ref(0)); // Table names
+    path.push_back(0);
+    auto table_name_nodes = get_nodes(m_alloc, get_ref(0)); // Table names
     consolidate_lists(all_nodes, table_name_nodes);
-    auto table_nodes = Array::get_nodes(m_alloc, get_ref(1)); // Tables
+    path.back() = 1;
+    auto table_nodes = get_nodes(m_alloc, get_ref(1)); // Tables
     consolidate_lists(all_nodes, table_nodes);
     std::cout << "State size: " << human_readable(get_size(all_nodes)) << std::endl;
 
-    std::vector<Entry> free_lists;
-    free_lists.emplace_back(m_free_list_positions.ref(), m_free_list_positions.size_in_bytes()); // Top array itself
-    free_lists.emplace_back(m_free_list_sizes.ref(), m_free_list_sizes.size_in_bytes());         // Top array itself
-    free_lists.emplace_back(m_free_list_versions.ref(), m_free_list_versions.size_in_bytes());   // Top array itself
-
-    consolidate_lists(all_nodes, free_lists);
-    std::vector<Entry> history;
-    if (size() > 8) {
-        history = Array::get_nodes(m_alloc, get_ref(8));
-        std::cout << "History size: " << human_readable(get_size(history)) << std::endl;
+    if (size() > 3) {
+        std::vector<Entry> free_lists;
+        free_lists.emplace_back(m_free_list_positions.ref(), m_free_list_positions.size_in_bytes());
+        free_lists.emplace_back(m_free_list_sizes.ref(), m_free_list_sizes.size_in_bytes());
+        free_lists.emplace_back(m_free_list_versions.ref(), m_free_list_versions.size_in_bytes());
+        consolidate_lists(all_nodes, free_lists);
     }
 
-    consolidate_lists(all_nodes, history);
+    if (size() > 8) {
+        std::vector<Entry> history;
+        history = get_nodes(m_alloc, get_ref(8));
+        std::cout << "History size: " << human_readable(get_size(history)) << std::endl;
+        consolidate_lists(all_nodes, history);
+    }
+
     return all_nodes;
 }
 
@@ -595,6 +616,9 @@ void RealmFile::node_scan()
     auto free_list = m_group->get_free_list();
     auto free_entry = free_list.begin();
     auto end = m_alloc.get_baseline();
+    if (m_alloc.is_file_on_streaming_form()) {
+        end -= 16; // sizeof(StreamingFooter)
+    }
     uint64_t bad_ref = 0;
     if (free_list.empty()) {
         std::cout << "*** No free list - results may be unreliable ***" << std::endl;

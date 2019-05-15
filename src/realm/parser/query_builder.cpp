@@ -772,12 +772,15 @@ void apply_predicate(Query &query, const Predicate &predicate, Arguments &argume
     realm_precondition(validateMessage.empty(), validateMessage.c_str());
 }
 
-void apply_ordering(DescriptorOrdering& ordering, ConstTableRef target, const parser::DescriptorOrderingState& state, Arguments&)
+void apply_ordering(DescriptorOrdering& ordering, ConstTableRef target, const parser::DescriptorOrderingState& state,
+                    Arguments&, parser::KeyPathMapping mapping)
 {
     for (const DescriptorOrderingState::SingleOrderingState& cur_ordering : state.orderings) {
         if (cur_ordering.type == DescriptorOrderingState::SingleOrderingState::DescriptorType::Limit) {
             ordering.append_limit(cur_ordering.limit);
-        } else {
+        }
+        else if (cur_ordering.type == DescriptorOrderingState::SingleOrderingState::DescriptorType::Distinct ||
+                 cur_ordering.type == DescriptorOrderingState::SingleOrderingState::DescriptorType::Sort) {
             bool is_distinct = cur_ordering.type == DescriptorOrderingState::SingleOrderingState::DescriptorType::Distinct;
             std::vector<std::vector<size_t>> property_indices;
             std::vector<bool> ascendings;
@@ -788,9 +791,9 @@ void apply_ordering(DescriptorOrdering& ordering, ConstTableRef target, const pa
                 for (size_t ndx_in_path = 0; ndx_in_path < path.size(); ++ndx_in_path) {
                     size_t col_ndx = cur_table->get_column_index(path[ndx_in_path]);
                     if (col_ndx == realm::not_found) {
-                        throw std::runtime_error(
-                            util::format("No property '%1' found on object type '%2' specified in '%3' clause",
-                                path[ndx_in_path], cur_table->get_name(), is_distinct ? "distinct" : "sort"));
+                        throw std::runtime_error(util::format(
+                            "No property '%1' found on object type '%2' specified in '%3' clause", path[ndx_in_path],
+                            cur_table->get_name(), is_distinct ? "distinct" : "sort"));
                     }
                     indices.push_back(col_ndx);
                     if (ndx_in_path < path.size() - 1) {
@@ -803,17 +806,71 @@ void apply_ordering(DescriptorOrdering& ordering, ConstTableRef target, const pa
 
             if (is_distinct) {
                 ordering.append_distinct(DistinctDescriptor{*target.get(), property_indices});
-            } else {
+            }
+            else {
                 ordering.append_sort(SortDescriptor{*target.get(), property_indices, ascendings});
             }
+        }
+        else if (cur_ordering.type == DescriptorOrderingState::SingleOrderingState::DescriptorType::Include) {
+            REALM_ASSERT(target->is_group_level());
+            using tf = _impl::TableFriend;
+            Group* g = tf::get_parent_group(*target);
+            REALM_ASSERT(g);
+
+            // by definition, included paths contain at least one backlink
+            bool backlink_paths_allowed = mapping.backlinks_allowed();
+            mapping.set_allow_backlinks(true);
+
+            std::vector<std::vector<LinkPathPart>> properties;
+            for (const DescriptorOrderingState::PropertyState& cur_property : cur_ordering.properties) {
+                KeyPath path = key_path_from_string(cur_property.key_path);
+                size_t index = 0;
+                std::vector<LinkPathPart> links;
+                ConstTableRef cur_table = target;
+
+                while (index < path.size()) {
+                    KeyPathElement element = mapping.process_next_path(cur_table, path, index); // throws if invalid
+                    // backlinks use type_LinkList since list operations apply to them (and is_backlink is set)
+                    if (element.col_type != type_Link && element.col_type != type_LinkList) {
+                        throw InvalidPathError(
+                            util::format("Property '%1' is not a link in object of type '%2' in 'INCLUDE' clause",
+                                         element.table->get_column_name(element.col_ndx),
+                                         get_printable_table_name(*element.table)));
+                    }
+                    if (element.table == cur_table) {
+                        if (element.col_ndx == realm::npos) {
+                            cur_table = element.table;
+                        }
+                        else {
+                            cur_table =
+                                element.table->get_link_target(element.col_ndx); // advance through forward link
+                        }
+                    }
+                    else {
+                        cur_table = element.table; // advance through backlink
+                    }
+                    ConstTableRef tr;
+                    if (element.is_backlink) {
+                        tr = element.table;
+                    }
+                    links.push_back(LinkPathPart(element.col_ndx, tr));
+                }
+                properties.emplace_back(std::move(links));
+            }
+            ordering.append_include(IncludeDescriptor{*target.get(), properties});
+            mapping.set_allow_backlinks(backlink_paths_allowed);
+        }
+        else {
+            REALM_UNREACHABLE();
         }
     }
 }
 
-void apply_ordering(DescriptorOrdering& ordering, ConstTableRef target, const parser::DescriptorOrderingState& state)
+void apply_ordering(DescriptorOrdering& ordering, ConstTableRef target, const parser::DescriptorOrderingState& state,
+                    parser::KeyPathMapping mapping)
 {
     NoArguments args;
-    apply_ordering(ordering, target, state, args);
+    apply_ordering(ordering, target, state, args, mapping);
 }
 
 } // namespace query_builder

@@ -24,6 +24,8 @@
 #include <realm/util/thread.hpp>
 #include <realm/util/encrypted_file_mapping.hpp>
 
+#include <functional>
+
 namespace realm {
 namespace util {
 
@@ -46,7 +48,8 @@ public:
     // must return the target load (also in bytes). Returns no_match if no
 	// target can be set
 	static constexpr int64_t no_match = -1;
-    virtual int64_t get_current_target(size_t current_load) = 0;
+    virtual std::function<int64_t()> current_target_getter(size_t load) = 0;
+    virtual void report_target_result(int64_t) = 0;
 };
 
 // Set a page reclaim governor. The governor is an object with a method which will be called periodically
@@ -59,10 +62,32 @@ public:
 // If no governor is installed, the page reclaim daemon will not start.
 void set_page_reclaim_governor(PageReclaimGovernor* governor);
 
+// Use the default governor. The default governor is used automatically if nothing else is set, so
+// this funciton is mostly useful for tests where changing back to the default could be desirable.
+inline void set_page_reclaim_governor_to_default()
+{
+    set_page_reclaim_governor(nullptr);
+}
+
+// Retrieves the number of in memory decrypted pages, across all open files.
+size_t get_num_decrypted_pages();
+
+// Retrieves the
+// - amount of memory used for decrypted pages, across all open files.
+// - current target for the reclaimer (desired number of decrypted pages)
+// - current workload size for the reclaimer, across all open files.
+struct decrypted_memory_stats_t {
+    size_t memory_size;
+    size_t reclaimer_target;
+    size_t reclaimer_workload;
+};
+
+decrypted_memory_stats_t get_decrypted_memory_stats();
+
 #if REALM_ENABLE_ENCRYPTION
 
-void encryption_note_reader_start(SharedFileInfo& info, void* reader_id);
-void encryption_note_reader_end(SharedFileInfo& info, void* reader_id);
+void encryption_note_reader_start(SharedFileInfo& info, const void* reader_id);
+void encryption_note_reader_end(SharedFileInfo& info, const void* reader_id) noexcept;
 
 SharedFileInfo* get_file_info_for_file(File& file);
 
@@ -90,7 +115,7 @@ void inline encryption_write_barrier(const void* addr, size_t size, EncryptedFil
 }
 
 
-extern util::Mutex mapping_mutex;
+extern util::Mutex& mapping_mutex;
 
 inline void do_encryption_read_barrier(const void* addr, size_t size, HeaderToSize header_to_size,
                                        EncryptedFileMapping* mapping)
@@ -109,6 +134,11 @@ inline void do_encryption_write_barrier(const void* addr, size_t size, Encrypted
 
 void inline set_page_reclaim_governor(PageReclaimGovernor*)
 {
+}
+
+size_t inline get_num_decrypted_pages()
+{
+    return 0;
 }
 
 void inline encryption_read_barrier(const void*, size_t, EncryptedFileMapping*, HeaderToSize = nullptr)

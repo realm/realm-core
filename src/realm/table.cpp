@@ -2251,7 +2251,7 @@ size_t Table::add_row_with_key(size_t key_col_ndx, util::Optional<int64_t> key)
             repl->add_row_with_key(this, row_ndx, prior_num_rows, key_col_ndx, *key); // Throws
         else {
             repl->insert_empty_rows(this, row_ndx, 1, prior_num_rows); // Throws
-            repl->set_null(this, key_col_ndx, row_ndx);
+            repl->set_null(this, key_col_ndx, row_ndx, _impl::instr_SetUnique);
         }
     }
 

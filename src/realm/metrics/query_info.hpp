@@ -53,6 +53,7 @@ public:
     ~QueryInfo() noexcept;
 
     std::string get_description() const;
+    std::string get_table_name() const;
     QueryType get_type() const;
     double get_query_time() const;
 
@@ -61,6 +62,7 @@ public:
 
 private:
     std::string m_description;
+    std::string m_table_name;
     QueryType m_type;
     std::shared_ptr<MetricTimerResult> m_query_time;
 };

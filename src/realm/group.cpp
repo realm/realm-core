@@ -714,8 +714,9 @@ void Group::rename_table(size_t table_ndx, StringData new_name, bool require_uni
 
 class Group::DefaultTableWriter : public Group::TableWriter {
 public:
-    DefaultTableWriter(const Group& group)
+    DefaultTableWriter(const Group& group, bool write_history)
         : m_group(group)
+        , m_write_history(write_history)
     {
     }
     ref_type write_names(_impl::OutputStream& out) override
@@ -746,7 +747,8 @@ public:
                                                              history_type,
                                                              history_schema_version);
             REALM_ASSERT(history_type != Replication::hist_None);
-            if (history_type != Replication::hist_SyncClient && history_type != Replication::hist_SyncServer) {
+            if (!m_write_history ||
+                (history_type != Replication::hist_SyncClient && history_type != Replication::hist_SyncServer)) {
                 return info; // Only sync history should be preserved when writing to a new file
             }
             info.type = history_type;
@@ -762,38 +764,49 @@ public:
 
 private:
     const Group& m_group;
+    bool m_write_history;
 };
 
 void Group::write(std::ostream& out, bool pad) const
 {
-    write(out, pad, 0);
+    write(out, pad, 0, true);
 }
 
-void Group::write(std::ostream& out, bool pad_for_encryption, uint_fast64_t version_number) const
+void Group::write(std::ostream& out, bool pad_for_encryption, uint_fast64_t version_number, bool write_history) const
 {
     REALM_ASSERT(is_attached());
-    DefaultTableWriter table_writer(*this);
+    DefaultTableWriter table_writer(*this, write_history);
     bool no_top_array = !m_top.is_attached();
     write(out, m_file_format_version, table_writer, no_top_array, pad_for_encryption, version_number); // Throws
 }
 
-void Group::write(const std::string& path, const char* encryption_key, uint64_t version_number) const
+void Group::write(const std::string& path, const char* encryption_key, uint64_t version_number,
+                  bool write_history) const
 {
     File file;
     int flags = 0;
     file.open(path, File::access_ReadWrite, File::create_Must, flags);
-    write(file, encryption_key, version_number);
+    write(file, encryption_key, version_number, write_history);
 }
 
-void Group::write(File& file, const char* encryption_key, uint_fast64_t version_number) const
+void Group::write(File& file, const char* encryption_key, uint_fast64_t version_number, bool write_history) const
 {
     REALM_ASSERT(file.get_size() == 0);
 
     file.set_encryption_key(encryption_key);
-    File::Streambuf streambuf(&file);
+
+    // The aim is that the buffer size should be at least 1/256 of needed size but less than 64 Mb
+    constexpr size_t upper_bound = 64 * 1024 * 1024;
+    size_t min_space = std::min(get_used_space() >> 8, upper_bound);
+    size_t buffer_size = 4096;
+    while (buffer_size < min_space) {
+        buffer_size <<= 1;
+    }
+    File::Streambuf streambuf(&file, buffer_size);
+
     std::ostream out(&streambuf);
     out.exceptions(std::ios_base::failbit | std::ios_base::badbit);
-    write(out, encryption_key != 0, version_number);
+    write(out, encryption_key != 0, version_number, write_history);
     int sync_status = streambuf.pubsync();
     REALM_ASSERT(sync_status == 0);
 }
@@ -860,7 +873,6 @@ void Group::write(std::ostream& out, int file_format_version, TableWriter& table
         // into a separate file.
         ref_type names_ref = table_writer.write_names(out_2);   // Throws
         ref_type tables_ref = table_writer.write_tables(out_2); // Throws
-        TableWriter::HistoryInfo history_info = table_writer.write_history(out_2); // Throws
         SlabAlloc new_alloc;
         new_alloc.attach_empty(); // Throws
         Array top(new_alloc);
@@ -875,6 +887,8 @@ void Group::write(std::ostream& out, int file_format_version, TableWriter& table
 
         int top_size = 3;
         if (version_number) {
+            TableWriter::HistoryInfo history_info = table_writer.write_history(out_2); // Throws
+
             Array free_list(new_alloc);
             Array size_list(new_alloc);
             Array version_list(new_alloc);
@@ -2044,7 +2058,7 @@ void Group::verify() const
             int history_schema_version = 0;
             get_version_and_history_info(m_top, version, history_type, history_schema_version);
             REALM_ASSERT(history_type != Replication::hist_None || history_schema_version == 0);
-            hist->update_from_parent(version);
+            hist->update_from_ref_and_version(get_history_ref(m_top), version);
             hist->verify();
         }
     }

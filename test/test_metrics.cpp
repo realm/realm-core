@@ -61,6 +61,7 @@
 #include <realm/replication.hpp>
 #include <realm/history.hpp>
 
+#include <future>
 #include <chrono>
 #include <string>
 #include <thread>
@@ -315,8 +316,10 @@ TEST(Metrics_QueryEqual)
 
     for (size_t i = 0; i < 7; ++i) {
         std::string description = queries->at(i).get_description();
+        std::string table_name = queries->at(i).get_table_name();
         CHECK_EQUAL(find_count(description, column_names[i]), 1);
         CHECK_GREATER_EQUAL(find_count(description, query_search_term), 1);
+        CHECK_EQUAL(table_name, "person");
     }
 }
 
@@ -862,6 +865,201 @@ TEST(Metrics_TransactionVersions)
     }
 }
 
+TEST(Metrics_MaxNumTransactionsIsNotExceeded)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    SharedGroupOptions options(crypt_key());
+    options.enable_metrics = true;
+    options.metrics_buffer_size = 10;
+    SharedGroup sg(*hist, options);
+    populate(sg); // 1
+    {
+        ReadTransaction rt(sg); // 2
+    }
+    {
+        WriteTransaction wt(sg); // 3
+        TableRef t0 = wt.get_table(0);
+        TableRef t1 = wt.get_table(1);
+        t0->add_empty_row(3);
+        t1->add_empty_row(7);
+        wt.commit();
+    }
+
+    for (size_t i = 0; i < options.metrics_buffer_size; ++i) {
+        ReadTransaction rt(sg);
+    }
+
+    std::shared_ptr<Metrics> metrics = sg.get_metrics();
+    CHECK(metrics);
+
+    CHECK_EQUAL(metrics->num_query_metrics(), 0);
+    CHECK_EQUAL(metrics->num_transaction_metrics(), options.metrics_buffer_size);
+    std::unique_ptr<Metrics::TransactionInfoList> transactions = metrics->take_transactions();
+    CHECK(transactions);
+    for (auto transaction : *transactions) {
+        CHECK_EQUAL(transaction.get_transaction_type(),
+                    realm::metrics::TransactionInfo::TransactionType::read_transaction);
+    }
+}
+
+TEST(Metrics_MaxNumQueriesIsNotExceeded)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    SharedGroupOptions options(crypt_key());
+    options.enable_metrics = true;
+    options.metrics_buffer_size = 10;
+    SharedGroup sg(*hist, options);
+
+    Group& g = sg.begin_write();
+    auto table = g.add_table("table");
+    size_t int_col = table->add_column(type_Int, "col_int");
+    table->add_empty_row(10);
+    sg.commit();
+
+    sg.begin_read();
+    table = g.get_table("table");
+    CHECK(bool(table));
+    Query query = table->column<int64_t>(int_col) == 0;
+    for (size_t i = 0; i < 2 * options.metrics_buffer_size; ++i) {
+        query.find();
+    }
+
+    std::shared_ptr<Metrics> metrics = sg.get_metrics();
+    CHECK(metrics);
+    CHECK_EQUAL(metrics->num_query_metrics(), options.metrics_buffer_size);
+}
+
+// The number of decrypted pages is updated periodically by the governor.
+// To test this, we need our own governor implementation which does not reclaim pages but runs at least once.
+class NoPageReclaimGovernor : public realm::util::PageReclaimGovernor {
+public:
+    NoPageReclaimGovernor()
+    {
+        has_run_once = will_run.get_future();
+    }
+    std::function<int64_t()> current_target_getter(size_t) override
+    {
+        return []() { return realm::util::PageReclaimGovernor::no_match; };
+    }
+
+    void report_target_result(int64_t) override
+    {
+        will_run.set_value();
+    }
+
+    std::future<void> has_run_once;
+    std::promise<void> will_run;
+};
+
+// this test relies on the global state of the number of decrypted pages and therefore must be run in isolation
+NONCONCURRENT_TEST(Metrics_NumDecryptedPagesWithoutEncryption)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    SharedGroupOptions options(nullptr);
+    options.enable_metrics = true;
+    options.metrics_buffer_size = 10;
+    SharedGroup sg(*hist, options);
+
+    Group& g = sg.begin_write();
+    auto table = g.add_table("table");
+
+    // we need this here because other unit tests might be using encryption and we need a guarantee
+    // that the global pages are from this shared group only.
+    NoPageReclaimGovernor gov;
+    realm::util::set_page_reclaim_governor(&gov);
+    CHECK(gov.has_run_once.valid());
+    gov.has_run_once.wait_for(std::chrono::seconds(2));
+
+    sg.commit();
+
+    sg.begin_read();
+    sg.end_read();
+
+    std::shared_ptr<Metrics> metrics = sg.get_metrics();
+    CHECK(metrics);
+
+    CHECK_EQUAL(metrics->num_transaction_metrics(), 2);
+    std::unique_ptr<Metrics::TransactionInfoList> transactions = metrics->take_transactions();
+    CHECK(transactions);
+    CHECK_EQUAL(transactions->size(), 2);
+    CHECK_EQUAL(transactions->at(0).get_transaction_type(),
+                realm::metrics::TransactionInfo::TransactionType::write_transaction);
+    CHECK_EQUAL(transactions->at(0).get_num_decrypted_pages(), 0);
+    CHECK_EQUAL(transactions->at(1).get_transaction_type(),
+                realm::metrics::TransactionInfo::TransactionType::read_transaction);
+    CHECK_EQUAL(transactions->at(1).get_num_decrypted_pages(), 0);
+
+    realm::util::set_page_reclaim_governor_to_default(); // the remainder of the test suite should use the default
+}
+
+// this test relies on the global state of the number of decrypted pages and therefore must be run in isolation
+NONCONCURRENT_TEST_IF(Metrics_NumDecryptedPagesWithEncryption, REALM_ENABLE_ENCRYPTION)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    SharedGroupOptions options(crypt_key(true));
+    options.enable_metrics = true;
+    options.metrics_buffer_size = 10;
+    SharedGroup sg(*hist, options);
+
+    Group& g = sg.begin_write();
+    auto table = g.add_table("table");
+
+    NoPageReclaimGovernor gov;
+    realm::util::set_page_reclaim_governor(&gov);
+    CHECK(gov.has_run_once.valid());
+    gov.has_run_once.wait_for(std::chrono::seconds(2));
+
+    sg.commit();
+
+    sg.begin_read();
+    sg.end_read();
+
+    std::shared_ptr<Metrics> metrics = sg.get_metrics();
+    CHECK(metrics);
+
+    CHECK_EQUAL(metrics->num_transaction_metrics(), 2);
+    std::unique_ptr<Metrics::TransactionInfoList> transactions = metrics->take_transactions();
+    CHECK(transactions);
+    CHECK_EQUAL(transactions->size(), 2);
+    CHECK_EQUAL(transactions->at(0).get_transaction_type(),
+                realm::metrics::TransactionInfo::TransactionType::write_transaction);
+    CHECK_EQUAL(transactions->at(0).get_num_decrypted_pages(), 1);
+    CHECK_EQUAL(transactions->at(1).get_transaction_type(),
+                realm::metrics::TransactionInfo::TransactionType::read_transaction);
+    CHECK_EQUAL(transactions->at(1).get_num_decrypted_pages(), 1);
+
+    realm::util::set_page_reclaim_governor_to_default(); // the remainder of the test suite should use the default
+}
+
+TEST(Metrics_MemoryChecks)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    SharedGroupOptions options(nullptr);
+    options.enable_metrics = true;
+    options.metrics_buffer_size = 10;
+    SharedGroup sg(*hist, options);
+    populate(sg);
+
+    sg.begin_read();
+    sg.end_read();
+
+    std::shared_ptr<Metrics> metrics = sg.get_metrics();
+    CHECK(metrics);
+
+    CHECK_EQUAL(metrics->num_transaction_metrics(), 2);
+    std::unique_ptr<Metrics::TransactionInfoList> transactions = metrics->take_transactions();
+    CHECK(transactions);
+
+    for (auto transaction : *transactions) {
+        CHECK_GREATER(transaction.get_disk_size(), 0);
+        CHECK_GREATER(transaction.get_free_space(), 0);
+    }
+}
 
 
 #endif // REALM_METRICS

@@ -223,10 +223,11 @@ void set_random_seed()
 
 class AggressiveGovernor : public PageReclaimGovernor {
 public:
-    int64_t get_current_target(size_t) override
+    std::function<int64_t()> current_target_getter(size_t) override
     {
-        return 4096;
+        return []() { return 4096; };
     }
+    void report_target_result(int64_t) override {}
 };
 
 AggressiveGovernor aggressive_governor;

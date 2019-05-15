@@ -866,7 +866,7 @@ private:
 /// Only output is supported at this point.
 class File::Streambuf : public std::streambuf {
 public:
-    explicit Streambuf(File*);
+    explicit Streambuf(File*, size_t = 4096);
     ~Streambuf() noexcept;
 
     // Disable copying
@@ -874,8 +874,6 @@ public:
     Streambuf& operator=(const Streambuf&) = delete;
 
 private:
-    static const size_t buffer_size = 4096;
-
     File& m_file;
     std::unique_ptr<char[]> const m_buffer;
 
@@ -1205,7 +1203,7 @@ inline T* File::Map<T>::release() noexcept
 }
 
 
-inline File::Streambuf::Streambuf(File* f)
+inline File::Streambuf::Streambuf(File* f, size_t buffer_size)
     : m_file(*f)
     , m_buffer(new char[buffer_size])
 {

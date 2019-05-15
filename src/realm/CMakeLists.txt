@@ -154,6 +154,7 @@ set(REALM_INSTALL_UTIL_HEADERS
     util/bind_ptr.hpp
     util/buffer.hpp
     util/call_with_tuple.hpp
+    util/fixed_size_buffer.hpp
     util/cf_ptr.hpp
     util/encrypted_file_mapping.hpp
     util/features.h

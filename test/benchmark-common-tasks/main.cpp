@@ -352,6 +352,96 @@ struct BenchmarkWithInts : BenchmarkWithIntsTable {
     }
 };
 
+struct BenchmarkQueryChainedOrInts : BenchmarkWithIntsTable {
+    const size_t num_queried_matches = 1000;
+    const size_t num_rows = 100000;
+    std::vector<int64_t> values_to_query;
+    const char* name() const
+    {
+        return "QueryChainedOrInts";
+    }
+
+    void before_all(SharedGroup& group)
+    {
+        BenchmarkWithIntsTable::before_all(group);
+        WriteTransaction tr(group);
+        TableRef t = tr.get_table("IntOnly");
+        t->add_empty_row(num_rows);
+        REALM_ASSERT(num_rows > num_queried_matches);
+        Random r;
+        for (size_t i = 0; i < num_rows; ++i) {
+            t->set_int(0, i, int64_t(i));
+        }
+        for (size_t i = 0; i < num_queried_matches; ++i) {
+            size_t ndx_to_match = (num_rows / num_queried_matches) * i;
+            values_to_query.push_back(t->get_int(0, ndx_to_match));
+        }
+        tr.commit();
+    }
+
+    void operator()(SharedGroup& group)
+    {
+        ReadTransaction tr(group);
+        ConstTableRef table = tr.get_table("IntOnly");
+        Query query = table->where();
+        for (size_t i = 0; i < values_to_query.size(); ++i) {
+            query.Or().equal(0, values_to_query[i]);
+        }
+        TableView results = query.find_all();
+        REALM_ASSERT_EX(results.size() == num_queried_matches, results.size(), num_queried_matches,
+                        values_to_query.size());
+        static_cast<void>(results);
+    }
+};
+
+struct BenchmarkQueryChainedOrIntsIndexed : BenchmarkQueryChainedOrInts {
+    const char* name() const
+    {
+        return "QueryChainedOrIntsIndexed";
+    }
+    void before_all(SharedGroup& group)
+    {
+        BenchmarkQueryChainedOrInts::before_all(group);
+        WriteTransaction tr(group);
+        TableRef t = tr.get_table("IntOnly");
+        t->add_search_index(0);
+        tr.commit();
+    }
+};
+
+
+struct BenchmarkQueryIntEquality : BenchmarkQueryChainedOrInts {
+    const char* name() const
+    {
+        return "QueryIntEquality";
+    }
+
+    void operator()(SharedGroup& group)
+    {
+        ReadTransaction tr(group);
+        ConstTableRef table = tr.get_table("IntOnly");
+        Query query = table->where().equal(0, 0);
+        TableView results = query.find_all();
+        REALM_ASSERT_EX(results.size() == 1, results.size(), 1);
+        static_cast<void>(results);
+    }
+};
+
+struct BenchmarkQueryIntEqualityIndexed : BenchmarkQueryIntEquality {
+    const char* name() const
+    {
+        return "QueryIntEqualityIndexed";
+    }
+    void before_all(SharedGroup& group)
+    {
+        BenchmarkQueryIntEquality::before_all(group);
+        WriteTransaction tr(group);
+        TableRef t = tr.get_table("IntOnly");
+        t->add_search_index(0);
+        tr.commit();
+    }
+};
+
 struct BenchmarkQuery : BenchmarkWithStrings {
     const char* name() const
     {
@@ -363,6 +453,51 @@ struct BenchmarkQuery : BenchmarkWithStrings {
         ReadTransaction tr(group);
         ConstTableRef table = tr.get_table("StringOnly");
         ConstTableView view = table->find_all_string(0, "200");
+    }
+};
+
+struct BenchmarkQueryChainedOrStrings : BenchmarkWithStringsTable {
+    const size_t num_queried_matches = 1000;
+    const size_t num_rows = 100000;
+    std::vector<std::string> values_to_query;
+    const char* name() const
+    {
+        return "QueryChainedOrStrings";
+    }
+
+    void before_all(SharedGroup& group)
+    {
+        BenchmarkWithStringsTable::before_all(group);
+        WriteTransaction tr(group);
+        TableRef t = tr.get_table("StringOnly");
+        t->add_empty_row(num_rows);
+        REALM_ASSERT(num_rows > num_queried_matches);
+        for (size_t i = 0; i < num_rows; ++i) {
+            std::stringstream ss;
+            ss << i;
+            auto s = ss.str();
+            t->set_string(0, i, s);
+        }
+        // t->add_search_index(0);
+        for (size_t i = 0; i < num_queried_matches; ++i) {
+            size_t ndx_to_match = (num_rows / num_queried_matches) * i;
+            values_to_query.push_back(t->get_string(0, ndx_to_match));
+        }
+        tr.commit();
+    }
+
+    void operator()(SharedGroup& group)
+    {
+        ReadTransaction tr(group);
+        ConstTableRef table = tr.get_table("StringOnly");
+        Query query = table->where();
+        for (size_t i = 0; i < values_to_query.size(); ++i) {
+            query.Or().equal(0, values_to_query[i]);
+        }
+        TableView results = query.find_all();
+        REALM_ASSERT_EX(results.size() == num_queried_matches, results.size(), num_queried_matches,
+                        values_to_query.size());
+        static_cast<void>(results);
     }
 };
 
@@ -1003,6 +1138,11 @@ int benchmark_common_tasks_main()
     BENCH(BenchmarkQueryInsensitiveString);
     BENCH(BenchmarkQueryInsensitiveStringIndexed);
     BENCH(BenchmarkNonInitatorOpen);
+    BENCH(BenchmarkQueryChainedOrStrings);
+    BENCH(BenchmarkQueryChainedOrInts);
+    BENCH(BenchmarkQueryChainedOrIntsIndexed);
+    BENCH(BenchmarkQueryIntEquality);
+    BENCH(BenchmarkQueryIntEqualityIndexed);
 
 #undef BENCH
     return 0;

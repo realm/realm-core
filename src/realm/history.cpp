@@ -47,7 +47,7 @@ public:
     /// produced by the added changeset.
     version_type add_changeset(BinaryData);
 
-    void update_early_from_top_ref(version_type, size_t, ref_type) override;
+    void update_from_ref_and_version(ref_type, version_type) override;
     void update_from_parent(version_type) override;
     void get_changesets(version_type, version_type, BinaryIterator*) const noexcept override;
     void set_oldest_bound_version(version_type) override;
@@ -81,8 +81,6 @@ private:
     /// dynamically allocated root node accessor, and the type of the required
     /// root node accessor depends on the size of the B+-tree.
     std::unique_ptr<BinaryColumn> m_changesets;
-
-    void update_from_ref(ref_type, version_type);
 };
 
 
@@ -128,23 +126,11 @@ InRealmHistory::version_type InRealmHistory::add_changeset(BinaryData changeset)
     return new_version;
 }
 
-
-void InRealmHistory::update_early_from_top_ref(version_type new_version, size_t new_file_size,
-                                               ref_type new_top_ref)
-{
-    using gf = _impl::GroupFriend;
-    gf::remap(*m_group, new_file_size); // Throws
-    Allocator& alloc = gf::get_alloc(*m_group);
-    ref_type hist_ref = gf::get_history_ref(alloc, new_top_ref);
-    update_from_ref(hist_ref, new_version); // Throws
-}
-
-
 void InRealmHistory::update_from_parent(version_type version)
 {
     using gf = _impl::GroupFriend;
     ref_type ref = gf::get_history_ref(*m_group);
-    update_from_ref(ref, version); // Throws
+    update_from_ref_and_version(ref, version); // Throws
 }
 
 
@@ -192,7 +178,7 @@ void InRealmHistory::verify() const
 }
 
 
-void InRealmHistory::update_from_ref(ref_type ref, version_type version)
+void InRealmHistory::update_from_ref_and_version(ref_type ref, version_type version)
 {
     using gf = _impl::GroupFriend;
     if (ref == 0) {
@@ -245,8 +231,7 @@ public:
 
     version_type prepare_changeset(const char* data, size_t size, version_type orig_version) override
     {
-        if (!is_history_updated())
-            update_from_parent(orig_version); // Throws
+        ensure_updated(orig_version);
         BinaryData changeset(data, size);
         version_type new_version = add_changeset(changeset); // Throws
         return new_version;

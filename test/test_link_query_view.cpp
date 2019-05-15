@@ -677,6 +677,9 @@ TEST(LinkList_QueryFindLinkTarget)
 
     tv = (table1->column<LinkList>(col_link3) != table2->get(3)).find_all();
     CHECK_TABLE_VIEW(tv, {0, 1});
+
+    tv = table1->where().links_to(col_link3, std::vector<ConstRow>({table2->get(0), table2->get(2)})).find_all();
+    CHECK_TABLE_VIEW(tv, {0, 1});
 }
 
 

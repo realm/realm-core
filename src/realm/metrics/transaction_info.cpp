@@ -28,6 +28,8 @@ TransactionInfo::TransactionInfo(TransactionInfo::TransactionType type)
     , m_realm_free_space(0)
     , m_total_objects(0)
     , m_type(type)
+    , m_num_versions(0)
+    , m_num_decrypted_pages(0)
 {
     if (m_type == write_transaction) {
         m_fsync_time = std::make_shared<MetricTimerResult>();
@@ -85,13 +87,21 @@ size_t TransactionInfo::get_num_available_versions() const
     return m_num_versions;
 }
 
-void TransactionInfo::update_stats(size_t disk_size, size_t free_space, size_t total_objects, size_t available_versions)
+size_t TransactionInfo::get_num_decrypted_pages() const
+{
+    return m_num_decrypted_pages;
+}
+
+void TransactionInfo::update_stats(size_t disk_size, size_t free_space, size_t total_objects,
+                                   size_t available_versions, size_t num_decrypted_pages)
 {
     m_realm_disk_size = disk_size;
     m_realm_free_space = free_space;
     m_total_objects = total_objects;
     m_num_versions = available_versions;
+    m_num_decrypted_pages = num_decrypted_pages;
 }
+
 void TransactionInfo::finish_timer()
 {
     m_transaction_time.report_seconds(m_transact_timer.get_elapsed_time());

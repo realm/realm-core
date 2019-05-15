@@ -380,7 +380,8 @@ public:
     /// types that are derived from util::File::AccessError, the
     /// derived exception type is thrown. In particular,
     /// util::File::Exists will be thrown if the file exists already.
-    void write(const std::string& file, const char* encryption_key = nullptr, uint64_t version = 0) const;
+    void write(const std::string& file, const char* encryption_key = nullptr, uint64_t version = 0,
+               bool write_history = true) const;
 
     /// Write this database to a memory buffer.
     ///
@@ -695,8 +696,8 @@ private:
 
     void mark_all_table_accessors() noexcept;
 
-    void write(util::File& file, const char* encryption_key, uint_fast64_t version_number) const;
-    void write(std::ostream&, bool pad, uint_fast64_t version_numer) const;
+    void write(util::File& file, const char* encryption_key, uint_fast64_t version_number, bool write_history) const;
+    void write(std::ostream&, bool pad, uint_fast64_t version_numer, bool write_history) const;
 
     Replication* get_replication() const noexcept;
     void set_replication(Replication*) noexcept;

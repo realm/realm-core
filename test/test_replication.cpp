@@ -162,8 +162,9 @@ public:
         if (!m_arr) {
             using gf = _impl::GroupFriend;
             Allocator& alloc = gf::get_alloc(*m_group);
-            m_arr = std::make_unique<Array>(alloc);
-            m_arr->create(Array::type_Normal);
+            m_arr = std::make_unique<ArrayString>(alloc);
+            m_arr->create();
+            m_arr->add("Changeset");
             gf::prepare_history_parent(*m_group, *m_arr, hist_SyncClient, m_history_schema_version);
             m_arr->update_parent(); // Throws
         }
@@ -199,7 +200,7 @@ private:
     int m_history_schema_version;
     bool m_upgraded = false;
     Group* m_group = nullptr;
-    std::unique_ptr<Array> m_arr;
+    std::unique_ptr<ArrayString> m_arr;
 };
 
 void my_table_add_columns(TableRef t)
@@ -3983,6 +3984,52 @@ TEST(Replication_HistorySchemaVersionDuringWT)
     SharedGroup sg_2(repl);
 }
 
+
+// This is to test that the exported file has no memory leaks
+TEST(Replication_GroupWriteWithoutHistory)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    SHARED_GROUP_TEST_PATH(out1);
+    SHARED_GROUP_TEST_PATH(out2);
+
+    ReplSyncClient repl(path, 1);
+    SharedGroup sg_1(repl);
+    {
+        WriteTransaction wt(sg_1);
+        auto table = wt.add_table("Table");
+        auto col = table->add_column(type_String, "strings");
+        auto ndx = table->add_empty_row();
+        table->set_string(col, ndx, "Hello");
+        wt.commit();
+    }
+    {
+        ReadTransaction rt(sg_1);
+        // Export file without history
+        rt.get_group().write(out1);
+    }
+
+    {
+        // Open without history
+        SharedGroup sg_2(out1);
+        ReadTransaction rt(sg_2);
+        rt.get_group().verify();
+    }
+
+    {
+        ReadTransaction rt(sg_1);
+        // Export file with history
+        rt.get_group().write(out2, nullptr, 1);
+    }
+
+    {
+        // Open with history
+        ReplSyncClient repl2(out2, 1);
+        SharedGroup sg_2(repl2);
+        ReadTransaction rt(sg_2);
+        rt.get_group().verify();
+    }
+}
+
 TEST(Replication_HistorySchemaVersionUpgrade)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -4005,6 +4052,35 @@ TEST(Replication_HistorySchemaVersionUpgrade)
     // If this was not the case we would have triggered another upgrade
     // and the test would hang
     SharedGroup sg_2(repl);
+}
+
+TEST(Replication_WriteWithoutHistory)
+{
+    SHARED_GROUP_TEST_PATH(path_1);
+    SHARED_GROUP_TEST_PATH(path_2);
+
+    ReplSyncClient repl(path_1, 1);
+    SharedGroup sg(repl);
+    {
+        // Do an empty commit to force the file format version to be established.
+        WriteTransaction wt(sg);
+        wt.add_table("Table");
+        wt.commit();
+    }
+
+    {
+        ReadTransaction rt(sg);
+        rt.get_group().write(path_2, nullptr, rt.get_version(), false);
+    }
+    // Make sure the realm can be opened without history
+    SharedGroup sg_2(path_2);
+    {
+        WriteTransaction wt(sg_2);
+        auto table = wt.get_table("Table");
+        CHECK(table);
+        table->add_column(type_Int, "int");
+        wt.commit();
+    }
 }
 
 #endif // TEST_REPLICATION
