@@ -4,7 +4,7 @@ if(NOT APPLE)
     if(UNIX)
         set(OPENSSL_URL "http://static.realm.io/downloads/openssl/@OPENSSL_VERSION@/Linux/x86_64/openssl.tgz")
         if(ANDROID)
-            set(OPENSSL_URL "http://static.realm.io/downloads/openssl/@OPENSSL_VERSION@/Android/${CMAKE_ANDROID_ARCH}/openssl.tgz")
+            set(OPENSSL_URL "http://static.realm.io/downloads/openssl/@OPENSSL_VERSION@/Android/${CMAKE_ANDROID_ARCH_ABI}/openssl.tgz")
         endif()
 
         message(STATUS "Downloading OpenSSL...")

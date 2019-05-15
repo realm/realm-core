@@ -1,3 +1,21 @@
+# 5.20.0-ndk18.2 Release notes
+
+### Enhancements
+* None.
+
+### Fixed
+* None.
+ 
+### Breaking changes
+* None.
+
+-----------
+
+### Internals
+* Fixed downloading OpenSSL on Android when including as a dependency.
+
+----------------------------------------------
+
 # 5.20.0-ndk18.1 Release notes
 
 ### Enhancements
