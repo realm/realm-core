@@ -1,4 +1,4 @@
-# 5.14.0-ndk18.1 Release notes
+# 5.20.0-ndk18.1 Release notes
 
 ### Enhancements
 * None.
@@ -12,7 +12,7 @@
 -----------
 
 ### Internals
-* Upgrade OpenSSL for Android to version 1.1.1a.
+* Upgrade OpenSSL for Android to version 1.1.1b.
 * Upgrade the NDK to version 18.
 * When using core as a CMake package, the target name changed to RealmCore::Core.
 * Removed support for ARMv5 and MIPS from Android. This is a consequence of the new NDK being used.
