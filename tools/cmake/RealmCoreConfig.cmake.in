@@ -4,7 +4,7 @@ if(NOT APPLE)
     if(UNIX)
         set(OPENSSL_URL "http://static.realm.io/downloads/openssl/@OPENSSL_VERSION@/Linux/x86_64/openssl.tgz")
         if(ANDROID)
-            set(OPENSSL_URL "http://static.realm.io/downloads/openssl/@OPENSSL_VERSION@/Android/${ANDROID_ABI}/openssl.tgz")
+            set(OPENSSL_URL "http://static.realm.io/downloads/openssl/@OPENSSL_VERSION@/Android/${CMAKE_ANDROID_ARCH}/openssl.tgz")
         endif()
 
         message(STATUS "Downloading OpenSSL...")
@@ -12,7 +12,7 @@ if(NOT APPLE)
 
         list(GET download_status 0 status_code)
         if (NOT "${status_code}" STREQUAL "0")
-            message(FATAL_ERROR "Downloading ${url}... Failed. Status: ${download_status}")
+            message(FATAL_ERROR "Downloading ${OPENSSL_URL}... Failed. Status: ${download_status}")
         endif()
 
         message(STATUS "Uncompressing OpenSSL...")
