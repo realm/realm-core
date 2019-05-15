@@ -289,6 +289,15 @@ inline bool ConstObj::do_is_null(ColKey::Idx col_ndx) const
 {
     T values(get_alloc());
     ref_type ref = to_ref(Array::get(m_mem.get_addr(), col_ndx.val + 1));
+    values.init_from_ref(ref);
+    return values.is_null(m_row_ndx);
+}
+
+template <>
+inline bool ConstObj::do_is_null<ArrayString>(ColKey::Idx col_ndx) const
+{
+    ArrayString values(get_alloc());
+    ref_type ref = to_ref(Array::get(m_mem.get_addr(), col_ndx.val + 1));
     values.set_spec(const_cast<Spec*>(&get_spec()), m_table->leaf_ndx2spec_ndx(col_ndx));
     values.init_from_ref(ref);
     return values.is_null(m_row_ndx);
@@ -646,6 +655,19 @@ inline void check_range(const BinaryData& val)
 }
 }
 
+// helper functions for filtering out calls to set_spec()
+template <class T>
+inline void Obj::set_spec(T&, ColKey)
+{
+}
+template <>
+inline void Obj::set_spec<ArrayString>(ArrayString& values, ColKey col_key)
+{
+    size_t spec_ndx = m_table->colkey2spec_ndx(col_key);
+    Spec* spec = const_cast<Spec*>(&get_spec());
+    values.set_spec(spec, spec_ndx);
+}
+
 template <class T>
 Obj& Obj::set(ColKey col_key, T value, bool is_default)
 {
@@ -672,9 +694,10 @@ Obj& Obj::set(ColKey col_key, T value, bool is_default)
     Array fallback(alloc);
     Array& fields = get_tree_top()->get_fields_accessor(fallback, m_mem);
     REALM_ASSERT(col_ndx.val + 1 < fields.size());
-    typename ColumnTypeTraits<T>::cluster_leaf_type values(alloc);
+    using LeafType = typename ColumnTypeTraits<T>::cluster_leaf_type;
+    LeafType values(alloc);
     values.set_parent(&fields, col_ndx.val + 1);
-    values.set_spec(const_cast<Spec*>(&get_spec()), m_table->colkey2spec_ndx(col_key));
+    set_spec<LeafType>(values, col_key);
     values.init_from_parent();
     values.set(m_row_ndx, value);
 
@@ -854,13 +877,28 @@ template <class T>
 inline void Obj::do_set_null(ColKey col_key)
 {
     ColKey::Idx col_ndx = col_key.get_index();
-    size_t spec_ndx = m_table->leaf_ndx2spec_ndx(col_ndx);
     Allocator& alloc = get_alloc();
     alloc.bump_content_version();
     Array fallback(alloc);
     Array& fields = get_tree_top()->get_fields_accessor(fallback, m_mem);
 
     T values(alloc);
+    values.set_parent(&fields, col_ndx.val + 1);
+    values.init_from_parent();
+    values.set_null(m_row_ndx);
+}
+
+template <>
+inline void Obj::do_set_null<ArrayString>(ColKey col_key)
+{
+    ColKey::Idx col_ndx = col_key.get_index();
+    size_t spec_ndx = m_table->leaf_ndx2spec_ndx(col_ndx);
+    Allocator& alloc = get_alloc();
+    alloc.bump_content_version();
+    Array fallback(alloc);
+    Array& fields = get_tree_top()->get_fields_accessor(fallback, m_mem);
+
+    ArrayString values(alloc);
     values.set_parent(&fields, col_ndx.val + 1);
     values.set_spec(const_cast<Spec*>(&get_spec()), spec_ndx);
     values.init_from_parent();

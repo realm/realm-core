@@ -270,6 +270,8 @@ private:
     bool replace_backlink(ColKey col_key, ObjKey old_key, ObjKey new_key, CascadeState& state);
     // Used when removing a backlink, return true if CascadeState contains objects to remove
     bool remove_backlink(ColKey col_key, ObjKey old_key, CascadeState& state);
+    template <class T>
+    inline void set_spec(T&, ColKey);
 };
 
 
