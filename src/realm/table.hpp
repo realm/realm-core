@@ -368,12 +368,10 @@ public:
     // Will return pointer to search index accessor. Will return nullptr if no index
     StringIndex* get_search_index(ColKey col) const noexcept
     {
-        if (col.get_type() == col_type_BackLink)
+        report_invalid_key(col);
+        if (!has_search_index(col))
             return nullptr;
-        size_t spec_ndx = colkey2spec_ndx(col);
-        REALM_ASSERT(m_index_accessors.size() == get_column_count());
-        REALM_ASSERT(spec_ndx < m_index_accessors.size());
-        return m_index_accessors[spec_ndx];
+        return m_index_accessors[col.get_index().val];
     }
     template <class T>
     ObjKey find_first(ColKey col_key, T value) const;
