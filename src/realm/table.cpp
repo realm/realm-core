@@ -453,6 +453,8 @@ void Table::init(ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent, bo
     // index setup relies on column mapping being up to date:
     build_column_mapping();
     m_index_refs.set_parent(&m_top, top_position_for_search_indexes);
+    m_opposite_table.set_parent(&m_top, top_position_for_opposite_table);
+    m_opposite_column.set_parent(&m_top, top_position_for_opposite_column);
     if (m_top.get_as_ref(top_position_for_search_indexes) == 0) {
         // This is an upgrade - create the necessary arrays
         bool context_flag = false;
@@ -460,12 +462,19 @@ void Table::init(ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent, bo
         MemRef mem = Array::create_array(Array::type_HasRefs, context_flag, nb_columns, 0, m_top.get_alloc());
         m_index_refs.init_from_mem(mem);
         m_index_refs.update_parent();
+        mem = Array::create_array(Array::type_Normal, context_flag, nb_columns, 0, m_top.get_alloc());
+        m_opposite_table.init_from_mem(mem);
+        m_opposite_table.update_parent();
+        mem = Array::create_array(Array::type_Normal, context_flag, nb_columns, 0, m_top.get_alloc());
+        m_opposite_column.init_from_mem(mem);
+        m_opposite_column.update_parent();
     }
     else {
+        m_opposite_table.init_from_parent();
+        m_opposite_column.init_from_parent();
         m_index_refs.init_from_parent();
         m_index_accessors.resize(m_index_refs.size());
     }
-
     if (!m_top.get_as_ref_or_tagged(top_position_for_column_key).is_tagged()) {
         m_top.set(top_position_for_column_key, RefOrTagged::make_tagged(0));
     }
@@ -645,14 +654,12 @@ ColKey Table::insert_root_column(ColKey col_key, DataType type, StringData name,
     if (link_target.is_valid()) {
         auto target_table_key = link_target.m_target_table->get_key();
         m_spec.set_opposite_link_table_key(col_ndx, target_table_key); // Throws
-        REALM_ASSERT(target_table_key == m_spec.get_opposite_link_table_key(col_ndx));
-    }
-
-    if (link_target.is_valid()) {
         auto origin_table_key = get_key();
         link_target.m_backlink_col_key = link_target.m_target_table->insert_backlink_column(
             origin_table_key, col_key, link_target.m_backlink_col_key); // Throws
         link_target.m_target_table->report_invalid_key(link_target.m_backlink_col_key);
+        set_opposite_column(col_key, target_table_key, link_target.m_backlink_col_key);
+        // backlink metadata in opposite table is set by insert_backlink_column...
     }
     return col_key;
 }
@@ -708,6 +715,16 @@ ColKey Table::do_insert_root_column(ColKey col_key, ColumnType type, StringData 
     else {
         m_index_refs.set(col_ndx, 0);
     }
+    REALM_ASSERT(col_ndx <= m_opposite_table.size());
+    if (col_ndx == m_opposite_table.size()) {
+        // m_opposite_table and m_opposite_column are always resized together!
+        m_opposite_table.insert(col_ndx, 0);
+        m_opposite_column.insert(col_ndx, 0);
+    }
+    else {
+        m_opposite_table.set(col_ndx, 0);
+        m_opposite_column.set(col_ndx, 0);
+    }
     refresh_index_accessors();
     m_clusters.insert_column(col_key);
 
@@ -725,6 +742,8 @@ void Table::do_erase_root_column(ColKey col_key)
     }
     delete m_index_accessors[col_ndx];
     m_index_refs.set(col_ndx, 0);
+    m_opposite_table.set(col_ndx, 0);
+    m_opposite_column.set(col_ndx, 0);
     m_index_accessors[col_ndx] = nullptr;
     m_clusters.remove_column(col_key);
     size_t spec_ndx = colkey2spec_ndx(col_key);
@@ -747,6 +766,7 @@ ColKey Table::insert_backlink_column(TableKey origin_table_key, ColKey origin_co
     size_t backlink_col_ndx = colkey2spec_ndx(retval);
     m_spec.set_opposite_link_table_key(backlink_col_ndx, origin_table_key); // Throws
     m_spec.set_backlink_origin_column(backlink_col_ndx, origin_col_key);    // Throws
+    set_opposite_column(retval, origin_table_key, origin_col_key);
     return retval;
 }
 
@@ -775,6 +795,9 @@ void Table::fully_detach() noexcept
     for (auto& index : m_index_accessors) {
         delete index;
     }
+    m_index_refs.detach();
+    m_opposite_table.detach();
+    m_opposite_column.detach();
     m_index_accessors.clear();
 }
 
@@ -1231,6 +1254,24 @@ ref_type Table::create_empty_table(Allocator& alloc, TableKey key)
     top.add(rot);
     top.add(rot);
     dg.release();
+    // Opposite keys (table and column)
+    {
+        bool context_flag = false;
+        {
+            MemRef mem = Array::create_empty_array(Array::type_Normal, context_flag, alloc); // Throws
+            dg_2.reset(mem.get_ref());
+            int_fast64_t v(from_ref(mem.get_ref()));
+            top.add(v); // Throws
+            dg_2.release();
+        }
+        {
+            MemRef mem = Array::create_empty_array(Array::type_Normal, context_flag, alloc); // Throws
+            dg_2.reset(mem.get_ref());
+            int_fast64_t v(from_ref(mem.get_ref()));
+            top.add(v); // Throws
+            dg_2.release();
+        }
+    }
     return top.get_ref();
 }
 
@@ -1310,6 +1351,7 @@ TableRef Table::get_link_target(ColKey col_key) noexcept
 {
     size_t col_ndx = colkey2spec_ndx(col_key);
     auto target_key = m_spec.get_opposite_link_table_key(col_ndx);
+    REALM_ASSERT(target_key == TableKey(m_opposite_table.get(col_key.get_index().val)));
     return get_parent_group()->get_table(target_key);
 }
 
@@ -1721,6 +1763,10 @@ void Table::update_from_parent(size_t old_baseline) noexcept
                 }
             }
         }
+        if (m_top.size() > top_position_for_opposite_table)
+            m_opposite_table.update_from_parent(old_baseline);
+        if (m_top.size() > top_position_for_opposite_column)
+            m_opposite_column.update_from_parent(old_baseline);
         refresh_content_version();
     }
     m_alloc.bump_storage_version();
@@ -1814,6 +1860,12 @@ void Table::refresh_accessor_tree()
         }
         if (m_top.size() > top_position_for_search_indexes) {
             m_index_refs.init_from_parent();
+        }
+        if (m_top.size() > top_position_for_opposite_table) {
+            m_opposite_table.init_from_parent();
+        }
+        if (m_top.size() > top_position_for_opposite_column) {
+            m_opposite_column.init_from_parent();
         }
         refresh_content_version();
         bump_storage_version();
@@ -2270,9 +2322,8 @@ Table::BacklinkOrigin Table::find_backlink_origin(StringData origin_table_name, 
 Table::BacklinkOrigin Table::find_backlink_origin(ColKey backlink_col) const noexcept
 {
     try {
-        size_t backlink_col_ndx = colkey2spec_ndx(backlink_col);
-        TableKey linked_table_key = m_spec.get_opposite_link_table_key(backlink_col_ndx);
-        ColKey linked_column_key = m_spec.get_origin_column_key(backlink_col_ndx);
+        TableKey linked_table_key = get_opposite_table_key(backlink_col);
+        ColKey linked_column_key = get_opposite_column(backlink_col);
         if (linked_table_key == m_key) {
             return {{get_table_ref(), linked_column_key}};
         }
@@ -2492,4 +2543,25 @@ ColKey Table::set_nullability(ColKey col_key, bool nullable, bool throw_on_null)
         add_search_index(new_col);
 
     return new_col;
+}
+
+void Table::set_opposite_column(ColKey col_key, TableKey opposite_table, ColKey opposite_column)
+{
+    m_opposite_table.set(col_key.get_index().val, opposite_table.value);
+    m_opposite_column.set(col_key.get_index().val, opposite_column.value);
+}
+
+TableKey Table::get_opposite_table_key(ColKey col_key) const
+{
+    return TableKey(m_opposite_table.get(col_key.get_index().val));
+}
+
+TableRef Table::get_opposite_table(ColKey col_key) const
+{
+    return get_parent_group()->get_table(get_opposite_table_key(col_key));
+}
+
+ColKey Table::get_opposite_column(ColKey col_key) const
+{
+    return ColKey(m_opposite_column.get(col_key.get_index().val));
 }

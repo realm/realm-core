@@ -734,7 +734,7 @@ void Cluster::create(size_t nb_leaf_columns)
             arr.create(type_HasRefs);
             arr.set_parent(this, col_ndx.val + s_first_col_index);
             arr.update_parent();
-            return;
+            return false;
         }
         switch (type) {
             case col_type_Int:
@@ -780,6 +780,7 @@ void Cluster::create(size_t nb_leaf_columns)
                 throw LogicError(LogicError::illegal_type);
                 break;
         }
+        return false;
     };
     table->for_each_and_every_column(column_initialize);
 }
@@ -859,17 +860,10 @@ inline void Cluster::do_insert_key(size_t ndx, ColKey col_key, Mixed init_val, O
     // Insert backlink if link is not null
     if (key) {
         const Table* origin_table = m_tree_top.get_owner();
-
-        // Find target table
-        TableRef target_table = _impl::TableFriend::get_opposite_link_table(*origin_table, col_key);
-
-        // Find actual backlink column
-        const Spec& target_table_spec = _impl::TableFriend::get_spec(*target_table);
-        size_t backlink_col = target_table_spec.find_backlink_column(origin_table->get_key(), col_key);
-        ColKey backlink_col_key = target_table->spec_ndx2colkey(backlink_col);
-
-        Obj target_obj = target_table->get_object(key);
-        target_obj.add_backlink(backlink_col_key, origin_key);
+        TableRef opp_table = origin_table->get_opposite_table(col_key);
+        ColKey opp_col = origin_table->get_opposite_column(col_key);
+        Obj target_obj = opp_table->get_object(key);
+        target_obj.add_backlink(opp_col, origin_key);
     }
 }
 
@@ -900,7 +894,7 @@ void Cluster::insert_row(size_t ndx, ObjKey k, const FieldValues& init_values)
             arr.set_parent(this, col_ndx.val + s_first_col_index);
             arr.init_from_parent();
             arr.insert(ndx, 0);
-            return;
+            return false;
         }
 
         bool nullable = attr.test(col_attr_Nullable);
@@ -946,6 +940,7 @@ void Cluster::insert_row(size_t ndx, ObjKey k, const FieldValues& init_values)
                 REALM_ASSERT(false);
                 break;
         }
+        return false;
     };
     table->for_each_and_every_column(insert_in_column);
 }
@@ -975,7 +970,7 @@ void Cluster::move(size_t ndx, ClusterNode* new_node, int64_t offset)
 
         if (attr.test(col_attr_List)) {
             do_move<ArrayInteger>(ndx, col_key, new_leaf);
-            return;
+            return false;
         }
 
         switch (type) {
@@ -1021,6 +1016,7 @@ void Cluster::move(size_t ndx, ClusterNode* new_node, int64_t offset)
                 REALM_ASSERT(false);
                 break;
         }
+        return false;
     };
     m_tree_top.get_owner()->for_each_and_every_column(move_from_column);
     for (size_t i = ndx; i < m_keys.size(); i++) {
@@ -1347,7 +1343,7 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
 
             values.erase(ndx);
 
-            return;
+            return false;
         }
 
         switch (col_type) {
@@ -1387,6 +1383,7 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
                 REALM_ASSERT(false);
                 break;
         }
+        return false;
     };
     m_tree_top.get_owner()->for_each_and_every_column(erase_in_column);
 
@@ -1564,15 +1561,8 @@ void Cluster::remove_backlinks(ObjKey origin_key, ColKey origin_col_key, const s
                                CascadeState& state) const
 {
     const Table* origin_table = m_tree_top.get_owner();
-
-    // Find target table
-    TableRef target_table = _impl::TableFriend::get_opposite_link_table(*origin_table, origin_col_key);
-    TableKey target_table_key = target_table->get_key();
-
-    // Find actual backlink column
-    const Spec& target_table_spec = _impl::TableFriend::get_spec(*target_table);
-    size_t backlink_col = target_table_spec.find_backlink_column(origin_table->get_key(), origin_col_key);
-    ColKey backlink_col_key = target_table->spec_ndx2colkey(backlink_col);
+    TableRef target_table = origin_table->get_opposite_table(origin_col_key);
+    ColKey backlink_col_key = origin_table->get_opposite_column(origin_col_key);
 
     CascadeState::Mode mode = state.m_mode;
     bool strong_links = (origin_table->get_link_type(origin_col_key) == link_Strong);
@@ -1589,7 +1579,7 @@ void Cluster::remove_backlinks(ObjKey origin_key, ColKey origin_col_key, const s
 
                 if (!has_backlinks) {
                     // Object has no more backlinks - add to list for deletion
-                    state.m_to_be_deleted.emplace_back(target_table_key, key);
+                    state.m_to_be_deleted.emplace_back(target_table->get_key(), key);
                 }
             }
         }
@@ -1775,6 +1765,7 @@ Obj ClusterTree::insert(ObjKey k, const FieldValues& values)
                     break;
             }
         }
+        return false;
     };
     get_owner()->for_each_public_column(insert_in_column);
 
@@ -2018,6 +2009,7 @@ void ClusterTree::remove_links()
                     values.nullify_fwd_links(i, state);
                 }
             }
+            return false;
         };
         get_owner()->for_each_and_every_column(remove_link_from_column);
         // Continue

@@ -435,28 +435,34 @@ public:
     // table is unchanged.
     ColKey set_nullability(ColKey col_key, bool nullable, bool throw_on_null);
 
+    // Iterate through (subset of) columns. The supplied function may abort iteration
+    // by returning 'true' (early out).
     template <typename Func>
-    void for_each_and_every_column(Func func) const
+    bool for_each_and_every_column(Func func) const
     {
         for (auto col_key : m_leaf_ndx2colkey) {
             if (!col_key)
                 continue;
-            func(col_key);
+            if (func(col_key))
+                return true;
         }
+        return false;
     }
     template <typename Func>
-    void for_each_public_column(Func func) const
+    bool for_each_public_column(Func func) const
     {
         for (auto col_key : m_leaf_ndx2colkey) {
             if (!col_key)
                 continue;
             if (col_key.get_type() == col_type_BackLink)
                 continue;
-            func(col_key);
+            if (func(col_key))
+                return true;
         }
+        return false;
     }
     template <typename Func>
-    void for_each_backlink_column(Func func) const
+    bool for_each_backlink_column(Func func) const
     {
         // FIXME: Optimize later - to not iterate through all non-backlink columns:
         for (auto col_key : m_leaf_ndx2colkey) {
@@ -464,8 +470,10 @@ public:
                 continue;
             if (col_key.get_type() != col_type_BackLink)
                 continue;
-            func(col_key);
+            if (func(col_key))
+                return true;
         }
+        return false;
     }
 
 private:
@@ -632,6 +640,9 @@ public:
     void dump_node_structure() const; // To std::cerr (for GDB)
     void dump_node_structure(std::ostream&, int level) const;
 #endif
+    TableRef get_opposite_table(ColKey col_key) const;
+    TableKey get_opposite_table_key(ColKey col_key) const;
+    ColKey get_opposite_column(ColKey col_key) const;
 
 protected:
     /// Compare the objects of two tables under the assumption that the two tables
@@ -653,6 +664,8 @@ private:
     int64_t m_next_key_value = -1;
     TableKey m_key;     // 4th slot in m_top
     Array m_index_refs; // 5th slot in m_top
+    Array m_opposite_table;  // 7th slot in m_top
+    Array m_opposite_column; // 8th slot in m_top
     std::vector<StringIndex*> m_index_accessors;
     Replication* const* m_repl;
     static Replication* g_dummy_replication;
@@ -712,6 +725,7 @@ private:
     ColKey insert_backlink_column(TableKey origin_table_key, ColKey origin_col_key, ColKey backlink_col_key);
     void erase_backlink_column(TableKey origin_table_key, ColKey origin_col_key);
 
+    void set_opposite_column(ColKey col_key, TableKey opposite_table, ColKey opposite_column);
     /// Called in the context of Group::commit() to ensure that
     /// attached table accessors stay valid across a commit. Please
     /// note that this works only for non-transactional commits. Table
@@ -736,8 +750,6 @@ private:
     /// Create an empty table with independent spec and return just
     /// the reference to the underlying memory.
     static ref_type create_empty_table(Allocator&, TableKey = TableKey());
-
-    void connect_opposite_link_columns(ColKey link_col_key, Table& target_table, ColKey backlink_col_key) noexcept;
 
     void remove_recursive(CascadeState&);
     //@{
@@ -868,6 +880,8 @@ private:
     static constexpr int top_position_for_search_indexes = 4;
     static constexpr int top_position_for_column_key = 5;
     static constexpr int top_position_for_version = 6;
+    static constexpr int top_position_for_opposite_table = 7;
+    static constexpr int top_position_for_opposite_column = 8;
 
     friend class SubtableNode;
     friend class _impl::TableFriend;
@@ -1048,6 +1062,8 @@ inline Table::Table(Allocator& alloc)
     , m_spec(m_alloc)
     , m_clusters(this, m_alloc)
     , m_index_refs(m_alloc)
+    , m_opposite_table(m_alloc)
+    , m_opposite_column(m_alloc)
     , m_repl(&g_dummy_replication)
 {
     ref_type ref = create_empty_table(m_alloc); // Throws
@@ -1062,6 +1078,8 @@ inline Table::Table(Replication* const* repl, Allocator& alloc)
     , m_spec(m_alloc)
     , m_clusters(this, m_alloc)
     , m_index_refs(m_alloc)
+    , m_opposite_table(m_alloc)
+    , m_opposite_column(m_alloc)
     , m_repl(repl)
 {
 }

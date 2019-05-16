@@ -342,53 +342,35 @@ bool ConstObj::is_null(ColKey col_key) const
 // Figure out if this object has any remaining backlinkss
 bool ConstObj::has_backlinks(bool only_strong_links) const
 {
-    const Spec& spec = get_spec();
-    size_t backlink_columns_begin = spec.first_backlink_column_index();
-    size_t backlink_columns_end = backlink_columns_begin + spec.backlink_column_count();
-
     const Table* target_table = m_table;
-    const Spec& target_table_spec = _impl::TableFriend::get_spec(*target_table);
-
-    for (size_t i = backlink_columns_begin; i != backlink_columns_end; ++i) {
-        ColKey backlink_col_key = target_table->spec_ndx2colkey(i);
-
+    auto look_for_backlinks = [&](ColKey backlink_col_key) {
         // Find origin table and column for this backlink column
-        TableRef origin_table = _impl::TableFriend::get_opposite_link_table(*target_table, backlink_col_key);
-        auto origin_col = target_table_spec.get_origin_column_key(i);
-
+        TableRef origin_table = target_table->get_opposite_table(backlink_col_key);
+        ColKey origin_col = target_table->get_opposite_column(backlink_col_key);
         if (!only_strong_links || origin_table->get_link_type(origin_col) == link_Strong) {
-            origin_table->report_invalid_key(origin_col);
             auto cnt = get_backlink_count(*origin_table, origin_col);
             if (cnt)
                 return true;
         }
-    }
-
-    return false;
+        return false;
+    };
+    return m_table->for_each_backlink_column(look_for_backlinks);
 }
 
 size_t ConstObj::get_backlink_count(bool only_strong_links) const
 {
-    const Spec& spec = get_spec();
-    size_t backlink_columns_begin = spec.first_backlink_column_index();
-    size_t backlink_columns_end = backlink_columns_begin + spec.backlink_column_count();
-
     const Table* target_table = m_table;
-    const Spec& target_table_spec = _impl::TableFriend::get_spec(*target_table);
-
     size_t cnt = 0;
-    for (size_t i = backlink_columns_begin; i != backlink_columns_end; ++i) {
-        ColKey backlink_col_key = target_table->spec_ndx2colkey(i);
-
+    auto look_for_backlinks = [&](ColKey backlink_col_key) {
         // Find origin table and column for this backlink column
-        TableRef origin_table = _impl::TableFriend::get_opposite_link_table(*target_table, backlink_col_key);
-        auto origin_col = target_table_spec.get_origin_column_key(i);
-
+        TableRef origin_table = target_table->get_opposite_table(backlink_col_key);
+        ColKey origin_col = target_table->get_opposite_column(backlink_col_key);
         if (!only_strong_links || origin_table->get_link_type(origin_col) == link_Strong) {
             cnt += get_backlink_count(*origin_table, origin_col);
         }
-    }
-
+        return false;
+    };
+    m_table->for_each_backlink_column(look_for_backlinks);
     return cnt;
 }
 
@@ -397,8 +379,7 @@ size_t ConstObj::get_backlink_count(const Table& origin, ColKey origin_col_key) 
     size_t cnt = 0;
     TableKey origin_table_key = origin.get_key();
     if (origin_table_key != TableKey()) {
-        size_t backlink_spec_ndx = get_spec().find_backlink_column(origin_table_key, origin_col_key);
-        auto backlink_col_key = m_table->spec_ndx2colkey(backlink_spec_ndx);
+        ColKey backlink_col_key = origin.get_opposite_column(origin_col_key);
         cnt = get_backlink_count(backlink_col_key);
     }
     return cnt;
@@ -406,9 +387,7 @@ size_t ConstObj::get_backlink_count(const Table& origin, ColKey origin_col_key) 
 
 ObjKey ConstObj::get_backlink(const Table& origin, ColKey origin_col_key, size_t backlink_ndx) const
 {
-    TableKey origin_key = origin.get_key();
-    size_t backlink_spec_ndx = get_spec().find_backlink_column(origin_key, origin_col_key);
-    auto backlink_col_key = get_table()->spec_ndx2colkey(backlink_spec_ndx);
+    ColKey backlink_col_key = origin.get_opposite_column(origin_col_key);
     return get_backlink(backlink_col_key, backlink_ndx);
 }
 
