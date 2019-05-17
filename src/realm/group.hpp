@@ -227,6 +227,11 @@ public:
 
     int get_history_schema_version() noexcept;
 
+    Replication* get_replication() const
+    {
+        return *get_repl();
+    }
+
     /// Returns the keys for all tables in this group.
     TableKeys get_table_keys() const;
 
@@ -537,6 +542,12 @@ public:
     void to_dot(const char* file_path) const;
 #endif
 
+protected:
+    virtual Replication* const* get_repl() const
+    {
+        return &Table::g_dummy_replication;
+    }
+
 private:
     // nullptr, if we're sharing an allocator provided during initialization
     std::unique_ptr<SlabAlloc> m_local_alloc;
@@ -818,7 +829,6 @@ private:
     friend class _impl::GroupFriend;
     friend class _impl::TransactLogConvenientEncoder;
     friend class _impl::TransactLogParser;
-    friend class Replication;
     friend class TrivialReplication;
     friend class metrics::QueryInfo;
     friend class metrics::Metrics;

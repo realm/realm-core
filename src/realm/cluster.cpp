@@ -1307,7 +1307,7 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
         state.send_notifications(notifications);
     }
 
-    if (Replication* repl = m_alloc.get_replication()) {
+    if (Replication* repl = table->get_repl()) {
         repl->remove_object(table, real_key);
     }
 
@@ -1763,7 +1763,7 @@ Obj ClusterTree::insert(ObjKey k, const FieldValues& values)
     };
     get_owner()->for_each_public_column(insert_in_column);
 
-    if (Replication* repl = get_alloc().get_replication()) {
+    if (Replication* repl = table->get_repl()) {
         repl->create_object(table, k);
         for (const auto& v : values) {
             if (v.value.is_null()) {

@@ -63,6 +63,11 @@ const Spec& ConstObj::get_spec() const
     return m_table->m_spec;
 }
 
+Replication* ConstObj::get_replication() const
+{
+    return m_table->get_repl();
+}
+
 template <class T>
 inline int ConstObj::cmp(const ConstObj& other, ColKey::Idx col_ndx) const
 {
@@ -493,7 +498,7 @@ Obj& Obj::set<int64_t>(ColKey col_key, int64_t value, bool is_default)
         values.set(m_row_ndx, value);
     }
 
-    if (Replication* repl = alloc.get_replication()) {
+    if (Replication* repl = get_replication()) {
         repl->set_int(m_table, col_key, m_key, value,
                       is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
     }
@@ -549,7 +554,7 @@ Obj& Obj::add_int(ColKey col_key, int64_t value)
         values.set(m_row_ndx, new_val);
     }
 
-    if (Replication* repl = alloc.get_replication()) {
+    if (Replication* repl = get_replication()) {
         repl->add_int(m_table, col_key, m_key, value); // Throws
     }
 
@@ -589,7 +594,7 @@ Obj& Obj::set<ObjKey>(ColKey col_key, ObjKey target_key, bool is_default)
 
         values.set(m_row_ndx, target_key);
 
-        if (Replication* repl = alloc.get_replication()) {
+        if (Replication* repl = get_replication()) {
             repl->set(m_table, col_key, m_key, target_key,
                       is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
         }
@@ -673,7 +678,7 @@ Obj& Obj::set(ColKey col_key, T value, bool is_default)
     values.init_from_parent();
     values.set(m_row_ndx, value);
 
-    if (Replication* repl = alloc.get_replication())
+    if (Replication* repl = get_replication())
         repl->set<T>(m_table, col_key, m_key, value,
                      is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
 
@@ -748,7 +753,7 @@ void Obj::nullify_link(ColKey origin_col_key, ObjKey target_key)
 
         REALM_ASSERT(ndx != realm::npos); // There has to be one
 
-        if (Replication* repl = alloc.get_replication()) {
+        if (Replication* repl = get_replication()) {
             repl->link_list_nullify(link_list, ndx); // Throws
         }
 
@@ -769,7 +774,7 @@ void Obj::nullify_link(ColKey origin_col_key, ObjKey target_key)
 
         links.set(m_row_ndx, ObjKey{});
 
-        if (Replication* repl = alloc.get_replication())
+        if (Replication* repl = get_replication())
             repl->nullify_link(m_table, origin_col_key, m_key); // Throws
     }
     alloc.bump_content_version();
@@ -907,7 +912,7 @@ Obj& Obj::set_null(ColKey col_key, bool is_default)
             break;
     }
 
-    if (Replication* repl = get_alloc().get_replication())
+    if (Replication* repl = get_replication())
         repl->set_null(m_table, col_key, m_key, is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
 
     return *this;

@@ -771,7 +771,7 @@ void Group::create_and_insert_table(TableKey key, StringData name)
         m_table_names.set(table_ndx, name); // Throws
     }
 
-    if (Replication* repl = m_alloc.get_replication())
+    if (Replication* repl = *get_repl())
         repl->insert_group_level_table(key, prior_num_tables, name); // Throws
     ++m_num_tables;
 }
@@ -804,11 +804,11 @@ Table* Group::create_table_accessor(size_t table_ndx)
         }
     }
     if (table) {
-        table->revive(m_alloc, m_is_writable);
+        table->revive(get_repl(), m_alloc, m_is_writable);
         table->init(ref, this, table_ndx, m_is_writable);
     }
     else {
-        std::unique_ptr<Table> new_table(new Table(Table::ref_count_tag(), m_alloc)); // Throws
+        std::unique_ptr<Table> new_table(new Table(get_repl(), m_alloc));             // Throws
         new_table->init(ref, this, table_ndx, m_is_writable);                         // Throws
         table = new_table.release();
     }
@@ -877,7 +877,7 @@ void Group::remove_table(size_t table_ndx, TableKey key)
     }
 
     size_t prior_num_tables = m_tables.size();
-    if (Replication* repl = m_alloc.get_replication())
+    if (Replication* repl = *get_repl())
         repl->erase_group_level_table(key, prior_num_tables); // Throws
 
     int64_t ref_64 = m_tables.get(table_ndx);
@@ -921,7 +921,7 @@ void Group::rename_table(TableKey key, StringData new_name, bool require_unique_
         throw TableNameInUse();
     size_t table_ndx = key2ndx_checked(key);
     m_table_names.set(table_ndx, new_name);
-    if (Replication* repl = m_alloc.get_replication())
+    if (Replication* repl = *get_repl())
         repl->rename_group_level_table(key, new_name); // Throws
 }
 
@@ -1735,7 +1735,7 @@ void Group::verify() const
     }
 
     // Verify history if present
-    if (Replication* repl = m_alloc.get_replication()) {
+    if (Replication* repl = *get_repl()) {
         if (auto hist = repl->_create_history_read()) {
             hist->set_group(const_cast<Group*>(this), false);
             _impl::History::version_type version = 0;

@@ -166,7 +166,6 @@ private:
     // true and sets `type` to the type of the first column.
     static bool get_first_column_type_from_ref(ref_type, Allocator&, ColumnType& type) noexcept;
 
-    friend class Replication;
     friend class Group;
     friend class Table;
 };

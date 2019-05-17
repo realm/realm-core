@@ -769,7 +769,7 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
     Replication::HistoryType openers_hist_type = Replication::hist_None;
     int openers_hist_schema_version = 0;
     bool opener_is_sync_agent = false;
-    if (Replication* repl = m_alloc.get_replication()) {
+    if (Replication* repl = get_replication()) {
         openers_hist_type = repl->get_history_type();
         openers_hist_schema_version = repl->get_history_schema_version();
         opener_is_sync_agent = repl->is_sync_agent();
@@ -1113,12 +1113,12 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
                 bool need_hist_schema_upgrade =
                     (stored_hist_schema_version < openers_hist_schema_version && top_ref != 0);
                 if (need_hist_schema_upgrade) {
-                    Replication* repl = m_alloc.get_replication();
+                    Replication* repl = get_replication();
                     if (!repl->is_upgradable_history_schema(stored_hist_schema_version))
                         throw IncompatibleHistories("Nonupgradable history schema", path);
                 }
 
-                if (Replication* repl = m_alloc.get_replication())
+                if (Replication* repl = get_replication())
                     repl->initiate_session(version); // Throws
 
                 if (m_key) {
@@ -1315,7 +1315,7 @@ void DB::open(Replication& repl, const DBOptions options)
 
     repl.initialize(*this); // Throws
 
-    m_alloc.set_replication(&repl);
+    set_replication(&repl);
 
     std::string file = repl.get_database_path();
     bool no_create = false;
@@ -1476,7 +1476,7 @@ void DB::close_internal(std::unique_lock<InterprocessMutex> lock) noexcept
     SharedInfo* info = m_file_map.get_addr();
     {
         bool is_sync_agent = false;
-        if (Replication* repl = m_alloc.get_replication())
+        if (Replication* repl = get_replication())
             is_sync_agent = repl->is_sync_agent();
 
         if (!lock.owns_lock())
@@ -1504,7 +1504,7 @@ void DB::close_internal(std::unique_lock<InterprocessMutex> lock) noexcept
                 catch (...) {
                 } // ignored on purpose.
             }
-            if (Replication* repl = m_alloc.get_replication())
+            if (Replication* repl = get_replication())
                 repl->terminate_session();
         }
         lock.unlock();
@@ -1982,7 +1982,7 @@ Replication::version_type DB::do_commit(Transaction& transaction)
     }
     version_type new_version = current_version + 1;
 
-    if (Replication* repl = m_alloc.get_replication()) {
+    if (Replication* repl = get_replication()) {
         // If Replication::prepare_commit() fails, then the entire transaction
         // fails. The application then has the option of terminating the
         // transaction with a call to SharedGroup::rollback(), which in turn
@@ -2437,7 +2437,7 @@ TransactionRef DB::start_write(bool nonblocking)
         ReadLockGuard g(*this, read_lock);
         tr = new Transaction(shared_from_this(), &m_alloc, read_lock, DB::transact_Writing);
         tr->set_file_format_version(get_file_format_version());
-        if (Replication* repl = m_alloc.get_replication()) {
+        if (Replication* repl = get_replication()) {
             version_type current_version = read_lock.m_version;
             bool history_updated = false;
             repl->initiate_transact(*tr, current_version, history_updated); // Throws

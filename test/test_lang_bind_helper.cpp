@@ -614,12 +614,23 @@ TEST(LangBindHelper_AdvanceReadTransact_PinnedSize)
     CHECK_GREATER(locked_space, 0);
     CHECK_LESS(locked_space, free_space);
 
-    // Move to latest version
-    rt->advance_read();
+    // Cancel read transaction
+    rt = nullptr;
     size_t new_locked_space;
     {
         WriteTransaction wt(sg);
         wt.commit();
+        // Large history entries are freed here
+    }
+    {
+        WriteTransaction wt(sg);
+        wt.commit();
+        // History entries still held by previous commit
+    }
+    {
+        WriteTransaction wt(sg);
+        wt.commit();
+        // History entries now finally free
     }
     sg->get_stats(free_space, used_space, new_locked_space);
 

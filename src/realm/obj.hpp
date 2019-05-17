@@ -28,6 +28,7 @@
 
 namespace realm {
 
+class Replication;
 class TableView;
 class LstBase;
 
@@ -76,6 +77,8 @@ public:
     {
         return m_table;
     }
+
+    Replication* get_replication() const;
 
     // Check if this object is default constructed
     explicit operator bool()

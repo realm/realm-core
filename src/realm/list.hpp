@@ -473,7 +473,7 @@ public:
             do_set(ndx, value);
             m_obj.bump_content_version();
         }
-        if (Replication* repl = this->m_const_obj->get_alloc().get_replication()) {
+        if (Replication* repl = this->m_const_obj->get_replication()) {
             set_repl(repl, ndx, value);
         }
         return old;
@@ -487,7 +487,7 @@ public:
             throw std::out_of_range("Index out of range");
         }
         ensure_writeable();
-        if (Replication* repl = this->m_const_obj->get_alloc().get_replication()) {
+        if (Replication* repl = this->m_const_obj->get_replication()) {
             insert_repl(repl, ndx, value);
         }
         do_insert(ndx, value);
@@ -503,7 +503,7 @@ public:
     {
         REALM_ASSERT_DEBUG(!update_if_needed());
         ensure_writeable();
-        if (Replication* repl = this->m_const_obj->get_alloc().get_replication()) {
+        if (Replication* repl = this->m_const_obj->get_replication()) {
             ConstLstBase::erase_repl(repl, ndx);
         }
         T old = get(ndx);
@@ -526,7 +526,7 @@ public:
         REALM_ASSERT_DEBUG(!update_if_needed());
         if (from != to) {
             ensure_writeable();
-            if (Replication* repl = this->m_const_obj->get_alloc().get_replication()) {
+            if (Replication* repl = this->m_const_obj->get_replication()) {
                 ConstLstBase::move_repl(repl, from, to);
             }
             if (to > from) {
@@ -551,7 +551,7 @@ public:
     {
         REALM_ASSERT_DEBUG(!update_if_needed());
         if (ndx1 != ndx2) {
-            if (Replication* repl = this->m_const_obj->get_alloc().get_replication()) {
+            if (Replication* repl = this->m_const_obj->get_replication()) {
                 ConstLstBase::swap_repl(repl, ndx1, ndx2);
             }
             m_tree->swap(ndx1, ndx2);
@@ -564,7 +564,7 @@ public:
         ensure_created();
         update_if_needed();
         ensure_writeable();
-        if (Replication* repl = this->m_const_obj->get_alloc().get_replication()) {
+        if (Replication* repl = this->m_const_obj->get_replication()) {
             ConstLstBase::clear_repl(repl);
         }
         m_tree->clear();

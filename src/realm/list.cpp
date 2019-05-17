@@ -233,7 +233,7 @@ void Lst<ObjKey>::clear()
     update_if_needed();
     Table* origin_table = const_cast<Table*>(m_obj.get_table());
 
-    if (Replication* repl = m_const_obj->get_alloc().get_replication())
+    if (Replication* repl = m_const_obj->get_replication())
         repl->list_clear(*this); // Throws
 
     if (!origin_table->get_column_attr(m_col_key).test(col_attr_StrongLinks)) {

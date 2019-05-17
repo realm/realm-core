@@ -24,7 +24,6 @@
 #include <realm/array.hpp>
 #include <realm/alloc_slab.hpp>
 #include <realm/group.hpp>
-#include <realm/replication.hpp>
 
 using namespace realm;
 

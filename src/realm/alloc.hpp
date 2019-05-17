@@ -36,8 +36,6 @@ namespace realm {
 
 class Allocator;
 
-class Replication;
-
 using ref_type = size_t;
 
 int_fast64_t from_ref(ref_type) noexcept;
@@ -145,11 +143,6 @@ public:
     }
 #endif
 
-    Replication* get_replication() const
-    {
-        return m_replication;
-    }
-
     struct MappedFile;
 
 protected:
@@ -157,7 +150,6 @@ protected:
 
     std::atomic<size_t> m_baseline; // Separation line between immutable and mutable refs.
 
-    Replication* m_replication = nullptr;
     ref_type m_debug_watch = 0;
 
     // The following logically belongs in the slab allocator, but is placed
@@ -278,7 +270,6 @@ public:
         : m_alloc(&underlying_allocator)
     {
         m_baseline.store(m_alloc->m_baseline, std::memory_order_relaxed);
-        m_replication = m_alloc->m_replication;
         m_debug_watch = 0;
         m_ref_translation_ptr.store(m_alloc->m_ref_translation_ptr);
     }
@@ -291,7 +282,6 @@ public:
     {
         m_alloc = &underlying_allocator;
         m_baseline.store(m_alloc->m_baseline, std::memory_order_relaxed);
-        m_replication = m_alloc->m_replication;
         m_debug_watch = 0;
         m_ref_translation_ptr.store(m_alloc->m_ref_translation_ptr);
     }

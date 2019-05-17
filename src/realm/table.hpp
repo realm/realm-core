@@ -52,7 +52,6 @@ template <class>
 class SubQuery;
 struct LinkTargetInfo;
 class ColKeys;
-class Replication;
 
 struct Link {
 };
@@ -87,7 +86,6 @@ public:
     /// ConstTableRef that refer to it, or to any of its subtables,
     /// when it goes out of scope.
     Table(const Table&, Allocator& = Allocator::get_default());
-    void revive(Allocator& new_allocator, bool writable);
 
     ~Table() noexcept;
 
@@ -658,6 +656,8 @@ private:
     TableKey m_key;     // 4th slot in m_top
     Array m_index_refs; // 5th slot in m_top
     std::vector<StringIndex*> m_index_accessors;
+    Replication* const* m_repl;
+    static Replication* g_dummy_replication;
 
     // Used for queries: Items are added with link() method during buildup of query
     mutable std::vector<ColKey> m_link_chain;
@@ -690,15 +690,9 @@ private:
     /// typed tables.
     Table& operator=(const Table&) = delete;
 
-    /// Used when constructing an accessor whose lifetime is going to be managed
-    /// by reference counting. The lifetime of accessors of free-standing tables
-    /// allocated on the stack by the application is not managed by reference
-    /// counting, so that is a case where this tag must **not** be specified.
-    class ref_count_tag {
-    };
-
     /// Create an uninitialized accessor whose lifetime is managed by Group
-    Table(ref_count_tag, Allocator&);
+    Table(Replication* const* repl, Allocator&);
+    void revive(Replication* const* repl, Allocator& new_allocator, bool writable);
 
     void init(ref_type top_ref, ArrayParent*, size_t ndx_in_parent, bool is_writable);
 
@@ -843,7 +837,7 @@ private:
     /// Used by query. Follows chain of link columns and returns final target table
     const Table* get_link_chain_target(const std::vector<ColKey>&) const;
 
-    Replication* get_repl() noexcept;
+    Replication* get_repl() const noexcept;
 
     void set_ndx_in_parent(size_t ndx_in_parent) noexcept;
 
@@ -895,6 +889,7 @@ private:
     friend class LinkView;
     friend class Group;
     friend class Transaction;
+    friend class Cluster;
     friend class ClusterTree;
     friend class ArrayBacklink;
     friend class ColKeyIterator;
@@ -1055,6 +1050,7 @@ inline Table::Table(Allocator& alloc)
     , m_spec(m_alloc)
     , m_clusters(this, m_alloc)
     , m_index_refs(m_alloc)
+    , m_repl(&g_dummy_replication)
 {
     ref_type ref = create_empty_table(m_alloc); // Throws
     ArrayParent* parent = nullptr;
@@ -1062,19 +1058,22 @@ inline Table::Table(Allocator& alloc)
     init(ref, parent, ndx_in_parent, true);
 }
 
-inline Table::Table(ref_count_tag, Allocator& alloc)
+inline Table::Table(Replication* const* repl, Allocator& alloc)
     : m_alloc(alloc)
     , m_top(m_alloc)
     , m_spec(m_alloc)
     , m_clusters(this, m_alloc)
     , m_index_refs(m_alloc)
+    , m_repl(repl)
 {
 }
 
-inline void Table::revive(Allocator& alloc, bool writable)
+inline void Table::revive(Replication* const* repl, Allocator& alloc, bool writable)
 {
     m_alloc.switch_underlying_allocator(alloc);
     m_alloc.update_from_underlying_allocator(writable);
+    m_repl = repl;
+
     // since we're rebinding to a new table, we'll bump version counters
     // FIXME
     // this can be optimized if version counters are saved along with the
@@ -1209,9 +1208,9 @@ inline bool Table::is_link_type(ColumnType col_type) noexcept
     return col_type == col_type_Link || col_type == col_type_LinkList;
 }
 
-inline Replication* Table::get_repl() noexcept
+inline Replication* Table::get_repl() const noexcept
 {
-    return m_top.get_alloc().get_replication();
+    return *m_repl;
 }
 
 inline void Table::set_ndx_in_parent(size_t ndx_in_parent) noexcept

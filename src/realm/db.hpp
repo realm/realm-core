@@ -115,14 +115,14 @@ public:
         return m_alloc;
     }
 
-    Replication* get_replication() const noexcept
+    Replication* get_replication() const
     {
-        return m_alloc.get_replication();
+        return m_replication;
     }
 
     void set_replication(Replication* repl) noexcept
     {
-        m_alloc.set_replication(repl);
+        m_replication = repl;
     }
 
 
@@ -334,6 +334,7 @@ private:
     std::recursive_mutex m_mutex;
     int m_transaction_count = 0;
     SlabAlloc m_alloc;
+    Replication* m_replication = nullptr;
     struct SharedInfo;
     struct ReadCount;
     struct ReadLockInfo {
@@ -423,6 +424,11 @@ private:
 
 
     void do_open(const std::string& file, bool no_create, bool is_backend, const DBOptions options);
+
+    Replication* const* get_repl() const noexcept
+    {
+        return &m_replication;
+    }
 
     // Ring buffer management
     bool ringbuf_is_empty() const noexcept;
@@ -582,6 +588,12 @@ private:
     {
         return db;
     }
+
+    Replication* const* get_repl() const final
+    {
+        return db->get_repl();
+    }
+
     template <class O>
     bool internal_advance_read(O* observer, VersionID target_version, _impl::History&, bool);
     void set_transact_stage(DB::TransactStage stage) noexcept;

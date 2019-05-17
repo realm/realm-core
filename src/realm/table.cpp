@@ -261,6 +261,7 @@ using namespace realm::util;
 
 const int_fast64_t realm::Table::max_integer;
 const int_fast64_t realm::Table::min_integer;
+Replication* Table::g_dummy_replication = nullptr;
 
 bool TableVersions::operator==(const TableVersions& other) const
 {
