@@ -1676,7 +1676,7 @@ void ClusterTree::clear()
     m_root->destroy_deep();
 
     auto leaf = std::make_unique<Cluster>(0, m_root->get_alloc(), *this);
-    leaf->create(get_spec().get_column_count());
+    leaf->create(m_owner->num_leaf_cols());
     replace_root(std::move(leaf));
     m_size = 0;
 }
