@@ -2225,7 +2225,7 @@ ColKey Table::generate_col_key(ColumnType tp, ColumnAttrMask attr)
     REALM_ASSERT(!attr.test(col_attr_Unique)); // Must not be encoded into col_key
     // FIXME: Change this to be random number mixed with the TableKey.
     RefOrTagged rot = m_top.get_as_ref_or_tagged(top_position_for_column_key);
-    uint64_t upper = rot.get_as_int() ^ random();
+    unsigned upper = unsigned(rot.get_as_int() ^ random());
     rot = RefOrTagged::make_tagged(upper + 1);
     m_top.set(top_position_for_column_key, rot);
 

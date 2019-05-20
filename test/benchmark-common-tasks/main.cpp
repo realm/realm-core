@@ -430,6 +430,52 @@ struct BenchmarkQuery : BenchmarkWithStrings {
     }
 };
 
+struct BenchmarkQueryChainedOrStrings : BenchmarkWithStringsTable {
+    const size_t num_queried_matches = 1000;
+    const size_t num_rows = 100000;
+    std::vector<std::string> values_to_query;
+    const char* name() const
+    {
+        return "QueryChainedOrStrings";
+    }
+
+    void before_all(DBRef group)
+    {
+        BenchmarkWithStringsTable::before_all(group);
+        WriteTransaction tr(group);
+        TableRef t = tr.get_table("StringOnly");
+        REALM_ASSERT(num_rows > num_queried_matches);
+        Random r;
+        for (size_t i = 0; i < num_rows; ++i) {
+            std::stringstream ss;
+            ss << i;
+            auto s = ss.str();
+            t->create_object().set(m_col, s);
+        }
+        // t->add_search_index(0);
+        for (size_t i = 0; i < num_queried_matches; ++i) {
+            size_t ndx_to_match = (num_rows / num_queried_matches) * i;
+            auto obj = t->get_object(ndx_to_match);
+            values_to_query.push_back(obj.get<String>(m_col));
+        }
+        tr.commit();
+    }
+
+    void operator()(DBRef group)
+    {
+        ReadTransaction tr(group);
+        ConstTableRef table = tr.get_table("StringOnly");
+        Query query = table->where();
+        for (size_t i = 0; i < values_to_query.size(); ++i) {
+            query.Or().equal(m_col, values_to_query[i]);
+        }
+        TableView results = query.find_all();
+        REALM_ASSERT_EX(results.size() == num_queried_matches, results.size(), num_queried_matches,
+                        values_to_query.size());
+        static_cast<void>(results);
+    }
+};
+
 struct BenchmarkSize : BenchmarkWithStrings {
     const char* name() const
     {
@@ -1166,6 +1212,7 @@ int benchmark_common_tasks_main()
     BENCH(BenchmarkQueryInsensitiveString);
     BENCH(BenchmarkQueryInsensitiveStringIndexed);
     BENCH(BenchmarkNonInitatorOpen);
+    BENCH(BenchmarkQueryChainedOrStrings);
 
 #undef BENCH
     return 0;

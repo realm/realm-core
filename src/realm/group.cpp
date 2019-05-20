@@ -928,8 +928,9 @@ void Group::rename_table(TableKey key, StringData new_name, bool require_unique_
 
 class Group::DefaultTableWriter : public Group::TableWriter {
 public:
-    DefaultTableWriter(const Group& group)
+    DefaultTableWriter(const Group& group, bool write_history)
         : m_group(group)
+        , m_write_history(write_history)
     {
     }
     ref_type write_names(_impl::OutputStream& out) override
@@ -958,7 +959,8 @@ public:
                                                              m_group.m_top.get_ref(), version, history_type,
                                                              history_schema_version);
             REALM_ASSERT(history_type != Replication::hist_None);
-            if (history_type != Replication::hist_SyncClient && history_type != Replication::hist_SyncServer) {
+            if (!m_write_history ||
+                (history_type != Replication::hist_SyncClient && history_type != Replication::hist_SyncServer)) {
                 return info; // Only sync history should be preserved when writing to a new file
             }
             info.type = history_type;
@@ -974,30 +976,32 @@ public:
 
 private:
     const Group& m_group;
+    bool m_write_history;
 };
 
 void Group::write(std::ostream& out, bool pad) const
 {
-    write(out, pad, 0);
+    write(out, pad, 0, true);
 }
 
-void Group::write(std::ostream& out, bool pad_for_encryption, uint_fast64_t version_number) const
+void Group::write(std::ostream& out, bool pad_for_encryption, uint_fast64_t version_number, bool write_history) const
 {
     REALM_ASSERT(is_attached());
-    DefaultTableWriter table_writer(*this);
+    DefaultTableWriter table_writer(*this, write_history);
     bool no_top_array = !m_top.is_attached();
     write(out, m_file_format_version, table_writer, no_top_array, pad_for_encryption, version_number); // Throws
 }
 
-void Group::write(const std::string& path, const char* encryption_key, uint64_t version_number) const
+void Group::write(const std::string& path, const char* encryption_key, uint64_t version_number,
+                  bool write_history) const
 {
     File file;
     int flags = 0;
     file.open(path, File::access_ReadWrite, File::create_Must, flags);
-    write(file, encryption_key, version_number);
+    write(file, encryption_key, version_number, write_history);
 }
 
-void Group::write(File& file, const char* encryption_key, uint_fast64_t version_number) const
+void Group::write(File& file, const char* encryption_key, uint_fast64_t version_number, bool write_history) const
 {
     REALM_ASSERT(file.get_size() == 0);
 
@@ -1014,7 +1018,7 @@ void Group::write(File& file, const char* encryption_key, uint_fast64_t version_
 
     std::ostream out(&streambuf);
     out.exceptions(std::ios_base::failbit | std::ios_base::badbit);
-    write(out, encryption_key != 0, version_number);
+    write(out, encryption_key != 0, version_number, write_history);
     int sync_status = streambuf.pubsync();
     REALM_ASSERT(sync_status == 0);
 }

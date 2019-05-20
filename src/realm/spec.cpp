@@ -204,7 +204,7 @@ ColKey Spec::generate_converted_colkey(size_t column_ndx)
     // columns get the same leaf index as in the spec during conversion.
     ColKey tmp(ColKey::Idx{static_cast<unsigned>(column_ndx)}, type, attr, 0);
     // simply reuse the lower bits of the tmp ColKey (+1) as tag for the real one
-    return ColKey(ColKey::Idx{static_cast<unsigned>(column_ndx)}, type, attr, tmp.value + 1);
+    return ColKey(ColKey::Idx{static_cast<unsigned>(column_ndx)}, type, attr, unsigned(tmp.value) + 1);
 }
 
 bool Spec::convert_column(size_t column_ndx)

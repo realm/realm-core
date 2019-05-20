@@ -8,6 +8,11 @@ if (CMAKE_BUILD_TYPE MATCHES "RelASAN")
     set(CMAKE_CXX_FLAGS_RELASAN "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} -O1")
 endif()
 
+if (CMAKE_BUILD_TYPE MATCHES "RelTSAN")
+    set(REALM_TSAN ON CACHE BOOL "Build with address sanitizer")
+    set(CMAKE_CXX_FLAGS_RELTSAN "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} -O1")
+endif()
+
 # -------------
 # Coverage
 # -------------

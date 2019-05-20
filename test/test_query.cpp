@@ -4850,6 +4850,7 @@ TEST(Query_FindAllOr)
     ttt.create_object().set_all(4, 5, "a");
     ttt.create_object().set_all(5, 6, "a");
     ttt.create_object().set_all(6, 7, "X");
+    ttt.create_object().set_all(7, 8, "z");
 
     // first == 5 || second == X
     Query q1 = ttt.where().equal(col_int, 5).Or().equal(col_str, "X");
@@ -4858,6 +4859,15 @@ TEST(Query_FindAllOr)
     CHECK_EQUAL(2, tv1[0].get<Int>(col_id));
     CHECK_EQUAL(4, tv1[1].get<Int>(col_id));
     CHECK_EQUAL(6, tv1[2].get<Int>(col_id));
+
+    // second == X || second == b || second == z || first == -1
+    Query q2 =
+        ttt.where().equal(col_str, "X").Or().equal(col_str, "b").Or().equal(col_str, "z").Or().equal(col_int, -1);
+    TableView tv2 = q2.find_all();
+    CHECK_EQUAL(3, tv2.size());
+    CHECK_EQUAL(2, tv2[0].get<Int>(col_id));
+    CHECK_EQUAL(6, tv2[1].get<Int>(col_id));
+    CHECK_EQUAL(7, tv2[2].get<Int>(col_id));
 }
 
 
@@ -9380,6 +9390,33 @@ TEST(Query_Group_bug)
             .end_group();
 
     CHECK_EQUAL(5, q0.count());
+}
+
+TEST(Query_TwoColumnUnaligned)
+{
+    Group g;
+    TableRef table = g.add_table("table");
+    ColKey a_col_ndx = table->add_column(type_Int, "a");
+    ColKey b_col_ndx = table->add_column(type_Int, "b");
+
+    // Adding 1001 rows causes arrays in the 2 columns to be aligned differently
+    // (on a 0 and on an 8 address resp)
+    auto matches = 0;
+    for (int i = 0; i < 1001; ++i) {
+        Obj obj = table->create_object();
+        obj.set(a_col_ndx, i);
+        if (i % 88) {
+            obj.set(b_col_ndx, i + 5);
+        }
+        else {
+            obj.set(b_col_ndx, i);
+            matches++;
+        }
+    }
+
+    Query q = table->column<Int>(a_col_ndx) == table->column<Int>(b_col_ndx);
+    size_t cnt = q.count();
+    CHECK_EQUAL(cnt, matches);
 }
 
 #endif // TEST_QUERY
