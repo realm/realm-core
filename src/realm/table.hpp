@@ -859,7 +859,7 @@ private:
 
     std::vector<ColKey> m_leaf_ndx2colkey;
     std::vector<ColKey::Idx> m_spec_ndx2leaf_ndx;
-    std::vector<int> m_leaf_ndx2spec_ndx;
+    std::vector<size_t> m_leaf_ndx2spec_ndx;
 
     uint64_t m_in_file_version_at_transaction_boundary = 0;
 

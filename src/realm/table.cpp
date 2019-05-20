@@ -2231,9 +2231,9 @@ ColKey Table::generate_col_key(ColumnType tp, ColumnAttrMask attr)
     m_top.set(top_position_for_column_key, rot);
 
     // reuse lowest available leaf ndx:
-    unsigned lower = m_leaf_ndx2colkey.size();
+    unsigned lower = unsigned(m_leaf_ndx2colkey.size());
     // look for an unused entry:
-    for (size_t idx = 0; idx < lower; ++idx) {
+    for (unsigned idx = 0; idx < lower; ++idx) {
         if (m_leaf_ndx2colkey[idx] == ColKey()) {
             lower = idx;
             break;
