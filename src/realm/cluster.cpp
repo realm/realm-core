@@ -1676,7 +1676,7 @@ void ClusterTree::clear()
     m_root->destroy_deep();
 
     auto leaf = std::make_unique<Cluster>(0, m_root->get_alloc(), *this);
-    leaf->create(get_spec().get_column_count());
+    leaf->create(m_owner->num_leaf_cols());
     replace_root(std::move(leaf));
     m_size = 0;
 }
@@ -1962,13 +1962,11 @@ const Spec& ClusterTree::get_spec() const
 
 void ClusterTree::remove_links()
 {
-    const Spec& spec = get_spec();
     CascadeState state(CascadeState::Mode::strong);
     state.m_group = m_owner->get_parent_group();
     Allocator& alloc = get_alloc();
-    auto table = get_owner();
     // This function will add objects that should be deleted to 'state'
-    ClusterTree::TraverseFunction func = [this, &spec, &state, &alloc, table](const Cluster* cluster) {
+    ClusterTree::TraverseFunction func = [this, &state, &alloc](const Cluster* cluster) {
         auto remove_link_from_column = [&](ColKey col_key) {
             auto col_type = col_key.get_type();
             if (col_type == col_type_Link) {

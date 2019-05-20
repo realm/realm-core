@@ -2868,4 +2868,54 @@ TEST(Parser_Between)
     CHECK(message.find("Invalid Predicate. The 'between' operator is not supported yet, please rewrite the expression using '>' and '<'.") != std::string::npos);
 }
 
+TEST(Parser_ChainedStringEqualQueries)
+{
+    Group g;
+    TableRef table = g.add_table("table");
+    ColKey a_col_ndx = table->add_column(type_String, "a", false);
+    ColKey b_col_ndx = table->add_column(type_String, "b", true);
+    ColKey c_col_ndx = table->add_column(type_String, "c", false);
+    ColKey d_col_ndx = table->add_column(type_String, "d", true);
+
+    table->add_search_index(c_col_ndx);
+    table->add_search_index(d_col_ndx);
+
+    std::vector<std::string> populated_data;
+    std::stringstream ss;
+    for (size_t i = 0; i < 100; ++i) {
+        ss.str({});
+        ss << i;
+        std::string sd(ss.str());
+        populated_data.push_back(sd);
+        table->create_object().set(a_col_ndx, sd).set(b_col_ndx, sd).set(c_col_ndx, sd).set(d_col_ndx, sd);
+    }
+    table->create_object(); // one null/empty string
+
+    verify_query(test_context, table, "a == '0' or a == '1' or a == '2'", 3);
+    verify_query(test_context, table, "a == '0' or b == '2' or a == '3' or b == '4'", 4);
+    verify_query(test_context, table,
+                 "(a == '0' or b == '2' or a == '3' or b == '4') and (c == '0' or d == '2' or c == '3' or d == '4')",
+                 4);
+    verify_query(test_context, table, "a == '' or a == null", 1);
+    verify_query(test_context, table, "b == '' or b == null", 1);
+    verify_query(test_context, table, "c == '' or c == null", 1);
+    verify_query(test_context, table, "d == '' or d == null", 1);
+    verify_query(
+        test_context, table,
+        "(a == null or a == '') and (b == null or b == '') and (c == null or c == '') and (d == null or d == '')", 1);
+
+    Random rd;
+    rd.shuffle(populated_data.begin(), populated_data.end());
+    std::string query;
+    bool first = true;
+    char column_to_query = 0;
+    for (auto s : populated_data) {
+        std::string column_name(1, 'a' + column_to_query);
+        query += (first ? "" : " or ") + column_name + " == '" + s + "'";
+        first = false;
+        column_to_query = (column_to_query + 1) % 4;
+    }
+    verify_query(test_context, table, query, populated_data.size());
+}
+
 #endif // TEST_PARSER

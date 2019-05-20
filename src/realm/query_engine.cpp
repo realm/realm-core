@@ -21,6 +21,7 @@
 #include <realm/query_expression.hpp>
 #include <realm/index_string.hpp>
 #include <realm/db.hpp>
+#include <realm/utilities.hpp>
 
 using namespace realm;
 
@@ -290,10 +291,90 @@ void StringNode<Equal>::_search_index_init()
     }
 }
 
+void StringNode<Equal>::consume_condition(StringNode<Equal>* other)
+{
+    // If a search index is present, don't try to combine conditions since index search is most likely faster.
+    // Assuming N elements to search and M conditions to check:
+    // 1) search index present:                     O(log(N)*M)
+    // 2) no search index, combine conditions:      O(N)
+    // 3) no search index, conditions not combined: O(N*M)
+    // In practice N is much larger than M, so if we have a search index, choose 1, otherwise if possible choose 2.
+    REALM_ASSERT(m_condition_column_key == other->m_condition_column_key);
+    REALM_ASSERT(other->m_needles.empty());
+    if (m_needles.empty()) {
+        m_needles.insert(bool(m_value) ? StringData(*m_value) : StringData());
+    }
+    if (bool(other->m_value)) {
+        m_needle_storage.push_back(StringBuffer());
+        m_needle_storage.back().append(*other->m_value);
+        m_needles.insert(StringData(m_needle_storage.back().data(), m_needle_storage.back().size()));
+    }
+    else {
+        m_needles.insert(StringData());
+    }
+}
+
 size_t StringNode<Equal>::_find_first_local(size_t start, size_t end)
 {
-    return m_leaf_ptr->find_first(m_value, start, end);
+    if (m_needles.empty()) {
+        return m_leaf_ptr->find_first(m_value, start, end);
+    }
+    else {
+        size_t n = m_leaf_ptr->size();
+        if (end == npos)
+            end = n;
+        REALM_ASSERT_7(start, <=, n, &&, end, <=, n);
+        REALM_ASSERT_3(start, <=, end);
+
+        const auto not_in_set = m_needles.end();
+        // For a small number of conditions it is faster to cycle through
+        // and check them individually. The threshold depends on how fast
+        // our hashing of StringData is (see `StringData.hash()`). The
+        // number 20 was found empirically when testing small strings
+        // with N==100k
+        if (m_needles.size() < 20) {
+            for (size_t i = start; i < end; ++i) {
+                auto element = m_leaf_ptr->get(i);
+                StringData value_2{element.data(), element.size()};
+                for (auto it = m_needles.begin(); it != not_in_set; ++it) {
+                    if (*it == value_2)
+                        return i;
+                }
+            }
+        }
+        else {
+            for (size_t i = start; i < end; ++i) {
+                auto element = m_leaf_ptr->get(i);
+                StringData value_2{element.data(), element.size()};
+                if (m_needles.find(value_2) != not_in_set)
+                    return i;
+            }
+        }
+    }
+    return not_found;
 }
+
+std::string StringNode<Equal>::describe(util::serializer::SerialisationState& state) const
+{
+    if (m_needles.empty()) {
+        return StringNodeEqualBase::describe(state);
+    }
+
+    // FIXME: once the parser supports it, print something like "column IN {s1, s2, s3}"
+    std::string desc;
+    bool is_first = true;
+    for (auto it : m_needles) {
+        StringData sd(it.data(), it.size());
+        desc += (is_first ? "" : " or ") + state.describe_column(ParentNode::m_table, m_condition_column_key) + " " +
+                Equal::description() + " " + util::serializer::print_value(sd);
+        is_first = false;
+    }
+    if (!is_first) {
+        desc = "(" + desc + ")";
+    }
+    return desc;
+}
+
 
 void StringNode<EqualIns>::_search_index_init()
 {
