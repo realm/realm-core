@@ -109,17 +109,17 @@ public:
     {
         return m_alloc.get_storage_version(inst_ver);
     }
-    void insert_column(size_t ndx)
+    void insert_column(ColKey col)
     {
-        m_root->insert_column(ndx);
+        m_root->insert_column(col);
     }
-    void remove_column(size_t ndx)
+    void remove_column(ColKey col)
     {
-        m_root->remove_column(ndx);
+        m_root->remove_column(col);
     }
 
-    // Insert entry for object, but do not create and return the object
-    void insert_fast(ObjKey k, const InitValues& init_values, ClusterNode::State& state);
+    // Insert entry for object, but do not create and return the object accessor
+    void insert_fast(ObjKey k, const FieldValues& init_values, ClusterNode::State& state);
     // Create and return object
     Obj insert(ObjKey k, const FieldValues&);
     // Delete object with given key
@@ -130,7 +130,7 @@ public:
     ConstObj get(ObjKey k) const;
     // Lookup and return object
     Obj get(ObjKey k);
-    // Lookup ContObj by index
+    // Lookup ContsObj by index
     ConstObj get(size_t ndx) const;
     // Lookup Obj by index
     Obj get(size_t ndx);
@@ -144,7 +144,7 @@ public:
     // Visit all leaves and call the supplied function. The function can modify the leaf.
     void update(UpdateFunction& func);
 
-    void enumerate_string_column(size_t ndx);
+    void enumerate_string_column(ColKey col_key);
     void dump_objects()
     {
         m_root->dump_objects(0, "");

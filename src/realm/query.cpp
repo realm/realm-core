@@ -905,13 +905,12 @@ R Query::aggregate(ColKey column_key, size_t* resultcount, ObjKey* return_ndx) c
             LeafType leaf(m_table->get_alloc());
             auto node = root_node();
             bool nullable = m_table->is_nullable(column_key);
-            size_t column_ndx = m_table->colkey2ndx(column_key);
 
             using TRV = ClusterTree::TraverseFunction;
-            TRV f = [column_ndx, nullable, &leaf, &node, &st, this](const Cluster* cluster) {
+            TRV f = [column_key, nullable, &leaf, &node, &st, this](const Cluster* cluster) {
                 size_t e = cluster->node_size();
                 node->set_cluster(cluster);
-                cluster->init_leaf(column_ndx, &leaf);
+                cluster->init_leaf(column_key, &leaf);
                 st.m_key_offset = cluster->get_offset();
                 st.m_key_values = cluster->get_key_array();
                 aggregate_internal(action, ColumnTypeTraits<T>::id, nullable, node, &st, 0, e, &leaf);

@@ -242,7 +242,7 @@ TEST(Links_SetLinkLogicErrors)
     CHECK_THROW(obj.set(col0, ObjKey(10)), InvalidKey);
 
     group.remove_table("origin");
-    CHECK_LOGIC_ERROR(obj.set(col0, ObjKey(10)), LogicError::column_does_not_exist);
+    CHECK_LOGIC_ERROR(obj.set(col0, ObjKey(10)), LogicError::detached_accessor);
 }
 
 
@@ -1309,13 +1309,13 @@ TEST(Links_CascadeRemove_ColumnLinkList)
         {
             col_link = origin->add_column_link(type_LinkList, "o_1", *target, link_Strong);
             // target now has a backlink column 0
-            auto key0 = target->ndx2colkey(0);
-            REALM_ASSERT(target->colkey2ndx(key0) == 0);
+            auto key0 = target->spec_ndx2colkey(0);
+            REALM_ASSERT(target->colkey2spec_ndx(key0) == 0);
             REALM_ASSERT(key0 == target->find_backlink_column(origin->get_key(), col_link));
             target->add_column(type_Int, "t_1");
             // backlink column moves to pos 1
-            REALM_ASSERT(target->colkey2ndx(key0) == 1); // <--- ok
-            REALM_ASSERT(key0 == target->ndx2colkey(1)); // <--- fails
+            REALM_ASSERT(target->colkey2spec_ndx(key0) == 1); // <--- ok
+            REALM_ASSERT(key0 == target->spec_ndx2colkey(1)); // <--- fails
             REALM_ASSERT(key0 == target->find_backlink_column(origin->get_key(), col_link));
             origin->create_objects(3, origin_keys);
             target->create_objects(3, target_keys);

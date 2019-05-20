@@ -20,6 +20,7 @@
 #define REALM_KEYS_HPP
 
 #include <realm/util/to_string.hpp>
+#include <realm/column_type.hpp>
 #include <ostream>
 #include <vector>
 
@@ -87,12 +88,21 @@ public:
 };
 
 struct ColKey {
+    struct Idx {
+        unsigned val;
+    };
+
     constexpr ColKey()
         : value(uint64_t(-1) >> 1) // free top bit
     {
     }
     explicit ColKey(int64_t val)
         : value(val)
+    {
+    }
+    explicit ColKey(Idx index, ColumnType type, ColumnAttrMask attrs, unsigned tag)
+        : ColKey((index.val & 0xFFFFUL) | ((type & 0x3FUL) << 16) | ((attrs.m_value & 0xFFUL) << 22) |
+                 ((tag & 0xFFFFFFFFUL) << 30))
     {
     }
     ColKey& operator=(int64_t val)
@@ -119,6 +129,22 @@ struct ColKey {
     explicit operator bool() const
     {
         return value != ColKey().value;
+    }
+    Idx get_index() const
+    {
+        return Idx{static_cast<unsigned>(value) & 0xFFFFU};
+    }
+    ColumnType get_type() const
+    {
+        return ColumnType((static_cast<unsigned>(value) >> 16) & 0x3F);
+    }
+    ColumnAttrMask get_attrs() const
+    {
+        return ColumnAttrMask((static_cast<unsigned>(value) >> 22) & 0xFF);
+    }
+    unsigned get_tag() const
+    {
+        return (value >> 30) & 0xFFFFFFFFUL;
     }
     int64_t value;
 };

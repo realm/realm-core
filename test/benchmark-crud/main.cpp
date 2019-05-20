@@ -44,7 +44,7 @@ inline int_fast64_t read(TableRef table, const OrderVec& order)
     int_fast64_t dummy = 0;
     size_t n = order.size();
 #ifdef REALM_CLUSTER_IF
-    ColKey col0 = table->ndx2colkey(0);
+    ColKey col0 = table->spec_ndx2colkey(0);
 #endif
     for (size_t i = 0; i != n; ++i)
 #ifdef REALM_CLUSTER_IF
@@ -59,7 +59,7 @@ inline void write(TableRef table, const OrderVec& order)
 {
     size_t n = order.size();
 #ifdef REALM_CLUSTER_IF
-    ColKey col0 = table->ndx2colkey(0);
+    ColKey col0 = table->spec_ndx2colkey(0);
 #endif
     for (size_t i = 0; i != n; ++i)
 #ifdef REALM_CLUSTER_IF
@@ -73,7 +73,7 @@ inline void insert(TableRef table, const OrderVec& order)
 {
     size_t n = order.size();
 #ifdef REALM_CLUSTER_IF
-    ColKey col0 = table->ndx2colkey(0);
+    ColKey col0 = table->spec_ndx2colkey(0);
 #endif
     for (size_t i = 0; i != n; ++i) {
 #ifdef REALM_CLUSTER_IF

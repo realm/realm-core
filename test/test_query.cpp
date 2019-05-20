@@ -7622,7 +7622,7 @@ TEST(Query_OperatorsOverLink)
 
     // Rows 1 and 2 should match this query as 2 * 2 == 4.
     // Row 0 should not as the power subexpression will not produce any results.
-    q = table2->column<Int>(col_int) == power(table2->link(col_linklist).column<Int>(col_int));
+    q = table2->column<Int>(col_int2) == power(table2->link(col_linklist).column<Int>(col_int));
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 2);
     CHECK_EQUAL(k1, tv.get_key(0));
@@ -7631,7 +7631,7 @@ TEST(Query_OperatorsOverLink)
 
     // Rows 1 and 2 should match this query as 2.0 * 2.0 == 4.0.
     // Row 0 should not as the power subexpression will not produce any results.
-    q = power(table2->link(col_linklist).column<Double>(col_dbl)) == table2->column<Int>(col_int);
+    q = power(table2->link(col_linklist).column<Double>(col_dbl)) == table2->column<Int>(col_int2);
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 2);
     CHECK_EQUAL(k1, tv.get_key(0));
@@ -7639,7 +7639,7 @@ TEST(Query_OperatorsOverLink)
 
     // Rows 1 and 2 should match this query as 2.0 * 2.0 == 4.0.
     // Row 0 should not as the power subexpression will not produce any results.
-    q = table2->column<Int>(col_int) == power(table2->link(col_linklist).column<Double>(col_dbl));
+    q = table2->column<Int>(col_int2) == power(table2->link(col_linklist).column<Double>(col_dbl));
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 2);
     CHECK_EQUAL(k1, tv.get_key(0));
@@ -7650,7 +7650,7 @@ TEST(Query_OperatorsOverLink)
 
     // Rows 1 and 2 should match this query as 2 * 2 == 4.
     // Row 0 should not as the multiplication will not produce any results.
-    q = table2->link(col_linklist).column<Int>(col_int) * 2 == table2->column<Int>(col_int);
+    q = table2->link(col_linklist).column<Int>(col_int) * 2 == table2->column<Int>(col_int2);
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 2);
     CHECK_EQUAL(k1, tv.get_key(0));
@@ -7658,7 +7658,7 @@ TEST(Query_OperatorsOverLink)
 
     // Rows 1 and 2 should match this query as 2 * 2 == 4.
     // Row 0 should not as the multiplication will not produce any results.
-    q = table2->column<Int>(col_int) == 2 * table2->link(col_linklist).column<Int>(col_int);
+    q = table2->column<Int>(col_int2) == 2 * table2->link(col_linklist).column<Int>(col_int);
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 2);
     CHECK_EQUAL(k1, tv.get_key(0));
@@ -7666,7 +7666,7 @@ TEST(Query_OperatorsOverLink)
 
     // Rows 1 and 2 should match this query as 2.0 * 2.0 == 4.0.
     // Row 0 should not as the multiplication will not produce any results.
-    q = table2->link(col_linklist).column<Double>(col_dbl) * 2 == table2->column<Int>(col_int);
+    q = table2->link(col_linklist).column<Double>(col_dbl) * 2 == table2->column<Int>(col_int2);
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 2);
     CHECK_EQUAL(k1, tv.get_key(0));
@@ -7674,7 +7674,7 @@ TEST(Query_OperatorsOverLink)
 
     // Rows 1 and 2 should match this query as 2.0 * 2.0 == 4.0.
     // Row 0 should not as the multiplication will not produce any results.
-    q = table2->column<Int>(col_int) == 2 * table2->link(col_linklist).column<Double>(col_dbl);
+    q = table2->column<Int>(col_int2) == 2 * table2->link(col_linklist).column<Double>(col_dbl);
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 2);
     CHECK_EQUAL(k1, tv.get_key(0));
@@ -9102,8 +9102,10 @@ TEST(Query_ColumnDeletionLinks)
     CHECK_EQUAL(tv.size(), 1);
     // remove link column, disaster
     bar->remove_column(col_link0);
+    CHECK_LOGIC_ERROR(bar->report_invalid_key(col_link0), LogicError::column_does_not_exist);
     CHECK_LOGIC_ERROR(tv.sync_if_needed(), LogicError::column_does_not_exist);
     foo->remove_column(col_link1);
+    CHECK_LOGIC_ERROR(foo->report_invalid_key(col_link1), LogicError::column_does_not_exist);
     CHECK_LOGIC_ERROR(q1.count(), LogicError::column_does_not_exist);
     CHECK_LOGIC_ERROR(q2.count(), LogicError::column_does_not_exist);
 }

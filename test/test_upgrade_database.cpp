@@ -1069,6 +1069,8 @@ TEST_IF(Upgrade_Database_5_6_StringIndex, REALM_MAX_BPNODE_SIZE == 4 || REALM_MA
 }
 #endif
 
+#ifdef LEGACY_TESTS
+
 TEST_IF(Upgrade_Database_6_7, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZE == 1000)
 {
     std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
@@ -1437,5 +1439,5 @@ TEST_IF(Upgrade_Database_9_10, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SI
     g.write(path);
 #endif // TEST_READ_UPGRADE_MODE
 }
-
+#endif // LEGACY_TESTS
 #endif // TEST_GROUP

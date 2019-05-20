@@ -196,11 +196,7 @@ public:
     /// them. In this case, if A->B is changed to A->C, then both A and B will
     /// be cascade-removed. This can lead to obscure bugs in some applications.
     ///
-    /// \param col_key The key of the link column (`type_Link` or
-    /// `type_LinkList`) to be modified.
-    ///
-    /// \param link_type The type of links the column should store.
-    void set_link_type(ColKey col_key, LinkType);
+    /// The link type must be specified at column creation and cannot be changed
     // Returns the link type for the given column.
     // Throws an LogicError if target column is not a link column.
     LinkType get_link_type(ColKey col_key) const;
@@ -374,16 +370,13 @@ public:
     // Will return pointer to search index accessor. Will return nullptr if no index
     StringIndex* get_search_index(ColKey col) const noexcept
     {
-        size_t column_ndx = colkey2ndx(col);
-        REALM_ASSERT(column_ndx < m_index_accessors.size());
-        return m_index_accessors[column_ndx];
+        if (col.get_type() == col_type_BackLink)
+            return nullptr;
+        size_t spec_ndx = colkey2spec_ndx(col);
+        REALM_ASSERT(m_index_accessors.size() == get_column_count());
+        REALM_ASSERT(spec_ndx < m_index_accessors.size());
+        return m_index_accessors[spec_ndx];
     }
-    StringIndex* get_search_index(size_t column_ndx) const noexcept
-    {
-        REALM_ASSERT(column_ndx < m_index_accessors.size());
-        return m_index_accessors[column_ndx];
-    }
-
     template <class T>
     ObjKey find_first(ColKey col_key, T value) const;
 
@@ -446,14 +439,44 @@ public:
     // table is unchanged.
     ColKey set_nullability(ColKey col_key, bool nullable, bool throw_on_null);
 
+    template <typename Func>
+    void for_each_and_every_column(Func func) const
+    {
+        for (auto col_key : m_leaf_ndx2colkey) {
+            if (!col_key)
+                continue;
+            func(col_key);
+        }
+    }
+    template <typename Func>
+    void for_each_public_column(Func func) const
+    {
+        for (auto col_key : m_leaf_ndx2colkey) {
+            if (!col_key)
+                continue;
+            if (col_key.get_type() == col_type_BackLink)
+                continue;
+            func(col_key);
+        }
+    }
+    template <typename Func>
+    void for_each_backlink_column(Func func) const
+    {
+        // FIXME: Optimize later - to not iterate through all non-backlink columns:
+        for (auto col_key : m_leaf_ndx2colkey) {
+            if (!col_key)
+                continue;
+            if (col_key.get_type() != col_type_BackLink)
+                continue;
+            func(col_key);
+        }
+    }
+
 private:
     template <class T>
     TableView find_all(ColKey col_key, T value);
-    // insert a mapping, moving all later mappings to a higher index
-    void insert_col_mapping(size_t ndx, ColKey key);
-    // remove a mapping, moving all later mappings to a lower index
-    void remove_col_mapping(size_t ndx);
-    ColKey generate_col_key();
+    void build_column_mapping();
+    ColKey generate_col_key(ColumnType ct, ColumnAttrMask attrs);
     void convert_column(ColKey from, ColKey to, bool throw_on_null);
     template <class F, class T>
     void change_nullability(ColKey from, ColKey to, bool throw_on_null);
@@ -461,9 +484,15 @@ private:
     void change_nullability_list(ColKey from, ColKey to, bool throw_on_null);
 
 public:
-    size_t colkey2ndx(ColKey key) const;
-    ColKey ndx2colkey(size_t ndx) const;
-    void verify_inv() const;
+    // mapping between index used in leaf nodes (leaf_ndx) and index used in spec (spec_ndx)
+    // as well as the full column key. A leaf_ndx can be obtained directly from the column key
+    size_t colkey2spec_ndx(ColKey key) const;
+    size_t leaf_ndx2spec_ndx(ColKey::Idx idx) const;
+    ColKey::Idx spec_ndx2leaf_ndx(size_t idx) const;
+    ColKey leaf_ndx2colkey(ColKey::Idx idx) const;
+    ColKey spec_ndx2colkey(size_t ndx) const;
+    void report_invalid_key(ColKey col_key) const;
+    size_t num_leaf_cols() const;
     //@{
     /// Find the lower/upper bound according to a column that is
     /// already sorted in ascending order.
@@ -637,10 +666,11 @@ private:
     void do_remove_object(ObjKey key);
     size_t do_set_link(ColKey col_key, size_t row_ndx, size_t target_row_ndx);
 
-    void populate_search_index(ColKey column_ndx);
+    void populate_search_index(ColKey col_key);
     bool convert_columns();
+    bool convert_column_keys(Group* group);
     bool create_objects();
-    bool copy_content_from_columns(size_t col_ndx);
+    bool copy_content_from_columns(size_t spec_ndx);
 
     /// Disable copying assignment.
     ///
@@ -675,17 +705,17 @@ private:
     void set_key(TableKey key);
 
     ColKey do_insert_column(ColKey col_key, DataType type, StringData name, LinkTargetInfo& link_target_info,
-                            bool nullable = false, bool listtype = false);
+                            bool nullable = false, bool listtype = false, LinkType link_type = link_Weak);
 
     struct InsertSubtableColumns;
     struct EraseSubtableColumns;
     struct RenameSubtableColumns;
 
     ColKey insert_root_column(ColKey col_key, DataType type, StringData name, LinkTargetInfo& link_target,
-                              bool nullable = false, bool linktype = false);
+                              bool nullable = false, bool linktype = false, LinkType link_type = link_Weak);
     void erase_root_column(ColKey col_key);
     ColKey do_insert_root_column(ColKey col_key, ColumnType, StringData name, bool nullable = false,
-                                 bool listtype = false);
+                                 bool listtype = false, LinkType link_type = link_Weak);
     void do_erase_root_column(ColKey col_key);
     ColKey insert_backlink_column(TableKey origin_table_key, ColKey origin_col_key, ColKey backlink_col_key);
     void erase_backlink_column(TableKey origin_table_key, ColKey origin_col_key);
@@ -833,10 +863,10 @@ private:
     template <typename T>
     double average(ColKey col_key, size_t* resultcount) const;
 
-    std::vector<ColKey> m_ndx2colkey;
-    // holds the ndx in the lower bits, the tag in the higher bit to save an indirection
-    // when validating colkeys.
-    std::vector<uint64_t> m_colkey2ndx;
+    std::vector<ColKey> m_leaf_ndx2colkey;
+    std::vector<ColKey::Idx> m_spec_ndx2leaf_ndx;
+    std::vector<int> m_leaf_ndx2spec_ndx;
+
     uint64_t m_in_file_version_at_transaction_boundary = 0;
 
     static constexpr int top_position_for_spec = 0;
@@ -892,6 +922,7 @@ public:
     ColKey operator*()
     {
         if (m_pos < m_table->get_column_count()) {
+            REALM_ASSERT(m_table->m_spec.get_key(m_pos) == m_table->spec_ndx2colkey(m_pos));
             return m_table->m_spec.get_key(m_pos);
         }
         return {};
@@ -989,31 +1020,32 @@ inline size_t Table::get_column_count() const noexcept
 
 inline StringData Table::get_column_name(ColKey column_key) const
 {
-    auto ndx = colkey2ndx(column_key);
-    REALM_ASSERT_3(ndx, <, get_column_count());
-    return m_spec.get_column_name(ndx);
+    auto spec_ndx = colkey2spec_ndx(column_key);
+    REALM_ASSERT_3(spec_ndx, <, get_column_count());
+    return m_spec.get_column_name(spec_ndx);
 }
 
 inline ColKey Table::get_column_key(StringData name) const noexcept
 {
-    size_t ndx = m_spec.get_column_index(name);
-    if (ndx == npos)
+    size_t spec_ndx = m_spec.get_column_index(name);
+    if (spec_ndx == npos)
         return ColKey();
-    return ndx2colkey(ndx);
+    return spec_ndx2colkey(spec_ndx);
 }
 
 inline ColumnType Table::get_real_column_type(ColKey col_key) const noexcept
 {
-    size_t ndx = colkey2ndx(col_key);
-    REALM_ASSERT_3(ndx, <, m_spec.get_column_count());
-    return m_spec.get_column_type(ndx);
+    return col_key.get_type();
 }
 
 inline DataType Table::get_column_type(ColKey column_key) const
 {
-    auto ndx = colkey2ndx(column_key);
-    REALM_ASSERT_3(ndx, <, m_spec.get_column_count());
-    return m_spec.get_public_column_type(ndx);
+    return DataType(column_key.get_type());
+}
+
+inline ColumnAttrMask Table::get_column_attr(ColKey column_key) const noexcept
+{
+    return column_key.get_attrs();
 }
 
 
@@ -1092,8 +1124,8 @@ inline Columns<T> Table::column(const Table& origin, ColKey origin_col_key)
 
     auto origin_table_key = origin.get_key();
     const Table& current_target_table = *get_link_chain_target(m_link_chain);
-    size_t backlink_col_ndx = current_target_table.m_spec.find_backlink_column(origin_table_key, origin_col_key);
-    ColKey backlink_col_key = current_target_table.ndx2colkey(backlink_col_ndx);
+    size_t backlink_col_spec_ndx = current_target_table.m_spec.find_backlink_column(origin_table_key, origin_col_key);
+    ColKey backlink_col_key = current_target_table.spec_ndx2colkey(backlink_col_spec_ndx);
 
     std::vector<ColKey> link_chain = std::move(m_link_chain);
     m_link_chain.clear();
@@ -1128,8 +1160,8 @@ inline Table& Table::backlink(const Table& origin, ColKey origin_col_key)
 {
     auto origin_table_key = origin.get_key();
     const Table& current_target_table = *get_link_chain_target(m_link_chain);
-    size_t backlink_col_ndx = current_target_table.m_spec.find_backlink_column(origin_table_key, origin_col_key);
-    ColKey backlink_col_key = current_target_table.ndx2colkey(backlink_col_ndx);
+    size_t backlink_col_spec_ndx = current_target_table.m_spec.find_backlink_column(origin_table_key, origin_col_key);
+    ColKey backlink_col_key = current_target_table.spec_ndx2colkey(backlink_col_spec_ndx);
     return link(backlink_col_key);
 }
 
@@ -1188,36 +1220,65 @@ inline void Table::set_ndx_in_parent(size_t ndx_in_parent) noexcept
     m_top.set_ndx_in_parent(ndx_in_parent);
 }
 
-inline size_t Table::colkey2ndx(ColKey key) const
+inline size_t Table::colkey2spec_ndx(ColKey key) const
 {
-    size_t idx = key.value & max_num_columns;
-    if (idx >= m_colkey2ndx.size())
-        throw InvalidKey("Nonexisting column key");
-    // FIXME: Optimization! There are many scenarios where this test may be avoided.
-    uint64_t ndx_and_tag = m_colkey2ndx[idx];
-    size_t ndx = ndx_and_tag & max_num_columns;
-    if ((ndx == max_num_columns) || ((ndx_and_tag ^ key.value) > max_num_columns))
-        throw LogicError(LogicError::column_does_not_exist);
-    return ndx;
+    auto leaf_idx = key.get_index();
+    REALM_ASSERT(leaf_idx.val < m_leaf_ndx2spec_ndx.size());
+    return m_leaf_ndx2spec_ndx[leaf_idx.val];
 }
 
-inline ColKey Table::ndx2colkey(size_t ndx) const
+inline size_t Table::num_leaf_cols() const
 {
-    REALM_ASSERT(ndx < m_ndx2colkey.size());
-    return m_ndx2colkey[ndx];
+    return m_leaf_ndx2spec_ndx.size();
+}
+
+inline ColKey Table::spec_ndx2colkey(size_t spec_ndx) const
+{
+    REALM_ASSERT(spec_ndx < m_spec_ndx2leaf_ndx.size());
+    return m_leaf_ndx2colkey[m_spec_ndx2leaf_ndx[spec_ndx].val];
+}
+
+inline void Table::report_invalid_key(ColKey col_key) const
+{
+    if (col_key == ColKey())
+        throw LogicError(LogicError::column_does_not_exist);
+    auto idx = col_key.get_index();
+    if (idx.val >= m_leaf_ndx2colkey.size() || m_leaf_ndx2colkey[idx.val] != col_key)
+        throw LogicError(LogicError::column_does_not_exist);
+}
+
+inline size_t Table::leaf_ndx2spec_ndx(ColKey::Idx leaf_ndx) const
+{
+    REALM_ASSERT(leaf_ndx.val < m_leaf_ndx2colkey.size());
+    return m_leaf_ndx2spec_ndx[leaf_ndx.val];
+}
+
+inline ColKey::Idx Table::spec_ndx2leaf_ndx(size_t spec_ndx) const
+{
+    REALM_ASSERT(spec_ndx < m_spec_ndx2leaf_ndx.size());
+    return m_spec_ndx2leaf_ndx[spec_ndx];
+}
+
+inline ColKey Table::leaf_ndx2colkey(ColKey::Idx leaf_ndx) const
+{
+    // this may be called with leaf indicies outside of the table. This can happen
+    // when a column is removed from the mapping, but space for it is still reserved
+    // at leaf level. Operations on Cluster and ClusterTree which walks the columns
+    // based on leaf indicies may ask for colkeys which are no longer valid.
+    if (leaf_ndx.val < m_leaf_ndx2spec_ndx.size())
+        return m_leaf_ndx2colkey[leaf_ndx.val];
+    else
+        return ColKey();
 }
 
 bool inline Table::valid_column(ColKey col_key) const
 {
-    size_t idx = col_key.value & max_num_columns;
-    if (idx >= m_colkey2ndx.size())
+    if (col_key == ColKey())
         return false;
-    uint64_t ndx_and_tag = m_colkey2ndx[idx];
-    if ((ndx_and_tag ^ col_key.value) > max_num_columns)
+    ColKey::Idx leaf_idx = col_key.get_index();
+    if (leaf_idx.val >= m_leaf_ndx2colkey.size())
         return false;
-    if ((ndx_and_tag & max_num_columns) == max_num_columns)
-        return false;
-    return true;
+    return col_key == m_leaf_ndx2colkey[leaf_idx.val];
 }
 
 // This class groups together information about the target of a link column
@@ -1227,6 +1288,8 @@ struct LinkTargetInfo {
         : m_target_table(target)
         , m_backlink_col_key(backlink_key)
     {
+        if (backlink_key)
+            m_target_table->report_invalid_key(backlink_key);
     }
     bool is_valid() const
     {

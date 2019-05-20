@@ -20,7 +20,7 @@
 #include <realm/spec.hpp>
 #include <realm/replication.hpp>
 #include <realm/util/to_string.hpp>
-
+#include <realm/group.hpp>
 using namespace realm;
 
 Spec::~Spec() noexcept
@@ -194,6 +194,19 @@ MemRef Spec::create_empty_spec(Allocator& alloc)
     return spec_set.get_mem();
 }
 
+ColKey Spec::generate_converted_colkey(size_t column_ndx)
+{
+    auto attr = get_column_attr(column_ndx);
+    // index and uniqueness are not passed on to the key, so clear them
+    attr.reset(col_attr_Indexed);
+    attr.reset(col_attr_Unique);
+    auto type = get_column_type(column_ndx);
+    // columns get the same leaf index as in the spec during conversion.
+    ColKey tmp(ColKey::Idx{static_cast<unsigned>(column_ndx)}, type, attr, 0);
+    // simply reuse the lower bits of the tmp ColKey (+1) as tag for the real one
+    return ColKey(ColKey::Idx{static_cast<unsigned>(column_ndx)}, type, attr, tmp.value + 1);
+}
+
 bool Spec::convert_column(size_t column_ndx)
 {
     bool changes = false;
@@ -234,6 +247,31 @@ bool Spec::convert_column(size_t column_ndx)
     return changes;
 }
 
+bool Spec::convert_column_key(size_t column_ndx, Group* group)
+{
+    bool changes = false;
+    ColKey col_key = generate_converted_colkey(column_ndx);
+    ColKey existing_key = ColKey{m_keys.get(column_ndx)};
+    if (col_key.value != existing_key.value) {
+        m_keys.set(column_ndx, col_key.value);
+        changes = true;
+    }
+    auto type = col_key.get_type();
+    if (type == col_type_BackLink) {
+        ColKey stored_oc = get_origin_column_key(column_ndx);
+        Spec& origin_spec = _impl::TableFriend::get_spec(*group->get_table(get_opposite_link_table_key(column_ndx)));
+        // old type column keys had the spec index where we'll have the leaf index, so use get_index() on the key
+        size_t old_oc_index = stored_oc.get_index().val;
+        if (old_oc_index < origin_spec.get_public_column_count()) {
+            ColKey generated_oc = origin_spec.generate_converted_colkey(old_oc_index);
+            if (generated_oc != stored_oc) {
+                set_backlink_origin_column(column_ndx, generated_oc);
+                changes = true;
+            }
+        }
+    }
+    return changes;
+}
 
 void Spec::insert_column(size_t column_ndx, ColKey col_key, ColumnType type, StringData name, int attr)
 {
@@ -480,8 +518,8 @@ ColKey Spec::get_origin_column_key(size_t backlink_col_ndx) const noexcept
     size_t subspec_ndx = get_subspec_ndx(backlink_col_ndx);
     int64_t tagged_value = m_subspecs.get(subspec_ndx + 1);
     REALM_ASSERT(tagged_value != 0); // can't retrieve it if never set
-
-    return ColKey(uint64_t(tagged_value) >> 1);
+    auto retval = ColKey(uint64_t(tagged_value) >> 1);
+    return retval;
 }
 
 

@@ -338,9 +338,8 @@ ColKey Table::insert_column_link(ColKey col_key, DataType type, StringData name,
         throw LogicError(LogicError::group_mismatch);
 
     LinkTargetInfo link_target_info(&target);
-    auto retval = do_insert_column(col_key, type, name, link_target_info, false, type == type_LinkList); // Throws
-
-    set_link_type(retval, link_type); // Throws
+    auto retval =
+        do_insert_column(col_key, type, name, link_target_info, false, type == type_LinkList, link_type); // Throws
     return retval;
 }
 
@@ -394,7 +393,7 @@ void Table::rename_column(ColKey col_key, StringData name)
     if (REALM_UNLIKELY(!valid_column(col_key)))
         throw InvalidKey("Non-existing column");
 
-    auto col_ndx = colkey2ndx(col_key);
+    auto col_ndx = colkey2spec_ndx(col_key);
     m_spec.rename_column(col_ndx, name); // Throws
 
     bump_content_version();
@@ -475,28 +474,21 @@ void Table::init(ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent, bo
     else
         m_in_file_version_at_transaction_boundary = rot_version.get_as_int();
 
-    // update column mapping
-    m_ndx2colkey.clear();
-    m_colkey2ndx.clear();
-    size_t num_cols = m_spec.get_column_count();
-    for (size_t ndx = 0; ndx < num_cols; ++ndx) {
-        ColKey col_key = m_spec.get_key(ndx);
-        insert_col_mapping(ndx, col_key);
-    }
+    build_column_mapping();
 }
 
 
 ColKey Table::do_insert_column(ColKey col_key, DataType type, StringData name, LinkTargetInfo& link_target_info,
-                               bool nullable, bool listtype)
+                               bool nullable, bool listtype, LinkType link_type)
 {
     if (type == type_Link)
         nullable = true;
 
     bump_storage_version();
-    col_key = insert_root_column(col_key, type, name, link_target_info, nullable, listtype); // Throws
+    col_key = insert_root_column(col_key, type, name, link_target_info, nullable, listtype, link_type); // Throws
 
     if (Replication* repl = get_repl())
-        repl->insert_column(this, col_key, type, name, link_target_info, nullable, listtype); // Throws
+        repl->insert_column(this, col_key, type, name, link_target_info, nullable, listtype, link_type); // Throws
 
     return col_key;
 }
@@ -504,7 +496,7 @@ ColKey Table::do_insert_column(ColKey col_key, DataType type, StringData name, L
 
 void Table::populate_search_index(ColKey col_key)
 {
-    size_t col_ndx = colkey2ndx(col_key);
+    size_t col_ndx = colkey2spec_ndx(col_key);
     StringIndex* index = m_index_accessors[col_ndx];
 
     // Insert ref to index
@@ -550,15 +542,13 @@ void Table::add_search_index(ColKey col_key)
 {
     if (REALM_UNLIKELY(!valid_column(col_key)))
         throw InvalidKey("No such column");
-    size_t column_ndx = colkey2ndx(col_key);
+    size_t column_ndx = colkey2spec_ndx(col_key);
 
-    ColumnAttrMask attr = m_spec.get_column_attr(column_ndx);
-
-    // Early-out of already indexed
-    if (attr.test(col_attr_Indexed))
+    // Early-out if already indexed
+    if (m_index_accessors[column_ndx] != nullptr)
         return;
 
-    if (!StringIndex::type_supported(get_column_type(col_key))) {
+    if (!StringIndex::type_supported(DataType(col_key.get_type()))) {
         // FIXME: This is what we used to throw, so keep throwing that for compatibility reasons, even though it
         // should probably be a type mismatch exception instead.
         throw LogicError(LogicError::illegal_combination);
@@ -577,24 +567,22 @@ void Table::add_search_index(ColKey col_key)
     index->set_parent(&m_index_refs, column_ndx);
     m_index_refs.set(column_ndx, index->get_ref()); // Throws
 
-    populate_search_index(col_key);
-
-    // Mark the column as having an index
-    attr = m_spec.get_column_attr(column_ndx);
+    // Update spec
+    auto attr = m_spec.get_column_attr(column_ndx);
     attr.set(col_attr_Indexed);
     m_spec.set_column_attr(column_ndx, attr); // Throws
+
+    populate_search_index(col_key);
 }
 
 void Table::remove_search_index(ColKey col_key)
 {
     if (REALM_UNLIKELY(!valid_column(col_key)))
         throw InvalidKey("No such column");
-    size_t column_ndx = colkey2ndx(col_key);
+    size_t column_ndx = colkey2spec_ndx(col_key);
 
-    ColumnAttrMask attr = m_spec.get_column_attr(column_ndx);
-
-    // Early-out of non-indexed
-    if (!attr.test(col_attr_Indexed))
+    // Early-out if non-indexed
+    if (m_index_accessors[column_ndx] == nullptr)
         return;
 
     // Destroy and remove the index column
@@ -606,8 +594,8 @@ void Table::remove_search_index(ColKey col_key)
 
     m_index_refs.set(column_ndx, 0);
 
-    // Mark the column as no longer having an index
-    attr = m_spec.get_column_attr(column_ndx);
+    // update spec
+    auto attr = m_spec.get_column_attr(column_ndx);
     attr.reset(col_attr_Indexed);
     m_spec.set_column_attr(column_ndx, attr); // Throws
 }
@@ -616,16 +604,16 @@ void Table::enumerate_string_column(ColKey col_key)
 {
     if (REALM_UNLIKELY(!valid_column(col_key)))
         throw InvalidKey("No such column");
-    size_t column_ndx = colkey2ndx(col_key);
-    ColumnType type = m_spec.get_column_type(column_ndx);
+    size_t column_ndx = colkey2spec_ndx(col_key);
+    ColumnType type = col_key.get_type();
     if (type == col_type_String && !m_spec.is_string_enum_type(column_ndx)) {
-        m_clusters.enumerate_string_column(column_ndx);
+        m_clusters.enumerate_string_column(col_key);
     }
 }
 
 bool Table::is_enumerated(ColKey col_key) const noexcept
 {
-    size_t col_ndx = colkey2ndx(col_key);
+    size_t col_ndx = colkey2spec_ndx(col_key);
     return m_spec.is_string_enum_type(col_ndx);
 }
 
@@ -635,7 +623,7 @@ size_t Table::get_num_unique_values(ColKey col_key) const
         return 0;
 
     ArrayParent* parent;
-    ref_type ref = const_cast<Spec&>(m_spec).get_enumkeys_ref(colkey2ndx(col_key), parent);
+    ref_type ref = const_cast<Spec&>(m_spec).get_enumkeys_ref(colkey2spec_ndx(col_key), parent);
     BPlusTree<StringData> col(get_alloc());
     col.init_from_ref(ref);
 
@@ -643,29 +631,25 @@ size_t Table::get_num_unique_values(ColKey col_key) const
 }
 
 ColKey Table::insert_root_column(ColKey col_key, DataType type, StringData name, LinkTargetInfo& link_target,
-                                 bool nullable, bool listtype)
+                                 bool nullable, bool listtype, LinkType link_type)
 {
-    col_key = do_insert_root_column(col_key, ColumnType(type), name, nullable, listtype); // Throws
-    size_t col_ndx = colkey2ndx(col_key);
+    col_key = do_insert_root_column(col_key, ColumnType(type), name, nullable, listtype, link_type); // Throws
+    size_t col_ndx = colkey2spec_ndx(col_key);
 
     // When the inserted column is a link-type column, we must also add a
-    // backlink column to the target table, however, since the origin column
-    // accessor does not yet exist, the connection between the column accessors
-    // (Table::connect_opposite_link_columns()) cannot be established yet. The
-    // marking of the target table tells Table::refresh_column_accessors() that
-    // it should not try to establish the connection yet. The connection will be
-    // established by Table::refresh_column_accessors() when it is invoked for
-    // the target table below.
+    // backlink column to the target table.
 
     if (link_target.is_valid()) {
         auto target_table_key = link_target.m_target_table->get_key();
         m_spec.set_opposite_link_table_key(col_ndx, target_table_key); // Throws
+        REALM_ASSERT(target_table_key == m_spec.get_opposite_link_table_key(col_ndx));
     }
 
     if (link_target.is_valid()) {
         auto origin_table_key = get_key();
         link_target.m_backlink_col_key = link_target.m_target_table->insert_backlink_column(
             origin_table_key, col_key, link_target.m_backlink_col_key); // Throws
+        link_target.m_target_table->report_invalid_key(link_target.m_backlink_col_key);
     }
     return col_key;
 }
@@ -674,8 +658,8 @@ ColKey Table::insert_root_column(ColKey col_key, DataType type, StringData name,
 void Table::erase_root_column(ColKey col_key)
 {
     REALM_ASSERT(valid_column(col_key));
-    size_t col_ndx = colkey2ndx(col_key);
-    ColumnType col_type = m_spec.get_column_type(col_ndx);
+    size_t col_ndx = colkey2spec_ndx(col_key);
+    ColumnType col_type = col_key.get_type();
     if (is_link_type(col_type)) {
         auto target_table_key = m_spec.get_opposite_link_table_key(col_ndx);
         auto link_target_table = get_parent_group()->get_table(target_table_key);
@@ -687,15 +671,11 @@ void Table::erase_root_column(ColKey col_key)
 }
 
 
-ColKey Table::do_insert_root_column(ColKey col_key, ColumnType type, StringData name, bool nullable, bool listtype)
+ColKey Table::do_insert_root_column(ColKey col_key, ColumnType type, StringData name, bool nullable, bool listtype,
+                                    LinkType link_type)
 {
     // if col_key specifies a key, it must be unused
     REALM_ASSERT(!col_key || !valid_column(col_key));
-
-    // if col_key does not specify a key, one must be generated
-    if (!col_key) {
-        col_key = generate_col_key();
-    }
 
     // locate insertion point: ordinary columns must come before backlink columns
     size_t ndx = (type == col_type_BackLink) ? m_spec.get_column_count() : m_spec.get_public_column_count();
@@ -705,29 +685,34 @@ ColKey Table::do_insert_root_column(ColKey col_key, ColumnType type, StringData 
         attr |= col_attr_Nullable;
     if (listtype)
         attr |= col_attr_List;
-    m_spec.insert_column(ndx, col_key, type, name, attr); // Throws
+    if (link_type == link_Strong)
+        attr |= col_attr_StrongLinks;
+    // if col_key does not specify a key, one must be generated
+    if (!col_key) {
+        col_key = generate_col_key(type, attr);
+    }
+    else {
+        REALM_ASSERT(false); // FIXME
+    }
 
+    m_spec.insert_column(ndx, col_key, type, name, attr); // Throws
+    build_column_mapping();
     // Backlink columns don't have search index
     if (type != col_type_BackLink) {
         // Column has no search index
         m_index_refs.insert(ndx, 0);
         m_index_accessors.insert(m_index_accessors.begin() + ndx, nullptr);
     }
+    m_clusters.insert_column(col_key);
 
-    m_clusters.insert_column(ndx);
-
-    insert_col_mapping(ndx, col_key);
     return col_key;
 }
 
 
 void Table::do_erase_root_column(ColKey col_key)
 {
-    size_t ndx = colkey2ndx(col_key);
+    size_t ndx = colkey2spec_ndx(col_key);
     bool removing_public_column = ndx < m_spec.get_public_column_count(); // cache before changing spec below
-    remove_col_mapping(ndx);
-    m_spec.erase_column(ndx); // Throws
-
     if (removing_public_column) {
         // If the column had a source index we have to remove and destroy that as well
         ref_type index_ref = m_index_refs.get_as_ref(ndx);
@@ -743,49 +728,24 @@ void Table::do_erase_root_column(ColKey col_key)
         }
     }
 
-    m_clusters.remove_column(ndx);
-}
-
-
-void Table::set_link_type(ColKey col_key, LinkType link_type)
-{
-    bool weak_links = false;
-    switch (link_type) {
-        case link_Strong:
-            break;
-        case link_Weak:
-            weak_links = true;
-            break;
-    }
-
-    size_t col_ndx = colkey2ndx(col_key);
-    ColumnAttrMask attr = m_spec.get_column_attr(col_ndx);
-    ColumnAttrMask new_attr{attr};
-    new_attr.reset(col_attr_StrongLinks);
-    if (!weak_links)
-        new_attr.set(col_attr_StrongLinks);
-    if (new_attr == attr)
-        return;
-    m_spec.set_column_attr(col_ndx, new_attr);
-
-    if (Replication* repl = get_repl())
-        repl->set_link_type(this, col_key, link_type); // Throws
+    m_clusters.remove_column(col_key);
+    m_spec.erase_column(ndx);
+    build_column_mapping();
 }
 
 LinkType Table::get_link_type(ColKey col_key) const
 {
-    size_t col_ndx = colkey2ndx(col_key);
-    if (!(m_spec.get_column_type(col_ndx) == col_type_Link) &&
-        !(m_spec.get_column_type(col_ndx) == col_type_LinkList)) {
+    auto type = col_key.get_type();
+    if (!(type == col_type_Link) && !(type == col_type_LinkList)) {
         throw LogicError{LogicError::illegal_type};
     }
-    return m_spec.get_column_attr(col_ndx).test(col_attr_StrongLinks) ? link_Strong : link_Weak;
+    return col_key.get_attrs().test(col_attr_StrongLinks) ? link_Strong : link_Weak;
 }
 
 ColKey Table::insert_backlink_column(TableKey origin_table_key, ColKey origin_col_key, ColKey backlink_col_key)
 {
     ColKey retval = do_insert_root_column(backlink_col_key, col_type_BackLink, ""); // Throws
-    size_t backlink_col_ndx = colkey2ndx(retval);
+    size_t backlink_col_ndx = colkey2spec_ndx(retval);
     m_spec.set_opposite_link_table_key(backlink_col_ndx, origin_table_key); // Throws
     m_spec.set_backlink_origin_column(backlink_col_ndx, origin_col_key);    // Throws
     return retval;
@@ -798,7 +758,7 @@ void Table::erase_backlink_column(TableKey origin_table_key, ColKey origin_col_k
     REALM_ASSERT_3(backlink_col_ndx, !=, realm::not_found);
     bump_content_version();
     bump_storage_version();
-    ColKey backlink_col_key = ndx2colkey(backlink_col_ndx);
+    ColKey backlink_col_key = spec_ndx2colkey(backlink_col_ndx);
     do_erase_root_column(backlink_col_key); // Throws
 }
 
@@ -840,11 +800,19 @@ Table::~Table() noexcept
 
 bool Table::has_search_index(ColKey col_key) const noexcept
 {
-    size_t col_ndx = colkey2ndx(col_key);
-    ColumnAttrMask attr = m_spec.get_column_attr(col_ndx);
-    return attr.test(col_attr_Indexed);
+    return m_index_accessors[colkey2spec_ndx(col_key)] != nullptr;
 }
 
+bool Table::convert_column_keys(Group* group)
+{
+    bool changes = false;
+    size_t nb_columns = m_spec.get_column_count();
+    for (size_t col_ndx = 0; col_ndx < nb_columns; col_ndx++) {
+        changes |= m_spec.convert_column_key(col_ndx, group);
+    }
+    build_column_mapping();
+    return changes;
+}
 
 bool Table::convert_columns()
 {
@@ -956,12 +924,12 @@ bool Table::create_objects()
 
 namespace {
 template <class T>
-void copy_column(ClusterTree& clusters, size_t col_ndx, ref_type col_ref, Allocator& allocator)
+void copy_column(ClusterTree& clusters, ColKey col_key, ref_type col_ref, Allocator& allocator)
 {
     BPlusTree<T> from_column(allocator);
     from_column.init_from_ref(col_ref);
 
-    ClusterTree::UpdateFunction func = [col_ndx, &from_column, &allocator](Cluster* cluster) {
+    ClusterTree::UpdateFunction func = [col_key, &from_column, &allocator](Cluster* cluster) {
         size_t sz = cluster->node_size();
         size_t offset = size_t(cluster->get_offset());
         typename ColumnTypeTraits<T>::cluster_leaf_type arr(allocator);
@@ -970,19 +938,19 @@ void copy_column(ClusterTree& clusters, size_t col_ndx, ref_type col_ref, Alloca
             auto v = from_column.get(i + offset);
             arr.add(v);
         }
-        cluster->add_leaf(col_ndx, arr.get_ref());
+        cluster->add_leaf(col_key, arr.get_ref());
     };
 
     clusters.update(func);
 }
 
 template <>
-void copy_column<util::Optional<bool>>(ClusterTree& clusters, size_t col_ndx, ref_type col_ref, Allocator& allocator)
+void copy_column<util::Optional<bool>>(ClusterTree& clusters, ColKey col_key, ref_type col_ref, Allocator& allocator)
 {
     BPlusTree<util::Optional<int64_t>> from_column(allocator);
     from_column.init_from_ref(col_ref);
 
-    ClusterTree::UpdateFunction func = [col_ndx, &from_column, &allocator](Cluster* cluster) {
+    ClusterTree::UpdateFunction func = [col_key, &from_column, &allocator](Cluster* cluster) {
         size_t sz = cluster->node_size();
         size_t offset = size_t(cluster->get_offset());
         ArrayBoolNull arr(allocator);
@@ -994,14 +962,14 @@ void copy_column<util::Optional<bool>>(ClusterTree& clusters, size_t col_ndx, re
                 val = opt.value();
             arr.add(val);
         }
-        cluster->add_leaf(col_ndx, arr.get_ref());
+        cluster->add_leaf(col_key, arr.get_ref());
     };
 
     clusters.update(func);
 }
 
 template <>
-void copy_column<Timestamp>(ClusterTree& clusters, size_t col_ndx, ref_type col_ref, Allocator& allocator)
+void copy_column<Timestamp>(ClusterTree& clusters, ColKey col_key, ref_type col_ref, Allocator& allocator)
 {
     Array top(allocator);
     top.init_from_ref(col_ref);
@@ -1010,7 +978,7 @@ void copy_column<Timestamp>(ClusterTree& clusters, size_t col_ndx, ref_type col_
     seconds.init_from_ref(top.get_as_ref(0));
     nano_seconds.init_from_ref(top.get_as_ref(1));
 
-    ClusterTree::UpdateFunction func = [col_ndx, &seconds, &nano_seconds, &allocator](Cluster* cluster) {
+    ClusterTree::UpdateFunction func = [col_key, &seconds, &nano_seconds, &allocator](Cluster* cluster) {
         size_t sz = cluster->node_size();
         size_t offset = size_t(cluster->get_offset());
         ArrayTimestamp arr(allocator);
@@ -1025,18 +993,18 @@ void copy_column<Timestamp>(ClusterTree& clusters, size_t col_ndx, ref_type col_
                 arr.add(Timestamp());
             }
         }
-        cluster->add_leaf(col_ndx, arr.get_ref());
+        cluster->add_leaf(col_key, arr.get_ref());
     };
 
     clusters.update(func);
 }
 
-void copy_column_backlink(ClusterTree& clusters, size_t col_ndx, ref_type col_ref, Allocator& allocator)
+void copy_column_backlink(ClusterTree& clusters, ColKey col_key, ref_type col_ref, Allocator& allocator)
 {
     BPlusTree<Int> list_refs(allocator);
     list_refs.init_from_ref(col_ref);
 
-    ClusterTree::UpdateFunction func = [col_ndx, &list_refs, &allocator](Cluster* cluster) {
+    ClusterTree::UpdateFunction func = [col_key, &list_refs, &allocator](Cluster* cluster) {
         size_t sz = cluster->node_size();
         size_t offset = size_t(cluster->get_offset());
         ArrayInteger arr(allocator);
@@ -1056,19 +1024,19 @@ void copy_column_backlink(ClusterTree& clusters, size_t col_ndx, ref_type col_re
                 }
             }
         }
-        cluster->add_leaf(col_ndx, arr.get_ref());
+        cluster->add_leaf(col_key, arr.get_ref());
     };
 
     clusters.update(func);
 }
 
-void copy_column_list(ClusterTree& clusters, size_t col_ndx, ref_type col_ref, ColumnType col_type,
+void copy_column_list(ClusterTree& clusters, ColKey col_key, ref_type col_ref, ColumnType col_type,
                       Allocator& allocator)
 {
     BPlusTree<Int> list_refs(allocator);
     list_refs.init_from_ref(col_ref);
 
-    ClusterTree::UpdateFunction func = [col_ndx, col_type, &list_refs, &allocator](Cluster* cluster) {
+    ClusterTree::UpdateFunction func = [col_key, col_type, &list_refs, &allocator](Cluster* cluster) {
         size_t sz = cluster->node_size();
         size_t offset = size_t(cluster->get_offset());
         ArrayInteger arr(allocator);
@@ -1089,28 +1057,28 @@ void copy_column_list(ClusterTree& clusters, size_t col_ndx, ref_type col_ref, C
                 arr.set_as_ref(i, copy_mem.get_ref());
             }
         }
-        cluster->add_leaf(col_ndx, arr.get_ref());
+        cluster->add_leaf(col_key, arr.get_ref());
     };
 
     clusters.update(func);
 }
 }
 
-bool Table::copy_content_from_columns(size_t col_ndx)
+bool Table::copy_content_from_columns(size_t spec_ndx)
 {
     ref_type ref = m_top.get_as_ref(top_position_for_columns);
     if (!ref) {
         // All columns have already been converted
         return false;
     }
-    ColKey col_key(col_ndx);
     Array col_refs(m_alloc);
     col_refs.init_from_ref(ref);
     col_refs.set_parent(&m_top, top_position_for_columns);
 
-    // Calculate index in columns list
+    // Calculate index in columns list (indexed columns have 2 entries in this list)
     size_t ndx_in_parent = 0;
-    for (size_t i = 0; i < col_ndx; i++) {
+    for (size_t i = 0; i < spec_ndx; i++) {
+
         ndx_in_parent += m_spec.get_column_attr(i).test(col_attr_Indexed) ? 2 : 1;
     }
     ref_type col_ref = col_refs.get_as_ref(ndx_in_parent);
@@ -1118,52 +1086,55 @@ bool Table::copy_content_from_columns(size_t col_ndx)
         // Column has already been converted
         return false;
     }
-
-    ColumnAttrMask attr = m_spec.get_column_attr(col_ndx);
-    ColumnType col_type = m_spec.get_column_type(col_ndx);
+    ColKey col_key = spec_ndx2colkey(spec_ndx);
+    report_invalid_key(col_key);
+    // get the attr from spec, since the attr in the col_key excludes search index and uniqueness
+    ColumnAttrMask attr = m_spec.get_column_attr(spec_ndx);
+    ColumnType col_type = col_key.get_type();
+    REALM_ASSERT(col_type == m_spec.get_column_type(spec_ndx));
 
     if (attr.test(col_attr_List)) {
-        copy_column_list(m_clusters, col_ndx, col_ref, col_type, m_alloc);
+        copy_column_list(m_clusters, col_key, col_ref, col_type, m_alloc);
     }
     else {
         switch (col_type) {
             case col_type_Int:
                 if (attr.test(col_attr_Nullable)) {
-                    copy_column<util::Optional<int64_t>>(m_clusters, col_ndx, col_ref, m_alloc);
+                    copy_column<util::Optional<int64_t>>(m_clusters, col_key, col_ref, m_alloc);
                 }
                 else {
-                    copy_column<int64_t>(m_clusters, col_ndx, col_ref, m_alloc);
+                    copy_column<int64_t>(m_clusters, col_key, col_ref, m_alloc);
                 }
                 break;
             case col_type_Bool:
                 if (attr.test(col_attr_Nullable)) {
-                    copy_column<util::Optional<bool>>(m_clusters, col_ndx, col_ref, m_alloc);
+                    copy_column<util::Optional<bool>>(m_clusters, col_key, col_ref, m_alloc);
                 }
                 else {
-                    copy_column<bool>(m_clusters, col_ndx, col_ref, m_alloc);
+                    copy_column<bool>(m_clusters, col_key, col_ref, m_alloc);
                 }
                 break;
             case col_type_Float:
-                copy_column<float>(m_clusters, col_ndx, col_ref, m_alloc);
+                copy_column<float>(m_clusters, col_key, col_ref, m_alloc);
                 break;
             case col_type_Double:
-                copy_column<double>(m_clusters, col_ndx, col_ref, m_alloc);
+                copy_column<double>(m_clusters, col_key, col_ref, m_alloc);
                 break;
             case col_type_String:
-                copy_column<String>(m_clusters, col_ndx, col_ref, m_alloc);
+                copy_column<String>(m_clusters, col_key, col_ref, m_alloc);
                 break;
             case col_type_Binary:
-                copy_column<Binary>(m_clusters, col_ndx, col_ref, m_alloc);
+                copy_column<Binary>(m_clusters, col_key, col_ref, m_alloc);
                 break;
             case col_type_Timestamp:
-                copy_column<Timestamp>(m_clusters, col_ndx, col_ref, m_alloc);
+                copy_column<Timestamp>(m_clusters, col_key, col_ref, m_alloc);
                 break;
             case col_type_Link:
                 // Just copy links as integers
-                copy_column<int64_t>(m_clusters, col_ndx, col_ref, m_alloc);
+                copy_column<int64_t>(m_clusters, col_key, col_ref, m_alloc);
                 break;
             case col_type_BackLink:
-                copy_column_backlink(m_clusters, col_ndx, col_ref, m_alloc);
+                copy_column_backlink(m_clusters, col_key, col_ref, m_alloc);
                 break;
             default:
                 REALM_UNREACHABLE();
@@ -1174,11 +1145,11 @@ bool Table::copy_content_from_columns(size_t col_ndx)
     if (attr.test(col_attr_Indexed)) {
         // Move index over to new position in table
         ref_type index_ref = col_refs.get_as_ref(ndx_in_parent + 1);
-        m_index_refs.set(col_ndx, index_ref);
+        m_index_refs.set(spec_ndx, index_ref);
         col_refs.set(ndx_in_parent + 1, 0);
     }
 
-    if (col_ndx == (m_spec.get_column_count() - 1)) {
+    if (spec_ndx == (m_spec.get_column_count() - 1)) {
         // Last column - destroy column ref array
         col_refs.destroy_deep();
         m_top.set(top_position_for_columns, 0);
@@ -1211,15 +1182,13 @@ StringData Table::get_name() const noexcept
 bool Table::is_nullable(ColKey col_key) const
 {
     REALM_ASSERT_DEBUG(valid_column(col_key));
-    size_t col_ndx = colkey2ndx(col_key);
-    return m_spec.get_column_attr(col_ndx).test(col_attr_Nullable);
+    return col_key.get_attrs().test(col_attr_Nullable);
 }
 
 bool Table::is_list(ColKey col_key) const
 {
     REALM_ASSERT_DEBUG(valid_column(col_key));
-    size_t col_ndx = colkey2ndx(col_key);
-    return m_spec.get_column_attr(col_ndx).test(col_attr_List);
+    return col_key.get_attrs().test(col_attr_List);
 }
 
 
@@ -1340,7 +1309,7 @@ TableKey Table::get_key() const noexcept
 
 TableRef Table::get_link_target(ColKey col_key) noexcept
 {
-    size_t col_ndx = colkey2ndx(col_key);
+    size_t col_ndx = colkey2spec_ndx(col_key);
     auto target_key = m_spec.get_opposite_link_table_key(col_ndx);
     return get_parent_group()->get_table(target_key);
 }
@@ -1472,7 +1441,7 @@ ObjKey Table::find_first(ColKey col_key, T value) const
         throw InvalidKey("Non-existing column");
 
     if (has_search_index(col_key)) {
-        size_t col_ndx = colkey2ndx(col_key);
+        size_t col_ndx = colkey2spec_ndx(col_key);
         REALM_ASSERT(col_ndx < m_index_accessors.size());
         auto index = m_index_accessors[col_ndx];
         REALM_ASSERT(index);
@@ -1482,10 +1451,9 @@ ObjKey Table::find_first(ColKey col_key, T value) const
     ObjKey key;
     using LeafType = typename ColumnTypeTraits<T>::cluster_leaf_type;
     LeafType leaf(get_alloc());
-    size_t col_ndx = colkey2ndx(col_key);
 
-    ClusterTree::TraverseFunction f = [&key, &col_ndx, &value, &leaf](const Cluster* cluster) {
-        cluster->init_leaf(col_ndx, &leaf);
+    ClusterTree::TraverseFunction f = [&key, &col_key, &value, &leaf](const Cluster* cluster) {
+        cluster->init_leaf(col_key, &leaf);
         size_t row = leaf.find_first(value, 0, cluster->node_size());
         if (row != realm::npos) {
             key = cluster->get_real_key(row);
@@ -1510,10 +1478,9 @@ ObjKey Table::find_first(ColKey col_key, ObjKey value) const
     ObjKey key;
     using LeafType = typename ColumnTypeTraits<ObjKey>::cluster_leaf_type;
     LeafType leaf(get_alloc());
-    size_t col_ndx = colkey2ndx(col_key);
 
-    ClusterTree::TraverseFunction f = [&key, &col_ndx, &value, &leaf](const Cluster* cluster) {
-        cluster->init_leaf(col_ndx, &leaf);
+    ClusterTree::TraverseFunction f = [&key, &col_key, &value, &leaf](const Cluster* cluster) {
+        cluster->init_leaf(col_key, &leaf);
         size_t row = leaf.find_first(value, 0, cluster->node_size());
         if (row != realm::npos) {
             key = cluster->get_real_key(row);
@@ -1726,7 +1693,7 @@ const Table* Table::get_link_chain_target(const std::vector<ColKey>& link_chain)
         // Link column can be a single Link, LinkList, or BackLink.
         ColumnType type = table->get_real_column_type(link_chain[t]);
         if (type == col_type_LinkList || type == col_type_Link || type == col_type_BackLink) {
-            auto key = table->m_spec.get_opposite_link_table_key(table->colkey2ndx(link_chain[t]));
+            auto key = table->m_spec.get_opposite_link_table_key(table->colkey2spec_ndx(link_chain[t]));
             table = table->get_parent_group()->get_table(key);
         }
         else {
@@ -1855,14 +1822,7 @@ void Table::refresh_accessor_tree()
         }
         refresh_content_version();
         bump_storage_version();
-        // update column mapping
-        m_ndx2colkey.clear();
-        m_colkey2ndx.clear();
-        size_t num_cols = m_spec.get_column_count();
-        for (size_t ndx = 0; ndx < num_cols; ++ndx) {
-            ColKey col_key = m_spec.get_key(ndx);
-            insert_col_mapping(ndx, col_key);
-        }
+        build_column_mapping();
     }
     refresh_index_accessors();
 }
@@ -1883,7 +1843,7 @@ void Table::refresh_index_accessors()
     m_index_accessors.resize(col_ndx_end);
 
     for (size_t col_ndx = 0; col_ndx < col_ndx_end; col_ndx++) {
-        ColKey col_key = ndx2colkey(col_ndx);
+        ColKey col_key = spec_ndx2colkey(col_ndx);
         bool has_index = m_spec.get_column_attr(col_ndx).test(col_attr_Indexed);
 
         if (has_index) {
@@ -1913,7 +1873,8 @@ bool Table::is_cross_table_link_target() const noexcept
     size_t first_backlink_column = m_spec.first_backlink_column_index();
     size_t end_backlink_column = m_spec.get_column_count();
     for (size_t i = first_backlink_column; i < end_backlink_column; ++i) {
-        auto t = m_spec.get_column_type(i);
+        ColKey col_key = spec_ndx2colkey(i);
+        auto t = col_key.get_type();
         // look for a backlink with a different target than ourselves
         if (t == col_type_BackLink && m_spec.get_opposite_link_table_key(i) != get_key())
             return true;
@@ -1974,7 +1935,7 @@ void Table::print() const
     // Types
     std::cout << "\n    ";
     for (size_t k = 0; k < column_count; ++k) {
-        auto i = ndx2colkey(k);
+        auto i = spec_ndx2colkey(k);
         ColumnType type = get_real_column_type(i);
         switch (type) {
             case col_type_Int:
@@ -2033,7 +1994,7 @@ void Table::print() const
         std::cout << std::setw(4) << obj.get_key().value;
 
         for (size_t k = 0; k < column_count; ++k) {
-            auto n = ndx2colkey(k);
+            auto n = spec_ndx2colkey(k);
             ColumnType type = get_real_column_type(n);
             if (is_nullable(n) && obj.is_null(n)) {
                 std::cout << std::setw(10) << "null"
@@ -2227,7 +2188,7 @@ TableRef _impl::TableFriend::get_opposite_link_table(const Table& table, ColKey 
 {
     TableRef ret;
     if (col_key) {
-        auto target_table_key = table.m_spec.get_opposite_link_table_key(table.colkey2ndx(col_key));
+        auto target_table_key = table.m_spec.get_opposite_link_table_key(table.colkey2spec_ndx(col_key));
         ret = table.get_parent_group()->get_table(target_table_key);
     }
     return ret;
@@ -2235,90 +2196,54 @@ TableRef _impl::TableFriend::get_opposite_link_table(const Table& table, ColKey 
 
 const uint64_t Table::max_num_columns;
 
-// insert a mapping, moving all later mappings to a higher index
-void Table::insert_col_mapping(size_t ndx, ColKey key)
+void Table::build_column_mapping()
 {
-    if (ndx >= max_num_columns)
-        throw util::runtime_error("Max number of columns exceeded");
-    REALM_ASSERT(!valid_column(key));
-
-    // increment index at all entries in key->ndx map pointing at ndx or above
-    for (auto& e : m_colkey2ndx) {
-        uint64_t e_ndx = e & max_num_columns;
-        if ((e_ndx >= ndx) && (e_ndx != max_num_columns))
-            ++e;
+    // build column mapping from spec
+    // TODO: Optimization - Don't rebuild this for every change
+    m_spec_ndx2leaf_ndx.clear();
+    m_leaf_ndx2spec_ndx.clear();
+    m_leaf_ndx2colkey.clear();
+    size_t num_spec_cols = m_spec.get_column_count();
+    m_spec_ndx2leaf_ndx.resize(num_spec_cols);
+    for (size_t spec_ndx = 0; spec_ndx < num_spec_cols; ++spec_ndx) {
+        ColKey col_key = m_spec.get_key(spec_ndx);
+        unsigned leaf_ndx = col_key.get_index().val;
+        if (leaf_ndx >= m_leaf_ndx2colkey.size()) {
+            m_leaf_ndx2colkey.resize(leaf_ndx + 1);
+            m_leaf_ndx2spec_ndx.resize(leaf_ndx + 1, -1);
+        }
+        m_spec_ndx2leaf_ndx[spec_ndx] = ColKey::Idx{leaf_ndx};
+        m_leaf_ndx2spec_ndx[leaf_ndx] = spec_ndx;
+        m_leaf_ndx2colkey[leaf_ndx] = col_key;
     }
-    // insert new entry into ndx->key
-    if (ndx == m_ndx2colkey.size())
-        m_ndx2colkey.push_back(key);
-    else
-        m_ndx2colkey.insert(m_ndx2colkey.begin() + ndx, key);
-
-    // make sure there is a free entry in key->ndx
-    size_t idx = key.value & max_num_columns;
-
-    // fill new positions with a blocked entry
-    while (idx >= m_colkey2ndx.size()) {
-        // auto tmp = max_num_columns;
-        // m_colkey2ndx.push_back(tmp);
-        m_colkey2ndx.push_back(max_num_columns);
-    }
-    // store tag of key along with ndx
-    m_colkey2ndx[idx] = ndx | (key.value & ~max_num_columns);
 }
 
-// remove a mapping, moving all later mappings to a lower index
-void Table::remove_col_mapping(size_t ndx)
+ColKey Table::generate_col_key(ColumnType tp, ColumnAttrMask attr)
 {
-    ColKey key = ndx2colkey(ndx);
-    REALM_ASSERT(valid_column(key));
-
-    // decrement index at all entries in key->ndx map pointing above ndx
-    for (auto& e : m_colkey2ndx) {
-        uint64_t e_ndx = e & max_num_columns;
-        if ((e_ndx > ndx) && (e_ndx != max_num_columns))
-            --e;
-    }
-    // remove selected entry
-    size_t idx = key.value & max_num_columns;
-    m_colkey2ndx[idx] = max_num_columns;
-
-    // and opposite mapping
-    m_ndx2colkey.erase(m_ndx2colkey.begin() + ndx);
-}
-
-ColKey Table::generate_col_key()
-{
-    // to generate the next key, we get the upper 48 bits from a dedicated counter,
-    // and pick the lower 16 bits to be the first free slot in our
-    // table for mapping key->ndx.
+    REALM_ASSERT(!attr.test(col_attr_Indexed));
+    REALM_ASSERT(!attr.test(col_attr_Unique)); // Must not be encoded into col_key
+    // FIXME: Change this to be random number mixed with the TableKey.
     RefOrTagged rot = m_top.get_as_ref_or_tagged(top_position_for_column_key);
-    uint64_t upper = rot.get_as_int();
+    uint64_t upper = rot.get_as_int() ^ random();
     rot = RefOrTagged::make_tagged(upper + 1);
     m_top.set(top_position_for_column_key, rot);
 
-    uint64_t lower = m_colkey2ndx.size();
-    // look for an unused entry in m_colkey2ndx:
+    // reuse lowest available leaf ndx:
+    unsigned lower = m_leaf_ndx2colkey.size();
+    // look for an unused entry:
     for (size_t idx = 0; idx < lower; ++idx) {
-        size_t ndx = m_colkey2ndx[idx] & max_num_columns;
-        if (ndx >= max_num_columns) {
+        if (m_leaf_ndx2colkey[idx] == ColKey()) {
             lower = idx;
             break;
         }
     }
-    return ColKey((upper << 16) | lower);
-}
-
-ColumnAttrMask Table::get_column_attr(ColKey column_key) const noexcept
-{
-    size_t ndx = colkey2ndx(column_key);
-    return m_spec.get_column_attr(ndx);
+    return ColKey(ColKey::Idx{lower}, tp, attr, upper);
 }
 
 ColKey Table::find_backlink_column(TableKey origin_table_key, ColKey origin_col_key) const noexcept
 {
     size_t ndx = m_spec.find_backlink_column(origin_table_key, origin_col_key);
-    return ndx2colkey(ndx);
+    return spec_ndx2colkey(ndx);
 }
 
 Table::BacklinkOrigin Table::find_backlink_origin(StringData origin_table_name, StringData origin_col_name) const
@@ -2353,7 +2278,7 @@ Table::BacklinkOrigin Table::find_backlink_origin(StringData origin_table_name, 
 Table::BacklinkOrigin Table::find_backlink_origin(ColKey backlink_col) const noexcept
 {
     try {
-        size_t backlink_col_ndx = colkey2ndx(backlink_col);
+        size_t backlink_col_ndx = colkey2spec_ndx(backlink_col);
         TableKey linked_table_key = m_spec.get_opposite_link_table_key(backlink_col_ndx);
         ColKey linked_column_key = m_spec.get_origin_column_key(backlink_col_ndx);
         if (linked_table_key == m_key) {
@@ -2396,15 +2321,14 @@ void Table::change_nullability(ColKey key_from, ColKey key_to, bool throw_on_nul
 {
     Allocator& allocator = this->get_alloc();
     bool from_nullability = is_nullable(key_from);
-    size_t to = colkey2ndx(key_to);
-    size_t from = colkey2ndx(key_from);
-    ClusterTree::UpdateFunction func = [from, to, throw_on_null, from_nullability, &allocator](Cluster* cluster) {
+    ClusterTree::UpdateFunction func = [key_from, key_to, throw_on_null, from_nullability,
+                                        &allocator](Cluster* cluster) {
         size_t sz = cluster->node_size();
 
         typename ColumnTypeTraits<F>::cluster_leaf_type from_arr(allocator);
         typename ColumnTypeTraits<T>::cluster_leaf_type to_arr(allocator);
-        cluster->init_leaf(from, &from_arr);
-        cluster->init_leaf(to, &to_arr);
+        cluster->init_leaf(key_from, &from_arr);
+        cluster->init_leaf(key_to, &to_arr);
 
         for (size_t i = 0; i < sz; i++) {
             if (from_nullability && from_arr.is_null(i)) {
@@ -2430,15 +2354,14 @@ void Table::change_nullability_list(ColKey key_from, ColKey key_to, bool throw_o
 {
     Allocator& allocator = this->get_alloc();
     bool from_nullability = is_nullable(key_from);
-    size_t to = colkey2ndx(key_to);
-    size_t from = colkey2ndx(key_from);
-    ClusterTree::UpdateFunction func = [from, to, throw_on_null, from_nullability, &allocator](Cluster* cluster) {
+    ClusterTree::UpdateFunction func = [key_from, key_to, throw_on_null, from_nullability,
+                                        &allocator](Cluster* cluster) {
         size_t sz = cluster->node_size();
 
         ArrayInteger from_arr(allocator);
         ArrayInteger to_arr(allocator);
-        cluster->init_leaf(from, &from_arr);
-        cluster->init_leaf(to, &to_arr);
+        cluster->init_leaf(key_from, &from_arr);
+        cluster->init_leaf(key_to, &to_arr);
 
         for (size_t i = 0; i < sz; i++) {
             ref_type ref_from = to_ref(from_arr.get(i));
@@ -2571,48 +2494,10 @@ ColKey Table::set_nullability(ColKey col_key, bool nullable, bool throw_on_null)
     bump_storage_version();
 
     erase_root_column(col_key);
-    m_spec.rename_column(colkey2ndx(new_col), column_name);
+    m_spec.rename_column(colkey2spec_ndx(new_col), column_name);
 
     if (si)
         add_search_index(new_col);
 
     return new_col;
 }
-
-// LCOV_EXCL_START
-void Table::verify_inv() const
-{
-#ifdef REALM_DEBUG
-    std::cerr << "       ndx -> colkey: ";
-    for (size_t ndx = 0; ndx < m_ndx2colkey.size(); ++ndx) {
-        ColKey col_key = m_ndx2colkey[ndx];
-        // size_t idx = col_key.value & 0xFFFF;
-        std::cerr << "{ " << ndx << " -> " << col_key << " } ";
-    }
-    std::cerr << std::endl;
-    std::cerr << "       colkey -> ndx: ";
-    for (size_t idx = 0; idx < m_colkey2ndx.size(); ++idx) {
-        uint64_t ndx = m_colkey2ndx[idx];
-        std::cerr << "{ " << idx << " -> " << (ndx & max_num_columns) << ", " << (ndx & ~max_num_columns) << " } ";
-    }
-    std::cerr << std::endl;
-#endif
-    for (size_t ndx = 0; ndx < m_ndx2colkey.size(); ++ndx) {
-        ColKey col_key = m_ndx2colkey[ndx];
-        size_t idx = col_key.value & max_num_columns;
-        REALM_ASSERT(ndx < m_colkey2ndx.size());
-        REALM_ASSERT(ndx == (m_colkey2ndx[idx] & max_num_columns));
-    }
-    for (size_t idx = 0; idx < m_colkey2ndx.size(); ++idx) {
-        uint64_t ndx_and_tag = m_colkey2ndx[idx];
-        size_t ndx = ndx_and_tag & max_num_columns;
-        if (ndx != max_num_columns) {
-            // valid entry, must be verified
-            REALM_ASSERT(ndx < m_ndx2colkey.size());
-            ColKey col_key = m_ndx2colkey[ndx];
-            REALM_ASSERT((col_key.value & max_num_columns) == idx);
-            REALM_ASSERT((col_key.value ^ ndx_and_tag) <= max_num_columns);
-        }
-    }
-}
-// LCOV_EXCL_STOP

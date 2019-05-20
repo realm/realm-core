@@ -37,8 +37,9 @@ void ArrayBacklink::nullify_fwd_links(size_t ndx, CascadeState& state)
         REALM_ASSERT_DEBUG(dynamic_cast<Cluster*>(get_parent()));
         auto cluster = static_cast<Cluster*>(get_parent());
         const Table* target_table = cluster->m_tree_top.get_owner();
-        size_t target_col_ndx = get_ndx_in_parent() - 1;
-        auto target_col_key = target_table->ndx2colkey(target_col_ndx);
+        ColKey::Idx target_col_ndx{unsigned(get_ndx_in_parent() - 1)}; // <- leaf_index here. Opaque.
+        auto target_col_key = target_table->leaf_ndx2colkey(target_col_ndx);
+        REALM_ASSERT(target_col_key.get_index().val == target_col_ndx.val);
 
         ObjKey target_key = cluster->get_real_key(ndx);
 
@@ -48,7 +49,8 @@ void ArrayBacklink::nullify_fwd_links(size_t ndx, CascadeState& state)
         TableRef source_table = _impl::TableFriend::get_opposite_link_table(*target_table, target_col_key);
         source_table->bump_content_version();
         const Spec& target_spec = cluster->m_tree_top.get_spec();
-        ColKey src_col_key = target_spec.get_origin_column_key(target_col_ndx);
+        size_t target_spec_ndx = target_table->leaf_ndx2spec_ndx(target_col_ndx);
+        ColKey src_col_key = target_spec.get_origin_column_key(target_spec_ndx);
         TableKey src_table_key = source_table->get_key();
 
         Group::CascadeNotification notifications;

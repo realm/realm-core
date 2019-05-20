@@ -67,6 +67,40 @@ enum ColumnAttr {
     col_attr_List = 32
 };
 
+class ColumnAttrMask {
+public:
+    ColumnAttrMask()
+        : m_value(0)
+    {
+    }
+    bool test(ColumnAttr prop)
+    {
+        return (m_value & prop) != 0;
+    }
+    void set(ColumnAttr prop)
+    {
+        m_value |= prop;
+    }
+    void reset(ColumnAttr prop)
+    {
+        m_value &= ~prop;
+    }
+    bool operator==(const ColumnAttrMask& other) const
+    {
+        return m_value == other.m_value;
+    }
+
+private:
+    friend class Spec;
+    friend struct ColKey;
+    friend class Table;
+    int m_value;
+    ColumnAttrMask(int64_t val)
+        : m_value(int(val))
+    {
+    }
+};
+
 
 } // namespace realm
 

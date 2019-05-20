@@ -317,7 +317,7 @@ public:
     virtual void erase_group_level_table(TableKey table_key, size_t num_tables);
     virtual void rename_group_level_table(TableKey table_key, StringData new_name);
     virtual void insert_column(const Table*, ColKey col_key, DataType type, StringData name, LinkTargetInfo& link,
-                               bool nullable = false, bool listtype = false);
+                               bool nullable = false, bool listtype = false, LinkType link_type = link_Weak);
     virtual void erase_column(const Table*, ColKey col_key);
     virtual void rename_column(const Table*, ColKey col_key, StringData name);
 
@@ -756,7 +756,7 @@ inline bool TransactLogEncoder::insert_column(ColKey col_key)
 }
 
 inline void TransactLogConvenientEncoder::insert_column(const Table* t, ColKey col_key, DataType, StringData,
-                                                        LinkTargetInfo&, bool, bool)
+                                                        LinkTargetInfo&, bool, bool, LinkType)
 {
     select_table(t); // Throws
     m_encoder.insert_column(col_key); // Throws

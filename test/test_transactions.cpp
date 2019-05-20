@@ -137,7 +137,8 @@ struct Header {
 TEST(Transactions_LargeUpgrade)
 {
     SHARED_GROUP_TEST_PATH(path);
-    DBRef sg = DB::create(path);
+    auto hist = make_in_realm_history(path);
+    DBRef sg = DB::create(*hist);
     int data_size = 12 * 1024 * 1024;
     {
         TransactionRef g = sg->start_write();
@@ -169,7 +170,7 @@ TEST(Transactions_LargeUpgrade)
         header->m_file_format[1] = header->m_file_format[0] = 9; // downgrade (both) to previous version
         headerMap.sync();
     }
-    sg = DB::create(path); // triggers idempotent upgrade - but importantly for this test, uses compat mapping
+    sg = DB::create(*hist); // triggers idempotent upgrade - but importantly for this test, uses compat mapping
     {
         // compat mapping is in effect for this part of the test
         {
@@ -205,7 +206,7 @@ TEST(Transactions_LargeUpgrade)
         g->commit();
     }
     sg->close();           // file has been upgrade to version 10, so....
-    sg = DB::create(path); // when opened again, compatibility mapping is NOT in use:
+    sg = DB::create(*hist); // when opened again, compatibility mapping is NOT in use:
     {
         TransactionRef g = sg->start_read();
         ConstTableRef tr = g->get_table("test");

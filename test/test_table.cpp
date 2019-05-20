@@ -2864,7 +2864,7 @@ TEST(Table_remove_column)
     table.remove_column(int2_col);
 
     CHECK_EQUAL(obj.get<int64_t>("int1"), 100);
-    CHECK_THROW(obj.get<int64_t>("int2"), InvalidKey);
+    CHECK_THROW(obj.get<int64_t>("int2"), LogicError);
     CHECK_EQUAL(obj.get<int64_t>("int3"), 25);
     table.add_column(type_Int, "int4");
     CHECK_EQUAL(obj.get<int64_t>("int4"), 0);
