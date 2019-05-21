@@ -326,13 +326,12 @@ void Transaction::upgrade_file_format(int target_file_format_version)
             m_top.add(initial_history_schema_version); // Throws
         }
         set_file_format_version(7);
-        commit_and_continue_as_read();
-        promote_to_write();
+        commit_and_continue_writing();
     }
 
     // NOTE: Additional future upgrade steps go here.
     if (current_file_format_version <= 9 && target_file_format_version >= 10) {
-        // DisableReplication disable_replication(*this);
+        DisableReplication disable_replication(*this);
 
         std::vector<TableKey> table_keys;
         for (size_t t = 0; t < m_table_names.size(); t++) {
@@ -341,10 +340,7 @@ void Transaction::upgrade_file_format(int target_file_format_version)
             table_keys.push_back(table->get_key());
         }
 
-        auto commit_and_continue = [this]() {
-            commit_and_continue_as_read();
-            promote_to_write();
-        };
+        auto commit_and_continue = [this]() { commit_and_continue_writing(); };
         for (auto k : table_keys) {
             get_table(k)->migrate_column_info(commit_and_continue);
         }

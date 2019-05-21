@@ -2403,6 +2403,42 @@ DB::version_type Transaction::commit()
     return new_version;
 }
 
+void Transaction::commit_and_continue_writing()
+{
+    if (m_transact_stage != DB::transact_Writing)
+        throw LogicError(LogicError::wrong_transact_state);
+
+    REALM_ASSERT(is_attached());
+
+    // before committing, allow any accessors at group level or below to sync
+    flush_accessors_for_commit();
+
+    db->do_commit(*this); // Throws
+
+    // We need to set m_read_lock in order for wait_for_change to work.
+    // To set it, we grab a readlock on the latest available snapshot
+    // and release it again.
+    VersionID version_id = VersionID(); // Latest available snapshot
+    DB::ReadLockInfo lock_after_commit;
+    db->grab_read_lock(lock_after_commit, version_id);
+    db->release_read_lock(m_read_lock);
+    m_read_lock = lock_after_commit;
+
+    bool writable = true;
+    remap_and_update_refs(m_read_lock.m_top_ref, m_read_lock.m_file_size, writable); // Throws
+}
+
+void Transaction::initialize_replication()
+{
+    if (m_transact_stage == DB::transact_Writing) {
+        if (Replication* repl = get_replication()) {
+            auto current_version = m_read_lock.m_version;
+            bool history_updated = false;
+            repl->initiate_transact(*this, current_version, history_updated); // Throws
+        }
+    }
+}
+
 Transaction::~Transaction()
 {
     // Note that this does not call close() - calling close() is done
