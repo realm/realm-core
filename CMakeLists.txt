@@ -41,8 +41,16 @@ else()
 endif()
 
 if(ANDROID)
+    # Optimize for size vs. performance for Android. The has the following implications:
+    # - Replace `-O3` with `-Oz`.
+    # - Add `-ffunction-sections` and `-fdata-sections`. This requires that `-Wl,-gc-sections` are used when creating
+    #   the final .so file.
+    # - `-fstrict-aliasing` is inherited from NDK r10e.
+    # - `-fomit-frame-pointer` is inherited from NDK r10e.
+    #
     # On some architectures char is unsigned by default. Make it signed
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsigned-char")
+    set(CMAKE_CXX_FLAGS_RELEASE "-Oz -DNDEBUG")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fdata-sections -ffunction-sections -fomit-frame-pointer -fsigned-char -fstrict-aliasing")
 endif()
 
 # Add REALM_DEBUG=1 to compile definitions for Debug / MinSizeDebug targets
