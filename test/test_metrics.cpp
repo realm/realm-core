@@ -939,6 +939,7 @@ public:
     {
         has_run_once = will_run.get_future();
     }
+
     std::function<int64_t()> current_target_getter(size_t) override
     {
         return []() { return realm::util::PageReclaimGovernor::no_match; };
@@ -946,11 +947,15 @@ public:
 
     void report_target_result(int64_t) override
     {
-        will_run.set_value();
+        if (!has_run) {
+            will_run.set_value();
+            has_run = true;
+        }
     }
 
     std::future<void> has_run_once;
     std::promise<void> will_run;
+    bool has_run = false;
 };
 
 // this test relies on the global state of the number of decrypted pages and therefore must be run in isolation
