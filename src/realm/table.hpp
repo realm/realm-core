@@ -723,7 +723,7 @@ private:
                                  bool listtype = false, LinkType link_type = link_Weak);
     void do_erase_root_column(ColKey col_key);
     ColKey insert_backlink_column(TableKey origin_table_key, ColKey origin_col_key, ColKey backlink_col_key);
-    void erase_backlink_column(TableKey origin_table_key, ColKey origin_col_key);
+    void erase_backlink_column(ColKey backlink_col_key);
 
     void set_opposite_column(ColKey col_key, TableKey opposite_table, ColKey opposite_column);
     /// Called in the context of Group::commit() to ensure that
@@ -1114,6 +1114,7 @@ inline Columns<T> Table::column(ColKey col_key)
     // Check if user-given template type equals Realm type. Todo, we should clean up and reuse all our
     // type traits (all the is_same() cases below).
     const Table* table = get_link_chain_target(link_chain);
+    table->report_invalid_key(col_key);
 
     realm::DataType ct = table->get_column_type(col_key);
     if (std::is_same<T, int64_t>::value && ct != type_Int)
@@ -1139,8 +1140,7 @@ inline Columns<T> Table::column(const Table& origin, ColKey origin_col_key)
 
     auto origin_table_key = origin.get_key();
     const Table& current_target_table = *get_link_chain_target(m_link_chain);
-    size_t backlink_col_spec_ndx = current_target_table.m_spec.find_backlink_column(origin_table_key, origin_col_key);
-    ColKey backlink_col_key = current_target_table.spec_ndx2colkey(backlink_col_spec_ndx);
+    ColKey backlink_col_key = current_target_table.find_backlink_column(origin_table_key, origin_col_key);
 
     std::vector<ColKey> link_chain = std::move(m_link_chain);
     m_link_chain.clear();
@@ -1175,8 +1175,7 @@ inline Table& Table::backlink(const Table& origin, ColKey origin_col_key)
 {
     auto origin_table_key = origin.get_key();
     const Table& current_target_table = *get_link_chain_target(m_link_chain);
-    size_t backlink_col_spec_ndx = current_target_table.m_spec.find_backlink_column(origin_table_key, origin_col_key);
-    ColKey backlink_col_key = current_target_table.spec_ndx2colkey(backlink_col_spec_ndx);
+    ColKey backlink_col_key = current_target_table.find_backlink_column(origin_table_key, origin_col_key);
     return link(backlink_col_key);
 }
 

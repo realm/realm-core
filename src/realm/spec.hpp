@@ -81,12 +81,8 @@ public:
     void set_opposite_link_table_key(size_t column_ndx, TableKey key);
 
     // Backlinks
-    bool has_backlinks() const noexcept;
-    size_t first_backlink_column_index() const noexcept;
-    size_t backlink_column_count() const noexcept;
-    void set_backlink_origin_column(size_t backlink_col_ndx, ColKey origin_col_key);
     ColKey get_origin_column_key(size_t backlink_col_ndx) const noexcept;
-    size_t find_backlink_column(TableKey origin_table_key, ColKey origin_col_key) const noexcept;
+    void set_backlink_origin_column(size_t backlink_col_ndx, ColKey origin_col_key);
 
     //@{
     /// Compare two table specs for equality.
@@ -296,27 +292,6 @@ inline bool Spec::get_first_column_type_from_ref(ref_type top_ref, Allocator& al
     type = ColumnType(Array::get(types_header, 0));
     return true;
 }
-
-inline bool Spec::has_backlinks() const noexcept
-{
-    // backlinks are always last and do not have names.
-    return m_names.size() < m_types.size();
-
-    // Fixme: It's bad design that backlinks are stored and recognized like this. Backlink columns
-    // should be a column type like any other, and we should find another way to hide them away from
-    // the user.
-}
-
-inline size_t Spec::first_backlink_column_index() const noexcept
-{
-    return m_num_public_columns;
-}
-
-inline size_t Spec::backlink_column_count() const noexcept
-{
-    return m_types.size() - m_num_public_columns;
-}
-
 // Spec will have a subspec when it contains a column which is one of:
 // link, linklist, backlink.
 inline bool Spec::has_subspec() const noexcept

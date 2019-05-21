@@ -250,7 +250,7 @@ void Lst<ObjKey>::clear()
 
     TableRef target_table = m_obj.get_target_table(m_col_key);
     TableKey target_table_key = target_table->get_key();
-    ColKey backlink_col = target_table->find_backlink_column(m_obj.get_table_key(), m_col_key);
+    ColKey backlink_col = origin_table->get_opposite_column(m_col_key);
 
     CascadeState state;
 

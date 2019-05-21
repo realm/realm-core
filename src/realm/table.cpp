@@ -646,14 +646,12 @@ ColKey Table::insert_root_column(ColKey col_key, DataType type, StringData name,
                                  bool nullable, bool listtype, LinkType link_type)
 {
     col_key = do_insert_root_column(col_key, ColumnType(type), name, nullable, listtype, link_type); // Throws
-    size_t col_ndx = colkey2spec_ndx(col_key);
 
     // When the inserted column is a link-type column, we must also add a
     // backlink column to the target table.
 
     if (link_target.is_valid()) {
         auto target_table_key = link_target.m_target_table->get_key();
-        m_spec.set_opposite_link_table_key(col_ndx, target_table_key); // Throws
         auto origin_table_key = get_key();
         link_target.m_backlink_col_key = link_target.m_target_table->insert_backlink_column(
             origin_table_key, col_key, link_target.m_backlink_col_key); // Throws
@@ -668,15 +666,12 @@ ColKey Table::insert_root_column(ColKey col_key, DataType type, StringData name,
 void Table::erase_root_column(ColKey col_key)
 {
     REALM_ASSERT(valid_column(col_key));
-    size_t col_ndx = colkey2spec_ndx(col_key);
     ColumnType col_type = col_key.get_type();
     if (is_link_type(col_type)) {
-        auto target_table_key = m_spec.get_opposite_link_table_key(col_ndx);
-        auto link_target_table = get_parent_group()->get_table(target_table_key);
-        auto origin_table_key = get_key();
-        link_target_table->erase_backlink_column(origin_table_key, col_key); // Throws
+        auto target_table = get_opposite_table(col_key);
+        auto target_column = get_opposite_column(col_key);
+        target_table->erase_backlink_column(target_column);
     }
-
     do_erase_root_column(col_key); // Throws
 }
 
@@ -718,12 +713,12 @@ ColKey Table::do_insert_root_column(ColKey col_key, ColumnType type, StringData 
     REALM_ASSERT(col_ndx <= m_opposite_table.size());
     if (col_ndx == m_opposite_table.size()) {
         // m_opposite_table and m_opposite_column are always resized together!
-        m_opposite_table.insert(col_ndx, 0);
-        m_opposite_column.insert(col_ndx, 0);
+        m_opposite_table.insert(col_ndx, TableKey().value);
+        m_opposite_column.insert(col_ndx, ColKey().value);
     }
     else {
-        m_opposite_table.set(col_ndx, 0);
-        m_opposite_column.set(col_ndx, 0);
+        m_opposite_table.set(col_ndx, TableKey().value);
+        m_opposite_column.set(col_ndx, ColKey().value);
     }
     refresh_index_accessors();
     m_clusters.insert_column(col_key);
@@ -763,21 +758,15 @@ LinkType Table::get_link_type(ColKey col_key) const
 ColKey Table::insert_backlink_column(TableKey origin_table_key, ColKey origin_col_key, ColKey backlink_col_key)
 {
     ColKey retval = do_insert_root_column(backlink_col_key, col_type_BackLink, ""); // Throws
-    size_t backlink_col_ndx = colkey2spec_ndx(retval);
-    m_spec.set_opposite_link_table_key(backlink_col_ndx, origin_table_key); // Throws
-    m_spec.set_backlink_origin_column(backlink_col_ndx, origin_col_key);    // Throws
     set_opposite_column(retval, origin_table_key, origin_col_key);
     return retval;
 }
 
 
-void Table::erase_backlink_column(TableKey origin_table_key, ColKey origin_col_key)
+void Table::erase_backlink_column(ColKey backlink_col_key)
 {
-    size_t backlink_col_ndx = m_spec.find_backlink_column(origin_table_key, origin_col_key);
-    REALM_ASSERT_3(backlink_col_ndx, !=, realm::not_found);
     bump_content_version();
     bump_storage_version();
-    ColKey backlink_col_key = spec_ndx2colkey(backlink_col_ndx);
     do_erase_root_column(backlink_col_key); // Throws
 }
 
@@ -1349,10 +1338,7 @@ TableKey Table::get_key() const noexcept
 
 TableRef Table::get_link_target(ColKey col_key) noexcept
 {
-    size_t col_ndx = colkey2spec_ndx(col_key);
-    auto target_key = m_spec.get_opposite_link_table_key(col_ndx);
-    REALM_ASSERT(target_key == TableKey(m_opposite_table.get(col_key.get_index().val)));
-    return get_parent_group()->get_table(target_key);
+    return get_opposite_table(col_key);
 }
 
 // count ----------------------------------------------
@@ -1728,10 +1714,10 @@ const Table* Table::get_link_chain_target(const std::vector<ColKey>& link_chain)
     const Table* table = this;
     for (size_t t = 0; t < link_chain.size(); t++) {
         // Link column can be a single Link, LinkList, or BackLink.
+        REALM_ASSERT(table->valid_column(link_chain[t]));
         ColumnType type = table->get_real_column_type(link_chain[t]);
         if (type == col_type_LinkList || type == col_type_Link || type == col_type_BackLink) {
-            auto key = table->m_spec.get_opposite_link_table_key(table->colkey2spec_ndx(link_chain[t]));
-            table = table->get_parent_group()->get_table(key);
+            table = table->get_opposite_table(link_chain[t]);
         }
         else {
             // Only last column in link chain is allowed to be non-link
@@ -1913,16 +1899,12 @@ void Table::refresh_index_accessors()
 
 bool Table::is_cross_table_link_target() const noexcept
 {
-    size_t first_backlink_column = m_spec.first_backlink_column_index();
-    size_t end_backlink_column = m_spec.get_column_count();
-    for (size_t i = first_backlink_column; i < end_backlink_column; ++i) {
-        ColKey col_key = spec_ndx2colkey(i);
+    auto is_cross_link = [this](ColKey col_key) {
         auto t = col_key.get_type();
         // look for a backlink with a different target than ourselves
-        if (t == col_type_BackLink && m_spec.get_opposite_link_table_key(i) != get_key())
-            return true;
-    }
-    return false;
+        return (t == col_type_BackLink && get_opposite_table_key(col_key) != get_key());
+    };
+    return for_each_backlink_column(is_cross_link);
 }
 
 // LCOV_EXCL_START ignore debug functions
@@ -1997,22 +1979,19 @@ void Table::print() const
                 std::cout << "String     ";
                 break;
             case col_type_Link: {
-                auto target_table_key = m_spec.get_opposite_link_table_key(k);
-                ConstTableRef target_table = get_parent_group()->get_table(target_table_key);
+                ConstTableRef target_table = get_opposite_table(i);
                 const StringData target_name = target_table->get_name();
                 std::cout << "L->" << std::setw(7) << std::string(target_name).substr(0, 7) << " ";
                 break;
             }
             case col_type_LinkList: {
-                auto target_table_key = m_spec.get_opposite_link_table_key(k);
-                ConstTableRef target_table = get_parent_group()->get_table(target_table_key);
+                ConstTableRef target_table = get_opposite_table(i);
                 const StringData target_name = target_table->get_name();
                 std::cout << "LL->" << std::setw(6) << std::string(target_name).substr(0, 6) << " ";
                 break;
             }
             case col_type_BackLink: {
-                auto target_table_key = m_spec.get_opposite_link_table_key(k);
-                ConstTableRef target_table = get_parent_group()->get_table(target_table_key);
+                ConstTableRef target_table = get_opposite_table(i);
                 const StringData target_name = target_table->get_name();
                 std::cout << "BL->" << std::setw(6) << std::string(target_name).substr(0, 6) << " ";
                 break;
@@ -2231,8 +2210,7 @@ TableRef _impl::TableFriend::get_opposite_link_table(const Table& table, ColKey 
 {
     TableRef ret;
     if (col_key) {
-        auto target_table_key = table.m_spec.get_opposite_link_table_key(table.colkey2spec_ndx(col_key));
-        ret = table.get_parent_group()->get_table(target_table_key);
+        return table.get_opposite_table(col_key);
     }
     return ret;
 }
@@ -2284,10 +2262,19 @@ ColKey Table::generate_col_key(ColumnType tp, ColumnAttrMask attr)
     return ColKey(ColKey::Idx{lower}, tp, attr, upper);
 }
 
+// Find the backlink column which is linked to from the given table and column
 ColKey Table::find_backlink_column(TableKey origin_table_key, ColKey origin_col_key) const noexcept
 {
-    size_t ndx = m_spec.find_backlink_column(origin_table_key, origin_col_key);
-    return spec_ndx2colkey(ndx);
+    ColKey retval;
+    auto predicate = [&](ColKey col_key) {
+        if (origin_col_key == get_opposite_column(col_key) && origin_table_key == get_opposite_table_key(col_key)) {
+            retval = col_key;
+            return true;
+        }
+        return false;
+    };
+    for_each_backlink_column(predicate);
+    return retval;
 }
 
 Table::BacklinkOrigin Table::find_backlink_origin(StringData origin_table_name, StringData origin_col_name) const

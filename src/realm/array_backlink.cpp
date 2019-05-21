@@ -44,15 +44,10 @@ void ArrayBacklink::nullify_fwd_links(size_t ndx, CascadeState& state)
         ObjKey target_key = cluster->get_real_key(ndx);
 
         // determine the source table/col - which is the one holding the forward links
-        // FIXME: May have to be moved to Table so that we don't have spec access here.
-        // FIXME: This mix of using keys and indexes are not good.
-        TableRef source_table = _impl::TableFriend::get_opposite_link_table(*target_table, target_col_key);
-        source_table->bump_content_version();
-        const Spec& target_spec = cluster->m_tree_top.get_spec();
-        size_t target_spec_ndx = target_table->leaf_ndx2spec_ndx(target_col_ndx);
-        ColKey src_col_key = target_spec.get_origin_column_key(target_spec_ndx);
+        TableRef source_table = target_table->get_opposite_table(target_col_key);
         TableKey src_table_key = source_table->get_key();
-
+        ColKey src_col_key = target_table->get_opposite_column(target_col_key);
+        source_table->bump_content_version();
         Group::CascadeNotification notifications;
         // Now follow all backlinks to their origin and clear forward links.
         if ((value & 1) != 0) {

@@ -548,12 +548,11 @@ void ConstTableView::do_sync()
     else if (m_source_column_key) {
         m_key_values->clear();
         if (m_table && m_linked_table->is_valid(m_linked_obj_key)) {
-            TableKey origin_table_key = m_table->get_key();
             ConstObj m_linked_obj = m_linked_table->get_object(m_linked_obj_key);
-            const Spec& spec = _impl::TableFriend::get_spec(*m_linked_table);
-            size_t backlink_col_ndx = spec.find_backlink_column(origin_table_key, m_source_column_key);
-            if (backlink_col_ndx != realm::npos) {
-                ColKey backlink_col = m_linked_table->spec_ndx2colkey(backlink_col_ndx);
+            if (m_table->valid_column(m_source_column_key)) { // return empty result, if column has been removed
+                ColKey backlink_col = m_table->get_opposite_column(m_source_column_key);
+                REALM_ASSERT(backlink_col);
+                m_linked_table->report_invalid_key(backlink_col);
                 size_t backlink_count = m_linked_obj.get_backlink_count(backlink_col);
                 for (size_t i = 0; i < backlink_count; i++)
                     m_key_values->add(m_linked_obj.get_backlink(backlink_col, i));

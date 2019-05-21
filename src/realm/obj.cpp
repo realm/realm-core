@@ -785,8 +785,10 @@ void Obj::nullify_link(ColKey origin_col_key, ObjKey target_key)
 void Obj::set_backlink(ColKey col_key, ObjKey new_key)
 {
     if (new_key != realm::null_key) {
+        REALM_ASSERT(m_table->valid_column(col_key));
         TableRef target_table = get_target_table(col_key);
-        ColKey backlink_col_key = target_table->find_backlink_column(get_table_key(), col_key);
+        ColKey backlink_col_key = m_table->get_opposite_column(col_key);
+        REALM_ASSERT(target_table->valid_column(backlink_col_key));
 
         Obj target_obj = target_table->get_object(new_key);
         target_obj.add_backlink(backlink_col_key, m_key); // Throws
@@ -807,8 +809,10 @@ bool Obj::remove_backlink(ColKey col_key, ObjKey old_key, CascadeState& state)
 
     const Table* origin_table = m_table;
 
+    REALM_ASSERT(origin_table->valid_column(col_key));
     TableRef target_table = get_target_table(col_key);
-    ColKey backlink_col_key = target_table->find_backlink_column(get_table_key(), col_key);
+    ColKey backlink_col_key = m_table->get_opposite_column(col_key);
+    REALM_ASSERT(target_table->valid_column(backlink_col_key));
 
     bool strong_links = (origin_table->get_link_type(col_key) == link_Strong);
     CascadeState::Mode mode = state.m_mode;
