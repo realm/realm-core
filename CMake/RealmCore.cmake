@@ -221,6 +221,7 @@ endfunction()
 macro(build_realm_core)
     set(core_prefix_directory "${CMAKE_CURRENT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/realm-core")
 
+    separate_arguments(core_cfg_args UNIX_COMMAND "-D REALM_BUILD_LIB_ONLY=YES -D REALM_SKIP_SHARED_LIB=YES -G Ninja ${CORE_SANITIZER_FLAGS}")
     ExternalProject_Add(realm-core
         PREFIX ${core_prefix_directory}
         BUILD_IN_SOURCE 1
@@ -228,11 +229,11 @@ macro(build_realm_core)
         INSTALL_COMMAND ""
         CONFIGURE_COMMAND ${CMAKE_COMMAND} -E make_directory build.debug
                         && cd build.debug
-                        && cmake -D CMAKE_BUILD_TYPE=Debug -DREALM_BUILD_LIB_ONLY=YES -G Ninja ..
+                        && cmake -D CMAKE_BUILD_TYPE=Debug ${core_cfg_args} ..
                         && cd ..
                         && ${CMAKE_COMMAND} -E make_directory build.release
                         && cd build.release
-                        && cmake -D CMAKE_BUILD_TYPE=RelWithDebInfo -DREALM_BUILD_LIB_ONLY=YES -G Ninja ..
+                        && cmake -D CMAKE_BUILD_TYPE=RelWithDebInfo ${core_cfg_args} ..
 
         BUILD_COMMAND cd build.debug
                    && cmake --build .
@@ -305,6 +306,7 @@ endfunction()
 macro(build_realm_sync core_directory)
     set(sync_prefix_directory "${CMAKE_CURRENT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/realm-sync")
 
+    separate_arguments(sync_cfg_args UNIX_COMMAND "-DOPENSSL_ROOT_DIR=${OPENSSL_ROOT_DIR} -DREALM_BUILD_TESTS=OFF -DREALM_BUILD_COMMANDLINE_TOOLS=OFF -G Ninja ${CORE_SANITIZER_FLAGS}")
     ExternalProject_Add(realm-sync-lib
         PREFIX ${sync_prefix_directory}
         BUILD_IN_SOURCE 1
@@ -312,11 +314,11 @@ macro(build_realm_sync core_directory)
         INSTALL_COMMAND ""
         CONFIGURE_COMMAND ${CMAKE_COMMAND} -E make_directory build.debug
                         && cd build.debug
-                        && cmake -D CMAKE_BUILD_TYPE=Debug -DREALM_CORE_BUILDTREE=${core_directory}/build.debug -DREALM_BUILD_TESTS=OFF -DREALM_BUILD_COMMANDLINE_TOOLS=OFF -G Ninja ..
+                        && cmake -D CMAKE_BUILD_TYPE=Debug -DREALM_CORE_BUILDTREE=${core_directory}/build.debug ${sync_cfg_args} ..
                         && cd ..
                         && ${CMAKE_COMMAND} -E make_directory build.release
                         && cd build.release
-                        && cmake -D CMAKE_BUILD_TYPE=RelWithDebInfo -DREALM_CORE_BUILDTREE=${core_directory}/build.release -DREALM_BUILD_TESTS=OFF -DREALM_BUILD_COMMANDLINE_TOOLS=OFF -G Ninja ..
+                        && cmake -D CMAKE_BUILD_TYPE=RelWithDebInfo -DREALM_CORE_BUILDTREE=${core_directory}/build.release ${sync_cfg_args} ..
 
         BUILD_COMMAND cd build.debug
                    && cmake --build .
