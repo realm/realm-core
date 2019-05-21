@@ -1,19 +1,13 @@
-# NEXT RELEASE
-
-### Enhancements
-* None.
+# 6.0.0-alpha.6 Release notes
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * None.
  
-### Breaking changes
-* None.
-
 -----------
 
 ### Internals
-* None.
+* Column keys cannot be used across tables. If a key is obtained from one table, it can only be
+  used in relation to that table.
 
 Besides the changes above, this release includes changes introduced by v5.16.0 and up
 until v5.17.0
