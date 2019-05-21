@@ -607,7 +607,12 @@ private:
     }
 
     bool do_add_required_change_info(_impl::TransactionChangeInfo&) override { return false; }
-    bool prepare_to_deliver() override { return m_has_results_to_deliver; }
+    bool prepare_to_deliver() override
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        return m_has_results_to_deliver;
+
+    }
 
     _impl::RealmCoordinator *m_coordinator;
 

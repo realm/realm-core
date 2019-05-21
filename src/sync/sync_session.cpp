@@ -364,18 +364,18 @@ struct sync_session_states::Dying : public SyncSession::State {
 struct sync_session_states::Inactive : public SyncSession::State {
     void enter_state(std::unique_lock<std::mutex>& lock, SyncSession& session) const override
     {
+        // Manually set the disconnected state. Sync would also do this, but
+        // since the underlying SyncSession object already have been destroyed,
+        // we are not able to get the callback.
+        auto old_state = session.m_connection_state;
+        auto new_state = session.m_connection_state = SyncSession::ConnectionState::Disconnected;
+
         auto completion_wait_packages = std::move(session.m_completion_wait_packages);
         session.m_completion_wait_packages.clear();
         session.m_session = nullptr;
         session.unregister(lock); // releases lock
 
         // Send notifications after releasing the lock to prevent deadlocks in the callback.
-
-        // Manually set the disconnected state. Sync would also do this, but since the underlying SyncSession object
-        // already have been destroyed, we are not able to get the callback.
-        SyncSession::ConnectionState old_state = session.connection_state();
-        session.m_connection_state = realm::sync::Session::ConnectionState::disconnected;
-        SyncSession::ConnectionState new_state = session.connection_state();
         if (old_state != new_state) {
             session.m_connection_change_notifier.invoke_callbacks(old_state, session.connection_state());
         }
@@ -711,10 +711,18 @@ void SyncSession::create_sync_session()
         // If the OS SyncSession object is destroyed, we ignore any events from the underlying Session as there is
         // nothing useful we can do with them.
         if (auto self = weak_self.lock()) {
-            ConnectionState last_state = self->connection_state();
-            self->m_connection_state = state;
-            ConnectionState new_state = self->connection_state();
-            self->m_connection_change_notifier.invoke_callbacks(last_state, new_state);
+            std::unique_lock<std::mutex> lock(self->m_state_mutex);
+            auto old_state = self->m_connection_state;
+            using cs = sync::Session::ConnectionState;
+            switch (state) {
+                case cs::disconnected: self->m_connection_state = ConnectionState::Disconnected; break;
+                case cs::connecting:   self->m_connection_state = ConnectionState::Connecting;   break;
+                case cs::connected:    self->m_connection_state = ConnectionState::Connected;    break;
+                default: REALM_UNREACHABLE();
+            }
+            auto new_state = self->m_connection_state;
+            lock.unlock();
+            self->m_connection_change_notifier.invoke_callbacks(old_state, new_state);
             if (error) {
                 self->handle_error(SyncError{error->error_code, std::move(error->detailed_message), error->is_fatal});
             }
@@ -860,13 +868,8 @@ SyncSession::PublicState SyncSession::state() const
 
 SyncSession::ConnectionState SyncSession::connection_state() const
 {
-    switch (m_connection_state) {
-        case sync::Session::ConnectionState::disconnected: return ConnectionState::Disconnected;
-        case sync::Session::ConnectionState::connecting: return ConnectionState::Connecting;
-        case sync::Session::ConnectionState::connected: return ConnectionState::Connected;
-        default:
-            REALM_UNREACHABLE();
-    }
+    std::unique_lock<std::mutex> lock(m_state_mutex);
+    return m_connection_state;
 }
 
 void SyncSession::update_configuration(SyncConfig new_config)

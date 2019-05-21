@@ -356,7 +356,7 @@ private:
     // The underlying state of the connection. Even when sharing connections, the underlying session
     // will always start out as diconnected and then immediately transition to the correct state when calling
     // bind().
-    sync::Session::ConnectionState m_connection_state = sync::Session::ConnectionState::disconnected;
+    ConnectionState m_connection_state = ConnectionState::Disconnected;
     size_t m_death_count = 0;
 
     SyncConfig m_config;
