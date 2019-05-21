@@ -46,7 +46,7 @@ if (env.BRANCH_NAME == 'master') {
   env.DOCKER_PUSH = "1"
 }
 
-def doDockerBuild(String flavor, Boolean withCoverage, Boolean enableSync) {
+def doDockerBuild(String flavor, Boolean withCoverage, Boolean enableSync, String sanitizerFlags = "") {
   def sync = enableSync ? "sync" : ""
   def label = "${flavor}${enableSync ? '-sync' : ''}"
 
@@ -59,7 +59,7 @@ def doDockerBuild(String flavor, Boolean withCoverage, Boolean enableSync) {
           if(withCoverage) {
             sh "rm -rf coverage.build ${label}.build && ./workflow/test_coverage.sh ${sync} && mv coverage.build ${label}.build"
           } else {
-            sh "./workflow/build.sh ${flavor} ${sync}"
+            sh "./workflow/build.sh ${flavor} ${sync} ${sanitizerFlags}"
           }
         }
       }
@@ -170,6 +170,8 @@ stage('unit-tests') {
   parallel(
     linux: doDockerBuild('linux', true, false),
     linux_sync: doDockerBuild('linux', true, true),
+    linux_asan: doDockerBuild('linux', false, true, '-DSANITIZE_ADDRESS=1'),
+    linux_tsan: doDockerBuild('linux', false, true, '-DSANITIZE_THREAD=1'),
     android: doAndroidDockerBuild(),
     macos: doBuild('osx', 'macOS', false, ''),
     macos_sync: doBuild('osx', 'macOS', true, ''),
