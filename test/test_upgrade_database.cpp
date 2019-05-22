@@ -1379,7 +1379,9 @@ TEST_IF(Upgrade_Database_9_10, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SI
     subdesc->add_column(type_Int, "list");
     t->add_search_index(col_string_i);
 
-    o->add_column(type_Int, "int");
+    size_t col_val = o->add_column(type_Int, "val");
+    size_t col_string_list = o->add_column(type_Table, "strings", false, &subdesc);
+    subdesc->add_column(type_String, "list");
 
     t->add_empty_row(nb_rows);
     o->add_empty_row(25);
@@ -1399,8 +1401,10 @@ TEST_IF(Upgrade_Database_9_10, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SI
             t->set_string(col_string_i, i, str);
 
             // Binary
-            std::string bin("abcdefghijklmnopqrstuvwxyz");
-            t->set_binary(col_binary, i, BinaryData(bin));
+            if (i % 9 == 0) {
+                const char bin[] = "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz";
+                t->set_binary(col_binary, i, BinaryData(bin, strlen(bin) - i / 10));
+            }
 
             // Timestamp
             t->set_timestamp(col_date, i, Timestamp(100 * i, i));
@@ -1426,6 +1430,18 @@ TEST_IF(Upgrade_Database_9_10, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SI
                     st->set_int(0, j, j + i % 30);
                 }
                 st->remove(0);
+            }
+        }
+    }
+
+    for (size_t i = 0; i < 25; i++) {
+        o->set_int(col_val, i, i);
+        auto st = o->get_subtable(col_string_list, i);
+        if (i % 5 == 0) {
+            for (size_t j = 0; j < i / 5; j++) {
+                st->add_empty_row();
+                std::string str = "String_" + std::to_string(j);
+                st->set_string(0, j, str);
             }
         }
     }
