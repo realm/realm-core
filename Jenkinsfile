@@ -168,7 +168,7 @@ stage('prepare') {
 
 stage('unit-tests') {
   parallel(
-    linux: doDockerBuild('linux', true, false),
+    linux: doDockerBuild('linux', false, false),
     linux_sync: doDockerBuild('linux', true, true),
     linux_asan: doDockerBuild('linux', false, true, '-DSANITIZE_ADDRESS=1'),
     linux_tsan: doDockerBuild('linux', false, true, '-DSANITIZE_THREAD=1'),
@@ -183,9 +183,7 @@ stage('unit-tests') {
 
 stage('publish') {
   node('docker') {
-    publishReport('linux')
     publishReport('linux-sync')
-    publishReport('macOS')
     publishReport('macOS-sync')
   }
 }
