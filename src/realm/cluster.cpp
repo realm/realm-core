@@ -814,6 +814,21 @@ MemRef Cluster::ensure_writeable(ObjKey)
     return get_mem();
 }
 
+namespace realm {
+
+template <class T>
+inline void Cluster::set_spec(T&, ColKey::Idx)
+{
+}
+
+template <>
+inline void Cluster::set_spec(ArrayString& arr, ColKey::Idx col_ndx)
+{
+    auto spec_ndx = m_tree_top.get_owner()->leaf_ndx2spec_ndx(col_ndx);
+    arr.set_spec(const_cast<Spec*>(&m_tree_top.get_spec()), spec_ndx);
+}
+} // namespace realm
+
 template <class T>
 inline void Cluster::do_insert_row(size_t ndx, ColKey col, Mixed init_val, bool nullable)
 {
@@ -822,8 +837,7 @@ inline void Cluster::do_insert_row(size_t ndx, ColKey col, Mixed init_val, bool 
     T arr(m_alloc);
     auto col_ndx = col.get_index();
     arr.set_parent(this, col_ndx.val + s_first_col_index);
-    auto spec_ndx = m_tree_top.get_owner()->leaf_ndx2spec_ndx(col_ndx);
-    arr.set_spec(const_cast<Spec*>(&m_tree_top.get_spec()), spec_ndx);
+    set_spec<T>(arr, col_ndx);
     arr.init_from_parent();
     if (init_val.is_null()) {
         arr.insert(ndx, T::default_value(nullable));
@@ -1212,8 +1226,7 @@ inline void Cluster::do_erase(size_t ndx, ColKey col_key)
     auto col_ndx = col_key.get_index();
     T values(m_alloc);
     values.set_parent(this, col_ndx.val + s_first_col_index);
-    size_t spec_ndx = m_tree_top.get_owner()->colkey2spec_ndx(col_key);
-    values.set_spec(const_cast<Spec*>(&m_tree_top.get_spec()), spec_ndx);
+    set_spec<T>(values, col_ndx);
     values.init_from_parent();
     values.erase(ndx);
 }
@@ -1422,8 +1435,10 @@ void Cluster::init_leaf(ColKey col_key, ArrayPayload* leaf) const
     // once fixed, reintroduce the noexcept declaration :-D
     m_tree_top.get_owner()->report_invalid_key(col_key);
     ref_type ref = to_ref(Array::get(col_ndx.val + 1));
-    size_t spec_ndx = m_tree_top.get_owner()->leaf_ndx2spec_ndx(col_ndx);
-    leaf->set_spec(const_cast<Spec*>(&m_tree_top.get_spec()), spec_ndx);
+    if (ArrayString* str = dynamic_cast<ArrayString*>(leaf)) {
+        size_t spec_ndx = m_tree_top.get_owner()->leaf_ndx2spec_ndx(col_ndx);
+        str->set_spec(const_cast<Spec*>(&m_tree_top.get_spec()), spec_ndx);
+    }
     leaf->init_from_ref(ref);
     leaf->set_parent(const_cast<Cluster*>(this), col_ndx.val + 1);
 }
