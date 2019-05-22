@@ -450,11 +450,13 @@ void Table::init(ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent, bo
     }
     m_key = TableKey(rot.get_as_int());
 
+    // index setup relies on column mapping being up to date:
+    build_column_mapping();
     m_index_refs.set_parent(&m_top, top_position_for_search_indexes);
     if (m_top.get_as_ref(top_position_for_search_indexes) == 0) {
         // This is an upgrade - create the necessary arrays
         bool context_flag = false;
-        size_t nb_columns = m_spec.get_public_column_count();
+        size_t nb_columns = m_leaf_ndx2colkey.size();
         MemRef mem = Array::create_array(Array::type_HasRefs, context_flag, nb_columns, 0, m_top.get_alloc());
         m_index_refs.init_from_mem(mem);
         m_index_refs.update_parent();
@@ -474,8 +476,6 @@ void Table::init(ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent, bo
     }
     else
         m_in_file_version_at_transaction_boundary = rot_version.get_as_int();
-
-    build_column_mapping();
 }
 
 
@@ -497,7 +497,7 @@ ColKey Table::do_insert_column(ColKey col_key, DataType type, StringData name, L
 
 void Table::populate_search_index(ColKey col_key)
 {
-    size_t col_ndx = colkey2spec_ndx(col_key);
+    auto col_ndx = col_key.get_index().val;
     StringIndex* index = m_index_accessors[col_ndx];
 
     // Insert ref to index
@@ -543,7 +543,7 @@ void Table::add_search_index(ColKey col_key)
 {
     if (REALM_UNLIKELY(!valid_column(col_key)))
         throw InvalidKey("No such column");
-    size_t column_ndx = colkey2spec_ndx(col_key);
+    size_t column_ndx = col_key.get_index().val;
 
     // Early-out if already indexed
     if (m_index_accessors[column_ndx] != nullptr)
@@ -557,7 +557,7 @@ void Table::add_search_index(ColKey col_key)
 
     // m_index_accessors always has the same number of pointers as the number of columns. Columns without search
     // index have 0-entries.
-    REALM_ASSERT(m_index_accessors.size() == get_column_count());
+    REALM_ASSERT(m_index_accessors.size() == m_leaf_ndx2colkey.size());
     REALM_ASSERT(m_index_accessors[column_ndx] == nullptr);
 
     // Create the index
@@ -569,9 +569,10 @@ void Table::add_search_index(ColKey col_key)
     m_index_refs.set(column_ndx, index->get_ref()); // Throws
 
     // Update spec
-    auto attr = m_spec.get_column_attr(column_ndx);
+    auto spec_ndx = leaf_ndx2spec_ndx(col_key.get_index());
+    auto attr = m_spec.get_column_attr(spec_ndx);
     attr.set(col_attr_Indexed);
-    m_spec.set_column_attr(column_ndx, attr); // Throws
+    m_spec.set_column_attr(spec_ndx, attr); // Throws
 
     populate_search_index(col_key);
 }
@@ -580,25 +581,26 @@ void Table::remove_search_index(ColKey col_key)
 {
     if (REALM_UNLIKELY(!valid_column(col_key)))
         throw InvalidKey("No such column");
-    size_t column_ndx = colkey2spec_ndx(col_key);
+    auto column_ndx = col_key.get_index();
 
     // Early-out if non-indexed
-    if (m_index_accessors[column_ndx] == nullptr)
+    if (m_index_accessors[column_ndx.val] == nullptr)
         return;
 
     // Destroy and remove the index column
-    StringIndex* index = m_index_accessors[column_ndx];
+    StringIndex* index = m_index_accessors[column_ndx.val];
     REALM_ASSERT(index != nullptr);
     index->destroy();
     delete index;
-    m_index_accessors[column_ndx] = nullptr;
+    m_index_accessors[column_ndx.val] = nullptr;
 
-    m_index_refs.set(column_ndx, 0);
+    m_index_refs.set(column_ndx.val, 0);
 
     // update spec
-    auto attr = m_spec.get_column_attr(column_ndx);
+    auto spec_ndx = leaf_ndx2spec_ndx(column_ndx);
+    auto attr = m_spec.get_column_attr(spec_ndx);
     attr.reset(col_attr_Indexed);
-    m_spec.set_column_attr(column_ndx, attr); // Throws
+    m_spec.set_column_attr(spec_ndx, attr); // Throws
 }
 
 void Table::enumerate_string_column(ColKey col_key)
@@ -679,7 +681,7 @@ ColKey Table::do_insert_root_column(ColKey col_key, ColumnType type, StringData 
     REALM_ASSERT(!col_key || !valid_column(col_key));
 
     // locate insertion point: ordinary columns must come before backlink columns
-    size_t ndx = (type == col_type_BackLink) ? m_spec.get_column_count() : m_spec.get_public_column_count();
+    size_t spec_ndx = (type == col_type_BackLink) ? m_spec.get_column_count() : m_spec.get_public_column_count();
 
     int attr = col_attr_None;
     if (nullable)
@@ -696,14 +698,17 @@ ColKey Table::do_insert_root_column(ColKey col_key, ColumnType type, StringData 
         REALM_ASSERT(false); // FIXME
     }
 
-    m_spec.insert_column(ndx, col_key, type, name, attr); // Throws
+    m_spec.insert_column(spec_ndx, col_key, type, name, attr); // Throws
+    auto col_ndx = col_key.get_index().val;
     build_column_mapping();
-    // Backlink columns don't have search index
-    if (type != col_type_BackLink) {
-        // Column has no search index
-        m_index_refs.insert(ndx, 0);
-        m_index_accessors.insert(m_index_accessors.begin() + ndx, nullptr);
+    REALM_ASSERT(col_ndx <= m_index_refs.size());
+    if (col_ndx == m_index_refs.size()) {
+        m_index_refs.insert(col_ndx, 0);
     }
+    else {
+        m_index_refs.set(col_ndx, 0);
+    }
+    refresh_index_accessors();
     m_clusters.insert_column(col_key);
 
     return col_key;
@@ -712,25 +717,18 @@ ColKey Table::do_insert_root_column(ColKey col_key, ColumnType type, StringData 
 
 void Table::do_erase_root_column(ColKey col_key)
 {
-    size_t ndx = colkey2spec_ndx(col_key);
-    bool removing_public_column = ndx < m_spec.get_public_column_count(); // cache before changing spec below
-    if (removing_public_column) {
-        // If the column had a source index we have to remove and destroy that as well
-        ref_type index_ref = m_index_refs.get_as_ref(ndx);
-        if (index_ref) {
-            Array::destroy_deep(index_ref, m_index_refs.get_alloc());
-        }
-        m_index_refs.erase(ndx);
-        delete m_index_accessors[ndx];
-        m_index_accessors.erase(m_index_accessors.begin() + ndx);
-        for (size_t i = ndx; i < m_index_accessors.size(); ++i) {
-            if (StringIndex* index = m_index_accessors[i])
-                index->set_ndx_in_parent(i);
-        }
+    size_t col_ndx = col_key.get_index().val;
+    // If the column had a source index we have to remove and destroy that as well
+    ref_type index_ref = m_index_refs.get_as_ref(col_ndx);
+    if (index_ref) {
+        Array::destroy_deep(index_ref, m_index_refs.get_alloc());
     }
-
+    delete m_index_accessors[col_ndx];
+    m_index_refs.set(col_ndx, 0);
+    m_index_accessors[col_ndx] = nullptr;
     m_clusters.remove_column(col_key);
-    m_spec.erase_column(ndx);
+    size_t spec_ndx = colkey2spec_ndx(col_key);
+    m_spec.erase_column(spec_ndx);
     build_column_mapping();
 }
 
@@ -801,7 +799,7 @@ Table::~Table() noexcept
 
 bool Table::has_search_index(ColKey col_key) const noexcept
 {
-    return m_index_accessors[colkey2spec_ndx(col_key)] != nullptr;
+    return m_index_accessors[col_key.get_index().val] != nullptr;
 }
 
 bool Table::convert_column_keys(Group* group)
@@ -1146,7 +1144,7 @@ bool Table::copy_content_from_columns(size_t spec_ndx)
     if (attr.test(col_attr_Indexed)) {
         // Move index over to new position in table
         ref_type index_ref = col_refs.get_as_ref(ndx_in_parent + 1);
-        m_index_refs.set(spec_ndx, index_ref);
+        m_index_refs.set(col_key.get_index().val, index_ref);
         col_refs.set(ndx_in_parent + 1, 0);
     }
 
@@ -1441,11 +1439,7 @@ ObjKey Table::find_first(ColKey col_key, T value) const
     if (REALM_UNLIKELY(!valid_column(col_key)))
         throw InvalidKey("Non-existing column");
 
-    if (has_search_index(col_key)) {
-        size_t col_ndx = colkey2spec_ndx(col_key);
-        REALM_ASSERT(col_ndx < m_index_accessors.size());
-        auto index = m_index_accessors[col_ndx];
-        REALM_ASSERT(index);
+    if (StringIndex* index = get_search_index(col_key)) {
         return index->find_first(value);
     }
 
@@ -1831,40 +1825,36 @@ void Table::refresh_accessor_tree()
 void Table::refresh_index_accessors()
 {
     // Refresh search index accessors
-    size_t col_ndx_end = m_spec.get_public_column_count();
 
-    // Move all accessors to a temporary array
-    std::vector<std::unique_ptr<StringIndex>> old_index_accessors;
-    for (auto& i : m_index_accessors) {
-        if (i) {
-            old_index_accessors.emplace_back(i);
-            i = nullptr;
+    // First eliminate any index accessors for eliminated last columns
+    size_t col_ndx_end = m_leaf_ndx2colkey.size();
+    for (size_t col_ndx = col_ndx_end; col_ndx < m_index_accessors.size(); col_ndx++) {
+        if (m_index_accessors[col_ndx]) {
+            delete m_index_accessors[col_ndx];
+            m_index_accessors[col_ndx] = nullptr;
         }
     }
     m_index_accessors.resize(col_ndx_end);
 
+    // Then eliminate/refresh/create accessors within column range
+    // we can not use for_each_column() here, since the columns may have changed
+    // and the index accessor vector is not updated correspondingly.
     for (size_t col_ndx = 0; col_ndx < col_ndx_end; col_ndx++) {
-        ColKey col_key = spec_ndx2colkey(col_ndx);
-        bool has_index = m_spec.get_column_attr(col_ndx).test(col_attr_Indexed);
 
-        if (has_index) {
-            std::unique_ptr<StringIndex> index;
-            // Check if we already have an accessor ready
-            for (auto& i : old_index_accessors) {
-                if (i && i->get_column_key() == col_key) {
-                    index = std::move(i);
-                    break;
-                }
-            }
-            if (index) {
-                index->set_parent(&m_index_refs, col_ndx);
-                index->refresh_accessor_tree();
-            }
-            else if (ref_type ref = m_index_refs.get_as_ref(col_ndx)) {
-                ClusterColumn virtual_col(&m_clusters, col_key);
-                index.reset(new StringIndex(ref, &m_index_refs, col_ndx, virtual_col, get_alloc()));
-            }
-            m_index_accessors[col_ndx] = index.release();
+        bool has_old_accessor = m_index_accessors[col_ndx];
+        ref_type ref = m_index_refs.get_as_ref(col_ndx);
+
+        if (has_old_accessor && ref == 0) { // accessor drop
+            delete m_index_accessors[col_ndx];
+            m_index_accessors[col_ndx] = nullptr;
+        }
+        else if (has_old_accessor && ref != 0) { // still there, refresh:
+            m_index_accessors[col_ndx]->refresh_accessor_tree();
+        }
+        else if (!has_old_accessor && ref != 0) { // new index!
+            auto col_key = m_leaf_ndx2colkey[col_ndx];
+            ClusterColumn virtual_col(&m_clusters, col_key);
+            m_index_accessors[col_ndx] = new StringIndex(ref, &m_index_refs, col_ndx, virtual_col, get_alloc());
         }
     }
 }
