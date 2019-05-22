@@ -2262,21 +2262,6 @@ ColKey Table::generate_col_key(ColumnType tp, ColumnAttrMask attr)
     return ColKey(ColKey::Idx{lower}, tp, attr, upper);
 }
 
-// Find the backlink column which is linked to from the given table and column
-ColKey Table::find_backlink_column(TableKey origin_table_key, ColKey origin_col_key) const noexcept
-{
-    ColKey retval;
-    auto predicate = [&](ColKey col_key) {
-        if (origin_col_key == get_opposite_column(col_key) && origin_table_key == get_opposite_table_key(col_key)) {
-            retval = col_key;
-            return true;
-        }
-        return false;
-    };
-    for_each_backlink_column(predicate);
-    return retval;
-}
-
 Table::BacklinkOrigin Table::find_backlink_origin(StringData origin_table_name, StringData origin_col_name) const
     noexcept
 {
