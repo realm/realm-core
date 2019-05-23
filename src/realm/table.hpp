@@ -115,7 +115,6 @@ public:
     ColumnAttrMask get_column_attr(ColKey column_key) const noexcept;
     ColKey get_column_key(StringData name) const noexcept;
     ColKeys get_column_keys() const;
-    ColKey find_backlink_column(TableKey origin_table_key, ColKey origin_col_key) const noexcept;
     typedef util::Optional<std::pair<ConstTableRef, ColKey>> BacklinkOrigin;
     BacklinkOrigin find_backlink_origin(StringData origin_table_name, StringData origin_col_name) const noexcept;
     BacklinkOrigin find_backlink_origin(ColKey backlink_col) const noexcept;
@@ -238,6 +237,7 @@ public:
     Columns<T> column(ColKey col_key); // FIXME: Should this one have been declared noexcept?
     template <class T>
     Columns<T> column(const Table& origin, ColKey origin_col_key);
+
     // BacklinkCount is a total count per row and therefore not attached to a specific column
     template <class T>
     BacklinkCount<T> get_backlink_count();
@@ -1138,10 +1138,7 @@ inline Columns<T> Table::column(const Table& origin, ColKey origin_col_key)
 {
     static_assert(std::is_same<T, BackLink>::value, "");
 
-    auto origin_table_key = origin.get_key();
-    const Table& current_target_table = *get_link_chain_target(m_link_chain);
-    ColKey backlink_col_key = current_target_table.find_backlink_column(origin_table_key, origin_col_key);
-
+    auto backlink_col_key = origin.get_opposite_column(origin_col_key);
     std::vector<ColKey> link_chain = std::move(m_link_chain);
     m_link_chain.clear();
     link_chain.push_back(backlink_col_key);
@@ -1173,9 +1170,7 @@ SubQuery<T> Table::column(const Table& origin, ColKey origin_col_key, Query subq
 
 inline Table& Table::backlink(const Table& origin, ColKey origin_col_key)
 {
-    auto origin_table_key = origin.get_key();
-    const Table& current_target_table = *get_link_chain_target(m_link_chain);
-    ColKey backlink_col_key = current_target_table.find_backlink_column(origin_table_key, origin_col_key);
+    auto backlink_col_key = origin.get_opposite_column(origin_col_key);
     return link(backlink_col_key);
 }
 
