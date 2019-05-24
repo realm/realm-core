@@ -643,6 +643,7 @@ public:
     TableRef get_opposite_table(ColKey col_key) const;
     TableKey get_opposite_table_key(ColKey col_key) const;
     ColKey get_opposite_column(ColKey col_key) const;
+    ColKey find_opposite_column(ColKey col_key) const;
 
 protected:
     /// Compare the objects of two tables under the assumption that the two tables

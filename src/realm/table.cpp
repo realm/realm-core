@@ -885,7 +885,11 @@ void Table::migrate_subspec(std::function<void()> commit_and_continue)
                 auto target_key = m_spec.get_opposite_link_table_key(col_ndx);
                 auto target_table = group->get_table(target_key);
                 Spec& target_spec = _impl::TableFriend::get_spec(*target_table);
-                ColKey backlink_col_key = target_spec.find_backlink_column(m_key, col_ndx);
+                // The target table spec may already be migrated.
+                // If it has, the new functions should be used.
+                ColKey backlink_col_key = target_spec.has_subspec()
+                                              ? target_spec.find_backlink_column(m_key, col_ndx)
+                                              : target_table->find_opposite_column(m_spec.get_key(col_ndx));
                 REALM_ASSERT(backlink_col_key.get_type() == col_type_BackLink);
                 if (m_opposite_table.get(col_ndx) != target_key.value) {
                     m_opposite_table.set(col_ndx, target_key.value);
@@ -2777,4 +2781,14 @@ TableRef Table::get_opposite_table(ColKey col_key) const
 ColKey Table::get_opposite_column(ColKey col_key) const
 {
     return ColKey(m_opposite_column.get(col_key.get_index().val));
+}
+
+ColKey Table::find_opposite_column(ColKey col_key) const
+{
+    for (size_t i = 0; i < m_opposite_column.size(); i++) {
+        if (m_opposite_column.get(i) == col_key.value) {
+            return m_spec.get_key(m_leaf_ndx2spec_ndx[i]);
+        }
+    }
+    return ColKey();
 }
