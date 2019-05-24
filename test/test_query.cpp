@@ -2354,7 +2354,13 @@ TEST(Query_StrIndex3)
 
     Random random(random_int<unsigned long>()); // Seed from slow global generator
 
-#ifdef REALM_DEBUG
+#if REALM_MAX_BPNODE_SIZE > 256
+    constexpr int node_size = 256;
+#else
+    constexpr int node_size = 4;
+#endif
+
+#if defined REALM_DEBUG || REALM_ANDROID
     for (int N = 0; N < 4; N++) {
 #else
     for (int N = 0; N < 20; N++) {
@@ -2366,22 +2372,20 @@ TEST(Query_StrIndex3)
         std::vector<ObjKey> vec;
 
         size_t n = 0;
-#ifdef REALM_DEBUG
+#if defined REALM_DEBUG || REALM_ANDROID
         for (int i = 0; i < 4; i++) {
 #else
         for (int i = 0; i < 20; i++) {
 #endif
-            // 1/500 match probability because we want possibility for a 1000 sized leaf to contain 0 matches
-            // (important
-            // edge case)
-            int f1 = random.draw_int_mod(REALM_MAX_BPNODE_SIZE) / 2 + 1;
-            int f2 = random.draw_int_mod(REALM_MAX_BPNODE_SIZE) / 2 + 1;
+            // 1/128 match probability because we want possibility for a 256 sized leaf to contain 0 matches
+            // (important edge case)
+            int f1 = random.draw_int_mod(node_size) / 2 + 1;
+            int f2 = random.draw_int_mod(node_size) / 2 + 1;
             bool longstrings = random.chance(1, 5);
 
-            // 2200 entries with that probability to fill out two concecutive 1000 sized leaves with above
-            // probability,
-            // plus a remainder (edge case)
-            for (int j = 0; j < REALM_MAX_BPNODE_SIZE * 2 + REALM_MAX_BPNODE_SIZE / 5; j++) {
+            // 576 entries with that probability to fill out two concecutive 256 sized leaves with above
+            // probability, plus a remainder (edge case)
+            for (int j = 0; j < node_size * 2 + node_size / 4; j++) {
                 if (random.chance(1, f1)) {
                     if (random.chance(1, f2)) {
                         ObjKey key =
