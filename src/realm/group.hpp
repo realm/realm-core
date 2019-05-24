@@ -555,7 +555,6 @@ private:
     // in-use allocator. If local, then equal to m_local_alloc.
     SlabAlloc& m_alloc;
 
-
     int m_file_format_version;
     /// `m_top` is the root node (or top array) of the Realm, and has the
     /// following layout:
