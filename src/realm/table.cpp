@@ -2507,30 +2507,19 @@ ColKey Table::generate_col_key(ColumnType tp, ColumnAttrMask attr)
 Table::BacklinkOrigin Table::find_backlink_origin(StringData origin_table_name, StringData origin_col_name) const
     noexcept
 {
-    try {
-        if (get_name() == origin_table_name) {
-            ColKey linked_col_key = get_column_key(origin_col_name);
-            if (linked_col_key != ColKey()) {
-                return {{get_table_ref(), linked_col_key}};
-            }
+    BacklinkOrigin ret;
+    auto f = [&](ColKey backlink_col_key) {
+        auto origin_table = get_opposite_table(backlink_col_key);
+        auto origin_link_col = get_opposite_column(backlink_col_key);
+        if (origin_table->get_name() == origin_table_name &&
+            origin_table->get_column_name(origin_link_col) == origin_col_name) {
+            ret = BacklinkOrigin{{origin_table, origin_link_col}};
+            return true;
         }
-        else {
-            Group* current_group = get_parent_group();
-            if (current_group) {
-                ConstTableRef linked_table = current_group->get_table(origin_table_name);
-                if (linked_table) {
-                    ColKey linked_col_key = linked_table->get_column_key(origin_col_name);
-                    if (linked_col_key != ColKey()) {
-                        return {{linked_table, linked_col_key}};
-                    }
-                }
-            }
-        }
-    }
-    catch (...) {
-        // not found, returning empty optional
-    }
-    return {};
+        return false;
+    };
+    this->for_each_backlink_column(f);
+    return ret;
 }
 
 Table::BacklinkOrigin Table::find_backlink_origin(ColKey backlink_col) const noexcept
