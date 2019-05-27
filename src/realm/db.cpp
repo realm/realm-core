@@ -1741,6 +1741,24 @@ void DB::upgrade_file_format(bool allow_file_format_upgrade, int target_file_for
         auto wt = start_write();
         bool dirty = false;
 
+        // We need to upgrade history first. We may need to access it during migration
+        // when processing the !OID columns
+        int current_hist_schema_version_2 = wt->get_history_schema_version();
+        // The history must either still be using its initial schema or have
+        // been upgraded already to the chosen target schema version via a
+        // concurrent SharedGroup object.
+        REALM_ASSERT(current_hist_schema_version_2 == current_hist_schema_version ||
+                     current_hist_schema_version_2 == target_hist_schema_version);
+        bool need_hist_schema_upgrade = (current_hist_schema_version_2 < target_hist_schema_version);
+        if (need_hist_schema_upgrade) {
+            if (!allow_file_format_upgrade)
+                throw FileFormatUpgradeRequired();
+            Replication* repl = get_replication();
+            repl->upgrade_history_schema(current_hist_schema_version_2); // Throws
+            wt->set_history_schema_version(target_hist_schema_version);  // Throws
+            dirty = true;
+        }
+
         // File format upgrade
         int current_file_format_version_2 = m_alloc.get_committed_file_format_version();
         // The file must either still be using its initial file_format or have
@@ -1762,23 +1780,6 @@ void DB::upgrade_file_format(bool allow_file_format_upgrade, int target_file_for
         }
         wt->set_file_format_version(target_file_format_version);
         m_file_format_version = target_file_format_version;
-
-        // History schema upgrade
-        int current_hist_schema_version_2 = wt->get_history_schema_version();
-        // The history must either still be using its initial schema or have
-        // been upgraded already to the chosen target schema version via a
-        // concurrent SharedGroup object.
-        REALM_ASSERT(current_hist_schema_version_2 == current_hist_schema_version ||
-                     current_hist_schema_version_2 == target_hist_schema_version);
-        bool need_hist_schema_upgrade = (current_hist_schema_version_2 < target_hist_schema_version);
-        if (need_hist_schema_upgrade) {
-            if (!allow_file_format_upgrade)
-                throw FileFormatUpgradeRequired();
-            Replication* repl = get_replication();
-            repl->upgrade_history_schema(current_hist_schema_version_2);     // Throws
-            wt->set_history_schema_version(target_hist_schema_version);      // Throws
-            dirty = true;
-        }
 
         if (dirty)
             wt->commit(); // Throws
