@@ -733,9 +733,10 @@ void Table::do_erase_root_column(ColKey col_key)
     ref_type index_ref = m_index_refs.get_as_ref(col_ndx);
     if (index_ref) {
         Array::destroy_deep(index_ref, m_index_refs.get_alloc());
+        m_index_refs.set(col_ndx, 0);
+        delete m_index_accessors[col_ndx];
+        m_index_accessors[col_ndx] = nullptr;
     }
-    delete m_index_accessors[col_ndx];
-    m_index_refs.set(col_ndx, 0);
     m_opposite_table.set(col_ndx, 0);
     m_opposite_column.set(col_ndx, 0);
     m_index_accessors[col_ndx] = nullptr;
@@ -745,6 +746,10 @@ void Table::do_erase_root_column(ColKey col_key)
     m_top.adjust(top_position_for_column_key, 2);
 
     build_column_mapping();
+    while (m_index_accessors.size() > m_leaf_ndx2colkey.size()) {
+        REALM_ASSERT(m_index_accessors.back() == nullptr);
+        m_index_accessors.erase(m_index_accessors.end() - 1);
+    }
 }
 
 LinkType Table::get_link_type(ColKey col_key) const
