@@ -411,7 +411,7 @@ size_t Spec::get_origin_column_ndx(size_t backlink_col_ndx) const noexcept
     size_t subspec_ndx = get_subspec_ndx(backlink_col_ndx);
     int64_t tagged_value = m_oldsubspecs.get(subspec_ndx + 1);
     REALM_ASSERT(tagged_value != 0); // can't retrieve it if never set
-    return uint64_t(tagged_value) >> 1;
+    return size_t(tagged_value) >> 1;
 }
 
 ColKey Spec::find_backlink_column(TableKey origin_table_key, size_t spec_ndx) const noexcept

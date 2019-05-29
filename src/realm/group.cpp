@@ -911,9 +911,9 @@ void Group::rename_table(TableKey key, StringData new_name, bool require_unique_
 
 class Group::DefaultTableWriter : public Group::TableWriter {
 public:
-    DefaultTableWriter(const Group& group, bool write_history)
+    DefaultTableWriter(const Group& group, bool should_write_history)
         : m_group(group)
-        , m_write_history(write_history)
+        , m_should_write_history(should_write_history)
     {
     }
     ref_type write_names(_impl::OutputStream& out) override
@@ -942,7 +942,7 @@ public:
                                                              m_group.m_top.get_ref(), version, history_type,
                                                              history_schema_version);
             REALM_ASSERT(history_type != Replication::hist_None);
-            if (!m_write_history ||
+            if (!m_should_write_history ||
                 (history_type != Replication::hist_SyncClient && history_type != Replication::hist_SyncServer)) {
                 return info; // Only sync history should be preserved when writing to a new file
             }
@@ -959,7 +959,7 @@ public:
 
 private:
     const Group& m_group;
-    bool m_write_history;
+    bool m_should_write_history;
 };
 
 void Group::write(std::ostream& out, bool pad) const

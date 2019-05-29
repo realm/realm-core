@@ -845,7 +845,7 @@ void Table::migrate_indexes(std::function<void()> commit_and_continue)
 
         for (size_t col_ndx = 0; col_ndx < m_spec.get_column_count(); col_ndx++) {
             if (m_spec.get_column_attr(col_ndx).test(col_attr_Indexed) && !m_index_refs.get(col_ndx)) {
-                auto old_index_ref = col_refs.get(col_ndx + 1);
+                auto old_index_ref = to_ref(col_refs.get(col_ndx + 1));
 
                 // Delete old index
                 Array::destroy_deep(old_index_ref, m_alloc);
@@ -917,7 +917,7 @@ void Table::migrate_subspec(std::function<void()> commit_and_continue)
                 if (m_opposite_column.get(col_ndx) != origin_col_key.value) {
                     m_opposite_column.set(col_ndx, origin_col_key.value);
                 }
-                if (auto ref = col_refs.get(col_ndx)) {
+                if (auto ref = to_ref(col_refs.get(col_ndx))) {
                     Array::destroy_deep(ref, m_alloc);
                     col_refs.set(col_ndx, 0);
                 }
@@ -965,9 +965,9 @@ void Table::convert_links_from_ndx_to_key(std::function<void()> commit_and_conti
                                 link_list.init_from_ref(ref_type(val));
                                 size_t link_list_sz = link_list.size();
                                 for (size_t j = 0; j < link_list_sz; j++) {
-                                    int64_t link = link_list.get(j);
-                                    int64_t key_val = oid_column.get(link);
-                                    if (key_val != link) {
+                                    int64_t link_val = link_list.get(j);
+                                    int64_t key_val = oid_column.get(size_t(link_val));
+                                    if (key_val != link_val) {
                                         link_list.set(j, key_val);
                                     }
                                 }
@@ -975,7 +975,7 @@ void Table::convert_links_from_ndx_to_key(std::function<void()> commit_and_conti
                                 new_val = link_list.get_ref();
                             }
                             else {
-                                new_val = oid_column.get(val - 1) + 1;
+                                new_val = oid_column.get(size_t(val - 1)) + 1;
                             }
                             if (new_val != val) {
                                 link_column.set(row_ndx, new_val);
@@ -999,8 +999,8 @@ void Table::convert_links_from_ndx_to_key(std::function<void()> commit_and_conti
 ref_type Table::get_oid_column_ref() const
 {
     Array col_refs(m_alloc);
-    col_refs.init_from_ref(m_top.get(top_position_for_columns));
-    return col_refs.get(0);
+    col_refs.init_from_ref(m_top.get_as_ref(top_position_for_columns));
+    return to_ref(col_refs.get(0));
 }
 
 namespace {
@@ -1330,7 +1330,7 @@ void Table::migrate_objects(std::function<void()> commit_and_continue)
 
     // Destroy values in the old columns
     for (auto col_ndx : cols_to_destroy) {
-        Array::destroy_deep(col_refs.get(col_ndx), m_alloc);
+        Array::destroy_deep(to_ref(col_refs.get(col_ndx)), m_alloc);
         col_refs.set(col_ndx, 0);
     }
 
@@ -1391,7 +1391,7 @@ void Table::migrate_links(std::function<void()> commit_and_continue)
     if (sz != size_t(-1)) {
         BPlusTree<Int> oid_column(m_alloc);
         if (use_oid) {
-            oid_column.init_from_ref(col_refs.get(0));
+            oid_column.init_from_ref(to_ref(col_refs.get(0)));
         }
         for (size_t i = 0; i < sz; i++) {
             ObjKey obj_key(use_oid ? oid_column.get(i) : i);
