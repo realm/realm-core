@@ -144,6 +144,71 @@ void ConstObj::remove()
     const_cast<Table*>(get_table())->remove_object(m_key);
 }
 
+Mixed ConstObj::get_any(ColKey col_key) const
+{
+    Mixed ret;
+    bool is_nullable = col_key.get_attrs().test(col_attr_Nullable);
+    switch (col_key.get_type()) {
+        case col_type_Int:
+            if (is_nullable) {
+                if (auto val = get<util::Optional<int64_t>>(col_key)) {
+                    ret = *val;
+                }
+            }
+            else {
+                ret = get<Int>(col_key);
+            }
+            break;
+        case col_type_Bool:
+            if (auto val = get<util::Optional<bool>>(col_key)) {
+                ret = *val;
+            }
+            break;
+        case col_type_Float:
+            if (auto val = get<util::Optional<float>>(col_key)) {
+                ret = *val;
+            }
+            break;
+        case col_type_Double:
+            if (auto val = get<util::Optional<double>>(col_key)) {
+                ret = *val;
+            }
+            break;
+        case col_type_String: {
+            auto val = get<String>(col_key);
+            if (!val.is_null()) {
+                ret = val;
+            }
+            break;
+        }
+        case col_type_Binary: {
+            auto val = get<Binary>(col_key);
+            if (!val.is_null()) {
+                ret = val;
+            }
+            break;
+        }
+        case col_type_Timestamp: {
+            auto val = get<Timestamp>(col_key);
+            if (!val.is_null()) {
+                ret = val;
+            }
+            break;
+        }
+        case col_type_Link: {
+            auto val = get<ObjKey>(col_key);
+            if (val) {
+                ret = val;
+            }
+            break;
+        }
+        default:
+            REALM_UNREACHABLE();
+            break;
+    }
+    return ret;
+}
+
 ColKey ConstObj::get_column_key(StringData col_name) const
 {
     return get_table()->get_column_key(col_name);
@@ -449,6 +514,51 @@ void Obj::bump_both_versions()
     Allocator& alloc = get_alloc();
     alloc.bump_content_version();
     alloc.bump_storage_version();
+}
+
+Obj& Obj::set(ColKey col_key, Mixed value)
+{
+    if (value.is_null()) {
+        REALM_ASSERT(col_key.get_attrs().test(col_attr_Nullable));
+        set_null(col_key);
+    }
+    else {
+        REALM_ASSERT(value.get_type() == DataType(col_key.get_type()));
+        switch (col_key.get_type()) {
+            case col_type_Int:
+                if (col_key.get_attrs().test(col_attr_Nullable)) {
+                    set(col_key, util::Optional<Int>(value.get_int()));
+                }
+                else {
+                    set(col_key, value.get_int());
+                }
+                break;
+            case col_type_Bool:
+                set(col_key, value.get_bool());
+                break;
+            case col_type_Float:
+                set(col_key, value.get_float());
+                break;
+            case col_type_Double:
+                set(col_key, value.get_double());
+                break;
+            case col_type_String:
+                set(col_key, value.get_string());
+                break;
+            case col_type_Binary:
+                set(col_key, value.get<Binary>());
+                break;
+            case col_type_Timestamp:
+                set(col_key, value.get<Timestamp>());
+                break;
+            case col_type_Link:
+                set(col_key, value.get<ObjKey>());
+                break;
+            default:
+                break;
+        }
+    }
+    return *this;
 }
 
 template <>

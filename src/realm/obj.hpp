@@ -94,6 +94,8 @@ public:
     template <typename U>
     U get(ColKey col_key) const;
 
+    Mixed get_any(ColKey col_key) const;
+
     template <typename U>
     U get(StringData col_name) const
     {
@@ -189,6 +191,8 @@ public:
 
     template <typename U>
     Obj& set(ColKey col_key, U value, bool is_default = false);
+
+    Obj& set(ColKey col_key, Mixed value);
 
     template <typename U>
     Obj& set(StringData col_name, U value, bool is_default = false)
