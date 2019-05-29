@@ -20,6 +20,8 @@
 #include <realm/string_data.hpp>
 #include <iomanip>
 #include <ostream>
+#include <sstream>
+#include <cctype>
 
 using namespace realm;
 
