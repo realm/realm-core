@@ -1964,7 +1964,15 @@ private:
 class LinksToNode : public ParentNode {
 public:
     LinksToNode(ColKey origin_column_key, ObjKey target_key)
-        : m_target_key(target_key)
+        : m_target_keys(1, target_key)
+    {
+        m_dD = 10.0;
+        m_dT = 50.0;
+        m_condition_column_key = origin_column_key;
+    }
+
+    LinksToNode(ColKey origin_column_key, const std::vector<ObjKey>& target_keys)
+        : m_target_keys(target_keys)
     {
         m_dD = 10.0;
         m_dT = 50.0;
@@ -1993,8 +2001,10 @@ public:
     virtual std::string describe(util::serializer::SerialisationState& state) const override
     {
         REALM_ASSERT(m_condition_column_key);
+        if (m_target_keys.size() > 1)
+            throw SerialisationError("Serialising a query which links to multiple objects is currently unsupported.");
         return state.describe_column(ParentNode::m_table, m_condition_column_key) + " " + describe_condition() + " " +
-               util::serializer::print_value(m_target_key);
+               util::serializer::print_value(m_target_keys[0]);
     }
 
     virtual std::string describe_condition() const override
@@ -2005,15 +2015,27 @@ public:
     size_t find_first_local(size_t start, size_t end) override
     {
         if (m_column_type == type_Link) {
-            return static_cast<const ArrayKey*>(m_leaf_ptr)->find_first(m_target_key, start, end);
+            for (auto& key : m_target_keys) {
+                if (key) {
+                    // LinkColumn stores link to row N as the integer N + 1
+                    auto pos = static_cast<const ArrayKey*>(m_leaf_ptr)->find_first(key, start, end);
+                    if (pos != realm::npos) {
+                        return pos;
+                    }
+                }
+            }
         }
         else if (m_column_type == type_LinkList) {
             ArrayKeyNonNullable arr(m_table->get_alloc());
             for (size_t i = start; i < end; i++) {
                 if (ref_type ref = static_cast<const ArrayList*>(m_leaf_ptr)->get(i)) {
                     arr.init_from_ref(ref);
-                    if (arr.find_first(m_target_key, 0, arr.size()) != not_found)
-                        return i;
+                    for (auto& key : m_target_keys) {
+                        if (key) {
+                            if (arr.find_first(key, 0, arr.size()) != not_found)
+                                return i;
+                        }
+                    }
                 }
             }
         }
@@ -2027,7 +2049,7 @@ public:
     }
 
 private:
-    ObjKey m_target_key;
+    std::vector<ObjKey> m_target_keys;
     DataType m_column_type = type_Link;
     using LeafPtr = std::unique_ptr<ArrayPayload, PlacementDelete>;
     union Storage {
@@ -2041,7 +2063,7 @@ private:
 
     LinksToNode(const LinksToNode& source)
         : ParentNode(source, nullptr)
-        , m_target_key(source.m_target_key)
+        , m_target_keys(source.m_target_keys)
         , m_column_type(source.m_column_type)
     {
     }

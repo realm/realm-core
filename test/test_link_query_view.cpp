@@ -429,6 +429,9 @@ TEST(LinkList_QueryFindLinkTarget)
 
     tv = (table1->column<Link>(col_link3) != o23).find_all();
     CHECK_TABLE_VIEW(tv, {o10.get_key(), o11.get_key()});
+
+    tv = table1->where().links_to(col_link3, std::vector<ObjKey>({o20.get_key(), o22.get_key()})).find_all();
+    CHECK_TABLE_VIEW(tv, {o10.get_key(), o11.get_key()});
 }
 
 // Tests chains of links, such as table->link(2).link(0)...

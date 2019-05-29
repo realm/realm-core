@@ -630,6 +630,12 @@ Query& Query::links_to(ColKey origin_column_key, ObjKey target_key)
     return *this;
 }
 
+Query& Query::links_to(ColKey origin_column, const std::vector<ObjKey>& target_keys)
+{
+    add_node(std::unique_ptr<ParentNode>(new LinksToNode(origin_column, target_keys)));
+    return *this;
+}
+
 // int64 constant vs column
 Query& Query::equal(ColKey column_key, int64_t value)
 {

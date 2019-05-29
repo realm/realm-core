@@ -3595,11 +3595,41 @@ TEST(Query_EmptyDescriptors)
         tv.sort(SortDescriptor());
         tv.sort(SortDescriptor({{t1_int_col}}));
         tv.sort(SortDescriptor());
+        tv.include(IncludeDescriptor({}));
         results = {2, 3, 3, 4};
         for (size_t i = 0; i < results.size(); ++i) {
             CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results[i]);
         }
     }
+}
+
+TEST(Query_AllowEmptyDescriptors)
+{
+    Group g;
+    TableRef t1 = g.add_table("t1");
+    t1->add_column(type_Int, "t1_int");
+    t1->add_column(type_String, "t1_str");
+    t1->create_object();
+
+    DescriptorOrdering ordering;
+
+    CHECK(!ordering.will_apply_sort());
+    CHECK(!ordering.will_apply_distinct());
+    CHECK(!ordering.will_apply_limit());
+    CHECK(!ordering.will_apply_include());
+    CHECK(!ordering.will_limit_to_zero());
+    CHECK_EQUAL(ordering.size(), 0);
+
+    std::vector<std::vector<ColKey>> cols;
+    ordering.append_sort(SortDescriptor(cols));
+    ordering.append_distinct(DistinctDescriptor(cols));
+    ordering.append_include(IncludeDescriptor());
+    CHECK(!ordering.will_apply_sort());
+    CHECK(!ordering.will_apply_distinct());
+    CHECK(!ordering.will_apply_limit());
+    CHECK(!ordering.will_apply_include());
+    CHECK(!ordering.will_limit_to_zero());
+    CHECK_EQUAL(ordering.size(), 0);
 }
 
 TEST(Query_DescriptorsWillApply)
@@ -3608,6 +3638,7 @@ TEST(Query_DescriptorsWillApply)
     TableRef t1 = g.add_table("t1");
     auto t1_int_col = t1->add_column(type_Int, "t1_int");
     auto t1_str_col = t1->add_column(type_String, "t1_str");
+    auto t1_link_col = t1->add_column_link(type_Link, "t1_link", *t1);
 
     t1->create_object();
 
@@ -3616,6 +3647,7 @@ TEST(Query_DescriptorsWillApply)
     CHECK(!ordering.will_apply_sort());
     CHECK(!ordering.will_apply_distinct());
     CHECK(!ordering.will_apply_limit());
+    CHECK(!ordering.will_apply_include());
     CHECK(!ordering.will_limit_to_zero());
     CHECK_EQUAL(ordering.size(), 0);
 
@@ -3623,6 +3655,7 @@ TEST(Query_DescriptorsWillApply)
     CHECK(!ordering.will_apply_sort());
     CHECK(!ordering.will_apply_distinct());
     CHECK(!ordering.will_apply_limit());
+    CHECK(!ordering.will_apply_include());
     CHECK(!ordering.will_limit_to_zero());
     CHECK_EQUAL(ordering.size(), 0);
 
@@ -3630,6 +3663,7 @@ TEST(Query_DescriptorsWillApply)
     CHECK(!ordering.will_apply_sort());
     CHECK(!ordering.will_apply_distinct());
     CHECK(!ordering.will_apply_limit());
+    CHECK(!ordering.will_apply_include());
     CHECK(!ordering.will_limit_to_zero());
     CHECK_EQUAL(ordering.size(), 0);
 
@@ -3644,47 +3678,63 @@ TEST(Query_DescriptorsWillApply)
     CHECK(ordering.will_apply_sort());
     CHECK(!ordering.will_apply_distinct());
     CHECK(!ordering.will_apply_limit());
+    CHECK(!ordering.will_apply_include());
     CHECK(!ordering.will_limit_to_zero());
 
     ordering.append_distinct(DistinctDescriptor({{t1_int_col}}));
     CHECK(ordering.will_apply_sort());
     CHECK(ordering.will_apply_distinct());
     CHECK(!ordering.will_apply_limit());
+    CHECK(!ordering.will_apply_include());
     CHECK(!ordering.will_limit_to_zero());
 
     ordering.append_distinct(DistinctDescriptor({{t1_str_col}}));
     CHECK(ordering.will_apply_sort());
     CHECK(ordering.will_apply_distinct());
     CHECK(!ordering.will_apply_limit());
+    CHECK(!ordering.will_apply_include());
     CHECK(!ordering.will_limit_to_zero());
 
     ordering.append_sort(SortDescriptor({{t1_str_col}}));
     CHECK(ordering.will_apply_sort());
     CHECK(ordering.will_apply_distinct());
     CHECK(!ordering.will_apply_limit());
+    CHECK(!ordering.will_apply_include());
     CHECK(!ordering.will_limit_to_zero());
 
     ordering.append_limit(LimitDescriptor(1));
     CHECK(ordering.will_apply_sort());
     CHECK(ordering.will_apply_distinct());
     CHECK(ordering.will_apply_limit());
+    CHECK(!ordering.will_apply_include());
     CHECK(!ordering.will_limit_to_zero());
 
+    ordering.append_include(IncludeDescriptor(*t1, {{LinkPathPart{t1_link_col, t1}}}));
+    CHECK(ordering.will_apply_sort());
+    CHECK(ordering.will_apply_distinct());
+    CHECK(ordering.will_apply_limit());
+    CHECK(ordering.will_apply_include());
+    CHECK(!ordering.will_limit_to_zero());
+
+    // FIXME: Wrong merge here:
     CHECK_EQUAL(ordering.size(), 5);
     CHECK(ordering.get_type(0) == DescriptorType::Sort);
     CHECK(ordering.get_type(1) == DescriptorType::Distinct);
     CHECK(ordering.get_type(2) == DescriptorType::Distinct);
     CHECK(ordering.get_type(3) == DescriptorType::Sort);
     CHECK(ordering.get_type(4) == DescriptorType::Limit);
+    CHECK(ordering.get_type(5) == DescriptorType::Include);
 
     DescriptorOrdering ordering_copy = ordering;
     CHECK(ordering.will_apply_sort());
     CHECK(ordering.will_apply_distinct());
     CHECK(ordering.will_apply_limit());
+    CHECK(ordering.will_apply_include());
     CHECK(!ordering.will_limit_to_zero());
     CHECK(ordering_copy.will_apply_sort());
     CHECK(ordering_copy.will_apply_distinct());
     CHECK(ordering_copy.will_apply_limit());
+    CHECK(ordering_copy.will_apply_include());
     CHECK(!ordering_copy.will_limit_to_zero());
 
     ordering_copy.append_limit({10});
@@ -4031,6 +4081,7 @@ TEST(Query_SortDistinctOrderThroughHandover)
     TableRef t1 = g->add_table("t1");
     auto t1_int_col = t1->add_column(type_Int, "t1_int");
     auto t1_str_col = t1->add_column(type_String, "t1_str");
+    auto t1_link_col = t1->add_column_link(type_Link, "t1_link", *t1);
 
     ObjKey k0 = t1->create_object().set_all(100, "A").get_key();
     ObjKey k1 = t1->create_object().set_all(200, "A").get_key();
@@ -4081,6 +4132,18 @@ TEST(Query_SortDistinctOrderThroughHandover)
         tv.sort(SortDescriptor({{t1_int_col}}, {false}));
         tv.distinct(DistinctDescriptor({{t1_str_col}}));
         tv.limit(LimitDescriptor(0));
+        CHECK_EQUAL(tv.size(), results.size());
+        auto tr = g->duplicate();
+        auto tv2 = tr->import_copy_of(tv, PayloadPolicy::Stay);
+        check_across_handover(results, std::move(tv2));
+    }
+    { // sort descending then distinct then limit and include
+        TableView tv = t1->where().find_all();
+        ResultList results = {};
+        tv.sort(SortDescriptor({{t1_int_col}}, {false}));
+        tv.distinct(DistinctDescriptor({{t1_str_col}}));
+        tv.limit(LimitDescriptor(0));
+        tv.include(IncludeDescriptor(*t1, {{{t1_link_col, t1}}}));
         CHECK_EQUAL(tv.size(), results.size());
         auto tr = g->duplicate();
         auto tv2 = tr->import_copy_of(tv, PayloadPolicy::Stay);
@@ -4425,6 +4488,382 @@ TEST(Query_DistinctThroughLinks)
         }
     }
 }
+
+#ifdef LEGACY_TESTS
+TEST(Query_IncludeDescriptorSelfLinks)
+{
+    Group g;
+    TableRef t1 = g.add_table("t1");
+
+    size_t t1_int_col = t1->add_column(type_Int, "t1_int");
+    size_t t1_link_self_col = t1->add_column_link(type_Link, "t1_link_self", *t1);
+
+    t1->add_empty_row(7);
+
+    t1->set_int(t1_int_col, 0, 99);
+    for (size_t i = 0; i < t1->size() - 1; i++) {
+        t1->set_int(t1_int_col, i + 1, i);
+    }
+
+    // first link is null
+    t1->set_link(t1_link_self_col, 1, 2);
+    t1->set_link(t1_link_self_col, 2, 3);
+    t1->set_link(t1_link_self_col, 3, 4);
+    t1->set_link(t1_link_self_col, 4, 5);
+    t1->set_link(t1_link_self_col, 5, 6);
+    t1->set_link(t1_link_self_col, 6, 0);
+
+    //  T1
+    //  t1_int  t1_link_self
+    //  =====================
+    //  99       null
+    //  0        2
+    //  1        3
+    //  2        4
+    //  3        5
+    //  4        6
+    //  5        0
+
+    { // test single backlink path from the same table: INCLUDE(@links.t1.t1_link_self)
+        TableView tv = t1->where().less(t1_int_col, 6).find_all();
+        tv.sort(t1_int_col);
+        tv.include(IncludeDescriptor(*t1, {{{t1_link_self_col, t1}}}));
+
+        IncludeDescriptor includes = tv.get_include_descriptors();
+        std::vector<size_t> expected_values;
+        auto reporter = [&](const Table* table, std::unordered_set<size_t> rows) {
+            CHECK(table == t1);
+            CHECK_EQUAL(expected_values.size(), rows.size());
+            for (auto row : rows) {
+                int64_t row_value = table->get_int(t1_int_col, row);
+                CHECK(std::find(expected_values.begin(), expected_values.end(), row_value) != expected_values.end());
+            }
+        };
+        CHECK_EQUAL(tv.size(), 6);
+        for (size_t i = 0; i < tv.size(); ++i) {
+            if (i == 0) {
+                expected_values = {}; // first result has no backlinks
+            }
+            else {
+                expected_values = {i - 1}; // linked to by the previous row
+            }
+            includes.report_included_backlinks(t1.get(), tv.get_source_ndx(i), reporter);
+        }
+    }
+    { // test a backlink chain of size two from the same table: INCLUDE(t1_link_self.@links.t1.t1_link_self)
+        TableView tv = t1->where().less(t1_int_col, 6).find_all();
+        tv.sort(t1_int_col);
+        tv.include(IncludeDescriptor(*t1, {{{t1_link_self_col}, {t1_link_self_col, t1}}}));
+
+        IncludeDescriptor includes = tv.get_include_descriptors();
+        std::vector<size_t> expected_values;
+        auto reporter = [&](const Table* table, std::unordered_set<size_t> rows) {
+            CHECK(table == t1);
+            CHECK_EQUAL(expected_values.size(), rows.size());
+            for (auto row : rows) {
+                int64_t row_value = table->get_int(t1_int_col, row);
+                CHECK(std::find(expected_values.begin(), expected_values.end(), row_value) != expected_values.end());
+            }
+        };
+        CHECK_EQUAL(tv.size(), 6);
+        for (size_t i = 0; i < tv.size(); ++i) {
+            expected_values = {i}; // following a single link gives this row as a backlink
+            includes.report_included_backlinks(t1.get(), tv.get_source_ndx(i), reporter);
+        }
+    }
+    {   // test a backlink chain of size three from the same table:
+        // INCLUDE(t1_link_self.t1_link_self.@links.t1.t1_link_self)
+        TableView tv = t1->where().less(t1_int_col, 6).find_all();
+        tv.sort(t1_int_col);
+        tv.include(IncludeDescriptor(*t1, {{{t1_link_self_col}, {t1_link_self_col}, {t1_link_self_col, t1}}}));
+
+        IncludeDescriptor includes = tv.get_include_descriptors();
+        std::vector<size_t> expected_values;
+        auto reporter = [&](const Table* table, std::unordered_set<size_t> rows) {
+            CHECK(table == t1);
+            CHECK_EQUAL(expected_values.size(), rows.size());
+            for (auto row : rows) {
+                int64_t row_value = table->get_int(t1_int_col, row);
+                CHECK(std::find(expected_values.begin(), expected_values.end(), row_value) != expected_values.end());
+            }
+        };
+        CHECK_EQUAL(tv.size(), 6);
+        for (size_t i = 0; i < tv.size(); ++i) {
+            if (i == 5) {
+                expected_values = {}; // nullified by the second link
+            }
+            else {
+                expected_values = {i + 1}; // linked to by the next row in the chain (ndx + 1)
+            }
+            includes.report_included_backlinks(t1.get(), tv.get_source_ndx(i), reporter);
+        }
+    }
+}
+
+
+TEST(Query_IncludeDescriptorOtherLinks)
+{
+    Group g;
+    TableRef t1 = g.add_table("t1");
+    TableRef t2 = g.add_table("t2");
+
+    size_t t1_int_col = t1->add_column(type_Int, "t1_int");
+    size_t t2_int_col = t2->add_column(type_Int, "t2_int");
+    size_t t2_link_t1_col = t2->add_column_link(type_Link, "t2_link_t1", *t1);
+
+    t1->add_empty_row(7);
+
+    t1->set_int(t1_int_col, 0, 99);
+    for (size_t i = 0; i < t1->size() - 1; ++i) {
+        t1->set_int(t1_int_col, i + 1, i);
+    }
+
+    t2->add_empty_row(6);
+    for (size_t i = 0; i < t2->size(); ++i) {
+        t2->set_int(t2_int_col, i, i);
+    }
+
+    t2->set_link(t2_link_t1_col, 0, 1);
+    t2->set_link(t2_link_t1_col, 1, 2);
+    t2->set_link(t2_link_t1_col, 2, 3);
+    t2->set_link(t2_link_t1_col, 3, 1);
+
+    //  T1      T2
+    //  t1_int |   t2_int  t2_link_t1 |
+    //  ===============================
+    //  99     |   0       1          |
+    //  0      |   1       2          |
+    //  1      |   2       3          |
+    //  2      |   3       1          |
+    //  3      |   4       null       |
+    //  4      |   5       null       |
+    //  5      |                      |
+
+    { // test single backlink path from t2: INCLUDE(@links.t2.t2_link_t1)
+        TableView tv = t1->where().less(t1_int_col, 6).find_all();
+        tv.sort(t1_int_col);
+        tv.include(IncludeDescriptor(*t1, {{{t2_link_t1_col, t2}}}));
+
+        IncludeDescriptor includes = tv.get_include_descriptors();
+        std::vector<size_t> expected_t2_values;
+        auto reporter = [&](const Table* table, std::unordered_set<size_t> rows) {
+            CHECK(table == t2);
+            CHECK_EQUAL(expected_t2_values.size(), rows.size());
+            for (auto row : rows) {
+                int64_t row_value = table->get_int(t2_int_col, row);
+                CHECK(std::find(expected_t2_values.begin(), expected_t2_values.end(), row_value) !=
+                      expected_t2_values.end());
+            }
+        };
+        CHECK_EQUAL(tv.size(), 6);
+
+        expected_t2_values = {0, 3};
+        includes.report_included_backlinks(t1.get(), tv.get_source_ndx(0), reporter);
+        expected_t2_values = {1};
+        includes.report_included_backlinks(t1.get(), tv.get_source_ndx(1), reporter);
+        expected_t2_values = {2};
+        includes.report_included_backlinks(t1.get(), tv.get_source_ndx(2), reporter);
+        expected_t2_values = {}; // last three results are not linked to
+        includes.report_included_backlinks(t1.get(), tv.get_source_ndx(3), reporter);
+        includes.report_included_backlinks(t1.get(), tv.get_source_ndx(4), reporter);
+        includes.report_included_backlinks(t1.get(), tv.get_source_ndx(5), reporter);
+    }
+}
+
+
+TEST(Query_IncludeDescriptorOtherLists)
+{
+    Group g;
+    TableRef t1 = g.add_table("t1");
+    TableRef t2 = g.add_table("t2");
+
+    size_t t1_int_col = t1->add_column(type_Int, "t1_int");
+    size_t t2_int_col = t2->add_column(type_Int, "t2_int");
+    size_t t2_list_t1_col = t2->add_column_link(type_LinkList, "t2_list_t1", *t1);
+
+    t1->add_empty_row(7);
+
+    t1->set_int(t1_int_col, 0, 99);
+    for (size_t i = 0; i < t1->size() - 1; ++i) {
+        t1->set_int(t1_int_col, i + 1, i);
+    }
+
+    t2->add_empty_row(6);
+    for (size_t i = 0; i < t2->size(); ++i) {
+        t2->set_int(t2_int_col, i, i);
+    }
+
+    LinkViewRef links0 = t2->get_linklist(t2_list_t1_col, 0);
+    links0->add(0);
+    links0->add(1);
+    links0->add(2);
+    LinkViewRef links1 = t2->get_linklist(t2_list_t1_col, 1);
+    links1->add(0);
+    links1->add(1);
+    links1->add(2);
+    LinkViewRef links2 = t2->get_linklist(t2_list_t1_col, 2);
+    links2->add(0);
+    links2->add(1);
+    links2->add(2);
+    LinkViewRef links3 = t2->get_linklist(t2_list_t1_col, 4);
+    links3->add(3);
+
+    //  T1      T2
+    //  t1_int |   t2_int  t2_link_t1 |
+    //  ===============================
+    //  99     |   0       {0, 1, 2}  |
+    //  0      |   1       {0, 1, 2}  |
+    //  1      |   2       {0, 1, 2}  |
+    //  2      |   3       empty      |
+    //  3      |   4       {3}        |
+    //  4      |   5       empty      |
+    //  5      |                      |
+
+    { // test single backlink path from t2 list: INCLUDE(@links.t2.t2_list_t1_col)
+        TableView tv = t1->where().less(t1_int_col, 6).find_all();
+        tv.sort(t1_int_col);
+        tv.include(IncludeDescriptor(*t1, {{{t2_list_t1_col, t2}}}));
+
+        IncludeDescriptor includes = tv.get_include_descriptors();
+        std::vector<size_t> expected_t2_values;
+        auto reporter = [&](const Table* table, std::unordered_set<size_t> rows) {
+            CHECK(table == t2);
+            CHECK_EQUAL(expected_t2_values.size(), rows.size());
+            for (auto row : rows) {
+                int64_t row_value = table->get_int(t2_int_col, row);
+                CHECK(std::find(expected_t2_values.begin(), expected_t2_values.end(), row_value) !=
+                      expected_t2_values.end());
+            }
+        };
+        CHECK_EQUAL(tv.size(), 6);
+
+        expected_t2_values = {0, 1, 2};
+        includes.report_included_backlinks(t1.get(), tv.get_source_ndx(0), reporter);
+        expected_t2_values = {0, 1, 2};
+        includes.report_included_backlinks(t1.get(), tv.get_source_ndx(1), reporter);
+        expected_t2_values = {4};
+        includes.report_included_backlinks(t1.get(), tv.get_source_ndx(2), reporter);
+        expected_t2_values = {}; // nothing links to the last three rows
+        includes.report_included_backlinks(t1.get(), tv.get_source_ndx(3), reporter);
+        includes.report_included_backlinks(t1.get(), tv.get_source_ndx(4), reporter);
+        includes.report_included_backlinks(t1.get(), tv.get_source_ndx(5), reporter);
+    }
+}
+
+
+TEST(Query_IncludeDescriptorLinkAndListTranslation)
+{
+    Group g;
+    TableRef t1 = g.add_table("t1");
+    TableRef t2 = g.add_table("t2");
+    TableRef t3 = g.add_table("t3");
+    TableRef t4 = g.add_table("t4");
+
+    size_t t1_int_col = t1->add_column(type_Int, "t1_int");
+    size_t t1_link_t2_col = t1->add_column_link(type_Link, "t1_link_t2", *t2);
+    size_t t2_int_col = t2->add_column(type_Int, "t2_int");
+    size_t t2_list_t3_col = t2->add_column_link(type_LinkList, "t2_list_t3", *t3);
+    size_t t3_int_col = t3->add_column(type_Int, "t3_int");
+    size_t t4_int_col = t4->add_column(type_Int, "t4_int");
+    size_t t4_link_t3_col = t4->add_column_link(type_Link, "t4_link_t3", *t3);
+
+    t1->add_empty_row(7);
+    t2->add_empty_row(6);
+    t3->add_empty_row(7);
+    t4->add_empty_row(7);
+
+    t1->set_int(t1_int_col, 0, 99);
+    for (size_t i = 0; i < t1->size() - 1; ++i) {
+        t1->set_int(t1_int_col, i + 1, i);
+        t1->set_link(t1_link_t2_col, i, 5 - i);
+    }
+
+    for (size_t i = 0; i < t2->size(); ++i) {
+        t2->set_int(t2_int_col, i, i);
+    }
+
+    LinkViewRef links0 = t2->get_linklist(t2_list_t3_col, 0);
+    links0->add(0);
+    links0->add(1);
+    LinkViewRef links1 = t2->get_linklist(t2_list_t3_col, 1);
+    links1->add(1);
+    links1->add(2);
+    LinkViewRef links2 = t2->get_linklist(t2_list_t3_col, 2);
+    links2->add(3);
+    LinkViewRef links3 = t2->get_linklist(t2_list_t3_col, 4);
+    links3->add(4);
+    links3->add(5);
+    links3->add(6);
+
+    for (size_t i = 0; i < t3->size(); ++i) {
+        t3->set_int(t3_int_col, i, i);
+    }
+
+    for (size_t i = 0; i < t4->size(); ++i) {
+        t4->set_int(t4_int_col, i, i);
+    }
+    t4->set_link(t4_link_t3_col, 0, 0);
+    t4->set_link(t4_link_t3_col, 1, 0);
+    t4->set_link(t4_link_t3_col, 2, 0);
+    t4->set_link(t4_link_t3_col, 3, 1);
+    t4->set_link(t4_link_t3_col, 4, 1);
+    t4->set_link(t4_link_t3_col, 5, 2);
+    t4->set_link(t4_link_t3_col, 6, 3);
+
+    //  T1                   T2                   T3        T4
+    //  t1_int  t1_link_t2 | t2_int  t2_list_t3 | t3_int  | t4_int t4_link_t3
+    //  =====================================================================
+    //  99      5          |   0     {0, 1}     | 0       |  0      0
+    //  0       4          |   1     {1, 2}     | 1       |  1      0
+    //  1       3          |   2     {3}        | 2       |  2      0
+    //  2       2          |   3     {4, 5, 6}  | 3       |  3      1
+    //  3       1          |   4     empty      | 4       |  4      1
+    //  4       0          |   5     empty      | 5       |  5      2
+    //  5       null       |                    | 6       |  6      3
+
+    auto check_include = [&](DescriptorOrdering descriptor) {
+        // test link.list.backlink path: INCLUDE(t1_link_t2.t2_list_t3.@links.t4.t4_link_t3)
+        TableView tv = t1->where().less(t1_int_col, 6).find_all();
+        tv.apply_descriptor_ordering(descriptor);
+        IncludeDescriptor includes = tv.get_include_descriptors();
+
+        std::vector<size_t> expected_t4_values;
+        auto reporter = [&](const Table* table, std::unordered_set<size_t> rows) {
+            CHECK(table == t4);
+            CHECK_EQUAL(expected_t4_values.size(), rows.size());
+            for (auto row : rows) {
+                int64_t row_value = table->get_int(t4_int_col, row);
+                CHECK(std::find(expected_t4_values.begin(), expected_t4_values.end(), row_value) !=
+                      expected_t4_values.end());
+            }
+        };
+        CHECK_EQUAL(tv.size(), 6);
+
+        expected_t4_values = {}; // nullified path by empty t2 list
+        includes.report_included_backlinks(t1.get(), tv.get_source_ndx(0), reporter);
+        expected_t4_values = {}; // t4 does not link to 4,5,6 of t3
+        includes.report_included_backlinks(t1.get(), tv.get_source_ndx(1), reporter);
+        expected_t4_values = {6};
+        includes.report_included_backlinks(t1.get(), tv.get_source_ndx(2), reporter);
+        expected_t4_values = {3, 4, 5};
+        includes.report_included_backlinks(t1.get(), tv.get_source_ndx(3), reporter);
+        expected_t4_values = {0, 1, 2, 3, 4};
+        includes.report_included_backlinks(t1.get(), tv.get_source_ndx(4), reporter);
+        expected_t4_values = {}; // nullified path by null link in t1
+        includes.report_included_backlinks(t1.get(), tv.get_source_ndx(5), reporter);
+    };
+
+    DescriptorOrdering ordering;
+    ordering.append_include(IncludeDescriptor(*t1, {{{t1_link_t2_col}, {t2_list_t3_col}, {t4_link_t3_col, t4}}}));
+    ordering.append_sort(SortDescriptor(*t1, {{t1_int_col}}));
+    check_include(ordering);
+
+    DescriptorOrdering::HandoverPatch patch;
+    DescriptorOrdering::generate_patch(ordering, patch);
+    DescriptorOrdering transferred = DescriptorOrdering::create_from_and_consume_patch(patch, *t1);
+    check_include(transferred);
+}
+#endif
 
 TEST(Query_Sort_And_Requery_Typed1)
 {
