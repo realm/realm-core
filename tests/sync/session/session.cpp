@@ -736,7 +736,7 @@ TEST_CASE("sync: Migration from Sync 1.x to Sync 2.x", "[sync]") {
     }
 }
 
-TEST_CASE("sync: client reset") {
+TEST_CASE("sync: client resync") {
     using namespace std::literals::chrono_literals;
     if (!EventLoop::has_implementation())
         return;
@@ -834,7 +834,7 @@ TEST_CASE("sync: client reset") {
     };
 
     SECTION("should trigger error callback when mode is manual") {
-        config.sync_config->client_reset_mode = ClientResetHandling::Manual;
+        config.sync_config->client_resync_mode = ClientResyncMode::Manual;
         std::atomic<bool> called{false};
         config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
             REQUIRE(error.is_client_reset_requested());
@@ -851,7 +851,7 @@ TEST_CASE("sync: client reset") {
     };
 
     SECTION("should discard local changeset when mode is discard") {
-        config.sync_config->client_reset_mode = ClientResetHandling::DiscardLocal;
+        config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
 
         auto realm = trigger_client_reset([](auto&){}, [](auto&){});
         wait_for_download(*realm);
@@ -861,7 +861,7 @@ TEST_CASE("sync: client reset") {
     }
 
     SECTION("should recover local changeset when mode is recover") {
-        config.sync_config->client_reset_mode = ClientResetHandling::Recover;
+        config.sync_config->client_resync_mode = ClientResyncMode::Recover;
         config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError) {
             FAIL("Error handler should not have been called");
         };
@@ -877,7 +877,7 @@ TEST_CASE("sync: client reset") {
         config.encryption_key.resize(64, 'a');
         config.sync_config->realm_encryption_key = std::array<char, 64>();
         config.sync_config->realm_encryption_key->fill('a');
-        config.sync_config->client_reset_mode = ClientResetHandling::DiscardLocal;
+        config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
 
         auto realm = trigger_client_reset([](auto&){}, [](auto&){});
         wait_for_download(*realm);
@@ -886,7 +886,7 @@ TEST_CASE("sync: client reset") {
         REQUIRE_NOTHROW(Realm::get_shared_realm(config));
     }
 
-    config.sync_config->client_reset_mode = ClientResetHandling::DiscardLocal;
+    config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
 
     SECTION("add table in discarded transaction") {
         auto realm = trigger_client_reset([](auto& realm) {
@@ -920,7 +920,7 @@ TEST_CASE("sync: client reset") {
         REQUIRE(table->get_int(2, 0) == 0);
     }
 
-    config.sync_config->client_reset_mode = ClientResetHandling::Recover;
+    config.sync_config->client_resync_mode = ClientResyncMode::Recover;
 
     SECTION("add table without pk in recovered transaction") {
         auto realm = trigger_client_reset([](auto& realm) {

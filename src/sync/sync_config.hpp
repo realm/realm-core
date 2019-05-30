@@ -112,9 +112,12 @@ struct SyncError {
     }
 };
 
-enum class ClientResetHandling {
+enum class ClientResyncMode {
+    // Enable automatic client resync with local transaction recovery
     Recover,
+    // Enable automatic client resync without local transaction recovery
     DiscardLocal,
+    // Fire a client reset error
     Manual
 };
 
@@ -149,7 +152,7 @@ struct SyncConfig {
     // The name of the directory which Realms should be backed up to following
     // a client reset
     util::Optional<std::string> recovery_directory;
-    ClientResetHandling client_reset_mode = ClientResetHandling::Recover;
+    ClientResyncMode client_resync_mode = ClientResyncMode::Recover;
 
     // The URL that will be used when connecting to the object server.
     // This will differ from `reference_realm_url` when partial sync is being used.

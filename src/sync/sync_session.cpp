@@ -400,10 +400,10 @@ const SyncSession::State& SyncSession::State::active = Active();
 const SyncSession::State& SyncSession::State::dying = Dying();
 const SyncSession::State& SyncSession::State::inactive = Inactive();
 
-SyncSession::SyncSession(SyncClient& client, std::string realm_path, SyncConfig config, bool force_client_reset)
+SyncSession::SyncSession(SyncClient& client, std::string realm_path, SyncConfig config, bool force_client_resync)
 : m_state(&State::inactive)
 , m_config(std::move(config))
-, m_force_client_reset(force_client_reset)
+, m_force_client_resync(force_client_resync)
 , m_realm_path(std::move(realm_path))
 , m_client(client)
 {
@@ -474,14 +474,14 @@ void SyncSession::handle_error(SyncError error)
     }
 
     if (error.is_client_reset_requested()) {
-        switch (m_config.client_reset_mode) {
-            case ClientResetHandling::Manual:
+        switch (m_config.client_resync_mode) {
+            case ClientResyncMode::Manual:
                 break;
-            case ClientResetHandling::DiscardLocal:
-            case ClientResetHandling::Recover: {
+            case ClientResyncMode::DiscardLocal:
+            case ClientResyncMode::Recover: {
                 {
                     std::unique_lock<std::mutex> lock(m_state_mutex);
-                    m_force_client_reset = true;
+                    m_force_client_resync = true;
 
                     ++m_completion_counter;
                     auto download_handlers = std::move(m_download_completion_callbacks);
@@ -678,13 +678,13 @@ void SyncSession::create_sync_session()
         session_config.url_prefix = *m_config.url_prefix;
     }
 
-    if (m_force_client_reset) {
+    if (m_force_client_resync) {
         std::string metadata_dir = m_realm_path + ".resync";
         util::try_make_dir(metadata_dir);
 
         sync::Session::Config::ClientReset config;
         config.metadata_dir = metadata_dir;
-        if (m_config.client_reset_mode != ClientResetHandling::Recover)
+        if (m_config.client_resync_mode != ClientResyncMode::Recover)
             config.recover_local_changes = false;
         session_config.client_reset_config = config;
     }
