@@ -1,19 +1,16 @@
-# NEXT RELEASE
+# 6.0.0-alpha.7 Release notes
 
 ### Enhancements
-* None.
+* Ability to get/set Mixed on ConstObj/Obj.
+* Now able to migrate files with Sync histories.
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * None.
  
-### Breaking changes
-* None.
-
 -----------
 
 ### Internals
-* None.
+* Class ObjectId is moved over from Sync.
 
 ----------------------------------------------
 

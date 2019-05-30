@@ -404,25 +404,20 @@ TEST(Group_AddTable2)
 
 TEST(Group_AddTableWithLinks)
 {
-    using tf = _impl::TableFriend;
-
     Group group;
     TableRef a = group.add_table("a");
     TableRef b = group.add_table("b");
-    a->add_column(type_Int, "foo");
-    b->add_column_link(type_Link, "bar", *a);
+    auto c0 = a->add_column(type_Int, "foo");
+    auto c1 = b->add_column_link(type_Link, "bar", *a);
 
-    auto& a_spec = tf::get_spec(*a);
-    auto& b_spec = tf::get_spec(*b);
     auto a_key = a->get_key();
-    auto b_key = b->get_key();
-    CHECK_EQUAL(b_spec.get_opposite_link_table_key(0), a_key);
-    CHECK_EQUAL(a_spec.get_opposite_link_table_key(1), b_key);
+    CHECK_EQUAL(b->get_opposite_table_key(c1), a_key);
+    CHECK_EQUAL(a->get_opposite_table_key(c0), TableKey());
 
     group.add_table("c");
 
-    CHECK_EQUAL(b_spec.get_opposite_link_table_key(0), a_key);
-    CHECK_EQUAL(a_spec.get_opposite_link_table_key(1), b_key);
+    CHECK_EQUAL(b->get_opposite_table_key(c1), a_key);
+    CHECK_EQUAL(a->get_opposite_table_key(c0), TableKey());
 }
 
 

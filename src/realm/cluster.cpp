@@ -734,7 +734,7 @@ void Cluster::create(size_t nb_leaf_columns)
             arr.create(type_HasRefs);
             arr.set_parent(this, col_ndx.val + s_first_col_index);
             arr.update_parent();
-            return;
+            return false;
         }
         switch (type) {
             case col_type_Int:
@@ -780,6 +780,7 @@ void Cluster::create(size_t nb_leaf_columns)
                 throw LogicError(LogicError::illegal_type);
                 break;
         }
+        return false;
     };
     table->for_each_and_every_column(column_initialize);
 }
@@ -814,6 +815,21 @@ MemRef Cluster::ensure_writeable(ObjKey)
     return get_mem();
 }
 
+namespace realm {
+
+template <class T>
+inline void Cluster::set_spec(T&, ColKey::Idx)
+{
+}
+
+template <>
+inline void Cluster::set_spec(ArrayString& arr, ColKey::Idx col_ndx)
+{
+    auto spec_ndx = m_tree_top.get_owner()->leaf_ndx2spec_ndx(col_ndx);
+    arr.set_spec(const_cast<Spec*>(&m_tree_top.get_spec()), spec_ndx);
+}
+} // namespace realm
+
 template <class T>
 inline void Cluster::do_insert_row(size_t ndx, ColKey col, Mixed init_val, bool nullable)
 {
@@ -822,8 +838,7 @@ inline void Cluster::do_insert_row(size_t ndx, ColKey col, Mixed init_val, bool 
     T arr(m_alloc);
     auto col_ndx = col.get_index();
     arr.set_parent(this, col_ndx.val + s_first_col_index);
-    auto spec_ndx = m_tree_top.get_owner()->leaf_ndx2spec_ndx(col_ndx);
-    arr.set_spec(const_cast<Spec*>(&m_tree_top.get_spec()), spec_ndx);
+    set_spec<T>(arr, col_ndx);
     arr.init_from_parent();
     if (init_val.is_null()) {
         arr.insert(ndx, T::default_value(nullable));
@@ -845,17 +860,10 @@ inline void Cluster::do_insert_key(size_t ndx, ColKey col_key, Mixed init_val, O
     // Insert backlink if link is not null
     if (key) {
         const Table* origin_table = m_tree_top.get_owner();
-
-        // Find target table
-        TableRef target_table = _impl::TableFriend::get_opposite_link_table(*origin_table, col_key);
-
-        // Find actual backlink column
-        const Spec& target_table_spec = _impl::TableFriend::get_spec(*target_table);
-        size_t backlink_col = target_table_spec.find_backlink_column(origin_table->get_key(), col_key);
-        ColKey backlink_col_key = target_table->spec_ndx2colkey(backlink_col);
-
-        Obj target_obj = target_table->get_object(key);
-        target_obj.add_backlink(backlink_col_key, origin_key);
+        TableRef opp_table = origin_table->get_opposite_table(col_key);
+        ColKey opp_col = origin_table->get_opposite_column(col_key);
+        Obj target_obj = opp_table->get_object(key);
+        target_obj.add_backlink(opp_col, origin_key);
     }
 }
 
@@ -886,7 +894,7 @@ void Cluster::insert_row(size_t ndx, ObjKey k, const FieldValues& init_values)
             arr.set_parent(this, col_ndx.val + s_first_col_index);
             arr.init_from_parent();
             arr.insert(ndx, 0);
-            return;
+            return false;
         }
 
         bool nullable = attr.test(col_attr_Nullable);
@@ -932,6 +940,7 @@ void Cluster::insert_row(size_t ndx, ObjKey k, const FieldValues& init_values)
                 REALM_ASSERT(false);
                 break;
         }
+        return false;
     };
     table->for_each_and_every_column(insert_in_column);
 }
@@ -961,7 +970,7 @@ void Cluster::move(size_t ndx, ClusterNode* new_node, int64_t offset)
 
         if (attr.test(col_attr_List)) {
             do_move<ArrayInteger>(ndx, col_key, new_leaf);
-            return;
+            return false;
         }
 
         switch (type) {
@@ -1007,6 +1016,7 @@ void Cluster::move(size_t ndx, ClusterNode* new_node, int64_t offset)
                 REALM_ASSERT(false);
                 break;
         }
+        return false;
     };
     m_tree_top.get_owner()->for_each_and_every_column(move_from_column);
     for (size_t i = ndx; i < m_keys.size(); i++) {
@@ -1212,8 +1222,7 @@ inline void Cluster::do_erase(size_t ndx, ColKey col_key)
     auto col_ndx = col_key.get_index();
     T values(m_alloc);
     values.set_parent(this, col_ndx.val + s_first_col_index);
-    size_t spec_ndx = m_tree_top.get_owner()->colkey2spec_ndx(col_key);
-    values.set_spec(const_cast<Spec*>(&m_tree_top.get_spec()), spec_ndx);
+    set_spec<T>(values, col_ndx);
     values.init_from_parent();
     values.erase(ndx);
 }
@@ -1334,7 +1343,7 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
 
             values.erase(ndx);
 
-            return;
+            return false;
         }
 
         switch (col_type) {
@@ -1374,6 +1383,7 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
                 REALM_ASSERT(false);
                 break;
         }
+        return false;
     };
     m_tree_top.get_owner()->for_each_and_every_column(erase_in_column);
 
@@ -1422,8 +1432,10 @@ void Cluster::init_leaf(ColKey col_key, ArrayPayload* leaf) const
     // once fixed, reintroduce the noexcept declaration :-D
     m_tree_top.get_owner()->report_invalid_key(col_key);
     ref_type ref = to_ref(Array::get(col_ndx.val + 1));
-    size_t spec_ndx = m_tree_top.get_owner()->leaf_ndx2spec_ndx(col_ndx);
-    leaf->set_spec(const_cast<Spec*>(&m_tree_top.get_spec()), spec_ndx);
+    if (ArrayString* str = dynamic_cast<ArrayString*>(leaf)) {
+        size_t spec_ndx = m_tree_top.get_owner()->leaf_ndx2spec_ndx(col_ndx);
+        str->set_spec(const_cast<Spec*>(&m_tree_top.get_spec()), spec_ndx);
+    }
     leaf->init_from_ref(ref);
     leaf->set_parent(const_cast<Cluster*>(this), col_ndx.val + 1);
 }
@@ -1549,15 +1561,8 @@ void Cluster::remove_backlinks(ObjKey origin_key, ColKey origin_col_key, const s
                                CascadeState& state) const
 {
     const Table* origin_table = m_tree_top.get_owner();
-
-    // Find target table
-    TableRef target_table = _impl::TableFriend::get_opposite_link_table(*origin_table, origin_col_key);
-    TableKey target_table_key = target_table->get_key();
-
-    // Find actual backlink column
-    const Spec& target_table_spec = _impl::TableFriend::get_spec(*target_table);
-    size_t backlink_col = target_table_spec.find_backlink_column(origin_table->get_key(), origin_col_key);
-    ColKey backlink_col_key = target_table->spec_ndx2colkey(backlink_col);
+    TableRef target_table = origin_table->get_opposite_table(origin_col_key);
+    ColKey backlink_col_key = origin_table->get_opposite_column(origin_col_key);
 
     CascadeState::Mode mode = state.m_mode;
     bool strong_links = (origin_table->get_link_type(origin_col_key) == link_Strong);
@@ -1574,7 +1579,7 @@ void Cluster::remove_backlinks(ObjKey origin_key, ColKey origin_col_key, const s
 
                 if (!has_backlinks) {
                     // Object has no more backlinks - add to list for deletion
-                    state.m_to_be_deleted.emplace_back(target_table_key, key);
+                    state.m_to_be_deleted.emplace_back(target_table->get_key(), key);
                 }
             }
         }
@@ -1760,6 +1765,7 @@ Obj ClusterTree::insert(ObjKey k, const FieldValues& values)
                     break;
             }
         }
+        return false;
     };
     get_owner()->for_each_public_column(insert_in_column);
 
@@ -2003,6 +2009,7 @@ void ClusterTree::remove_links()
                     values.nullify_fwd_links(i, state);
                 }
             }
+            return false;
         };
         get_owner()->for_each_and_every_column(remove_link_from_column);
         // Continue

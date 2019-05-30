@@ -326,60 +326,43 @@ void Transaction::upgrade_file_format(int target_file_format_version)
             m_top.add(initial_history_schema_version); // Throws
         }
         set_file_format_version(7);
-        commit_and_continue_as_read();
-        promote_to_write();
+        commit_and_continue_writing();
     }
 
     // NOTE: Additional future upgrade steps go here.
     if (current_file_format_version <= 9 && target_file_format_version >= 10) {
-        bool changes = false;
+        DisableReplication disable_replication(*this);
+
         std::vector<TableKey> table_keys;
         for (size_t t = 0; t < m_table_names.size(); t++) {
             StringData name = m_table_names.get(t);
             auto table = get_table(name);
             table_keys.push_back(table->get_key());
-            changes |= table->convert_columns();
         }
 
-        if (changes) {
-            commit_and_continue_as_read();
-            promote_to_write();
-        }
-        // we must do convert_columns() above to have all attributes
-        // correct before column key conversion.
-        changes = false;
+        auto commit_and_continue = [this]() { commit_and_continue_writing(); };
         for (auto k : table_keys) {
-            auto table = get_table(k);
-            changes |= table->convert_column_keys(this);
+            get_table(k)->migrate_column_info(commit_and_continue);
         }
-        if (changes) {
-            commit_and_continue_as_read();
-            promote_to_write();
-        }
-
         for (auto k : table_keys) {
-            auto table = get_table(k);
-            if (table->create_objects()) {
-                commit_and_continue_as_read();
-                promote_to_write();
-            }
+            get_table(k)->migrate_indexes(commit_and_continue);
         }
-
         for (auto k : table_keys) {
-            auto table = get_table(k);
-            const Spec& spec = _impl::TableFriend::get_spec(*table);
-            size_t nb_cols = spec.get_column_count();
-            for (size_t col_ndx = 0; col_ndx < nb_cols; col_ndx++) {
-                if (table->copy_content_from_columns(col_ndx)) {
-                    commit_and_continue_as_read();
-                    promote_to_write();
-                    table = get_table(k);
-                }
-            }
+            get_table(k)->migrate_subspec(commit_and_continue);
+        }
+        for (auto k : table_keys) {
+            get_table(k)->convert_links_from_ndx_to_key(commit_and_continue);
+        }
+        for (auto k : table_keys) {
+            get_table(k)->create_columns(commit_and_continue);
+        }
+        for (auto k : table_keys) {
+            get_table(k)->migrate_objects(commit_and_continue);
+        }
+        for (auto k : table_keys) {
+            get_table(k)->migrate_links(commit_and_continue);
         }
     }
-
-    set_file_format_version(target_file_format_version);
 }
 
 void Group::open(ref_type top_ref, const std::string& file_path)
@@ -928,9 +911,9 @@ void Group::rename_table(TableKey key, StringData new_name, bool require_unique_
 
 class Group::DefaultTableWriter : public Group::TableWriter {
 public:
-    DefaultTableWriter(const Group& group, bool write_history)
+    DefaultTableWriter(const Group& group, bool should_write_history)
         : m_group(group)
-        , m_write_history(write_history)
+        , m_should_write_history(should_write_history)
     {
     }
     ref_type write_names(_impl::OutputStream& out) override
@@ -959,7 +942,7 @@ public:
                                                              m_group.m_top.get_ref(), version, history_type,
                                                              history_schema_version);
             REALM_ASSERT(history_type != Replication::hist_None);
-            if (!m_write_history ||
+            if (!m_should_write_history ||
                 (history_type != Replication::hist_SyncClient && history_type != Replication::hist_SyncServer)) {
                 return info; // Only sync history should be preserved when writing to a new file
             }
@@ -976,7 +959,7 @@ public:
 
 private:
     const Group& m_group;
-    bool m_write_history;
+    bool m_should_write_history;
 };
 
 void Group::write(std::ostream& out, bool pad) const

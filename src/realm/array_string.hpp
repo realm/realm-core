@@ -94,6 +94,12 @@ public:
     /// slower.
     static StringData get(const char* header, size_t ndx, Allocator& alloc) noexcept;
 
+    void set_spec(Spec* spec, size_t col_ndx) const
+    {
+        m_spec = spec;
+        m_col_ndx = col_ndx;
+    }
+
 private:
     static constexpr size_t small_string_max_size = 15;  // ArrayStringShort
     static constexpr size_t medium_string_max_size = 63; // ArrayStringLong
@@ -110,6 +116,8 @@ private:
     Allocator& m_alloc;
     Storage m_storage;
     Array* m_arr;
+    mutable Spec* m_spec = nullptr;
+    mutable size_t m_col_ndx = realm::npos;
 
     std::unique_ptr<ArrayString> m_string_enum_values;
 

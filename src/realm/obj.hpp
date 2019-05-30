@@ -94,6 +94,8 @@ public:
     template <typename U>
     U get(ColKey col_key) const;
 
+    Mixed get_any(ColKey col_key) const;
+
     template <typename U>
     U get(StringData col_name) const
     {
@@ -190,6 +192,8 @@ public:
     template <typename U>
     Obj& set(ColKey col_key, U value, bool is_default = false);
 
+    Obj& set(ColKey col_key, Mixed value);
+
     template <typename U>
     Obj& set(StringData col_name, U value, bool is_default = false)
     {
@@ -270,6 +274,8 @@ private:
     bool replace_backlink(ColKey col_key, ObjKey old_key, ObjKey new_key, CascadeState& state);
     // Used when removing a backlink, return true if CascadeState contains objects to remove
     bool remove_backlink(ColKey col_key, ObjKey old_key, CascadeState& state);
+    template <class T>
+    inline void set_spec(T&, ColKey);
 };
 
 

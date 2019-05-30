@@ -598,6 +598,8 @@ private:
     bool internal_advance_read(O* observer, VersionID target_version, _impl::History&, bool);
     void set_transact_stage(DB::TransactStage stage) noexcept;
     void do_end_read() noexcept;
+    void commit_and_continue_writing();
+    void initialize_replication();
 
     DBRef db;
     mutable std::unique_ptr<_impl::History> m_history_read;
@@ -613,19 +615,28 @@ private:
 class DisableReplication {
 public:
     DisableReplication(Transaction& t)
-        : m_owner(t.get_db())
+        : m_tr(t)
+        , m_owner(t.get_db())
+        , m_repl(m_owner->get_replication())
+        , m_version(t.get_version())
     {
-        m_repl = m_owner->get_replication();
         m_owner->set_replication(nullptr);
+        t.get_version();
+        t.m_history = nullptr;
     }
+
     ~DisableReplication()
     {
         m_owner->set_replication(m_repl);
+        if (m_version != m_tr.get_version())
+            m_tr.initialize_replication();
     }
 
 private:
+    Transaction& m_tr;
     DBRef m_owner;
     Replication* m_repl;
+    DB::version_type m_version;
 };
 
 

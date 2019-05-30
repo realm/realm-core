@@ -1069,8 +1069,6 @@ TEST_IF(Upgrade_Database_5_6_StringIndex, REALM_MAX_BPNODE_SIZE == 4 || REALM_MA
 }
 #endif
 
-#ifdef LEGACY_TESTS
-
 TEST_IF(Upgrade_Database_6_7, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZE == 1000)
 {
     std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
@@ -1268,7 +1266,7 @@ TEST_IF(Upgrade_Database_9_10, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SI
             CHECK_EQUAL(t->get_column_name(col_link), "link");
             CHECK_EQUAL(t->get_column_name(col_linklist), "linklist");
             CHECK_EQUAL(t->get_column_name(col_int_list), "integers");
-            CHECK_EQUAL(o->get_column_name(col_o), "int");
+            CHECK_EQUAL(o->get_column_name(col_o), "val");
 
             CHECK_EQUAL(t->get_column_type(col_int_null), type_Int);
             CHECK_EQUAL(t->get_column_type(col_bool), type_Bool);
@@ -1333,7 +1331,7 @@ TEST_IF(Upgrade_Database_9_10, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SI
             CHECK_EQUAL(int_list.get(17), 41);
 
             CHECK_EQUAL(obj27.get<Bool>(col_bool), true);
-            std::string bin("abcdefghijklmnopqrstuvwxyz");
+            std::string bin("abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwx");
             CHECK_EQUAL(obj27.get<Binary>(col_binary), BinaryData(bin));
             CHECK_EQUAL(obj27.get_backlink_count(*t, col_link), 1);
             CHECK_EQUAL(obj27.get_backlink(*t, col_link, 0), obj17.get_key());
@@ -1379,7 +1377,9 @@ TEST_IF(Upgrade_Database_9_10, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SI
     subdesc->add_column(type_Int, "list");
     t->add_search_index(col_string_i);
 
-    o->add_column(type_Int, "int");
+    size_t col_val = o->add_column(type_Int, "val");
+    size_t col_string_list = o->add_column(type_Table, "strings", false, &subdesc);
+    subdesc->add_column(type_String, "list");
 
     t->add_empty_row(nb_rows);
     o->add_empty_row(25);
@@ -1399,8 +1399,10 @@ TEST_IF(Upgrade_Database_9_10, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SI
             t->set_string(col_string_i, i, str);
 
             // Binary
-            std::string bin("abcdefghijklmnopqrstuvwxyz");
-            t->set_binary(col_binary, i, BinaryData(bin));
+            if (i % 9 == 0) {
+                const char bin[] = "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz";
+                t->set_binary(col_binary, i, BinaryData(bin, strlen(bin) - i / 10));
+            }
 
             // Timestamp
             t->set_timestamp(col_date, i, Timestamp(100 * i, i));
@@ -1430,6 +1432,18 @@ TEST_IF(Upgrade_Database_9_10, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SI
         }
     }
 
+    for (size_t i = 0; i < 25; i++) {
+        o->set_int(col_val, i, i);
+        auto st = o->get_subtable(col_string_list, i);
+        if (i % 5 == 0) {
+            for (size_t j = 0; j < i / 5; j++) {
+                st->add_empty_row();
+                std::string str = "String_" + std::to_string(j);
+                st->set_string(0, j, str);
+            }
+        }
+    }
+
     t->set_string(col_string, 17, "This is a medium long string");
     std::string bigbin(1000, 'x');
     t->set_binary(col_binary, 17, BinaryData(bigbin));
@@ -1439,5 +1453,5 @@ TEST_IF(Upgrade_Database_9_10, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SI
     g.write(path);
 #endif // TEST_READ_UPGRADE_MODE
 }
-#endif // LEGACY_TESTS
+
 #endif // TEST_GROUP

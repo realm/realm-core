@@ -144,6 +144,71 @@ void ConstObj::remove()
     const_cast<Table*>(get_table())->remove_object(m_key);
 }
 
+Mixed ConstObj::get_any(ColKey col_key) const
+{
+    Mixed ret;
+    bool is_nullable = col_key.get_attrs().test(col_attr_Nullable);
+    switch (col_key.get_type()) {
+        case col_type_Int:
+            if (is_nullable) {
+                if (auto val = get<util::Optional<int64_t>>(col_key)) {
+                    ret = *val;
+                }
+            }
+            else {
+                ret = get<Int>(col_key);
+            }
+            break;
+        case col_type_Bool:
+            if (auto val = get<util::Optional<bool>>(col_key)) {
+                ret = *val;
+            }
+            break;
+        case col_type_Float:
+            if (auto val = get<util::Optional<float>>(col_key)) {
+                ret = *val;
+            }
+            break;
+        case col_type_Double:
+            if (auto val = get<util::Optional<double>>(col_key)) {
+                ret = *val;
+            }
+            break;
+        case col_type_String: {
+            auto val = get<String>(col_key);
+            if (!val.is_null()) {
+                ret = val;
+            }
+            break;
+        }
+        case col_type_Binary: {
+            auto val = get<Binary>(col_key);
+            if (!val.is_null()) {
+                ret = val;
+            }
+            break;
+        }
+        case col_type_Timestamp: {
+            auto val = get<Timestamp>(col_key);
+            if (!val.is_null()) {
+                ret = val;
+            }
+            break;
+        }
+        case col_type_Link: {
+            auto val = get<ObjKey>(col_key);
+            if (val) {
+                ret = val;
+            }
+            break;
+        }
+        default:
+            REALM_UNREACHABLE();
+            break;
+    }
+    return ret;
+}
+
 ColKey ConstObj::get_column_key(StringData col_name) const
 {
     return get_table()->get_column_key(col_name);
@@ -289,6 +354,15 @@ inline bool ConstObj::do_is_null(ColKey::Idx col_ndx) const
 {
     T values(get_alloc());
     ref_type ref = to_ref(Array::get(m_mem.get_addr(), col_ndx.val + 1));
+    values.init_from_ref(ref);
+    return values.is_null(m_row_ndx);
+}
+
+template <>
+inline bool ConstObj::do_is_null<ArrayString>(ColKey::Idx col_ndx) const
+{
+    ArrayString values(get_alloc());
+    ref_type ref = to_ref(Array::get(m_mem.get_addr(), col_ndx.val + 1));
     values.set_spec(const_cast<Spec*>(&get_spec()), m_table->leaf_ndx2spec_ndx(col_ndx));
     values.init_from_ref(ref);
     return values.is_null(m_row_ndx);
@@ -333,53 +407,35 @@ bool ConstObj::is_null(ColKey col_key) const
 // Figure out if this object has any remaining backlinkss
 bool ConstObj::has_backlinks(bool only_strong_links) const
 {
-    const Spec& spec = get_spec();
-    size_t backlink_columns_begin = spec.first_backlink_column_index();
-    size_t backlink_columns_end = backlink_columns_begin + spec.backlink_column_count();
-
     const Table* target_table = m_table;
-    const Spec& target_table_spec = _impl::TableFriend::get_spec(*target_table);
-
-    for (size_t i = backlink_columns_begin; i != backlink_columns_end; ++i) {
-        ColKey backlink_col_key = target_table->spec_ndx2colkey(i);
-
+    auto look_for_backlinks = [&](ColKey backlink_col_key) {
         // Find origin table and column for this backlink column
-        TableRef origin_table = _impl::TableFriend::get_opposite_link_table(*target_table, backlink_col_key);
-        auto origin_col = target_table_spec.get_origin_column_key(i);
-
+        TableRef origin_table = target_table->get_opposite_table(backlink_col_key);
+        ColKey origin_col = target_table->get_opposite_column(backlink_col_key);
         if (!only_strong_links || origin_table->get_link_type(origin_col) == link_Strong) {
-            origin_table->report_invalid_key(origin_col);
             auto cnt = get_backlink_count(*origin_table, origin_col);
             if (cnt)
                 return true;
         }
-    }
-
-    return false;
+        return false;
+    };
+    return m_table->for_each_backlink_column(look_for_backlinks);
 }
 
 size_t ConstObj::get_backlink_count(bool only_strong_links) const
 {
-    const Spec& spec = get_spec();
-    size_t backlink_columns_begin = spec.first_backlink_column_index();
-    size_t backlink_columns_end = backlink_columns_begin + spec.backlink_column_count();
-
     const Table* target_table = m_table;
-    const Spec& target_table_spec = _impl::TableFriend::get_spec(*target_table);
-
     size_t cnt = 0;
-    for (size_t i = backlink_columns_begin; i != backlink_columns_end; ++i) {
-        ColKey backlink_col_key = target_table->spec_ndx2colkey(i);
-
+    auto look_for_backlinks = [&](ColKey backlink_col_key) {
         // Find origin table and column for this backlink column
-        TableRef origin_table = _impl::TableFriend::get_opposite_link_table(*target_table, backlink_col_key);
-        auto origin_col = target_table_spec.get_origin_column_key(i);
-
+        TableRef origin_table = target_table->get_opposite_table(backlink_col_key);
+        ColKey origin_col = target_table->get_opposite_column(backlink_col_key);
         if (!only_strong_links || origin_table->get_link_type(origin_col) == link_Strong) {
             cnt += get_backlink_count(*origin_table, origin_col);
         }
-    }
-
+        return false;
+    };
+    m_table->for_each_backlink_column(look_for_backlinks);
     return cnt;
 }
 
@@ -388,8 +444,7 @@ size_t ConstObj::get_backlink_count(const Table& origin, ColKey origin_col_key) 
     size_t cnt = 0;
     TableKey origin_table_key = origin.get_key();
     if (origin_table_key != TableKey()) {
-        size_t backlink_spec_ndx = get_spec().find_backlink_column(origin_table_key, origin_col_key);
-        auto backlink_col_key = m_table->spec_ndx2colkey(backlink_spec_ndx);
+        ColKey backlink_col_key = origin.get_opposite_column(origin_col_key);
         cnt = get_backlink_count(backlink_col_key);
     }
     return cnt;
@@ -397,9 +452,7 @@ size_t ConstObj::get_backlink_count(const Table& origin, ColKey origin_col_key) 
 
 ObjKey ConstObj::get_backlink(const Table& origin, ColKey origin_col_key, size_t backlink_ndx) const
 {
-    TableKey origin_key = origin.get_key();
-    size_t backlink_spec_ndx = get_spec().find_backlink_column(origin_key, origin_col_key);
-    auto backlink_col_key = get_table()->spec_ndx2colkey(backlink_spec_ndx);
+    ColKey backlink_col_key = origin.get_opposite_column(origin_col_key);
     return get_backlink(backlink_col_key, backlink_ndx);
 }
 
@@ -461,6 +514,51 @@ void Obj::bump_both_versions()
     Allocator& alloc = get_alloc();
     alloc.bump_content_version();
     alloc.bump_storage_version();
+}
+
+Obj& Obj::set(ColKey col_key, Mixed value)
+{
+    if (value.is_null()) {
+        REALM_ASSERT(col_key.get_attrs().test(col_attr_Nullable));
+        set_null(col_key);
+    }
+    else {
+        REALM_ASSERT(value.get_type() == DataType(col_key.get_type()));
+        switch (col_key.get_type()) {
+            case col_type_Int:
+                if (col_key.get_attrs().test(col_attr_Nullable)) {
+                    set(col_key, util::Optional<Int>(value.get_int()));
+                }
+                else {
+                    set(col_key, value.get_int());
+                }
+                break;
+            case col_type_Bool:
+                set(col_key, value.get_bool());
+                break;
+            case col_type_Float:
+                set(col_key, value.get_float());
+                break;
+            case col_type_Double:
+                set(col_key, value.get_double());
+                break;
+            case col_type_String:
+                set(col_key, value.get_string());
+                break;
+            case col_type_Binary:
+                set(col_key, value.get<Binary>());
+                break;
+            case col_type_Timestamp:
+                set(col_key, value.get<Timestamp>());
+                break;
+            case col_type_Link:
+                set(col_key, value.get<ObjKey>());
+                break;
+            default:
+                break;
+        }
+    }
+    return *this;
 }
 
 template <>
@@ -646,6 +744,19 @@ inline void check_range(const BinaryData& val)
 }
 }
 
+// helper functions for filtering out calls to set_spec()
+template <class T>
+inline void Obj::set_spec(T&, ColKey)
+{
+}
+template <>
+inline void Obj::set_spec<ArrayString>(ArrayString& values, ColKey col_key)
+{
+    size_t spec_ndx = m_table->colkey2spec_ndx(col_key);
+    Spec* spec = const_cast<Spec*>(&get_spec());
+    values.set_spec(spec, spec_ndx);
+}
+
 template <class T>
 Obj& Obj::set(ColKey col_key, T value, bool is_default)
 {
@@ -672,9 +783,10 @@ Obj& Obj::set(ColKey col_key, T value, bool is_default)
     Array fallback(alloc);
     Array& fields = get_tree_top()->get_fields_accessor(fallback, m_mem);
     REALM_ASSERT(col_ndx.val + 1 < fields.size());
-    typename ColumnTypeTraits<T>::cluster_leaf_type values(alloc);
+    using LeafType = typename ColumnTypeTraits<T>::cluster_leaf_type;
+    LeafType values(alloc);
     values.set_parent(&fields, col_ndx.val + 1);
-    values.set_spec(const_cast<Spec*>(&get_spec()), m_table->colkey2spec_ndx(col_key));
+    set_spec<LeafType>(values, col_key);
     values.init_from_parent();
     values.set(m_row_ndx, value);
 
@@ -783,8 +895,10 @@ void Obj::nullify_link(ColKey origin_col_key, ObjKey target_key)
 void Obj::set_backlink(ColKey col_key, ObjKey new_key)
 {
     if (new_key != realm::null_key) {
+        REALM_ASSERT(m_table->valid_column(col_key));
         TableRef target_table = get_target_table(col_key);
-        ColKey backlink_col_key = target_table->find_backlink_column(get_table_key(), col_key);
+        ColKey backlink_col_key = m_table->get_opposite_column(col_key);
+        REALM_ASSERT(target_table->valid_column(backlink_col_key));
 
         Obj target_obj = target_table->get_object(new_key);
         target_obj.add_backlink(backlink_col_key, m_key); // Throws
@@ -805,8 +919,10 @@ bool Obj::remove_backlink(ColKey col_key, ObjKey old_key, CascadeState& state)
 
     const Table* origin_table = m_table;
 
+    REALM_ASSERT(origin_table->valid_column(col_key));
     TableRef target_table = get_target_table(col_key);
-    ColKey backlink_col_key = target_table->find_backlink_column(get_table_key(), col_key);
+    ColKey backlink_col_key = m_table->get_opposite_column(col_key);
+    REALM_ASSERT(target_table->valid_column(backlink_col_key));
 
     bool strong_links = (origin_table->get_link_type(col_key) == link_Strong);
     CascadeState::Mode mode = state.m_mode;
@@ -854,13 +970,28 @@ template <class T>
 inline void Obj::do_set_null(ColKey col_key)
 {
     ColKey::Idx col_ndx = col_key.get_index();
-    size_t spec_ndx = m_table->leaf_ndx2spec_ndx(col_ndx);
     Allocator& alloc = get_alloc();
     alloc.bump_content_version();
     Array fallback(alloc);
     Array& fields = get_tree_top()->get_fields_accessor(fallback, m_mem);
 
     T values(alloc);
+    values.set_parent(&fields, col_ndx.val + 1);
+    values.init_from_parent();
+    values.set_null(m_row_ndx);
+}
+
+template <>
+inline void Obj::do_set_null<ArrayString>(ColKey col_key)
+{
+    ColKey::Idx col_ndx = col_key.get_index();
+    size_t spec_ndx = m_table->leaf_ndx2spec_ndx(col_ndx);
+    Allocator& alloc = get_alloc();
+    alloc.bump_content_version();
+    Array fallback(alloc);
+    Array& fields = get_tree_top()->get_fields_accessor(fallback, m_mem);
+
+    ArrayString values(alloc);
     values.set_parent(&fields, col_ndx.val + 1);
     values.set_spec(const_cast<Spec*>(&get_spec()), spec_ndx);
     values.init_from_parent();

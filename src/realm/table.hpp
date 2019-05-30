@@ -115,7 +115,6 @@ public:
     ColumnAttrMask get_column_attr(ColKey column_key) const noexcept;
     ColKey get_column_key(StringData name) const noexcept;
     ColKeys get_column_keys() const;
-    ColKey find_backlink_column(TableKey origin_table_key, ColKey origin_col_key) const noexcept;
     typedef util::Optional<std::pair<ConstTableRef, ColKey>> BacklinkOrigin;
     BacklinkOrigin find_backlink_origin(StringData origin_table_name, StringData origin_col_name) const noexcept;
     BacklinkOrigin find_backlink_origin(ColKey backlink_col) const noexcept;
@@ -238,6 +237,7 @@ public:
     Columns<T> column(ColKey col_key); // FIXME: Should this one have been declared noexcept?
     template <class T>
     Columns<T> column(const Table& origin, ColKey origin_col_key);
+
     // BacklinkCount is a total count per row and therefore not attached to a specific column
     template <class T>
     BacklinkCount<T> get_backlink_count();
@@ -368,12 +368,10 @@ public:
     // Will return pointer to search index accessor. Will return nullptr if no index
     StringIndex* get_search_index(ColKey col) const noexcept
     {
-        if (col.get_type() == col_type_BackLink)
+        report_invalid_key(col);
+        if (!has_search_index(col))
             return nullptr;
-        size_t spec_ndx = colkey2spec_ndx(col);
-        REALM_ASSERT(m_index_accessors.size() == get_column_count());
-        REALM_ASSERT(spec_ndx < m_index_accessors.size());
-        return m_index_accessors[spec_ndx];
+        return m_index_accessors[col.get_index().val];
     }
     template <class T>
     ObjKey find_first(ColKey col_key, T value) const;
@@ -437,28 +435,34 @@ public:
     // table is unchanged.
     ColKey set_nullability(ColKey col_key, bool nullable, bool throw_on_null);
 
+    // Iterate through (subset of) columns. The supplied function may abort iteration
+    // by returning 'true' (early out).
     template <typename Func>
-    void for_each_and_every_column(Func func) const
+    bool for_each_and_every_column(Func func) const
     {
         for (auto col_key : m_leaf_ndx2colkey) {
             if (!col_key)
                 continue;
-            func(col_key);
+            if (func(col_key))
+                return true;
         }
+        return false;
     }
     template <typename Func>
-    void for_each_public_column(Func func) const
+    bool for_each_public_column(Func func) const
     {
         for (auto col_key : m_leaf_ndx2colkey) {
             if (!col_key)
                 continue;
             if (col_key.get_type() == col_type_BackLink)
                 continue;
-            func(col_key);
+            if (func(col_key))
+                return true;
         }
+        return false;
     }
     template <typename Func>
-    void for_each_backlink_column(Func func) const
+    bool for_each_backlink_column(Func func) const
     {
         // FIXME: Optimize later - to not iterate through all non-backlink columns:
         for (auto col_key : m_leaf_ndx2colkey) {
@@ -466,8 +470,10 @@ public:
                 continue;
             if (col_key.get_type() != col_type_BackLink)
                 continue;
-            func(col_key);
+            if (func(col_key))
+                return true;
         }
+        return false;
     }
 
 private:
@@ -634,6 +640,10 @@ public:
     void dump_node_structure() const; // To std::cerr (for GDB)
     void dump_node_structure(std::ostream&, int level) const;
 #endif
+    TableRef get_opposite_table(ColKey col_key) const;
+    TableKey get_opposite_table_key(ColKey col_key) const;
+    ColKey get_opposite_column(ColKey col_key) const;
+    ColKey find_opposite_column(ColKey col_key) const;
 
 protected:
     /// Compare the objects of two tables under the assumption that the two tables
@@ -655,6 +665,8 @@ private:
     int64_t m_next_key_value = -1;
     TableKey m_key;     // 4th slot in m_top
     Array m_index_refs; // 5th slot in m_top
+    Array m_opposite_table;  // 7th slot in m_top
+    Array m_opposite_column; // 8th slot in m_top
     std::vector<StringIndex*> m_index_accessors;
     Replication* const* m_repl;
     static Replication* g_dummy_replication;
@@ -667,10 +679,17 @@ private:
     size_t do_set_link(ColKey col_key, size_t row_ndx, size_t target_row_ndx);
 
     void populate_search_index(ColKey col_key);
-    bool convert_columns();
-    bool convert_column_keys(Group* group);
-    bool create_objects();
-    bool copy_content_from_columns(size_t spec_ndx);
+
+    // Migration support
+    void migrate_column_info(std::function<void()>);
+    void migrate_indexes(std::function<void()>);
+    void migrate_subspec(std::function<void()>);
+    void convert_links_from_ndx_to_key(std::function<void()>);
+    ref_type get_oid_column_ref() const;
+    void create_columns(std::function<void()>);
+    void migrate_objects(std::function<void()>);
+    void migrate_links(std::function<void()>);
+    void finalize_migration();
 
     /// Disable copying assignment.
     ///
@@ -712,8 +731,9 @@ private:
                                  bool listtype = false, LinkType link_type = link_Weak);
     void do_erase_root_column(ColKey col_key);
     ColKey insert_backlink_column(TableKey origin_table_key, ColKey origin_col_key, ColKey backlink_col_key);
-    void erase_backlink_column(TableKey origin_table_key, ColKey origin_col_key);
+    void erase_backlink_column(ColKey backlink_col_key);
 
+    void set_opposite_column(ColKey col_key, TableKey opposite_table, ColKey opposite_column);
     /// Called in the context of Group::commit() to ensure that
     /// attached table accessors stay valid across a commit. Please
     /// note that this works only for non-transactional commits. Table
@@ -738,8 +758,6 @@ private:
     /// Create an empty table with independent spec and return just
     /// the reference to the underlying memory.
     static ref_type create_empty_table(Allocator&, TableKey = TableKey());
-
-    void connect_opposite_link_columns(ColKey link_col_key, Table& target_table, ColKey backlink_col_key) noexcept;
 
     void remove_recursive(CascadeState&);
     //@{
@@ -870,6 +888,9 @@ private:
     static constexpr int top_position_for_search_indexes = 4;
     static constexpr int top_position_for_column_key = 5;
     static constexpr int top_position_for_version = 6;
+    static constexpr int top_position_for_opposite_table = 7;
+    static constexpr int top_position_for_opposite_column = 8;
+    static constexpr int top_array_size = 9;
 
     friend class SubtableNode;
     friend class _impl::TableFriend;
@@ -1050,6 +1071,8 @@ inline Table::Table(Allocator& alloc)
     , m_spec(m_alloc)
     , m_clusters(this, m_alloc)
     , m_index_refs(m_alloc)
+    , m_opposite_table(m_alloc)
+    , m_opposite_column(m_alloc)
     , m_repl(&g_dummy_replication)
 {
     ref_type ref = create_empty_table(m_alloc); // Throws
@@ -1064,6 +1087,8 @@ inline Table::Table(Replication* const* repl, Allocator& alloc)
     , m_spec(m_alloc)
     , m_clusters(this, m_alloc)
     , m_index_refs(m_alloc)
+    , m_opposite_table(m_alloc)
+    , m_opposite_column(m_alloc)
     , m_repl(repl)
 {
 }
@@ -1098,6 +1123,7 @@ inline Columns<T> Table::column(ColKey col_key)
     // Check if user-given template type equals Realm type. Todo, we should clean up and reuse all our
     // type traits (all the is_same() cases below).
     const Table* table = get_link_chain_target(link_chain);
+    table->report_invalid_key(col_key);
 
     realm::DataType ct = table->get_column_type(col_key);
     if (std::is_same<T, int64_t>::value && ct != type_Int)
@@ -1121,11 +1147,7 @@ inline Columns<T> Table::column(const Table& origin, ColKey origin_col_key)
 {
     static_assert(std::is_same<T, BackLink>::value, "");
 
-    auto origin_table_key = origin.get_key();
-    const Table& current_target_table = *get_link_chain_target(m_link_chain);
-    size_t backlink_col_spec_ndx = current_target_table.m_spec.find_backlink_column(origin_table_key, origin_col_key);
-    ColKey backlink_col_key = current_target_table.spec_ndx2colkey(backlink_col_spec_ndx);
-
+    auto backlink_col_key = origin.get_opposite_column(origin_col_key);
     std::vector<ColKey> link_chain = std::move(m_link_chain);
     m_link_chain.clear();
     link_chain.push_back(backlink_col_key);
@@ -1157,10 +1179,7 @@ SubQuery<T> Table::column(const Table& origin, ColKey origin_col_key, Query subq
 
 inline Table& Table::backlink(const Table& origin, ColKey origin_col_key)
 {
-    auto origin_table_key = origin.get_key();
-    const Table& current_target_table = *get_link_chain_target(m_link_chain);
-    size_t backlink_col_spec_ndx = current_target_table.m_spec.find_backlink_column(origin_table_key, origin_col_key);
-    ColKey backlink_col_key = current_target_table.spec_ndx2colkey(backlink_col_spec_ndx);
+    auto backlink_col_key = origin.get_opposite_column(origin_col_key);
     return link(backlink_col_key);
 }
 

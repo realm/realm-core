@@ -31,25 +31,19 @@ void LinkMap::set_base_table(const Table* table)
     m_link_types.clear();
     m_only_unary_links = true;
 
-    Group* group = _impl::TableFriend::get_parent_group(*table);
-
     for (size_t i = 0; i < m_link_column_keys.size(); i++) {
         ColKey link_column_key = m_link_column_keys[i];
-        size_t link_column_ndx = m_tables[i]->colkey2spec_ndx(link_column_key);
         // Link column can be either LinkList or single Link
-        const Table* t = m_tables.back();
-        const Spec& spec = _impl::TableFriend::get_spec(*t);
-
-        ColumnType type = t->get_real_column_type(link_column_key);
+        ColumnType type = link_column_key.get_type();
         REALM_ASSERT(Table::is_link_type(type) || type == col_type_BackLink);
         if (type == col_type_LinkList || type == col_type_BackLink) {
             m_only_unary_links = false;
         }
 
         m_link_types.push_back(type);
-        TableKey target_table_key = spec.get_opposite_link_table_key(link_column_ndx);
-        const Table* target_table = group->get_table(target_table_key);
-        m_tables.push_back(target_table);
+        REALM_ASSERT(table->valid_column(link_column_key));
+        table = table->get_opposite_table(link_column_key);
+        m_tables.push_back(table);
     }
 }
 

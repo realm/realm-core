@@ -1741,6 +1741,24 @@ void DB::upgrade_file_format(bool allow_file_format_upgrade, int target_file_for
         auto wt = start_write();
         bool dirty = false;
 
+        // We need to upgrade history first. We may need to access it during migration
+        // when processing the !OID columns
+        int current_hist_schema_version_2 = wt->get_history_schema_version();
+        // The history must either still be using its initial schema or have
+        // been upgraded already to the chosen target schema version via a
+        // concurrent SharedGroup object.
+        REALM_ASSERT(current_hist_schema_version_2 == current_hist_schema_version ||
+                     current_hist_schema_version_2 == target_hist_schema_version);
+        bool need_hist_schema_upgrade = (current_hist_schema_version_2 < target_hist_schema_version);
+        if (need_hist_schema_upgrade) {
+            if (!allow_file_format_upgrade)
+                throw FileFormatUpgradeRequired();
+            Replication* repl = get_replication();
+            repl->upgrade_history_schema(current_hist_schema_version_2); // Throws
+            wt->set_history_schema_version(target_hist_schema_version);  // Throws
+            dirty = true;
+        }
+
         // File format upgrade
         int current_file_format_version_2 = m_alloc.get_committed_file_format_version();
         // The file must either still be using its initial file_format or have
@@ -1760,29 +1778,8 @@ void DB::upgrade_file_format(bool allow_file_format_upgrade, int target_file_for
                 m_upgrade_callback(current_file_format_version_2, target_file_format_version); // Throws
             dirty = true;
         }
-        else {
-            // If somebody else has already performed the upgrade, we still need
-            // to inform the rest of the core library about the new file format
-            // of the attached file.
-            wt->set_file_format_version(target_file_format_version);
-        }
-
-        // History schema upgrade
-        int current_hist_schema_version_2 = wt->get_history_schema_version();
-        // The history must either still be using its initial schema or have
-        // been upgraded already to the chosen target schema version via a
-        // concurrent SharedGroup object.
-        REALM_ASSERT(current_hist_schema_version_2 == current_hist_schema_version ||
-                     current_hist_schema_version_2 == target_hist_schema_version);
-        bool need_hist_schema_upgrade = (current_hist_schema_version_2 < target_hist_schema_version);
-        if (need_hist_schema_upgrade) {
-            if (!allow_file_format_upgrade)
-                throw FileFormatUpgradeRequired();
-            Replication* repl = get_replication();
-            repl->upgrade_history_schema(current_hist_schema_version_2);     // Throws
-            wt->set_history_schema_version(target_hist_schema_version);      // Throws
-            dirty = true;
-        }
+        wt->set_file_format_version(target_file_format_version);
+        m_file_format_version = target_file_format_version;
 
         if (dirty)
             wt->commit(); // Throws
@@ -2404,6 +2401,42 @@ DB::version_type Transaction::commit()
     m_read_lock = lock_after_commit;
 
     return new_version;
+}
+
+void Transaction::commit_and_continue_writing()
+{
+    if (m_transact_stage != DB::transact_Writing)
+        throw LogicError(LogicError::wrong_transact_state);
+
+    REALM_ASSERT(is_attached());
+
+    // before committing, allow any accessors at group level or below to sync
+    flush_accessors_for_commit();
+
+    db->do_commit(*this); // Throws
+
+    // We need to set m_read_lock in order for wait_for_change to work.
+    // To set it, we grab a readlock on the latest available snapshot
+    // and release it again.
+    VersionID version_id = VersionID(); // Latest available snapshot
+    DB::ReadLockInfo lock_after_commit;
+    db->grab_read_lock(lock_after_commit, version_id);
+    db->release_read_lock(m_read_lock);
+    m_read_lock = lock_after_commit;
+
+    bool writable = true;
+    remap_and_update_refs(m_read_lock.m_top_ref, m_read_lock.m_file_size, writable); // Throws
+}
+
+void Transaction::initialize_replication()
+{
+    if (m_transact_stage == DB::transact_Writing) {
+        if (Replication* repl = get_replication()) {
+            auto current_version = m_read_lock.m_version;
+            bool history_updated = false;
+            repl->initiate_transact(*this, current_version, history_updated); // Throws
+        }
+    }
 }
 
 Transaction::~Transaction()

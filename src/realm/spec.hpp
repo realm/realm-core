@@ -67,26 +67,11 @@ public:
     // Column Attributes
     ColumnAttrMask get_column_attr(size_t column_ndx) const noexcept;
 
-    size_t get_subspec_ndx(size_t column_ndx) const noexcept;
-    ref_type get_subspec_ref(size_t subspec_ndx) const noexcept;
-
     // Auto Enumerated string columns
     void upgrade_string_to_enum(size_t column_ndx, ref_type keys_ref);
     size_t _get_enumkeys_ndx(size_t column_ndx) const noexcept;
     bool is_string_enum_type(size_t column_ndx) const noexcept;
     ref_type get_enumkeys_ref(size_t column_ndx, ArrayParent*& keys_parent) noexcept;
-
-    // Links
-    TableKey get_opposite_link_table_key(size_t column_ndx) const noexcept;
-    void set_opposite_link_table_key(size_t column_ndx, TableKey key);
-
-    // Backlinks
-    bool has_backlinks() const noexcept;
-    size_t first_backlink_column_index() const noexcept;
-    size_t backlink_column_count() const noexcept;
-    void set_backlink_origin_column(size_t backlink_col_ndx, ColKey origin_col_key);
-    ColKey get_origin_column_key(size_t backlink_col_ndx) const noexcept;
-    size_t find_backlink_column(TableKey origin_table_key, ColKey origin_col_key) const noexcept;
 
     //@{
     /// Compare two table specs for equality.
@@ -120,9 +105,9 @@ private:
     ArrayInteger m_types; // 1st slot in m_top
     ArrayStringShort m_names; // 2nd slot in m_top
     ArrayInteger m_attr;  // 3rd slot in m_top
-    ArrayInteger m_keys;  // 4th slot in m_top
-    Array m_subspecs;     // 5th slot in m_top (optional)
-    Array m_enumkeys;     // 6th slot in m_top (optional)
+    Array m_oldsubspecs;  // 4th slot in m_top
+    Array m_enumkeys;     // 5th slot in m_top
+    ArrayInteger m_keys;  // 6th slot in m_top
     size_t m_num_public_columns;
     bool m_has_strong_link_columns;
 
@@ -148,23 +133,30 @@ private:
 
     void set_column_attr(size_t column_ndx, ColumnAttrMask attr);
 
-    // Convert columns to new list format
-    bool convert_column(size_t column_ndx);
-    bool convert_column_key(size_t column_ndx, Group* group);
+    // Migration
+    bool convert_column_attributes();
+    bool convert_column_keys(TableKey table_key);
+    bool has_subspec()
+    {
+        return m_oldsubspecs.is_attached();
+    }
+    void destroy_subspec()
+    {
+        m_oldsubspecs.destroy();
+        m_top.set(3, 0);
+    }
+    TableKey get_opposite_link_table_key(size_t column_ndx) const noexcept;
+    size_t get_origin_column_ndx(size_t backlink_col_ndx) const noexcept;
+    ColKey find_backlink_column(TableKey origin_table_key, size_t spec_ndx) const noexcept;
+
 
     // Generate a column key only from state in the spec.
-    ColKey generate_converted_colkey(size_t column_ndx);
+    ColKey generate_converted_colkey(size_t column_ndx, TableKey table_key);
     /// Construct an empty spec and return just the reference to the
     /// underlying memory.
     static MemRef create_empty_spec(Allocator&);
 
-    size_t get_subspec_ndx_after(size_t column_ndx, size_t skip_column_ndx) const noexcept;
-    size_t get_subspec_entries_for_col_type(ColumnType type) const noexcept;
-    bool has_subspec() const noexcept;
-
-    // Returns false if the spec has no columns, otherwise it returns
-    // true and sets `type` to the type of the first column.
-    static bool get_first_column_type_from_ref(ref_type, Allocator&, ColumnType& type) noexcept;
+    size_t get_subspec_ndx(size_t column_ndx) const noexcept;
 
     friend class Group;
     friend class Table;
@@ -182,24 +174,15 @@ inline bool Spec::has_strong_link_columns() noexcept
     return m_has_strong_link_columns;
 }
 
-inline ref_type Spec::get_subspec_ref(size_t subspec_ndx) const noexcept
-{
-    REALM_ASSERT(subspec_ndx < m_subspecs.size());
-
-    // Note that this addresses subspecs directly, indexing
-    // by number of sub-table columns
-    return m_subspecs.get_as_ref(subspec_ndx);
-}
-
 // Uninitialized Spec (call init() to init)
 inline Spec::Spec(Allocator& alloc) noexcept
     : m_top(alloc)
     , m_types(alloc)
     , m_names(alloc)
     , m_attr(alloc)
-    , m_keys(alloc)
-    , m_subspecs(alloc)
+    , m_oldsubspecs(alloc)
     , m_enumkeys(alloc)
+    , m_keys(alloc)
 {
 }
 
@@ -284,44 +267,6 @@ inline StringData Spec::get_column_name(size_t ndx) const noexcept
 inline size_t Spec::get_column_index(StringData name) const noexcept
 {
     return m_names.find_first(name);
-}
-
-inline bool Spec::get_first_column_type_from_ref(ref_type top_ref, Allocator& alloc, ColumnType& type) noexcept
-{
-    const char* top_header = alloc.translate(top_ref);
-    ref_type types_ref = to_ref(Array::get(top_header, 0));
-    const char* types_header = alloc.translate(types_ref);
-    if (Array::get_size_from_header(types_header) == 0)
-        return false;
-    type = ColumnType(Array::get(types_header, 0));
-    return true;
-}
-
-inline bool Spec::has_backlinks() const noexcept
-{
-    // backlinks are always last and do not have names.
-    return m_names.size() < m_types.size();
-
-    // Fixme: It's bad design that backlinks are stored and recognized like this. Backlink columns
-    // should be a column type like any other, and we should find another way to hide them away from
-    // the user.
-}
-
-inline size_t Spec::first_backlink_column_index() const noexcept
-{
-    return m_num_public_columns;
-}
-
-inline size_t Spec::backlink_column_count() const noexcept
-{
-    return m_types.size() - m_num_public_columns;
-}
-
-// Spec will have a subspec when it contains a column which is one of:
-// link, linklist, backlink.
-inline bool Spec::has_subspec() const noexcept
-{
-    return (m_top.size() > 3) && (m_top.get_as_ref(3) != 0);
 }
 
 inline bool Spec::operator!=(const Spec& s) const noexcept
