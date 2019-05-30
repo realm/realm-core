@@ -2953,8 +2953,10 @@ TEST_TYPES(Table_list_nullable, int64_t, float, double)
         CHECK_EQUAL(list1.size(), 100);
         CHECK_EQUAL(list1.get(0), 1000);
         CHECK_EQUAL(list1.get(99), 1099);
+        CHECK_NOT(list1.is_null(0));
         auto list_base = obj.get_listbase_ptr(list_col);
         CHECK_EQUAL(list_base->size(), 100);
+        CHECK_NOT(list_base->is_null(0));
         CHECK(dynamic_cast<Lst<util::Optional<TEST_TYPE>>*>(list_base.get()));
 
         CHECK_EQUAL(list_sum(list1), sum);

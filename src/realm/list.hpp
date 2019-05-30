@@ -83,6 +83,7 @@ public:
      * can be made virtual.
      */
     virtual size_t size() const = 0;
+    virtual bool is_null(size_t ndx) const = 0;
     bool is_empty() const
     {
         return size() == 0;
@@ -271,6 +272,10 @@ public:
             return 0;
 
         return m_tree->size();
+    }
+    bool is_null(size_t ndx) const final
+    {
+        return m_nullable && get(ndx) == BPlusTree<T>::default_value(true);
     }
     T get(size_t ndx) const
     {
