@@ -50,7 +50,7 @@ if(ANDROID)
     #
     # On some architectures char is unsigned by default. Make it signed
     set(CMAKE_CXX_FLAGS_RELEASE "-Oz -DNDEBUG")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fdata-sections -ffunction-sections -fomit-frame-pointer -fsigned-char -fstrict-aliasing")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fdata-sections -ffunction-sections -fomit-frame-pointer -fsigned-char -fstrict-aliasing -funwind-tables -no-canonical-prefixes")
 endif()
 
 # Add REALM_DEBUG=1 to compile definitions for Debug / MinSizeDebug targets
