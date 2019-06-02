@@ -124,14 +124,25 @@ namespace util {
 bool try_make_dir(const std::string& path)
 {
 #ifdef _WIN32
-    if (_mkdir(path.c_str()) == 0)
+    int w_path_size = MultiByteToWideChar(CP_UTF8, 0, path.c_str(), -1, NULL, 0);
+    wchar_t* w_path = new wchar_t[w_path_size];
+    MultiByteToWideChar(CP_UTF8, 0, path.c_str(), -1, w_path, w_path_size);
+    if (CreateDirectoryW(w_path, NULL) != 0) {
+        delete w_path;
         return true;
+    }
+    delete w_path;
+    DWORD dw_err = GetLastError();
+    int err = (int)dw_err;
+    std::string msg;
+    FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,
+                  dw_err, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPTSTR)&msg, 0, NULL);
 #else // POSIX
     if (::mkdir(path.c_str(), S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH) == 0)
         return true;
-#endif
     int err = errno; // Eliminate any risk of clobbering
     std::string msg = get_errno_msg("make_dir() failed: ", err);
+#endif
     switch (err) {
         case EEXIST:
             return false;
