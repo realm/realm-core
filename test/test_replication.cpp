@@ -160,18 +160,17 @@ public:
         TrivialReplication::initialize(sg);
     }
 
-    version_type prepare_changeset(const char*, size_t, version_type) override
+    version_type prepare_changeset(const char*, size_t, version_type version) override
     {
         if (!m_arr) {
             using gf = _impl::GroupFriend;
             Allocator& alloc = gf::get_alloc(*m_group);
-            m_arr = std::make_unique<ArrayString>(alloc);
-            m_arr->create();
-            m_arr->add("Changeset");
+            m_arr = std::make_unique<BinaryColumn>(alloc);
             gf::prepare_history_parent(*m_group, *m_arr, hist_SyncClient, m_history_schema_version);
-            // m_arr->update_parent(); // Throws
+            m_arr->create();
+            m_arr->add(BinaryData("Changeset"));
         }
-        return 1;
+        return version + 1;
     }
 
     bool is_upgraded() const
@@ -202,8 +201,7 @@ public:
 private:
     int m_history_schema_version;
     bool m_upgraded = false;
-    Group* m_group = nullptr;
-    std::unique_ptr<ArrayString> m_arr;
+    std::unique_ptr<BinaryColumn> m_arr;
 };
 
 } // anonymous namespace
@@ -232,7 +230,7 @@ TEST(Replication_HistorySchemaVersionDuringWT)
 
     WriteTransaction wt(sg_1);
 
-    // It should be possible to open a second SharedGroup at the same path
+    // It should be possible to open a second db at the same path
     // while a WriteTransaction is active via another SharedGroup.
     DBRef sg_2 = DB::create(repl);
 }
@@ -246,13 +244,13 @@ TEST(Replication_GroupWriteWithoutHistory)
     SHARED_GROUP_TEST_PATH(out2);
 
     ReplSyncClient repl(path, 1);
-    SharedGroup sg_1(repl);
+    DBRef sg_1 = DB::create(repl);
     {
         WriteTransaction wt(sg_1);
         auto table = wt.add_table("Table");
         auto col = table->add_column(type_String, "strings");
-        auto ndx = table->add_empty_row();
-        table->set_string(col, ndx, "Hello");
+        auto obj = table->create_object();
+        obj.set(col, "Hello");
         wt.commit();
     }
     {
@@ -263,7 +261,7 @@ TEST(Replication_GroupWriteWithoutHistory)
 
     {
         // Open without history
-        SharedGroup sg_2(out1);
+        DBRef sg_2 = DB::create(out1);
         ReadTransaction rt(sg_2);
         rt.get_group().verify();
     }
@@ -277,7 +275,7 @@ TEST(Replication_GroupWriteWithoutHistory)
     {
         // Open with history
         ReplSyncClient repl2(out2, 1);
-        SharedGroup sg_2(repl2);
+        DBRef sg_2 = DB::create(repl2);
         ReadTransaction rt(sg_2);
         rt.get_group().verify();
     }
