@@ -15,6 +15,23 @@
 ### Internals
 * None.
 
+Besides the changes above, this release includes changes introduced by v5.18.0 and up
+until v5.18.0:
+| # 5.18.0 Release notes
+|
+| ### Enhancements
+| * Adds support for a new IncludeDescriptor type which describes arbitrary link paths
+|   on a TableView. Applying this to a TableView does not modify the results, but gives
+|   users the ability to use the reporting method to find rows in a different table that
+|   are connected by backlinks. This is intended for sync subscriptions.
+| * Enhances LinksToNode so that it can check links to multiple targets. This can be utilized
+|   in permissions check in sync.
+|
+| -----------
+|
+| ### Internals
+| * The release binaries for Apple platforms are now built with Xcode 9.2 (up from 8.3.3).
+
 ----------------------------------------------
 
 # 6.0.0-alpha.7 Release notes

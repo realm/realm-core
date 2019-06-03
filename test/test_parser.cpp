@@ -162,8 +162,8 @@ static std::vector<std::string> valid_queries = {
     "! 0=0",
     "!(0=0)",
     "! (0=0)",
-    "NOT0=0",   // keypath NOT0
-    "NOT0.a=0", // keypath NOT0
+    "NOT0=0",    // keypath NOT0
+    "NOT0.a=0",  // keypath NOT0
     "NOT0a.b=0", // keypath NOT0a
     "not-1=1",
     "not 0=0",
@@ -196,7 +196,8 @@ static std::vector<std::string> valid_queries = {
     "a == b sort(a ASC, b DESC) DISTINCT(p)",
     "a == b sort(a ASC, b DESC) DISTINCT(p) sort(c ASC, d DESC) DISTINCT(q.r)",
     "a == b and c==d sort(a ASC, b DESC) DISTINCT(p) sort(c ASC, d DESC) DISTINCT(q.r)",
-    "a == b  sort(     a   ASC  ,  b DESC) and c==d   DISTINCT(   p )  sort(   c   ASC  ,  d   DESC  )  DISTINCT(   q.r ,   p)   ",
+    "a == b  sort(     a   ASC  ,  b DESC) and c==d   DISTINCT(   p )  sort(   c   ASC  ,  d   DESC  )  DISTINCT(   "
+    "q.r ,   p)   ",
 
     // limit
     "a=b LIMIT(1)",
@@ -211,6 +212,19 @@ static std::vector<std::string> valid_queries = {
     "a=b LIMIT(5) && c=d LIMIT(2)",
     "a=b LIMIT(5) SORT(age ASC) DISTINCT(name) LIMIT(2)",
 
+    // include
+    "a=b INCLUDE(c)",
+    "a=b include(c,d)",
+    "a=b INCLUDE(c.d)",
+    "a=b INCLUDE(c.d.e, f.g, h)",
+    "a=b INCLUDE ( c )",
+    "a=b INCLUDE(d, e, f    , g )",
+    "a=b INCLUDE(c) && d=f",
+    "a=b INCLUDE(c) INCLUDE(d)",
+    "a=b && c=d || e=f INCLUDE(g)",
+    "a=b LIMIT(5) SORT(age ASC) DISTINCT(name) INCLUDE(links1, links2)",
+    "a=b INCLUDE(links1, links2) LIMIT(5) SORT(age ASC) DISTINCT(name)",
+
     // subquery expression
     "SUBQUERY(items, $x, $x.name == 'Tom').@size > 0",
     "SUBQUERY(items, $x, $x.name == 'Tom').@count > 0",
@@ -224,7 +238,7 @@ static std::vector<std::string> valid_queries = {
 
 static std::vector<std::string> invalid_queries = {
     "predicate",
-    "'\\a' = ''",        // invalid escape
+    "'\\a' = ''", // invalid escape
 
     // invalid unicode
     "'\\u0' = ''",
@@ -275,48 +289,61 @@ static std::vector<std::string> invalid_queries = {
     "truepredicate & truepredicate",
 
     // sort/distinct
-    "SORT(p ASCENDING)",  // no query conditions
-    "a=b SORT(p)",        // no asc/desc
-    "a=b SORT(0 Descending)", // bad keypath
-    "a=b sort()",             // missing condition
-    "a=b sort",      // no target property
-    "distinct(p)",           // no query condition
-    "a=b DISTINCT()",      // no target property
-    "a=b Distinct",      // no target property
-    "sort(a ASC b, DESC) a == b", // before query condition
+    "SORT(p ASCENDING)",                      // no query conditions
+    "a=b SORT(p)",                            // no asc/desc
+    "a=b SORT(0 Descending)",                 // bad keypath
+    "a=b sort()",                             // missing condition
+    "a=b sort",                               // no target property
+    "distinct(p)",                            // no query condition
+    "a=b DISTINCT()",                         // no target property
+    "a=b Distinct",                           // no target property
+    "sort(a ASC b, DESC) a == b",             // before query condition
     "sort(a ASC b, DESC) a == b sort(c ASC)", // before query condition
-    "a=bDISTINCT(p)", // bad spacing
-    "a=b sort p.q desc", // no braces
-    "a=b sort(p.qDESC)", // bad spacing
-    "a=b DISTINCT p", // no braces
-    "a=b SORT(p ASC", // bad braces
-    "a=b DISTINCT(p", // no braces
-    "a=b sort(p.q DESC a ASC)", // missing comma
-    "a=b DISTINCT(p q)", // missing comma
+    "a=bDISTINCT(p)",                         // bad spacing
+    "a=b sort p.q desc",                      // no braces
+    "a=b sort(p.qDESC)",                      // bad spacing
+    "a=b DISTINCT p",                         // no braces
+    "a=b SORT(p ASC",                         // bad braces
+    "a=b DISTINCT(p",                         // no braces
+    "a=b sort(p.q DESC a ASC)",               // missing comma
+    "a=b DISTINCT(p q)",                      // missing comma
 
     // limit
-    "LIMIT(1)", // no query conditions
-    "a=b LIMIT", // no params
-    "a=b LIMIT()", // no params
-    "a=b LIMIT(2", // missing end paren
-    "a=b LIMIT2)", // missing open paren
-    "a=b LIMIT(-1)", // negative limit
-    "a=b LIMIT(2.7)", // input must be an integer
+    "LIMIT(1)",          // no query conditions
+    "a=b LIMIT",         // no params
+    "a=b LIMIT()",       // no params
+    "a=b LIMIT(2",       // missing end paren
+    "a=b LIMIT2)",       // missing open paren
+    "a=b LIMIT(-1)",     // negative limit
+    "a=b LIMIT(2.7)",    // input must be an integer
     "a=b LIMIT(0xFFEE)", // input must be an integer
-    "a=b LIMIT(word)", // non numeric limit
+    "a=b LIMIT(word)",   // non numeric limit
     "a=b LIMIT(11asdf)", // non numeric limit
-    "a=b LIMIT(1, 1)", // only accept one input
+    "a=b LIMIT(1, 1)",   // only accept one input
+
+    // include
+    "INCLUDE(a)",         // no query conditions
+    "a=b INCLUDE",        // no parameters
+    "a=b INCLUDE()",      // empty params
+    "a=b INCLUDE(a",      // missing end paren
+    "a=b INCLUDEb)",      // missing open paren
+    "a=b INCLUDE(1)",     // numeric input
+    "a=b INCLUDE(a,)",    // missing param
+    "a=b INCLUDE(,a)",    // missing param
+    "a=b INCLUDE(a.)",    // incomplete keypath
+    "a=b INCLUDE(a b)",   // missing comma
+    "a=b INCLUDE(a < b)", // parameters should not be a predicate
 
     // subquery
-    "SUBQUERY(items, $x, $x.name == 'Tom') > 0", // missing .@count
-    "SUBQUERY(items, $x, $x.name == 'Tom').@min > 0", // @min not yet supported
-    "SUBQUERY(items, $x, $x.name == 'Tom').@max > 0", // @max not yet supported
-    "SUBQUERY(items, $x, $x.name == 'Tom').@sum > 0", // @sum not yet supported
-    "SUBQUERY(items, $x, $x.name == 'Tom').@avg > 0", // @avg not yet supported
+    "SUBQUERY(items, $x, $x.name == 'Tom') > 0",        // missing .@count
+    "SUBQUERY(items, $x, $x.name == 'Tom').@min > 0",   // @min not yet supported
+    "SUBQUERY(items, $x, $x.name == 'Tom').@max > 0",   // @max not yet supported
+    "SUBQUERY(items, $x, $x.name == 'Tom').@sum > 0",   // @sum not yet supported
+    "SUBQUERY(items, $x, $x.name == 'Tom').@avg > 0",   // @avg not yet supported
     "SUBQUERY(items, var, var.name == 'Tom').@avg > 0", // variable must start with '$'
-    "SUBQUERY(, $x, $x.name == 'Tom').@avg > 0", // a target keypath is required
-    "SUBQUERY(items, , name == 'Tom').@avg > 0", // a variable name is required
-    "SUBQUERY(items, $x, ).@avg > 0", // the subquery is required
+    "SUBQUERY(, $x, $x.name == 'Tom').@avg > 0",        // a target keypath is required
+    "SUBQUERY(items, , name == 'Tom').@avg > 0",        // a variable name is required
+    "SUBQUERY(items, $x, ).@avg > 0",                   // the subquery is required
 
     // no @ allowed in keypaths except for keyword '@links'
     "@prop > 2",
@@ -2045,6 +2072,260 @@ TEST(Parser_Limit)
     CHECK(tv2->is_attached());
     CHECK(tv2->is_in_sync());
     CHECK_EQUAL(tv2->size(), 1);
+}
+
+
+TEST(Parser_IncludeDescriptor)
+{
+    Group g;
+    TableRef people = g.add_table("person");
+    TableRef accounts = g.add_table("account");
+
+    auto name_col = people->add_column(type_String, "name");
+    auto age_col = people->add_column(type_Int, "age");
+    auto account_col = people->add_column_link(type_Link, "account", *accounts);
+    static_cast<void>(age_col);     // silence warning
+    static_cast<void>(account_col); // do
+
+    auto balance_col = accounts->add_column(type_Double, "balance");
+    static_cast<void>(balance_col);
+    auto transaction_col = accounts->add_column(type_Int, "num_transactions");
+
+    auto a0 = accounts->create_object().set_all(50.55, 2);
+    auto a1 = accounts->create_object().set_all(50.55, 73);
+    auto a2 = accounts->create_object().set_all(98.92, 17);
+
+    auto p0 = people->create_object().set_all("Adam", 28, a0.get_key());
+    auto p1 = people->create_object().set_all("Frank", 30, a1.get_key());
+    auto p2 = people->create_object().set_all("Ben", 28, a2.get_key());
+
+    // person:                      | account:
+    // name     age     account     | balance       num_transactions
+    // Adam     28      0 ->        | 50.55         2
+    // Frank    30      1 ->        | 50.55         73
+    // Ben      28      2 ->        | 98.92         17
+
+    // include serialisation
+    TableView tv = get_sorted_view(accounts, "balance > 0 SORT(num_transactions ASC) INCLUDE(@links.person.account)");
+    IncludeDescriptor includes = tv.get_include_descriptors();
+    CHECK(includes.is_valid());
+    CHECK_EQUAL(tv.size(), 3);
+
+    CHECK_EQUAL(tv.get(0).get<Int>(transaction_col), 2);
+    CHECK_EQUAL(tv.get(1).get<Int>(transaction_col), 17);
+    CHECK_EQUAL(tv.get(2).get<Int>(transaction_col), 73);
+
+    std::vector<std::string> expected_include_names;
+    auto reporter = [&](const Table* table, const std::unordered_set<ObjKey>& objs) {
+        CHECK(table == people);
+        CHECK_EQUAL(expected_include_names.size(), objs.size());
+        for (auto obj : objs) {
+            std::string obj_value = table->get_object(obj).get<String>(name_col);
+            CHECK(std::find(expected_include_names.begin(), expected_include_names.end(), obj_value) !=
+                  expected_include_names.end());
+        }
+    };
+
+    expected_include_names = {"Adam"};
+    includes.report_included_backlinks(accounts, tv.get_key(0), reporter);
+    expected_include_names = {"Ben"};
+    includes.report_included_backlinks(accounts, tv.get_key(1), reporter);
+    expected_include_names = {"Frank"};
+    includes.report_included_backlinks(accounts, tv.get_key(2), reporter);
+
+    // Error checking
+    std::string message;
+    CHECK_THROW_ANY_GET_MESSAGE(get_sorted_view(people, "age > 0 INCLUDE(account)"), message);
+    CHECK_EQUAL(message,
+                "Invalid INCLUDE path at [0, 0]: the last part of an included path must be a backlink column.");
+    CHECK_THROW_ANY_GET_MESSAGE(get_sorted_view(people, "age > 0 INCLUDE(age)"), message);
+    CHECK_EQUAL(message, "Property 'age' is not a link in object of type 'person' in 'INCLUDE' clause");
+    CHECK_THROW_ANY_GET_MESSAGE(get_sorted_view(accounts, "balance > 0 INCLUDE(bad_property_name)"), message);
+    CHECK_EQUAL(message, "No property 'bad_property_name' on object of type 'account'");
+    CHECK_THROW_ANY_GET_MESSAGE(get_sorted_view(people, "age > 0 INCLUDE(@links.person.account)"), message);
+    CHECK_EQUAL(message, "No property 'account' found in type 'person' which links to type 'person'");
+}
+
+
+TEST(Parser_IncludeDescriptorMultiple)
+{
+    Group g;
+    TableRef people = g.add_table("person");
+    TableRef accounts = g.add_table("account");
+    TableRef banks = g.add_table("bank");
+    TableRef languages = g.add_table("language");
+
+    auto name_col = people->add_column(type_String, "name");
+    auto account_col = people->add_column_link(type_Link, "account", *accounts);
+
+    auto balance_col = accounts->add_column(type_Double, "balance");
+    auto transaction_col = accounts->add_column(type_Int, "num_transactions");
+    auto account_bank_col = accounts->add_column_link(type_Link, "bank", *banks);
+
+    auto bank_name_col = banks->add_column(type_String, "name");
+
+    auto language_name_col = languages->add_column(type_String, "name");
+    auto language_available_col = languages->add_column_link(type_LinkList, "available_from", *banks);
+
+    auto b0 = banks->create_object().set_all("Danske Bank");
+    auto b1 = banks->create_object().set_all("RBC");
+
+    auto l0 = languages->create_object().set_all("English");
+    auto l1 = languages->create_object().set_all("Danish");
+    auto l2 = languages->create_object().set_all("French");
+    auto ll0 = l0.get_linklist(language_available_col);
+    ll0.add(b0.get_key());
+    ll0.add(b1.get_key());
+    auto ll1 = l1.get_linklist(language_available_col);
+    ll1.add(b0.get_key());
+    auto ll2 = l2.get_linklist(language_available_col);
+    ll2.add(b1.get_key());
+
+    auto a0 = accounts->create_object().set_all(50.55, 2, b1.get_key());
+    auto a1 = accounts->create_object().set_all(50.55, 73, b0.get_key());
+    auto a2 = accounts->create_object().set_all(98.92, 17, b1.get_key());
+
+    people->create_object().set_all("Adam", a0.get_key());
+    people->create_object().set_all("Frank", a1.get_key());
+    people->create_object().set_all("Ben", a2.get_key());
+
+    static_cast<void>(account_col);
+    static_cast<void>(balance_col);
+    static_cast<void>(account_bank_col);
+    static_cast<void>(bank_name_col);
+    // person:             | account:                              | bank:        | languages:
+    // name    account     | balance       num_transactions  bank  | name         | name      available_from
+    // Adam    0 ->        | 50.55         2                 1     | Danske Bank  | English    {0, 1}
+    // Frank   1 ->        | 50.55         73                0     | RBC          | Danish     {0}
+    // Ben     2 ->        | 98.92         17                1     |              | French     {1}
+
+    // include serialisation
+    TableView tv = get_sorted_view(
+        accounts,
+        "balance > 0 SORT(num_transactions ASC) INCLUDE(@links.person.account, bank.@links.language.available_from)");
+    CHECK_EQUAL(tv.size(), 3);
+
+    CHECK_EQUAL(tv.get(0).get<Int>(transaction_col), 2);
+    CHECK_EQUAL(tv.get(1).get<Int>(transaction_col), 17);
+    CHECK_EQUAL(tv.get(2).get<Int>(transaction_col), 73);
+
+    std::vector<std::string> expected_people_names;
+    std::vector<std::string> expected_language_names;
+    auto reporter = [&](const Table* table, const std::unordered_set<ObjKey>& rows) {
+        CHECK(table == people || table == languages);
+        if (table == people) {
+            CHECK_EQUAL(expected_people_names.size(), rows.size());
+            for (auto row : rows) {
+                std::string row_value = table->get_object(row).get<StringData>(name_col);
+                CHECK(std::find(expected_people_names.begin(), expected_people_names.end(), row_value) !=
+                      expected_people_names.end());
+            }
+        }
+        else if (table == languages) {
+            CHECK_EQUAL(expected_language_names.size(), rows.size());
+            if (expected_language_names.size() != rows.size()) {
+                throw std::runtime_error("blob");
+            }
+            for (auto row : rows) {
+                std::string row_value = table->get_object(row).get<StringData>(language_name_col);
+                CHECK(std::find(expected_language_names.begin(), expected_language_names.end(), row_value) !=
+                      expected_language_names.end());
+            }
+        }
+    };
+
+    {
+        IncludeDescriptor includes = tv.get_include_descriptors();
+        CHECK(includes.is_valid());
+        expected_people_names = {"Adam"};
+        expected_language_names = {"English", "French"};
+        includes.report_included_backlinks(accounts, tv.get_key(0), reporter);
+        expected_people_names = {"Ben"};
+        expected_language_names = {"English", "French"};
+        includes.report_included_backlinks(accounts, tv.get_key(1), reporter);
+        expected_people_names = {"Frank"};
+        expected_language_names = {"Danish", "English"};
+        includes.report_included_backlinks(accounts, tv.get_key(2), reporter);
+    }
+    {
+        parser::KeyPathMapping mapping;
+        // disable parsing backlink queries, INCLUDE still allows backlinks
+        mapping.set_allow_backlinks(false);
+        // include supports backlink mappings
+        mapping.add_mapping(accounts, "account_owner", "@links.person.account");
+        mapping.add_mapping(banks, "service_languages", "@links.language.available_from");
+        query_builder::NoArguments args;
+
+        Query query = accounts->where();
+        realm::parser::ParserResult result = realm::parser::parse(
+            "balance > 0 SORT(num_transactions ASC) INCLUDE(account_owner, bank.service_languages)");
+        realm::query_builder::apply_predicate(query, result.predicate, args, mapping);
+        DescriptorOrdering ordering;
+        realm::query_builder::apply_ordering(ordering, accounts, result.ordering, args, mapping);
+        CHECK_EQUAL(query.count(), 3);
+        IncludeDescriptor includes = ordering.compile_included_backlinks();
+        CHECK(includes.is_valid());
+
+        expected_people_names = {"Adam"};
+        expected_language_names = {"English", "French"};
+        includes.report_included_backlinks(accounts, tv.get_key(0), reporter);
+        expected_people_names = {"Ben"};
+        expected_language_names = {"English", "French"};
+        includes.report_included_backlinks(accounts, tv.get_key(1), reporter);
+        expected_people_names = {"Frank"};
+        expected_language_names = {"Danish", "English"};
+        includes.report_included_backlinks(accounts, tv.get_key(2), reporter);
+    }
+    {
+        parser::KeyPathMapping mapping;
+        mapping.set_allow_backlinks(false);
+        mapping.add_mapping(banks, "service_languages", "@links.language.available_from");
+        query_builder::NoArguments args;
+
+        Query query = accounts->where();
+        realm::parser::ParserResult result = realm::parser::parse("balance > 0 SORT(num_transactions ASC)");
+        realm::query_builder::apply_predicate(query, result.predicate, args, mapping);
+        DescriptorOrdering ordering;
+        realm::query_builder::apply_ordering(ordering, accounts, result.ordering, args, mapping);
+        CHECK_EQUAL(ordering.compile_included_backlinks().is_valid(), false); // nothing included yet
+
+        DescriptorOrdering parsed_ordering_1;
+        realm::parser::DescriptorOrderingState include_1 = realm::parser::parse_include_path("@links.person.account");
+        realm::query_builder::apply_ordering(parsed_ordering_1, accounts, include_1, args, mapping);
+        CHECK(parsed_ordering_1.compile_included_backlinks().is_valid());
+        DescriptorOrdering parsed_ordering_2;
+        realm::parser::DescriptorOrderingState include_2 =
+            realm::parser::parse_include_path("bank.service_languages");
+        realm::query_builder::apply_ordering(parsed_ordering_2, accounts, include_2, args, mapping);
+        CHECK(parsed_ordering_2.compile_included_backlinks().is_valid());
+
+        ordering.append_include(parsed_ordering_1.compile_included_backlinks());
+        CHECK(ordering.compile_included_backlinks().is_valid());
+        ordering.append_include(parsed_ordering_2.compile_included_backlinks());
+        CHECK(ordering.compile_included_backlinks().is_valid());
+
+        CHECK_EQUAL(query.count(), 3);
+        IncludeDescriptor includes = ordering.compile_included_backlinks();
+        CHECK(includes.is_valid());
+
+        expected_people_names = {"Adam"};
+        expected_language_names = {"English", "French"};
+        includes.report_included_backlinks(accounts, tv.get_key(0), reporter);
+        expected_people_names = {"Ben"};
+        expected_language_names = {"English", "French"};
+        includes.report_included_backlinks(accounts, tv.get_key(1), reporter);
+        expected_people_names = {"Frank"};
+        expected_language_names = {"Danish", "English"};
+        includes.report_included_backlinks(accounts, tv.get_key(2), reporter);
+
+        std::string message;
+        CHECK_THROW_ANY_GET_MESSAGE(realm::parser::parse_include_path(""), message);
+        CHECK(message.find("Invalid syntax encountered while parsing key path for 'INCLUDE'.") != std::string::npos);
+        CHECK_THROW_ANY_GET_MESSAGE(realm::parser::parse_include_path("2"), message);
+        CHECK(message.find("Invalid syntax encountered while parsing key path for 'INCLUDE'.") != std::string::npos);
+        CHECK_THROW_ANY_GET_MESSAGE(realm::parser::parse_include_path("something with spaces"), message);
+        CHECK(message.find("Invalid syntax encountered while parsing key path for 'INCLUDE'.") != std::string::npos);
+    }
 }
 
 

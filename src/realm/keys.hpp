@@ -234,4 +234,21 @@ inline std::string to_string(ColKey ck)
 } // namespace realm
 
 
+namespace std {
+
+template <>
+
+struct hash<realm::ObjKey> {
+
+    size_t operator()(realm::ObjKey key) const
+
+    {
+
+        return std::hash<uint64_t>{}(key.value);
+    }
+};
+
+} // namespace std
+
+
 #endif

@@ -503,6 +503,17 @@ void ConstTableView::apply_descriptor_ordering(DescriptorOrdering new_ordering)
     do_sync();
 }
 
+void ConstTableView::include(IncludeDescriptor include_paths)
+{
+    m_descriptor_ordering.append_include(std::move(include_paths));
+    do_sync();
+}
+
+IncludeDescriptor ConstTableView::get_include_descriptors()
+{
+    return m_descriptor_ordering.compile_included_backlinks();
+}
+
 std::string ConstTableView::get_descriptor_ordering_description() const
 {
     return m_descriptor_ordering.get_description(m_table);

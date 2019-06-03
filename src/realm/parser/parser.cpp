@@ -189,7 +189,10 @@ struct limit_param : disable<int_num> {
 };
 struct limit : seq<string_token_t("limit"), star<blank>, one<'('>, star<blank>, limit_param, star<blank>, one<')'>> {
 };
-struct predicate_suffix_modifier : sor<sort, distinct, limit> {
+struct include : seq<string_token_t("include"), star<blank>, one<'('>,
+                     list<seq<star<blank>, descriptor_property, star<blank>>, one<','>>, one<')'>> {
+};
+struct predicate_suffix_modifier : sor<sort, distinct, limit, include> {
 };
 
 struct string_oper : seq< sor< contains, begins, ends, like>, star< blank >, opt< case_insensitive > > {};
@@ -517,6 +520,18 @@ template<> struct action< distinct >
 };
 
 template <>
+struct action<include> {
+    template <typename Input>
+    static void apply(const Input& in, ParserState& state)
+    {
+        DEBUG_PRINT_TOKEN(in.string());
+        state.temp_ordering.type = DescriptorOrderingState::SingleOrderingState::DescriptorType::Include;
+        state.ordering_state.orderings.push_back(state.temp_ordering);
+        state.temp_ordering.properties.clear();
+    }
+};
+
+template <>
 struct action<limit_param> {
     template <typename Input>
     static void apply(const Input& in, ParserState& state)
@@ -762,11 +777,28 @@ struct error_message_control : tao::pegtl::normal< Rule >
     }
 };
 
+template <typename Rule>
+struct error_message_control_include : tao::pegtl::normal<Rule> {
+    static const std::string error_message;
+
+    template <typename Input, typename... States>
+    static void raise(const Input& in, States&&...)
+    {
+        throw tao::pegtl::parse_error(error_message, in);
+    }
+};
+
+
 template<>
 const std::string error_message_control< chars >::error_message = "Invalid characters in string constant.";
 
 template< typename Rule>
 const std::string error_message_control< Rule >::error_message = "Invalid predicate.";
+
+template <typename Rule>
+const std::string error_message_control_include<Rule>::error_message =
+    "Invalid syntax encountered while parsing key path for 'INCLUDE'.";
+
 
 ParserResult parse(const char* query)
 {
@@ -797,6 +829,25 @@ ParserResult parse(const StringData& query)
     }
 
     return ParserResult{std::move(out_predicate), state.ordering_state};
+}
+
+DescriptorOrderingState parse_include_path(const realm::StringData& path)
+{
+    DEBUG_PRINT_TOKEN(path);
+
+    Predicate out_predicate(Predicate::Type::And);
+    ParserState state;
+    state.group_stack.push_back(&out_predicate);
+
+    // pegtl::memory_input does not make a copy, it operates on pointers to the contiguous data
+    tao::pegtl::memory_input<> input(path.data(), path.size(), path);
+    tao::pegtl::parse<must<descriptor_property, eof>, action, error_message_control_include>(input, state);
+
+    state.temp_ordering.type = DescriptorOrderingState::SingleOrderingState::DescriptorType::Include;
+    state.ordering_state.orderings.push_back(state.temp_ordering);
+    state.temp_ordering.properties.clear();
+
+    return state.ordering_state;
 }
 
 size_t analyze_grammar()
