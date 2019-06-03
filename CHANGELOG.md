@@ -34,6 +34,22 @@ until v5.18.0:
 
 ----------------------------------------------
 
+# 6.0.0-alpha.7 Release notes
+
+### Enhancements
+* Ability to get/set Mixed on ConstObj/Obj.
+* Now able to migrate files with Sync histories.
+
+### Fixed
+* None.
+ 
+-----------
+
+### Internals
+* Class ObjectId is moved over from Sync.
+
+----------------------------------------------
+
 # 6.0.0-alpha.6 Release notes
 
 ### Fixed

@@ -329,9 +329,6 @@ void BaseDescriptor::Sorter::cache_first_column(IndexPairs& v)
 
     auto& col = m_columns[0];
     ColKey ck = col.col_key;
-    DataType dt = m_columns[0].table->get_column_type(ck);
-    bool is_nullable = col.table->is_nullable(ck);
-
     for (size_t i = 0; i < v.size(); i++) {
         IndexPair& index = v[i];
         ObjKey key = index.key_for_object;
@@ -346,59 +343,7 @@ void BaseDescriptor::Sorter::cache_first_column(IndexPairs& v)
             }
         }
 
-        ConstObj obj = col.table->get_object(key);
-        switch (dt) {
-            case type_Int:
-                if (is_nullable) {
-                    auto val = obj.get<util::Optional<int64_t>>(ck);
-                    if (val) {
-                        index.cached_value = val.value();
-                    }
-                    else {
-                        index.cached_value = Mixed();
-                    }
-                }
-                else {
-                    index.cached_value = obj.get<Int>(ck);
-                }
-                break;
-            case type_Timestamp:
-                index.cached_value = obj.get<Timestamp>(ck);
-                break;
-            case type_String:
-                index.cached_value = obj.get<String>(ck);
-                break;
-            case type_Float:
-                if (is_nullable && obj.is_null(ck)) {
-                    index.cached_value = Mixed();
-                }
-                else {
-                    index.cached_value = obj.get<Float>(ck);
-                }
-                break;
-            case type_Double:
-                if (is_nullable && obj.is_null(ck)) {
-                    index.cached_value = Mixed();
-                }
-                else {
-                    index.cached_value = obj.get<Double>(ck);
-                }
-                break;
-            case type_Bool:
-                if (is_nullable && obj.is_null(ck)) {
-                    index.cached_value = Mixed();
-                }
-                else {
-                    index.cached_value = obj.get<Bool>(ck);
-                }
-                break;
-            case type_Link:
-                index.cached_value = obj.get<ObjKey>(ck);
-                break;
-            default:
-                REALM_UNREACHABLE();
-                break;
-        }
+        index.cached_value = col.table->get_object(key).get_any(ck);
     }
 }
 

@@ -39,9 +39,9 @@ class Transaction;
 /// as two 64-bit integers, each of which may frequently be small, for best
 /// on-wire compressibility.
 struct ObjectID {
-    constexpr ObjectID(uint64_t hi, uint64_t lo)
-        : m_lo(lo)
-        , m_hi(hi)
+    constexpr ObjectID(uint64_t h, uint64_t l)
+        : m_lo(l)
+        , m_hi(h)
     {
     }
     static ObjectID from_string(StringData);

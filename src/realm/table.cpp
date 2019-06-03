@@ -733,9 +733,10 @@ void Table::do_erase_root_column(ColKey col_key)
     ref_type index_ref = m_index_refs.get_as_ref(col_ndx);
     if (index_ref) {
         Array::destroy_deep(index_ref, m_index_refs.get_alloc());
+        m_index_refs.set(col_ndx, 0);
+        delete m_index_accessors[col_ndx];
+        m_index_accessors[col_ndx] = nullptr;
     }
-    delete m_index_accessors[col_ndx];
-    m_index_refs.set(col_ndx, 0);
     m_opposite_table.set(col_ndx, 0);
     m_opposite_column.set(col_ndx, 0);
     m_index_accessors[col_ndx] = nullptr;
@@ -745,6 +746,10 @@ void Table::do_erase_root_column(ColKey col_key)
     m_top.adjust(top_position_for_column_key, 2);
 
     build_column_mapping();
+    while (m_index_accessors.size() > m_leaf_ndx2colkey.size()) {
+        REALM_ASSERT(m_index_accessors.back() == nullptr);
+        m_index_accessors.erase(m_index_accessors.end() - 1);
+    }
 }
 
 LinkType Table::get_link_type(ColKey col_key) const
@@ -840,7 +845,7 @@ void Table::migrate_indexes(std::function<void()> commit_and_continue)
 
         for (size_t col_ndx = 0; col_ndx < m_spec.get_column_count(); col_ndx++) {
             if (m_spec.get_column_attr(col_ndx).test(col_attr_Indexed) && !m_index_refs.get(col_ndx)) {
-                auto old_index_ref = col_refs.get(col_ndx + 1);
+                auto old_index_ref = to_ref(col_refs.get(col_ndx + 1));
 
                 // Delete old index
                 Array::destroy_deep(old_index_ref, m_alloc);
@@ -886,7 +891,11 @@ void Table::migrate_subspec(std::function<void()> commit_and_continue)
                 auto target_key = m_spec.get_opposite_link_table_key(col_ndx);
                 auto target_table = group->get_table(target_key);
                 Spec& target_spec = _impl::TableFriend::get_spec(*target_table);
-                ColKey backlink_col_key = target_spec.find_backlink_column(m_key, col_ndx);
+                // The target table spec may already be migrated.
+                // If it has, the new functions should be used.
+                ColKey backlink_col_key = target_spec.has_subspec()
+                                              ? target_spec.find_backlink_column(m_key, col_ndx)
+                                              : target_table->find_opposite_column(m_spec.get_key(col_ndx));
                 REALM_ASSERT(backlink_col_key.get_type() == col_type_BackLink);
                 if (m_opposite_table.get(col_ndx) != target_key.value) {
                     m_opposite_table.set(col_ndx, target_key.value);
@@ -908,7 +917,7 @@ void Table::migrate_subspec(std::function<void()> commit_and_continue)
                 if (m_opposite_column.get(col_ndx) != origin_col_key.value) {
                     m_opposite_column.set(col_ndx, origin_col_key.value);
                 }
-                if (auto ref = col_refs.get(col_ndx)) {
+                if (auto ref = to_ref(col_refs.get(col_ndx))) {
                     Array::destroy_deep(ref, m_alloc);
                     col_refs.set(col_ndx, 0);
                 }
@@ -956,9 +965,9 @@ void Table::convert_links_from_ndx_to_key(std::function<void()> commit_and_conti
                                 link_list.init_from_ref(ref_type(val));
                                 size_t link_list_sz = link_list.size();
                                 for (size_t j = 0; j < link_list_sz; j++) {
-                                    int64_t link = link_list.get(j);
-                                    int64_t key_val = oid_column.get(link);
-                                    if (key_val != link) {
+                                    int64_t link_val = link_list.get(j);
+                                    int64_t key_val = oid_column.get(size_t(link_val));
+                                    if (key_val != link_val) {
                                         link_list.set(j, key_val);
                                     }
                                 }
@@ -966,7 +975,7 @@ void Table::convert_links_from_ndx_to_key(std::function<void()> commit_and_conti
                                 new_val = link_list.get_ref();
                             }
                             else {
-                                new_val = oid_column.get(val - 1) + 1;
+                                new_val = oid_column.get(size_t(val - 1)) + 1;
                             }
                             if (new_val != val) {
                                 link_column.set(row_ndx, new_val);
@@ -990,8 +999,8 @@ void Table::convert_links_from_ndx_to_key(std::function<void()> commit_and_conti
 ref_type Table::get_oid_column_ref() const
 {
     Array col_refs(m_alloc);
-    col_refs.init_from_ref(m_top.get(top_position_for_columns));
-    return col_refs.get(0);
+    col_refs.init_from_ref(m_top.get_as_ref(top_position_for_columns));
+    return to_ref(col_refs.get(0));
 }
 
 namespace {
@@ -1321,7 +1330,7 @@ void Table::migrate_objects(std::function<void()> commit_and_continue)
 
     // Destroy values in the old columns
     for (auto col_ndx : cols_to_destroy) {
-        Array::destroy_deep(col_refs.get(col_ndx), m_alloc);
+        Array::destroy_deep(to_ref(col_refs.get(col_ndx)), m_alloc);
         col_refs.set(col_ndx, 0);
     }
 
@@ -1382,7 +1391,7 @@ void Table::migrate_links(std::function<void()> commit_and_continue)
     if (sz != size_t(-1)) {
         BPlusTree<Int> oid_column(m_alloc);
         if (use_oid) {
-            oid_column.init_from_ref(col_refs.get(0));
+            oid_column.init_from_ref(to_ref(col_refs.get(0)));
         }
         for (size_t i = 0; i < sz; i++) {
             ObjKey obj_key(use_oid ? oid_column.get(i) : i);
@@ -2767,4 +2776,14 @@ TableRef Table::get_opposite_table(ColKey col_key) const
 ColKey Table::get_opposite_column(ColKey col_key) const
 {
     return ColKey(m_opposite_column.get(col_key.get_index().val));
+}
+
+ColKey Table::find_opposite_column(ColKey col_key) const
+{
+    for (size_t i = 0; i < m_opposite_column.size(); i++) {
+        if (m_opposite_column.get(i) == col_key.value) {
+            return m_spec.get_key(m_leaf_ndx2spec_ndx[i]);
+        }
+    }
+    return ColKey();
 }

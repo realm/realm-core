@@ -160,7 +160,7 @@ struct ObjKey {
         : value(-1)
     {
     }
-    explicit ObjKey(int64_t val)
+    explicit constexpr ObjKey(int64_t val)
         : value(val)
     {
     }
