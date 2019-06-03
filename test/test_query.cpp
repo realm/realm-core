@@ -3716,8 +3716,7 @@ TEST(Query_DescriptorsWillApply)
     CHECK(ordering.will_apply_include());
     CHECK(!ordering.will_limit_to_zero());
 
-    // FIXME: Wrong merge here:
-    CHECK_EQUAL(ordering.size(), 5);
+    CHECK_EQUAL(ordering.size(), 6);
     CHECK(ordering.get_type(0) == DescriptorType::Sort);
     CHECK(ordering.get_type(1) == DescriptorType::Distinct);
     CHECK(ordering.get_type(2) == DescriptorType::Distinct);

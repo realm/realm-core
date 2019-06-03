@@ -2223,6 +2223,9 @@ TEST(Parser_IncludeDescriptorMultiple)
         }
         else if (table == languages) {
             CHECK_EQUAL(expected_language_names.size(), rows.size());
+            if (expected_language_names.size() != rows.size()) {
+                throw std::runtime_error("blob");
+            }
             for (auto row : rows) {
                 std::string row_value = table->get_object(row).get<StringData>(language_name_col);
                 CHECK(std::find(expected_language_names.begin(), expected_language_names.end(), row_value) !=

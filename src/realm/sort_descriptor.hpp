@@ -33,11 +33,12 @@ class Group;
 enum class DescriptorType { Sort, Distinct, Limit, Include };
 
 struct LinkPathPart {
+    // Constructor for forward links
     LinkPathPart(ColKey col_key)
         : column_key(col_key)
     {
     }
-
+    // Constructor for backward links. Source table must be a valid table.
     LinkPathPart(ColKey col_key, ConstTableRef source);
     // Each step in the path can be a forward or a backward link.
     // In case of a backlink, the column_key indicates the origin link column

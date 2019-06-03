@@ -452,7 +452,7 @@ IncludeDescriptor::IncludeDescriptor(const Table& table, const std::vector<std::
                         // An inclusion must end with a backlink column, link/list columns are included automatically
                         throw InvalidPathError(util::format("Invalid INCLUDE path at [%1, %2]: the last part of an "
                                                             "included path must be a backlink column.",
-                                                            i, cur_table->get_column_name(link.column_key)));
+                                                            i, link_ndx));
                     }
                     cur_table = cur_table->get_opposite_table(link.column_key);
                 }
@@ -485,7 +485,8 @@ std::string IncludeDescriptor::get_description(ConstTableRef attached_table) con
             }
 
             auto col_key = chain[j];
-            if (ConstTableRef from_table = group->get_table(m_backlink_sources[i][j])) { // backlink
+            if (auto from_table_key = m_backlink_sources[i][j]) { // backlink
+                ConstTableRef from_table = group->get_table(from_table_key);
                 REALM_ASSERT_DEBUG(from_table->valid_column(col_key));
                 REALM_ASSERT_DEBUG(from_table->get_link_target(col_key) == cur_link_table);
                 description += basic_serialiser.get_backlink_column_name(from_table, col_key);
@@ -532,17 +533,20 @@ void IncludeDescriptor::report_included_backlinks(
 
     for (size_t i = 0; i < m_column_keys.size(); ++i) {
         const Table* table = origin;
-        std::unordered_set<ObjKey> objs_to_explore;
-        objs_to_explore.insert(obj);
+        std::unordered_set<ObjKey> objkeys_to_explore;
+        objkeys_to_explore.insert(obj);
+
+
+
         for (size_t j = 0; j < m_column_keys[i].size(); ++j) {
             std::unordered_set<ObjKey> results_of_next_table;
             if (bool(m_backlink_sources[i][j])) { // backlink - collect objects linking into "objs_to_explore"
                 // get table and column holding fwd links:
                 const Table& from_table = *group->get_table(m_backlink_sources[i][j]);
                 ColKey from_col = m_column_keys[i][j];
-                for (auto obj_to_explore : objs_to_explore) {
+                for (auto objkey_to_explore : objkeys_to_explore) {
                     // collect backlinks for this object
-                    auto target_obj = table->get_object(obj_to_explore);
+                    auto target_obj = table->get_object(objkey_to_explore);
                     size_t num_backlinks = target_obj.get_backlink_count(from_table, from_col);
                     for (size_t backlink_ndx = 0; backlink_ndx < num_backlinks; ++backlink_ndx) {
                         results_of_next_table.insert(target_obj.get_backlink(from_table, from_col, backlink_ndx));
@@ -555,17 +559,17 @@ void IncludeDescriptor::report_included_backlinks(
                 ColKey col_key = m_column_keys[i][j];
                 DataType col_type = DataType(col_key.get_type());
                 if (col_type == type_Link) {
-                    for (auto obj_to_explore : objs_to_explore) {
-                        auto src_obj = table->get_object(obj_to_explore);
+                    for (auto objkey_to_explore : objkeys_to_explore) {
+                        auto src_obj = table->get_object(objkey_to_explore);
                         ObjKey link_translation = src_obj.get<ObjKey>(col_key);
-                        if (!link_translation) { // null links terminate a chain
+                        if (link_translation) { // null links terminate a chain
                             results_of_next_table.insert(link_translation);
                         }
                     }
                 }
                 else if (col_type == type_LinkList) {
-                    for (auto obj_to_explore : objs_to_explore) {
-                        auto src_obj = table->get_object(obj_to_explore);
+                    for (auto objkey_to_explore : objkeys_to_explore) {
+                        auto src_obj = table->get_object(objkey_to_explore);
                         auto links = src_obj.get_linklist(col_key);
                         const size_t num_links = links.size();
                         for (size_t link_ndx = 0; link_ndx < num_links; ++link_ndx) {
@@ -581,7 +585,7 @@ void IncludeDescriptor::report_included_backlinks(
                 ConstTableRef linked_table = table->get_link_target(col_key);
                 table = linked_table;
             }
-            objs_to_explore = results_of_next_table;
+            objkeys_to_explore = results_of_next_table;
         }
     }
 }

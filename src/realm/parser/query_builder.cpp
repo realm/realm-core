@@ -866,8 +866,10 @@ void apply_ordering(DescriptorOrdering& ordering, ConstTableRef target, const pa
                     ConstTableRef tr;
                     if (element.is_backlink) {
                         tr = element.table;
+                        links.push_back(LinkPathPart(element.col_key, tr));
                     }
-                    links.push_back(LinkPathPart(element.col_key, tr));
+                    else
+                        links.push_back(LinkPathPart(element.col_key));
                 }
                 properties.emplace_back(std::move(links));
             }
