@@ -1062,7 +1062,6 @@ void Group::write(std::ostream& out, int file_format_version, TableWriter& table
         // into a separate file.
         ref_type names_ref = table_writer.write_names(out_2);   // Throws
         ref_type tables_ref = table_writer.write_tables(out_2); // Throws
-        TableWriter::HistoryInfo history_info = table_writer.write_history(out_2); // Throws
         SlabAlloc new_alloc;
         new_alloc.attach_empty(); // Throws
         Array top(new_alloc);
@@ -1077,6 +1076,8 @@ void Group::write(std::ostream& out, int file_format_version, TableWriter& table
 
         int top_size = 3;
         if (version_number) {
+            TableWriter::HistoryInfo history_info = table_writer.write_history(out_2); // Throws
+
             Array free_list(new_alloc);
             Array size_list(new_alloc);
             Array version_list(new_alloc);
