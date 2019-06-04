@@ -1033,17 +1033,12 @@ TEST(TableView_QueryCopy)
 TEST(TableView_QueryCopyStringOr)
 {
     Table table;
-    size_t str_col_ndx = table.add_column(type_String, "str_col", true);
-    table.add_empty_row();
-    table.add_empty_row();
-    table.add_empty_row();
-    table.add_empty_row();
-    table.add_empty_row();
-    table[0].set_string(str_col_ndx, "one");
-    table[1].set_string(str_col_ndx, "two");
-    table[2].set_string(str_col_ndx, "three");
-    table[3].set_string(str_col_ndx, "");
-    table[4].set_null(str_col_ndx);
+    auto str_col_key = table.add_column(type_String, "str_col", true);
+    table.create_object().set_all("one");
+    table.create_object().set_all("two");
+    table.create_object().set_all("three");
+    table.create_object().set_all("");
+    table.create_object().set_null(str_col_key);
 
     // Test if copy-assign of Query in TableView works
     TableView tv = table.where().find_all();
@@ -1051,26 +1046,26 @@ TEST(TableView_QueryCopyStringOr)
     Query q = table.where();
 
     q.group();
-    q.equal(str_col_ndx, "one");
+    q.equal(str_col_key, "one");
     q.Or();
-    q.equal(str_col_ndx, "two");
+    q.equal(str_col_key, "two");
     q.Or();
-    q.equal(str_col_ndx, realm::null());
+    q.equal(str_col_key, realm::null());
     q.Or();
-    q.equal(str_col_ndx, "");
+    q.equal(str_col_key, "");
     q.end_group();
 
     size_t before_copy_count = q.count();
     CHECK_EQUAL(before_copy_count, 4);
 
     Query q2;
-    q2 = table.where().equal(str_col_ndx, "not found");
+    q2 = table.where().equal(str_col_key, "not found");
     size_t q2_count = q2.count();
     CHECK_EQUAL(q2_count, 0);
 
     q2 = q;
     size_t after_copy_count = q2.count();
-
+    CHECK_EQUAL(q.count(), 4);
     CHECK_EQUAL(after_copy_count, 4);
 }
 

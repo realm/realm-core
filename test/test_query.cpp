@@ -9873,14 +9873,13 @@ TEST(Query_IntOrQueryOptimisation)
     auto col_id = table->add_column(type_Int, "id");
 
     for (int i = 0; i < 100; i++) {
-        auto ndx = table->add_empty_row();
-        table->set_bool(col_active, ndx, (i % 10) != 0);
-        table->set_int(col_id, ndx, i);
+        auto obj = table->create_object();
+        obj.set<bool>(col_active, (i % 10) != 0);
+        obj.set<int>(col_id, i);
+        if (i == 0) obj.set(col_optype, "CREATE");
+        if (i == 1) obj.set(col_optype, "DELETE");
+        if (i == 2) obj.set(col_optype, "CREATE");
     }
-    table->set_string(col_optype, 0, "CREATE");
-    table->set_string(col_optype, 1, "DELETE");
-    table->set_string(col_optype, 2, "CREATE");
-
     auto optype = table->column<String>(col_optype);
     auto active = table->column<Bool>(col_active);
     auto id = table->column<Int>(col_id);
@@ -9903,31 +9902,31 @@ TEST(Query_IntOrQueryPerformance)
 
     Group g;
     TableRef table = g.add_table("table");
-    size_t ints_col_ndx = table->add_column(type_Int, "ints");
-    size_t nullable_ints_col_ndx = table->add_column(type_Int, "nullable_ints", true);
+    auto ints_col_key = table->add_column(type_Int, "ints");
+    auto nullable_ints_col_key = table->add_column(type_Int, "nullable_ints", true);
 
     const size_t null_frequency = 1000;
     size_t num_nulls_added = 0;
-    table->add_empty_row(100000);
-    for (size_t i = 0; i < table->size(); ++i) {
-        table->set_int(ints_col_ndx, i, i);
+    size_t limit = 100000;
+    for (size_t i = 0; i < limit; ++i) {
         if (i % null_frequency == 0) {
-            table->set_null(nullable_ints_col_ndx, i);
+            auto o = table->create_object().set_all(i);
+            o.set_null(nullable_ints_col_key);
             ++num_nulls_added;
         }
         else {
-            table->set_int(nullable_ints_col_ndx, i, i);
+            auto o = table->create_object().set_all(i, i);
         }
     }
 
     auto run_queries = [&](size_t num_matches) {
         // std::cout << "num_matches: " << num_matches << std::endl;
-        Query q_ints = table->column<Int>(ints_col_ndx) == -1;
+        Query q_ints = table->column<Int>(ints_col_key) == -1;
         Query q_nullables =
-            (table->column<Int>(nullable_ints_col_ndx) == -1).Or().equal(nullable_ints_col_ndx, realm::null());
+            (table->column<Int>(nullable_ints_col_key) == -1).Or().equal(nullable_ints_col_key, realm::null());
         for (size_t i = 0; i < num_matches; ++i) {
-            q_ints = q_ints.Or().equal(ints_col_ndx, int64_t(i));
-            q_nullables = q_nullables.Or().equal(nullable_ints_col_ndx, int64_t(i));
+            q_ints = q_ints.Or().equal(ints_col_key, int64_t(i));
+            q_nullables = q_nullables.Or().equal(nullable_ints_col_key, int64_t(i));
         }
 
         auto before = std::chrono::steady_clock().now();
@@ -9950,8 +9949,8 @@ TEST(Query_IntOrQueryPerformance)
     run_queries(2);
     run_queries(2048);
 
-    //    table->add_search_index(ints_col_ndx);
-    //    table->add_search_index(nullable_ints_col_ndx);
+    //    table->add_search_index(ints_col_key);
+    //    table->add_search_index(nullable_ints_col_key);
     //    run_queries();
 }
 

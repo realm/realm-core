@@ -3204,25 +3204,26 @@ TEST(Parser_ChainedIntEqualQueries)
 {
     Group g;
     TableRef table = g.add_table("table");
-    size_t a_col_ndx = table->add_column(type_Int, "a", false);
-    size_t b_col_ndx = table->add_column(type_Int, "b", true);
-    size_t c_col_ndx = table->add_column(type_Int, "c", false);
-    size_t d_col_ndx = table->add_column(type_Int, "d", true);
+    auto a_col_key = table->add_column(type_Int, "a", false);
+    auto b_col_key = table->add_column(type_Int, "b", true);
+    auto c_col_key = table->add_column(type_Int, "c", false);
+    auto d_col_key = table->add_column(type_Int, "d", true);
 
-    table->add_search_index(c_col_ndx);
-    table->add_search_index(d_col_ndx);
+    table->add_search_index(c_col_key);
+    table->add_search_index(d_col_key);
 
-    table->add_empty_row(100);
+    std::vector<ObjKey> keys;
+    table->create_objects(100, keys);
     std::vector<int64_t> populated_data;
-    for (size_t i = 0; i < table->size(); ++i) {
-        int64_t payload = i;
+    for (auto o = table->begin(); o != table->end(); ++o) {
+        auto payload = o->get_key().value;
         populated_data.push_back(payload);
-        table->set_int(a_col_ndx, i, payload);
-        table->set_int(b_col_ndx, i, payload);
-        table->set_int(c_col_ndx, i, payload);
-        table->set_int(d_col_ndx, i, payload);
+        o->set(a_col_key, payload);
+        o->set(b_col_key, payload);
+        o->set(c_col_key, payload);
+        o->set(d_col_key, payload);
     }
-    size_t default_row_ndx = table->add_empty_row(); // one null/default 0 row
+    auto default_obj = table->create_object(); // one null/default 0 object
 
     verify_query(test_context, table, "a == 0 or a == 1 or a == 2", 4);
     verify_query(test_context, table, "a == 1 or b == 2 or a == 3 or b == 4", 4);
@@ -3249,7 +3250,7 @@ TEST(Parser_ChainedIntEqualQueries)
         first = false;
         column_to_query = (column_to_query + 1) % 4;
     }
-    table->move_last_over(default_row_ndx);
+    default_obj.remove();
     verify_query(test_context, table, query, populated_data.size());
 }
 
