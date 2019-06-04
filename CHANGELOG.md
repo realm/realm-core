@@ -13,7 +13,8 @@
 -----------
 
 ### Internals
-* None.
+* Introduced new feature test macros for address and thread sanitizers in
+  `<realm/util/features.h>`.
 
 ----------------------------------------------
 
