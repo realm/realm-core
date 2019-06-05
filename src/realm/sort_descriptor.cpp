@@ -365,14 +365,14 @@ IncludeDescriptor::IncludeDescriptor(const Table& table, const std::vector<std::
         const Table* cur_table = &table;
         size_t link_ndx = 0;
         for (auto link : links) {  // follow path, one link at a time:
-            if (bool(link.from)) { // backlink
+            auto col_type = link.column_key.get_type();
+            columns.push_back(link.column_key);
+            backlink_source.push_back(link.from);
+            if (TableKey from_table_key = link.from) { // backlink
                 // must point back to cur_table:
-                Table* from_table = group->get_table(link.from);
+                Table* from_table = group->get_table(from_table_key);
                 REALM_ASSERT(cur_table == from_table->get_opposite_table(link.column_key));
-                columns.push_back(link.column_key);
-                backlink_source.push_back(link.from);
-                auto type = DataType(link.column_key.get_type());
-                if (type == type_Link || type == type_LinkList) {
+                if (Table::is_link_type(col_type)) {
                     // FIXME: How can this ever be true - ref assert above...
                     if (from_table->get_opposite_table_key(link.column_key) != cur_table->get_key()) {
                         // the link does not point to the last table in the chain
@@ -389,10 +389,7 @@ IncludeDescriptor::IncludeDescriptor(const Table& table, const std::vector<std::
                 }
             }
             else { // forward link/list
-                columns.push_back(link.column_key);
-                backlink_source.push_back(TableKey());
-                auto type = DataType(link.column_key.get_type());
-                if (type == type_Link || type == type_LinkList) {
+                if (Table::is_link_type(col_type)) {
                     if (columns.size() == links.size()) {
                         // An inclusion must end with a backlink column, link/list columns are included automatically
                         throw InvalidPathError(util::format("Invalid INCLUDE path at [%1, %2]: the last part of an "
@@ -481,13 +478,12 @@ void IncludeDescriptor::report_included_backlinks(
         std::unordered_set<ObjKey> objkeys_to_explore;
         objkeys_to_explore.insert(obj);
 
-
-
         for (size_t j = 0; j < m_column_keys[i].size(); ++j) {
             std::unordered_set<ObjKey> results_of_next_table;
-            if (bool(m_backlink_sources[i][j])) { // backlink - collect objects linking into "objs_to_explore"
+            if (TableKey from_table_key = m_backlink_sources[i][j]) {
+                // backlink - collect objects linking into "objs_to_explore"
                 // get table and column holding fwd links:
-                const Table& from_table = *group->get_table(m_backlink_sources[i][j]);
+                const Table& from_table = *group->get_table(from_table_key);
                 ColKey from_col = m_column_keys[i][j];
                 for (auto objkey_to_explore : objkeys_to_explore) {
                     // collect backlinks for this object
