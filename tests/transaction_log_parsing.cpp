@@ -55,7 +55,7 @@ public:
         _impl::CollectionChangeBuilder c;
         _impl::TransactionChangeInfo info{};
         info.tables[m_table_key.value];
-        info.lists.push_back({m_table_key.value, 0, 0, &c});
+        info.lists.push_back({m_table_key.value, m_list.ConstLstBase::get_key().value, m_list.get_col_key().value, &c});
         _impl::transaction::advance(*m_group, info);
 
         if (info.lists.empty()) {
@@ -110,6 +110,9 @@ private:
         REQUIRE(m_list.is_attached());
 
         // and make sure we end up with the same end result
+        if (m_initial.size() != m_list.size()) {
+            std::cout << "Error " << m_list.size() << std::endl;
+        }
         REQUIRE(m_initial.size() == m_list.size());
         for (size_t i = 0; i < m_initial.size(); ++i)
             CHECK(m_initial[i] == m_list.ObjList::get_key(i));
