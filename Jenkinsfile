@@ -169,12 +169,12 @@ stage('prepare') {
 stage('unit-tests') {
   parallel(
     linux: doDockerBuild('linux', true, false),
-    linux_sync: doDockerBuild('linux', true, true),
+    // linux_sync: doDockerBuild('linux', true, true),
     android: doAndroidDockerBuild(),
     macos: doBuild('osx', 'macOS', false, ''),
-    macos_sync: doBuild('osx', 'macOS', true, ''),
-    win32: doWindowsBuild(),
-    windows_universal: doWindowsUniversalBuild()
+    // macos_sync: doBuild('osx', 'macOS', true, ''),
+    // win32: doWindowsBuild(),
+    // windows_universal: doWindowsUniversalBuild()
   )
   currentBuild.result = 'SUCCESS'
 }
@@ -182,8 +182,8 @@ stage('unit-tests') {
 stage('publish') {
   node('docker') {
     publishReport('linux')
-    publishReport('linux-sync')
+    // publishReport('linux-sync')
     publishReport('macOS')
-    publishReport('macOS-sync')
+    // publishReport('macOS-sync')
   }
 }
