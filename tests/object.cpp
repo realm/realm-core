@@ -307,6 +307,7 @@ TEST_CASE("object") {
         auto link_target = *r->read_group().get_table("class_link target")->begin();
         auto table = row.get_table();
         auto target_table = link_target.get_table();
+        auto array_target_table = r->read_group().get_table("class_array target");
         REQUIRE(row.get<Int>(table->get_column_key("pk")) == 1);
         REQUIRE(row.get<Bool>(table->get_column_key("bool")) == true);
         REQUIRE(row.get<Int>(table->get_column_key("int")) == 5);
@@ -341,7 +342,7 @@ TEST_CASE("object") {
 
         auto list = row.get_linklist_ptr(table->get_column_key("object array"));
         REQUIRE(list->size() == 1);
-        REQUIRE(list->get_object(0).get<Int>(target_table->get_column_key("value")) == 20);
+        REQUIRE(list->get_object(0).get<Int>(array_target_table->get_column_key("value")) == 20);
     }
 
     SECTION("create uses defaults for missing values") {
