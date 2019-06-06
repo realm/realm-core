@@ -640,16 +640,23 @@ Results Results::apply_ordering(DescriptorOrdering&& ordering)
 {
     DescriptorOrdering new_order = m_descriptor_ordering;
     for (size_t i = 0; i < ordering.size(); ++i) {
-        const CommonDescriptor* desc = ordering[i];
-        if (const SortDescriptor* sort = dynamic_cast<const SortDescriptor*>(desc)) {
-            new_order.append_sort(std::move(*sort));
-            continue;
+        switch (ordering.get_type(i)) {
+            case DescriptorType::Sort: {
+                auto sort = dynamic_cast<const SortDescriptor*>(ordering[i]);
+                new_order.append_sort(std::move(*sort));
+                break;
+            }
+            case DescriptorType::Distinct: {
+                auto distinct = dynamic_cast<const DistinctDescriptor*>(ordering[i]);
+                new_order.append_distinct(std::move(*distinct));
+                break;
+            }
+            case DescriptorType::Limit: {
+                auto limit = dynamic_cast<const LimitDescriptor*>(ordering[i]);
+                new_order.append_limit(std::move(*limit));
+                break;
+            }
         }
-        if (const DistinctDescriptor* distinct = dynamic_cast<const DistinctDescriptor*>(desc)) {
-            new_order.append_distinct(std::move(*distinct));
-            continue;
-        }
-        REALM_COMPILER_HINT_UNREACHABLE();
     }
     return Results(m_realm, get_query(), std::move(new_order));
 }

@@ -1593,7 +1593,7 @@ TEST_CASE("notifications: results") {
     }
 
     SECTION("distinct notifications") {
-        results = results.distinct(SortDescriptor({{col_value}}));
+        results = results.distinct(DistinctDescriptor({{col_value}}));
 
         int notification_calls = 0;
         CollectionChangeSet change;
@@ -2207,7 +2207,7 @@ TEST_CASE("results: distinct") {
     ColKey col_num3 = table->get_column_key("num3");
 
     SECTION("Single integer property") {
-        Results unique = results.distinct(SortDescriptor({{col_num1}}));
+        Results unique = results.distinct(DistinctDescriptor({{col_num1}}));
         // unique:
         //  0, Foo_0, 10
         //  1, Foo_1,  9
@@ -2234,7 +2234,7 @@ TEST_CASE("results: distinct") {
     }
 
     SECTION("Single string property") {
-        Results unique = results.distinct(SortDescriptor({{col_string}}));
+        Results unique = results.distinct(DistinctDescriptor({{col_string}}));
         // unique:
         //  0, Foo_0, 10
         //  1, Foo_1,  9
@@ -2246,7 +2246,7 @@ TEST_CASE("results: distinct") {
     }
 
     SECTION("Two integer properties combined") {
-        Results unique = results.distinct(SortDescriptor({{col_num1}, {col_num2}}));
+        Results unique = results.distinct(DistinctDescriptor({{col_num1}, {col_num2}}));
         // unique is the same as the table
         REQUIRE(unique.size() == N);
         for (int i = 0; i < N; ++i) {
@@ -2255,7 +2255,7 @@ TEST_CASE("results: distinct") {
     }
 
     SECTION("String and integer combined") {
-        Results unique = results.distinct(SortDescriptor({{col_num2}, {col_string}}));
+        Results unique = results.distinct(DistinctDescriptor({{col_num2}, {col_string}}));
         // unique is the same as the table
         REQUIRE(unique.size() == N);
         for (int i = 0; i < N; ++i) {
@@ -2274,7 +2274,7 @@ TEST_CASE("results: distinct") {
         REQUIRE(reverse.last()->get<Int>(col_num2) == 10);
 
         // distinct() will be applied to the table, after sorting
-        Results unique = reverse.distinct(SortDescriptor({{col_num1}}));
+        Results unique = reverse.distinct(DistinctDescriptor({{col_num1}}));
         // unique:
         //  0, Foo_0,  1
         //  2, Foo_2,  2
@@ -2286,7 +2286,7 @@ TEST_CASE("results: distinct") {
     }
 
     SECTION("Order after distinct and sort") {
-        Results unique = results.distinct(SortDescriptor({{col_num1}}));
+        Results unique = results.distinct(DistinctDescriptor({{col_num1}}));
         // unique:
         //  0, Foo_0, 10
         //  1, Foo_1,  9
@@ -2308,11 +2308,11 @@ TEST_CASE("results: distinct") {
     }
 
     SECTION("Chaining distinct") {
-        Results first = results.distinct(SortDescriptor({{col_num1}}));
+        Results first = results.distinct(DistinctDescriptor({{col_num1}}));
         REQUIRE(first.size() == 3);
 
         // distinct() will not discard the previous applied distinct() calls
-        Results second = first.distinct(SortDescriptor({{col_num3}}));
+        Results second = first.distinct(DistinctDescriptor({{col_num3}}));
         REQUIRE(second.size() == 2);
     }
 
@@ -2334,7 +2334,7 @@ TEST_CASE("results: distinct") {
     }
 
     SECTION("Distinct is carried over to new queries") {
-        Results unique = results.distinct(SortDescriptor({{col_num1}}));
+        Results unique = results.distinct(DistinctDescriptor({{col_num1}}));
         // unique:
         //  0, Foo_0, 10
         //  1, Foo_1,  9
@@ -2360,7 +2360,7 @@ TEST_CASE("results: distinct") {
         //   1, Foo_1,  6
         REQUIRE(filtered.size() == 5);
 
-        Results unique = filtered.distinct(SortDescriptor({{col_num1}}));
+        Results unique = filtered.distinct(DistinctDescriptor({{col_num1}}));
         // unique:
         //   0, Foo_0, 10
         //   1, Foo_1,  9
