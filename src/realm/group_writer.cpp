@@ -727,10 +727,15 @@ GroupWriter::FreeListElement GroupWriter::search_free_space_in_free_list_element
 
 GroupWriter::FreeListElement GroupWriter::search_free_space_in_part_of_freelist(size_t size)
 {
+    size_t min_size = size + 8;
     for (auto it = m_size_map.lower_bound(size); it != m_size_map.end(); ++it) {
-        auto ret = search_free_space_in_free_list_element(it, size);
-        if (ret != m_size_map.end()) {
-            return ret;
+        // Either we should have an exact match or there should be at least 16 bytes left
+        // It is very hard to reuse 8 byte blocks
+        if (it->first == size || it->first > min_size) {
+            auto ret = search_free_space_in_free_list_element(it, size);
+            if (ret != m_size_map.end()) {
+                return ret;
+            }
         }
     }
     // No match

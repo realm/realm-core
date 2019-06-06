@@ -108,6 +108,7 @@ AggregateState      State of the aggregate - contains a state variable that stor
 #include <realm/util/shared_ptr.hpp>
 #include <realm/util/string_buffer.hpp>
 #include <realm/utilities.hpp>
+#include <realm/index_string.hpp>
 
 #include <map>
 #include <unordered_set>
@@ -683,7 +684,28 @@ public:
 
     IntegerNode(TConditionValue value, ColKey column_key)
         : BaseType(value, column_key)
+        , m_result(
     {
+    }
+    ~IntegerNode()
+    {
+        if (m_result.is_attached()) {
+            m_result.destroy();
+        }
+    }
+
+    void init() override
+    {
+        BaseType::init();
+        m_nb_needles = m_needles.size();
+
+        if (has_search_index()) {
+            // _search_index_init();
+            auto index = ParentNode::m_table->get_search_index(ParentNode::m_condition_column_key);
+            auto fr = index->find_all(BaseType::m_value, m_result);
+            m_index_get = 0;
+            m_index_end = m_result.size();
+        }
     }
 
     void consume_condition(IntegerNode<LeafType, Equal>* other)
@@ -719,34 +741,26 @@ public:
     size_t find_first_local(size_t start, size_t end) override
     {
         REALM_ASSERT(this->m_table);
-        size_t nb_needles = m_needles.size();
         size_t s = realm::npos;
-        if (start < end) {
 
-            if (nb_needles) {
-
-                const auto not_in_set = m_needles.end();
-                bool search = nb_needles < 22; // why 22? It works well for string equal searches :-)
-                auto cmp_fn = [this, search, not_in_set](const auto& v) {
-                    if (search) {
-                        for (auto it = m_needles.begin(); it != not_in_set; ++it) {
-                            if (*it == v)
-                                return true;
-                        }
-                        return false;
-                    }
-                    else {
-                        return (m_needles.find(v) != not_in_set);
-                    }
-                };
-
-                for (size_t i = start; i < end; ++i) {
-                    TConditionValue val = this->m_leaf_ptr->get(i);
-                    if (cmp_fn(val)) {
-                        s = i;
-                        break;
-                    }
+        if (has_search_index()) {
+            while (m_index_get < m_index_end) {
+                // m_results are stored in sorted ascending order, guaranteed by the string index
+                size_t ndx = size_t(m_result.get(m_index_get));
+                if (ndx >= end) {
+                    break;
                 }
+                m_index_get++;
+                if (ndx >= start) {
+                    return ndx;
+                }
+            }
+            return not_found;
+        }
+
+        if (start < end) {
+            if (m_nb_needles) {
+                s = find_first_haystack(start, end);
             }
             else if (end - start == 1) {
                 if (this->m_leaf_ptr->get(start) == this->m_value) {
@@ -790,12 +804,43 @@ public:
     }
 
 private:
-    IntegerNode(const IntegerNode& from, Transaction* tr)
-        : BaseType(from, tr)
+    std::unordered_set<TConditionValue> m_needles;
+    IntegerColumn m_result;
+    size_t m_nb_needles = 0;
+    size_t m_index_get = 0;
+    size_t m_index_end = 0;
+
+    IntegerNode(const IntegerNode<LeafType, Equal>& from, Transaction* patches)
+        : BaseType(from, patches)
         , m_needles(from.m_needles)
     {
     }
-    std::unordered_set<TConditionValue> m_needles;
+    size_t find_first_haystack(size_t start, size_t end)
+    {
+        const auto not_in_set = m_needles.end();
+        // for a small number of conditions, it is faster to do a linear search than to compute the hash
+        // the decision threshold was determined experimentally to be 22 conditions
+        bool search = m_nb_needles < 22;
+        auto cmp_fn = [this, search, not_in_set](const auto& v) {
+            if (search) {
+                for (auto it = m_needles.begin(); it != not_in_set; ++it) {
+                    if (*it == v)
+                        return true;
+                }
+                return false;
+            }
+            else {
+                return (m_needles.find(v) != not_in_set);
+            }
+        };
+        for (size_t i = start; i < end; ++i) {
+            auto val = this->m_leaf_ptr->get(i);
+            if (cmp_fn(val)) {
+                return i;
+            }
+        }
+        return realm::npos;
+    }
 };
 
 
