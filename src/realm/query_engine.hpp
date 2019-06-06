@@ -1591,6 +1591,21 @@ public:
 
     std::string describe(util::serializer::SerialisationState& state) const override;
 
+    StringNode<Equal>(const StringNode& from, Transaction* tr)
+        : StringNodeEqualBase(from, tr)
+    {
+        for (auto it = from.m_needles.begin(); it != from.m_needles.end(); ++it) {
+            if (it->data() == nullptr && it->size() == 0) {
+                m_needles.insert(StringData()); // nulls
+            }
+            else {
+                m_needle_storage.emplace_back(StringBuffer());
+                m_needle_storage.back().append(it->data(), it->size());
+                m_needles.insert(StringData(m_needle_storage.back().data(), m_needle_storage.back().size()));
+            }
+        }
+    }
+
 private:
     std::unique_ptr<IntegerColumn> m_index_matches;
 
