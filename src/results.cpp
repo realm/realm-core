@@ -270,10 +270,8 @@ void Results::evaluate_query_if_needed(bool wants_notifications)
             m_mode = Mode::TableView;
             REALM_FALLTHROUGH;
         case Mode::TableView:
-            if (wants_notifications && !m_notifier && !m_realm->is_in_transaction() && m_realm->can_deliver_notifications()) {
-                m_notifier = std::make_shared<_impl::ResultsNotifier>(*this);
-                _impl::RealmCoordinator::register_notifier(m_notifier);
-            }
+            if (wants_notifications)
+                prepare_async(ForCallback{false});
             else if (m_notifier)
                 m_notifier->get_tableview(m_table_view);
             m_table_view.sync_if_needed();
@@ -723,19 +721,34 @@ Results Results::snapshot() &&
     REALM_COMPILER_HINT_UNREACHABLE();
 }
 
-void Results::prepare_async()
+void Results::prepare_async(ForCallback force)
 {
     if (m_notifier) {
         return;
     }
     if (m_realm->config().immutable()) {
-        throw InvalidTransactionException("Cannot create asynchronous query for immutable Realms");
+        if (force)
+            throw InvalidTransactionException("Cannot create asynchronous query for immutable Realms");
+        return;
     }
     if (m_realm->is_in_transaction()) {
-        throw InvalidTransactionException("Cannot create asynchronous query while in a write transaction");
+        if (force)
+            throw InvalidTransactionException("Cannot create asynchronous query while in a write transaction");
+        return;
     }
     if (m_update_policy == UpdatePolicy::Never) {
-        throw std::logic_error("Cannot create asynchronous query for snapshotted Results.");
+        if (force)
+            throw std::logic_error("Cannot create asynchronous query for snapshotted Results.");
+        return;
+    }
+    if (!force) {
+        // Don't do implicit background updates if we can't actually deliver them
+        if (!m_realm->can_deliver_notifications())
+            return;
+        // Don't do implicit background updates if there isn't actually anything
+        // that needs to be run.
+        if (!m_query.get_table() && m_descriptor_ordering.is_empty())
+            return;
     }
 
     m_notifier = std::make_shared<_impl::ResultsNotifier>(*this);
@@ -744,7 +757,7 @@ void Results::prepare_async()
 
 NotificationToken Results::add_notification_callback(CollectionChangeCallback cb) &
 {
-    prepare_async();
+    prepare_async(ForCallback{true});
     return {m_notifier, m_notifier->add_callback(std::move(cb))};
 }
 

@@ -421,6 +421,8 @@ public:
     std::unique_ptr<BindingContext> m_binding_context;
     Group& read_group();
 
+    std::size_t compute_size();
+
     // `enable_shared_from_this` is unsafe with public constructors; use `make_shared_realm` instead
     Realm(Config config, std::shared_ptr<_impl::RealmCoordinator> coordinator, MakeSharedTag);
 };

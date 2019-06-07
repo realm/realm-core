@@ -39,6 +39,14 @@ inline bool sessions_are_inactive(const SyncSession& session)
     return session.state() == SyncSession::PublicState::Inactive;
 }
 
+inline bool sessions_are_disconnected(const SyncSession& session) {
+    return session.connection_state() == SyncSession::ConnectionState::Disconnected;
+}
+
+inline bool sessions_are_connected(const SyncSession& session) {
+    return session.connection_state() == SyncSession::ConnectionState::Connected;
+}
+
 template <typename... S>
 bool sessions_are_active(const SyncSession& session, const S&... s)
 {

@@ -116,7 +116,7 @@ bool ResultsNotifier::need_to_run()
 void ResultsNotifier::calculate_changes()
 {
     int64_t table_key = m_query->get_table()->get_key().value;
-    if (has_run()) {
+    if (has_run() && have_callbacks()) {
         CollectionChangeBuilder* changes = nullptr;
         /*
         if (table_key == npos)

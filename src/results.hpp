@@ -244,7 +244,8 @@ private:
     void validate_read() const;
     void validate_write() const;
 
-    void prepare_async();
+    using ForCallback = util::TaggedBool<class ForCallback>;
+    void prepare_async(ForCallback);
 
     ColKey key(StringData) const;
 

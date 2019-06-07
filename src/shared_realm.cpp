@@ -620,6 +620,7 @@ bool Realm::compact()
         throw InvalidTransactionException("Can't compact a Realm within a write transaction");
     }
 
+    verify_open();
     m_group = nullptr;
     return m_coordinator->compact();
 }
@@ -955,3 +956,8 @@ MismatchedConfigException::MismatchedConfigException(StringData message, StringD
 
 MismatchedRealmException::MismatchedRealmException(StringData message)
 : std::logic_error(message.data()) { }
+
+std::size_t Realm::compute_size() {
+    Group& group = read_group();
+    return group.compute_aggregated_byte_size();
+}

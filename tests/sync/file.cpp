@@ -163,33 +163,6 @@ TEST_CASE("sync_file: SyncFileManager APIs", "[sync]") {
             }
         }
 
-        SECTION("getting a user directory with additional metadata") {
-            const std::string identity = "the-identity";
-            const std::string auth_url = "https://realm.example.org";
-            SyncUserIdentifier info_tuple{identity, auth_url};
-            auto actual = manager.user_directory(local_identity, info_tuple);
-            REQUIRE(actual == expected);
-            REQUIRE_DIR_EXISTS(expected);
-            // Check the backup file
-            auto user_info_path = actual + "/__user_info";
-            std::ifstream user_info;
-            user_info.open(user_info_path.c_str());
-            REQUIRE(user_info.is_open());
-            int ctr = 0;
-            for (std::string current_line; std::getline(user_info, current_line);) {
-                if (ctr == 0) {
-                    // First line is the user's ROS identity
-                    CHECK(current_line == identity);
-                } else if (ctr == 1) {
-                    // Second line is the user's auth server URL
-                    CHECK(current_line == auth_url);
-                }
-                ctr++;
-            }
-            user_info.close();
-            CHECK(ctr == 2);
-        }
-
         SECTION("deleting a user directory") {
             manager.user_directory(local_identity);
             REQUIRE_DIR_EXISTS(expected);
