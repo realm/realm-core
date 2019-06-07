@@ -684,14 +684,10 @@ public:
 
     IntegerNode(TConditionValue value, ColKey column_key)
         : BaseType(value, column_key)
-        , m_result(
     {
     }
     ~IntegerNode()
     {
-        if (m_result.is_attached()) {
-            m_result.destroy();
-        }
     }
 
     void init() override
@@ -702,9 +698,8 @@ public:
         if (has_search_index()) {
             // _search_index_init();
             auto index = ParentNode::m_table->get_search_index(ParentNode::m_condition_column_key);
-            auto fr = index->find_all(BaseType::m_value, m_result);
-            m_index_get = 0;
-            m_index_end = m_result.size();
+            index->find_all(m_result, BaseType::m_value);
+            m_result_get = 0;
         }
     }
 
@@ -744,18 +739,27 @@ public:
         size_t s = realm::npos;
 
         if (has_search_index()) {
-            while (m_index_get < m_index_end) {
-                // m_results are stored in sorted ascending order, guaranteed by the string index
-                size_t ndx = size_t(m_result.get(m_index_get));
-                if (ndx >= end) {
-                    break;
+
+            if (m_result_get < m_result.size() && start < end) {
+                ObjKey first_key = BaseType::m_cluster->get_real_key(start);
+                auto actual_key = m_result[m_result_get];
+                // skip through keys which are in "earlier" leafs than the one selected by start..end:
+                while (first_key > actual_key) {
+                    m_result_get++;
+                    if (m_result_get == m_result.size())
+                        return not_found;
+                    actual_key = m_result[m_result_get];
                 }
-                m_index_get++;
-                if (ndx >= start) {
-                    return ndx;
-                }
+
+                // if actual key is bigger than last key, it is not in this leaf
+                ObjKey last_key = BaseType::m_cluster->get_real_key(end - 1);
+                if (actual_key > last_key)
+                    return not_found;
+
+                // key is known to be in this leaf, so find key whithin leaf keys
+                return BaseType::m_cluster->lower_bound_key(ObjKey(actual_key.value - BaseType::m_cluster->get_offset()));
             }
-            return not_found;
+
         }
 
         if (start < end) {
@@ -805,10 +809,9 @@ public:
 
 private:
     std::unordered_set<TConditionValue> m_needles;
-    IntegerColumn m_result;
+    std::vector<ObjKey> m_result;
     size_t m_nb_needles = 0;
-    size_t m_index_get = 0;
-    size_t m_index_end = 0;
+    size_t m_result_get = 0;
 
     IntegerNode(const IntegerNode<LeafType, Equal>& from, Transaction* patches)
         : BaseType(from, patches)

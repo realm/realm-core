@@ -49,8 +49,8 @@ namespace {
   are likely to use internally.
 
   This has the following implications:
-  - All access is done with a SharedGroup in transactions.
-  - The SharedGroup has full durability (is backed by a file).
+  - All access is done with a DB in transactions.
+  - The DB has full durability (is backed by a file).
     (but all benchmarks are also run with MemOnly durability for comparison)
   - Cases have been derived from:
     https://github.com/realm/realm-java/blob/bp-performance-test/realm/src/androidTest/java/io/realm/RealmPerformanceTest.java
@@ -425,31 +425,34 @@ struct BenchmarkQueryChainedOrInts : BenchmarkWithIntsTable {
         return "QueryChainedOrInts";
     }
 
-    void before_all(SharedGroup& group)
+    void before_all(DBRef group)
     {
         BenchmarkWithIntsTable::before_all(group);
         WriteTransaction tr(group);
         TableRef t = tr.get_table("IntOnly");
-        t->add_empty_row(num_rows);
+        std::vector<ObjKey> keys;
+        t->create_objects(num_rows, keys);
         REALM_ASSERT(num_rows > num_queried_matches);
         Random r;
-        for (size_t i = 0; i < num_rows; ++i) {
-            t->set_int(0, i, int64_t(i));
+        size_t i = 0;
+        for (auto e : *t) {
+            e.set(m_col, i);
+            ++i;
         }
-        for (size_t i = 0; i < num_queried_matches; ++i) {
+        for (i = 0; i < num_queried_matches; ++i) {
             size_t ndx_to_match = (num_rows / num_queried_matches) * i;
-            values_to_query.push_back(t->get_int(0, ndx_to_match));
+            values_to_query.push_back(t->get_object(ndx_to_match).get<Int>(m_col));
         }
         tr.commit();
     }
 
-    void operator()(SharedGroup& group)
+    void operator()(DBRef group)
     {
         ReadTransaction tr(group);
         ConstTableRef table = tr.get_table("IntOnly");
         Query query = table->where();
         for (size_t i = 0; i < values_to_query.size(); ++i) {
-            query.Or().equal(0, values_to_query[i]);
+            query.Or().equal(m_col, values_to_query[i]);
         }
         TableView results = query.find_all();
         REALM_ASSERT_EX(results.size() == num_queried_matches, results.size(), num_queried_matches,
@@ -463,12 +466,12 @@ struct BenchmarkQueryChainedOrIntsIndexed : BenchmarkQueryChainedOrInts {
     {
         return "QueryChainedOrIntsIndexed";
     }
-    void before_all(SharedGroup& group)
+    void before_all(DBRef group)
     {
         BenchmarkQueryChainedOrInts::before_all(group);
         WriteTransaction tr(group);
         TableRef t = tr.get_table("IntOnly");
-        t->add_search_index(0);
+        t->add_search_index(m_col);
         tr.commit();
     }
 };
@@ -480,11 +483,11 @@ struct BenchmarkQueryIntEquality : BenchmarkQueryChainedOrInts {
         return "QueryIntEquality";
     }
 
-    void operator()(SharedGroup& group)
+    void operator()(DBRef group)
     {
         ReadTransaction tr(group);
         ConstTableRef table = tr.get_table("IntOnly");
-        Query query = table->where().equal(0, 0);
+        Query query = table->where().equal(m_col, 0);
         TableView results = query.find_all();
         REALM_ASSERT_EX(results.size() == 1, results.size(), 1);
         static_cast<void>(results);
@@ -496,12 +499,12 @@ struct BenchmarkQueryIntEqualityIndexed : BenchmarkQueryIntEquality {
     {
         return "QueryIntEqualityIndexed";
     }
-    void before_all(SharedGroup& group)
+    void before_all(DBRef group)
     {
         BenchmarkQueryIntEquality::before_all(group);
         WriteTransaction tr(group);
         TableRef t = tr.get_table("IntOnly");
-        t->add_search_index(0);
+        t->add_search_index(m_col);
         tr.commit();
     }
 };

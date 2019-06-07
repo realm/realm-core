@@ -9962,31 +9962,13 @@ TEST(Query_IntIndexed)
     TableRef table = g.add_table("table");
     auto col_id = table->add_column(type_Int, "id");
 
-    table->add_empty_row(100);
     for (int i = 0; i < 100; i++) {
-        table->set_int(col_id, i, i % 10);
+        table->create_object().set_all(i % 10);
     }
 
     table->add_search_index(col_id);
     Query q = table->where().equal(col_id, 1);
     CHECK_EQUAL(q.count(), 10);
-}
-
-TEST(Query_IntIndexedUnordered)
-{
-    Group g;
-    TableRef table = g.add_table("table");
-    auto col_id = table->add_column(type_Int, "id");
-    table->add_search_index(col_id);
-    table->add_empty_row(4);
-    table->set_int(col_id, 0, 1);
-    table->set_int(col_id, 2, 1);
-    table->set_int(col_id, 1, 1);
-    table->set_int(col_id, 3, 2);
-    table->move_last_over(1);
-
-    Query q = table->where().equal(col_id, 1) || table->where().equal(col_id, 2);
-    CHECK_EQUAL(q.count(), 3);
 }
 
 TEST(Query_IntFindInNextLeaf)
@@ -9997,12 +9979,10 @@ TEST(Query_IntFindInNextLeaf)
 
     // num_misses > MAX_BPNODE_SIZE to check results on other leafs
     constexpr size_t num_misses = 1000 * 2 + 10;
-    table->add_empty_row(num_misses);
     for (size_t i = 0; i < num_misses; i++) {
-        table->set_int(col_id, i, i % 10);
+        table->create_object().set(col_id, i % 10);
     }
-    size_t last_row_ndx = table->add_empty_row();
-    table->set_int(col_id, last_row_ndx, 20);
+    table->create_object().set(col_id, 20);
 
     auto check_results = [&]() {
         for (size_t i = 0; i < 10; ++i) {
