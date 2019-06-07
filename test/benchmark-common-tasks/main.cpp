@@ -436,7 +436,7 @@ struct BenchmarkQueryChainedOrInts : BenchmarkWithIntsTable {
         Random r;
         size_t i = 0;
         for (auto e : *t) {
-            e.set(m_col, i);
+            e.set<Int>(m_col, i);
             ++i;
         }
         for (i = 0; i < num_queried_matches; ++i) {
