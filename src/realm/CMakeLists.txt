@@ -129,6 +129,7 @@ set(REALM_INSTALL_GENERAL_HEADERS
     timestamp.hpp
     unicode.hpp
     utilities.hpp
+    version.hpp
     version_id.hpp
     views.hpp
 ) # REALM_INSTALL_GENERAL_HEADERS
@@ -368,7 +369,7 @@ install(FILES ${REALM_OTHER_UTIL_HEADERS}
 install(FILES ${REALM_METRICS_HEADERS}
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/realm/metrics
         COMPONENT devel)
-install(FILES ${PROJECT_BINARY_DIR}/src/realm/version.hpp
+install(FILES ${PROJECT_BINARY_DIR}/src/realm/version_numbers.hpp
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/realm
         COMPONENT devel)
 install(FILES ${PROJECT_BINARY_DIR}/src/realm/util/config.h
