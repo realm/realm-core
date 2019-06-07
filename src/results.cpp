@@ -124,7 +124,7 @@ size_t Results::size()
         case Mode::Query:
             m_query.sync_view_if_needed();
             if (!m_descriptor_ordering.will_apply_distinct())
-                return m_query.count();
+                return m_query.count(m_descriptor_ordering);
             REALM_FALLTHROUGH;
         case Mode::TableView:
             evaluate_query_if_needed();
@@ -263,10 +263,7 @@ void Results::evaluate_query_if_needed(bool wants_notifications)
                 break;
             }
             m_query.sync_view_if_needed();
-            m_table_view = m_query.find_all();
-            if (!m_descriptor_ordering.is_empty()) {
-                m_table_view.apply_descriptor_ordering(m_descriptor_ordering);
-            }
+            m_table_view = m_query.find_all(m_descriptor_ordering);
             m_mode = Mode::TableView;
             REALM_FALLTHROUGH;
         case Mode::TableView:
@@ -631,7 +628,16 @@ Results Results::sort(SortDescriptor&& sort) const
 
 Results Results::filter(Query&& q) const
 {
+    if (m_descriptor_ordering.will_apply_limit())
+        throw UnimplementedOperationException("Filtering a Results with a limit is not yet implemented");
     return Results(m_realm, get_query().and_query(std::move(q)), m_descriptor_ordering);
+}
+
+Results Results::limit(size_t max_count) const
+{
+    auto new_order = m_descriptor_ordering;
+    new_order.append_limit(max_count);
+    return Results(m_realm, get_query(), std::move(new_order));
 }
 
 Results Results::apply_ordering(DescriptorOrdering&& ordering)
@@ -783,7 +789,6 @@ ColKey Results::key(StringData name) const
 {
     return m_table->get_column_key(name);
 }
-
 #define REALM_RESULTS_TYPE(T) \
     template T Results::get<T>(size_t); \
     template util::Optional<T> Results::first<T>(); \
@@ -827,6 +832,17 @@ Results::UnsupportedColumnTypeException::UnsupportedColumnTypeException(ColKey c
 , column_key(column)
 , column_name(table->get_column_name(column))
 , property_type(ObjectSchema::from_core_type(*table, ColKey(column)))
+{
+}
+
+Results::InvalidPropertyException::InvalidPropertyException(const std::string& object_type, const std::string& property_name)
+: std::logic_error(util::format("Property '%1.%2' does not exist", object_type, property_name))
+, object_type(object_type), property_name(property_name)
+{
+}
+
+Results::UnimplementedOperationException::UnimplementedOperationException(const char* msg)
+: std::logic_error(msg)
 {
 }
 

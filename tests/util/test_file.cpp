@@ -198,9 +198,10 @@ static void wait_for_session(Realm& realm, bool (SyncSession::*fn)(std::function
 {
     std::condition_variable cv;
     std::mutex wait_mutex;
-    std::atomic<bool> wait_flag(false);
+    bool wait_flag(false);
     auto& session = *SyncManager::shared().get_session(realm.config().path, *realm.config().sync_config);
     (session.*fn)([&](auto) {
+        std::unique_lock<std::mutex> lock(wait_mutex);
         wait_flag = true;
         cv.notify_one();
     });

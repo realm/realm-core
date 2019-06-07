@@ -61,7 +61,7 @@ public:
     // the binding's native data types to the core data types. See CppContext
     // for a reference implementation of such a context.
     //
-    // The actual definitions of these tempated functions is in object_accessor.hpp
+    // The actual definitions of these templated functions is in object_accessor.hpp
 
     // property getter/setter
     template<typename ValueType, typename ContextType>
@@ -95,6 +95,8 @@ public:
                                       ValueType primary_value);
 
 private:
+    friend class Results;
+
     std::shared_ptr<Realm> m_realm;
     const ObjectSchema *m_object_schema;
     Obj m_obj;
@@ -143,6 +145,13 @@ struct ReadOnlyPropertyException : public std::logic_error {
     const std::string object_type;
     const std::string property_name;
 };
+
+struct ModifyPrimaryKeyException : public std::logic_error {
+    ModifyPrimaryKeyException(const std::string& object_type, const std::string& property_name);
+    const std::string object_type;
+    const std::string property_name;
+};
+
 } // namespace realm
 
 #endif // REALM_OS_OBJECT_HPP
