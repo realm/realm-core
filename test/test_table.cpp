@@ -1328,8 +1328,8 @@ TEST(Table_IndexString)
     table.add_search_index(col_str);
     CHECK(table.has_search_index(col_str));
 
-    ObjKey k0 = table.create_object({}, {{col_int, int(Mon)}, {col_str, "jeff"}}).get_key();
-    ObjKey k1 = table.create_object({}, {{col_str, "jim"}, {col_int, int(Tue)}}).get_key();
+    ObjKey k0 = table.create_object(ObjKey{}, {{col_int, int(Mon)}, {col_str, "jeff"}}).get_key();
+    ObjKey k1 = table.create_object(ObjKey{}, {{col_str, "jim"}, {col_int, int(Tue)}}).get_key();
     table.create_object().set_all(int(Wed), "jennifer");
     table.create_object().set_all(int(Thu), "john");
     table.create_object().set_all(int(Fri), "jimmy");

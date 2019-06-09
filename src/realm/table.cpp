@@ -31,7 +31,7 @@
 #include <realm/table.hpp>
 #include <realm/alloc_slab.hpp>
 #include <realm/index_string.hpp>
-#include <realm/group.hpp>
+#include <realm/db.hpp>
 #include <realm/replication.hpp>
 #include <realm/table_view.hpp>
 #include <realm/query_engine.hpp>
@@ -2385,10 +2385,16 @@ void Table::dump_node_structure(std::ostream& out, int level) const
 Obj Table::create_object(ObjKey key, const FieldValues& values)
 {
     if (key == null_key) {
-        if (m_next_key_value == -1 || is_valid(ObjKey(m_next_key_value))) {
-            m_next_key_value = m_clusters.get_last_key_value() + 1;
+        auto repl = get_repl();
+        if (auto oid_p = dynamic_cast<ObjectIDProvider*>(repl)) {
+            auto tr = static_cast<Transaction*>(get_parent_group());
+            ObjectID object_id = oid_p->allocate_object_id_squeezed(*tr, get_key());
+            key = oid_p->global_to_local_object_id_squeezed(object_id, *tr);
+            repl->create_object(this, object_id);
         }
-        key = ObjKey(m_next_key_value++);
+        else {
+            key = get_next_key();
+        }
     }
 
     REALM_ASSERT(key.value >= 0);
@@ -2398,6 +2404,132 @@ Obj Table::create_object(ObjKey key, const FieldValues& values)
     Obj obj = m_clusters.insert(key, values);
 
     return obj;
+}
+
+Obj Table::create_object(ObjectID object_id, const FieldValues& values)
+{
+    auto repl = get_repl();
+    auto oid_p = dynamic_cast<ObjectIDProvider*>(repl);
+    auto tr = static_cast<Transaction*>(get_parent_group());
+
+    REALM_ASSERT(oid_p); // FIXME: Exception
+
+    ObjKey key = oid_p->global_to_local_object_id_squeezed(object_id, *tr);
+    repl->create_object(this, object_id);
+
+    bump_content_version();
+    bump_storage_version();
+    Obj obj = m_clusters.insert(key, values);
+
+    return obj;
+}
+
+Obj Table::create_object_with_primary_key(const Mixed& primary_key)
+{
+    auto primary_key_col = get_primary_key_column();
+    REALM_ASSERT(primary_key_col);
+    DataType type = DataType(primary_key_col.get_type());
+    REALM_ASSERT((primary_key.is_null() && primary_key_col.get_attrs().test(col_attr_Nullable)) ||
+                 primary_key.get_type() == type);
+
+    auto repl = get_repl();
+    ObjKey object_key;
+    ObjectID object_id = object_id_for_primary_key(primary_key);
+
+    if (type == type_Int) {
+        if (primary_key.is_null())
+            object_key = find_first_null(primary_key_col);
+        else
+            object_key = find_first_int(primary_key_col, primary_key.get_int());
+
+        if (object_key)
+            return get_object(object_key); // Already exists
+        object_key = get_next_key();
+    }
+
+    if (type == type_String) {
+        if (primary_key.is_null())
+            object_key = find_first_string(primary_key_col, StringData());
+        else
+            object_key = find_first_string(primary_key_col, primary_key.get_string());
+        if (object_key)
+            return get_object(object_key); // Already exists
+
+        if (repl) {
+            // Generate local ObjKey
+            auto oid_p = dynamic_cast<ObjectIDProvider*>(repl);
+            auto tr = static_cast<Transaction*>(get_parent_group());
+            object_key = oid_p->global_to_local_object_id_hashed(*tr, get_key(), object_id);
+            // Check for collission
+            if (is_valid(object_key)) {
+                Obj existing_obj = get_object(object_key);
+                StringData existing_pk_value = existing_obj.get<String>(primary_key_col);
+                ObjectID existing_id = object_id_for_primary_key(existing_pk_value);
+
+                object_key =
+                    oid_p->allocate_local_id_after_hash_collision(*tr, get_key(), object_id, existing_id, object_key);
+            }
+        }
+    }
+
+    if (repl) {
+        repl->create_object_with_primary_key(this, object_id, primary_key);
+    }
+
+    return create_object(object_key, {{primary_key_col, primary_key}});
+}
+
+ObjKey Table::get_obj_key(ObjectID id) const
+{
+    ObjKey key;
+    auto oid_p = dynamic_cast<ObjectIDProvider*>(get_repl());
+    auto tr = static_cast<Transaction*>(get_parent_group());
+    if (oid_p && tr) {
+        auto col = get_primary_key_column();
+        if (col) {
+            if (col.get_type() == col_type_Int) {
+                REALM_ASSERT(id.hi() == 0 || col.get_attrs().test(col_attr_Nullable));
+                if (id.hi() != 0 && id.lo() == 0) {
+                    key = find_first_null(col);
+                }
+                else {
+                    key = find_first_int(col, int64_t(id.lo()));
+                }
+            }
+            if (col.get_type() == col_type_String) {
+                key = oid_p->global_to_local_object_id_hashed(*tr, get_key(), id);
+            }
+        }
+        else {
+            uint32_t max = std::numeric_limits<uint32_t>::max();
+            if (id.hi() <= max && id.lo() <= max) {
+                key = oid_p->global_to_local_object_id_squeezed(id, *tr);
+                if (!is_valid(key)) {
+                    key = realm::null_key;
+                }
+            }
+        }
+    }
+    return key;
+}
+
+ObjectID Table::get_object_id(ObjKey key) const
+{
+    ObjectID id;
+    auto oid_p = dynamic_cast<ObjectIDProvider*>(get_repl());
+    auto tr = static_cast<Transaction*>(get_parent_group());
+    if (oid_p && tr) {
+        auto col = get_primary_key_column();
+        if (col) {
+            ConstObj obj = get_object(key);
+            auto val = obj.get_any(col);
+            id = object_id_for_primary_key(val);
+        }
+        else {
+            id = oid_p->local_to_global_object_id_squeezed(key, *tr);
+        }
+    }
+    return id;
 }
 
 void Table::create_objects(size_t number, std::vector<ObjKey>& keys)
@@ -2617,7 +2749,7 @@ void Table::set_primary_key_column(ColKey col_key) const
     if (!row) {
         // Schema-breaking change; if this was illegal, it should have been detected
         // by checks at higher levels. Here we let it through.
-        pk->create_object().set(g_pk_table, class_name).set(g_pk_property, column_name);
+        pk->create_object(pk->get_next_key()).set(g_pk_table, class_name).set(g_pk_property, column_name);
     }
     else {
         pk->get_object(row).set(g_pk_property, column_name);
@@ -2636,6 +2768,14 @@ void Table::remove_primary_key_column() const
             pk->remove_object(row);
         }
     }
+}
+
+ObjKey Table::get_next_key()
+{
+    if (m_next_key_value == -1 || is_valid(ObjKey(m_next_key_value))) {
+        m_next_key_value = m_clusters.get_last_key_value() + 1;
+    }
+    return ObjKey(m_next_key_value++);
 }
 
 namespace {

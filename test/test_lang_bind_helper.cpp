@@ -744,7 +744,7 @@ TEST(LangBindHelper_AdvanceReadTransact_EnumeratedStrings)
             std::ostringstream out;
             out << i;
             std::string str = out.str();
-            table_w->create_object({}, {{c0, str}, {c1, "foo"}, {c2, str}});
+            table_w->create_object(ObjKey{}, {{c0, str}, {c1, "foo"}, {c2, str}});
         }
         wt.commit();
     }
@@ -3176,7 +3176,7 @@ TEST(LangBindHelper_ImplicitTransactions_SearchIndex)
     auto c0 = table_w->add_column(type_Int, "int1");
     auto c1 = table_w->add_column(type_String, "str");
     auto c2 = table_w->add_column(type_Int, "int2");
-    auto ok = table_w->create_object({}, {{c1, "2"}, {c0, 1}, {c2, 3}}).get_key();
+    auto ok = table_w->create_object(ObjKey{}, {{c1, "2"}, {c0, 1}, {c2, 3}}).get_key();
     group_w->commit_and_continue_as_read();
     group_w->verify();
 

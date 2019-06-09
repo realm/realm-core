@@ -32,6 +32,9 @@
 #include <realm/list.hpp>
 
 namespace realm {
+
+struct ObjectID;
+
 namespace _impl {
 
 /// Transaction log instruction encoding
@@ -358,7 +361,9 @@ public:
     virtual void list_insert_binary(const Lst<Binary>& list, size_t list_ndx, BinaryData value);
     virtual void list_insert_timestamp(const Lst<Timestamp>& list, size_t list_ndx, Timestamp value);
 
+    virtual void create_object(const Table*, ObjectID);
     virtual void create_object(const Table*, ObjKey);
+    virtual void create_object_with_primary_key(const Table*, ObjectID, Mixed);
     virtual void remove_object(const Table*, ObjKey);
     /// \param prior_num_rows The number of rows in the table prior to the
     /// modification.
