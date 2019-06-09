@@ -18,14 +18,16 @@
 
 #include <realm/object_id.hpp>
 #include <realm/string_data.hpp>
+#include <realm/mixed.hpp>
+#include <realm/util/sha_crypto.hpp>
 #include <iomanip>
 #include <ostream>
 #include <sstream>
 #include <cctype>
 
-using namespace realm;
+namespace realm {
 
-std::ostream& realm::operator<<(std::ostream& os, const ObjectID& object_id)
+std::ostream& operator<<(std::ostream& os, const ObjectID& object_id)
 {
     return os << '{' << std::setw(4) << std::right << std::setfill('0') << std::hex << object_id.hi() << '-'
               << std::setw(4) << std::right << std::setfill('0') << std::hex << object_id.lo() << '}'
@@ -77,3 +79,47 @@ ObjectID ObjectID::from_string(StringData string)
     // stop processing when it reaches either of those characters.
     return ObjectID(strtoull(hi_begin, nullptr, 16), strtoull(lo_begin, nullptr, 16));
 }
+
+ObjectID object_id_for_primary_key(Mixed pk)
+{
+    if (pk.is_null())
+        // Choose {1, 0} as the object ID for NULL. This could just as well have been {0, 0},
+        // but then the null-representation for string and integer primary keys would have to
+        // be different, as {0, 0} is a valid object ID for a row with an integer primary key.
+        // Therefore, in the interest of simplicity, {1, 0} is chosen to represent NULL for
+        // both integer and string primary keys.
+        return ObjectID{1, 0};
+
+    if (pk.get_type() == type_String) {
+        // FIXME: Type-punning will only work on little-endian architectures
+        // (which is everyone we care about).
+        union {
+            unsigned char buffer[20];
+            struct {
+                uint64_t lo;
+                uint64_t hi;
+            } oid;
+        } data;
+        // FIXME: Use a better hash function than SHA1
+        auto val = pk.get_string();
+        util::sha1(val.data(), val.size(), data.buffer);
+
+        // On big-endian architectures, this is necessary instead:
+        // uint64_t lo = uint64_t(buffer[0]) | (uint64_t(buffer[1]) << 8)
+        //             | (uint64_t(buffer[2])  << 16) | (uint64_t(buffer[3])  << 24)
+        //             | (uint64_t(buffer[4])  << 32) | (uint64_t(buffer[5])  << 40)
+        //             | (uint64_t(buffer[6])  << 48) | (uint64_t(buffer[7])  << 56);
+        // uint64_t hi = uint64_t(buffer[8]) | (uint64_t(buffer[9]) << 8)
+        //             | (uint64_t(buffer[10]) << 16) | (uint64_t(buffer[11]) << 24)
+        //             | (uint64_t(buffer[12]) << 32) | (uint64_t(buffer[13]) << 40)
+        //             | (uint64_t(buffer[14]) << 48) | (uint64_t(buffer[15]) << 56);
+
+        return ObjectID{data.oid.hi, data.oid.lo};
+    }
+    if (pk.get_type() == type_Int) {
+        return ObjectID{0, uint64_t(pk.get_int())};
+    }
+    return {};
+}
+
+} // namespace realm

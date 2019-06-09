@@ -34,6 +34,7 @@ namespace realm {
 
 class StringData;
 class Transaction;
+class Mixed;
 
 /// ObjectIDs are globally unique, and up to 128 bits wide. They are represented
 /// as two 64-bit integers, each of which may frequently be small, for best
@@ -198,6 +199,8 @@ public:
         return ObjKey{int64_t(0x4000000000000000 | sequence_number)};
     }
 };
+
+ObjectID object_id_for_primary_key(Mixed pk);
 
 } // namespace realm
 

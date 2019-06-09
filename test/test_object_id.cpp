@@ -19,6 +19,7 @@
 #include "test.hpp"
 
 #include <realm/object_id.hpp>
+#include <realm/mixed.hpp>
 #include <realm/string_data.hpp>
 
 using namespace realm;
@@ -69,4 +70,23 @@ TEST(ObjectID_OptimisticLocalID)
 #else
     CHECK_EQUAL(lid, ObjKey(0xff));
 #endif
+}
+
+TEST(ObjectID_PrimaryKey)
+{
+    {
+        ObjectID object_id = object_id_for_primary_key({});
+        auto oid = object_id.to_string();
+        CHECK_EQUAL(oid, "{0001-0000}");
+    }
+    {
+        ObjectID object_id = object_id_for_primary_key(123);
+        auto oid = object_id.to_string();
+        CHECK_EQUAL(oid, "{0000-007b}");
+    }
+    {
+        ObjectID object_id = object_id_for_primary_key("Exactly!");
+        auto oid = object_id.to_string();
+        CHECK_EQUAL(oid, "{495f44d153789d90-d2f64663ba17c5bc}");
+    }
 }

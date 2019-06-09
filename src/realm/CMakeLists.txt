@@ -53,6 +53,7 @@ set(REALM_SOURCES
     util/memory_stream.cpp
     util/misc_errors.cpp
     util/serializer.cpp
+    util/sha_crypto.cpp
     util/terminate.cpp
     util/thread.cpp
     util/to_string.cpp
@@ -185,6 +186,7 @@ set(REALM_METRICS_HEADERS
 ) # REALM_METRICS_HEADERS
 
 set(REALM_OTHER_UTIL_HEADERS
+    util/sha_crypto.hpp
     util/aes_cryptor.hpp
     util/errno.hpp
 ) # REALM_OTHER_UTIL_HEADERS
@@ -302,7 +304,7 @@ if(NOT REALM_SKIP_SHARED_LIB)
     )
 endif()
 
-if(REALM_ENABLE_ENCRYPTION AND UNIX AND NOT APPLE)
+if(UNIX AND NOT APPLE)
     if(ANDROID)
         string(TOLOWER "${CMAKE_BUILD_TYPE}" BUILD_TYPE)
         set(OPENSSL_FILENAME "openssl-${BUILD_TYPE}-${ANDROID_OPENSSL_VERSION}-${ANDROID_OPENSSL_BUILD_NUMBER}-Android-${ANDROID_ABI}")

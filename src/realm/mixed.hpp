@@ -106,6 +106,11 @@ public:
     {
     }
 
+    Mixed(util::None) noexcept
+        : Mixed()
+    {
+    }
+
     Mixed(int i) noexcept
         : Mixed(int64_t(i))
     {
