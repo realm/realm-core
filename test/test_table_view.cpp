@@ -1030,6 +1030,44 @@ TEST(TableView_QueryCopy)
     CHECK_EQUAL(t, 2);
 }
 
+TEST(TableView_QueryCopyStringOr)
+{
+    Table table;
+    auto str_col_key = table.add_column(type_String, "str_col", true);
+    table.create_object().set_all("one");
+    table.create_object().set_all("two");
+    table.create_object().set_all("three");
+    table.create_object().set_all("");
+    table.create_object().set_null(str_col_key);
+
+    // Test if copy-assign of Query in TableView works
+    TableView tv = table.where().find_all();
+
+    Query q = table.where();
+
+    q.group();
+    q.equal(str_col_key, "one");
+    q.Or();
+    q.equal(str_col_key, "two");
+    q.Or();
+    q.equal(str_col_key, realm::null());
+    q.Or();
+    q.equal(str_col_key, "");
+    q.end_group();
+
+    size_t before_copy_count = q.count();
+    CHECK_EQUAL(before_copy_count, 4);
+
+    Query q2;
+    q2 = table.where().equal(str_col_key, "not found");
+    size_t q2_count = q2.count();
+    CHECK_EQUAL(q2_count, 0);
+
+    q2 = q;
+    size_t after_copy_count = q2.count();
+    CHECK_EQUAL(q.count(), 4);
+    CHECK_EQUAL(after_copy_count, 4);
+}
 
 TEST(TableView_SortEnum)
 {

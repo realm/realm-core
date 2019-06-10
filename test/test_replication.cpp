@@ -160,17 +160,17 @@ public:
         TrivialReplication::initialize(sg);
     }
 
-    version_type prepare_changeset(const char*, size_t, version_type) override
+    version_type prepare_changeset(const char*, size_t, version_type version) override
     {
         if (!m_arr) {
             using gf = _impl::GroupFriend;
             Allocator& alloc = gf::get_alloc(*m_group);
             m_arr = std::make_unique<BinaryColumn>(alloc);
-            m_arr->create();
             gf::prepare_history_parent(*m_group, *m_arr, hist_SyncClient, m_history_schema_version);
-            // m_arr->update_parent(); // Throws
+            m_arr->create();
+            m_arr->add(BinaryData("Changeset"));
         }
-        return 1;
+        return version + 1;
     }
 
     bool is_upgraded() const
@@ -230,9 +230,55 @@ TEST(Replication_HistorySchemaVersionDuringWT)
 
     WriteTransaction wt(sg_1);
 
-    // It should be possible to open a second SharedGroup at the same path
+    // It should be possible to open a second db at the same path
     // while a WriteTransaction is active via another SharedGroup.
     DBRef sg_2 = DB::create(repl);
+}
+
+
+// This is to test that the exported file has no memory leaks
+TEST(Replication_GroupWriteWithoutHistory)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    SHARED_GROUP_TEST_PATH(out1);
+    SHARED_GROUP_TEST_PATH(out2);
+
+    ReplSyncClient repl(path, 1);
+    DBRef sg_1 = DB::create(repl);
+    {
+        WriteTransaction wt(sg_1);
+        auto table = wt.add_table("Table");
+        auto col = table->add_column(type_String, "strings");
+        auto obj = table->create_object();
+        obj.set(col, "Hello");
+        wt.commit();
+    }
+    {
+        ReadTransaction rt(sg_1);
+        // Export file without history
+        rt.get_group().write(out1);
+    }
+
+    {
+        // Open without history
+        DBRef sg_2 = DB::create(out1);
+        ReadTransaction rt(sg_2);
+        rt.get_group().verify();
+    }
+
+    {
+        ReadTransaction rt(sg_1);
+        // Export file with history
+        rt.get_group().write(out2, nullptr, 1);
+    }
+
+    {
+        // Open with history
+        ReplSyncClient repl2(out2, 1);
+        DBRef sg_2 = DB::create(repl2);
+        ReadTransaction rt(sg_2);
+        rt.get_group().verify();
+    }
 }
 
 TEST(Replication_HistorySchemaVersionUpgrade)

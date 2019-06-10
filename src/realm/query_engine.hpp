@@ -108,6 +108,7 @@ AggregateState      State of the aggregate - contains a state variable that stor
 #include <realm/util/shared_ptr.hpp>
 #include <realm/util/string_buffer.hpp>
 #include <realm/utilities.hpp>
+#include <realm/index_string.hpp>
 
 #include <map>
 #include <unordered_set>
@@ -550,10 +551,74 @@ protected:
     // Aggregate optimization
     using TFind_callback_specialized = bool (ThisType::*)(size_t, size_t);
     TFind_callback_specialized m_find_callback_specialized = nullptr;
+
+    template <class TConditionFunction>
+    static TFind_callback_specialized get_specialized_callback(Action action, DataType col_id, bool is_nullable)
+    {
+        switch (action) {
+            case act_Count:
+                return get_specialized_callback_2_int<act_Count, TConditionFunction>(col_id, is_nullable);
+            case act_Sum:
+                return get_specialized_callback_2<act_Sum, TConditionFunction>(col_id, is_nullable);
+            case act_Max:
+                return get_specialized_callback_2<act_Max, TConditionFunction>(col_id, is_nullable);
+            case act_Min:
+                return get_specialized_callback_2<act_Min, TConditionFunction>(col_id, is_nullable);
+            case act_FindAll:
+                return get_specialized_callback_2_int<act_FindAll, TConditionFunction>(col_id, is_nullable);
+            case act_CallbackIdx:
+                return get_specialized_callback_2_int<act_CallbackIdx, TConditionFunction>(col_id, is_nullable);
+            default:
+                break;
+        }
+        REALM_ASSERT(false); // Invalid aggregate function
+        return nullptr;
+    }
+
+    template <Action TAction, class TConditionFunction>
+    static TFind_callback_specialized get_specialized_callback_2(DataType col_id, bool is_nullable)
+    {
+        switch (col_id) {
+            case type_Int:
+                return get_specialized_callback_3<TAction, type_Int, TConditionFunction>(is_nullable);
+            case type_Float:
+                return get_specialized_callback_3<TAction, type_Float, TConditionFunction>(is_nullable);
+            case type_Double:
+                return get_specialized_callback_3<TAction, type_Double, TConditionFunction>(is_nullable);
+            case type_Timestamp:
+                return get_specialized_callback_3<TAction, type_Timestamp, TConditionFunction>(is_nullable);
+            default:
+                break;
+        }
+        REALM_ASSERT(false); // Invalid aggregate source column
+        return nullptr;
+    }
+
+    template <Action TAction, class TConditionFunction>
+    static TFind_callback_specialized get_specialized_callback_2_int(DataType col_id, bool is_nullable)
+    {
+        if (col_id == type_Int) {
+            return get_specialized_callback_3<TAction, type_Int, TConditionFunction>(is_nullable);
+        }
+        REALM_ASSERT(false); // Invalid aggregate source column
+        return nullptr;
+    }
+
+    template <Action TAction, DataType TDataType, class TConditionFunction>
+    static TFind_callback_specialized get_specialized_callback_3(bool is_nullable)
+    {
+        if (is_nullable) {
+            return &IntegerNodeBase<LeafType>::template find_callback_specialization<TConditionFunction, TAction,
+                                                                                     TDataType, true>;
+        }
+        else {
+            return &IntegerNodeBase<LeafType>::template find_callback_specialization<TConditionFunction, TAction,
+                                                                                     TDataType, false>;
+        }
+    }
 };
 
 
-// FIXME: Add specialization that uses index for TConditionFunction = Equal
 template <class LeafType, class TConditionFunction>
 class IntegerNode : public IntegerNodeBase<LeafType> {
     using BaseType = IntegerNodeBase<LeafType>;
@@ -576,7 +641,9 @@ public:
     {
         this->m_fastmode_disabled = (col_id == type_Float || col_id == type_Double);
         this->m_action = action;
-        this->m_find_callback_specialized = get_specialized_callback(action, col_id, is_nullable);
+        this->m_find_callback_specialized =
+            IntegerNodeBase<LeafType>::template get_specialized_callback<TConditionFunction>(action, col_id,
+                                                                                             is_nullable);
     }
 
     size_t aggregate_local(QueryStateBase* st, size_t start, size_t end, size_t local_limit,
@@ -591,13 +658,13 @@ public:
         return this->m_leaf_ptr->template find_first<TConditionFunction>(this->m_value, start, end);
     }
 
-    virtual std::string describe(util::serializer::SerialisationState& state) const override
+    std::string describe(util::serializer::SerialisationState& state) const override
     {
         return state.describe_column(ParentNode::m_table, ColumnNodeBase::m_condition_column_key) + " " +
                describe_condition() + " " + util::serializer::print_value(this->m_value);
     }
 
-    virtual std::string describe_condition() const override
+    std::string describe_condition() const override
     {
         return TConditionFunction::description();
     }
@@ -606,70 +673,176 @@ public:
     {
         return std::unique_ptr<ParentNode>(new ThisType(*this, tr));
     }
+};
 
-protected:
-    using TFind_callback_specialized = typename BaseType::TFind_callback_specialized;
+template <class LeafType>
+class IntegerNode<LeafType, Equal> : public IntegerNodeBase<LeafType> {
+public:
+    using BaseType = IntegerNodeBase<LeafType>;
+    using TConditionValue = typename BaseType::TConditionValue;
+    using ThisType = IntegerNode<LeafType, Equal>;
 
-    static TFind_callback_specialized get_specialized_callback(Action action, DataType col_id, bool is_nullable)
+    IntegerNode(TConditionValue value, ColKey column_key)
+        : BaseType(value, column_key)
     {
-        switch (action) {
-            case act_Count:
-                return get_specialized_callback_2_int<act_Count>(col_id, is_nullable);
-            case act_Sum:
-                return get_specialized_callback_2<act_Sum>(col_id, is_nullable);
-            case act_Max:
-                return get_specialized_callback_2<act_Max>(col_id, is_nullable);
-            case act_Min:
-                return get_specialized_callback_2<act_Min>(col_id, is_nullable);
-            case act_FindAll:
-                return get_specialized_callback_2_int<act_FindAll>(col_id, is_nullable);
-            case act_CallbackIdx:
-                return get_specialized_callback_2_int<act_CallbackIdx>(col_id, is_nullable);
-            default:
-                break;
-        }
-        REALM_ASSERT(false); // Invalid aggregate function
-        return nullptr;
+    }
+    ~IntegerNode()
+    {
     }
 
-    template <Action TAction>
-    static TFind_callback_specialized get_specialized_callback_2(DataType col_id, bool is_nullable)
+    void init() override
     {
-        switch (col_id) {
-            case type_Int:
-                return get_specialized_callback_3<TAction, type_Int>(is_nullable);
-            case type_Float:
-                return get_specialized_callback_3<TAction, type_Float>(is_nullable);
-            case type_Double:
-                return get_specialized_callback_3<TAction, type_Double>(is_nullable);
-            case type_Timestamp:
-                return get_specialized_callback_3<TAction, type_Timestamp>(is_nullable);
-            default:
-                break;
+        BaseType::init();
+        m_nb_needles = m_needles.size();
+
+        if (has_search_index()) {
+            // _search_index_init();
+            auto index = ParentNode::m_table->get_search_index(ParentNode::m_condition_column_key);
+            index->find_all(m_result, BaseType::m_value);
+            m_result_get = 0;
         }
-        REALM_ASSERT(false); // Invalid aggregate source column
-        return nullptr;
     }
 
-    template <Action TAction>
-    static TFind_callback_specialized get_specialized_callback_2_int(DataType col_id, bool is_nullable)
+    void consume_condition(IntegerNode<LeafType, Equal>* other)
     {
-        if (col_id == type_Int) {
-            return get_specialized_callback_3<TAction, type_Int>(is_nullable);
+        REALM_ASSERT(this->m_condition_column_key == other->m_condition_column_key);
+        REALM_ASSERT(other->m_needles.empty());
+        if (m_needles.empty()) {
+            m_needles.insert(this->m_value);
         }
-        REALM_ASSERT(false); // Invalid aggregate source column
-        return nullptr;
+        m_needles.insert(other->m_value);
     }
 
-    template <Action TAction, DataType TDataType>
-    static TFind_callback_specialized get_specialized_callback_3(bool is_nullable)
+    bool has_search_index() const
     {
-        if (is_nullable) {
-            return &BaseType::template find_callback_specialization<TConditionFunction, TAction, TDataType, true>;
+        return this->m_table->has_search_index(IntegerNodeBase<LeafType>::m_condition_column_key);
+    }
+
+    void aggregate_local_prepare(Action action, DataType col_id, bool is_nullable) override
+    {
+        this->m_fastmode_disabled = (col_id == type_Float || col_id == type_Double);
+        this->m_action = action;
+        this->m_find_callback_specialized =
+            IntegerNodeBase<LeafType>::template get_specialized_callback<Equal>(action, col_id, is_nullable);
+    }
+
+    size_t aggregate_local(QueryStateBase* st, size_t start, size_t end, size_t local_limit,
+                           ArrayPayload* source_column) override
+    {
+        constexpr int cond = Equal::condition;
+        return this->aggregate_local_impl(st, start, end, local_limit, source_column, cond);
+    }
+ 
+    size_t find_first_local(size_t start, size_t end) override
+    {
+        REALM_ASSERT(this->m_table);
+        size_t s = realm::npos;
+
+        if (has_search_index()) {
+
+            if (m_result_get < m_result.size() && start < end) {
+                ObjKey first_key = BaseType::m_cluster->get_real_key(start);
+                auto actual_key = m_result[m_result_get];
+                // skip through keys which are in "earlier" leafs than the one selected by start..end:
+                while (first_key > actual_key) {
+                    m_result_get++;
+                    if (m_result_get == m_result.size())
+                        return not_found;
+                    actual_key = m_result[m_result_get];
+                }
+
+                // if actual key is bigger than last key, it is not in this leaf
+                ObjKey last_key = BaseType::m_cluster->get_real_key(end - 1);
+                if (actual_key > last_key)
+                    return not_found;
+
+                // key is known to be in this leaf, so find key whithin leaf keys
+                return BaseType::m_cluster->lower_bound_key(ObjKey(actual_key.value - BaseType::m_cluster->get_offset()));
+            }
+
         }
-        else {
-            return &BaseType::template find_callback_specialization<TConditionFunction, TAction, TDataType, false>;
+
+        if (start < end) {
+            if (m_nb_needles) {
+                s = find_first_haystack(start, end);
+            }
+            else if (end - start == 1) {
+                if (this->m_leaf_ptr->get(start) == this->m_value) {
+                    s = start;
+                }
+            }
+            else {
+                s = this->m_leaf_ptr->template find_first<Equal>(this->m_value, start, end);
+            }
         }
+        return s;
+    }
+
+    std::string describe(util::serializer::SerialisationState& state) const override
+    {
+        REALM_ASSERT(this->m_condition_column_key);
+        std::string col_descr = state.describe_column(this->m_table, this->m_condition_column_key);
+
+        if (m_needles.empty()) {
+            return col_descr + " " + Equal::description() + " " +
+                   util::serializer::print_value(IntegerNodeBase<LeafType>::m_value);
+        }
+
+        // FIXME: once the parser supports it, print something like "column IN {n1, n2, n3}"
+        std::string desc = "(";
+        bool is_first = true;
+        for (auto it : m_needles) {
+            if (!is_first)
+                desc += " or ";
+            desc +=
+                col_descr + " " + Equal::description() + " " + util::serializer::print_value(it); // "it" may be null
+            is_first = false;
+        }
+        desc += ")";
+        return desc;
+    }
+
+    std::unique_ptr<ParentNode> clone(Transaction* tr) const override
+    {
+        return std::unique_ptr<ParentNode>(new ThisType(*this, tr));
+    }
+
+private:
+    std::unordered_set<TConditionValue> m_needles;
+    std::vector<ObjKey> m_result;
+    size_t m_nb_needles = 0;
+    size_t m_result_get = 0;
+
+    IntegerNode(const IntegerNode<LeafType, Equal>& from, Transaction* patches)
+        : BaseType(from, patches)
+        , m_needles(from.m_needles)
+    {
+    }
+    size_t find_first_haystack(size_t start, size_t end)
+    {
+        const auto not_in_set = m_needles.end();
+        // for a small number of conditions, it is faster to do a linear search than to compute the hash
+        // the decision threshold was determined experimentally to be 22 conditions
+        bool search = m_nb_needles < 22;
+        auto cmp_fn = [this, search, not_in_set](const auto& v) {
+            if (search) {
+                for (auto it = m_needles.begin(); it != not_in_set; ++it) {
+                    if (*it == v)
+                        return true;
+                }
+                return false;
+            }
+            else {
+                return (m_needles.find(v) != not_in_set);
+            }
+        };
+        for (size_t i = start; i < end; ++i) {
+            auto val = this->m_leaf_ptr->get(i);
+            if (cmp_fn(val)) {
+                return i;
+            }
+        }
+        return realm::npos;
     }
 };
 
@@ -735,13 +908,13 @@ public:
             return find(false);
     }
 
-    virtual std::string describe(util::serializer::SerialisationState& state) const override
+    std::string describe(util::serializer::SerialisationState& state) const override
     {
         REALM_ASSERT(m_condition_column_key);
         return state.describe_column(ParentNode::m_table, m_condition_column_key) + " " + describe_condition() + " " +
                util::serializer::print_value(FloatDoubleNode::m_value);
     }
-    virtual std::string describe_condition() const override
+    std::string describe_condition() const override
     {
         return TConditionFunction::description();
     }
@@ -1464,7 +1637,22 @@ public:
         return std::unique_ptr<ParentNode>(new StringNode<Equal>(*this, tr));
     }
 
-    virtual std::string describe(util::serializer::SerialisationState& state) const override;
+    std::string describe(util::serializer::SerialisationState& state) const override;
+
+    StringNode<Equal>(const StringNode& from, Transaction* tr)
+        : StringNodeEqualBase(from, tr)
+    {
+        for (auto it = from.m_needles.begin(); it != from.m_needles.end(); ++it) {
+            if (it->data() == nullptr && it->size() == 0) {
+                m_needles.insert(StringData()); // nulls
+            }
+            else {
+                m_needle_storage.emplace_back(StringBuffer());
+                m_needle_storage.back().append(it->data(), it->size());
+                m_needles.insert(StringData(m_needle_storage.back().data(), m_needle_storage.back().size()));
+            }
+        }
+    }
 
 private:
     std::unique_ptr<IntegerColumn> m_index_matches;
@@ -1607,30 +1795,12 @@ public:
 
         m_dD = 10.0;
 
-        StringNode<Equal>* first = nullptr;
         std::sort(m_conditions.begin(), m_conditions.end(),
-                  [](auto& a, auto& b) { return a->m_condition_column_key.value < b->m_condition_column_key.value; });
-        auto it = m_conditions.begin();
-        while (it != m_conditions.end()) {
-            // Only try to optimize on StringNode<Equal> conditions without search index
-            if ((first = dynamic_cast<StringNode<Equal>*>(it->get())) && !first->has_search_index()) {
-                auto col_key = first->m_condition_column_key;
-                auto next = it + 1;
-                while (next != m_conditions.end() && (*next)->m_condition_column_key == col_key) {
-                    if (auto advance = dynamic_cast<StringNode<Equal>*>(next->get())) {
-                        first->consume_condition(advance);
-                        next = m_conditions.erase(next);
-                    }
-                    else {
-                        ++next;
-                    }
-                }
-                it = next;
-            }
-            else {
-                ++it;
-            }
-        }
+                  [](auto& a, auto& b) { return a->m_condition_column_key < b->m_condition_column_key; });
+
+        combine_conditions<StringNode<Equal>>();
+        combine_conditions<IntegerNode<ArrayInteger, Equal>>();
+        combine_conditions<IntegerNode<ArrayIntNull, Equal>>();
 
         m_start.clear();
         m_start.resize(m_conditions.size(), 0);
@@ -1713,6 +1883,36 @@ public:
     std::vector<std::unique_ptr<ParentNode>> m_conditions;
 
 private:
+    template<class QueryNodeType>
+    void combine_conditions() {
+        QueryNodeType* first_match = nullptr;
+        QueryNodeType* advance = nullptr;
+        auto it = m_conditions.begin();
+        while (it != m_conditions.end()) {
+            // Only try to optimize on QueryNodeType conditions without search index
+            auto node = it->get();
+            if ((first_match = dynamic_cast<QueryNodeType*>(node)) && first_match->m_child == nullptr &&
+                !first_match->has_search_index()) {
+                auto col_key = first_match->m_condition_column_key;
+                auto next = it + 1;
+                while (next != m_conditions.end() && (*next)->m_condition_column_key == col_key) {
+                    auto next_node = next->get();
+                    if ((advance = dynamic_cast<QueryNodeType*>(next_node)) && next_node->m_child == nullptr) {
+                        first_match->consume_condition(advance);
+                        next = m_conditions.erase(next);
+                    }
+                    else {
+                        ++next;
+                    }
+                }
+                it = next;
+            }
+            else {
+                ++it;
+            }
+        }
+    }
+
     // start index of the last find for each cond
     std::vector<size_t> m_start;
     // last looked at index of the lasft find for each cond

@@ -68,6 +68,7 @@
 #include <thread>
 #include <utility>
 #include <vector>
+#include <set>
 
 using namespace realm;
 using namespace realm::metrics;
@@ -3198,5 +3199,60 @@ TEST(Parser_ChainedStringEqualQueries)
     }
     verify_query(test_context, table, query, populated_data.size());
 }
+
+TEST(Parser_ChainedIntEqualQueries)
+{
+    Group g;
+    TableRef table = g.add_table("table");
+    auto a_col_key = table->add_column(type_Int, "a", false);
+    auto b_col_key = table->add_column(type_Int, "b", true);
+    auto c_col_key = table->add_column(type_Int, "c", false);
+    auto d_col_key = table->add_column(type_Int, "d", true);
+
+    table->add_search_index(c_col_key);
+    table->add_search_index(d_col_key);
+
+    std::vector<ObjKey> keys;
+    table->create_objects(100, keys);
+    std::vector<int64_t> populated_data;
+    for (auto o = table->begin(); o != table->end(); ++o) {
+        auto payload = o->get_key().value;
+        populated_data.push_back(payload);
+        o->set(a_col_key, payload);
+        o->set(b_col_key, payload);
+        o->set(c_col_key, payload);
+        o->set(d_col_key, payload);
+    }
+    auto default_obj = table->create_object(); // one null/default 0 object
+
+    verify_query(test_context, table, "a == 0 or a == 1 or a == 2", 4);
+    verify_query(test_context, table, "a == 1 or b == 2 or a == 3 or b == 4", 4);
+    verify_query(test_context, table,
+                 "(a == 0 or b == 2 or a == 3 or b == 4) and (c == 0 or d == 2 or c == 3 or d == 4)", 5);
+    verify_query(test_context, table, "a == 0 or a == null", 2);
+    verify_query(test_context, table, "b == 0 or b == null", 2);
+    verify_query(test_context, table, "c == 0 or c == null", 2);
+    verify_query(test_context, table, "d == 0 or d == null", 2);
+    verify_query(
+        test_context, table,
+        "(a == null or a == 0) and (b == null or b == 0) and (c == null or c == 0) and (d == null or d == 0)", 2);
+
+    Random rd;
+    rd.shuffle(populated_data.begin(), populated_data.end());
+    std::string query;
+    bool first = true;
+    char column_to_query = 0;
+    for (auto s : populated_data) {
+        std::string column_name(1, 'a' + column_to_query);
+        std::stringstream ss;
+        ss << s;
+        query += (first ? "" : " or ") + column_name + " == '" + ss.str() + "'";
+        first = false;
+        column_to_query = (column_to_query + 1) % 4;
+    }
+    default_obj.remove();
+    verify_query(test_context, table, query, populated_data.size());
+}
+
 
 #endif // TEST_PARSER

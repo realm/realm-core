@@ -49,8 +49,8 @@ namespace {
   are likely to use internally.
 
   This has the following implications:
-  - All access is done with a SharedGroup in transactions.
-  - The SharedGroup has full durability (is backed by a file).
+  - All access is done with a DB in transactions.
+  - The DB has full durability (is backed by a file).
     (but all benchmarks are also run with MemOnly durability for comparison)
   - Cases have been derived from:
     https://github.com/realm/realm-java/blob/bp-performance-test/realm/src/androidTest/java/io/realm/RealmPerformanceTest.java
@@ -416,6 +416,99 @@ struct BenchmarkWithInts : BenchmarkWithIntsTable {
     }
 };
 
+struct BenchmarkQueryChainedOrInts : BenchmarkWithIntsTable {
+    const size_t num_queried_matches = 1000;
+    const size_t num_rows = 100000;
+    std::vector<int64_t> values_to_query;
+    const char* name() const
+    {
+        return "QueryChainedOrInts";
+    }
+
+    void before_all(DBRef group)
+    {
+        BenchmarkWithIntsTable::before_all(group);
+        WriteTransaction tr(group);
+        TableRef t = tr.get_table("IntOnly");
+        std::vector<ObjKey> keys;
+        t->create_objects(num_rows, keys);
+        REALM_ASSERT(num_rows > num_queried_matches);
+        Random r;
+        size_t i = 0;
+        for (auto e : *t) {
+            e.set<Int>(m_col, i);
+            ++i;
+        }
+        for (i = 0; i < num_queried_matches; ++i) {
+            size_t ndx_to_match = (num_rows / num_queried_matches) * i;
+            values_to_query.push_back(t->get_object(ndx_to_match).get<Int>(m_col));
+        }
+        tr.commit();
+    }
+
+    void operator()(DBRef group)
+    {
+        ReadTransaction tr(group);
+        ConstTableRef table = tr.get_table("IntOnly");
+        Query query = table->where();
+        for (size_t i = 0; i < values_to_query.size(); ++i) {
+            query.Or().equal(m_col, values_to_query[i]);
+        }
+        TableView results = query.find_all();
+        REALM_ASSERT_EX(results.size() == num_queried_matches, results.size(), num_queried_matches,
+                        values_to_query.size());
+        static_cast<void>(results);
+    }
+};
+
+struct BenchmarkQueryChainedOrIntsIndexed : BenchmarkQueryChainedOrInts {
+    const char* name() const
+    {
+        return "QueryChainedOrIntsIndexed";
+    }
+    void before_all(DBRef group)
+    {
+        BenchmarkQueryChainedOrInts::before_all(group);
+        WriteTransaction tr(group);
+        TableRef t = tr.get_table("IntOnly");
+        t->add_search_index(m_col);
+        tr.commit();
+    }
+};
+
+
+struct BenchmarkQueryIntEquality : BenchmarkQueryChainedOrInts {
+    const char* name() const
+    {
+        return "QueryIntEquality";
+    }
+
+    void operator()(DBRef group)
+    {
+        ReadTransaction tr(group);
+        ConstTableRef table = tr.get_table("IntOnly");
+        Query query = table->where().equal(m_col, 0);
+        TableView results = query.find_all();
+        REALM_ASSERT_EX(results.size() == 1, results.size(), 1);
+        static_cast<void>(results);
+    }
+};
+
+struct BenchmarkQueryIntEqualityIndexed : BenchmarkQueryIntEquality {
+    const char* name() const
+    {
+        return "QueryIntEqualityIndexed";
+    }
+    void before_all(DBRef group)
+    {
+        BenchmarkQueryIntEquality::before_all(group);
+        WriteTransaction tr(group);
+        TableRef t = tr.get_table("IntOnly");
+        t->add_search_index(m_col);
+        tr.commit();
+    }
+};
+
 struct BenchmarkQuery : BenchmarkWithStrings {
     const char* name() const
     {
@@ -445,7 +538,6 @@ struct BenchmarkQueryChainedOrStrings : BenchmarkWithStringsTable {
         WriteTransaction tr(group);
         TableRef t = tr.get_table("StringOnly");
         REALM_ASSERT(num_rows > num_queried_matches);
-        Random r;
         for (size_t i = 0; i < num_rows; ++i) {
             std::stringstream ss;
             ss << i;
@@ -1213,6 +1305,10 @@ int benchmark_common_tasks_main()
     BENCH(BenchmarkQueryInsensitiveStringIndexed);
     BENCH(BenchmarkNonInitatorOpen);
     BENCH(BenchmarkQueryChainedOrStrings);
+    BENCH(BenchmarkQueryChainedOrInts);
+    BENCH(BenchmarkQueryChainedOrIntsIndexed);
+    BENCH(BenchmarkQueryIntEquality);
+    BENCH(BenchmarkQueryIntEqualityIndexed);
 
 #undef BENCH
     return 0;
