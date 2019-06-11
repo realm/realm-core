@@ -202,6 +202,9 @@ void SlabAlloc::detach() noexcept
     // placed correctly (logically) after the end of the file.
     m_slabs.clear();
     clear_freelists();
+#if REALM_ENABLE_ENCRYPTION
+    m_realm_file_info = nullptr;
+#endif
 
     m_attach_mode = attach_None;
 }
