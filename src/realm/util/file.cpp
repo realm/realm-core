@@ -140,21 +140,15 @@ bool try_make_dir(const std::string& path)
 {
 #ifdef _WIN32
     std::wstring w_path = string_to_wstring(path);
-    if (CreateDirectoryW(w_path.c_str(), NULL) != 0)
+    if (_wmkdir(w_path.c_str()) == 0)
         return true;
-    DWORD dw_err = GetLastError();
-    int err = (int)dw_err;
-    std::string msg = get_last_error_msg("make_dir() failed: ", dw_err);
 #else // POSIX
     if (::mkdir(path.c_str(), S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH) == 0)
         return true;
+#endif
     int err = errno; // Eliminate any risk of clobbering
     std::string msg = get_errno_msg("make_dir() failed: ", err);
-#endif
     switch (err) {
-		#ifdef _WIN32
-        case ERROR_ALREADY_EXISTS:
-		#endif
         case EEXIST:
             return false;
         case EACCES:
@@ -189,19 +183,14 @@ bool try_remove_dir(const std::string& path)
 {
 #ifdef _WIN32
     std::wstring w_path = string_to_wstring(path);
-    if (RemoveDirectoryW(w_path.c_str()) != 0)
+    if (_wrmdir(w_path.c_str()) == 0)
         return true;
-    DWORD dw_err = GetLastError();
-    int err = (int)dw_err;
-    std::string msg;
-    FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,
-                  dw_err, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPTSTR)&msg, 0, NULL);
 #else // POSIX
     if (::rmdir(path.c_str()) == 0)
         return true;
+#endif
     int err = errno; // Eliminate any risk of clobbering
     std::string msg = get_errno_msg("remove_dir() failed: ", err);
-#endif
     switch (err) {
         case EACCES:
         case EROFS:
@@ -1071,7 +1060,8 @@ void File::sync_map(FileDesc fd, void* addr, size_t size)
 bool File::exists(const std::string& path)
 {
 #ifdef _WIN32
-    if (_access(path.c_str(), 0) == 0)
+    std::wstring w_path = string_to_wstring(path);
+    if (_waccess(w_path.c_str(), 0) == 0)
         return true;
 #else // POSIX
     if (::access(path.c_str(), F_OK) == 0)
@@ -1125,7 +1115,8 @@ void File::remove(const std::string& path)
 bool File::try_remove(const std::string& path)
 {
 #ifdef _WIN32
-    if (_unlink(path.c_str()) == 0)
+    std::wstring w_path = string_to_wstring(path);
+    if (_wunlink(w_path.c_str()) == 0)
         return true;
 #else // POSIX
     if (::unlink(path.c_str()) == 0)
