@@ -144,9 +144,7 @@ bool try_make_dir(const std::string& path)
         return true;
     DWORD dw_err = GetLastError();
     int err = (int)dw_err;
-    std::string msg;
-    FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,
-                  dw_err, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPTSTR)&msg, 0, NULL);
+    std::string msg = get_last_error_msg("make_dir() failed: ", dw_err);
 #else // POSIX
     if (::mkdir(path.c_str(), S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH) == 0)
         return true;
@@ -154,6 +152,9 @@ bool try_make_dir(const std::string& path)
     std::string msg = get_errno_msg("make_dir() failed: ", err);
 #endif
     switch (err) {
+		#ifdef _WIN32
+        case ERROR_ALREADY_EXISTS:
+		#endif
         case EEXIST:
             return false;
         case EACCES:
@@ -338,7 +339,7 @@ void File::open_internal(const std::string& path, AccessMode a, CreateMode c, in
             break;
     }
     DWORD flags_and_attributes = 0;
-    std::wstring ws(path.begin(), path.end());
+    std::wstring ws = string_to_wstring(path);
     HANDLE handle =
         CreateFile2(ws.c_str(), desired_access, share_mode, creation_disposition, nullptr);
     if (handle != INVALID_HANDLE_VALUE) {
@@ -1102,7 +1103,8 @@ bool File::is_dir(const std::string& path)
     }
     throw std::system_error(err, std::system_category(), "stat() failed");
 #elif REALM_HAVE_STD_FILESYSTEM
-    return std::filesystem::is_directory(path);
+    std::wstring w_path = string_to_wstring(path);
+    return std::filesystem::is_directory(w_path);
 #else
     static_cast<void>(path);
     throw util::runtime_error("Not yet supported");
