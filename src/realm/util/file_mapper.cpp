@@ -189,15 +189,14 @@ public:
             --m_refresh_count;
             return std::bind([](int64_t target_copy) { return target_copy; }, m_target);
         }
+        m_refresh_count = 10;
+     
         return std::bind(get_target_from_system, m_cfg_file_name);
     }
 
     void report_target_result(int64_t target) override
     {
         m_target = target;
-        if (m_refresh_count == 0) {
-            m_refresh_count = 10; // refresh every 10 seconds
-        }
     }
 
     DefaultGovernor()
@@ -263,7 +262,7 @@ struct ReclaimerThreadStopper {
 
 ReclaimerThreadStopper reclaimer_thread_stopper;
 
-void encryption_note_reader_start(SharedFileInfo& info, void* reader_id)
+void encryption_note_reader_start(SharedFileInfo& info, const void* reader_id)
 {
     UniqueLock lock(mapping_mutex);
     ensure_reclaimer_thread_runs();
@@ -279,7 +278,7 @@ void encryption_note_reader_start(SharedFileInfo& info, void* reader_id)
     ++info.current_version;
 }
 
-void encryption_note_reader_end(SharedFileInfo& info, void* reader_id)
+void encryption_note_reader_end(SharedFileInfo& info, const void* reader_id) noexcept
 {
     UniqueLock lock(mapping_mutex);
     for (auto j = info.readers.begin(); j != info.readers.end(); ++j)
@@ -325,6 +324,8 @@ const std::vector<work_limit_desc> control_table = {{0.5f, 0.001f},  {0.75f, 0.0
 
 size_t get_work_limit(size_t decrypted_pages, size_t target)
 {
+    if (target == 0)
+        target = 1;
     float load = 1.0f * decrypted_pages / target;
     float akku = 0.0f;
     for (const auto& e : control_table) {
@@ -389,13 +390,12 @@ void reclaim_pages()
     // callback to governor defined function without mutex held
     int64_t target = PageReclaimGovernor::no_match;
     if (runnable) {
-        target = runnable() / page_size();
+        target = runnable();
     }
     {
         UniqueLock lock(mapping_mutex);
         reclaimer_workload = 0;
-        reclaimer_target = size_t(target);
-
+        reclaimer_target = size_t(target / page_size());
         // Putting the target back into the govenor object will allow the govenor
         // to return a getter producing this value again next time it is called
         governor->report_target_result(target);
@@ -406,7 +406,7 @@ void reclaim_pages()
         if (mappings_by_file.size() == 0)
             return;
 
-        size_t work_limit = get_work_limit(load, size_t(target));
+        size_t work_limit = get_work_limit(load, reclaimer_target);
         reclaimer_workload = work_limit;
         if (file_reclaim_index >= mappings_by_file.size())
             file_reclaim_index = 0;

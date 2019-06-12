@@ -37,6 +37,7 @@
 #include <realm/util/miscellaneous.hpp>
 #include <realm/util/terminate.hpp>
 #include <realm/util/thread.hpp>
+#include <realm/util/scope_exit.hpp>
 #include <realm/array.hpp>
 #include <realm/alloc_slab.hpp>
 
@@ -201,6 +202,9 @@ void SlabAlloc::detach() noexcept
     // placed correctly (logically) after the end of the file.
     m_slabs.clear();
     clear_freelists();
+#if REALM_ENABLE_ENCRYPTION
+    m_realm_file_info = nullptr;
+#endif
 
     m_attach_mode = attach_None;
 }
@@ -781,6 +785,7 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
     File::Map<char> initial_mapping;
     try {
         File::Map<char> map(m_file, File::access_ReadOnly, size); // Throws
+        note_reader_start(this);
         // we'll read header and (potentially) footer
         realm::util::encryption_read_barrier(map, 0, sizeof(Header));
         realm::util::encryption_read_barrier(map, size - sizeof(Header), sizeof(Header));
@@ -796,8 +801,15 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
         m_attach_mode = cfg.is_shared ? attach_SharedFile : attach_UnsharedFile;
     }
     catch (const DecryptionFailed&) {
+        note_reader_end(this);
         throw InvalidDatabase("Realm file decryption failed", path);
     }
+    catch (...) {
+        note_reader_end(this);
+        throw;
+    }
+    auto handler = [this]() noexcept { note_reader_end(this); };
+    auto reader_end_guard = make_scope_exit(handler);
     // make sure that any call to begin_read cause any slab to be placed in free
     // lists correctly
     m_free_space_state = free_space_Invalid; // Odd! FIXME
@@ -925,7 +937,7 @@ void SlabAlloc::setup_compatibility_mapping(size_t file_size)
     update_reader_view(file_size);
 }
 
-void SlabAlloc::note_reader_start(void* reader_id)
+void SlabAlloc::note_reader_start(const void* reader_id)
 {
 #if REALM_ENABLE_ENCRYPTION
     if (m_realm_file_info)
@@ -935,7 +947,7 @@ void SlabAlloc::note_reader_start(void* reader_id)
 #endif
 }
 
-void SlabAlloc::note_reader_end(void* reader_id)
+void SlabAlloc::note_reader_end(const void* reader_id) noexcept
 {
 #if REALM_ENABLE_ENCRYPTION
     if (m_realm_file_info)
