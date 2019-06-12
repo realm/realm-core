@@ -261,10 +261,10 @@ SlabAlloc::~SlabAlloc() noexcept
 
 MemRef SlabAlloc::do_alloc(size_t size)
 {
-    REALM_ASSERT(0 < size);
-    REALM_ASSERT((size & 0x7) == 0); // only allow sizes that are multiples of 8
-    REALM_ASSERT(is_attached());
-    REALM_ASSERT(size < 1 * 1024 * 1024 * 1024);
+    REALM_ASSERT_EX(0 < size, size, get_file_path_for_assertions());
+    REALM_ASSERT_EX((size & 0x7) == 0, size, get_file_path_for_assertions()); // only allow sizes that are multiples of 8
+    REALM_ASSERT_EX(is_attached(), get_file_path_for_assertions());
+    REALM_ASSERT_EX(size < 1 * 1024 * 1024 * 1024, size, get_file_path_for_assertions());
 
     // If we failed to correctly record free space, new allocations cannot be
     // carried out until the free space record is reset.
@@ -291,7 +291,7 @@ MemRef SlabAlloc::do_alloc(size_t size)
 #endif
 
     char* addr = reinterpret_cast<char*>(entry);
-    REALM_ASSERT(addr == translate(ref));
+    REALM_ASSERT_EX(addr == translate(ref), addr, ref, get_file_path_for_assertions());
 
 #if REALM_ENABLE_ALLOC_SET_ZERO
     std::fill(addr, addr + size, 0);
@@ -299,7 +299,7 @@ MemRef SlabAlloc::do_alloc(size_t size)
 #ifdef REALM_SLAB_ALLOC_DEBUG
     malloc_debug_map[ref] = malloc(1);
 #endif
-    REALM_ASSERT_EX(ref >= m_baseline, ref, m_baseline);
+    REALM_ASSERT_EX(ref >= m_baseline, ref, m_baseline, get_file_path_for_assertions());
     return MemRef(addr, ref, *this);
 }
 
@@ -367,7 +367,7 @@ void SlabAlloc::remove_freelist_entry(FreeBlock* entry)
 {
     int size = bb_before(entry)->block_after_size;
     auto it = m_block_map.find(size);
-    REALM_ASSERT(it != m_block_map.end());
+    REALM_ASSERT_EX(it != m_block_map.end(), get_file_path_for_assertions());
     auto header = it->second;
     if (header == entry) {
         header = entry->next;
@@ -402,22 +402,22 @@ void SlabAlloc::push_freelist_entry(FreeBlock* entry)
 void SlabAlloc::mark_freed(FreeBlock* entry, int size)
 {
     auto bb = bb_before(entry);
-    REALM_ASSERT(bb->block_after_size < 0);
-    REALM_ASSERT(bb->block_after_size == -size);
+    REALM_ASSERT_EX(bb->block_after_size < 0, bb->block_after_size, get_file_path_for_assertions());
+    REALM_ASSERT_EX(bb->block_after_size == -size, bb->block_after_size, -size, get_file_path_for_assertions());
     bb->block_after_size = 0 - bb->block_after_size;
     bb = bb_after(entry);
-    REALM_ASSERT(bb->block_before_size < 0);
-    REALM_ASSERT(bb->block_before_size == -size);
+    REALM_ASSERT_EX(bb->block_before_size < 0, bb->block_before_size, get_file_path_for_assertions());
+    REALM_ASSERT_EX(bb->block_before_size == -size, bb->block_before_size, -size, get_file_path_for_assertions());
     bb->block_before_size = 0 - bb->block_before_size;
 }
 
 void SlabAlloc::mark_allocated(FreeBlock* entry)
 {
     auto bb = bb_before(entry);
-    REALM_ASSERT(bb->block_after_size > 0);
+    REALM_ASSERT_EX(bb->block_after_size > 0, bb->block_after_size, get_file_path_for_assertions());
     auto bb2 = bb_after(entry);
     bb->block_after_size = 0 - bb->block_after_size;
-    REALM_ASSERT(bb2->block_before_size > 0);
+    REALM_ASSERT_EX(bb2->block_before_size > 0, bb2->block_before_size, get_file_path_for_assertions());
     bb2->block_before_size = 0 - bb2->block_before_size;
 }
 
@@ -439,7 +439,7 @@ SlabAlloc::FreeBlock* SlabAlloc::allocate_block(int size)
     FreeBlock* remaining = break_block(block, size);
     if (remaining)
         push_freelist_entry(remaining);
-    REALM_ASSERT(size_from_block(block) == size);
+    REALM_ASSERT_EX(size_from_block(block) == size, size_from_block(block), size, get_file_path_for_assertions());
     return block;
 }
 
@@ -513,7 +513,7 @@ SlabAlloc::FreeBlock* SlabAlloc::grow_slab_for(int size)
     else {
         // Find size of memory that has been modified (through copy-on-write) in current write transaction
         ref_type curr_ref_end = to_size_t(m_slabs.back().ref_end);
-        REALM_ASSERT_DEBUG_EX(curr_ref_end >= m_baseline, curr_ref_end, m_baseline);
+        REALM_ASSERT_DEBUG_EX(curr_ref_end >= m_baseline, curr_ref_end, m_baseline, get_file_path_for_assertions());
         size_t copy_on_write = curr_ref_end - m_baseline;
 
         // Allocate 20% of that (for the first few number of slabs the math below will just result in 1 page each)
@@ -547,7 +547,7 @@ SlabAlloc::FreeBlock* SlabAlloc::grow_slab_for(int size)
 
 void SlabAlloc::do_free(ref_type ref, char* addr) noexcept
 {
-    REALM_ASSERT_3(translate(ref), ==, addr);
+    REALM_ASSERT_EX(translate(ref) == addr, translate(ref), addr, get_file_path_for_assertions());
 
     bool read_only = is_read_only(ref);
 #ifdef REALM_SLAB_ALLOC_DEBUG
@@ -567,18 +567,18 @@ void SlabAlloc::do_free(ref_type ref, char* addr) noexcept
 
     // Mutable memory cannot be freed unless it has first been allocated, and
     // any allocation puts free space tracking into the "dirty" state.
-    REALM_ASSERT_3(read_only, ||, m_free_space_state == free_space_Dirty);
+    REALM_ASSERT_EX(read_only || m_free_space_state == free_space_Dirty, read_only, m_free_space_state, free_space_Dirty, get_file_path_for_assertions());
 
     m_free_space_state = free_space_Dirty;
 
     if (read_only) {
         // Free space in read only segment is tracked separately
         try {
-            REALM_ASSERT_RELEASE(ref != 0);
-            REALM_ASSERT_RELEASE_EX(!(ref & 7), ref);
+            REALM_ASSERT_RELEASE_EX(ref != 0, ref, get_file_path_for_assertions());
+            REALM_ASSERT_RELEASE_EX(!(ref & 7), ref, get_file_path_for_assertions());
             auto next = m_free_read_only.lower_bound(ref);
             if (next != m_free_read_only.end()) {
-                REALM_ASSERT_RELEASE_EX(ref + size <= next->first, ref, size, next->first, next->second);
+                REALM_ASSERT_RELEASE_EX(ref + size <= next->first, ref, size, next->first, next->second, get_file_path_for_assertions());
                 // See if element can be combined with next element
                 if (ref + size == next->first) {
                     size += next->second;
@@ -590,7 +590,7 @@ void SlabAlloc::do_free(ref_type ref, char* addr) noexcept
                 auto prev = next;
                 prev--;
 
-                REALM_ASSERT_RELEASE_EX(prev->first + prev->second <= ref, ref, size, prev->first, prev->second);
+                REALM_ASSERT_RELEASE_EX(prev->first + prev->second <= ref, ref, size, prev->first, prev->second, get_file_path_for_assertions());
                 // See if element can be combined with previous element
                 // We can do that just by adding the size
                 if (prev->first + prev->second == ref) {
@@ -618,7 +618,7 @@ void SlabAlloc::do_free(ref_type ref, char* addr) noexcept
             size = (size + 7) & ~0x7;
 
         FreeBlock* e = reinterpret_cast<FreeBlock*>(addr);
-        REALM_ASSERT_RELEASE(size < 2UL * 1024 * 1024 * 1024);
+        REALM_ASSERT_RELEASE_EX(size < 2UL * 1024 * 1024 * 1024, size, get_file_path_for_assertions());
         mark_freed(e, static_cast<int>(size));
         free_block(ref, e);
     }
@@ -652,8 +652,8 @@ size_t SlabAlloc::consolidate_free_read_only()
 MemRef SlabAlloc::do_realloc(size_t ref, char* addr, size_t old_size, size_t new_size)
 {
     REALM_ASSERT_DEBUG(translate(ref) == addr);
-    REALM_ASSERT(0 < new_size);
-    REALM_ASSERT((new_size & 0x7) == 0); // only allow sizes that are multiples of 8
+    REALM_ASSERT_EX(0 < new_size, new_size, get_file_path_for_assertions());
+    REALM_ASSERT_EX((new_size & 0x7) == 0, new_size, get_file_path_for_assertions()); // only allow sizes that are multiples of 8
 
     // FIXME: Check if we can extend current space. In that case, remember to
     // check whether m_free_space_state == free_state_Invalid. Also remember to
@@ -683,7 +683,7 @@ MemRef SlabAlloc::do_realloc(size_t ref, char* addr, size_t old_size, size_t new
 char* SlabAlloc::do_translate(ref_type ref) const noexcept
 {
     REALM_ASSERT_DEBUG(is_attached());
-    REALM_ASSERT_RELEASE_EX(!(ref & 7), ref);
+    REALM_ASSERT_RELEASE_EX(!(ref & 7), ref, get_file_path_for_assertions());
 
     const char* addr = nullptr;
 
@@ -771,6 +771,10 @@ ref_type SlabAlloc::get_top_ref(const char* buffer, size_t len)
     }
 }
 
+std::string SlabAlloc::get_file_path_for_assertions() const
+{
+    return m_file_mappings ? m_file_mappings->m_file.get_path() : "(empty file mapping)";
+}
 
 namespace {
 
@@ -786,18 +790,18 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
     // ExceptionSafety: If this function throws, it must leave the allocator in
     // the detached state.
 
-    REALM_ASSERT(!is_attached());
+    REALM_ASSERT_EX(!is_attached(), get_file_path_for_assertions());
 
     // When 'read_only' is true, this function will throw InvalidDatabase if the
     // file exists already but is empty. This can happen if another process is
     // currently creating it. Note however, that it is only legal for multiple
     // processes to access a database file concurrently if it is done via a
     // SharedGroup, and in that case 'read_only' can never be true.
-    REALM_ASSERT(!(cfg.is_shared && cfg.read_only));
+    REALM_ASSERT_EX(!(cfg.is_shared && cfg.read_only), cfg.is_shared, cfg.read_only, get_file_path_for_assertions());
     // session_initiator can be set *only* if we're shared.
-    REALM_ASSERT(cfg.is_shared || !cfg.session_initiator);
+    REALM_ASSERT_EX(cfg.is_shared || !cfg.session_initiator, cfg.is_shared, cfg.session_initiator, get_file_path_for_assertions());
     // clear_file can be set *only* if we're the first session.
-    REALM_ASSERT(cfg.session_initiator || !cfg.clear_file);
+    REALM_ASSERT_EX(cfg.session_initiator || !cfg.clear_file, cfg.session_initiator, cfg.clear_file, get_file_path_for_assertions());
 
     // Create a deep copy of the file_path string, otherwise it can appear that
     // users are leaking paths because string assignment operator implementations might
@@ -977,15 +981,15 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
         // Don't compare file format version fields as they are allowed to differ.
         // Also don't compare reserved fields (todo, is it correct to ignore?)
         static_cast<void>(header);
-        REALM_ASSERT_3(header.m_flags, ==, 0);
-        REALM_ASSERT_3(header.m_mnemonic[0], ==, uint8_t('T'));
-        REALM_ASSERT_3(header.m_mnemonic[1], ==, uint8_t('-'));
-        REALM_ASSERT_3(header.m_mnemonic[2], ==, uint8_t('D'));
-        REALM_ASSERT_3(header.m_mnemonic[3], ==, uint8_t('B'));
-        REALM_ASSERT_3(header.m_top_ref[0], ==, 0xFFFFFFFFFFFFFFFFULL);
-        REALM_ASSERT_3(header.m_top_ref[1], ==, 0);
+        REALM_ASSERT_EX(header.m_flags == 0, header.m_flags, get_file_path_for_assertions());
+        REALM_ASSERT_EX(header.m_mnemonic[0] == uint8_t('T'), header.m_mnemonic[0], get_file_path_for_assertions());
+        REALM_ASSERT_EX(header.m_mnemonic[1] == uint8_t('-'), header.m_mnemonic[1], get_file_path_for_assertions());
+        REALM_ASSERT_EX(header.m_mnemonic[2] == uint8_t('D'), header.m_mnemonic[2], get_file_path_for_assertions());
+        REALM_ASSERT_EX(header.m_mnemonic[3] == uint8_t('B'), header.m_mnemonic[3], get_file_path_for_assertions());
+        REALM_ASSERT_EX(header.m_top_ref[0] == 0xFFFFFFFFFFFFFFFFULL, header.m_top_ref[0], get_file_path_for_assertions());
+        REALM_ASSERT_EX(header.m_top_ref[1] == 0, header.m_top_ref[1], get_file_path_for_assertions());
 
-        REALM_ASSERT_3(footer.m_magic_cookie, ==, footer_magic_cookie);
+        REALM_ASSERT_EX(footer.m_magic_cookie == footer_magic_cookie, footer.m_magic_cookie, get_file_path_for_assertions());
         {
             File::Map<Header> writable_map(m_file_mappings->m_file, File::access_ReadWrite, sizeof(Header)); // Throws
             Header& writable_header = *writable_map.get_addr();
@@ -1096,7 +1100,7 @@ ref_type SlabAlloc::attach_buffer(const char* data, size_t size)
     // ExceptionSafety: If this function throws, it must leave the allocator in
     // the detached state.
 
-    REALM_ASSERT(!is_attached());
+    REALM_ASSERT_EX(!is_attached(), get_file_path_for_assertions());
 
     // Verify the data structures
     std::string path;                  // No path
@@ -1120,7 +1124,7 @@ void SlabAlloc::attach_empty()
     // ExceptionSafety: If this function throws, it must leave the allocator in
     // the detached state.
 
-    REALM_ASSERT(!is_attached());
+    REALM_ASSERT_EX(!is_attached(), get_file_path_for_assertions());
 
     m_attach_mode = attach_OwnedBuffer;
     m_data = nullptr; // Empty buffer
@@ -1221,8 +1225,8 @@ void SlabAlloc::update_reader_view(size_t file_size)
     if (file_size <= m_baseline) {
         return;
     }
-    REALM_ASSERT(file_size % 8 == 0); // 8-byte alignment required
-    REALM_ASSERT(m_attach_mode == attach_SharedFile || m_attach_mode == attach_UnsharedFile);
+    REALM_ASSERT_EX(file_size % 8 == 0, file_size, get_file_path_for_assertions()); // 8-byte alignment required
+    REALM_ASSERT_EX(m_attach_mode == attach_SharedFile || m_attach_mode == attach_UnsharedFile, m_attach_mode, get_file_path_for_assertions());
     REALM_ASSERT_DEBUG(is_free_space_clean());
 
     // Extend mapping by adding sections
@@ -1378,7 +1382,7 @@ size_t SlabAlloc::find_section_in_range(size_t start_pos, size_t free_chunk_size
 void SlabAlloc::resize_file(size_t new_file_size)
 {
     std::lock_guard<Mutex> lock(m_file_mappings->m_mutex);
-    REALM_ASSERT(matches_section_boundary(new_file_size));
+    REALM_ASSERT_EX(matches_section_boundary(new_file_size), new_file_size, get_file_path_for_assertions());
     m_file_mappings->m_file.prealloc(new_file_size); // Throws
 
     bool disable_sync = get_disable_sync_to_disk() || m_cfg.disable_sync;

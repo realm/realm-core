@@ -278,6 +278,7 @@ size_t page_size()
 void File::open_internal(const std::string& path, AccessMode a, CreateMode c, int flags, bool* success)
 {
     REALM_ASSERT_RELEASE(!is_attached());
+    m_path = path; // for error reporting and debugging
 
 #ifdef _WIN32 // Windows version
 
@@ -1252,6 +1253,11 @@ bool File::get_unique_id(const std::string& path, File::UniqueID& uid)
         return false;
     throw std::system_error(err, std::system_category(), "fstat() failed");
 #endif
+}
+
+std::string File::get_path() const
+{
+    return m_path;
 }
 
 bool File::is_removed() const

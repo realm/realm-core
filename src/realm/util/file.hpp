@@ -554,6 +554,9 @@ public:
     UniqueID get_unique_id() const;
     // Return the file descriptor for the file
     FileDesc get_descriptor() const;
+    // Return the path of the open file, or an empty string if
+    // this file has never been opened.
+    std::string get_path() const;
     // Return false if the file doesn't exist. Otherwise uid will be set.
     static bool get_unique_id(const std::string& path, UniqueID& uid);
 
@@ -583,6 +586,7 @@ private:
     int m_fd;
 #endif
     std::unique_ptr<const char[]> m_encryption_key = nullptr;
+    std::string m_path;
 
     bool lock(bool exclusive, bool non_blocking);
     void open_internal(const std::string& path, AccessMode, CreateMode, int flags, bool* success);

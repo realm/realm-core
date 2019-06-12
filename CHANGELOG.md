@@ -15,6 +15,7 @@
 ### Internals
 * Introduced new feature test macros for address and thread sanitizers in
   `<realm/util/features.h>`.
+* Added Realm file path to Allocator assertions ([3283](https://github.com/realm/realm-core/issues/3283)).
 
 ----------------------------------------------
 
