@@ -16,7 +16,6 @@
  *
  **************************************************************************/
 
-#include <limits>
 #include <stdexcept>
 
 #ifdef REALM_DEBUG
@@ -40,7 +39,6 @@
 #include <realm/array_string.hpp>
 #include <realm/array_timestamp.hpp>
 #include <realm/table_tpl.hpp>
-#include <realm/object_id.hpp>
 
 /// \page AccessorConsistencyLevels
 ///
@@ -272,43 +270,6 @@ constexpr char g_class_name_prefix[] = "class_";
 constexpr size_t g_class_name_prefix_len = 6;
 constexpr ColKey g_pk_table{0x20000};
 constexpr ColKey g_pk_property{0x40020001};
-
-inline ObjKey global_to_local_object_id_squeezed(ObjectID object_id, uint64_t sync_file_id)
-{
-    REALM_ASSERT(object_id.hi() <= 0x3fffffff);
-    REALM_ASSERT(object_id.lo() <= std::numeric_limits<uint32_t>::max());
-
-    auto hi = object_id.hi();
-    if (hi == sync_file_id)
-        hi = 0;
-    uint64_t a = object_id.lo() & 0xff;
-    uint64_t b = (hi & 0xff) << 8;
-    uint64_t c = (object_id.lo() & 0xffffff00) << 8;
-    uint64_t d = (hi & 0x3fffff00) << 32;
-    union {
-        uint64_t u;
-        int64_t s;
-    } bitcast;
-    bitcast.u = a | b | c | d;
-    return ObjKey(bitcast.s);
-}
-
-inline ObjectID local_to_global_object_id_squeezed(ObjKey squeezed, uint64_t sync_file_id)
-{
-    union {
-        uint64_t u;
-        int64_t s;
-    } bitcast;
-    bitcast.s = squeezed.value;
-
-    uint64_t u = bitcast.u;
-
-    uint64_t lo = (u & 0xff) | ((u & 0xffffff0000) >> 8);
-    uint64_t hi = ((u & 0xff00) >> 8) | ((u & 0xffffff0000000000) >> 32);
-    if (hi == 0)
-        hi = sync_file_id;
-    return ObjectID{hi, lo};
-}
 
 } // namespace
 
@@ -1661,6 +1622,11 @@ void Table::set_sequence_number(uint64_t seq)
     m_top.set(top_position_for_sequence_number, RefOrTagged::make_tagged(seq));
 }
 
+void Table::set_collision_map(ref_type ref)
+{
+    m_top.set(top_position_for_collision_map, RefOrTagged::make_ref(ref));
+}
+
 TableRef Table::get_link_target(ColKey col_key) noexcept
 {
     return get_opposite_table(col_key);
@@ -2444,7 +2410,7 @@ Obj Table::create_object(ObjKey key, const FieldValues& values)
 {
     if (key == null_key) {
         ObjectID object_id = allocate_object_id_squeezed();
-        key = global_to_local_object_id_squeezed(object_id, get_sync_file_id());
+        key = object_id.get_local_key(get_sync_file_id());
         if (auto repl = get_repl())
             repl->create_object(this, object_id);
     }
@@ -2460,7 +2426,7 @@ Obj Table::create_object(ObjKey key, const FieldValues& values)
 
 Obj Table::create_object(ObjectID object_id, const FieldValues& values)
 {
-    ObjKey key = global_to_local_object_id_squeezed(object_id, get_sync_file_id());
+    ObjKey key = object_id.get_local_key(get_sync_file_id());
 
     if (auto repl = get_repl())
         repl->create_object(this, object_id);
@@ -2482,7 +2448,7 @@ Obj Table::create_object_with_primary_key(const Mixed& primary_key)
 
     auto repl = get_repl();
     ObjKey object_key;
-    ObjectID object_id = object_id_for_primary_key(primary_key);
+    ObjectID object_id{primary_key};
 
     if (type == type_Int) {
         if (primary_key.is_null())
@@ -2505,17 +2471,14 @@ Obj Table::create_object_with_primary_key(const Mixed& primary_key)
 
         if (repl) {
             // Generate local ObjKey
-            auto oid_p = dynamic_cast<ObjectIDProvider*>(repl);
-            auto tr = static_cast<Transaction*>(get_parent_group());
-            object_key = oid_p->global_to_local_object_id_hashed(*tr, get_key(), object_id);
+            object_key = global_to_local_object_id_hashed(object_id);
             // Check for collission
             if (is_valid(object_key)) {
                 Obj existing_obj = get_object(object_key);
                 StringData existing_pk_value = existing_obj.get<String>(primary_key_col);
-                ObjectID existing_id = object_id_for_primary_key(existing_pk_value);
+                ObjectID existing_id{existing_pk_value};
 
-                object_key =
-                    oid_p->allocate_local_id_after_hash_collision(*tr, get_key(), object_id, existing_id, object_key);
+                object_key = allocate_local_id_after_hash_collision(object_id, existing_id, object_key);
             }
         }
     }
@@ -2530,31 +2493,27 @@ Obj Table::create_object_with_primary_key(const Mixed& primary_key)
 ObjKey Table::get_obj_key(ObjectID id) const
 {
     ObjKey key;
-    auto oid_p = dynamic_cast<ObjectIDProvider*>(get_repl());
-    auto tr = static_cast<Transaction*>(get_parent_group());
-    if (oid_p && tr) {
-        auto col = get_primary_key_column();
-        if (col) {
-            if (col.get_type() == col_type_Int) {
-                REALM_ASSERT(id.hi() == 0 || col.get_attrs().test(col_attr_Nullable));
-                if (id.hi() != 0 && id.lo() == 0) {
-                    key = find_first_null(col);
-                }
-                else {
-                    key = find_first_int(col, int64_t(id.lo()));
-                }
+    auto col = get_primary_key_column();
+    if (col) {
+        if (col.get_type() == col_type_Int) {
+            REALM_ASSERT(id.hi() == 0 || col.get_attrs().test(col_attr_Nullable));
+            if (id.hi() != 0 && id.lo() == 0) {
+                key = find_first_null(col);
             }
-            if (col.get_type() == col_type_String) {
-                key = oid_p->global_to_local_object_id_hashed(*tr, get_key(), id);
+            else {
+                key = find_first_int(col, int64_t(id.lo()));
             }
         }
-        else {
-            uint32_t max = std::numeric_limits<uint32_t>::max();
-            if (id.hi() <= max && id.lo() <= max) {
-                key = global_to_local_object_id_squeezed(id, get_sync_file_id());
-                if (!is_valid(key)) {
-                    key = realm::null_key;
-                }
+        if (col.get_type() == col_type_String) {
+            key = global_to_local_object_id_hashed(id);
+        }
+    }
+    else {
+        uint32_t max = std::numeric_limits<uint32_t>::max();
+        if (id.hi() <= max && id.lo() <= max) {
+            key = id.get_local_key(get_sync_file_id());
+            if (!is_valid(key)) {
+                key = realm::null_key;
             }
         }
     }
@@ -2563,17 +2522,16 @@ ObjKey Table::get_obj_key(ObjectID id) const
 
 ObjectID Table::get_object_id(ObjKey key) const
 {
-    ObjectID id;
     auto col = get_primary_key_column();
     if (col) {
         ConstObj obj = get_object(key);
         auto val = obj.get_any(col);
-        id = object_id_for_primary_key(val);
+        return {val};
     }
     else {
-        id = local_to_global_object_id_squeezed(key, get_sync_file_id());
+        return {key, get_sync_file_id()};
     }
-    return id;
+    return {};
 }
 
 ObjectID Table::allocate_object_id_squeezed()
@@ -2583,6 +2541,169 @@ ObjectID Table::allocate_object_id_squeezed()
     auto peer_id = get_sync_file_id();
     auto sequence = allocate_sequence_number();
     return ObjectID{peer_id, sequence};
+}
+
+namespace {
+
+/// Calculate optimistic local ID that may collide with others. It is up to
+/// the caller to ensure that collisions are detected and that
+/// allocate_local_id_after_collision() is called to obtain a non-colliding
+/// ID.
+inline ObjKey get_optimistic_local_id_hashed(ObjectID global_id)
+{
+#if REALM_EXERCISE_OBJECT_ID_COLLISION
+    const uint64_t optimistic_mask = 0xff;
+#else
+    const uint64_t optimistic_mask = 0x3fffffffffffffff;
+#endif
+    static_assert(optimistic_mask < 0xc000000000000000,
+                  "optimistic Object ID mask must leave the 63rd and 64th bit zero");
+    return ObjKey{int64_t(global_id.lo() & optimistic_mask)};
+}
+
+inline ObjKey make_tagged_local_id_after_hash_collision(uint64_t sequence_number)
+{
+    REALM_ASSERT(sequence_number < 0xc000000000000000);
+    return ObjKey{int64_t(0x4000000000000000 | sequence_number)};
+}
+
+} // namespace
+
+ObjKey Table::global_to_local_object_id_hashed(ObjectID object_id) const
+{
+    ObjKey optimistic = get_optimistic_local_id_hashed(object_id);
+
+    if (ref_type collision_map_ref = to_ref(m_top.get(top_position_for_collision_map))) {
+        Allocator& alloc = m_top.get_alloc();
+        Array collision_map{alloc};
+        collision_map.init_from_ref(collision_map_ref); // Throws
+
+        Array hi{alloc};
+        hi.init_from_ref(to_ref(collision_map.get(s_collision_map_hi))); // Throws
+
+        // Entries are ordered by hi,lo
+        size_t begin = hi.find_first(object_id.hi());
+        if (begin != npos && uint64_t(hi.get(begin)) == object_id.hi()) {
+            Array lo{alloc};
+            lo.init_from_ref(to_ref(collision_map.get(s_collision_map_lo))); // Throws
+            size_t candidate = lo.find_first(object_id.lo(), begin);
+            if (candidate != npos && uint64_t(hi.get(candidate)) == object_id.hi()) {
+                Array local_id{alloc};
+                local_id.init_from_ref(to_ref(collision_map.get(s_collision_map_local_id))); // Throws
+                return ObjKey{local_id.get(candidate)};
+            }
+        }
+    }
+
+    return optimistic;
+}
+
+ObjKey Table::allocate_local_id_after_hash_collision(ObjectID incoming_id, ObjectID colliding_id,
+                                                     ObjKey colliding_local_id)
+{
+    // FIXME: Cache these accessors
+    Allocator& alloc = m_top.get_alloc();
+    Array collision_map{alloc};
+    Array hi{alloc};
+    Array lo{alloc};
+    Array local_id{alloc};
+
+    collision_map.set_parent(&m_top, top_position_for_collision_map);
+    hi.set_parent(&collision_map, s_collision_map_hi);
+    lo.set_parent(&collision_map, s_collision_map_lo);
+    local_id.set_parent(&collision_map, s_collision_map_local_id);
+
+    ref_type collision_map_ref = to_ref(m_top.get(top_position_for_collision_map));
+    if (collision_map_ref) {
+        collision_map.init_from_parent(); // Throws
+    }
+    else {
+        MemRef mem = Array::create_empty_array(Array::type_HasRefs, false, alloc); // Throws
+        collision_map.init_from_mem(mem);                                          // Throws
+        collision_map.update_parent();
+
+        ref_type lo_ref = Array::create_array(Array::type_Normal, false, 0, 0, alloc).get_ref();       // Throws
+        ref_type hi_ref = Array::create_array(Array::type_Normal, false, 0, 0, alloc).get_ref();       // Throws
+        ref_type local_id_ref = Array::create_array(Array::type_Normal, false, 0, 0, alloc).get_ref(); // Throws
+        collision_map.add(lo_ref);                                                                     // Throws
+        collision_map.add(hi_ref);                                                                     // Throws
+        collision_map.add(local_id_ref);                                                               // Throws
+    }
+
+    hi.init_from_parent();       // Throws
+    lo.init_from_parent();       // Throws
+    local_id.init_from_parent(); // Throws
+
+    size_t num_entries = hi.size();
+    REALM_ASSERT(lo.size() == num_entries);
+    REALM_ASSERT(local_id.size() == num_entries);
+
+    auto lower_bound_object_id = [&](ObjectID object_id) -> size_t {
+        size_t i = hi.lower_bound_int(int64_t(object_id.hi()));
+        while (i < num_entries && uint64_t(hi.get(i)) == object_id.hi() && uint64_t(lo.get(i)) < object_id.lo())
+            ++i;
+        return i;
+    };
+
+    auto insert_collision = [&](ObjectID object_id, ObjKey new_local_id) {
+        size_t i = lower_bound_object_id(object_id);
+        if (i != num_entries) {
+            ObjectID existing{uint64_t(hi.get(i)), uint64_t(lo.get(i))};
+            if (existing == object_id) {
+                REALM_ASSERT(new_local_id.value == local_id.get(i));
+                return;
+            }
+        }
+        hi.insert(i, int64_t(object_id.hi()));
+        lo.insert(i, int64_t(object_id.lo()));
+        local_id.insert(i, new_local_id.value);
+        ++num_entries;
+    };
+
+    uint64_t sequence_number_for_local_id = allocate_sequence_number();
+    ObjKey new_local_id = make_tagged_local_id_after_hash_collision(sequence_number_for_local_id);
+    insert_collision(incoming_id, new_local_id);
+    insert_collision(colliding_id, colliding_local_id);
+
+    return new_local_id;
+}
+
+void Table::free_local_id_after_hash_collision(ObjectID object_id)
+{
+    if (ref_type collision_map_ref = to_ref(m_top.get(top_position_for_collision_map))) {
+        // FIXME: Cache these accessors
+        Allocator& alloc = m_top.get_alloc();
+        Array collision_map{alloc};
+        Array hi{alloc};
+        Array lo{alloc};
+        Array local_id{alloc};
+
+        collision_map.set_parent(&m_top, top_position_for_collision_map);
+        hi.set_parent(&collision_map, s_collision_map_hi);
+        lo.set_parent(&collision_map, s_collision_map_lo);
+        local_id.set_parent(&collision_map, s_collision_map_local_id);
+        collision_map.init_from_ref(collision_map_ref);
+        hi.init_from_parent();
+        lo.init_from_parent();
+        local_id.init_from_parent();
+
+        size_t num_entries = hi.size();
+        REALM_ASSERT(lo.size() == num_entries);
+        REALM_ASSERT(local_id.size() == num_entries);
+
+        size_t i = hi.lower_bound_int(int64_t(object_id.hi()));
+        while (i < num_entries && uint64_t(hi.get(i)) == object_id.hi() && uint64_t(lo.get(i)) < object_id.lo())
+            ++i;
+
+        if (i != num_entries) {
+            ObjectID existing{uint64_t(hi.get(i)), uint64_t(lo.get(i))};
+            if (existing == object_id) {
+                hi.erase(i);
+                lo.erase(i);
+                local_id.erase(i);
+            }
+        }
+    }
 }
 
 void Table::create_objects(size_t number, std::vector<ObjKey>& keys)

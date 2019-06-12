@@ -80,15 +80,18 @@ ObjectID ObjectID::from_string(StringData string)
     return ObjectID(strtoull(hi_begin, nullptr, 16), strtoull(lo_begin, nullptr, 16));
 }
 
-ObjectID object_id_for_primary_key(Mixed pk)
+ObjectID::ObjectID(Mixed pk)
 {
-    if (pk.is_null())
+    if (pk.is_null()) {
         // Choose {1, 0} as the object ID for NULL. This could just as well have been {0, 0},
         // but then the null-representation for string and integer primary keys would have to
         // be different, as {0, 0} is a valid object ID for a row with an integer primary key.
         // Therefore, in the interest of simplicity, {1, 0} is chosen to represent NULL for
         // both integer and string primary keys.
-        return ObjectID{1, 0};
+        m_hi = 1;
+        m_lo = 0;
+        return;
+    }
 
     if (pk.get_type() == type_String) {
         // FIXME: Type-punning will only work on little-endian architectures
@@ -114,12 +117,19 @@ ObjectID object_id_for_primary_key(Mixed pk)
         //             | (uint64_t(buffer[12]) << 32) | (uint64_t(buffer[13]) << 40)
         //             | (uint64_t(buffer[14]) << 48) | (uint64_t(buffer[15]) << 56);
 
-        return ObjectID{data.oid.hi, data.oid.lo};
+        m_hi = data.oid.hi;
+        m_lo = data.oid.lo;
+        return;
     }
+
     if (pk.get_type() == type_Int) {
-        return ObjectID{0, uint64_t(pk.get_int())};
+        m_hi = 0;
+        m_lo = uint64_t(pk.get_int());
+        return;
     }
-    return {};
+
+    m_hi = -1;
+    m_lo = -1;
 }
 
 } // namespace realm

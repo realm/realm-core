@@ -62,30 +62,20 @@ TEST(ObjectID_Compare)
     CHECK_LESS(ObjectID(0, 0), ObjectID(1, 0));
 }
 
-TEST(ObjectID_OptimisticLocalID)
-{
-    auto lid = ObjectIDProvider::get_optimistic_local_id_hashed(ObjectID(0, 0xffffffffffffffff));
-#if !REALM_EXERCISE_OBJECT_ID_COLLISION
-    CHECK_EQUAL(lid, ObjKey(0x3fffffffffffffff));
-#else
-    CHECK_EQUAL(lid, ObjKey(0xff));
-#endif
-}
-
 TEST(ObjectID_PrimaryKey)
 {
     {
-        ObjectID object_id = object_id_for_primary_key({});
+        ObjectID object_id(Mixed{});
         auto oid = object_id.to_string();
         CHECK_EQUAL(oid, "{0001-0000}");
     }
     {
-        ObjectID object_id = object_id_for_primary_key(123);
+        ObjectID object_id{123};
         auto oid = object_id.to_string();
         CHECK_EQUAL(oid, "{0000-007b}");
     }
     {
-        ObjectID object_id = object_id_for_primary_key("Exactly!");
+        ObjectID object_id{"Exactly!"};
         auto oid = object_id.to_string();
         CHECK_EQUAL(oid, "{495f44d153789d90-d2f64663ba17c5bc}");
     }

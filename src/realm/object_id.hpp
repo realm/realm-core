@@ -21,24 +21,41 @@
 
 #include <realm/keys.hpp>
 #include <realm/util/optional.hpp>
-#include <cstdint>
 #include <limits>
-
-// Only set this to one when testing the code paths that exercise object ID
-// hash collisions. It artificially limits the "optimistic" local ID to use
-// only the lower 15 bits of the ID rather than the lower 63 bits, making it
-// feasible to generate collisions within reasonable time.
-#define REALM_EXERCISE_OBJECT_ID_COLLISION 1
+#include <cstdint>
 
 namespace realm {
 
 class StringData;
-class Transaction;
 class Mixed;
 
 /// ObjectIDs are globally unique, and up to 128 bits wide. They are represented
 /// as two 64-bit integers, each of which may frequently be small, for best
 /// on-wire compressibility.
+///
+/// We define a way to map from 128-bit on-write ObjectIDs to local 64-bit object IDs.
+///
+/// The three object ID types are:
+/// a. Object IDs for objects in tables without primary keys.
+/// b. Object IDs for objects in tables with integer primary keys.
+/// c. Object IDs for objects in tables with other primary key types.
+///
+/// For objects without primary keys (a), a "squeezed" tuple of the
+/// client_file_ident and a peer-local sequence number is used as the local
+/// ObjKey. The on-write Object ID is the "unsqueezed" format.
+///
+/// For integer primary keys (b), the ObjectID just the integer value as the low
+/// part.
+///
+/// For objects with other types of primary keys (c), the ObjectID is a 128-bit
+/// hash of the primary key value. However, the local object ID must be a 63-bit
+/// integer, because that is the maximum size integer that can be used in an ObjKey.
+/// The solution is to optimistically use the lower 62 bits of the on-wire ObjectID.
+/// If this results in a ObjKey which is already in use, a new local ObjKey is
+/// generated with the 63th bit set and using a locally generated sequence number for
+/// the lower bits. The mapping between ObjectID and ObjKey is stored in the Table
+/// structure.
+
 struct ObjectID {
     constexpr ObjectID(uint64_t h, uint64_t l)
         : m_lo(l)
@@ -47,12 +64,26 @@ struct ObjectID {
     }
     static ObjectID from_string(StringData);
 
-    // FIXME: Remove "empty" ObjectIDs, wrap in Optional instead.
     constexpr ObjectID(realm::util::None = realm::util::none)
         : m_lo(-1)
         , m_hi(-1)
     {
     }
+
+    // Construct an ObjectId from either a string or an integer
+    ObjectID(Mixed pk);
+
+    // Construct an object id from the local squeezed ObjKey
+    ObjectID(ObjKey squeezed, uint64_t sync_file_id)
+    {
+        uint64_t u = uint64_t(squeezed.value);
+
+        m_lo = (u & 0xff) | ((u & 0xffffff0000) >> 8);
+        m_hi = ((u & 0xff00) >> 8) | ((u & 0xffffff0000000000) >> 32);
+        if (m_hi == 0)
+            m_hi = sync_file_id;
+    }
+
     constexpr ObjectID(const ObjectID&) noexcept = default;
     ObjectID& operator=(const ObjectID&) noexcept = default;
 
@@ -80,78 +111,32 @@ struct ObjectID {
         return !(*this == other);
     }
 
+    // Generate a local key from the ObjectID. If the object is created
+    // in this realm (sync_file_id == hi) then 0 is used for hi. In this
+    // way we achieves that objects created before first contact with the
+    // server does not need to change key.
+    ObjKey get_local_key(uint64_t sync_file_id)
+    {
+        REALM_ASSERT(m_hi <= 0x3fffffff);
+        REALM_ASSERT(lo() <= std::numeric_limits<uint32_t>::max());
+
+        auto hi = m_hi;
+        if (hi == sync_file_id)
+            hi = 0;
+        uint64_t a = m_lo & 0xff;
+        uint64_t b = (hi & 0xff) << 8;
+        uint64_t c = (m_lo & 0xffffff00) << 8;
+        uint64_t d = (hi & 0x3fffff00) << 32;
+
+        return ObjKey(int64_t(a | b | c | d));
+    }
+
 private:
     uint64_t m_lo;
     uint64_t m_hi;
 };
 
 std::ostream& operator<<(std::ostream&, const ObjectID&);
-
-
-/// Implementors of this interface should define a way to map from 128-bit
-/// on-write ObjectIDs to local 64-bit object IDs.
-///
-/// The three object ID types are:
-/// a. Object IDs for objects in tables without primary keys.
-/// b. Object IDs for objects in tables with integer primary keys.
-/// c. Object IDs for objects in tables with other primary key types.
-///
-/// For integer primary keys (b), the Object ID is just the integer value.
-///
-/// For objects without primary keys (a), a "squeezed" tuple of the
-/// client_file_ident and a peer-local sequence number is used as the local
-/// Object ID. The on-write Object ID is the "unsqueezed" format. The methods on
-/// this interface ending in "_squeezed" aid in the creation and conversion of
-/// these IDs.
-///
-/// For objects with other types of primary keys (c), the ObjectID
-/// is a 128-bit hash of the primary key value. However, the local object ID
-/// must be a 64-bit integer, because that is the maximum size integer that
-/// Realm is able to store. The solution is to optimistically use the lower 63
-/// bits of the on-wire Object ID, and use a local ID with the upper 64th bit
-/// set when there is a collision in the lower 63 bits between two different
-/// hash values.
-class ObjectIDProvider {
-public:
-    virtual ~ObjectIDProvider() {}
-
-    /// Find the local 64-bit object ID for the provided global 128-bit ID.
-    virtual ObjKey global_to_local_object_id_hashed(const Transaction&, TableKey table_ndx,
-                                                    ObjectID global_id) const = 0;
-
-    /// After a local ID collision has been detected, this function may be
-    /// called to obtain a non-colliding local ID in such a way that subsequence
-    /// calls to global_to_local_object_id() will return the correct local ID
-    /// for both \a incoming_id and \a colliding_id.
-    virtual ObjKey allocate_local_id_after_hash_collision(Transaction&, TableKey table_ndx, ObjectID incoming_id,
-                                                          ObjectID colliding_id, ObjKey colliding_local_id) = 0;
-    virtual void free_local_id_after_hash_collision(Transaction&, TableKey table_ndx, ObjectID object_id) = 0;
-
-    virtual void table_erased(Transaction&, TableKey) = 0;
-
-    /// Calculate optimistic local ID that may collide with others. It is up to
-    /// the caller to ensure that collisions are detected and that
-    /// allocate_local_id_after_collision() is called to obtain a non-colliding
-    /// ID.
-    static ObjKey get_optimistic_local_id_hashed(ObjectID global_id)
-    {
-#if REALM_EXERCISE_OBJECT_ID_COLLISION
-        const uint64_t optimistic_mask = 0xff;
-#else
-        const uint64_t optimistic_mask = 0x3fffffffffffffff;
-#endif
-        static_assert(optimistic_mask < 0xc000000000000000,
-                      "optimistic Object ID mask must leave the 63rd and 64th bit zero");
-        return ObjKey{int64_t(global_id.lo() & optimistic_mask)};
-    }
-    static ObjKey make_tagged_local_id_after_hash_collision(uint64_t sequence_number)
-    {
-        REALM_ASSERT(sequence_number < 0xc000000000000000);
-        return ObjKey{int64_t(0x4000000000000000 | sequence_number)};
-    }
-};
-
-ObjectID object_id_for_primary_key(Mixed pk);
 
 } // namespace realm
 

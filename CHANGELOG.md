@@ -1,5 +1,14 @@
 # NEXT RELEASE
 
+### Enhancements
+* All ObjectID handling functionality has been moved from Sync to Core.
+* The primary key column concept is now handled in Core in a way consistent with Sync
+  and ObjectStore. This means that the corresponding code can be removed in those
+  subsystems.
+* Creating tables and objects can now be done entirely using the Core interface. All
+  sync::create_table...() and sync::create_object...() functions now map directly to a
+  core function.
+
 ### Breaking changes
 * None.
 

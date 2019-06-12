@@ -34,6 +34,13 @@
 #include <realm/query.hpp>
 #include <realm/cluster_tree.hpp>
 #include <realm/keys.hpp>
+#include <realm/object_id.hpp>
+
+// Only set this to one when testing the code paths that exercise object ID
+// hash collisions. It artificially limits the "optimistic" local ID to use
+// only the lower 15 bits of the ID rather than the lower 63 bits, making it
+// feasible to generate collisions within reasonable time.
+#define REALM_EXERCISE_OBJECT_ID_COLLISION 1
 
 namespace realm {
 
@@ -297,6 +304,9 @@ public:
     {
         return m_clusters.get_ndx(key);
     }
+    // FIXME: This should be private
+    void free_local_id_after_hash_collision(ObjectID object_id);
+
     void dump_objects()
     {
         return m_clusters.dump_objects();
@@ -355,6 +365,7 @@ public:
     uint64_t allocate_sequence_number();
     // Used by upgrade
     void set_sequence_number(uint64_t seq);
+    void set_collision_map(ref_type ref);
 
     // Get the key of this table directly, without needing a Table accessor.
     static TableKey get_key_direct(Allocator& alloc, ref_type top_ref);
@@ -760,6 +771,16 @@ private:
     /// ObjectID.
     ObjectID allocate_object_id_squeezed();
 
+    /// Find the local 64-bit object ID for the provided global 128-bit ID.
+    ObjKey global_to_local_object_id_hashed(ObjectID global_id) const;
+
+    /// After a local ID collision has been detected, this function may be
+    /// called to obtain a non-colliding local ID in such a way that subsequent
+    /// calls to global_to_local_object_id() will return the correct local ID
+    /// for both \a incoming_id and \a colliding_id.
+    ObjKey allocate_local_id_after_hash_collision(ObjectID incoming_id, ObjectID colliding_id,
+                                                  ObjKey colliding_local_id);
+
     /// Called in the context of Group::commit() to ensure that
     /// attached table accessors stay valid across a commit. Please
     /// note that this works only for non-transactional commits. Table
@@ -918,7 +939,10 @@ private:
     static constexpr int top_position_for_opposite_table = 7;
     static constexpr int top_position_for_opposite_column = 8;
     static constexpr int top_position_for_sequence_number = 9;
-    static constexpr int top_array_size = 10;
+    static constexpr int top_position_for_collision_map = 10;
+    static constexpr int top_array_size = 11;
+
+    enum { s_collision_map_lo = 0, s_collision_map_hi = 1, s_collision_map_local_id = 2, s_collision_map_num_slots };
 
     friend class SubtableNode;
     friend class _impl::TableFriend;
