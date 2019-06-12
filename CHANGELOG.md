@@ -8,9 +8,35 @@
 ### Internals
 * None.
 
-Besides the changes above, this release includes changes introduced by v5.18.0 and up
-until v5.19.0:
+Besides the changes above, this release includes changes introduced by v5.18.0 to v5.20.0:
 
+| # 5.20.0 Release notes
+|
+| ### Enhancements
+| * Added the ability to convert a std::chrono::time_point to a Timestamp and
+|   vice versa. This allows us to make calculations using std::chrono::duration.
+|
+| ### Fixed
+| * Slab usage was reported wrong by SlabAlloc::get_total_slab_size() ([#3284](https://github.com/realm/realm-core/pull/3284)
+|   This caused ROS to incorectly report "exabytes" of memory used for slab.
+| * The control of the page reclaimer did not limit the page reclaimers workload correctly. This could lead
+|   to the reclaimer not running as much as intended. This is not believed to have been visible to end users.
+|   This bug also caused ROS to occasionally report odd metrics for the reclaimer.
+|   ([#3285](https://github.com/realm/realm-core/pull/3285))
+| * When opening an encrypted file via SharedGroup::open(), it could wrongly fail and indicate a file corruption
+|   although the file was ok.
+|   ([#3267](https://github.com/realm/realm-core/issues/3267), since core v5.12.2)
+|
+| ----------------------------------------------
+|
+| # 5.19.1 Release notes
+|
+| ### Fixed
+| * Freelist would keep growing with a decreased commit performance as a result.
+|   ([2927](https://github.com/realm/realm-sync/issues/2927))
+| * Fixed an incorrect debug mode assertion which could be triggered when generating the description of an IncludeDescriptor.
+|  ([PR #3276](https://github.com/realm/realm-core/pull/3276) since v5.18.0). 
+| ----------------------------------------------
 | # 5.19.0 Release notes
 |
 | ### Enhancements
