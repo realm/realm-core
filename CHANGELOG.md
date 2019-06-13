@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 6.0.0-alpha.8 Release notes
 
 ### Enhancements
 * All ObjectID handling functionality has been moved from Sync to Core.
@@ -8,14 +8,6 @@
 * Creating tables and objects can now be done entirely using the Core interface. All
   sync::create_table...() and sync::create_object...() functions now map directly to a
   core function.
-
-### Breaking changes
-* None.
-
------------
-
-### Internals
-* None.
 
 Besides the changes above, this release includes changes introduced by v5.18.0 to v5.20.0:
 
