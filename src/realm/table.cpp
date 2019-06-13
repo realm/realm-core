@@ -2461,21 +2461,19 @@ Obj Table::create_object_with_primary_key(const Mixed& primary_key)
     }
 
     if (type == type_String) {
-        if (primary_key.is_null())
-            object_key = find_first_string(primary_key_col, StringData());
-        else
-            object_key = find_first_string(primary_key_col, primary_key.get_string());
-        if (object_key)
-            return get_object(object_key); // Already exists
-
         // Generate local ObjKey
         object_key = global_to_local_object_id_hashed(object_id);
         // Check for collision
         if (is_valid(object_key)) {
             Obj existing_obj = get_object(object_key);
             StringData existing_pk_value = existing_obj.get<String>(primary_key_col);
-            ObjectID existing_id{existing_pk_value};
 
+            // It may just be the same object
+            if (existing_pk_value == primary_key.get_string()) {
+                return existing_obj;
+            }
+
+            ObjectID existing_id{existing_pk_value};
             object_key = allocate_local_id_after_hash_collision(object_id, existing_id, object_key);
         }
     }

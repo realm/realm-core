@@ -40,7 +40,7 @@
 // hash collisions. It artificially limits the "optimistic" local ID to use
 // only the lower 15 bits of the ID rather than the lower 63 bits, making it
 // feasible to generate collisions within reasonable time.
-#define REALM_EXERCISE_OBJECT_ID_COLLISION 1
+#define REALM_EXERCISE_OBJECT_ID_COLLISION 0
 
 namespace realm {
 

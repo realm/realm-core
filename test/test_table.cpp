@@ -3812,6 +3812,34 @@ TEST(Table_CollisionMapping)
     }
 }
 
+TEST(Table_PrimaryKeyString)
+{
+#ifdef REALM_DEBUG
+    int nb_rows = 1000;
+#else
+    int nb_rows = 100000;
+#endif
+    SHARED_GROUP_TEST_PATH(path);
+
+    DBRef sg = DB::create(path);
+    auto wt = sg->start_write();
+    TableRef t0 = wt->add_table_with_primary_key("class_t0", type_String, "pk");
+
+    auto t1 = steady_clock::now();
+    CALLGRIND_START_INSTRUMENTATION;
+
+    for (int i = 0; i < nb_rows; ++i) {
+        std::string pk = "KEY_" + util::to_string(i);
+        t0->create_object_with_primary_key(pk);
+    }
+
+    CALLGRIND_STOP_INSTRUMENTATION;
+    auto t2 = steady_clock::now();
+    std::cout << "   insertion time: " << duration_cast<nanoseconds>(t2 - t1).count() / nb_rows << " ns/key"
+              << std::endl;
+    wt->commit();
+}
+
 TEST(Table_3)
 {
     Table table;
