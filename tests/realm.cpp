@@ -538,6 +538,30 @@ TEST_CASE("SharedRealm: get_shared_realm() with callback") {
         util::EventLoop::main().run_until([&]{ return called.load(); });
         REQUIRE(called);
     }
+
+    SECTION("can download partial Realms") {
+        config.sync_config->is_partial = true;
+        config2.sync_config->is_partial = true;
+        {
+            auto realm = Realm::get_shared_realm(config2);
+            realm->begin_transaction();
+            sync::create_object(realm->read_group(), *realm->read_group().get_table("class_object"));
+            realm->commit_transaction();
+            wait_for_upload(*realm);
+        }
+
+        std::atomic<bool> called{false};
+        Realm::get_shared_realm(config, [&](auto realm, auto error) {
+            REQUIRE(realm);
+            REQUIRE(!error);
+            called = true;
+        });
+        util::EventLoop::main().run_until([&]{ return called.load(); });
+        REQUIRE(called);
+
+        // No subscriptions, so no objects
+        REQUIRE(Realm::get_shared_realm(config)->read_group().get_table("class_object")->size() == 0);
+    }
 #endif
 }
 

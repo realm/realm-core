@@ -269,7 +269,7 @@ void RealmCoordinator::get_realm(Realm::Config config,
     if (config.sync_config) {
         std::unique_lock<std::mutex> lock(m_realm_mutex);
         set_config(config);
-        create_sync_session(!File::exists(m_config.path));
+        create_sync_session(!config.sync_config->is_partial && !File::exists(m_config.path));
         m_sync_session->wait_for_download_completion([callback, self = shared_from_this()](std::error_code ec) {
             if (ec)
                 callback(nullptr, std::make_exception_ptr(std::system_error(ec)));
