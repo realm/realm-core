@@ -25,7 +25,7 @@
 #elif defined(_WIN32)
 #include <windows.h>
 #include <stdio.h>
-#include <wincrypt.h>
+#include <bcrypt.h>
 #pragma comment(lib, "bcrypt.lib")
 #else
 #include <openssl/sha.h>
@@ -40,32 +40,66 @@ namespace {
 // message digests with a maximum output size.
 #if REALM_PLATFORM_APPLE
 #elif defined(_WIN32)
-void message_digest(ALG_ID digest_type, const BYTE* in_buffer, DWORD in_buffer_size, BYTE* out_buffer,
-                    DWORD* output_size)
-{
-    HCRYPTPROV hProv = 0;
-    HCRYPTHASH hHash = 0;
-
-    if (!CryptAcquireContext(&hProv, NULL, NULL, PROV_RSA_FULL, CRYPT_VERIFYCONTEXT)) {
-        throw realm::util::runtime_error("CryptAcquireContext() failed");
+struct Algorithm {
+    Algorithm(LPCWSTR alg_id)
+    {
+        if (BCryptOpenAlgorithmProvider(&hAlg, alg_id, NULL, 0) < 0) {
+            throw realm::util::runtime_error("BCryptOpenAlgorithmProvider() failed");
+        }
+    }
+    ~Algorithm()
+    {
+        if (hAlg) {
+            BCryptCloseAlgorithmProvider(hAlg, 0);
+        }
+    }
+    DWORD obj_length()
+    {
+        DWORD len;
+        ULONG dummy;
+        BCryptGetProperty(hAlg, BCRYPT_OBJECT_LENGTH, (PBYTE)&len, sizeof(DWORD), &dummy, 0);
+        return len;
+    }
+    DWORD hash_length()
+    {
+        DWORD len;
+        ULONG dummy;
+        BCryptGetProperty(hAlg, BCRYPT_HASH_LENGTH, (PBYTE)&len, sizeof(DWORD), &dummy, 0);
+        return len;
     }
 
-    if (!CryptCreateHash(hProv, digest_type, 0, 0, &hHash)) {
-        CryptReleaseContext(hProv, 0);
-        throw realm::util::runtime_error("CryptCreateHash() failed");
+    BCRYPT_ALG_HANDLE hAlg = NULL;
+};
+struct Hash {
+    Hash(Algorithm& a, DWORD output_size)
+        : alg(a)
+        , hash_size(output_size)
+    {
+        REALM_ASSERT(alg.obj_length() < 512);
+        REALM_ASSERT(alg.hash_length() == hash_size);
+        if (BCryptCreateHash(alg.hAlg, &hHash, hash_object_buffer, 515, NULL, 0, 0) < 0) {
+            throw realm::util::runtime_error("BCryptCreateHash() failed");
+        }
     }
-
-    if (!CryptHashData(hHash, in_buffer, in_buffer_size, 0)) {
-        CryptReleaseContext(hProv, 0);
-        CryptDestroyHash(hHash);
-        throw realm::util::runtime_error("CryptCreateHash() failed");
+    ~Hash()
+    {
+        if (hHash) {
+            BCryptDestroyHash(hHash);
+        }
     }
+    void get_hash(PUCHAR in_buffer, DWORD in_buffer_size, PUCHAR out_buffer)
+    {
+        if (BCryptHashData(hHash, in_buffer, in_buffer_size, 0) < 0) {
+            throw realm::util::runtime_error("BCryptHashData() failed");
+        }
 
-    CryptGetHashParam(hHash, HP_HASHVAL, out_buffer, output_size, 0);
-
-    CryptDestroyHash(hHash);
-    CryptReleaseContext(hProv, 0);
-}
+        BCryptFinishHash(hHash, out_buffer, hash_size, 0);
+    }
+    Algorithm& alg;
+    BCRYPT_HASH_HANDLE hHash = NULL;
+    UCHAR hash_object_buffer[512];
+    DWORD hash_size;
+};
 #else
 void message_digest(const EVP_MD* digest_type, const char* in_buffer, size_t in_buffer_size,
                     unsigned char* out_buffer, unsigned int* output_size)
@@ -102,10 +136,9 @@ void sha1(const char* in_buffer, size_t in_buffer_size, unsigned char* out_buffe
 #if REALM_PLATFORM_APPLE
     CC_SHA1(in_buffer, CC_LONG(in_buffer_size), out_buffer);
 #elif defined(_WIN32)
-    DWORD output_size = 20;
-    message_digest(CALG_SHA1, reinterpret_cast<const BYTE*>(in_buffer), DWORD(in_buffer_size),
-                   reinterpret_cast<BYTE*>(out_buffer), &output_size);
-    REALM_ASSERT(output_size == 20);
+    Algorithm alg(BCRYPT_SHA1_ALGORITHM);
+    Hash hash(alg, 20);
+    hash.get_hash(reinterpret_cast<PUCHAR>(const_cast<char*>(in_buffer)), DWORD(in_buffer_size), out_buffer);
 #else
     const EVP_MD* digest_type = EVP_sha1();
     unsigned int output_size;
@@ -119,10 +152,9 @@ void sha256(const char* in_buffer, size_t in_buffer_size, unsigned char* out_buf
 #if REALM_PLATFORM_APPLE
     CC_SHA256(in_buffer, CC_LONG(in_buffer_size), out_buffer);
 #elif defined(_WIN32)
-    DWORD output_size = 32;
-    message_digest(CALG_SHA_256, reinterpret_cast<const BYTE*>(in_buffer), DWORD(in_buffer_size),
-                   reinterpret_cast<BYTE*>(out_buffer), &output_size);
-    REALM_ASSERT(output_size == 32);
+    Algorithm alg(BCRYPT_SHA256_ALGORITHM);
+    Hash hash(alg, 32);
+    hash.get_hash(reinterpret_cast<PUCHAR>(const_cast<char*>(in_buffer)), DWORD(in_buffer_size), out_buffer);
 #else
     const EVP_MD* digest_type = EVP_sha256();
     unsigned int output_size;
