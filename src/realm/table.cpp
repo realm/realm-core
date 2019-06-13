@@ -2446,7 +2446,6 @@ Obj Table::create_object_with_primary_key(const Mixed& primary_key)
     REALM_ASSERT((primary_key.is_null() && primary_key_col.get_attrs().test(col_attr_Nullable)) ||
                  primary_key.get_type() == type);
 
-    auto repl = get_repl();
     ObjKey object_key;
     ObjectID object_id{primary_key};
 
@@ -2469,21 +2468,19 @@ Obj Table::create_object_with_primary_key(const Mixed& primary_key)
         if (object_key)
             return get_object(object_key); // Already exists
 
-        if (repl) {
-            // Generate local ObjKey
-            object_key = global_to_local_object_id_hashed(object_id);
-            // Check for collission
-            if (is_valid(object_key)) {
-                Obj existing_obj = get_object(object_key);
-                StringData existing_pk_value = existing_obj.get<String>(primary_key_col);
-                ObjectID existing_id{existing_pk_value};
+        // Generate local ObjKey
+        object_key = global_to_local_object_id_hashed(object_id);
+        // Check for collision
+        if (is_valid(object_key)) {
+            Obj existing_obj = get_object(object_key);
+            StringData existing_pk_value = existing_obj.get<String>(primary_key_col);
+            ObjectID existing_id{existing_pk_value};
 
-                object_key = allocate_local_id_after_hash_collision(object_id, existing_id, object_key);
-            }
+            object_key = allocate_local_id_after_hash_collision(object_id, existing_id, object_key);
         }
     }
 
-    if (repl) {
+    if (auto repl = get_repl()) {
         repl->create_object_with_primary_key(this, object_id, primary_key);
     }
 
@@ -2668,40 +2665,31 @@ ObjKey Table::allocate_local_id_after_hash_collision(ObjectID incoming_id, Objec
     return new_local_id;
 }
 
-void Table::free_local_id_after_hash_collision(ObjectID object_id)
+void Table::free_local_id_after_hash_collision(ObjKey key)
 {
     if (ref_type collision_map_ref = to_ref(m_top.get(top_position_for_collision_map))) {
         // FIXME: Cache these accessors
         Allocator& alloc = m_top.get_alloc();
         Array collision_map{alloc};
-        Array hi{alloc};
-        Array lo{alloc};
         Array local_id{alloc};
 
         collision_map.set_parent(&m_top, top_position_for_collision_map);
-        hi.set_parent(&collision_map, s_collision_map_hi);
-        lo.set_parent(&collision_map, s_collision_map_lo);
         local_id.set_parent(&collision_map, s_collision_map_local_id);
         collision_map.init_from_ref(collision_map_ref);
-        hi.init_from_parent();
-        lo.init_from_parent();
         local_id.init_from_parent();
+        auto ndx = local_id.find_first(key.value);
+        if (ndx != realm::npos) {
+            Array hi{alloc};
+            Array lo{alloc};
 
-        size_t num_entries = hi.size();
-        REALM_ASSERT(lo.size() == num_entries);
-        REALM_ASSERT(local_id.size() == num_entries);
+            hi.set_parent(&collision_map, s_collision_map_hi);
+            lo.set_parent(&collision_map, s_collision_map_lo);
+            hi.init_from_parent();
+            lo.init_from_parent();
 
-        size_t i = hi.lower_bound_int(int64_t(object_id.hi()));
-        while (i < num_entries && uint64_t(hi.get(i)) == object_id.hi() && uint64_t(lo.get(i)) < object_id.lo())
-            ++i;
-
-        if (i != num_entries) {
-            ObjectID existing{uint64_t(hi.get(i)), uint64_t(lo.get(i))};
-            if (existing == object_id) {
-                hi.erase(i);
-                lo.erase(i);
-                local_id.erase(i);
-            }
+            hi.erase(ndx);
+            lo.erase(ndx);
+            local_id.erase(ndx);
         }
     }
 }

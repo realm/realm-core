@@ -304,8 +304,6 @@ public:
     {
         return m_clusters.get_ndx(key);
     }
-    // FIXME: This should be private
-    void free_local_id_after_hash_collision(ObjectID object_id);
 
     void dump_objects()
     {
@@ -774,12 +772,14 @@ private:
     /// Find the local 64-bit object ID for the provided global 128-bit ID.
     ObjKey global_to_local_object_id_hashed(ObjectID global_id) const;
 
-    /// After a local ID collision has been detected, this function may be
-    /// called to obtain a non-colliding local ID in such a way that subsequent
-    /// calls to global_to_local_object_id() will return the correct local ID
+    /// After a local ObjKey collision has been detected, this function may be
+    /// called to obtain a non-colliding local ObjKey in such a way that subsequent
+    /// calls to global_to_local_object_id() will return the correct local ObjKey
     /// for both \a incoming_id and \a colliding_id.
     ObjKey allocate_local_id_after_hash_collision(ObjectID incoming_id, ObjectID colliding_id,
                                                   ObjKey colliding_local_id);
+    /// Should be called when an object is deleted
+    void free_local_id_after_hash_collision(ObjKey key);
 
     /// Called in the context of Group::commit() to ensure that
     /// attached table accessors stay valid across a commit. Please

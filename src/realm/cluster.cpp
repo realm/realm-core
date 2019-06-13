@@ -1316,6 +1316,7 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
         state.send_notifications(notifications);
     }
 
+    const_cast<Table*>(table)->free_local_id_after_hash_collision(real_key);
     if (Replication* repl = table->get_repl()) {
         repl->remove_object(table, real_key);
     }

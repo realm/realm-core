@@ -33,6 +33,7 @@ using namespace std::chrono;
 #include <realm/history.hpp>
 #include <realm/util/buffer.hpp>
 #include <realm/util/to_string.hpp>
+#include <realm/util/base64.hpp>
 #include <realm/array_bool.hpp>
 #include <realm/array_string.hpp>
 #include <realm/array_timestamp.hpp>
@@ -3719,6 +3720,97 @@ TEST(Table_object_random)
     CALLGRIND_STOP_INSTRUMENTATION;
 }
 
+TEST(Table_CollisionMapping)
+{
+
+#if REALM_EXERCISE_OBJECT_ID_COLLISION
+    bool expect_collisions = true;
+#else
+    bool expect_collisions = false;
+#endif
+
+    // This number corresponds to the mask used to calculate "optimistic"
+    // object IDs. See `ObjectIDProvider::get_optimistic_local_id_hashed`.
+    const size_t num_objects_with_guaranteed_collision = 0xff;
+
+    SHARED_GROUP_TEST_PATH(path);
+
+    {
+        DBRef sg = DB::create(path);
+        {
+            auto wt = sg->start_write();
+            TableRef t0 = wt->add_table_with_primary_key("class_t0", type_String, "pk");
+
+            char buffer[12];
+            for (size_t i = 0; i < num_objects_with_guaranteed_collision; ++i) {
+                const char* in = reinterpret_cast<char*>(&i);
+                size_t len = base64_encode(in, sizeof(i), buffer, sizeof(buffer));
+
+                t0->create_object_with_primary_key(StringData{buffer, len});
+            }
+            wt->commit();
+        }
+
+        {
+            ReadTransaction rt{sg};
+            ConstTableRef t0 = rt.get_table("class_t0");
+            // Check that at least one object exists where the 63rd bit is set.
+            size_t num_object_keys_with_63rd_bit_set = 0;
+            uint64_t bit63 = 0x4000000000000000;
+            for (Obj obj : *t0) {
+                if (obj.get_key().value & bit63)
+                    ++num_object_keys_with_63rd_bit_set;
+            }
+            CHECK(!expect_collisions || num_object_keys_with_63rd_bit_set > 0);
+        }
+    }
+
+    // Check that locally allocated IDs are properly persisted
+    {
+        DBRef sg_2 = DB::create(path);
+        {
+            WriteTransaction wt{sg_2};
+            TableRef t0 = wt.get_table("class_t0");
+
+            // Make objects with primary keys that do not already exist but are guaranteed
+            // to cause further collisions.
+            char buffer[12];
+            for (size_t i = 0; i < num_objects_with_guaranteed_collision; ++i) {
+                size_t foo = num_objects_with_guaranteed_collision + i;
+                const char* in = reinterpret_cast<char*>(&foo);
+                size_t len = base64_encode(in, sizeof(foo), buffer, sizeof(buffer));
+
+                t0->create_object_with_primary_key(StringData{buffer, len});
+            }
+            wt.commit();
+        }
+        {
+            WriteTransaction wt{sg_2};
+            TableRef t0 = wt.get_table("class_t0");
+
+            // Find an object with collision key
+            std::string pk;
+            ObjKey key;
+            uint64_t bit63 = 0x4000000000000000;
+            for (Obj obj : *t0) {
+                if (obj.get_key().value & bit63) {
+                    key = obj.get_key();
+                    pk = obj.get<String>("pk");
+                    obj.remove();
+                    break;
+                }
+            }
+
+            if (key) {
+                // Insert object again - should get a different key
+                auto obj = t0->create_object_with_primary_key(pk);
+                CHECK_NOT_EQUAL(obj.get_key(), key);
+            }
+
+            wt.commit();
+        }
+    }
+}
 
 TEST(Table_3)
 {
