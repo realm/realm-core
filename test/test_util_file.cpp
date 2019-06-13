@@ -112,6 +112,47 @@ TEST(Utils_File_dir)
     CHECK(dir_exists);
 }
 
+TEST(Utils_File_dir_unicode)
+{
+  // Test make_dir and remove_dir with paths that include special characters
+  // This would previously fail on Windows
+  std::string dir_name = File::resolve("temporäreDatei", test_util::get_test_path_prefix());
+
+  // Create directory
+  bool dir_exists = File::is_dir(dir_name);
+  CHECK_NOT(dir_exists);
+
+  make_dir(dir_name);
+  try {
+      make_dir(dir_name);
+  }
+  catch (const File::Exists& e) {
+      CHECK_EQUAL(e.get_path(), dir_name);
+      dir_exists = File::is_dir(dir_name);
+  }
+  CHECK(dir_exists);
+
+  // Remove directory
+  remove_dir(dir_name);
+  try {
+      remove_dir(dir_name);
+  }
+  catch (const File::NotFound& e) {
+      CHECK_EQUAL(e.get_path(), dir_name);
+      dir_exists = false;
+  }
+  CHECK_NOT(dir_exists);
+
+  // try_remove_dir missing directory
+  dir_exists = try_remove_dir(dir_name);
+  CHECK_NOT(dir_exists);
+
+  // try_remove_dir existing directory
+  make_dir(dir_name);
+  dir_exists = try_remove_dir(dir_name);
+  CHECK(dir_exists);
+}
+
 TEST(Utils_File_resolve)
 {
     std::string res;
