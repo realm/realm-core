@@ -1,7 +1,8 @@
 # NEXT RELEASE
 
 ### Enhancements
-* None.
+* Added unicode path support for Windows. Contribution by @rajivshah3.
+  ([#3293](https://github.com/realm/realm-core/pull/3293))
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
