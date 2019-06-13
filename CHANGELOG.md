@@ -1,7 +1,7 @@
 # NEXT RELEASE
 
 ### Enhancements
-* Added unicode path support for Windows. Contribution by @rajivshah3.
+* Added support for unicode characters in realm path and filenames for Windows. Contribution by @rajivshah3.
   ([#3293](https://github.com/realm/realm-core/pull/3293))
 
 ### Fixed
