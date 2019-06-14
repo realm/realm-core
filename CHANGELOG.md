@@ -1,13 +1,12 @@
-# NEXT RELEASE
+# 5.21.0 Release notes
 
 ### Enhancements
 * Added support for unicode characters in realm path and filenames for Windows. Contribution by @rajivshah3.
   ([#3293](https://github.com/realm/realm-core/pull/3293))
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * None.
- 
+
 ### Breaking changes
 * None.
 
