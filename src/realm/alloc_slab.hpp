@@ -596,6 +596,9 @@ private:
     /// if the buffer contains a file in streaming form
     static ref_type get_top_ref(const char* data, size_t len);
 
+    // Gets the path of the attached file, or other relevant debugging info.
+    std::string get_file_path_for_assertions() const;
+
     class ChunkRefEq;
     class ChunkRefEndEq;
     class SlabRefEndEq;
