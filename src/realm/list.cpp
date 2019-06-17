@@ -524,7 +524,12 @@ void Lst<Binary>::insert_repl(Replication* repl, size_t ndx, BinaryData value)
 template <>
 void Lst<Timestamp>::insert_repl(Replication* repl, size_t ndx, Timestamp value)
 {
-    repl->list_insert_timestamp(*this, ndx, value);
+    if (value.is_null()) {
+        repl->list_insert_null(*this, ndx);
+    }
+    else {
+        repl->list_insert_timestamp(*this, ndx, value);
+    }
 }
 
 template <>
