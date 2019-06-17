@@ -3636,6 +3636,7 @@ TEST(Shared_ConstList)
     auto list1 = obj.get_list<int64_t>(list_col);
 
     CHECK_EQUAL(list1.get(0), 47);
+    CHECK_EQUAL(obj.get_listbase_ptr(list_col)->size(), 1);
 }
 
 #ifdef LEGACY_TESTS

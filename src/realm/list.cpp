@@ -33,6 +33,60 @@
 
 using namespace realm;
 
+ConstLstBasePtr ConstObj::get_listbase_ptr(ColKey col_key) const
+{
+    auto attr = get_table()->get_column_attr(col_key);
+    REALM_ASSERT(attr.test(col_attr_List));
+    bool nullable = attr.test(col_attr_Nullable);
+
+    switch (get_table()->get_column_type(col_key)) {
+        case type_Int: {
+            if (nullable)
+                return std::make_unique<ConstLst<util::Optional<Int>>>(*this, col_key);
+            else
+                return std::make_unique<ConstLst<Int>>(*this, col_key);
+        }
+        case type_Bool: {
+            if (nullable)
+                return std::make_unique<ConstLst<util::Optional<Bool>>>(*this, col_key);
+            else
+                return std::make_unique<ConstLst<Bool>>(*this, col_key);
+        }
+        case type_Float: {
+            if (nullable)
+                return std::make_unique<ConstLst<util::Optional<Float>>>(*this, col_key);
+            else
+                return std::make_unique<ConstLst<Float>>(*this, col_key);
+        }
+        case type_Double: {
+            if (nullable)
+                return std::make_unique<ConstLst<util::Optional<Double>>>(*this, col_key);
+            else
+                return std::make_unique<ConstLst<Double>>(*this, col_key);
+        }
+        case type_String: {
+            return std::make_unique<ConstLst<String>>(*this, col_key);
+        }
+        case type_Binary: {
+            return std::make_unique<ConstLst<Binary>>(*this, col_key);
+        }
+        case type_Timestamp: {
+            return std::make_unique<ConstLst<Timestamp>>(*this, col_key);
+        }
+        case type_LinkList: {
+            const ConstLstBase* clb = get_linklist_ptr(col_key).release();
+            return ConstLstBasePtr(const_cast<ConstLstBase*>(clb));
+        }
+        case type_Link:
+        case type_OldDateTime:
+        case type_OldTable:
+        case type_OldMixed:
+            REALM_ASSERT(false);
+            break;
+    }
+    return {};
+}
+
 LstBasePtr Obj::get_listbase_ptr(ColKey col_key) const
 {
     auto attr = get_table()->get_column_attr(col_key);

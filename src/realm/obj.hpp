@@ -30,6 +30,7 @@ namespace realm {
 
 class Replication;
 class TableView;
+class ConstLstBase;
 class LstBase;
 
 template <class>
@@ -44,6 +45,7 @@ template <class T>
 using LstPtr = std::unique_ptr<Lst<T>>;
 template <class T>
 using ConstLstPtr = std::unique_ptr<const Lst<T>>;
+using ConstLstBasePtr = std::unique_ptr<ConstLstBase>;
 using LstBasePtr = std::unique_ptr<LstBase>;
 
 class LnkLst;
@@ -117,7 +119,9 @@ public:
     ConstLnkLst get_linklist(ColKey col_key) const;
     ConstLnkLstPtr get_linklist_ptr(ColKey col_key) const;
     ConstLnkLst get_linklist(StringData col_name) const;
-    
+
+    ConstLstBasePtr get_listbase_ptr(ColKey col_key) const;
+
     size_t get_link_count(ColKey col_key) const;
 
     bool is_null(ColKey col_key) const;
