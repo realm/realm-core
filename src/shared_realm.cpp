@@ -272,11 +272,13 @@ SharedRealm Realm::get_shared_realm(Config config)
     return coordinator->get_realm(std::move(config));
 }
 
-void Realm::get_shared_realm(Config config, std::function<void(SharedRealm, std::exception_ptr)> callback)
+#if REALM_ENABLE_SYNC
+std::shared_ptr<AsyncOpenTask> Realm::get_synchronized_realm(Config config)
 {
     auto coordinator = RealmCoordinator::get_coordinator(config.path);
-    coordinator->get_realm(std::move(config), callback);
+    return coordinator->get_synchronized_realm(std::move(config));
 }
+#endif
 
 void Realm::set_schema(Schema const& reference, Schema schema)
 {

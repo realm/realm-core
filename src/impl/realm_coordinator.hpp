@@ -58,7 +58,13 @@ public:
     // configuration is compatible with the existing one
     std::shared_ptr<Realm> get_realm(Realm::Config config);
     std::shared_ptr<Realm> get_realm();
-    void get_realm(Realm::Config config, std::function<void(std::shared_ptr<Realm>, std::exception_ptr)> callback);
+#if REALM_ENABLE_SYNC
+    // Get a thread-local shared Realm with the given configuration
+    // If the Realm is not already present, it will be fully downloaded before being returned.
+    // If the Realm is already on disk, it will be fully synchronized before being returned.
+    // Timeouts and interruptions are not handled by this method and must be handled by upper layers.
+    std::shared_ptr<AsyncOpenTask> get_synchronized_realm(Realm::Config config);
+#endif
 
     Realm::Config get_config() const { return m_config; }
 
