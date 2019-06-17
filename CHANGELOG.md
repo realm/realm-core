@@ -1,19 +1,12 @@
-# NEXT RELEASE
+# 6.0.0-alpha.9 Release notes
 
 ### Enhancements
-* None.
+* Ability to get a general pointer to list object added to ConstObj
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Fixed replication of null timestamps in list
  
-### Breaking changes
-* None.
-
 -----------
-
-### Internals
-* None.
 
 Besides the changes above, this release includes changes introduced by v5.21.0:
 
