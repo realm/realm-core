@@ -610,7 +610,8 @@ size_t GroupWriter::recreate_freelist(size_t reserve_pos)
         for (size_t i = 0; i < limit; ++i) {
             const auto& free_space = free_in_file[i];
             auto ref = free_space.ref;
-            REALM_ASSERT_RELEASE_EX(prev_ref + prev_size <= ref, prev_ref, prev_size, ref, i, limit);
+            REALM_ASSERT_RELEASE_EX(prev_ref + prev_size <= ref, prev_ref, prev_size, ref, i, limit,
+                                    m_alloc.get_file_path_for_assertions());
             if (reserve_pos == ref) {
                 reserve_ndx = i;
             }

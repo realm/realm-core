@@ -15,6 +15,22 @@
 ### Internals
 * None.
 
+Besides the changes above, this release includes changes introduced by v5.21.0:
+
+| # 5.21.0 Release notes
+|
+| ### Enhancements
+| * Added support for unicode characters in realm path and filenames for Windows. Contribution by @rajivshah3.
+|   ([#3293](https://github.com/realm/realm-core/pull/3293))
+|
+| -----------
+|
+| ### Internals
+| * Introduced new feature test macros for address and thread sanitizers in
+|  `<realm/util/features.h>`.
+| * Added Realm file path to Allocator assertions ([3283](https://github.com/realm/realm-core/issues/3283)).
+|
+
 ----------------------------------------------
 
 # 6.0.0-alpha.8 Release notes
