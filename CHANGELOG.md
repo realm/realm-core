@@ -1,6 +1,18 @@
 # NEXT RELEASE
-=======
+
 ### Enhancements
+* None.
+
+### Fixed
+* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* None.
+ 
+### Breaking changes
+* None.
+
+-----------
+
+### Internals
 * None.
 
 Besides the changes above, this release includes changes introduced by v5.21.0:
@@ -18,19 +30,6 @@ Besides the changes above, this release includes changes introduced by v5.21.0:
 |  `<realm/util/features.h>`.
 | * Added Realm file path to Allocator assertions ([3283](https://github.com/realm/realm-core/issues/3283)).
 |
-| ----------------------------------------------
-
-### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
- 
-### Breaking changes
-* None.
-
------------
-
-### Internals
-* None.
 
 ----------------------------------------------
 
