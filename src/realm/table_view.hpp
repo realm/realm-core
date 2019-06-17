@@ -258,7 +258,7 @@ public:
     size_t find_by_source_ndx(size_t source_ndx) const noexcept;
 
     // Conversion
-    void to_json(std::ostream&) const;
+    void to_json(std::ostream&, size_t link_depth = 0, std::map<std::string, std::string>* renames = nullptr) const;
     void to_string(std::ostream&, size_t limit = 500) const;
     void row_to_string(size_t row_ndx, std::ostream&) const;
 
