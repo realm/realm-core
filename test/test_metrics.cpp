@@ -1066,6 +1066,73 @@ TEST(Metrics_MemoryChecks)
     }
 }
 
+#else // REALM_METRICS
+
+#include <realm.hpp>
+#include <realm/replication.hpp>
+#include <realm/history.hpp>
+
+using namespace realm;
+using namespace realm::metrics;
+using namespace realm::test_util;
+using namespace realm::util;
+
+TEST(Metrics_APIAvailability)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    SharedGroupOptions options(crypt_key());
+    options.enable_metrics = true;
+    SharedGroup sg(*hist, options);
+    CHECK(!sg.get_metrics());
+    Group& g = sg.begin_write();
+    auto table = g.add_table("table");
+    table->add_column(type_Int, "first");
+    table->add_empty_row(10);
+    sg.commit();
+    sg.begin_read();
+    table = g.get_table("table");
+    CHECK(bool(table));
+    Query q = table->column<int64_t>(0) == 0;
+    q.count();
+    sg.end_read();
+    std::shared_ptr<Metrics> metrics = sg.get_metrics();
+
+    // the following will never execute since when REALM_METRICS is undefined,
+    // then sg.get_metrics() will always return a nullptr, however, the purpose
+    // of the remainder of the test is to ensure that all of the methods below
+    // are still accessible at compile time so that users of core do not need to check
+    // REALM_METRICS, but can use a core with or without the flag in the same way.
+    if (metrics) {
+        CHECK_EQUAL(metrics->num_transaction_metrics(), 0);
+        CHECK_EQUAL(metrics->num_query_metrics(), 0);
+        std::unique_ptr<Metrics::TransactionInfoList> transactions = metrics->take_transactions();
+
+        if (transactions) {
+            for (auto transaction : *transactions) {
+                transaction.get_disk_size();
+                transaction.get_free_space();
+                transaction.get_transaction_time();
+                transaction.get_fsync_time();
+                transaction.get_write_time();
+                transaction.get_disk_size();
+                transaction.get_free_space();
+                transaction.get_total_objects();
+                transaction.get_num_available_versions();
+                transaction.get_num_decrypted_pages();
+            }
+        }
+        std::unique_ptr<Metrics::QueryInfoList> queries = metrics->take_queries();
+        if (queries) {
+            for (auto query : *queries) {
+                query.get_description();
+                query.get_table_name();
+                query.get_type();
+                query.get_query_time();
+            }
+        }
+    }
+}
 
 #endif // REALM_METRICS
 #endif // TEST_METRICS

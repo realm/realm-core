@@ -23,8 +23,6 @@
 #include <iostream>
 #include <sstream>
 
-#if REALM_METRICS
-
 using namespace realm;
 using namespace realm::metrics;
 
@@ -142,5 +140,3 @@ void MetricTimer::format(double seconds_float, std::ostream& out)
         }
     }
 }
-
-#endif // REALM_METRICS
