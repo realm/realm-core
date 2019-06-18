@@ -78,7 +78,7 @@ std::shared_ptr<RealmCoordinator> RealmCoordinator::get_existing_coordinator(Str
     return it == s_coordinators_per_path.end() ? nullptr : it->second.lock();
 }
 
-void RealmCoordinator::create_sync_session(bool force_client_reset)
+void RealmCoordinator::create_sync_session(bool force_client_reset, bool validate_sync_history)
 {
 #if REALM_ENABLE_SYNC
     if (m_sync_session)
@@ -95,7 +95,7 @@ void RealmCoordinator::create_sync_session(bool force_client_reset)
     }
 
     auto sync_config = *m_config.sync_config;
-    sync_config.validate_sync_history = false;
+    sync_config.validate_sync_history = validate_sync_history;
     m_sync_session = SyncManager::shared().get_session(m_config.path, sync_config, force_client_reset);
 
     std::weak_ptr<RealmCoordinator> weak_self = shared_from_this();
@@ -270,7 +270,7 @@ void RealmCoordinator::do_get_realm(Realm::Config config, std::shared_ptr<Realm>
     m_weak_realm_notifiers.emplace_back(realm, realm->config().cache, bind_to_context);
 
     if (realm->config().sync_config)
-        create_sync_session(false);
+        create_sync_session(false, false);
 
     if (!m_audit_context && audit_factory)
         m_audit_context = audit_factory();
@@ -302,7 +302,8 @@ std::shared_ptr<AsyncOpenTask> RealmCoordinator::get_synchronized_realm(Realm::C
 
     std::unique_lock<std::mutex> lock(m_realm_mutex);
     set_config(config);
-    create_sync_session(!config.sync_config->is_partial && !File::exists(m_config.path));
+    bool exists = File::exists(m_config.path);
+    create_sync_session(!config.sync_config->is_partial && !exists, exists);
     return std::make_shared<AsyncOpenTask>(shared_from_this(), m_sync_session);
 }
 #endif
@@ -975,7 +976,7 @@ void RealmCoordinator::process_available_async(Realm& realm)
 
 void RealmCoordinator::set_transaction_callback(std::function<void(VersionID, VersionID)> fn)
 {
-    create_sync_session(false);
+    create_sync_session(false, false);
     m_transaction_callback = std::move(fn);
 }
 
