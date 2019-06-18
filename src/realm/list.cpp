@@ -473,25 +473,45 @@ void Lst<util::Optional<Double>>::set_repl(Replication* repl, size_t ndx, util::
 template <>
 void Lst<String>::set_repl(Replication* repl, size_t ndx, StringData value)
 {
-    repl->list_set_string(*this, ndx, value);
+    if (value.is_null()) {
+        repl->list_set_null(*this, ndx);
+    }
+    else {
+        repl->list_set_string(*this, ndx, value);
+    }
 }
 
 template <>
 void Lst<Binary>::set_repl(Replication* repl, size_t ndx, BinaryData value)
 {
-    repl->list_set_binary(*this, ndx, value);
+    if (value.is_null()) {
+        repl->list_set_null(*this, ndx);
+    }
+    else {
+        repl->list_set_binary(*this, ndx, value);
+    }
 }
 
 template <>
 void Lst<Timestamp>::set_repl(Replication* repl, size_t ndx, Timestamp value)
 {
-    repl->list_set_timestamp(*this, ndx, value);
+    if (value.is_null()) {
+        repl->list_set_null(*this, ndx);
+    }
+    else {
+        repl->list_set_timestamp(*this, ndx, value);
+    }
 }
 
 template <>
 void Lst<ObjKey>::set_repl(Replication* repl, size_t ndx, ObjKey key)
 {
-    repl->list_set_link(*this, ndx, key);
+    if (key) {
+        repl->list_set_link(*this, ndx, key);
+    }
+    else {
+        repl->list_set_null(*this, ndx);
+    }
 }
 
 /*************************** Lst<T>::insert_repl ****************************/
@@ -566,13 +586,23 @@ void Lst<util::Optional<Double>>::insert_repl(Replication* repl, size_t ndx, uti
 template <>
 void Lst<String>::insert_repl(Replication* repl, size_t ndx, StringData value)
 {
-    repl->list_insert_string(*this, ndx, value);
+    if (value.is_null()) {
+        repl->list_insert_null(*this, ndx);
+    }
+    else {
+        repl->list_insert_string(*this, ndx, value);
+    }
 }
 
 template <>
 void Lst<Binary>::insert_repl(Replication* repl, size_t ndx, BinaryData value)
 {
-    repl->list_insert_binary(*this, ndx, value);
+    if (value.is_null()) {
+        repl->list_insert_null(*this, ndx);
+    }
+    else {
+        repl->list_insert_binary(*this, ndx, value);
+    }
 }
 
 template <>
@@ -589,7 +619,12 @@ void Lst<Timestamp>::insert_repl(Replication* repl, size_t ndx, Timestamp value)
 template <>
 void Lst<ObjKey>::insert_repl(Replication* repl, size_t ndx, ObjKey key)
 {
-    repl->list_insert_link(*this, ndx, key);
+    if (key) {
+        repl->list_insert_link(*this, ndx, key);
+    }
+    else {
+        repl->list_insert_null(*this, ndx);
+    }
 }
 }
 
