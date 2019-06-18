@@ -81,7 +81,7 @@ jobWrapper {
                     buildUwpx64Debug        : doBuildWindows('Debug', true, 'x64', false),
                     androidArmeabiRelease   : doAndroidBuildInDocker('armeabi-v7a', 'Release', true),
                     coverage                : doBuildCoverage(),
-                    performance             : buildPerformance()
+                    // performance             : buildPerformance()
                 ]
                 parallelExecutors.putAll(extendedChecks)
             }
