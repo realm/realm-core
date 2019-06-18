@@ -1,20 +1,9 @@
-# NEXT RELEASE
-
-### Enhancements
-* None.
+# 6.0.0-alpha.10 Release notes
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Fixed replication of setting and inserting null values in lists. Now also fixed
+  for String and Binary.
  
-### Breaking changes
-* None.
-
------------
-
-### Internals
-* None.
-
 ----------------------------------------------
 
 # 6.0.0-alpha.9 Release notes
