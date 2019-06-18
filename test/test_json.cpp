@@ -495,6 +495,30 @@ TEST(Json_LinkCycles)
     ss.str("");
     table1->to_json(ss, 2);
     CHECK(json_test(ss.str(), "expected_json_link_cycles5", generate_all));
+
+    // Redo but from a TableView instead of the Table.
+    auto tv = table1->where().find_all();
+    // Now try different link_depth arguments
+    ss.str("");
+    tv.to_json(ss);
+    CHECK(json_test(ss.str(), "expected_json_link_cycles1", generate_all));
+
+    ss.str("");
+    tv.to_json(ss, -1);
+    CHECK(json_test(ss.str(), "expected_json_link_cycles2", generate_all));
+
+    ss.str("");
+    tv.to_json(ss, 0);
+    CHECK(json_test(ss.str(), "expected_json_link_cycles3", generate_all));
+
+    ss.str("");
+    tv.to_json(ss, 1);
+    CHECK(json_test(ss.str(), "expected_json_link_cycles4", generate_all));
+
+    ss.str("");
+    tv.to_json(ss, 2);
+    CHECK(json_test(ss.str(), "expected_json_link_cycles5", generate_all));
+    
 }
 
 } // anonymous namespace
