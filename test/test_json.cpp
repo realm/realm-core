@@ -518,7 +518,6 @@ TEST(Json_LinkCycles)
     ss.str("");
     tv.to_json(ss, 2);
     CHECK(json_test(ss.str(), "expected_json_link_cycles5", generate_all));
-    
 }
 
 } // anonymous namespace
