@@ -144,6 +144,32 @@ void initialize_schema(Group& group)
     cleanup_subscriptions(group, system_clock::now());
 }
 
+void ensure_partial_sync_schema_initialized(Realm& realm)
+{
+    auto was_in_read = realm.is_in_read_transaction();
+    auto cleanup = util::make_scope_exit([&]() noexcept {
+        if (realm.is_in_transaction())
+            realm.cancel_transaction();
+        if (!was_in_read)
+            realm.invalidate();
+    });
+
+    auto& group = realm.read_group();
+    // Check if the result sets table already has the expected number of columns
+    auto table = ObjectStore::table_for_object_type(group, result_sets_type_name);
+    if (table && table->size() >= 10)
+        return;
+
+    realm.begin_transaction();
+    // Recheck after starting the transaction as it refreshes
+    if (!table)
+        table = ObjectStore::table_for_object_type(group, result_sets_type_name);
+    if (table && table->size() >= 10)
+        return;
+    initialize_schema(group);
+    realm.commit_transaction();
+}
+
 // A stripped-down version of WriteTransaction that can promote an existing read transaction
 // and that notifies the sync session after committing a change.
 class WriteTransactionNotifyingSync {

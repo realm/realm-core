@@ -30,10 +30,11 @@
 
 #if REALM_ENABLE_SYNC
 #include "sync/impl/work_queue.hpp"
+#include "sync/async_open_task.hpp"
+#include "sync/partial_sync.hpp"
 #include "sync/sync_config.hpp"
 #include "sync/sync_manager.hpp"
 #include "sync/sync_session.hpp"
-#include "sync/async_open_task.hpp"
 #endif
 
 #include <realm/group_shared.hpp>
@@ -275,11 +276,15 @@ void RealmCoordinator::do_get_realm(Realm::Config config, std::shared_ptr<Realm>
     if (!m_audit_context && audit_factory)
         m_audit_context = audit_factory();
 
+    realm_lock.unlock();
     if (schema) {
-        realm_lock.unlock();
         realm->update_schema(std::move(*schema), config.schema_version, std::move(migration_function),
                              std::move(initialization_function));
     }
+#if REALM_ENABLE_SYNC
+    else if (realm->is_partial())
+        _impl::ensure_partial_sync_schema_initialized(*realm);
+#endif
 }
 
 void RealmCoordinator::bind_to_context(Realm& realm, AnyExecutionContextID execution_context)
@@ -356,7 +361,7 @@ void RealmCoordinator::advance_schema_cache(uint64_t previous, uint64_t next)
 
 RealmCoordinator::RealmCoordinator()
 #if REALM_ENABLE_SYNC
-: m_partial_sync_work_queue(std::make_unique<partial_sync::WorkQueue>())
+: m_partial_sync_work_queue(std::make_unique<_impl::partial_sync::WorkQueue>())
 #endif
 {
 }
@@ -981,7 +986,7 @@ void RealmCoordinator::set_transaction_callback(std::function<void(VersionID, Ve
 }
 
 #if REALM_ENABLE_SYNC
-partial_sync::WorkQueue& RealmCoordinator::partial_sync_work_queue()
+_impl::partial_sync::WorkQueue& RealmCoordinator::partial_sync_work_queue()
 {
     return *m_partial_sync_work_queue;
 }

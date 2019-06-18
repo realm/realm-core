@@ -160,7 +160,7 @@ public:
 
 #if REALM_ENABLE_SYNC
     // A work queue that can be used to perform background work related to partial sync.
-    partial_sync::WorkQueue& partial_sync_work_queue();
+    _impl::partial_sync::WorkQueue& partial_sync_work_queue();
 #endif
 
     AuditInterface* audit_context() const noexcept { return m_audit_context.get(); }

@@ -178,6 +178,7 @@ void unsubscribe(Object&&);
 namespace _impl {
 
 void initialize_schema(Group&);
+void ensure_partial_sync_schema_initialized(Realm&);
 
 } // namespace _impl
 } // namespace realm
