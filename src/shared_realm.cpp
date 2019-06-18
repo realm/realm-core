@@ -272,6 +272,18 @@ SharedRealm Realm::get_shared_realm(Config config)
     return coordinator->get_realm(std::move(config));
 }
 
+SharedRealm Realm::get_shared_realm(ThreadSafeReference<Realm> ref, util::Optional<AbstractExecutionContextID> execution_context)
+{
+    REALM_ASSERT(ref.m_realm);
+    auto& config = ref.m_realm->config();
+    auto coordinator = RealmCoordinator::get_coordinator(config.path);
+    if (auto realm = coordinator->get_cached_realm(config, execution_context))
+        return realm;
+    coordinator->bind_to_context(*ref.m_realm, execution_context);
+    ref.m_realm->m_execution_context = execution_context;
+    return std::move(ref.m_realm);
+}
+
 #if REALM_ENABLE_SYNC
 std::shared_ptr<AsyncOpenTask> Realm::get_synchronized_realm(Config config)
 {

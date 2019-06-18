@@ -19,13 +19,16 @@
 #ifndef ASYNC_OPEN_TASK_HPP
 #define ASYNC_OPEN_TASK_HPP
 
+#include <functional>
+#include <memory>
+
 namespace realm {
 class Realm;
 class SyncSession;
+template<typename> class ThreadSafeReference;
 namespace _impl {
 class RealmCoordinator;
 }
-
 
 // Class used to wrap the intent of opening a new Realm or fully synchronize it before returning it to the user
 // Timeouts are not handled by this class but must be handled by each binding.
@@ -37,7 +40,7 @@ public:
     //
     // If multiple AsyncOpenTasks all attempt to download the same Realm and one of them is canceled,
     // the other tasks will receive a "Cancelled" exception.
-    void start(std::function<void(std::shared_ptr<Realm>, std::exception_ptr)> callback);
+    void start(std::function<void(ThreadSafeReference<Realm>, std::exception_ptr)> callback);
 
     // Cancels the download and stops the session. No further functions should be called on this class.
     void cancel();

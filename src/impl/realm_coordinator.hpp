@@ -66,6 +66,16 @@ public:
     std::shared_ptr<AsyncOpenTask> get_synchronized_realm(Realm::Config config);
 #endif
 
+    // Get a Realm which is not bound to the current execution context
+    ThreadSafeReference<Realm> get_unbound_realm();
+
+    // Get the existing cached Realm for the given execution context if it exists
+    std::shared_ptr<Realm> get_cached_realm(Realm::Config const&, AnyExecutionContextID);
+
+    // Bind an unbound Realm to a specific execution context. The Realm must
+    // be managed by this coordinator.
+    void bind_to_context(Realm& realm, AnyExecutionContextID);
+
     Realm::Config get_config() const { return m_config; }
 
     uint64_t get_schema_version() const noexcept { return m_schema_version; }
@@ -201,8 +211,7 @@ private:
     void set_config(const Realm::Config&);
     void create_sync_session(bool force_client_reset);
     void do_get_realm(Realm::Config config, std::shared_ptr<Realm>& realm,
-                      std::unique_lock<std::mutex>& realm_lock);
-    std::shared_ptr<Realm> get_cached_realm(Realm::Config const& config);
+                      std::unique_lock<std::mutex>& realm_lock, bool bind_to_context=true);
 
     void run_async_notifiers();
     void open_helper_shared_group();

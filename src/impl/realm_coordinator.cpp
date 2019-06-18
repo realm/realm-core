@@ -26,6 +26,7 @@
 #include "object_schema.hpp"
 #include "object_store.hpp"
 #include "schema.hpp"
+#include "thread_safe_reference.hpp"
 
 #if REALM_ENABLE_SYNC
 #include "sync/impl/work_queue.hpp"
@@ -181,16 +182,17 @@ void RealmCoordinator::set_config(const Realm::Config& config)
             }
         }
 #endif
+        // Mixing cached and uncached Realms is allowed
+        m_config.cache = config.cache;
 
         // Realm::update_schema() handles complaining about schema mismatches
     }
 }
 
-std::shared_ptr<Realm> RealmCoordinator::get_cached_realm(Realm::Config const& config)
+std::shared_ptr<Realm> RealmCoordinator::get_cached_realm(Realm::Config const& config, AnyExecutionContextID execution_context)
 {
     if (!config.cache)
         return nullptr;
-    AnyExecutionContextID execution_context(config.execution_context);
     for (auto& cached_realm : m_weak_realm_notifiers) {
         if (!cached_realm.is_cached_for_execution_context(execution_context))
             continue;
@@ -221,17 +223,34 @@ std::shared_ptr<Realm> RealmCoordinator::get_realm(Realm::Config config)
     // to acquire the same lock
     std::shared_ptr<Realm> realm;
     std::unique_lock<std::mutex> lock(m_realm_mutex);
+    set_config(config);
+    if ((realm = get_cached_realm(config, config.execution_context)))
+        return realm;
     do_get_realm(std::move(config), realm, lock);
     return realm;
 }
 
-void RealmCoordinator::do_get_realm(Realm::Config config, std::shared_ptr<Realm>& realm,
-                                    std::unique_lock<std::mutex>& realm_lock)
+std::shared_ptr<Realm> RealmCoordinator::get_realm()
 {
-    set_config(config);
-    if ((realm = get_cached_realm(config)))
-        return;
+    std::shared_ptr<Realm> realm;
+    std::unique_lock<std::mutex> lock(m_realm_mutex);
+    if ((realm = get_cached_realm(m_config, m_config.execution_context)))
+        return realm;
+    do_get_realm(m_config, realm, lock);
+    return realm;
+}
 
+ThreadSafeReference<Realm> RealmCoordinator::get_unbound_realm()
+{
+    ThreadSafeReference<Realm> ref;
+    std::unique_lock<std::mutex> lock(m_realm_mutex);
+    do_get_realm(m_config, ref.m_realm, lock, false);
+    return ref;
+}
+
+void RealmCoordinator::do_get_realm(Realm::Config config, std::shared_ptr<Realm>& realm,
+                                    std::unique_lock<std::mutex>& realm_lock, bool bind_to_context)
+{
     auto schema = std::move(config.schema);
     auto migration_function = std::move(config.migration_function);
     auto initialization_function = std::move(config.initialization_function);
@@ -248,7 +267,7 @@ void RealmCoordinator::do_get_realm(Realm::Config config, std::shared_ptr<Realm>
             throw RealmFileException(RealmFileException::Kind::AccessError, get_path(), ex.code().message(), "");
         }
     }
-    m_weak_realm_notifiers.emplace_back(realm, realm->config().cache);
+    m_weak_realm_notifiers.emplace_back(realm, realm->config().cache, bind_to_context);
 
     if (realm->config().sync_config)
         create_sync_session(false);
@@ -263,6 +282,18 @@ void RealmCoordinator::do_get_realm(Realm::Config config, std::shared_ptr<Realm>
     }
 }
 
+void RealmCoordinator::bind_to_context(Realm& realm, AnyExecutionContextID execution_context)
+{
+    std::unique_lock<std::mutex> lock(m_realm_mutex);
+    for (auto& cached_realm : m_weak_realm_notifiers) {
+        if (!cached_realm.is_for_realm(&realm))
+            continue;
+        cached_realm.bind_to_execution_context(execution_context);
+        return;
+    }
+    REALM_TERMINATE("Invalid Realm passed to bind_to_context()");
+}
+
 #if REALM_ENABLE_SYNC
 std::shared_ptr<AsyncOpenTask> RealmCoordinator::get_synchronized_realm(Realm::Config config)
 {
@@ -275,12 +306,6 @@ std::shared_ptr<AsyncOpenTask> RealmCoordinator::get_synchronized_realm(Realm::C
     return std::make_shared<AsyncOpenTask>(shared_from_this(), m_sync_session);
 }
 #endif
-
-
-std::shared_ptr<Realm> RealmCoordinator::get_realm()
-{
-    return get_realm(m_config);
-}
 
 bool RealmCoordinator::get_cached_schema(Schema& schema, uint64_t& schema_version,
                                          uint64_t& transaction) const noexcept

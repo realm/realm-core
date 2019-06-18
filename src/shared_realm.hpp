@@ -262,6 +262,10 @@ public:
     // encryption key will raise an exception.
     static SharedRealm get_shared_realm(Config config);
 
+    // Get a Realm for the given execution context (or current thread if `none`)
+    // from the thread safe reference. May return a cached Realm or create a new one.
+    static SharedRealm get_shared_realm(ThreadSafeReference<Realm>, util::Optional<AbstractExecutionContextID> = util::none);
+
 #if REALM_ENABLE_SYNC
     // Open a synchronized Realm and make sure it is fully up to date before
     // returning it.

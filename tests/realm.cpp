@@ -29,6 +29,7 @@
 #include "property.hpp"
 #include "results.hpp"
 #include "schema.hpp"
+#include "thread_safe_reference.hpp"
 
 #include "impl/realm_coordinator.hpp"
 
@@ -479,12 +480,11 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
     SECTION("can open synced Realms that don't already exist") {
         std::atomic<bool> called{false};
         auto task = Realm::get_synchronized_realm(config);
-        task->start([&](auto realm, auto error) {
-            REQUIRE(realm);
+        task->start([&](auto ref, auto error) {
             REQUIRE(!error);
             called = true;
 
-            REQUIRE(realm->read_group().get_table("class_object"));
+            REQUIRE(Realm::get_shared_realm(std::move(ref))->read_group().get_table("class_object"));
         });
         util::EventLoop::main().run_until([&]{ return called.load(); });
         REQUIRE(called);
@@ -501,12 +501,11 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
 
         std::atomic<bool> called{false};
         auto task = Realm::get_synchronized_realm(config);
-        task->start([&](auto realm, auto error) {
-            REQUIRE(realm);
+        task->start([&](auto ref, auto error) {
             REQUIRE(!error);
             called = true;
 
-            REQUIRE(realm->read_group().get_table("class_object")->size() == 1);
+            REQUIRE(Realm::get_shared_realm(std::move(ref))->read_group().get_table("class_object"));
         });
         util::EventLoop::main().run_until([&]{ return called.load(); });
         REQUIRE(called);
@@ -525,12 +524,11 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
 
         std::atomic<bool> called{false};
         auto task = Realm::get_synchronized_realm(config);
-        task->start([&](auto realm, auto error) {
-            REQUIRE(realm);
+        task->start([&](auto ref, auto error) {
             REQUIRE(!error);
             called = true;
 
-            REQUIRE(realm->read_group().get_table("class_object")->size() == 1);
+            REQUIRE(Realm::get_shared_realm(std::move(ref))->read_group().get_table("class_object")->size() == 1);
         });
         util::EventLoop::main().run_until([&]{ return called.load(); });
         REQUIRE(called);
@@ -549,8 +547,7 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
 
         std::atomic<bool> called{false};
         auto task = Realm::get_synchronized_realm(config);
-        task->start([&](auto realm, auto error) {
-            REQUIRE(realm);
+        task->start([&](auto, auto error) {
             REQUIRE(!error);
             called = true;
         });
@@ -1824,3 +1821,79 @@ TEST_CASE("BindingContext is notified in case of notifier errors") {
     }
 }
 #endif
+
+TEST_CASE("RealmCoordinator: get_unbound_realm()") {
+    TestFile config;
+    config.schema = Schema{
+        {"object", {
+            {"value", PropertyType::Int}
+        }},
+    };
+
+    ThreadSafeReference<Realm> ref;
+    std::thread([&] { ref = _impl::RealmCoordinator::get_coordinator(config)->get_unbound_realm(); }).join();
+
+    SECTION("checks thread after being resolved") {
+        auto realm = Realm::get_shared_realm(std::move(ref));
+        REQUIRE_NOTHROW(realm->verify_thread());
+        std::thread([&] {
+            REQUIRE_THROWS(realm->verify_thread());
+        }).join();
+    }
+
+    SECTION("delivers notifications to the thread it is resolved on") {
+        if (!util::EventLoop::has_implementation())
+            return;
+        auto realm = Realm::get_shared_realm(std::move(ref));
+        Results results(realm, ObjectStore::table_for_object_type(realm->read_group(), "object")->where());
+        bool called = false;
+        auto token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+            called = true;
+        });
+        util::EventLoop::main().run_until([&] { return called; });
+    }
+
+    SECTION("does not check thread if resolved using an execution context") {
+        auto realm = Realm::get_shared_realm(std::move(ref), AbstractExecutionContextID(1));
+        REQUIRE_NOTHROW(realm->verify_thread());
+        std::thread([&] {
+            REQUIRE_NOTHROW(realm->verify_thread());
+        }).join();
+    }
+
+    SECTION("resolves to existing cached Realm for the thread if caching is enabled") {
+        auto r1 = Realm::get_shared_realm(config);
+        auto r2 = Realm::get_shared_realm(std::move(ref));
+        REQUIRE(r1 == r2);
+    }
+
+    SECTION("resolves to existing cached Realm for the execution context if caching is enabled") {
+        config.execution_context = AbstractExecutionContextID(1);
+        auto r1 = Realm::get_shared_realm(config);
+        config.execution_context = AbstractExecutionContextID(2);
+        auto r2 = Realm::get_shared_realm(config);
+        auto r3 = Realm::get_shared_realm(std::move(ref), AbstractExecutionContextID(1));
+        REQUIRE(r1 == r3);
+        REQUIRE(r1 != r2);
+        REQUIRE(r2 != r3);
+    }
+
+    SECTION("resolves to a new Realm if caching is disabled") {
+        // Cache disabled for local realm, enabled for unbound
+        config.cache = false;
+        auto r1 = Realm::get_shared_realm(config);
+        auto r2 = Realm::get_shared_realm(std::move(ref));
+        REQUIRE(r1 != r2);
+
+        // New unbound with cache disabled
+        std::thread([&] { ref = _impl::RealmCoordinator::get_coordinator(config)->get_unbound_realm(); }).join();
+        auto r3 = Realm::get_shared_realm(std::move(ref));
+        REQUIRE(r1 != r3);
+        REQUIRE(r2 != r3);
+
+        // New local with cache enabled should grab the resolved unbound
+        config.cache = true;
+        auto r4 = Realm::get_shared_realm(config);
+        REQUIRE(r4 == r2);
+    }
+}
