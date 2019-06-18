@@ -202,7 +202,6 @@ std::string reserve_unique_file_name(const std::string& path, const std::string&
 
 constexpr const char SyncFileManager::c_sync_directory[];
 constexpr const char SyncFileManager::c_utility_directory[];
-constexpr const char SyncFileManager::c_state_directory[];
 constexpr const char SyncFileManager::c_recovery_directory[];
 constexpr const char SyncFileManager::c_metadata_directory[];
 constexpr const char SyncFileManager::c_metadata_realm[];
