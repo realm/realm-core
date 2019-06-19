@@ -33,17 +33,19 @@ AsyncOpenTask::AsyncOpenTask(std::shared_ptr<_impl::RealmCoordinator> coordinato
 
 void AsyncOpenTask::start(std::function<void(ThreadSafeReference<Realm>, std::exception_ptr)> callback)
 {
+    auto session = m_session.load();
+    if (!session)
+        return;
+
     std::shared_ptr<AsyncOpenTask> self(shared_from_this());
-    m_session->wait_for_download_completion([callback, self](std::error_code ec) {
-        if (self->m_canceled)
+   session->wait_for_download_completion([callback, self, this](std::error_code ec) {
+       auto session = m_session.exchange(nullptr);
+        if (!session)
             return; // Swallow all events if the task as been canceled.
 
-        // Release our references to the session and coordinator after calling
-        // the callback
-        auto session = std::move(self->m_session);
-        auto coordinator = std::move(self->m_coordinator);
-        self->m_session = nullptr;
-        self->m_coordinator = nullptr;
+        // Release our references to the coordinator after calling the callback
+        auto coordinator = std::move(m_coordinator);
+        m_coordinator = nullptr;
 
         if (ec)
             return callback({}, std::make_exception_ptr(std::system_error(ec)));
@@ -61,19 +63,17 @@ void AsyncOpenTask::start(std::function<void(ThreadSafeReference<Realm>, std::ex
 
 void AsyncOpenTask::cancel()
 {
-    if (m_session) {
+    if (auto session = m_session.exchange(nullptr)) {
         // Does a better way exists for canceling the download?
-        m_canceled = true;
-        m_session->log_out();
-        m_session = nullptr;
+        session->log_out();
         m_coordinator = nullptr;
     }
 }
 
 uint64_t AsyncOpenTask::register_download_progress_notifier(std::function<SyncProgressNotifierCallback> callback)
 {
-    if (m_session) {
-        return m_session->register_progress_notifier(callback, realm::SyncSession::NotifierType::download, false);
+    if (auto session = m_session.load()) {
+        return session->register_progress_notifier(callback, realm::SyncSession::NotifierType::download, false);
     }
     else {
         return 0;
@@ -82,8 +82,8 @@ uint64_t AsyncOpenTask::register_download_progress_notifier(std::function<SyncPr
 
 void AsyncOpenTask::unregister_download_progress_notifier(uint64_t token)
 {
-    if (m_session)
-        m_session->unregister_progress_notifier(token);
+    if (auto session = m_session.load())
+        session->unregister_progress_notifier(token);
 }
 
 }
