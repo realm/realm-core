@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 5.22.0 Release notes
 
 ### Enhancements
 
@@ -7,7 +7,6 @@
   ([#3301](https://github.com/realm/realm-core/pull/3301))
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * None.
  
 ### Breaking changes
