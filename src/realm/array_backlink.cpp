@@ -126,12 +126,15 @@ bool ArrayBacklink::remove(size_t ndx, ObjKey key)
     backlink_list.init_from_ref(ref_type(value));
     backlink_list.set_parent(this, ndx);
 
+    size_t last_ndx = backlink_list.size() - 1;
     size_t backlink_ndx = backlink_list.find_first(key.value);
     REALM_ASSERT_3(backlink_ndx, !=, not_found);
-    backlink_list.erase(backlink_ndx); // Throws
+    if (backlink_ndx != last_ndx)
+        backlink_list.set(backlink_ndx, backlink_list.get(last_ndx));
+    backlink_list.truncate(last_ndx); // Throws
 
     // If there is only one backlink left we can inline it as tagged value
-    if (backlink_list.size() == 1) {
+    if (last_ndx == 1) {
         uint64_t key_value = backlink_list.get(0);
         backlink_list.destroy();
 
