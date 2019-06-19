@@ -33,31 +33,29 @@ AsyncOpenTask::AsyncOpenTask(std::shared_ptr<_impl::RealmCoordinator> coordinato
 
 void AsyncOpenTask::start(std::function<void(ThreadSafeReference<Realm>, std::exception_ptr)> callback)
 {
-    std::weak_ptr<AsyncOpenTask> weak_self(shared_from_this());
-    m_session->wait_for_download_completion([callback, weak_self](std::error_code ec) {
-        if (auto self = weak_self.lock()) {
-            if (self->m_canceled)
-                return; // Swallow all events if the task as been canceled.
+    std::shared_ptr<AsyncOpenTask> self(shared_from_this());
+    m_session->wait_for_download_completion([callback, self](std::error_code ec) {
+        if (self->m_canceled)
+            return; // Swallow all events if the task as been canceled.
 
-            // Release our references to the session and coordinator after calling
-            // the callback
-            auto session = std::move(self->m_session);
-            auto coordinator = std::move(self->m_coordinator);
-            self->m_session = nullptr;
-            self->m_coordinator = nullptr;
+        // Release our references to the session and coordinator after calling
+        // the callback
+        auto session = std::move(self->m_session);
+        auto coordinator = std::move(self->m_coordinator);
+        self->m_session = nullptr;
+        self->m_coordinator = nullptr;
 
-            if (ec)
-                return callback({}, std::make_exception_ptr(std::system_error(ec)));
+        if (ec)
+            return callback({}, std::make_exception_ptr(std::system_error(ec)));
 
-            ThreadSafeReference<Realm> realm;
-            try {
-                realm = coordinator->get_unbound_realm();
-            }
-            catch (...) {
-                return callback({}, std::current_exception());
-            }
-            callback(std::move(realm), nullptr);
+        ThreadSafeReference<Realm> realm;
+        try {
+            realm = coordinator->get_unbound_realm();
         }
+        catch (...) {
+            return callback({}, std::current_exception());
+        }
+        callback(std::move(realm), nullptr);
     });
 }
 
