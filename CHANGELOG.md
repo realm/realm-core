@@ -1,7 +1,10 @@
 # NEXT RELEASE
 
 ### Enhancements
-* None.
+
+* Expose the ability to follow links while printing a TableView in JSON format.
+  TableView::to_json() now supports the same arguments as Table::to_json().
+  ([#3301](https://github.com/realm/realm-core/pull/3301))
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
