@@ -545,9 +545,7 @@ public:
     // Release pinned version (not thread safe)
     void unpin_version(VersionID version);
 
-#if REALM_METRICS
     std::shared_ptr<metrics::Metrics> get_metrics();
-#endif // REALM_METRICS
 
     // Try to grab a exclusive lock of the given realm path's lock file. If the lock
     // can be acquired, the callback will be executed with the lock and then return true.

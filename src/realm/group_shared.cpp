@@ -2032,12 +2032,14 @@ void SharedGroup::unpin_version(VersionID token)
     release_read_lock(read_lock);
 }
 
-#if REALM_METRICS
 std::shared_ptr<Metrics> SharedGroup::get_metrics()
 {
+#if REALM_METRICS
     return m_metrics;
-}
+#else
+    return nullptr;
 #endif // REALM_METRICS
+}
 
 void SharedGroup::do_begin_read(VersionID version_id, bool writable)
 {

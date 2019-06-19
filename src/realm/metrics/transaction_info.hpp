@@ -25,8 +25,6 @@
 #include <realm/metrics/metric_timer.hpp>
 #include <realm/util/features.h>
 
-#if REALM_METRICS
-
 namespace realm {
 namespace metrics {
 
@@ -74,7 +72,5 @@ private:
 
 } // namespace metrics
 } // namespace realm
-
-#endif // REALM_METRICS
 
 #endif // REALM_TRANSACTION_INFO_HPP

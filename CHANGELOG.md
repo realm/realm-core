@@ -16,7 +16,9 @@
 -----------
 
 ### Internals
-* None.
+* Fixed an inconsistency in the use of the `REALM_METRICS` compile time option. Now core consumers are able
+  to use `SharedGroup::get_metrics()` regardless of whether or not metrics are compiled in. A null pointer
+  is returned if the feature has been disabled at compile time.
 
 ----------------------------------------------
 
