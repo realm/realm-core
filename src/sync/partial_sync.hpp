@@ -46,6 +46,7 @@ static constexpr const char* property_created_at = "created_at";
 static constexpr const char* property_updated_at = "updated_at";
 static constexpr const char* property_expires_at = "expires_at";
 static constexpr const char* property_time_to_live = "time_to_live";
+static constexpr const size_t result_sets_property_count = 10;
 
 struct InvalidRealmStateException : public std::logic_error {
     InvalidRealmStateException(const std::string& msg);

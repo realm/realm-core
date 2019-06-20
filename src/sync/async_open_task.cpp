@@ -38,7 +38,7 @@ void AsyncOpenTask::start(std::function<void(ThreadSafeReference<Realm>, std::ex
         return;
 
     std::shared_ptr<AsyncOpenTask> self(shared_from_this());
-   session->wait_for_download_completion([callback, self, this](std::error_code ec) {
+    session->wait_for_download_completion([callback, self, this](std::error_code ec) {
        auto session = m_session.exchange(nullptr);
         if (!session)
             return; // Swallow all events if the task as been canceled.
