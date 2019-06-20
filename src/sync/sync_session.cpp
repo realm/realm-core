@@ -442,9 +442,10 @@ SyncSession::SyncSession(SyncClient& client, std::string realm_path, SyncConfig 
                       realm_config.encryption_key.begin());
         }
 
-        // FIXME: Opening a Realm only to discard it is relatively expensive. It may be preferable to have
-        // realm-sync open the Realm when the `sync::Session` is created since it can continue to use it.
-        Realm::get_shared_realm(realm_config); // Throws
+        std::unique_ptr<Replication> history;
+        std::unique_ptr<SharedGroup> shared_group;
+        std::unique_ptr<Group> read_only_group;
+        Realm::open_with_config(realm_config, history, shared_group, read_only_group, nullptr);
    }
 }
 
@@ -666,9 +667,9 @@ void SyncSession::create_sync_session()
     }
 
     if (m_force_client_reset) {
-        std::string metadata_dir = SyncManager::shared().m_file_manager->get_state_directory();
+        std::string metadata_dir = m_realm_path + ".resync";
         util::try_make_dir(metadata_dir);
-        
+
         sync::Session::Config::ClientReset config;
         config.metadata_dir = metadata_dir;
         session_config.client_reset_config = config;

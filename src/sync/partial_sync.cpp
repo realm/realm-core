@@ -16,10 +16,6 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-// Work-around for GCC bug: See https://stackoverflow.com/a/3233069/1389357
-// Must be defined at top of file
-#define __STDC_LIMIT_MACROS 
-
 #include "sync/partial_sync.hpp"
 
 #include "impl/collection_notifier.hpp"
@@ -37,7 +33,8 @@
 #include <realm/lang_bind_helper.hpp>
 #include <realm/util/scope_exit.hpp>
 
-#include <stdint.h>
+#include <cstdint>
+#include <limits>
 
 using namespace std::chrono;
 
@@ -62,54 +59,15 @@ namespace {
         results.clear(realm::RemoveMode::unordered);
     }
 
-    // FIXME: Replace these methods with: https://github.com/realm/realm-core/pull/3259
-
-    realm::Timestamp timestamp_now()
-    {
-        auto now = std::chrono::system_clock::now();
-        auto sec = std::chrono::time_point_cast<std::chrono::seconds>(now);
-        auto ns = static_cast<int32_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(now - sec).count());
-        return {sec.time_since_epoch().count(), ns};
-    }
-
     // Calculates the expiry date, claming at the high end if a timestamp overflows
     realm::Timestamp calculate_expiry_date(realm::Timestamp starting_time, int64_t user_ttl_ms)
     {
-
-        // Short-circuit the common case and prevent a bunch of annoying edge cases in the below calculations
-        // if a max value has been provided.
-        if (user_ttl_ms == INT64_MAX) {
-            return realm::Timestamp(INT64_MAX, realm::Timestamp::nanoseconds_per_second - 1);
-        }
-
-        // Get {sec, nanosec} pair representing `now`
-        int64_t s_arg = starting_time.get_seconds();
-        auto ns_arg = starting_time.get_nanoseconds();
-
-        // Convert millisecond input to match Timestamp representation
-        int64_t s_ttl = user_ttl_ms / 1000;
-        auto ns_ttl = static_cast<int32_t>((user_ttl_ms % 1000) * 1000000);
-
-        // Add user TTL to `now` but clamp at MAX if it overflows
-        // Also handle the slightly complicated situation where the ns part doesn't overflow but
-        // exceeds `nanoseconds_pr_second`.
-        int64_t modified_s_arg = s_arg;
-        int32_t modified_ns_arg = ns_arg + ns_ttl;
-
-        // The nano-second part can never overflow the int32_t type itself as the maximum result
-        // is `999.999.999ns + 999.999.999ns`, but we need to handle the case where it
-        // exceeds `nanoseconds_pr_second`
-        if (modified_ns_arg > realm::Timestamp::nanoseconds_per_second) {
-            modified_s_arg++;
-            modified_ns_arg = modified_ns_arg - realm::Timestamp::nanoseconds_per_second;
-        }
-
-        // Modify the seconds argument. Even if modified_ns_arg caused the addition of an extra second, we only
-        // need to check for a normal overflow as the complicated case of INT64_MAX + 1 + INT64_MAX is
-        // handled by the short-circuit at the top of this function.
-        modified_s_arg = (modified_s_arg + s_ttl < modified_s_arg) ? INT64_MAX : modified_s_arg + s_ttl;
-
-        return realm::Timestamp(modified_s_arg, modified_ns_arg);
+        auto tp = starting_time.get_time_point();
+        using time_point = decltype(tp);
+        milliseconds ttl(user_ttl_ms);
+        if (time_point::max() - ttl < tp)
+            return time_point::max();
+        return tp + ttl;
     }
 }
 
@@ -125,19 +83,26 @@ void initialize_schema(Group& group)
     if (!table) {
         // Create the schema required by Sync
         table = sync::create_table(group, result_sets_table_name);
-        table->add_column(type_String, property_query);
-        table->add_column(type_String, property_matches_property_name);
-        table->add_column(type_Int, property_status);
-        table->add_column(type_String, property_error_message);
-        table->add_column(type_Int, property_query_parse_counter);
     }
-    else {
-        // The table already existed, so it should have all of the columns that are in the shared schema.
-        REALM_ASSERT(table->get_column_index(property_query) != npos);
-        REALM_ASSERT(table->get_column_index(property_matches_property_name) != npos);
-        REALM_ASSERT(table->get_column_index(property_status) != npos);
-        REALM_ASSERT(table->get_column_index(property_error_message) != npos);
-        REALM_ASSERT(table->get_column_index(property_query_parse_counter) != npos);
+
+    if (table->get_column_index(property_query) == npos) {
+        table->add_column(type_String, property_query);
+    }
+
+    if (table->get_column_index(property_matches_property_name) == npos) {
+        table->add_column(type_String, property_matches_property_name);
+    }
+
+    if (table->get_column_index(property_status) == npos) {
+        table->add_column(type_Int, property_status);
+    }
+
+    if (table->get_column_index(property_error_message) == npos) {
+        table->add_column(type_String, property_error_message);
+    }
+
+    if (table->get_column_index(property_query_parse_counter) == npos) {
+        table->add_column(type_Int, property_query_parse_counter);
     }
 
     // Add columns not required by Sync, but used by the bindings to offer better tracking of subscriptions.
@@ -176,7 +141,33 @@ void initialize_schema(Group& group)
     }
 
     // Remove any subscriptions no longer relevant
-    cleanup_subscriptions(group, timestamp_now());
+    cleanup_subscriptions(group, system_clock::now());
+}
+
+void ensure_partial_sync_schema_initialized(Realm& realm)
+{
+    auto was_in_read = realm.is_in_read_transaction();
+    auto cleanup = util::make_scope_exit([&]() noexcept {
+        if (realm.is_in_transaction())
+            realm.cancel_transaction();
+        if (!was_in_read)
+            realm.invalidate();
+    });
+
+    auto& group = realm.read_group();
+    // Check if the result sets table already has the expected number of columns
+    auto table = ObjectStore::table_for_object_type(group, result_sets_type_name);
+    if (table && table->size() >= result_sets_property_count)
+        return;
+
+    realm.begin_transaction();
+    // Recheck after starting the transaction as it refreshes
+    if (!table)
+        table = ObjectStore::table_for_object_type(group, result_sets_type_name);
+    if (table && table->size() >= result_sets_property_count)
+        return;
+    initialize_schema(group);
+    realm.commit_transaction();
 }
 
 // A stripped-down version of WriteTransaction that can promote an existing read transaction
@@ -352,7 +343,7 @@ struct ResultSetsColumns {
 Row write_subscription(std::string const& object_type, std::string const& name, std::string const& query,
         util::Optional<int64_t> time_to_live_ms, bool update, Group& group)
 {
-    Timestamp now = timestamp_now();
+    Timestamp now = system_clock::now();
     auto matches_property = std::string(object_type) + "_matches";
 
     auto table = ObjectStore::table_for_object_type(group, result_sets_type_name);
@@ -415,7 +406,7 @@ Row write_subscription(std::string const& object_type, std::string const& name, 
     // Always set updated_at/expires_at when a subscription is touched, no matter if it is new, updated or someone just
     // resubscribes.
     table->set_timestamp(columns.updated_at, row_ndx, now);
-    if (table->is_null(columns.time_to_live, row_ndx)) {
+    if (table->is_null(columns.time_to_live, row_ndx) || table->get_int(columns.time_to_live, row_ndx) == std::numeric_limits<int64_t>::max()) {
         table->set_null(columns.expires_at, row_ndx);
     }
     else {
@@ -745,11 +736,11 @@ Subscription::Subscription(std::string name, std::string object_type, std::share
 
     auto matches_property = std::string(object_type) + "_matches";
 
-    m_wrapper_created_at = timestamp_now();
+    m_wrapper_created_at = system_clock::now();
     TableRef table = ObjectStore::table_for_object_type(realm->read_group(), result_sets_type_name);
     Query query = table->where();
-    query.equal(m_object_schema.property_for_name("name")->table_column, name);
-    query.equal(m_object_schema.property_for_name("matches_property")->table_column, matches_property);
+    query.equal(m_object_schema.property_for_name(property_name)->table_column, name);
+    query.equal(m_object_schema.property_for_name(property_matches_property_name)->table_column, matches_property);
     m_result_sets = Results(std::move(realm), std::move(query));
 }
 

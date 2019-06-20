@@ -16,10 +16,12 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "impl/realm_coordinator.hpp"
 #include "sync/async_open_task.hpp"
+
+#include "impl/realm_coordinator.hpp"
 #include "sync/sync_manager.hpp"
 #include "sync/sync_session.hpp"
+#include "thread_safe_reference.hpp"
 
 namespace realm {
 
@@ -29,45 +31,49 @@ AsyncOpenTask::AsyncOpenTask(std::shared_ptr<_impl::RealmCoordinator> coordinato
 {
 }
 
-void AsyncOpenTask::start(std::function<void(std::shared_ptr<Realm>, std::exception_ptr)> callback)
+void AsyncOpenTask::start(std::function<void(ThreadSafeReference<Realm>, std::exception_ptr)> callback)
 {
-    std::weak_ptr<AsyncOpenTask> weak_self(shared_from_this());
-    m_session->wait_for_download_completion([callback, weak_self](std::error_code ec) {
-        if (auto self = weak_self.lock()) {
-            if (self->m_canceled)
-                return; // Swallow all events if the task as been canceled.
+    auto session = m_session.load();
+    if (!session)
+        return;
 
-            if (ec)
-                callback(nullptr, std::make_exception_ptr(std::system_error(ec)));
-            else {
-                std::shared_ptr<Realm> realm;
-                try {
-                    realm = self->m_coordinator->get_realm();
-                }
-                catch (...) {
-                    return callback(nullptr, std::current_exception());
-                }
-                callback(realm, nullptr);
-            }
+    std::shared_ptr<AsyncOpenTask> self(shared_from_this());
+    session->wait_for_download_completion([callback, self, this](std::error_code ec) {
+       auto session = m_session.exchange(nullptr);
+        if (!session)
+            return; // Swallow all events if the task as been canceled.
+
+        // Release our references to the coordinator after calling the callback
+        auto coordinator = std::move(m_coordinator);
+        m_coordinator = nullptr;
+
+        if (ec)
+            return callback({}, std::make_exception_ptr(std::system_error(ec)));
+
+        ThreadSafeReference<Realm> realm;
+        try {
+            realm = coordinator->get_unbound_realm();
         }
+        catch (...) {
+            return callback({}, std::current_exception());
+        }
+        callback(std::move(realm), nullptr);
     });
 }
 
 void AsyncOpenTask::cancel()
 {
-    if (m_session) {
+    if (auto session = m_session.exchange(nullptr)) {
         // Does a better way exists for canceling the download?
-        m_canceled = true;
-        m_session->log_out();
-        m_session = nullptr;
+        session->log_out();
         m_coordinator = nullptr;
     }
 }
 
 uint64_t AsyncOpenTask::register_download_progress_notifier(std::function<SyncProgressNotifierCallback> callback)
 {
-    if (m_session) {
-        return m_session->register_progress_notifier(callback, realm::SyncSession::NotifierType::download, false);
+    if (auto session = m_session.load()) {
+        return session->register_progress_notifier(callback, realm::SyncSession::NotifierType::download, false);
     }
     else {
         return 0;
@@ -76,8 +82,8 @@ uint64_t AsyncOpenTask::register_download_progress_notifier(std::function<SyncPr
 
 void AsyncOpenTask::unregister_download_progress_notifier(uint64_t token)
 {
-    if (m_session)
-        m_session->unregister_progress_notifier(token);
+    if (auto session = m_session.load())
+        session->unregister_progress_notifier(token);
 }
 
 }

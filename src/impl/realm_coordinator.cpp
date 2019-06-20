@@ -26,13 +26,15 @@
 #include "object_schema.hpp"
 #include "object_store.hpp"
 #include "schema.hpp"
+#include "thread_safe_reference.hpp"
 
 #if REALM_ENABLE_SYNC
 #include "sync/impl/work_queue.hpp"
+#include "sync/async_open_task.hpp"
+#include "sync/partial_sync.hpp"
 #include "sync/sync_config.hpp"
 #include "sync/sync_manager.hpp"
 #include "sync/sync_session.hpp"
-#include "sync/async_open_task.hpp"
 #endif
 
 #include <realm/group_shared.hpp>
@@ -77,7 +79,7 @@ std::shared_ptr<RealmCoordinator> RealmCoordinator::get_existing_coordinator(Str
     return it == s_coordinators_per_path.end() ? nullptr : it->second.lock();
 }
 
-void RealmCoordinator::create_sync_session(bool force_client_reset)
+void RealmCoordinator::create_sync_session(bool force_client_reset, bool validate_sync_history)
 {
 #if REALM_ENABLE_SYNC
     if (m_sync_session)
@@ -94,7 +96,7 @@ void RealmCoordinator::create_sync_session(bool force_client_reset)
     }
 
     auto sync_config = *m_config.sync_config;
-    sync_config.validate_sync_history = false;
+    sync_config.validate_sync_history = validate_sync_history;
     m_sync_session = SyncManager::shared().get_session(m_config.path, sync_config, force_client_reset);
 
     std::weak_ptr<RealmCoordinator> weak_self = shared_from_this();
@@ -181,16 +183,17 @@ void RealmCoordinator::set_config(const Realm::Config& config)
             }
         }
 #endif
+        // Mixing cached and uncached Realms is allowed
+        m_config.cache = config.cache;
 
         // Realm::update_schema() handles complaining about schema mismatches
     }
 }
 
-std::shared_ptr<Realm> RealmCoordinator::get_cached_realm(Realm::Config const& config)
+std::shared_ptr<Realm> RealmCoordinator::get_cached_realm(Realm::Config const& config, AnyExecutionContextID execution_context)
 {
     if (!config.cache)
         return nullptr;
-    AnyExecutionContextID execution_context(config.execution_context);
     for (auto& cached_realm : m_weak_realm_notifiers) {
         if (!cached_realm.is_cached_for_execution_context(execution_context))
             continue;
@@ -221,17 +224,34 @@ std::shared_ptr<Realm> RealmCoordinator::get_realm(Realm::Config config)
     // to acquire the same lock
     std::shared_ptr<Realm> realm;
     std::unique_lock<std::mutex> lock(m_realm_mutex);
+    set_config(config);
+    if ((realm = get_cached_realm(config, config.execution_context)))
+        return realm;
     do_get_realm(std::move(config), realm, lock);
     return realm;
 }
 
-void RealmCoordinator::do_get_realm(Realm::Config config, std::shared_ptr<Realm>& realm,
-                                    std::unique_lock<std::mutex>& realm_lock)
+std::shared_ptr<Realm> RealmCoordinator::get_realm()
 {
-    set_config(config);
-    if ((realm = get_cached_realm(config)))
-        return;
+    std::shared_ptr<Realm> realm;
+    std::unique_lock<std::mutex> lock(m_realm_mutex);
+    if ((realm = get_cached_realm(m_config, m_config.execution_context)))
+        return realm;
+    do_get_realm(m_config, realm, lock);
+    return realm;
+}
 
+ThreadSafeReference<Realm> RealmCoordinator::get_unbound_realm()
+{
+    ThreadSafeReference<Realm> ref;
+    std::unique_lock<std::mutex> lock(m_realm_mutex);
+    do_get_realm(m_config, ref.m_realm, lock, false);
+    return ref;
+}
+
+void RealmCoordinator::do_get_realm(Realm::Config config, std::shared_ptr<Realm>& realm,
+                                    std::unique_lock<std::mutex>& realm_lock, bool bind_to_context)
+{
     auto schema = std::move(config.schema);
     auto migration_function = std::move(config.migration_function);
     auto initialization_function = std::move(config.initialization_function);
@@ -248,19 +268,35 @@ void RealmCoordinator::do_get_realm(Realm::Config config, std::shared_ptr<Realm>
             throw RealmFileException(RealmFileException::Kind::AccessError, get_path(), ex.code().message(), "");
         }
     }
-    m_weak_realm_notifiers.emplace_back(realm, realm->config().cache);
+    m_weak_realm_notifiers.emplace_back(realm, realm->config().cache, bind_to_context);
 
     if (realm->config().sync_config)
-        create_sync_session(false);
+        create_sync_session(false, false);
 
     if (!m_audit_context && audit_factory)
         m_audit_context = audit_factory();
 
+    realm_lock.unlock();
     if (schema) {
-        realm_lock.unlock();
         realm->update_schema(std::move(*schema), config.schema_version, std::move(migration_function),
                              std::move(initialization_function));
     }
+#if REALM_ENABLE_SYNC
+    else if (realm->is_partial())
+        _impl::ensure_partial_sync_schema_initialized(*realm);
+#endif
+}
+
+void RealmCoordinator::bind_to_context(Realm& realm, AnyExecutionContextID execution_context)
+{
+    std::unique_lock<std::mutex> lock(m_realm_mutex);
+    for (auto& cached_realm : m_weak_realm_notifiers) {
+        if (!cached_realm.is_for_realm(&realm))
+            continue;
+        cached_realm.bind_to_execution_context(execution_context);
+        return;
+    }
+    REALM_TERMINATE("Invalid Realm passed to bind_to_context()");
 }
 
 #if REALM_ENABLE_SYNC
@@ -271,16 +307,11 @@ std::shared_ptr<AsyncOpenTask> RealmCoordinator::get_synchronized_realm(Realm::C
 
     std::unique_lock<std::mutex> lock(m_realm_mutex);
     set_config(config);
-    create_sync_session(!config.sync_config->is_partial && !File::exists(m_config.path));
+    bool exists = File::exists(m_config.path);
+    create_sync_session(!config.sync_config->is_partial && !exists, exists);
     return std::make_shared<AsyncOpenTask>(shared_from_this(), m_sync_session);
 }
 #endif
-
-
-std::shared_ptr<Realm> RealmCoordinator::get_realm()
-{
-    return get_realm(m_config);
-}
 
 bool RealmCoordinator::get_cached_schema(Schema& schema, uint64_t& schema_version,
                                          uint64_t& transaction) const noexcept
@@ -330,7 +361,7 @@ void RealmCoordinator::advance_schema_cache(uint64_t previous, uint64_t next)
 
 RealmCoordinator::RealmCoordinator()
 #if REALM_ENABLE_SYNC
-: m_partial_sync_work_queue(std::make_unique<partial_sync::WorkQueue>())
+: m_partial_sync_work_queue(std::make_unique<_impl::partial_sync::WorkQueue>())
 #endif
 {
 }
@@ -950,12 +981,12 @@ void RealmCoordinator::process_available_async(Realm& realm)
 
 void RealmCoordinator::set_transaction_callback(std::function<void(VersionID, VersionID)> fn)
 {
-    create_sync_session(false);
+    create_sync_session(false, false);
     m_transaction_callback = std::move(fn);
 }
 
 #if REALM_ENABLE_SYNC
-partial_sync::WorkQueue& RealmCoordinator::partial_sync_work_queue()
+_impl::partial_sync::WorkQueue& RealmCoordinator::partial_sync_work_queue()
 {
     return *m_partial_sync_work_queue;
 }

@@ -69,6 +69,7 @@ static void update_schema(Group& group, Property matches_property)
 
     Schema desired_schema({
         ObjectSchema(result_sets_type_name, {
+            {"name", PropertyType::String},
             {"matches_property", PropertyType::String},
             {"query", PropertyType::String},
             {"status", PropertyType::Int},
@@ -93,12 +94,17 @@ static void subscribe_to_all(std::shared_ptr<Realm> const& r)
 
     CppContext context;
     auto obj = Object::create<util::Any>(context, r, schema, AnyDict{
+        {"name", ""s},
         {"matches_property", "object_matches"s},
         {"query", "TRUEPREDICATE"s},
         {"status", int64_t(0)},
         {"error_message", ""s},
         {"query_parse_counter", int64_t(0)},
         {"matches_count", int64_t(0)},
+        {"created_at", Timestamp(0, 0)},
+        {"updated_at", Timestamp(0, 0)},
+        {"expires_at", Timestamp()},
+        {"time_to_live", {}},
     }, false);
 
     r->commit_transaction();
