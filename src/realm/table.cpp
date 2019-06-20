@@ -2049,6 +2049,27 @@ void Table::update_from_parent(size_t old_baseline) noexcept
     m_alloc.bump_storage_version();
 }
 
+
+void Table::to_json(std::ostream& out, size_t link_depth, std::map<std::string, std::string>* renames) const
+{
+    // Represent table as list of objects
+    out << "[";
+    bool first = true;
+
+    for (auto& obj : *this) {
+        if (first) {
+            first = false;
+        }
+        else {
+            out << ",";
+        }
+        obj.to_json(out, link_depth, renames);
+    }
+
+    out << "]";
+}
+
+
 size_t Table::compute_aggregated_byte_size() const noexcept
 {
     if (!m_top.is_attached())

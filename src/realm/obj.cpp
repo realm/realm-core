@@ -490,6 +490,137 @@ ObjKey ConstObj::get_backlink(ColKey backlink_col, size_t backlink_ndx) const
     return backlinks.get_backlink(m_row_ndx, backlink_ndx);
 }
 
+namespace {
+
+template <class T>
+void out_floats(std::ostream& out, T value)
+{
+    std::streamsize old = out.precision();
+    out.precision(std::numeric_limits<T>::digits10 + 1);
+    out << std::scientific << value;
+    out.precision(old);
+}
+inline void out_binary(std::ostream& out, const BinaryData bin)
+{
+    const char* p = bin.data();
+
+    for (size_t i = 0; i < bin.size(); ++i) {
+        out << std::setw(2) << std::setfill('0') << std::hex << static_cast<unsigned int>(p[i]) << std::dec;
+    }
+}
+
+} // anonymous namespace
+
+void ConstObj::to_json(std::ostream& out, size_t link_depth, std::map<std::string, std::string>& renames,
+                       std::vector<ColKey>& followed) const
+{
+    out << "{";
+    bool first = true;
+    auto col_keys = m_table->get_column_keys();
+    for (auto ck : col_keys) {
+        if (is_null(ck))
+            continue;
+
+        if (first) {
+            first = false;
+        }
+        else {
+            out << ",";
+        }
+
+        StringData name = m_table->get_column_name(ck);
+        if (renames[name] != "")
+            name = renames[name];
+
+        out << "\"" << name << "\":";
+
+        DataType type = DataType(ck.get_type());
+        switch (type) {
+            case type_Int:
+                if (ck.get_attrs().test(col_attr_Nullable)) {
+                    out << *get<util::Optional<Int>>(ck);
+                }
+                else {
+                    out << get<Int>(ck);
+                }
+                break;
+            case type_Bool:
+                out << (get<bool>(ck) ? "true" : "false");
+                break;
+            case type_Float:
+                out_floats<float>(out, get<float>(ck));
+                break;
+            case type_Double:
+                out_floats<double>(out, get<double>(ck));
+                break;
+            case type_String:
+                out << "\"" << get<String>(ck) << "\"";
+                break;
+            case type_Binary:
+                out << "\"";
+                out_binary(out, get<Binary>(ck));
+                out << "\"";
+                break;
+            case type_Timestamp:
+                out << "\"";
+                out << get<Timestamp>(ck);
+                out << "\"";
+                break;
+            case type_Link: {
+                if (ObjKey obj_key = get<ObjKey>(ck)) {
+                    auto obj = get_linked_object(ck);
+                    if ((link_depth == 0) || (link_depth == not_found &&
+                                              std::find(followed.begin(), followed.end(), ck) != followed.end())) {
+                        out << "\"" << obj_key.value << "\"";
+                        break;
+                    }
+                    else {
+                        out << "[";
+                        followed.push_back(ck);
+                        size_t new_depth = link_depth == not_found ? not_found : link_depth - 1;
+                        obj.to_json(out, new_depth, renames, followed);
+                        out << "]";
+                    }
+                }
+                break;
+            }
+            case type_LinkList: {
+                auto ll = get_linklist(ck);
+
+                if ((link_depth == 0) ||
+                    (link_depth == not_found && std::find(followed.begin(), followed.end(), ck) != followed.end())) {
+                    out << "{\"table\": \"" << get_target_table(ck)->get_name() << "\", \"rows\": [";
+                    for (size_t i = 0; i < ll.size(); i++) {
+                        if (i > 0)
+                            out << ", ";
+                        out << ll.get(i).value;
+                    }
+                    out << "]}";
+                    break;
+                }
+                else {
+                    out << "[";
+                    for (size_t i = 0; i < ll.size(); i++) {
+                        if (i > 0)
+                            out << ", ";
+                        followed.push_back(ck);
+                        size_t new_depth = link_depth == not_found ? not_found : link_depth - 1;
+                        ll.get_object(i).to_json(out, new_depth, renames, followed);
+                    }
+                    out << "]";
+                }
+
+                break;
+            }
+            case type_OldDateTime:
+            case type_OldMixed:
+            case type_OldTable:
+                break;
+        }
+    }
+    out << "}";
+}
+
 /*********************************** Obj *************************************/
 
 bool Obj::ensure_writeable()

@@ -138,6 +138,12 @@ TEST(Group_UnattachedErrorHandling)
         CHECK_LOGIC_ERROR(group.get_or_add_table("foo", &f), LogicError::detached_accessor);
         CHECK_LOGIC_ERROR(group.get_or_add_table("foo", &f), LogicError::detached_accessor);
     }
+    {
+        std::ostringstream out;
+        size_t link_depth = 0;
+        std::map<std::string, std::string> renames;
+        CHECK_LOGIC_ERROR(group.to_json(out, link_depth, &renames), LogicError::detached_accessor);
+    }
 }
 
 
@@ -1194,6 +1200,23 @@ TEST(Group_Persist)
         CHECK_EQUAL("binary", obj.get<Binary>(cols[3]).data());
         CHECK(obj.get<Timestamp>(cols[4]) == Timestamp(111, 222));
     }
+}
+
+TEST(Group_ToJSON)
+{
+    Group g;
+    TableRef table = g.add_table("test");
+    test_table_add_columns(table);
+
+    table->create_object().set_all("jeff", 1, true, int(Wed));
+    table->create_object().set_all("jim", 1, true, int(Wed));
+    std::ostringstream out;
+    g.to_json(out);
+    std::string str = out.str();
+    CHECK(str.length() > 0);
+    CHECK_EQUAL("{\"test\":[{\"first\":\"jeff\",\"second\":1,\"third\":true,\"fourth\":2},{\"first\":\"jim\","
+                "\"second\":1,\"third\":true,\"fourth\":2}]}",
+                str);
 }
 
 TEST(Group_IndexString)

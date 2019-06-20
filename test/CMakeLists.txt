@@ -32,6 +32,7 @@ set(NORMAL_TESTS
     test_group.cpp
     test_impl_simulated_failure.cpp
     test_index_string.cpp
+    test_json.cpp
     test_lang_bind_helper.cpp
     test_link_query_view.cpp
     test_links.cpp

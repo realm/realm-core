@@ -364,6 +364,30 @@ size_t ConstTableView::count_timestamp(ColKey column_key, Timestamp target) cons
     return count;
 }
 
+void ConstTableView::to_json(std::ostream& out) const
+{
+    check_cookie();
+
+    // Represent table as list of objects
+    out << "[";
+
+    const size_t row_count = size();
+    bool first = true;
+    for (size_t r = 0; r < row_count; ++r) {
+        if (ObjKey key = get_key(r)) {
+            if (first) {
+                first = false;
+            }
+            else {
+                out << ",";
+            }
+            m_table->get_object(key).to_json(out);
+        }
+    }
+
+    out << "]";
+}
+
 bool ConstTableView::depends_on_deleted_object() const
 {
     if (m_linklist_source && !m_linklist_source->is_attached()) {

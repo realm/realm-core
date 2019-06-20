@@ -64,6 +64,24 @@ using namespace test_util;
 // `experiments/testcase.cpp` and then run `sh build.sh
 // check-testcase` (or one of its friends) from the command line.
 
+TEST(TableView_Json)
+{
+    Table table;
+    auto col = table.add_column(type_Int, "first");
+
+    table.create_object().set(col, 1);
+    table.create_object().set(col, 2);
+    table.create_object().set(col, 3);
+
+    TableView v = table.where().find_all(1);
+    std::stringstream ss;
+    v.to_json(ss);
+    const std::string json = ss.str();
+    CHECK_EQUAL(true, json.length() > 0);
+    CHECK_EQUAL("[{\"first\":2},{\"first\":3}]", json);
+}
+
+
 TEST(TableView_TimestampMaxMinCount)
 {
     Table t;

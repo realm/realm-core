@@ -23,6 +23,7 @@
 #include <realm/cluster.hpp>
 #include <realm/table_ref.hpp>
 #include <realm/keys.hpp>
+#include <map>
 
 #define REALM_CLUSTER_IF
 
@@ -145,6 +146,18 @@ public:
         Cluster cluster(0, get_alloc(), *get_tree_top());
         cluster.init_from_mem(m_mem);
         return func(&cluster, m_row_ndx);
+    }
+
+    void to_json(std::ostream& out, size_t link_depth, std::map<std::string, std::string>& renames,
+                 std::vector<ColKey>& followed) const;
+    void to_json(std::ostream& out, size_t link_depth = 0,
+                 std::map<std::string, std::string>* renames = nullptr) const
+    {
+        std::map<std::string, std::string> renames2;
+        renames = renames ? renames : &renames2;
+
+        std::vector<ColKey> followed;
+        to_json(out, link_depth, *renames, followed);
     }
 
 protected:

@@ -502,6 +502,10 @@ public:
 
     //@}
 
+    // Conversion
+    template <class S>
+    void to_json(S& out, size_t link_depth = 0, std::map<std::string, std::string>* renames = nullptr) const;
+
     /// Compare two groups for equality. Two groups are equal if, and
     /// only if, they contain the same tables in the same order, that
     /// is, for each table T at index I in one of the groups, there is
@@ -1007,6 +1011,37 @@ inline TableRef Group::get_or_add_table(StringData name, bool* was_added)
         throw LogicError(LogicError::detached_accessor);
     Table* table = do_get_or_add_table(name, was_added); // Throws
     return TableRef(table);
+}
+
+template <class S>
+void Group::to_json(S& out, size_t link_depth, std::map<std::string, std::string>* renames) const
+{
+    if (!is_attached())
+        throw LogicError(LogicError::detached_accessor);
+
+    std::map<std::string, std::string> renames2;
+    renames = renames ? renames : &renames2;
+
+    out << "{";
+
+    auto keys = get_table_keys();
+    for (size_t i = 0; i < keys.size(); ++i) {
+        auto key = keys[i];
+        StringData name = get_table_name(key);
+        std::map<std::string, std::string>& m = *renames;
+        if (m[name] != "")
+            name = m[name];
+
+        ConstTableRef table = get_table(key);
+
+        if (i)
+            out << ",";
+        out << "\"" << name << "\"";
+        out << ":";
+        table->to_json(out, link_depth, renames);
+    }
+
+    out << "}";
 }
 
 inline void Group::init_array_parents() noexcept

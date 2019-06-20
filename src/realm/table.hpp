@@ -615,6 +615,10 @@ public:
     }
     Table& backlink(const Table& origin, ColKey origin_col_key);
 
+    // Conversion
+    void to_json(std::ostream& out, size_t link_depth = 0,
+                 std::map<std::string, std::string>* renames = nullptr) const;
+
     // Get a reference to this table
     TableRef get_table_ref()
     {

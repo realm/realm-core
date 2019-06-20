@@ -272,6 +272,9 @@ public:
         return m_key_values->find_first(key);
     }
 
+    // Conversion
+    void to_json(std::ostream&) const;
+
     // Determine if the view is 'in sync' with the underlying table
     // as well as other views used to generate the view. Note that updates
     // through views maintains synchronization between view and table.
