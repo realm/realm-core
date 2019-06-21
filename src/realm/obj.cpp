@@ -459,19 +459,53 @@ ObjKey ConstObj::get_backlink(ColKey backlink_col, size_t backlink_ndx) const
 namespace {
 
 template <class T>
-void out_floats(std::ostream& out, T value)
+inline void out_floats(std::ostream& out, T value)
 {
     std::streamsize old = out.precision();
     out.precision(std::numeric_limits<T>::digits10 + 1);
     out << std::scientific << value;
     out.precision(old);
 }
-inline void out_binary(std::ostream& out, const BinaryData bin)
-{
-    const char* p = bin.data();
 
-    for (size_t i = 0; i < bin.size(); ++i) {
-        out << std::setw(2) << std::setfill('0') << std::hex << static_cast<unsigned int>(p[i]) << std::dec;
+void out_mixed(std::ostream& out, const Mixed& val)
+{
+    switch (val.get_type()) {
+        case type_Int:
+            out << val.get<Int>();
+            break;
+        case type_Bool:
+            out << (val.get<bool>() ? "true" : "false");
+            break;
+        case type_Float:
+            out_floats<float>(out, val.get<float>());
+            break;
+        case type_Double:
+            out_floats<double>(out, val.get<double>());
+            break;
+        case type_String:
+            out << "\"" << val.get<String>() << "\"";
+            break;
+        case type_Binary: {
+            out << "\"";
+            auto bin = val.get<Binary>();
+            const char* p = bin.data();
+            for (size_t i = 0; i < bin.size(); ++i) {
+                out << std::setw(2) << std::setfill('0') << std::hex << static_cast<unsigned int>(p[i]) << std::dec;
+            }
+            out << "\"";
+            break;
+        }
+        case type_Timestamp:
+            out << "\"";
+            out << val.get<Timestamp>();
+            out << "\"";
+            break;
+        case type_Link:
+        case type_LinkList:
+        case type_OldDateTime:
+        case type_OldMixed:
+        case type_OldTable:
+            break;
     }
 }
 
@@ -495,78 +529,30 @@ void ConstObj::to_json(std::ostream& out, size_t link_depth, std::map<std::strin
         }
 
         StringData name = m_table->get_column_name(ck);
+        DataType type = DataType(ck.get_type());
         if (renames[name] != "")
             name = renames[name];
 
         out << "\"" << name << "\":";
 
-        DataType type = DataType(ck.get_type());
-        switch (type) {
-            case type_Int:
-                if (ck.get_attrs().test(col_attr_Nullable)) {
-                    out << *get<util::Optional<Int>>(ck);
-                }
-                else {
-                    out << get<Int>(ck);
-                }
-                break;
-            case type_Bool:
-                out << (get<bool>(ck) ? "true" : "false");
-                break;
-            case type_Float:
-                out_floats<float>(out, get<float>(ck));
-                break;
-            case type_Double:
-                out_floats<double>(out, get<double>(ck));
-                break;
-            case type_String:
-                out << "\"" << get<String>(ck) << "\"";
-                break;
-            case type_Binary:
-                out << "\"";
-                out_binary(out, get<Binary>(ck));
-                out << "\"";
-                break;
-            case type_Timestamp:
-                out << "\"";
-                out << get<Timestamp>(ck);
-                out << "\"";
-                break;
-            case type_Link: {
-                if (ObjKey obj_key = get<ObjKey>(ck)) {
-                    auto obj = get_linked_object(ck);
-                    if ((link_depth == 0) || (link_depth == not_found &&
-                                              std::find(followed.begin(), followed.end(), ck) != followed.end())) {
-                        out << "\"" << obj_key.value << "\"";
-                        break;
-                    }
-                    else {
-                        out << "[";
-                        followed.push_back(ck);
-                        size_t new_depth = link_depth == not_found ? not_found : link_depth - 1;
-                        obj.to_json(out, new_depth, renames, followed);
-                        out << "]";
-                    }
-                }
-                break;
-            }
-            case type_LinkList: {
+        if (ck.get_attrs().test(col_attr_List)) {
+            if (type == type_LinkList) {
                 auto ll = get_linklist(ck);
+                auto sz = ll.size();
 
                 if ((link_depth == 0) ||
                     (link_depth == not_found && std::find(followed.begin(), followed.end(), ck) != followed.end())) {
                     out << "{\"table\": \"" << get_target_table(ck)->get_name() << "\", \"rows\": [";
-                    for (size_t i = 0; i < ll.size(); i++) {
+                    for (size_t i = 0; i < sz; i++) {
                         if (i > 0)
                             out << ", ";
                         out << ll.get(i).value;
                     }
                     out << "]}";
-                    break;
                 }
                 else {
                     out << "[";
-                    for (size_t i = 0; i < ll.size(); i++) {
+                    for (size_t i = 0; i < sz; i++) {
                         if (i > 0)
                             out << ", ";
                         followed.push_back(ck);
@@ -576,12 +562,44 @@ void ConstObj::to_json(std::ostream& out, size_t link_depth, std::map<std::strin
                     out << "]";
                 }
 
-                break;
             }
-            case type_OldDateTime:
-            case type_OldMixed:
-            case type_OldTable:
-                break;
+            else {
+                auto list = get_listbase_ptr(ck);
+                auto sz = list->size();
+
+                out << "[";
+                for (size_t i = 0; i < sz; i++) {
+                    auto val = list->get_any(i);
+                    if (val.is_null())
+                        continue;
+
+                    if (i > 0)
+                        out << ", ";
+
+                    out_mixed(out, val);
+                }
+                out << "]";
+            }
+        }
+        else {
+            if (type == type_Link) {
+                auto obj = get_linked_object(ck);
+                if ((link_depth == 0) ||
+                    (link_depth == not_found && std::find(followed.begin(), followed.end(), ck) != followed.end())) {
+                    out << "\"" << obj.get_key().value << "\"";
+                    break;
+                }
+                else {
+                    out << "[";
+                    followed.push_back(ck);
+                    size_t new_depth = link_depth == not_found ? not_found : link_depth - 1;
+                    obj.to_json(out, new_depth, renames, followed);
+                    out << "]";
+                }
+            }
+            else {
+                out_mixed(out, get_any(ck));
+            }
         }
     }
     out << "}";

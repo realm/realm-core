@@ -93,6 +93,7 @@ void setup_multi_table(Table& table, size_t rows)
     ColKey string_big = table.add_column(type_String, "string_big_blobs"); //  7
     ColKey string_enum = table.add_column(type_String, "string_enum");     //  8 - becomes StringEnumColumn
     ColKey binary = table.add_column(type_Binary, "binary");               //  9
+    ColKey int_list = table.add_column_list(type_Int, "integers");
 
     std::vector<std::string> strings;
     for (size_t i = 0; i < rows; ++i) {
@@ -130,6 +131,10 @@ void setup_multi_table(Table& table, size_t rows)
                 break;
         }
         obj.set(binary, BinaryData("binary", 7));
+        auto list = obj.get_list<Int>(int_list);
+        for (size_t n = 0; n < i % 5; n++) {
+            list.add(n);
+        }
     }
 
     // We also want a StringEnumColumn
