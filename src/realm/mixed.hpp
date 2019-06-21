@@ -119,6 +119,10 @@ public:
     Mixed(bool) noexcept;
     Mixed(float) noexcept;
     Mixed(double) noexcept;
+    Mixed(util::Optional<int64_t>) noexcept;
+    Mixed(util::Optional<bool>) noexcept;
+    Mixed(util::Optional<float>) noexcept;
+    Mixed(util::Optional<double>) noexcept;
     Mixed(StringData) noexcept;
     Mixed(BinaryData) noexcept;
     Mixed(Timestamp) noexcept;
@@ -214,28 +218,92 @@ inline Mixed::Mixed(double v) noexcept
     double_val = v;
 }
 
+inline Mixed::Mixed(util::Optional<int64_t> v) noexcept
+{
+    if (v) {
+        m_type = type_Int;
+        int_val = *v;
+    }
+    else {
+        m_type = null_type;
+    }
+}
+
+inline Mixed::Mixed(util::Optional<bool> v) noexcept
+{
+    if (v) {
+        m_type = type_Bool;
+        bool_val = *v;
+    }
+    else {
+        m_type = null_type;
+    }
+}
+
+inline Mixed::Mixed(util::Optional<float> v) noexcept
+{
+    if (v) {
+        m_type = type_Float;
+        float_val = *v;
+    }
+    else {
+        m_type = null_type;
+    }
+}
+
+inline Mixed::Mixed(util::Optional<double> v) noexcept
+{
+    if (v) {
+        m_type = type_Double;
+        double_val = *v;
+    }
+    else {
+        m_type = null_type;
+    }
+}
+
 inline Mixed::Mixed(StringData v) noexcept
 {
-    m_type = type_String;
-    string_val = v;
+    if (!v.is_null()) {
+        m_type = type_String;
+        string_val = v;
+    }
+    else {
+        m_type = null_type;
+    }
 }
 
 inline Mixed::Mixed(BinaryData v) noexcept
 {
-    m_type = type_Binary;
-    string_val = StringData(v.data(), v.size());
+    if (!v.is_null()) {
+        m_type = type_Binary;
+        string_val = StringData(v.data(), v.size());
+    }
+    else {
+        m_type = null_type;
+    }
 }
 
 inline Mixed::Mixed(Timestamp v) noexcept
 {
-    m_type = type_Timestamp;
-    date_val = v;
+    if (!v.is_null()) {
+        m_type = type_Timestamp;
+        date_val = v;
+    }
+    else {
+        m_type = null_type;
+    }
 }
 
 inline Mixed::Mixed(ObjKey v) noexcept
 {
-    m_type = type_Link;
-    int_val = v.value;
+    if (v) {
+        m_type = type_Link;
+        int_val = v.value;
+    }
+    else {
+        m_type = null_type;
+    }
 }
 
 template <>

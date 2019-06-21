@@ -84,6 +84,8 @@ public:
      */
     virtual size_t size() const = 0;
     virtual bool is_null(size_t ndx) const = 0;
+    virtual Mixed get_any(size_t ndx) const = 0;
+
     bool is_empty() const
     {
         return size() == 0;
@@ -276,6 +278,10 @@ public:
     bool is_null(size_t ndx) const final
     {
         return m_nullable && get(ndx) == BPlusTree<T>::default_value(true);
+    }
+    Mixed get_any(size_t ndx) const final
+    {
+        return Mixed(get(ndx));
     }
     T get(size_t ndx) const
     {

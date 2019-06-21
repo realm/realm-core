@@ -146,67 +146,33 @@ void ConstObj::remove()
 
 Mixed ConstObj::get_any(ColKey col_key) const
 {
-    Mixed ret;
-    bool is_nullable = col_key.get_attrs().test(col_attr_Nullable);
     switch (col_key.get_type()) {
         case col_type_Int:
-            if (is_nullable) {
-                if (auto val = get<util::Optional<int64_t>>(col_key)) {
-                    ret = *val;
-                }
+            if (col_key.get_attrs().test(col_attr_Nullable)) {
+                return Mixed{get<util::Optional<int64_t>>(col_key)};
             }
             else {
-                ret = get<Int>(col_key);
+                return Mixed{get<int64_t>(col_key)};
             }
-            break;
         case col_type_Bool:
-            if (auto val = get<util::Optional<bool>>(col_key)) {
-                ret = *val;
-            }
-            break;
+            return Mixed{get<util::Optional<bool>>(col_key)};
         case col_type_Float:
-            if (auto val = get<util::Optional<float>>(col_key)) {
-                ret = *val;
-            }
-            break;
+            return Mixed{get<util::Optional<float>>(col_key)};
         case col_type_Double:
-            if (auto val = get<util::Optional<double>>(col_key)) {
-                ret = *val;
-            }
-            break;
-        case col_type_String: {
-            auto val = get<String>(col_key);
-            if (!val.is_null()) {
-                ret = val;
-            }
-            break;
-        }
-        case col_type_Binary: {
-            auto val = get<Binary>(col_key);
-            if (!val.is_null()) {
-                ret = val;
-            }
-            break;
-        }
-        case col_type_Timestamp: {
-            auto val = get<Timestamp>(col_key);
-            if (!val.is_null()) {
-                ret = val;
-            }
-            break;
-        }
-        case col_type_Link: {
-            auto val = get<ObjKey>(col_key);
-            if (val) {
-                ret = val;
-            }
-            break;
-        }
+            return Mixed{get<util::Optional<double>>(col_key)};
+        case col_type_String:
+            return Mixed{get<String>(col_key)};
+        case col_type_Binary:
+            return Mixed{get<Binary>(col_key)};
+        case col_type_Timestamp:
+            return Mixed{get<Timestamp>(col_key)};
+        case col_type_Link:
+            return Mixed{get<ObjKey>(col_key)};
         default:
             REALM_UNREACHABLE();
             break;
     }
-    return ret;
+    return {};
 }
 
 ColKey ConstObj::get_column_key(StringData col_name) const
