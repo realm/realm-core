@@ -660,6 +660,11 @@ Results Results::apply_ordering(DescriptorOrdering&& ordering)
                 new_order.append_limit(std::move(*limit));
                 break;
             }
+            case DescriptorType::Include: {
+                auto include = dynamic_cast<const IncludeDescriptor*>(ordering[i]);
+                new_order.append_include(std::move(*include));
+                break;
+            }
         }
     }
     return Results(m_realm, get_query(), std::move(new_order));

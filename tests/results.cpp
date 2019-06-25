@@ -1365,7 +1365,7 @@ TEST_CASE("notifications: results") {
 
         SECTION("inserting a row then modifying it in a second transaction does not report it as modified") {
             r2->begin_transaction();
-            ObjKey k = r2_table->create_object().set(col_value, 6).get_key();
+            ObjKey k = r2_table->create_object(ObjKey(53)).set(col_value, 6).get_key();
             r2->commit_transaction();
 
             coordinator->on_change();
@@ -1469,7 +1469,7 @@ TEST_CASE("notifications: results") {
 
         SECTION("both are called after a write") {
             write([&](auto&& t) {
-                t.create_object().set(col_value, 5);
+                t.create_object(ObjKey(53)).set(col_value, 5);
             });
             REQUIRE(callback.before_calls == 1);
             REQUIRE(callback.after_calls == 2);
@@ -1498,7 +1498,7 @@ TEST_CASE("notifications: results") {
                 REQUIRE(results.last()->get<int64_t>(col_value) == 5);
             };
             write([&](auto&& t) {
-                t.create_object().set(col_value, 5);
+                t.create_object(ObjKey(53)).set(col_value, 5);
             });
             REQUIRE(callback.before_calls == 1);
             REQUIRE(callback.after_calls == 2);
@@ -1712,7 +1712,7 @@ TEST_CASE("notifications: results") {
 
         SECTION("insert table before observed table") {
             write([&] {
-                table->create_object().set(col_value, 5);
+                table->create_object(ObjKey(53)).set(col_value, 5);
                 r->read_group().add_table("new table");
                 table->create_object(ObjKey(0)).set(col_value, 5);
             });
