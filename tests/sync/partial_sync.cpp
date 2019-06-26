@@ -226,7 +226,7 @@ TEST_CASE("Partial sync", "[sync]") {
     if (!EventLoop::has_implementation())
         return;
 
-    SyncManager::shared().configure_file_system(tmp_dir(), SyncManager::MetadataMode::NoEncryption);
+    SyncManager::shared().configure(tmp_dir(), SyncManager::MetadataMode::NoEncryption);
 
     SyncServer server;
     SyncTestFile config(server, "test");
@@ -489,6 +489,20 @@ TEST_CASE("Partial sync", "[sync]") {
         EventLoop::main().run_until([&] { return partial_sync_done; });
     }
 
+    SECTION("named query can be unsubscribed by looking up the object in the Realm") {
+        auto subscription = subscription_with_query("number != 1", partial_config, "object_a", "query"s);
+        EventLoop::main().run_until([&] { return subscription.state() == partial_sync::SubscriptionState::Complete; });
+
+        auto realm = Realm::get_shared_realm(partial_config);
+        auto table = ObjectStore::table_for_object_type(realm->read_group(), partial_sync::result_sets_type_name);
+        ObjectSchema object_schema(realm->read_group(), partial_sync::result_sets_type_name);
+        size_t row = table->find_first(table->get_column_index("name"), StringData("query"));
+        Object subscription_object(realm, object_schema, table->get(row));
+
+        partial_sync::unsubscribe(std::move(subscription_object));
+        EventLoop::main().run_until([&] { return subscription.state() != partial_sync::SubscriptionState::Complete; });
+    }
+
     SECTION("clearing a `Results` backed by a table works with partial sync") {
         // The `ClearTable` instruction emitted by `Table::clear` won't be supported on partially-synced Realms
         // going forwards. Currently it gives incorrect results. Verify that `Results::clear` backed by a table
@@ -547,7 +561,7 @@ TEST_CASE("Partial sync", "[sync]") {
 }
 
 TEST_CASE("Partial sync error checking", "[sync]") {
-    SyncManager::shared().configure_file_system(tmp_dir(), SyncManager::MetadataMode::NoEncryption);
+    SyncManager::shared().configure(tmp_dir(), SyncManager::MetadataMode::NoEncryption);
 
     SECTION("API misuse throws an exception from `subscribe`") {
         SECTION("non-synced Realm") {
@@ -629,7 +643,7 @@ TEST_CASE("Creating subscriptions synchronously", "[sync]") {
     if (!EventLoop::has_implementation())
         return;
 
-    SyncManager::shared().configure_file_system(tmp_dir(), SyncManager::MetadataMode::NoEncryption);
+    SyncManager::shared().configure(tmp_dir(), SyncManager::MetadataMode::NoEncryption);
 
     SyncServer server;
     SyncTestFile config(server, "test");

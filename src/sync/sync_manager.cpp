@@ -37,8 +37,9 @@ SyncManager& SyncManager::shared()
     return manager;
 }
 
-void SyncManager::configure_file_system(const std::string& base_file_path,
+void SyncManager::configure(const std::string& base_file_path,
                                         MetadataMode metadata_mode,
+                                        const std::string& user_agent_binding_info,
                                         util::Optional<std::vector<char>> custom_encryption_key,
                                         bool reset_metadata_on_error)
 {
@@ -48,6 +49,8 @@ void SyncManager::configure_file_system(const std::string& base_file_path,
         std::string server_url;
         bool is_admin;
     };
+
+    m_user_agent_binding_info = user_agent_binding_info;
 
     std::vector<UserCreationData> users_to_add;
     {
@@ -253,6 +256,12 @@ void SyncManager::set_logger_factory(SyncLoggerFactory& factory) noexcept
 {
     std::lock_guard<std::mutex> lock(m_mutex);
     m_logger_factory = &factory;
+}
+
+void SyncManager::set_user_agent(std::string user_agent)
+{
+    std::lock_guard<std::mutex> lock(m_mutex);
+    m_user_agent_application_info = std::move(user_agent);
 }
 
 void SyncManager::reconnect()
@@ -505,7 +514,9 @@ std::unique_ptr<SyncClient> SyncManager::create_sync_client() const
         stderr_logger->set_level_threshold(m_log_level);
         logger = std::move(stderr_logger);
     }
-    return std::make_unique<SyncClient>(std::move(logger), m_client_reconnect_mode, m_multiplex_sessions);
+
+    return std::make_unique<SyncClient>(std::move(logger), m_client_reconnect_mode, m_multiplex_sessions,
+                                        util::format("%1 %2", m_user_agent_binding_info, m_user_agent_application_info));
 }
 
 std::string SyncManager::client_uuid() const

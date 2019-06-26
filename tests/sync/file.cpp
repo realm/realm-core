@@ -182,7 +182,7 @@ TEST_CASE("sync_file: SyncFileManager APIs", "[sync]") {
             const std::string& token = "fake-token";
             prepare_sync_manager_test();
             auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
-            SyncManager::shared().configure_file_system(base_path + "syncmanager/", SyncManager::MetadataMode::NoEncryption);
+            SyncManager::shared().configure(base_path + "syncmanager/", SyncManager::MetadataMode::NoEncryption);
 
             SECTION("migrating a user directory if an old identity is specified") {
                 // Create the "old directory"

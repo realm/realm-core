@@ -97,6 +97,7 @@ static void subscribe_to_all(std::shared_ptr<Realm> const& r)
         {"status", int64_t(0)},
         {"error_message", ""s},
         {"query_parse_counter", int64_t(0)},
+        {"matches_count", int64_t(0)},
     }, false);
 
     r->commit_transaction();
@@ -108,7 +109,7 @@ static void subscribe_to_all(std::shared_ptr<Realm> const& r)
 }
 
 TEST_CASE("Object-level Permissions") {
-    SyncManager::shared().configure_file_system(tmp_dir(), SyncManager::MetadataMode::NoEncryption);
+    SyncManager::shared().configure(tmp_dir(), SyncManager::MetadataMode::NoEncryption);
 
     SyncServer server{StartImmediately{false}};
 

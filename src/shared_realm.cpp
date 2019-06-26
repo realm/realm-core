@@ -41,10 +41,12 @@
 
 #include <realm/sync/history.hpp>
 #include <realm/sync/permissions.hpp>
+#include <realm/sync/version.hpp>
 #else
 namespace realm {
 namespace sync {
     struct PermissionsCache {};
+    struct TableInfoCache {};
 }
 }
 #endif
@@ -70,7 +72,7 @@ Realm::Realm(Config config, std::shared_ptr<_impl::RealmCoordinator> coordinator
 static bool is_nonupgradable_history(IncompatibleHistories const& ex)
 {
     // FIXME: Replace this with a proper specific exception type once Core adds support for it.
-    return ex.what() == std::string("Incompatible histories. Nonupgradable history schema");
+    return std::string(ex.what()).find(std::string("Incompatible histories. Nonupgradable history schema")) != npos;
 }
 #endif
 
@@ -605,6 +607,7 @@ void Realm::invalidate()
     }
 
     m_permissions_cache = nullptr;
+    m_table_info_cache = nullptr;
     m_group = nullptr;
 }
 
@@ -782,6 +785,7 @@ void Realm::close()
     }
 
     m_permissions_cache = nullptr;
+    m_table_info_cache = nullptr;
     m_group = nullptr;
     m_binding_context = nullptr;
     m_coordinator = nullptr;
@@ -896,7 +900,13 @@ bool Realm::init_permission_cache()
 
     // Admin users bypass permissions checks outside of the logic in PermissionsCache
     if (m_config.sync_config && m_config.sync_config->is_partial && !m_config.sync_config->user->is_admin()) {
+#if REALM_SYNC_VER_MAJOR == 3 && (REALM_SYNC_VER_MINOR < 13 || (REALM_SYNC_VER_MINOR == 13 && REALM_SYNC_VER_PATCH < 3))
         m_permissions_cache = std::make_unique<sync::PermissionsCache>(read_group(), m_config.sync_config->user->identity());
+#else
+        m_table_info_cache = std::make_unique<sync::TableInfoCache>(read_group());
+        m_permissions_cache = std::make_unique<sync::PermissionsCache>(read_group(), *m_table_info_cache,
+                                                                       m_config.sync_config->user->identity());
+#endif
         return true;
     }
     return false;

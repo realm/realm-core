@@ -33,13 +33,10 @@
 #include <realm/lang_bind_helper.hpp>
 #include <realm/util/scope_exit.hpp>
 
-namespace {
-constexpr const char* result_sets_type_name = "__ResultSets";
-}
-
 namespace realm {
 
 namespace _impl {
+using namespace ::realm::partial_sync;
 
 void initialize_schema(Group& group)
 {
@@ -507,6 +504,18 @@ void unsubscribe(Subscription& subscription)
     }
 }
 
+void unsubscribe(Object&& subscription)
+{
+    REALM_ASSERT(subscription.get_object_schema().name == result_sets_type_name);
+    auto realm = subscription.realm();
+    enqueue_unregistration(std::move(subscription), [=] {
+        // The partial sync worker thread bypasses the normal machinery which
+        // would trigger notifications since it does its own notification things
+        // in the other cases, so manually trigger it here.
+        _impl::PartialSyncHelper::get_coordinator(*realm).wake_up_notifier_worker();
+    });
+}
+
 Subscription::Subscription(std::string name, std::string object_type, std::shared_ptr<Realm> realm)
 : m_object_schema(realm->read_group(), result_sets_type_name)
 {
@@ -586,17 +595,6 @@ std::exception_ptr Subscription::error() const
     }
 
     return nullptr;
-}
-
-Results Subscription::results() const
-{
-    auto object = result_set_object();
-    REALM_ASSERT_RELEASE(object);
-
-    CppContext context;
-    auto matches_property = any_cast<std::string>(object->get_property_value<util::Any>(context, "matches_property"));
-    auto list = any_cast<List>(object->get_property_value<util::Any>(context, matches_property));
-    return list.as_results();
 }
 
 } // namespace partial_sync
