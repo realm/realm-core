@@ -42,6 +42,7 @@
 #include <realm/parser/parser.hpp>
 #include <realm/parser/query_builder.hpp>
 #include <realm/util/optional.hpp>
+#include <sync/partial_sync.hpp>
 
 using namespace realm;
 using namespace std::string_literals;
@@ -62,6 +63,42 @@ enum class PartialSyncTestObjects { A, B };
 
 // Test helpers.
 namespace {
+
+// Creates a timestamp representing `now` as defined by the system clock.
+Timestamp now()
+{
+    auto now = std::chrono::system_clock::now();
+    int64_t ns_since_epoch = std::chrono::duration_cast<std::chrono::nanoseconds>(now.time_since_epoch()).count();
+    int64_t s_arg = ns_since_epoch / static_cast<int64_t>(realm::Timestamp::nanoseconds_per_second);
+    int32_t ns_arg = ns_since_epoch % Timestamp::nanoseconds_per_second;
+    return Timestamp(s_arg, ns_arg);
+}
+
+// Creates lowest possible date expressible.
+Timestamp min()
+{
+    return Timestamp(INT64_MIN, -Timestamp::nanoseconds_per_second + 1);
+}
+
+// Creates highest possible date expressible.
+Timestamp max()
+{
+    return Timestamp(INT64_MAX, Timestamp::nanoseconds_per_second - 1);
+}
+
+// Return a copy of this timestamp that has been adjusted by the given number of seconds. If the Timestamp
+// overflows in a positive direction it clamps to Timestamp::max(). If it overflows in negative direction it clamps
+// to Timestamp::min().
+Timestamp add_seconds(Timestamp& ts, int64_t s)
+{
+    int64_t seconds = ts.get_seconds();
+    if (util::int_add_with_overflow_detect(seconds, s)) {
+        return (s < 0) ? min() : max();
+    }
+    else {
+        return Timestamp(seconds, ts.get_nanoseconds());
+    }
+}
 
 Schema partial_sync_schema()
 {
@@ -143,10 +180,10 @@ auto results_for_query(std::string const& query_string, Realm::Config const& con
     return Results(std::move(realm), std::move(query), std::move(ordering));
 }
 
-partial_sync::Subscription subscribe_and_wait(Results results, util::Optional<std::string> name,
-                                              std::function<void(Results, std::exception_ptr)> check)
+partial_sync::Subscription subscribe_and_wait(Results results, util::Optional<std::string> name, util::Optional<int64_t> ttl,
+                                              bool update, std::function<void(Results, std::exception_ptr)> check)
 {
-    auto subscription = partial_sync::subscribe(results, name);
+    auto subscription = partial_sync::subscribe(results, name, ttl, update);
 
     bool partial_sync_done = false;
     std::exception_ptr exception;
@@ -173,16 +210,29 @@ partial_sync::Subscription subscribe_and_wait(Results results, util::Optional<st
     return subscription;
 }
 
-/// Run a partial sync query, wait for the results, and then perform checks.
-auto subscribe_and_wait(std::string const& query, Realm::Config const& partial_config,
+partial_sync::Subscription subscribe_and_wait(Results results, util::Optional<std::string> name, std::function<void(Results, std::exception_ptr)> check)
+{
+    return subscribe_and_wait(results, name, none, false, check);
+}
+
+partial_sync::Subscription subscribe_and_wait(std::string const& query, Realm::Config const& partial_config,
+                                              std::string const& object_type, util::Optional<std::string> name,
+                                              util::Optional<int64_t> ttl, bool update,
+                                              std::function<void(Results, std::exception_ptr)> check)
+{
+    auto results = results_for_query(query, partial_config, object_type);
+    return subscribe_and_wait(std::move(results), std::move(name), std::move(ttl), update, std::move(check));
+}
+
+/// Run a Query-based Sync query, wait for the results, and then perform checks.
+partial_sync::Subscription subscribe_and_wait(std::string const& query, Realm::Config const& partial_config,
                         std::string const& object_type, util::Optional<std::string> name,
                         std::function<void(Results, std::exception_ptr)> check)
 {
-    auto results = results_for_query(query, partial_config, object_type);
-    return subscribe_and_wait(std::move(results), std::move(name), std::move(check));
+    return subscribe_and_wait(query, partial_config, object_type, name, none, false, check);
 }
 
-auto subscription_with_query(std::string const& query, Realm::Config const& partial_config,
+partial_sync::Subscription subscription_with_query(std::string const& query, Realm::Config const& partial_config,
                              std::string const& object_type, util::Optional<std::string> name)
 {
     auto results = results_for_query(query, partial_config, object_type);
@@ -223,7 +273,7 @@ bool results_contains(Results& r, TypeB b)
 
 }
 
-TEST_CASE("Partial sync", "[sync]") {
+TEST_CASE("Query-based Sync", "[sync]") {
     if (!EventLoop::has_implementation())
         return;
 
@@ -242,7 +292,7 @@ TEST_CASE("Partial sync", "[sync]") {
 
     SECTION("works in the most basic case") {
         // Open the partially synced Realm and run a query.
-        subscribe_and_wait("string = \"partial\"", partial_config, "object_a", util::none, [](Results results, std::exception_ptr) {
+        auto subscription = subscribe_and_wait("string = \"partial\"", partial_config, "object_a", util::none, [](Results results, std::exception_ptr) {
             REQUIRE(results.size() == 2);
             REQUIRE(results_contains(results, {1, 10, "partial"}));
             REQUIRE(results_contains(results, {2, 2, "partial"}));
@@ -490,6 +540,30 @@ TEST_CASE("Partial sync", "[sync]") {
         EventLoop::main().run_until([&] { return partial_sync_done; });
     }
 
+    SECTION("named query can be unsubscribed while in creating state without holding a strong reference to the subscription") {
+        // Hold the write lock on the Realm so that the subscription can't actually be created
+        auto config2 = partial_config;
+        config2.cache = false;
+        auto realm = Realm::get_shared_realm(config2);
+        realm->begin_transaction();
+        {
+            // Create and immediately unsubscribe from the query
+            auto subscription = subscription_with_query("number > 1", partial_config, "object_a", "subscription"s);
+            partial_sync::unsubscribe(subscription);
+        }
+        realm->cancel_transaction();
+
+        // Create another subscription with the same name but a different query
+        // to verify that the first subscription was actually removed
+        auto subscription2 = subscription_with_query("number > 2", partial_config, "object_a", "subscription"s);
+        bool partial_sync_done = false;
+        auto token = subscription2.add_notification_callback([&] {
+            if (subscription2.state() != partial_sync::SubscriptionState::Creating)
+                partial_sync_done = true;
+        });
+        EventLoop::main().run_until([&] { return partial_sync_done; });
+    }
+
     SECTION("named query can be unsubscribed by looking up the object in the Realm") {
         auto subscription = subscription_with_query("number != 1", partial_config, "object_a", "query"s);
         EventLoop::main().run_until([&] { return subscription.state() == partial_sync::SubscriptionState::Complete; });
@@ -504,7 +578,7 @@ TEST_CASE("Partial sync", "[sync]") {
         EventLoop::main().run_until([&] { return subscription.state() != partial_sync::SubscriptionState::Complete; });
     }
 
-    SECTION("clearing a `Results` backed by a table works with partial sync") {
+    SECTION("clearing a `Results` backed by a table works with Query-based sync") {
         // The `ClearTable` instruction emitted by `Table::clear` won't be supported on partially-synced Realms
         // going forwards. Currently it gives incorrect results. Verify that `Results::clear` backed by a table
         // uses something other than `Table::clear` and gives the results we expect.
@@ -559,9 +633,147 @@ TEST_CASE("Partial sync", "[sync]") {
             REQUIRE(results_contains(results, {2, 2, "partial"}));
         });
     }
+
+    SECTION("Updating a subscriptions query will download new data and remove old data") {
+        auto realm = Realm::get_shared_realm(partial_config);
+        subscribe_and_wait("truepredicate", partial_config, "object_a", "query"s, [&](Results, std::exception_ptr error) {
+           REQUIRE(!error);
+           auto table = ObjectStore::table_for_object_type(realm->read_group(), "object_a");
+           REQUIRE(table->size() == 3);
+        });
+
+        subscribe_and_wait("number = 3", partial_config, "object_a", "query"s, none, true, [&](Results, std::exception_ptr error) {
+            REQUIRE(!error);
+            auto table = ObjectStore::table_for_object_type(realm->read_group(), "object_a");
+            REQUIRE(table->size() == 1);
+        });
+    }
+
+    SECTION("The same subscription state should not be reported twice until the Complete state ") {
+        auto results = results_for_query("number > 1", partial_config, "object_a");
+        auto subscription = partial_sync::subscribe(results, "sub"s);
+        bool partial_sync_done = false;
+        std::exception_ptr exception;
+        util::Optional<partial_sync::SubscriptionState> last_state = none;
+        auto token = subscription.add_notification_callback([&] {
+            auto new_state = subscription.state();
+            if (last_state) {
+                REQUIRE(last_state.value() != new_state);
+            }
+            last_state = new_state;
+            switch (new_state) {
+                case partial_sync::SubscriptionState::Creating:
+                case partial_sync::SubscriptionState::Pending:
+                case partial_sync::SubscriptionState::Error:
+                case partial_sync::SubscriptionState::Invalidated:
+                    break;
+                case partial_sync::SubscriptionState::Complete:
+                    partial_sync_done = true;
+                    break;
+                default:
+                    throw std::logic_error(util::format("Unexpected state: %1", static_cast<uint8_t>(subscription.state())));
+            }
+        });
+
+        // Also create the same subscription on the UI thread to force the subscription notifications to run.
+        // This could potentially trigger the Pending state twice if this isn't prevented by the notification
+        // handling.
+        auto realm = Realm::get_shared_realm(partial_config);
+        realm->begin_transaction();
+        partial_sync::subscribe_blocking(results, "sub"s);
+        realm->commit_transaction();
+
+        EventLoop::main().run_until([&] { return partial_sync_done; });
+    }
+
+    SECTION("Manually deleting a Subscription also triggers the Invalidated state") {
+        auto results = results_for_query("number > 1", partial_config, "object_a");
+        auto subscription = partial_sync::subscribe(results, "sub"s);
+        bool subscription_created = false;
+        bool subscription_deleted = false;
+        std::exception_ptr exception;
+        util::Optional<partial_sync::SubscriptionState> last_state = none;
+        auto token = subscription.add_notification_callback([&] {
+            if (subscription_created)
+                // Next state after creating the subscription should be that it is deleted
+                REQUIRE(subscription.state() == partial_sync::SubscriptionState::Invalidated);
+
+            switch (subscription.state()) {
+                case partial_sync::SubscriptionState::Creating:
+                case partial_sync::SubscriptionState::Pending:
+                case partial_sync::SubscriptionState::Error:
+                    break;
+                case partial_sync::SubscriptionState::Complete:
+                    subscription_created = true;
+                    break;
+                case partial_sync::SubscriptionState::Invalidated:
+                    subscription_deleted = true;
+                    break;
+                default:
+                    throw std::logic_error(util::format("Unexpected state: %1", static_cast<uint8_t>(subscription.state())));
+            }
+        });
+
+        EventLoop::main().run_until([&] { return subscription_created; });
+
+        auto realm = Realm::get_shared_realm(partial_config);
+        realm->begin_transaction();
+        Results subs = results_for_query("name = 'sub'", partial_config, partial_sync::result_sets_type_name);
+        subs.clear();
+        realm->commit_transaction();
+
+        EventLoop::main().run_until([&] { return subscription_deleted; });
+    }
+
+    SECTION("Updating a subscription will not report Complete from a previous subscription") {
+        // Due to the asynchronous nature of updating subscriptions and listening to changes
+        // in the query that returns the subscription there is a small chance that the query
+        // returns before the update does. In that case, the previous state of the subscription
+        // will be returned, i.e you might see `Complete` before it goes into `Pending`.
+        // This test
+        auto realm = Realm::get_shared_realm(partial_config);
+
+        // Create initial subscription
+        subscribe_and_wait("number > 1", partial_config, "object_a", "query"s, [&](Results, std::exception_ptr error) {
+            REQUIRE(!error);
+            auto table = ObjectStore::table_for_object_type(realm->read_group(), "object_a");
+            REQUIRE(table->size() == 2);
+        });
+
+        // Start an update and verify that Complete is not called before Pending
+        // Note: This is racy, so not 100% reproducible
+        for (size_t i = 0; i < 100; ++i) {
+            auto results = results_for_query((i % 2 == 0) ? "truepredicate" : "falsepredicate", partial_config, "object_a");
+            auto subscription = partial_sync::subscribe(results, "query"s, none, true);
+            bool seen_completed_state = false;
+            bool seen_pending_state = false;
+            bool seen_complete_before_pending = false;
+            auto token = subscription.add_notification_callback([&] {
+                switch (subscription.state()) {
+                    case partial_sync::SubscriptionState::Creating:
+                    case partial_sync::SubscriptionState::Error:
+                    case partial_sync::SubscriptionState::Invalidated:
+                        break;
+                    case partial_sync::SubscriptionState::Pending:
+                        seen_complete_before_pending = seen_completed_state;
+                        seen_pending_state = true;
+                        break;
+                    case partial_sync::SubscriptionState::Complete:
+                        seen_completed_state = true;
+                        break;
+                    default:
+                        throw std::logic_error(util::format("Unexpected state: %1", static_cast<uint8_t>(subscription.state())));
+                }
+            });
+            EventLoop::main().run_until([&] { return seen_pending_state; });
+            REQUIRE(!seen_complete_before_pending);
+            EventLoop::main().run_until([&] { return seen_completed_state; });
+            REQUIRE(results.size() == ((i % 2 == 0) ? 3 : 0));
+        }
+    }
 }
 
-TEST_CASE("Partial sync error checking", "[sync]") {
+TEST_CASE("Query-based Sync error checking", "[sync]") {
     SyncManager::shared().configure(tmp_dir(), SyncManager::MetadataMode::NoEncryption);
 
     SECTION("API misuse throws an exception from `subscribe`") {
@@ -615,6 +827,12 @@ TEST_CASE("Partial sync error checking", "[sync]") {
             subscribe_and_wait("number > 0", partial_config, "object_b", "query"s, [](Results, std::exception_ptr error) {
                 REQUIRE(error);
             });
+
+            // Trying to update the query will also fail
+            subscribe_and_wait("number > 0", partial_config, "object_b", "query"s, none, true, [](Results, std::exception_ptr error) {
+                REQUIRE(error);
+            });
+
         }
 
         SECTION("unsupported queries should raise an error") {
@@ -640,9 +858,11 @@ TEST_CASE("Partial sync error checking", "[sync]") {
     }
 }
 
-TEST_CASE("Creating subscriptions synchronously", "[sync]") {
+TEST_CASE("Creating/Updating subscriptions synchronously", "[sync]") {
     if (!EventLoop::has_implementation())
         return;
+
+    using namespace std::string_literals;
 
     SyncManager::shared().configure(tmp_dir(), SyncManager::MetadataMode::NoEncryption);
 
@@ -656,42 +876,136 @@ TEST_CASE("Creating subscriptions synchronously", "[sync]") {
     auto subscription_table = ObjectStore::table_for_object_type(realm->read_group(), "__ResultSets");
     Results subscriptions(realm, *subscription_table);
 
-    SECTION("Create new unnamed subscription") {
-        CHECK(subscriptions.size() == 0);
+    // Wait for the server-created subscriptions to be downloaded
+    EventLoop::main().run_until([&] { return subscriptions.size() == 5; });
 
+    size_t query_ndx = subscription_table->get_column_index(partial_sync::property_query);
+    size_t name_ndx = subscription_table->get_column_index(partial_sync::property_name);
+    size_t created_at_ndx = subscription_table->get_column_index(partial_sync::property_created_at);
+    size_t updated_at_ndx = subscription_table->get_column_index(partial_sync::property_updated_at);
+    size_t time_to_live_ndx = subscription_table->get_column_index(partial_sync::property_time_to_live);
+    size_t expires_at_ndx = subscription_table->get_column_index(partial_sync::property_expires_at);
+
+    SECTION("Create new unnamed subscription") {
         realm->begin_transaction();
         auto table = ObjectStore::table_for_object_type(realm->read_group(), "object_a");
         Results user_query(realm, *table);
         partial_sync::subscribe_blocking(user_query, none);
         realm->commit_transaction();
 
-        CHECK(subscriptions.size() == 1);
-        CHECK(subscriptions.get(0).get_string(6) == "[object_a] TRUEPREDICATE "); // Name of subscription
-        CHECK(subscriptions.get(0).get_int(3) == static_cast<int64_t>(partial_sync::SubscriptionState::Pending));
+        CHECK(subscriptions.size() == 6);
+        auto sub = subscriptions.get(5);
+        CHECK(sub.get_string(name_ndx) == "[object_a] TRUEPREDICATE "); // Name of subscription
+        CHECK(sub.get_int(3) == static_cast<int64_t>(partial_sync::SubscriptionState::Pending));
+        CHECK(sub.get_timestamp(created_at_ndx) == sub.get_timestamp(updated_at_ndx));
+        CHECK(sub.is_null(time_to_live_ndx) == true);
+        CHECK(sub.is_null(expires_at_ndx) == true);
+    }
+
+    SECTION("Create a new subscription with time-to-live")  {
+        realm->begin_transaction();
+        auto table = ObjectStore::table_for_object_type(realm->read_group(), "object_a");
+        Results user_query(realm, *table);
+        Timestamp current_time = now();
+        partial_sync::subscribe_blocking(user_query, "ttl-test"s, util::Optional<int64_t>(10000));
+        realm->commit_transaction();
+
+        CHECK(subscriptions.size() == 6);
+        auto sub = subscriptions.get(5);
+        CHECK(sub.get_string(name_ndx) == "ttl-test");
+        CHECK(sub.get_timestamp(created_at_ndx) == sub.get_timestamp(updated_at_ndx));
+        CHECK(sub.get_int(time_to_live_ndx) == 10000);
+        CHECK(sub.get_timestamp(expires_at_ndx) < add_seconds(current_time, 11));
+        CHECK(add_seconds(current_time, 9) < sub.get_timestamp(expires_at_ndx));
     }
 
     SECTION("Create existing subscription returns old row") {
-        subscribe_and_wait("truepredicate", partial_config, "object_a", util::Optional<std::string>("sub"), [](Results, std::exception_ptr error) {
+        subscribe_and_wait("truepredicate", partial_config, "object_a", "sub"s, [](Results, std::exception_ptr error) {
             REQUIRE(!error);
         });
 
-        CHECK(subscriptions.size() == 6); // Waiting for first subscription also means subscriptions from the server has been downloaded.
-        RowExpr old_sub = subscriptions.get(0);
+        CHECK(subscriptions.size() == 6);
+        RowExpr old_sub = subscriptions.get(5);
+        Timestamp old_updated = old_sub.get_timestamp(updated_at_ndx);
+        Timestamp old_expires_at = old_sub.get_timestamp(expires_at_ndx);
 
         realm->begin_transaction();
         auto table = ObjectStore::table_for_object_type(realm->read_group(), "object_a");
         Results user_query(realm, *table);
-        RowExpr new_sub = partial_sync::subscribe_blocking(user_query, util::Optional<std::string>("sub"));
+        RowExpr new_sub = partial_sync::subscribe_blocking(user_query, "sub"s);
         realm->commit_transaction();
 
         CHECK(subscriptions.size() == 6);
         CHECK(old_sub.get_index() == new_sub.get_index());
+        CHECK(old_updated < new_sub.get_timestamp(updated_at_ndx));
+        CHECK(old_expires_at == new_sub.get_timestamp(expires_at_ndx));
+    }
+
+    SECTION("Returning existing row updates expires_at") {
+        realm->begin_transaction();
+        auto table = ObjectStore::table_for_object_type(realm->read_group(), "object_a");
+        Results user_query(realm, *table);
+        RowExpr old_sub = partial_sync::subscribe_blocking(user_query, "sub"s, util::Optional<int64_t>(1000));
+        Timestamp old_updated = old_sub.get_timestamp(updated_at_ndx);
+        Timestamp old_expires_at = old_sub.get_timestamp(expires_at_ndx);
+        RowExpr new_sub = partial_sync::subscribe_blocking(user_query, "sub"s, util::Optional<int64_t>(1000));
+        CHECK(old_sub.get_index() == new_sub.get_index());
+        CHECK(old_updated < new_sub.get_timestamp(updated_at_ndx));
+        CHECK(old_expires_at < new_sub.get_timestamp(expires_at_ndx));
     }
 
     SECTION("Create subscription outside write transaction throws") {
         auto table = ObjectStore::table_for_object_type(realm->read_group(), "object_a");
         Results user_query(realm, *table);
         CHECK_THROWS(partial_sync::subscribe_blocking(user_query, none));
+    }
+
+    SECTION("Update subscription") {
+        realm->begin_transaction();
+        auto user_query = results_for_query("number > 0", partial_config, "object_a");
+        RowExpr old_sub = partial_sync::subscribe_blocking(user_query, "update-test"s, util::Optional<int64_t>(1000));
+        CHECK(subscriptions.size() == 6);
+        CHECK(old_sub.get_string(query_ndx) == "number > 0 ");
+        Timestamp old_created_at = old_sub.get_timestamp(created_at_ndx);
+        Timestamp old_updated_at = old_sub.get_timestamp(updated_at_ndx);
+        Timestamp old_expires_at = old_sub.get_timestamp(expires_at_ndx);
+        int64_t old_ttl = old_sub.get_int(time_to_live_ndx);
+
+        user_query = results_for_query("number > 10", partial_config, "object_a");
+        RowExpr new_sub = partial_sync::subscribe_blocking(user_query, "update-test"s, util::Optional<int64_t>(5000), true);
+        CHECK(subscriptions.size() == 6);
+        CHECK(new_sub.get_string(query_ndx) == "number > 10 ");
+        CHECK(old_created_at == new_sub.get_timestamp(created_at_ndx));
+        CHECK(old_updated_at < new_sub.get_timestamp(updated_at_ndx));
+        CHECK(old_expires_at < new_sub.get_timestamp(expires_at_ndx));
+        CHECK(old_ttl == 1000);
+        CHECK(new_sub.get_int(time_to_live_ndx) == 5000);
+    }
+
+    SECTION("Update subscription with query on different type throws") {
+        realm->begin_transaction();
+        auto user_query1 = results_for_query("number > 0", partial_config, "object_a");
+        RowExpr old_sub = partial_sync::subscribe_blocking(user_query1, "update-wrong-typetest"s);
+        auto user_query2 = results_for_query("number > 0", partial_config, "object_b");
+        CHECK_THROWS(partial_sync::subscribe_blocking(user_query2, "update-wrong-typetest"s, none, true));
+    }
+
+    SECTION("Creating/Updating new subscription cleans up expired subscriptions") {
+        realm->begin_transaction();
+        auto user_query1 = results_for_query("number > 0", partial_config, "object_a");
+        partial_sync::subscribe_blocking(user_query1, none, util::Optional<int64_t>(0));
+        realm->commit_transaction();
+
+        CHECK(subscriptions.size() == 6);
+        CHECK(subscriptions.get(5).get_string(name_ndx) == "[object_a] number > 0 ");
+
+        realm->begin_transaction();
+        auto user_query2 = results_for_query("number > 0", partial_config, "object_b");
+        partial_sync::subscribe_blocking(user_query2, none, util::Optional<int64_t>(0));
+        realm->commit_transaction();
+
+        CHECK(subscriptions.size() == 6);
+        CHECK(subscriptions.get(5).get_string(name_ndx) == "[object_b] number > 0 ");
     }
 }
 
