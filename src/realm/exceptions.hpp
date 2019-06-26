@@ -137,6 +137,24 @@ public:
     /// runtime_error::what() returns the msg provided in the constructor.
 };
 
+class DuplicatePrimaryKeyValueException : public std::logic_error {
+public:
+    DuplicatePrimaryKeyValueException(std::string object_type, std::string property);
+
+    std::string const& object_type() const
+    {
+        return m_object_type;
+    }
+    std::string const& property() const
+    {
+        return m_property;
+    }
+
+private:
+    std::string m_object_type;
+    std::string m_property;
+};
+
 
 /// The \c LogicError exception class is intended to be thrown only when
 /// applications (or bindings) violate rules that are stated (or ought to have

@@ -130,6 +130,9 @@ public:
 
     // Primary key columns
     ColKey get_primary_key_column() const;
+    void set_primary_key_column(ColKey col) const;
+    void remove_primary_key_column() const;
+    void validate_primary_column_uniqueness() const;
 
     //@{
     /// Convenience functions for manipulating the dynamic table type.
@@ -657,6 +660,7 @@ public:
 
     // Debug
     void verify() const;
+
 #ifdef REALM_DEBUG
     void to_dot(std::ostream&, StringData title = StringData()) const;
     void print() const;
@@ -758,9 +762,6 @@ private:
     void erase_backlink_column(ColKey backlink_col_key);
 
     void set_opposite_column(ColKey col_key, TableKey opposite_table, ColKey opposite_column);
-
-    void set_primary_key_column(ColKey col) const;
-    void remove_primary_key_column() const;
 
     ObjKey get_next_key();
     /// Some Object IDs are generated as a tuple of the client_file_ident and a

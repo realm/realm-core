@@ -18,8 +18,18 @@
 
 #include <realm/exceptions.hpp>
 #include <realm/version.hpp>
+#include <realm/util/to_string.hpp>
 
 using namespace realm;
+
+DuplicatePrimaryKeyValueException::DuplicatePrimaryKeyValueException(std::string object_type, std::string property)
+    : logic_error(
+          util::format("Primary key property '%1.%2' has duplicate values after migration.", object_type, property))
+    , m_object_type(object_type)
+    , m_property(property)
+{
+}
+
 
 // LCOV_EXCL_START (LogicError is not a part of the public API, so code may never
 // rely on the contents of these strings, as they are deliberately unspecified.)

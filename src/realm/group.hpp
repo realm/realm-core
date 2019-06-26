@@ -538,6 +538,7 @@ public:
     size_t get_used_space() const noexcept;
 
     void verify() const;
+    void validate_primary_column_uniqueness() const;
 #ifdef REALM_DEBUG
     void print() const;
     void print_free() const;
@@ -558,6 +559,14 @@ protected:
     }
 
 private:
+    static constexpr char g_primary_key_table_name[] = "pk";
+    static constexpr char g_primary_key_class_column_name[] = "pk_table";
+    static constexpr char g_primary_key_property_column_name[] = "pk_property";
+    static constexpr char g_class_name_prefix[] = "class_";
+    static constexpr size_t g_class_name_prefix_len = 6;
+    static constexpr ColKey g_pk_table{0x20000};
+    static constexpr ColKey g_pk_property{0x40020001};
+
     // nullptr, if we're sharing an allocator provided during initialization
     std::unique_ptr<SlabAlloc> m_local_alloc;
     // in-use allocator. If local, then equal to m_local_alloc.
@@ -842,6 +851,8 @@ private:
     size_t key2ndx(TableKey key) const;
     size_t key2ndx_checked(TableKey key) const;
     void set_size() const noexcept;
+
+    TableRef get_pk_table();
 
     friend class Table;
     friend class GroupWriter;
