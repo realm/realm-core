@@ -31,6 +31,7 @@
 #include "results.hpp"
 #include "schema.hpp"
 
+#include <realm/db.hpp>
 #include <realm/group.hpp>
 #include <realm/query_engine.hpp>
 #include <realm/query_expression.hpp>
@@ -40,6 +41,15 @@
 #include "sync/sync_session.hpp"
 #endif
 
+namespace realm {
+class TestHelper {
+public:
+    static DBRef& get_shared_group(SharedRealm const& shared_realm)
+    {
+        return Realm::Internal::get_db(*shared_realm);
+    }
+};
+}
 
 using namespace realm;
 using namespace std::string_literals;
@@ -1793,7 +1803,7 @@ TEST_CASE("results: notifications after move") {
     }
 }
 
-TEST_CASE("results: implicit background notifier") {
+TEST_CASE("results: notifier with no callbacks") {
     _impl::RealmCoordinator::assert_no_open_realms();
 
     InMemoryTestFile config;
@@ -1812,6 +1822,11 @@ TEST_CASE("results: implicit background notifier") {
     results.last(); // force evaluation and creation of TableView
 
     SECTION("refresh() does not block due to implicit notifier") {
+        // Create and then immediately remove a callback because
+        // `automatic_change_notifications = false` makes Results not implicitly
+        // create a notifier
+        results.add_notification_callback([](CollectionChangeSet const&, std::exception_ptr) {});
+
         auto r2 = coordinator->get_realm();
         r2->begin_transaction();
         r2->read_group().get_table("class_object")->create_object();
@@ -1821,6 +1836,8 @@ TEST_CASE("results: implicit background notifier") {
     }
 
     SECTION("refresh() does not attempt to deliver stale results") {
+        results.add_notification_callback([](CollectionChangeSet const&, std::exception_ptr) {});
+
         // Create version 1
         r->begin_transaction();
         table->create_object();
@@ -1836,6 +1853,29 @@ TEST_CASE("results: implicit background notifier") {
         // Give it a chance to deliver the async query results (and fail, becuse
         // they're for version 1 and the realm is at 2)
         r->refresh();
+    }
+
+    SECTION("should not pin the source version even after the Realm has been closed") {
+        auto r2 = coordinator->get_realm();
+        REQUIRE(r != r2);
+        r->close();
+
+        auto& shared_group = TestHelper::get_shared_group(r2);
+        // There's always at least 2 live versions because the previous version
+        // isn't clean up until the *next* commit
+        REQUIRE(shared_group->get_number_of_versions() == 2);
+
+        auto table = r2->read_group().get_table("class_object");
+
+        r2->begin_transaction();
+        table->create_object();
+        r2->commit_transaction();
+        r2->begin_transaction();
+        table->create_object();
+        r2->commit_transaction();
+
+        // Would now be 3 if the closed Realm is still pinning the version it was at
+        REQUIRE(shared_group->get_number_of_versions() == 2);
     }
 }
 

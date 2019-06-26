@@ -23,6 +23,7 @@
 #include "schema.hpp"
 
 #include "impl/object_accessor_impl.hpp"
+#include "util/test_utils.hpp"
 
 #include <realm/util/file.hpp>
 #include <realm/util/scope_exit.hpp>

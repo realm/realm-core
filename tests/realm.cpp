@@ -21,6 +21,7 @@
 #include "util/event_loop.hpp"
 #include "util/test_file.hpp"
 #include "util/templated_test_case.hpp"
+#include "util/test_utils.hpp"
 
 #include "binding_context.hpp"
 #include "object_schema.hpp"
@@ -135,6 +136,53 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
             REQUIRE_THROWS(Realm::get_shared_realm(config));
         }
     }
+
+
+// Windows doesn't use fifos
+#ifndef _WIN32
+    SECTION("should be able to set a FIFO fallback path") {
+        std::string fallback_dir = tmp_dir() + "/fallback/";
+        realm::util::try_make_dir(fallback_dir);
+        TestFile config;
+        config.fifo_files_fallback_path = fallback_dir;
+        config.schema_version = 1;
+        config.schema = Schema{
+            {"object", {
+                {"value", PropertyType::Int}
+            }},
+        };
+
+        realm::util::make_dir(config.path + ".note");
+        auto realm = Realm::get_shared_realm(config);
+        auto fallback_file = util::format("%1realm_%2.note", fallback_dir, std::hash<std::string>()(config.path)); // Mirror internal implementation
+        REQUIRE(File::exists(fallback_file));
+        realm::util::remove_dir(config.path + ".note");
+        realm::util::remove_dir_recursive(fallback_dir);
+    }
+#endif
+
+// Windows doesn't use fifos
+#ifndef _WIN32
+    SECTION("automatically append dir separator to end of fallback path") {
+        std::string fallback_dir = tmp_dir() + "/fallback";
+        realm::util::try_make_dir(fallback_dir);
+        TestFile config;
+        config.fifo_files_fallback_path = fallback_dir;
+        config.schema_version = 1;
+        config.schema = Schema{
+            {"object", {
+                {"value", PropertyType::Int}
+            }},
+        };
+
+        realm::util::make_dir(config.path + ".note");
+        auto realm = Realm::get_shared_realm(config);
+        auto fallback_file = util::format("%1/realm_%2.note", fallback_dir, std::hash<std::string>()(config.path)); // Mirror internal implementation
+        REQUIRE(File::exists(fallback_file));
+        realm::util::remove_dir(config.path + ".note");
+        realm::util::remove_dir_recursive(fallback_dir);
+    }
+#endif
 
     SECTION("should verify that the schema is valid") {
         config.schema = Schema{
@@ -320,8 +368,11 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
 #ifndef _WIN32
     SECTION("should throw when creating the notification pipe fails") {
         util::try_make_dir(config.path + ".note");
+        auto sys_fallback_file = util::format("%1realm_%2.note", DBOptions::get_sys_tmp_dir(), std::hash<std::string>()(config.path)); // Mirror internal implementation
+        util::try_make_dir(sys_fallback_file);
         REQUIRE_THROWS(Realm::get_shared_realm(config));
         util::remove_dir(config.path + ".note");
+        util::remove_dir(sys_fallback_file);
     }
 #endif
 
@@ -1526,7 +1577,7 @@ TEST_CASE("Statistics on Realms") {
     });
 
     SECTION("compute_size") {
-        auto s = r->compute_size();
+        auto s = r->read_group().compute_aggregated_byte_size();
         REQUIRE(s > 0);
     }
 }

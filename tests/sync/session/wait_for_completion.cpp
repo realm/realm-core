@@ -17,10 +17,9 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #include "catch.hpp"
-
 #include "sync/session/session_util.hpp"
-
 #include "util/event_loop.hpp"
+#include "util/test_utils.hpp"
 
 #include <realm/util/scope_exit.hpp>
 
@@ -36,7 +35,7 @@ TEST_CASE("SyncSession: wait_for_download_completion() API", "[sync]") {
     auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
     SyncServer server;
     // Disable file-related functionality and metadata functionality for testing purposes.
-    SyncManager::shared().configure_file_system(tmp_dir(), SyncManager::MetadataMode::NoMetadata);
+    SyncManager::shared().configure(tmp_dir(), SyncManager::MetadataMode::NoMetadata);
 
     std::atomic<bool> handler_called(false);
 
@@ -137,7 +136,7 @@ TEST_CASE("SyncSession: wait_for_upload_completion() API", "[sync]") {
     auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
     SyncServer server;
     // Disable file-related functionality and metadata functionality for testing purposes.
-    SyncManager::shared().configure_file_system(tmp_dir(), SyncManager::MetadataMode::NoMetadata);
+    SyncManager::shared().configure(tmp_dir(), SyncManager::MetadataMode::NoMetadata);
 
     std::atomic<bool> handler_called(false);
 

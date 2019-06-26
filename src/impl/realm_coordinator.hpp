@@ -157,6 +157,8 @@ public:
     partial_sync::WorkQueue& partial_sync_work_queue();
 #endif
 
+    AuditInterface* audit_context() const noexcept { return m_audit_context.get(); }
+
 private:
     friend Realm::Internal;
     Realm::Config m_config;
@@ -196,6 +198,8 @@ private:
     std::shared_ptr<SyncSession> m_sync_session;
     std::unique_ptr<partial_sync::WorkQueue> m_partial_sync_work_queue;
 #endif
+
+    std::shared_ptr<AuditInterface> m_audit_context;
 
     void open_db();
 

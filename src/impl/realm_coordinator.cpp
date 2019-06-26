@@ -37,6 +37,7 @@
 #include <realm/db.hpp>
 #include <realm/history.hpp>
 #include <realm/string_data.hpp>
+#include <util/fifo.hpp>
 
 #include <algorithm>
 #include <unordered_map>
@@ -190,6 +191,7 @@ std::shared_ptr<Realm> RealmCoordinator::get_realm(Realm::Config config)
     auto schema = std::move(config.schema);
     auto migration_function = std::move(config.migration_function);
     auto initialization_function = std::move(config.initialization_function);
+    auto audit_factory = std::move(config.audit_factory);
     config.schema = {};
 
     realm = Realm::make_shared_realm(std::move(config), shared_from_this());
@@ -206,6 +208,9 @@ std::shared_ptr<Realm> RealmCoordinator::get_realm(Realm::Config config)
 
     if (realm->config().sync_config)
         create_sync_session();
+
+    if (!m_audit_context && audit_factory)
+        m_audit_context = audit_factory();
 
     if (schema) {
         lock.unlock();
@@ -313,6 +318,8 @@ void RealmCoordinator::open_db()
         options.durability = m_config.in_memory
                            ? DBOptions::Durability::MemOnly
                            : DBOptions::Durability::Full;
+
+        options.temp_dir = util::normalize_dir(m_config.fifo_files_fallback_path);
         options.encryption_key = m_config.encryption_key.data();
         options.allow_file_format_upgrade = !m_config.disable_format_upgrade
                                          && m_config.schema_mode != SchemaMode::ResetFile;
@@ -351,7 +358,7 @@ void RealmCoordinator::open_db()
             translate_file_exception(config.path, config.immutable()); // Throws
 
         // Move the Realm file into the recovery directory.
-        std::string recovery_directory = SyncManager::shared().recovery_directory_path();
+        std::string recovery_directory = SyncManager::shared().recovery_directory_path(config.sync_config ? config.sync_config->recovery_directory : none);
         std::string new_realm_path = util::reserve_unique_file_name(recovery_directory, "synced-realm-XXXXXXX");
         util::File::move(config.path, new_realm_path);
 
@@ -463,10 +470,19 @@ RealmCoordinator::~RealmCoordinator()
 
 void RealmCoordinator::unregister_realm(Realm* realm)
 {
-    std::lock_guard<std::mutex> lock(m_realm_mutex);
-    auto new_end = remove_if(begin(m_weak_realm_notifiers), end(m_weak_realm_notifiers),
-                             [=](auto& notifier) { return notifier.expired() || notifier.is_for_realm(realm); });
-    m_weak_realm_notifiers.erase(new_end, end(m_weak_realm_notifiers));
+    // Normally results notifiers are cleaned up by the background worker thread
+    // but if that's disabled we need to ensure that any notifiers from this
+    // Realm get cleaned up
+    if (!m_config.automatic_change_notifications) {
+        std::unique_lock<std::mutex> lock(m_notifier_mutex);
+        clean_up_dead_notifiers();
+    }
+    {
+        std::lock_guard<std::mutex> lock(m_realm_mutex);
+        auto new_end = remove_if(begin(m_weak_realm_notifiers), end(m_weak_realm_notifiers),
+                                 [=](auto& notifier) { return notifier.expired() || notifier.is_for_realm(realm); });
+        m_weak_realm_notifiers.erase(new_end, end(m_weak_realm_notifiers));
+    }
 }
 
 void RealmCoordinator::clear_cache()
@@ -962,19 +978,16 @@ void RealmCoordinator::process_available_async(Realm& realm)
     if (notifiers.empty())
         return;
 
-    if (realm.m_binding_context)
-        realm.m_binding_context->will_send_notifications();
-
     if (auto error = m_async_error) {
         lock.unlock();
+        if (realm.m_binding_context)
+            realm.m_binding_context->will_send_notifications();
         for (auto& notifier : notifiers)
             notifier->deliver_error(m_async_error);
         if (realm.m_binding_context)
             realm.m_binding_context->did_send_notifications();
         return;
     }
-    if (realm.is_closed())
-        return;
 
     bool in_read = realm.is_in_read_transaction();
     auto& sg = Realm::Internal::get_transaction(realm);
@@ -983,11 +996,19 @@ void RealmCoordinator::process_available_async(Realm& realm)
         return !(notifier->has_run() && (!in_read || notifier->version() == version) && notifier->package_for_delivery());
     };
     notifiers.erase(std::remove_if(begin(notifiers), end(notifiers), package), end(notifiers));
+    if (notifiers.empty())
+        return;
     lock.unlock();
 
     // no before advance because the Realm is already at the given version,
     // because we're either sending initial notifications or the write was
     // done on this Realm instance
+
+    if (realm.m_binding_context) {
+        realm.m_binding_context->will_send_notifications();
+        if (realm.is_closed()) // i.e. the Realm was closed in the callback above
+            return;
+    }
 
     // Skip delivering if the Realm isn't in a read transaction
     if (in_read) {

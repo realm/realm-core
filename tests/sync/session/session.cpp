@@ -28,6 +28,7 @@
 
 #include "util/event_loop.hpp"
 #include "util/templated_test_case.hpp"
+#include "util/test_utils.hpp"
 
 #include <realm/util/time.hpp>
 #include <realm/util/scope_exit.hpp>
@@ -48,7 +49,7 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync]") {
 
     auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
     SyncServer server;
-    SyncManager::shared().configure_file_system(tmp_dir(), SyncManager::MetadataMode::NoEncryption);
+    SyncManager::shared().configure(tmp_dir(), SyncManager::MetadataMode::NoEncryption);
     const std::string realm_base_url = server.base_url();
 
     SECTION("a SyncUser can properly retrieve its owned sessions") {
@@ -192,7 +193,7 @@ TEST_CASE("sync: log-in", "[sync]") {
 
     SyncServer server;
     // Disable file-related functionality and metadata functionality for testing purposes.
-    SyncManager::shared().configure_file_system(tmp_dir(), SyncManager::MetadataMode::NoMetadata);
+    SyncManager::shared().configure(tmp_dir(), SyncManager::MetadataMode::NoMetadata);
     auto user = SyncManager::shared().get_user({ "user", dummy_auth_url }, "not_a_real_token");
 
     SECTION("Can log in") {
@@ -230,7 +231,7 @@ TEST_CASE("sync: token refreshing", "[sync]") {
 
     SyncServer server;
     // Disable file-related functionality and metadata functionality for testing purposes.
-    SyncManager::shared().configure_file_system(tmp_dir(), SyncManager::MetadataMode::NoMetadata);
+    SyncManager::shared().configure(tmp_dir(), SyncManager::MetadataMode::NoMetadata);
     auto user = SyncManager::shared().get_user({ "user-token-refreshing", dummy_auth_url }, "not_a_real_token");
 
     SECTION("Can preemptively refresh token while session is active.") {
@@ -314,7 +315,7 @@ TEST_CASE("sync: error handling", "[sync]") {
     auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
     using ProtocolError = realm::sync::ProtocolError;
     SyncServer server;
-    SyncManager::shared().configure_file_system(tmp_dir(), SyncManager::MetadataMode::NoEncryption);
+    SyncManager::shared().configure(tmp_dir(), SyncManager::MetadataMode::NoEncryption);
 
     // Create a valid session.
     std::function<void(std::shared_ptr<SyncSession>, SyncError)> error_handler = [](auto, auto) { };
@@ -489,7 +490,7 @@ TEST_CASE("sync: encrypt local realm file", "[sync]") {
 
     SyncServer server;
     // Disable file-related functionality and metadata functionality for testing purposes.
-    SyncManager::shared().configure_file_system(tmp_dir(), SyncManager::MetadataMode::NoMetadata);
+    SyncManager::shared().configure(tmp_dir(), SyncManager::MetadataMode::NoMetadata);
 
     std::array<char, 64> encryption_key;
     encryption_key.fill(12);
@@ -549,7 +550,7 @@ TEST_CASE("sync: non-synced metadata table doesn't result in non-additive schema
 
     SyncServer server;
     // Disable file-related functionality and metadata functionality for testing purposes.
-    SyncManager::shared().configure_file_system(tmp_dir(), SyncManager::MetadataMode::NoMetadata);
+    SyncManager::shared().configure(tmp_dir(), SyncManager::MetadataMode::NoMetadata);
 
     // Create a synced Realm containing a class with two properties.
     {
@@ -599,7 +600,7 @@ TEST_CASE("sync: stable IDs", "[sync]") {
 
     SyncServer server;
     // Disable file-related functionality and metadata functionality for testing purposes.
-    SyncManager::shared().configure_file_system(tmp_dir(), SyncManager::MetadataMode::NoMetadata);
+    SyncManager::shared().configure(tmp_dir(), SyncManager::MetadataMode::NoMetadata);
 
     SECTION("ID column isn't visible in schema read from Group") {
         SyncTestFile config(server, "schema-test");
@@ -624,7 +625,7 @@ TEST_CASE("sync: Migration from Sync 1.x to Sync 2.x", "[sync]") {
 
     SyncServer server;
     // Disable file-related functionality and metadata functionality for testing purposes.
-    SyncManager::shared().configure_file_system(tmp_dir(), SyncManager::MetadataMode::NoMetadata);
+    SyncManager::shared().configure(tmp_dir(), SyncManager::MetadataMode::NoMetadata);
 
 
     SyncTestFile config(server, "migration-test");

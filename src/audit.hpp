@@ -1,6 +1,6 @@
 ////////////////////////////////////////////////////////////////////////////
 //
-// Copyright 2016 Realm Inc.
+// Copyright 2018 Realm Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,19 +16,19 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#ifndef REALM_SYNC_TEST_UTILS_HPP
-#define REALM_SYNC_TEST_UTILS_HPP
-
-#include "catch.hpp"
-
-#include "sync/impl/sync_file.hpp"
-#include "sync/impl/sync_metadata.hpp"
-
 namespace realm {
+class Table;
+class TableView;
+template<typename> class BasicRowExpr;
+using RowExpr = BasicRowExpr<Table>;
+struct VersionID;
 
-bool results_contains_user(SyncUserMetadataResults& results, const std::string& identity, const std::string& auth_server);
-bool results_contains_original_name(SyncFileActionMetadataResults& results, const std::string& original_name);
+class AuditInterface {
+public:
+    virtual ~AuditInterface() {}
 
-} // namespace realm
-
-#endif // REALM_SYNC_TEST_UTILS_HPP
+    virtual void record_query(realm::VersionID, realm::TableView const&) = 0;
+    virtual void record_read(realm::VersionID, realm::RowExpr) = 0;
+    virtual void record_write(realm::VersionID, realm::VersionID) = 0;
+};
+}
