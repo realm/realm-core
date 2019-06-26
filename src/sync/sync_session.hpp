@@ -327,7 +327,7 @@ private:
     void cancel_pending_waits(std::unique_lock<std::mutex>&);
     enum class ShouldBackup { yes, no };
     void update_error_and_mark_file_for_deletion(SyncError&, ShouldBackup);
-    static std::string get_recovery_file_path();
+    std::string get_recovery_file_path();
     void handle_progress_update(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t);
 
     void set_sync_transact_callback(std::function<SyncSessionTransactCallback>);

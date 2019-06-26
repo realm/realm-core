@@ -21,7 +21,9 @@
 #include "impl/collection_notifier.hpp"
 #include "impl/realm_coordinator.hpp"
 #include "impl/transact_log_handler.hpp"
+#include "util/fifo.hpp"
 
+#include "audit.hpp"
 #include "binding_context.hpp"
 #include "list.hpp"
 #include "object.hpp"
@@ -456,14 +458,14 @@ void Realm::notify_schema_changed()
     }
 }
 
-static void check_read_write(Realm *realm)
+static void check_read_write(const Realm* realm)
 {
     if (realm->config().immutable()) {
         throw InvalidTransactionException("Can't perform transactions on read-only Realms.");
     }
 }
 
-static void check_write(Realm* realm)
+static void check_write(const Realm* realm)
 {
     if (realm->config().immutable() || realm->config().read_only_alternative()) {
         throw InvalidTransactionException("Can't perform transactions on read-only Realms.");
@@ -492,6 +494,14 @@ void Realm::verify_open() const
     if (is_closed()) {
         throw ClosedRealmException();
     }
+}
+
+VersionID Realm::read_transaction_version() const
+{
+    verify_thread();
+    verify_open();
+    check_read_write(this);
+    return static_cast<Transaction&>(*m_group).get_version_of_current_transaction();
 }
 
 bool Realm::is_in_transaction() const noexcept
@@ -574,7 +584,15 @@ void Realm::commit_transaction()
         throw InvalidTransactionException("Can't commit a non-existing write transaction");
     }
 
-    m_coordinator->commit_write(*this);
+    if (auto audit = audit_context()) {
+        auto prev_version = transaction().get_version_of_current_transaction();
+        m_coordinator->commit_write(*this);
+        audit->record_write(prev_version, transaction().get_version_of_current_transaction());
+        // m_shared_group->unpin_version(prev_version);
+    }
+    else {
+        m_coordinator->commit_write(*this);
+    }
     cache_new_schema();
     invalidate_permission_cache();
 }
@@ -755,7 +773,7 @@ bool Realm::refresh()
 
 bool Realm::can_deliver_notifications() const noexcept
 {
-    if (m_config.immutable()) {
+    if (m_config.immutable() || !m_config.automatic_change_notifications) {
         return false;
     }
 
@@ -863,6 +881,11 @@ template Object Realm::resolve_thread_safe_reference(ThreadSafeReference<Object>
 template List Realm::resolve_thread_safe_reference(ThreadSafeReference<List> reference);
 template Results Realm::resolve_thread_safe_reference(ThreadSafeReference<Results> reference);
 
+AuditInterface* Realm::audit_context() const noexcept
+{
+    return m_coordinator ? m_coordinator->audit_context() : nullptr;
+}
+
 #if REALM_ENABLE_SYNC
 static_assert(static_cast<int>(ComputedPrivileges::Read) == static_cast<int>(sync::Privilege::Read), "");
 static_assert(static_cast<int>(ComputedPrivileges::Update) == static_cast<int>(sync::Privilege::Update), "");
@@ -967,7 +990,3 @@ MismatchedConfigException::MismatchedConfigException(StringData message, StringD
 MismatchedRealmException::MismatchedRealmException(StringData message)
 : std::logic_error(message.data()) { }
 
-std::size_t Realm::compute_size() {
-    Group& group = read_group();
-    return group.compute_aggregated_byte_size();
-}

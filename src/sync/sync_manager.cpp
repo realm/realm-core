@@ -218,13 +218,10 @@ void SyncManager::reset_for_testing()
 
         {
             std::lock_guard<std::mutex> lock(m_session_mutex);
-
-            // Callers of `SyncManager::reset_for_testing` should ensure there are no active sessions
+            // Callers of `SyncManager::reset_for_testing` should ensure there are no existing sessions
             // prior to calling `reset_for_testing`.
-            auto no_active_sessions = std::none_of(m_sessions.begin(), m_sessions.end(), [](auto& element){
-                return element.second->existing_external_reference();
-            });
-            REALM_ASSERT_RELEASE(no_active_sessions);
+            bool no_sessions = !do_has_existing_sessions();
+            REALM_ASSERT_RELEASE(no_sessions);
 
             // Destroy any inactive sessions.
             // FIXME: We shouldn't have any inactive sessions at this point! Sessions are expected to
@@ -415,11 +412,11 @@ std::string SyncManager::path_for_realm(const SyncUser& user, const std::string&
     return m_file_manager->path(user.local_identity(), raw_realm_url);
 }
 
-std::string SyncManager::recovery_directory_path() const
+std::string SyncManager::recovery_directory_path(util::Optional<std::string> const& custom_dir_name) const
 {
     std::lock_guard<std::mutex> lock(m_file_system_mutex);
     REALM_ASSERT(m_file_manager);
-    return m_file_manager->recovery_directory_path();
+    return m_file_manager->recovery_directory_path(custom_dir_name);
 }
 
 std::shared_ptr<SyncSession> SyncManager::get_existing_active_session(const std::string& path) const
@@ -470,6 +467,19 @@ std::shared_ptr<SyncSession> SyncManager::get_session(const std::string& path, c
     return external_reference;
 }
 
+
+bool SyncManager::has_existing_sessions()
+{
+    std::lock_guard<std::mutex> lock(m_session_mutex);
+    return do_has_existing_sessions();
+}
+
+bool SyncManager::do_has_existing_sessions(){
+    return std::any_of(m_sessions.begin(), m_sessions.end(), [](auto& element){
+        return element.second->existing_external_reference();
+    });
+}
+
 void SyncManager::unregister_session(const std::string& path)
 {
     std::lock_guard<std::mutex> lock(m_session_mutex);
@@ -488,8 +498,12 @@ void SyncManager::unregister_session(const std::string& path)
 void SyncManager::enable_session_multiplexing()
 {
     std::lock_guard<std::mutex> lock(m_mutex);
+    if (m_multiplex_sessions)
+        return; // Already enabled, we can ignore
+
     if (m_sync_client)
         throw std::logic_error("Cannot enable session multiplexing after creating the sync client");
+
     m_multiplex_sessions = true;
 }
 

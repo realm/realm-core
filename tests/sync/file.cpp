@@ -17,6 +17,7 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #include "sync_test_utils.hpp"
+#include "util/test_utils.hpp"
 
 #include "shared_realm.hpp"
 #include "sync/sync_manager.hpp"

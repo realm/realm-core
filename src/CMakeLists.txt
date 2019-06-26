@@ -63,13 +63,14 @@ set(HEADERS
     util/aligned_union.hpp
     util/atomic_shared_ptr.hpp
     util/event_loop_signal.hpp
+    util/fifo.hpp
     util/tagged_bool.hpp
     util/uuid.hpp)
 
 if(APPLE)
-    list(APPEND SOURCES impl/apple/external_commit_helper.cpp impl/apple/keychain_helper.cpp)
+    list(APPEND SOURCES impl/apple/external_commit_helper.cpp impl/apple/keychain_helper.cpp util/fifo.cpp)
 elseif(REALM_HAVE_EPOLL)
-    list(APPEND SOURCES impl/epoll/external_commit_helper.cpp)
+    list(APPEND SOURCES impl/epoll/external_commit_helper.cpp util/fifo.cpp)
 elseif(CMAKE_SYSTEM_NAME MATCHES "^Windows")
     list(APPEND SOURCES impl/windows/external_commit_helper.cpp)
 else()

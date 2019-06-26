@@ -20,6 +20,7 @@
 
 #include "sync/sync_manager.hpp"
 #include "sync/sync_user.hpp"
+#include "util/test_utils.hpp"
 #include <realm/util/file.hpp>
 #include <realm/util/scope_exit.hpp>
 
