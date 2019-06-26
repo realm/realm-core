@@ -54,6 +54,13 @@ Initialization initialization;
 
 } // anonymous namespace
 
+constexpr char Group::g_primary_key_table_name[];
+constexpr char Group::g_primary_key_class_column_name[];
+constexpr char Group::g_primary_key_property_column_name[];
+constexpr char Group::g_class_name_prefix[];
+constexpr size_t Group::g_class_name_prefix_len;
+constexpr ColKey Group::g_pk_table;
+constexpr ColKey Group::g_pk_property;
 
 Group::Group()
     : m_local_alloc(new SlabAlloc)
@@ -1871,6 +1878,33 @@ void Group::verify() const
     // allocator
     mem_usage_1.check_total_coverage();
 #endif
+}
+
+TableRef Group::get_pk_table()
+{
+    TableRef pk = get_table(g_primary_key_table_name);
+
+    if (!pk) {
+        pk = add_table(g_primary_key_table_name);
+        pk->insert_column(g_pk_table, type_String, g_primary_key_class_column_name);
+        pk->insert_column(g_pk_property, type_String, g_primary_key_property_column_name);
+        pk->add_search_index(g_pk_table);
+    }
+
+    return pk;
+}
+
+void Group::validate_primary_column_uniqueness() const
+{
+    auto pk_table = get_table(g_primary_key_table_name);
+    if (pk_table) {
+        for (auto pk_obj : *pk_table) {
+            auto object_type = pk_obj.get<String>(g_pk_table);
+            auto name = std::string(g_class_name_prefix) + std::string(object_type);
+            auto table = get_table(name);
+            table->validate_primary_column_uniqueness();
+        }
+    }
 }
 
 #ifdef REALM_DEBUG
