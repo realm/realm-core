@@ -138,17 +138,6 @@ private:
     uint64_t m_old_version, m_new_version;
 };
 
-class DuplicatePrimaryKeyValueException : public std::logic_error {
-public:
-    DuplicatePrimaryKeyValueException(std::string object_type, std::string property);
-
-    std::string const& object_type() const { return m_object_type; }
-    std::string const& property() const { return m_property; }
-private:
-    std::string m_object_type;
-    std::string m_property;
-};
-
 // Schema validation exceptions
 struct ObjectSchemaValidationException : public std::logic_error {
     ObjectSchemaValidationException(std::string message) : logic_error(std::move(message)) {}

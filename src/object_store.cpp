@@ -45,28 +45,17 @@ namespace {
 const char * const c_metadataTableName = "metadata";
 const char * const c_versionColumnName = "version";
 
-const char * const c_primaryKeyTableName = "pk";
-const char * const c_primaryKeyObjectClassColumnName = "pk_table";
-const char * const c_primaryKeyPropertyNameColumnName = "pk_property";
-
 const char c_object_table_prefix[] = "class_";
 
 void create_metadata_tables(Group& group) {
     // The tables 'pk' and 'metadata' are treated specially by Sync. The 'pk' table
     // is populated by `sync::create_table` and friends, while the 'metadata' table
     // is simply ignored.
-    TableRef pk_table = group.get_or_add_table(c_primaryKeyTableName);
     TableRef metadata_table = group.get_or_add_table(c_metadataTableName);
 
     if (metadata_table->get_column_count() == 0) {
         metadata_table->add_column(type_Int, c_versionColumnName);
         metadata_table->create_object().set(c_versionColumnName, int64_t(ObjectStore::NotVersioned));
-    }
-
-    if (pk_table->get_column_count() == 0) {
-        auto pk_key = pk_table->add_column(type_String, c_primaryKeyObjectClassColumnName);
-        pk_table->add_column(type_String, c_primaryKeyPropertyNameColumnName);
-        pk_table->add_search_index(pk_key);
     }
 }
 
@@ -102,6 +91,12 @@ ColKey add_column(Group& group, Table& table, Property const& property)
     // LinkingObjects must be an artifact of an existing link column.
     REALM_ASSERT(property.type != PropertyType::LinkingObjects);
 
+    if (property.is_primary) {
+        // Primary key columns should have been created when the table was created
+        if (auto col = table.get_column_key(property.name)) {
+            return col;
+        }
+    }
     if (property.type == PropertyType::Object) {
         auto target_name = ObjectStore::table_name_for_object_type(property.object_type);
         TableRef link_table = group.get_table(target_name);
@@ -117,6 +112,8 @@ ColKey add_column(Group& group, Table& table, Property const& property)
         auto key = table.add_column(to_core_type(property.type), property.name, is_nullable(property.type));
         if (property.requires_index())
             table.add_search_index(key);
+        if (property.is_primary)
+            table.set_primary_key_column(key);
         return key;
     }
 }
@@ -133,19 +130,13 @@ TableRef create_table(Group& group, ObjectSchema const& object_schema)
     auto name = ObjectStore::table_name_for_object_type(object_schema.name);
 
     TableRef table;
-#if REALM_ENABLE_SYNC
     if (auto* pk_property = object_schema.primary_key_property()) {
-        table = sync::create_table_with_primary_key(group, name, to_core_type(pk_property->type),
-                                                    pk_property->name, is_nullable(pk_property->type));
+        table = group.add_table_with_primary_key(name, to_core_type(pk_property->type), pk_property->name,
+                                                 is_nullable(pk_property->type));
     }
     else {
-        table = sync::create_table(group, name);
+        table = group.get_or_add_table(name);
     }
-#else
-    table = group.get_or_add_table(name);
-    ObjectStore::set_primary_key_for_object(group, object_schema.name, object_schema.primary_key);
-#endif // REALM_ENABLE_SYNC
-
     return table;
 }
 
@@ -178,23 +169,6 @@ void make_property_required(Group& group, Table& table, Property property)
     property.column_key = add_column(group, table, property).value;
 }
 
-void validate_primary_column_uniqueness(Group const& group, StringData object_type, StringData primary_property)
-{
-    auto table = ObjectStore::table_for_object_type(group, object_type);
-    if (table->get_distinct_view(table->get_column_key(primary_property)).size() != table->size()) {
-        throw DuplicatePrimaryKeyValueException(object_type, primary_property);
-    }
-}
-
-void validate_primary_column_uniqueness(Group const& group)
-{
-    auto pk_table = group.get_table(c_primaryKeyTableName);
-    ColKey objectClass = pk_table->get_column_key(c_primaryKeyObjectClassColumnName);
-    ColKey propertyName = pk_table->get_column_key(c_primaryKeyPropertyNameColumnName);
-    for (auto pk_obj : *pk_table)
-        validate_primary_column_uniqueness(group, pk_obj.get<StringData>(objectClass),
-                                           pk_obj.get<StringData>(propertyName));
-}
 } // anonymous namespace
 
 void ObjectStore::set_schema_version(Group& group, uint64_t version) {
@@ -211,48 +185,23 @@ uint64_t ObjectStore::get_schema_version(Group const& group) {
 }
 
 StringData ObjectStore::get_primary_key_for_object(Group const& group, StringData object_type) {
-    ConstTableRef table = group.get_table(c_primaryKeyTableName);
-    if (!table) {
-        return "";
+    if (ConstTableRef table = table_for_object_type(group, object_type)) {
+        if (auto col = table->get_primary_key_column()) {
+            return table->get_column_name(col);
+        }
     }
-    ObjKey row = table->find_first_string(table->get_column_key(c_primaryKeyObjectClassColumnName), object_type);
-    if (!row) {
-        return "";
-    }
-    return table->get_object(row).get<StringData>(c_primaryKeyPropertyNameColumnName);
+    return "";
 }
 
 void ObjectStore::set_primary_key_for_object(Group& group, StringData object_type, StringData primary_key) {
-    TableRef table = group.get_table(c_primaryKeyTableName);
-
-    ObjKey key = table->find_first_string(table->get_column_key(c_primaryKeyObjectClassColumnName), object_type);
-
-#if REALM_ENABLE_SYNC
-    // sync::create_table* functions should have already updated the pk table.
-    if (sync::has_object_ids(group)) {
-        if (primary_key.size() == 0)
-            REALM_ASSERT(row == not_found);
-        else {
-             REALM_ASSERT(row != not_found);
-             REALM_ASSERT(table->get_string(c_primaryKeyPropertyNameColumnIndex, row) == primary_key);
-        }
-        return;
-    }
-#endif // REALM_ENABLE_SYNC
-
-    if (primary_key.size() == 0) {
-        if (key)
-            table->remove_object(key);
+    auto t = table_for_object_type(group, object_type);
+    if (primary_key.size()) {
+        auto col = t->get_column_key(primary_key);
+        REALM_ASSERT(col);
+        t->set_primary_key_column(col);
     }
     else {
-        Obj obj;
-        if (key)
-            obj = table->get_object(key);
-        else {
-            obj = table->create_object();
-            obj.set(c_primaryKeyObjectClassColumnName, object_type);
-        }
-        obj.set(c_primaryKeyPropertyNameColumnName, primary_key);
+        t->remove_primary_key_column();
     }
 }
 
@@ -621,8 +570,15 @@ static void apply_post_migration_changes(Group& group,
 
         void operator()(ChangePrimaryKey op)
         {
+            Table& t = table(op.object);
             if (op.property) {
-                validate_primary_column_uniqueness(group, op.object->name, op.property->name);
+                auto col = t.get_column_key(op.property->name);
+                REALM_ASSERT(col);
+                t.set_primary_key_column(col);
+                t.validate_primary_column_uniqueness();
+            }
+            else {
+                t.remove_primary_key_column();
             }
         }
 
@@ -762,7 +718,7 @@ void ObjectStore::apply_schema_changes(Group& group, uint64_t schema_version,
         }
 
         verify_no_changes_required(schema_from_group(group).compare(target_schema));
-        validate_primary_column_uniqueness(group);
+        group.validate_primary_column_uniqueness();
         set_schema_columns(group, target_schema);
         set_schema_version(group, target_schema_version);
         return;
@@ -783,7 +739,7 @@ void ObjectStore::apply_schema_changes(Group& group, uint64_t schema_version,
         // Migration function may have changed the schema, so we need to re-read it
         auto schema = schema_from_group(group);
         apply_post_migration_changes(group, schema.compare(target_schema), old_schema, DidRereadSchema::Yes);
-        validate_primary_column_uniqueness(group);
+        group.validate_primary_column_uniqueness();
     }
     else {
         apply_post_migration_changes(group, changes, {}, DidRereadSchema::No);
@@ -846,8 +802,8 @@ void ObjectStore::set_schema_columns(Group const& group, Schema& schema)
 void ObjectStore::delete_data_for_object(Group& group, StringData object_type)
 {
     if (TableRef table = table_for_object_type(group, object_type)) {
-        group.remove_table(table->get_key());
         ObjectStore::set_primary_key_for_object(group, object_type, "");
+        group.remove_table(table->get_key());
     }
 }
 
@@ -927,12 +883,6 @@ void ObjectStore::rename_property(Group& group, Schema& target_schema, StringDat
 InvalidSchemaVersionException::InvalidSchemaVersionException(uint64_t old_version, uint64_t new_version)
 : logic_error(util::format("Provided schema version %1 is less than last set version %2.", new_version, old_version))
 , m_old_version(old_version), m_new_version(new_version)
-{
-}
-
-DuplicatePrimaryKeyValueException::DuplicatePrimaryKeyValueException(std::string object_type, std::string property)
-: logic_error(util::format("Primary key property '%1.%2' has duplicate values after migration.", object_type, property))
-, m_object_type(object_type), m_property(property)
 {
 }
 

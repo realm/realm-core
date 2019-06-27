@@ -113,15 +113,9 @@ TEST_CASE("ObjectSchema") {
 
     SECTION("from a Group") {
         Group g;
-        TableRef pk = g.add_table("pk");
-        pk->add_column(type_String, "pk_table");
-        auto prop_col = pk->add_column(type_String, "pk_property");
-        pk->create_object().set_all("table", "pk");
 
-        TableRef table = g.add_table("class_table");
+        TableRef table = g.add_table_with_primary_key("class_table", type_Int, "pk");
         TableRef target = g.add_table("class_target");
-
-        table->add_column(type_Int, "pk");
 
         table->add_column(type_Int, "int");
         table->add_column(type_Bool, "bool");
@@ -234,9 +228,6 @@ TEST_CASE("ObjectSchema") {
         REQUIRE_PROPERTY("indexed bool?", Bool|PropertyType::Nullable, Property::IsPrimary{false}, Property::IsIndexed{true});
         REQUIRE_PROPERTY("indexed string?", String|PropertyType::Nullable, Property::IsPrimary{false}, Property::IsIndexed{true});
         REQUIRE_PROPERTY("indexed date?", Date|PropertyType::Nullable, Property::IsPrimary{false}, Property::IsIndexed{true});
-
-        pk->get_object(0).set(prop_col, "nonexistent property");
-        REQUIRE(ObjectSchema(g, "table", table->get_key()).primary_key_property() == nullptr);
     }
 }
 

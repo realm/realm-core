@@ -138,14 +138,14 @@ static void compare(ObjectSchema const& existing_schema,
         }
     }
 
-    if (existing_schema.primary_key != target_schema.primary_key) {
-        changes.emplace_back(schema_change::ChangePrimaryKey{&existing_schema, target_schema.primary_key_property()});
-    }
-
     for (auto& target_prop : target_schema.persisted_properties) {
         if (!existing_schema.property_for_name(target_prop.name)) {
             changes.emplace_back(schema_change::AddProperty{&existing_schema, &target_prop});
         }
+    }
+
+    if (existing_schema.primary_key != target_schema.primary_key) {
+        changes.emplace_back(schema_change::ChangePrimaryKey{&existing_schema, target_schema.primary_key_property()});
     }
 }
 
