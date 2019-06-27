@@ -1,20 +1,13 @@
-# NEXT RELEASE
+# 6.0.0-alpha.11 Release notes
 
 ### Enhancements
-* None.
+* to_json operations reintroduced.
+* get_any() and is_null() operations added to ConstLstBase
+* pk handling enhanched so that it can be used by OS
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * None.
  
-### Breaking changes
-* None.
-
------------
-
-### Internals
-* None.
-
 ----------------------------------------------
 
 # 6.0.0-alpha.10 Release notes
