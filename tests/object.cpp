@@ -913,6 +913,7 @@ TEST_CASE("object") {
         REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "object array")).size() == 1);
     }
 
+#if 0
 #if REALM_ENABLE_SYNC
     if (!util::EventLoop::has_implementation())
         return;
@@ -965,5 +966,6 @@ TEST_CASE("object") {
         REQUIRE(obj.row().get_linklist(4)->size() == 2);
 
     }
+#endif
 #endif
 }

@@ -70,14 +70,6 @@ Realm::Realm(Config config, std::shared_ptr<_impl::RealmCoordinator> coordinator
     m_coordinator = std::move(coordinator);
 }
 
-#if REALM_ENABLE_SYNC
-static bool is_nonupgradable_history(IncompatibleHistories const& ex)
-{
-    // FIXME: Replace this with a proper specific exception type once Core adds support for it.
-    return std::string(ex.what()).find(std::string("Incompatible histories. Nonupgradable history schema")) != npos;
-}
-#endif
-
 Realm::~Realm()
 {
     if (m_coordinator) {
@@ -373,7 +365,7 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
             m_in_migration = false;
         });
 
-        ObjectStore::apply_schema_changes(read_group(), version, m_schema, m_schema_version,
+        ObjectStore::apply_schema_changes(transaction(), version, m_schema, m_schema_version,
                                           m_config.schema_mode, required_changes, util::none, wrapper);
     }
     else {
@@ -382,7 +374,7 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
         if (m_config.sync_config && m_config.sync_config->is_partial)
             sync_user_id = m_config.sync_config->user->identity();
 #endif
-        ObjectStore::apply_schema_changes(read_group(), m_schema_version, schema, version,
+        ObjectStore::apply_schema_changes(transaction(), m_schema_version, schema, version,
                                           m_config.schema_mode, required_changes, std::move(sync_user_id));
         REALM_ASSERT_DEBUG(additive || (required_changes = ObjectStore::schema_from_group(read_group()).compare(schema)).empty());
     }
@@ -860,13 +852,9 @@ bool Realm::init_permission_cache()
 
     // Admin users bypass permissions checks outside of the logic in PermissionsCache
     if (m_config.sync_config && m_config.sync_config->is_partial && !m_config.sync_config->user->is_admin()) {
-#if REALM_SYNC_VER_MAJOR == 3 && (REALM_SYNC_VER_MINOR < 13 || (REALM_SYNC_VER_MINOR == 13 && REALM_SYNC_VER_PATCH < 3))
-        m_permissions_cache = std::make_unique<sync::PermissionsCache>(read_group(), m_config.sync_config->user->identity());
-#else
-        m_table_info_cache = std::make_unique<sync::TableInfoCache>(read_group());
-        m_permissions_cache = std::make_unique<sync::PermissionsCache>(read_group(), *m_table_info_cache,
+        m_table_info_cache = std::make_unique<sync::TableInfoCache>(transaction());
+        m_permissions_cache = std::make_unique<sync::PermissionsCache>(transaction(), *m_table_info_cache,
                                                                        m_config.sync_config->user->identity());
-#endif
         return true;
     }
     return false;
@@ -911,7 +899,7 @@ ComputedPrivileges Realm::get_privileges(Obj const& obj)
 
     auto& table = *obj.get_table();
     auto object_type = ObjectStore::object_type_for_table_name(table.get_name());
-    sync::GlobalID global_id{object_type, sync::object_id_for_row(read_group(), table, obj.get_key())};
+    sync::GlobalID global_id{object_type, sync::object_id_for_row(transaction(), table, obj.get_key())};
     auto privileges = inherited_mask(m_permissions_cache->get_realm_privileges())
                     & inherited_mask(m_permissions_cache->get_class_privileges(object_type))
                     & m_permissions_cache->get_object_privileges(global_id);

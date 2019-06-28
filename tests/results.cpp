@@ -1204,7 +1204,7 @@ TEST_CASE("notifications: sync") {
         {
             auto write_realm = Realm::get_shared_realm(config);
             write_realm->begin_transaction();
-            sync::create_object(write_realm->read_group(), *write_realm->read_group().get_table("class_object"));
+            write_realm->read_group().get_table("class_object")->create_object();
             write_realm->commit_transaction();
         }
 

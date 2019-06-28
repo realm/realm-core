@@ -24,6 +24,7 @@
 
 #include <realm/util/optional.hpp>
 #include <realm/binary_data.hpp>
+#include <realm/db.hpp>
 
 #if REALM_ENABLE_SYNC
 #include <realm/sync/client.hpp>

@@ -240,24 +240,17 @@ Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
         }
         else {
             created = true;
+            Mixed primary_key;
             if (primary_prop->type == PropertyType::Int) {
-#if REALM_ENABLE_SYNC
-                row_index = sync::create_object_with_primary_key(realm->read_group(), *table, ctx.template unbox<util::Optional<int64_t>>(*primary_value));
-#else
-                obj = table->create_object();
-#endif // REALM_ENABLE_SYNC
+                primary_key = ctx.template unbox<util::Optional<int64_t>>(*primary_value);
             }
             else if (primary_prop->type == PropertyType::String) {
-#if REALM_ENABLE_SYNC
-                auto value = ctx.template unbox<StringData>(*primary_value);
-                row_index = sync::create_object_with_primary_key(realm->read_group(), *table, value);
-#else
-                obj = table->create_object();
-#endif // REALM_ENABLE_SYNC
+                primary_key = ctx.template unbox<StringData>(*primary_value);
             }
             else {
                 REALM_TERMINATE("Unsupported primary key type.");
             }
+            obj = table->create_object_with_primary_key(primary_key);
         }
     }
     else {
@@ -265,11 +258,7 @@ Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
             obj = table->get_object(current_obj);
         }
         else {
-#if REALM_ENABLE_SYNC
-        obj = sync::create_object(realm->read_group(), *table);
-#else
         obj = table->create_object();
-#endif // REALM_ENABLE_SYNC
             created = true;
         }
     }

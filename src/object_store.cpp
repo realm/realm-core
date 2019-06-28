@@ -137,6 +137,7 @@ TableRef create_table(Group& group, ObjectSchema const& object_schema)
     else {
         table = group.get_or_add_table(name);
     }
+
     return table;
 }
 
@@ -608,7 +609,7 @@ static void apply_post_migration_changes(Group& group,
     }
 }
 
-static void create_default_permissions(Group& group, std::vector<SchemaChange> const& changes,
+static void create_default_permissions(Transaction& group, std::vector<SchemaChange> const& changes,
                                        std::string const& sync_user_id)
 {
 #if !REALM_ENABLE_SYNC
@@ -630,7 +631,7 @@ static void create_default_permissions(Group& group, std::vector<SchemaChange> c
     // sure that the permissions tables actually exist.
     using namespace schema_change;
     struct Applier {
-        Group& group;
+        Transaction& group;
         void operator()(AddTable op)
         {
             sync::set_class_permissions_for_role(group, op.object->name, "everyone",
@@ -656,13 +657,13 @@ static void create_default_permissions(Group& group, std::vector<SchemaChange> c
 }
 
 #if REALM_ENABLE_SYNC
-void ObjectStore::ensure_private_role_exists_for_user(Group& group, StringData sync_user_id)
+void ObjectStore::ensure_private_role_exists_for_user(Transaction& group, StringData sync_user_id)
 {
     std::string private_role_name = util::format("__User:%1", sync_user_id);
 
     TableRef roles = ObjectStore::table_for_object_type(group, "__Role");
-    size_t private_role_ndx = roles->find_first_string(roles->get_column_index("name"), private_role_name);
-    if (private_role_ndx != npos) {
+    ObjKey private_role_ndx = roles->find_first_string(roles->get_column_key("name"), private_role_name);
+    if (private_role_ndx) {
         // The private role already exists, so there's nothing for us to do.
         return;
     }
@@ -671,14 +672,14 @@ void ObjectStore::ensure_private_role_exists_for_user(Group& group, StringData s
     sync::add_user_to_role(group, sync_user_id, private_role_name);
 
     // Set the private role on the user.
-    private_role_ndx = roles->find_first_string(roles->get_column_index("name"), private_role_name);
+    private_role_ndx = roles->find_first_string(roles->get_column_key("name"), private_role_name);
     TableRef users = ObjectStore::table_for_object_type(group, "__User");
-    size_t user_ndx = users->find_first_string(users->get_column_index("id"), sync_user_id);
-    users->set_link(users->get_column_index("role"), user_ndx, private_role_ndx);
+    ObjKey user_ndx = users->find_first_string(users->get_column_key("id"), sync_user_id);
+    users->get_object(user_ndx).set("role", private_role_ndx);
 }
 #endif
 
-void ObjectStore::apply_schema_changes(Group& group, uint64_t schema_version,
+void ObjectStore::apply_schema_changes(Transaction& group, uint64_t schema_version,
                                        Schema& target_schema, uint64_t target_schema_version,
                                        SchemaMode mode, std::vector<SchemaChange> const& changes,
                                        util::Optional<std::string> sync_user_id,
@@ -764,13 +765,6 @@ Schema ObjectStore::schema_from_group(Group const& group) {
 util::Optional<Property> ObjectStore::property_for_column_index(ConstTableRef& table, ColKey column_key)
 {
     StringData column_name = table->get_column_name(column_key);
-
-#if REALM_ENABLE_SYNC
-    // The object ID column is an implementation detail, and is omitted from the schema.
-    // FIXME: Consider filtering out all column names starting with `!`.
-    if (column_name == sync::object_id_column_name)
-        return util::none;
-#endif
 
     Property property;
     property.name = column_name;

@@ -159,7 +159,7 @@ void Permissions::get_permissions(std::shared_ptr<SyncUser> user,
             // We monitor the raw results. The presence of a `__management` Realm indicates
             // that the permissions have been downloaded (hence, we wait until size > 0).
             TableRef table = ObjectStore::table_for_object_type(results->get_realm()->read_group(), "Permission");
-            size_t col_idx = table->get_descriptor()->get_column_index("path");
+            auto col_idx = table->get_column_key("path");
             auto query = !(table->column<StringData>(col_idx).ends_with("/__permission")
                            || table->column<StringData>(col_idx).ends_with("/__perm")
                            || table->column<StringData>(col_idx).ends_with("/__management"));
