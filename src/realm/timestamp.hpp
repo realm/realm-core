@@ -22,6 +22,7 @@
 #include <cstdint>
 #include <ostream>
 #include <chrono>
+#include <ctime>
 #include <realm/util/assert.hpp>
 #include <realm/null.hpp>
 
@@ -177,7 +178,8 @@ private:
 template <class C, class T>
 inline std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& out, const Timestamp& d)
 {
-    struct tm* t = gmtime(&d.m_seconds);
+    auto seconds = time_t(d.get_seconds());
+    struct tm* t = gmtime(&seconds);
     if (t) {
         // We need a buffer for formatting dates (and binary to hex). Max
         // size is 20 bytes (incl zero byte) "YYYY-MM-DD HH:MM:SS"\0

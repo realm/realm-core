@@ -120,13 +120,13 @@ struct ObjectID {
         REALM_ASSERT(m_hi <= 0x3fffffff);
         REALM_ASSERT(lo() <= std::numeric_limits<uint32_t>::max());
 
-        auto hi = m_hi;
-        if (hi == sync_file_id)
-            hi = 0;
+        auto high = m_hi;
+        if (high == sync_file_id)
+            high = 0;
         uint64_t a = m_lo & 0xff;
-        uint64_t b = (hi & 0xff) << 8;
+        uint64_t b = (high & 0xff) << 8;
         uint64_t c = (m_lo & 0xffffff00) << 8;
-        uint64_t d = (hi & 0x3fffff00) << 32;
+        uint64_t d = (high & 0x3fffff00) << 32;
 
         return ObjKey(int64_t(a | b | c | d));
     }
