@@ -705,12 +705,10 @@ TEMPLATE_TEST_CASE("primitive list", ::Int, ::Bool, ::Float, ::Double, ::String,
     SECTION("handover") {
         r->commit_transaction();
 
-        auto handover = r->obtain_thread_safe_reference(list);
-        auto list2 = r->resolve_thread_safe_reference(std::move(handover));
+        auto list2 = ThreadSafeReference(list).resolve<List>(r);
         REQUIRE(list == list2);
 #if 0
-        auto results_handover = r->obtain_thread_safe_reference(results);
-        auto results2 = r->resolve_thread_safe_reference(std::move(results_handover));
+        auto results2 = ThreadSafeReference(results).resolve<Results>(r);
         REQUIRE(results2 == values);
 #endif
     }

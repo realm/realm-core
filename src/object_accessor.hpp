@@ -333,7 +333,7 @@ Object Object::get_for_primary_key(ContextType& ctx, std::shared_ptr<Realm> cons
     if (!table)
         return Object(realm, object_schema, Obj());
     auto key = get_for_primary_key_impl(ctx, *table, *primary_prop, primary_value);
-    return Object(realm, object_schema, table->get_object(key));
+    return Object(realm, object_schema, key ? table->get_object(key) : Obj{});
 }
 
 template<typename ValueType, typename ContextType>

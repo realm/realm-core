@@ -37,9 +37,9 @@ class Query;
 class Realm;
 class Results;
 class SortDescriptor;
+class ThreadSafeReference;
 struct ColKey;
 struct ObjKey;
-template <typename T> class ThreadSafeReference;
 
 namespace _impl {
 class ListNotifier;
@@ -59,7 +59,10 @@ public:
 
     const std::shared_ptr<Realm>& get_realm() const { return m_realm; }
     Query get_query() const;
+
+    ColKey get_parent_column_key() const;
     ObjKey get_parent_object_key() const;
+    TableKey get_parent_table_key() const;
 
     // Get the type of the values contained in this List
     PropertyType get_type() const { return m_type; }
@@ -111,10 +114,10 @@ public:
     // sum() returns 0,
     // Throws UnsupportedColumnTypeException for sum/average on timestamp or non-numeric column
     // Throws OutOfBoundsIndexException for an out-of-bounds column
-    util::Optional<Mixed> max(size_t column=0);
-    util::Optional<Mixed> min(size_t column=0);
-    util::Optional<double> average(size_t column=0);
-    Mixed sum(size_t column=0);
+    util::Optional<Mixed> max(ColKey column={});
+    util::Optional<Mixed> min(ColKey column={});
+    util::Optional<double> average(ColKey column={});
+    Mixed sum(ColKey column={});
 
     bool operator==(List const& rgt) const noexcept;
 
@@ -154,8 +157,6 @@ public:
     static std::unique_ptr<LstBase> get_list(PropertyType type, const LstBase& list);
 
 private:
-    friend ThreadSafeReference<List>;
-
     std::shared_ptr<Realm> m_realm;
     PropertyType m_type;
     mutable const ObjectSchema* m_object_schema = nullptr;
@@ -167,8 +168,8 @@ private:
 
     template<typename Fn>
     auto dispatch(Fn&&) const;
-    template<template<class...> class Predicate, typename Fn, typename Err>
-    auto aggregate(Fn&&, Err&&) const;
+    template<template<class...> class Predicate, typename Ret, typename Fn>
+    Ret aggregate(const char *type, Fn&&) const;
     template<typename T>
     auto& as() const;
 
