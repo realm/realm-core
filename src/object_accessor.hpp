@@ -211,6 +211,7 @@ Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
     Obj obj;
     TableRef table = ObjectStore::table_for_object_type(realm->read_group(), object_schema.name);
 
+    bool skip_primary = true;
     if (auto primary_prop = object_schema.primary_key_property()) {
         // search for existing object based on primary key type
         auto primary_value = ctx.value_for_property(value, *primary_prop,
@@ -232,6 +233,7 @@ Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
                 // new column which is the PK will inherently result in duplicates at first
                 obj = table->create_object();
                 created = true;
+                skip_primary = false;
             }
             else {
                 throw std::logic_error(util::format("Attempting to create an object of type '%1' with an existing primary key value '%2'.",
@@ -269,10 +271,8 @@ Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
         *out_row = obj;
     for (size_t i = 0; i < object_schema.persisted_properties.size(); ++i) {
         auto& prop = object_schema.persisted_properties[i];
-#if REALM_ENABLE_SYNC
-        if (prop.is_primary)
+        if (skip_primary && prop.is_primary)
             continue;
-#endif
 
         auto v = ctx.value_for_property(value, prop, i);
         if (!created && !v)

@@ -146,11 +146,13 @@ class SyncMetadataResults {
 public:
     size_t size() const
     {
+        m_realm->refresh();
         return m_results.size();
     }
 
     T get(size_t idx) const
     {
+        m_realm->refresh();
         auto row = m_results.get(idx);
         return T(m_schema, m_realm, row);
     }

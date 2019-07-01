@@ -182,9 +182,9 @@ void initialize_schema(Group& group)
 // and that notifies the sync session after committing a change.
 class WriteTransactionNotifyingSync {
 public:
-    WriteTransactionNotifyingSync(Realm::Config const& config, Transaction& tr)
+    WriteTransactionNotifyingSync(Realm::Config const& config, TransactionRef tr)
     : m_config(config)
-    , m_tr(&tr)
+    , m_tr(std::move(tr))
     {
         if (m_tr->get_transact_stage() == DB::TransactStage::transact_Reading)
             m_tr->promote_to_write();
@@ -222,7 +222,7 @@ public:
 
 private:
     Realm::Config const& m_config;
-    Transaction* m_tr;
+    TransactionRef m_tr;
 };
 
 // Provides a convenient way for code in this file to access private details of `Realm`
@@ -279,13 +279,6 @@ QueryTypeMismatchException::QueryTypeMismatchException(const std::string& msg)
 {}
 
 namespace {
-
-template<typename F>
-void with_open_shared_group(Realm::Config const& config, F&& function)
-{
-    auto realm = _impl::RealmCoordinator::get_coordinator(config)->get_realm();
-    function(static_cast<Transaction&>(realm->read_group()));
-}
 
 struct ResultSetsColumns {
     ResultSetsColumns(Table& table, std::string const& matches_property_name)
@@ -348,6 +341,7 @@ Obj write_subscription(std::string const& object_type, std::string const& name, 
         util::Optional<int64_t> time_to_live_ms, bool update, Group& group)
 {
     Timestamp now = timestamp_now();
+
     auto matches_property = std::string(object_type) + "_matches";
 
     auto table = ObjectStore::table_for_object_type(group, result_sets_type_name);
@@ -411,11 +405,12 @@ Obj write_subscription(std::string const& object_type, std::string const& name, 
     // Always set updated_at/expires_at when a subscription is touched, no matter if it is new, updated or someone just
     // resubscribes.
     subscription.set(columns.updated_at, now);
-    if (subscription.is_null(columns.time_to_live)) {
+    time_to_live_ms = subscription.get<util::Optional<Int>>(columns.time_to_live);
+    if (!time_to_live_ms) {
         subscription.set_null(columns.expires_at);
     }
     else {
-        subscription.set(columns.expires_at, calculate_expiry_date(now, subscription.get<Int>(columns.time_to_live)));
+        subscription.set(columns.expires_at, calculate_expiry_date(now, *time_to_live_ms));
     }
 
     // Fetch subscription first and return it. Cleanup needs to be performed after as it might delete subscription
@@ -429,16 +424,15 @@ void enqueue_registration(Realm& realm, std::string object_type, std::string que
                           std::function<void(std::exception_ptr)> callback)
 {
     auto config = realm.config();
+    auto transact = realm.transaction().duplicate();
 
     auto& work_queue = _impl::PartialSyncHelper::get_coordinator(realm).partial_sync_work_queue();
-    work_queue.enqueue([object_type=std::move(object_type), query=std::move(query), name=std::move(name),
+    work_queue.enqueue([object_type, query, name, transact=std::move(transact),
                         callback=std::move(callback), config=std::move(config), time_to_live=time_to_live, update=update] {
         try {
-            with_open_shared_group(config, [&](Transaction& sg) {
-                _impl::WriteTransactionNotifyingSync write(config, sg);
-                write_subscription(object_type, name, query, time_to_live, update, write.get_group());
-                write.commit();
-            });
+            _impl::WriteTransactionNotifyingSync write(config, std::move(transact));
+            write_subscription(object_type, name, query, time_to_live, update, write.get_group());
+            write.commit();
         } catch (...) {
             callback(std::current_exception());
             return;
@@ -452,6 +446,7 @@ void enqueue_unregistration(Object result_set, std::function<void()> callback)
 {
     auto realm = result_set.realm();
     auto config = realm->config();
+    auto transact = realm->transaction().duplicate();
     auto& work_queue = _impl::PartialSyncHelper::get_coordinator(*realm).partial_sync_work_queue();
 
     // Export a reference to the __ResultSets row so we can hand it to the worker thread.
@@ -459,19 +454,17 @@ void enqueue_unregistration(Object result_set, std::function<void()> callback)
     auto obj_key = obj.get_key();
     auto table_key = obj.get_table()->get_key();
 
-    work_queue.enqueue([obj_key, table_key, callback=std::move(callback),
+    work_queue.enqueue([obj_key, table_key, transact=std::move(transact), callback=std::move(callback),
                         config=std::move(config)] () {
-        with_open_shared_group(config, [&](Transaction& sg) {
-            _impl::WriteTransactionNotifyingSync write(config, sg);
-            auto t = sg.get_table(table_key);
-            if (t->is_valid(obj_key)) {
-                t->remove_object(obj_key);
-                write.commit();
-            }
-            else {
-                write.rollback();
-            }
-        });
+        _impl::WriteTransactionNotifyingSync write(config, std::move(transact));
+        auto t = write.get_group().get_table(table_key);
+        if (t->is_valid(obj_key)) {
+            t->remove_object(obj_key);
+            write.commit();
+        }
+        else {
+            write.rollback();
+        }
         callback();
     });
 }
@@ -486,33 +479,31 @@ void enqueue_unregistration(Results const& result_set, std::shared_ptr<Notifier>
 
     // Export a reference to the query which will match the __ResultSets row
     // once it's created so we can hand it to the worker thread
-    Query q = result_set.get_query();
-    //auto handover = _impl::export_for_handover(*realm, q, MutableSourcePayload::Move);
+    auto transact = realm->transaction().duplicate();
+    auto tmp_query = result_set.get_query();
+    std::shared_ptr<Query> query = transact->import_copy_of(tmp_query, PayloadPolicy::Move);
 
-    work_queue.enqueue([query=std::move(q), callback=std::move(callback),
+    work_queue.enqueue([query=std::move(query), transact=std::move(transact), callback=std::move(callback),
                         config=std::move(config), notifier=std::move(notifier)] () {
-        with_open_shared_group(config, [&](Transaction& tr) {
-            auto q2 = query.clone_for_handover(&tr, PayloadPolicy::Move);
 
-            // If creating the subscription failed there might be another
-            // pre-existing subscription which matches our query, so we need to
-            // not remove that
-            if (notifier->failed())
-                return;
+        // If creating the subscription failed there might be another
+        // pre-existing subscription which matches our query, so we need to
+        // not remove that
+        if (notifier->failed())
+            return;
 
-            _impl::WriteTransactionNotifyingSync write(config, tr);
-            auto obj_key = q2->find();
-            auto t = q2->get_table();
-            if (t->is_valid(obj_key)) {
-                t->remove_object(obj_key);
-                write.commit();
-            }
-            else {
-                // If unsubscribe() is called twice before the subscription is
-                // even created the row might already be gone
-                write.rollback();
-            }
-        });
+        _impl::WriteTransactionNotifyingSync write(config, std::move(transact));
+        auto obj_key = query->find();
+        auto t = query->get_table();
+        if (t->is_valid(obj_key)) {
+            t->remove_object(obj_key);
+            write.commit();
+        }
+        else {
+            // If unsubscribe() is called twice before the subscription is
+            // even created the row might already be gone
+            write.rollback();
+        }
         callback();
     });
 }

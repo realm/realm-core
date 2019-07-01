@@ -331,6 +331,7 @@ std::string SyncUserMetadata::identity() const
 {
     REALM_ASSERT(m_realm);
     m_realm->verify_thread();
+    m_realm->refresh();
     return m_obj.get<String>(m_schema.idx_identity);
 }
 
@@ -338,6 +339,7 @@ std::string SyncUserMetadata::local_uuid() const
 {
     REALM_ASSERT(m_realm);
     m_realm->verify_thread();
+    m_realm->refresh();
     return m_obj.get<String>(m_schema.idx_local_uuid);
 }
 
@@ -345,6 +347,7 @@ util::Optional<std::string> SyncUserMetadata::user_token() const
 {
     REALM_ASSERT(m_realm);
     m_realm->verify_thread();
+    m_realm->refresh();
     StringData result = m_obj.get<String>(m_schema.idx_user_token);
     return result.is_null() ? util::none : util::make_optional(std::string(result));
 }
@@ -353,6 +356,7 @@ std::string SyncUserMetadata::auth_server_url() const
 {
     REALM_ASSERT(m_realm);
     m_realm->verify_thread();
+    m_realm->refresh();
     return m_obj.get<String>(m_schema.idx_auth_server_url);
 }
 
@@ -360,6 +364,7 @@ bool SyncUserMetadata::is_admin() const
 {
     REALM_ASSERT(m_realm);
     m_realm->verify_thread();
+    m_realm->refresh();
     return m_obj.get<bool>(m_schema.idx_user_is_admin);
 }
 
@@ -420,6 +425,7 @@ std::string SyncFileActionMetadata::original_name() const
 {
     REALM_ASSERT(m_realm);
     m_realm->verify_thread();
+    m_realm->refresh();
     return m_obj.get<String>(m_schema.idx_original_name);
 }
 
@@ -427,6 +433,7 @@ util::Optional<std::string> SyncFileActionMetadata::new_name() const
 {
     REALM_ASSERT(m_realm);
     m_realm->verify_thread();
+    m_realm->refresh();
     StringData result =m_obj.get<String>(m_schema.idx_new_name);
     return result.is_null() ? util::none : util::make_optional(std::string(result));
 }
@@ -435,6 +442,7 @@ std::string SyncFileActionMetadata::user_local_uuid() const
 {
     REALM_ASSERT(m_realm);
     m_realm->verify_thread();
+    m_realm->refresh();
     return m_obj.get<String>(m_schema.idx_user_identity);
 }
 
@@ -442,6 +450,7 @@ SyncFileActionMetadata::Action SyncFileActionMetadata::action() const
 {
     REALM_ASSERT(m_realm);
     m_realm->verify_thread();
+    m_realm->refresh();
     return static_cast<SyncFileActionMetadata::Action>(m_obj.get<Int>(m_schema.idx_action));
 }
 
@@ -449,6 +458,7 @@ std::string SyncFileActionMetadata::url() const
 {
     REALM_ASSERT(m_realm);
     m_realm->verify_thread();
+    m_realm->refresh();
     return m_obj.get<String>(m_schema.idx_url);
 }
 
