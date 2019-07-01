@@ -292,7 +292,7 @@ private:
     void handle_pending_not();
     void set_table(TableRef tr);
 public:
-    std::unique_ptr<Query> clone_for_handover(Transaction* tr, PayloadPolicy policy)
+    std::unique_ptr<Query> clone_for_handover(Transaction* tr, PayloadPolicy policy) const
     {
         return std::make_unique<Query>(this, tr, policy);
     }

@@ -762,9 +762,9 @@ Table* Group::do_get_or_add_table(StringData name, bool* was_added)
         return table;
     }
     else {
-        if (Replication* repl = *get_repl())
+        Replication* repl = *get_repl();
+        if (repl && name.begins_with(g_class_name_prefix))
             repl->add_class(name);
-
 
         table = do_add_table(name, false);
         if (was_added)
