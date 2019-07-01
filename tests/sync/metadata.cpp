@@ -350,7 +350,8 @@ TEST_CASE("sync_metadata: file action metadata", "[sync]") {
 
     SECTION("can be properly constructed") {
         const auto original_name = tmp_dir() + "foobar/test1";
-        auto metadata = manager.make_file_action_metadata(original_name, url_1, local_uuid_1, SyncAction::BackUpThenDeleteRealm);
+        manager.make_file_action_metadata(original_name, url_1, local_uuid_1, SyncAction::BackUpThenDeleteRealm);
+        auto metadata = *manager.get_file_action_metadata(original_name);
         REQUIRE(metadata.original_name() == original_name);
         REQUIRE(metadata.new_name() == none);
         REQUIRE(metadata.action() == SyncAction::BackUpThenDeleteRealm);
@@ -362,14 +363,17 @@ TEST_CASE("sync_metadata: file action metadata", "[sync]") {
         const auto original_name = tmp_dir() + "foobar/test2a";
         const std::string new_name_1 = tmp_dir() + "foobar/test2b";
         const std::string new_name_2 = tmp_dir() + "foobar/test2c";
-        auto metadata_1 = manager.make_file_action_metadata(original_name, url_1, local_uuid_1, SyncAction::BackUpThenDeleteRealm, new_name_1);
+
+        manager.make_file_action_metadata(original_name, url_1, local_uuid_1, SyncAction::BackUpThenDeleteRealm, new_name_1);
+        auto metadata_1 = *manager.get_file_action_metadata(original_name);
         REQUIRE(metadata_1.original_name() == original_name);
         REQUIRE(metadata_1.new_name() == new_name_1);
         REQUIRE(metadata_1.action() == SyncAction::BackUpThenDeleteRealm);
         REQUIRE(metadata_1.url() == url_1);
         REQUIRE(metadata_1.user_local_uuid() == local_uuid_1);
 
-        auto metadata_2 = manager.make_file_action_metadata(original_name, url_2, local_uuid_2, SyncAction::DeleteRealm, new_name_2);
+        manager.make_file_action_metadata(original_name, url_2, local_uuid_2, SyncAction::DeleteRealm, new_name_2);
+        auto metadata_2 = *manager.get_file_action_metadata(original_name);
         REQUIRE(metadata_1.original_name() == original_name);
         REQUIRE(metadata_1.new_name() == new_name_2);
         REQUIRE(metadata_1.action() == SyncAction::DeleteRealm);
@@ -388,17 +392,17 @@ TEST_CASE("sync_metadata: file action metadata APIs", "[sync]") {
         const auto filename1 = tmp_dir() + "foobar/file1";
         const auto filename2 = tmp_dir() + "foobar/file2";
         const auto filename3 = tmp_dir() + "foobar/file3";
-        auto first = manager.make_file_action_metadata(filename1, "asdf", "realm://realm.example.com/1", SyncAction::BackUpThenDeleteRealm);
-        auto second = manager.make_file_action_metadata(filename2, "asdf", "realm://realm.example.com/2", SyncAction::BackUpThenDeleteRealm);
-        auto third = manager.make_file_action_metadata(filename3, "asdf", "realm://realm.example.com/3", SyncAction::BackUpThenDeleteRealm);
+        manager.make_file_action_metadata(filename1, "asdf", "realm://realm.example.com/1", SyncAction::BackUpThenDeleteRealm);
+        manager.make_file_action_metadata(filename2, "asdf", "realm://realm.example.com/2", SyncAction::BackUpThenDeleteRealm);
+        manager.make_file_action_metadata(filename3, "asdf", "realm://realm.example.com/3", SyncAction::BackUpThenDeleteRealm);
         auto actions = manager.all_pending_actions();
         REQUIRE(actions.size() == 3);
         REQUIRE(results_contains_original_name(actions, filename1));
         REQUIRE(results_contains_original_name(actions, filename2));
         REQUIRE(results_contains_original_name(actions, filename3));
-        first.remove();
-        second.remove();
-        third.remove();
+        manager.get_file_action_metadata(filename1)->remove();
+        manager.get_file_action_metadata(filename2)->remove();
+        manager.get_file_action_metadata(filename3)->remove();
         REQUIRE(actions.size() == 0);
     }
 }

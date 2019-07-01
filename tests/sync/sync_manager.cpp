@@ -98,7 +98,7 @@ TEST_CASE("sync_manager: `path_for_realm` API", "[sync]") {
     reset_test_directory(base_path);
     const std::string auth_server_url = "https://realm.example.org";
     const std::string raw_url = "realms://realm.example.org/a/b/~/123456/xyz";
-    
+
     SECTION("should work properly without metadata") {
         SyncManager::shared().configure(base_path, SyncManager::MetadataMode::NoMetadata);
         // Get a sync user
@@ -270,7 +270,7 @@ TEST_CASE("sync_manager: persistent user state management", "[sync]") {
         const std::string identity_1 = "foo-2";
         const std::string identity_2 = "bar-2";
         const std::string identity_3 = "baz-2";
-        
+
         // Create the user metadata.
         auto u1 = manager.get_or_make_user_metadata(identity_1, auth_url);
         u1->mark_for_removal();
@@ -332,9 +332,9 @@ TEST_CASE("sync_manager: file actions", "[sync]") {
 
     SECTION("Action::DeleteRealm") {
         // Create some file actions
-        auto a1 = manager.make_file_action_metadata(realm_path_1, realm_url, "user1", Action::DeleteRealm);
-        auto a2 = manager.make_file_action_metadata(realm_path_2, realm_url, "user2", Action::DeleteRealm);
-        auto a3 = manager.make_file_action_metadata(realm_path_3, realm_url, "user3", Action::DeleteRealm);
+        manager.make_file_action_metadata(realm_path_1, realm_url, "user1", Action::DeleteRealm);
+        manager.make_file_action_metadata(realm_path_2, realm_url, "user2", Action::DeleteRealm);
+        manager.make_file_action_metadata(realm_path_3, realm_url, "user3", Action::DeleteRealm);
 
         SECTION("should properly delete the Realm") {
             // Create some Realms
@@ -383,9 +383,9 @@ TEST_CASE("sync_manager: file actions", "[sync]") {
         const std::string recovery_1 = util::file_path_by_appending_component(recovery_dir, "recovery-1");
         const std::string recovery_2 = util::file_path_by_appending_component(recovery_dir, "recovery-2");
         const std::string recovery_3 = util::file_path_by_appending_component(recovery_dir, "recovery-3");
-        auto a1 = manager.make_file_action_metadata(realm_path_1, realm_url, "user1", Action::BackUpThenDeleteRealm, recovery_1);
-        auto a2 = manager.make_file_action_metadata(realm_path_2, realm_url, "user2", Action::BackUpThenDeleteRealm, recovery_2);
-        auto a3 = manager.make_file_action_metadata(realm_path_3, realm_url, "user3", Action::BackUpThenDeleteRealm, recovery_3);
+        manager.make_file_action_metadata(realm_path_1, realm_url, "user1", Action::BackUpThenDeleteRealm, recovery_1);
+        manager.make_file_action_metadata(realm_path_2, realm_url, "user2", Action::BackUpThenDeleteRealm, recovery_2);
+        manager.make_file_action_metadata(realm_path_3, realm_url, "user3", Action::BackUpThenDeleteRealm, recovery_3);
 
         SECTION("should properly copy the Realm file and delete the Realm") {
             // Create some Realms
@@ -415,7 +415,7 @@ TEST_CASE("sync_manager: file actions", "[sync]") {
             REQUIRE_REALM_EXISTS(realm_base_path);
             REQUIRE(!File::exists(recovery_path));
             // Manually create a file action metadata entry to simulate a client reset.
-            auto a = manager.make_file_action_metadata(realm_base_path, realm_url, identity, Action::BackUpThenDeleteRealm, recovery_path);
+            manager.make_file_action_metadata(realm_base_path, realm_url, identity, Action::BackUpThenDeleteRealm, recovery_path);
             auto pending_actions = manager.all_pending_actions();
             REQUIRE(pending_actions.size() == 4);
 
@@ -448,20 +448,18 @@ TEST_CASE("sync_manager: file actions", "[sync]") {
             create_dummy_realm(realm_path_4);
             // Configure the system
             SyncManager::shared().configure(base_path, SyncManager::MetadataMode::NoEncryption);
-            auto pending_actions = manager.all_pending_actions();
-            REQUIRE(pending_actions.size() == 0);
+            REQUIRE(manager.all_pending_actions().size() == 0);
             // Add a file action after the system is configured.
             REQUIRE_REALM_EXISTS(realm_path_4);
             REQUIRE(File::exists(file_manager.recovery_directory_path()));
-            auto a4 = manager.make_file_action_metadata(realm_path_4, realm_url, "user4", Action::BackUpThenDeleteRealm, recovery_1);
-            CHECK(pending_actions.size() == 1);
+            manager.make_file_action_metadata(realm_path_4, realm_url, "user4", Action::BackUpThenDeleteRealm, recovery_1);
+            REQUIRE(manager.all_pending_actions().size() == 1);
             // Force the recovery. (In a real application, the user would have closed the files by now.)
             REQUIRE(SyncManager::shared().immediately_run_file_actions(realm_path_4));
             // There should be recovery files.
             REQUIRE_REALM_DOES_NOT_EXIST(realm_path_4);
             CHECK(File::exists(recovery_1));
-            pending_actions = manager.all_pending_actions();
-            CHECK(pending_actions.size() == 0);
+            REQUIRE(manager.all_pending_actions().size() == 0);
         }
 
         SECTION("should fail gracefully if there is already a file at the destination") {
@@ -510,17 +508,17 @@ TEST_CASE("sync_manager: metadata") {
 
     SECTION("should be reset in case of decryption error") {
         SyncManager::shared().configure(base_path,
-                                                    SyncManager::MetadataMode::Encryption,
-                                                    "",
-                                                    make_test_encryption_key());
+                                        SyncManager::MetadataMode::Encryption,
+                                        "",
+                                        make_test_encryption_key());
 
         SyncManager::shared().reset_for_testing();
 
         SyncManager::shared().configure(base_path,
-                                                    SyncManager::MetadataMode::Encryption,
-                                                    "",
-                                                    make_test_encryption_key(1),
-                                                    true);
+                                        SyncManager::MetadataMode::Encryption,
+                                        "",
+                                        make_test_encryption_key(1),
+                                        true);
     }
 }
 
@@ -535,9 +533,9 @@ TEST_CASE("sync_manager: has_active_sessions", "[active_sessions]") {
 
     SyncServer server(false);
     auto schema = Schema{
-            {"object", {
-                               {"value", PropertyType::Int},
-                       }},
+        {"object", {
+            {"value", PropertyType::Int},
+        }},
     };
 
     std::atomic<bool> error_handler_invoked(false);

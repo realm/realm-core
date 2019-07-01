@@ -319,7 +319,9 @@ void RealmCoordinator::open_db()
                            ? DBOptions::Durability::MemOnly
                            : DBOptions::Durability::Full;
 
-        options.temp_dir = util::normalize_dir(m_config.fifo_files_fallback_path);
+        if (!m_config.fifo_files_fallback_path.empty()) {
+            options.temp_dir = util::normalize_dir(m_config.fifo_files_fallback_path);
+        }
         options.encryption_key = m_config.encryption_key.data();
         options.allow_file_format_upgrade = !m_config.disable_format_upgrade
                                          && m_config.schema_mode != SchemaMode::ResetFile;
