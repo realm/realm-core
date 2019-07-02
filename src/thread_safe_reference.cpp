@@ -18,101 +18,141 @@
 
 #include "thread_safe_reference.hpp"
 
-#include "impl/realm_coordinator.hpp"
 #include "list.hpp"
 #include "object.hpp"
 #include "object_schema.hpp"
-#include "object_store.hpp"
 #include "results.hpp"
+#include "shared_realm.hpp"
 
-#include <realm/util/scope_exit.hpp>
 #include <realm/db.hpp>
+#include <realm/keys.hpp>
 
 using namespace realm;
 
-ThreadSafeReferenceBase::~ThreadSafeReferenceBase()
+namespace realm {
+class ThreadSafeReference::Payload {
+public:
+    virtual ~Payload() = default;
+};
+
+template<>
+class ThreadSafeReference::PayloadImpl<List> : public ThreadSafeReference::Payload {
+public:
+    PayloadImpl(List const& list, Transaction& t)
+    : m_key(list.get_parent_object_key())
+    , m_table_key(list.get_parent_table_key())
+    , m_col_key(list.get_parent_column_key())
+    , m_version(t.get_version_of_current_transaction())
+    {
+    }
+
+    List import_into(std::shared_ptr<Realm>&& r, Transaction& t)
+    {
+        Obj obj = t.get_table(m_table_key)->get_object(m_key);
+        return List(std::move(r), obj, m_col_key);
+    }
+
+    VersionID desired_version() const noexcept { return m_version; }
+
+private:
+    ObjKey m_key;
+    TableKey m_table_key;
+    ColKey m_col_key;
+    VersionID m_version;
+};
+
+template<>
+class ThreadSafeReference::PayloadImpl<Object> : public ThreadSafeReference::Payload {
+public:
+    PayloadImpl(Object const& object, Transaction& t)
+    : m_key(object.obj().get_key())
+    , m_object_schema_name(object.get_object_schema().name)
+    , m_version(t.get_version_of_current_transaction())
+    {
+    }
+
+    Object import_into(std::shared_ptr<Realm>&& r, Transaction&)
+    {
+        return Object(std::move(r), m_object_schema_name, m_key);
+    }
+
+    VersionID desired_version() const noexcept { return m_version; }
+
+private:
+    ObjKey m_key;
+    std::string m_object_schema_name;
+    VersionID m_version;
+};
+
+template<>
+class ThreadSafeReference::PayloadImpl<Results> : public ThreadSafeReference::Payload {
+public:
+    PayloadImpl(Results const& r, Transaction& t)
+    : m_transaction(t.duplicate())
+    , m_query([&] { Query q(r.get_query()); return m_transaction->import_copy_of(q, PayloadPolicy::Move); }())
+    , m_ordering(r.get_descriptor_ordering())
+    {
+    }
+
+    Results import_into(std::shared_ptr<Realm>&& r, Transaction& t)
+    {
+        auto realm_version = t.get_version_of_current_transaction();
+        if (realm_version > m_transaction->get_version_of_current_transaction())
+            m_transaction->advance_read(realm_version);
+
+        auto q = t.import_copy_of(*m_query, PayloadPolicy::Copy);
+        return Results(std::move(r), std::move(*q), m_ordering);
+    }
+
+    VersionID desired_version() const noexcept { return m_transaction->get_version_of_current_transaction(); }
+
+private:
+    TransactionRef m_transaction;
+    std::unique_ptr<Query> m_query;
+    DescriptorOrdering m_ordering;
+};
+} // namespace realm
+
+ThreadSafeReference::ThreadSafeReference() noexcept = default;
+ThreadSafeReference::~ThreadSafeReference() = default;
+ThreadSafeReference::ThreadSafeReference(ThreadSafeReference&&) noexcept = default;
+ThreadSafeReference& ThreadSafeReference::operator=(ThreadSafeReference&&) noexcept = default;
+
+template<typename T>
+ThreadSafeReference::ThreadSafeReference(T const& value)
 {
+    auto realm = value.get_realm();
+    realm->verify_thread();
+    m_payload.reset(new PayloadImpl<T>(value, Realm::Internal::get_transaction(*realm)));
 }
 
-ThreadSafeReference<List>::ThreadSafeReference(List const& list)
-: ThreadSafeReferenceBase()
-, m_key(list.m_list_base->get_key())
-, m_table_key(list.m_list_base->get_table()->get_key())
-, m_col_key(list.m_list_base->get_col_key())
-{
-}
+template ThreadSafeReference::ThreadSafeReference(List const&);
+template ThreadSafeReference::ThreadSafeReference(Results const&);
+template ThreadSafeReference::ThreadSafeReference(Object const&);
 
-ThreadSafeReference<Results>::ThreadSafeReference(Results const&) {}
-
-ThreadSafeReference<Object>::ThreadSafeReference(Object const& object)
-: ThreadSafeReferenceBase()
-, m_key(object.obj().get_key())
-, m_object_schema_name(object.get_object_schema().name)
+template<typename T>
+T ThreadSafeReference::resolve(std::shared_ptr<Realm> realm)
 {
-}
+    REALM_ASSERT(realm);
+    realm->verify_thread();
 
-List ThreadSafeReference<List>::import_into(std::shared_ptr<Realm>& r)
-{
+    REALM_ASSERT(m_payload);
+    auto& payload = static_cast<PayloadImpl<T>&>(*m_payload);
+    REALM_ASSERT(typeid(payload) == typeid(PayloadImpl<T>));
+
     try {
-        Obj obj = r->read_group().get_table(m_table_key)->get_object(m_key);
-        return List(r, obj, m_col_key);
+        if (!realm->is_in_read_transaction())
+            Realm::Internal::begin_read(*realm, payload.desired_version());
+        auto& transaction = Realm::Internal::get_transaction(*realm);
+        if (transaction.get_version_of_current_transaction() < payload.desired_version())
+            realm->refresh();
+        return payload.import_into(std::move(realm), transaction);
     }
     catch (const InvalidKey&) {
         return {};
     }
 }
 
-Results ThreadSafeReference<Results>::import_into(std::shared_ptr<Realm>&) { REALM_TERMINATE("not implemented"); }
-
-Object ThreadSafeReference<Object>::import_into(std::shared_ptr<Realm>& r)
-{
-    try {
-        return Object(r, m_object_schema_name, m_key);
-    }
-    catch (const InvalidKey&) {
-        return {};
-    }
-}
-
-#if 0
-ThreadSafeReference<List>::ThreadSafeReference(List const& list)
-: ThreadSafeReferenceBase(list.get_realm())
-, m_link_view(get_source_shared_group().export_linkview_for_handover(list.m_link_view))
-, m_table(get_source_shared_group().export_table_for_handover(list.m_table))
-{ }
-
-List ThreadSafeReference<List>::import_into_realm(SharedRealm realm) && {
-    return invalidate_after_import<List>(*realm, [&](Transaction& shared_group) {
-        if (auto link_view = shared_group.import_linkview_from_handover(std::move(m_link_view)))
-            return List(std::move(realm), std::move(link_view));
-        return List(std::move(realm), shared_group.import_table_from_handover(std::move(m_table)));
-    });
-}
-
-Object ThreadSafeReference<Object>::import_into_realm(SharedRealm realm) && {
-    return invalidate_after_import<Object>(*realm, [&](Transaction& shared_group) {
-        Row row = *shared_group.import_from_handover(std::move(m_row));
-        auto object_schema = realm->schema().find(m_object_schema_name);
-        REALM_ASSERT_DEBUG(object_schema != realm->schema().end());
-        return Object(std::move(realm), *object_schema, row);
-    });
-}
-
-ThreadSafeReference<Results>::ThreadSafeReference(Results const& results)
-: ThreadSafeReferenceBase(results.get_realm())
-, m_query(get_source_shared_group().export_for_handover(results.get_query(), ConstSourcePayload::Copy))
-, m_ordering_patch([&]() {
-    DescriptorOrdering::HandoverPatch ordering_patch;
-    DescriptorOrdering::generate_patch(results.get_descriptor_ordering(), ordering_patch);
-    return ordering_patch;
-}()){ }
-
-Results ThreadSafeReference<Results>::import_into_realm(SharedRealm realm) && {
-    return invalidate_after_import<Results>(*realm, [&](Transaction& shared_group) {
-        Query query = *shared_group.import_from_handover(std::move(m_query));
-        Table& table = *query.get_table();
-        DescriptorOrdering descriptors = DescriptorOrdering::create_from_and_consume_patch(m_ordering_patch, table);
-        return Results(std::move(realm), std::move(query), std::move(descriptors));
-    });
-}
-#endif
+template Results ThreadSafeReference::resolve<Results>(std::shared_ptr<Realm>);
+template List ThreadSafeReference::resolve<List>(std::shared_ptr<Realm>);
+template Object ThreadSafeReference::resolve<Object>(std::shared_ptr<Realm>);

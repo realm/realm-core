@@ -513,8 +513,6 @@ TEST_CASE("list") {
 
             advance_and_notify(*r);
         };
-#if 0
-        // FIXME: not working
         SECTION("add duplicates") {
             write([&] {
                 lst.add(target_keys[5]);
@@ -524,7 +522,7 @@ TEST_CASE("list") {
             REQUIRE(notification_calls == 2);
             REQUIRE_INDICES(change.insertions, 5, 6, 7);
         }
-#endif
+
         SECTION("change order by modifying target") {
             write([&] {
                 lst.get(5).set(col_value, 15);
@@ -570,8 +568,6 @@ TEST_CASE("list") {
 
             advance_and_notify(*r);
         };
-#if 0
-        // FIXME: not working
         SECTION("add duplicates") {
             write([&] {
                 lst.add(target_keys[5]);
@@ -581,7 +577,7 @@ TEST_CASE("list") {
             REQUIRE(notification_calls == 2);
             REQUIRE_INDICES(change.insertions, 9, 10, 11);
         }
-#endif
+
         SECTION("swap") {
             write([&] {
                 lst.swap(1, 2);
@@ -857,7 +853,7 @@ TEST_CASE("list") {
             realm::Object obj(r, list.get_object_schema(), target->get_object(target_keys[5]));
             list.add(ctx, util::Any(obj));
             REQUIRE(list.size() == 11);
-            REQUIRE(list.get(10).get_key().value == 5);
+            REQUIRE(list.get(10).get_key() == target_keys[5]);
         }
 
         SECTION("creates new object for dictionary") {
@@ -868,8 +864,8 @@ TEST_CASE("list") {
         }
 
         SECTION("throws for object in wrong table") {
-            REQUIRE_THROWS(list.add(ctx, util::Any(obj)));
-            realm::Object object(r, *r->schema().find("origin"), obj);
+            REQUIRE_THROWS(list.add(ctx, util::Any(origin->get_object(0))));
+            realm::Object object(r, *r->schema().find("origin"), origin->get_object(0));
             REQUIRE_THROWS(list.add(ctx, util::Any(object)));
         }
 
@@ -906,6 +902,6 @@ TEST_CASE("list") {
         Object obj;
         REQUIRE_NOTHROW(obj = any_cast<Object&&>(list.get(ctx, 1)));
         REQUIRE(obj.is_valid());
-        REQUIRE(obj.obj().get_key().value == 1);
+        REQUIRE(obj.obj().get_key() == target_keys[1]);
     }
 }
