@@ -1,7 +1,7 @@
-# NEXT RELEASE
+# 5.23.0 Release notes
 
 ### Enhancements
-* Add a Swift Package Manager packgae ([#3308](https://github.com/realm/realm-core/pull/3308)).
+* Add a Swift Package Manager package ([#3308](https://github.com/realm/realm-core/pull/3308)).
 
 ### Fixed
 * Constructing an `IncludeDescriptor` made unnecessary table comparisons. This resulted in poor performance for subscriptions
