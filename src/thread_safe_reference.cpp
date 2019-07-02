@@ -29,6 +29,7 @@
 
 using namespace realm;
 
+namespace realm {
 class ThreadSafeReference::Payload {
 public:
     virtual ~Payload() = default;
@@ -110,6 +111,7 @@ private:
     std::unique_ptr<Query> m_query;
     DescriptorOrdering m_ordering;
 };
+} // namespace realm
 
 ThreadSafeReference::ThreadSafeReference() noexcept = default;
 ThreadSafeReference::~ThreadSafeReference() = default;
