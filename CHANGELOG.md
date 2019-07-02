@@ -4,8 +4,8 @@
 * Add a Swift Package Manager packgae ([#3308](https://github.com/realm/realm-core/pull/3308)).
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Constructing an `IncludeDescriptor` made unnecessary table comparisons. This resulted in poor performance for subscriptions
+  using the `includeLinkingObjects` functionality. ([#3311](https://github.com/realm/realm-core/issues/3311), since v5.18.0)
  
 ### Breaking changes
 * None.

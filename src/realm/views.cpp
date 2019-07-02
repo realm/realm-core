@@ -342,12 +342,12 @@ IncludeDescriptor::IncludeDescriptor(const Table& table, const std::vector<std::
         size_t link_ndx = 0;
         for (auto link : links) {
             if (bool(link.from)) { // backlink
-                REALM_ASSERT(cur_table == link.from->get_link_target(link.column_ndx));
+                REALM_ASSERT_DEBUG(cur_table->get_name() == link.from->get_link_target(link.column_ndx)->get_name());
                 auto& col = tf::get_column(*link.from, link.column_ndx);
                 columns.push_back(&col);
                 backlink_source.push_back(link.from);
                 if (auto link_col = dynamic_cast<const LinkColumnBase*>(&col)) { // LinkColumn and ListColumn
-                    if (link_col->get_target_table() != *cur_table) {
+                    if (link_col->get_target_table().get_name() != cur_table->get_name()) {
                         // the link does not point to the last table in the chain
                         throw InvalidPathError(util::format("Invalid INCLUDE path at [%1, %2]: this link does not "
                                                             "connect to the previous table ('%3').",
