@@ -93,9 +93,6 @@ class ArrayWriterBase;
 template <class T>
 class BPlusTree;
 
-using KeyColumn = BPlusTree<ObjKey>;
-
-
 struct MemStats {
     size_t allocated = 0;
     size_t used = 0;
@@ -213,7 +210,7 @@ public:
 
 
     static void add_to_column(IntegerColumn* column, int64_t value);
-    static void add_to_column(KeyColumn* column, int64_t value);
+    static void add_to_column(std::vector<ObjKey>* column, int64_t value);
 
     void insert(size_t ndx, int_fast64_t value);
     void add(int_fast64_t value);
@@ -819,7 +816,7 @@ public:
     {
     }
 
-    QueryState(Action action, KeyColumn* akku, size_t limit = -1)
+    QueryState(Action action, std::vector<ObjKey>* akku, size_t limit = -1)
         : QueryState(action, reinterpret_cast<int64_t>(akku), limit)
     {
     }
@@ -870,7 +867,7 @@ public:
         else if (action == act_FindAll) {
             if (m_key_values) {
                 int64_t key_value = m_key_values->get(index) + m_key_offset;
-                Array::add_to_column(reinterpret_cast<KeyColumn*>(m_state), key_value);
+                Array::add_to_column(reinterpret_cast<std::vector<ObjKey>*>(m_state), key_value);
             }
             else {
                 Array::add_to_column(reinterpret_cast<IntegerColumn*>(m_state), index);
@@ -903,7 +900,7 @@ public:
         else if (action == act_FindAll) {
             if (m_key_values) {
                 int64_t key_value = m_key_values->get(index) + m_key_offset;
-                Array::add_to_column(reinterpret_cast<KeyColumn*>(m_state), key_value);
+                Array::add_to_column(reinterpret_cast<std::vector<ObjKey>*>(m_state), key_value);
             }
             else {
                 Array::add_to_column(reinterpret_cast<IntegerColumn*>(m_state), index);

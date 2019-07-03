@@ -1167,7 +1167,7 @@ bool StringIndex::leaf_insert(ObjKey obj_key, key_type key, size_t offset, Strin
 }
 
 
-void StringIndex::distinct(BPlusTree<ObjKey>& result) const
+void StringIndex::distinct(std::vector<ObjKey>& result) const
 {
     Allocator& alloc = m_array->get_alloc();
     const size_t array_size = m_array->size();
@@ -1187,7 +1187,7 @@ void StringIndex::distinct(BPlusTree<ObjKey>& result) const
             // low bit set indicate literal ref (shifted)
             if (ref & 1) {
                 ObjKey k = ObjKey((uint64_t(ref) >> 1));
-                result.add(k);
+                result.emplace_back(k);
             }
             else {
                 // A real ref either points to a list or a subindex
@@ -1200,7 +1200,7 @@ void StringIndex::distinct(BPlusTree<ObjKey>& result) const
                     IntegerColumn sub(alloc, to_ref(ref)); // Throws
                     if (sub.size() == 1) {                 // Optimization.
                         ObjKey k = ObjKey(sub.get(0));     // get first match
-                        result.add(k);
+                        result.emplace_back(k);
                     }
                     else {
                         // Add all unique values from this sorted list
@@ -1209,7 +1209,7 @@ void StringIndex::distinct(BPlusTree<ObjKey>& result) const
                         SortedListComparator slc(m_target_column);
                         StringConversionBuffer buffer;
                         while (it != it_end) {
-                            result.add(ObjKey(*it));
+                            result.emplace_back(ObjKey(*it));
                             StringData it_data = get(ObjKey(*it), buffer);
                             it = std::upper_bound(it, it_end, it_data, slc);
                         }

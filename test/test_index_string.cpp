@@ -547,18 +547,14 @@ TEST_TYPES(StringIndex_Distinct, string_column, nullable_string_column, enum_col
 
     // Get view of unique values
     // (sorted in alphabetical order, each ref to first match)
-    BPlusTree<ObjKey> results(Allocator::get_default());
-    results.create();
+    std::vector<ObjKey> results;
     ndx.distinct(results);
 
     CHECK_EQUAL(4, results.size());
-    CHECK_EQUAL(col.key(1), results.get(0)); // s2 = Brian
-    CHECK_EQUAL(col.key(0), results.get(1)); // s1 = John
-    CHECK_EQUAL(col.key(3), results.get(2)); // s3 = Samantha
-    CHECK_EQUAL(col.key(6), results.get(3)); // s4 = Tom
-
-    // Clean up
-    results.destroy();
+    CHECK_EQUAL(col.key(1), results[0]); // s2 = Brian
+    CHECK_EQUAL(col.key(0), results[1]); // s1 = John
+    CHECK_EQUAL(col.key(3), results[2]); // s3 = Samantha
+    CHECK_EQUAL(col.key(6), results[3]); // s4 = Tom
 }
 
 TEST_TYPES(StringIndex_FindAllNoCopy, string_column, nullable_string_column, enum_column, nullable_enum_column)
@@ -788,8 +784,7 @@ TEST(StringIndex_Distinct_Int)
     // Create a new index on column
     const StringIndex& ndx = *col.create_search_index();
 
-    BPlusTree<ObjKey> results(Allocator::get_default());
-    results.create();
+    std::vector<ObjKey> results;
 
     ndx.distinct(results);
 
@@ -799,9 +794,6 @@ TEST(StringIndex_Distinct_Int)
     }
 
     CHECK_EQUAL(s.size(), results.size());
-
-    // Clean up
-    results.destroy();
 }
 
 
@@ -1240,15 +1232,13 @@ TEST_TYPES(StringIndex_MaxBytes, string_column, nullable_string_column, enum_col
         }
         CHECK_EQUAL(col.size(), num_dups);
         CHECK(ndx.has_duplicate_values() == (num_dups > 1));
-        BPlusTree<ObjKey> results(Allocator::get_default());
-        results.create();
+        std::vector<ObjKey> results;
         ndx.distinct(results);
         CHECK_EQUAL(results.size(), 1);
-        CHECK_EQUAL(results.get(0), col.key(0));
+        CHECK_EQUAL(results[0], col.key(0));
         CHECK_EQUAL(col.get(0), s);
         CHECK_EQUAL(col.count(s), num_dups);
         CHECK_EQUAL(col.find_first(s), 0);
-        results.destroy();
         col.clear();
     };
 
@@ -1312,8 +1302,7 @@ TEST_TYPES(StringIndex_InsertLongPrefix, string_column, nullable_string_column, 
     col.add(base2_b); // adds a duplicate in the middle of the list
 
     CHECK(ndx.has_duplicate_values());
-    BPlusTree<ObjKey> results(Allocator::get_default());
-    results.create();
+    std::vector<ObjKey> results;
     std::vector<ObjKey> find_all_result;
     ndx.distinct(results);
     CHECK_EQUAL(results.size(), 7);
@@ -1350,9 +1339,6 @@ TEST_TYPES(StringIndex_InsertLongPrefix, string_column, nullable_string_column, 
     CHECK_EQUAL(find_all_result[0], col.key(4));
     CHECK_EQUAL(find_all_result[1], col.key(6));
     col.verify();
-
-    results.destroy();
-
     col.clear(); // calls recursive function Array::destroy_deep()
 }
 

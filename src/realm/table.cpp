@@ -1531,6 +1531,35 @@ ref_type Table::create_empty_table(Allocator& alloc, TableKey key)
 }
 
 
+void Table::batch_erase_rows(const std::vector<ObjKey>& keys)
+{
+    Group* g = get_parent_group();
+
+    size_t num_objs = keys.size();
+    std::vector<ObjKey> vec;
+    vec.reserve(num_objs);
+    for (size_t i = 0; i < num_objs; ++i) {
+        ObjKey key = keys[i];
+        if (key != null_key && is_valid(key)) {
+            vec.push_back(key);
+        }
+    }
+    sort(vec.begin(), vec.end());
+    vec.erase(unique(vec.begin(), vec.end()), vec.end());
+
+    if (m_spec.has_strong_link_columns() || (g && g->has_cascade_notification_handler())) {
+        CascadeState state(CascadeState::Mode::strong);
+        state.m_group = g;
+        std::for_each(vec.begin(), vec.end(),
+                      [this, &state](ObjKey k) { state.m_to_be_deleted.emplace_back(m_key, k); });
+        remove_recursive(state);
+    }
+    else {
+        CascadeState state(CascadeState::Mode::none);
+        std::for_each(vec.begin(), vec.end(), [this, &state](ObjKey k) { m_clusters.erase(k, state); });
+    }
+}
+
 void Table::batch_erase_rows(const KeyColumn& keys)
 {
     Group* g = get_parent_group();

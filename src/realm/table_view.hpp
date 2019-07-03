@@ -166,7 +166,6 @@ public:
     /// Construct null view (no memory allocated).
     ConstTableView()
         : ObjList(&m_table_view_key_values)
-        , m_table_view_key_values(Allocator::get_default())
     {
     }
 
@@ -194,7 +193,6 @@ public:
 
     ~ConstTableView()
     {
-        m_key_values->destroy(); // Shallow
     }
     // - not in use / implemented yet:   ... explicit calls to sync_if_needed() must be used
     //                                       to get 'reflective' mode.
@@ -203,7 +201,7 @@ public:
     //    mode get_operating_mode();
     bool is_empty() const noexcept
     {
-        return m_key_values->size() == 0;
+        return m_table_view_key_values.size() == 0;
     }
 
     // Tells if the table that this TableView points at still exists or has been deleted.
@@ -214,7 +212,7 @@ public:
 
     bool is_obj_valid(size_t row_ndx) const noexcept
     {
-        return m_table->is_valid(ObjKey(m_key_values->get(row_ndx)));
+        return m_table->is_valid(ObjKey(m_table_view_key_values[row_ndx]));
     }
 
     // Get the query used to create this TableView
@@ -372,13 +370,14 @@ protected:
     size_t m_limit = size_t(-1);
 
     mutable TableVersions m_last_seen_versions;
+    std::vector<ObjKey> m_table_view_key_values; // We should generally not use this name
 
 private:
-    KeyColumn m_table_view_key_values; // We should generally not use this name
     ObjKey find_first_integer(ColKey column_key, int64_t value) const;
     template <class oper>
     Timestamp minmax_timestamp(ColKey column_key, ObjKey* return_key) const;
 
+    friend class ObjList; // Needed for ObjList::find_all to generate a TableView
     friend class Table;
     friend class ConstObj;
     friend class Query;
@@ -462,9 +461,7 @@ private:
 
 inline ConstTableView::ConstTableView(const Table* parent)
     : ObjList(&m_table_view_key_values, parent) // Throws
-    , m_table_view_key_values(Allocator::get_default())
 {
-    m_table_view_key_values.create();
     if (m_table) {
         m_last_seen_versions.emplace_back(m_table->get_key(), m_table->get_content_version());
     }
@@ -476,9 +473,7 @@ inline ConstTableView::ConstTableView(const Table* parent, Query& query, size_t 
     , m_start(start)
     , m_end(end)
     , m_limit(lim)
-    , m_table_view_key_values(Allocator::get_default())
 {
-    m_table_view_key_values.create();
 }
 
 inline ConstTableView::ConstTableView(const Table* src_table, ColKey src_column_key, const ConstObj& obj)
@@ -486,9 +481,7 @@ inline ConstTableView::ConstTableView(const Table* src_table, ColKey src_column_
     , m_source_column_key(src_column_key)
     , m_linked_obj_key(obj.get_key())
     , m_linked_table(obj.get_table())
-    , m_table_view_key_values(Allocator::get_default())
 {
-    m_table_view_key_values.create();
     if (m_table) {
         m_last_seen_versions.emplace_back(m_table->get_key(), m_table->get_content_version());
         m_last_seen_versions.emplace_back(obj.get_table()->get_key(), obj.get_table()->get_content_version());
@@ -498,10 +491,8 @@ inline ConstTableView::ConstTableView(const Table* src_table, ColKey src_column_
 inline ConstTableView::ConstTableView(DistinctViewTag, const Table* parent, ColKey column_key)
     : ObjList(&m_table_view_key_values, parent) // Throws
     , m_distinct_column_source(column_key)
-    , m_table_view_key_values(Allocator::get_default())
 {
     REALM_ASSERT(m_distinct_column_source != ColKey());
-    m_table_view_key_values.create();
     if (m_table) {
         m_last_seen_versions.emplace_back(m_table->get_key(), m_table->get_content_version());
     }
@@ -510,10 +501,8 @@ inline ConstTableView::ConstTableView(DistinctViewTag, const Table* parent, ColK
 inline ConstTableView::ConstTableView(const Table* parent, ConstLnkLstPtr link_list)
     : ObjList(&m_table_view_key_values, parent) // Throws
     , m_linklist_source(std::move(link_list))
-    , m_table_view_key_values(Allocator::get_default())
 {
     REALM_ASSERT(m_linklist_source);
-    m_table_view_key_values.create();
     if (m_table) {
         m_last_seen_versions.emplace_back(m_table->get_key(), m_table->get_content_version());
     }
@@ -607,7 +596,7 @@ inline ConstTableView& ConstTableView::operator=(const ConstTableView& tv)
 
 #define REALM_ASSERT_ROW(row_ndx)                                                                                    \
     REALM_ASSERT(m_table);                                                                                           \
-    REALM_ASSERT(row_ndx < m_key_values->size())
+    REALM_ASSERT(row_ndx < m_table_view_key_values.size())
 
 #define REALM_ASSERT_COLUMN_AND_TYPE(column_key, column_type)                                                        \
     REALM_ASSERT_COLUMN(column_key);                                                                                 \
@@ -618,11 +607,11 @@ inline ConstTableView& ConstTableView::operator=(const ConstTableView& tv)
 
 #define REALM_ASSERT_INDEX(column_key, row_ndx)                                                                      \
     REALM_ASSERT_COLUMN(column_key);                                                                                 \
-    REALM_ASSERT(row_ndx < m_key_values->size())
+    REALM_ASSERT(row_ndx < m_table_view_key_values.size())
 
 #define REALM_ASSERT_INDEX_AND_TYPE(column_key, row_ndx, column_type)                                                \
     REALM_ASSERT_COLUMN_AND_TYPE(column_key, column_type);                                                           \
-    REALM_ASSERT(row_ndx < m_key_values->size())
+    REALM_ASSERT(row_ndx < m_table_view_key_values.size())
 
 #define REALM_ASSERT_INDEX_AND_TYPE_TABLE_OR_MIXED(column_key, row_ndx)                                              \
     REALM_ASSERT_COLUMN(column_key);                                                                                 \
@@ -631,16 +620,16 @@ inline ConstTableView& ConstTableView::operator=(const ConstTableView& tv)
     REALM_ASSERT(m_table->get_column_type(column_key) == type_Table ||                                               \
                  (m_table->get_column_type(column_key) == type_Mixed));                                              \
     REALM_DIAG_POP();                                                                                                \
-    REALM_ASSERT(row_ndx < m_key_values->size())
+    REALM_ASSERT(row_ndx < m_table_view_key_values.size())
 
 template <class T>
 ConstTableView ObjList::find_all(ColKey column_key, T value)
 {
     ConstTableView tv(m_table);
-    auto keys = tv.m_key_values;
+    auto& keys = tv.m_table_view_key_values;
     for_each([column_key, value, &keys](ConstObj& o) {
         if (o.get<T>(column_key) == value) {
-            keys->add(o.get_key());
+            keys.emplace_back(o.get_key());
         }
         return false;
     });
@@ -680,7 +669,7 @@ inline TableView::TableView(ConstTableView::DistinctViewTag, Table& parent, ColK
 inline Obj TableView::get(size_t row_ndx)
 {
     REALM_ASSERT_ROW(row_ndx);
-    ObjKey key(m_key_values->get(row_ndx));
+    ObjKey key(m_table_view_key_values[row_ndx]);
     REALM_ASSERT(key != realm::null_key);
     return get_parent().get_object(key);
 }

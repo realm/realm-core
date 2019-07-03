@@ -45,7 +45,7 @@ using namespace std::chrono;
 #include "test_table_helper.hpp"
 
 // #include <valgrind/callgrind.h>
-// #define PERFORMACE_TESTING
+//#define PERFORMACE_TESTING
 
 using namespace realm;
 using namespace realm::util;
@@ -3457,7 +3457,7 @@ TEST(Table_object_sequential)
 TEST(Table_object_seq_rnd)
 {
 #ifdef PERFORMACE_TESTING
-    size_t rows = 100000;
+    size_t rows = 10000000;
     int runs = 100;     // runs for building scenario
 #else
     size_t rows = 50000;
@@ -3499,7 +3499,7 @@ TEST(Table_object_seq_rnd)
     // scenario established!
     int nb_rows = int(key_values.size());
 #ifdef PERFORMACE_TESTING
-    int num_runs = 100; // runs for timing access
+    int num_runs = 10; // runs for timing access
 #else
     int num_runs = 1; // runs for timing access
 #endif
@@ -3566,8 +3566,8 @@ TEST(Table_object_seq_rnd)
 TEST(Table_object_random)
 {
 #ifdef PERFORMACE_TESTING
-    int nb_rows = 100000;
-    int num_runs = 100;
+    int nb_rows = 10000000;
+    int num_runs = 3;
 #else
     int nb_rows = 1024;
     int num_runs = 1;

@@ -324,6 +324,8 @@ public:
     /// remove_object_recursive() will delete linked rows if the removed link was the
     /// last one holding on to the row in question. This will be done recursively.
     void remove_object_recursive(ObjKey key);
+    void batch_erase_rows(const KeyColumn& keys);
+    void batch_erase_rows(const std::vector<ObjKey>& keys);
     void clear();
     using Iterator = ClusterTree::Iterator;
     using ConstIterator = ClusterTree::ConstIterator;
@@ -702,7 +704,6 @@ private:
     // Used for queries: Items are added with link() method during buildup of query
     mutable std::vector<ColKey> m_link_chain;
 
-    void batch_erase_rows(const KeyColumn& keys);
     void do_remove_object(ObjKey key);
     size_t do_set_link(ColKey col_key, size_t row_ndx, size_t target_row_ndx);
 
@@ -1397,11 +1398,6 @@ public:
     static void remove_recursive(Table& table, CascadeState& rows)
     {
         table.remove_recursive(rows); // Throws
-    }
-
-    static void batch_erase_rows(Table& table, const KeyColumn& keys)
-    {
-        table.batch_erase_rows(keys); // Throws
     }
 };
 

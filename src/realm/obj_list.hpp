@@ -30,9 +30,13 @@ class DescriptorOrdering;
 class Table;
 class ConstTableView;
 
+using KeyColumn = BPlusTree<ObjKey>;
+
 class ObjList {
 public:
     ObjList(KeyColumn* key_values);
+    ObjList(std::vector<ObjKey>* key_values);
+    ObjList(std::vector<ObjKey>* key_values, const Table* parent);
     ObjList(KeyColumn* key_values, const Table* parent);
 
     virtual ~ObjList()
@@ -102,6 +106,7 @@ protected:
     // Null if, and only if, the view is detached.
     mutable ConstTableRef m_table;
     KeyColumn* m_key_values = nullptr;
+    std::vector<ObjKey>* m_key_vector = nullptr;
     size_t m_limit_count = 0;
     uint64_t m_debug_cookie;
 

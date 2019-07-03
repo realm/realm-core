@@ -395,9 +395,9 @@ void Array::add_to_column(IntegerColumn* column, int64_t value)
     column->add(value);
 }
 
-void Array::add_to_column(KeyColumn* column, int64_t value)
+void Array::add_to_column(std::vector<ObjKey>* column, int64_t value)
 {
-    column->add(ObjKey(value));
+    column->emplace_back(ObjKey(value));
 }
 
 void Array::set(size_t ndx, int64_t value)

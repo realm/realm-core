@@ -222,7 +222,7 @@ public:
 
     void clear();
 
-    void distinct(BPlusTree<ObjKey>& result) const;
+    void distinct(std::vector<ObjKey>& result) const;
     bool has_duplicate_values() const noexcept;
 
     void verify() const;

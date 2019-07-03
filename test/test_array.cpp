@@ -686,7 +686,6 @@ TEST(Array_LowerUpperBound)
  *
  */
 
-
 TEST(Array_FindAllInt0)
 {
     Array a(Allocator::get_default());

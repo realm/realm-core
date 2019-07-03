@@ -28,7 +28,6 @@ using namespace realm;
 ConstTableView::ConstTableView(ConstTableView& src, Transaction*, PayloadPolicy)
     : ObjList(&m_table_view_key_values)
     , m_source_column_key(src.m_source_column_key)
-    , m_table_view_key_values(Allocator::get_default())
 {
     REALM_ASSERT(false); // unimplemented
 }
@@ -37,7 +36,6 @@ ConstTableView::ConstTableView(const ConstTableView& src, Transaction* tr, Paylo
     : ObjList(&m_table_view_key_values)
     , m_source_column_key(src.m_source_column_key)
     , m_linked_obj_key(src.m_linked_obj_key)
-    , m_table_view_key_values(Allocator::get_default())
 {
     bool was_in_sync = src.is_in_sync();
     m_query = Query(src.m_query, tr, mode);
@@ -63,13 +61,13 @@ ConstTableView::ConstTableView(const ConstTableView& src, Transaction* tr, Paylo
         m_linked_table = tr->import_copy_of(src.m_linked_table);
     }
     // don't use methods which throw after this point...or m_table_view_key_values will leak
-    if (mode == PayloadPolicy::Copy && src.m_table_view_key_values.is_attached()) {
+    if (mode == PayloadPolicy::Copy) {
         m_table_view_key_values = src.m_table_view_key_values;
     }
-    else if (mode == PayloadPolicy::Move && src.m_table_view_key_values.is_attached())
+    else if (mode == PayloadPolicy::Move)
         m_table_view_key_values = std::move(src.m_table_view_key_values);
     else {
-        m_table_view_key_values.create();
+        m_table_view_key_values.clear();
     }
     if (mode == PayloadPolicy::Move) {
         src.m_last_seen_versions.clear();
@@ -97,7 +95,7 @@ R ConstTableView::aggregate(ColKey column_key, size_t* result_count, ObjKey* ret
     REALM_ASSERT(m_table);
     REALM_ASSERT(m_table->valid_column(column_key));
 
-    if ((m_key_values->size()) == 0) {
+    if ((m_table_view_key_values.size()) == 0) {
         return {};
     }
 
@@ -105,7 +103,7 @@ R ConstTableView::aggregate(ColKey column_key, size_t* result_count, ObjKey* ret
 
     // FIXME: Optimization temporarely removed for stability
     /*
-        if (m_num_detached_refs == 0 && m_key_values->size() == column->size()) {
+        if (m_num_detached_refs == 0 && m_table_view_key_values.size() == column->size()) {
             // direct aggregate on the column
             if (action == act_Count)
                 return static_cast<R>(column->count(count_target));
@@ -129,9 +127,9 @@ R ConstTableView::aggregate(ColKey column_key, size_t* result_count, ObjKey* ret
 */
     R res = R{};
     bool is_first = true;
-    for (size_t tv_index = 0; tv_index < m_key_values->size(); ++tv_index) {
+    for (size_t tv_index = 0; tv_index < m_table_view_key_values.size(); ++tv_index) {
 
-        ObjKey key(m_key_values->get(tv_index));
+        ObjKey key(m_table_view_key_values[tv_index]);
 
         // skip detached references:
         if (key == realm::null_key)
@@ -197,14 +195,14 @@ size_t ConstTableView::aggregate_count(ColKey column_key, T count_target) const
     REALM_ASSERT(m_table);
     REALM_ASSERT(m_table->valid_column(column_key));
 
-    if ((m_key_values->size()) == 0) {
+    if ((m_table_view_key_values.size()) == 0) {
         return {};
     }
 
     size_t cnt = 0;
-    for (size_t tv_index = 0; tv_index < m_key_values->size(); ++tv_index) {
+    for (size_t tv_index = 0; tv_index < m_table_view_key_values.size(); ++tv_index) {
 
-        ObjKey key(m_key_values->get(tv_index));
+        ObjKey key(m_table_view_key_values[tv_index]);
 
         // skip detached references:
         if (key == realm::null_key)
@@ -349,7 +347,7 @@ size_t ConstTableView::count_timestamp(ColKey column_key, Timestamp target) cons
     size_t count = 0;
     for (size_t t = 0; t < size(); t++) {
         try {
-            ObjKey key = m_key_values->get(t);
+            ObjKey key = m_table_view_key_values[t];
             ConstObj obj = m_table->get_object(key);
             auto ts = obj.get<Timestamp>(column_key);
             realm::Equal e;
@@ -459,14 +457,14 @@ TableVersions ConstTableView::sync_if_needed() const
 void TableView::remove(size_t row_ndx)
 {
     REALM_ASSERT(m_table);
-    REALM_ASSERT(row_ndx < m_key_values->size());
+    REALM_ASSERT(row_ndx < m_table_view_key_values.size());
 
     bool sync_to_keep = m_last_seen_versions == get_dependencies();
 
-    ObjKey key = m_key_values->get(row_ndx);
+    ObjKey key = m_table_view_key_values[row_ndx];
 
     // Update refs
-    m_key_values->erase(row_ndx);
+    m_table_view_key_values.erase(m_table_view_key_values.begin() + row_ndx);
 
     // Delete row in origin table
     get_parent().remove_object(key);
@@ -488,9 +486,9 @@ void TableView::clear()
 
     bool sync_to_keep = m_last_seen_versions == get_dependencies();
 
-    _impl::TableFriend::batch_erase_rows(get_parent(), *m_key_values); // Throws
+    get_parent().batch_erase_rows(m_table_view_key_values); // Throws
 
-    m_key_values->clear();
+    m_table_view_key_values.clear();
 
     // It is important to not accidentally bring us in sync, if we were
     // not in sync to start with:
@@ -570,18 +568,18 @@ void ConstTableView::do_sync()
     m_last_seen_versions.clear();
 
     if (m_linklist_source) {
-        m_key_values->clear();
+        m_table_view_key_values.clear();
         std::for_each(m_linklist_source->begin(), m_linklist_source->end(),
-                      [this](ObjKey key) { m_key_values->add(key); });
+                      [this](ObjKey key) { m_table_view_key_values.emplace_back(key); });
     }
     else if (m_distinct_column_source) {
-        m_key_values->clear();
+        m_table_view_key_values.clear();
         auto index = m_table->get_search_index(m_distinct_column_source);
         REALM_ASSERT(index);
-        index->distinct(*m_key_values);
+        index->distinct(m_table_view_key_values);
     }
     else if (m_source_column_key) {
-        m_key_values->clear();
+        m_table_view_key_values.clear();
         if (m_table && m_linked_table->is_valid(m_linked_obj_key)) {
             ConstObj m_linked_obj = m_linked_table->get_object(m_linked_obj_key);
             if (m_table->valid_column(m_source_column_key)) { // return empty result, if column has been removed
@@ -590,7 +588,7 @@ void ConstTableView::do_sync()
                 m_linked_table->report_invalid_key(backlink_col);
                 size_t backlink_count = m_linked_obj.get_backlink_count(backlink_col);
                 for (size_t i = 0; i < backlink_count; i++)
-                    m_key_values->add(m_linked_obj.get_backlink(backlink_col, i));
+                    m_table_view_key_values.emplace_back(m_linked_obj.get_backlink(backlink_col, i));
             }
         }
     }
@@ -599,10 +597,7 @@ void ConstTableView::do_sync()
         REALM_ASSERT(m_query.m_table);
 
         // valid query, so clear earlier results and reexecute it.
-        if (m_key_values->is_attached())
-            m_key_values->clear();
-        else
-            m_key_values->create();
+        m_table_view_key_values.clear();
 
         if (m_query.m_view)
             m_query.m_view->sync_if_needed();

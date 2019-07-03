@@ -24,13 +24,21 @@ using namespace realm;
 
 size_t ObjList::size() const
 {
-    return m_key_values->size();
+    if (m_key_values)
+        return m_key_values->size();
+    if (m_key_vector)
+        return m_key_vector->size();
+    REALM_ASSERT_RELEASE(false && "ObjList with no values");
 }
 
 // Get key for object this view is "looking" at.
 ObjKey ObjList::get_key(size_t ndx) const
 {
-    return ObjKey(m_key_values->get(ndx));
+    if (m_key_values)
+        return ObjKey(m_key_values->get(ndx));
+    if (m_key_vector)
+        return (*m_key_vector)[ndx];
+    return ObjKey();
 }
 
 void ObjList::do_sort(const DescriptorOrdering& ordering)
@@ -73,16 +81,34 @@ void ObjList::do_sort(const DescriptorOrdering& ordering)
     }
     // Apply the results
     m_limit_count = index_pairs.m_removed_by_limit;
-    m_key_values->clear();
-    for (auto& pair : index_pairs) {
-        m_key_values->add(pair.key_for_object);
+    if (m_key_values) {
+        m_key_values->clear();
+        for (auto& pair : index_pairs) {
+            m_key_values->add(pair.key_for_object);
+        }
+        for (size_t t = 0; t < detached_ref_count; ++t)
+            m_key_values->add(null_key);
     }
-    for (size_t t = 0; t < detached_ref_count; ++t)
-        m_key_values->add(null_key);
+    if (m_key_vector) {
+        m_key_vector->clear();
+        for (auto& pair : index_pairs) {
+            m_key_vector->emplace_back(pair.key_for_object);
+        }
+        for (size_t t = 0; t < detached_ref_count; ++t)
+            m_key_vector->emplace_back(null_key);
+    }
 }
 
 ObjList::ObjList(KeyColumn* key_values)
     : m_key_values(key_values)
+#ifdef REALM_COOKIE_CHECK
+    , m_debug_cookie(cookie_expected)
+#endif
+{
+}
+
+ObjList::ObjList(std::vector<ObjKey>* key_values)
+    : m_key_vector(key_values)
 #ifdef REALM_COOKIE_CHECK
     , m_debug_cookie(cookie_expected)
 #endif
@@ -98,26 +124,56 @@ ObjList::ObjList(KeyColumn* key_values, const Table* parent)
 {
 }
 
+ObjList::ObjList(std::vector<ObjKey>* key_values, const Table* parent)
+    : m_table(parent)
+    , m_key_vector(key_values)
+#ifdef REALM_COOKIE_CHECK
+    , m_debug_cookie(cookie_expected)
+#endif
+{
+}
+
 ConstObj ObjList::get_object(size_t row_ndx) const
 {
     REALM_ASSERT(m_table);
-    REALM_ASSERT(row_ndx < m_key_values->size());
-    ObjKey key(m_key_values->get(row_ndx));
-    REALM_ASSERT(key != realm::null_key);
-    return m_table->get_object(key);
+    if (m_key_values) {
+        REALM_ASSERT(row_ndx < m_key_values->size());
+        ObjKey key(m_key_values->get(row_ndx));
+        REALM_ASSERT(key != realm::null_key);
+        return m_table->get_object(key);
+    }
+    if (m_key_vector) {
+        REALM_ASSERT(row_ndx < m_key_vector->size());
+        ObjKey key((*m_key_vector)[row_ndx]);
+        REALM_ASSERT(key != realm::null_key);
+        return m_table->get_object(key);
+    }
+    REALM_ASSERT(false && "no object keys");
+    return ConstObj();
 }
 
 ConstObj ObjList::try_get_object(size_t row_ndx) const
 {
     REALM_ASSERT(m_table);
-    REALM_ASSERT(row_ndx < m_key_values->size());
-    ObjKey key(m_key_values->get(row_ndx));
-    REALM_ASSERT(key != realm::null_key);
-    return m_table->is_valid(key) ? m_table->get_object(key) : ConstObj();
+    if (m_key_values) {
+        REALM_ASSERT(row_ndx < m_key_values->size());
+        ObjKey key(m_key_values->get(row_ndx));
+        REALM_ASSERT(key != realm::null_key);
+        return m_table->is_valid(key) ? m_table->get_object(key) : ConstObj();
+    }
+    if (m_key_vector) {
+        REALM_ASSERT(row_ndx < m_key_vector->size());
+        ObjKey key((*m_key_vector)[row_ndx]);
+        REALM_ASSERT(key != realm::null_key);
+        return m_table->is_valid(key) ? m_table->get_object(key) : ConstObj();
+    }
+    REALM_ASSERT(false && "no object keys");
+    return ConstObj();
 }
 
 void ObjList::assign(KeyColumn* key_values, const Table* parent)
 {
     m_key_values = key_values;
+    m_key_vector = nullptr;
     m_table = ConstTableRef(parent);
 }

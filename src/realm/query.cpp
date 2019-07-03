@@ -1281,7 +1281,7 @@ void Query::find_all(ConstTableView& ret, size_t begin, size_t end, size_t limit
         for (size_t t = begin; t < end && ret.size() < limit; t++) {
             ConstObj obj = m_view->get_object(t);
             if (eval_object(obj)) {
-                ret.m_key_values->add(obj.get_key());
+                ret.m_table_view_key_values.emplace_back(obj.get_key());
             }
         }
     }
@@ -1289,7 +1289,7 @@ void Query::find_all(ConstTableView& ret, size_t begin, size_t end, size_t limit
         if (end == size_t(-1))
             end = m_table->size();
         if (!has_conditions()) {
-            KeyColumn* refs = ret.m_key_values;
+            std::vector<ObjKey>* refs = &ret.m_table_view_key_values;
 
             ClusterTree::TraverseFunction f = [&begin, &end, &limit, refs](const Cluster* cluster) {
                 size_t e = cluster->node_size();
@@ -1300,7 +1300,7 @@ void Query::find_all(ConstTableView& ret, size_t begin, size_t end, size_t limit
                     auto offset = cluster->get_offset();
                     auto key_values = cluster->get_key_array();
                     for (size_t i = begin; (i < e) && limit; i++) {
-                        refs->add(ObjKey(key_values->get(i) + offset));
+                        refs->emplace_back(ObjKey(key_values->get(i) + offset));
                         --limit;
                     }
                     begin = 0;
@@ -1317,7 +1317,7 @@ void Query::find_all(ConstTableView& ret, size_t begin, size_t end, size_t limit
         }
         else {
             auto node = root_node();
-            QueryState<int64_t> st(act_FindAll, ret.m_key_values, limit);
+            QueryState<int64_t> st(act_FindAll, &ret.m_table_view_key_values, limit);
 
             ClusterTree::TraverseFunction f = [&begin, &end, &node, &st, this](const Cluster* cluster) {
                 size_t e = cluster->node_size();

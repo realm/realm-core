@@ -367,7 +367,7 @@ void LnkLst::remove_target_row(size_t link_ndx)
 void LnkLst::remove_all_target_rows()
 {
     if (is_attached()) {
-        _impl::TableFriend::batch_erase_rows(get_target_table(), *this->m_tree);
+        get_target_table().batch_erase_rows(*this->m_tree);
     }
 }
 
