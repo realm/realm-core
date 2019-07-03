@@ -1465,6 +1465,10 @@ void Cluster::dump_objects(int64_t key_offset, std::string lead) const
         }
         std::cout << lead << "key: " << std::hex << key_value + key_offset << std::dec;
         for (size_t j = 1; j < size(); j++) {
+            if (m_tree_top.get_spec().get_column_attr(j - 1).test(col_attr_List)) {
+                std::cout << ", list";
+            }
+
             switch (m_tree_top.get_spec().get_column_type(j - 1)) {
                 case col_type_Int: {
                     bool nullable = m_tree_top.get_spec().get_column_attr(j - 1).test(col_attr_Nullable);
@@ -1535,7 +1539,12 @@ void Cluster::dump_objects(int64_t key_offset, std::string lead) const
                     ArrayTimestamp arr(m_alloc);
                     ref_type ref = Array::get_as_ref(j);
                     arr.init_from_ref(ref);
-                    std::cout << ", " << arr.get(i);
+                    if (arr.is_null(i)) {
+                        std::cout << ", " << "null";
+                    }
+                    else  {
+                        std::cout << ", " << arr.get(i);
+                    }
                     break;
                 }
                 case col_type_Link: {
