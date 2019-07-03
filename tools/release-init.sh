@@ -21,6 +21,10 @@ git checkout -b prepare-$realm_version
 sed -i.bak -e "s/^VERSION.*/VERSION=${realm_version}/" "${project_dir}/dependencies.list"
 rm "${project_dir}/dependencies.list.bak" || exit 1
 
+# update Package.swift
+sed -i.bak -e "s/^let versionStr =.*/let versionStr = \"${realm_version}\"/" "${project_dir}/Package.swift"
+rm "${project_dir}/Package.swift.bak" || exit 1
+
 RELEASE_HEADER="# $realm_version Release notes" || exit 1
 sed -i.bak -e "1s/.*/$RELEASE_HEADER/" "${project_dir}/CHANGELOG.md" || exit 1
 rm "${project_dir}/CHANGELOG.md.bak" || exit 1

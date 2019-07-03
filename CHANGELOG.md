@@ -1,7 +1,7 @@
 # NEXT RELEASE
 
 ### Enhancements
-* None.
+* Small improvements in pk handling to support ObjectStore
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
@@ -14,6 +14,48 @@
 
 ### Internals
 * None.
+
+Besides the changes above, this release includes changes introduced by v5.22.0 to v5.23.0:
+
+| # 5.23.0 Release notes
+| 
+| ### Enhancements
+| * Add a Swift Package Manager package ([#3308](https://github.com/realm/realm-core/pull/3308)).
+| 
+| ### Fixed
+| * Constructing an `IncludeDescriptor` made unnecessary table comparisons. This resulted in poor performance for subscriptions
+|   using the `includeLinkingObjects` functionality. ([#3311](https://github.com/realm/realm-core/issues/3311), since v5.18.0)
+|  
+| ### Breaking changes
+| * None.
+| 
+| -----------
+| 
+| ### Internals
+| * None.
+| 
+| ----------------------------------------------
+| 
+| # 5.22.0 Release notes
+| 
+| ### Enhancements
+| 
+| * Expose the ability to follow links while printing a TableView in JSON format.
+|   TableView::to_json() now supports the same arguments as Table::to_json().
+|   ([#3301](https://github.com/realm/realm-core/pull/3301))
+| 
+| ### Fixed
+| * None.
+|  
+| ### Breaking changes
+| * None.
+| 
+| -----------
+| 
+| ### Internals
+| * Fixed an inconsistency in the use of the `REALM_METRICS` compile time option. Now core consumers are able
+|   to use `SharedGroup::get_metrics()` regardless of whether or not metrics are compiled in. A null pointer
+|   is returned if the feature has been disabled at compile time.
 
 ----------------------------------------------
 

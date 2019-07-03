@@ -81,3 +81,7 @@ Thumbs.db
 # Ignore python compiled files
 *.pyc
 /test/android/jni/#Android.mk#
+
+# Swift package manager
+/.swiftpm
+/.build

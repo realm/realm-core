@@ -51,13 +51,19 @@
 // `experiments/testcase.cpp` and then run `sh build.sh
 // check-testcase` (or one of its friends) from the command line.
 
-#if REALM_METRICS
-
 #include <realm.hpp>
-#include <realm/util/encrypted_file_mapping.hpp>
-#include <realm/util/to_string.hpp>
 #include <realm/replication.hpp>
 #include <realm/history.hpp>
+
+using namespace realm;
+using namespace realm::metrics;
+using namespace realm::test_util;
+using namespace realm::util;
+
+#if REALM_METRICS
+
+#include <realm/util/encrypted_file_mapping.hpp>
+#include <realm/util/to_string.hpp>
 
 #include <future>
 #include <chrono>
@@ -65,10 +71,6 @@
 #include <thread>
 #include <vector>
 
-using namespace realm;
-using namespace realm::metrics;
-using namespace realm::test_util;
-using namespace realm::util;
 
 TEST(Metrics_HasNoReportsWhenDisabled)
 {
@@ -1109,6 +1111,72 @@ TEST(Metrics_MemoryChecks)
     for (auto transaction : *transactions) {
         CHECK_GREATER(transaction.get_disk_size(), 0);
         CHECK_GREATER(transaction.get_free_space(), 0);
+    }
+}
+
+#else // REALM_METRICS
+
+TEST(Metrics_APIAvailability)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    DBOptions options(crypt_key());
+    options.enable_metrics = true;
+    DBRef sg = DB::create(*hist, options);
+    CHECK(!sg->get_metrics());
+    {
+        auto tr = sg->start_write();
+        auto table = tr->add_table("table");
+        table->add_column(type_Int, "first");
+        for (int i = 0; i < 10; i++) {
+            table->create_object();
+        }
+        tr->commit();
+    }
+
+    {
+        ReadTransaction rt(sg);
+        auto table = rt.get_table("table");
+        auto col = table->get_column_key("first");
+        CHECK(bool(table));
+        Query q = const_cast<Table&>(*table).column<int64_t>(col) == 0;
+        q.count();
+    }
+    std::shared_ptr<Metrics> metrics = sg->get_metrics();
+
+    // the following will never execute since when REALM_METRICS is undefined,
+    // then sg.get_metrics() will always return a nullptr, however, the purpose
+    // of the remainder of the test is to ensure that all of the methods below
+    // are still accessible at compile time so that users of core do not need to check
+    // REALM_METRICS, but can use a core with or without the flag in the same way.
+    if (metrics) {
+        CHECK_EQUAL(metrics->num_transaction_metrics(), 0);
+        CHECK_EQUAL(metrics->num_query_metrics(), 0);
+        std::unique_ptr<Metrics::TransactionInfoList> transactions = metrics->take_transactions();
+
+        if (transactions) {
+            for (auto transaction : *transactions) {
+                transaction.get_disk_size();
+                transaction.get_free_space();
+                transaction.get_transaction_time();
+                transaction.get_fsync_time();
+                transaction.get_write_time();
+                transaction.get_disk_size();
+                transaction.get_free_space();
+                transaction.get_total_objects();
+                transaction.get_num_available_versions();
+                transaction.get_num_decrypted_pages();
+            }
+        }
+        std::unique_ptr<Metrics::QueryInfoList> queries = metrics->take_queries();
+        if (queries) {
+            for (auto query : *queries) {
+                query.get_description();
+                query.get_table_name();
+                query.get_type();
+                query.get_query_time();
+            }
+        }
     }
 }
 

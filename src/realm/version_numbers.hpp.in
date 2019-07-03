@@ -16,10 +16,8 @@
  *
  **************************************************************************/
 
-#ifndef REALM_VERSION_HPP
-#define REALM_VERSION_HPP
-
-#include <string>
+#ifndef REALM_VERSION_NUMBERS_HPP
+#define REALM_VERSION_NUMBERS_HPP
 
 // Do not use `cmakedefine` here, as certain versions can be 0, which CMake
 // interprets as being undefined.
@@ -29,31 +27,4 @@
 #define REALM_VERSION_EXTRA "@CONFIG_VERSION_TWEAK@"
 #define REALM_VERSION_STRING "@CONFIG_VERSION@"
 
-#define REALM_PRODUCT_NAME "realm-core"
-#define REALM_VER_CHUNK "[" REALM_PRODUCT_NAME "-" REALM_VERSION_STRING "]"
-
-namespace realm {
-
-enum Feature {
-    feature_Debug,
-    feature_Replication,
-};
-
-class StringData;
-
-class Version {
-public:
-    static int get_major() { return REALM_VERSION_MAJOR; }
-    static int get_minor() { return REALM_VERSION_MINOR; }
-    static int get_patch() { return REALM_VERSION_PATCH; }
-    static StringData get_extra();
-    static std::string get_version();
-    static bool is_at_least(int major, int minor, int patch, StringData extra);
-    static bool is_at_least(int major, int minor, int patch);
-    static bool has_feature(Feature feature);
-};
-
-
-} // namespace realm
-
-#endif // REALM_VERSION_HPP
+#endif // REALM_VERSION_NUMBERS_HPP

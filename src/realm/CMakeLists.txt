@@ -125,6 +125,7 @@ set(REALM_INSTALL_GENERAL_HEADERS
     timestamp.hpp
     unicode.hpp
     utilities.hpp
+    version.hpp
     version_id.hpp
 ) # REALM_INSTALL_GENERAL_HEADERS
 
@@ -199,13 +200,11 @@ set(REALM_INSTALL_ALL_HEADERS
     ${REALM_METRICS_HEADERS}
 )
 
-if(REALM_METRICS)
-    list(APPEND REALM_SOURCES
-        metrics/metrics.cpp
-        metrics/metric_timer.cpp
-        metrics/query_info.cpp
-        metrics/transaction_info.cpp)
-endif()
+list(APPEND REALM_SOURCES
+    metrics/metrics.cpp
+    metrics/metric_timer.cpp
+    metrics/query_info.cpp
+    metrics/transaction_info.cpp)
 
 if(NOT MSVC)
     list(APPEND REALM_SOURCES util/interprocess_mutex.cpp)
@@ -365,7 +364,7 @@ install(FILES ${REALM_OTHER_UTIL_HEADERS}
 install(FILES ${REALM_METRICS_HEADERS}
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/realm/metrics
         COMPONENT devel)
-install(FILES ${PROJECT_BINARY_DIR}/src/realm/version.hpp
+install(FILES ${PROJECT_BINARY_DIR}/src/realm/version_numbers.hpp
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/realm
         COMPONENT devel)
 install(FILES ${PROJECT_BINARY_DIR}/src/realm/util/config.h
