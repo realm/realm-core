@@ -34,7 +34,11 @@ QueryInfo::QueryInfo(const Query* query, QueryType type)
     const Group* group = query->m_table->get_parent_group();
     REALM_ASSERT(group);
 
-    m_description = query->get_description();
+    try {
+        m_description = query->get_description();
+    } catch (const SerialisationError& e) {
+        m_description = e.message();
+    }
     m_table_name = query->m_table->get_name();
 #else
     static_cast<void>(query);

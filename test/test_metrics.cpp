@@ -305,14 +305,14 @@ TEST(Metrics_QueryEqual)
     q4.find_all();
     q5.find_all();
     q6.find_all();
-    CHECK_THROW(q7.find_all(), SerialisationError);
-    CHECK_THROW(q8.find_all(), SerialisationError);
+    q7.find_all();
+    q8.find_all();
 
     std::shared_ptr<Metrics> metrics = sg.get_metrics();
     CHECK(metrics);
     std::unique_ptr<Metrics::QueryInfoList> queries = metrics->take_queries();
     CHECK(queries);
-    CHECK_EQUAL(queries->size(), 7);
+    CHECK_EQUAL(queries->size(), 9);
 
     for (size_t i = 0; i < 7; ++i) {
         std::string description = queries->at(i).get_description();
@@ -321,6 +321,10 @@ TEST(Metrics_QueryEqual)
         CHECK_GREATER_EQUAL(find_count(description, query_search_term), 1);
         CHECK_EQUAL(table_name, "person");
     }
+    std::string list_to_object_description = queries->at(7).get_description();
+    CHECK_EQUAL(list_to_object_description, "Serialising a query which links to an object is currently unsupported.");
+    std::string link_to_object_description = queries->at(8).get_description();
+    CHECK_EQUAL(link_to_object_description, "Serialising a query which links to an object is currently unsupported.");
 }
 
 TEST(Metrics_QueryOrAndNot)
@@ -568,7 +572,7 @@ TEST(Metrics_LinkListQueries)
     q0.find_all();
     q1.find_all();
     q2.find_all();
-    CHECK_THROW(q3.find_all(), SerialisationError);
+    q3.find_all();
     q4.find_all();
     q5.find_all();
 
@@ -577,7 +581,7 @@ TEST(Metrics_LinkListQueries)
     std::unique_ptr<Metrics::QueryInfoList> queries = metrics->take_queries();
     CHECK(queries);
 
-    CHECK_EQUAL(queries->size(), 16);
+    CHECK_EQUAL(queries->size(), 17);
 
     std::string null_links_description = queries->at(0).get_description();
     CHECK_EQUAL(find_count(null_links_description, "NULL"), 1);
@@ -593,16 +597,17 @@ TEST(Metrics_LinkListQueries)
     CHECK_EQUAL(find_count(count_link_description, column_names[ll_col_ndx]), 1);
     CHECK_EQUAL(find_count(count_link_description, "=="), 1);
 
-    //CHECK_THROW(queries->at(3), SerialisationError);
+    std::string to_object_description = queries->at(3).get_description();
+    CHECK_EQUAL(to_object_description, "Serialising a query which links to an object is currently unsupported.");
 
-    std::string sum_link_description = queries->at(3).get_description();
+    std::string sum_link_description = queries->at(4).get_description();
     CHECK_EQUAL(find_count(sum_link_description, "@sum"), 1);
     CHECK_EQUAL(find_count(sum_link_description, column_names[ll_col_ndx]), 1);
     CHECK_EQUAL(find_count(sum_link_description, column_names[double_col_ndx]), 1);
     // the query system can choose to flip the argument order and operators so that >= might be <=
     CHECK_EQUAL(find_count(sum_link_description, "<=") + find_count(sum_link_description, ">="), 1);
 
-    std::string link_subquery_description = queries->at(4).get_description();
+    std::string link_subquery_description = queries->at(5).get_description();
     CHECK_EQUAL(find_count(link_subquery_description, "@count"), 1);
     CHECK_EQUAL(find_count(link_subquery_description, column_names[ll_col_ndx]), 1);
     CHECK_EQUAL(find_count(link_subquery_description, "=="), 2);
@@ -674,13 +679,13 @@ TEST(Metrics_SubQueries)
     Query q2 = table->column<SubTable>(1).list<String>().begins_with("Str");
     Query q3 = table->column<SubTable>(1).list<String>() == "Str_0";
 
-    CHECK_THROW(q0.find_all(), SerialisationError);
-    CHECK_THROW(q1.find_all(), SerialisationError);
-    CHECK_THROW(q2.find_all(), SerialisationError);
-    CHECK_THROW(q3.find_all(), SerialisationError);
+    q0.find_all();
+    q1.find_all();
+    q2.find_all();
+    q3.find_all();
 
     sg.commit();
-/*
+
     std::shared_ptr<Metrics> metrics = sg.get_metrics();
     CHECK(metrics);
     std::unique_ptr<Metrics::QueryInfoList> queries = metrics->take_queries();
@@ -689,21 +694,16 @@ TEST(Metrics_SubQueries)
     CHECK_EQUAL(queries->size(), 4);
 
     std::string int_equal_description = queries->at(0).get_description();
-    CHECK_EQUAL(find_count(int_equal_description, "=="), 1);
-    CHECK_EQUAL(find_count(int_equal_description, int_col_name), 1);
+    CHECK_EQUAL(int_equal_description, "Serialisation of subtable expressions is not yet supported.");
 
     std::string int_max_description = queries->at(1).get_description();
-    CHECK_EQUAL(find_count(int_max_description, "@max"), 1);
-    CHECK_EQUAL(find_count(int_max_description, int_col_name), 1);
+    CHECK_EQUAL(int_equal_description, "Serialisation of subtable expressions is not yet supported.");
 
     std::string str_begins_description = queries->at(2).get_description();
-    CHECK_EQUAL(find_count(str_begins_description, "BEGINSWITH"), 1);
-    CHECK_EQUAL(find_count(str_begins_description, str_col_name), 1);
+    CHECK_EQUAL(int_equal_description, "Serialisation of subtable expressions is not yet supported.");
 
     std::string str_equal_description = queries->at(3).get_description();
-    CHECK_EQUAL(find_count(str_equal_description, "=="), 1);
-    CHECK_EQUAL(find_count(str_equal_description, str_col_name), 1);
-*/
+    CHECK_EQUAL(int_equal_description, "Serialisation of subtable expressions is not yet supported.");
 }
 
 
