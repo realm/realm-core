@@ -1,15 +1,11 @@
-# NEXT RELEASE
+# 6.0.0-alpha.12 Release notes
 
 ### Enhancements
 * Small improvements in pk handling to support ObjectStore
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * None.
  
-### Breaking changes
-* None.
-
 -----------
 
 ### Internals
