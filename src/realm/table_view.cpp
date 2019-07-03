@@ -362,10 +362,9 @@ size_t ConstTableView::count_timestamp(ColKey column_key, Timestamp target) cons
     return count;
 }
 
-void ConstTableView::to_json(std::ostream& out) const
+void ConstTableView::to_json(std::ostream& out, size_t link_depth, std::map<std::string, std::string>* renames) const
 {
     check_cookie();
-
     // Represent table as list of objects
     out << "[";
 
@@ -379,7 +378,7 @@ void ConstTableView::to_json(std::ostream& out) const
             else {
                 out << ",";
             }
-            m_table->get_object(key).to_json(out);
+            m_table->get_object(key).to_json(out, link_depth, renames);
         }
     }
 

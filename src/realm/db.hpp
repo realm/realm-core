@@ -305,12 +305,10 @@ public:
 /// On the importing side, the top-level accessor being created during
 /// import takes ownership of all other accessors (if any) being created as
 /// part of the import.
-#if REALM_METRICS
     std::shared_ptr<metrics::Metrics> get_metrics()
     {
         return m_metrics;
     }
-#endif // REALM_METRICS
 
     // Try to grab a exclusive lock of the given realm path's lock file. If the lock
     // can be acquired, the callback will be executed with the lock and then return true.
@@ -375,9 +373,7 @@ private:
     util::InterprocessCondVar m_pick_next_writer;
     std::function<void(int, int)> m_upgrade_callback;
 
-#if REALM_METRICS
     std::shared_ptr<metrics::Metrics> m_metrics;
-#endif // REALM_METRICS
 protected:
     explicit DB(const DBOptions& options);
 

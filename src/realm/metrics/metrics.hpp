@@ -32,8 +32,6 @@ class Group;
 
 namespace metrics {
 
-#if REALM_METRICS
-
 class Metrics {
 public:
     Metrics(size_t max_history_size);
@@ -70,14 +68,6 @@ private:
     size_t m_max_num_queries;
     size_t m_max_num_transactions;
 };
-
-
-#else
-
-class Metrics {
-};
-
-#endif // REALM_METRICS
 
 } // namespace metrics
 } // namespace realm

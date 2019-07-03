@@ -22,14 +22,13 @@
 #include <realm/query.hpp>
 #include <realm/query_engine.hpp>
 
-#if REALM_METRICS
-
 using namespace realm;
 using namespace realm::metrics;
 
 QueryInfo::QueryInfo(const Query* query, QueryType type)
     : m_type(type)
 {
+#if REALM_METRICS
     REALM_ASSERT(query);
 
     const Group* group = query->m_table->get_parent_group();
@@ -37,6 +36,9 @@ QueryInfo::QueryInfo(const Query* query, QueryType type)
 
     m_description = query->get_description();
     m_table_name = query->m_table->get_name();
+#else
+    static_cast<void>(query);
+#endif
 }
 
 QueryInfo::~QueryInfo() noexcept
@@ -68,6 +70,7 @@ double QueryInfo::get_query_time() const
 
 std::unique_ptr<MetricTimer> QueryInfo::track(const Query* query, QueryType type)
 {
+#if REALM_METRICS
     REALM_ASSERT_DEBUG(query);
 
     if (!bool(query->m_table)) {
@@ -89,6 +92,11 @@ std::unique_ptr<MetricTimer> QueryInfo::track(const Query* query, QueryType type
     metrics->add_query(info);
 
     return std::make_unique<MetricTimer>(info.m_query_time);
+#else
+    static_cast<void>(query);
+    static_cast<void>(type);
+    return nullptr;
+#endif
 }
 
 QueryInfo::QueryType QueryInfo::type_from_action(Action action)
@@ -117,5 +125,3 @@ QueryInfo::QueryType QueryInfo::type_from_action(Action action)
     };
     REALM_UNREACHABLE();
 }
-
-#endif // REALM_METRICS

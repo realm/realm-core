@@ -371,7 +371,7 @@ IncludeDescriptor::IncludeDescriptor(const Table& table, const std::vector<std::
             if (TableKey from_table_key = link.from) { // backlink
                 // must point back to cur_table:
                 Table* from_table = group->get_table(from_table_key);
-                REALM_ASSERT(cur_table == from_table->get_opposite_table(link.column_key));
+                REALM_ASSERT_DEBUG(cur_table == from_table->get_opposite_table(link.column_key));
                 if (Table::is_link_type(col_type)) {
                     // FIXME: How can this ever be true - ref assert above...
                     if (from_table->get_opposite_table_key(link.column_key) != cur_table->get_key()) {

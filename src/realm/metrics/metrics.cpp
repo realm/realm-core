@@ -19,8 +19,6 @@
 #include <realm/group.hpp>
 #include <realm/metrics/metrics.hpp>
 
-#if REALM_METRICS
-
 using namespace realm;
 using namespace realm::metrics;
 
@@ -133,6 +131,3 @@ std::unique_ptr<Metrics::TransactionInfoList> Metrics::take_transactions()
     values.swap(m_transaction_info);
     return values;
 }
-
-
-#endif // REALM_METRICS
