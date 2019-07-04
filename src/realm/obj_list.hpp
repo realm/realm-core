@@ -112,7 +112,6 @@ protected:
 
     void assign(KeyColumn* key_values, const Table* parent);
 
-    void do_sort(const DescriptorOrdering&);
     void detach() const noexcept // may have to remove const
     {
         m_table = TableRef();

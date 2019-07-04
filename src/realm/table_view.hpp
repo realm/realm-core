@@ -344,6 +344,7 @@ protected:
     TableVersions get_dependencies() const override;
 
     void do_sync();
+    void do_sort(const DescriptorOrdering&);
 
     // The source column index that this view contain backlinks for.
     ColKey m_source_column_key;

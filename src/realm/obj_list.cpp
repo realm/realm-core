@@ -41,63 +41,6 @@ ObjKey ObjList::get_key(size_t ndx) const
     return ObjKey();
 }
 
-void ObjList::do_sort(const DescriptorOrdering& ordering)
-{
-    if (ordering.is_empty())
-        return;
-    size_t sz = size();
-    if (sz == 0)
-        return;
-
-    // Gather the current rows into a container we can use std algorithms on
-    size_t detached_ref_count = 0;
-    BaseDescriptor::IndexPairs index_pairs;
-    index_pairs.reserve(sz);
-    // always put any detached refs at the end of the sort
-    // FIXME: reconsider if this is the right thing to do
-    // FIXME: consider specialized implementations in derived classes
-    // (handling detached refs is not required in linkviews)
-    for (size_t t = 0; t < sz; t++) {
-        ObjKey key = get_key(t);
-        if (m_table->is_valid(key)) {
-            index_pairs.emplace_back(key, t);
-        }
-        else
-            ++detached_ref_count;
-    }
-
-    const int num_descriptors = int(ordering.size());
-    for (int desc_ndx = 0; desc_ndx < num_descriptors; ++desc_ndx) {
-        const BaseDescriptor* base_descr = ordering[desc_ndx];
-        const BaseDescriptor* next = ((desc_ndx + 1) < num_descriptors) ? ordering[desc_ndx + 1] : nullptr;
-        BaseDescriptor::Sorter predicate = base_descr->sorter(get_parent(), index_pairs);
-
-        // Sorting can be specified by multiple columns, so that if two entries in the first column are
-        // identical, then the rows are ordered according to the second column, and so forth. For the
-        // first column, we cache all the payload of fields of the view in a std::vector<Mixed>
-        predicate.cache_first_column(index_pairs);
-
-        base_descr->execute(index_pairs, predicate, next);
-    }
-    // Apply the results
-    m_limit_count = index_pairs.m_removed_by_limit;
-    if (m_key_values) {
-        m_key_values->clear();
-        for (auto& pair : index_pairs) {
-            m_key_values->add(pair.key_for_object);
-        }
-        for (size_t t = 0; t < detached_ref_count; ++t)
-            m_key_values->add(null_key);
-    }
-    if (m_key_vector) {
-        m_key_vector->clear();
-        for (auto& pair : index_pairs) {
-            m_key_vector->emplace_back(pair.key_for_object);
-        }
-        for (size_t t = 0; t < detached_ref_count; ++t)
-            m_key_vector->emplace_back(null_key);
-    }
-}
 
 ObjList::ObjList(KeyColumn* key_values)
     : m_key_values(key_values)
