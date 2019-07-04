@@ -26,14 +26,14 @@
 using namespace realm;
 
 ConstTableView::ConstTableView(ConstTableView& src, Transaction*, PayloadPolicy)
-    : ObjList(&m_table_view_key_values)
+    : ObjList()
     , m_source_column_key(src.m_source_column_key)
 {
     REALM_ASSERT(false); // unimplemented
 }
 
 ConstTableView::ConstTableView(const ConstTableView& src, Transaction* tr, PayloadPolicy mode)
-    : ObjList(&m_table_view_key_values)
+    : ObjList()
     , m_source_column_key(src.m_source_column_key)
     , m_linked_obj_key(src.m_linked_obj_key)
 {
@@ -654,6 +654,29 @@ void ConstTableView::do_sync()
 
     m_last_seen_versions = get_dependencies();
 }
+
+ObjKey ConstTableView::get_key(size_t ndx) const {
+    return m_table_view_key_values[ndx];
+}
+
+ConstObj ConstTableView::get_object(size_t row_ndx) const
+{
+    REALM_ASSERT(m_table);
+    REALM_ASSERT(row_ndx < m_table_view_key_values.size());
+    ObjKey key(m_table_view_key_values[row_ndx]);
+    REALM_ASSERT(key != realm::null_key);
+    return m_table->get_object(key);
+}
+
+ConstObj ConstTableView::try_get_object(size_t row_ndx) const
+{
+    REALM_ASSERT(m_table);
+    REALM_ASSERT(row_ndx < m_table_view_key_values.size());
+    ObjKey key(m_table_view_key_values[row_ndx]);
+    REALM_ASSERT(key != realm::null_key);
+    return m_table->is_valid(key) ? m_table->get_object(key) : ConstObj();
+}
+
 
 bool ConstTableView::is_in_table_order() const
 {

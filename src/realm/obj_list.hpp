@@ -34,10 +34,8 @@ using KeyColumn = BPlusTree<ObjKey>;
 
 class ObjList {
 public:
-    ObjList(KeyColumn* key_values);
-    ObjList(std::vector<ObjKey>* key_values);
-    ObjList(std::vector<ObjKey>* key_values, const Table* parent);
-    ObjList(KeyColumn* key_values, const Table* parent);
+    ObjList();
+    ObjList(const Table* parent);
 
     virtual ~ObjList()
     {
@@ -51,7 +49,6 @@ public:
         return *m_table;
     }
 
-    virtual size_t size() const;
 
     // Get the number of total results which have been filtered out because a number of "LIMIT" operations have
     // been applied. This number only applies to the last sync.
@@ -61,10 +58,11 @@ public:
     }
 
     // Get key for object this view is "looking" at.
-    ObjKey get_key(size_t ndx) const;
+    virtual ObjKey get_key(size_t ndx) const = 0;
+    virtual ConstObj try_get_object(size_t row_ndx) const = 0;
+    virtual ConstObj get_object(size_t row_ndx) const = 0;
+    virtual size_t size() const = 0;
 
-    ConstObj try_get_object(size_t row_ndx) const;
-    ConstObj get_object(size_t row_ndx) const;
     ConstObj front() const noexcept
     {
         return get_object(0);
@@ -105,12 +103,10 @@ protected:
 
     // Null if, and only if, the view is detached.
     mutable ConstTableRef m_table;
-    KeyColumn* m_key_values = nullptr;
-    std::vector<ObjKey>* m_key_vector = nullptr;
     size_t m_limit_count = 0;
     uint64_t m_debug_cookie;
 
-    void assign(KeyColumn* key_values, const Table* parent);
+    void assign(const Table* parent);
 
     void detach() const noexcept // may have to remove const
     {

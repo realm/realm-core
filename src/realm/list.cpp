@@ -336,10 +336,25 @@ template void Lst<ObjKey>::clear();
 }
 #endif
 
-Obj LnkLst::get_object(size_t ndx)
+ConstObj LnkLst::get_object(size_t ndx) const
 {
     ObjKey k = get(ndx);
     return get_target_table().get_object(k);
+}
+
+ConstObj LnkLst::try_get_object(size_t ndx) const
+{
+    ObjKey k = get(ndx);
+    Table& t = get_target_table();
+    if (t.is_valid(k))
+        return t.get_object(k);
+    else
+        return ConstObj();
+}
+
+ObjKey LnkLst::get_key(size_t ndx) const
+{
+    return get(ndx);
 }
 
 TableView LnkLst::get_sorted_view(SortDescriptor order) const
@@ -374,7 +389,7 @@ void LnkLst::remove_all_target_rows()
 LnkLst::LnkLst(const Obj& owner, ColKey col_key)
     : ConstLstBase(col_key, &m_obj)
     , Lst<ObjKey>(owner, col_key)
-    , ObjList(this->m_tree.get(), m_obj.get_target_table(m_col_key))
+    , ObjList(m_obj.get_target_table(m_col_key))
 {
 }
 

@@ -165,7 +165,7 @@ public:
 
     /// Construct null view (no memory allocated).
     ConstTableView()
-        : ObjList(&m_table_view_key_values)
+        : ObjList()
     {
     }
 
@@ -263,13 +263,6 @@ public:
     Timestamp maximum_timestamp(ColKey column_key, ObjKey* return_key = nullptr) const;
     size_t count_timestamp(ColKey column_key, Timestamp target) const;
 
-    /// Search this view for the specified key. If found, the index of that row
-    /// within this view is returned, otherwise `realm::not_found` is returned.
-    size_t find_by_source_ndx(ObjKey key) const noexcept
-    {
-        return m_key_values->find_first(key);
-    }
-
     // Conversion
     void to_json(std::ostream&, size_t link_depth = 0, std::map<std::string, std::string>* renames = nullptr) const;
 
@@ -333,6 +326,10 @@ public:
     {
         return m_source_column_key != ColKey();
     }
+    size_t size() const override;
+    ObjKey get_key(size_t ndx) const override;
+    ConstObj try_get_object(size_t row_ndx) const override;
+    ConstObj get_object(size_t row_ndx) const override;
 
 protected:
     // This TableView can be "born" from 4 different sources:
@@ -460,8 +457,13 @@ private:
 // ================================================================================================
 // ConstTableView Implementation:
 
+inline size_t ConstTableView::size() const
+{
+    return m_table_view_key_values.size();
+}
+
 inline ConstTableView::ConstTableView(const Table* parent)
-    : ObjList(&m_table_view_key_values, parent) // Throws
+    : ObjList(parent) // Throws
 {
     if (m_table) {
         m_last_seen_versions.emplace_back(m_table->get_key(), m_table->get_content_version());
@@ -469,7 +471,7 @@ inline ConstTableView::ConstTableView(const Table* parent)
 }
 
 inline ConstTableView::ConstTableView(const Table* parent, Query& query, size_t start, size_t end, size_t lim)
-    : ObjList(&m_table_view_key_values, parent)
+    : ObjList(parent)
     , m_query(query)
     , m_start(start)
     , m_end(end)
@@ -478,7 +480,7 @@ inline ConstTableView::ConstTableView(const Table* parent, Query& query, size_t 
 }
 
 inline ConstTableView::ConstTableView(const Table* src_table, ColKey src_column_key, const ConstObj& obj)
-    : ObjList(&m_table_view_key_values, src_table) // Throws
+    : ObjList(src_table) // Throws
     , m_source_column_key(src_column_key)
     , m_linked_obj_key(obj.get_key())
     , m_linked_table(obj.get_table())
@@ -490,7 +492,7 @@ inline ConstTableView::ConstTableView(const Table* src_table, ColKey src_column_
 }
 
 inline ConstTableView::ConstTableView(DistinctViewTag, const Table* parent, ColKey column_key)
-    : ObjList(&m_table_view_key_values, parent) // Throws
+    : ObjList(parent) // Throws
     , m_distinct_column_source(column_key)
 {
     REALM_ASSERT(m_distinct_column_source != ColKey());
@@ -500,7 +502,7 @@ inline ConstTableView::ConstTableView(DistinctViewTag, const Table* parent, ColK
 }
 
 inline ConstTableView::ConstTableView(const Table* parent, ConstLnkLstPtr link_list)
-    : ObjList(&m_table_view_key_values, parent) // Throws
+    : ObjList(parent) // Throws
     , m_linklist_source(std::move(link_list))
 {
     REALM_ASSERT(m_linklist_source);
@@ -510,7 +512,7 @@ inline ConstTableView::ConstTableView(const Table* parent, ConstLnkLstPtr link_l
 }
 
 inline ConstTableView::ConstTableView(const ConstTableView& tv)
-    : ObjList(&m_table_view_key_values, tv.m_table)
+    : ObjList(tv.m_table)
     , m_source_column_key(tv.m_source_column_key)
     , m_linked_obj_key(tv.m_linked_obj_key)
     , m_linked_table(tv.m_linked_table)
@@ -528,7 +530,7 @@ inline ConstTableView::ConstTableView(const ConstTableView& tv)
 }
 
 inline ConstTableView::ConstTableView(ConstTableView&& tv) noexcept
-    : ObjList(&m_table_view_key_values, tv.m_table)
+    : ObjList(tv.m_table)
     , m_source_column_key(tv.m_source_column_key)
     , m_linked_obj_key(tv.m_linked_obj_key)
     , m_linked_table(tv.m_linked_table)

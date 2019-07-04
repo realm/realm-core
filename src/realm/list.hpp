@@ -701,26 +701,26 @@ class LnkLst : public Lst<ObjKey>, public ObjList {
 public:
     LnkLst()
         : ConstLstBase({}, &m_obj)
-        , ObjList(this->m_tree.get())
+        , ObjList()
     {
     }
     LnkLst(const Obj& owner, ColKey col_key);
     LnkLst(const LnkLst& other)
         : ConstLstBase(other.m_col_key, &m_obj)
         , Lst<ObjKey>(other)
-        , ObjList(this->m_tree.get(), m_obj.get_target_table(m_col_key))
+        , ObjList(m_obj.get_target_table(m_col_key))
     {
     }
     LnkLst(LnkLst&& other)
         : ConstLstBase(other.m_col_key, &m_obj)
         , Lst<ObjKey>(std::move(other))
-        , ObjList(this->m_tree.get(), m_obj.get_target_table(m_col_key))
+        , ObjList(m_obj.get_target_table(m_col_key))
     {
     }
     LnkLst& operator=(const LnkLst& other)
     {
         Lst<ObjKey>::operator=(other);
-        this->ObjList::assign(this->m_tree.get(), m_obj.get_target_table(m_col_key));
+        this->ObjList::assign(m_obj.get_target_table(m_col_key));
         return *this;
     }
 
@@ -741,7 +741,9 @@ public:
         return Lst<ObjKey>::size();
     }
 
-    Obj get_object(size_t ndx);
+    ConstObj get_object(size_t ndx) const override;
+    ObjKey get_key(size_t ndx) const override;
+    ConstObj try_get_object(size_t row_ndx) const override;
 
     Obj operator[](size_t ndx)
     {
