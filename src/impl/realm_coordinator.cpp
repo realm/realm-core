@@ -111,6 +111,7 @@ void RealmCoordinator::create_sync_session(bool force_client_reset, bool validat
     });
 #else
     static_cast<void>(force_client_reset);
+    static_cast<void>(validate_sync_history);
 #endif
 }
 
