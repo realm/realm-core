@@ -4,9 +4,9 @@
 * None.
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
- 
+* Fixed the metrics throwing an exception when a query cannot be serialised. Now it reports the exception message as the description.
+ ([#3031](https://github.com/realm/realm-sync/issues/3031), since v3.2.0)
+
 ### Breaking changes
 * None.
 
