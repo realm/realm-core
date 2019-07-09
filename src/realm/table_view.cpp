@@ -420,10 +420,9 @@ void TableViewBase::aggregate(size_t group_by_column, size_t aggr_column, Table:
     m_table->aggregate(group_by_column, aggr_column, op, result, &m_row_indexes);
 }
 
-void TableViewBase::to_json(std::ostream& out) const
+void TableViewBase::to_json(std::ostream& out, size_t link_depth, std::map<std::string, std::string>* renames) const
 {
     check_cookie();
-
     // Represent table as list of objects
     out << "[";
 
@@ -433,7 +432,7 @@ void TableViewBase::to_json(std::ostream& out) const
         if (real_row_index != detached_ref) {
             if (r > 0)
                 out << ",";
-            m_table->to_json_row(to_size_t(real_row_index), out);
+            m_table->to_json_row(to_size_t(real_row_index), out, link_depth, renames);
         }
     }
 

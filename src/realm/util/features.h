@@ -27,7 +27,9 @@
 #define NOMINMAX
 #endif
 
+#ifndef REALM_NO_CONFIG
 #include <realm/util/config.h>
+#endif
 
 /* The maximum number of elements in a B+-tree node. Applies to inner nodes and
  * to leaves. The minimum allowable value is 2.
@@ -311,6 +313,32 @@
 #define REALM_ARCHITECTURE_X86_64 1
 #else
 #define REALM_ARCHITECTURE_X86_64 0
+#endif
+
+// Address Sanitizer
+#if defined(__has_feature) // Clang
+#  if __has_feature(address_sanitizer)
+#    define REALM_SANITIZE_ADDRESS 1
+#  else
+#    define REALM_SANITIZE_ADDRESS 0
+#  endif
+#elif defined(__SANITIZE_ADDRESS__) && __SANITIZE_ADDRESS__ // GCC
+#  define REALM_SANITIZE_ADDRESS 1
+#else
+#  define REALM_SANITIZE_ADDRESS 0
+#endif
+
+// Thread Sanitizer
+#if defined(__has_feature) // Clang
+#  if __has_feature(thread_sanitizer)
+#    define REALM_SANITIZE_THREAD 1
+#  else
+#    define REALM_SANITIZE_THREAD 0
+#  endif
+#elif defined(__SANITIZE_THREAD__) && __SANITIZE_THREAD__ // GCC
+#  define REALM_SANITIZE_THREAD 1
+#else
+#  define REALM_SANITIZE_THREAD 0
 #endif
 
 #endif /* REALM_UTIL_FEATURES_H */

@@ -1,29 +1,12 @@
-# 5.20.0-ndk18.2 Release notes
+# NEXT RELEASE
 
 ### Enhancements
 * None.
 
 ### Fixed
-* None.
- 
-### Breaking changes
-* None.
+* Fixed the metrics throwing an exception when a query cannot be serialised. Now it reports the exception message as the description.
+ ([#3031](https://github.com/realm/realm-sync/issues/3031), since v3.2.0)
 
------------
-
-### Internals
-* Fixed downloading OpenSSL on Android when including as a dependency.
-
-----------------------------------------------
-
-# 5.20.0-ndk18.1 Release notes
-
-### Enhancements
-* None.
-
-### Fixed
-* None.
- 
 ### Breaking changes
 * None.
 
@@ -34,6 +17,69 @@
 * Upgrade the NDK to version 18.
 * When using core as a CMake package, the target name changed to RealmCore::Core.
 * Removed support for ARMv5 and MIPS from Android. This is a consequence of the new NDK being used.
+
+----------------------------------------------
+
+# 5.23.0 Release notes
+
+### Enhancements
+* Add a Swift Package Manager package ([#3308](https://github.com/realm/realm-core/pull/3308)).
+
+### Fixed
+* Constructing an `IncludeDescriptor` made unnecessary table comparisons. This resulted in poor performance for subscriptions
+  using the `includeLinkingObjects` functionality. ([#3311](https://github.com/realm/realm-core/issues/3311), since v5.18.0)
+ 
+### Breaking changes
+* None.
+
+-----------
+
+### Internals
+* None.
+
+----------------------------------------------
+
+# 5.22.0 Release notes
+
+### Enhancements
+
+* Expose the ability to follow links while printing a TableView in JSON format.
+  TableView::to_json() now supports the same arguments as Table::to_json().
+  ([#3301](https://github.com/realm/realm-core/pull/3301))
+
+### Fixed
+* None.
+ 
+### Breaking changes
+* None.
+
+-----------
+
+### Internals
+* Fixed an inconsistency in the use of the `REALM_METRICS` compile time option. Now core consumers are able
+  to use `SharedGroup::get_metrics()` regardless of whether or not metrics are compiled in. A null pointer
+  is returned if the feature has been disabled at compile time.
+
+----------------------------------------------
+
+# 5.21.0 Release notes
+
+### Enhancements
+* Added support for unicode characters in realm path and filenames for Windows. Contribution by @rajivshah3.
+  ([#3293](https://github.com/realm/realm-core/pull/3293))
+
+### Fixed
+* None.
+
+### Breaking changes
+* None
+
+-----------
+
+### Internals
+* Introduced new feature test macros for address and thread sanitizers in
+  `<realm/util/features.h>`.
+* Added Realm file path to Allocator assertions ([3283](https://github.com/realm/realm-core/issues/3283)).
 
 ----------------------------------------------
 

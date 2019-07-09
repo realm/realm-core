@@ -18,8 +18,6 @@
 
 #include <realm/metrics/transaction_info.hpp>
 
-#if REALM_METRICS
-
 using namespace realm;
 using namespace metrics;
 
@@ -31,10 +29,12 @@ TransactionInfo::TransactionInfo(TransactionInfo::TransactionType type)
     , m_num_versions(0)
     , m_num_decrypted_pages(0)
 {
+#if REALM_METRICS
     if (m_type == write_transaction) {
         m_fsync_time = std::make_shared<MetricTimerResult>();
         m_write_time = std::make_shared<MetricTimerResult>();
     }
+#endif
 }
 
 TransactionInfo::~TransactionInfo() noexcept
@@ -106,5 +106,3 @@ void TransactionInfo::finish_timer()
 {
     m_transaction_time.report_seconds(m_transact_timer.get_elapsed_time());
 }
-
-#endif // REALM_METRICS

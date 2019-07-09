@@ -2287,6 +2287,47 @@ TEST(Parser_IncludeDescriptorMultiple)
 }
 
 
+TEST(Parser_IncludeDescriptorDeepLinks)
+{
+    Group g;
+    TableRef people = g.add_table("person");
+
+    size_t name_col = people->add_column(type_String, "name");
+    size_t link_col = people->add_column_link(type_Link, "father", *people);
+
+    people->add_empty_row(5);
+    people->set_string(name_col, 0, "Bones");
+    people->set_string(name_col, 1, "John");
+    people->set_link(link_col, 1, 0);
+    people->set_string(name_col, 2, "Mark");
+    people->set_link(link_col, 2, 1);
+    people->set_string(name_col, 3, "Jonathan");
+    people->set_link(link_col, 3, 2);
+    people->set_string(name_col, 4, "Eli");
+    people->set_link(link_col, 4, 3);
+
+    // include serialisation
+    TableView tv = get_sorted_view(people, "name contains[c] 'bone' SORT(name DESC) INCLUDE(@links.person.father.@links.person.father.@links.person.father.@links.person.father)");
+    IncludeDescriptor includes = tv.get_include_descriptors();
+    CHECK(includes.is_valid());
+    CHECK_EQUAL(tv.size(), 1);
+
+    CHECK_EQUAL(tv.get_string(name_col, 0), "Bones");
+
+    size_t cur_ndx_to_check = 0;
+    std::vector<std::string> expected_include_names;
+    auto reporter = [&](const Table* table, const std::unordered_set<size_t>& rows) {
+        CHECK(table == people);
+        CHECK_EQUAL(1, rows.size());
+        std::string row_value = table->get_string(name_col, *rows.begin());
+        CHECK_EQUAL(row_value, expected_include_names[cur_ndx_to_check++]);
+    };
+
+    expected_include_names = {"John", "Mark", "Jonathan", "Eli"};
+    includes.report_included_backlinks(people.get(), tv.get_source_ndx(0), reporter);
+}
+
+
 TEST(Parser_Backlinks)
 {
     Group g;

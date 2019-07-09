@@ -130,7 +130,7 @@ check_include_files(malloc.h HAVE_MALLOC_H)
 configure_file(src/realm/util/config.h.in src/realm/util/config.h)
 
 # Configure source code to use right version number
-configure_file(src/realm/version.hpp.in src/realm/version.hpp)
+configure_file(src/realm/version_numbers.hpp.in src/realm/version_numbers.hpp)
 
 set(DEPRECATED_CONFIG_FILE "${RealmCore_SOURCE_DIR}/src/realm/util/config.h")
 if(EXISTS "${DEPRECATED_CONFIG_FILE}")

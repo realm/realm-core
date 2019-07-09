@@ -305,14 +305,14 @@ TEST(Metrics_QueryEqual)
     q4.find_all();
     q5.find_all();
     q6.find_all();
-    CHECK_THROW(q7.find_all(), SerialisationError);
-    CHECK_THROW(q8.find_all(), SerialisationError);
+    q7.find_all();
+    q8.find_all();
 
     std::shared_ptr<Metrics> metrics = sg.get_metrics();
     CHECK(metrics);
     std::unique_ptr<Metrics::QueryInfoList> queries = metrics->take_queries();
     CHECK(queries);
-    CHECK_EQUAL(queries->size(), 7);
+    CHECK_EQUAL(queries->size(), 9);
 
     for (size_t i = 0; i < 7; ++i) {
         std::string description = queries->at(i).get_description();
@@ -321,6 +321,10 @@ TEST(Metrics_QueryEqual)
         CHECK_GREATER_EQUAL(find_count(description, query_search_term), 1);
         CHECK_EQUAL(table_name, "person");
     }
+    std::string list_to_object_description = queries->at(7).get_description();
+    CHECK_EQUAL(list_to_object_description, "Serialising a query which links to an object is currently unsupported.");
+    std::string link_to_object_description = queries->at(8).get_description();
+    CHECK_EQUAL(link_to_object_description, "Serialising a query which links to an object is currently unsupported.");
 }
 
 TEST(Metrics_QueryOrAndNot)
@@ -568,7 +572,7 @@ TEST(Metrics_LinkListQueries)
     q0.find_all();
     q1.find_all();
     q2.find_all();
-    CHECK_THROW(q3.find_all(), SerialisationError);
+    q3.find_all();
     q4.find_all();
     q5.find_all();
 
@@ -577,7 +581,7 @@ TEST(Metrics_LinkListQueries)
     std::unique_ptr<Metrics::QueryInfoList> queries = metrics->take_queries();
     CHECK(queries);
 
-    CHECK_EQUAL(queries->size(), 16);
+    CHECK_EQUAL(queries->size(), 17);
 
     std::string null_links_description = queries->at(0).get_description();
     CHECK_EQUAL(find_count(null_links_description, "NULL"), 1);
@@ -593,16 +597,17 @@ TEST(Metrics_LinkListQueries)
     CHECK_EQUAL(find_count(count_link_description, column_names[ll_col_ndx]), 1);
     CHECK_EQUAL(find_count(count_link_description, "=="), 1);
 
-    //CHECK_THROW(queries->at(3), SerialisationError);
+    std::string to_object_description = queries->at(3).get_description();
+    CHECK_EQUAL(to_object_description, "Serialising a query which links to an object is currently unsupported.");
 
-    std::string sum_link_description = queries->at(3).get_description();
+    std::string sum_link_description = queries->at(4).get_description();
     CHECK_EQUAL(find_count(sum_link_description, "@sum"), 1);
     CHECK_EQUAL(find_count(sum_link_description, column_names[ll_col_ndx]), 1);
     CHECK_EQUAL(find_count(sum_link_description, column_names[double_col_ndx]), 1);
     // the query system can choose to flip the argument order and operators so that >= might be <=
     CHECK_EQUAL(find_count(sum_link_description, "<=") + find_count(sum_link_description, ">="), 1);
 
-    std::string link_subquery_description = queries->at(4).get_description();
+    std::string link_subquery_description = queries->at(5).get_description();
     CHECK_EQUAL(find_count(link_subquery_description, "@count"), 1);
     CHECK_EQUAL(find_count(link_subquery_description, column_names[ll_col_ndx]), 1);
     CHECK_EQUAL(find_count(link_subquery_description, "=="), 2);
@@ -674,13 +679,13 @@ TEST(Metrics_SubQueries)
     Query q2 = table->column<SubTable>(1).list<String>().begins_with("Str");
     Query q3 = table->column<SubTable>(1).list<String>() == "Str_0";
 
-    CHECK_THROW(q0.find_all(), SerialisationError);
-    CHECK_THROW(q1.find_all(), SerialisationError);
-    CHECK_THROW(q2.find_all(), SerialisationError);
-    CHECK_THROW(q3.find_all(), SerialisationError);
+    q0.find_all();
+    q1.find_all();
+    q2.find_all();
+    q3.find_all();
 
     sg.commit();
-/*
+
     std::shared_ptr<Metrics> metrics = sg.get_metrics();
     CHECK(metrics);
     std::unique_ptr<Metrics::QueryInfoList> queries = metrics->take_queries();
@@ -689,21 +694,16 @@ TEST(Metrics_SubQueries)
     CHECK_EQUAL(queries->size(), 4);
 
     std::string int_equal_description = queries->at(0).get_description();
-    CHECK_EQUAL(find_count(int_equal_description, "=="), 1);
-    CHECK_EQUAL(find_count(int_equal_description, int_col_name), 1);
+    CHECK_EQUAL(int_equal_description, "Serialisation of subtable expressions is not yet supported.");
 
     std::string int_max_description = queries->at(1).get_description();
-    CHECK_EQUAL(find_count(int_max_description, "@max"), 1);
-    CHECK_EQUAL(find_count(int_max_description, int_col_name), 1);
+    CHECK_EQUAL(int_equal_description, "Serialisation of subtable expressions is not yet supported.");
 
     std::string str_begins_description = queries->at(2).get_description();
-    CHECK_EQUAL(find_count(str_begins_description, "BEGINSWITH"), 1);
-    CHECK_EQUAL(find_count(str_begins_description, str_col_name), 1);
+    CHECK_EQUAL(int_equal_description, "Serialisation of subtable expressions is not yet supported.");
 
     std::string str_equal_description = queries->at(3).get_description();
-    CHECK_EQUAL(find_count(str_equal_description, "=="), 1);
-    CHECK_EQUAL(find_count(str_equal_description, str_col_name), 1);
-*/
+    CHECK_EQUAL(int_equal_description, "Serialisation of subtable expressions is not yet supported.");
 }
 
 
@@ -939,6 +939,7 @@ public:
     {
         has_run_once = will_run.get_future();
     }
+
     std::function<int64_t()> current_target_getter(size_t) override
     {
         return []() { return realm::util::PageReclaimGovernor::no_match; };
@@ -946,11 +947,15 @@ public:
 
     void report_target_result(int64_t) override
     {
-        will_run.set_value();
+        if (!has_run) {
+            will_run.set_value();
+            has_run = true;
+        }
     }
 
     std::future<void> has_run_once;
     std::promise<void> will_run;
+    bool has_run = false;
 };
 
 // this test relies on the global state of the number of decrypted pages and therefore must be run in isolation
@@ -1061,6 +1066,73 @@ TEST(Metrics_MemoryChecks)
     }
 }
 
+#else // REALM_METRICS
+
+#include <realm.hpp>
+#include <realm/replication.hpp>
+#include <realm/history.hpp>
+
+using namespace realm;
+using namespace realm::metrics;
+using namespace realm::test_util;
+using namespace realm::util;
+
+TEST(Metrics_APIAvailability)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    SharedGroupOptions options(crypt_key());
+    options.enable_metrics = true;
+    SharedGroup sg(*hist, options);
+    CHECK(!sg.get_metrics());
+    Group& g = sg.begin_write();
+    auto table = g.add_table("table");
+    table->add_column(type_Int, "first");
+    table->add_empty_row(10);
+    sg.commit();
+    sg.begin_read();
+    table = g.get_table("table");
+    CHECK(bool(table));
+    Query q = table->column<int64_t>(0) == 0;
+    q.count();
+    sg.end_read();
+    std::shared_ptr<Metrics> metrics = sg.get_metrics();
+
+    // the following will never execute since when REALM_METRICS is undefined,
+    // then sg.get_metrics() will always return a nullptr, however, the purpose
+    // of the remainder of the test is to ensure that all of the methods below
+    // are still accessible at compile time so that users of core do not need to check
+    // REALM_METRICS, but can use a core with or without the flag in the same way.
+    if (metrics) {
+        CHECK_EQUAL(metrics->num_transaction_metrics(), 0);
+        CHECK_EQUAL(metrics->num_query_metrics(), 0);
+        std::unique_ptr<Metrics::TransactionInfoList> transactions = metrics->take_transactions();
+
+        if (transactions) {
+            for (auto transaction : *transactions) {
+                transaction.get_disk_size();
+                transaction.get_free_space();
+                transaction.get_transaction_time();
+                transaction.get_fsync_time();
+                transaction.get_write_time();
+                transaction.get_disk_size();
+                transaction.get_free_space();
+                transaction.get_total_objects();
+                transaction.get_num_available_versions();
+                transaction.get_num_decrypted_pages();
+            }
+        }
+        std::unique_ptr<Metrics::QueryInfoList> queries = metrics->take_queries();
+        if (queries) {
+            for (auto query : *queries) {
+                query.get_description();
+                query.get_table_name();
+                query.get_type();
+                query.get_query_time();
+            }
+        }
+    }
+}
 
 #endif // REALM_METRICS
 #endif // TEST_METRICS
