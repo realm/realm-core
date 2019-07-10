@@ -1,7 +1,4 @@
-# NEXT RELEASE
-
-### Enhancements
-* None.
+# 5.23.1 Release notes
 
 ### Fixed
 * Fixed the metrics throwing an exception when a query cannot be serialised. Now it reports the exception message as the description.
@@ -9,14 +6,6 @@
 * Queries involving an indexed int column which were constrained by a LinkList with an order different from the table's order would
   give incorrect results. ([#3307](https://github.com/realm/realm-core/issues/3307), since v3.19.0)
 * Queries involving an indexed int column had a memory leak if run multiple times. ([#6186](https://github.com/realm/realm-cocoa/issues/6186)), since v3.19.0)
-
-### Breaking changes
-* None.
-
------------
-
-### Internals
-* None.
 
 ----------------------------------------------
 
