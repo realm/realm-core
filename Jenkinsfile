@@ -47,6 +47,7 @@ jobWrapper {
 
             releaseTesting = targetBranch.contains('release')
             isPublishingRun = false
+            valgrindCheck = true // FIXME: default to false
             if (gitTag) {
                 isPublishingRun = currentBranch.contains('release')
             }
@@ -59,6 +60,7 @@ jobWrapper {
                 // If we're on master, instruct the docker image builds to push to the
                 // cache registry
                 env.DOCKER_PUSH = "1"
+                valgrindCheck = true
             }
         }
 
@@ -82,6 +84,12 @@ jobWrapper {
                     androidArmeabiRelease   : doAndroidBuildInDocker('armeabi-v7a', 'Release', true),
                     coverage                : doBuildCoverage(),
                     performance             : buildPerformance()
+                ]
+                parallelExecutors.putAll(extendedChecks)
+            }
+            if (valgrindCheck) {
+                extendedChecks = [
+                    valgrindLinuxDebug      : doCheckValgrind(),
                 ]
                 parallelExecutors.putAll(extendedChecks)
             }
@@ -282,6 +290,37 @@ def doBuildLinuxClang(String buildType) {
                 def stashName = "linux___${buildType}"
                 stash includes:"*.tar.gz", name:stashName
                 publishingStashes << stashName
+            }
+        }
+    }
+}
+
+def doCheckValgrind() {
+    return {
+        node('docker') {
+            getArchive()
+            def buildEnv = docker.build('realm-core-valgrind:snapshot', '-f valgrind.Dockerfile .')
+            def environment = environment()
+            environment << 'UNITTEST_PROGRESS=1'
+            withEnv(environment) {
+                buildEnv.inside {
+                    def workspace = pwd()
+                    try {
+                        sh """
+                           mkdir build-dir
+                           cd build-dir
+                           cmake -D CMAKE_BUILD_TYPE=Debug -D REALM_VALGRIND=ON -D REALM_ENABLE_ALLOC_SET_ZERO=ON -D REALM_MAX_BPNODE_SIZE=1000 -G Ninja ..
+                        """
+                        runAndCollectWarnings(script: "cd build-dir && ninja")
+                        sh """
+                            cd build-dir/test
+                            valgrind --version
+                            valgrind --tool=memcheck --leak-check=full --undef-value-errors=yes --track-origins=yes --child-silent-after-fork=no --trace-children=yes --xml=yes --suppressions=${workspace}/test/valgrind.suppress --xml-file=${workspace}/build-dir/test/realm-tests-dbg.memreport --error-exitcode=1 ./realm-tests --no-error-exitcode
+                        """
+                    } finally {
+                        recordTests("Linux-ValgrindDebug")
+                    }
+                }
             }
         }
     }
