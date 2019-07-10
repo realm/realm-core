@@ -887,8 +887,15 @@ public:
     }
     ~IntegerNode()
     {
-        if (m_result.is_attached()) {
-            m_result.destroy();
+        deallocate();
+    }
+
+    void deallocate()
+    {
+        // Must be called after each query execution to free temporary resources used by the execution. Run in
+        // destructor, but also in Init because a user could define a query once and execute it multiple times.
+        if (m_result && m_result->is_attached()) {
+            m_result->destroy();
         }
     }
 
@@ -897,13 +904,15 @@ public:
         BaseType::init();
         m_nb_needles = m_needles.size();
 
-        if (has_search_index()) {
-            ref_type ref = IntegerColumn::create(Allocator::get_default());
-            m_result.init_from_ref(Allocator::get_default(), ref);
+        deallocate();
 
-            IntegerNodeBase<ColType>::m_condition_column->find_all(m_result, this->m_value, 0, realm::npos);
+        if (has_search_index()) {
+            m_result.reset(new IntegerColumn(IntegerColumn::unattached_root_tag(), Allocator::get_default())); // Throws
+            m_result->get_root_array()->create(Array::type_Normal); // Throws
+
+            IntegerNodeBase<ColType>::m_condition_column->find_all(*m_result, this->m_value, 0, realm::npos);
             m_index_get = 0;
-            m_index_end = m_result.size();
+            m_index_end = m_result->size();
         }
     }
 
@@ -935,9 +944,10 @@ public:
             else
                 m_index_last_start = start;
 
+            REALM_ASSERT(m_result);
             while (m_index_get < m_index_end) {
                 // m_results are stored in sorted ascending order, guaranteed by the string index
-                size_t ndx = size_t(m_result.get(m_index_get));
+                size_t ndx = size_t(m_result->get(m_index_get));
                 if (ndx >= end) {
                     break;
                 }
@@ -1015,7 +1025,7 @@ public:
 
 private:
     std::unordered_set<TConditionValue> m_needles;
-    IntegerColumn m_result;
+    std::unique_ptr<IntegerColumn> m_result;
     size_t m_nb_needles = 0;
     size_t m_index_get = 0;
     size_t m_index_last_start = 0;
