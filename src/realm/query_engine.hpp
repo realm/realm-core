@@ -927,6 +927,14 @@ public:
         REALM_ASSERT(this->m_table);
 
         if (has_search_index()) {
+            if (m_index_end == 0)
+                return not_found;
+
+            if (start <= m_index_last_start)
+                m_index_get = 0;
+            else
+                m_index_last_start = start;
+
             while (m_index_get < m_index_end) {
                 // m_results are stored in sorted ascending order, guaranteed by the string index
                 size_t ndx = size_t(m_result.get(m_index_get));
@@ -1010,6 +1018,7 @@ private:
     IntegerColumn m_result;
     size_t m_nb_needles = 0;
     size_t m_index_get = 0;
+    size_t m_index_last_start = 0;
     size_t m_index_end = 0;
 
     IntegerNode(const IntegerNode<ColType, Equal>& from, QueryNodeHandoverPatches* patches)

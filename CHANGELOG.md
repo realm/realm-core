@@ -6,6 +6,8 @@
 ### Fixed
 * Fixed the metrics throwing an exception when a query cannot be serialised. Now it reports the exception message as the description.
  ([#3031](https://github.com/realm/realm-sync/issues/3031), since v3.2.0)
+* Queries involving an indexed int column which were constrained by a LinkList with an order differenet from the table's order would
+  give incorrect results. ([#3307](https://github.com/realm/realm-core/issues/3307), since v3.19.0)
 
 ### Breaking changes
 * None.

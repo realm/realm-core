@@ -69,7 +69,6 @@ using namespace realm::test_util;
 // `experiments/testcase.cpp` and then run `sh build.sh
 // check-testcase` (or one of its friends) from the command line.
 
-
 TEST(Query_NoConditions)
 {
     Table table;
@@ -11995,5 +11994,32 @@ TEST(Query_IntFindInNextLeaf)
     check_results();
 }
 
+TEST(Query_IntIndexOverLinkViewNotInTableOrder)
+{
+    Group g;
 
+    TableRef child_table = g.add_table("child");
+    size_t col_child_id = child_table->add_column(type_Int, "id");
+    child_table->add_search_index(col_child_id);
+
+    child_table->set_int(col_child_id, child_table->add_empty_row(), 3);
+    child_table->set_int(col_child_id, child_table->add_empty_row(), 2);
+
+    TableRef parent_table = g.add_table("parent");
+    size_t col_parent_children = parent_table->add_column_link(type_LinkList, "children", *child_table);
+
+    size_t parent_row = parent_table->add_empty_row();
+    auto children = parent_table->get_linklist(col_parent_children, parent_row);
+    // Add in reverse order so that the query node sees declining start indices
+    children->add(1);
+    children->add(0);
+
+    // Query via linkview
+    CHECK_EQUAL(0, child_table->where(children).equal(col_child_id, 3).find());
+    CHECK_EQUAL(1, child_table->where(children).equal(col_child_id, 2).find());
+
+    // Query directly
+    CHECK_EQUAL(0, child_table->where().equal(col_child_id, 3).find());
+    CHECK_EQUAL(1, child_table->where().equal(col_child_id, 2).find());
+}
 #endif // TEST_QUERY
