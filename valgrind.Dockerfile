@@ -2,7 +2,7 @@ FROM ubuntu:18.04
 
 # One dependency per line in alphabetical order.
 # This should help avoiding duplicates and make the file easier to update.
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
     build-essential \
     curl \
     gcovr \
