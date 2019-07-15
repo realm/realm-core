@@ -1,0 +1,691 @@
+/*
+module realm_array_basic_tpl {
+    header "realm/array_basic_tpl.hpp"
+    export *
+}
+module realm_column_tpl {
+    header "realm/column_tpl.hpp"
+    export *
+}
+module realm_column_mixed_tpl {
+    header "realm/column_mixed_tpl.hpp"
+    export *
+}
+*/
+module realm {
+    header "realm.hpp"
+    export *
+}
+module realm_spec {
+    header "realm/spec.hpp"
+    export *
+}
+module realm_array_direct {
+    header "realm/array_direct.hpp"
+    export *
+}
+module realm_column_binary {
+    header "realm/column_binary.hpp"
+    export *
+}
+module realm_alloc_slab {
+    header "realm/alloc_slab.hpp"
+    export *
+}
+module realm_group_shared_options {
+    header "realm/group_shared_options.hpp"
+    export *
+}
+module realm_column_type {
+    header "realm/column_type.hpp"
+    export *
+}
+module realm_column_backlink {
+    header "realm/column_backlink.hpp"
+    export *
+}
+module realm_handover_defs {
+    header "realm/handover_defs.hpp"
+    export *
+}
+module realm_descriptor {
+    header "realm/descriptor.hpp"
+    export *
+}
+module realm_array_integer {
+    header "realm/array_integer.hpp"
+    export *
+}
+module realm_exceptions {
+    header "realm/exceptions.hpp"
+    export *
+}
+module realm_index_string {
+    header "realm/index_string.hpp"
+    export *
+}
+module realm_query_operators {
+    header "realm/query_operators.hpp"
+    export *
+}
+module realm_column_string_enum {
+    header "realm/column_string_enum.hpp"
+    export *
+}
+module realm_column_mixed {
+    header "realm/column_mixed.hpp"
+    export *
+}
+module realm_descriptor_fwd {
+    header "realm/descriptor_fwd.hpp"
+    export *
+}
+module realm_query_conditions {
+    header "realm/query_conditions.hpp"
+    export *
+}
+module realm_column_string {
+    header "realm/column_string.hpp"
+    export *
+}
+module realm_column_timestamp {
+    header "realm/column_timestamp.hpp"
+    export *
+}
+module realm_column_linklist {
+    header "realm/column_linklist.hpp"
+    export *
+}
+module realm_array_blobs_big {
+    header "realm/array_blobs_big.hpp"
+    export *
+}
+module realm_row {
+    header "realm/row.hpp"
+    export *
+}
+module realm_version_id {
+    header "realm/version_id.hpp"
+    export *
+}
+module realm_array_string {
+    header "realm/array_string.hpp"
+    export *
+}
+module realm_exec_importer {
+    header "realm/exec/importer.hpp"
+    export *
+}
+module realm_disable_sync_to_disk {
+    header "realm/disable_sync_to_disk.hpp"
+    export *
+}
+module realm_group_writer {
+    header "realm/group_writer.hpp"
+    export *
+}
+module realm_owned_data {
+    header "realm/owned_data.hpp"
+    export *
+}
+module realm_link_view {
+    header "realm/link_view.hpp"
+    export *
+}
+module realm_table {
+    header "realm/table.hpp"
+    export *
+}
+module realm_array_binary {
+    header "realm/array_binary.hpp"
+    export *
+}
+module realm_string_data {
+    header "realm/string_data.hpp"
+    export *
+}
+module realm_query_engine {
+    header "realm/query_engine.hpp"
+    export *
+}
+module realm_table_ref {
+    header "realm/table_ref.hpp"
+    export *
+}
+module realm_utilities {
+    header "realm/utilities.hpp"
+    export *
+}
+module realm_array_basic {
+    header "realm/array_basic.hpp"
+    export *
+}
+module realm_column_table {
+    header "realm/column_table.hpp"
+    export *
+}
+module realm_column_linkbase {
+    header "realm/column_linkbase.hpp"
+    export *
+}
+module realm_replication {
+    header "realm/replication.hpp"
+    export *
+}
+module realm_metrics_metric_timer {
+    header "realm/metrics/metric_timer.hpp"
+    export *
+}
+module realm_metrics_metrics {
+    header "realm/metrics/metrics.hpp"
+    export *
+}
+module realm_metrics_query_info {
+    header "realm/metrics/query_info.hpp"
+    export *
+}
+module realm_metrics_transaction_info {
+    header "realm/metrics/transaction_info.hpp"
+    export *
+}
+module realm_alloc {
+    header "realm/alloc.hpp"
+    export *
+}
+module realm_impl_simulated_failure {
+    header "realm/impl/simulated_failure.hpp"
+    export *
+}
+module realm_impl_sequential_getter {
+    header "realm/impl/sequential_getter.hpp"
+    export *
+}
+module realm_impl_array_writer {
+    header "realm/impl/array_writer.hpp"
+    export *
+}
+module realm_impl_destroy_guard {
+    header "realm/impl/destroy_guard.hpp"
+    export *
+}
+module realm_impl_cont_transact_hist {
+    header "realm/impl/cont_transact_hist.hpp"
+    export *
+}
+module realm_impl_transact_log {
+    header "realm/impl/transact_log.hpp"
+    export *
+}
+module realm_impl_input_stream {
+    header "realm/impl/input_stream.hpp"
+    export *
+}
+module realm_impl_output_stream {
+    header "realm/impl/output_stream.hpp"
+    export *
+}
+module realm_data_type {
+    header "realm/data_type.hpp"
+    export *
+}
+module realm_table_view {
+    header "realm/table_view.hpp"
+    export *
+}
+module realm_history {
+    header "realm/history.hpp"
+    export *
+}
+module realm_util_priority_queue {
+    header "realm/util/priority_queue.hpp"
+    export *
+}
+module realm_util_interprocess_condvar {
+    header "realm/util/interprocess_condvar.hpp"
+    export *
+}
+module realm_util_memory_stream {
+    header "realm/util/memory_stream.hpp"
+    export *
+}
+module realm_util_logger {
+    header "realm/util/logger.hpp"
+    export *
+}
+module realm_util_fixed_size_buffer {
+    header "realm/util/fixed_size_buffer.hpp"
+    export *
+}
+module realm_util_utf8 {
+    header "realm/util/utf8.hpp"
+    export *
+}
+module realm_util_thread {
+    header "realm/util/thread.hpp"
+    export *
+}
+module realm_util_call_with_tuple {
+    header "realm/util/call_with_tuple.hpp"
+    export *
+}
+module realm_util_base64 {
+    header "realm/util/base64.hpp"
+    export *
+}
+module realm_util_to_string {
+    header "realm/util/to_string.hpp"
+    export *
+}
+module realm_util_aes_cryptor {
+    header "realm/util/aes_cryptor.hpp"
+    export *
+}
+module realm_util_any {
+    header "realm/util/any.hpp"
+    export *
+}
+module realm_util_overload {
+    header "realm/util/overload.hpp"
+    export *
+}
+module realm_util_cf_ptr {
+    header "realm/util/cf_ptr.hpp"
+    export *
+}
+module realm_util_shared_ptr {
+    header "realm/util/shared_ptr.hpp"
+    export *
+}
+module realm_util_hex_dump {
+    header "realm/util/hex_dump.hpp"
+    export *
+}
+module realm_util_optional {
+    header "realm/util/optional.hpp"
+    export *
+}
+module realm_util_string_buffer {
+    header "realm/util/string_buffer.hpp"
+    export *
+}
+module realm_util_interprocess_mutex {
+    header "realm/util/interprocess_mutex.hpp"
+    export *
+}
+module realm_util_inspect {
+    header "realm/util/inspect.hpp"
+    export *
+}
+module realm_util_buffer {
+    header "realm/util/buffer.hpp"
+    export *
+}
+module realm_util_bind_ptr {
+    header "realm/util/bind_ptr.hpp"
+    export *
+}
+module realm_util_type_traits {
+    header "realm/util/type_traits.hpp"
+    export *
+}
+module realm_util_safe_int_ops {
+    header "realm/util/safe_int_ops.hpp"
+    export *
+}
+module realm_util_file_mapper {
+    header "realm/util/file_mapper.hpp"
+    export *
+}
+module realm_util_backtrace {
+    header "realm/util/backtrace.hpp"
+    export *
+}
+module realm_util_basic_system_errors {
+    header "realm/util/basic_system_errors.hpp"
+    export *
+}
+module realm_util_errno {
+    header "realm/util/errno.hpp"
+    export *
+}
+module realm_util_serializer {
+    header "realm/util/serializer.hpp"
+    export *
+}
+module realm_util_type_list {
+    header "realm/util/type_list.hpp"
+    export *
+}
+module realm_util_scope_exit {
+    header "realm/util/scope_exit.hpp"
+    export *
+}
+module realm_util_file {
+    header "realm/util/file.hpp"
+    export *
+}
+module realm_util_misc_errors {
+    header "realm/util/misc_errors.hpp"
+    export *
+}
+module realm_util_terminate {
+    header "realm/util/terminate.hpp"
+    export *
+}
+module realm_util_allocator {
+    header "realm/util/allocator.hpp"
+    export *
+}
+module realm_util_miscellaneous {
+    header "realm/util/miscellaneous.hpp"
+    export *
+}
+module realm_util_assert {
+    header "realm/util/assert.hpp"
+    export *
+}
+module realm_util_encrypted_file_mapping {
+    header "realm/util/encrypted_file_mapping.hpp"
+    export *
+}
+module realm_query_expression {
+    header "realm/query_expression.hpp"
+    export *
+}
+module realm_group_shared {
+    header "realm/group_shared.hpp"
+    export *
+}
+module realm_binary_data {
+    header "realm/binary_data.hpp"
+    export *
+}
+module realm_array_string_long {
+    header "realm/array_string_long.hpp"
+    export *
+}
+module realm_timestamp {
+    header "realm/timestamp.hpp"
+    export *
+}
+module realm_column_fwd {
+    header "realm/column_fwd.hpp"
+    export *
+}
+module realm_null {
+    header "realm/null.hpp"
+    export *
+}
+module realm_parser_expression_container {
+    header "realm/parser/expression_container.hpp"
+    export *
+}
+module realm_parser_parser {
+    header "realm/parser/parser.hpp"
+    export *
+}
+module realm_parser_subquery_expression {
+    header "realm/parser/subquery_expression.hpp"
+    export *
+}
+module realm_parser_query_builder {
+    header "realm/parser/query_builder.hpp"
+    export *
+}
+module realm_parser_value_expression {
+    header "realm/parser/value_expression.hpp"
+    export *
+}
+module realm_parser_parser_utils {
+    header "realm/parser/parser_utils.hpp"
+    export *
+}
+module realm_parser_keypath_mapping {
+    header "realm/parser/keypath_mapping.hpp"
+    export *
+}
+module realm_parser_property_expression {
+    header "realm/parser/property_expression.hpp"
+    export *
+}
+module realm_parser_collection_operator_expression {
+    header "realm/parser/collection_operator_expression.hpp"
+    export *
+}
+module realm_olddatetime {
+    header "realm/olddatetime.hpp"
+    export *
+}
+module realm_array_blob {
+    header "realm/array_blob.hpp"
+    export *
+}
+module realm_views {
+    header "realm/views.hpp"
+    export *
+}
+module realm_link_view_fwd {
+    header "realm/link_view_fwd.hpp"
+    export *
+}
+module realm_group {
+    header "realm/group.hpp"
+    export *
+}
+module realm_column_link {
+    header "realm/column_link.hpp"
+    export *
+}
+module realm_unicode {
+    header "realm/unicode.hpp"
+    export *
+}
+module realm_array {
+    header "realm/array.hpp"
+    export *
+}
+module realm_lang_bind_helper {
+    header "realm/lang_bind_helper.hpp"
+    export *
+}
+module realm_mixed {
+    header "realm/mixed.hpp"
+    export *
+}
+module realm_query {
+    header "realm/query.hpp"
+    export *
+}
+module realm_column_type_traits {
+    header "realm/column_type_traits.hpp"
+    export *
+}
+module realm_version {
+    header "realm/version.hpp"
+    export *
+}
+module realm_bptree {
+    header "realm/bptree.hpp"
+    export *
+}
+module realm_column {
+    header "realm/column.hpp"
+    export *
+}
+module external_pegtl_src_example_pegtl_double {
+    header "external/pegtl/src/example/pegtl/double.hpp"
+    export *
+}
+module external_pegtl_src_example_pegtl_json_classes {
+    header "external/pegtl/src/example/pegtl/json_classes.hpp"
+    export *
+}
+module external_pegtl_src_example_pegtl_json_unescape {
+    header "external/pegtl/src/example/pegtl/json_unescape.hpp"
+    export *
+}
+module external_pegtl_src_example_pegtl_json_errors {
+    header "external/pegtl/src/example/pegtl/json_errors.hpp"
+    export *
+}
+module external_pegtl_include {
+    header "external/pegtl/include/tao/pegtl.hpp"
+    header "external/pegtl/include/tao/pegtl/uint64.hpp"
+    header "external/pegtl/include/tao/pegtl/utf8.hpp"
+    header "external/pegtl/include/tao/pegtl/tracking_mode.hpp"
+    header "external/pegtl/include/tao/pegtl/analyze.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/rep.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/skip_control.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/cstream_reader.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/action.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/opt.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/cr_eol.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/identifier.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/pad.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/peek_mask_uint.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/three.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/peek_uint8.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/raise.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/if_must_else.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/seq.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/bump_help.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/sor.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/rule_conjunction.hpp"
+    textual header "external/pegtl/include/tao/pegtl/internal/endian_win.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/try_catch_type.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/rep_min_max.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/any.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/discard.hpp"
+    textual header "external/pegtl/include/tao/pegtl/internal/demangle_sanitise.hpp"
+    textual header "external/pegtl/include/tao/pegtl/internal/endian_gcc.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/endian.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/list_tail.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/plus.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/star.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/demangle.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/not_at.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/bof.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/rules.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/apply0_single.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/trivial.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/has_apply0.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/apply_single.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/read_uint.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/if_apply.hpp"
+    textual header "external/pegtl/include/tao/pegtl/internal/demangle_cxxabi.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/pad_opt.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/cr_crlf_eol.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/action_input.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/dusel_mode.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/until.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/crlf_eol.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/peek_utf16.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/cstring_reader.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/apply0.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/require.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/file_mapper.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/two.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/istream_reader.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/ranges.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/bump_impl.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/alpha.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/string.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/duseltronik.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/peek_mask_uint8.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/eolf.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/rep_min.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/pegtl_string.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/star_must.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/disable.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/file_reader.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/lf_eol.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/result_on_found.hpp"
+    textual header "external/pegtl/include/tao/pegtl/internal/demangle_nop.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/alnum.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/bytes.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/peek_char.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/eof.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/bol.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/list_tail_pad.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/if_then_else.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/peek_utf32.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/enable.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/lf_crlf_eol.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/istring.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/peek_utf8.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/apply.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/must.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/rep_opt.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/at.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/marker.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/file_opener.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/range.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/eol.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/peek_uint.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/minus.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/iterator.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/one.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/has_apply.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/state.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/input_pair.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/integer_sequence.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/list.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/control.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/if_must.hpp"
+    header "external/pegtl/include/tao/pegtl/internal/list_must.hpp"
+    header "external/pegtl/include/tao/pegtl/uint8.hpp"
+    header "external/pegtl/include/tao/pegtl/normal.hpp"
+    header "external/pegtl/include/tao/pegtl/contrib/unescape.hpp"
+    header "external/pegtl/include/tao/pegtl/contrib/rep_one_min_max.hpp"
+    header "external/pegtl/include/tao/pegtl/contrib/to_string.hpp"
+    header "external/pegtl/include/tao/pegtl/contrib/uri.hpp"
+    header "external/pegtl/include/tao/pegtl/contrib/integer.hpp"
+    header "external/pegtl/include/tao/pegtl/contrib/tracer.hpp"
+    header "external/pegtl/include/tao/pegtl/contrib/raw_string.hpp"
+    header "external/pegtl/include/tao/pegtl/contrib/icu/utf8.hpp"
+    header "external/pegtl/include/tao/pegtl/contrib/icu/utf32.hpp"
+    header "external/pegtl/include/tao/pegtl/contrib/icu/utf16.hpp"
+    header "external/pegtl/include/tao/pegtl/contrib/icu/internal.hpp"
+    header "external/pegtl/include/tao/pegtl/contrib/http.hpp"
+    header "external/pegtl/include/tao/pegtl/contrib/parse_tree.hpp"
+    header "external/pegtl/include/tao/pegtl/contrib/alphabet.hpp"
+    header "external/pegtl/include/tao/pegtl/contrib/abnf.hpp"
+    header "external/pegtl/include/tao/pegtl/contrib/changes.hpp"
+    header "external/pegtl/include/tao/pegtl/contrib/json.hpp"
+    header "external/pegtl/include/tao/pegtl/contrib/counter.hpp"
+    header "external/pegtl/include/tao/pegtl/file_input.hpp"
+    header "external/pegtl/include/tao/pegtl/config.hpp"
+    header "external/pegtl/include/tao/pegtl/utf32.hpp"
+    header "external/pegtl/include/tao/pegtl/rules.hpp"
+    header "external/pegtl/include/tao/pegtl/string_input.hpp"
+    header "external/pegtl/include/tao/pegtl/buffer_input.hpp"
+    header "external/pegtl/include/tao/pegtl/input_error.hpp"
+    header "external/pegtl/include/tao/pegtl/apply_mode.hpp"
+    header "external/pegtl/include/tao/pegtl/uint32.hpp"
+    header "external/pegtl/include/tao/pegtl/utf16.hpp"
+    header "external/pegtl/include/tao/pegtl/memory_input.hpp"
+    header "external/pegtl/include/tao/pegtl/uint16.hpp"
+    header "external/pegtl/include/tao/pegtl/nothing.hpp"
+    header "external/pegtl/include/tao/pegtl/rewind_mode.hpp"
+    header "external/pegtl/include/tao/pegtl/analysis/rule_info.hpp"
+    header "external/pegtl/include/tao/pegtl/analysis/generic.hpp"
+    header "external/pegtl/include/tao/pegtl/analysis/insert_rules.hpp"
+    header "external/pegtl/include/tao/pegtl/analysis/counted.hpp"
+    header "external/pegtl/include/tao/pegtl/analysis/grammar_info.hpp"
+    header "external/pegtl/include/tao/pegtl/analysis/analyze_cycles.hpp"
+    header "external/pegtl/include/tao/pegtl/analysis/rule_type.hpp"
+    header "external/pegtl/include/tao/pegtl/analysis/insert_guard.hpp"
+    header "external/pegtl/include/tao/pegtl/mmap_input.hpp"
+    header "external/pegtl/include/tao/pegtl/ascii.hpp"
+    header "external/pegtl/include/tao/pegtl/istream_input.hpp"
+    header "external/pegtl/include/tao/pegtl/parse.hpp"
+    header "external/pegtl/include/tao/pegtl/cstream_input.hpp"
+    header "external/pegtl/include/tao/pegtl/parse_error.hpp"
+    header "external/pegtl/include/tao/pegtl/argv_input.hpp"
+    header "external/pegtl/include/tao/pegtl/read_input.hpp"
+    header "external/pegtl/include/tao/pegtl/eol_pair.hpp"
+    header "external/pegtl/include/tao/pegtl/eol.hpp"
+    header "external/pegtl/include/tao/pegtl/position.hpp"
+    header "external/pegtl/include/tao/pegtl/version.hpp"
+    export *
+}

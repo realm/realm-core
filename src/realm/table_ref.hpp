@@ -124,7 +124,7 @@ class Table;
 template <class T>
 class BasicTableRef : util::bind_ptr<T> {
 public:
-    constexpr BasicTableRef() noexcept
+    /*constexpr*/ BasicTableRef() noexcept
     {
     }
     ~BasicTableRef() noexcept

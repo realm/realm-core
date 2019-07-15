@@ -20,6 +20,7 @@
 #ifdef TEST_COLUMN_TIMESTAMP
 
 #include <realm/column_timestamp.hpp>
+#include <realm/timestamp.hpp>
 #include <realm.hpp>
 
 #include "test.hpp"
@@ -734,7 +735,8 @@ TEST(Timestamp_ChronoConvertions)
     auto now = std::chrono::system_clock::now();
     Timestamp t3(now);
     tp = t3.get_time_point();
-    CHECK_EQUAL(tp, now);
+    // Not sure why this compiles without the conversions without modules... :(
+    CHECK_EQUAL(tp.time_since_epoch().count(), now.time_since_epoch().count());
 }
 
 #endif // TEST_COLUMN_TIMESTAMP

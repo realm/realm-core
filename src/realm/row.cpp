@@ -23,6 +23,10 @@
 using namespace realm;
 
 
+RowBase::RowBase()
+{
+}
+
 void RowBase::attach(Table* table, size_t row_ndx) noexcept
 {
     if (table) {

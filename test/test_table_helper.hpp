@@ -19,6 +19,8 @@
 #ifndef TEST_TEST_TABLE_HELPER_HPP_
 #define TEST_TEST_TABLE_HELPER_HPP_
 
+#include <realm/table.hpp>
+
 enum Days { Mon, Tue, Wed, Thu, Fri, Sat, Sun };
 
 class TestTable : public realm::Table {

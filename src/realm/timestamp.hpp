@@ -167,20 +167,20 @@ public:
     friend std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, const Timestamp&);
     static constexpr int32_t nanoseconds_per_second = 1000000000;
 
+// LCOV_EXCL_START
+    template <class C, class T>
+    friend inline std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& out, const Timestamp& d)
+    {
+        out << "Timestamp(" << d.m_seconds << ", " << d.m_nanoseconds << ")";
+        return out;
+    }
+// LCOV_EXCL_STOP
+
 private:
     int64_t m_seconds;
     int32_t m_nanoseconds;
     bool m_is_null;
 };
-
-// LCOV_EXCL_START
-template <class C, class T>
-inline std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& out, const Timestamp& d)
-{
-    out << "Timestamp(" << d.m_seconds << ", " << d.m_nanoseconds << ")";
-    return out;
-}
-// LCOV_EXCL_STOP
 
 } // namespace realm
 

@@ -47,16 +47,10 @@ public:
 class SortDescriptor;
 
 struct LinkPathPart {
-    LinkPathPart(size_t col_ndx)
-        : column_ndx(col_ndx)
-    {
-    }
+    //TODO inline?
+    LinkPathPart(size_t col_ndx);
 
-    LinkPathPart(size_t col_ndx, ConstTableRef source)
-        : column_ndx(col_ndx)
-        , from(source)
-    {
-    }
+    LinkPathPart(size_t col_ndx, ConstTableRef source);
 
     size_t column_ndx;
     // "from" is omitted for forward links, if it is valid then

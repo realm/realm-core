@@ -19,6 +19,8 @@
 #ifndef REALM_UTIL_TYPE_LIST_HPP
 #define REALM_UTIL_TYPE_LIST_HPP
 
+#include <type_traits>
+
 namespace realm {
 namespace util {
 

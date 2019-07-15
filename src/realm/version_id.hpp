@@ -24,6 +24,7 @@
 #endif
 
 #include <limits>
+#include <cstdint>
 
 namespace realm {
 

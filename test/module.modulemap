@@ -1,0 +1,126 @@
+
+module realm_test_experiments_query_expr {
+    header "experiments/query_expr.hpp"
+    export *
+}
+
+module realm_test_test_all {
+    header "test_all.hpp"
+    export *
+}
+module realm_test_pthread_test {
+    header "pthread_test.hpp"
+    export *
+}
+module realm_test_benchmark_common_tasks_compatibility {
+    header "benchmark-common-tasks/compatibility.hpp"
+    export *
+}
+module realm_test_test_table_helper {
+    header "test_table_helper.hpp"
+    export *
+}
+module realm_test_fuzz_group {
+    header "fuzz_group.hpp"
+    export *
+}
+module realm_test_util_number_names {
+    header "util/number_names.hpp"
+    export *
+}
+module realm_test_util_thread_wrapper {
+    header "util/thread_wrapper.hpp"
+    export *
+}
+module realm_test_util_verified_integer {
+    header "util/verified_integer.hpp"
+    export *
+}
+module realm_test_util_jsmn {
+    header "util/jsmn.hpp"
+    export *
+}
+module realm_test_util_check_logic_error {
+    header "util/check_logic_error.hpp"
+    export *
+}
+module realm_test_util_wildcard {
+    header "util/wildcard.hpp"
+    export *
+}
+module realm_test_util_crypt_key {
+    header "util/crypt_key.hpp"
+    export *
+}
+module realm_test_util_super_int {
+    header "util/super_int.hpp"
+    export *
+}
+module realm_test_util_mem {
+    header "util/mem.hpp"
+    export *
+}
+module realm_test_util_demangle {
+    header "util/demangle.hpp"
+    export *
+}
+module realm_test_util_test_types {
+    header "util/test_types.hpp"
+    export *
+}
+module realm_test_util_semaphore {
+    header "util/semaphore.hpp"
+    export *
+}
+module realm_test_util_test_path {
+    header "util/test_path.hpp"
+    export *
+}
+module realm_test_util_test_only {
+    header "util/test_only.hpp"
+    export *
+}
+module realm_test_util_verified_string {
+    header "util/verified_string.hpp"
+    export *
+}
+module realm_test_util_unit_test {
+    header "util/unit_test.hpp"
+    export *
+}
+module realm_test_util_timer {
+    header "util/timer.hpp"
+    export *
+}
+module realm_test_util_quote {
+    header "util/quote.hpp"
+    export *
+}
+module realm_test_util_misc {
+    header "util/misc.hpp"
+    export *
+}
+module realm_test_util_random {
+    header "util/random.hpp"
+    export *
+}
+module realm_test_util_benchmark_results {
+    header "util/benchmark_results.hpp"
+    export *
+}
+module realm_test_util_resource_limits {
+    header "util/resource_limits.hpp"
+    export *
+}
+module realm_test_test_string_types {
+    header "test_string_types.hpp"
+    export *
+}
+module realm_test_test {
+    header "test.hpp"
+    export *
+}
+module realm_test_testsettings {
+    header "testsettings.hpp"
+    export *
+}

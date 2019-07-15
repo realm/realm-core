@@ -44,7 +44,7 @@ set(NORMAL_TESTS
     test_optional.cpp
     test_parser.cpp
     test_priority_queue.cpp
-    test_query.cpp
+    # test_query.cpp # This test dominates compile time. Should be split up.
     test_replication.cpp
     test_safe_int_ops.cpp
     test_self.cpp

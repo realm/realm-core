@@ -242,9 +242,8 @@ protected:
     void reattach(Table*, size_t row_ndx) noexcept;
     void impl_detach() noexcept;
 
-    RowBase()
-    {
-    }
+    // TODO why does this need to be out-of-line?
+    RowBase();
 
     RowBase(const RowBase&) = delete;
     using HandoverPatch = RowBaseHandoverPatch;

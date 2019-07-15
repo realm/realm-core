@@ -32,6 +32,17 @@ namespace {
 
 } // anonymous namespace
 
+LinkPathPart::LinkPathPart(size_t col_ndx)
+        : column_ndx(col_ndx)
+{
+}
+
+LinkPathPart::LinkPathPart(size_t col_ndx, ConstTableRef source)
+        : column_ndx(col_ndx)
+        , from(source)
+{
+}
+
 ColumnsDescriptor::ColumnsDescriptor(Table const& table, std::vector<std::vector<size_t>> column_indices)
 {
     if (table.is_degenerate()) {
