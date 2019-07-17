@@ -46,7 +46,7 @@ std::string print_value(T value);
 template <typename T>
 std::string print_value(Optional<T> value);
 
-const static std::string value_separator = ".";
+extern const std::string value_separator;
 
 // Specializations declared here to be defined in the cpp file
 template <> std::string print_value<>(BinaryData);

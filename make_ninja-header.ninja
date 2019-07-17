@@ -1,0 +1,55 @@
+CXX = /home/mstearn/opensource/llvm-project/build/bin/clang++
+COMMONFLAGS = -stdlib=libc++ -pthread
+DEBUGFLAGS = -ggdb3 -gsplit-dwarf -fcolor-diagnostics
+CXXFLAGS = -fPIC -Isrc -Ibuild/src  -Isrc/external/pegtl/include/tao/ -std=c++2a -DREALM_DEBUG=1 $COMMONFLAGS $DEBUGFLAGS
+LIBS = -lcrypto -lc++fs -lc++experimental
+LINKFLAGS = -fuse-ld=lld $COMMONFLAGS $LIBS
+MODULE_CODEGEN = -Xclang -fmodules-debuginfo -Xclang -fmodules-codegen
+
+MAKE_NINJA = ./make_ninja.py
+
+rule SCAN
+    command = $CXX $CXXFLAGS -w -E -x $KIND $in -o /dev/null -MD -MF $out.d -MT $PCM_FILE && $MAKE_NINJA --scan $out.d $in $out $PCMFLAGS_FILE
+    description = SCAN $in
+    deps = gcc
+    depfile = $out.d
+    restat = 1
+
+rule HEADER_UNIT
+    command = $CXX $CXXFLAGS @$PCMFLAGS_FILE $MODULE_CODEGEN -c -x c++-header -fmodule-name=$in $MODULE_FILES --precompile $$(realpath $in) -o $out -MD -MF $out.d
+    description = HEADER_UNIT $in
+    deps = gcc
+    depfile = $out.d
+    restat = 1
+
+rule HEADER_UNIT_CXX
+    command = $CXX $DEBUGFLAGS -c $in -o $out
+    description = HEADER_UNIT_CXX $out
+
+rule CXX
+    command = $CXX $CXXFLAGS @$FLAGS_FILE $MODULE_FILES -c $in -o $out -MD -MF $out.d
+    description = CXX $out
+    deps = gcc
+    depfile = $out.d
+
+rule LINKSCAN
+    command = $MAKE_NINJA --link-scan $out $in
+    description = LINKSCAN $out
+    deps = msvc
+    msvc_deps_prefix = opening:
+    # restat = 1
+
+rule BIN
+    command = $CXX $LINKFLAGS $EXTRALIBS -o $out -Wl,--start-group @$in.flags -Wl,--end-group
+    description = BIN $out
+    dyndep = $in
+    
+rule GENERATOR
+    command = $MAKE_NINJA
+    description = GENERATOR
+    generator = 1
+    restat = 1
+
+include builds.inc.ninja
+    
+build build.ninja builds.inc.ninja: GENERATOR make_ninja.py make_ninja.yml make_ninja-header.ninja

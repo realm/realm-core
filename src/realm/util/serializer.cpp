@@ -32,6 +32,8 @@ namespace realm {
 namespace util {
 namespace serializer {
 
+const std::string value_separator = ".";
+
 template <>
 std::string print_value<>(BinaryData data)
 {
