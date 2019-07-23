@@ -13,7 +13,7 @@
 -----------
 
 ### Internals
-* None.
+* The release binaries for Apple platforms are now built with Xcode 9.4 (up from 9.2).
 
 ----------------------------------------------
 
