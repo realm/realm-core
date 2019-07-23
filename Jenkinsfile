@@ -317,7 +317,7 @@ def doCheckValgrind() {
                         sh """
                             cd build-dir/test
                             valgrind --version
-                            valgrind --tool=memcheck --leak-check=full --undef-value-errors=yes --track-origins=yes --child-silent-after-fork=no --trace-children=yes --xml=yes --suppressions=${workspace}/test/valgrind.suppress --xml-file=${workspace}/build-dir/test/realm-tests-dbg.memreport --error-exitcode=1 ./realm-tests --no-error-exitcode
+                            valgrind --tool=memcheck --leak-check=full --undef-value-errors=yes --track-origins=yes --child-silent-after-fork=no --trace-children=yes --suppressions=${workspace}/test/valgrind.suppress --error-exitcode=1 ./realm-tests --no-error-exitcode
                         """
                     } finally {
                         recordTests("Linux-ValgrindDebug")
