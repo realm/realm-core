@@ -10309,29 +10309,6 @@ TEST(LangBindHelper_RacingAttachers)
     }
 }
 
-void some_external_function(size_t leak_size)
-{
-    size_t *leaked = new size_t(leak_size);
-    std::cout << "address of leak is : " << leaked << " size: " << leak_size << std::endl;
-}
-
-TEST(LangBindHelper_IntentionalMemoryLeak)
-{
-    // FIXME: this is only to trigger valgrind and ensure the stack trace is readable
-    SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
-    Group& g = sg.begin_write();
-    some_external_function(1000);
-    auto table = g.add_table("table");
-    table->add_column(type_Int, "first");
-    sg.commit();
-    sg.begin_read();
-    table = g.get_table("table");
-    CHECK(bool(table));
-    sg.end_read();
-}
-
 // This test takes a very long time when running with valgrind
 TEST_IF(LangBindHelper_HandoverBetweenThreads, !running_with_valgrind)
 {
