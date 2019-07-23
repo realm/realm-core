@@ -73,7 +73,7 @@ jobWrapper {
             iosDebug                : doBuildAppleDevice('ios', 'MinSizeDebug'),
             androidArm64Debug       : doAndroidBuildInDocker('arm64-v8a', 'Debug', false),
             threadSanitizer         : doCheckSanity('Debug', '1000', 'thread'),
-            addressSanitizer        : doCheckSanity('Debug', '1000', 'address'),
+            addressSanitizer        : doCheckSanity('Debug', '1000', 'address')
         ]
         if (releaseTesting) {
             extendedChecks = [
@@ -311,7 +311,7 @@ def doCheckValgrind() {
                         sh """
                            mkdir build-dir
                            cd build-dir
-                           cmake -D CMAKE_BUILD_TYPE=Debug -D REALM_VALGRIND=ON -D REALM_ENABLE_ALLOC_SET_ZERO=ON -D REALM_MAX_BPNODE_SIZE=1000 -G Ninja ..
+                           cmake -D CMAKE_BUILD_TYPE=RelWithDebInfo -D REALM_VALGRIND=ON -D REALM_ENABLE_ALLOC_SET_ZERO=ON -D REALM_MAX_BPNODE_SIZE=1000 -G Ninja ..
                         """
                         runAndCollectWarnings(script: "cd build-dir && ninja")
                         sh """
