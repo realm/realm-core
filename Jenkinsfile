@@ -65,15 +65,15 @@ jobWrapper {
 
     stage('Checking') {
         parallelExecutors = [
-            checkLinuxDebug         : doCheckInDocker('Debug'),
-            checkLinuxDebugNoEncryp : doCheckInDocker('Debug', '4', 'OFF'),
-            checkMacOsRelease       : doBuildMacOs('Release', true),
-            checkWin32Debug         : doBuildWindows('Debug', false, 'Win32', true),
-            checkWin64Release       : doBuildWindows('Release', false, 'x64', true),
-            iosDebug                : doBuildAppleDevice('ios', 'MinSizeDebug'),
-            androidArm64Debug       : doAndroidBuildInDocker('arm64-v8a', 'Debug', false),
-            threadSanitizer         : doCheckSanity('Debug', '1000', 'thread'),
-            addressSanitizer        : doCheckSanity('Debug', '1000', 'address')
+            checkLinuxDebug         : doCheckInDocker('Debug')
+           // checkLinuxDebugNoEncryp : doCheckInDocker('Debug', '4', 'OFF'),
+           // checkMacOsRelease       : doBuildMacOs('Release', true),
+           // checkWin32Debug         : doBuildWindows('Debug', false, 'Win32', true),
+           // checkWin64Release       : doBuildWindows('Release', false, 'x64', true),
+           // iosDebug                : doBuildAppleDevice('ios', 'MinSizeDebug'),
+           // androidArm64Debug       : doAndroidBuildInDocker('arm64-v8a', 'Debug', false),
+           // threadSanitizer         : doCheckSanity('Debug', '1000', 'thread'),
+           // addressSanitizer        : doCheckSanity('Debug', '1000', 'address')
         ]
         if (releaseTesting) {
             extendedChecks = [
