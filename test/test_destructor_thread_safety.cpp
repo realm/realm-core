@@ -174,7 +174,8 @@ TEST(ThreadSafety_RowDestruction)
 }
 
 // Tests thread safety of subtable desctruction
-TEST(ThreadSafety_SubTableDestruction)
+// This test takes too long when run with valgrind
+TEST_IF(ThreadSafety_SubTableDestruction, !running_with_valgrind)
 {
     std::vector<TableRef> ptrs;
     Mutex mutex;
