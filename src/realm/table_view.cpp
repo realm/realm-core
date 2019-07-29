@@ -218,7 +218,7 @@ size_t ConstTableView::aggregate_count(ColKey column_key, T count_target) const
                 cnt++;
             }
         }
-        catch (realm::InvalidKey) {
+        catch (const realm::InvalidKey&) {
         }
     }
 

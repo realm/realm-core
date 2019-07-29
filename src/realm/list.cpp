@@ -205,7 +205,7 @@ Lst<T>::Lst(const Obj& obj, ColKey col_key)
 {
     if (m_obj) {
         this->m_nullable = obj.m_table->is_nullable(col_key);
-        this->init_from_parent();
+        ConstLstIf<T>::init_from_parent();
     }
 }
 
