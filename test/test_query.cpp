@@ -12015,7 +12015,10 @@ TEST(Query_IntIndexOverLinkViewNotInTableOrder)
     children->add(0);
 
     // Query via linkview
-    CHECK_EQUAL(0, child_table->where(children).equal(col_child_id, 3).find());
+    Query q = child_table->where(children).equal(col_child_id, 3);
+    // Call find() twice. This caused a memory lead at some point. Must pass a memory leak test.
+    CHECK_EQUAL(0, q.find());
+    CHECK_EQUAL(0, q.find());
     CHECK_EQUAL(1, child_table->where(children).equal(col_child_id, 2).find());
 
     // Query directly

@@ -887,14 +887,7 @@ public:
     }
     ~IntegerNode()
     {
-        deallocate();
-    }
-
-    void deallocate()
-    {
-        // Must be called after each query execution to free temporary resources used by the execution. Run in
-        // destructor, but also in Init because a user could define a query once and execute it multiple times.
-        if (m_result && m_result->is_attached()) {
+        if (m_result) {
             m_result->destroy();
         }
     }
@@ -904,11 +897,15 @@ public:
         BaseType::init();
         m_nb_needles = m_needles.size();
 
-        deallocate();
-
         if (has_search_index()) {
-            m_result.reset(new IntegerColumn(IntegerColumn::unattached_root_tag(), Allocator::get_default())); // Throws
-            m_result->get_root_array()->create(Array::type_Normal); // Throws
+            if (m_result) {
+                m_result->clear();
+            }
+            else {
+                ref_type ref = IntegerColumn::create(Allocator::get_default());
+                m_result = std::make_unique<IntegerColumn>();
+                m_result->init_from_ref(Allocator::get_default(), ref);
+            }
 
             IntegerNodeBase<ColType>::m_condition_column->find_all(*m_result, this->m_value, 0, realm::npos);
             m_index_get = 0;
