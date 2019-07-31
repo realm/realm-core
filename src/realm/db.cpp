@@ -2038,6 +2038,7 @@ DB::version_type Transaction::commit_and_continue_as_read()
     // Remap file if it has grown, and update refs in underlying node structure
     remap_and_update_refs(m_read_lock.m_top_ref, m_read_lock.m_file_size, false); // Throws
 
+    m_history = nullptr;
     set_transact_stage(DB::transact_Reading);
 
     return version;
