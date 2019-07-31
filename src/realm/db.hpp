@@ -816,7 +816,6 @@ inline bool Transaction::promote_to_write(O* observer, bool nonblocking)
     if (m_transact_stage != DB::transact_Reading)
         throw LogicError(LogicError::wrong_transact_state);
 
-    m_history = nullptr;
     if (nonblocking) {
         bool succes = db->do_try_begin_write();
         if (!succes) {
@@ -827,13 +826,13 @@ inline bool Transaction::promote_to_write(O* observer, bool nonblocking)
         db->do_begin_write(); // Throws
     }
     try {
-        set_transact_stage(DB::transact_Writing);
         Replication* repl = db->get_replication();
         if (!repl)
             throw LogicError(LogicError::no_history);
 
         VersionID version = VersionID();                                              // Latest
-        bool history_updated = internal_advance_read(observer, version, *get_history(), true); // Throws
+        m_history = repl->_get_history_write();
+        bool history_updated = internal_advance_read(observer, version, *m_history, true); // Throws
 
         REALM_ASSERT(repl); // Presence of `repl` follows from the presence of `hist`
         DB::version_type current_version = m_read_lock.m_version;
@@ -847,9 +846,11 @@ inline bool Transaction::promote_to_write(O* observer, bool nonblocking)
     }
     catch (...) {
         db->do_end_write();
+        m_history = nullptr;
         throw;
     }
 
+    set_transact_stage(DB::transact_Writing);
     return true;
 }
 

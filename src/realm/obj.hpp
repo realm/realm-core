@@ -160,6 +160,8 @@ public:
         to_json(out, link_depth, *renames, followed);
     }
 
+    std::string to_string() const;
+
 protected:
     friend class ColumnListBase;
     friend class ConstLstBase;

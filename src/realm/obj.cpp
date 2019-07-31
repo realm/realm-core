@@ -605,6 +605,13 @@ void ConstObj::to_json(std::ostream& out, size_t link_depth, std::map<std::strin
     out << "}";
 }
 
+std::string ConstObj::to_string() const
+{
+    std::ostringstream ostr;
+    to_json(ostr, 0, nullptr);
+    return ostr.str();
+}
+
 /*********************************** Obj *************************************/
 
 bool Obj::ensure_writeable()
