@@ -19,6 +19,7 @@
 #include <realm/util/fifo_helper.hpp>
 
 #include <sstream>
+#include <system_error>
 #include <sys/stat.h>
 
 namespace realm {
@@ -26,7 +27,7 @@ namespace util {
 
 void create_fifo(std::string path, const std::string tmp_dir)
 {
-#if REALM_ANDROID
+#ifdef REALM_ANDROID
     // Upgrading apps on Android Huawai devices sometimes leave FIFO files with the wrong
     // file owners. This results in the Android sandbox preventing Realm from opening the
     // database file. To prevent this from happening we create all FIFO files with full permissions.
