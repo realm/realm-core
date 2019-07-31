@@ -109,14 +109,12 @@ static void subscribe_to_all(std::shared_ptr<Realm> const& r)
     }
 }
 
-#if 0
 TEST_CASE("Object-level Permissions") {
     SyncManager::shared().configure(tmp_dir(), SyncManager::MetadataMode::NoEncryption);
 
     SyncServer server{StartImmediately{false}};
 
     SyncTestFile config{server, "default"};
-    config.cache = false;
     config.automatic_change_notifications = false;
     config.schema = Schema{
         {"object", {
@@ -126,10 +124,10 @@ TEST_CASE("Object-level Permissions") {
 
     auto create_object = [](auto&& r) -> Table& {
         r->begin_transaction();
-        auto& table = *r->read_group().get_table("class_object");
-        sync::create_object(r->read_group(), table);
+        auto table = r->read_group().get_table("class_object");
+        table->create_object();
         r->commit_transaction();
-        return table;
+        return *table;
     };
 
     SECTION("Non-sync Realms") {
@@ -140,7 +138,7 @@ TEST_CASE("Object-level Permissions") {
 
             CHECK(r->get_privileges() == ComputedPrivileges::AllRealm);
             CHECK(r->get_privileges("object") == ComputedPrivileges::AllClass);
-            CHECK(r->get_privileges(table[0]) == ComputedPrivileges::AllObject);
+            CHECK(r->get_privileges(*table.begin()) == ComputedPrivileges::AllObject);
         }
     }
 
@@ -151,7 +149,7 @@ TEST_CASE("Object-level Permissions") {
 
             CHECK(r->get_privileges() == ComputedPrivileges::AllRealm);
             CHECK(r->get_privileges("object") == ComputedPrivileges::AllClass);
-            CHECK(r->get_privileges(table[0]) == ComputedPrivileges::AllObject);
+            CHECK(r->get_privileges(*table.begin()) == ComputedPrivileges::AllObject);
         }
     }
 
@@ -164,7 +162,7 @@ TEST_CASE("Object-level Permissions") {
 
             CHECK(r->get_privileges() == ComputedPrivileges::AllRealm);
             CHECK(r->get_privileges("object") == ComputedPrivileges::AllClass);
-            CHECK(r->get_privileges(table[0]) == ComputedPrivileges::AllObject);
+            CHECK(r->get_privileges(*table.begin()) == ComputedPrivileges::AllObject);
         }
 
         SECTION("continue to permit all operations after syncing locally-created data") {
@@ -179,7 +177,7 @@ TEST_CASE("Object-level Permissions") {
 
             CHECK(r->get_privileges() == ComputedPrivileges::AllRealm);
             CHECK(r->get_privileges("object") == ComputedPrivileges::AllClass);
-            CHECK(r->get_privileges(table[0]) == ComputedPrivileges::AllObject);
+            CHECK(r->get_privileges(*table.begin()) == ComputedPrivileges::AllObject);
         }
 
         SECTION("permit all operations on a downloaded Realm created as a Full Realm when logged in as an admin") {
@@ -198,7 +196,7 @@ TEST_CASE("Object-level Permissions") {
 
             CHECK(r->get_privileges() == ComputedPrivileges::AllRealm);
             CHECK(r->get_privileges("object") == ComputedPrivileges::AllClass);
-            CHECK(r->get_privileges(r->read_group().get_table("class_object")->get(0)) == ComputedPrivileges::AllObject);
+            CHECK(r->get_privileges(*r->read_group().get_table("class_object")->begin()) == ComputedPrivileges::AllObject);
         }
 
         SECTION("permit nothing on pre-existing types in a downloaded Realm created as a Full Realm") {
@@ -240,9 +238,11 @@ TEST_CASE("Object-level Permissions") {
 
             auto role_table = r->read_group().get_table("class___Role");
             REQUIRE(role_table);
-            size_t ndx = role_table->find_first_string(role_table->get_column_index("name"), "everyone");
-            REQUIRE(ndx != npos);
-            REQUIRE(role_table->get_linklist(role_table->get_column_index("members"), ndx)->find(user.row().get_index()) != npos);
+            auto obj_key = role_table->find_first_string(role_table->get_column_key("name"), "everyone");
+            REQUIRE(obj_key);
+            auto everyone = role_table->get_object(obj_key);
+            auto n = everyone.get_linklist(role_table->get_column_key("members")).find_first(user.obj().get_key());
+            REQUIRE(everyone.get_linklist(role_table->get_column_key("members")).find_first(user.obj().get_key()) != npos);
 
             r->commit_transaction();
         }
@@ -260,16 +260,17 @@ TEST_CASE("Object-level Permissions") {
             r->begin_transaction();
 
             auto validate_user_role = [](const Object& user) {
-                auto user_table = user.row().get_table();
+                auto user_table = user.obj().get_table();
                 REQUIRE(user_table);
-                size_t ndx = user.row().get_link(user_table->get_column_index("role"));
-                REQUIRE(ndx != npos);
+                ObjKey key = user.obj().get<ObjKey>(user_table->get_column_key("role"));
+                REQUIRE(key);
 
                 auto role_table = user.realm()->read_group().get_table("class___Role");
                 REQUIRE(role_table);
-                auto members = role_table->get_linklist(role_table->get_column_index("members"), ndx);
-                REQUIRE(members->size() == 1);
-                REQUIRE(members->find(user.row().get_index()) != npos);
+                auto role = role_table->get_object(key);
+                auto members = role.get_linklist(role_table->get_column_key("members"));
+                REQUIRE(members.size() == 1);
+                REQUIRE(members.find_first(user.obj().get_key()) != npos);
             };
 
             SECTION("logged-in user") {
@@ -303,9 +304,9 @@ TEST_CASE("Object-level Permissions") {
             // Revoke modifySchema permission for all users
             r->begin_transaction();
             TableRef permission_table = r->read_group().get_table("class___Permission");
-            size_t col = permission_table->get_column_index("canModifySchema");
-            for (size_t i = 0; i < permission_table->size(); ++i)
-                permission_table->set_bool(col, i, false);
+            auto col = permission_table->get_column_key("canModifySchema");
+            for (auto& o : *permission_table)
+                o.set(col, false);
             r->commit_transaction();
             wait_for_upload(*r);
         }
@@ -377,4 +378,3 @@ TEST_CASE("Object-level Permissions") {
         }
     }
 }
-#endif

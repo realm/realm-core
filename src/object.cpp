@@ -120,7 +120,7 @@ void Object::ensure_user_in_everyone_role()
         if (ObjKey ndx = role_table->find_first_string(role_table->get_column_key("name"), "everyone")) {
             auto role = role_table->get_object(ndx);
             auto users = role.get_linklist(role_table->get_column_key("members"));
-            if (!users.find_first(m_obj.get_key())) {
+            if (users.find_first(m_obj.get_key()) == realm::npos) {
                 users.add(m_obj.get_key());
             }
         }
