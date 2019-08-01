@@ -575,11 +575,13 @@ public:
         ensure_created();
         update_if_needed();
         ensure_writeable();
-        if (Replication* repl = this->m_const_obj->get_replication()) {
-            ConstLstBase::clear_repl(repl);
+        if (size() > 0) {
+            if (Replication* repl = this->m_const_obj->get_replication()) {
+                ConstLstBase::clear_repl(repl);
+            }
+            m_tree->clear();
+            m_obj.bump_content_version();
         }
-        m_tree->clear();
-        m_obj.bump_content_version();
     }
 
 protected:
