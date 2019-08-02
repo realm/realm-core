@@ -189,6 +189,14 @@ public:
         return DescriptorType::Sort;
     }
 
+    util::Optional<bool> is_ascending(size_t ndx) const
+    {
+        util::Optional<bool> ret;
+        if (ndx < m_ascending.size())
+            ret = m_ascending[ndx];
+        return ret;
+    }
+
     void merge_with(SortDescriptor&& other);
 
     Sorter sorter(Table const& table, const IndexPairs& indexes) const override;
