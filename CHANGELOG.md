@@ -1,19 +1,15 @@
-# NEXT RELEASE
-
-### Enhancements
-* None.
+# 6.0.0-alpha.14 Release notes
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Issues related to history object handling.
+* Lst<>.clear() will not issue sync operation if list is empty.
+* Fixed compilation issues using GCC 8.
  
-### Breaking changes
-* None.
-
 -----------
 
 ### Internals
-* None.
+* ConstObj::to_string() added. Mostly to be used during debugging.
+* SortDescriptor::is_ascending() added. Potentially to be used by OS.
 
 ----------------------------------------------
 
