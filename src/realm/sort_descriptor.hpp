@@ -191,10 +191,10 @@ public:
 
     util::Optional<bool> is_ascending(size_t ndx) const
     {
-        util::Optional<bool> ret;
-        if (ndx < m_ascending.size())
-            ret = m_ascending[ndx];
-        return ret;
+        if (ndx < m_ascending.size()) {
+            return util::Optional<bool>(m_ascending[ndx]);
+        }
+        return util::none;
     }
 
     void merge_with(SortDescriptor&& other);
