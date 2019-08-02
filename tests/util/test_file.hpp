@@ -58,7 +58,16 @@ struct TestFile : realm::Realm::Config {
     TestFile();
     ~TestFile();
 
+    // The file should outlive the object, ie. should not be deleted in destructor
+    void persist()
+    {
+        m_persist = true;
+    }
+
     realm::DBOptions options() const;
+
+private:
+    bool m_persist = false;
 };
 
 struct InMemoryTestFile : TestFile {

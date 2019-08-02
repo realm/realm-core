@@ -81,7 +81,8 @@ TestFile::TestFile()
 
 TestFile::~TestFile()
 {
-    unlink(path.c_str());
+    if (!m_persist)
+        unlink(path.c_str());
 }
 
 DBOptions TestFile::options() const
