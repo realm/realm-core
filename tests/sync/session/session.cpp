@@ -669,6 +669,7 @@ TEST_CASE("sync: stable IDs", "[sync]") {
     }
 }
 
+#if 0 // Not possible to open core-5 format realms in read-only mode
 TEST_CASE("sync: Migration from Sync 1.x to Sync 2.x", "[sync]") {
     if (!EventLoop::has_implementation())
         return;
@@ -729,4 +730,4 @@ TEST_CASE("sync: Migration from Sync 1.x to Sync 2.x", "[sync]") {
     }
 
 }
-
+#endif
