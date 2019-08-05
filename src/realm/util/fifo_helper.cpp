@@ -80,6 +80,16 @@ void create_fifo(std::string path, const std::string tmp_dir)
 #endif
 }
 
+bool try_create_fifo(const std::string& path)
+{
+    try {
+        create_fifo(path);
+        return true;
+    } catch (...) {
+        return false;
+    }
+}
+
 } // namespace util
 } // namespace realm
 

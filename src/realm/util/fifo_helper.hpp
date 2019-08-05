@@ -36,6 +36,9 @@ namespace util {
 // If a FIFO already exists at the given location, this method does nothing.
 void create_fifo(std::string path, const std::string tmp_dir); // throws
 
+// Same as above, but returns `false` if the FIFO could not be created instead of throwing.
+bool try_create_fifo(const std::string& path);
+
 } // namespace util
 } // namespace realm
 
