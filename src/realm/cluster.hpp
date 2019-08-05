@@ -180,10 +180,11 @@ public:
         : ClusterNode(offset, allocator, tree_top)
     {
     }
-    ~Cluster() override;
+    ~Cluster() override {};
 
     void create(size_t nb_leaf_columns); // Note: leaf columns - may include holes
     void init(MemRef mem) override;
+    void init_ro(MemRef mem);
     bool update_from_parent(size_t old_baseline) noexcept override;
     bool is_writeable() const
     {

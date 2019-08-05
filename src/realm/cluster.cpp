@@ -67,10 +67,11 @@ namespace realm {
 class ClusterNodeInner : public ClusterNode {
 public:
     ClusterNodeInner(Allocator& allocator, const ClusterTree& tree_top);
-    ~ClusterNodeInner() override;
+    ~ClusterNodeInner() override {};
 
     void create(int sub_tree_depth);
     void init(MemRef mem) override;
+    void init_ro(MemRef mem);
     bool update_from_parent(size_t old_baseline) noexcept override;
     MemRef ensure_writeable(ObjKey k) override;
 
@@ -191,6 +192,9 @@ private:
 
     template <class T, class F>
     T recurse(ChildInfo& child_info, F func);
+
+    template <class T, class F1, class F2>
+    T recurse_ro(ChildInfo& child_info, F1 leaf_func, F2 interior_func);
 };
 }
 
@@ -210,12 +214,8 @@ void ClusterNode::get(ObjKey k, ClusterNode::State& state) const
 
 /***************************** ClusterNodeInner ******************************/
 
-ClusterNodeInner::ClusterNodeInner(Allocator& allocator, const ClusterTree& tree_top)
+inline ClusterNodeInner::ClusterNodeInner(Allocator& allocator, const ClusterTree& tree_top)
     : ClusterNode(0, allocator, tree_top)
-{
-}
-
-ClusterNodeInner::~ClusterNodeInner()
 {
 }
 
@@ -235,6 +235,20 @@ void ClusterNodeInner::init(MemRef mem)
 {
     Array::init_from_mem(mem);
     m_keys.set_parent(this, s_key_ref_index);
+    ref_type ref = Array::get_as_ref(s_key_ref_index);
+    if (ref) {
+        m_keys.init_from_ref(ref);
+    }
+    else {
+        m_keys.detach();
+    }
+    m_sub_tree_depth = int(Array::get(s_sub_tree_depth_index)) >> 1;
+    m_shift_factor = m_sub_tree_depth * node_shift_factor;
+}
+
+inline void ClusterNodeInner::init_ro(MemRef mem)
+{
+    Array::init_from_mem(mem);
     ref_type ref = Array::get_as_ref(s_key_ref_index);
     if (ref) {
         m_keys.init_from_ref(ref);
@@ -345,14 +359,23 @@ ref_type ClusterNodeInner::insert(ObjKey key, const FieldValues& init_values, Cl
     });
 }
 
-bool ClusterNodeInner::try_get(ObjKey key, ClusterNode::State& state) const
+inline bool ClusterNodeInner::try_get(ObjKey key, ClusterNode::State& state) const
 {
     ChildInfo child_info;
     if (!find_child(key, child_info)) {
         return false;
     }
-    return const_cast<ClusterNodeInner*>(this)->recurse<bool>(
-        child_info, [&state](const ClusterNode* node, ChildInfo& info) { return node->try_get(info.key, state); });
+    bool child_is_inner = Array::get_is_inner_bptree_node_from_header(child_info.mem.get_addr());
+    if (child_is_inner) {
+        ClusterNodeInner node(m_alloc, m_tree_top);
+        node.init_ro(child_info.mem);
+        return node.try_get(child_info.key, state);
+    }
+    else {
+        Cluster leaf(child_info.offset + m_offset, m_alloc, m_tree_top);
+        leaf.init_ro(child_info.mem);
+        return leaf.try_get(child_info.key, state);
+    }
 }
 
 ObjKey ClusterNodeInner::get(size_t ndx, ClusterNode::State& state) const
@@ -797,6 +820,18 @@ void Cluster::init(MemRef mem)
     }
 }
 
+void Cluster::init_ro(MemRef mem)
+{
+    Array::init_from_mem(mem);
+    auto rot = Array::get_as_ref_or_tagged(0);
+    if (rot.is_tagged()) {
+        m_keys.detach();
+    }
+    else {
+        m_keys.init_from_ref(rot.get_as_ref());
+    }
+}
+
 bool Cluster::update_from_parent(size_t old_baseline) noexcept
 {
     if (Array::update_from_parent(old_baseline)) {
@@ -1023,10 +1058,6 @@ void Cluster::move(size_t ndx, ClusterNode* new_node, int64_t offset)
         new_leaf->m_keys.add(m_keys.get(i) - offset);
     }
     m_keys.truncate(ndx);
-}
-
-Cluster::~Cluster()
-{
 }
 
 void Cluster::ensure_general_form()
