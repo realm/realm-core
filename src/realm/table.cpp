@@ -2160,6 +2160,8 @@ void Table::refresh_accessor_tree()
         refresh_content_version();
         bump_storage_version();
         build_column_mapping();
+
+        m_primary_key_col = null();
     }
     refresh_index_accessors();
 }

@@ -5,7 +5,8 @@
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Program would crash if a primary key column is set in a transaction that is subsequently rolled back.
+  ([#814](https://github.com/realm/realm-object-store/issues/814), since 6.0.0-alpha.11)
  
 ### Breaking changes
 * None.
