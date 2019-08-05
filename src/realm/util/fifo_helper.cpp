@@ -22,6 +22,7 @@
 #include <sstream>
 #include <system_error>
 #include <sys/stat.h>
+#include <sys/types.h>
 
 #ifdef _WIN32
 #include <Windows.h>
