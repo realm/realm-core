@@ -23,6 +23,10 @@
 #include <system_error>
 #include <sys/stat.h>
 
+#ifdef _WIN32
+#include <Windows.h>
+#endif
+
 namespace realm {
 namespace util {
 
