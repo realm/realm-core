@@ -18,21 +18,18 @@
 
 #include <realm/util/fifo_helper.hpp>
 
-#include <fcntl.h>
 #include <sstream>
 #include <system_error>
 #include <sys/stat.h>
-#include <sys/types.h>
-
-#ifdef _WIN32
-#include <Windows.h>
-#endif
 
 namespace realm {
 namespace util {
 
 void create_fifo(std::string path, const std::string tmp_dir)
 {
+#ifdef _WIN32
+    throw std::system_error("mkfifo is not supported on Windows");
+#else
 #ifdef REALM_ANDROID
     // Upgrading apps on Android Huawai devices sometimes leave FIFO files with the wrong
     // file owners. This results in the Android sandbox preventing Realm from opening the
@@ -80,6 +77,7 @@ void create_fifo(std::string path, const std::string tmp_dir)
             }
         }
     }
+#endif
 }
 
 } // namespace util
