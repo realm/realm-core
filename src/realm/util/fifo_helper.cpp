@@ -18,6 +18,7 @@
 
 #include <realm/util/fifo_helper.hpp>
 
+#include <fcntl.h>
 #include <sstream>
 #include <system_error>
 #include <sys/stat.h>
