@@ -28,7 +28,7 @@ namespace util {
 void create_fifo(std::string path, const std::string tmp_dir)
 {
 #ifdef _WIN32
-    throw std::system_error("mkfifo is not supported on Windows");
+    throw std::logic_error("mkfifo is not supported on Windows");
 #else
 #ifdef REALM_ANDROID
     // Upgrading apps on Android Huawai devices sometimes leave FIFO files with the wrong
