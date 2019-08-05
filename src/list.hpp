@@ -153,9 +153,6 @@ public:
         size_t valid_count;
     };
 
-    static std::unique_ptr<LstBase> get_list(PropertyType type, const Obj& parent_obj, ColKey col);
-    static std::unique_ptr<LstBase> get_list(PropertyType type, const LstBase& list);
-
 private:
     std::shared_ptr<Realm> m_realm;
     PropertyType m_type;
@@ -168,8 +165,6 @@ private:
 
     template<typename Fn>
     auto dispatch(Fn&&) const;
-    template<template<class...> class Predicate, typename Ret, typename Fn>
-    Ret aggregate(const char *type, Fn&&) const;
     template<typename T>
     auto& as() const;
 

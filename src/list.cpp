@@ -55,32 +55,15 @@ List& List::operator=(List&&) = default;
 List::List(std::shared_ptr<Realm> r, const Obj& parent_obj, ColKey col)
 : m_realm(std::move(r))
 , m_type(ObjectSchema::from_core_type(*parent_obj.get_table(), col) & ~PropertyType::Array)
-, m_list_base(get_list(m_type, parent_obj, col))
+, m_list_base(parent_obj.get_listbase_ptr(col))
 {
 }
 
 List::List(std::shared_ptr<Realm> r, const LstBase& list)
 : m_realm(std::move(r))
 , m_type(ObjectSchema::from_core_type(*list.get_table(), list.get_col_key()) & ~PropertyType::Array)
-, m_list_base(get_list(m_type, list))
+, m_list_base(list.clone())
 {
-}
-
-std::unique_ptr<LstBase> List::get_list(PropertyType type, const Obj& parent_obj, ColKey col)
-{
-    return switch_on_type(type, [&](auto t) {
-        using T = std::decay_t<decltype(*t)>;
-        return std::unique_ptr<LstBase>(new typename ListType<T>::type(parent_obj, col));
-    });
-}
-
-std::unique_ptr<LstBase> List::get_list(PropertyType type, const LstBase& list)
-{
-    return switch_on_type(type, [&](auto t) {
-        using T = std::decay_t<decltype(*t)>;
-        auto& l = static_cast<const typename ListType<T>::type&>(list);
-        return std::unique_ptr<LstBase>(new typename ListType<T>::type(l));
-    });
 }
 
 static StringData object_name(Table const& table)
@@ -381,59 +364,53 @@ struct If<false> {
     static auto call(T, Then&&, Else&& fn) { return fn(); }
 };
 
-template<template<class...> class Predicate, typename Ret, typename Fn>
-Ret List::aggregate(const char *type, Fn&& fn) const
-{
-    return dispatch([&](auto t) -> Ret {
-        using T = std::decay_t<decltype(*t)>;
-        return If<Predicate<T>::value>::call(this, [&](auto self) {
-            return fn(self->template as<T>());
-        }, [=] () -> Ret {
-            throw realm::Results::UnsupportedColumnTypeException(m_list_base->get_col_key(), m_list_base->get_table(), type);
-        });
-    });
-}
-
 util::Optional<Mixed> List::max(ColKey col)
 {
     if (get_type() == PropertyType::Object)
         return as_results().max(col);
-    return aggregate<HasMinmaxType, util::Optional<Mixed>>("max", [](auto& list) {
-        size_t out_ndx = not_found;
-        auto result = list_maximum(list, &out_ndx);
-        return out_ndx == not_found ? none : make_optional(Mixed(result));
-    });
+    size_t out_ndx = not_found;
+    auto result = m_list_base->max(&out_ndx);
+    if (result.is_null()) {
+        throw realm::Results::UnsupportedColumnTypeException(m_list_base->get_col_key(), m_list_base->get_table(), "max");
+    }
+    return out_ndx == not_found ? none : make_optional(result);
 }
 
 util::Optional<Mixed> List::min(ColKey col)
 {
     if (get_type() == PropertyType::Object)
         return as_results().min(col);
-    return aggregate<HasMinmaxType, util::Optional<Mixed>>("min", [](auto& list) {
-        size_t out_ndx = not_found;
-        auto result = list_minimum(list, &out_ndx);
-        return out_ndx == not_found ? none : make_optional(Mixed(result));
-    });
+
+    size_t out_ndx = not_found;
+    auto result = m_list_base->min(&out_ndx);
+    if (result.is_null()) {
+        throw realm::Results::UnsupportedColumnTypeException(m_list_base->get_col_key(), m_list_base->get_table(), "min");
+    }
+    return out_ndx == not_found ? none : make_optional(result);
 }
 
 Mixed List::sum(ColKey col)
 {
     if (get_type() == PropertyType::Object)
         return *as_results().sum(col);
-    return aggregate<HasSumType, Mixed>("sum", [](auto& list) {
-        return Mixed(list_sum(list));
-    });
+
+    auto result = m_list_base->sum();
+    if (result.is_null()) {
+        throw realm::Results::UnsupportedColumnTypeException(m_list_base->get_col_key(), m_list_base->get_table(), "sum");
+    }
+    return result;
 }
 
 util::Optional<double> List::average(ColKey col)
 {
     if (get_type() == PropertyType::Object)
         return as_results().average(col);
-    return aggregate<HasSumType, util::Optional<double>>("average", [](auto& list) {
-        size_t count = 0;
-        auto result = list_average(list, &count);
-        return count == 0 ? none : make_optional(result);
-    });
+    size_t count = 0;
+    auto result = m_list_base->avg(&count);
+    if (result.is_null()) {
+        throw realm::Results::UnsupportedColumnTypeException(m_list_base->get_col_key(), m_list_base->get_table(), "average");
+    }
+    return count == 0 ? none : make_optional(result.get_double());
 }
 
 bool List::operator==(List const& rgt) const noexcept
