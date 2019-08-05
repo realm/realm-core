@@ -209,6 +209,122 @@ Lst<T>::Lst(const Obj& obj, ColKey col_key)
     }
 }
 
+/****************************** Lst aggregates *******************************/
+
+// This will be defined when using C++17
+template <typename... Ts>
+struct make_void {
+    typedef void type;
+};
+template <typename... Ts>
+using void_t = typename make_void<Ts...>::type;
+
+
+template <class T, class = void>
+struct MinHelper {
+    template <class U>
+    static Mixed eval(U&, size_t*)
+    {
+        return Mixed{};
+    }
+};
+
+template <class T>
+struct MinHelper<T, void_t<typename ColumnTypeTraits<T>::minmax_type>> {
+    template <class U>
+    static Mixed eval(U& tree, size_t* return_ndx)
+    {
+        return Mixed(bptree_minimum<T>(tree, return_ndx));
+    }
+};
+
+template <class T>
+Mixed ConstLstIf<T>::min(size_t* return_ndx) const
+{
+    return MinHelper<T>::eval(*m_tree, return_ndx);
+}
+
+template <class T, class Enable = void>
+struct MaxHelper {
+    template <class U>
+    static Mixed eval(U&, size_t*)
+    {
+        return Mixed{};
+    }
+};
+
+template <class T>
+struct MaxHelper<T, void_t<typename ColumnTypeTraits<T>::minmax_type>> {
+    template <class U>
+    static Mixed eval(U& tree, size_t* return_ndx)
+    {
+        return Mixed(bptree_maximum<T>(tree, return_ndx));
+    }
+};
+
+template <class T>
+Mixed ConstLstIf<T>::max(size_t* return_ndx) const
+{
+    return MaxHelper<T>::eval(*m_tree, return_ndx);
+}
+
+template <class T, class Enable = void>
+class SumHelper {
+public:
+    template <class U>
+    static Mixed eval(U&, size_t* return_cnt)
+    {
+        if (return_cnt)
+            *return_cnt = 0;
+        return Mixed{};
+    }
+};
+
+template <class T>
+class SumHelper<T, void_t<typename ColumnTypeTraits<T>::sum_type>> {
+public:
+    template <class U>
+    static Mixed eval(U& tree, size_t* return_cnt)
+    {
+        return Mixed(bptree_sum<T>(tree, return_cnt));
+    }
+};
+
+template <class T>
+Mixed ConstLstIf<T>::sum(size_t* return_cnt) const
+{
+    return SumHelper<T>::eval(*m_tree, return_cnt);
+}
+
+template <class T, class = void>
+struct AverageHelper {
+    template <class U>
+    static Mixed eval(U&, size_t* return_cnt)
+    {
+        if (return_cnt)
+            *return_cnt = 0;
+        return Mixed{};
+    }
+};
+
+template <class T>
+struct AverageHelper<T, void_t<typename ColumnTypeTraits<T>::sum_type>> {
+    template <class U>
+    static Mixed eval(U& tree, size_t* return_cnt)
+    {
+        return Mixed(bptree_average<T>(tree, return_cnt));
+    }
+};
+
+template <class T>
+Mixed ConstLstIf<T>::avg(size_t* return_cnt) const
+{
+    return AverageHelper<T>::eval(*m_tree, return_cnt);
+}
+
+
+/************************* template instantiations ***************************/
+
 namespace realm {
 template ConstLst<int64_t>::ConstLst(const ConstObj& obj, ColKey col_key);
 template ConstLst<util::Optional<Int>>::ConstLst(const ConstObj& obj, ColKey col_key);

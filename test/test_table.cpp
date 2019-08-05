@@ -2880,13 +2880,13 @@ TEST(Table_list_basic)
         CHECK(list.is_empty());
 
         size_t return_cnt = 0;
-        list_sum(list, &return_cnt);
+        list.sum(&return_cnt);
         CHECK_EQUAL(return_cnt, 0);
-        list_maximum(list, &return_cnt);
+        list.max(&return_cnt);
         CHECK_EQUAL(return_cnt, 0);
-        list_minimum(list, &return_cnt);
+        list.min(&return_cnt);
         CHECK_EQUAL(return_cnt, 0);
-        list_average(list, &return_cnt);
+        list.avg(&return_cnt);
         CHECK_EQUAL(return_cnt, 0);
 
         for (int i = 0; i < 100; i++) {
@@ -2904,10 +2904,10 @@ TEST(Table_list_basic)
         CHECK_EQUAL(list_base->size(), 100);
         CHECK(dynamic_cast<Lst<Int>*>(list_base.get()));
 
-        CHECK_EQUAL(list_sum(list1), sum);
-        CHECK_EQUAL(list_maximum(list1), 1099);
-        CHECK_EQUAL(list_minimum(list1), 1000);
-        CHECK_EQUAL(list_average(list1), double(sum) / 100);
+        CHECK_EQUAL(list1.sum(), sum);
+        CHECK_EQUAL(list1.max(), 1099);
+        CHECK_EQUAL(list1.min(), 1000);
+        CHECK_EQUAL(list1.avg(), double(sum) / 100);
 
         auto list2 = obj.get_list<int64_t>(list_col);
         list2.set(50, 747);
@@ -2933,7 +2933,7 @@ TEST_TYPES(Table_list_nullable, int64_t, float, double)
 {
     Table table;
     auto list_col = table.add_column_list(ColumnTypeTraits<TEST_TYPE>::id, "int_list", true);
-    TEST_TYPE sum = 0;
+    typename ColumnTypeTraits<TEST_TYPE>::sum_type sum = 0;
 
     {
         Obj obj = table.create_object(ObjKey(5));
@@ -2959,10 +2959,10 @@ TEST_TYPES(Table_list_nullable, int64_t, float, double)
         CHECK_NOT(list_base->is_null(0));
         CHECK(dynamic_cast<Lst<util::Optional<TEST_TYPE>>*>(list_base.get()));
 
-        CHECK_EQUAL(list_sum(list1), sum);
-        CHECK_EQUAL(list_maximum(list1), 1099);
-        CHECK_EQUAL(list_minimum(list1), 1000);
-        CHECK_EQUAL(list_average(list1), double(sum) / 100);
+        CHECK_EQUAL(list1.sum(), sum);
+        CHECK_EQUAL(list1.max(), TEST_TYPE(1099));
+        CHECK_EQUAL(list1.min(), TEST_TYPE(1000));
+        CHECK_EQUAL(list1.avg(), double(sum) / 100);
 
         auto list2 = obj.get_list<util::Optional<TEST_TYPE>>(list_col);
         list2.set(50, TEST_TYPE(747));
@@ -3132,6 +3132,8 @@ TEST(Table_ListOfPrimitives)
     }
 
     auto string_list = obj.get_list<StringData>(string_col);
+    auto str_min = string_list.min();
+    CHECK(str_min.is_null());
     CHECK_EQUAL(string_list.begin()->size(), string_vector.begin()->size());
     CHECK_EQUAL(string_vector.size(), string_list.size());
     for (unsigned i = 0; i < string_list.size(); i++) {
@@ -3154,9 +3156,9 @@ TEST(Table_ListOfPrimitives)
         CHECK_EQUAL(timestamp_vector[i], timestamp_list.get(i));
     }
     size_t return_ndx = 7;
-    list_minimum(timestamp_list, &return_ndx);
+    timestamp_list.min(&return_ndx);
     CHECK_EQUAL(return_ndx, 0);
-    list_maximum(timestamp_list, &return_ndx);
+    timestamp_list.max(&return_ndx);
     CHECK_EQUAL(return_ndx, 1);
 
     t->remove_object(ObjKey(7));

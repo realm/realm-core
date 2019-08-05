@@ -166,6 +166,7 @@ struct ColumnTypeTraits<Timestamp> {
 template <>
 struct ColumnTypeTraits<StringData> {
     using cluster_leaf_type = ArrayString;
+    using no_sum_type = double;
     static const DataType id = type_String;
     static const ColumnType column_id = col_type_String;
 };
