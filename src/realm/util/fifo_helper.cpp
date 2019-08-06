@@ -22,6 +22,8 @@
 #include <system_error>
 #include <sys/stat.h>
 
+// FIFOs do not work on Windows.
+#ifndef _WIN32
 namespace realm {
 namespace util {
 
@@ -38,9 +40,6 @@ void check_is_fifo(const std::string& path) {
 
 void create_fifo(std::string path)
 {
-#ifdef _WIN32
-    throw std::logic_error("mkfifo is not supported on Windows");
-#else
 #ifdef REALM_ANDROID
     // Upgrading apps on Android Huawai devices sometimes leave FIFO files with the wrong
     // file owners. This results in the Android sandbox preventing Realm from opening the
@@ -51,7 +50,7 @@ void create_fifo(std::string path)
     // full access to modify or copy files from there, so there should be no change from a pratical
     // security standpoint.
     // See more here: https://github.com/realm/realm-java/issues/3972#issuecomment-313675948
-    mode_t mode = 0600;
+    mode_t mode = 0666;
 #else
     mode_t mode = 0600;
 #endif
@@ -81,7 +80,6 @@ void create_fifo(std::string path)
             return check_is_fifo(path);
         }
     }
-#endif
 }
 
 bool try_create_fifo(const std::string& path)
@@ -93,6 +91,7 @@ bool try_create_fifo(const std::string& path)
         return false;
     }
 }
+#endif
 
 } // namespace util
 } // namespace realm
