@@ -26,7 +26,7 @@
 #include "db.hpp"
 
 int main(int argc, char* argv[]) {
-    const int limit = 10000;
+    const int limit = 10000000;
     const char* fields = "uuuu";
 
     Db& db = Db::create("perf.core2");

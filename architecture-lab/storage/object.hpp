@@ -25,7 +25,7 @@
 
 // fwd decls
 class Memory;
-struct SnapshotImpl;
+class SnapshotImpl;
 struct _Cluster;
 struct _Table;
 
@@ -40,10 +40,10 @@ struct String {
 
 // helper for accessing a list
 template<typename T>
-struct ListAccessor;
+class ListAccessor;
 
-struct Object {
-
+class Object {
+public:
     // singular entries
     template<typename T>
     T operator()(Field<T> f);
@@ -83,7 +83,8 @@ struct ObjectIterator {
 };
 
 template<typename T>
-struct ListAccessor {
+class ListAccessor {
+public:
     Object o;
     Field<List<T>> f;
 
@@ -102,7 +103,8 @@ struct ListAccessor {
 
 // specializations for Table and Row fields
 template<>
-struct ListAccessor<Table> {
+class ListAccessor<Table> {
+public:
     ListAccessor<uint64_t> list;
     uint64_t get_size() { return list.get_size(); }
     void set_size(uint64_t new_size) { list.set_size(new_size); }
@@ -111,7 +113,8 @@ struct ListAccessor<Table> {
 };
 
 template<>
-struct ListAccessor<Row> {
+class ListAccessor<Row> {
+public:
     ListAccessor<uint64_t> list;
     uint64_t get_size() { return list.get_size(); }
     void set_size(uint64_t new_size) { list.set_size(new_size); }

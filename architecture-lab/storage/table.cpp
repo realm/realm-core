@@ -129,7 +129,8 @@ union Reps {
 
 struct _Cluster { ArrayReps entries[1]; };
 
-struct ClusterMgr : public PayloadMgr {
+class ClusterMgr : public PayloadMgr {
+public:
     ClusterMgr(Memory& mem, int num_fields, const _FieldInfo* field_info);
     ~ClusterMgr();
     virtual void cow(Ref<DynType>& payload, int old_capacity, int new_capacity);
@@ -637,26 +638,26 @@ template void Object::set<uint64_t>(Field<uint64_t>, uint64_t);
 template void Object::set<int64_t>(Field<int64_t>, int64_t);
 template void Object::set<float>(Field<float>, float);
 template void Object::set<double>(Field<double>, double);
-template void Object::set<Table>(Field<Table>, Table);
-template void Object::set<Row>(Field<Row>, Row);
+//template void Object::set<Table>(Field<Table>, Table);
+//template void Object::set<Row>(Field<Row>, Row);
 
 template uint64_t Object::operator()<uint64_t>(Field<uint64_t>);
 template int64_t Object::operator()<int64_t>(Field<int64_t>);
 template float Object::operator()<float>(Field<float>);
 template double Object::operator()<double>(Field<double>);
-template Table Object::operator()<Table>(Field<Table>);
-template Row Object::operator()<Row>(Field<Row>);
+//template Table Object::operator()<Table>(Field<Table>);
+//template Row Object::operator()<Row>(Field<Row>);
 
 template ListAccessor<uint64_t> Object::operator()<uint64_t>(Field<List<uint64_t>>);
 template ListAccessor<int64_t> Object::operator()<int64_t>(Field<List<int64_t>>);
 template ListAccessor<float> Object::operator()<float>(Field<List<float>>);
 template ListAccessor<double> Object::operator()<double>(Field<List<double>>);
-template ListAccessor<Table> Object::operator()<Table>(Field<List<Table>>);
-template ListAccessor<Row> Object::operator()<Row>(Field<List<Row>>);
+//template ListAccessor<Table> Object::operator()<Table>(Field<List<Table>>);
+//template ListAccessor<Row> Object::operator()<Row>(Field<List<Row>>);
 
 template class ListAccessor<uint64_t>;
 template class ListAccessor<int64_t>;
 template class ListAccessor<float>;
 template class ListAccessor<double>;
-template class ListAccessor<Table>;
-template class ListAccessor<Row>;
+//template class ListAccessor<Table>;
+//template class ListAccessor<Row>;
