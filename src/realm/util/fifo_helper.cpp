@@ -91,8 +91,9 @@ bool try_create_fifo(const std::string& path)
         return false;
     }
 }
-#endif
 
 } // namespace util
 } // namespace realm
+#endif
+
 
