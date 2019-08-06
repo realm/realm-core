@@ -29,7 +29,7 @@ void _Cuckoo::init() {
     secondary_tree.init(0);
 }
 
-struct CondensationEntry { uint8_t idx; uint8_t quick_key; };
+struct CondensationEntry { uint8_t quick_key; uint8_t idx; };
 
 struct TreeLeaf {
     uint16_t sz;
@@ -91,6 +91,43 @@ int find_in_leaf(Memory& mem, TreeLeaf* leaf_ptr, uint64_t hash, uint64_t key) {
     int subhash = hash & 0xFF; // cut off all above one byte
     int subhash_limit = (subhash + 4) & 0xFF;
     key >>= 1; // shift out hash indicator prior to key comparions
+    
+    if (subhash + 4 == subhash_limit) {
+        uint64_t ce = * (uint64_t*)(leaf_ptr->condenser + subhash);
+        // quickkeys are in bytes 0,2,4 and 6 of ce. Generate key vector to match
+        uint64_t kv = (key & 0xFF) | ((key & 0xFF) << 16);
+        kv = kv | (kv << 32);
+        uint64_t indexes = (ce >> 8) & 0x00FF00FF00FF00FFULL;
+        ce &= 0x00FF00FF00FF00FFULL;
+        uint64_t mask = 0x0100010001000100ULL;
+        uint64_t l = (ce | mask) - kv; // overflows will clear bits 8, 24, 40 or 56
+        uint64_t r = (kv | mask) - ce; // do
+        uint64_t q = ~(mask - indexes); // do, but invert result as we want to filter zero elements
+        // combine subtraction overflows from l, r and q and mask out all other bits
+        uint64_t rv = (l & r & q) & mask;
+        std::cout << std::hex << "key/hash = " << key << " " << hash
+                  << "    ce/kv/ix = "<< ce << " " << kv << " " << indexes
+                  << "    l/r/q = " << l << " " << r << " " << q
+                  << "    rv = " << rv << std::endl;
+
+        // bit 8 set means key 3 was identical, bit 24 means key 2, etc (little endian)
+        if (rv) {
+            // at least 1 found!
+            bool found = true;
+            unsigned idx = 0;
+            if (rv == 0x0100ULL) idx = indexes;
+            else if (rv == 0x01000000ULL) idx = indexes >> 16;
+            else if (rv == 0x010000000000ULL) idx = indexes >> 32;
+            else if (rv == 0x0100000000000000ULL) idx = indexes >> 48;
+            else found = false;
+            if (found) {
+                idx &= 0xFFUL;
+                --idx;
+                if ((leaf_ptr->keys[idx] >> 1) == key)
+                    return idx;
+            }
+        }
+    }
     while (subhash != subhash_limit) {
         uint8_t idx = leaf_ptr->condenser[subhash].idx;
         uint8_t quick_key = leaf_ptr->condenser[subhash].quick_key;
@@ -194,8 +231,9 @@ bool _Cuckoo::find_and_cow_path(Memory& mem, PayloadMgr& pm, uint64_t key,
 struct KeyInUse {};
 
 bool insert_in_leaf(Memory& mem, Ref<TreeLeaf> leaf, _TreeTop<TreeLeaf>* tree_ptr, 
-		    uint64_t hash, uint64_t &key, PayloadMgr& pm) {
+		    uint64_t hash, uint64_t key, PayloadMgr& pm) {
 
+    std::cout << std::hex << "[" << hash << "] <- " << key << std::endl;
     TreeLeaf* leaf_ptr = mem.txl(leaf);
     if (find_in_leaf(mem, leaf_ptr, hash, key) >= 0)
         throw KeyInUse();
@@ -232,6 +270,7 @@ bool insert_in_leaf(Memory& mem, Ref<TreeLeaf> leaf, _TreeTop<TreeLeaf>* tree_pt
         pm.swap_internalbuffer(leaf_ptr->payload, idx, leaf_ptr->sz);
         key = old_key;
     } else { // we're adding a new key:
+        std::cout << "Adding new key at " << subhash << " quickkey = " << (key >> 1) << std::endl;
         uint8_t idx = leaf_ptr->sz;
         leaf_ptr->keys[idx] = key;
         leaf_ptr->condenser[subhash].quick_key = key >> 1;
@@ -327,7 +366,7 @@ void _Cuckoo::insert(Memory& mem, uint64_t key, PayloadMgr& pm) {
         //uint64_t old_key = key;
         bool conflict = insert_in_leaf(mem, leaf, tree_ptr, hash, key, pm);
         if (!conflict) {
-            //std::cout << " - added key: " << old_key << std::endl;
+            std::cout << " - added key: " << key << std::endl;
             break;
         }
         //std::cout << " - added key: " << old_key << " and has to move " << key << std::endl;

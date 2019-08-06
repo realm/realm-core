@@ -41,10 +41,10 @@ libstorage.a: $(OBJS)
 $(OBJS): Makefile
 
 test : main.o libstorage.a
-	g++ -pthread main.o -L. -lstorage -o test
+	$(CXX) -pthread main.o -L. -lstorage -o test
 
 test_perf : test_perf.o libstorage.a
-	g++ -pthread test_perf.o -L. -lstorage -o test_perf
+	$(CXX) -pthread test_perf.o -L. -lstorage -o test_perf
 
 clean:
 	rm -f $(OBJS)
