@@ -429,14 +429,16 @@ void Realm::add_schema_change_handler()
 
 void Realm::cache_new_schema()
 {
-    auto new_version = transaction().get_version_of_current_transaction().version;
-    if (m_new_schema)
-        m_coordinator->cache_schema(std::move(*m_new_schema),
-                                    m_schema_version, new_version);
-    else
-        m_coordinator->advance_schema_cache(m_schema_transaction_version, new_version);
-    m_schema_transaction_version = new_version;
-    m_new_schema = util::none;
+    if (!is_closed()) {
+        auto new_version = transaction().get_version_of_current_transaction().version;
+        if (m_new_schema)
+            m_coordinator->cache_schema(std::move(*m_new_schema),
+                                        m_schema_version, new_version);
+        else
+            m_coordinator->advance_schema_cache(m_schema_transaction_version, new_version);
+        m_schema_transaction_version = new_version;
+        m_new_schema = util::none;
+    }
 }
 
 void Realm::translate_schema_error()
