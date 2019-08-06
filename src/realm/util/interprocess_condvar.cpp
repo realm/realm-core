@@ -151,7 +151,16 @@ void InterprocessCondVar::set_shared_part(SharedPart& shared_part, std::string b
 
 #if !REALM_TVOS
     m_resource_path = base_path + "." + condvar_name + ".cv";
-    create_fifo(m_resource_path, tmp_path); // throws
+    if (!try_create_fifo(m_resource_path)) {
+            // Filesystem doesn't support named pipes, so try putting it in tmp_dir instead
+            // Hash collisions are okay here because they just result in doing
+            // extra work, as opposed to correctness problems.
+            std::ostringstream ss;
+            ss << normalize_dir(tmp_path);
+            ss << "realm_" << std::hash<std::string>()(m_resource_path) << ".cv";
+            m_resource_path = ss.str();
+            create_fifo(m_resource_path);
+    }
     m_fd_read = open(m_resource_path.c_str(), O_RDWR);
     if (m_fd_read == -1) {
         throw std::system_error(errno, std::system_category());

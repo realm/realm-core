@@ -34,10 +34,15 @@ namespace util {
 //
 // If creating the FIFO at both of these locations, an exception is thrown.
 // If a FIFO already exists at the given location, this method does nothing.
-void create_fifo(std::string path, const std::string tmp_dir); // throws
+void create_fifo(std::string path); // throws
 
 // Same as above, but returns `false` if the FIFO could not be created instead of throwing.
 bool try_create_fifo(const std::string& path);
+
+// Ensure that a path representing a directory ends with `/`
+inline std::string normalize_dir(const std::string& path) {
+    return (!path.empty() && path.back() != '/') ? path + '/' : path;
+}
 
 } // namespace util
 } // namespace realm

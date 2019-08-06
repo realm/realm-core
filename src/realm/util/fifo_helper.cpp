@@ -25,7 +25,18 @@
 namespace realm {
 namespace util {
 
-void create_fifo(std::string path, const std::string tmp_dir)
+namespace {
+void check_is_fifo(const std::string& path) {
+    struct stat stat_buf;
+    if (stat(path.c_str(), &stat_buf) == 0) {
+        if ((stat_buf.st_mode & S_IFMT) != S_IFIFO) {
+            throw std::runtime_error(path + " exists and it is not a fifo.");
+        }
+    }
+}
+} // Anonymous namespace
+
+void create_fifo(std::string path)
 {
 #ifdef _WIN32
     throw std::logic_error("mkfifo is not supported on Windows");
@@ -49,32 +60,25 @@ void create_fifo(std::string path, const std::string tmp_dir)
     int ret = mkfifo(path.c_str(), mode);
     if (ret == -1) {
         int err = errno;
-        if (err == ENOTSUP || err == EACCES || err == EPERM || err == EINVAL) {
-            // Filesystem doesn't support named pipes, so try putting it in tmp_dir instead
-            // Hash collisions are okay here because they just result in doing
-            // extra work, as opposed to correctness problems.
-            std::ostringstream ss;
-            ss << tmp_dir;
-            ss << "realm_" << std::hash<std::string>()(path) << ".cv";
-            path = ss.str();
-            ret = mkfifo(path.c_str(), mode);
-            err = errno;
-        }
-
         // the fifo already existing isn't an error
-        if (ret == -1 && err != EEXIST) {
+        if (err != EEXIST) {
+#ifdef __ANDROID__
             // Workaround for a mkfifo bug on Blackberry devices:
             // When the fifo already exists, mkfifo fails with error ENOSYS which is not correct.
             // In this case, we use stat to check if the path exists and it is a fifo.
-            struct stat stat_buf;
-            if (stat(path.c_str(), &stat_buf) == 0) {
-                if ((stat_buf.st_mode & S_IFMT) != S_IFIFO) {
-                    throw std::runtime_error(path + " exists and it is not a fifo.");
-                }
+            if (err == ENOSYS) {
+                check_is_fifo(path);
             }
             else {
                 throw std::system_error(err, std::system_category());
             }
+#else
+            throw std::system_error(err, std::system_category());
+#endif
+        }
+        else {
+            // If the file already exists, verify it is a FIFO
+            return check_is_fifo(path);
         }
     }
 #endif
