@@ -5,7 +5,7 @@
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Named pipes on Android are now created with 0666 permissions instead of 0600. This fixes a bug on Huawei devices which caused named pipes to change owners during app upgrades causing subsequent `ACCESS DENIED` errors. This should have not practical security implications. (Issue [#3328](https://github.com/realm/realm-core/pull/3328))
  
 ### Breaking changes
 * None.
