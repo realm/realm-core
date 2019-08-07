@@ -1519,6 +1519,10 @@ ref_type Table::create_empty_table(Allocator& alloc, TableKey key)
         }
     }
     top.add(0); // Sequence number
+    top.add(0); // Collision_map
+
+    REALM_ASSERT(top.size() == top_array_size);
+
     return top.get_ref();
 }
 
