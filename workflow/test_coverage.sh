@@ -13,6 +13,7 @@ fi
 
 set -e
 
+rm -rf /tmp/realm*
 rm -rf coverage.build
 mkdir -p coverage.build
 cd coverage.build
