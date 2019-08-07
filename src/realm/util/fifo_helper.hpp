@@ -25,14 +25,7 @@ namespace realm {
 namespace util {
 
 // Attempts to create a FIFO file at the location determined by `path`.
-// If the filesystem does not allow FIFO's at this location the path is hashed
-// and used as the file name for the FIFO which is then created in `tmp_path`.
-// This should usually be set to the systems global tmp folder.
-//
-// The `tmp_dir` must point to an existing writable directory. The path should end with a
-// trailing `/`.
-//
-// If creating the FIFO at both of these locations, an exception is thrown.
+// If creating the FIFO at this location fails, an exception is thrown.
 // If a FIFO already exists at the given location, this method does nothing.
 void create_fifo(std::string path); // throws
 
