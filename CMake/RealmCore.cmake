@@ -1,4 +1,3 @@
-###########################################################################
 #
 # Copyright 2016 Realm Inc.
 #
@@ -73,7 +72,7 @@ function(use_realm_core enable_sync core_prefix sync_prefix)
     if(core_prefix)
         build_existing_realm_core(${core_prefix})
         if(sync_prefix)
-            build_existing_realm_sync(${sync_prefix} ${core_prefix})
+            build_existing_realm_sync(${sync_prefix})
         endif()
     elseif(enable_sync)
         # FIXME: Support building against prebuilt sync binaries.
@@ -317,6 +316,9 @@ endfunction()
 macro(build_realm_sync)
     set(sync_prefix_directory "${CMAKE_CURRENT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/realm-sync")
 
+    ExternalProject_Get_Property(realm-core SOURCE_DIR)
+    set(core_directory ${SOURCE_DIR})
+
     ExternalProject_Add(realm-sync-lib
         DEPENDS realm-core
         PREFIX ${sync_prefix_directory}
@@ -363,8 +365,8 @@ macro(build_realm_sync)
 
     # Create directories that are included in INTERFACE_INCLUDE_DIRECTORIES, as CMake requires they exist at
     # configure time, when they'd otherwise not be created until we download and build sync.
-    file(MAKE_DIRECTORY ${sync_directory}/src)
-    set_property(TARGET realm-sync PROPERTY INTERFACE_INCLUDE_DIRECTORIES ${sync_directory}/src)
+    file(MAKE_DIRECTORY ${SOURCE_DIR}/src)
+    set_property(TARGET realm-sync PROPERTY INTERFACE_INCLUDE_DIRECTORIES ${SOURCE_DIR}/src)
 
     # Sync server library is built as part of the sync library build
     set(sync_server_library_debug "${sync_debug_binary_dir}/src/realm/${CMAKE_STATIC_LIBRARY_PREFIX}realm-server-dbg${CMAKE_STATIC_LIBRARY_SUFFIX}")
@@ -388,7 +390,7 @@ macro(build_realm_sync)
     set_property(TARGET realm-sync-server PROPERTY INTERFACE_LINK_LIBRARIES ${SSL_LIBRARIES} ${YAML_LDFLAGS})
 endmacro()
 
-function(build_existing_realm_sync sync_directory core_directory)
+function(build_existing_realm_sync sync_directory)
     get_filename_component(sync_directory ${sync_directory} ABSOLUTE)
     build_realm_sync(URL ""
                      SOURCE_DIR ${sync_directory}
@@ -399,11 +401,6 @@ endfunction()
 
 function(clone_and_build_realm_sync branch)
     set(cmake_files ${CMAKE_CURRENT_BINARY_DIR}${CMAKE_FILES_DIRECTORY})
-    if(REALM_PLATFORM STREQUAL "Android")
-        set(config_cmd test -f src/config.mk || REALM_CORE_PREFIX=${cmake_files}/realm-core/src/realm-core REALM_FORCE_OPENSSL=YES REALM_ENABLE_ASSERTIONS= sh build.sh config && echo "ENABLE_ENCRYPTION    = yes" >> src/config.mk)
-    else()
-        set(config_cmd test -f src/config.mk || REALM_CORE_PREFIX=${cmake_files}/realm-core/src/realm-core sh build.sh config)
-    endif()
 
     build_realm_sync(GIT_REPOSITORY "git@github.com:realm/realm-sync.git"
                      GIT_TAG ${branch}
