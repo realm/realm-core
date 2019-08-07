@@ -67,7 +67,7 @@ namespace realm {
 class ClusterNodeInner : public ClusterNode {
 public:
     ClusterNodeInner(Allocator& allocator, const ClusterTree& tree_top);
-    ~ClusterNodeInner() override {};
+    ~ClusterNodeInner() override {}
 
     void create(int sub_tree_depth);
     void init(MemRef mem) override;

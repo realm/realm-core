@@ -180,7 +180,7 @@ public:
         : ClusterNode(offset, allocator, tree_top)
     {
     }
-    ~Cluster() override {};
+    ~Cluster() override {}
 
     void create(size_t nb_leaf_columns); // Note: leaf columns - may include holes
     void init(MemRef mem) override;
