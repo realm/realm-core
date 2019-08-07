@@ -23,23 +23,26 @@
 #include <sys/stat.h>
 
 // FIFOs do not work on Windows.
-#ifndef _WIN32
 namespace realm {
 namespace util {
 
 namespace {
-void check_is_fifo(const std::string& path) {
+void check_is_fifo(const std::string& path)
+{
+#ifndef _WIN32
     struct stat stat_buf;
     if (stat(path.c_str(), &stat_buf) == 0) {
         if ((stat_buf.st_mode & S_IFMT) != S_IFIFO) {
             throw std::runtime_error(path + " exists and it is not a fifo.");
         }
     }
+#endif
 }
 } // Anonymous namespace
 
 void create_fifo(std::string path)
 {
+#ifndef _WIN32
 #ifdef REALM_ANDROID
     // Upgrading apps on Android Huawai devices sometimes leave FIFO files with the wrong
     // file owners. This results in the Android sandbox preventing Realm from opening the
@@ -80,6 +83,7 @@ void create_fifo(std::string path)
             return check_is_fifo(path);
         }
     }
+#endif
 }
 
 bool try_create_fifo(const std::string& path)
@@ -94,6 +98,3 @@ bool try_create_fifo(const std::string& path)
 
 } // namespace util
 } // namespace realm
-#endif
-
-
