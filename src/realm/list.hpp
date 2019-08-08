@@ -259,6 +259,18 @@ private:
     size_t m_ndx;
 };
 
+template <class T>
+inline void check_column_type(ColKey col)
+{
+    REALM_ASSERT(!col || col.get_type() == ColumnTypeTraits<T>::column_id);
+}
+
+template <>
+inline void check_column_type<ObjKey>(ColKey col)
+{
+    REALM_ASSERT(!col || col.get_type() == col_type_LinkList);
+}
+
 /// This class defines the interface to ConstList, except for the constructor
 /// The ConstList class has the ConstObj member m_obj, which should not be
 /// inherited from Lst<T>.
@@ -337,6 +349,8 @@ protected:
         : ConstLstBase(ColKey{}, nullptr)
         , m_tree(new BPlusTree<T>(alloc))
     {
+        check_column_type<T>(m_col_key);
+
         m_tree->set_parent(this, 0); // ndx not used, implicit in m_owner
     }
 

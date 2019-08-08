@@ -145,6 +145,7 @@ ConstLstBase::ConstLstBase(ColKey col_key, const ConstObj* obj)
     : m_const_obj(obj)
     , m_col_key(col_key)
 {
+    REALM_ASSERT(col_key.get_attrs().test(col_attr_List));
 }
 
 template <class T>
