@@ -7,6 +7,8 @@
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Program would crash if a primary key column is set in a transaction that is subsequently rolled back.
   ([#814](https://github.com/realm/realm-object-store/issues/814), since 6.0.0-alpha.11)
+* Creating new objects in a file with InRealm history and migrated from file format 9 would fail.
+  ([#3334](https://github.com/realm/realm-core/issues/3334), since 6.0.0-alpha.8)
  
 ### Breaking changes
 * None.

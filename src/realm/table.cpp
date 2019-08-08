@@ -1283,6 +1283,7 @@ void Table::migrate_objects(std::function<void()> commit_and_continue)
 
     /*************************** Create objects ******************************/
 
+    int64_t max_key_value = -1;
     for (size_t row_ndx = 0; row_ndx < number_of_objects; row_ndx++) {
 
         // Build a vector of values obtained from the old columns
@@ -1300,6 +1301,9 @@ void Table::migrate_objects(std::function<void()> commit_and_continue)
         // Key will either be equal to the old row number or be based on value from !OID column
         ObjKey obj_key(oid_column ? oid_column->get(row_ndx) : row_ndx);
         // Create object with the initial values
+        if (obj_key.value > max_key_value) {
+            max_key_value = obj_key.value;
+        }
         Obj obj = create_object(obj_key, init_values);
 
         // Then update possible list types
@@ -1340,6 +1344,15 @@ void Table::migrate_objects(std::function<void()> commit_and_continue)
     if (!has_link_columns) {
         // No link columns to update - mark that we are done with this table
         finalize_migration();
+    }
+
+    // We need to be sure that the stored 'next sequence number' is bigger than
+    // the biggest ObjKey currently used.
+    RefOrTagged rot = m_top.get_as_ref_or_tagged(top_position_for_sequence_number);
+    uint64_t sn = rot.is_tagged() ? rot.get_as_int() : 0;
+    if (uint64_t(max_key_value) >= sn) {
+        rot = RefOrTagged::make_tagged(max_key_value + 1);
+        m_top.set(top_position_for_sequence_number, rot);
     }
 
     commit_and_continue();
