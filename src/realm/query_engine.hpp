@@ -179,7 +179,7 @@ public:
     {
         collect_dependencies(tables);
         if (m_child)
-            m_child->collect_dependencies(tables);
+            m_child->get_link_dependencies(tables);
     }
 
     void set_table(const Table& table)
