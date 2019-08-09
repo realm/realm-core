@@ -1436,6 +1436,17 @@ TEST_CASE("notifications: results") {
             REQUIRE(notification_calls == 2);
             REQUIRE_INDICES(change.insertions, 0);
         }
+
+        SECTION("modification to related table not included in query") {
+            write([&] {
+                auto table = r->read_group().get_table("class_linked to object");
+                auto col = table->get_column_key("value");
+                auto obj = table->get_object(target_keys[1]);
+                obj.set(col, 42);  // Will affect first entry in results
+            });
+            REQUIRE(notification_calls == 2);
+            REQUIRE_INDICES(change.modifications, 0);
+        }
     }
 
     SECTION("before/after change callback") {

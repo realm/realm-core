@@ -26,6 +26,26 @@
 using namespace realm;
 using namespace realm::_impl;
 
+bool CollectionNotifier::all_related_tables_covered(const TableVersions& versions)
+{
+    if (m_related_tables.size() > versions.size()) {
+        return false;
+    }
+    auto first = versions.begin();
+    auto last = versions.end();
+    for (auto& it : m_related_tables) {
+        TableKey tk{it.table_key};
+        auto match = std::find_if(first, last, [tk](auto& elem) {
+            return elem.first == tk;
+        });
+        if (match == last) {
+            // tk not found in versions
+            return false;
+        }
+    }
+    return true;
+}
+
 std::function<bool (size_t)>
 CollectionNotifier::get_modification_checker(TransactionChangeInfo const& info,
                                              Table const& root_table)
