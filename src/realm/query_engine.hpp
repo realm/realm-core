@@ -1789,6 +1789,13 @@ public:
         return s;
     }
 
+    void collect_dependencies(std::vector<TableKey>& versions) const override
+    {
+        for (const auto& cond : m_conditions) {
+            cond->collect_dependencies(versions);
+        }
+    }
+
     void init() override
     {
         ParentNode::init();
@@ -1976,12 +1983,19 @@ public:
         return "";
     }
 
-    virtual std::string describe(util::serializer::SerialisationState& state) const override
+    std::string describe(util::serializer::SerialisationState& state) const override
     {
         if (m_condition) {
             return "!(" + m_condition->describe_expression(state) + ")";
         }
         return "!()";
+    }
+
+    void collect_dependencies(std::vector<TableKey>& versions) const override
+    {
+        if (m_condition) {
+            m_condition->collect_dependencies(versions);
+        }
     }
 
 
