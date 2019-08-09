@@ -23,6 +23,7 @@
 
 #include <realm/util/assert.hpp>
 #include <realm/version_id.hpp>
+#include <realm/keys.hpp>
 
 #include <array>
 #include <atomic>
@@ -187,6 +188,7 @@ protected:
     std::unique_lock<std::mutex> lock_target();
     Transaction& source_shared_group();
 
+    bool all_related_tables_covered(const TableVersions& versions);
     std::function<bool (size_t)> get_modification_checker(TransactionChangeInfo const&, Table const&);
 
 private:

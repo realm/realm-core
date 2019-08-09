@@ -108,8 +108,12 @@ bool ResultsNotifier::need_to_run()
     }
 
     // If we've run previously, check if we need to rerun
-    if (has_run() && m_query->sync_view_if_needed() == m_last_seen_version)
-        return false;
+    if (has_run() && m_query->sync_view_if_needed() == m_last_seen_version) {
+        // Does m_last_seen_version match m_related_tables
+        if (all_related_tables_covered(m_last_seen_version)) {
+            return false;
+        }
+    }
     return true;
 }
 
