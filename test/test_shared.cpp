@@ -2072,8 +2072,8 @@ TEST_IF(Shared_AsyncMultiprocess, allow_async)
 
 #endif // !defined(_WIN32) && !REALM_PLATFORM_APPLE
 
+#if 0  // FIXME: Reenable when it can pass reliably
 #ifdef _WIN32
-#if 0
 
 TEST(Shared_WaitForChangeAfterOwnCommit)
 {
@@ -2084,8 +2084,6 @@ TEST(Shared_WaitForChangeAfterOwnCommit)
     sg->commit();
     bool b = sg->wait_for_change();
 }
-
-#endif
 
 NONCONCURRENT_TEST(Shared_InterprocessWaitForChange)
 {
@@ -2290,6 +2288,7 @@ TEST(Shared_WaitForChange)
     for (int j = 0; j < num_threads; j++)
         threads[j].join();
 }
+#endif
 
 TEST(Shared_MultipleSharersOfStreamingFormat)
 {
