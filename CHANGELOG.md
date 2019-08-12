@@ -1,7 +1,7 @@
 # 6.0.0-alpha.15 Release notes
 
 ### Enhancements
-* min, max, som and avg functions added as virtual members of ConstLstBase. Makes it possible to
+* min, max, sum and avg functions added as virtual members of ConstLstBase. Makes it possible to
   get the values without knowing the exact type of list.
 
 ### Fixed
