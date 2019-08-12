@@ -1053,7 +1053,7 @@ size_t Column<T>::find_first(T value, size_t begin, size_t end) const
 
     if (m_search_index && begin == 0 && end == npos)
         return m_search_index->find_first(value);
-    return m_tree.find_first(value, begin, end);
+    return m_tree.template find_first<Equal>(value, begin, end);
 }
 
 template <class T>

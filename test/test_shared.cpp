@@ -4008,4 +4008,40 @@ TEST(Shared_GetCommitSize)
     }
 }
 
+TEST(Shared_TimestampQuery)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg(path);
+
+    {
+        WriteTransaction wt(sg);
+
+        auto table = wt.get_or_add_table("table");
+        auto col_date = table->add_column(type_Timestamp, "date");
+        auto col_value = table->add_column(type_Int, "value");
+
+        for (int i = 0; i < 10; i++) {
+            auto ndx = table->add_empty_row();
+            table->set_timestamp(col_date, ndx, Timestamp(i / 4, i % 4));
+            table->set_int(col_value, ndx, i);
+        }
+        // Timestamps : {0,0}, {0,1}, {0,2}, {0,3}, {1,0}, {1,1}, {1,2}, {1,3}, {2,0}, {2,1}
+        wt.commit();
+    }
+
+    Group& g = const_cast<Group&>(sg.begin_read());
+    auto table = g.get_table("table");
+    auto col_date = table->get_column_index("date");
+
+    Query q = table->column<Timestamp>(col_date) > Timestamp(0, 3);
+    auto cnt = q.count();
+    CHECK_EQUAL(cnt, 6);
+    q = table->column<Timestamp>(col_date) >= Timestamp(0, 3);
+    cnt = q.count();
+    CHECK_EQUAL(cnt, 7);
+    q = table->column<Timestamp>(col_date) > Timestamp(0, 3) && table->column<Timestamp>(col_date) < Timestamp(1, 3);
+    cnt = q.count();
+    CHECK_EQUAL(cnt, 3);
+}
+
 #endif // TEST_SHARED

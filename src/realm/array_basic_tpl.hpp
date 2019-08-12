@@ -286,8 +286,16 @@ size_t BasicArray<T>::find(T value, size_t begin, size_t end) const
     return i == data + end ? not_found : size_t(i - data);
 }
 
-template <class T>
-inline size_t BasicArray<T>::find_first(T value, size_t begin, size_t end) const
+template <>
+template <>
+inline size_t BasicArray<float>::find_first<Equal>(float value, size_t begin, size_t end) const
+{
+    return this->find(value, begin, end);
+}
+
+template <>
+template <>
+inline size_t BasicArray<double>::find_first<Equal>(double value, size_t begin, size_t end) const
 {
     return this->find(value, begin, end);
 }
