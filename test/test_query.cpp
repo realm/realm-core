@@ -10557,7 +10557,7 @@ TEST(Query_MoveDoesntDoubleDelete)
     }
 }
 
-TEST(Query_Timestamp)
+ONLY(Query_Timestamp)
 {
     size_t match;
     Table table;
@@ -10608,6 +10608,18 @@ TEST(Query_Timestamp)
 
     match = (first != null{}).count();
     CHECK_EQUAL(match, 5);
+
+    match = (first > null{}).count();
+    CHECK_EQUAL(match, 0);
+
+    match = (first < null{}).count();
+    CHECK_EQUAL(match, 0);
+
+    match = (first >= null{}).count();
+    CHECK_EQUAL(match, 1);
+
+    match = (first <= null{}).count();
+    CHECK_EQUAL(match, 1);
 
     match = (first != Timestamp(0, 0)).count();
     CHECK_EQUAL(match, 5);

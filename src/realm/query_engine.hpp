@@ -1288,6 +1288,11 @@ class TimestampNode : public ParentNode {
 public:
     using TConditionValue = Timestamp;
     static const bool special_null_node = false;
+    using LeafTypeSeconds = typename IntNullColumn::LeafType;
+    using LeafInfoSeconds = typename IntNullColumn::LeafInfo;
+    using LeafTypeNanos = typename IntegerColumn::LeafType;
+    using LeafInfoNanos = typename IntegerColumn::LeafInfo;
+
 
     TimestampNode(Timestamp v, size_t column)
         : m_value(v)
@@ -1315,13 +1320,100 @@ public:
         ParentNode::init();
 
         m_dD = 100.0;
+
+        // Clear leaf cache
+        m_leaf_end_seconds = 0;
+        m_array_ptr_seconds.reset(); // Explicitly destroy the old one first, because we're reusing the memory.
+        m_array_ptr_seconds.reset(new (&m_leaf_cache_storage_seconds) LeafTypeSeconds(m_table->get_alloc()));
+        m_leaf_end_nanos = 0;
+        m_array_ptr_nanos.reset(); // Explicitly destroy the old one first, because we're reusing the memory.
+        m_array_ptr_nanos.reset(new (&m_leaf_cache_storage_nanos) LeafTypeNanos(m_table->get_alloc()));
+
+    }
+
+    void get_leaf_seconds(const TimestampColumn& col, size_t ndx)
+    {
+        size_t ndx_in_leaf;
+        LeafInfoSeconds leaf_info_seconds{&m_leaf_ptr_seconds, m_array_ptr_seconds.get()};
+        col.get_seconds_leaf(ndx, ndx_in_leaf, leaf_info_seconds);
+        m_leaf_start_seconds = ndx - ndx_in_leaf;
+        m_leaf_end_seconds = m_leaf_start_seconds + m_leaf_ptr_seconds->size();
+    }
+
+    void get_leaf_nanos(const TimestampColumn& col, size_t ndx)
+    {
+        size_t ndx_in_leaf;
+        LeafInfoNanos leaf_info_nanos{&m_leaf_ptr_nanos, m_array_ptr_nanos.get()};
+        col.get_nanoseconds_leaf(ndx, ndx_in_leaf, leaf_info_nanos);
+        m_leaf_start_nanos = ndx - ndx_in_leaf;
+        m_leaf_end_nanos = m_leaf_start_nanos + m_leaf_ptr_nanos->size();
     }
 
     size_t find_first_local(size_t start, size_t end) override
     {
-        size_t ret = m_condition_column->find<TConditionFunction>(m_value, start, end);
-        return ret;
+        REALM_ASSERT(this->m_table);
+
+        if (this->m_value.is_null()) {
+            if (TConditionFunction::condition == cond_Greater || TConditionFunction::condition == cond_Less) {
+                return not_found;
+            }
+        }
+
+        while (start < end) {
+
+            // Cache internal leaves
+            if (start >= this->m_leaf_end_seconds || start < this->m_leaf_start_seconds) {
+                this->get_leaf_seconds(*this->m_condition_column, start);
+            }
+
+            size_t end2;
+            if (end > this->m_leaf_end_seconds)
+                end2 = this->m_leaf_end_seconds - this->m_leaf_start_seconds;
+            else
+                end2 = end - this->m_leaf_start_seconds;
+
+            size_t s;
+            int64_t needle = this->m_value.is_null() ? this->m_leaf_ptr_seconds->null_value() : this->m_value.get_seconds();
+            s = this->m_leaf_ptr_seconds->template find_first<TConditionFunction>(needle, start - this->m_leaf_start_seconds, end2);
+
+            if (s == not_found) {
+                start = this->m_leaf_end_seconds;
+                continue;
+            }
+            else {
+                size_t ndx_in_col = s + this->m_leaf_start_seconds;
+                if (true || TConditionFunction::condition == cond_NotEqual) { // FIXME: specialise this with a template
+                    // we might have passed some that match in seconds but not in nanoseconds
+//                    for (size_t i = start; i < ndx_in_col; ++i) {
+//                        Timestamp ts = m_condition_column->get(i);
+//                        if (condition(ts, m_value, ts.is_null(), m_value.is_null())) {
+//                            return i;
+//                        }
+//                    }
+
+
+
+                    return ndx_in_col;
+                }
+                Timestamp ts = m_condition_column->get(ndx_in_col);
+                if (condition(ts, m_value, ts.is_null(), m_value.is_null())) {
+                    return ndx_in_col;
+                }
+                else {
+                    ++start;
+                }
+            }
+        }
+
+        return not_found;
     }
+
+
+//    size_t find_first_local(size_t start, size_t end) override
+//    {
+//        size_t ret = m_condition_column->find<TConditionFunction>(m_value, start, end);
+//        return ret;
+//    }
 
     virtual std::string describe(util::serializer::SerialisationState& state) const override
     {
@@ -1347,6 +1439,24 @@ public:
 private:
     Timestamp m_value;
     const TimestampColumn* m_condition_column;
+    TConditionFunction condition;
+
+    // Leaf cache seconds
+    using LeafCacheStorageSeconds = typename std::aligned_storage<sizeof(LeafTypeSeconds), alignof(LeafTypeSeconds)>::type;
+    LeafCacheStorageSeconds m_leaf_cache_storage_seconds;
+    std::unique_ptr<LeafTypeSeconds, PlacementDelete> m_array_ptr_seconds;
+    const LeafTypeSeconds* m_leaf_ptr_seconds = nullptr;
+    size_t m_leaf_start_seconds = npos;
+    size_t m_leaf_end_seconds = 0;
+    size_t m_local_end_seconds;
+    // Leaf cache nanoseconds
+    using LeafCacheStorageNanos = typename std::aligned_storage<sizeof(LeafTypeNanos), alignof(LeafTypeNanos)>::type;
+    LeafCacheStorageNanos m_leaf_cache_storage_nanos;
+    std::unique_ptr<LeafTypeNanos, PlacementDelete> m_array_ptr_nanos;
+    const LeafTypeNanos* m_leaf_ptr_nanos = nullptr;
+    size_t m_leaf_start_nanos = npos;
+    size_t m_leaf_end_nanos = 0;
+    size_t m_local_end_nanos;
 };
 
 class StringNodeBase : public ParentNode {

@@ -17,6 +17,7 @@
  **************************************************************************/
 
 #include <iostream>
+#include <set>
 #include <sstream>
 
 #include <realm.hpp>
@@ -40,7 +41,7 @@ using namespace realm::util;
 using namespace realm::test_util;
 
 namespace {
-#define BASE_SIZE 3600
+#define BASE_SIZE 36000
 
 /**
   This bechmark suite represents a number of common use cases,
@@ -317,6 +318,49 @@ struct BenchmarkWithLongStrings : BenchmarkWithStrings {
         t->set_string(0, BASE_SIZE * 2, "A really long string, longer than 63 bytes at least, I guess......");
         t->set_string(0, BASE_SIZE * 3, "A really long string, longer than 63 bytes at least, I guess......");
         tr.commit();
+    }
+};
+
+struct BenchmarkWithTimestamps : Benchmark {
+    std::multiset<Timestamp> values;
+    void before_all(SharedGroup& group)
+    {
+        WriteTransaction tr(group);
+        TableRef t = tr.add_table("Timestamps");
+        t->add_column(type_Timestamp, "timestamps");
+        t->add_empty_row(BASE_SIZE * 10);
+        Random r;
+        for (size_t i = 0; i < BASE_SIZE * 10; ++i) {
+            Timestamp time{r.draw_int<int64_t>(0, 1000000), r.draw_int<int32_t>(0, 1000000)};
+            t->set_timestamp(0, i, time);
+            values.insert(time);
+        }
+        tr.commit();
+    }
+
+    void after_all(SharedGroup& group)
+    {
+        Group& g = group.begin_write();
+        g.remove_table("Timestamps");
+        group.commit();
+    }
+};
+
+struct BenchmarkQueryTimestampGreater : BenchmarkWithTimestamps {
+    const char* name() const
+    {
+        return "QueryTimestampGreater";
+    }
+
+    void operator()(SharedGroup& group)
+    {
+        ReadTransaction tr(group);
+        ConstTableRef table = tr.get_table("Timestamps");
+        Query query = table->where().greater(0, *(values.begin()));
+        TableView results = query.find_all();
+        REALM_ASSERT_EX(results.size() == values.size() - 1, results.size(), values.size() / 2,
+                        values.size());
+        static_cast<void>(results);
     }
 };
 
@@ -1111,38 +1155,39 @@ int benchmark_common_tasks_main()
 
 #define BENCH(B) run_benchmark<B>(results)
 
-    BENCH(BenchmarkUnorderedTableViewClear);
-    BENCH(BenchmarkEmptyCommit);
-    BENCH(AddTable);
-    BENCH(BenchmarkQuery);
-    BENCH(BenchmarkQueryNot);
-    BENCH(BenchmarkSize);
-    BENCH(BenchmarkSort);
-    BENCH(BenchmarkSortInt);
-    BENCH(BenchmarkDistinctIntFewDupes);
-    BENCH(BenchmarkDistinctIntManyDupes);
-    BENCH(BenchmarkDistinctStringFewDupes);
-    BENCH(BenchmarkDistinctStringManyDupes);
-    BENCH(BenchmarkFindAllStringFewDupes);
-    BENCH(BenchmarkFindAllStringManyDupes);
-    BENCH(BenchmarkFindFirstStringFewDupes);
-    BENCH(BenchmarkFindFirstStringManyDupes);
-    BENCH(BenchmarkInsert);
-    BENCH(BenchmarkGetString);
-    BENCH(BenchmarkSetString);
-    BENCH(BenchmarkCreateIndex);
-    BENCH(BenchmarkGetLongString);
-    BENCH(BenchmarkQueryLongString);
-    BENCH(BenchmarkSetLongString);
-    BENCH(BenchmarkGetLinkList);
-    BENCH(BenchmarkQueryInsensitiveString);
-    BENCH(BenchmarkQueryInsensitiveStringIndexed);
-    BENCH(BenchmarkNonInitatorOpen);
-    BENCH(BenchmarkQueryChainedOrStrings);
-    BENCH(BenchmarkQueryChainedOrInts);
-    BENCH(BenchmarkQueryChainedOrIntsIndexed);
-    BENCH(BenchmarkQueryIntEquality);
-    BENCH(BenchmarkQueryIntEqualityIndexed);
+//    BENCH(BenchmarkUnorderedTableViewClear);
+//    BENCH(BenchmarkEmptyCommit);
+//    BENCH(AddTable);
+//    BENCH(BenchmarkQuery);
+//    BENCH(BenchmarkQueryNot);
+//    BENCH(BenchmarkSize);
+//    BENCH(BenchmarkSort);
+//    BENCH(BenchmarkSortInt);
+//    BENCH(BenchmarkDistinctIntFewDupes);
+//    BENCH(BenchmarkDistinctIntManyDupes);
+//    BENCH(BenchmarkDistinctStringFewDupes);
+//    BENCH(BenchmarkDistinctStringManyDupes);
+//    BENCH(BenchmarkFindAllStringFewDupes);
+//    BENCH(BenchmarkFindAllStringManyDupes);
+//    BENCH(BenchmarkFindFirstStringFewDupes);
+//    BENCH(BenchmarkFindFirstStringManyDupes);
+//    BENCH(BenchmarkInsert);
+//    BENCH(BenchmarkGetString);
+//    BENCH(BenchmarkSetString);
+//    BENCH(BenchmarkCreateIndex);
+//    BENCH(BenchmarkGetLongString);
+//    BENCH(BenchmarkQueryLongString);
+//    BENCH(BenchmarkSetLongString);
+//    BENCH(BenchmarkGetLinkList);
+//    BENCH(BenchmarkQueryInsensitiveString);
+//    BENCH(BenchmarkQueryInsensitiveStringIndexed);
+//    BENCH(BenchmarkNonInitatorOpen);
+//    BENCH(BenchmarkQueryChainedOrStrings);
+//    BENCH(BenchmarkQueryChainedOrInts);
+//    BENCH(BenchmarkQueryChainedOrIntsIndexed);
+//    BENCH(BenchmarkQueryIntEquality);
+//    BENCH(BenchmarkQueryIntEqualityIndexed);
+    BENCH(BenchmarkQueryTimestampGreater);
 
 #undef BENCH
     return 0;

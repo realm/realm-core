@@ -384,7 +384,6 @@ Query verify_query(test_util::unit_test::TestContext& test_context, TableRef t, 
 
     parser::ParserResult res2 = realm::parser::parse(description);
     realm::query_builder::apply_predicate(q2, res2.predicate, args);
-
     CHECK_EQUAL(q2.count(), num_results);
     return q2;
 }
@@ -454,9 +453,11 @@ TEST(Parser_basic_serialisation)
     TableRef t = g.add_table(table_name);
     size_t int_col_ndx = t->add_column(type_Int, "age");
     size_t str_col_ndx = t->add_column(type_String, "name");
-    size_t double_col_ndx = t->add_column(type_Double, "fees");
+    size_t double_col_ndx = t->add_column(type_Double, "fees", true);
+    size_t bool_col_ndx = t->add_column(type_Bool, "licensed", true);
     size_t link_col_ndx = t->add_column_link(type_Link, "buddy", *t);
     size_t time_col_ndx = t->add_column(type_Timestamp, "time", true);
+    t->add_search_index(int_col_ndx);
     t->add_empty_row(5);
     std::vector<std::string> names = {"Billy", "Bob", "Joe", "Jane", "Joel"};
     std::vector<double> fees = { 2.0, 2.23, 2.22, 2.25, 3.73 };
@@ -465,6 +466,7 @@ TEST(Parser_basic_serialisation)
         t->set_int(int_col_ndx, i, i);
         t->set_string(str_col_ndx, i, names[i]);
         t->set_double(double_col_ndx, i, fees[i]);
+        t->set_bool(bool_col_ndx, i, i % 2 == 0);
     }
     t->set_timestamp(time_col_ndx, 0, Timestamp(realm::null()));
     t->set_timestamp(time_col_ndx, 1, Timestamp(1512130073, 0)); // 2017/12/02 @ 12:47am (UTC)
@@ -493,8 +495,24 @@ TEST(Parser_basic_serialisation)
     verify_query(test_context, t, "3 =< age", 2);
     verify_query(test_context, t, "age > 2 and age < 4", 1);
     verify_query(test_context, t, "age = 1 || age == 3", 2);
+    verify_query(test_context, t, "fees = 1.2 || fees = 2.23", 1);
+    verify_query(test_context, t, "fees = 2 || fees = 3", 1);
+    verify_query(test_context, t, "fees = 2 || fees = 3 || fees = 4", 1);
+    verify_query(test_context, t, "fees = 0 || fees = 1", 0);
+
     verify_query(test_context, t, "fees != 2.22 && fees > 2.2", 3);
     verify_query(test_context, t, "(age > 1 || fees >= 2.25) && age == 4", 1);
+    verify_query(test_context, t, "licensed == true", 3);
+    verify_query(test_context, t, "licensed == false", 2);
+    verify_query(test_context, t, "licensed = true || licensed = true", 3);
+    verify_query(test_context, t, "licensed = 1 || licensed = 0", 5);
+    verify_query(test_context, t, "licensed = true || licensed = false", 5);
+    verify_query(test_context, t, "licensed == true || licensed == false", 5);
+    verify_query(test_context, t, "licensed == true || buddy.licensed == true", 3);
+    verify_query(test_context, t, "buddy.licensed == true", 0);
+    verify_query(test_context, t, "buddy.licensed == false", 1);
+    verify_query(test_context, t, "licensed == false || buddy.licensed == false", 3);
+    verify_query(test_context, t, "licensed == true or licensed = true || licensed = TRUE", 3);
     verify_query(test_context, t, "name = \"Joe\"", 1);
     verify_query(test_context, t, "buddy.age > 0", 1);
     verify_query(test_context, t, "name BEGINSWITH \"J\"", 3);
@@ -520,6 +538,7 @@ TEST(Parser_basic_serialisation)
     CHECK(message.find(table_name) != std::string::npos); // no prefix modification for names without "class_"
     CHECK(message.find("missing_property") != std::string::npos);
 }
+
 
 TEST(Parser_LinksToSameTable)
 {
