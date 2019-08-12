@@ -29,6 +29,7 @@
 #include <vector>
 namespace realm {
 class Group;
+class Transaction;
 class Schema;
 class SchemaChange;
 class StringData;
@@ -82,7 +83,7 @@ public:
     // passed in target schema is updated with the correct column mapping
     // optionally runs migration function if schema is out of date
     // NOTE: must be performed within a write transaction
-    static void apply_schema_changes(Group& group, uint64_t schema_version,
+    static void apply_schema_changes(Transaction& group, uint64_t schema_version,
                                      Schema& target_schema, uint64_t target_schema_version,
                                      SchemaMode mode, std::vector<SchemaChange> const& changes,
                                      util::Optional<std::string> sync_user_id,
@@ -123,7 +124,7 @@ public:
     static StringData object_type_for_table_name(StringData table_name);
 
     // creates the private role for the given user if it does not exist
-    static void ensure_private_role_exists_for_user(Group& group, StringData sync_user_id);
+    static void ensure_private_role_exists_for_user(Transaction& group, StringData sync_user_id);
 
 private:
     friend class ObjectSchema;

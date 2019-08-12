@@ -29,6 +29,7 @@
 
 #if REALM_ENABLE_SYNC
 #include "sync/impl/work_queue.hpp"
+#include "sync/impl/sync_file.hpp"
 #include "sync/sync_config.hpp"
 #include "sync/sync_manager.hpp"
 #include "sync/sync_session.hpp"
@@ -288,6 +289,14 @@ REALM_NOINLINE void translate_file_exception(StringData path, bool immutable)
 } // namespace _impl
 } // namespace realm
 
+#if REALM_ENABLE_SYNC
+static bool is_nonupgradable_history(IncompatibleHistories const& ex)
+{
+    // FIXME: Replace this with a proper specific exception type once Core adds support for it.
+    return std::string(ex.what()).find(std::string("Incompatible histories. Nonupgradable history schema")) != npos;
+}
+#endif
+
 void RealmCoordinator::open_db()
 {
     if (m_db || m_read_only_group)
@@ -310,7 +319,7 @@ void RealmCoordinator::open_db()
 
         if (server_synchronization_mode) {
 #if REALM_ENABLE_SYNC
-            m_history = sync::make_client_history(config.path);
+            m_history = sync::make_client_replication(m_config.path);
 #else
             REALM_TERMINATE("Realm was not built with sync enabled");
 #endif
@@ -369,12 +378,12 @@ void RealmCoordinator::open_db()
 #if REALM_ENABLE_SYNC
     catch (IncompatibleHistories const& ex) {
         if (!server_synchronization_mode || !is_nonupgradable_history(ex))
-            translate_file_exception(config.path, config.immutable()); // Throws
+            translate_file_exception(m_config.path, m_config.immutable()); // Throws
 
         // Move the Realm file into the recovery directory.
-        std::string recovery_directory = SyncManager::shared().recovery_directory_path(config.sync_config ? config.sync_config->recovery_directory : none);
+        std::string recovery_directory = SyncManager::shared().recovery_directory_path(m_config.sync_config ? m_config.sync_config->recovery_directory : none);
         std::string new_realm_path = util::reserve_unique_file_name(recovery_directory, "synced-realm-XXXXXXX");
-        util::File::move(config.path, new_realm_path);
+        util::File::move(m_config.path, new_realm_path);
 
         const char* message = "The local copy of this synced Realm was created with an incompatible version of "
                               "Realm. It has been moved aside, and the Realm will be re-downloaded the next time it "
@@ -571,13 +580,14 @@ void RealmCoordinator::commit_write(Realm& realm)
     REALM_ASSERT(!m_config.immutable());
     REALM_ASSERT(realm.is_in_transaction());
 
+    Transaction& tr = Realm::Internal::get_transaction(realm);
     {
         // Need to acquire this lock before committing or another process could
         // perform a write and notify us before we get the chance to set the
         // skip version
         std::lock_guard<std::mutex> l(m_notifier_mutex);
 
-        Realm::Internal::get_transaction(realm).commit_and_continue_as_read();
+        tr.commit_and_continue_as_read();
 
         // Don't need to check m_new_notifiers because those don't skip versions
         bool have_notifiers = std::any_of(m_notifiers.begin(), m_notifiers.end(),
@@ -590,8 +600,7 @@ void RealmCoordinator::commit_write(Realm& realm)
 #if REALM_ENABLE_SYNC
     // Realm could be closed in did_change. So send sync notification first before did_change.
     if (m_sync_session) {
-        auto& sg = Realm::Internal::get_shared_group(realm);
-        auto version = LangBindHelper::get_version_of_latest_snapshot(*sg);
+        auto version = tr.get_version();
         SyncSession::Internal::nonsync_transact_notify(*m_sync_session, version);
     }
 #endif
@@ -982,8 +991,8 @@ void RealmCoordinator::promote_to_write(Realm& realm)
     lock.unlock();
 
     // FIXME: we probably won't actually want a strong pointer here
-    auto sg = Realm::Internal::get_transaction_ref(realm);
-    transaction::begin(sg, realm.m_binding_context.get(), notifiers);
+    auto tr = Realm::Internal::get_transaction_ref(realm);
+    transaction::begin(tr, realm.m_binding_context.get(), notifiers);
 }
 
 void RealmCoordinator::process_available_async(Realm& realm)

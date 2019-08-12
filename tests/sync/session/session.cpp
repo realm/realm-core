@@ -473,7 +473,7 @@ TEMPLATE_TEST_CASE("sync: stop policy behavior", RegularUser, AdminTokenUser) {
         const auto& property1 = *object_schema.property_for_name("value");
         TableRef table = ObjectStore::table_for_object_type(r->read_group(), "object");
         r->begin_transaction();
-        sync::create_object(r->read_group(), *table);
+        table->create_object();
         r->commit_transaction();
 
         return session;
@@ -664,12 +664,12 @@ TEST_CASE("sync: stable IDs", "[sync]") {
 
         auto realm = Realm::get_shared_realm(config);
 
-        ObjectSchema object_schema(realm->read_group(), "object");
-        REQUIRE(object_schema.property_for_name(sync::object_id_column_name) == nullptr);
+        ObjectSchema object_schema(realm->read_group(), "object", TableKey());
         REQUIRE(object_schema == *config.schema->find("object"));
     }
 }
 
+#if 0 // Not possible to open core-5 format realms in read-only mode
 TEST_CASE("sync: Migration from Sync 1.x to Sync 2.x", "[sync]") {
     if (!EventLoop::has_implementation())
         return;
@@ -730,4 +730,4 @@ TEST_CASE("sync: Migration from Sync 1.x to Sync 2.x", "[sync]") {
     }
 
 }
-
+#endif
