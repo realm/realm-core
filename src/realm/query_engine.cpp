@@ -684,3 +684,44 @@ ExpressionNode::ExpressionNode(const ExpressionNode& from, QueryNodeHandoverPatc
 , m_expression(from.m_expression->clone(patches))
 {
 }
+
+
+template<>
+size_t TimestampNode<Greater>::find_first_local(size_t start, size_t end)
+{
+    REALM_ASSERT(this->m_table);
+
+    if (this->m_value.is_null()) {
+        return not_found;
+    }
+    Greater cond;
+
+    while (start < end) {
+        size_t ret = this->find_first_local_seconds<GreaterEqual>(start, end);
+
+        if (ret == not_found)
+            return not_found;
+
+        util::Optional<int64_t> seconds = get_seconds_and_cache(ret);
+        if (!seconds) {
+            start = ret + 1;
+            continue;
+        }
+        if (have_nanoseconds_leaf_and_all_are_zeros(ret)) {
+            if (*seconds > m_value.get_seconds()) {
+                return ret;
+            } else {
+                start = ret + 1;
+                continue;
+            }
+        }
+        int32_t nanos = this->get_nanoseconds_and_cache(ret);
+        Timestamp ts{*seconds, nanos};
+        if (cond(ts, m_value, ts.is_null(), m_value.is_null())) {
+            return ret;
+        }
+        start = ret + 1;
+    }
+
+    return not_found;
+}

@@ -323,6 +323,9 @@ struct BenchmarkWithLongStrings : BenchmarkWithStrings {
 
 struct BenchmarkWithTimestamps : Benchmark {
     std::multiset<Timestamp> values;
+    Timestamp needle;
+    size_t num_results_to_needle;
+    double percent_results_to_needle = 0.5;
     void before_all(SharedGroup& group)
     {
         WriteTransaction tr(group);
@@ -336,6 +339,14 @@ struct BenchmarkWithTimestamps : Benchmark {
             values.insert(time);
         }
         tr.commit();
+        // simulate a work load where this percent of random results match
+        num_results_to_needle = values.size() * percent_results_to_needle;
+        // this relies on values being stored in sorted order by std::multiset
+        auto it = values.begin();
+        for (size_t i = 0; i < num_results_to_needle; ++i) {
+            ++it;
+        }
+        needle = *it;
     }
 
     void after_all(SharedGroup& group)
@@ -347,6 +358,10 @@ struct BenchmarkWithTimestamps : Benchmark {
 };
 
 struct BenchmarkQueryTimestampGreater : BenchmarkWithTimestamps {
+    void before_all(SharedGroup& group) {
+        percent_results_to_needle = 2.0f / 3.0f;
+        BenchmarkWithTimestamps::before_all(group);
+    }
     const char* name() const
     {
         return "QueryTimestampGreater";
@@ -356,10 +371,73 @@ struct BenchmarkQueryTimestampGreater : BenchmarkWithTimestamps {
     {
         ReadTransaction tr(group);
         ConstTableRef table = tr.get_table("Timestamps");
-        Query query = table->where().greater(0, *(values.begin()));
+        Query query = table->where().greater(0, needle);
         TableView results = query.find_all();
-        REALM_ASSERT_EX(results.size() == values.size() - 1, results.size(), values.size() / 2,
-                        values.size());
+        REALM_ASSERT_EX(results.size() == values.size() - num_results_to_needle - 1, results.size(), num_results_to_needle, values.size());
+        static_cast<void>(results);
+    }
+};
+
+struct BenchmarkQueryTimestampGreaterEqual : BenchmarkWithTimestamps {
+    void before_all(SharedGroup& group) {
+        percent_results_to_needle = 2.0f / 3.0f;
+        BenchmarkWithTimestamps::before_all(group);
+    }
+    const char* name() const
+    {
+        return "QueryTimestampGreaterEqual";
+    }
+
+    void operator()(SharedGroup& group)
+    {
+        ReadTransaction tr(group);
+        ConstTableRef table = tr.get_table("Timestamps");
+        Query query = table->where().greater_equal(0, needle);
+        TableView results = query.find_all();
+        REALM_ASSERT_EX(results.size() == values.size() - num_results_to_needle, results.size(), num_results_to_needle, values.size());
+        static_cast<void>(results);
+    }
+};
+
+
+struct BenchmarkQueryTimestampLess : BenchmarkWithTimestamps {
+    void before_all(SharedGroup& group) {
+        percent_results_to_needle = 1.0f / 3.0f;
+        BenchmarkWithTimestamps::before_all(group);
+    }
+    const char* name() const
+    {
+        return "QueryTimestampLess";
+    }
+
+    void operator()(SharedGroup& group)
+    {
+        ReadTransaction tr(group);
+        ConstTableRef table = tr.get_table("Timestamps");
+        Query query = table->where().less(0, needle);
+        TableView results = query.find_all();
+        REALM_ASSERT_EX(results.size() == num_results_to_needle, results.size(), num_results_to_needle, values.size());
+        static_cast<void>(results);
+    }
+};
+
+struct BenchmarkQueryTimestampLessEqual : BenchmarkWithTimestamps {
+    void before_all(SharedGroup& group) {
+        percent_results_to_needle = 1.0f / 3.0f;
+        BenchmarkWithTimestamps::before_all(group);
+    }
+    const char* name() const
+    {
+        return "QueryTimestampLessEqual";
+    }
+
+    void operator()(SharedGroup& group)
+    {
+        ReadTransaction tr(group);
+        ConstTableRef table = tr.get_table("Timestamps");
+        Query query = table->where().less_equal(0, needle);
+        TableView results = query.find_all();
+        REALM_ASSERT_EX(results.size() == num_results_to_needle + 1, results.size(), num_results_to_needle, values.size());
         static_cast<void>(results);
     }
 };
@@ -1187,7 +1265,11 @@ int benchmark_common_tasks_main()
 //    BENCH(BenchmarkQueryChainedOrIntsIndexed);
 //    BENCH(BenchmarkQueryIntEquality);
 //    BENCH(BenchmarkQueryIntEqualityIndexed);
+
     BENCH(BenchmarkQueryTimestampGreater);
+    BENCH(BenchmarkQueryTimestampGreaterEqual);
+    BENCH(BenchmarkQueryTimestampLess);
+    BENCH(BenchmarkQueryTimestampLessEqual);
 
 #undef BENCH
     return 0;

@@ -1349,18 +1349,9 @@ public:
         m_leaf_end_nanos = m_leaf_start_nanos + m_leaf_ptr_nanos->size();
     }
 
-    size_t find_first_local(size_t start, size_t end) override
-    {
-        REALM_ASSERT(this->m_table);
-
-        if (this->m_value.is_null()) {
-            if (TConditionFunction::condition == cond_Greater || TConditionFunction::condition == cond_Less) {
-                return not_found;
-            }
-        }
-
+    template<class Condition>
+    size_t find_first_local_seconds(size_t start, size_t end) {
         while (start < end) {
-
             // Cache internal leaves
             if (start >= this->m_leaf_end_seconds || start < this->m_leaf_start_seconds) {
                 this->get_leaf_seconds(*this->m_condition_column, start);
@@ -1372,48 +1363,76 @@ public:
             else
                 end2 = end - this->m_leaf_start_seconds;
 
-            size_t s;
-            int64_t needle = this->m_value.is_null() ? this->m_leaf_ptr_seconds->null_value() : this->m_value.get_seconds();
-            s = this->m_leaf_ptr_seconds->template find_first<TConditionFunction>(needle, start - this->m_leaf_start_seconds, end2);
+            int64_t needle = this->m_value.is_null() ? this->m_leaf_ptr_seconds->null_value() : this->m_value.get_seconds(); // FIXME: test null
+            size_t s = this->m_leaf_ptr_seconds->template find_first<Condition>(needle, start - this->m_leaf_start_seconds, end2);
 
             if (s == not_found) {
                 start = this->m_leaf_end_seconds;
                 continue;
             }
-            else {
-                size_t ndx_in_col = s + this->m_leaf_start_seconds;
-                if (true || TConditionFunction::condition == cond_NotEqual) { // FIXME: specialise this with a template
-                    // we might have passed some that match in seconds but not in nanoseconds
-//                    for (size_t i = start; i < ndx_in_col; ++i) {
-//                        Timestamp ts = m_condition_column->get(i);
-//                        if (condition(ts, m_value, ts.is_null(), m_value.is_null())) {
-//                            return i;
-//                        }
-//                    }
-
-
-
-                    return ndx_in_col;
-                }
-                Timestamp ts = m_condition_column->get(ndx_in_col);
-                if (condition(ts, m_value, ts.is_null(), m_value.is_null())) {
-                    return ndx_in_col;
-                }
-                else {
-                    ++start;
-                }
-            }
+            return s + this->m_leaf_start_seconds;
         }
-
         return not_found;
     }
 
+    util::Optional<int64_t> get_seconds_and_cache(size_t ndx) {
+        // Cache internal leaves
+        if (ndx >= this->m_leaf_end_seconds || ndx < this->m_leaf_start_seconds) {
+            this->get_leaf_seconds(*this->m_condition_column, ndx);
+        }
+        return this->m_leaf_ptr_seconds->get(ndx - this->m_leaf_start_seconds);
+    }
 
-//    size_t find_first_local(size_t start, size_t end) override
-//    {
-//        size_t ret = m_condition_column->find<TConditionFunction>(m_value, start, end);
-//        return ret;
-//    }
+
+    bool have_nanoseconds_leaf_and_all_are_zeros(size_t ndx) {
+        if (ndx >= this->m_leaf_start_nanos && ndx < this->m_leaf_end_nanos) {
+            return this->m_leaf_ptr_nanos->get_width() == 0;
+        }
+        return false;
+    }
+
+    int32_t get_nanoseconds_and_cache(size_t ndx) {
+        // Cache internal leaves
+        if (ndx >= this->m_leaf_end_nanos || ndx < this->m_leaf_start_nanos) {
+            this->get_leaf_nanos(*this->m_condition_column, ndx);
+        }
+        return int32_t(this->m_leaf_ptr_nanos->get(ndx - this->m_leaf_start_nanos));
+    }
+
+    template<class Condition>
+    size_t find_first_local_nanoseconds(size_t start, size_t end) {
+        while (start < end) {
+            // Cache internal leaves
+            if (start >= this->m_leaf_end_nanos || start < this->m_leaf_start_nanos) {
+                this->get_leaf_nanos(*this->m_condition_column, start);
+            }
+
+            size_t end2;
+            if (end > this->m_leaf_end_nanos)
+                end2 = this->m_leaf_end_nanos - this->m_leaf_start_nanos;
+            else
+                end2 = end - this->m_leaf_start_nanos;
+
+            int32_t needle = this->m_value.get_nanoseconds(); // FIXME: test null
+            size_t s = this->m_leaf_ptr_nanos->template find_first<Condition>(needle, start - this->m_leaf_start_nanos, end2);
+
+            if (s == not_found) {
+                start = this->m_leaf_end_nanos;
+                continue;
+            }
+            return s + this->m_leaf_start_nanos;
+        }
+        return not_found;
+    }
+
+    // see query_engine.cpp for operator specialisations
+    size_t find_first_local(size_t start, size_t end) override
+    {
+        REALM_ASSERT(this->m_table);
+
+        size_t ret = m_condition_column->find<TConditionFunction>(m_value, start, end);
+        return ret;
+    }
 
     virtual std::string describe(util::serializer::SerialisationState& state) const override
     {
