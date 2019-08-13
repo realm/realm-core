@@ -340,7 +340,7 @@ struct BenchmarkWithTimestamps : Benchmark {
         }
         tr.commit();
         // simulate a work load where this percent of random results match
-        num_results_to_needle = values.size() * percent_results_to_needle;
+        num_results_to_needle = size_t(values.size() * percent_results_to_needle);
         // this relies on values being stored in sorted order by std::multiset
         auto it = values.begin();
         for (size_t i = 0; i < num_results_to_needle; ++i) {

@@ -685,7 +685,7 @@ ExpressionNode::ExpressionNode(const ExpressionNode& from, QueryNodeHandoverPatc
 {
 }
 
-
+namespace realm {
 template<>
 size_t TimestampNode<Greater>::find_first_local(size_t start, size_t end)
 {
@@ -725,3 +725,4 @@ size_t TimestampNode<Greater>::find_first_local(size_t start, size_t end)
 
     return not_found;
 }
+} // namespace realm

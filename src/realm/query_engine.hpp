@@ -2377,7 +2377,6 @@ private:
 
 // For Next-Generation expressions like col1 / col2 + 123 > col4 * 100.
 class ExpressionNode : public ParentNode {
-
 public:
     ExpressionNode(std::unique_ptr<Expression>);
 
