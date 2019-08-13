@@ -1283,8 +1283,7 @@ private:
 };
 
 
-template <class TConditionFunction>
-class TimestampNode : public ParentNode {
+class TimestampNodeBase : public ParentNode {
 public:
     using TConditionValue = Timestamp;
     static const bool special_null_node = false;
@@ -1294,14 +1293,14 @@ public:
     using LeafInfoNanos = typename IntegerColumn::LeafInfo;
 
 
-    TimestampNode(Timestamp v, size_t column)
+    TimestampNodeBase(Timestamp v, size_t column)
         : m_value(v)
     {
         m_condition_column_idx = column;
     }
 
-    TimestampNode(null, size_t column)
-        : TimestampNode(Timestamp{}, column)
+    TimestampNodeBase(null, size_t column)
+        : TimestampNodeBase(Timestamp{}, column)
     {
     }
 
@@ -1328,9 +1327,9 @@ public:
         m_leaf_end_nanos = 0;
         m_array_ptr_nanos.reset(); // Explicitly destroy the old one first, because we're reusing the memory.
         m_array_ptr_nanos.reset(new (&m_leaf_cache_storage_nanos) LeafTypeNanos(m_table->get_alloc()));
-
     }
 
+protected:
     void get_leaf_seconds(const TimestampColumn& col, size_t ndx)
     {
         size_t ndx_in_leaf;
@@ -1349,8 +1348,63 @@ public:
         m_leaf_end_nanos = m_leaf_start_nanos + m_leaf_ptr_nanos->size();
     }
 
-    template<class Condition>
-    size_t find_first_local_seconds(size_t start, size_t end) {
+    util::Optional<int64_t> get_seconds_and_cache(size_t ndx)
+    {
+        // Cache internal leaves
+        if (ndx >= this->m_leaf_end_seconds || ndx < this->m_leaf_start_seconds) {
+            this->get_leaf_seconds(*this->m_condition_column, ndx);
+        }
+        return this->m_leaf_ptr_seconds->get(ndx - this->m_leaf_start_seconds);
+    }
+
+    int32_t get_nanoseconds_and_cache(size_t ndx)
+    {
+        // Cache internal leaves
+        if (ndx >= this->m_leaf_end_nanos || ndx < this->m_leaf_start_nanos) {
+            this->get_leaf_nanos(*this->m_condition_column, ndx);
+        }
+        return int32_t(this->m_leaf_ptr_nanos->get(ndx - this->m_leaf_start_nanos));
+    }
+
+    TimestampNodeBase(const TimestampNodeBase& from, QueryNodeHandoverPatches* patches)
+        : ParentNode(from, patches)
+        , m_value(from.m_value)
+        , m_condition_column(from.m_condition_column)
+    {
+        if (m_condition_column && patches)
+            m_condition_column_idx = m_condition_column->get_column_index();
+    }
+
+    Timestamp m_value;
+    const TimestampColumn* m_condition_column;
+
+    // Leaf cache seconds
+    using LeafCacheStorageSeconds =
+        typename std::aligned_storage<sizeof(LeafTypeSeconds), alignof(LeafTypeSeconds)>::type;
+    LeafCacheStorageSeconds m_leaf_cache_storage_seconds;
+    std::unique_ptr<LeafTypeSeconds, PlacementDelete> m_array_ptr_seconds;
+    const LeafTypeSeconds* m_leaf_ptr_seconds = nullptr;
+    size_t m_leaf_start_seconds = npos;
+    size_t m_leaf_end_seconds = 0;
+
+    // Leaf cache nanoseconds
+    using LeafCacheStorageNanos = typename std::aligned_storage<sizeof(LeafTypeNanos), alignof(LeafTypeNanos)>::type;
+    LeafCacheStorageNanos m_leaf_cache_storage_nanos;
+    std::unique_ptr<LeafTypeNanos, PlacementDelete> m_array_ptr_nanos;
+    const LeafTypeNanos* m_leaf_ptr_nanos = nullptr;
+    size_t m_leaf_start_nanos = npos;
+    size_t m_leaf_end_nanos = 0;
+};
+
+template <class TConditionFunction>
+class TimestampNode : public TimestampNodeBase {
+public:
+    using TimestampNodeBase::TimestampNodeBase;
+
+    template <class Condition>
+    size_t find_first_local_seconds(size_t start, size_t end)
+    {
+        REALM_ASSERT(!this->m_value.is_null());
         while (start < end) {
             // Cache internal leaves
             if (start >= this->m_leaf_end_seconds || start < this->m_leaf_start_seconds) {
@@ -1363,64 +1417,15 @@ public:
             else
                 end2 = end - this->m_leaf_start_seconds;
 
-            int64_t needle = this->m_value.is_null() ? this->m_leaf_ptr_seconds->null_value() : this->m_value.get_seconds(); // FIXME: test null
-            size_t s = this->m_leaf_ptr_seconds->template find_first<Condition>(needle, start - this->m_leaf_start_seconds, end2);
+            int64_t needle = this->m_value.get_seconds();
+            size_t s = this->m_leaf_ptr_seconds->template find_first<Condition>(
+                needle, start - this->m_leaf_start_seconds, end2);
 
             if (s == not_found) {
                 start = this->m_leaf_end_seconds;
                 continue;
             }
             return s + this->m_leaf_start_seconds;
-        }
-        return not_found;
-    }
-
-    util::Optional<int64_t> get_seconds_and_cache(size_t ndx) {
-        // Cache internal leaves
-        if (ndx >= this->m_leaf_end_seconds || ndx < this->m_leaf_start_seconds) {
-            this->get_leaf_seconds(*this->m_condition_column, ndx);
-        }
-        return this->m_leaf_ptr_seconds->get(ndx - this->m_leaf_start_seconds);
-    }
-
-
-    bool have_nanoseconds_leaf_and_all_are_zeros(size_t ndx) {
-        if (ndx >= this->m_leaf_start_nanos && ndx < this->m_leaf_end_nanos) {
-            return this->m_leaf_ptr_nanos->get_width() == 0;
-        }
-        return false;
-    }
-
-    int32_t get_nanoseconds_and_cache(size_t ndx) {
-        // Cache internal leaves
-        if (ndx >= this->m_leaf_end_nanos || ndx < this->m_leaf_start_nanos) {
-            this->get_leaf_nanos(*this->m_condition_column, ndx);
-        }
-        return int32_t(this->m_leaf_ptr_nanos->get(ndx - this->m_leaf_start_nanos));
-    }
-
-    template<class Condition>
-    size_t find_first_local_nanoseconds(size_t start, size_t end) {
-        while (start < end) {
-            // Cache internal leaves
-            if (start >= this->m_leaf_end_nanos || start < this->m_leaf_start_nanos) {
-                this->get_leaf_nanos(*this->m_condition_column, start);
-            }
-
-            size_t end2;
-            if (end > this->m_leaf_end_nanos)
-                end2 = this->m_leaf_end_nanos - this->m_leaf_start_nanos;
-            else
-                end2 = end - this->m_leaf_start_nanos;
-
-            int32_t needle = this->m_value.get_nanoseconds(); // FIXME: test null
-            size_t s = this->m_leaf_ptr_nanos->template find_first<Condition>(needle, start - this->m_leaf_start_nanos, end2);
-
-            if (s == not_found) {
-                start = this->m_leaf_end_nanos;
-                continue;
-            }
-            return s + this->m_leaf_start_nanos;
         }
         return not_found;
     }
@@ -1437,45 +1442,14 @@ public:
     virtual std::string describe(util::serializer::SerialisationState& state) const override
     {
         REALM_ASSERT(m_condition_column != nullptr);
-        return state.describe_column(ParentNode::m_table, m_condition_column->get_column_index())
-            + " " + TConditionFunction::description() + " " + util::serializer::print_value(TimestampNode::m_value);
+        return state.describe_column(ParentNode::m_table, m_condition_column->get_column_index()) + " " +
+               TConditionFunction::description() + " " + util::serializer::print_value(TimestampNode::m_value);
     }
 
     std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches* patches) const override
     {
         return std::unique_ptr<ParentNode>(new TimestampNode(*this, patches));
     }
-
-    TimestampNode(const TimestampNode& from, QueryNodeHandoverPatches* patches)
-        : ParentNode(from, patches)
-        , m_value(from.m_value)
-        , m_condition_column(from.m_condition_column)
-    {
-        if (m_condition_column && patches)
-            m_condition_column_idx = m_condition_column->get_column_index();
-    }
-
-private:
-    Timestamp m_value;
-    const TimestampColumn* m_condition_column;
-    TConditionFunction condition;
-
-    // Leaf cache seconds
-    using LeafCacheStorageSeconds = typename std::aligned_storage<sizeof(LeafTypeSeconds), alignof(LeafTypeSeconds)>::type;
-    LeafCacheStorageSeconds m_leaf_cache_storage_seconds;
-    std::unique_ptr<LeafTypeSeconds, PlacementDelete> m_array_ptr_seconds;
-    const LeafTypeSeconds* m_leaf_ptr_seconds = nullptr;
-    size_t m_leaf_start_seconds = npos;
-    size_t m_leaf_end_seconds = 0;
-    size_t m_local_end_seconds;
-    // Leaf cache nanoseconds
-    using LeafCacheStorageNanos = typename std::aligned_storage<sizeof(LeafTypeNanos), alignof(LeafTypeNanos)>::type;
-    LeafCacheStorageNanos m_leaf_cache_storage_nanos;
-    std::unique_ptr<LeafTypeNanos, PlacementDelete> m_array_ptr_nanos;
-    const LeafTypeNanos* m_leaf_ptr_nanos = nullptr;
-    size_t m_leaf_start_nanos = npos;
-    size_t m_leaf_end_nanos = 0;
-    size_t m_local_end_nanos;
 };
 
 class StringNodeBase : public ParentNode {
