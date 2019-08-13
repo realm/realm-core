@@ -162,7 +162,6 @@ public:
 
 
     size_t find_first(value_type value, size_t begin = 0, size_t end = npos) const;
-    size_t find_first_ge(value_type value, size_t begin = 0, size_t end = npos) const;
 
 
     // Overwrite Array::bptree_leaf_insert to correctly split nodes.
@@ -624,11 +623,6 @@ size_t ArrayIntNull::find_first(value_type value, size_t start, size_t end) cons
 inline size_t ArrayIntNull::find_first(value_type value, size_t begin, size_t end) const
 {
     return find_first<Equal>(value, begin, end);
-}
-
-inline size_t ArrayIntNull::find_first_ge(value_type value, size_t begin, size_t end) const
-{
-    return find_first<GreaterEqual>(value, begin, end);
 }
 }
 

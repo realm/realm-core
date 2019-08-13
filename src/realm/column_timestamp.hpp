@@ -98,7 +98,7 @@ public:
     void erase(size_t row_ndx, bool is_last);
 
     template <class Condition>
-    size_t find_slow(Timestamp value, size_t begin, size_t end) const noexcept
+    size_t find(Timestamp value, size_t begin, size_t end) const noexcept
     {
         // FIXME: Here we can do all sorts of clever optimizations. Use bithack-search on seconds, then for each match
         // check nanoseconds, etc. Lots of possibilities. Below code is naive and slow but works.
@@ -110,12 +110,6 @@ public:
                 return t;
         }
         return npos;
-    }
-
-    template <class Condition>
-    size_t find(Timestamp value, size_t begin, size_t end) const noexcept
-    {
-        return find_slow<Condition>(value, begin, end);
     }
 
     typedef Timestamp value_type;
@@ -157,9 +151,6 @@ private:
         return best;
     }
 };
-
-template <>
-size_t TimestampColumn::find<Greater>(Timestamp value, size_t begin, size_t end) const noexcept;
 
 } // namespace realm
 

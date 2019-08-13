@@ -291,7 +291,6 @@ public:
     T front() const noexcept;
     T back() const noexcept;
 
-    template <class Cond>
     size_t find_first(T value, size_t begin = 0, size_t end = npos) const;
     void find_all(IntegerColumn& out_indices, T value, size_t begin = 0, size_t end = npos) const;
 
@@ -1177,11 +1176,10 @@ void BpTree<T>::get_leaf(size_t ndx, size_t& ndx_in_leaf, LeafInfo& inout_leaf_i
 }
 
 template <class T>
-template <class Cond>
 size_t BpTree<T>::find_first(T value, size_t begin, size_t end) const
 {
     if (root_is_leaf()) {
-        return root_as_leaf().template find_first<Cond>(value, begin, end);
+        return root_as_leaf().find_first(value, begin, end);
     }
 
     // FIXME: It would be better to always require that 'end' is
@@ -1199,7 +1197,7 @@ size_t BpTree<T>::find_first(T value, size_t begin, size_t end) const
         get_leaf(ndx_in_tree, ndx_in_leaf, leaf_info);
         size_t leaf_offset = ndx_in_tree - ndx_in_leaf;
         size_t end_in_leaf = std::min(leaf->size(), end - leaf_offset);
-        size_t ndx = leaf->template find_first<Cond>(value, ndx_in_leaf, end_in_leaf); // Throws (maybe)
+        size_t ndx = leaf->find_first(value, ndx_in_leaf, end_in_leaf); // Throws (maybe)
         if (ndx != not_found)
             return leaf_offset + ndx;
         ndx_in_tree = leaf_offset + end_in_leaf;

@@ -4007,7 +4007,7 @@ TEST(Shared_GetCommitSize)
         CHECK_LESS(size_after - size_before, commit_size);
     }
 }
-
+/*
 TEST(Shared_TimestampQuery)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -4060,7 +4060,7 @@ TEST(Shared_TimestampQuery)
         for (int i = 0; i < 100000; i++) {
             auto ndx = table->add_empty_row();
             int seconds = random.draw_int_max(3600 * 24 * 10);
-            table->set_timestamp(col_date, ndx, Timestamp(seconds, i));
+            table->set_timestamp(col_date, ndx, Timestamp(seconds, 0));
             table->set_int(col_value, ndx, i);
         }
         wt.commit();
@@ -4082,5 +4082,6 @@ TEST(Shared_TimestampQuery)
         sg.end_read();
     }
 }
+*/
 
 #endif // TEST_SHARED

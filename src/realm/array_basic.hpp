@@ -47,12 +47,7 @@ public:
     void truncate(size_t size);
     void clear();
 
-    template <class Cond>
     size_t find_first(T value, size_t begin = 0, size_t end = npos) const;
-    size_t find_first(T value, size_t begin = 0, size_t end = npos) const
-    {
-        return find_first<Equal>(value, begin, end);
-    }
     void find_all(IntegerColumn* result, T value, size_t add_offset = 0, size_t begin = 0, size_t end = npos) const;
 
     size_t count(T value, size_t begin = 0, size_t end = npos) const;
