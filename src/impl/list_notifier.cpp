@@ -49,7 +49,7 @@ void ListNotifier::release_data() noexcept
 void ListNotifier::do_attach_to(Transaction& sg)
 {
     auto obj = sg.get_table(m_table)->get_object(m_obj);
-    m_list = List::get_list(m_type, obj, m_col);
+    m_list = obj.get_listbase_ptr(m_col);
 }
 
 bool ListNotifier::do_add_required_change_info(TransactionChangeInfo& info)

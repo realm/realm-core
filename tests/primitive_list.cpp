@@ -634,33 +634,34 @@ TEMPLATE_TEST_CASE("primitive list", ::Int, ::Bool, ::Float, ::Double, ::String,
         REQUIRE(filtered.size() == 1);
         REQUIRE(*filtered.first<T>() == v);
     }
+#endif
 
     SECTION("min()") {
         if (!TestType::can_minmax()) {
             REQUIRE_THROWS(list.min());
-            REQUIRE_THROWS(results.min());
+            // REQUIRE_THROWS(results.min());
             return;
         }
 
         REQUIRE(get<W>(*list.min()) == TestType::min());
-        REQUIRE(get<W>(*results.min()) == TestType::min());
+        // REQUIRE(get<W>(*results.min()) == TestType::min());
         list.remove_all();
         REQUIRE(list.min() == util::none);
-        REQUIRE(results.min() == util::none);
+        // REQUIRE(results.min() == util::none);
     }
 
     SECTION("max()") {
         if (!TestType::can_minmax()) {
             REQUIRE_THROWS(list.max());
-            REQUIRE_THROWS(results.max());
+            // REQUIRE_THROWS(results.max());
             return;
         }
 
         REQUIRE(get<W>(*list.max()) == TestType::max());
-        REQUIRE(get<W>(*results.max()) == TestType::max());
+        // REQUIRE(get<W>(*results.max()) == TestType::max());
         list.remove_all();
         REQUIRE(list.max() == util::none);
-        REQUIRE(results.max() == util::none);
+        // REQUIRE(results.max() == util::none);
     }
 
     SECTION("sum()") {
@@ -670,10 +671,10 @@ TEMPLATE_TEST_CASE("primitive list", ::Int, ::Bool, ::Float, ::Double, ::String,
         }
 
         REQUIRE(get<W>(list.sum()) == TestType::sum());
-        REQUIRE(get<W>(*results.sum()) == TestType::sum());
+        // REQUIRE(get<W>(*results.sum()) == TestType::sum());
         list.remove_all();
         REQUIRE(get<W>(list.sum()) == W{});
-        REQUIRE(get<W>(*results.sum()) == W{});
+        // REQUIRE(get<W>(*results.sum()) == W{});
     }
 
     SECTION("average()") {
@@ -683,12 +684,12 @@ TEMPLATE_TEST_CASE("primitive list", ::Int, ::Bool, ::Float, ::Double, ::String,
         }
 
         REQUIRE(*list.average() == TestType::average());
-        REQUIRE(*results.average() == TestType::average());
+        // REQUIRE(*results.average() == TestType::average());
         list.remove_all();
         REQUIRE(list.average() == util::none);
-        REQUIRE(results.average() == util::none);
+        // REQUIRE(results.average() == util::none);
     }
-#endif
+
     SECTION("operator==()") {
         Obj obj1 = table->create_object();
         REQUIRE(list == List(r, obj, col));
