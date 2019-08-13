@@ -2190,26 +2190,25 @@ TEST(Shared_WaitForChange)
         db->wait_for_change(tr); // we'll fall right through here, because we haven't advanced our readlock
         {
             LockGuard l(mutex);
+            tr->end_read();
+            tr = db->start_read();
             shared_state[i] = 3;
         }
-        tr->end_read();
-        tr = db->start_read();
         db->wait_for_change(tr); // this time we'll wait because state hasn't advanced since we did.
         {
-            LockGuard l(mutex);
-            shared_state[i] = 4;
+            tr = db->start_read();
+            {
+                LockGuard l(mutex);
+                shared_state[i] = 4;
+            }
+            db->wait_for_change(tr); // everybody waits in state 4
+            {
+                LockGuard l(mutex);
+                tr->end_read();
+                tr = db->start_read();
+                shared_state[i] = 5;
+            }
         }
-        // works within a read transaction as well
-        {
-            auto rt = db->start_read();
-            db->wait_for_change(rt); // everybody waits in state 4
-        }
-        {
-            LockGuard l(mutex);
-            shared_state[i] = 5;
-        }
-        tr->end_read();
-        tr = db->start_read();
         db->wait_for_change(tr); // wait until wait_for_change is released
         {
             LockGuard l(mutex);

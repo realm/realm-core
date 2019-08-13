@@ -16,7 +16,7 @@
 -----------
 
 ### Internals
-* None.
+* Fixes unittest Shared_WaitForChange which could deadlock. ([#3346] https://github.com/realm/realm-core/issues/3346)
 
 ----------------------------------------------
 
