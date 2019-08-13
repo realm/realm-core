@@ -10557,7 +10557,7 @@ TEST(Query_MoveDoesntDoubleDelete)
     }
 }
 
-ONLY(Query_Timestamp)
+TEST(Query_Timestamp)
 {
     size_t match;
     Table table;

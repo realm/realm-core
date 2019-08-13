@@ -4029,19 +4029,58 @@ TEST(Shared_TimestampQuery)
         wt.commit();
     }
 
-    Group& g = const_cast<Group&>(sg.begin_read());
-    auto table = g.get_table("table");
-    auto col_date = table->get_column_index("date");
+    {
+        Group& g = const_cast<Group&>(sg.begin_read());
+        auto table = g.get_table("table");
+        auto col_date = table->get_column_index("date");
 
-    Query q = table->column<Timestamp>(col_date) > Timestamp(0, 3);
-    auto cnt = q.count();
-    CHECK_EQUAL(cnt, 6);
-    q = table->column<Timestamp>(col_date) >= Timestamp(0, 3);
-    cnt = q.count();
-    CHECK_EQUAL(cnt, 7);
-    q = table->column<Timestamp>(col_date) > Timestamp(0, 3) && table->column<Timestamp>(col_date) < Timestamp(1, 3);
-    cnt = q.count();
-    CHECK_EQUAL(cnt, 3);
+        Query q = table->column<Timestamp>(col_date) > Timestamp(0, 3);
+        auto cnt = q.count();
+        CHECK_EQUAL(cnt, 6);
+        q = table->column<Timestamp>(col_date) >= Timestamp(0, 3);
+        cnt = q.count();
+        CHECK_EQUAL(cnt, 7);
+        q = table->column<Timestamp>(col_date) > Timestamp(0, 3) &&
+            table->column<Timestamp>(col_date) < Timestamp(1, 3);
+        cnt = q.count();
+        CHECK_EQUAL(cnt, 3);
+        sg.end_read();
+    }
+
+    {
+        WriteTransaction wt(sg);
+
+        auto table = wt.get_table("table");
+        auto col_date = table->get_column_index("date");
+        auto col_value = table->get_column_index("value");
+
+        table->clear();
+        Random random(random_int<unsigned long>()); // Seed from slow global generator
+
+        for (int i = 0; i < 100000; i++) {
+            auto ndx = table->add_empty_row();
+            int seconds = random.draw_int_max(3600 * 24 * 10);
+            table->set_timestamp(col_date, ndx, Timestamp(seconds, i));
+            table->set_int(col_value, ndx, i);
+        }
+        wt.commit();
+    }
+
+    {
+        Group& g = const_cast<Group&>(sg.begin_read());
+        auto table = g.get_table("table");
+        auto col_date = table->get_column_index("date");
+
+        Query q = table->column<Timestamp>(col_date) > Timestamp(3600 * 24 * 5, 3);
+        auto start = std::chrono::steady_clock::now();
+        auto cnt = q.count();
+        auto end = std::chrono::steady_clock::now();
+
+        std::cout << "Time: " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << " us"
+                  << std::endl;
+        CHECK_GREATER(cnt, 50000);
+        sg.end_read();
+    }
 }
 
 #endif // TEST_SHARED
