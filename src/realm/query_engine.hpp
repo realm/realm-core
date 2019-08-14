@@ -1500,7 +1500,7 @@ public:
         for (size_t s = start; s < end; ++s) {
             StringData t = get_string(s);
             
-            if (cond(StringData(m_value), m_ucase.data(), m_lcase.data(), t))
+            if (cond(StringData(m_value), m_ucase.c_str(), m_lcase.c_str(), t))
                 return s;
         }
         return not_found;
@@ -1650,7 +1650,7 @@ public:
             if (!bool(m_value)) {
                 return s;
             }
-            if (cond(StringData(m_value), m_ucase.data(), m_lcase.data(), m_charmap, t))
+            if (cond(StringData(m_value), m_ucase.c_str(), m_lcase.c_str(), m_charmap, t))
                 return s;
         }
         return not_found;

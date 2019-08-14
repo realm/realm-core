@@ -494,7 +494,7 @@ size_t StringNode<EqualIns>::_find_first_local(size_t start, size_t end)
     for (size_t s = start; s < end; ++s) {
         StringData t = get_string(s);
 
-        if (cond(StringData(m_value), m_ucase.data(), m_lcase.data(), t))
+        if (cond(StringData(m_value), m_ucase.c_str(), m_lcase.c_str(), t))
             return s;
     }
 
