@@ -253,11 +253,11 @@ uint64_t fastrand(uint64_t max, bool is_seed)
     util::LockGuard lg(fastrand_mutex);
 
     // All the atomics (except the add) may be eliminated completely by the compiler on x64
-    static std::atomic<uint64_t> state(is_seed ? max : 1);
+    static std::atomic<uint64_t> state(1);
 
     // Thread safe increment to prevent two threads from producing the same value if called at the exact same time
     state.fetch_add(1, std::memory_order_release);
-    uint64_t x = state.load(std::memory_order_acquire);
+    uint64_t x = is_seed ? max : state.load(std::memory_order_acquire);
     // The result of this arithmetic may be overwritten by another thread, but that's fine in a rand generator
     x ^= x >> 12; // a
     x ^= x << 25; // b
