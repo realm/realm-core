@@ -1984,6 +1984,12 @@ void ClusterTree::remove_links()
     // This function will add objects that should be deleted to 'state'
     ClusterTree::TraverseFunction func = [this, &state, &alloc](const Cluster* cluster) {
         auto remove_link_from_column = [&](ColKey col_key) {
+            // Prevent making changes to table that is going to be removed anyway
+            // Furthermore it is a prerequisite for using 'traverse' that the tree
+            // is not modified
+            if (m_owner->links_to_self(col_key)) {
+                return false;
+            }
             auto col_type = col_key.get_type();
             if (col_type == col_type_Link) {
                 ArrayKey values(alloc);

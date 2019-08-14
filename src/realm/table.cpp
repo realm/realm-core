@@ -3189,6 +3189,11 @@ TableKey Table::get_opposite_table_key(ColKey col_key) const
     return TableKey(m_opposite_table.get(col_key.get_index().val));
 }
 
+bool Table::links_to_self(ColKey col_key) const
+{
+    return get_opposite_table_key(col_key) == m_key;
+}
+
 TableRef Table::get_opposite_table(ColKey col_key) const
 {
     return get_parent_group()->get_table(get_opposite_table_key(col_key));

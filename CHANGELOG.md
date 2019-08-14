@@ -5,7 +5,8 @@
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Clearing a table with links to itself could sometimes result in a crash. 
+  ([#324](https://github.com/realm/realm-core-private/issues/324))
  
 ### Breaking changes
 * None.

@@ -228,6 +228,12 @@ std::string get_current_time_stamp()
     return str_buffer;
 }
 
+namespace {
+// You can use this variable to make a conditional breakpoint if you know that
+// a problem occurs after a certain amount of iterations.
+int iteration;
+}
+
 void parse_and_apply_instructions(std::string& in, const std::string& path, util::Optional<std::ostream&> log)
 {
     const size_t add_empty_row_max = REALM_MAX_BPNODE_SIZE * REALM_MAX_BPNODE_SIZE + 1000;
@@ -286,6 +292,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
 
         for (;;) {
             char instr = get_next(s) % COUNT;
+            iteration++;
 
             if (instr == ADD_TABLE && wt->size() < max_tables) {
                 std::string name = create_table_name();
