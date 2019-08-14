@@ -20,6 +20,7 @@
 
 #include <realm/array_direct.hpp>
 #include <realm/alloc_slab.hpp>
+#include <realm/keys.hpp>
 #include <realm/array.hpp>
 #include <realm/column_type.hpp>
 #include <realm/data_type.hpp>
@@ -246,8 +247,18 @@ public:
             m_column_types.init(alloc, spec.get_ref(0));
             m_column_names.init(alloc, spec.get_ref(1));
             m_column_attributes.init(alloc, spec.get_ref(2));
-            if (spec.size() > 3) {
+            if (spec.size() > 5) {
+                // Must be a Core-6 file.
+                m_column_colkeys.init(alloc, spec.get_ref(5));
+            }
+            else if (spec.size() > 3) {
+                // In pre Core-6, the subspecs array is optional
+                // Not used in Core-6
                 m_column_subspecs.init(alloc, spec.get_ref(3));
+            }
+            if (size() > 7) {
+                // Must be a Core-6 file.
+                m_opposite_table.init(alloc, get_ref(7));
             }
         }
     }
@@ -276,6 +287,8 @@ private:
     Array m_column_names;
     Array m_column_attributes;
     Array m_column_subspecs;
+    Array m_column_colkeys;
+    Array m_opposite_table;
 };
 
 class Group : public Array {
@@ -432,15 +445,33 @@ void Table::print_columns(const Group& group) const
         auto type = realm::ColumnType(m_column_types.get_val(i));
         auto attr = realm::ColumnAttr(m_column_attributes.get_val(i));
         std::string type_str;
+        realm::ColKey col_key;
+        if (this->m_column_colkeys.valid()) {
+            // core6
+            col_key = realm::ColKey(m_column_colkeys.get_val(i));
+        }
+
         if (type == realm::col_type_Link || type == realm::col_type_LinkList) {
-            size_t target_table_ndx = size_t(m_column_subspecs.get_val(get_subspec_ndx_after(i)));
-            type_str = group.get_table_name(target_table_ndx);
+            size_t target_table_ndx;
+            type_str = "->";
+            if (col_key) {
+                // core6
+                realm::TableKey opposite_table_key(m_opposite_table.get_val(col_key.get_index().val));
+                target_table_ndx = opposite_table_key.value & 0xFFFF;
+            }
+            else {
+                target_table_ndx = size_t(m_column_subspecs.get_val(get_subspec_ndx_after(i)));
+            }
+            type_str += group.get_table_name(target_table_ndx);
             if (type == realm::col_type_LinkList) {
                 type_str += "[]";
             }
         }
         else {
             type_str = get_data_type_name(realm::DataType(type));
+            if (col_key && col_key.get_attrs().test(realm::col_attr_List)) {
+                type_str += "[]";
+            }
             if (attr & realm::col_attr_Nullable)
                 type_str += "?";
             if (attr & realm::col_attr_Indexed)
