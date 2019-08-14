@@ -2964,8 +2964,7 @@ NONCONCURRENT_TEST(Shared_StaticFuzzTestRunSanityCheck)
         for (size_t counter = 0; counter < iterations; counter++) {
             // You can use your own seed if you have observed a crashing unit test that
             // printed out some specific seed (the "Unit test random seed:" part that appears).
-            // fastrand(534653645, true);
-            fastrand(unit_test_random_seed + counter, true);
+            FastRand generator(unit_test_random_seed + counter);
 
             std::string instr;
 
@@ -2974,7 +2973,7 @@ NONCONCURRENT_TEST(Shared_StaticFuzzTestRunSanityCheck)
             std::string fastlog = "char[] instr2 = {";
 
             for (size_t t = 0; t < instructions; t++) {
-                char c = static_cast<char>(fastrand());
+                char c = static_cast<char>(generator());
                 instr += c;
                 std::string tmp;
                 unit_test::to_string(static_cast<int>(c), tmp);
@@ -2986,6 +2985,7 @@ NONCONCURRENT_TEST(Shared_StaticFuzzTestRunSanityCheck)
                     fastlog += "}; instr = string(instr2);";
                 }
             }
+
             // Scope guard of "path" is inside the loop to clean up files per iteration
             SHARED_GROUP_TEST_PATH(path);
             // If using std::cerr, you can copy/paste the console output into a unit test

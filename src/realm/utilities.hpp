@@ -140,6 +140,20 @@ int fast_popcount32(int32_t x);
 int fast_popcount64(int64_t x);
 uint64_t fastrand(uint64_t max = 0xffffffffffffffffULL, bool is_seed = false);
 
+// Class to be used when a private generator is wanted.
+// Object of this class should not be shared between threads.
+class FastRand {
+public:
+    FastRand(uint64_t seed = 1)
+        : m_state(seed)
+    {
+    }
+    uint64_t operator()(uint64_t max = uint64_t(-1));
+
+private:
+    uint64_t m_state;
+};
+
 // log2 - returns -1 if x==0, otherwise log2(x)
 inline int log2(size_t x)
 {

@@ -266,6 +266,15 @@ uint64_t fastrand(uint64_t max, bool is_seed)
     return (x * 2685821657736338717ULL) % (max + 1 == 0 ? 0xffffffffffffffffULL : max + 1);
 }
 
+uint64_t FastRand::operator()(uint64_t max)
+{
+    uint64_t x = m_state;
+    x ^= x >> 12; // a
+    x ^= x << 25; // b
+    x ^= x >> 27; // c
+    m_state = x;
+    return (x * 2685821657736338717ULL) % (max + 1 == 0 ? 0xffffffffffffffffULL : max + 1);
+}
 
 void millisleep(unsigned long milliseconds)
 {
