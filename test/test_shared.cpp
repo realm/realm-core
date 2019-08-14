@@ -1799,6 +1799,31 @@ TEST(Shared_ClearColumnWithBasicArrayRootLeaf)
     }
 }
 
+TEST(Shared_ClearColumnWithLinksToSelf)
+{
+    // Reproduction of issue found by fuzzer
+    SHARED_GROUP_TEST_PATH(path);
+    DBRef sg = DB::create(path, false, DBOptions(crypt_key()));
+    {
+        WriteTransaction wt(sg);
+        TableRef test = wt.add_table("Test");
+        auto col = test->add_column_link(type_Link, "foo", *test);
+        test->add_column(type_Int, "bar");
+        ObjKeys keys;
+        test->create_objects(400, keys);             // Ensure non root clusters
+        test->get_object(keys[3]).set(col, keys[8]); // Link must be even
+        wt.commit();
+    }
+    {
+        WriteTransaction wt(sg);
+        TableRef test = wt.get_table("Test");
+        // Ensure that cluster array is COW, but not expanded
+        test->remove_column(test->get_column_key("bar"));
+        test->clear();
+        wt.commit();
+    }
+}
+
 // disable shared async on windows and any Apple operating system
 // TODO: enable async daemon for OS X - think how to do it in XCode (no issue for build.sh)
 #if !defined(_WIN32) && !REALM_PLATFORM_APPLE

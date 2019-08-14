@@ -674,6 +674,7 @@ public:
 #endif
     TableRef get_opposite_table(ColKey col_key) const;
     TableKey get_opposite_table_key(ColKey col_key) const;
+    bool links_to_self(ColKey col_key) const;
     ColKey get_opposite_column(ColKey col_key) const;
     ColKey find_opposite_column(ColKey col_key) const;
 
