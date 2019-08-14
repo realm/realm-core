@@ -1452,6 +1452,17 @@ public:
     }
 };
 
+template <>
+size_t TimestampNode<Greater>::find_first_local(size_t start, size_t end);
+template <>
+size_t TimestampNode<Less>::find_first_local(size_t start, size_t end);
+template <>
+size_t TimestampNode<GreaterEqual>::find_first_local(size_t start, size_t end);
+template <>
+size_t TimestampNode<LessEqual>::find_first_local(size_t start, size_t end);
+
+
+
 class StringNodeBase : public ParentNode {
 public:
     using TConditionValue = StringData;

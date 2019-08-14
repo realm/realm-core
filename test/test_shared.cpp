@@ -4007,80 +4007,32 @@ TEST(Shared_GetCommitSize)
         CHECK_LESS(size_after - size_before, commit_size);
     }
 }
+
 /*
+#include <valgrind/callgrind.h>
 TEST(Shared_TimestampQuery)
 {
-    SHARED_GROUP_TEST_PATH(path);
-    SharedGroup sg(path);
+    Table table;
+    auto col_date = table.add_column(type_Timestamp, "date", true);
 
-    {
-        WriteTransaction wt(sg);
+    Random random(random_int<unsigned long>()); // Seed from slow global generator
 
-        auto table = wt.get_or_add_table("table");
-        auto col_date = table->add_column(type_Timestamp, "date");
-        auto col_value = table->add_column(type_Int, "value");
-
-        for (int i = 0; i < 10; i++) {
-            auto ndx = table->add_empty_row();
-            table->set_timestamp(col_date, ndx, Timestamp(i / 4, i % 4));
-            table->set_int(col_value, ndx, i);
-        }
-        // Timestamps : {0,0}, {0,1}, {0,2}, {0,3}, {1,0}, {1,1}, {1,2}, {1,3}, {2,0}, {2,1}
-        wt.commit();
+    for (int i = 0; i < 10000; i++) {
+        auto ndx = table.add_empty_row();
+        int seconds = random.draw_int_max(3600 * 24 * 10);
+        table.set_timestamp(col_date, ndx, Timestamp(seconds, 0));
     }
 
-    {
-        Group& g = const_cast<Group&>(sg.begin_read());
-        auto table = g.get_table("table");
-        auto col_date = table->get_column_index("date");
+    Query q = table.column<Timestamp>(col_date) > Timestamp(3600 * 24 * 5, 3);
+    auto start = std::chrono::steady_clock::now();
+    CALLGRIND_START_INSTRUMENTATION;
+    auto cnt = q.count();
+    CALLGRIND_STOP_INSTRUMENTATION;
+    auto end = std::chrono::steady_clock::now();
 
-        Query q = table->column<Timestamp>(col_date) > Timestamp(0, 3);
-        auto cnt = q.count();
-        CHECK_EQUAL(cnt, 6);
-        q = table->column<Timestamp>(col_date) >= Timestamp(0, 3);
-        cnt = q.count();
-        CHECK_EQUAL(cnt, 7);
-        q = table->column<Timestamp>(col_date) > Timestamp(0, 3) &&
-            table->column<Timestamp>(col_date) < Timestamp(1, 3);
-        cnt = q.count();
-        CHECK_EQUAL(cnt, 3);
-        sg.end_read();
-    }
-
-    {
-        WriteTransaction wt(sg);
-
-        auto table = wt.get_table("table");
-        auto col_date = table->get_column_index("date");
-        auto col_value = table->get_column_index("value");
-
-        table->clear();
-        Random random(random_int<unsigned long>()); // Seed from slow global generator
-
-        for (int i = 0; i < 100000; i++) {
-            auto ndx = table->add_empty_row();
-            int seconds = random.draw_int_max(3600 * 24 * 10);
-            table->set_timestamp(col_date, ndx, Timestamp(seconds, 0));
-            table->set_int(col_value, ndx, i);
-        }
-        wt.commit();
-    }
-
-    {
-        Group& g = const_cast<Group&>(sg.begin_read());
-        auto table = g.get_table("table");
-        auto col_date = table->get_column_index("date");
-
-        Query q = table->column<Timestamp>(col_date) > Timestamp(3600 * 24 * 5, 3);
-        auto start = std::chrono::steady_clock::now();
-        auto cnt = q.count();
-        auto end = std::chrono::steady_clock::now();
-
-        std::cout << "Time: " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << " us"
-                  << std::endl;
-        CHECK_GREATER(cnt, 50000);
-        sg.end_read();
-    }
+    std::cout << "Time: " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << " us"
+              << std::endl;
+    CHECK_GREATER(cnt, 50000);
 }
 */
 

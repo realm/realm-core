@@ -14,6 +14,7 @@
 
 ### Internals
 * The release binaries for Apple platforms are now built with Xcode 9.4 (up from 9.2).
+* Performance of queries on Timestamp is improved
 
 ----------------------------------------------
 
