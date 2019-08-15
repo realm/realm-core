@@ -354,6 +354,18 @@ void TimestampColumn::leaf_to_dot(MemRef, ArrayParent*, size_t /*ndx_in_parent*/
     // FIXME: Dummy implementation
 }
 
+void TimestampColumn::get_seconds_leaf(size_t ndx, size_t& ndx_in_leaf,
+                                       BpTree<util::Optional<int64_t>>::LeafInfo& inout_leaf_info) const noexcept
+{
+    m_seconds->get_leaf(ndx, ndx_in_leaf, inout_leaf_info);
+}
+
+void TimestampColumn::get_nanoseconds_leaf(size_t ndx, size_t& ndx_in_leaf,
+                                           BpTree<int64_t>::LeafInfo& inout_leaf) const noexcept
+{
+    m_nanoseconds->get_leaf(ndx, ndx_in_leaf, inout_leaf);
+}
+
 // LCOV_EXCL_STOP ignore debug functions
 
 void TimestampColumn::add(const Timestamp& ts)

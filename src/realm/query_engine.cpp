@@ -684,3 +684,148 @@ ExpressionNode::ExpressionNode(const ExpressionNode& from, QueryNodeHandoverPatc
 , m_expression(from.m_expression->clone(patches))
 {
 }
+
+namespace realm {
+template <>
+size_t TimestampNode<Greater>::find_first_local(size_t start, size_t end)
+{
+    REALM_ASSERT(this->m_table);
+
+    if (this->m_value.is_null()) {
+        return not_found;
+    }
+    while (start < end) {
+        size_t ret = this->find_first_local_seconds<GreaterEqual>(start, end);
+
+        if (ret == not_found)
+            return not_found;
+
+        util::Optional<int64_t> seconds = get_seconds_and_cache(ret);
+        if (!seconds) {
+            start = ret + 1;
+            continue;
+        }
+        if (*seconds > m_value.get_seconds()) {
+            return ret;
+        }
+        // We now know that neither m_value nor current value is null and that seconds part equals
+        // We are just missing to compare nanoseconds part
+        int32_t nanos = this->get_nanoseconds_and_cache(ret);
+        if (nanos > m_value.get_nanoseconds()) {
+            return ret;
+        }
+        start = ret + 1;
+    }
+
+    return not_found;
+}
+
+template <>
+size_t TimestampNode<Less>::find_first_local(size_t start, size_t end)
+{
+    REALM_ASSERT(this->m_table);
+
+    if (this->m_value.is_null()) {
+        return not_found;
+    }
+    while (start < end) {
+        size_t ret = this->find_first_local_seconds<LessEqual>(start, end);
+
+        if (ret == not_found)
+            return not_found;
+
+        util::Optional<int64_t> seconds = get_seconds_and_cache(ret);
+        if (!seconds) {
+            start = ret + 1;
+            continue;
+        }
+        if (*seconds < m_value.get_seconds()) {
+            return ret;
+        }
+        // We now know that neither m_value nor current value is null and that seconds part equals
+        // We are just missing to compare nanoseconds part
+        int32_t nanos = this->get_nanoseconds_and_cache(ret);
+        if (nanos < m_value.get_nanoseconds()) {
+            return ret;
+        }
+        start = ret + 1;
+    }
+
+    return not_found;
+}
+
+template <>
+size_t TimestampNode<GreaterEqual>::find_first_local(size_t start, size_t end)
+{
+    REALM_ASSERT(this->m_table);
+
+    if (this->m_value.is_null()) {
+        return not_found;
+    }
+    while (start < end) {
+        size_t ret = this->find_first_local_seconds<GreaterEqual>(start, end);
+
+        if (ret == not_found)
+            return not_found;
+
+        util::Optional<int64_t> seconds = get_seconds_and_cache(ret);
+        if (!seconds) { // null equality
+            start = ret + 1;
+            continue;
+        }
+        if (*seconds > m_value.get_seconds()) {
+            return ret;
+        }
+        // We now know that neither m_value nor current value is null and that seconds part equals
+        // We are just missing to compare nanoseconds part
+        int32_t nanos = this->get_nanoseconds_and_cache(ret);
+        if (nanos >= m_value.get_nanoseconds()) {
+            return ret;
+        }
+        start = ret + 1;
+    }
+
+    return not_found;
+}
+
+template <>
+size_t TimestampNode<LessEqual>::find_first_local(size_t start, size_t end)
+{
+    REALM_ASSERT(this->m_table);
+
+    if (this->m_value.is_null()) {
+        return not_found;
+    }
+    while (start < end) {
+        size_t ret = this->find_first_local_seconds<LessEqual>(start, end);
+
+        if (ret == not_found)
+            return not_found;
+
+        util::Optional<int64_t> seconds = get_seconds_and_cache(ret);
+        if (!seconds) { // null equality
+            start = ret + 1;
+            continue;
+        }
+        if (*seconds < m_value.get_seconds()) {
+            return ret;
+        }
+        // We now know that neither m_value nor current value is null and that seconds part equals
+        // We are just missing to compare nanoseconds part
+        int32_t nanos = this->get_nanoseconds_and_cache(ret);
+        if (nanos <= m_value.get_nanoseconds()) {
+            return ret;
+        }
+        start = ret + 1;
+    }
+
+    return not_found;
+}
+#ifdef _WIN32
+// Explicit instantiation required on some windows builds
+template size_t TimestampNode<Greater>::find_first_local(size_t start, size_t end);
+template size_t TimestampNode<Less>::find_first_local(size_t start, size_t end);
+template size_t TimestampNode<GreaterEqual>::find_first_local(size_t start, size_t end);
+template size_t TimestampNode<LessEqual>::find_first_local(size_t start, size_t end);
+#endif
+} // namespace realm

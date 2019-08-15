@@ -10609,6 +10609,18 @@ TEST(Query_Timestamp)
     match = (first != null{}).count();
     CHECK_EQUAL(match, 5);
 
+    match = (first > null{}).count();
+    CHECK_EQUAL(match, 0);
+
+    match = (first < null{}).count();
+    CHECK_EQUAL(match, 0);
+
+    match = (first >= null{}).count();
+    CHECK_EQUAL(match, 1);
+
+    match = (first <= null{}).count();
+    CHECK_EQUAL(match, 1);
+
     match = (first != Timestamp(0, 0)).count();
     CHECK_EQUAL(match, 5);
 
@@ -10671,6 +10683,28 @@ TEST(Query_Timestamp)
 
     match = (first < second).find();
     CHECK_EQUAL(match, npos); // Note that (null < null) == false
+}
+
+TEST(Query_TimestampCount)
+{
+    Table table;
+    auto col_date = table.add_column(type_Timestamp, "date", true);
+    for (int i = 0; i < 10; i++) {
+        auto ndx = table.add_empty_row();
+        table.set_timestamp(col_date, ndx, Timestamp(i / 4, i % 4));
+    }
+    table.set_null(col_date, 5);
+
+    // Timestamps : {0,0}, {0,1}, {0,2}, {0,3}, {1,0}, {}, {1,2}, {1,3}, {2,0}, {2,1}
+
+    auto timestamps = table.column<Timestamp>(col_date);
+
+    CHECK_EQUAL((timestamps > Timestamp(0, 3)).count(), 5);
+    CHECK_EQUAL((timestamps >= Timestamp(0, 3)).count(), 6);
+    CHECK_EQUAL((timestamps < Timestamp(1, 3)).count(), 6);
+    CHECK_EQUAL((timestamps <= Timestamp(1, 3)).count(), 7);
+    CHECK_EQUAL((timestamps == Timestamp()).count(), 1);
+    CHECK_EQUAL((timestamps != Timestamp()).count(), 9);
 }
 
 TEST(Query_Timestamp_Null)
