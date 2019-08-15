@@ -29,9 +29,9 @@ namespace realm {
 class StringData;
 class Mixed;
 
-/// ObjectIDs are globally unique, and up to 128 bits wide. They are represented
-/// as two 64-bit integers, each of which may frequently be small, for best
-/// on-wire compressibility.
+/// ObjectIDs are globally unique for a given class (table), and up to 128 bits
+/// wide. They are represented as two 64-bit integers, each of which may
+/// frequently be small, for best on-wire compressibility.
 ///
 /// We define a way to map from 128-bit on-write ObjectIDs to local 64-bit object IDs.
 ///
