@@ -1295,6 +1295,7 @@ public:
 
     TimestampNodeBase(Timestamp v, size_t column)
         : m_value(v)
+        , m_needle_seconds(m_value.is_null() ? util::none : util::make_optional(m_value.get_seconds()))
     {
         m_condition_column_idx = column;
     }
@@ -1327,6 +1328,7 @@ public:
         m_leaf_end_nanos = 0;
         m_array_ptr_nanos.reset(); // Explicitly destroy the old one first, because we're reusing the memory.
         m_array_ptr_nanos.reset(new (&m_leaf_cache_storage_nanos) LeafTypeNanos(m_table->get_alloc()));
+        m_condition_column_is_nullable = m_condition_column->is_nullable();
     }
 
 protected:
@@ -1354,7 +1356,8 @@ protected:
         if (ndx >= this->m_leaf_end_seconds || ndx < this->m_leaf_start_seconds) {
             this->get_leaf_seconds(*this->m_condition_column, ndx);
         }
-        return this->m_leaf_ptr_seconds->get(ndx - this->m_leaf_start_seconds);
+        const size_t ndx_in_leaf = ndx - m_leaf_start_seconds;
+        return this->m_leaf_ptr_seconds->get(ndx_in_leaf);
     }
 
     int32_t get_nanoseconds_and_cache(size_t ndx)
@@ -1369,14 +1372,18 @@ protected:
     TimestampNodeBase(const TimestampNodeBase& from, QueryNodeHandoverPatches* patches)
         : ParentNode(from, patches)
         , m_value(from.m_value)
+        , m_needle_seconds(from.m_needle_seconds)
         , m_condition_column(from.m_condition_column)
+        , m_condition_column_is_nullable(from.m_condition_column_is_nullable)
     {
         if (m_condition_column && patches)
             m_condition_column_idx = m_condition_column->get_column_index();
     }
 
     Timestamp m_value;
+    util::Optional<int64_t> m_needle_seconds;
     const TimestampColumn* m_condition_column;
+    bool m_condition_column_is_nullable = false;
 
     // Leaf cache seconds
     using LeafCacheStorageSeconds =
@@ -1404,7 +1411,6 @@ public:
     template <class Condition>
     size_t find_first_local_seconds(size_t start, size_t end)
     {
-        REALM_ASSERT(!this->m_value.is_null());
         while (start < end) {
             // Cache internal leaves
             if (start >= this->m_leaf_end_seconds || start < this->m_leaf_start_seconds) {
@@ -1417,9 +1423,8 @@ public:
             else
                 end2 = end - this->m_leaf_start_seconds;
 
-            int64_t needle = this->m_value.get_seconds();
             size_t s = this->m_leaf_ptr_seconds->template find_first<Condition>(
-                needle, start - this->m_leaf_start_seconds, end2);
+                m_needle_seconds, start - this->m_leaf_start_seconds, end2);
 
             if (s == not_found) {
                 start = this->m_leaf_end_seconds;
@@ -1460,8 +1465,12 @@ template <>
 size_t TimestampNode<GreaterEqual>::find_first_local(size_t start, size_t end);
 template <>
 size_t TimestampNode<LessEqual>::find_first_local(size_t start, size_t end);
-
-
+template <>
+size_t TimestampNode<Equal>::find_first_local(size_t start, size_t end);
+template <>
+size_t TimestampNode<NotEqual>::find_first_local(size_t start, size_t end);
+template <>
+size_t TimestampNode<NotNull>::find_first_local(size_t start, size_t end);
 
 class StringNodeBase : public ParentNode {
 public:
