@@ -46,7 +46,6 @@ Searching: The main finding function is:
 #include <vector>
 #include <ostream>
 
-
 #include <cstdint> // unint8_t etc
 
 #include <realm/util/assert.hpp>
@@ -2223,21 +2222,22 @@ bool Array::find_optimized(int64_t value, size_t start, size_t end, size_t basei
     if (nullable_array) {
         // We were called by find() of a nullable array. So skip first entry, take nulls into account, etc, etc.
         const int64_t null_value_of_leaf = get(0);
+        const size_t baseindex_minus_one = baseindex - 1; // this works even if it wraps around zero
 
         if (find_null) {
             if (std::is_same<cond, realm::Equal>::value || std::is_same<cond, realm::NotEqual>::value) {
                 // optimisation: normal search for special null value (past 0)
-                return find_optimized<cond, action, bitwidth>(null_value_of_leaf, start + 1, end, baseindex, state, callback, false, false);
+                return find_optimized<cond, action, bitwidth>(null_value_of_leaf, start + 1, end + 1, baseindex_minus_one, state, callback, false, false);
             } else if (std::is_same<cond, realm::GreaterEqual>::value || std::is_same<cond, LessEqual>::value) {
                 // optimisation: normal search for special null value (past 0), knowing <,> always return false on comparison to null
-                return find_optimized<realm::Equal, action, bitwidth>(null_value_of_leaf, start + 1, end, baseindex, state, callback, false, false);
+                return find_optimized<realm::Equal, action, bitwidth>(null_value_of_leaf, start + 1, end + 1, baseindex_minus_one, state, callback, false, false);
             } else if (std::is_same<cond, Greater>::value || std::is_same<cond, Less>::value) {
                 // optimisation: operators <,> always return false for comparison to null
                 return true; // tell caller to continue aggregating/search (on next array leafs)
             }
             else if (std::is_same<cond, NotNull>::value) {
                 // optimisation: find any value not equal to null (past 0)
-                return find_optimized<NotEqual, action, bitwidth>(null_value_of_leaf, start + 1, end, baseindex, state, callback, false, false);
+                return find_optimized<NotEqual, action, bitwidth>(null_value_of_leaf, start + 1, end + 1, baseindex_minus_one, state, callback, false, false);
             } else {
                 REALM_UNREACHABLE();
             }
@@ -2258,7 +2258,7 @@ bool Array::find_optimized(int64_t value, size_t start, size_t end, size_t basei
                 } else {
                     // value >= LLONG_MIN is always true (except for nulls) and we know nulls don't match
                     // for operator > so this can be simplified into a search for any non null values
-                    return find_optimized<NotEqual, action, bitwidth>(null_value_of_leaf, start + 1, end, baseindex, state, callback, false, false);
+                    return find_optimized<NotEqual, action, bitwidth>(null_value_of_leaf, start + 1, end + 1, baseindex_minus_one, state, callback, false, false);
                 }
             } else if (std::is_same<cond, LessEqual>::value) {
                 if (REALM_LIKELY(value < std::numeric_limits<int64_t>::max())) {
@@ -2266,21 +2266,50 @@ bool Array::find_optimized(int64_t value, size_t start, size_t end, size_t basei
                 } else {
                     // value <= LLONG_MAX is always true (except for nulls) and we know nulls don't match
                     // for operator < so this can be simplified into a search for any non null values
-                    return find_optimized<NotEqual, action, bitwidth>(null_value_of_leaf, start + 1, end, baseindex, state, callback, false, false);
+                    return find_optimized<NotEqual, action, bitwidth>(null_value_of_leaf, start + 1, end + 1, baseindex_minus_one, state, callback, false, false);
                 }
             }
 
-            ++start2; // skip null
+            // in these cases, we know there are no false positives of finding a null value, so we can do a direct optimized search
+            if (std::is_same<ProcessedCondition, Less>::value && null_value_of_leaf >= processed_value) {
+                // when the value of null is greater than or equal to the value we search for, all lesser values are not null, do direct search
+                return find_optimized<ProcessedCondition, action, bitwidth>(processed_value, start2 + 1, end + 1, baseindex_minus_one, state, callback, false, false);
+            } else if (std::is_same<ProcessedCondition, Greater>::value && null_value_of_leaf <= processed_value) {
+                // when the value of null is less than or equal to the value we search for, all greater values are not null, do direct search
+                return find_optimized<ProcessedCondition, action, bitwidth>(processed_value, start2 + 1, end + 1, baseindex_minus_one, state, callback, false, false);
+            } else if (std::is_same<ProcessedCondition, Equal>::value && null_value_of_leaf != processed_value) {
+                // null is guaranteed to be unique relative to the rest of the values in the leaf and will not match equality,
+                // as long as the user value is not equal to the null value, do direct search
+                return find_optimized<ProcessedCondition, action, bitwidth>(processed_value, start2 + 1, end + 1, baseindex_minus_one, state, callback, false, false);
+            } /*else if (std::is_same<ProcessedCondition, NotNull>::value) {
+                // not null is equivilent to not equal to null which may be optimized
+                return find_optimized<NotEqual, action, bitwidth>(null_value_of_leaf, start2 + 1, end + 1, baseindex_minus_one, state, callback, false, false);
+            }*/
+
             for (; start2 < end; start2++) {
                 QueryState<int64_t> precheck_state;
                 precheck_state.init(act_ReturnFirst, nullptr, 1);
 
                 // perform normal optimised find first, then double check that we didn't hit a null value before adding it
-                bool result = find_optimized<ProcessedCondition, act_ReturnFirst, bitwidth>(processed_value, start2, end, baseindex, &precheck_state, Array::CallbackDummy(), false, false);
+                bool result = find_optimized<ProcessedCondition, act_ReturnFirst, bitwidth>(processed_value, start2 + 1, end + 1, baseindex, &precheck_state, Array::CallbackDummy(), false, false);
                 if (!result) {
                     if (precheck_state.m_match_count > 0) {
-                        start2 = to_size_t(precheck_state.m_state);
-                        int64_t v = get<bitwidth>(start2);
+                        start2 = to_size_t(precheck_state.m_state) - 1;
+                        int64_t v = get<bitwidth>(start2 + 1);
+                        if (std::is_same<ProcessedCondition, Less>::value) {
+                            // we know nulls don't match on < so we can direct check here
+                            if (v != null_value_of_leaf && !find_action<action, Callback>(start2 + baseindex, v, state, callback)) {
+                                return false; // tell caller to stop aggregating/search
+                            }
+                            continue;
+                        } else if (std::is_same<ProcessedCondition, Greater>::value) {
+                            // we know nulls don't match on > so we can direct check here
+                            if (v != null_value_of_leaf && !find_action<action, Callback>(start2 + baseindex, v, state, callback)) {
+                                return false; // tell caller to stop aggregating/search
+                            }
+                            continue;
+                        }
+
                         if (c(v, value, v == null_value_of_leaf, find_null)) {
                             util::Optional<int64_t> v2(v == null_value_of_leaf ? util::none : util::make_optional(v));
                             if (!find_action<action, Callback>(start2 + baseindex, v2, state, callback))
