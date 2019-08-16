@@ -759,9 +759,6 @@ size_t TimestampNode<GreaterEqual>::find_first_local(size_t start, size_t end)
 {
     REALM_ASSERT(this->m_table);
 
-    if (this->m_value.is_null()) {
-        return not_found;
-    }
     while (start < end) {
         size_t ret = this->find_first_local_seconds<GreaterEqual>(start, end);
 
@@ -770,6 +767,9 @@ size_t TimestampNode<GreaterEqual>::find_first_local(size_t start, size_t end)
 
         util::Optional<int64_t> seconds = get_seconds_and_cache(ret);
         if (!seconds) { // null equality
+            if (this->m_value.is_null()) {
+                return ret;
+            }
             start = ret + 1;
             continue;
         }
@@ -793,9 +793,6 @@ size_t TimestampNode<LessEqual>::find_first_local(size_t start, size_t end)
 {
     REALM_ASSERT(this->m_table);
 
-    if (this->m_value.is_null()) {
-        return not_found;
-    }
     while (start < end) {
         size_t ret = this->find_first_local_seconds<LessEqual>(start, end);
 
@@ -804,6 +801,9 @@ size_t TimestampNode<LessEqual>::find_first_local(size_t start, size_t end)
 
         util::Optional<int64_t> seconds = get_seconds_and_cache(ret);
         if (!seconds) { // null equality
+            if (this->m_value.is_null()) {
+                return ret;
+            }
             start = ret + 1;
             continue;
         }
@@ -857,17 +857,6 @@ size_t TimestampNode<NotEqual>::find_first_local(size_t start, size_t end)
 {
     REALM_ASSERT(this->m_table);
 
-    // in many scenarios it is likely that the first item is not equal do a quick first check
-    if (start < end) {
-        util::Optional<int64_t> seconds = get_seconds_and_cache(start);
-        if (seconds != m_needle_seconds
-            || (seconds && this->get_nanoseconds_and_cache(start) != m_value.get_nanoseconds())) {
-            return start;
-        }
-    }
-
-    ++start;
-
     if (m_value.is_null()) {
         if (REALM_UNLIKELY(!m_condition_column_is_nullable)) {
             return not_found;
@@ -878,14 +867,17 @@ size_t TimestampNode<NotEqual>::find_first_local(size_t start, size_t end)
     int64_t needle_seconds = m_value.get_seconds();
     while (start < end) {
         util::Optional<int64_t> seconds = get_seconds_and_cache(start);
-        if (!seconds || *seconds != needle_seconds) {
-            return start;
-        }
-        // We now know that neither m_value nor current value is null and that seconds part equals
-        // We are just missing to compare nanoseconds part
-        int32_t nanos = this->get_nanoseconds_and_cache(start);
-        if (nanos != m_value.get_nanoseconds()) {
-            return start;
+        // Null value does not match
+        if (seconds) {
+            if (*seconds != needle_seconds) {
+                return start;
+            }
+            // We now know that neither m_value nor current value is null and that seconds part equals
+            // We are just missing to compare nanoseconds part
+            int32_t nanos = this->get_nanoseconds_and_cache(start);
+            if (nanos != m_value.get_nanoseconds()) {
+                return start;
+            }
         }
         ++start;
     }

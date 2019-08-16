@@ -2221,10 +2221,12 @@ bool Array::find_optimized(int64_t value, size_t start, size_t end, size_t basei
     if (nullable_array) {
         // We were called by find() of a nullable array. So skip first entry, take nulls in count, etc, etc. Fixme:
         // Huge speed optimizations are possible here! This is a very simple generic method.
+        auto null_value = get(0);
         for (; start2 < end; start2++) {
             int64_t v = get<bitwidth>(start2 + 1);
-            if (c(v, value, v == get(0), find_null)) {
-                util::Optional<int64_t> v2(v == get(0) ? util::none : util::make_optional(v));
+            bool value_is_null = (v == null_value);
+            if (c(v, value, value_is_null, find_null)) {
+                util::Optional<int64_t> v2(value_is_null ? util::none : util::make_optional(v));
                 if (!find_action<action, Callback>(start2 + baseindex, v2, state, callback))
                     return false; // tell caller to stop aggregating/search
             }

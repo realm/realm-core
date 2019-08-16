@@ -10622,7 +10622,7 @@ TEST(Query_Timestamp)
     CHECK_EQUAL(match, 1);
 
     match = (first != Timestamp(0, 0)).count();
-    CHECK_EQUAL(match, 5);
+    CHECK_EQUAL(match, 4); // Null values does not 'not match'
 
     match = (first < Timestamp(-100, 0)).find();
     CHECK_EQUAL(match, 5);
@@ -10703,6 +10703,8 @@ TEST(Query_TimestampCount)
     CHECK_EQUAL((timestamps >= Timestamp(0, 3)).count(), 6);
     CHECK_EQUAL((timestamps < Timestamp(1, 3)).count(), 6);
     CHECK_EQUAL((timestamps <= Timestamp(1, 3)).count(), 7);
+    CHECK_EQUAL((timestamps == Timestamp(0, 2)).count(), 1);
+    CHECK_EQUAL((timestamps != Timestamp(0, 2)).count(), 8);
     CHECK_EQUAL((timestamps == Timestamp()).count(), 1);
     CHECK_EQUAL((timestamps != Timestamp()).count(), 9);
 }
