@@ -2243,12 +2243,6 @@ bool Array::find_optimized(int64_t value, size_t start, size_t end, size_t basei
             }
         } else {
 
-            if (std::is_same<cond, Equal>::value) {
-                // If the value to search for is equal to the null value, the value cannot be in the array
-                if (value == get(0)) {
-                    return true;
-                }
-            }
             // change >= to > and <= to < because we only have optimised search for those
             using ProcessedCondition = typename std::conditional<std::is_same<cond, GreaterEqual>::value, Greater, typename std::conditional<std::is_same<cond, LessEqual>::value, Less, cond>::type>::type;
             int64_t processed_value = value;
@@ -2277,51 +2271,91 @@ bool Array::find_optimized(int64_t value, size_t start, size_t end, size_t basei
             } else if (std::is_same<ProcessedCondition, Greater>::value && null_value_of_leaf <= processed_value) {
                 // when the value of null is less than or equal to the value we search for, all greater values are not null, do direct search
                 return find_optimized<ProcessedCondition, action, bitwidth>(processed_value, start2 + 1, end + 1, baseindex_minus_one, state, callback, false, false);
-            } else if (std::is_same<ProcessedCondition, Equal>::value && null_value_of_leaf != processed_value) {
+            } else if (std::is_same<ProcessedCondition, Equal>::value) {
                 // null is guaranteed to be unique relative to the rest of the values in the leaf and will not match equality,
                 // as long as the user value is not equal to the null value, do direct search
+                if (value == null_value_of_leaf) {
+                    // If the value to search for is equal to the null value, the value cannot be in the array
+                    return true; // continue search on next leaf
+                }
                 return find_optimized<ProcessedCondition, action, bitwidth>(processed_value, start2 + 1, end + 1, baseindex_minus_one, state, callback, false, false);
-            } /*else if (std::is_same<ProcessedCondition, NotNull>::value) {
+            } else if (std::is_same<ProcessedCondition, NotNull>::value) {
                 // not null is equivilent to not equal to null which may be optimized
                 return find_optimized<NotEqual, action, bitwidth>(null_value_of_leaf, start2 + 1, end + 1, baseindex_minus_one, state, callback, false, false);
-            }*/
+            }
 
+            // optimization: test the first few items with no overhead
+            constexpr bool value_is_null = false;
+            if (m_size > start2 + 1 && start2 < end) {
+                int64_t test_value = get<bitwidth>(start2 + 1);
+                const bool test_value_is_null = test_value == null_value_of_leaf;
+                if (c(test_value, value, test_value_is_null, value_is_null)
+                    && !find_action<action, Callback>(start2 + baseindex, test_value_is_null ? util::none : util::make_optional(test_value), state, callback))
+                    return false;
+            }
+            ++start2;
+
+            if (m_size > start2 + 1 && start2 < end) {
+                int64_t test_value = get<bitwidth>(start2 + 1);
+                const bool test_value_is_null = test_value == null_value_of_leaf;
+                if (c(test_value, value, test_value_is_null, value_is_null)
+                    && !find_action<action, Callback>(start2 + baseindex, test_value_is_null ? util::none : util::make_optional(test_value), state, callback))
+                    return false;
+            }
+            ++start2;
+
+            if (m_size > start2 + 1 && start2 < end) {
+                int64_t test_value = get<bitwidth>(start2 + 1);
+                const bool test_value_is_null = test_value == null_value_of_leaf;
+                if (c(test_value, value, test_value_is_null, value_is_null)
+                    && !find_action<action, Callback>(start2 + baseindex, test_value_is_null ? util::none : util::make_optional(test_value), state, callback))
+                    return false;
+            }
+            ++start2;
+
+            if (m_size > start2 + 1 && start2 < end) {
+                int64_t test_value = get<bitwidth>(start2 + 1);
+                const bool test_value_is_null = test_value == null_value_of_leaf;
+                if (c(test_value, value, test_value_is_null, value_is_null)
+                    && !find_action<action, Callback>(start2 + baseindex, test_value_is_null ? util::none : util::make_optional(test_value), state, callback))
+                    return false;
+            }
+            ++start2;
+
+            QueryState<int64_t> precheck_state;
+            precheck_state.init(act_ReturnFirst, nullptr, 1);
             for (; start2 < end; start2++) {
-                QueryState<int64_t> precheck_state;
-                precheck_state.init(act_ReturnFirst, nullptr, 1);
+                // optimized init()
+                precheck_state.m_match_count = 0;
+                precheck_state.m_state = not_found;
 
                 // perform normal optimised find first, then double check that we didn't hit a null value before adding it
                 bool result = find_optimized<ProcessedCondition, act_ReturnFirst, bitwidth>(processed_value, start2 + 1, end + 1, baseindex, &precheck_state, Array::CallbackDummy(), false, false);
                 if (!result) {
-                    if (precheck_state.m_match_count > 0) {
-                        start2 = to_size_t(precheck_state.m_state) - 1;
-                        int64_t v = get<bitwidth>(start2 + 1);
-                        if (std::is_same<ProcessedCondition, Less>::value) {
-                            // we know nulls don't match on < so we can direct check here
-                            if (v != null_value_of_leaf && !find_action<action, Callback>(start2 + baseindex, v, state, callback)) {
-                                return false; // tell caller to stop aggregating/search
-                            }
-                            continue;
-                        } else if (std::is_same<ProcessedCondition, Greater>::value) {
-                            // we know nulls don't match on > so we can direct check here
-                            if (v != null_value_of_leaf && !find_action<action, Callback>(start2 + baseindex, v, state, callback)) {
-                                return false; // tell caller to stop aggregating/search
-                            }
-                            continue;
+                    int64_t v = get<bitwidth>(to_size_t(precheck_state.m_state));
+                    start2 = to_size_t(precheck_state.m_state) - 1;
+                    if (std::is_same<ProcessedCondition, Less>::value) {
+                        // we know nulls don't match on < so we can direct check here
+                        if (v != null_value_of_leaf && !find_action<action, Callback>(start2 + baseindex, v, state, callback)) {
+                            return false; // tell caller to stop aggregating/search
                         }
-
-                        if (c(v, value, v == null_value_of_leaf, find_null)) {
-                            util::Optional<int64_t> v2(v == null_value_of_leaf ? util::none : util::make_optional(v));
-                            if (!find_action<action, Callback>(start2 + baseindex, v2, state, callback))
-                                return false; // tell caller to stop aggregating/search
+                        continue;
+                    } else if (std::is_same<ProcessedCondition, Greater>::value) {
+                        // we know nulls don't match on > so we can direct check here
+                        if (v != null_value_of_leaf && !find_action<action, Callback>(start2 + baseindex, v, state, callback)) {
+                            return false; // tell caller to stop aggregating/search
                         }
                         continue;
                     }
-                    else {
-                        return true; // tell caller to continue aggregating/search (on next array leafs)
+
+                    if (c(v, value, v == null_value_of_leaf, find_null)) {
+                        util::Optional<int64_t> v2(v == null_value_of_leaf ? util::none : util::make_optional(v));
+                        if (!find_action<action, Callback>(start2 + baseindex, v2, state, callback))
+                            return false; // tell caller to stop aggregating/search
                     }
+                    continue;
                 } else {
-                    return true;// tell caller to continue aggregating/search (on next array leafs)
+                    return true; // tell caller to continue aggregating/search (on next array leafs)
                 }
             }
             return true; // tell caller to continue aggregating/search (on next array leafs)

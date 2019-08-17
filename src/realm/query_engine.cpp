@@ -878,6 +878,8 @@ size_t TimestampNode<NotEqual>::find_first_local(size_t start, size_t end)
             if (nanos != m_value.get_nanoseconds()) {
                 return start;
             }
+        } else {
+            return start;
         }
         ++start;
     }

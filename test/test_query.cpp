@@ -10111,6 +10111,11 @@ TEST(Query_MaximumSumAverage)
             d = table1->where().not_equal(2, 1234.).average_double(2);
             CHECK_APPROXIMATELY_EQUAL(d, 7. / 2., 0.001);
 
+            d = (table1->column<Int>(0) == null()).average_int(0);
+            CHECK_EQUAL(d, 0);
+
+            d = (table1->column<Int>(0) != null()).average_int(0);
+            CHECK_APPROXIMATELY_EQUAL(d, 7. / 2., 0.001);
 
             // Those with criteria now only include some rows, whereof none are null
             d = table1->where().average_int(0);
@@ -10170,10 +10175,10 @@ TEST(Query_MaximumSumAverage)
 
             // Average of double, criteria on integer
             dbl = table1->where().not_equal(0, 1234).maximum_double(2);
-            CHECK_EQUAL(d, 4);
+            CHECK_EQUAL(dbl, 4);
 
             dbl = table1->where().not_equal(2, 1234.).maximum_double(2);
-            CHECK_EQUAL(d, 4.);
+            CHECK_EQUAL(dbl, 4.);
 
 
             // Those with criteria now only include some rows, whereof none are null
@@ -10206,10 +10211,10 @@ TEST(Query_MaximumSumAverage)
             CHECK_EQUAL(dbl, 4.);
 
             d = (table1->column<Int>(0) != null()).maximum_int(0);
-            CHECK_EQUAL(dbl, 4);
+            CHECK_EQUAL(d, 4);
 
             d = (table1->column<Int>(1) != null()).maximum_int(0);
-            CHECK_EQUAL(dbl, 4);
+            CHECK_EQUAL(d, 4);
         }
 
 
@@ -10234,10 +10239,10 @@ TEST(Query_MaximumSumAverage)
 
             // Average of double, criteria on integer
             dbl = table1->where().not_equal(0, 1234).minimum_double(2);
-            CHECK_EQUAL(d, 3);
+            CHECK_EQUAL(dbl, 3);
 
             dbl = table1->where().not_equal(2, 1234.).minimum_double(2);
-            CHECK_EQUAL(d, 3.);
+            CHECK_EQUAL(dbl, 3.);
 
 
             // Those with criteria now only include some rows, whereof none are null
@@ -10270,10 +10275,10 @@ TEST(Query_MaximumSumAverage)
             CHECK_EQUAL(dbl, 3.);
 
             d = (table1->column<Int>(0) != null()).minimum_int(0);
-            CHECK_EQUAL(dbl, 3);
+            CHECK_EQUAL(d, 3);
 
             d = (table1->column<Int>(1) != null()).minimum_int(0);
-            CHECK_EQUAL(dbl, 3);
+            CHECK_EQUAL(d, 3);
         }
 
         // Sum
@@ -10292,9 +10297,15 @@ TEST(Query_MaximumSumAverage)
             d = table1->where().not_equal(0, 1234).sum_int(1);
             CHECK_EQUAL(d, 7);
 
+            d = (table1->column<Int>(0) == null()).sum_int(0);
+            CHECK_EQUAL(d, 0);
+
+            d = (table1->column<Int>(0) != null()).sum_int(0);
+            CHECK_EQUAL(d, 7);
+
             // Average of double, criteria on integer
             dbl = table1->where().not_equal(0, 1234).sum_double(2);
-            CHECK_EQUAL(d, 7.);
+            CHECK_EQUAL(dbl, 7.);
 
             dbl = table1->where().not_equal(2, 1234.).sum_double(2);
             CHECK_APPROXIMATELY_EQUAL(dbl, 7., 0.001);
@@ -10330,10 +10341,10 @@ TEST(Query_MaximumSumAverage)
             CHECK_APPROXIMATELY_EQUAL(dbl, 7., 0.001);
 
             d = (table1->column<Int>(0) != null()).sum_int(0);
-            CHECK_EQUAL(dbl, 7);
+            CHECK_EQUAL(d, 7);
 
             d = (table1->column<Int>(1) != null()).sum_int(0);
-            CHECK_EQUAL(dbl, 7);
+            CHECK_EQUAL(d, 7);
         }
 
 
@@ -10358,6 +10369,9 @@ TEST(Query_MaximumSumAverage)
             // Now using null as criteria
             d = (table1->column<Int>(0) != null()).count();
             CHECK_EQUAL(d, 2);
+
+            d = (table1->column<Int>(0) == null()).count();
+            CHECK_EQUAL(d, n ? 1 : 0);
 
             d = (table1->column<Double>(2) != null()).count();
             CHECK_EQUAL(d, 2);
@@ -10622,7 +10636,19 @@ TEST(Query_Timestamp)
     CHECK_EQUAL(match, 1);
 
     match = (first != Timestamp(0, 0)).count();
-    CHECK_EQUAL(match, 4); // Null values does not 'not match'
+    CHECK_EQUAL(match, 5);
+
+    match = (first >= Timestamp(std::numeric_limits<int64_t>::min(), -Timestamp::nanoseconds_per_second + 1)).count();
+    CHECK_EQUAL(match, 5);
+
+    match = (first > Timestamp(std::numeric_limits<int64_t>::min(), -Timestamp::nanoseconds_per_second + 1)).count();
+    CHECK_EQUAL(match, 5);
+
+    match = (first <= Timestamp(std::numeric_limits<int64_t>::max(), Timestamp::nanoseconds_per_second - 1)).count();
+    CHECK_EQUAL(match, 5);
+
+    match = (first < Timestamp(std::numeric_limits<int64_t>::max(), Timestamp::nanoseconds_per_second - 1)).count();
+    CHECK_EQUAL(match, 5);
 
     match = (first < Timestamp(-100, 0)).find();
     CHECK_EQUAL(match, 5);
@@ -10704,7 +10730,7 @@ TEST(Query_TimestampCount)
     CHECK_EQUAL((timestamps < Timestamp(1, 3)).count(), 6);
     CHECK_EQUAL((timestamps <= Timestamp(1, 3)).count(), 7);
     CHECK_EQUAL((timestamps == Timestamp(0, 2)).count(), 1);
-    CHECK_EQUAL((timestamps != Timestamp(0, 2)).count(), 8);
+    CHECK_EQUAL((timestamps != Timestamp(0, 2)).count(), 9);
     CHECK_EQUAL((timestamps == Timestamp()).count(), 1);
     CHECK_EQUAL((timestamps != Timestamp()).count(), 9);
 }
