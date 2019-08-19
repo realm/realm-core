@@ -10069,7 +10069,7 @@ TEST(Query_EqualityInts)
 
         int64_t id = -1;
         int64_t sum = 0;
-        constexpr static size_t num_rows = 2000;
+        constexpr static size_t num_rows = REALM_MAX_BPNODE_SIZE + 10;
         for (size_t i = 0; i < num_rows; ++i) {
             sum += id;
             table->add_empty_row();
