@@ -868,16 +868,14 @@ size_t TimestampNode<NotEqual>::find_first_local(size_t start, size_t end)
     while (start < end) {
         util::Optional<int64_t> seconds = get_seconds_and_cache(start);
         // Null value does not match
-        if (seconds) {
-            if (*seconds != needle_seconds) {
-                return start;
-            }
-            // We now know that neither m_value nor current value is null and that seconds part equals
-            // We are just missing to compare nanoseconds part
-            int32_t nanos = this->get_nanoseconds_and_cache(start);
-            if (nanos != m_value.get_nanoseconds()) {
-                return start;
-            }
+        if (! seconds || *seconds != needle_seconds) {
+            return start;
+        }
+        // We now know that neither m_value nor current value is null and that seconds part equals
+        // We are just missing to compare nanoseconds part
+        int32_t nanos = this->get_nanoseconds_and_cache(start);
+        if (nanos != m_value.get_nanoseconds()) {
+            return start;
         }
         ++start;
     }
