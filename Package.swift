@@ -3,7 +3,7 @@
 import PackageDescription
 import Foundation
 
-let versionStr = "5.23.1"
+let versionStr = "5.23.2"
 let versionPieces = versionStr.split(separator: "-")
 let versionCompontents = versionPieces[0].split(separator: ".")
 let versionExtra = versionPieces.count > 1 ? versionPieces[1] : ""
