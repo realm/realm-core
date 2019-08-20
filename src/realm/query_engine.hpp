@@ -697,6 +697,7 @@ public:
 
         if (has_search_index()) {
             // _search_index_init();
+            m_result.clear();
             auto index = ParentNode::m_table->get_search_index(ParentNode::m_condition_column_key);
             index->find_all(m_result, BaseType::m_value);
             m_result_get = 0;
@@ -1205,20 +1206,19 @@ private:
     const ArrayBoolNull* m_leaf_ptr = nullptr;
 };
 
-template <class TConditionFunction>
-class TimestampNode : public ParentNode {
+class TimestampNodeBase : public ParentNode {
 public:
     using TConditionValue = Timestamp;
     static const bool special_null_node = false;
 
-    TimestampNode(Timestamp v, ColKey column)
+    TimestampNodeBase(Timestamp v, ColKey column)
         : m_value(v)
     {
         m_condition_column_key = column;
     }
 
-    TimestampNode(null, ColKey column)
-        : TimestampNode(Timestamp{}, column)
+    TimestampNodeBase(null, ColKey column)
+        : TimestampNodeBase(Timestamp{}, column)
     {
     }
 
@@ -1237,19 +1237,32 @@ public:
         m_dD = 100.0;
     }
 
-    size_t find_first_local(size_t start, size_t end) override
+protected:
+    TimestampNodeBase(const TimestampNodeBase& from, Transaction* tr)
+        : ParentNode(from, tr)
+        , m_value(from.m_value)
     {
-        TConditionFunction condition;
-        bool m_value_is_null = m_value.is_null();
-        for (size_t s = start; s < end; ++s) {
-            Timestamp value = m_leaf_ptr->get(s);
-            if (condition(value, m_value, value.is_null(), m_value_is_null))
-                return s;
-        }
-        return not_found;
     }
 
-    virtual std::string describe(util::serializer::SerialisationState& state) const override
+    Timestamp m_value;
+    using LeafCacheStorage = typename std::aligned_storage<sizeof(ArrayTimestamp), alignof(ArrayTimestamp)>::type;
+    using LeafPtr = std::unique_ptr<ArrayTimestamp, PlacementDelete>;
+    LeafCacheStorage m_leaf_cache_storage;
+    LeafPtr m_array_ptr;
+    const ArrayTimestamp* m_leaf_ptr = nullptr;
+};
+
+template <class TConditionFunction>
+class TimestampNode : public TimestampNodeBase {
+public:
+    using TimestampNodeBase::TimestampNodeBase;
+
+    size_t find_first_local(size_t start, size_t end) override
+    {
+        return m_leaf_ptr->find_first<TConditionFunction>(m_value, start, end);
+    }
+
+    std::string describe(util::serializer::SerialisationState& state) const override
     {
         REALM_ASSERT(m_condition_column_key);
         return state.describe_column(ParentNode::m_table, m_condition_column_key) + " " +
@@ -1260,20 +1273,6 @@ public:
     {
         return std::unique_ptr<ParentNode>(new TimestampNode(*this, tr));
     }
-
-    TimestampNode(const TimestampNode& from, Transaction* tr)
-        : ParentNode(from, tr)
-        , m_value(from.m_value)
-    {
-    }
-
-private:
-    Timestamp m_value;
-    using LeafCacheStorage = typename std::aligned_storage<sizeof(ArrayTimestamp), alignof(ArrayTimestamp)>::type;
-    using LeafPtr = std::unique_ptr<ArrayTimestamp, PlacementDelete>;
-    LeafCacheStorage m_leaf_cache_storage;
-    LeafPtr m_array_ptr;
-    const ArrayTimestamp* m_leaf_ptr = nullptr;
 };
 
 class StringNodeBase : public ParentNode {
@@ -1403,7 +1402,7 @@ public:
         for (size_t s = start; s < end; ++s) {
             StringData t = get_string(s);
 
-            if (cond(StringData(m_value), m_ucase.data(), m_lcase.data(), t))
+            if (cond(StringData(m_value), m_ucase.c_str(), m_lcase.c_str(), t))
                 return s;
         }
         return not_found;
@@ -1554,7 +1553,7 @@ public:
             if (!bool(m_value)) {
                 return s;
             }
-            if (cond(StringData(m_value), m_ucase.data(), m_lcase.data(), m_charmap, t))
+            if (cond(StringData(m_value), m_ucase.c_str(), m_lcase.c_str(), m_charmap, t))
                 return s;
         }
         return not_found;
@@ -2154,7 +2153,6 @@ private:
 
 // For Next-Generation expressions like col1 / col2 + 123 > col4 * 100.
 class ExpressionNode : public ParentNode {
-
 public:
     ExpressionNode(std::unique_ptr<Expression>);
 

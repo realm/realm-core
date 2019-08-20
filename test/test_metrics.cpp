@@ -693,13 +693,12 @@ TEST(Metrics_SubQueries)
     Query q2 = table->column<Lst<String>>(col_list_string).begins_with("Str");
     Query q3 = table->column<Lst<String>>(col_list_string) == "Str_0";
 
-    CHECK_THROW(q0.find_all(), SerialisationError);
-    CHECK_THROW(q1.find_all(), SerialisationError);
-    CHECK_THROW(q2.find_all(), SerialisationError);
-    CHECK_THROW(q3.find_all(), SerialisationError);
+    q0.find_all();
+    q1.find_all();
+    q2.find_all();
+    q3.find_all();
 
     wt->commit();
-    /*
     std::shared_ptr<Metrics> metrics = sg->get_metrics();
     CHECK(metrics);
     std::unique_ptr<Metrics::QueryInfoList> queries = metrics->take_queries();
@@ -708,21 +707,16 @@ TEST(Metrics_SubQueries)
     CHECK_EQUAL(queries->size(), 4);
 
     std::string int_equal_description = queries->at(0).get_description();
-    CHECK_EQUAL(find_count(int_equal_description, "=="), 1);
-    CHECK_EQUAL(find_count(int_equal_description, int_col_name), 1);
+    CHECK_EQUAL(int_equal_description, "Serialisation of subtable expressions is not yet supported.");
 
     std::string int_max_description = queries->at(1).get_description();
-    CHECK_EQUAL(find_count(int_max_description, "@max"), 1);
-    CHECK_EQUAL(find_count(int_max_description, int_col_name), 1);
+    CHECK_EQUAL(int_equal_description, "Serialisation of subtable expressions is not yet supported.");
 
     std::string str_begins_description = queries->at(2).get_description();
-    CHECK_EQUAL(find_count(str_begins_description, "BEGINSWITH"), 1);
-    CHECK_EQUAL(find_count(str_begins_description, str_col_name), 1);
+    CHECK_EQUAL(int_equal_description, "Serialisation of subtable expressions is not yet supported.");
 
     std::string str_equal_description = queries->at(3).get_description();
-    CHECK_EQUAL(find_count(str_equal_description, "=="), 1);
-    CHECK_EQUAL(find_count(str_equal_description, str_col_name), 1);
-    */
+    CHECK_EQUAL(int_equal_description, "Serialisation of subtable expressions is not yet supported.");
 }
 
 TEST(Metrics_TransactionTimings)

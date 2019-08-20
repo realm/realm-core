@@ -1703,7 +1703,8 @@ std::string create_random_a_string(size_t max_len) {
 }
 
 
-TEST_TYPES(StringIndex_Insensitive_Fuzz, string_column, nullable_string_column, enum_column, nullable_enum_column)
+// Excluded when run with valgrind because it takes a long time
+TEST_TYPES_IF(StringIndex_Insensitive_Fuzz, !running_with_valgrind, string_column, nullable_string_column, enum_column, nullable_enum_column)
 {
     const size_t max_str_len = 9;
     const size_t iters = 3;

@@ -97,12 +97,33 @@ public:
         m_nanoseconds.clear();
     }
 
+    template <class Condition>
+    size_t find_first(Timestamp value, size_t begin, size_t end) const noexcept;
+
     size_t find_first(Timestamp value, size_t begin, size_t end) const noexcept;
 
 private:
     ArrayIntNull m_seconds;
     ArrayInteger m_nanoseconds;
 };
+
+template <>
+size_t ArrayTimestamp::find_first<Equal>(Timestamp value, size_t begin, size_t end) const noexcept;
+template <>
+size_t ArrayTimestamp::find_first<NotEqual>(Timestamp value, size_t begin, size_t end) const noexcept;
+template <>
+size_t ArrayTimestamp::find_first<Less>(Timestamp value, size_t begin, size_t end) const noexcept;
+template <>
+size_t ArrayTimestamp::find_first<LessEqual>(Timestamp value, size_t begin, size_t end) const noexcept;
+template <>
+size_t ArrayTimestamp::find_first<GreaterEqual>(Timestamp value, size_t begin, size_t end) const noexcept;
+template <>
+size_t ArrayTimestamp::find_first<Greater>(Timestamp value, size_t begin, size_t end) const noexcept;
+
+inline size_t ArrayTimestamp::find_first(Timestamp value, size_t begin, size_t end) const noexcept
+{
+    return find_first<Equal>(value, begin, end);
+}
 
 template <>
 class QueryState<Timestamp> : public QueryStateBase {

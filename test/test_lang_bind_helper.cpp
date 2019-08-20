@@ -3775,7 +3775,8 @@ TEST(LangBindHelper_RacingAttachers)
     }
 }
 
-TEST(LangBindHelper_HandoverBetweenThreads)
+// This test takes a very long time when running with valgrind
+TEST_IF(LangBindHelper_HandoverBetweenThreads, !running_with_valgrind)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));

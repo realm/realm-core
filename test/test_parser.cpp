@@ -386,7 +386,6 @@ Query verify_query(test_util::unit_test::TestContext& test_context, TableRef t, 
 
     parser::ParserResult res2 = realm::parser::parse(description);
     realm::query_builder::apply_predicate(q2, res2.predicate, args);
-
     CHECK_EQUAL(q2.count(), num_results);
     return q2;
 }
@@ -457,18 +456,20 @@ TEST(Parser_basic_serialisation)
     Group g;
     std::string table_name = "person";
     TableRef t = g.add_table(table_name);
-    t->add_column(type_Int, "age");
+    auto int_col_key = t->add_column(type_Int, "age");
     t->add_column(type_String, "name");
-    t->add_column(type_Double, "fees");
+    t->add_column(type_Double, "fees", true);
+    t->add_column(type_Bool, "licensed", true);
     auto link_col = t->add_column_link(type_Link, "buddy", *t);
     auto time_col = t->add_column(type_Timestamp, "time", true);
+    t->add_search_index(int_col_key);
     std::vector<std::string> names = {"Billy", "Bob", "Joe", "Jane", "Joel"};
     std::vector<double> fees = { 2.0, 2.23, 2.22, 2.25, 3.73 };
     std::vector<ObjKey> keys;
 
     t->create_objects(5, keys);
     for (size_t i = 0; i < t->size(); ++i) {
-        t->get_object(keys[i]).set_all(int(i), StringData(names[i]), fees[i]);
+        t->get_object(keys[i]).set_all(int(i), StringData(names[i]), fees[i], (i % 2 == 0));
     }
     t->get_object(keys[0]).set(time_col, Timestamp(realm::null()));
     t->get_object(keys[1]).set(time_col, Timestamp(1512130073, 0));   // 2017/12/02 @ 12:47am (UTC)
@@ -497,8 +498,24 @@ TEST(Parser_basic_serialisation)
     verify_query(test_context, t, "3 =< age", 2);
     verify_query(test_context, t, "age > 2 and age < 4", 1);
     verify_query(test_context, t, "age = 1 || age == 3", 2);
+    verify_query(test_context, t, "fees = 1.2 || fees = 2.23", 1);
+    verify_query(test_context, t, "fees = 2 || fees = 3", 1);
+    verify_query(test_context, t, "fees = 2 || fees = 3 || fees = 4", 1);
+    verify_query(test_context, t, "fees = 0 || fees = 1", 0);
+
     verify_query(test_context, t, "fees != 2.22 && fees > 2.2", 3);
     verify_query(test_context, t, "(age > 1 || fees >= 2.25) && age == 4", 1);
+    verify_query(test_context, t, "licensed == true", 3);
+    verify_query(test_context, t, "licensed == false", 2);
+    verify_query(test_context, t, "licensed = true || licensed = true", 3);
+    verify_query(test_context, t, "licensed = 1 || licensed = 0", 5);
+    verify_query(test_context, t, "licensed = true || licensed = false", 5);
+    verify_query(test_context, t, "licensed == true || licensed == false", 5);
+    verify_query(test_context, t, "licensed == true || buddy.licensed == true", 3);
+    verify_query(test_context, t, "buddy.licensed == true", 0);
+    verify_query(test_context, t, "buddy.licensed == false", 1);
+    verify_query(test_context, t, "licensed == false || buddy.licensed == false", 3);
+    verify_query(test_context, t, "licensed == true or licensed = true || licensed = TRUE", 3);
     verify_query(test_context, t, "name = \"Joe\"", 1);
     verify_query(test_context, t, "buddy.age > 0", 1);
     verify_query(test_context, t, "name BEGINSWITH \"J\"", 3);
@@ -524,6 +541,7 @@ TEST(Parser_basic_serialisation)
     CHECK(message.find(table_name) != std::string::npos); // no prefix modification for names without "class_"
     CHECK(message.find("missing_property") != std::string::npos);
 }
+
 
 TEST(Parser_LinksToSameTable)
 {
@@ -2327,6 +2345,42 @@ TEST(Parser_IncludeDescriptorMultiple)
         CHECK_THROW_ANY_GET_MESSAGE(realm::parser::parse_include_path("something with spaces"), message);
         CHECK(message.find("Invalid syntax encountered while parsing key path for 'INCLUDE'.") != std::string::npos);
     }
+}
+
+
+TEST(Parser_IncludeDescriptorDeepLinks)
+{
+    Group g;
+    TableRef people = g.add_table("person");
+
+    auto name_col = people->add_column(type_String, "name");
+    auto link_col = people->add_column_link(type_Link, "father", *people);
+
+    auto bones = people->create_object().set(name_col, "Bones");
+    auto john = people->create_object().set(name_col, "John").set(link_col, bones.get_key());
+    auto mark = people->create_object().set(name_col, "Mark").set(link_col, john.get_key());
+    auto jonathan = people->create_object().set(name_col, "Jonathan").set(link_col, mark.get_key());
+    auto eli = people->create_object().set(name_col, "Eli").set(link_col, jonathan.get_key());
+
+    // include serialisation
+    TableView tv = get_sorted_view(people, "name contains[c] 'bone' SORT(name DESC) INCLUDE(@links.person.father.@links.person.father.@links.person.father.@links.person.father)");
+    IncludeDescriptor includes = tv.get_include_descriptors();
+    CHECK(includes.is_valid());
+    CHECK_EQUAL(tv.size(), 1);
+
+    CHECK_EQUAL(tv.get_object(0).get<String>(name_col), "Bones");
+
+    size_t cur_ndx_to_check = 0;
+    std::vector<std::string> expected_include_names;
+    auto reporter = [&](const Table* table, const std::unordered_set<ObjKey>& rows) {
+        CHECK(table == people);
+        CHECK_EQUAL(1, rows.size());
+        std::string row_value = table->get_object(*rows.begin()).get<String>(name_col);
+        CHECK_EQUAL(row_value, expected_include_names[cur_ndx_to_check++]);
+    };
+
+    expected_include_names = {"John", "Mark", "Jonathan", "Eli"};
+    includes.report_included_backlinks(people, tv.get_key(0), reporter);
 }
 
 
