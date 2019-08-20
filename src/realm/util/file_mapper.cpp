@@ -851,9 +851,10 @@ void msync(FileDesc fd, void* addr, size_t size)
     return;
 #else
     static_cast<void>(fd);
-    if (::msync(addr, size, MS_SYNC) != 0) {
+    while (::msync(addr, size, MS_SYNC) != 0) {
         int err = errno; // Eliminate any risk of clobbering
-        throw std::system_error(err, std::system_category(), "msync() failed");
+        if (err != EINTR)
+            throw std::system_error(err, std::system_category(), "msync() failed");
     }
 #endif
 }
