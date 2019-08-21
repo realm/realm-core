@@ -10060,6 +10060,39 @@ TEST(Query_NegativeNumbers)
     }
 }
 
+TEST(Query_EqualityInts)
+{
+    for (size_t nullable = 0; nullable < 2; ++nullable) {
+        Group group;
+        TableRef table = group.add_table("test");
+        size_t col_ndx = table->add_column(type_Int, "int", nullable == 0);
+
+        int64_t id = -1;
+        int64_t sum = 0;
+        constexpr static size_t num_rows = REALM_MAX_BPNODE_SIZE + 10;
+        for (size_t i = 0; i < num_rows; ++i) {
+            sum += id;
+            table->add_empty_row();
+            table->set_int(col_ndx, i, id++);
+        }
+
+        for (size_t i = 0; i < num_rows; ++i) {
+            int64_t target = table->get_int(col_ndx, i);
+            Query q_eq = table->where().equal(col_ndx, target);
+            CHECK_EQUAL(q_eq.find(), i);
+            CHECK_EQUAL(q_eq.count(), 1);
+            CHECK_EQUAL(q_eq.sum_int(col_ndx), target);
+            CHECK_EQUAL(q_eq.average_int(col_ndx), target);
+
+            Query q_neq = table->where().not_equal(col_ndx, target);
+            CHECK_EQUAL(q_neq.find(), i == 0 ? 1 : 0);
+            CHECK_EQUAL(q_neq.count(), num_rows - 1);
+            CHECK_EQUAL(q_neq.sum_int(col_ndx), sum - target);
+            CHECK_EQUAL(q_neq.average_int(col_ndx), (sum - target) / double(num_rows - 1));
+        }
+    }
+}
+
 // Exposes bug that would lead to nulls being included as 0 value in average when performed
 // on Query. When performed on TableView or Table, it worked OK.
 TEST(Query_MaximumSumAverage)
@@ -10111,6 +10144,11 @@ TEST(Query_MaximumSumAverage)
             d = table1->where().not_equal(2, 1234.).average_double(2);
             CHECK_APPROXIMATELY_EQUAL(d, 7. / 2., 0.001);
 
+            d = (table1->column<Int>(0) == null()).average_int(0);
+            CHECK_EQUAL(d, 0);
+
+            d = (table1->column<Int>(0) != null()).average_int(0);
+            CHECK_APPROXIMATELY_EQUAL(d, 7. / 2., 0.001);
 
             // Those with criteria now only include some rows, whereof none are null
             d = table1->where().average_int(0);
@@ -10206,10 +10244,10 @@ TEST(Query_MaximumSumAverage)
             CHECK_EQUAL(dbl, 4.);
 
             d = (table1->column<Int>(0) != null()).maximum_int(0);
-            CHECK_EQUAL(dbl, 4);
+            CHECK_EQUAL(d, 4);
 
             d = (table1->column<Int>(1) != null()).maximum_int(0);
-            CHECK_EQUAL(dbl, 4);
+            CHECK_EQUAL(d, 4);
         }
 
 
@@ -10234,10 +10272,10 @@ TEST(Query_MaximumSumAverage)
 
             // Average of double, criteria on integer
             dbl = table1->where().not_equal(0, 1234).minimum_double(2);
-            CHECK_EQUAL(d, 3);
+            CHECK_EQUAL(dbl, 3);
 
             dbl = table1->where().not_equal(2, 1234.).minimum_double(2);
-            CHECK_EQUAL(d, 3.);
+            CHECK_EQUAL(dbl, 3.);
 
 
             // Those with criteria now only include some rows, whereof none are null
@@ -10270,10 +10308,10 @@ TEST(Query_MaximumSumAverage)
             CHECK_EQUAL(dbl, 3.);
 
             d = (table1->column<Int>(0) != null()).minimum_int(0);
-            CHECK_EQUAL(dbl, 3);
+            CHECK_EQUAL(d, 3);
 
             d = (table1->column<Int>(1) != null()).minimum_int(0);
-            CHECK_EQUAL(dbl, 3);
+            CHECK_EQUAL(d, 3);
         }
 
         // Sum
@@ -10292,9 +10330,15 @@ TEST(Query_MaximumSumAverage)
             d = table1->where().not_equal(0, 1234).sum_int(1);
             CHECK_EQUAL(d, 7);
 
+            d = (table1->column<Int>(0) == null()).sum_int(0);
+            CHECK_EQUAL(d, 0);
+
+            d = (table1->column<Int>(0) != null()).sum_int(0);
+            CHECK_EQUAL(d, 7);
+
             // Average of double, criteria on integer
             dbl = table1->where().not_equal(0, 1234).sum_double(2);
-            CHECK_EQUAL(d, 7.);
+            CHECK_EQUAL(dbl, 7.);
 
             dbl = table1->where().not_equal(2, 1234.).sum_double(2);
             CHECK_APPROXIMATELY_EQUAL(dbl, 7., 0.001);
@@ -10330,10 +10374,10 @@ TEST(Query_MaximumSumAverage)
             CHECK_APPROXIMATELY_EQUAL(dbl, 7., 0.001);
 
             d = (table1->column<Int>(0) != null()).sum_int(0);
-            CHECK_EQUAL(dbl, 7);
+            CHECK_EQUAL(d, 7);
 
             d = (table1->column<Int>(1) != null()).sum_int(0);
-            CHECK_EQUAL(dbl, 7);
+            CHECK_EQUAL(d, 7);
         }
 
 
@@ -10361,6 +10405,9 @@ TEST(Query_MaximumSumAverage)
 
             d = (table1->column<Double>(2) != null()).count();
             CHECK_EQUAL(d, 2);
+
+            d = (table1->column<Int>(0) == null()).count();
+            CHECK_EQUAL(d, n ? 1 : 0);
 
             d = (table1->column<Int>(0) != null()).count();
             CHECK_EQUAL(d, 2);
@@ -10625,6 +10672,18 @@ TEST(Query_Timestamp)
     CHECK_EQUAL(match, 5);
 
     match = (first < Timestamp(-100, 0)).find();
+    CHECK_EQUAL(match, 5);
+
+    match = (first >= Timestamp(std::numeric_limits<int64_t>::min(), -Timestamp::nanoseconds_per_second + 1)).count();
+    CHECK_EQUAL(match, 5);
+
+    match = (first > Timestamp(std::numeric_limits<int64_t>::min(), -Timestamp::nanoseconds_per_second + 1)).count();
+    CHECK_EQUAL(match, 5);
+
+    match = (first <= Timestamp(std::numeric_limits<int64_t>::max(), Timestamp::nanoseconds_per_second - 1)).count();
+    CHECK_EQUAL(match, 5);
+
+    match = (first < Timestamp(std::numeric_limits<int64_t>::max(), Timestamp::nanoseconds_per_second - 1)).count();
     CHECK_EQUAL(match, 5);
 
     // Left-hand-side being Timestamp() constant, right being column
