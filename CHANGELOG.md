@@ -12,7 +12,7 @@
 -----------
 
 ### Internals
-* None.
+* Changed the metrics timers to more precisely report in nanoseconds, instead of seconds. ([#3359](https://github.com/realm/realm-core/issues/3359))
 
 ----------------------------------------------
 

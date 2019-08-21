@@ -46,23 +46,23 @@ TransactionInfo::TransactionType TransactionInfo::get_transaction_type() const
     return m_type;
 }
 
-double TransactionInfo::get_transaction_time() const
+nanosecond_storage_t TransactionInfo::get_transaction_time_nanoseconds() const
 {
-    return m_transaction_time.get_elapsed_seconds();
+    return m_transaction_time.get_elapsed_nanoseconds();
 }
 
-double TransactionInfo::get_fsync_time() const
+nanosecond_storage_t TransactionInfo::get_fsync_time_nanoseconds() const
 {
     if (m_fsync_time) {
-        return m_fsync_time->get_elapsed_seconds();
+        return m_fsync_time->get_elapsed_nanoseconds();
     }
     return 0;
 }
 
-double TransactionInfo::get_write_time() const
+nanosecond_storage_t TransactionInfo::get_write_time_nanoseconds() const
 {
     if (m_write_time) {
-        return m_write_time->get_elapsed_seconds();
+        return m_write_time->get_elapsed_nanoseconds();
     }
     return 0;
 }
@@ -104,5 +104,5 @@ void TransactionInfo::update_stats(size_t disk_size, size_t free_space, size_t t
 
 void TransactionInfo::finish_timer()
 {
-    m_transaction_time.report_seconds(m_transact_timer.get_elapsed_time());
+    m_transaction_time.report_nanoseconds(m_transact_timer.get_elapsed_nanoseconds());
 }
