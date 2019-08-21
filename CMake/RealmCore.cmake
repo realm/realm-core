@@ -314,11 +314,11 @@ macro(build_realm_sync core_directory)
         INSTALL_COMMAND ""
         CONFIGURE_COMMAND ${CMAKE_COMMAND} -E make_directory build.debug
                         && cd build.debug
-                        && cmake -D CMAKE_BUILD_TYPE=Debug -DREALM_CORE_BUILDTREE=${core_directory}/build.debug ${sync_cfg_args} ..
+                        && cmake -D CMAKE_BUILD_TYPE=Debug -DREALM_CORE_BUILDTREE=${core_directory}/build.debug ${sync_cfg_args} -DREALM_BUILD_DOGLESS=OFF ..
                         && cd ..
                         && ${CMAKE_COMMAND} -E make_directory build.release
                         && cd build.release
-                        && cmake -D CMAKE_BUILD_TYPE=RelWithDebInfo -DREALM_CORE_BUILDTREE=${core_directory}/build.release ${sync_cfg_args} ..
+                        && cmake -D CMAKE_BUILD_TYPE=RelWithDebInfo -DREALM_CORE_BUILDTREE=${core_directory}/build.release ${sync_cfg_args} -DREALM_BUILD_DOGLESS=OFF ..
 
         BUILD_COMMAND cd build.debug
                    && cmake --build .
