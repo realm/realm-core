@@ -93,7 +93,7 @@ int64_t round_to_int64(double x)
 void MetricTimer::format(nanosecond_storage_t nanoseconds, std::ostream& out)
 {
     constexpr int64_t ns_per_second = 1'000'000'000;
-    int64_t rounded_minutes = round_to_int64(nanoseconds / (60 * ns_per_second));
+    int64_t rounded_minutes = round_to_int64(nanoseconds / (60.0 * ns_per_second));
     if (rounded_minutes > 60) {
         // 1h0m -> inf
         int64_t hours = rounded_minutes / 60;
@@ -101,7 +101,7 @@ void MetricTimer::format(nanosecond_storage_t nanoseconds, std::ostream& out)
         out << hours << "h" << minutes << "m";
     }
     else {
-        int64_t rounded_seconds = round_to_int64(nanoseconds / ns_per_second);
+        int64_t rounded_seconds = round_to_int64(nanoseconds / double(ns_per_second));
         if (rounded_seconds > 60) {
             // 1m0s -> 59m59s
             int64_t minutes = rounded_seconds / 60;
@@ -109,7 +109,7 @@ void MetricTimer::format(nanosecond_storage_t nanoseconds, std::ostream& out)
             out << minutes << "m" << seconds << "s";
         }
         else {
-            int64_t rounded_centies = round_to_int64(nanoseconds / 10'000'000);
+            int64_t rounded_centies = round_to_int64(nanoseconds / double(10'000'000));
             if (rounded_centies > 100) {
                 // 1s -> 59.99s
                 int64_t seconds = rounded_centies / 100;
@@ -121,7 +121,7 @@ void MetricTimer::format(nanosecond_storage_t nanoseconds, std::ostream& out)
                 out << 's';
             }
             else {
-                int64_t rounded_centi_ms = round_to_int64(nanoseconds / 10'000);
+                int64_t rounded_centi_ms = round_to_int64(nanoseconds / double(10'000));
                 if (rounded_centi_ms > 100) {
                     // 0.1ms -> 999.99ms
                     int64_t ms = rounded_centi_ms / 100;
@@ -134,7 +134,7 @@ void MetricTimer::format(nanosecond_storage_t nanoseconds, std::ostream& out)
                 }
                 else {
                     // 0 -> 999µs
-                    int64_t us = round_to_int64(nanoseconds / 1'000);
+                    int64_t us = round_to_int64(nanoseconds / double(1'000));
                     out << us << "us";
                 }
             }
