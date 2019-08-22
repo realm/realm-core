@@ -72,6 +72,7 @@ jobWrapper {
             androidArm64Debug       : doAndroidBuildInDocker('arm64-v8a', 'Debug', false),
             threadSanitizer         : doCheckSanity('Debug', '1000', 'thread'),
             addressSanitizer        : doCheckSanity('Debug', '1000', 'address')
+            performance             : buildPerformance()
         ]
         if (releaseTesting) {
             extendedChecks = [

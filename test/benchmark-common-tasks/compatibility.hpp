@@ -30,7 +30,28 @@ enum class RealmDurability {
     Async
 };
 
-realm::DBRef create_new_shared_group(std::string path, RealmDurability level, const char* key);
+#ifdef REALM_CLUSTER_IF
+using RdTrans = realm::ReadTransaction;
+using WrtTrans = realm::WriteTransaction;
+using DBRef = realm::DBRef;
+#else
+#include <realm/group_shared.hpp>
+#define DB SharedGroup
+#define DBOptions SharedGroupOptions
+using DBRef = std::shared_ptr<realm::SharedGroup>;
+class RdTrans : public realm::ReadTransaction {
+public:
+    RdTrans(DBRef ref) : realm::ReadTransaction(*ref) {};
+};
+
+class WrtTrans : public realm::WriteTransaction {
+public:
+    WrtTrans(DBRef ref) : realm::WriteTransaction(*ref) {};
+};
+using TransactionRef = std::unique_ptr<WrtTrans>;
+#endif
+
+DBRef create_new_shared_group(std::string path, RealmDurability level, const char* key);
 
 } // end namespace compatibility
 
