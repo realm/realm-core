@@ -2708,7 +2708,7 @@ inline bool Array::compare_equality(int64_t value, size_t start, size_t end, siz
                 if (a >= 64 / no0(width))
                     break;
 
-                if (!find_action<action, Callback>(a + start + baseindex, get<width>(start + t), state, callback))
+                if (!find_action<action, Callback>(a + start + baseindex, get<width>(start + a), state, callback))
                     return false;
                 v2 >>= (t + 1) * width;
                 a += 1;

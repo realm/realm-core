@@ -772,6 +772,11 @@ TEST_TYPES(Column_SumAverage, IntegerColumn, IntNullColumn)
     CHECK_EQUAL(123, c.sum());
     CHECK_EQUAL(123, c.average());
 
+    // Sum of 2 elements
+    c.add(456);
+    CHECK_EQUAL(579, c.sum());
+    CHECK_EQUAL(579.0f / 2.0f, c.average());
+
     c.clear();
 
     for (int i = 0; i < 100; i++)
