@@ -1290,6 +1290,11 @@ public:
     {
         return group.do_get_table(ndx);
     }
+
+    static int get_target_file_format_version_for_session(int current_file_format_version, int history_type) noexcept
+    {
+        return Group::get_target_file_format_version_for_session(current_file_format_version, history_type);
+    }
 };
 
 
