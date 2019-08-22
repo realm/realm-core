@@ -82,7 +82,7 @@ def doAndroidDockerBuild() {
             sh '''rm -rf build
               mkdir build
               cd build
-              cmake -DREALM_PLATFORM=Android -DANDROID_NDK=/opt/android-ndk -GNinja ..
+              cmake -DREALM_PLATFORM=Android -DANDROID_NDK=/opt/android-ndk -GNinja -DCMAKE_MAKE_PROGRAM=ninja ..
               ninja
               adb connect emulator
               timeout 10m adb wait-for-device
