@@ -14,7 +14,7 @@
 -----------
 
 ### Internals
-* None.
+* Better performance when cloud query metrics are turned on, by not acquiring a backtrace on query serialization errors (permissions queries). ([#3361](https://github.com/realm/realm-core/issues/3361)).
 
 ----------------------------------------------
 
