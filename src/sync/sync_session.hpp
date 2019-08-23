@@ -364,7 +364,9 @@ private:
 
     std::vector<std::function<void(std::error_code)>> m_download_completion_callbacks;
     std::vector<std::function<void(std::error_code)>> m_upload_completion_callbacks;
-    int m_completion_counter = 0;
+    // How many times a client resync has occurred. Used to discard session
+    // completion notifications from before the most recent client resync.
+    int m_client_resync_counter = 0;
 
     struct ServerOverride {
         std::string address;

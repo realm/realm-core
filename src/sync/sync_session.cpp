@@ -479,11 +479,22 @@ void SyncSession::handle_error(SyncError error)
                 break;
             case ClientResyncMode::DiscardLocal:
             case ClientResyncMode::Recover: {
+                // Performing a client resync requires tearing down our current
+                // sync session and creating a new one with a forced client
+                // reset. This will result in session completion handlers firing
+                // when the old session is torn down, which we don't want as this
+                // is supposed to be transparent to the user.
+                //
+                // To avoid this, we need to do two things: move the completion
+                // handlers aside temporarily so that moving to the inactive
+                // state doesn't clear them, and track which sync::Session each
+                // completion notification came from so that we can ignore
+                // notifications from the old session.
                 {
                     std::unique_lock<std::mutex> lock(m_state_mutex);
                     m_force_client_resync = true;
 
-                    ++m_completion_counter;
+                    ++m_client_resync_counter;
                     auto download_handlers = std::move(m_download_completion_callbacks);
                     auto upload_handlers = std::move(m_upload_completion_callbacks);
 
@@ -806,18 +817,23 @@ void SyncSession::add_completion_callback(_impl::SyncProgressNotifier::NotifierT
 {
     bool is_download = direction == _impl::SyncProgressNotifier::NotifierType::download;
 
-    int age_counter = m_completion_counter;
+    int resync_counter = m_client_resync_counter;
     std::weak_ptr<SyncSession> weak_self = shared_from_this();
     auto waiter = is_download ? &sync::Session::async_wait_for_download_completion
                               : &sync::Session::async_wait_for_upload_completion;
-    (m_session.get()->*waiter)([age_counter, weak_self, is_download](std::error_code ec) {
+    (m_session.get()->*waiter)([resync_counter, weak_self, is_download](std::error_code ec) {
         auto self = weak_self.lock();
         if (!self)
             return;
         std::unique_lock<std::mutex> lock(self->m_state_mutex);
-        if (age_counter != self->m_completion_counter)
+        if (resync_counter != self->m_client_resync_counter) {
+            // This callback was registered on a previous sync session and not
+            // the current one, so we want to simply discard completion
+            // notifications from it
             return;
-        auto callbacks = std::move(is_download ? self->m_download_completion_callbacks : self->m_upload_completion_callbacks);
+        }
+        auto callbacks = std::move(is_download ? self->m_download_completion_callbacks
+                                               : self->m_upload_completion_callbacks);
         lock.unlock();
         for (auto& callback : callbacks)
             callback(ec);
