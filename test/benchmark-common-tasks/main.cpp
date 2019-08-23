@@ -42,7 +42,7 @@ using namespace realm::util;
 using namespace realm::test_util;
 
 namespace {
-#define BASE_SIZE 36000
+#define BASE_SIZE 100000
 
 /**
   This bechmark suite represents a number of common use cases,
@@ -59,8 +59,8 @@ namespace {
 */
 
 const size_t min_repetitions = 10;
-const size_t max_repetitions = 1000;
-const double min_duration_s = 0.1;
+const size_t max_repetitions = 10000;
+const double min_duration_s = 0.5;
 const double min_warmup_time_s = 0.05;
 
 const char* to_lead_cstr(RealmDurability level);
@@ -121,7 +121,7 @@ struct BenchmarkUnorderedTableViewClear : Benchmark {
 
     void operator()(DBRef group)
     {
-        const size_t rows = 10000;
+        const size_t rows = BASE_SIZE;
         WrtTrans tr(group);
         TableRef tbl = tr.add_table(name());
         auto col = tbl->add_column(type_String, "s", true);
@@ -130,7 +130,7 @@ struct BenchmarkUnorderedTableViewClear : Benchmark {
 #else
         tbl->add_empty_row(rows);
 #endif
-        tbl->add_search_index(col);
+        // tbl->add_search_index(col);
 
         for (size_t t = 0; t < rows / 3; t += 3) {
 #ifdef REALM_CLUSTER_IF
@@ -157,7 +157,7 @@ struct AddTable : Benchmark {
 
     void operator()(DBRef group)
     {
-        WrtTrans tr(group);
+        WrtTrans tr(group);  // FIXME: Includes transaction management in what's measured.
         TableRef t = tr.add_table(name());
         t->add_column(type_String, "first");
         t->add_column(type_Int, "second");
@@ -198,7 +198,7 @@ struct BenchmarkWithStrings : BenchmarkWithStringsTable {
         WrtTrans tr(group);
         TableRef t = tr.get_table("StringOnly");
 
-        for (size_t i = 0; i < BASE_SIZE * 4; ++i) {
+        for (size_t i = 0; i < BASE_SIZE; ++i) {
             std::stringstream ss;
             ss << rand();
             auto s = ss.str();
@@ -223,9 +223,9 @@ struct BenchmarkWithStringsFewDup : BenchmarkWithStringsTable {
         TableRef t = tr.get_table("StringOnly");
 
         Random r;
-        for (size_t i = 0; i < BASE_SIZE * 4; ++i) {
+        for (size_t i = 0; i < BASE_SIZE; ++i) {
             std::stringstream ss;
-            ss << r.draw_int(0, BASE_SIZE * 2);
+            ss << r.draw_int(0, BASE_SIZE / 2);
             auto s = ss.str();
 #ifdef REALM_CLUSTER_IF
             Obj obj = t->create_object();
@@ -248,7 +248,7 @@ struct BenchmarkWithStringsManyDup : BenchmarkWithStringsTable {
         WrtTrans tr(group);
         TableRef t = tr.get_table("StringOnly");
         Random r;
-        for (size_t i = 0; i < BASE_SIZE * 4; ++i) {
+        for (size_t i = 0; i < BASE_SIZE; ++i) {
             std::stringstream ss;
             ss << r.draw_int(0, 100);
             auto s = ss.str();
@@ -274,7 +274,7 @@ struct BenchmarkDistinctStringFewDupes : BenchmarkWithStringsFewDup {
 
     void operator()(DBRef group)
     {
-        RdTrans tr(group);
+        RdTrans tr(group); // FIXME: These benchmarks have both get_table and transaction management?
         ConstTableRef table = tr.get_table("StringOnly");
         ConstTableView view = table->get_distinct_view(m_col);
     }
@@ -428,15 +428,15 @@ struct BenchmarkWithLongStrings : BenchmarkWithStrings {
         static std::string really_long_string = "A really long string, longer than 63 bytes at least, I guess......";
 #ifdef REALM_CLUSTER_IF
         t->get_object(m_keys[0]).set<StringData>(m_col, really_long_string);
-        t->get_object(m_keys[BASE_SIZE]).set<StringData>(m_col, really_long_string);
-        t->get_object(m_keys[BASE_SIZE * 2]).set<StringData>(m_col, really_long_string);
-        t->get_object(m_keys[BASE_SIZE * 3]).set<StringData>(m_col, really_long_string);
+        t->get_object(m_keys[BASE_SIZE / 4]).set<StringData>(m_col, really_long_string);
+        t->get_object(m_keys[BASE_SIZE * 2 / 4]).set<StringData>(m_col, really_long_string);
+        t->get_object(m_keys[BASE_SIZE * 3 / 4]).set<StringData>(m_col, really_long_string);
 #else
         t->insert_empty_row(0);
         t->set_string(m_col, 0, really_long_string);
-        t->set_string(m_col, BASE_SIZE, really_long_string);
-        t->set_string(m_col, BASE_SIZE * 2, really_long_string);
-        t->set_string(m_col, BASE_SIZE * 3, really_long_string);
+        t->set_string(m_col, BASE_SIZE / 4, really_long_string);
+        t->set_string(m_col, BASE_SIZE * 2 / 4, really_long_string);
+        t->set_string(m_col, BASE_SIZE * 3 / 4, really_long_string);
 #endif
         tr.commit();
     }
@@ -456,7 +456,7 @@ struct BenchmarkWithTimestamps : Benchmark {
         TableRef t = tr.add_table("Timestamps");
         m_col = t->add_column(type_Timestamp, "timestamps", true);
         Random r;
-        for (size_t i = 0; i < BASE_SIZE * 10; ++i) {
+        for (size_t i = 0; i < BASE_SIZE; ++i) {
             Timestamp time{r.draw_int<int64_t>(0, 1000000), r.draw_int<int32_t>(0, 1000000)};
             if (r.draw_int<int64_t>(0, 100) / 100.0 < percent_chance_of_null) {
                 time = Timestamp{};
@@ -749,7 +749,7 @@ struct BenchmarkWithInts : BenchmarkWithIntsTable {
         TableRef t = tr.get_table("IntOnly");
 
         Random r;
-        for (size_t i = 0; i < BASE_SIZE * 4; ++i) {
+        for (size_t i = 0; i < BASE_SIZE; ++i) {
             int64_t val = r.draw_int<int64_t>();
 #ifdef REALM_CLUSTER_IF
             Obj obj = t->create_object();
@@ -807,7 +807,7 @@ struct BenchmarkIntVsDoubleColumns : Benchmark {
 
 struct BenchmarkQueryChainedOrInts : BenchmarkWithIntsTable {
     const size_t num_queried_matches = 1000;
-    const size_t num_rows = 100000;
+    const size_t num_rows = BASE_SIZE;
     std::vector<int64_t> values_to_query;
     const char* name() const
     {
@@ -927,7 +927,7 @@ struct BenchmarkQuery : BenchmarkWithStrings {
 
 struct BenchmarkQueryChainedOrStrings : BenchmarkWithStringsTable {
     const size_t num_queried_matches = 1000;
-    const size_t num_rows = 100000;
+    const size_t num_rows = BASE_SIZE;
     std::vector<std::string> values_to_query;
     const char* name() const
     {
@@ -1047,8 +1047,8 @@ struct BenchmarkDistinctIntFewDupes : BenchmarkWithIntsTable {
         WrtTrans tr(group);
         TableRef t = tr.get_table("IntOnly");
         Random r;
-        for (size_t i = 0; i < BASE_SIZE * 4; ++i) {
-            int64_t val = r.draw_int(0, BASE_SIZE * 2);
+        for (size_t i = 0; i < BASE_SIZE; ++i) {
+            int64_t val = r.draw_int(0, BASE_SIZE / 2);
 #ifdef REALM_CLUSTER_IF
             Obj obj = t->create_object();
             obj.set(m_col, val);
@@ -1082,7 +1082,7 @@ struct BenchmarkDistinctIntManyDupes : BenchmarkWithIntsTable {
         WrtTrans tr(group);
         TableRef t = tr.get_table("IntOnly");
         Random r;
-        for (size_t i = 0; i < BASE_SIZE * 4; ++i) {
+        for (size_t i = 0; i < BASE_SIZE; ++i) {
             int64_t val = r.draw_int(0, 10);
 #ifdef REALM_CLUSTER_IF
             Obj obj = t->create_object();
@@ -1311,7 +1311,7 @@ struct BenchmarkQueryInsensitiveString : BenchmarkWithStringsTable {
 
         const size_t max_chars_in_string = 100;
 
-        for (size_t i = 0; i < BASE_SIZE * 4; ++i) {
+        for (size_t i = 0; i < BASE_SIZE; ++i) {
             size_t num_chars = rand() % max_chars_in_string;
             std::string randomly_cased_string = gen_random_case_string(num_chars);
 #ifdef REALM_CLUSTER_IF
@@ -1405,12 +1405,12 @@ struct BenchmarkQueryNot : Benchmark {
         TableRef table = tr.add_table(name());
         m_col = table->add_column(type_Int, "first");
 #ifdef REALM_CLUSTER_IF
-        for (size_t i = 0; i < 1000; ++i) {
+        for (size_t i = 0; i < BASE_SIZE; ++i) {
             table->create_object().set(m_col, 1);
         }
 #else
-        table->add_empty_row(1000);
-        for (size_t i = 0; i < 1000; ++i) {
+        table->add_empty_row(BASE_SIZE);
+        for (size_t i = 0; i < BASE_SIZE; ++i) {
             table->set_int(m_col, i, 1);
         }
 #endif
@@ -1442,7 +1442,7 @@ struct BenchmarkGetLinkList : Benchmark {
     {
         return "GetLinkList";
     }
-    static const size_t rows = 10000;
+    static const size_t rows = BASE_SIZE;
 
     void before_all(DBRef group)
     {
@@ -1602,13 +1602,13 @@ void run_benchmark(BenchmarkResults& results)
 
     configs.push_back(config_pair(RealmDurability::MemOnly, nullptr));
 #if REALM_ENABLE_ENCRYPTION
-    configs.push_back(config_pair(RealmDurability::MemOnly, crypt_key(true)));
+    // configs.push_back(config_pair(RealmDurability::MemOnly, crypt_key(true)));
 #endif
 
-    configs.push_back(config_pair(RealmDurability::Full, nullptr));
+    // configs.push_back(config_pair(RealmDurability::Full, nullptr));
 
 #if REALM_ENABLE_ENCRYPTION
-    configs.push_back(config_pair(RealmDurability::Full, crypt_key(true)));
+    // configs.push_back(config_pair(RealmDurability::Full, crypt_key(true)));
 #endif
 
     Timer timer(Timer::type_UserTime);

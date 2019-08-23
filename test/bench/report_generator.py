@@ -213,7 +213,8 @@ def generateReport(outputDirectory, csvFiles, statsfiles):
     for index, fname in enumerate(csvFiles):
         bench_data = csv2rec(fname)
         # do not assume that the csv files are ordered correctly (they are not)
-        bench_data = np.sort(bench_data, order='tag')
+        # well....actually, they are!
+        # bench_data = np.sort(bench_data, order='tag')
 
         print ("generating graph: " + str(index + 1) + "/" +
                str(len(csvFiles)) + " (" + fname + ")")
