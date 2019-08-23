@@ -57,6 +57,7 @@ public:
     // configuration is compatible with the existing one
     std::shared_ptr<Realm> get_realm(Realm::Config config);
     std::shared_ptr<Realm> get_realm();
+    void get_realm(Realm::Config config, std::function<void(std::shared_ptr<Realm>, std::exception_ptr)> callback);
 
     Realm::Config get_config() const { return m_config; }
 
@@ -207,7 +208,7 @@ private:
     void pin_version(VersionID version);
 
     void set_config(const Realm::Config&);
-    void create_sync_session();
+    void create_sync_session(bool force_client_reset);
 
     void run_async_notifiers();
     void advance_helper_shared_group_to_latest();

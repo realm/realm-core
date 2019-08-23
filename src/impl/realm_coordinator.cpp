@@ -71,7 +71,7 @@ std::shared_ptr<RealmCoordinator> RealmCoordinator::get_coordinator(const Realm:
     return coordinator;
 }
 
-void RealmCoordinator::create_sync_session()
+void RealmCoordinator::create_sync_session(bool force_client_reset)
 {
 #if REALM_ENABLE_SYNC
     if (m_sync_session)
@@ -89,7 +89,7 @@ void RealmCoordinator::create_sync_session()
 
     auto sync_config = *m_config.sync_config;
     sync_config.validate_sync_history = false;
-    m_sync_session = SyncManager::shared().get_session(m_config.path, sync_config);
+    m_sync_session = SyncManager::shared().get_session(m_config.path, sync_config, force_client_reset);
 
     std::weak_ptr<RealmCoordinator> weak_self = shared_from_this();
     SyncSession::Internal::set_sync_transact_callback(*m_sync_session,
@@ -101,6 +101,8 @@ void RealmCoordinator::create_sync_session()
                 self->m_notifier->notify_others();
         }
     });
+#else
+    static_cast<void>(force_client_reset);
 #endif
 }
 
@@ -208,7 +210,7 @@ std::shared_ptr<Realm> RealmCoordinator::get_realm(Realm::Config config)
     m_weak_realm_notifiers.emplace_back(realm);
 
     if (realm->config().sync_config)
-        create_sync_session();
+        create_sync_session(false);
 
     if (!m_audit_context && audit_factory)
         m_audit_context = audit_factory();
@@ -221,6 +223,42 @@ std::shared_ptr<Realm> RealmCoordinator::get_realm(Realm::Config config)
     }
 
     return realm;
+}
+
+void RealmCoordinator::get_realm(Realm::Config config,
+                                 std::function<void(std::shared_ptr<Realm>, std::exception_ptr)> callback)
+{
+#if REALM_ENABLE_SYNC
+    if (config.sync_config) {
+        std::unique_lock<std::mutex> lock(m_realm_mutex);
+        set_config(config);
+        create_sync_session(!File::exists(m_config.path));
+        m_sync_session->wait_for_download_completion([callback, self = shared_from_this()](std::error_code ec) {
+            if (ec)
+                callback(nullptr, std::make_exception_ptr(std::system_error(ec)));
+            else {
+                std::shared_ptr<Realm> realm;
+                try {
+                    realm = self->get_realm();
+                }
+                catch (...) {
+                    return callback(nullptr, std::current_exception());
+                }
+                callback(realm, nullptr);
+            }
+        });
+        return;
+    }
+#endif
+
+    std::shared_ptr<Realm> realm;
+    try {
+        realm = get_realm(std::move(config));
+    }
+    catch (...) {
+        return callback(nullptr, std::current_exception());
+    }
+    callback(realm, nullptr);
 }
 
 std::shared_ptr<Realm> RealmCoordinator::get_realm()
@@ -1053,7 +1091,7 @@ void RealmCoordinator::process_available_async(Realm& realm)
 
 void RealmCoordinator::set_transaction_callback(std::function<void(VersionID, VersionID)> fn)
 {
-    create_sync_session();
+    create_sync_session(false);
     m_transaction_callback = std::move(fn);
 }
 
