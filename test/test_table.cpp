@@ -3124,12 +3124,17 @@ TEST(Table_ListOfPrimitives)
     auto int_list2 = obj.get_list<int64_t>(int_col);
     CHECK_EQUAL(0, int_list2.size());
 
+    CHECK_THROW_ANY(obj.get_list<util::Optional<int64_t>>(int_col));
+
     auto bool_list = obj.get_list<bool>(bool_col);
     lists.push_back(&bool_list);
     CHECK_EQUAL(bool_vector.size(), bool_list.size());
     for (unsigned i = 0; i < bool_list.size(); i++) {
         CHECK_EQUAL(bool_vector[i], bool_list[i]);
     }
+
+    auto bool_list_nullable = obj.get_list<util::Optional<bool>>(bool_col);
+    CHECK_THROW_ANY(bool_list_nullable.set(0, util::none));
 
     auto string_list = obj.get_list<StringData>(string_col);
     auto str_min = string_list.min();
@@ -3143,6 +3148,9 @@ TEST(Table_ListOfPrimitives)
     string_list.insert(2, "Wednesday");
     CHECK_EQUAL(string_vector.size() + 1, string_list.size());
     CHECK_EQUAL(StringData("Wednesday"), string_list.get(2));
+    CHECK_THROW_ANY(string_list.set(2, StringData{}));
+    CHECK_THROW_ANY(string_list.add(StringData{}));
+    CHECK_THROW_ANY(string_list.insert(2, StringData{}));
 
     auto double_list = obj.get_list<double>(double_col);
     CHECK_EQUAL(double_vector.size(), double_list.size());

@@ -828,27 +828,6 @@ Obj& Obj::set<ObjKey>(ColKey col_key, ObjKey target_key, bool is_default)
 
 namespace {
 template <class T>
-inline bool value_is_null(const T& val)
-{
-    return val.is_null();
-}
-template <>
-inline bool value_is_null(const bool&)
-{
-    return false;
-}
-template <>
-inline bool value_is_null(const float& val)
-{
-    return null::is_null_float(val);
-}
-template <>
-inline bool value_is_null(const double& val)
-{
-    return null::is_null_float(val);
-}
-
-template <class T>
 inline void check_range(const T&)
 {
 }

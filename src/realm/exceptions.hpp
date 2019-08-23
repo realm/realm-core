@@ -283,7 +283,10 @@ public:
         column_does_not_exist,
 
         /// You can not add index on a subtable of a subtable
-        subtable_of_subtable_index
+        subtable_of_subtable_index,
+
+        /// You try to instantiate a list object not matching column type
+        list_type_mismatch
     };
 
     LogicError(ErrorKind message);

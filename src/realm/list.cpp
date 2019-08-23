@@ -145,7 +145,9 @@ ConstLstBase::ConstLstBase(ColKey col_key, const ConstObj* obj)
     : m_const_obj(obj)
     , m_col_key(col_key)
 {
-    REALM_ASSERT(col_key.get_attrs().test(col_attr_List));
+    if (!col_key.get_attrs().test(col_attr_List)) {
+        throw LogicError(LogicError::list_type_mismatch);
+    }
 }
 
 template <class T>
@@ -205,7 +207,7 @@ Lst<T>::Lst(const Obj& obj, ColKey col_key)
     , m_obj(obj)
 {
     if (m_obj) {
-        this->m_nullable = obj.m_table->is_nullable(col_key);
+        this->m_nullable = col_key.get_attrs().test(col_attr_Nullable);
         ConstLstIf<T>::init_from_parent();
     }
 }

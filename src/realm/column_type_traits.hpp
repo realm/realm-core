@@ -23,6 +23,7 @@
 #include <realm/column_type.hpp>
 #include <realm/data_type.hpp>
 #include <realm/array.hpp>
+#include <realm/keys.hpp>
 
 namespace realm {
 
@@ -204,6 +205,43 @@ struct GetLeafType<type_Timestamp, N> {
     // FIXME: Null definition
     using type = ArrayTimestamp;
 };
+
+template <class T>
+inline bool value_is_null(const T& val)
+{
+    return val.is_null();
 }
+template <class T>
+inline bool value_is_null(const util::Optional<T>& val)
+{
+    return !val;
+}
+template <>
+inline bool value_is_null(const int64_t&)
+{
+    return false;
+}
+template <>
+inline bool value_is_null(const bool&)
+{
+    return false;
+}
+template <>
+inline bool value_is_null(const float& val)
+{
+    return null::is_null_float(val);
+}
+template <>
+inline bool value_is_null(const double& val)
+{
+    return null::is_null_float(val);
+}
+template <>
+inline bool value_is_null(const ObjKey& val)
+{
+    return !val;
+}
+
+} // namespace realm
 
 #endif // REALM_COLUMN_TYPE_TRAITS_HPP

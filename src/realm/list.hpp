@@ -262,13 +262,33 @@ private:
 template <class T>
 inline void check_column_type(ColKey col)
 {
-    REALM_ASSERT(!col || col.get_type() == ColumnTypeTraits<T>::column_id);
+    if (col && col.get_type() != ColumnTypeTraits<T>::column_id) {
+        throw LogicError(LogicError::list_type_mismatch);
+    }
+}
+
+template <>
+inline void check_column_type<Int>(ColKey col)
+{
+    if (col && (col.get_type() != col_type_Int || col.get_attrs().test(col_attr_Nullable))) {
+        throw LogicError(LogicError::list_type_mismatch);
+    }
+}
+
+template <>
+inline void check_column_type<util::Optional<Int>>(ColKey col)
+{
+    if (col && (col.get_type() != col_type_Int || !col.get_attrs().test(col_attr_Nullable))) {
+        throw LogicError(LogicError::list_type_mismatch);
+    }
 }
 
 template <>
 inline void check_column_type<ObjKey>(ColKey col)
 {
-    REALM_ASSERT(!col || col.get_type() == col_type_LinkList);
+    if (col && col.get_type() != col_type_LinkList) {
+        throw LogicError(LogicError::list_type_mismatch);
+    }
 }
 
 /// This class defines the interface to ConstList, except for the constructor
@@ -502,6 +522,10 @@ public:
     T set(size_t ndx, T value)
     {
         REALM_ASSERT_DEBUG(!update_if_needed());
+
+        if (value_is_null(value) && !m_nullable)
+            throw LogicError(LogicError::column_not_nullable);
+
         // get will check for ndx out of bounds
         T old = get(ndx);
         if (old != value) {
@@ -518,6 +542,10 @@ public:
     void insert(size_t ndx, T value)
     {
         REALM_ASSERT_DEBUG(!update_if_needed());
+
+        if (value_is_null(value) && !m_nullable)
+            throw LogicError(LogicError::column_not_nullable);
+
         ensure_created();
         if (ndx > m_tree->size()) {
             throw std::out_of_range("Index out of range");

@@ -649,7 +649,7 @@ TEST(Metrics_SubQueries)
     TableRef table = wt->add_table(table_name);
 
     auto col_list_int = table->add_column_list(type_Int, int_col_name);
-    auto col_list_string = table->add_column_list(type_String, str_col_name);
+    auto col_list_string = table->add_column_list(type_String, str_col_name, true);
     auto col_other = table->add_column(type_String, "other");
 
     std::vector<ObjKey> keys;
