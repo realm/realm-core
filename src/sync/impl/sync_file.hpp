@@ -102,17 +102,11 @@ public:
         return get_special_directory(directory.value_or(c_recovery_directory));
     }
 
-    std::string get_state_directory() const
-    {
-        return get_special_directory(c_state_directory);
-    }
-
 private:
     const std::string m_base_path;
 
     static constexpr const char c_sync_directory[] = "realm-object-server";
     static constexpr const char c_utility_directory[] = "io.realm.object-server-utility";
-    static constexpr const char c_state_directory[] = "io.realm.object-server-state";
     static constexpr const char c_recovery_directory[] = "io.realm.object-server-recovered-realms";
     static constexpr const char c_metadata_directory[] = "metadata";
     static constexpr const char c_metadata_realm[] = "sync_metadata.realm";

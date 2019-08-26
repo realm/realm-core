@@ -63,6 +63,8 @@ public:
     // If the Realm is already on disk, it will be fully synchronized before being returned.
     // Timeouts and interruptions are not handled by this method and must be handled by upper layers.
     std::shared_ptr<AsyncOpenTask> get_synchronized_realm(Realm::Config config);
+    // Used from SyncSession constructor if config.validate_sync_history is set
+    void open_with_config(Realm::Config config);
 #endif
 
     // Get a Realm which is not bound to the current execution context
@@ -168,7 +170,7 @@ public:
 
 #if REALM_ENABLE_SYNC
     // A work queue that can be used to perform background work related to partial sync.
-    partial_sync::WorkQueue& partial_sync_work_queue();
+    _impl::partial_sync::WorkQueue& partial_sync_work_queue();
 #endif
 
     AuditInterface* audit_context() const noexcept { return m_audit_context.get(); }
@@ -221,7 +223,7 @@ private:
     void pin_version(VersionID version);
 
     void set_config(const Realm::Config&);
-    void create_sync_session(bool force_client_reset);
+    void create_sync_session(bool force_client_reset, bool validate_sync_history);
     void do_get_realm(Realm::Config config, std::shared_ptr<Realm>& realm,
                       std::unique_lock<std::mutex>& realm_lock, bool bind_to_context=true);
     void run_async_notifiers();

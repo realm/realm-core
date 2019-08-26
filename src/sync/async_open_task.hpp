@@ -19,6 +19,8 @@
 #ifndef ASYNC_OPEN_TASK_HPP
 #define ASYNC_OPEN_TASK_HPP
 
+#include <util/atomic_shared_ptr.hpp>
+
 #include <functional>
 #include <memory>
 
@@ -50,8 +52,7 @@ public:
 
 private:
     std::shared_ptr<_impl::RealmCoordinator> m_coordinator;
-    std::shared_ptr<SyncSession> m_session;
-    bool m_canceled = false;
+    util::AtomicSharedPtr<SyncSession> m_session;
 };
 
 }

@@ -27,6 +27,8 @@
 #include <realm/sync/client.hpp>
 #include <realm/sync/protocol.hpp>
 
+#include "impl/realm_coordinator.hpp"
+
 using namespace realm;
 using namespace realm::_impl;
 using namespace realm::_impl::sync_session_states;
@@ -444,7 +446,7 @@ SyncSession::SyncSession(SyncClient& client, std::string realm_path, SyncConfig 
 
         // FIXME: Opening a Realm only to discard it is relatively expensive. It may be preferable to have
         // realm-sync open the Realm when the `sync::Session` is created since it can continue to use it.
-        Realm::get_shared_realm(realm_config); // Throws
+        _impl::RealmCoordinator::get_coordinator(m_realm_path)->open_with_config(realm_config);
    }
 }
 
@@ -593,7 +595,7 @@ void SyncSession::handle_error(SyncError error)
             case ClientError::limits_exceeded:
             case ClientError::protocol_mismatch:
             case ClientError::ssl_server_cert_rejected:
-            // case ClientError::missing_protocol_feature:
+            case ClientError::missing_protocol_feature:
             case ClientError::unknown_message:
             // case ClientError::bad_serial_transact_status:
             // case ClientError::bad_object_id_substitutions:
@@ -666,9 +668,9 @@ void SyncSession::create_sync_session()
     }
 
     if (m_force_client_reset) {
-        std::string metadata_dir = SyncManager::shared().m_file_manager->get_state_directory();
+        std::string metadata_dir = m_realm_path + ".resync";
         util::try_make_dir(metadata_dir);
-        
+
         sync::Session::Config::ClientReset config;
         config.metadata_dir = metadata_dir;
         session_config.client_reset_config = config;

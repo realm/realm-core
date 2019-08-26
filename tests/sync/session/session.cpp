@@ -729,5 +729,10 @@ TEST_CASE("sync: Migration from Sync 1.x to Sync 2.x", "[sync]") {
         });
     }
 
+    SECTION("Realm::get_synchronized_realm allows recovery from Sync 1.x to Sync 2.x migration") {
+        check([&]{
+            return Realm::get_synchronized_realm(config);
+        });
+    }
 }
 #endif

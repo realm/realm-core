@@ -507,6 +507,28 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
         // No subscriptions, so no objects
         REQUIRE(Realm::get_shared_realm(config)->read_group().get_table("class_object")->size() == 0);
     }
+
+    SECTION("can download multiple Realms at a time") {
+        SyncTestFile config1(server, "realm1");
+        SyncTestFile config2(server, "realm2");
+        SyncTestFile config3(server, "realm3");
+        SyncTestFile config4(server, "realm4");
+
+        std::vector<std::shared_ptr<AsyncOpenTask>> tasks = {
+            Realm::get_synchronized_realm(config1),
+            Realm::get_synchronized_realm(config2),
+            Realm::get_synchronized_realm(config3),
+            Realm::get_synchronized_realm(config4),
+        };
+
+        std::atomic<int> completed{0};
+        for (auto& task : tasks) {
+            task->start([&](auto, auto) {
+                ++completed;
+            });
+        }
+        util::EventLoop::main().run_until([&]{ return completed == 4; });
+    }
 }
 #endif
 
