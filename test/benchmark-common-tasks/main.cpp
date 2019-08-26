@@ -979,21 +979,6 @@ struct BenchmarkQueryChainedOrStrings : BenchmarkWithStringsTable {
     }
 };
 
-struct BenchmarkSize : BenchmarkWithStrings {
-    const char* name() const
-    {
-        return "Size";
-    }
-
-    void operator()(DBRef group)
-    {
-        RdTrans tr(group);
-        ConstTableRef table = tr.get_table("StringOnly");
-        volatile size_t dummy = table->size();
-        static_cast<void>(dummy);
-    }
-};
-
 struct BenchmarkSort : BenchmarkWithStrings {
     const char* name() const
     {
@@ -1502,7 +1487,7 @@ struct BenchmarkGetLinkList : Benchmark {
     ColKey m_col_link;
 };
 
-struct BenchmarkNonInitatorOpen : Benchmark {
+struct BenchmarkNonInitiatorOpen : Benchmark {
     const char* name() const
     {
         return "NonInitiatorOpen";
@@ -1547,6 +1532,16 @@ struct BenchmarkNonInitatorOpen : Benchmark {
     }
 };
 
+struct BenchmarkInitiatorOpen : public BenchmarkNonInitiatorOpen {
+    const char* name() const
+    {
+        return "InitiatorOpen";
+    }
+    void before_all(DBRef r) {
+        BenchmarkNonInitiatorOpen::before_all(r); // create file
+        initiator.reset(); // for close.
+    }
+};
 
 const char* to_lead_cstr(RealmDurability level)
 {
@@ -1595,21 +1590,20 @@ void run_benchmark_once(Benchmark& benchmark, DBRef sg, Timer& timer)
 /// This little piece of likely over-engineering runs the benchmark a number of times,
 /// with each durability setting, and reports the results for each run.
 template<typename B>
-void run_benchmark(BenchmarkResults& results)
+void run_benchmark(BenchmarkResults& results, bool force_full = false)
 {
     typedef std::pair<RealmDurability, const char*> config_pair;
     std::vector<config_pair> configs;
 
-    configs.push_back(config_pair(RealmDurability::MemOnly, nullptr));
+    if (force_full) {
+        configs.push_back(config_pair(RealmDurability::Full, nullptr));
 #if REALM_ENABLE_ENCRYPTION
-    // configs.push_back(config_pair(RealmDurability::MemOnly, crypt_key(true)));
+        configs.push_back(config_pair(RealmDurability::Full, crypt_key(true)));
 #endif
-
-    // configs.push_back(config_pair(RealmDurability::Full, nullptr));
-
-#if REALM_ENABLE_ENCRYPTION
-    // configs.push_back(config_pair(RealmDurability::Full, crypt_key(true)));
-#endif
+    }
+    else {
+        configs.push_back(config_pair(RealmDurability::MemOnly, nullptr));
+    }
 
     Timer timer(Timer::type_UserTime);
 
@@ -1685,36 +1679,42 @@ int benchmark_common_tasks_main()
     BenchmarkResults results(40, results_file_stem.c_str());
 
 #define BENCH(B) run_benchmark<B>(results)
-    BENCH(BenchmarkUnorderedTableViewClear);
-    BENCH(BenchmarkEmptyCommit);
-    BENCH(AddTable);
-    BENCH(BenchmarkQuery);
-    BENCH(BenchmarkQueryNot);
-    BENCH(BenchmarkSize);
+#define BENCH2(B,mode) run_benchmark<B>(results, mode)
+    BENCH2(BenchmarkEmptyCommit, true);
+    BENCH2(BenchmarkEmptyCommit, false);
+    BENCH2(BenchmarkNonInitiatorOpen, true);
+    BENCH2(BenchmarkInitiatorOpen, true);
+    BENCH2(AddTable, true);
+    BENCH2(AddTable, false);
+
     BENCH(BenchmarkSort);
     BENCH(BenchmarkSortInt);
-
     BENCH(BenchmarkDistinctIntFewDupes);
     BENCH(BenchmarkDistinctIntManyDupes);
     BENCH(BenchmarkDistinctStringFewDupes);
     BENCH(BenchmarkDistinctStringManyDupes);
+    BENCH(BenchmarkUnorderedTableViewClear);
 
+    // getting/setting - tableview or not
+    BENCH(BenchmarkGetString);
+    BENCH(BenchmarkSetString);
+    BENCH(BenchmarkGetLinkList);
+    BENCH(BenchmarkInsert);
+    BENCH2(BenchmarkCreateIndex, true);
+    BENCH2(BenchmarkCreateIndex, false);
+    BENCH(BenchmarkGetLongString);
+    BENCH(BenchmarkSetLongString);
+
+    // queries / searching
     BENCH(BenchmarkFindAllStringFewDupes);
     BENCH(BenchmarkFindAllStringManyDupes);
     BENCH(BenchmarkFindFirstStringFewDupes);
     BENCH(BenchmarkFindFirstStringManyDupes);
-
-    BENCH(BenchmarkInsert);
-    BENCH(BenchmarkGetString);
-    BENCH(BenchmarkSetString);
-    BENCH(BenchmarkCreateIndex);
-    BENCH(BenchmarkGetLongString);
+    BENCH(BenchmarkQuery);
+    BENCH(BenchmarkQueryNot);
     BENCH(BenchmarkQueryLongString);
-    BENCH(BenchmarkSetLongString);
-    BENCH(BenchmarkGetLinkList);
     BENCH(BenchmarkQueryInsensitiveString);
     BENCH(BenchmarkQueryInsensitiveStringIndexed);
-    BENCH(BenchmarkNonInitatorOpen);
     BENCH(BenchmarkQueryChainedOrStrings);
     BENCH(BenchmarkQueryChainedOrInts);
     BENCH(BenchmarkQueryChainedOrIntsIndexed);
@@ -1733,6 +1733,7 @@ int benchmark_common_tasks_main()
     BENCH(BenchmarkQueryTimestampEqualNull);
 
 #undef BENCH
+#undef BENCH2
     return 0;
 }
 

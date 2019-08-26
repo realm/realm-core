@@ -4,15 +4,6 @@
 # where this branch diverged from a specified development branch.
 # Empty lines and lines beginning with '#" are ignored.
 
-tags/v3.0.0
-tags/v3.1.0
-tags/v3.2.0
-tags/v4.0.0
-tags/v5.0.0
-tags/v5.1.0
-tags/v5.2.0
-tags/v5.3.0
-tags/v5.4.0
 tags/v5.5.0
 tags/v5.6.0
 tags/v5.7.0

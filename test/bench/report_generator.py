@@ -168,7 +168,9 @@ def generateStats(outputDirectory, statsfiles):
               'orangered', 'gray', 'lightblue', 'limegreen', 'navy']
     for index, fname in enumerate(statsfiles):
         bench_data = csv2rec(fname)
-        bench_data = np.sort(bench_data, order='tag')
+        # FIXME This sorts alphabetically, doesn't work whith multidigit numbers
+        # ideally we would want something that understands semantic versioning
+        # bench_data = np.sort(bench_data, order='tag')
         print ("generating stats graph: " + str(index + 1) +
                "/" + str(len(statsfiles)) + " (" + fname + ")")
         formatter = TagFormatter(bench_data['tag'])
@@ -213,7 +215,9 @@ def generateReport(outputDirectory, csvFiles, statsfiles):
     for index, fname in enumerate(csvFiles):
         bench_data = csv2rec(fname)
         # do not assume that the csv files are ordered correctly (they are not)
-        # well....actually, they are!
+        # well....actually, they are! (they are in commit timestamp order AFAIK)
+        # FIXME This sorts alphabetically, doesn't work whith multidigit numbers
+        # ideally we would want something that understands semantic versioning
         # bench_data = np.sort(bench_data, order='tag')
 
         print ("generating graph: " + str(index + 1) + "/" +
