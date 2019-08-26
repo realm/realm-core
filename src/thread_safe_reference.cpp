@@ -128,7 +128,6 @@ public:
 private:
     std::shared_ptr<Realm> m_realm;
 };
-} // namespace realm
 
 ThreadSafeReference::ThreadSafeReference() noexcept = default;
 ThreadSafeReference::~ThreadSafeReference() = default;
@@ -191,3 +190,5 @@ template Results ThreadSafeReference::resolve<Results>(std::shared_ptr<Realm>);
 template List ThreadSafeReference::resolve<List>(std::shared_ptr<Realm>);
 template Object ThreadSafeReference::resolve<Object>(std::shared_ptr<Realm>);
 template std::shared_ptr<Realm> ThreadSafeReference::resolve<std::shared_ptr<Realm>>(std::shared_ptr<Realm>);
+
+} // namespace realm
