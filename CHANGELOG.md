@@ -14,6 +14,7 @@
 
 ### Internals
 * The release binaries for Apple platforms are now built with Xcode 10.3 (up from 9.4).
+* Add a Catalyst/UIKit for Mac library to the Cocoa release package.
 
 ----------------------------------------------
 

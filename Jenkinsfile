@@ -93,6 +93,8 @@ jobWrapper {
             parallelExecutors = [
                 buildMacOsDebug     : doBuildMacOs('Debug', false),
                 buildMacOsRelease   : doBuildMacOs('Release', false),
+                buildCatalystDebug  : doBuildMacOsCatalyst('Debug'),
+                buildCatalystRelease: doBuildMacOsCatalyst('Release'),
 
                 buildWin32Debug     : doBuildWindows('Debug', false, 'Win32', false),
                 buildWin32Release   : doBuildWindows('Release', false, 'Win32', false),
@@ -521,6 +523,36 @@ def doBuildMacOs(String buildType, boolean runTests) {
                     recordTests("macos_${buildType}")
                 }
             }
+        }
+    }
+}
+
+def doBuildMacOsCatalyst(String buildType) {
+    return {
+        node('osx') {
+            getArchive()
+
+            dir("build-maccatalyst-${buildType}") {
+                withEnv(['DEVELOPER_DIR=/Applications/Xcode-11.app/Contents/Developer/']) {
+                    sh """
+                            rm -rf *
+                            cmake -D CMAKE_TOOLCHAIN_FILE=../tools/cmake/catalyst.toolchain.cmake \\
+                                  -D CMAKE_BUILD_TYPE=${buildType} \\
+                                  -D REALM_VERSION=${gitDescribeVersion} \\
+                                  -D REALM_SKIP_SHARED_LIB=ON \\
+                                  -D REALM_BUILD_LIB_ONLY=ON \\
+                                  -G Ninja ..
+                        """
+                    runAndCollectWarnings(parser: 'clang', script: 'ninja package')
+                }
+            }
+
+            archiveArtifacts("build-maccatalyst-${buildType}/*.tar.gz")
+
+            def stashName = "maccatalyst__${buildType}"
+            stash includes:"build-maccatalyst-${buildType}/*.tar.gz", name:stashName
+            cocoaStashes << stashName
+            publishingStashes << stashName
         }
     }
 }

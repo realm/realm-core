@@ -29,25 +29,34 @@ done
 shift $((OPTIND-1))
 
 BUILD_TYPES=( Release Debug )
-[[ -z $MACOS_ONLY ]] && PLATFORMS=( macos ios watchos tvos ) || PLATFORMS=( macos )
+[[ -z $MACOS_ONLY ]] && PLATFORMS=( macos maccatalyst ios watchos tvos ) || PLATFORMS=( macos )
+
+function build_macos {
+    local folder_name="$1"
+    local toolchain="$2"
+    local bt="$3"
+    mkdir -p "${folder_name}"
+    (
+        cd "${folder_name}" || exit 1
+        rm -f realm-core-*-devel.tar.gz
+        cmake -D CMAKE_TOOLCHAIN_FILE="../tools/cmake/$toolchain.toolchain.cmake" \
+              -D CMAKE_BUILD_TYPE="${bt}" \
+              -D REALM_VERSION="$(git describe)" \
+              -D REALM_SKIP_SHARED_LIB=ON \
+              -D REALM_BUILD_LIB_ONLY=ON \
+              -G Ninja ..
+        cmake --build . --config "${bt}" --target package
+    )
+}
 
 if [[ ! -z $BUILD ]]; then
     for bt in "${BUILD_TYPES[@]}"; do
-        folder_name="build-macos-${bt}"
-        mkdir -p "${folder_name}"
-        (
-            cd "${folder_name}" || exit 1
-            rm -f realm-core-*-devel.tar.gz
-            cmake -D CMAKE_TOOLCHAIN_FILE="../tools/cmake/macos.toolchain.cmake" \
-                  -D CMAKE_BUILD_TYPE="${bt}" \
-                  -D REALM_VERSION="$(git describe)" \
-                  -D REALM_SKIP_SHARED_LIB=ON \
-                  -D REALM_BUILD_LIB_ONLY=ON \
-                  -G Ninja ..
-            cmake --build . --config "${bt}" --target package
-        )
+        build_macos "build-macos-${bt}" macos "$bt"
     done
     if [[ -z $MACOS_ONLY ]]; then
+        for bt in Release MinSizeDebug; do
+            build_macos "build-maccatalyst-${bt}" catalyst "$bt"
+        done
         for os in ios watchos tvos; do
             for bt in Release MinSizeDebug; do
                 tools/cross_compile.sh -o $os -t $bt -v $(git describe)
@@ -73,16 +82,9 @@ for bt in "${BUILD_TYPES[@]}"; do
         fi
         tar -C core -zxvf "${filename}" "lib/librealm${suffix}.a"
         mv "core/lib/librealm${suffix}.a" "core/librealm-${infix}${suffix}.a"
-        tar -C core -zxvf "${filename}" "lib/librealm-parser${suffix}.a"
-        mv "core/lib/librealm-parser${suffix}.a" "core/librealm-parser-${infix}${suffix}.a"
         rm -rf core/lib
     done
 done
-
-ln -s librealm-macosx.a core/librealm.a
-ln -s librealm-macosx-dbg.a core/librealm-dbg.a
-ln -s librealm-parser-macosx.a core/librealm-parser.a
-ln -s librealm-parser-macosx-dbg.a core/librealm-parser-dbg.a
 
 if [[ ! -z $COPY ]]; then
     rm -rf "${DESTINATION}/core"
