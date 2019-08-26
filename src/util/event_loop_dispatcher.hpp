@@ -29,13 +29,13 @@ namespace realm {
 // FIXME: remove once we switch to C++ 17 where we can use std::apply
 namespace _apply_polyfill {
 template <class Tuple, class F, size_t... Is>
-constexpr auto apply_impl(Tuple t, F f, std::index_sequence<Is...>) {
-    return f(std::get<Is>(t)...);
+constexpr auto apply_impl(Tuple&& t, F f, std::index_sequence<Is...>) {
+    return f(std::get<Is>(std::forward<Tuple>(t))...);
 }
 
 template <class Tuple, class F>
-constexpr auto apply(Tuple t, F f) {
-    return apply_impl(t, f, std::make_index_sequence<std::tuple_size<Tuple>{}>{});
+constexpr auto apply(Tuple&& t, F f) {
+    return apply_impl(std::forward<Tuple>(t), f, std::make_index_sequence<std::tuple_size<Tuple>{}>{});
 }
 }
 
@@ -69,7 +69,7 @@ private:
             std::unique_lock<std::mutex> lock(m_state->m_mutex);
             while (!m_state->m_invocations.empty()) {
                 auto& tuple = m_state->m_invocations.front();
-                _apply_polyfill::apply(tuple, m_state->m_func);
+                _apply_polyfill::apply(std::move(tuple), m_state->m_func);
                 m_state->m_invocations.pop();
             }
             m_state->m_signal.reset();
@@ -92,14 +92,14 @@ public:
     void operator()(Args... args)
     {
         if (m_thread == std::this_thread::get_id()) {
-            m_state->m_func(args...);
+            m_state->m_func(std::forward<Args>(args)...);
             return;
         }
 
         {
             std::unique_lock<std::mutex> lock(m_state->m_mutex);
             m_state->m_signal = m_signal;
-            m_state->m_invocations.push(std::make_tuple(args...));
+            m_state->m_invocations.push(std::make_tuple(std::forward<Args>(args)...));
         }
         m_signal->notify();
     }
