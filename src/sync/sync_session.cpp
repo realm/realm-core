@@ -836,6 +836,11 @@ void SyncSession::set_multiplex_identifier(std::string multiplex_identity)
     m_multiplex_identity = std::move(multiplex_identity);
 }
 
+void SyncSession::set_url_prefix(std::string url_prefix)
+{
+    m_config.url_prefix = std::move(url_prefix);
+}
+
 SyncSession::PublicState SyncSession::get_public_state() const
 {
     if (m_state == nullptr) {

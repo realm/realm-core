@@ -138,6 +138,8 @@ struct SyncConfig {
     util::Optional<std::string> authorization_header_name = none;
     std::map<std::string, std::string> custom_http_headers;
 
+    // Set the URL path prefix sync will use when opening a websocket for this session. Default is `/realm-sync`.
+    // Useful when the sync worker sits behind a firewall or load-balancer that rewrites incoming requests.
     util::Optional<std::string> url_prefix = none;
 
     // The name of the directory which Realms should be backed up to following
