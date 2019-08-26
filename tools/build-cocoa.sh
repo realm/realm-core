@@ -43,7 +43,7 @@ if [[ ! -z $BUILD ]]; then
                   -D REALM_VERSION="$(git describe)" \
                   -D REALM_SKIP_SHARED_LIB=ON \
                   -D REALM_BUILD_LIB_ONLY=ON \
-                  -G Xcode ..
+                  -G Ninja ..
             cmake --build . --config "${bt}" --target package
         )
     done

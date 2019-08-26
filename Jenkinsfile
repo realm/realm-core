@@ -483,17 +483,12 @@ def doBuildMacOs(String buildType, boolean runTests) {
                                     cmake -D CMAKE_TOOLCHAIN_FILE=../tools/cmake/macos.toolchain.cmake \\
                                           -D CMAKE_BUILD_TYPE=${buildType} \\
                                           -D REALM_VERSION=${gitDescribeVersion} \\
-                                          ${buildTests} -G Xcode ..
+                                          ${buildTests} -G Ninja ..
                                 """
                         }
                     }
 
-                    runAndCollectWarnings(parser: 'clang', script: """
-                            xcodebuild -sdk macosx \\
-                                       -configuration ${buildType} \\
-                                       -target package \\
-                                       ONLY_ACTIVE_ARCH=NO
-                            """)
+                    runAndCollectWarnings(parser: 'clang', script: 'ninja package')
                 }
             }
 

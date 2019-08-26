@@ -12,7 +12,7 @@ macro(check_generator _generator)
 endmacro()
 
 macro(set_common_xcode_attributes)
-    set(REALM_ENABLE_ASSERTIONS ON)
+    set(REALM_ENABLE_ASSERTIONS ON CACHE BOOL "Enable release assertions")
 
     list(APPEND CMAKE_CONFIGURATION_TYPES MinSizeDebug)
     list(REMOVE_DUPLICATES CMAKE_CONFIGURATION_TYPES)
