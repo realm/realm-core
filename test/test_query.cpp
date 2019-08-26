@@ -70,7 +70,6 @@ using namespace realm::test_util;
 // `experiments/testcase.cpp` and then run `sh build.sh
 // check-testcase` (or one of its friends) from the command line.
 
-
 TEST(Query_NoConditions)
 {
     Table table;
@@ -9010,6 +9009,21 @@ TEST(Query_Timestamp)
     cnt = (first != Timestamp(0, 0)).count();
     CHECK_EQUAL(cnt, 5);
 
+    cnt = (first > null{}).count();
+    CHECK_EQUAL(cnt, 0);
+
+    cnt = (first < null{}).count();
+    CHECK_EQUAL(cnt, 0);
+
+    cnt = (first >= null{}).count();
+    CHECK_EQUAL(cnt, 1);
+
+    cnt = (first <= null{}).count();
+    CHECK_EQUAL(cnt, 1);
+
+    cnt = (first != Timestamp(0, 0)).count();
+    CHECK_EQUAL(cnt, 5);
+
     match = (first < Timestamp(-100, 0)).find();
     CHECK_EQUAL(match, keys[5]);
 
@@ -9069,6 +9083,29 @@ TEST(Query_Timestamp)
 
     match = (first < second).find();
     CHECK_EQUAL(match, null_key); // Note that (null < null) == false
+}
+
+TEST(Query_TimestampCount)
+{
+    Table table;
+    auto col_date = table.add_column(type_Timestamp, "date", true);
+    for (int i = 0; i < 10; i++) {
+        table.create_object().set(col_date, Timestamp(i / 4, i % 4));
+    }
+    table.get_object(5).set_null(col_date);
+
+    // Timestamps : {0,0}, {0,1}, {0,2}, {0,3}, {1,0}, {}, {1,2}, {1,3}, {2,0}, {2,1}
+
+    auto timestamps = table.column<Timestamp>(col_date);
+
+    CHECK_EQUAL((timestamps > Timestamp(0, 3)).count(), 5);
+    CHECK_EQUAL((timestamps >= Timestamp(0, 3)).count(), 6);
+    CHECK_EQUAL((timestamps < Timestamp(1, 3)).count(), 6);
+    CHECK_EQUAL((timestamps <= Timestamp(1, 3)).count(), 7);
+    CHECK_EQUAL((timestamps == Timestamp(0, 2)).count(), 1);
+    CHECK_EQUAL((timestamps != Timestamp(0, 2)).count(), 9);
+    CHECK_EQUAL((timestamps == Timestamp()).count(), 1);
+    CHECK_EQUAL((timestamps != Timestamp()).count(), 9);
 }
 
 TEST(Query_Timestamp_Null)
@@ -10014,5 +10051,35 @@ TEST(Query_IntFindInNextLeaf)
     check_results();
 }
 
+TEST(Query_IntIndexOverLinkViewNotInTableOrder)
+{
+    Group g;
 
+    TableRef child_table = g.add_table("child");
+    auto col_child_id = child_table->add_column(type_Int, "id");
+    child_table->add_search_index(col_child_id);
+
+    auto k0 = child_table->create_object().set(col_child_id, 3).get_key();
+    auto k1 = child_table->create_object().set(col_child_id, 2).get_key();
+
+    TableRef parent_table = g.add_table("parent");
+    auto col_parent_children = parent_table->add_column_link(type_LinkList, "children", *child_table);
+
+    auto parent_obj = parent_table->create_object();
+    auto children = parent_obj.get_linklist(col_parent_children);
+    // Add in reverse order so that the query node sees declining start indices
+    children.add(k1);
+    children.add(k0);
+
+    // Query via linkview
+    Query q = child_table->where(children).equal(col_child_id, 3);
+    // Call find() twice. This caused a memory lead at some point. Must pass a memory leak test.
+    CHECK_EQUAL(k0, q.find());
+    CHECK_EQUAL(k0, q.find());
+    CHECK_EQUAL(k1, child_table->where(children).equal(col_child_id, 2).find());
+
+    // Query directly
+    CHECK_EQUAL(k0, child_table->where().equal(col_child_id, 3).find());
+    CHECK_EQUAL(k1, child_table->where().equal(col_child_id, 2).find());
+}
 #endif // TEST_QUERY

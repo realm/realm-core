@@ -77,10 +77,129 @@ void ArrayTimestamp::insert(size_t ndx, Timestamp value)
     }
 }
 
-size_t ArrayTimestamp::find_first(Timestamp value, size_t begin, size_t end) const noexcept
+namespace realm {
+
+template <>
+size_t ArrayTimestamp::find_first<Greater>(Timestamp value, size_t begin, size_t end) const noexcept
 {
     if (value.is_null()) {
-        return m_seconds.find_first(realm::util::none, begin, end);
+        return not_found;
+    }
+    int64_t sec = value.get_seconds();
+    while (begin < end) {
+        size_t ret = m_seconds.find_first<GreaterEqual>(sec, begin, end);
+
+        if (ret == not_found)
+            return not_found;
+
+        util::Optional<int64_t> seconds = m_seconds.get(ret);
+        if (*seconds > sec) {
+            return ret;
+        }
+        // We now know that neither m_value nor current value is null and that seconds part equals
+        // We are just missing to compare nanoseconds part
+        int32_t nanos = int32_t(m_nanoseconds.get(ret));
+        if (nanos > value.get_nanoseconds()) {
+            return ret;
+        }
+        begin = ret + 1;
+    }
+
+    return not_found;
+}
+
+template <>
+size_t ArrayTimestamp::find_first<Less>(Timestamp value, size_t begin, size_t end) const noexcept
+{
+    if (value.is_null()) {
+        return not_found;
+    }
+    int64_t sec = value.get_seconds();
+    while (begin < end) {
+        size_t ret = m_seconds.find_first<LessEqual>(sec, begin, end);
+
+        if (ret == not_found)
+            return not_found;
+
+        util::Optional<int64_t> seconds = m_seconds.get(ret);
+        if (*seconds < sec) {
+            return ret;
+        }
+        // We now know that neither m_value nor current value is null and that seconds part equals
+        // We are just missing to compare nanoseconds part
+        int32_t nanos = int32_t(m_nanoseconds.get(ret));
+        if (nanos < value.get_nanoseconds()) {
+            return ret;
+        }
+        begin = ret + 1;
+    }
+
+    return not_found;
+}
+
+template <>
+size_t ArrayTimestamp::find_first<GreaterEqual>(Timestamp value, size_t begin, size_t end) const noexcept
+{
+    if (value.is_null()) {
+        return m_seconds.find_first<Equal>(util::none, begin, end);
+    }
+    int64_t sec = value.get_seconds();
+    while (begin < end) {
+        size_t ret = m_seconds.find_first<GreaterEqual>(sec, begin, end);
+
+        if (ret == not_found)
+            return not_found;
+
+        util::Optional<int64_t> seconds = m_seconds.get(ret);
+        if (*seconds > sec) {
+            return ret;
+        }
+        // We now know that neither m_value nor current value is null and that seconds part equals
+        // We are just missing to compare nanoseconds part
+        int32_t nanos = int32_t(m_nanoseconds.get(ret));
+        if (nanos >= value.get_nanoseconds()) {
+            return ret;
+        }
+        begin = ret + 1;
+    }
+
+    return not_found;
+}
+
+template <>
+size_t ArrayTimestamp::find_first<LessEqual>(Timestamp value, size_t begin, size_t end) const noexcept
+{
+    if (value.is_null()) {
+        return m_seconds.find_first<Equal>(util::none, begin, end);
+    }
+    int64_t sec = value.get_seconds();
+    while (begin < end) {
+        size_t ret = m_seconds.find_first<LessEqual>(sec, begin, end);
+
+        if (ret == not_found)
+            return not_found;
+
+        util::Optional<int64_t> seconds = m_seconds.get(ret);
+        if (*seconds < sec) {
+            return ret;
+        }
+        // We now know that neither m_value nor current value is null and that seconds part equals
+        // We are just missing to compare nanoseconds part
+        int32_t nanos = int32_t(m_nanoseconds.get(ret));
+        if (nanos <= value.get_nanoseconds()) {
+            return ret;
+        }
+        begin = ret + 1;
+    }
+
+    return not_found;
+}
+
+template <>
+size_t ArrayTimestamp::find_first<Equal>(Timestamp value, size_t begin, size_t end) const noexcept
+{
+    if (value.is_null()) {
+        return m_seconds.find_first<Equal>(util::none, begin, end);
     }
     while (begin < end) {
         auto res = m_seconds.find_first(value.get_seconds(), begin, end);
@@ -92,3 +211,27 @@ size_t ArrayTimestamp::find_first(Timestamp value, size_t begin, size_t end) con
     }
     return not_found;
 }
+
+template <>
+size_t ArrayTimestamp::find_first<NotEqual>(Timestamp value, size_t begin, size_t end) const noexcept
+{
+    if (value.is_null()) {
+        return m_seconds.find_first<NotEqual>(util::none, begin, end);
+    }
+    int64_t sec = value.get_seconds();
+    while (begin < end) {
+        util::Optional<int64_t> seconds = m_seconds.get(begin);
+        if (!seconds || *seconds != sec) {
+            return begin;
+       }
+       // We now know that neither m_value nor current value is null and that seconds part equals
+       // We are just missing to compare nanoseconds part
+       int32_t nanos = int32_t(m_nanoseconds.get(begin));
+       if (nanos != value.get_nanoseconds()) {
+           return begin;
+       }
+       ++begin;
+    }
+    return not_found;
+}
+} // namespace realm

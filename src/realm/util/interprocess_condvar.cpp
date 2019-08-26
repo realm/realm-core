@@ -17,6 +17,7 @@
  **************************************************************************/
 
 #include <realm/util/interprocess_condvar.hpp>
+#include <realm/util/fifo_helper.hpp>
 
 #include <fcntl.h>
 #include <system_error>
@@ -150,40 +151,16 @@ void InterprocessCondVar::set_shared_part(SharedPart& shared_part, std::string b
 
 #if !REALM_TVOS
     m_resource_path = base_path + "." + condvar_name + ".cv";
-
-    // Create and open the named pipe
-    int ret = mkfifo(m_resource_path.c_str(), 0600);
-    if (ret == -1) {
-        int err = errno;
-        if (err == ENOTSUP || err == EACCES || err == EPERM || err == EINVAL) {
-            // Filesystem doesn't support named pipes, so try putting it in tmp instead
+    if (!try_create_fifo(m_resource_path)) {
+            // Filesystem doesn't support named pipes, so try putting it in tmp_dir instead
             // Hash collisions are okay here because they just result in doing
-            // extra work, as opposed to correctness problems
+            // extra work, as opposed to correctness problems.
             std::ostringstream ss;
-            ss << tmp_path;
+            ss << normalize_dir(tmp_path);
             ss << "realm_" << std::hash<std::string>()(m_resource_path) << ".cv";
             m_resource_path = ss.str();
-            ret = mkfifo(m_resource_path.c_str(), 0600);
-            err = errno;
-        }
-
-        // the fifo already existing isn't an error
-        if (ret == -1 && err != EEXIST) {
-            // Workaround for a mkfifo bug on Blackberry devices:
-            // When the fifo already exists, mkfifo fails with error ENOSYS which is not correct.
-            // In this case, we use stat to check if the path exists and it is a fifo.
-            struct stat stat_buf;
-            if (stat(m_resource_path.c_str(), &stat_buf) == 0) {
-                if ((stat_buf.st_mode & S_IFMT) != S_IFIFO) {
-                    throw std::runtime_error(m_resource_path + " exists and it is not a fifo.");
-                }
-            }
-            else {
-                throw std::system_error(err, std::system_category());
-            }
-        }
+            create_fifo(m_resource_path);
     }
-
     m_fd_read = open(m_resource_path.c_str(), O_RDWR);
     if (m_fd_read == -1) {
         throw std::system_error(errno, std::system_category());

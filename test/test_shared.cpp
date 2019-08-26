@@ -3982,4 +3982,32 @@ TEST(Shared_GetCommitSize)
     }
 }
 
+/*
+#include <valgrind/callgrind.h>
+TEST(Shared_TimestampQuery)
+{
+    Table table;
+    auto col_date = table.add_column(type_Timestamp, "date", true);
+
+    Random random(random_int<unsigned long>()); // Seed from slow global generator
+
+    for (int i = 0; i < 10000; i++) {
+        auto ndx = table.add_empty_row();
+        int seconds = random.draw_int_max(3600 * 24 * 10);
+        table.set_timestamp(col_date, ndx, Timestamp(seconds, 0));
+    }
+
+    Query q = table.column<Timestamp>(col_date) > Timestamp(3600 * 24 * 5, 3);
+    auto start = std::chrono::steady_clock::now();
+    CALLGRIND_START_INSTRUMENTATION;
+    auto cnt = q.count();
+    CALLGRIND_STOP_INSTRUMENTATION;
+    auto end = std::chrono::steady_clock::now();
+
+    std::cout << "Time: " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << " us"
+              << std::endl;
+    CHECK_GREATER(cnt, 50000);
+}
+*/
+
 #endif // TEST_SHARED
