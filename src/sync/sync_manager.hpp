@@ -68,10 +68,10 @@ public:
 
     // Configure the metadata and file management subsystems. This MUST be called upon startup.
     void configure(const std::string& base_file_path,
-                               MetadataMode metadata_mode=MetadataMode::Encryption,
-                               const std::string& user_agent_binding_info = "",
-                               util::Optional<std::vector<char>> custom_encryption_key=none,
-                               bool reset_metadata_on_error=false);
+                   MetadataMode metadata_mode=MetadataMode::Encryption,
+                   const std::string& user_agent_binding_info = "",
+                   util::Optional<std::vector<char>> custom_encryption_key=none,
+                   bool reset_metadata_on_error=false);
 
     // Immediately run file actions for a single Realm at a given original path.
     // Returns whether or not a file action was successfully executed for the specified Realm.
@@ -111,7 +111,7 @@ public:
 
     util::Logger::Level log_level() const noexcept;
 
-    std::shared_ptr<SyncSession> get_session(const std::string& path, const SyncConfig& config);
+    std::shared_ptr<SyncSession> get_session(const std::string& path, const SyncConfig& config, bool force_client_reset=false);
     std::shared_ptr<SyncSession> get_existing_session(const std::string& path) const;
     std::shared_ptr<SyncSession> get_existing_active_session(const std::string& path) const;
 

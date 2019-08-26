@@ -111,7 +111,23 @@ private:
     std::unique_ptr<Query> m_query;
     DescriptorOrdering m_ordering;
 };
-} // namespace realm
+
+template<>
+class ThreadSafeReference::PayloadImpl<std::shared_ptr<Realm>> : public ThreadSafeReference::Payload {
+public:
+    PayloadImpl(std::shared_ptr<Realm> const& realm)
+    : m_realm(realm)
+    {
+    }
+
+    std::shared_ptr<Realm> get_realm()
+    {
+        return std::move(m_realm);
+    }
+
+private:
+    std::shared_ptr<Realm> m_realm;
+};
 
 ThreadSafeReference::ThreadSafeReference() noexcept = default;
 ThreadSafeReference::~ThreadSafeReference() = default;
@@ -126,9 +142,16 @@ ThreadSafeReference::ThreadSafeReference(T const& value)
     m_payload.reset(new PayloadImpl<T>(value, Realm::Internal::get_transaction(*realm)));
 }
 
+template<>
+ThreadSafeReference::ThreadSafeReference(std::shared_ptr<Realm> const& value)
+{
+    m_payload.reset(new PayloadImpl<std::shared_ptr<Realm>>(value));
+}
+
 template ThreadSafeReference::ThreadSafeReference(List const&);
 template ThreadSafeReference::ThreadSafeReference(Results const&);
 template ThreadSafeReference::ThreadSafeReference(Object const&);
+template ThreadSafeReference::ThreadSafeReference(std::shared_ptr<Realm> const&);
 
 template<typename T>
 T ThreadSafeReference::resolve(std::shared_ptr<Realm> realm)
@@ -153,6 +176,19 @@ T ThreadSafeReference::resolve(std::shared_ptr<Realm> realm)
     }
 }
 
+template<>
+std::shared_ptr<Realm> ThreadSafeReference::resolve<std::shared_ptr<Realm>>(std::shared_ptr<Realm>)
+{
+    REALM_ASSERT(m_payload);
+    auto& payload = static_cast<PayloadImpl<std::shared_ptr<Realm>>&>(*m_payload);
+    REALM_ASSERT(typeid(payload) == typeid(PayloadImpl<std::shared_ptr<Realm>>));
+
+    return payload.get_realm();
+}
+
 template Results ThreadSafeReference::resolve<Results>(std::shared_ptr<Realm>);
 template List ThreadSafeReference::resolve<List>(std::shared_ptr<Realm>);
 template Object ThreadSafeReference::resolve<Object>(std::shared_ptr<Realm>);
+template std::shared_ptr<Realm> ThreadSafeReference::resolve<std::shared_ptr<Realm>>(std::shared_ptr<Realm>);
+
+} // namespace realm

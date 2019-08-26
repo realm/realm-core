@@ -69,14 +69,36 @@ ValueType Object::get_property_value(ContextType& ctx, StringData prop_name)
 }
 
 namespace {
-template <class T, typename ValueType, typename ContextType>
-inline void do_update_value(ContextType& ctx, ValueType& value, ColKey col, Obj& obj, bool update_only_diff, bool is_default)
-{
-    auto new_val = ctx.template unbox<T>(value);
-    if (!update_only_diff || obj.get<T>(col) != new_val) {
-        obj.set(col, new_val, is_default);
+template <typename ValueType, typename ContextType>
+struct ValueUpdater {
+    ContextType& ctx;
+    Property const& property;
+    ValueType& value;
+    Obj& obj;
+    ColKey col;
+    bool try_update;
+    bool update_only_diff;
+    bool is_default;
+
+    void operator()(Obj*)
+    {
+        ContextType child_ctx(ctx, property);
+        auto curr_link = obj.get<ObjKey>(col);
+        auto link = child_ctx.template unbox<Obj>(value, true, try_update, update_only_diff, curr_link);
+        if (!update_only_diff || curr_link != link.get_key()) {
+            obj.set(col, link.get_key());
+        }
     }
-}
+
+    template<typename T>
+    void operator()(T*)
+    {
+        auto new_val = ctx.template unbox<T>(value);
+        if (!update_only_diff || obj.get<T>(col) != new_val) {
+            obj.set(col, new_val, is_default);
+        }
+    }
+};
 }
 
 template <typename ValueType, typename ContextType>
@@ -112,42 +134,9 @@ void Object::set_property_value_impl(ContextType& ctx, const Property &property,
         return;
     }
 
-    switch (property.type & ~PropertyType::Nullable) {
-        case PropertyType::Object: {
-            ContextType child_ctx(ctx, property);
-            auto curr_link = m_obj.get<ObjKey>(col);
-            auto link = child_ctx.template unbox<Obj>(value, true, try_update, update_only_diff, curr_link);
-            if (!update_only_diff || curr_link != link.get_key()) {
-                m_obj.set(col, link.get_key(), is_default);
-            }
-            break;
-        }
-        case PropertyType::Bool:
-            do_update_value<bool>(ctx, value, col, m_obj, update_only_diff, is_default);
-            break;
-        case PropertyType::Int:
-            do_update_value<int64_t>(ctx, value, col, m_obj, update_only_diff, is_default);
-            break;
-        case PropertyType::Float:
-            do_update_value<float>(ctx, value, col, m_obj, update_only_diff, is_default);
-            break;
-        case PropertyType::Double:
-            do_update_value<double>(ctx, value, col, m_obj, update_only_diff, is_default);
-            break;
-        case PropertyType::String:
-            do_update_value<String>(ctx, value, col, m_obj, update_only_diff, is_default);
-            break;
-        case PropertyType::Data:
-            do_update_value<Binary>(ctx, value, col, m_obj, update_only_diff, is_default);
-            break;
-        case PropertyType::Date:
-            do_update_value<Timestamp>(ctx, value, col, m_obj, update_only_diff, is_default);
-            break;
-        case PropertyType::Any:
-            throw std::logic_error("not supported");
-        default:
-            REALM_COMPILER_HINT_UNREACHABLE();
-    }
+    ValueUpdater<ValueType, ContextType> updater{ctx, property, value,
+        m_obj, col, try_update, update_only_diff, is_default};
+    switch_on_type(property.type, updater);
     ctx.did_change();
 }
 

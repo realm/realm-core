@@ -46,6 +46,7 @@ static constexpr const char* property_created_at = "created_at";
 static constexpr const char* property_updated_at = "updated_at";
 static constexpr const char* property_expires_at = "expires_at";
 static constexpr const char* property_time_to_live = "time_to_live";
+static constexpr const size_t result_sets_property_count = 10;
 
 struct InvalidRealmStateException : public std::logic_error {
     InvalidRealmStateException(const std::string& msg);
@@ -71,6 +72,24 @@ struct SubscriptionCallbackWrapper {
     util::Optional<SubscriptionState> last_state;
 };
 
+struct SubscriptionOptions {
+    // A user defined name for referencing this subscription later. If no name is provided,
+    // a default name will be generated based off the contents of the query.
+    util::Optional<std::string> user_provided_name;
+    // `time_to_live` is expressed in milliseconds and indicates for how long a subscription should
+    // be persisted when not used. If no value is provided, the subscription will live until manually
+    // deleted.
+    util::Optional<int64_t> time_to_live_ms = none;
+    // If a subscription with the given name already exists the behaviour depends on `update`. If
+    // `update = true` the existing subscription will replace its query and time_to_live with the
+    // provided values. If `update = false` an exception is thrown if the new query doesn't match
+    // the old one. If no name is provided, the `update` flag is ignored.
+    bool update = false;
+    // A container which denotes a set of backlinks (linkingObjects) which should be included
+    // in the subscription.
+    IncludeDescriptor inclusions;
+};
+
 class Subscription {
 public:
     ~Subscription();
@@ -82,10 +101,10 @@ public:
 
     SubscriptionNotificationToken add_notification_callback(std::function<void()> callback);
 
+    util::Optional<Object> result_set_object() const;
+
 private:
     Subscription(std::string name, std::string object_type, std::shared_ptr<Realm>);
-
-    util::Optional<Object> result_set_object() const;
 
     void error_occurred(std::exception_ptr);
     void run_callback(SubscriptionCallbackWrapper& callback_wrapper);
@@ -106,7 +125,7 @@ private:
     struct Notifier;
     _impl::CollectionNotifier::Handle<Notifier> m_notifier;
 
-    friend Subscription subscribe(Results const&, util::Optional<std::string>, util::Optional<int64_t> time_to_live, bool update);
+    friend Subscription subscribe(Results const&, SubscriptionOptions);
     friend void unsubscribe(Subscription&);
 
 };
@@ -120,16 +139,7 @@ private:
 ///
 /// Programming errors, such as attempting to create a subscription in a Realm that is not
 /// Query-based, or subscribing to an unsupported query, will throw an exception.
-//
-// If a subscription with the given name already exists the behaviour depends on `update`. If
-// `update = true` the existing subscription will replace its query and time_to_live with the
-// provided values. If `update = false` an exception is thrown if the new query doesn't match
-// the old one. If no name is provided, the `update` flag is ignored.
-//
-// `time_to_live` is expressed in milliseconds and indicates for how long a subscription should
-// be persisted when not used. If no value is provided, the subscription will live until manually
-// deleted.
-Subscription subscribe(Results const&, util::Optional<std::string> name, util::Optional<int64_t> time_to_live_ms = none, bool update = false);
+Subscription subscribe(Results const&, SubscriptionOptions options);
 
 // Create a subscription from the query associated with the `Results`
 //
@@ -168,6 +178,7 @@ void unsubscribe(Object&&);
 namespace _impl {
 
 void initialize_schema(Group&);
+void ensure_partial_sync_schema_initialized(Realm&);
 
 } // namespace _impl
 } // namespace realm
