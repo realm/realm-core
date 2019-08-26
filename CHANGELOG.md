@@ -1,28 +1,23 @@
-# NEXT RELEASE
-
-### Enhancements
-* None.
+# 6.0.0-alpha.16 Release notes
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Clearing a table with links to itself could sometimes result in a crash. 
   ([#324](https://github.com/realm/realm-core-private/issues/324))
  
-### Breaking changes
-* None.
-
 -----------
 
 ### Internals
-* Fixes unittest Shared_WaitForChange which could deadlock. ([#3346] https://github.com/realm/realm-core/issues/3346)
+* Fixes unittest Shared_WaitForChange which could deadlock.
+  ([#3346] https://github.com/realm/realm-core/issues/3346)
 
 Besides the changes above, this release includes changes introduced by v5.23.1 to v5.23.2:
 
 | # 5.23.2 Release notes
 | 
 | ### Fixed
-| * Named pipes on Android are now created with 0666 permissions instead of 0600. This fixes a bug on Huawei devices which caused named pipes to change
-|   owners during app upgrades causing | subsequent `ACCESS DENIED` errors. This should have not practical security implications.
+| * Named pipes on Android are now created with 0666 permissions instead of 0600. This fixes a bug
+|   on Huawei devices which caused named pipes to change owners during app upgrades causing
+|   subsequent `ACCESS DENIED` errors. This should have not practical security implications.
 |   (Issue [#3328](https://github.com/realm/realm-core/pull/3328))
 |  
 | -----------
@@ -36,11 +31,14 @@ Besides the changes above, this release includes changes introduced by v5.23.1 t
 | # 5.23.1 Release notes
 | 
 | ### Fixed
-| * Fixed the metrics throwing an exception when a query cannot be serialised. Now it reports the exception message as the description.
-|  ([#3031](https://github.com/realm/realm-sync/issues/3031), since v3.2.0)
-| * Queries involving an indexed int column which were constrained by a LinkList with an order different from the table's order would
-|   give incorrect results. ([#3307](https://github.com/realm/realm-core/issues/3307), since v5.19.0)
-| * Queries involving an indexed int column had a memory leak if run multiple times. ([#6186](https://github.com/realm/realm-cocoa/issues/6186)), since v5.19.0)
+| * Fixed the metrics throwing an exception when a query cannot be serialised. Now it reports the 
+|   exception message as the description.
+|   ([#3031](https://github.com/realm/realm-sync/issues/3031), since v3.2.0)
+| * Queries involving an indexed int column which were constrained by a LinkList with an order
+|   different from the table's order would give incorrect results.
+|   ([#3307](https://github.com/realm/realm-core/issues/3307), since v5.19.0)
+| * Queries involving an indexed int column had a memory leak if run multiple times.
+    ([#6186](https://github.com/realm/realm-cocoa/issues/6186)), since v5.19.0)
 
 ----------------------------------------------
 
