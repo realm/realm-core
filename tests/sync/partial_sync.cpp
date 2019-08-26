@@ -529,13 +529,13 @@ TEST_CASE("Query-based Sync", "[sync]") {
             using SubscriptionState = partial_sync::SubscriptionState;
 
             switch (subscription.state()) {
+                case SubscriptionState::Complete:
                 case SubscriptionState::Creating:
                     partial_sync::unsubscribe(subscription);
                     break;
 
                 case SubscriptionState::Pending:
                 case SubscriptionState::Error:
-                case SubscriptionState::Complete:
                     break;
 
                 case SubscriptionState::Invalidated:
@@ -799,7 +799,6 @@ TEST_CASE("Query-based Sync", "[sync]") {
         bool subscription_created = false;
         bool subscription_deleted = false;
         std::exception_ptr exception;
-        util::Optional<partial_sync::SubscriptionState> last_state = none;
         auto token = subscription.add_notification_callback([&] {
             if (subscription_created)
                 // Next state after creating the subscription should be that it is deleted
@@ -1220,7 +1219,7 @@ TEST_CASE("Creating/Updating subscriptions synchronously", "[sync]") {
     SECTION("Update subscription with query on different type throws") {
         realm->begin_transaction();
         auto user_query1 = results_for_query("number > 0", partial_config, "object_a");
-        RowExpr old_sub = partial_sync::subscribe_blocking(user_query1, "update-wrong-typetest"s);
+        partial_sync::subscribe_blocking(user_query1, "update-wrong-typetest"s);
         auto user_query2 = results_for_query("number > 0", partial_config, "object_b");
         CHECK_THROWS(partial_sync::subscribe_blocking(user_query2, "update-wrong-typetest"s, none, true));
     }

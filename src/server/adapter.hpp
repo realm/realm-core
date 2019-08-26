@@ -48,7 +48,7 @@ public:
     };
 
     static std::string instruction_type_string(InstructionType type) {
-        switch(type) {
+        switch (type) {
             case InstructionType::Insert:           return "INSERT";
             case InstructionType::Delete:           return "DELETE";
             case InstructionType::Set:              return "SET";
@@ -60,6 +60,7 @@ public:
             case InstructionType::AddType:          return "ADD_TYPE";
             case InstructionType::AddProperties:    return "ADD_PROPERTIES";
         }
+        REALM_COMPILER_HINT_UNREACHABLE();
     }
 
     util::Optional<util::AppendBuffer<char>> current(std::string realm_path);
