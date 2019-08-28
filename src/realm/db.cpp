@@ -2498,63 +2498,61 @@ TransactionRef DB::start_write(bool nonblocking)
 
 Obj Transaction::import_copy_of(const ConstObj& original)
 {
-    TableKey tk = original.get_table_key();
-    ObjKey rk = original.get_key();
-    auto table = get_table(tk);
-    return table->is_valid(rk) ? table->get_object(rk) : Obj();
+    if (bool(original)) {
+        TableKey tk = original.get_table_key();
+        ObjKey rk = original.get_key();
+        auto table = get_table(tk);
+        if (table->is_valid(rk))
+            return table->get_object(rk);
+    }
+    return {};
 }
 
-ConstTableRef Transaction::import_copy_of(ConstTableRef original)
+TableRef Transaction::import_copy_of(ConstTableRef original)
 {
     TableKey tk = original->get_key();
     return get_table(tk);
 }
 
-TableRef Transaction::import_copy_of(TableRef original)
+LnkLst Transaction::import_copy_of(const ConstLnkLst& original)
 {
-    TableKey tk = original->get_key();
-    return get_table(tk);
-}
-
-LnkLst Transaction::import_copy_of(const LnkLst& original)
-{
-    Obj obj = import_copy_of(*original.m_const_obj);
-    ColKey ck = original.m_col_key;
-    return obj.get_linklist(ck);
+    if (Obj obj = import_copy_of(*original.m_const_obj)) {
+        ColKey ck = original.m_col_key;
+        return obj.get_linklist(ck);
+    }
+    return LnkLst();
 }
 
 LstBasePtr Transaction::import_copy_of(const LstBase& original)
 {
-    Obj obj = import_copy_of(*original.m_const_obj);
-    ColKey ck = original.get_col_key();
-    return obj.get_listbase_ptr(ck);
+    if (Obj obj = import_copy_of(*original.m_const_obj)) {
+        ColKey ck = original.get_col_key();
+        return obj.get_listbase_ptr(ck);
+    }
+    return {};
 }
 
 LnkLstPtr Transaction::import_copy_of(const LnkLstPtr& original)
 {
     if (!bool(original))
         return nullptr;
-    Obj obj = import_copy_of(*original->m_const_obj);
-    if (!obj)
-        return std::make_unique<LnkLst>();
-    ColKey ck = original->m_col_key;
-    return obj.get_linklist_ptr(ck);
+    if (Obj obj = import_copy_of(*original->m_const_obj)) {
+        ColKey ck = original->m_col_key;
+        return obj.get_linklist_ptr(ck);
+
+    }
+    return std::make_unique<LnkLst>();
 }
 
-ConstLnkLst Transaction::import_copy_of(const ConstLnkLst& original)
-{
-    ConstObj obj = import_copy_of(*original.m_const_obj);
-    ColKey ck = original.m_col_key;
-    return obj.get_linklist(ck);
-}
-
-ConstLnkLstPtr Transaction::import_copy_of(const ConstLnkLstPtr& original)
+LnkLstPtr Transaction::import_copy_of(const ConstLnkLstPtr& original)
 {
     if (!bool(original))
         return nullptr;
-    Obj obj = import_copy_of(*original->m_const_obj);
-    ColKey ck = original->m_col_key;
-    return obj.get_linklist_ptr(ck);
+    if (Obj obj = import_copy_of(*original->m_const_obj)) {
+        ColKey ck = original->m_col_key;
+        return obj.get_linklist_ptr(ck);
+    }
+    return std::make_unique<LnkLst>();
 }
 
 

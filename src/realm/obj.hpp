@@ -84,7 +84,7 @@ public:
     Replication* get_replication() const;
 
     // Check if this object is default constructed
-    explicit operator bool()
+    explicit operator bool() const
     {
         return m_table != nullptr;
     }

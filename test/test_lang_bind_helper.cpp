@@ -5725,4 +5725,72 @@ TEST(LangBindHelper_AdvanceReadCluster)
     }
 }
 
+TEST(LangBindHelper_ImportDetachedLinkList)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    auto hist = make_in_realm_history(path);
+    DBRef db = DB::create(*hist);
+    std::unique_ptr<TableView> tv_1;
+
+    ColKey col_pet;
+    ColKey col_addr;
+    ColKey col_name;
+    ColKey col_age;
+
+    {
+        WriteTransaction wt(db);
+        auto persons = wt.add_table("person");
+        auto dogs = wt.add_table("dog");
+        col_pet = persons->add_column_link(type_LinkList, "pet", *dogs);
+        col_addr = persons->add_column_list(type_String, "address");
+        col_name = dogs->add_column(type_String, "name");
+        col_age = dogs->add_column(type_Int, "age");
+
+        auto tago = dogs->create_object().set(col_name, "Tago").set(col_age, 9);
+        auto hector = dogs->create_object().set(col_name, "Hector").set(col_age, 7);
+
+        auto me = persons->create_object();
+        me.set_list_values<String>(col_addr, {"Paradisæblevej 5", "2500 Andeby"});
+        auto pets = me.get_linklist(col_pet);
+        pets.add(tago.get_key());
+        pets.add(hector.get_key());
+        wt.commit();
+    }
+
+    auto rt = db->start_read();
+    auto persons = rt->get_table("person");
+    auto dogs = rt->get_table("dog");
+    Obj me = *persons->begin();
+    auto my_pets = me.get_linklist(col_pet);
+    Query q = dogs->where(my_pets).equal(col_age, 7);
+    auto tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    auto my_address = me.get_listbase_ptr(col_addr);
+    CHECK_EQUAL(my_address->size(), 2);
+
+    {
+        // Delete the person.
+        WriteTransaction wt(db);
+        wt.get_table("person")->begin()->remove();
+        wt.commit();
+    }
+
+    {
+        auto read_transaction = db->start_read();
+
+        // The link_list that is embedded in the query imported here should be detached
+        auto local_tv = read_transaction->import_copy_of(tv, PayloadPolicy::Stay);
+        local_tv->sync_if_needed();
+        CHECK_EQUAL(local_tv->size(), 0);
+
+        // Check that we can import a detached link_list back
+        tv_1 = rt->import_copy_of(*local_tv, PayloadPolicy::Move);
+
+        // The list imported here should be null
+        CHECK_NOT(read_transaction->import_copy_of(*my_address));
+    }
+
+    CHECK_EQUAL(tv_1->size(), 0);
+}
+
 #endif

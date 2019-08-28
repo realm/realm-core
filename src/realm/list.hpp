@@ -723,6 +723,11 @@ void Lst<ObjKey>::clear();
 
 class ConstLnkLst : public ConstLstIf<ObjKey> {
 public:
+    ConstLnkLst()
+        : ConstLstBase({}, &m_obj)
+    {
+    }
+
     ConstLnkLst(const ConstObj& obj, ColKey col_key)
         : ConstLstBase(col_key, &m_obj)
         , ConstLstIf<ObjKey>(obj.get_alloc())
