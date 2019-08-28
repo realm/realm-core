@@ -42,7 +42,7 @@ using namespace realm::util;
 using namespace realm::test_util;
 
 namespace {
-#define BASE_SIZE 100000
+#define BASE_SIZE 2000000
 
 /**
   This bechmark suite represents a number of common use cases,
@@ -110,6 +110,8 @@ struct Benchmark {
     const char* m_encryption_key = nullptr;
 #ifdef REALM_CLUSTER_IF
     std::vector<ObjKey> m_keys;
+#else
+    std::vector<uint64_t> m_keys;
 #endif
 };
 
@@ -752,7 +754,7 @@ struct BenchmarkWithInts : BenchmarkWithIntsTable {
         for (size_t i = 0; i < BASE_SIZE; ++i) {
             int64_t val = r.draw_int<int64_t>();
 #ifdef REALM_CLUSTER_IF
-            Obj obj = t->create_object();
+            Obj obj = t->create_object(ObjKey(val));
             obj.set(m_col, val);
             m_keys.push_back(obj.get_key());
 #else
@@ -801,6 +803,104 @@ struct BenchmarkIntVsDoubleColumns : Benchmark {
     {
         WriteTransaction tr(group);
         tr.get_group().remove_table("table");
+        tr.commit();
+    }
+};
+
+
+struct BenchmarkWithIntUIDsRandomOrderSeqAccess : BenchmarkWithIntsTable {
+    const char* name() const { return "IntUIDsRandomOrderSeqAccess"; }
+    void before_all(DBRef group)
+    {
+        BenchmarkWithIntsTable::before_all(group);
+        WrtTrans tr(group);
+        TableRef t = tr.get_table("IntOnly");
+#ifndef REALM_CLUSTER_IF
+        // For Core5 we need a search index
+        t->add_search_index(m_col);
+#endif
+        Random r;
+        for (size_t i = 0; i < BASE_SIZE; ++i) {
+            int64_t val = r.draw_int<int64_t>();
+#ifdef REALM_CLUSTER_IF
+            m_keys.push_back(ObjKey(val));
+            Obj obj = t->create_object(ObjKey(val));
+            obj.set(m_col, val);
+#else
+            m_keys.push_back(val);
+            auto row = t->add_row_with_key(m_col, val);
+#endif
+        }
+        tr.commit();
+    }
+    void operator()(DBRef group) {
+        RdTrans tr(group);
+        ConstTableRef t = tr.get_table("IntOnly");
+        volatile uint64_t sum = 0;
+        for (size_t i = 0; i < 100000; ++i) {
+#ifdef REALM_CLUSTER_IF
+            auto obj = t->get_object(m_keys[i]);
+            sum += obj.get<Int>(m_col);
+#else
+            auto row = t->find_first_int(m_col, m_keys[i]);
+            sum += t->get_int(m_col, row);
+#endif
+        }
+    }
+};
+
+struct BenchmarkWithIntUIDsRandomOrderRandomAccess : BenchmarkWithIntUIDsRandomOrderSeqAccess {
+    const char* name() const { return "IntUIDsRandomOrderRandomAccess"; }
+    void before_all(DBRef group)
+    {
+        BenchmarkWithIntUIDsRandomOrderSeqAccess::before_all(group);
+        // randomize key order for later access
+        std::random_device rd;
+        std::mt19937 g(rd());
+        std::shuffle(m_keys.begin(), m_keys.end(), g);
+    }
+};
+
+struct BenchmarkWithIntUIDsRandomOrderRandomDelete : BenchmarkWithIntUIDsRandomOrderRandomAccess {
+    const char* name() const { return "IntUIDsRandomOrderRandomDelete"; }
+    void before_all(DBRef group)
+    {
+        BenchmarkWithIntUIDsRandomOrderRandomAccess::before_all(group);
+    }
+    void operator()(DBRef group) {
+        WrtTrans tr(group);
+        TableRef t = tr.get_table("IntOnly");
+        for (size_t i = 0; i < 10000; ++i) {
+#ifdef REALM_CLUSTER_IF
+            t->remove_object(m_keys[i]);
+#else
+            auto row = t->find_first_int(m_col, m_keys[i]);
+            t->move_last_over(row);
+#endif
+        }
+    }
+};
+struct BenchmarkWithIntUIDsRandomOrderRandomCreate : BenchmarkWithIntUIDsRandomOrderRandomAccess {
+    const char* name() const { return "IntUIDsRandomOrderRandomCreate"; }
+    void before_all(DBRef group)
+    {
+        BenchmarkWithIntUIDsRandomOrderRandomAccess::before_all(group);
+    }
+    void operator()(DBRef group) {
+        WrtTrans tr(group);
+        TableRef t = tr.get_table("IntOnly");
+        Random r;
+        for (size_t i = 0; i < 10000; ++i) {
+            int64_t val = r.draw_int<int64_t>();
+#ifdef REALM_CLUSTER_IF
+            m_keys.push_back(ObjKey(val));
+            Obj obj = t->create_object(ObjKey(val));
+            obj.set(m_col, val);
+#else
+            m_keys.push_back(val);
+            auto row = t->add_row_with_key(m_col, val);
+#endif
+        }
         tr.commit();
     }
 };
@@ -1680,6 +1780,7 @@ int benchmark_common_tasks_main()
 
 #define BENCH(B) run_benchmark<B>(results)
 #define BENCH2(B,mode) run_benchmark<B>(results, mode)
+
     BENCH2(BenchmarkEmptyCommit, true);
     BENCH2(BenchmarkEmptyCommit, false);
     BENCH2(BenchmarkNonInitiatorOpen, true);
@@ -1732,6 +1833,10 @@ int benchmark_common_tasks_main()
     BENCH(BenchmarkQueryTimestampNotNull);
     BENCH(BenchmarkQueryTimestampEqualNull);
 
+    BENCH(BenchmarkWithIntUIDsRandomOrderSeqAccess);
+    BENCH(BenchmarkWithIntUIDsRandomOrderRandomAccess);
+    BENCH(BenchmarkWithIntUIDsRandomOrderRandomDelete);
+    BENCH(BenchmarkWithIntUIDsRandomOrderRandomCreate);
 #undef BENCH
 #undef BENCH2
     return 0;
