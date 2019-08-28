@@ -151,7 +151,6 @@ ThreadSafeReference::ThreadSafeReference(std::shared_ptr<Realm> const& value)
 template ThreadSafeReference::ThreadSafeReference(List const&);
 template ThreadSafeReference::ThreadSafeReference(Results const&);
 template ThreadSafeReference::ThreadSafeReference(Object const&);
-template ThreadSafeReference::ThreadSafeReference(std::shared_ptr<Realm> const&);
 
 template<typename T>
 T ThreadSafeReference::resolve(std::shared_ptr<Realm> realm)
@@ -189,6 +188,5 @@ std::shared_ptr<Realm> ThreadSafeReference::resolve<std::shared_ptr<Realm>>(std:
 template Results ThreadSafeReference::resolve<Results>(std::shared_ptr<Realm>);
 template List ThreadSafeReference::resolve<List>(std::shared_ptr<Realm>);
 template Object ThreadSafeReference::resolve<Object>(std::shared_ptr<Realm>);
-template std::shared_ptr<Realm> ThreadSafeReference::resolve<std::shared_ptr<Realm>>(std::shared_ptr<Realm>);
 
 } // namespace realm
