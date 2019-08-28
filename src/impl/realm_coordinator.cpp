@@ -41,7 +41,7 @@
 #include <realm/db.hpp>
 #include <realm/history.hpp>
 #include <realm/string_data.hpp>
-#include <util/fifo.hpp>
+#include <realm/util/fifo_helper.hpp>
 
 #include <algorithm>
 #include <unordered_map>

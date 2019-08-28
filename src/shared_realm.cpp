@@ -21,7 +21,6 @@
 #include "impl/collection_notifier.hpp"
 #include "impl/realm_coordinator.hpp"
 #include "impl/transact_log_handler.hpp"
-#include "util/fifo.hpp"
 
 #include "audit.hpp"
 #include "binding_context.hpp"
@@ -35,6 +34,8 @@
 
 #include <realm/db.hpp>
 #include <realm/util/scope_exit.hpp>
+#include <realm/util/fifo_helper.hpp>
+
 
 #if REALM_ENABLE_SYNC
 #include "sync/impl/sync_file.hpp"
@@ -138,13 +139,13 @@ SharedRealm Realm::get_shared_realm(Config config)
 
 SharedRealm Realm::get_shared_realm(ThreadSafeReference ref, util::Optional<AbstractExecutionContextID> execution_context)
 {
-    std::shared_ptr<Realm> realm = ref.resolve<std::shared_ptr<Realm>>(nullptr);
+    SharedRealm realm = ref.resolve<std::shared_ptr<Realm>>(nullptr);
     REALM_ASSERT(realm);
     auto& config = realm->config();
     auto coordinator = RealmCoordinator::get_coordinator(config.path);
     coordinator->bind_to_context(*realm, execution_context);
     realm->m_execution_context = execution_context;
-    return std::move(realm);
+    return realm;
 }
 
 #if REALM_ENABLE_SYNC
