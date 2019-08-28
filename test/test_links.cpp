@@ -1525,4 +1525,37 @@ TEST(Links_DetachedAccessor)
     CHECK_NOT(link_list.is_attached());
 }
 
+
+TEST(Links_BacklistCounts)
+{
+    Group group;
+    TableRef parent = group.add_table("parent");
+    TableRef child = group.add_table("child");
+
+    auto childNameCol = child->add_column(type_String, "name");
+
+    auto parentIdCol = parent->add_column(type_Int, "id");
+    auto parentLinkCol = parent->add_column_link(type_LinkList, "children", *child);
+
+    Obj p1 = parent->create_object();
+    p1.set(parentIdCol, 0);
+
+    Obj c1 = child->create_object();
+    c1.set(childNameCol, "Oliver");
+    Obj p2 = parent->create_object();
+    p2.set(parentIdCol, 1);
+    auto link_list2 = p2.get_linklist(parentLinkCol);
+    link_list2.add(c1.get_key());
+
+    CHECK_EQUAL(parent->size(), 2);
+    CHECK_EQUAL(child->size(), 1);
+    CHECK_EQUAL(c1.get_backlink_count(), 1);
+
+    auto link_list1 = p1.get_linklist(parentLinkCol);
+    link_list1.add(c1.get_key());
+
+    CHECK_EQUAL(parent->size(), 2);
+    CHECK_EQUAL(child->size(), 1);
+    CHECK_EQUAL(c1.get_backlink_count(), 2);
+}
 #endif // TEST_LINKS
