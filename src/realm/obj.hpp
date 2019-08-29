@@ -131,7 +131,6 @@ public:
         return is_null(get_column_key(col_name));
     }
     bool has_backlinks(bool only_strong_links) const;
-    size_t get_backlink_count(size_t) const;
     size_t get_backlink_count(bool only_strong_links = false) const;
     size_t get_backlink_count(const Table& origin, ColKey origin_col_key) const;
     ObjKey get_backlink(const Table& origin, ColKey origin_col_key, size_t backlink_ndx) const;
