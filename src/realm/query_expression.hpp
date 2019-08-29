@@ -429,6 +429,11 @@ public:
         return nullptr;
     }
 
+    virtual bool has_constant_evaluation() const
+    {
+        return false;
+    }
+
     virtual void evaluate(size_t index, ValueBase& destination) = 0;
 };
 
@@ -451,8 +456,6 @@ template <class oper, class TLeft = Subexpr>
 class UnaryOperator;
 template <class oper, class TLeft = Subexpr>
 class SizeOperator;
-template <class TCond, class T>
-class CompareColumnPathToValue;
 template <class TCond, class T, class TLeft = Subexpr, class TRight = Subexpr>
 class Compare;
 template <bool has_links>
@@ -524,15 +527,6 @@ Query create(L left, const Subexpr2<R>& right)
         }
         // Return query_engine.hpp node
         return q;
-    }
-    else if (column && ((std::numeric_limits<L>::is_integer && std::numeric_limits<R>::is_integer) ||
-                (std::is_same<L, double>::value && std::is_same<R, double>::value) ||
-                (std::is_same<L, float>::value && std::is_same<R, float>::value) ||
-                (std::is_same<L, Timestamp>::value && std::is_same<R, Timestamp>::value) ||
-                (std::is_same<L, StringData>::value && std::is_same<R, StringData>::value) ||
-                (std::is_same<L, BinaryData>::value && std::is_same<R, BinaryData>::value)) &&
-             column->links_exist() && column->only_unary_links()) {
-            return make_expression<CompareColumnPathToValue<Cond, L>>(left, column->column_ndx(), column->get_link_map());
     }
     else
 #endif
@@ -1183,11 +1177,11 @@ class Value : public ValueBase, public Subexpr2<T> {
 public:
     Value()
     {
-        init(false, ValueBase::default_size, T());
+        init(false, 1, T());
     }
     Value(T v)
     {
-        init(false, ValueBase::default_size, v);
+        init(false, 1, v);
     }
 
     Value(bool from_link_list, size_t values)
@@ -1231,6 +1225,11 @@ public:
             return util::serializer::print_value(m_storage[0]);
         }
         return "";
+    }
+
+    virtual bool has_constant_evaluation() const override
+    {
+        return true;
     }
 
     void evaluate(size_t, ValueBase& destination) override
@@ -1446,7 +1445,7 @@ public:
         : Value()
         , m_string(string.is_null() ? util::none : util::make_optional(std::string(string)))
     {
-        init(false, ValueBase::default_size, m_string);
+        init(false, 1, m_string);
     }
 
     std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches*) const override
@@ -2093,14 +2092,25 @@ public:
         size_t col = column_ndx();
 
         if (links_exist()) {
-            std::vector<size_t> links = m_link_map.get_links(index);
-            Value<T> v = make_value_for_link<T>(m_link_map.only_unary_links(), links.size());
-
-            for (size_t t = 0; t < links.size(); t++) {
-                size_t link_to = links[t];
-                v.m_storage.set(t, m_link_map.target_table()->template get<T>(col, link_to));
+            if (m_link_map.only_unary_links()) {
+                const Table* target_table = m_link_map.target_table();
+                d.init(false, 1);
+                d.m_storage.set_null(0);
+                size_t link_translation_index = this->m_link_map.get_unary_link_or_not_found(index);
+                if (link_translation_index != realm::not_found) {
+                    d.m_storage.set(0, target_table->get<T>(col, link_translation_index));
+                }
             }
-            destination.import(v);
+            else {
+                std::vector<size_t> links = m_link_map.get_links(index);
+                constexpr bool only_unary_links = false;
+                Value<T> v = make_value_for_link<T>(only_unary_links, links.size());
+                for (size_t t = 0; t < links.size(); t++) {
+                    size_t link_to = links[t];
+                    v.m_storage.set(t, m_link_map.target_table()->template get<T>(col, link_to));
+                }
+                destination.import(v);
+            }
         }
         else {
             // Not a link column
@@ -3259,9 +3269,19 @@ public:
         return m_link_map.m_link_columns.size() > 0;
     }
 
+    bool only_unary_links() const
+    {
+        return m_link_map.only_unary_links();
+    }
+
     bool is_nullable() const
     {
         return m_nullable;
+    }
+
+    LinkMap get_link_map() const
+    {
+        return m_link_map;
     }
 
     size_t column_ndx() const noexcept
@@ -3830,185 +3850,6 @@ private:
     std::unique_ptr<TRight> m_right;
 };
 
-
-template <class TCond, class T>
-class CompareColumnPathToValueBase : public Expression {
-public:
-    CompareColumnPathToValueBase(T left, size_t column, LinkMap link_map)
-    : m_left(std::move(left))
-    , m_column_ndx(column)
-    , m_link_map(std::move(link_map))
-    {
-        REALM_ASSERT(m_link_map.target_table());
-        REALM_ASSERT(m_link_map.links_exist());
-        REALM_ASSERT(m_link_map.only_unary_links());
-        m_column = &m_link_map.target_table()->get_column_base(m_column_ndx);
-        m_right_is_nullable = m_column->is_nullable();
-    }
-
-    bool is_nullable() const noexcept
-    {
-        return m_link_map.base_table()->is_nullable(m_column->get_column_index());
-    }
-
-    const Table* get_base_table() const override
-    {
-        return m_link_map.base_table();
-    }
-
-    void set_base_table(const Table* table) override
-    {
-        if (table != get_base_table()) {
-            m_link_map.set_base_table(table);
-            m_column = &m_link_map.target_table()->get_column_base(m_column_ndx);
-        }
-    }
-
-    void verify_column() const override
-    {
-        // verify links
-        m_link_map.verify_columns();
-        // verify target table
-        const Table* target_table = m_link_map.target_table();
-        if (target_table && m_column_ndx != npos) {
-            target_table->verify_column(m_column_ndx, m_column);
-        }
-    }
-
-    size_t find_first(size_t start, size_t end) const override
-    {
-        size_t match;
-        size_t col = m_column->get_column_index();
-        const Table* target_table = m_link_map.target_table();
-        for (; start < end; ++start) {
-            size_t link_translation_index = m_link_map.get_unary_link_or_not_found(start);
-            if (link_translation_index != realm::not_found) {
-                T rval = target_table->template get<T>(col, link_translation_index);
-                match = cmp(m_left, rval);
-                if (match)
-                    return start;
-            }
-        }
-
-        return not_found; // no match
-    }
-
-    // fixme: test this
-    virtual std::string description(util::serializer::SerialisationState& state) const override
-    {
-        if (std::is_same<TCond, BeginsWith>::value
-            || std::is_same<TCond, BeginsWithIns>::value
-            || std::is_same<TCond, EndsWith>::value
-            || std::is_same<TCond, EndsWithIns>::value
-            || std::is_same<TCond, Contains>::value
-            || std::is_same<TCond, ContainsIns>::value
-            || std::is_same<TCond, Like>::value
-            || std::is_same<TCond, LikeIns>::value) {
-            // these string conditions have the arguments reversed but the order is important
-            // operations ==, and != can be reversed because the produce the same results both ways
-            return util::serializer::print_value(state.describe_columns(m_link_map, m_column_ndx)
-                                                 + " " + TCond::description()
-                                                 + " " + util::serializer::print_value(m_left));
-        }
-        return util::serializer::print_value(state.describe_columns(m_link_map, m_column_ndx) + " " + TCond::description()
-                                             + " " + util::serializer::print_value(m_left));
-    }
-
-    std::unique_ptr<Expression> clone(QueryNodeHandoverPatches* patches) const override
-    {
-        return std::unique_ptr<Expression>(new CompareColumnPathToValueBase(*this, patches));
-    }
-
-//    void apply_handover_patch(QueryNodeHandoverPatches& patches, Group& group) override
-//    {
-//        m_right->apply_handover_patch(patches, group);
-//    }
-
-protected:
-    CompareColumnPathToValueBase(const CompareColumnPathToValueBase& other, QueryNodeHandoverPatches* patches)
-    : m_left(other.m_left)
-    , m_column_ndx(other.m_column_ndx)
-    , m_column(other.m_column)
-    , m_link_map(other.m_link_map, patches)
-    {
-        if (patches && m_column) {
-            m_right_is_nullable = m_column->is_nullable();
-            m_column_ndx = m_column->get_column_index();
-            m_column = nullptr;
-        }
-    }
-    TCond cmp;
-    T m_left;
-    bool m_right_is_nullable;
-    // Column index of payload column of m_table
-    mutable size_t m_column_ndx;
-    const ColumnBase* m_column;
-    LinkMap m_link_map;
-};
-
-
-template <class TCond, class T>
-class CompareColumnPathToValue : public CompareColumnPathToValueBase<TCond, T> {
-public:
-    CompareColumnPathToValue(T left, size_t column, LinkMap link_map)
-    : CompareColumnPathToValueBase<TCond, T>(left, column, link_map)
-    {
-    }
-
-    std::unique_ptr<Expression> clone(QueryNodeHandoverPatches* patches) const override
-    {
-        return std::unique_ptr<Expression>(new CompareColumnPathToValue(*this, patches));
-    }
-
-private:
-    CompareColumnPathToValue(const CompareColumnPathToValue& other, QueryNodeHandoverPatches* patches)
-    : CompareColumnPathToValueBase<TCond, T>(other, patches)
-    {
-    }
-};
-
-
-template <class TCond>
-class CompareColumnPathToValue<TCond, Timestamp> : public CompareColumnPathToValueBase<TCond, Timestamp> {
-public:
-    CompareColumnPathToValue(Timestamp left, size_t column, LinkMap link_map)
-    : CompareColumnPathToValueBase<TCond, Timestamp>(left, column, link_map)
-    {
-    }
-
-    std::unique_ptr<Expression> clone(QueryNodeHandoverPatches* patches) const override
-    {
-        return std::unique_ptr<Expression>(new CompareColumnPathToValue(*this, patches));
-    }
-
-    size_t find_first(size_t start, size_t end) const override
-    {
-        size_t match;
-        size_t col = this->m_column->get_column_index();
-        const Table* target_table = this->m_link_map.target_table();
-        const TimestampColumn* timestamp_col = dynamic_cast<const TimestampColumn*>(this->m_column);
-        for (; start < end; ++start) {
-            size_t link_translation_index = this->m_link_map.get_unary_link_or_not_found(start);
-            if (link_translation_index != realm::not_found) {
-//                timestamp_col->get_secod
-                Timestamp rval = target_table->get<Timestamp>(col, link_translation_index);
-                match = this->cmp(this->m_left, rval, this->m_left.is_null(), this->m_right_is_nullable && rval.is_null());
-                if (match)
-                    return start;
-            }
-        }
-
-        return not_found; // no match
-    }
-
-private:
-    CompareColumnPathToValue(const CompareColumnPathToValue& other, QueryNodeHandoverPatches* patches)
-    : CompareColumnPathToValueBase<TCond, Timestamp>(other, patches)
-    {
-    }
-};
-
-
 template <class TCond, class T, class TLeft, class TRight>
 class Compare : public Expression {
 public:
@@ -4016,6 +3857,10 @@ public:
         : m_left(std::move(left))
         , m_right(std::move(right))
     {
+        m_left_is_const = m_left->has_constant_evaluation();
+        if (m_left_is_const) {
+            m_left->evaluate(-1/*unused*/, m_left_value);
+        }
     }
 
     // See comment in base class
@@ -4048,11 +3893,14 @@ public:
     size_t find_first(size_t start, size_t end) const override
     {
         size_t match;
+
+        Value<T> left(m_left_value);
         Value<T> right;
-        Value<T> left;
 
         for (; start < end;) {
-            m_left->evaluate(start, left);
+            if (!m_left_is_const) {
+                m_left->evaluate(start, left);
+            }
             m_right->evaluate(start, right);
             match = Value<T>::template compare<TCond>(&left, &right);
 
@@ -4101,11 +3949,16 @@ private:
     Compare(const Compare& other, QueryNodeHandoverPatches* patches)
         : m_left(other.m_left->clone(patches))
         , m_right(other.m_right->clone(patches))
+        , m_left_is_const(other.m_left_is_const)
+        , m_left_value(other.m_left_value)
     {
     }
 
     std::unique_ptr<TLeft> m_left;
     std::unique_ptr<TRight> m_right;
+    bool m_left_is_const;
+    Value<T> m_left_value;
 };
+
 }
 #endif // REALM_QUERY_EXPRESSION_HPP

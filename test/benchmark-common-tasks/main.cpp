@@ -1412,15 +1412,15 @@ int benchmark_common_tasks_main()
     BENCH(BenchmarkQueryIntEquality);
     BENCH(BenchmarkQueryIntEqualityIndexed);*/
     BENCH(BenchmarkQueryTimestampGreaterOverLinks);
-    //BENCH(BenchmarkQueryTimestampGreater);
-    /*BENCH(BenchmarkQueryTimestampGreaterEqual);
+    BENCH(BenchmarkQueryTimestampGreater);
+    BENCH(BenchmarkQueryTimestampGreaterEqual);
     BENCH(BenchmarkQueryTimestampLess);
     BENCH(BenchmarkQueryTimestampLessEqual);
     BENCH(BenchmarkQueryTimestampEqual);
     BENCH(BenchmarkQueryTimestampNotEqual);
     BENCH(BenchmarkQueryTimestampNotNull);
     BENCH(BenchmarkQueryTimestampEqualNull);
-*/
+
 #undef BENCH
     return 0;
 }

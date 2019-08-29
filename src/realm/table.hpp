@@ -1602,8 +1602,6 @@ private:
     template <class T>
     friend class Columns;
     friend class Columns<StringData>;
-    template <class TCond, class T>
-    friend class CompareColumnPathToValueBase;
     friend class ParentNode;
     template <class>
     friend class SequentialGetter;
