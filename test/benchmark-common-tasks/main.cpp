@@ -42,7 +42,8 @@ using namespace realm::util;
 using namespace realm::test_util;
 
 namespace {
-#define BASE_SIZE 2000000
+// not smaller than 100.000 or the UID based benchmarks has to be modified!
+#define BASE_SIZE 100000
 
 /**
   This bechmark suite represents a number of common use cases,
@@ -52,10 +53,12 @@ namespace {
 
   This has the following implications:
   - All access is done with a DB in transactions.
-  - The DB has full durability (is backed by a file).
-    (but all benchmarks are also run with MemOnly durability for comparison)
+  - The DB has MemOnly durability (is not backed by a file).
+    (but a few benchmarks are also run with Full durability where that is more relevant)
   - Cases have been derived from:
     https://github.com/realm/realm-java/blob/bp-performance-test/realm/src/androidTest/java/io/realm/RealmPerformanceTest.java
+  - Other cases has been added to track improvements (e.g. TimeStamp queries)
+  - And yet other has been added to reflect change in idiomatic use (e.g. core5->core6)
 */
 
 const size_t min_repetitions = 10;
@@ -820,15 +823,24 @@ struct BenchmarkWithIntUIDsRandomOrderSeqAccess : BenchmarkWithIntsTable {
         t->add_search_index(m_col);
 #endif
         Random r;
+        std::set<int> key_set;
         for (size_t i = 0; i < BASE_SIZE; ++i) {
-            int64_t val = r.draw_int<int64_t>();
+            int64_t val;
+            while (1) { // make all ints unique
+                val = r.draw_int<int64_t>();
+                auto search = key_set.find(val);
+                if (search == key_set.end()) {
+                    key_set.insert(val);
+                    break;
+                }
+            }
 #ifdef REALM_CLUSTER_IF
             m_keys.push_back(ObjKey(val));
             Obj obj = t->create_object(ObjKey(val));
             obj.set(m_col, val);
 #else
             m_keys.push_back(val);
-            auto row = t->add_row_with_key(m_col, val);
+            t->add_row_with_key(m_col, val);
 #endif
         }
         tr.commit();
@@ -898,7 +910,7 @@ struct BenchmarkWithIntUIDsRandomOrderRandomCreate : BenchmarkWithIntUIDsRandomO
             obj.set(m_col, val);
 #else
             m_keys.push_back(val);
-            auto row = t->add_row_with_key(m_col, val);
+            t->add_row_with_key(m_col, val);
 #endif
         }
         tr.commit();
