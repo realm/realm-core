@@ -325,6 +325,46 @@ Mixed ConstLstIf<T>::avg(size_t* return_cnt) const
     return AverageHelper<T>::eval(*m_tree, return_cnt);
 }
 
+template <class T>
+void ConstLstIf<T>::sort(std::vector<size_t>& indices, bool ascending) const
+{
+    auto sz = size();
+    auto sz2 = indices.size();
+
+    indices.reserve(sz);
+    if (sz < sz2) {
+        // If list size has decreased, we have to start all over
+        indices.clear();
+        sz2 = 0;
+    }
+    for (size_t i = sz2; i < sz; i++) {
+        // If list size has increased, just add the missing indices
+        indices.push_back(i);
+    }
+    auto b = indices.begin();
+    auto e = indices.end();
+    if (ascending) {
+        std::sort(b, e, [this](size_t i1, size_t i2) { return m_tree->get(i1) < m_tree->get(i2); });
+    }
+    else {
+        std::sort(b, e, [this](size_t i1, size_t i2) { return m_tree->get(i1) > m_tree->get(i2); });
+    }
+}
+
+template <class T>
+void ConstLstIf<T>::distinct(std::vector<size_t>& indices) const
+{
+    indices.clear();
+    sort(indices);
+    auto duplicates = std::unique(indices.begin(), indices.end(),
+                                  [this](size_t i1, size_t i2) { return m_tree->get(i1) == m_tree->get(i2); });
+    // Erase the duplicates
+    indices.erase(duplicates, indices.end());
+
+    // Restore original order
+    std::sort(indices.begin(), indices.end(), std::less<size_t>());
+}
+
 
 /************************* template instantiations ***************************/
 

@@ -91,6 +91,9 @@ public:
     virtual Mixed sum(size_t* return_cnt = nullptr) const = 0;
     virtual Mixed avg(size_t* return_cnt = nullptr) const = 0;
 
+    virtual void sort(std::vector<size_t>& indices, bool ascending = true) const = 0;
+    virtual void distinct(std::vector<size_t>& indices) const = 0;
+
     bool is_empty() const
     {
         return size() == 0;
@@ -102,6 +105,15 @@ public:
     bool is_attached() const
     {
         return m_const_obj->is_valid();
+    }
+    bool has_changed() const
+    {
+        update_if_needed();
+        if (m_last_content_version != m_content_version) {
+            m_last_content_version = m_content_version;
+            return true;
+        }
+        return false;
     }
     const Table* get_table() const
     {
@@ -124,6 +136,7 @@ protected:
 
     mutable std::vector<size_t> m_deleted;
     mutable uint_fast64_t m_content_version = 0;
+    mutable uint_fast64_t m_last_content_version = 0;
 
     ConstLstBase(ColKey col_key, const ConstObj* obj);
     virtual bool init_from_parent() const = 0;
@@ -325,6 +338,9 @@ public:
     Mixed max(size_t* return_ndx = nullptr) const final;
     Mixed sum(size_t* return_cnt = nullptr) const final;
     Mixed avg(size_t* return_cnt = nullptr) const final;
+
+    void sort(std::vector<size_t>& indices, bool ascending = true) const final;
+    void distinct(std::vector<size_t>& indices) const final;
 
     T get(size_t ndx) const
     {

@@ -3173,6 +3173,75 @@ TEST(Table_ListOfPrimitives)
     CHECK_NOT(timestamp_list.is_attached());
 }
 
+TEST(Table_ListOfPrimitivesSort)
+{
+    Group g;
+    TableRef t = g.add_table("table");
+    ColKey int_col = t->add_column_list(type_Int, "integers");
+
+    auto obj = t->create_object();
+    auto list = obj.get_list<Int>(int_col);
+
+    std::vector<int64_t> values = {9, 4, 2, 7, 4, 1, 8, 11, 3, 4, 5, 22};
+    std::vector<size_t> indices;
+    obj.set_list_values(int_col, values);
+
+    CHECK(list.has_changed());
+    CHECK_NOT(list.has_changed());
+
+    auto cmp = [&]() {
+        CHECK_EQUAL(values.size(), indices.size());
+        for (size_t i = 0; i < values.size(); i++) {
+            CHECK_EQUAL(values[i], list.get(indices[i]));
+        }
+    };
+    std::sort(values.begin(), values.end(), std::less<int64_t>());
+    list.sort(indices);
+    cmp();
+    std::sort(values.begin(), values.end(), std::greater<int64_t>());
+    list.sort(indices, false);
+    cmp();
+    CHECK_NOT(list.has_changed());
+
+    values.push_back(6);
+    list.add(6);
+    CHECK(list.has_changed());
+    std::sort(values.begin(), values.end(), std::less<int64_t>());
+    list.sort(indices);
+    cmp();
+
+    values.resize(7);
+    obj.set_list_values(int_col, values);
+    std::sort(values.begin(), values.end(), std::greater<int64_t>());
+    list.sort(indices, false);
+    cmp();
+}
+
+TEST(Table_ListOfPrimitivesDistinct)
+{
+    Group g;
+    TableRef t = g.add_table("table");
+    ColKey int_col = t->add_column_list(type_Int, "integers");
+
+    auto obj = t->create_object();
+    auto list = obj.get_list<Int>(int_col);
+
+    std::vector<int64_t> values = {9, 4, 2, 7, 4, 9, 8, 11, 2, 4, 5};
+    std::vector<int64_t> distinct_values = {9, 4, 2, 7, 8, 11, 5};
+    std::vector<size_t> indices;
+    obj.set_list_values(int_col, values);
+
+    auto cmp = [&]() {
+        CHECK_EQUAL(distinct_values.size(), indices.size());
+        for (size_t i = 0; i < distinct_values.size(); i++) {
+            CHECK_EQUAL(distinct_values[i], list.get(indices[i]));
+        }
+    };
+
+    list.distinct(indices);
+    cmp();
+}
+
 TEST(Table_object_merge_nodes)
 {
     // This test works best for REALM_MAX_BPNODE_SIZE == 8.
