@@ -67,7 +67,7 @@ public:
         return m_allow_backlinks;
     }
     void set_backlink_class_prefix(std::string prefix);
-    static Table* table_getter(TableRef table, const std::vector<KeyPathElement>& links);
+    static LinkChain table_getter(ConstTableRef table, const std::vector<KeyPathElement>& links);
 
 protected:
     bool m_allow_backlinks;

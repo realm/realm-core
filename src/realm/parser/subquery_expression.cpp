@@ -79,7 +79,7 @@ Query& SubqueryExpression::get_subquery()
     return subquery;
 }
 
-Table* SubqueryExpression::table_getter() const
+LinkChain SubqueryExpression::table_getter() const
 {
     auto& tbl = query.get_table();
     return KeyPathMapping::table_getter(tbl, link_chain);

@@ -56,7 +56,7 @@ PropertyExpression::PropertyExpression(Query& q, const std::string& key_path_str
     }
 }
 
-Table* PropertyExpression::table_getter() const
+LinkChain PropertyExpression::table_getter() const
 {
     auto& tbl = query.get_table();
     return KeyPathMapping::table_getter(tbl, link_chain);

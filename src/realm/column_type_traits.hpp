@@ -46,6 +46,9 @@ template <class>
 class BasicArray;
 template <class>
 class BasicArrayNull;
+struct Link;
+template <class>
+class Lst;
 
 template <class T>
 struct ColumnTypeTraits;
@@ -116,6 +119,11 @@ struct ColumnTypeTraits<ObjKey> {
 };
 
 template <>
+struct ColumnTypeTraits<Link> {
+    static const ColumnType column_id = col_type_Link;
+};
+
+template <>
 struct ColumnTypeTraits<float> {
     using cluster_leaf_type = BasicArray<float>;
     using sum_type = double;
@@ -156,7 +164,6 @@ struct ColumnTypeTraits<util::Optional<double>> {
 };
 
 template <>
-
 struct ColumnTypeTraits<Timestamp> {
     using cluster_leaf_type = ArrayTimestamp;
     using minmax_type = Timestamp;
@@ -178,6 +185,11 @@ struct ColumnTypeTraits<BinaryData> {
     static const DataType id = type_Binary;
     static const ColumnType column_id = col_type_Binary;
     static const ColumnType real_column_type = col_type_Binary;
+};
+
+template <class T>
+struct ColumnTypeTraits<Lst<T>> {
+    static const ColumnType column_id = ColumnTypeTraits<T>::column_id;
 };
 
 template <DataType, bool Nullable>

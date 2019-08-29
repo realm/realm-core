@@ -51,7 +51,7 @@ void do_add_null_comparison_to_query(Query &, Predicate::Operator, const ValueEx
 template<typename T>
 void do_add_null_comparison_to_query(Query &query, Predicate::Operator op, const PropertyExpression &expr)
 {
-    Columns<T> column = expr.table_getter()->template column<T>(expr.get_dest_col_key());
+    Columns<T> column = expr.table_getter().template column<T>(expr.get_dest_col_key());
     switch (op) {
         case Predicate::Operator::NotEqual:
             query.and_query(column != realm::null());

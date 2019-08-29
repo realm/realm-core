@@ -438,13 +438,13 @@ TEST(Parser_ConstrainedQuery)
     list_0.add(obj1.get_key());
 
     TableView tv = obj0.get_backlink_view(t, list_col);
-    Query q(const_cast<const Table&>(*t), &tv);
+    Query q(*t, &tv);
     CHECK_EQUAL(q.count(), 1);
     q.and_query(t->column<Int>(int_col) <= 0);
     CHECK_EQUAL(q.count(), 1);
     CHECK_THROW(q.get_description(), SerialisationError);
 
-    Query q2(const_cast<const Table&>(*t), list_0);
+    Query q2(*t, list_0);
     CHECK_EQUAL(q2.count(), 2);
     q2.and_query(t->column<Int>(int_col) <= 0);
     CHECK_EQUAL(q2.count(), 1);

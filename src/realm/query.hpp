@@ -258,7 +258,7 @@ public:
     int set_threads(unsigned int threadcount);
 #endif
 
-    const TableRef& get_table()
+    ConstTableRef& get_table()
     {
         return m_table;
     }
@@ -284,7 +284,6 @@ public:
     bool eval_object(ConstObj& obj) const;
 
 private:
-    Query(Table& table, ConstTableView* tv = nullptr);
     void create();
 
     void init() const;

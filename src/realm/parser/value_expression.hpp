@@ -29,7 +29,7 @@ struct ValueExpression
 {
     const parser::Expression* value;
     query_builder::Arguments* arguments;
-    std::function<Table *()> table_getter;
+    std::function<LinkChain()> table_getter;
 
     ValueExpression(Query& query, query_builder::Arguments* args, const parser::Expression* v);
     bool is_null();

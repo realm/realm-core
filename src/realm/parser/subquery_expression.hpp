@@ -47,7 +47,7 @@ struct SubqueryExpression {
                        parser::KeyPathMapping& mapping);
     Query& get_subquery();
 
-    Table* table_getter() const;
+    LinkChain table_getter() const;
 
     template <typename T>
     auto value_of_type_for_query() const
@@ -100,11 +100,11 @@ struct SubqueryGetter<RetType, typename std::enable_if_t<realm::is_any<RetType, 
     {
         if (expr.dest_type_is_backlink()) {
             return expr.table_getter()
-                ->template column<BackLink>(*expr.get_dest_table(), expr.get_dest_col_key(), expr.subquery)
+                .template column<BackLink>(*expr.get_dest_table(), expr.get_dest_col_key(), expr.subquery)
                 .count();
         }
         else {
-            return expr.table_getter()->template column<Link>(expr.get_dest_col_key(), expr.subquery).count();
+            return expr.table_getter().template column<Link>(expr.get_dest_col_key(), expr.subquery).count();
         }
     }
 };
