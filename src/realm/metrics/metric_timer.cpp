@@ -28,7 +28,7 @@ using namespace realm::metrics;
 
 
 MetricTimerResult::MetricTimerResult()
-    : m_elapsed_seconds(0)
+    : m_elapsed_nanoseconds(0)
 {
 }
 
@@ -36,14 +36,14 @@ MetricTimerResult::~MetricTimerResult()
 {
 }
 
-double MetricTimerResult::get_elapsed_seconds() const
+nanosecond_storage_t MetricTimerResult::get_elapsed_nanoseconds() const
 {
-    return m_elapsed_seconds;
+    return m_elapsed_nanoseconds;
 }
 
-void MetricTimerResult::report_seconds(double time)
+void MetricTimerResult::report_nanoseconds(nanosecond_storage_t time)
 {
-    m_elapsed_seconds = time;
+    m_elapsed_nanoseconds = time;
 }
 
 
@@ -56,7 +56,7 @@ MetricTimer::MetricTimer(std::shared_ptr<MetricTimerResult> destination)
 MetricTimer::~MetricTimer()
 {
     if (m_dest) {
-        m_dest->report_seconds(get_elapsed_time());
+        m_dest->report_nanoseconds(get_elapsed_nanoseconds());
     }
 }
 
@@ -65,16 +65,16 @@ MetricTimer::time_point MetricTimer::get_timer_ticks() const
     return clock_type::now();
 }
 
-double MetricTimer::calc_elapsed_seconds(MetricTimer::time_point begin, MetricTimer::time_point end) const
+nanosecond_storage_t MetricTimer::calc_elapsed_nanoseconds(MetricTimer::time_point begin, MetricTimer::time_point end) const
 {
-    std::chrono::duration<double> elapsed = end - begin;
+    std::chrono::duration<nanosecond_storage_t, std::nano> elapsed = end - begin;
     return elapsed.count();
 }
 
-std::string MetricTimer::format(double seconds)
+std::string MetricTimer::format(nanosecond_storage_t nanoseconds)
 {
     std::ostringstream out;
-    format(seconds, out);
+    format(nanoseconds, out);
     return out.str();
 }
 
@@ -90,9 +90,10 @@ int64_t round_to_int64(double x)
 } // end anonymous namespace
 
 // see also test/util/Timer.cpp
-void MetricTimer::format(double seconds_float, std::ostream& out)
+void MetricTimer::format(nanosecond_storage_t nanoseconds, std::ostream& out)
 {
-    int64_t rounded_minutes = round_to_int64(seconds_float / 60);
+    constexpr int64_t ns_per_second = 1'000'000'000;
+    int64_t rounded_minutes = round_to_int64(nanoseconds / (60.0 * ns_per_second));
     if (rounded_minutes > 60) {
         // 1h0m -> inf
         int64_t hours = rounded_minutes / 60;
@@ -100,7 +101,7 @@ void MetricTimer::format(double seconds_float, std::ostream& out)
         out << hours << "h" << minutes << "m";
     }
     else {
-        int64_t rounded_seconds = round_to_int64(seconds_float);
+        int64_t rounded_seconds = round_to_int64(nanoseconds / double(ns_per_second));
         if (rounded_seconds > 60) {
             // 1m0s -> 59m59s
             int64_t minutes = rounded_seconds / 60;
@@ -108,7 +109,7 @@ void MetricTimer::format(double seconds_float, std::ostream& out)
             out << minutes << "m" << seconds << "s";
         }
         else {
-            int64_t rounded_centies = round_to_int64(seconds_float * 100);
+            int64_t rounded_centies = round_to_int64(nanoseconds / double(10'000'000));
             if (rounded_centies > 100) {
                 // 1s -> 59.99s
                 int64_t seconds = rounded_centies / 100;
@@ -120,7 +121,7 @@ void MetricTimer::format(double seconds_float, std::ostream& out)
                 out << 's';
             }
             else {
-                int64_t rounded_centi_ms = round_to_int64(seconds_float * 100000);
+                int64_t rounded_centi_ms = round_to_int64(nanoseconds / double(10'000));
                 if (rounded_centi_ms > 100) {
                     // 0.1ms -> 999.99ms
                     int64_t ms = rounded_centi_ms / 100;
@@ -133,7 +134,7 @@ void MetricTimer::format(double seconds_float, std::ostream& out)
                 }
                 else {
                     // 0 -> 999µs
-                    int64_t us = round_to_int64(seconds_float * 1000000);
+                    int64_t us = round_to_int64(nanoseconds / double(1'000));
                     out << us << "us";
                 }
             }

@@ -64,10 +64,10 @@ QueryInfo::QueryType QueryInfo::get_type() const
     return m_type;
 }
 
-double QueryInfo::get_query_time() const
+nanosecond_storage_t QueryInfo::get_query_time_nanoseconds() const
 {
     if (m_query_time) {
-        return m_query_time->get_elapsed_seconds();
+        return m_query_time->get_elapsed_nanoseconds();
     }
     return 0;
 }
