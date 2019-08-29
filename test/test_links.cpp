@@ -966,7 +966,8 @@ TEST(Links_CircularAccessors)
 TEST(Links_Transactions)
 {
     SHARED_GROUP_TEST_PATH(path);
-    auto db = DB::create(path);
+    auto hist = make_in_realm_history(path);
+    auto db = DB::create(*hist);
 
     ColKey dog_col;
     ObjKey tim_key;
@@ -993,34 +994,35 @@ TEST(Links_Transactions)
         group.commit();
     }
 
-    {
-        ReadTransaction group(db);
+    auto rt = db->start_read();
+    ConstTableRef owners = rt->get_table("owners");
+    ConstTableRef dogs = rt->get_table("dogs");
+    ConstObj tim = owners->get_object(tim_key);
+    CHECK_NOT(tim.is_null(dog_col));
+    CHECK_EQUAL(harvey_key, tim.get<ObjKey>(dog_col));
+    ConstObj harvey = dogs->get_object(harvey_key);
+    CHECK_EQUAL(harvey.get_backlink_count(), 1);
 
-        // Verify that owner links to dog
-        ConstTableRef owners = group.get_table("owners");
-        ConstObj tim = owners->get_object(tim_key);
-        CHECK_NOT(tim.is_null(dog_col));
-        CHECK_EQUAL(harvey_key, tim.get<ObjKey>(dog_col));
+    {
+        // Add another another owner for Harvey
+        WriteTransaction wt(db);
+        wt.get_table("owners")->create_object().set_all("Tim", harvey_key);
+        wt.commit();
     }
 
-    {
-        WriteTransaction group(db);
+    rt->advance_read();
+    CHECK_EQUAL(harvey.get_backlink_count(), 2);
 
+    {
         // Delete dog
-        TableRef dogs = group.get_table("dogs");
-        dogs->remove_object(harvey_key);
-
-        group.commit();
+        WriteTransaction wt(db);
+        wt.get_table("dogs")->remove_object(harvey_key);
+        wt.commit();
     }
 
-    {
-        ReadTransaction group(db);
-
-        // Verify that link from owner was nullified
-        ConstTableRef owners = group.get_table("owners");
-        ConstObj tim = owners->get_object(tim_key);
-        CHECK(tim.is_null(dog_col));
-    }
+    // Verify that link from owner was nullified
+    rt->advance_read();
+    CHECK(tim.is_null(dog_col));
 }
 
 #if !REALM_ANDROID // FIXME

@@ -407,6 +407,8 @@ size_t ConstObj::get_backlink_count(bool only_strong_links) const
 
 size_t ConstObj::get_backlink_count(const Table& origin, ColKey origin_col_key) const
 {
+    update_if_needed();
+
     size_t cnt = 0;
     TableKey origin_table_key = origin.get_key();
     if (origin_table_key != TableKey()) {
