@@ -116,6 +116,7 @@ struct Benchmark {
 #else
     std::vector<uint64_t> m_keys;
 #endif
+    ColKey m_col;
 };
 
 struct BenchmarkUnorderedTableViewClear : Benchmark {
@@ -123,13 +124,12 @@ struct BenchmarkUnorderedTableViewClear : Benchmark {
     {
         return "UnorderedTableViewClear";
     }
-
-    void operator()(DBRef group)
+    void before_all(DBRef group)
     {
         const size_t rows = BASE_SIZE;
         WrtTrans tr(group);
         TableRef tbl = tr.add_table(name());
-        auto col = tbl->add_column(type_String, "s", true);
+        m_col = tbl->add_column(type_String, "s", true);
 #ifdef REALM_CLUSTER_IF
         tbl->create_objects(rows, m_keys);
 #else
@@ -139,17 +139,22 @@ struct BenchmarkUnorderedTableViewClear : Benchmark {
 
         for (size_t t = 0; t < rows / 3; t += 3) {
 #ifdef REALM_CLUSTER_IF
-            tbl->get_object(m_keys[t + 0]).set(col, StringData("foo"));
-            tbl->get_object(m_keys[t + 1]).set(col, StringData("bar"));
-            tbl->get_object(m_keys[t + 2]).set(col, StringData("hello"));
+            tbl->get_object(m_keys[t + 0]).set(m_col, StringData("foo"));
+            tbl->get_object(m_keys[t + 1]).set(m_col, StringData("bar"));
+            tbl->get_object(m_keys[t + 2]).set(m_col, StringData("hello"));
 #else
-            tbl->set_string(col, t + 0, StringData("foo"));
-            tbl->set_string(col, t + 1, StringData("bar"));
-            tbl->set_string(col, t + 2, StringData("hello"));
+            tbl->set_string(m_col, t + 0, StringData("foo"));
+            tbl->set_string(m_col, t + 1, StringData("bar"));
+            tbl->set_string(m_col, t + 2, StringData("hello"));
 #endif
         }
-
-        TableView tv = (tbl->column<String>(col) == "foo").find_all();
+        tr.commit();
+    }
+    void operator()(DBRef group)
+    {
+        WrtTrans tr(group);
+        TableRef tbl = tr.get_table(name());
+        TableView tv = (tbl->column<String>(m_col) == "foo").find_all();
         tv.clear();
     }
 };
@@ -193,7 +198,6 @@ struct BenchmarkWithStringsTable : Benchmark {
         tr.get_group().remove_table("StringOnly");
         tr.commit();
     }
-    ColKey m_col;
 };
 
 struct BenchmarkWithStrings : BenchmarkWithStringsTable {
@@ -494,7 +498,6 @@ struct BenchmarkWithTimestamps : Benchmark {
         tr.get_group().remove_table("Timestamps");
         tr.commit();
     }
-    ColKey m_col;
 };
 
 struct BenchmarkQueryTimestampGreater : BenchmarkWithTimestamps {
@@ -743,7 +746,6 @@ struct BenchmarkWithIntsTable : Benchmark {
         tr.get_group().remove_table("IntOnly");
         tr.commit();
     }
-    ColKey m_col;
 };
 
 struct BenchmarkWithInts : BenchmarkWithIntsTable {
@@ -1554,7 +1556,6 @@ struct BenchmarkQueryNot : Benchmark {
         tr.commit();
     }
 
-    ColKey m_col;
 };
 
 struct BenchmarkGetLinkList : Benchmark {
