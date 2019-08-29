@@ -286,6 +286,53 @@ struct BenchmarkFindFirstStringFewDupes : BenchmarkWithStringsFewDup {
     }
 };
 
+struct BenchmarkQueryStringOverLinks : BenchmarkWithStringsFewDup {
+    size_t link_col_ndx = -1;
+    size_t id_col_ndx = -1;
+    void before_all(SharedGroup& group) {
+        BenchmarkWithStringsFewDup::before_all(group);
+        WriteTransaction tr(group);
+        TableRef t = tr.add_table("Links");
+        id_col_ndx = t->add_column(type_Int, "id");
+        TableRef strings = tr.get_table("StringOnly");
+        link_col_ndx = t->add_column_link(type_Link, "myLink", *strings);
+        const size_t num_links = strings->size();
+        t->add_empty_row(num_links);
+        for (size_t i = 0; i < num_links; ++i) {
+            t->set_int(id_col_ndx, i, i);
+            t->set_link(link_col_ndx, i, i);
+        }
+        tr.commit();
+    }
+    const char* name() const
+    {
+        return "QueryStringOverLinks";
+    }
+
+    void operator()(SharedGroup& group)
+    {
+        ReadTransaction tr(group);
+        TableRef table(const_cast<Table*>(tr.get_table("Links").get()));
+        std::vector<std::string> strs = {
+            "10", "20", "30", "40", "50", "60", "70", "80", "90", "100",
+        };
+
+        for (auto s : strs) {
+            Query query = table->link(link_col_ndx).column<String>(0) == StringData(s);
+            TableView results = query.find_all();
+        }
+    }
+
+    void after_all(SharedGroup& group)
+    {
+        Group& g = group.begin_write();
+        g.remove_table("Links");
+        group.commit();
+        BenchmarkWithStringsFewDup::after_all(group);
+    }
+};
+
+
 struct BenchmarkFindFirstStringManyDupes : BenchmarkWithStringsManyDup {
     const char* name() const
     {
@@ -1411,6 +1458,7 @@ int benchmark_common_tasks_main()
     BENCH(BenchmarkQueryChainedOrIntsIndexed);
     BENCH(BenchmarkQueryIntEquality);
     BENCH(BenchmarkQueryIntEqualityIndexed);*/
+    BENCH(BenchmarkQueryStringOverLinks);
     BENCH(BenchmarkQueryTimestampGreaterOverLinks);
     BENCH(BenchmarkQueryTimestampGreater);
     BENCH(BenchmarkQueryTimestampGreaterEqual);
