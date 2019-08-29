@@ -1215,7 +1215,7 @@ public:
     {
     }
 
-    virtual std::string description(util::serializer::SerialisationState&) const override
+    std::string description(util::serializer::SerialisationState&) const override
     {
         if (ValueBase::m_from_link_list) {
             return util::serializer::print_value(util::to_string(ValueBase::m_values)
@@ -1227,7 +1227,7 @@ public:
         return "";
     }
 
-    virtual bool has_constant_evaluation() const override
+    bool has_constant_evaluation() const override
     {
         return true;
     }
