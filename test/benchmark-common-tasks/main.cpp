@@ -43,7 +43,7 @@ using namespace realm::test_util;
 
 namespace {
 // not smaller than 100.000 or the UID based benchmarks has to be modified!
-#define BASE_SIZE 100000
+#define BASE_SIZE 200000
 
 /**
   This bechmark suite represents a number of common use cases,
@@ -62,7 +62,7 @@ namespace {
 */
 
 const size_t min_repetitions = 10;
-const size_t max_repetitions = 10000;
+const size_t max_repetitions = 1000;
 const double min_duration_s = 0.5;
 const double min_warmup_time_s = 0.05;
 
@@ -98,15 +98,15 @@ struct Benchmark {
     }
     virtual void after_all(DBRef)
     {
+#ifdef REALM_CLUSTER_IF
+        m_keys.clear();
+#endif
     }
     virtual void before_each(DBRef)
     {
     }
     virtual void after_each(DBRef)
     {
-#ifdef REALM_CLUSTER_IF
-        m_keys.clear();
-#endif
     }
     virtual void operator()(DBRef) = 0;
     RealmDurability m_durability = RealmDurability::Full;
@@ -755,7 +755,10 @@ struct BenchmarkWithInts : BenchmarkWithIntsTable {
 
         Random r;
         for (size_t i = 0; i < BASE_SIZE; ++i) {
-            int64_t val = r.draw_int<int64_t>();
+            int64_t val;
+            do {
+                val = r.draw_int<int64_t>();
+            } while (val < 0);
 #ifdef REALM_CLUSTER_IF
             Obj obj = t->create_object(ObjKey(val));
             obj.set(m_col, val);
@@ -823,14 +826,15 @@ struct BenchmarkWithIntUIDsRandomOrderSeqAccess : BenchmarkWithIntsTable {
         t->add_search_index(m_col);
 #endif
         Random r;
-        std::set<int> key_set;
         for (size_t i = 0; i < BASE_SIZE; ++i) {
             int64_t val;
             while (1) { // make all ints unique
                 val = r.draw_int<int64_t>();
-                auto search = key_set.find(val);
-                if (search == key_set.end()) {
-                    key_set.insert(val);
+                if (val < 0)
+                    continue;
+                auto search = m_key_set.find(val);
+                if (search == m_key_set.end()) {
+                    m_key_set.insert(val);
                     break;
                 }
             }
@@ -859,6 +863,7 @@ struct BenchmarkWithIntUIDsRandomOrderSeqAccess : BenchmarkWithIntsTable {
 #endif
         }
     }
+    std::set<int64_t> m_key_set;
 };
 
 struct BenchmarkWithIntUIDsRandomOrderRandomAccess : BenchmarkWithIntUIDsRandomOrderSeqAccess {
@@ -890,6 +895,7 @@ struct BenchmarkWithIntUIDsRandomOrderRandomDelete : BenchmarkWithIntUIDsRandomO
             t->move_last_over(row);
 #endif
         }
+        // note: abort transaction so next run can start afresh
     }
 };
 struct BenchmarkWithIntUIDsRandomOrderRandomCreate : BenchmarkWithIntUIDsRandomOrderRandomAccess {
@@ -897,23 +903,40 @@ struct BenchmarkWithIntUIDsRandomOrderRandomCreate : BenchmarkWithIntUIDsRandomO
     void before_all(DBRef group)
     {
         BenchmarkWithIntUIDsRandomOrderRandomAccess::before_all(group);
+        int64_t val;
+        // produce 10000 more unique keys to drive later object creations
+        Random r;
+        for (size_t i = 0; i < 10000; ++i) {
+            while (1) { // make all ints unique
+                val = r.draw_int<int64_t>();
+                if (val < 0)
+                    continue;
+                auto search = m_key_set.find(val);
+                if (search == m_key_set.end()) {
+                    m_key_set.insert(val);
+                    break;
+                }
+            }
+#ifdef REALM_CLUSTER_IF
+            m_keys.push_back(ObjKey(val));
+#else
+            m_keys.push_back(val);
+#endif
+        }
     }
     void operator()(DBRef group) {
         WrtTrans tr(group);
         TableRef t = tr.get_table("IntOnly");
-        Random r;
         for (size_t i = 0; i < 10000; ++i) {
-            int64_t val = r.draw_int<int64_t>();
+            auto val = m_keys[BASE_SIZE + i];
 #ifdef REALM_CLUSTER_IF
-            m_keys.push_back(ObjKey(val));
-            Obj obj = t->create_object(ObjKey(val));
-            obj.set(m_col, val);
+            Obj obj = t->create_object(val);
+            obj.set<Int>(m_col, val.value);
 #else
-            m_keys.push_back(val);
             t->add_row_with_key(m_col, val);
 #endif
         }
-        tr.commit();
+        // abort transaction
     }
 };
 
@@ -1758,8 +1781,8 @@ void run_benchmark(BenchmarkResults& results, bool force_full = false)
             }
             time_to_execute_warmup_reps = t.get_elapsed_time();
         }
-
-        size_t required_reps = size_t(min_duration_s / (time_to_execute_warmup_reps / num_warmup_reps));
+        double time_to_execute_one_rep = time_to_execute_warmup_reps / num_warmup_reps;
+        size_t required_reps = size_t(min_duration_s / time_to_execute_one_rep);
         if (required_reps < min_repetitions) {
             required_reps = min_repetitions;
         }
