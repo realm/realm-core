@@ -345,7 +345,7 @@ public:
 
     ComputedPrivileges get_privileges();
     ComputedPrivileges get_privileges(StringData object_type);
-    ComputedPrivileges get_privileges(Obj const& obj);
+    ComputedPrivileges get_privileges(ConstObj const& obj);
 
     AuditInterface* audit_context() const noexcept;
 
