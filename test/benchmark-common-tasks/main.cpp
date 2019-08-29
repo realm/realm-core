@@ -1425,7 +1425,6 @@ int benchmark_common_tasks_main()
 
 #define BENCH(B) run_benchmark<B>(results)
 
-    /*
     BENCH(BenchmarkUnorderedTableViewClear);
     BENCH(BenchmarkEmptyCommit);
     BENCH(AddTable);
@@ -1457,7 +1456,7 @@ int benchmark_common_tasks_main()
     BENCH(BenchmarkQueryChainedOrInts);
     BENCH(BenchmarkQueryChainedOrIntsIndexed);
     BENCH(BenchmarkQueryIntEquality);
-    BENCH(BenchmarkQueryIntEqualityIndexed);*/
+    BENCH(BenchmarkQueryIntEqualityIndexed);
     BENCH(BenchmarkQueryStringOverLinks);
     BENCH(BenchmarkQueryTimestampGreaterOverLinks);
     BENCH(BenchmarkQueryTimestampGreater);
