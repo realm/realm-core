@@ -312,13 +312,14 @@ struct BenchmarkQueryStringOverLinks : BenchmarkWithStringsFewDup {
     void operator()(SharedGroup& group)
     {
         ReadTransaction tr(group);
-        TableRef table(const_cast<Table*>(tr.get_table("Links").get()));
+        ConstTableRef table = tr.get_table("Links");
         std::vector<std::string> strs = {
             "10", "20", "30", "40", "50", "60", "70", "80", "90", "100",
         };
 
         for (auto s : strs) {
-            Query query = table->link(link_col_ndx).column<String>(0) == StringData(s);
+            Query query = table->where();
+            query = query.get_table()->link(link_col_ndx).column<String>(0) == StringData(s);
             TableView results = query.find_all();
         }
     }
@@ -460,8 +461,9 @@ struct BenchmarkQueryTimestampGreaterOverLinks : BenchmarkQueryTimestampGreater 
     void operator()(SharedGroup& group)
     {
         ReadTransaction tr(group);
-        TableRef table(const_cast<Table*>(tr.get_table("Links").get()));
-        Query query = table->link(link_col_ndx).column<Timestamp>(timestamps_col_ndx) > needle;
+        ConstTableRef table = tr.get_table("Links");
+        Query query = table->where();
+        query = query.get_table()->link(link_col_ndx).column<Timestamp>(timestamps_col_ndx) > needle;
         TableView results = query.find_all();
         REALM_ASSERT_EX(results.size() == values.size() - num_results_to_needle - 1, results.size(), num_results_to_needle, values.size());
         static_cast<void>(results);
@@ -690,8 +692,9 @@ struct BenchmarkIntVsDoubleColumns : Benchmark {
     void operator()(SharedGroup& group)
     {
         ReadTransaction tr(group);
-        TableRef table(const_cast<Table*>(tr.get_table("table").get()));
-        Query q = (table->column<Int>(ints_col_ndx) > table->column<Double>(doubles_col_ndx));
+        ConstTableRef table = tr.get_table("table");
+        Query q = table->where();
+        q = (q.get_table()->column<Int>(ints_col_ndx) > q.get_table()->column<Double>(doubles_col_ndx));
         REALM_ASSERT_3(q.count(), ==, ((num_rows / 2) - 1));
     }
 
