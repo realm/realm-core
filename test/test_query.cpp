@@ -12120,4 +12120,50 @@ TEST(Query_IntIndexOverLinkViewNotInTableOrder)
     CHECK_EQUAL(0, child_table->where().equal(col_child_id, 3).find());
     CHECK_EQUAL(1, child_table->where().equal(col_child_id, 2).find());
 }
+
+TEST(Query_MixedTypeQuery)
+{
+    Group g;
+    auto table = g.add_table("Foo");
+    auto col_int = table->add_column(type_Int, "int");
+    auto col_double = table->add_column(type_Double, "double");
+    for (int64_t i = 0; i < 100; i++) {
+        auto ndx = table->add_empty_row();
+        table->set_int(col_int, ndx, i);
+        table->set_double(col_double, ndx, 100. - i);
+    }
+
+    auto tv = (table->column<Int>(col_int) > 9.5).find_all();
+    CHECK_EQUAL(tv.size(), 90);
+    auto tv1 = (table->column<Int>(col_int) > table->column<Double>(col_double)).find_all();
+    CHECK_EQUAL(tv1.size(), 49);
+}
+
+TEST(Query_LinkListIntPastOneIsNull)
+{
+    Group g;
+    auto table_foo = g.add_table("Foo");
+    auto table_bar = g.add_table("Bar");
+    auto col_int = table_foo->add_column(type_Int, "int", true);
+    auto col_list = table_bar->add_column_link(type_LinkList, "foo_link", *table_foo);
+    std::vector<util::Optional<int64_t>> values = {{0}, {1}, {2}, {util::none}};
+    auto bar_obj_ndx = table_bar->add_empty_row();
+    LinkViewRef list = table_bar->get_linklist(col_list, bar_obj_ndx);
+
+    for (size_t i = 0; i < values.size(); i++) {
+        auto ndx = table_foo->add_empty_row();
+        if (values[i]) {
+            table_foo->set_int(col_int, ndx, *values[i]);
+        } else {
+            table_foo->set_null(col_int, ndx);
+        }
+        list->add(ndx);
+    }
+
+    Query q = table_bar->link(col_list).column<Int>(col_int) == realm::null();
+
+    CHECK_EQUAL(q.count(), 1);
+}
+
+
 #endif // TEST_QUERY
