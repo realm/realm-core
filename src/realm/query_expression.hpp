@@ -3950,8 +3950,10 @@ private:
         : m_left(other.m_left->clone(patches))
         , m_right(other.m_right->clone(patches))
         , m_left_is_const(other.m_left_is_const)
-        , m_left_value(other.m_left_value)
     {
+        if (m_left_is_const) {
+            m_left->evaluate(-1/*unused*/, m_left_value);
+        }
     }
 
     std::unique_ptr<TLeft> m_left;
