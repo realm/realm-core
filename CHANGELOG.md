@@ -1,6 +1,11 @@
 # 5.14.0-hotfix.1 Release notes
 
 ### Enhancements
+* Performance improved for queries comparing a constant value to a property over unary link path (eg: "someLink.Id == 42"). ([#3670](https://github.com/realm/realm-core/issues/3370))
+
+# 5.14.0 Release notes
+
+### Enhancements
 * Add assertion to prevent translating a ref value that is not 8 byte aligned. This will allow
   us to detect file corruptions at an earlier stage.
 * You can now get size of the commit being built and the size of currently allocated slab area.
