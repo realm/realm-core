@@ -61,10 +61,10 @@ namespace {
   - And yet other has been added to reflect change in idiomatic use (e.g. core5->core6)
 */
 
-const size_t min_repetitions = 10;
-const size_t max_repetitions = 1000;
+const size_t min_repetitions = 5;
+const size_t max_repetitions = 100;
 const double min_duration_s = 0.5;
-const double min_warmup_time_s = 0.05;
+const double min_warmup_time_s = 0.1;
 
 const char* to_lead_cstr(RealmDurability level);
 const char* to_ident_cstr(RealmDurability level);
@@ -1502,16 +1502,18 @@ struct BenchmarkSetLongString : BenchmarkWithLongStrings {
         WrtTrans tr(group);
         TableRef table = tr.get_table("StringOnly");
 #ifdef REALM_CLUSTER_IF
-        Obj obj = table->create_object();
-        obj.set<String>(m_col, "c");
-        m_keys.push_back(obj.get_key());
+        size_t len = m_keys.size();
+        for (size_t i = 0; i < len; ++i) {
+            Obj obj = table->get_object(m_keys[i]);
+            obj.set<String>(m_col, "c");
+        }
 #else
         size_t len = table->size();
         for (size_t i = 0; i < len; ++i) {
             table->set_string(m_col, i, "c");
         }
 #endif
-        tr.commit();
+        // don't commit
     }
 };
 
