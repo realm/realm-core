@@ -12120,4 +12120,23 @@ TEST(Query_IntIndexOverLinkViewNotInTableOrder)
     CHECK_EQUAL(0, child_table->where().equal(col_child_id, 3).find());
     CHECK_EQUAL(1, child_table->where().equal(col_child_id, 2).find());
 }
+
+TEST(Query_MixedTypeQuery)
+{
+    Group g;
+    auto table = g.add_table("Foo");
+    auto col_int = table->add_column(type_Int, "int");
+    auto col_double = table->add_column(type_Double, "double");
+    for (int64_t i = 0; i < 100; i++) {
+        auto ndx = table->add_empty_row();
+        table->set_int(col_int, ndx, i);
+        table->set_double(col_double, ndx, 100. - i);
+    }
+
+    auto tv = (table->column<Int>(col_int) > 9.5).find_all();
+    CHECK_EQUAL(tv.size(), 90);
+    auto tv1 = (table->column<Int>(col_int) > table->column<Double>(col_double)).find_all();
+    CHECK_EQUAL(tv1.size(), 49);
+}
+
 #endif // TEST_QUERY

@@ -348,7 +348,7 @@ private:
 };
 
 struct ValueBase {
-    static const size_t default_size = 8;
+    static const size_t chunk_size = 8;
     virtual void export_bool(ValueBase& destination) const = 0;
     virtual void export_Timestamp(ValueBase& destination) const = 0;
     virtual void export_int(ValueBase& destination) const = 0;
@@ -1389,6 +1389,21 @@ public:
     }
 
     // Given a TCond (==, !=, >, <, >=, <=) and two Value<T>, return index of first match
+    template <class TCond>
+    REALM_FORCEINLINE static size_t compare_const(const Value<T>* left, Value<T>* right)
+    {
+        TCond c;
+
+        size_t sz = right->ValueBase::m_values;
+        bool left_is_null = left->m_storage.is_null(0);
+        for (size_t m = 0; m < sz; m++) {
+            if (c(left->m_storage[0], right->m_storage[m], left_is_null, right->m_storage.is_null(0)))
+                return right->m_from_link_list ? 0 : m;
+        }
+
+        return not_found; // no match
+    }
+
     template <class TCond>
     REALM_FORCEINLINE static size_t compare(Value<T>* left, Value<T>* right)
     {
@@ -2773,7 +2788,7 @@ public:
 
     void evaluate(size_t index, ValueBase& destination) override
     {
-        evaluate_internal(index, destination, ValueBase::default_size);
+        evaluate_internal(index, destination, ValueBase::chunk_size);
     }
 
     void evaluate_internal(size_t index, ValueBase& destination, size_t nb_elements);
@@ -3220,14 +3235,14 @@ public:
             sgc->cache_next(index);
             size_t colsize = sgc->m_column->size();
 
-            // Now load `ValueBase::default_size` rows from from the leaf into m_storage. If it's an integer
+            // Now load `ValueBase::chunck_size` rows from from the leaf into m_storage. If it's an integer
             // leaf, then it contains the method get_chunk() which copies these values in a super fast way (first
             // case of the `if` below. Otherwise, copy the values one by one in a for-loop (the `else` case).
-            if (std::is_same<U, int64_t>::value && index + ValueBase::default_size <= sgc->m_leaf_end) {
-                Value<int64_t> v;
+            if (std::is_same<U, int64_t>::value && index + ValueBase::chunk_size <= sgc->m_leaf_end) {
+                Value<int64_t> v(false, ValueBase::chunk_size);
 
                 // If you want to modify 'default_size' then update Array::get_chunk()
-                REALM_ASSERT_3(ValueBase::default_size, ==, 8);
+                REALM_ASSERT_3(ValueBase::chunk_size, ==, 8);
 
                 auto sgc_2 = static_cast<SequentialGetter<ColType>*>(m_sg.get());
                 sgc_2->m_leaf_ptr->get_chunk(index - sgc->m_leaf_start, v.m_storage.m_first);
@@ -3236,8 +3251,8 @@ public:
             }
             else {
                 size_t rows = colsize - index;
-                if (rows > ValueBase::default_size)
-                    rows = ValueBase::default_size;
+                if (rows > ValueBase::chunk_size)
+                    rows = ValueBase::chunk_size;
                 Value<typename util::RemoveOptional<U>::type> v(false, rows);
 
                 for (size_t t = 0; t < rows; t++)
@@ -3894,15 +3909,19 @@ public:
     {
         size_t match;
 
-        Value<T> left(m_left_value);
+        Value<T> left;
         Value<T> right;
 
         for (; start < end;) {
-            if (!m_left_is_const) {
-                m_left->evaluate(start, left);
+            if (m_left_is_const) {
+                m_right->evaluate(start, right);
+                match = Value<T>::template compare_const<TCond>(&m_left_value, &right);
             }
-            m_right->evaluate(start, right);
-            match = Value<T>::template compare<TCond>(&left, &right);
+            else {
+                m_left->evaluate(start, left);
+                m_right->evaluate(start, right);
+                match = Value<T>::template compare<TCond>(&left, &right);
+            }
 
             if (match != not_found && match + start < end)
                 return start + match;
