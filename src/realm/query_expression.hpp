@@ -1397,7 +1397,7 @@ public:
         size_t sz = right->ValueBase::m_values;
         bool left_is_null = left->m_storage.is_null(0);
         for (size_t m = 0; m < sz; m++) {
-            if (c(left->m_storage[0], right->m_storage[m], left_is_null, right->m_storage.is_null(0)))
+            if (c(left->m_storage[0], right->m_storage[m], left_is_null, right->m_storage.is_null(m)))
                 return right->m_from_link_list ? 0 : m;
         }
 
@@ -3235,7 +3235,7 @@ public:
             sgc->cache_next(index);
             size_t colsize = sgc->m_column->size();
 
-            // Now load `ValueBase::chunck_size` rows from from the leaf into m_storage. If it's an integer
+            // Now load `ValueBase::chunk_size` rows from from the leaf into m_storage. If it's an integer
             // leaf, then it contains the method get_chunk() which copies these values in a super fast way (first
             // case of the `if` below. Otherwise, copy the values one by one in a for-loop (the `else` case).
             if (std::is_same<U, int64_t>::value && index + ValueBase::chunk_size <= sgc->m_leaf_end) {
