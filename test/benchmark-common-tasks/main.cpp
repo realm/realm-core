@@ -666,6 +666,43 @@ struct BenchmarkWithInts : BenchmarkWithIntsTable {
     }
 };
 
+struct BenchmarkIntVsDoubleColumns : Benchmark {
+    size_t ints_col_ndx = -1;
+    size_t doubles_col_ndx = -1;
+    constexpr static size_t num_rows = BASE_SIZE * 4;
+    void before_all(SharedGroup& group)
+    {
+        WriteTransaction tr(group);
+        TableRef t = tr.add_table("table");
+        ints_col_ndx = t->add_column(type_Int, "ints");
+        doubles_col_ndx = t->add_column(type_Double, "doubles");
+        t->add_empty_row(num_rows);
+        for (size_t i = 0; i < num_rows; ++i) {
+            t->set_int(ints_col_ndx, i, i);
+            t->set_double(doubles_col_ndx, i, double(num_rows - i));
+        }
+        tr.commit();
+    }
+    const char* name() const
+    {
+        return "QueryIntsVsDoubleColumns";
+    }
+    void operator()(SharedGroup& group)
+    {
+        ReadTransaction tr(group);
+        TableRef table(const_cast<Table*>(tr.get_table("table").get()));
+        Query q = (table->column<Int>(ints_col_ndx) > table->column<Double>(doubles_col_ndx));
+        REALM_ASSERT_3(q.count(), ==, ((num_rows / 2) - 1));
+    }
+
+    void after_all(SharedGroup& group)
+    {
+        Group& g = group.begin_write();
+        g.remove_table("table");
+        group.commit();
+    }
+};
+
 struct BenchmarkQueryChainedOrInts : BenchmarkWithIntsTable {
     const size_t num_queried_matches = 1000;
     const size_t num_rows = 100000;
@@ -1457,6 +1494,7 @@ int benchmark_common_tasks_main()
     BENCH(BenchmarkQueryChainedOrIntsIndexed);
     BENCH(BenchmarkQueryIntEquality);
     BENCH(BenchmarkQueryIntEqualityIndexed);
+    BENCH(BenchmarkIntVsDoubleColumns);
     BENCH(BenchmarkQueryStringOverLinks);
     BENCH(BenchmarkQueryTimestampGreaterOverLinks);
     BENCH(BenchmarkQueryTimestampGreater);
