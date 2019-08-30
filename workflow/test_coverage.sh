@@ -15,6 +15,12 @@ fi
 
 set -e
 
+if [ "${TMPDIR}" = "" ]; then
+  TMPDIR="/tmp"
+fi
+
+echo "TMPDIR: ${TMPDIR}"
+ls "${TMPDIR}/realm*" | while read filename; do rm -rf "$filename"; done
 rm -rf coverage.build
 mkdir -p coverage.build
 cd coverage.build
