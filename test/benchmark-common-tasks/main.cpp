@@ -67,9 +67,17 @@ const char* to_ident_cstr(RealmDurability level);
 
 #ifdef REALM_CLUSTER_IF
 #define KEY(x) ObjKey(x)
+inline Table* table_ptr(ConstTableRef t)
+{
+    return const_cast<Table*>(t.operator const Table*());
+}
 #else
 #define KEY(x) x
 using ColKey = size_t;
+inline Table* table_ptr(ConstTableRef t)
+{
+    return const_cast<Table*>(t.get());
+}
 #endif
 
 
@@ -332,6 +340,63 @@ struct BenchmarkFindFirstStringFewDupes : BenchmarkWithStringsFewDup {
     }
 };
 
+struct BenchmarkQueryStringOverLinks : BenchmarkWithStringsFewDup {
+    ColKey link_col_ndx;
+    ColKey id_col_ndx;
+    void before_all(DBRef group)
+    {
+        BenchmarkWithStringsFewDup::before_all(group);
+        WriteTransaction tr(group);
+        TableRef t = tr.add_table("Links");
+        id_col_ndx = t->add_column(type_Int, "id");
+        TableRef strings = tr.get_table("StringOnly");
+        link_col_ndx = t->add_column_link(type_Link, "myLink", *strings);
+        const size_t num_links = strings->size();
+
+#ifdef REALM_CLUSTER_IF
+        auto target = strings->begin();
+        for (size_t i = 0; i < num_links; ++i) {
+            t->create_object().set_all(int64_t(i), target->get_key());
+            ++target;
+        }
+#else
+        for (size_t i = 0; i < num_links; ++i) {
+            auto ndx = t->add_empty_row();
+            t->set_int(id_col_ndx, ndx, i);
+            t->set_link(link_col_ndx, ndx, i);
+        }
+#endif
+        tr.commit();
+    }
+    const char* name() const
+    {
+        return "QueryStringOverLinks";
+    }
+
+    void operator()(DBRef group)
+    {
+        ReadTransaction tr(group);
+        Table* table = table_ptr(tr.get_table("Links"));
+        std::vector<std::string> strs = {
+            "10", "20", "30", "40", "50", "60", "70", "80", "90", "100",
+        };
+
+        for (auto s : strs) {
+            Query query = table->link(link_col_ndx).column<String>(m_col) == StringData(s);
+            TableView results = query.find_all();
+        }
+    }
+
+    void after_all(DBRef group)
+    {
+        WriteTransaction tr(group);
+        tr.get_group().remove_table("Links");
+        tr.commit();
+        BenchmarkWithStringsFewDup::after_all(group);
+    }
+};
+
+
 struct BenchmarkFindFirstStringManyDupes : BenchmarkWithStringsManyDup {
     const char* name() const
     {
@@ -383,11 +448,12 @@ struct BenchmarkWithTimestamps : Benchmark {
     size_t num_nulls_added = 0;
     double percent_results_to_needle = 0.5;
     double percent_chance_of_null = 0.0;
+    ColKey timestamps_col_ndx;
     void before_all(DBRef group)
     {
         WriteTransaction tr(group);
         TableRef t = tr.add_table("Timestamps");
-        auto col = t->add_column(type_Timestamp, "timestamps", true);
+        timestamps_col_ndx = t->add_column(type_Timestamp, "timestamps", true);
         Random r;
         for (size_t i = 0; i < BASE_SIZE * 10; ++i) {
             Timestamp time{r.draw_int<int64_t>(0, 1000000), r.draw_int<int32_t>(0, 1000000)};
@@ -398,9 +464,9 @@ struct BenchmarkWithTimestamps : Benchmark {
                 values.insert(time);
             }
 #ifdef REALM_CLUSTER_IF
-            t->create_object().set(col, time);
+            t->create_object().set(timestamps_col_ndx, time);
 #else
-            t->set_timestamp(col, t->add_empty_row(), time);
+            t->set_timestamp(timestamps_col_ndx, t->add_empty_row(), time);
 #endif
         }
         tr.commit();
@@ -437,13 +503,64 @@ struct BenchmarkQueryTimestampGreater : BenchmarkWithTimestamps {
     {
         ReadTransaction tr(group);
         ConstTableRef table = tr.get_table("Timestamps");
-        auto col = table->get_column_key("timestamps");
-        Query query = table->where().greater(col, needle);
+        Query query = table->where().greater(timestamps_col_ndx, needle);
         TableView results = query.find_all();
         REALM_ASSERT_EX(results.size() == values.size() - num_results_to_needle - 1, results.size(), num_results_to_needle, values.size());
         static_cast<void>(results);
     }
 };
+
+struct BenchmarkQueryTimestampGreaterOverLinks : BenchmarkQueryTimestampGreater {
+    ColKey link_col_ndx;
+    ColKey id_col_ndx;
+    void before_all(DBRef group)
+    {
+        BenchmarkQueryTimestampGreater::before_all(group);
+        WriteTransaction tr(group);
+        TableRef t = tr.add_table("Links");
+        id_col_ndx = t->add_column(type_Int, "id");
+        TableRef timestamps = tr.get_table("Timestamps");
+        link_col_ndx = t->add_column_link(type_Link, "myLink", *timestamps);
+        const size_t num_timestamps = timestamps->size();
+#ifdef REALM_CLUSTER_IF
+        auto target = timestamps->begin();
+        for (size_t i = 0; i < num_timestamps; ++i) {
+            t->create_object().set<Int>(id_col_ndx, i).set(link_col_ndx, target->get_key());
+            ++target;
+        }
+#else
+        for (size_t i = 0; i < num_timestamps; ++i) {
+            auto ndx = t->add_empty_row();
+            t->set_int(id_col_ndx, ndx, i);
+            t->set_link(link_col_ndx, ndx, i);
+        }
+#endif
+        tr.commit();
+    }
+    const char* name() const
+    {
+        return "QueryTimestampGreaterOverLinks";
+    }
+
+    void operator()(DBRef group)
+    {
+        ReadTransaction tr(group);
+        Table* table = table_ptr(tr.get_table("Links"));
+        Query query = table->link(link_col_ndx).column<Timestamp>(timestamps_col_ndx) > needle;
+        TableView results = query.find_all();
+        REALM_ASSERT_EX(results.size() == values.size() - num_results_to_needle - 1, results.size(),
+                        num_results_to_needle, values.size());
+        static_cast<void>(results);
+    }
+
+    void after_all(DBRef group)
+    {
+        WriteTransaction tr(group);
+        tr.get_group().remove_table("Links");
+        tr.commit();
+    }
+};
+
 
 struct BenchmarkQueryTimestampGreaterEqual : BenchmarkWithTimestamps {
     void before_all(DBRef group) {
@@ -460,8 +577,7 @@ struct BenchmarkQueryTimestampGreaterEqual : BenchmarkWithTimestamps {
     {
         ReadTransaction tr(group);
         ConstTableRef table = tr.get_table("Timestamps");
-        auto col = table->get_column_key("timestamps");
-        Query query = table->where().greater_equal(col, needle);
+        Query query = table->where().greater_equal(timestamps_col_ndx, needle);
         TableView results = query.find_all();
         REALM_ASSERT_EX(results.size() == values.size() - num_results_to_needle, results.size(), num_results_to_needle, values.size());
         static_cast<void>(results);
@@ -484,8 +600,7 @@ struct BenchmarkQueryTimestampLess : BenchmarkWithTimestamps {
     {
         ReadTransaction tr(group);
         ConstTableRef table = tr.get_table("Timestamps");
-        auto col = table->get_column_key("timestamps");
-        Query query = table->where().less(col, needle);
+        Query query = table->where().less(timestamps_col_ndx, needle);
         TableView results = query.find_all();
         REALM_ASSERT_EX(results.size() == num_results_to_needle, results.size(), num_results_to_needle, values.size());
         static_cast<void>(results);
@@ -507,8 +622,7 @@ struct BenchmarkQueryTimestampLessEqual : BenchmarkWithTimestamps {
     {
         ReadTransaction tr(group);
         ConstTableRef table = tr.get_table("Timestamps");
-        auto col = table->get_column_key("timestamps");
-        Query query = table->where().less_equal(col, needle);
+        Query query = table->where().less_equal(timestamps_col_ndx, needle);
         TableView results = query.find_all();
         REALM_ASSERT_EX(results.size() == num_results_to_needle + 1, results.size(), num_results_to_needle, values.size());
         static_cast<void>(results);
@@ -531,8 +645,7 @@ struct BenchmarkQueryTimestampEqual : BenchmarkWithTimestamps {
     {
         ReadTransaction tr(group);
         ConstTableRef table = tr.get_table("Timestamps");
-        auto col = table->get_column_key("timestamps");
-        Query query = table->where().equal(col, needle);
+        Query query = table->where().equal(timestamps_col_ndx, needle);
         TableView results = query.find_all();
         REALM_ASSERT_EX(results.size() == values.count(needle), results.size(), num_results_to_needle, values.count(needle), values.size());
         static_cast<void>(results);
@@ -554,8 +667,7 @@ struct BenchmarkQueryTimestampNotEqual : BenchmarkWithTimestamps {
     {
         ReadTransaction tr(group);
         ConstTableRef table = tr.get_table("Timestamps");
-        auto col = table->get_column_key("timestamps");
-        Query query = table->where().not_equal(col, needle);
+        Query query = table->where().not_equal(timestamps_col_ndx, needle);
         TableView results = query.find_all();
         REALM_ASSERT_EX(results.size() == values.size() - values.count(needle) + num_nulls_added, results.size(), values.size(), values.count(needle));
         static_cast<void>(results);
@@ -578,8 +690,7 @@ struct BenchmarkQueryTimestampNotNull : BenchmarkWithTimestamps {
     {
         ReadTransaction tr(group);
         ConstTableRef table = tr.get_table("Timestamps");
-        auto col = table->get_column_key("timestamps");
-        Query query = table->where().not_equal(col, realm::null());
+        Query query = table->where().not_equal(timestamps_col_ndx, realm::null());
         TableView results = query.find_all();
         REALM_ASSERT_EX(results.size() == values.size(), results.size(), num_nulls_added, num_results_to_needle, values.size());
         static_cast<void>(results);
@@ -601,8 +712,7 @@ struct BenchmarkQueryTimestampEqualNull : BenchmarkWithTimestamps {
     {
         ReadTransaction tr(group);
         ConstTableRef table = tr.get_table("Timestamps");
-        auto col = table->get_column_key("timestamps");
-        Query query = table->where().equal(col, realm::null());
+        Query query = table->where().equal(timestamps_col_ndx, realm::null());
         TableView results = query.find_all();
         REALM_ASSERT_EX(results.size() == num_nulls_added, results.size(), num_nulls_added, values.size());
         static_cast<void>(results);
@@ -646,6 +756,47 @@ struct BenchmarkWithInts : BenchmarkWithIntsTable {
             t->set_int(m_col, row, val);
 #endif
         }
+        tr.commit();
+    }
+};
+
+struct BenchmarkIntVsDoubleColumns : Benchmark {
+    ColKey ints_col_ndx;
+    ColKey doubles_col_ndx;
+    constexpr static size_t num_rows = BASE_SIZE * 4;
+    void before_all(DBRef group)
+    {
+        WriteTransaction tr(group);
+        TableRef t = tr.add_table("table");
+        ints_col_ndx = t->add_column(type_Int, "ints");
+        doubles_col_ndx = t->add_column(type_Double, "doubles");
+        for (size_t i = 0; i < num_rows; ++i) {
+#ifdef REALM_CLUSTER_IF
+            t->create_object().set<Int>(ints_col_ndx, i).set(doubles_col_ndx, double(num_rows - i));
+#else
+            auto ndx = t->add_empty_row();
+            t->set_int(ints_col_ndx, ndx, i);
+            t->set_double(doubles_col_ndx, ndx, double(num_rows - i));
+#endif
+        }
+        tr.commit();
+    }
+    const char* name() const
+    {
+        return "QueryIntsVsDoubleColumns";
+    }
+    void operator()(DBRef group)
+    {
+        ReadTransaction tr(group);
+        Table* table = table_ptr(tr.get_table("table"));
+        Query q = (table->column<Int>(ints_col_ndx) > table->column<Double>(doubles_col_ndx));
+        REALM_ASSERT_3(q.count(), ==, ((num_rows / 2) - 1));
+    }
+
+    void after_all(DBRef group)
+    {
+        WriteTransaction tr(group);
+        tr.get_group().remove_table("table");
         tr.commit();
     }
 };
@@ -1543,6 +1694,9 @@ int benchmark_common_tasks_main()
     BENCH(BenchmarkQueryChainedOrIntsIndexed);
     BENCH(BenchmarkQueryIntEquality);
     BENCH(BenchmarkQueryIntEqualityIndexed);
+    BENCH(BenchmarkIntVsDoubleColumns);
+    BENCH(BenchmarkQueryStringOverLinks);
+    BENCH(BenchmarkQueryTimestampGreaterOverLinks);
     BENCH(BenchmarkQueryTimestampGreater);
     BENCH(BenchmarkQueryTimestampGreaterEqual);
     BENCH(BenchmarkQueryTimestampLess);

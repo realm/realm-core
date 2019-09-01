@@ -71,7 +71,7 @@ std::string LinkMap::description(util::serializer::SerialisationState& state) co
     return s;
 }
 
-void LinkMap::map_links(size_t column, ObjKey key, LinkMapFunction& lm)
+void LinkMap::map_links(size_t column, ObjKey key, LinkMapFunction& lm) const
 {
     bool last = (column + 1 == m_link_column_keys.size());
     ColumnType type = m_link_types[column];
@@ -117,7 +117,7 @@ void LinkMap::map_links(size_t column, ObjKey key, LinkMapFunction& lm)
     }
 }
 
-void LinkMap::map_links(size_t column, size_t row, LinkMapFunction& lm)
+void LinkMap::map_links(size_t column, size_t row, LinkMapFunction& lm) const
 {
     REALM_ASSERT(m_leaf_ptr != nullptr);
 

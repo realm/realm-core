@@ -8488,6 +8488,50 @@ TEST(Query_NegativeNumbers)
     }
 }
 
+template <class T>
+int64_t unbox(const T& val)
+{
+    return val;
+}
+
+template <>
+int64_t unbox(const util::Optional<int64_t>& val)
+{
+    return *val;
+}
+
+TEST_TYPES(Query_EqualityInts, int64_t, util::Optional<int64_t>)
+{
+    Group group;
+    TableRef table = group.add_table("test");
+    auto col_ndx = table->add_column(type_Int, "int", std::is_same<TEST_TYPE, util::Optional<int64_t>>::value);
+
+    int64_t id = -1;
+    int64_t sum = 0;
+    constexpr static size_t num_rows = REALM_MAX_BPNODE_SIZE + 10;
+    for (size_t i = 0; i < num_rows; ++i) {
+        sum += id;
+        table->create_object().set<Int>(col_ndx, id++);
+    }
+
+    bool first = true;
+    for (auto& obj : *table) {
+        int64_t target = unbox(obj.get<TEST_TYPE>(col_ndx));
+        Query q_eq = table->where().equal(col_ndx, target);
+        CHECK_EQUAL(q_eq.find(), obj.get_key());
+        CHECK_EQUAL(q_eq.count(), 1);
+        CHECK_EQUAL(q_eq.sum_int(col_ndx), target);
+        CHECK_EQUAL(q_eq.average_int(col_ndx), target);
+
+        Query q_neq = table->where().not_equal(col_ndx, target);
+        CHECK_EQUAL(q_neq.find(), first ? ObjKey(1) : ObjKey(0));
+        CHECK_EQUAL(q_neq.count(), num_rows - 1);
+        CHECK_EQUAL(q_neq.sum_int(col_ndx), sum - target);
+        CHECK_EQUAL(q_neq.average_int(col_ndx), (sum - target) / double(num_rows - 1));
+        first = false;
+    }
+}
+
 // Exposes bug that would lead to nulls being included as 0 value in average when performed
 // on Query. When performed on TableView or Table, it worked OK.
 TEST(Query_MaximumSumAverage)
@@ -8536,6 +8580,11 @@ TEST(Query_MaximumSumAverage)
             d = table1->where().not_equal(c2, 1234.).average_double(c2);
             CHECK_APPROXIMATELY_EQUAL(d, 7. / 2., 0.001);
 
+            d = (table1->column<Int>(c0) == null()).average_int(c0);
+            CHECK_EQUAL(d, 0);
+
+            d = (table1->column<Int>(c0) != null()).average_int(c0);
+            CHECK_APPROXIMATELY_EQUAL(d, 7. / 2., 0.001);
 
             // Those with criteria now only include some rows, whereof none are null
             d = table1->where().average_int(c0);
@@ -8630,10 +8679,10 @@ TEST(Query_MaximumSumAverage)
             CHECK_EQUAL(dbl, 4.);
 
             d = (table1->column<Int>(c0) != null()).maximum_int(c0);
-            CHECK_EQUAL(dbl, 4);
+            CHECK_EQUAL(d, 4);
 
             d = (table1->column<Int>(c1) != null()).maximum_int(c0);
-            CHECK_EQUAL(dbl, 4);
+            CHECK_EQUAL(d, 4);
         }
 
 
@@ -8658,10 +8707,10 @@ TEST(Query_MaximumSumAverage)
 
             // Average of double, criteria on integer
             dbl = table1->where().not_equal(c0, 1234).minimum_double(c2);
-            CHECK_EQUAL(d, 3);
+            CHECK_EQUAL(dbl, 3);
 
             dbl = table1->where().not_equal(c2, 1234.).minimum_double(c2);
-            CHECK_EQUAL(d, 3.);
+            CHECK_EQUAL(dbl, 3.);
 
 
             // Those with criteria now only include some rows, whereof none are null
@@ -8694,10 +8743,10 @@ TEST(Query_MaximumSumAverage)
             CHECK_EQUAL(dbl, 3.);
 
             d = (table1->column<Int>(c0) != null()).minimum_int(c0);
-            CHECK_EQUAL(dbl, 3);
+            CHECK_EQUAL(d, 3);
 
             d = (table1->column<Int>(c1) != null()).minimum_int(c0);
-            CHECK_EQUAL(dbl, 3);
+            CHECK_EQUAL(d, 3);
         }
 
         // Sum
@@ -8716,9 +8765,15 @@ TEST(Query_MaximumSumAverage)
             d = table1->where().not_equal(c0, 1234).sum_int(c1);
             CHECK_EQUAL(d, 7);
 
+            d = (table1->column<Int>(c0) == null()).sum_int(c0);
+            CHECK_EQUAL(d, 0);
+
+            d = (table1->column<Int>(c0) != null()).sum_int(c0);
+            CHECK_EQUAL(d, 7);
+
             // Average of double, criteria on integer
             dbl = table1->where().not_equal(c0, 1234).sum_double(c2);
-            CHECK_EQUAL(d, 7.);
+            CHECK_EQUAL(dbl, 7.);
 
             dbl = table1->where().not_equal(c2, 1234.).sum_double(c2);
             CHECK_APPROXIMATELY_EQUAL(dbl, 7., 0.001);
@@ -8754,10 +8809,10 @@ TEST(Query_MaximumSumAverage)
             CHECK_APPROXIMATELY_EQUAL(dbl, 7., 0.001);
 
             d = (table1->column<Int>(c0) != null()).sum_int(c0);
-            CHECK_EQUAL(dbl, 7);
+            CHECK_EQUAL(d, 7);
 
             d = (table1->column<Int>(c1) != null()).sum_int(c0);
-            CHECK_EQUAL(dbl, 7);
+            CHECK_EQUAL(d, 7);
         }
 
 
@@ -8785,6 +8840,9 @@ TEST(Query_MaximumSumAverage)
 
             d = (table1->column<Double>(c2) != null()).count();
             CHECK_EQUAL(d, 2);
+
+            d = (table1->column<Int>(c0) == null()).count();
+            CHECK_EQUAL(d, n ? 1 : 0);
 
             d = (table1->column<Int>(c0) != null()).count();
             CHECK_EQUAL(d, 2);
@@ -9026,6 +9084,18 @@ TEST(Query_Timestamp)
 
     match = (first < Timestamp(-100, 0)).find();
     CHECK_EQUAL(match, keys[5]);
+
+    cnt = (first >= Timestamp(std::numeric_limits<int64_t>::min(), -Timestamp::nanoseconds_per_second + 1)).count();
+    CHECK_EQUAL(cnt, 5);
+
+    cnt = (first > Timestamp(std::numeric_limits<int64_t>::min(), -Timestamp::nanoseconds_per_second + 1)).count();
+    CHECK_EQUAL(cnt, 5);
+
+    cnt = (first <= Timestamp(std::numeric_limits<int64_t>::max(), Timestamp::nanoseconds_per_second - 1)).count();
+    CHECK_EQUAL(cnt, 5);
+
+    cnt = (first < Timestamp(std::numeric_limits<int64_t>::max(), Timestamp::nanoseconds_per_second - 1)).count();
+    CHECK_EQUAL(cnt, 5);
 
     // Left-hand-side being Timestamp() constant, right being column
     match = (Timestamp(111, 222) == first).find();
@@ -10082,4 +10152,44 @@ TEST(Query_IntIndexOverLinkViewNotInTableOrder)
     CHECK_EQUAL(k0, child_table->where().equal(col_child_id, 3).find());
     CHECK_EQUAL(k1, child_table->where().equal(col_child_id, 2).find());
 }
+
+TEST(Query_MixedTypeQuery)
+{
+    Group g;
+    auto table = g.add_table("Foo");
+    auto col_int = table->add_column(type_Int, "int");
+    auto col_double = table->add_column(type_Double, "double");
+    for (int64_t i = 0; i < 100; i++) {
+        table->create_object().set(col_int, i).set(col_double, 100. - i);
+    }
+
+    auto tv = (table->column<Int>(col_int) > 9.5).find_all();
+    CHECK_EQUAL(tv.size(), 90);
+    auto tv1 = (table->column<Int>(col_int) > table->column<Double>(col_double)).find_all();
+    CHECK_EQUAL(tv1.size(), 49);
+}
+
+TEST(Query_LinkListIntPastOneIsNull)
+{
+    Group g;
+    auto table_foo = g.add_table("Foo");
+    auto table_bar = g.add_table("Bar");
+    auto col_int = table_foo->add_column(type_Int, "int", true);
+    auto col_list = table_bar->add_column_link(type_LinkList, "foo_link", *table_foo);
+    std::vector<util::Optional<int64_t>> values = {{0}, {1}, {2}, {util::none}};
+    auto bar_obj = table_bar->create_object();
+    auto list = bar_obj.get_linklist(col_list);
+
+    for (size_t i = 0; i < values.size(); i++) {
+        auto obj = table_foo->create_object();
+        obj.set(col_int, values[i]);
+        list.add(obj.get_key());
+    }
+
+    Query q = table_bar->link(col_list).column<Int>(col_int) == realm::null();
+
+    CHECK_EQUAL(q.count(), 1);
+}
+
+
 #endif // TEST_QUERY

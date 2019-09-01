@@ -769,27 +769,34 @@ TEST(Metrics_TransactionTimings)
     CHECK_EQUAL(transactions->size(), 4);
 
     for (auto t : *transactions) {
-        CHECK_GREATER(t.get_transaction_time(), 0);
+        CHECK_GREATER(t.get_transaction_time_nanoseconds(), 0);
 
         if (t.get_transaction_type() == TransactionInfo::read_transaction) {
-            CHECK_EQUAL(t.get_fsync_time(), 0.0);
-            CHECK_EQUAL(t.get_write_time(), 0.0);
+            CHECK_EQUAL(t.get_fsync_time_nanoseconds(), 0.0);
+            CHECK_EQUAL(t.get_write_time_nanoseconds(), 0.0);
         }
         else {
             if (!get_disable_sync_to_disk()) {
-                CHECK_NOT_EQUAL(t.get_fsync_time(), 0.0);
+                CHECK_NOT_EQUAL(t.get_fsync_time_nanoseconds(), 0.0);
             }
-            CHECK_NOT_EQUAL(t.get_write_time(), 0.0);
-            CHECK_LESS(t.get_fsync_time(), t.get_transaction_time());
-            CHECK_LESS(t.get_write_time(), t.get_transaction_time());
+            CHECK_NOT_EQUAL(t.get_write_time_nanoseconds(), 0.0);
+            CHECK_LESS(t.get_fsync_time_nanoseconds(), t.get_transaction_time_nanoseconds());
+            CHECK_LESS(t.get_write_time_nanoseconds(), t.get_transaction_time_nanoseconds());
         }
     }
-    // give a margin of 100ms for transactions
-    // this is causing sporadic CI failures so best not to assume any upper bound
-    CHECK_GREATER(transactions->at(2).get_transaction_time(), 0.060);
-    //CHECK_LESS(transactions->at(2).get_transaction_time(), 0.160);
-    CHECK_GREATER(transactions->at(3).get_transaction_time(), 0.080);
-    //CHECK_LESS(transactions->at(3).get_transaction_time(), 0.180);
+    // test that the timings reported are in the right ballpark
+    // read transaction
+    CHECK_EQUAL(transactions->at(2).get_transaction_type(),
+                metrics::TransactionInfo::TransactionType::read_transaction);
+    CHECK_GREATER(transactions->at(2).get_transaction_time_nanoseconds(), 1'000);      // > 1us
+    CHECK_LESS(transactions->at(2).get_transaction_time_nanoseconds(), 2'000'000'000); // < 2s
+    CHECK_EQUAL(transactions->at(2).get_fsync_time_nanoseconds(), 0);                  // no fsync on read
+    // write transaction
+    CHECK_EQUAL(transactions->at(3).get_transaction_type(),
+                metrics::TransactionInfo::TransactionType::write_transaction);
+    CHECK_GREATER(transactions->at(3).get_transaction_time_nanoseconds(), 10'000);     // > 10us
+    CHECK_LESS(transactions->at(3).get_transaction_time_nanoseconds(), 2'000'000'000); // <  2s
+    CHECK_GREATER(transactions->at(3).get_fsync_time_nanoseconds(), 0); // fsync on write takes some time
 }
 
 

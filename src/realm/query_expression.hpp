@@ -310,7 +310,7 @@ struct Common<T1, T2, true, false, b> {
 
 
 struct ValueBase {
-    static const size_t default_size = 8;
+    static const size_t chunk_size = 8;
     virtual void export_bool(ValueBase& destination) const = 0;
     virtual void export_Timestamp(ValueBase& destination) const = 0;
     virtual void export_int(ValueBase& destination) const = 0;
@@ -392,6 +392,11 @@ public:
 
     virtual void collect_dependencies(std::vector<TableKey>&) const
     {
+    }
+
+    virtual bool has_constant_evaluation() const
+    {
+        return false;
     }
 
     virtual void evaluate(size_t index, ValueBase& destination) = 0;
@@ -1146,11 +1151,11 @@ class Value : public ValueBase, public Subexpr2<T> {
 public:
     Value()
     {
-        init(false, ValueBase::default_size, T());
+        init(false, 1, T());
     }
     Value(T v)
     {
-        init(false, ValueBase::default_size, v);
+        init(false, 1, v);
     }
 
     Value(bool from_link_list, size_t values)
@@ -1187,7 +1192,7 @@ public:
         ValueBase::m_values = values.size();
     }
 
-    virtual std::string description(util::serializer::SerialisationState&) const override
+    std::string description(util::serializer::SerialisationState&) const override
     {
         if (ValueBase::m_from_link_list) {
             return util::serializer::print_value(util::to_string(ValueBase::m_values) +
@@ -1197,6 +1202,11 @@ public:
             return util::serializer::print_value(m_storage[0]);
         }
         return "";
+    }
+
+    bool has_constant_evaluation() const override
+    {
+        return true;
     }
 
     void evaluate(size_t, ValueBase& destination) override
@@ -1350,6 +1360,21 @@ public:
 
     // Given a TCond (==, !=, >, <, >=, <=) and two Value<T>, return index of first match
     template <class TCond>
+    REALM_FORCEINLINE static size_t compare_const(const Value<T>* left, Value<T>* right)
+    {
+        TCond c;
+
+        size_t sz = right->ValueBase::m_values;
+        bool left_is_null = left->m_storage.is_null(0);
+        for (size_t m = 0; m < sz; m++) {
+            if (c(left->m_storage[0], right->m_storage[m], left_is_null, right->m_storage.is_null(m)))
+                return right->m_from_link_list ? 0 : m;
+        }
+
+        return not_found; // no match
+    }
+
+    template <class TCond>
     REALM_FORCEINLINE static size_t compare(Value<T>* left, Value<T>* right)
     {
         TCond c;
@@ -1405,7 +1430,7 @@ public:
         : Value()
         , m_string(string.is_null() ? util::none : util::make_optional(std::string(string)))
     {
-        init(false, ValueBase::default_size, m_string);
+        init(false, 1, m_string);
     }
 
     std::unique_ptr<Subexpr> clone(Transaction*) const override
@@ -1715,6 +1740,15 @@ struct MakeLinkVector : public LinkMapFunction {
     std::vector<ObjKey>& m_links;
 };
 
+struct UnaryLinkResult : public LinkMapFunction {
+    bool consume(ObjKey key) override
+    {
+        m_result = key;
+        return false; // exit search, only one result ever expected
+    }
+    ObjKey m_result;
+};
+
 struct CountLinks : public LinkMapFunction {
     bool consume(ObjKey) override
     {
@@ -1822,28 +1856,36 @@ public:
 
     virtual std::string description(util::serializer::SerialisationState& state) const;
 
-    std::vector<ObjKey> get_links(size_t index)
+    ObjKey get_unary_link_or_not_found(size_t index) const
+    {
+        REALM_ASSERT(m_only_unary_links);
+        UnaryLinkResult res;
+        map_links(index, res);
+        return res.m_result;
+    }
+
+    std::vector<ObjKey> get_links(size_t index) const
     {
         std::vector<ObjKey> res;
         get_links(index, res);
         return res;
     }
 
-    size_t count_links(size_t row)
+    size_t count_links(size_t row) const
     {
         CountLinks counter;
         map_links(row, counter);
         return counter.result();
     }
 
-    size_t count_all_backlinks(size_t row)
+    size_t count_all_backlinks(size_t row) const
     {
         CountBacklinks counter(get_target_table());
         map_links(row, counter);
         return counter.result();
     }
 
-    void map_links(size_t row, LinkMapFunction& lm)
+    void map_links(size_t row, LinkMapFunction& lm) const
     {
         map_links(0, row, lm);
     }
@@ -1870,10 +1912,10 @@ public:
     }
 
 private:
-    void map_links(size_t column, ObjKey key, LinkMapFunction& lm);
-    void map_links(size_t column, size_t row, LinkMapFunction& lm);
+    void map_links(size_t column, ObjKey key, LinkMapFunction& lm) const;
+    void map_links(size_t column, size_t row, LinkMapFunction& lm) const;
 
-    void get_links(size_t row, std::vector<ObjKey>& result)
+    void get_links(size_t row, std::vector<ObjKey>& result) const
     {
         MakeLinkVector mlv = MakeLinkVector(result);
         map_links(row, mlv);
@@ -1978,14 +2020,26 @@ public:
 
         if (links_exist()) {
             REALM_ASSERT(m_leaf_ptr == nullptr);
-            std::vector<ObjKey> links = m_link_map.get_links(index);
-            Value<T> v = make_value_for_link<T>(m_link_map.only_unary_links(), links.size());
 
-            for (size_t t = 0; t < links.size(); t++) {
-                ConstObj obj = m_link_map.get_target_table()->get_object(links[t]);
-                v.m_storage.set(t, obj.get<T>(m_column_key));
+            if (m_link_map.only_unary_links()) {
+                d.init(false, 1);
+                d.m_storage.set_null(0);
+                auto link_translation_key = this->m_link_map.get_unary_link_or_not_found(index);
+                if (link_translation_key) {
+                    ConstObj obj = m_link_map.get_target_table()->get_object(link_translation_key);
+                    d.m_storage.set(0, obj.get<T>(m_column_key));
+                }
             }
-            destination.import(v);
+            else {
+                std::vector<ObjKey> links = m_link_map.get_links(index);
+                constexpr bool only_unary_links = false;
+                Value<T> v = make_value_for_link<T>(only_unary_links, links.size());
+                for (size_t t = 0; t < links.size(); t++) {
+                    ConstObj obj = m_link_map.get_target_table()->get_object(links[t]);
+                    v.m_storage.set(t, obj.get<T>(m_column_key));
+                }
+                destination.import(v);
+            }
         }
         else {
             REALM_ASSERT(m_leaf_ptr != nullptr);
@@ -2005,6 +2059,16 @@ public:
     bool links_exist() const
     {
         return m_link_map.has_links();
+    }
+
+    bool only_unary_links() const
+    {
+        return m_link_map.only_unary_links();
+    }
+
+    LinkMap get_link_map() const
+    {
+        return m_link_map;
     }
 
     virtual std::string description(util::serializer::SerialisationState& state) const override
@@ -3052,14 +3116,14 @@ public:
             // Not a Link column
             size_t colsize = leaf->size();
 
-            // Now load `ValueBase::default_size` rows from from the leaf into m_storage. If it's an integer
+            // Now load `ValueBase::chunk_size` rows from from the leaf into m_storage. If it's an integer
             // leaf, then it contains the method get_chunk() which copies these values in a super fast way (first
             // case of the `if` below. Otherwise, copy the values one by one in a for-loop (the `else` case).
-            if (std::is_same<U, int64_t>::value && index + ValueBase::default_size <= colsize) {
-                Value<int64_t> v;
+            if (std::is_same<U, int64_t>::value && index + ValueBase::chunk_size <= colsize) {
+                Value<int64_t> v(false, ValueBase::chunk_size);
 
-                // If you want to modify 'default_size' then update Array::get_chunk()
-                REALM_ASSERT_3(ValueBase::default_size, ==, 8);
+                // If you want to modify 'chunk_size' then update Array::get_chunk()
+                REALM_ASSERT_3(ValueBase::chunk_size, ==, 8);
 
                 auto leaf_2 = static_cast<const Array*>(leaf);
                 leaf_2->get_chunk(index, v.m_storage.m_first);
@@ -3068,8 +3132,8 @@ public:
             }
             else {
                 size_t rows = colsize - index;
-                if (rows > ValueBase::default_size)
-                    rows = ValueBase::default_size;
+                if (rows > ValueBase::chunk_size)
+                    rows = ValueBase::chunk_size;
                 Value<typename util::RemoveOptional<U>::type> v(false, rows);
 
                 for (size_t t = 0; t < rows; t++)
@@ -3126,9 +3190,19 @@ public:
         return m_link_map.has_links();
     }
 
+    bool only_unary_links() const
+    {
+        return m_link_map.only_unary_links();
+    }
+
     bool is_nullable() const
     {
         return m_nullable;
+    }
+
+    LinkMap get_link_map() const
+    {
+        return m_link_map;
     }
 
     ColKey column_key() const noexcept
@@ -3666,7 +3740,6 @@ private:
     std::unique_ptr<TRight> m_right;
 };
 
-
 template <class TCond, class T, class TLeft, class TRight>
 class Compare : public Expression {
 public:
@@ -3674,6 +3747,10 @@ public:
         : m_left(std::move(left))
         , m_right(std::move(right))
     {
+        m_left_is_const = m_left->has_constant_evaluation();
+        if (m_left_is_const) {
+            m_left->evaluate(-1 /*unused*/, m_left_value);
+        }
     }
 
     // See comment in base class
@@ -3690,8 +3767,7 @@ public:
     }
 
     // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression
-    // and
-    // binds it to a Query at a later time
+    // and binds it to a Query at a later time
     const Table* get_base_table() const override
     {
         const Table* l = m_left->get_base_table();
@@ -3713,13 +3789,20 @@ public:
     size_t find_first(size_t start, size_t end) const override
     {
         size_t match;
-        Value<T> right;
+
         Value<T> left;
+        Value<T> right;
 
         for (; start < end;) {
-            m_left->evaluate(start, left);
-            m_right->evaluate(start, right);
-            match = Value<T>::template compare<TCond>(&left, &right);
+            if (m_left_is_const) {
+                m_right->evaluate(start, right);
+                match = Value<T>::template compare_const<TCond>(&m_left_value, &right);
+            }
+            else {
+                m_left->evaluate(start, left);
+                m_right->evaluate(start, right);
+                match = Value<T>::template compare<TCond>(&left, &right);
+            }
 
             if (match != not_found && match + start < end)
                 return start + match;
@@ -3756,11 +3839,17 @@ private:
     Compare(const Compare& other, Transaction* tr)
         : m_left(other.m_left->clone(tr))
         , m_right(other.m_right->clone(tr))
+        , m_left_is_const(other.m_left_is_const)
     {
+        if (m_left_is_const) {
+            m_left->evaluate(-1 /*unused*/, m_left_value);
+        }
     }
 
     std::unique_ptr<TLeft> m_left;
     std::unique_ptr<TRight> m_right;
+    bool m_left_is_const;
+    Value<T> m_left_value;
 };
 }
 #endif // REALM_QUERY_EXPRESSION_HPP

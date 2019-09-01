@@ -37,7 +37,7 @@ QueryInfo::QueryInfo(const Query* query, QueryType type)
     try {
         m_description = query->get_description();
     } catch (const SerialisationError& e) {
-        m_description = e.message();
+        m_description = e.what();
     }
     m_table_name = query->m_table->get_name();
 #else
@@ -64,10 +64,10 @@ QueryInfo::QueryType QueryInfo::get_type() const
     return m_type;
 }
 
-double QueryInfo::get_query_time() const
+nanosecond_storage_t QueryInfo::get_query_time_nanoseconds() const
 {
     if (m_query_time) {
-        return m_query_time->get_elapsed_seconds();
+        return m_query_time->get_elapsed_nanoseconds();
     }
     return 0;
 }

@@ -15,6 +15,21 @@
 ### Internals
 * None.
 
+Besides the changes above, this release includes changes introduced by v5.23.3:
+
+| # 5.23.3 Release notes
+| 
+| ### Fixed
+| * If a signal interrupted a msync() call, Core would throw an exception. This behavior has new been changed to retry the system call instead. (Issue [#3352](https://github.com/| realm/realm-core/issues/3352))
+| * Fixed a bug in sum() or average() of == and != queries on integer columns sometimes returning an incorrect result. ([#3356](https://github.com/realm/realm-core/pull/3356), since | the beginning).
+|  
+| -----------
+| 
+| ### Internals
+| * Changed the metrics timers to more precisely report in nanoseconds, instead of seconds. ([#3359](https://github.com/realm/realm-core/issues/3359))
+| * Better performance when cloud query metrics are turned on, by not acquiring a backtrace on query serialization errors (permissions queries). ([#3361](https://github.com/realm/| realm-core/issues/3361)).
+| * Performance improved for queries comparing a constant value to a property over unary link path (eg: "someLink.Id == 42"). ([#3670](https://github.com/realm/realm-core/issues/3370))
+
 ----------------------------------------------
 
 # 6.0.0-alpha.16 Release notes

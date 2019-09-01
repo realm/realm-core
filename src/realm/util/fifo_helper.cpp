@@ -64,7 +64,7 @@ void create_fifo(std::string path)
         int err = errno;
         // the fifo already existing isn't an error
         if (err != EEXIST) {
-#ifdef __ANDROID__
+#ifdef REALM_ANDROID
             // Workaround for a mkfifo bug on Blackberry devices:
             // When the fifo already exists, mkfifo fails with error ENOSYS which is not correct.
             // In this case, we use stat to check if the path exists and it is a fifo.

@@ -124,7 +124,13 @@ public:
     }
 };
 
-class SerialisationError : public ExceptionWithBacktrace<std::runtime_error> {
+// SerialisationError intentionally does not inherit ExceptionWithBacktrace
+// because the query-based-sync permissions queries generated on the server
+// use a LinksToNode which is not currently serialisable (this limitation can
+// be lifted in core 6 given stable ids). Coupled with query metrics which
+// serialize all queries, the capturing of the stack for these frequent
+// permission queries shows up in performance profiles.
+class SerialisationError : public std::runtime_error {
 public:
     SerialisationError(const std::string& msg);
     /// runtime_error::what() returns the msg provided in the constructor.
@@ -361,7 +367,7 @@ inline OutOfDiskSpace::OutOfDiskSpace(const std::string& msg)
 }
 
 inline SerialisationError::SerialisationError(const std::string& msg)
-    : ExceptionWithBacktrace<std::runtime_error>(msg)
+    : std::runtime_error(msg)
 {
 }
 
