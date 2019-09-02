@@ -56,6 +56,16 @@ public:
     {
         m_arr->set_parent(p, n);
     }
+    bool need_spec() const override
+    {
+        return true;
+    }
+    void set_spec(Spec* spec, size_t col_ndx) const override
+    {
+        m_spec = spec;
+        m_col_ndx = col_ndx;
+    }
+
     void update_parent()
     {
         m_arr->update_parent();
@@ -93,12 +103,6 @@ public:
     /// you need to get multiple values, then this method will be
     /// slower.
     static StringData get(const char* header, size_t ndx, Allocator& alloc) noexcept;
-
-    void set_spec(Spec* spec, size_t col_ndx) const
-    {
-        m_spec = spec;
-        m_col_ndx = col_ndx;
-    }
 
 private:
     static constexpr size_t small_string_max_size = 15;  // ArrayStringShort

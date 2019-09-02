@@ -719,21 +719,13 @@ public:
         return this->m_table->has_search_index(IntegerNodeBase<LeafType>::m_condition_column_key);
     }
 
-    void aggregate_local_prepare(Action action, DataType col_id, bool is_nullable) override
+    void cluster_changed() override
     {
-        this->m_fastmode_disabled = (col_id == type_Float || col_id == type_Double);
-        this->m_action = action;
-        this->m_find_callback_specialized =
-            IntegerNodeBase<LeafType>::template get_specialized_callback<Equal>(action, col_id, is_nullable);
+        if (!has_search_index()) {
+            BaseType::cluster_changed();
+        }
     }
 
-    size_t aggregate_local(QueryStateBase* st, size_t start, size_t end, size_t local_limit,
-                           ArrayPayload* source_column) override
-    {
-        constexpr int cond = Equal::condition;
-        return this->aggregate_local_impl(st, start, end, local_limit, source_column, cond);
-    }
- 
     size_t find_first_local(size_t start, size_t end) override
     {
         REALM_ASSERT(this->m_table);
@@ -760,7 +752,7 @@ public:
                 // key is known to be in this leaf, so find key whithin leaf keys
                 return BaseType::m_cluster->lower_bound_key(ObjKey(actual_key.value - BaseType::m_cluster->get_offset()));
             }
-
+            return not_found;
         }
 
         if (start < end) {
