@@ -62,7 +62,7 @@ namespace {
 */
 
 const size_t min_repetitions = 5;
-const size_t max_repetitions = 100;
+const size_t max_repetitions = 1000;
 const double min_duration_s = 0.5;
 const double min_warmup_time_s = 0.1;
 
@@ -167,14 +167,13 @@ struct AddTable : Benchmark {
 
     void operator()(DBRef group)
     {
-        WrtTrans tr(group);  // FIXME: Includes transaction management in what's measured.
+        WrtTrans tr(group);  // FIXME: Includes some transaction management in what's measured.
         TableRef t = tr.add_table(name());
         t->add_column(type_String, "first");
         t->add_column(type_Int, "second");
         t->add_column(type_Float, "third");
         tr.commit();
     }
-
     void after_each(DBRef group)
     {
         WrtTrans tr(group);
@@ -240,6 +239,7 @@ struct BenchmarkWithStringsFewDup : BenchmarkWithStringsTable {
             Obj obj = t->create_object();
             obj.set<StringData>(m_col, s);
             m_keys.push_back(obj.get_key());
+//            std::cout << obj.get_key() << " ";
 #else
             auto row = t->add_empty_row();
             t->set_string(m_col, row, s);
@@ -345,7 +345,8 @@ struct BenchmarkFindFirstStringFewDupes : BenchmarkWithStringsFewDup {
             "10", "20", "30", "40", "50", "60", "70", "80", "90", "100",
         };
         for (auto s : strs) {
-            table->where().equal(m_col, StringData(s)).find();
+            auto k = table->where().equal(m_col, StringData(s)).find();
+            //std::cout << "Found at entry: " << k << std::endl;
         }
     }
 };
@@ -441,7 +442,7 @@ struct BenchmarkWithLongStrings : BenchmarkWithStrings {
         t->get_object(m_keys[BASE_SIZE * 2 / 4]).set<StringData>(m_col, really_long_string);
         t->get_object(m_keys[BASE_SIZE * 3 / 4]).set<StringData>(m_col, really_long_string);
 #else
-        t->insert_empty_row(0);
+        //t->insert_empty_row(0);
         t->set_string(m_col, 0, really_long_string);
         t->set_string(m_col, BASE_SIZE / 4, really_long_string);
         t->set_string(m_col, BASE_SIZE * 2 / 4, really_long_string);
@@ -1248,7 +1249,6 @@ struct BenchmarkInsert : BenchmarkWithStringsTable {
             t->set_string(m_col, row, "a");
 #endif
         }
-        tr.commit();
     }
 };
 
@@ -1300,7 +1300,6 @@ struct BenchmarkSetString : BenchmarkWithStrings {
             table->set_string(m_col, i, "c");
         }
 #endif
-        tr.commit();
     }
 };
 
@@ -1314,7 +1313,6 @@ struct BenchmarkCreateIndex : BenchmarkWithStrings {
         WrtTrans tr(group);
         TableRef table = tr.get_table("StringOnly");
         table->add_search_index(m_col);
-        tr.commit();
     }
 };
 
@@ -1777,7 +1775,7 @@ void run_benchmark(BenchmarkResults& results, bool force_full = false)
         size_t num_warmup_reps = 1;
         double time_to_execute_warmup_reps = 0;
         while (time_to_execute_warmup_reps < min_warmup_time_s && num_warmup_reps < max_repetitions) {
-            num_warmup_reps *= 10;
+            num_warmup_reps *= 3;
             Timer t(Timer::type_UserTime);
             for (size_t i = 0; i < num_warmup_reps; ++i) {
                 run_benchmark_once(benchmark, group, t);
@@ -1792,7 +1790,7 @@ void run_benchmark(BenchmarkResults& results, bool force_full = false)
         if (required_reps > max_repetitions) {
             required_reps = max_repetitions;
         }
-
+        std::cout << "Req runs: " << required_reps << "  ";
         for (size_t rep = 0; rep < required_reps; ++rep) {
             Timer t;
             run_benchmark_once(benchmark, group, t);
@@ -1845,6 +1843,7 @@ int benchmark_common_tasks_main()
     BENCH(BenchmarkSetLongString);
 
     // queries / searching
+
     BENCH(BenchmarkFindAllStringFewDupes);
     BENCH(BenchmarkFindAllStringManyDupes);
     BENCH(BenchmarkFindFirstStringFewDupes);
@@ -1875,6 +1874,7 @@ int benchmark_common_tasks_main()
     BENCH(BenchmarkWithIntUIDsRandomOrderRandomAccess);
     BENCH(BenchmarkWithIntUIDsRandomOrderRandomDelete);
     BENCH(BenchmarkWithIntUIDsRandomOrderRandomCreate);
+
 #undef BENCH
 #undef BENCH2
     return 0;
