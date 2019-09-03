@@ -103,7 +103,7 @@ ExpressionContainer::ExpressionContainer(Query& query, const parser::Expression&
     }
     else {
         type = ExpressionInternal::exp_Value;
-        storage = ValueExpression(query, &args, &e);
+        storage = ValueExpression(&args, &e);
     }
 }
 

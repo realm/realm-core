@@ -99,14 +99,10 @@ StringData from_base64(const std::string& input, util::StringBuffer& decode_buff
 }
 
 
-ValueExpression::ValueExpression(Query& query, query_builder::Arguments* args, const parser::Expression* v)
+ValueExpression::ValueExpression(query_builder::Arguments* args, const parser::Expression* v)
     : value(v)
     , arguments(args)
 {
-    table_getter = [&] {
-        auto& tbl = query.get_table();
-        return LinkChain(tbl);
-    };
 }
 
 bool ValueExpression::is_null()

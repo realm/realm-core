@@ -35,7 +35,7 @@ template <parser::Expression::KeyPathOp OpType>
 struct CollectionOperatorExpression
 {
     static constexpr parser::Expression::KeyPathOp operation_type = OpType;
-    std::function<LinkChain()> table_getter;
+    std::function<LinkChain()> link_chain_getter;
     PropertyExpression pe;
     ColKey post_link_col_key;
     DataType post_link_col_type;
@@ -43,7 +43,7 @@ struct CollectionOperatorExpression
     CollectionOperatorExpression(PropertyExpression&& exp, std::string suffix_path, parser::KeyPathMapping& mapping)
         : pe(std::move(exp))
     {
-        table_getter = std::bind(&PropertyExpression::table_getter, pe);
+        link_chain_getter = std::bind(&PropertyExpression::link_chain_getter, pe);
 
         const bool requires_suffix_path =
             !(OpType == parser::Expression::KeyPathOp::SizeString ||
@@ -51,7 +51,7 @@ struct CollectionOperatorExpression
               OpType == parser::Expression::KeyPathOp::BacklinkCount);
 
         if (requires_suffix_path) {
-            const Table* pre_link_table = pe.table_getter().get_base_table();
+            const Table* pre_link_table = pe.link_chain_getter().get_base_table();
             REALM_ASSERT(pre_link_table);
             StringData list_property_name;
             if (pe.dest_type_is_backlink()) {
@@ -130,13 +130,13 @@ struct CollectionOperatorGetter<RetType, parser::Expression::KeyPathOp::Min,
     static SubColumnAggregate<RetType, aggregate_operations::Minimum<RetType> > convert(const CollectionOperatorExpression<parser::Expression::KeyPathOp::Min>& expr)
     {
         if (expr.pe.dest_type_is_backlink()) {
-            return expr.table_getter()
+            return expr.link_chain_getter()
                 .template column<Link>(*expr.pe.get_dest_table(), expr.pe.get_dest_col_key())
                 .template column<RetType>(expr.post_link_col_key)
                 .min();
         }
         else {
-            return expr.table_getter()
+            return expr.link_chain_getter()
                 .template column<Link>(expr.pe.get_dest_col_key())
                 .template column<RetType>(expr.post_link_col_key)
                 .min();
@@ -150,13 +150,13 @@ struct CollectionOperatorGetter<RetType, parser::Expression::KeyPathOp::Max,
     static SubColumnAggregate<RetType, aggregate_operations::Maximum<RetType> > convert(const CollectionOperatorExpression<parser::Expression::KeyPathOp::Max>& expr)
     {
         if (expr.pe.dest_type_is_backlink()) {
-            return expr.table_getter()
+            return expr.link_chain_getter()
                 .template column<Link>(*expr.pe.get_dest_table(), expr.pe.get_dest_col_key())
                 .template column<RetType>(expr.post_link_col_key)
                 .max();
         }
         else {
-            return expr.table_getter()
+            return expr.link_chain_getter()
                 .template column<Link>(expr.pe.get_dest_col_key())
                 .template column<RetType>(expr.post_link_col_key)
                 .max();
@@ -170,13 +170,13 @@ struct CollectionOperatorGetter<RetType, parser::Expression::KeyPathOp::Sum,
     static SubColumnAggregate<RetType, aggregate_operations::Sum<RetType> > convert(const CollectionOperatorExpression<parser::Expression::KeyPathOp::Sum>& expr)
     {
         if (expr.pe.dest_type_is_backlink()) {
-            return expr.table_getter()
+            return expr.link_chain_getter()
                 .template column<Link>(*expr.pe.get_dest_table(), expr.pe.get_dest_col_key())
                 .template column<RetType>(expr.post_link_col_key)
                 .sum();
         }
         else {
-            return expr.table_getter()
+            return expr.link_chain_getter()
                 .template column<Link>(expr.pe.get_dest_col_key())
                 .template column<RetType>(expr.post_link_col_key)
                 .sum();
@@ -190,13 +190,13 @@ struct CollectionOperatorGetter<RetType, parser::Expression::KeyPathOp::Avg,
     static SubColumnAggregate<RetType, aggregate_operations::Average<RetType> > convert(const CollectionOperatorExpression<parser::Expression::KeyPathOp::Avg>& expr)
     {
         if (expr.pe.dest_type_is_backlink()) {
-            return expr.table_getter()
+            return expr.link_chain_getter()
                 .template column<Link>(*expr.pe.get_dest_table(), expr.pe.get_dest_col_key())
                 .template column<RetType>(expr.post_link_col_key)
                 .average();
         }
         else {
-            return expr.table_getter()
+            return expr.link_chain_getter()
                 .template column<Link>(expr.pe.get_dest_col_key())
                 .template column<RetType>(expr.post_link_col_key)
                 .average();
@@ -210,12 +210,12 @@ struct CollectionOperatorGetter<RetType, parser::Expression::KeyPathOp::Count,
     static LinkCount convert(const CollectionOperatorExpression<parser::Expression::KeyPathOp::Count>& expr)
     {
         if (expr.pe.dest_type_is_backlink()) {
-            return expr.table_getter()
+            return expr.link_chain_getter()
                 .template column<Link>(*expr.pe.get_dest_table(), expr.pe.get_dest_col_key())
                 .count();
         }
         else {
-            return expr.table_getter().template column<Link>(expr.pe.get_dest_col_key()).count();
+            return expr.link_chain_getter().template column<Link>(expr.pe.get_dest_col_key()).count();
         }
     }
 };
@@ -229,16 +229,16 @@ struct CollectionOperatorGetter<RetType, parser::Expression::KeyPathOp::Backlink
     {
         if (expr.pe.link_chain.empty() || expr.pe.get_dest_col_key() == ColKey()) {
             // here we are operating on the current table from a "@links.@count" query with no link keypath prefix
-            return expr.table_getter().template get_backlink_count<Int>();
+            return expr.link_chain_getter().template get_backlink_count<Int>();
         }
         else {
             if (expr.pe.dest_type_is_backlink()) {
-                return expr.table_getter()
+                return expr.link_chain_getter()
                     .template column<Link>(*expr.pe.get_dest_table(), expr.pe.get_dest_col_key())
                     .template backlink_count<Int>();
             }
             else {
-                return expr.table_getter()
+                return expr.link_chain_getter()
                     .template column<Link>(expr.pe.get_dest_col_key())
                     .template backlink_count<Int>();
             }
@@ -251,7 +251,7 @@ template <>
 struct CollectionOperatorGetter<Int, parser::Expression::KeyPathOp::SizeString>{
     static SizeOperator<String> convert(const CollectionOperatorExpression<parser::Expression::KeyPathOp::SizeString>& expr)
     {
-        return expr.table_getter().template column<String>(expr.pe.get_dest_col_key()).size();
+        return expr.link_chain_getter().template column<String>(expr.pe.get_dest_col_key()).size();
     }
 };
 
@@ -259,7 +259,7 @@ template <>
 struct CollectionOperatorGetter<Int, parser::Expression::KeyPathOp::SizeBinary>{
     static SizeOperator<Binary> convert(const CollectionOperatorExpression<parser::Expression::KeyPathOp::SizeBinary>& expr)
     {
-        return expr.table_getter().template column<Binary>(expr.pe.get_dest_col_key()).size();
+        return expr.link_chain_getter().template column<Binary>(expr.pe.get_dest_col_key()).size();
     }
 };
 

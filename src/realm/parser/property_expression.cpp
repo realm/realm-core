@@ -56,10 +56,10 @@ PropertyExpression::PropertyExpression(Query& q, const std::string& key_path_str
     }
 }
 
-LinkChain PropertyExpression::table_getter() const
+LinkChain PropertyExpression::link_chain_getter() const
 {
     auto& tbl = query.get_table();
-    return KeyPathMapping::table_getter(tbl, link_chain);
+    return KeyPathMapping::link_chain_getter(tbl, link_chain);
 }
 
 } // namespace parser
