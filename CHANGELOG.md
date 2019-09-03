@@ -1,19 +1,13 @@
-# NEXT RELEASE
-
-### Enhancements
-* None.
+# 6.0.0-alpha.17 Release notes
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* There would be a crash if you tried to import a query with a detached linkview into a new transaction ([#328](https://github.com/realm/realm-core-private/issues/328), since v6.0.0-alpha.0)
+* Queries can be built without mutating the Table object.([#237](https://github.com/realm/realm-core-private/issues/237), since v1.0.0)
  
-### Breaking changes
-* None.
-
 -----------
 
 ### Internals
-* None.
+* sort() and distinct() added to the List interface
 
 Besides the changes above, this release includes changes introduced by v5.23.3:
 
