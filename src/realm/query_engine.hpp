@@ -760,7 +760,7 @@ public:
                 // key is known to be in this leaf, so find key whithin leaf keys
                 return BaseType::m_cluster->lower_bound_key(ObjKey(actual_key.value - BaseType::m_cluster->get_offset()));
             }
-
+            return not_found;
         }
 
         if (start < end) {
@@ -1595,6 +1595,15 @@ public:
     }
 
     void init() override;
+
+    void cluster_changed() override
+    {
+        // If we use searchindex, we do not need further access to clusters
+        if (!m_has_search_index) {
+            StringNodeBase::cluster_changed();
+        }
+    }
+
 
     size_t find_first_local(size_t start, size_t end) override;
 

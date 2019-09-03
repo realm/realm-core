@@ -1433,9 +1433,9 @@ void Cluster::init_leaf(ColKey col_key, ArrayPayload* leaf) const
     // once fixed, reintroduce the noexcept declaration :-D
     m_tree_top.get_owner()->report_invalid_key(col_key);
     ref_type ref = to_ref(Array::get(col_ndx.val + 1));
-    if (ArrayString* str = dynamic_cast<ArrayString*>(leaf)) {
+    if (leaf->need_spec()) {
         size_t spec_ndx = m_tree_top.get_owner()->leaf_ndx2spec_ndx(col_ndx);
-        str->set_spec(const_cast<Spec*>(&m_tree_top.get_spec()), spec_ndx);
+        leaf->set_spec(const_cast<Spec*>(&m_tree_top.get_spec()), spec_ndx);
     }
     leaf->init_from_ref(ref);
     leaf->set_parent(const_cast<Cluster*>(this), col_ndx.val + 1);
