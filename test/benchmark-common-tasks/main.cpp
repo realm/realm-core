@@ -109,7 +109,11 @@ struct Benchmark {
     }
     virtual void after_each(DBRef)
     {
+#ifdef REALM_CLUSTER_IF
+        m_table = nullptr;
+#else
         m_table.reset();
+#endif
         m_tr = nullptr;
     }
     virtual void operator()(DBRef) = 0;
@@ -374,10 +378,10 @@ struct BenchmarkQueryStringOverLinks : BenchmarkWithStringsFewDup {
     void before_all(DBRef group)
     {
         BenchmarkWithStringsFewDup::before_all(group);
-        WriteTransaction tr(group);
+        WrtTrans tr(group);
         TableRef t = tr.add_table("Links");
         id_col_ndx = t->add_column(type_Int, "id");
-        TableRef strings = tr.get_table("StringOnly");
+        TableRef strings = tr.get_table(name());
         link_col_ndx = t->add_column_link(type_Link, "myLink", *strings);
         const size_t num_links = strings->size();
 
@@ -400,11 +404,27 @@ struct BenchmarkQueryStringOverLinks : BenchmarkWithStringsFewDup {
     {
         return "QueryStringOverLinks";
     }
-
-    void operator()(DBRef group)
+    virtual void before_each(DBRef group)
     {
-        ReadTransaction tr(group);
-        Table* table = table_ptr(tr.get_table("Links"));
+#ifdef REALM_CLUSTER_IF
+        m_tr.reset(new WrtTrans(group));
+#else
+        m_tr.reset(new WrtTrans(group));
+#endif
+        m_table = m_tr->get_table("Links");
+    }
+    virtual void after_each(DBRef)
+    {
+#ifdef REALM_CLUSTER_IF
+        m_table = nullptr;
+#else
+        m_table.reset();
+#endif
+        m_tr = nullptr;
+    }
+    void operator()(DBRef)
+    {
+        TableRef table = m_table;
         std::vector<std::string> strs = {
             "10", "20", "30", "40", "50", "60", "70", "80", "90", "100",
         };
@@ -417,7 +437,7 @@ struct BenchmarkQueryStringOverLinks : BenchmarkWithStringsFewDup {
 
     void after_all(DBRef group)
     {
-        WriteTransaction tr(group);
+        WrtTrans tr(group);
         tr.get_group().remove_table("Links");
         tr.commit();
         BenchmarkWithStringsFewDup::after_all(group);
@@ -544,10 +564,10 @@ struct BenchmarkQueryTimestampGreaterOverLinks : BenchmarkQueryTimestampGreater 
     void before_all(DBRef group)
     {
         BenchmarkQueryTimestampGreater::before_all(group);
-        WriteTransaction tr(group);
+        WrtTrans tr(group);
         TableRef t = tr.add_table("Links");
         id_col_ndx = t->add_column(type_Int, "id");
-        TableRef timestamps = tr.get_table("Timestamps");
+        TableRef timestamps = tr.get_table(name());
         link_col_ndx = t->add_column_link(type_Link, "myLink", *timestamps);
         const size_t num_timestamps = timestamps->size();
 #ifdef REALM_CLUSTER_IF
@@ -570,11 +590,10 @@ struct BenchmarkQueryTimestampGreaterOverLinks : BenchmarkQueryTimestampGreater 
         return "QueryTimestampGreaterOverLinks";
     }
 
-    void operator()(DBRef group)
+    void operator()(DBRef)
     {
-        ReadTransaction tr(group);
-        Table* table = table_ptr(tr.get_table("Links"));
-        Query query = table->link(link_col_ndx).column<Timestamp>(timestamps_col_ndx) > needle;
+        TableRef table = m_tr->get_table("Links");
+        Query query = table->link(link_col_ndx).column<Timestamp>(m_col) > needle;
         TableView results = query.find_all();
         REALM_ASSERT_EX(results.size() == values.size() - num_results_to_needle - 1, results.size(),
                         num_results_to_needle, values.size());
@@ -583,7 +602,7 @@ struct BenchmarkQueryTimestampGreaterOverLinks : BenchmarkQueryTimestampGreater 
 
     void after_all(DBRef group)
     {
-        WriteTransaction tr(group);
+        WrtTrans tr(group);
         tr.get_group().remove_table("Links");
         tr.commit();
     }
@@ -789,8 +808,8 @@ struct BenchmarkIntVsDoubleColumns : Benchmark {
     constexpr static size_t num_rows = BASE_SIZE * 4;
     void before_all(DBRef group)
     {
-        WriteTransaction tr(group);
-        TableRef t = tr.add_table("table");
+        WrtTrans tr(group);
+        TableRef t = tr.add_table(name());
         ints_col_ndx = t->add_column(type_Int, "ints");
         doubles_col_ndx = t->add_column(type_Double, "doubles");
         for (size_t i = 0; i < num_rows; ++i) {
@@ -808,18 +827,17 @@ struct BenchmarkIntVsDoubleColumns : Benchmark {
     {
         return "QueryIntsVsDoubleColumns";
     }
-    void operator()(DBRef group)
+    void operator()(DBRef)
     {
-        ReadTransaction tr(group);
-        Table* table = table_ptr(tr.get_table("table"));
+        TableRef table = m_table;
         Query q = (table->column<Int>(ints_col_ndx) > table->column<Double>(doubles_col_ndx));
         REALM_ASSERT_3(q.count(), ==, ((num_rows / 2) - 1));
     }
 
     void after_all(DBRef group)
     {
-        WriteTransaction tr(group);
-        tr.get_group().remove_table("table");
+        WrtTrans tr(group);
+        tr.get_group().remove_table(name());
         tr.commit();
     }
 };
