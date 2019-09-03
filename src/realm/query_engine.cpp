@@ -118,6 +118,9 @@ void ParentNode::aggregate_local_prepare(Action TAction, DataType col_id, bool n
     else if (TAction == act_Max && col_id == type_Double) {
         m_column_action_specializer = &ThisType::column_action_specialization<act_Max, ArrayDouble>;
     }
+    else if (TAction == act_Max && col_id == type_Timestamp) {
+        m_column_action_specializer = &ThisType::column_action_specialization<act_Max, ArrayTimestamp>;
+    }
     else if (TAction == act_Min && col_id == type_Int) {
         if (nullable)
             m_column_action_specializer = &ThisType::column_action_specialization<act_Min, ArrayIntNull>;
@@ -129,6 +132,9 @@ void ParentNode::aggregate_local_prepare(Action TAction, DataType col_id, bool n
     }
     else if (TAction == act_Min && col_id == type_Double) {
         m_column_action_specializer = &ThisType::column_action_specialization<act_Min, ArrayDouble>;
+    }
+    else if (TAction == act_Min && col_id == type_Timestamp) {
+        m_column_action_specializer = &ThisType::column_action_specialization<act_Min, ArrayTimestamp>;
     }
     else if (TAction == act_FindAll) {
         // For find_all(), the column below is a dummy and the caller sets it to nullptr. Hence, no data is being read

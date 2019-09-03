@@ -695,7 +695,8 @@ public:
         BaseType::init();
         m_nb_needles = m_needles.size();
 
-        if (has_search_index()) {
+        m_has_search_index = this->m_table->has_search_index(IntegerNodeBase<LeafType>::m_condition_column_key);
+        if (m_has_search_index) {
             // _search_index_init();
             m_result.clear();
             auto index = ParentNode::m_table->get_search_index(ParentNode::m_condition_column_key);
@@ -716,30 +717,22 @@ public:
 
     bool has_search_index() const
     {
-        return this->m_table->has_search_index(IntegerNodeBase<LeafType>::m_condition_column_key);
+        return m_has_search_index;
     }
 
-    void aggregate_local_prepare(Action action, DataType col_id, bool is_nullable) override
+    void cluster_changed() override
     {
-        this->m_fastmode_disabled = (col_id == type_Float || col_id == type_Double);
-        this->m_action = action;
-        this->m_find_callback_specialized =
-            IntegerNodeBase<LeafType>::template get_specialized_callback<Equal>(action, col_id, is_nullable);
+        if (!m_has_search_index) {
+            BaseType::cluster_changed();
+        }
     }
 
-    size_t aggregate_local(QueryStateBase* st, size_t start, size_t end, size_t local_limit,
-                           ArrayPayload* source_column) override
-    {
-        constexpr int cond = Equal::condition;
-        return this->aggregate_local_impl(st, start, end, local_limit, source_column, cond);
-    }
- 
     size_t find_first_local(size_t start, size_t end) override
     {
         REALM_ASSERT(this->m_table);
         size_t s = realm::npos;
 
-        if (has_search_index()) {
+        if (m_has_search_index) {
 
             if (m_result_get < m_result.size() && start < end) {
                 ObjKey first_key = BaseType::m_cluster->get_real_key(start);
@@ -760,7 +753,7 @@ public:
                 // key is known to be in this leaf, so find key whithin leaf keys
                 return BaseType::m_cluster->lower_bound_key(ObjKey(actual_key.value - BaseType::m_cluster->get_offset()));
             }
-
+            return not_found;
         }
 
         if (start < end) {
@@ -811,6 +804,7 @@ public:
 private:
     std::unordered_set<TConditionValue> m_needles;
     std::vector<ObjKey> m_result;
+    bool m_has_search_index = false;
     size_t m_nb_needles = 0;
     size_t m_result_get = 0;
 
@@ -1595,6 +1589,15 @@ public:
     }
 
     void init() override;
+
+    void cluster_changed() override
+    {
+        // If we use searchindex, we do not need further access to clusters
+        if (!m_has_search_index) {
+            StringNodeBase::cluster_changed();
+        }
+    }
+
 
     size_t find_first_local(size_t start, size_t end) override;
 

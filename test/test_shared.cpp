@@ -3981,23 +3981,28 @@ TEST(Shared_GetCommitSize)
         CHECK_LESS(size_after - size_before, commit_size);
     }
 }
-
 /*
 #include <valgrind/callgrind.h>
-TEST(Shared_TimestampQuery)
+// valgrind --tool=callgrind --instr-atstart=no test/realm-tests
+TEST(Shared_QueryPerformance)
 {
     Table table;
+    auto col_int = table.add_column(type_Int, "int");
     auto col_date = table.add_column(type_Timestamp, "date", true);
 
     Random random(random_int<unsigned long>()); // Seed from slow global generator
 
     for (int i = 0; i < 10000; i++) {
-        auto ndx = table.add_empty_row();
+        Obj obj = table.create_object();
         int seconds = random.draw_int_max(3600 * 24 * 10);
-        table.set_timestamp(col_date, ndx, Timestamp(seconds, 0));
+        obj.set(col_int, i);
+        obj.set(col_date, Timestamp(seconds, 0));
     }
 
-    Query q = table.column<Timestamp>(col_date) > Timestamp(3600 * 24 * 5, 3);
+    table.add_search_index(col_int);
+
+    Query q = table.column<Int>(col_int) == 1000;
+    //Query q = table.column<Timestamp>(col_date) > Timestamp(3600 * 24 * 5, 3);
     auto start = std::chrono::steady_clock::now();
     CALLGRIND_START_INSTRUMENTATION;
     auto cnt = q.count();
@@ -4006,8 +4011,8 @@ TEST(Shared_TimestampQuery)
 
     std::cout << "Time: " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << " us"
               << std::endl;
-    CHECK_GREATER(cnt, 50000);
+    // CHECK_GREATER(cnt, 50000);
+    CHECK_EQUAL(cnt, 1);
 }
 */
-
 #endif // TEST_SHARED
