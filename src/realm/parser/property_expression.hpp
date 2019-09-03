@@ -37,12 +37,12 @@ struct PropertyExpression
 
     PropertyExpression(Query& q, const std::string& key_path_string, parser::KeyPathMapping& mapping);
 
-    Table* table_getter() const;
+    LinkChain link_chain_getter() const;
 
     template <typename RetType>
     auto value_of_type_for_query() const
     {
-        return this->table_getter()->template column<RetType>(get_dest_col_key());
+        return this->link_chain_getter().template column<RetType>(get_dest_col_key());
     }
 };
 

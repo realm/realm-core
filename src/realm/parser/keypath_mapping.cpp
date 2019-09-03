@@ -142,21 +142,22 @@ void KeyPathMapping::set_backlink_class_prefix(std::string prefix)
     m_backlink_class_prefix = prefix;
 }
 
-Table* KeyPathMapping::table_getter(TableRef table, const std::vector<KeyPathElement>& links)
+LinkChain KeyPathMapping::link_chain_getter(ConstTableRef table, const std::vector<KeyPathElement>& links)
 {
+    LinkChain lc(table);
     if (links.empty()) {
-        return table;
+        return lc;
     }
     // mutates m_link_chain on table
     for (size_t i = 0; i < links.size() - 1; i++) {
         if (links[i].is_backlink) {
-            table->backlink(*links[i].table, links[i].col_key);
+            lc.backlink(*links[i].table, links[i].col_key);
         }
         else {
-            table->link(links[i].col_key);
+            lc.link(links[i].col_key);
         }
     }
-    return table;
+    return lc;
 }
 
 

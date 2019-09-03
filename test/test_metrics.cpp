@@ -1140,7 +1140,7 @@ TEST(Metrics_APIAvailability)
         auto table = rt.get_table("table");
         auto col = table->get_column_key("first");
         CHECK(bool(table));
-        Query q = const_cast<Table&>(*table).column<int64_t>(col) == 0;
+        Query q = table->column<int64_t>(col) == 0;
         q.count();
     }
     std::shared_ptr<Metrics> metrics = sg->get_metrics();

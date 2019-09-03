@@ -37,18 +37,6 @@ Query::Query()
     create();
 }
 
-Query::Query(Table& table, ConstTableView* tv)
-    : m_table(table.get_table_ref())
-    , m_view(tv)
-    , m_source_table_view(tv)
-{
-#ifdef REALM_DEBUG
-    if (m_view)
-        m_view->check_cookie();
-#endif
-    create();
-}
-
 Query::Query(const Table& table, const LnkLst& list)
     : m_table((const_cast<Table&>(table)).get_table_ref())
     , m_source_link_list(list.clone())

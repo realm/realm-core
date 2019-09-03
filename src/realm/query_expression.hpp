@@ -2654,6 +2654,7 @@ public:
 private:
     LinkMap m_link_map;
     friend class Table;
+    friend class LinkChain;
 
     Columns(ColKey column_key, const Table* table, const std::vector<ColKey>& links = {})
         : m_link_map(table, links)
@@ -2811,6 +2812,7 @@ public:
 
 private:
     friend class Table;
+    friend class LinkChain;
 
     Columns(ColKey column_key, const Table* table, const std::vector<ColKey>& links = {})
         : ColumnListBase(column_key, table, links)

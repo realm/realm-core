@@ -60,6 +60,7 @@ class SubQuery;
 struct LinkTargetInfo;
 class ColKeys;
 struct ObjectID;
+class LinkChain;
 
 struct Link {
 };
@@ -248,18 +249,18 @@ public:
     size_t get_num_unique_values(ColKey col_key) const;
 
     template <class T>
-    Columns<T> column(ColKey col_key); // FIXME: Should this one have been declared noexcept?
+    Columns<T> column(ColKey col_key) const; // FIXME: Should this one have been declared noexcept?
     template <class T>
-    Columns<T> column(const Table& origin, ColKey origin_col_key);
+    Columns<T> column(const Table& origin, ColKey origin_col_key) const;
 
     // BacklinkCount is a total count per row and therefore not attached to a specific column
     template <class T>
-    BacklinkCount<T> get_backlink_count();
+    BacklinkCount<T> get_backlink_count() const;
 
     template <class T>
-    SubQuery<T> column(ColKey col_key, Query subquery);
+    SubQuery<T> column(ColKey col_key, Query subquery) const;
     template <class T>
-    SubQuery<T> column(const Table& origin, ColKey origin_col_key, Query subquery);
+    SubQuery<T> column(const Table& origin, ColKey origin_col_key, Query subquery) const;
 
     // Table size and deletion
     bool is_empty() const noexcept;
@@ -611,12 +612,8 @@ public:
     /// The two calls to link() in the erroneous example will append the two values 0 and 1 to an internal vector in
     /// the owners table, and we end up with three references to that same table: owners, cats and dogs. They are all
     /// the same table, its vector has the values {0, 1}, so a query would not make any sense.
-    Table& link(ColKey link_column)
-    {
-        m_link_chain.push_back(link_column);
-        return *this;
-    }
-    Table& backlink(const Table& origin, ColKey origin_col_key);
+    LinkChain link(ColKey link_column) const;
+    LinkChain backlink(const Table& origin, ColKey origin_col_key) const;
 
     // Conversion
     void to_json(std::ostream& out, size_t link_depth = 0,
@@ -703,9 +700,6 @@ private:
     mutable util::Optional<ColKey> m_primary_key_col;
     Replication* const* m_repl;
     static Replication* g_dummy_replication;
-
-    // Used for queries: Items are added with link() method during buildup of query
-    mutable std::vector<ColKey> m_link_chain;
 
     void batch_erase_rows(const KeyColumn& keys);
     void do_remove_object(ObjKey key);
@@ -1051,6 +1045,105 @@ private:
     const Table* m_table;
 };
 
+// Class used to collect a chain of links when building up a Query following links.
+// It has member functions corresponding to the ones defined on Table.
+class LinkChain {
+public:
+    LinkChain(const Table* t)
+        : m_current_table(t)
+        , m_base_table(t)
+    {
+    }
+    const Table* get_base_table()
+    {
+        return m_base_table;
+    }
+
+    LinkChain& link(ColKey link_column)
+    {
+        add(link_column);
+        return *this;
+    }
+
+    LinkChain& backlink(const Table& origin, ColKey origin_col_key)
+    {
+        auto backlink_col_key = origin.get_opposite_column(origin_col_key);
+        return link(backlink_col_key);
+    }
+
+
+    template <class T>
+    inline Columns<T> column(ColKey col_key)
+    {
+        m_current_table->report_invalid_key(col_key);
+
+        // Check if user-given template type equals Realm type.
+        auto ct = col_key.get_type();
+        if (ct == col_type_LinkList)
+            ct = col_type_Link;
+        if (ct != ColumnTypeTraits<T>::column_id)
+            throw LogicError(LogicError::type_mismatch);
+
+        if (std::is_same<T, Link>::value || std::is_same<T, LnkLst>::value || std::is_same<T, BackLink>::value) {
+            m_link_cols.push_back(col_key);
+        }
+
+        return Columns<T>(col_key, m_base_table, m_link_cols);
+    }
+    template <class T>
+    Columns<T> column(const Table& origin, ColKey origin_col_key)
+    {
+        static_assert(std::is_same<T, BackLink>::value, "");
+
+        auto backlink_col_key = origin.get_opposite_column(origin_col_key);
+        m_link_cols.push_back(backlink_col_key);
+
+        return Columns<T>(backlink_col_key, m_base_table, std::move(m_link_cols));
+    }
+    template <class T>
+    SubQuery<T> column(ColKey col_key, Query subquery)
+    {
+        static_assert(std::is_same<T, Link>::value, "A subquery must involve a link list or backlink column");
+        return SubQuery<T>(column<T>(col_key), std::move(subquery));
+    }
+
+    template <class T>
+    SubQuery<T> column(const Table& origin, ColKey origin_col_key, Query subquery)
+    {
+        static_assert(std::is_same<T, BackLink>::value, "A subquery must involve a link list or backlink column");
+        return SubQuery<T>(column<T>(origin, origin_col_key), std::move(subquery));
+    }
+
+
+    template <class T>
+    BacklinkCount<T> get_backlink_count()
+    {
+        return BacklinkCount<T>(m_base_table, std::move(m_link_cols));
+    }
+
+private:
+    friend class Table;
+
+    std::vector<ColKey> m_link_cols;
+    const Table* m_current_table;
+    const Table* m_base_table;
+
+    void add(ColKey ck)
+    {
+        // Link column can be a single Link, LinkList, or BackLink.
+        REALM_ASSERT(m_current_table->valid_column(ck));
+        ColumnType type = ck.get_type();
+        if (type == col_type_LinkList || type == col_type_Link || type == col_type_BackLink) {
+            m_current_table = m_current_table->get_opposite_table(ck);
+        }
+        else {
+            // Only last column in link chain is allowed to be non-link
+            throw(LogicError::type_mismatch);
+        }
+        m_link_cols.push_back(ck);
+    }
+};
+
 // Implementation:
 
 inline ColKeys Table::get_column_keys() const
@@ -1173,69 +1266,48 @@ inline Allocator& Table::get_alloc() const
 
 // For use by queries
 template <class T>
-inline Columns<T> Table::column(ColKey col_key)
+inline Columns<T> Table::column(ColKey col_key) const
 {
-    std::vector<ColKey> link_chain = std::move(m_link_chain);
-    m_link_chain.clear();
-
-    // Check if user-given template type equals Realm type. Todo, we should clean up and reuse all our
-    // type traits (all the is_same() cases below).
-    const Table* table = get_link_chain_target(link_chain);
-    table->report_invalid_key(col_key);
-
-    realm::DataType ct = table->get_column_type(col_key);
-    if (std::is_same<T, int64_t>::value && ct != type_Int)
-        throw LogicError(LogicError::type_mismatch);
-    else if (std::is_same<T, bool>::value && ct != type_Bool)
-        throw LogicError(LogicError::type_mismatch);
-    else if (std::is_same<T, float>::value && ct != type_Float)
-        throw LogicError(LogicError::type_mismatch);
-    else if (std::is_same<T, double>::value && ct != type_Double)
-        throw LogicError(LogicError::type_mismatch);
-
-    if (std::is_same<T, Link>::value || std::is_same<T, LnkLst>::value || std::is_same<T, BackLink>::value) {
-        link_chain.push_back(col_key);
-    }
-
-    return Columns<T>(col_key, this, std::move(link_chain));
+    LinkChain lc(this);
+    return lc.column<T>(col_key);
 }
 
 template <class T>
-inline Columns<T> Table::column(const Table& origin, ColKey origin_col_key)
+inline Columns<T> Table::column(const Table& origin, ColKey origin_col_key) const
 {
-    static_assert(std::is_same<T, BackLink>::value, "");
-
-    auto backlink_col_key = origin.get_opposite_column(origin_col_key);
-    std::vector<ColKey> link_chain = std::move(m_link_chain);
-    m_link_chain.clear();
-    link_chain.push_back(backlink_col_key);
-
-    return Columns<T>(backlink_col_key, this, std::move(link_chain));
+    LinkChain lc(this);
+    return lc.column<T>(origin, origin_col_key);
 }
 
 template <class T>
-inline BacklinkCount<T> Table::get_backlink_count()
+inline BacklinkCount<T> Table::get_backlink_count() const
 {
-    std::vector<ColKey> link_chain = std::move(m_link_chain);
-    m_link_chain.clear();
-    return BacklinkCount<T>(this, std::move(link_chain));
+    return BacklinkCount<T>(this, {});
 }
 
 template <class T>
-SubQuery<T> Table::column(ColKey col_key, Query subquery)
+SubQuery<T> Table::column(ColKey col_key, Query subquery) const
 {
-    static_assert(std::is_same<T, Link>::value, "A subquery must involve a link list or backlink column");
-    return SubQuery<T>(column<T>(col_key), std::move(subquery));
+    LinkChain lc(this);
+    return lc.column<T>(col_key, subquery);
 }
 
 template <class T>
-SubQuery<T> Table::column(const Table& origin, ColKey origin_col_key, Query subquery)
+SubQuery<T> Table::column(const Table& origin, ColKey origin_col_key, Query subquery) const
 {
-    static_assert(std::is_same<T, BackLink>::value, "A subquery must involve a link list or backlink column");
-    return SubQuery<T>(column<T>(origin, origin_col_key), std::move(subquery));
+    LinkChain lc(this);
+    return lc.column<T>(origin, origin_col_key, subquery);
 }
 
-inline Table& Table::backlink(const Table& origin, ColKey origin_col_key)
+inline LinkChain Table::link(ColKey link_column) const
+{
+    LinkChain lc(this);
+    lc.add(link_column);
+
+    return lc;
+}
+
+inline LinkChain Table::backlink(const Table& origin, ColKey origin_col_key) const
 {
     auto backlink_col_key = origin.get_opposite_column(origin_col_key);
     return link(backlink_col_key);

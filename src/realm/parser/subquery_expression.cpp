@@ -79,10 +79,10 @@ Query& SubqueryExpression::get_subquery()
     return subquery;
 }
 
-Table* SubqueryExpression::table_getter() const
+LinkChain SubqueryExpression::link_chain_getter() const
 {
     auto& tbl = query.get_table();
-    return KeyPathMapping::table_getter(tbl, link_chain);
+    return KeyPathMapping::link_chain_getter(tbl, link_chain);
 }
 
 } // namespace parser
