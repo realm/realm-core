@@ -306,7 +306,14 @@ void List::delete_all()
 Results List::sort(SortDescriptor order) const
 {
     verify_attached();
-    return Results(m_realm, std::dynamic_pointer_cast<LnkLst>(m_list_base), util::none, std::move(order));
+    if ((m_type == PropertyType::Object)) {
+        return Results(m_realm, std::dynamic_pointer_cast<LnkLst>(m_list_base), util::none, std::move(order));
+    }
+    else {
+        DescriptorOrdering o;
+        o.append_sort(order);
+        return Results(m_realm, m_list_base, std::move(o));
+    }
 }
 
 Results List::sort(std::vector<std::pair<std::string, bool>> const& keypaths) const

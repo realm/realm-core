@@ -55,6 +55,14 @@ Results::Results(std::shared_ptr<Realm> r, std::shared_ptr<LstBase> list)
 {
 }
 
+Results::Results(std::shared_ptr<Realm> r, std::shared_ptr<LstBase> list, DescriptorOrdering o)
+    : m_realm(std::move(r))
+    , m_descriptor_ordering(std::move(o))
+    , m_list(list)
+    , m_mode(Mode::List)
+{
+}
+
 Results::Results(std::shared_ptr<Realm> r, TableView tv, DescriptorOrdering o)
 : m_realm(std::move(r))
 , m_table_view(std::move(tv))
@@ -120,7 +128,19 @@ size_t Results::size()
     switch (m_mode) {
         case Mode::Empty:    return 0;
         case Mode::Table:    return m_table->size();
-        case Mode::List:     return m_list->size();
+        case Mode::List:
+            if (m_descriptor_ordering.will_apply_distinct()) {
+                bool needs_update = m_list->has_changed();
+                if (!m_list_indices) {
+                    m_list_indices = std::make_shared<std::vector<size_t>>();
+                    needs_update = true;
+                }
+                if (needs_update) {
+                    m_list->distinct(*m_list_indices);
+                }
+                return m_list_indices->size();
+            }
+            return m_list->size();
         case Mode::LinkList: return m_link_list->size();
         case Mode::Query:
             m_query.sync_view_if_needed();
@@ -169,8 +189,31 @@ util::Optional<T> Results::try_get(size_t ndx)
 {
     validate_read();
     if (m_mode == Mode::List) {
-        if (ndx < m_list->size())
-            return list_as<T>().get(ndx);
+        if (m_descriptor_ordering.is_empty()) {
+            if (ndx < m_list->size())
+                return list_as<T>().get(ndx);
+        }
+        else {
+            bool needs_update = m_list->has_changed();
+            if (!m_list_indices) {
+                m_list_indices = std::make_shared<std::vector<size_t>>();
+                needs_update = true;
+            }
+            if (needs_update) {
+                if (m_descriptor_ordering.will_apply_distinct()) {
+                    m_list->distinct(*m_list_indices);
+                }
+                else {
+                    auto s = m_descriptor_ordering[0];
+                    REALM_ASSERT(s->get_type() == DescriptorType::Sort);
+                    auto sort_desc = static_cast<const SortDescriptor*>(s);
+                    auto ascending = sort_desc->is_ascending(0);
+                    REALM_ASSERT(ascending);
+                    m_list->sort(*m_list_indices, *ascending);
+                }
+            }
+            return list_as<T>().get(m_list_indices->at(ndx));
+        }
     }
     return util::none;
 }
@@ -185,7 +228,7 @@ util::Optional<Obj> Results::try_get(size_t row_ndx)
             break;
         case Mode::Table:
             if (row_ndx < m_table->size())
-                return m_table->get_object(row_ndx);
+                return const_cast<Table&>(*m_table).get_object(row_ndx);
 //                return realm::get<T>(*m_table, row_ndx);
             break;
         case Mode::LinkList:
@@ -347,7 +390,7 @@ size_t Results::index_of(Query&& q)
     auto query = get_query().and_query(std::move(q));
     query.sync_view_if_needed();
     ObjKey row = query.find();
-    return row ? index_of(m_table->get_object(row)) : not_found;
+    return row ? index_of(const_cast<Table&>(*m_table).get_object(row)) : not_found;
 }
 
 void Results::prepare_for_aggregate(ColKey column, const char* name)
@@ -447,7 +490,7 @@ void Results::clear()
             if (m_realm->is_partial())
                 Results(m_realm, m_table->where()).clear();
             else
-                m_table->clear();
+                const_cast<Table&>(*m_table).clear();
             break;
         case Mode::Query:
             // Not using Query:remove() because building the tableview and
@@ -595,16 +638,14 @@ Results Results::sort(std::vector<std::pair<std::string, bool>> const& keypaths)
     if (keypaths.empty())
         return *this;
     if (get_type() != PropertyType::Object) {
-        throw std::runtime_error("not implemented");
-#if 0
         if (keypaths.size() != 1)
             throw std::invalid_argument(util::format("Cannot sort array of '%1' on more than one key path",
-                                                     string_for_property_type(get_type())));
+                                                     string_for_property_type(get_type() & ~PropertyType::Flags)));
         if (keypaths[0].first != "self")
-            throw std::invalid_argument(util::format("Cannot sort on key path '%1': arrays of '%2' can only be sorted on 'self'",
-                                                     keypaths[0].first, string_for_property_type(get_type())));
-        return sort({{{0}}, {keypaths[0].second}});
-#endif
+            throw std::invalid_argument(
+                util::format("Cannot sort on key path '%1': arrays of '%2' can only be sorted on 'self'",
+                             keypaths[0].first, string_for_property_type(get_type() & ~PropertyType::Flags)));
+        return sort({{{}}, {keypaths[0].second}});
     }
 
     std::vector<std::vector<ColKey>> column_keys;
@@ -622,10 +663,12 @@ Results Results::sort(std::vector<std::pair<std::string, bool>> const& keypaths)
 
 Results Results::sort(SortDescriptor&& sort) const
 {
-    if (m_mode == Mode::LinkList)
-        return Results(m_realm, m_link_list, util::none, std::move(sort));
     DescriptorOrdering new_order = m_descriptor_ordering;
     new_order.append_sort(std::move(sort));
+    if (m_mode == Mode::LinkList)
+        return Results(m_realm, m_link_list, util::none, std::move(sort));
+    else if (m_mode == Mode::List)
+        return Results(m_realm, m_list, std::move(new_order));
     return Results(m_realm, get_query(), std::move(new_order));
 }
 
@@ -677,6 +720,8 @@ Results Results::distinct(DistinctDescriptor&& uniqueness) const
 {
     DescriptorOrdering new_order = m_descriptor_ordering;
     new_order.append_distinct(std::move(uniqueness));
+    if (m_mode == Mode::List)
+        return Results(m_realm, m_list, std::move(new_order));
     return Results(m_realm, get_query(), std::move(new_order));
 }
 
@@ -685,16 +730,14 @@ Results Results::distinct(std::vector<std::string> const& keypaths) const
     if (keypaths.empty())
         return *this;
     if (get_type() != PropertyType::Object) {
-        throw "not implemented";
-#if 0
         if (keypaths.size() != 1)
             throw std::invalid_argument(util::format("Cannot sort array of '%1' on more than one key path",
-                                                     string_for_property_type(get_type())));
+                                                     string_for_property_type(get_type() & ~PropertyType::Flags)));
         if (keypaths[0] != "self")
-            throw std::invalid_argument(util::format("Cannot sort on key path '%1': arrays of '%2' can only be sorted on 'self'",
-                                                     keypaths[0], string_for_property_type(get_type())));
-        return distinct({{0}});
-#endif
+            throw std::invalid_argument(
+                util::format("Cannot sort on key path '%1': arrays of '%2' can only be sorted on 'self'", keypaths[0],
+                             string_for_property_type(get_type() & ~PropertyType::Flags)));
+        return distinct(DistinctDescriptor({{ColKey()}}));
     }
 
     std::vector<std::vector<ColKey>> column_keys;

@@ -88,9 +88,16 @@ template<>
 class ThreadSafeReference::PayloadImpl<Results> : public ThreadSafeReference::Payload {
 public:
     PayloadImpl(Results const& r, Transaction& t)
-    : m_transaction(t.duplicate())
-    , m_query([&] { Query q(r.get_query()); return m_transaction->import_copy_of(q, PayloadPolicy::Move); }())
-    , m_ordering(r.get_descriptor_ordering())
+        : m_transaction(t.duplicate())
+        , m_query([&] {
+            Query q(r.get_query());
+            return m_transaction->import_copy_of(q, PayloadPolicy::Move);
+        }())
+        , m_list([&] {
+            auto l = r.get_list();
+            return l ? m_transaction->import_copy_of(*l) : nullptr;
+        }())
+        , m_ordering(r.get_descriptor_ordering())
     {
     }
 
@@ -100,6 +107,10 @@ public:
         if (realm_version > m_transaction->get_version_of_current_transaction())
             m_transaction->advance_read(realm_version);
 
+        if (m_list) {
+            std::shared_ptr<LstBase> l = t.import_copy_of(*m_list);
+            return Results(std::move(r), std::move(l), m_ordering);
+        }
         auto q = t.import_copy_of(*m_query, PayloadPolicy::Copy);
         return Results(std::move(r), std::move(*q), m_ordering);
     }
@@ -109,6 +120,7 @@ public:
 private:
     TransactionRef m_transaction;
     std::unique_ptr<Query> m_query;
+    LstBasePtr m_list;
     DescriptorOrdering m_ordering;
 };
 

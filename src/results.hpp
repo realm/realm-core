@@ -46,6 +46,7 @@ public:
     Results();
     Results(std::shared_ptr<Realm> r, Table& table);
     Results(std::shared_ptr<Realm> r, std::shared_ptr<LstBase> list);
+    Results(std::shared_ptr<Realm> r, std::shared_ptr<LstBase> list, DescriptorOrdering o);
     Results(std::shared_ptr<Realm> r, Query q, DescriptorOrdering o = {});
     Results(std::shared_ptr<Realm> r, TableView tv, DescriptorOrdering o = {});
     Results(std::shared_ptr<Realm> r, std::shared_ptr<LnkLst> list, util::Optional<Query> q = {}, SortDescriptor s = {});
@@ -66,6 +67,12 @@ public:
     // Get a query which will match the same rows as is contained in this Results
     // Returned query will not be valid if the current mode is Empty
     Query get_query() const;
+
+    // Get a list object containing the same rows as this Result
+    const LstBase* get_list() const
+    {
+        return m_list.get();
+    }
 
     // Get the list of sort and distinct operations applied for this Results.
     DescriptorOrdering const& get_descriptor_ordering() const noexcept { return m_descriptor_ordering; }
@@ -254,10 +261,11 @@ private:
     mutable const ObjectSchema *m_object_schema = nullptr;
     Query m_query;
     TableView m_table_view;
-    TableRef m_table;
+    ConstTableRef m_table;
     DescriptorOrdering m_descriptor_ordering;
     std::shared_ptr<LnkLst> m_link_list;
     std::shared_ptr<LstBase> m_list;
+    std::shared_ptr<std::vector<size_t>> m_list_indices;
 
     _impl::CollectionNotifier::Handle<_impl::ResultsNotifier> m_notifier;
 
