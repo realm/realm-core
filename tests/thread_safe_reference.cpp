@@ -463,11 +463,11 @@ TEST_CASE("thread safe reference") {
             REQUIRE(list.get<int64_t>(1) == 2);
         }
 
-#if 0
         SECTION("sorted int results") {
             r->begin_transaction();
-            create_object(r, "int array", {{"value", AnyVector{INT64_C(0), INT64_C(2), INT64_C(1)}}});
-            List list(r, *get_table(*r, "int array"), 0, 0);
+            auto obj = create_object(r, "int array", {{"value", AnyVector{INT64_C(0), INT64_C(2), INT64_C(1)}}});
+            auto col = get_table(*r, "int array")->get_column_key("value");
+            List list(r, obj.obj(), col);
             r->commit_transaction();
 
             auto results = list.sort({{"self", true}});
@@ -479,7 +479,7 @@ TEST_CASE("thread safe reference") {
             auto ref = ThreadSafeReference(results);
             std::thread([ref = std::move(ref), config]() mutable {
                 SharedRealm r = Realm::get_shared_realm(config);
-                Results results = ref.resolve<Object>(r);
+                Results results = ref.resolve<Results>(r);
 
                 REQUIRE(results.size() == 3);
                 REQUIRE(results.get<int64_t>(0) == 0);
@@ -487,9 +487,10 @@ TEST_CASE("thread safe reference") {
                 REQUIRE(results.get<int64_t>(2) == 2);
 
                 r->begin_transaction();
-                List list(r, *get_table(*r, "int array"), 0, 0);
+                auto table = get_table(*r, "int array");
+                List list(r, *table->begin(), table->get_column_key("value"));
                 list.remove(1);
-                list.add(-1);
+                list.add(int64_t(-1));
                 r->commit_transaction();
 
                 REQUIRE(results.size() == 3);
@@ -513,30 +514,33 @@ TEST_CASE("thread safe reference") {
 
         SECTION("distinct int results") {
             r->begin_transaction();
-            create_object(r, "int array", {{"value", AnyVector{INT64_C(3), INT64_C(2), INT64_C(1), INT64_C(1), INT64_C(2)}}});
-            List list(r, *get_table(*r, "int array"), 0, 0);
+            auto obj = create_object(
+                r, "int array", {{"value", AnyVector{INT64_C(3), INT64_C(2), INT64_C(1), INT64_C(1), INT64_C(2)}}});
+            auto col = get_table(*r, "int array")->get_column_key("value");
+            List list(r, obj.obj(), col);
             r->commit_transaction();
 
             auto& table = *get_table(*r, "string object");
-            auto results = list.as_results().distinct({"self"}).sort({{"self", true}});
+            auto results = list.as_results().distinct({"self"}); // FIXME .sort({{"self", true}});
 
             REQUIRE(results.size() == 3);
-            REQUIRE(results.get<int64_t>(0) == 1);
+            REQUIRE(results.get<int64_t>(0) == 3);
             REQUIRE(results.get<int64_t>(1) == 2);
-            REQUIRE(results.get<int64_t>(2) == 3);
+            REQUIRE(results.get<int64_t>(2) == 1);
 
             auto ref = ThreadSafeReference(results);
             std::thread([ref = std::move(ref), config]() mutable {
                 SharedRealm r = Realm::get_shared_realm(config);
-                Results results = ref.resolve<Object>(r);
+                Results results = ref.resolve<Results>(r);
 
                 REQUIRE(results.size() == 3);
-                REQUIRE(results.get<int64_t>(0) == 1);
+                REQUIRE(results.get<int64_t>(0) == 3);
                 REQUIRE(results.get<int64_t>(1) == 2);
-                REQUIRE(results.get<int64_t>(2) == 3);
+                REQUIRE(results.get<int64_t>(2) == 1);
 
                 r->begin_transaction();
-                List list(r, *get_table(*r, "int array"), 0, 0);
+                auto table = get_table(*r, "int array");
+                List list(r, *table->begin(), table->get_column_key("value"));
                 list.remove(1);
                 list.remove(0);
                 r->commit_transaction();
@@ -547,9 +551,9 @@ TEST_CASE("thread safe reference") {
             }).join();
 
             REQUIRE(results.size() == 3);
-            REQUIRE(results.get<int64_t>(0) == 1);
+            REQUIRE(results.get<int64_t>(0) == 3);
             REQUIRE(results.get<int64_t>(1) == 2);
-            REQUIRE(results.get<int64_t>(2) == 3);
+            REQUIRE(results.get<int64_t>(2) == 1);
 
             r->refresh();
 
@@ -557,7 +561,6 @@ TEST_CASE("thread safe reference") {
             REQUIRE(results.get<int64_t>(0) == 1);
             REQUIRE(results.get<int64_t>(1) == 2);
         }
-#endif
 
         SECTION("multiple types") {
             auto results = Results(r, get_table(*r, "int object")->where().equal(int_obj_col, 5));

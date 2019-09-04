@@ -486,7 +486,7 @@ void enqueue_unregistration(Results const& result_set, std::shared_ptr<Notifier>
         auto obj_key = query->find();
         auto t = query->get_table();
         if (t->is_valid(obj_key)) {
-            t->remove_object(obj_key);
+            const_cast<Table&>(*t).remove_object(obj_key);
             write.commit();
         }
         else {
