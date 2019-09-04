@@ -71,17 +71,9 @@ const char* to_ident_cstr(RealmDurability level);
 
 #ifdef REALM_CLUSTER_IF
 #define KEY(x) ObjKey(x)
-inline Table* table_ptr(ConstTableRef t)
-{
-    return const_cast<Table*>(t.operator const Table*());
-}
 #else
 #define KEY(x) x
 using ColKey = size_t;
-inline Table* table_ptr(ConstTableRef t)
-{
-    return const_cast<Table*>(t.get());
-}
 #endif
 
 
