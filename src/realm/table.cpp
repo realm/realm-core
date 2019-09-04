@@ -2609,11 +2609,11 @@ ObjKey Table::global_to_local_object_id_hashed(ObjectID object_id) const
         hi.init_from_ref(to_ref(collision_map.get(s_collision_map_hi))); // Throws
 
         // Entries are ordered by hi,lo
-        size_t begin = hi.find_first(object_id.hi());
-        if (begin != npos && uint64_t(hi.get(begin)) == object_id.hi()) {
+        size_t found = hi.find_first(object_id.hi());
+        if (found != npos && uint64_t(hi.get(found)) == object_id.hi()) {
             Array lo{alloc};
             lo.init_from_ref(to_ref(collision_map.get(s_collision_map_lo))); // Throws
-            size_t candidate = lo.find_first(object_id.lo(), begin);
+            size_t candidate = lo.find_first(object_id.lo(), found);
             if (candidate != npos && uint64_t(hi.get(candidate)) == object_id.hi()) {
                 Array local_id{alloc};
                 local_id.init_from_ref(to_ref(collision_map.get(s_collision_map_local_id))); // Throws

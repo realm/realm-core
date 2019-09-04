@@ -2032,8 +2032,7 @@ public:
             }
             else {
                 std::vector<ObjKey> links = m_link_map.get_links(index);
-                constexpr bool only_unary_links = false;
-                Value<T> v = make_value_for_link<T>(only_unary_links, links.size());
+                Value<T> v = make_value_for_link<T>(false /*only_unary_links*/, links.size());
                 for (size_t t = 0; t < links.size(); t++) {
                     ConstObj obj = m_link_map.get_target_table()->get_object(links[t]);
                     v.m_storage.set(t, obj.get<T>(m_column_key));
