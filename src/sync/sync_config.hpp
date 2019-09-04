@@ -112,13 +112,13 @@ struct SyncError {
     }
 };
 
-enum class ClientResyncMode {
+enum class ClientResyncMode : unsigned char {
     // Enable automatic client resync with local transaction recovery
-    Recover,
+    Recover = 0,
     // Enable automatic client resync without local transaction recovery
-    DiscardLocal,
+    DiscardLocal = 1,
     // Fire a client reset error
-    Manual
+    Manual = 2,
 };
 
 struct SyncConfig {
