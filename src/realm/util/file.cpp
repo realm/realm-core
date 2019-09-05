@@ -1071,7 +1071,7 @@ void* File::map_fixed(AccessMode a, void* address, size_t size, EncryptedFileMap
 {
     if (m_encryption_key.get()) {
         // encryption enabled - we shouldn't be here, all memory was allocated by reserve
-        REALM_ASSERT(false);
+        REALM_ASSERT_RELEASE(false);
     }
 #ifndef _WIN32
     // no encryption. On Unixes, map relevant part of reserved virtual address range
@@ -1465,16 +1465,17 @@ void File::MapBase::unmap() noexcept
 #if REALM_ENABLE_ENCRYPTION
     m_encrypted_mapping = nullptr;
 #endif
-    m_fd = 0;
+    m_fd = -1;
 }
 
 void File::MapBase::remap(const File& f, AccessMode a, size_t size, int map_flags)
 {
     REALM_ASSERT(m_addr);
+    REALM_ASSERT(m_size == size);
+    REALM_ASSERT(m_reservation_size == size);
     m_addr = f.remap(m_addr, m_size, a, size, map_flags);
     m_size = size;
     m_reservation_size = size;
-    m_fd = f.m_fd;
 }
 
 void File::MapBase::sync()
@@ -1494,54 +1495,70 @@ void File::MapBase::reserve(const File& f, AccessMode a, size_t offset_in_file, 
     m_encrypted_mapping = nullptr;
     if (f.get_encryption_key()) {
         is_encrypted = true;
-        m_size = reservation_size;
+        m_size = m_reservation_size = reservation_size;
         m_addr = f.map(a, reservation_size, m_encrypted_mapping, 0, offset_in_file);
     }
 #endif
     if (!is_encrypted) {
 #ifdef _WIN32
+        m_reservation_size = 0;
         m_addr = nullptr; // no-op on windows
 #else
-        m_addr = f.map_reserve(a, reservation_size, offset_in_file);
+//        m_addr = f.map_reserve(a, reservation_size, offset_in_file);
+//        m_reservation_size = reservation_size;
+        m_addr = nullptr;
+        m_reservation_size = 0;
 #endif
     }
     m_offset = offset_in_file;
-    m_reservation_size = reservation_size;
     m_fd = f.m_fd;
 }
 
 
 bool File::MapBase::extend(const File& f, AccessMode a, size_t new_size)
 {
+    REALM_ASSERT_RELEASE(f.m_fd == m_fd);
     if (new_size <= m_size) // trivially OK
         return true;
-    REALM_ASSERT(new_size <= m_reservation_size);
 
 #if REALM_ENABLE_ENCRYPTION
-    // This is a nop when encryption is in use
-    if (f.get_encryption_key())
-        return true;
+    if (f.get_encryption_key()) {
+        // if the new size extends beyond reservation and encryption is enabled,
+        // we cannot extend, so fail.
+        if (new_size > m_reservation_size)
+            return false;
+        else
+            return true;
+    }
 #endif
 
-// no encryption. Windows and Unixes are handled differently:
-#ifdef _WIN32
-    // on windows, we cannot extend if we've already mapped some of it
-    if (m_size)
+    void* addr;
+    if (m_addr) {
+        // new mapping must be an extension of already assigned virtual address space.
+        // we attempt to mmap at the required address, but the mmap is allowed to fail.
+        auto desired_address = reinterpret_cast<char*>(m_addr) + m_size;
+        auto desired_offset = m_offset + m_size;
+        auto request_size = new_size - m_size;
+        addr = f.map_fixed(access_ReadOnly, desired_address, request_size, 0, desired_offset);
+        if (addr != MAP_FAILED) {
+            REALM_ASSERT_RELEASE(addr == desired_address);
+        }
+    }
+    else {
+        // we are free to mmap at any address so let the system decide
+        addr = f.map(a, new_size, 0, m_offset);
+        if (addr != MAP_FAILED)
+            m_addr = addr;
+    }
+    if (addr != MAP_FAILED) {
+        m_size = new_size;
+        if (m_size > m_reservation_size)
+            m_reservation_size = m_size;
+        return true;
+    }
+    else {
         return false;
-    // otherwise we just mmap it normally
-    m_size = new_size;
-    m_addr = f.map(a, m_size, 0, m_offset);
-    return true;
-#else
-    static_cast<void>(a);
-    auto desired_address = reinterpret_cast<char*>(m_addr) + m_size;
-    auto desired_offset = m_offset + m_size;
-    auto request_size = new_size - m_size;
-    auto addr = f.map_fixed(access_ReadOnly, desired_address, request_size, 0, desired_offset);
-    REALM_ASSERT(addr == desired_address);
-    m_size = new_size;
-    return true;
-#endif
+    }
 }
 
 

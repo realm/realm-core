@@ -625,17 +625,16 @@ void* mmap_reserve(FileDesc fd, size_t reservation_size, File::AccessMode access
 }
 
 void* mmap_fixed(FileDesc fd, void* address_request, size_t size, File::AccessMode access, size_t offset,
-                 const char* enc_key, EncryptedFileMapping* mapping)
+                 const char* enc_key, EncryptedFileMapping* encrypted_mapping)
 {
     REALM_ASSERT((enc_key == nullptr) ==
-                 (mapping == nullptr)); // Mapping must already have been set if encryption is used
-    if (mapping) {
+                 (encrypted_mapping == nullptr)); // Mapping must already have been set if encryption is used
+    if (encrypted_mapping) {
 // Since the encryption layer must be able to WRITE into the memory area,
 // we have to map it read/write regardless of the request.
 // FIXME: Make this work for windows!
 #ifdef _WIN32
-        REALM_ASSERT(false); // not supported on windows
-        return nullptr;
+        return MAP_FAILED;
 #else
         return ::mmap(address_request, size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE | MAP_FIXED, -1, 0);
 #endif
@@ -689,13 +688,13 @@ void* mmap_fixed(FileDesc fd, void* address_request, size_t size, File::AccessMo
     static_cast<void>(enc_key); // FIXME: Consider removing this parameter
 #ifdef _WIN32
     REALM_ASSERT(false);
-    return nullptr; // silence warning
+    return MAP_FAILED; // silence warning
 #else
     auto prot = PROT_READ;
     if (access == File::access_ReadWrite)
         prot |= PROT_WRITE;
     auto addr = ::mmap(address_request, size, prot, MAP_SHARED | MAP_FIXED, fd, offset);
-    if (addr != address_request) {
+    if (addr != MAP_FAILED && addr != address_request) {
         throw std::runtime_error(get_errno_msg("mmap() failed: ", errno) +
                                  ", when mapping an already reserved memory area");
     }

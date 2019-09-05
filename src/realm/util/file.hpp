@@ -617,8 +617,8 @@ private:
         void unmap() noexcept;
         void sync();
         // extends a mapping to a larger size and at the existing virtual
-        // memory address. Returns false if failed.
-        // The mapping must have been reserved in advance
+        // memory address. Returns false if failed. Chance of success is
+        // higher if virtual address space has been reserved in advance.
         bool extend(const File&, AccessMode, size_t new_size);
 #if REALM_ENABLE_ENCRYPTION
         mutable util::EncryptedFileMapping* m_encrypted_mapping = nullptr;
@@ -729,9 +729,11 @@ public:
         m_size = other.m_size;
         m_reservation_size = other.m_reservation_size;
         m_offset = other.m_offset;
+        m_fd = other.m_fd;
+        other.m_fd = -1;
         other.m_offset = 0;
         other.m_reservation_size = 0;
-        other.m_addr = 0;
+        other.m_addr = nullptr;
         other.m_size = 0;
 #if REALM_ENABLE_ENCRYPTION
         m_encrypted_mapping = other.m_encrypted_mapping;
