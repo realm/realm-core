@@ -352,17 +352,19 @@ void ConstLstIf<T>::sort(std::vector<size_t>& indices, bool ascending) const
 }
 
 template <class T>
-void ConstLstIf<T>::distinct(std::vector<size_t>& indices) const
+void ConstLstIf<T>::distinct(std::vector<size_t>& indices, util::Optional<bool> sort_order) const
 {
     indices.clear();
-    sort(indices);
+    sort(indices, sort_order ? *sort_order : true);
     auto duplicates = std::unique(indices.begin(), indices.end(),
                                   [this](size_t i1, size_t i2) { return m_tree->get(i1) == m_tree->get(i2); });
     // Erase the duplicates
     indices.erase(duplicates, indices.end());
 
-    // Restore original order
-    std::sort(indices.begin(), indices.end(), std::less<size_t>());
+    if (!sort_order) {
+        // Restore original order
+        std::sort(indices.begin(), indices.end(), std::less<size_t>());
+    }
 }
 
 
