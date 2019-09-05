@@ -182,7 +182,7 @@ struct AddTable : Benchmark {
 
     void operator()(DBRef group)
     {
-        WrtTrans tr(group);  // FIXME: Includes some transaction management in what's measured.
+        WrtTrans tr(group); // FIXME: Includes some transaction management in what's measured.
         TableRef t = tr.add_table(name());
         t->add_column(type_String, "first");
         t->add_column(type_Int, "second");
@@ -359,7 +359,7 @@ struct BenchmarkFindFirstStringFewDupes : BenchmarkWithStringsFewDup {
         };
         for (auto s : strs) {
             table->where().equal(m_col, StringData(s)).find();
-            //std::cout << "Found at entry: " << k << std::endl;
+            // std::cout << "Found at entry: " << k << std::endl;
         }
     }
 };
@@ -470,7 +470,7 @@ struct BenchmarkWithLongStrings : BenchmarkWithStrings {
         t->get_object(m_keys[BASE_SIZE * 2 / 4]).set<StringData>(m_col, really_long_string);
         t->get_object(m_keys[BASE_SIZE * 3 / 4]).set<StringData>(m_col, really_long_string);
 #else
-        //t->insert_empty_row(0);
+        // t->insert_empty_row(0);
         t->set_string(m_col, 0, really_long_string);
         t->set_string(m_col, BASE_SIZE / 4, really_long_string);
         t->set_string(m_col, BASE_SIZE * 2 / 4, really_long_string);
@@ -836,7 +836,10 @@ struct BenchmarkIntVsDoubleColumns : Benchmark {
 
 
 struct BenchmarkWithIntUIDsRandomOrderSeqAccess : BenchmarkWithIntsTable {
-    const char* name() const { return "IntUIDsRandomOrderSeqAccess"; }
+    const char* name() const
+    {
+        return "IntUIDsRandomOrderSeqAccess";
+    }
     void before_all(DBRef group)
     {
         BenchmarkWithIntsTable::before_all(group);
@@ -870,7 +873,8 @@ struct BenchmarkWithIntUIDsRandomOrderSeqAccess : BenchmarkWithIntsTable {
         }
         tr.commit();
     }
-    void operator()(DBRef) {
+    void operator()(DBRef)
+    {
         ConstTableRef t = m_table;
         volatile uint64_t sum = 0;
         for (size_t i = 0; i < 100000; ++i) {
@@ -887,7 +891,10 @@ struct BenchmarkWithIntUIDsRandomOrderSeqAccess : BenchmarkWithIntsTable {
 };
 
 struct BenchmarkWithIntUIDsRandomOrderRandomAccess : BenchmarkWithIntUIDsRandomOrderSeqAccess {
-    const char* name() const { return "IntUIDsRandomOrderRandomAccess"; }
+    const char* name() const
+    {
+        return "IntUIDsRandomOrderRandomAccess";
+    }
     void before_all(DBRef group)
     {
         BenchmarkWithIntUIDsRandomOrderSeqAccess::before_all(group);
@@ -899,12 +906,16 @@ struct BenchmarkWithIntUIDsRandomOrderRandomAccess : BenchmarkWithIntUIDsRandomO
 };
 
 struct BenchmarkWithIntUIDsRandomOrderRandomDelete : BenchmarkWithIntUIDsRandomOrderRandomAccess {
-    const char* name() const { return "IntUIDsRandomOrderRandomDelete"; }
+    const char* name() const
+    {
+        return "IntUIDsRandomOrderRandomDelete";
+    }
     void before_all(DBRef group)
     {
         BenchmarkWithIntUIDsRandomOrderRandomAccess::before_all(group);
     }
-    void operator()(DBRef) {
+    void operator()(DBRef)
+    {
         TableRef t = m_table;
         for (size_t i = 0; i < 10000; ++i) {
 #ifdef REALM_CLUSTER_IF
@@ -918,7 +929,10 @@ struct BenchmarkWithIntUIDsRandomOrderRandomDelete : BenchmarkWithIntUIDsRandomO
     }
 };
 struct BenchmarkWithIntUIDsRandomOrderRandomCreate : BenchmarkWithIntUIDsRandomOrderRandomAccess {
-    const char* name() const { return "IntUIDsRandomOrderRandomCreate"; }
+    const char* name() const
+    {
+        return "IntUIDsRandomOrderRandomCreate";
+    }
     void before_all(DBRef group)
     {
         BenchmarkWithIntUIDsRandomOrderRandomAccess::before_all(group);
@@ -943,7 +957,8 @@ struct BenchmarkWithIntUIDsRandomOrderRandomCreate : BenchmarkWithIntUIDsRandomO
 #endif
         }
     }
-    void operator()(DBRef) {
+    void operator()(DBRef)
+    {
         TableRef t = m_table;
         for (size_t i = 0; i < 10000; ++i) {
             auto val = m_keys[BASE_SIZE + i];
@@ -1681,9 +1696,10 @@ struct BenchmarkInitiatorOpen : public BenchmarkNonInitiatorOpen {
     {
         return "InitiatorOpen";
     }
-    void before_all(DBRef r) {
+    void before_all(DBRef r)
+    {
         BenchmarkNonInitiatorOpen::before_all(r); // create file
-        initiator.reset(); // for close.
+        initiator.reset();                        // for close.
     }
 };
 
@@ -1733,7 +1749,7 @@ void run_benchmark_once(Benchmark& benchmark, DBRef sg, Timer& timer)
 
 /// This little piece of likely over-engineering runs the benchmark a number of times,
 /// with each durability setting, and reports the results for each run.
-template<typename B>
+template <typename B>
 void run_benchmark(BenchmarkResults& results, bool force_full = false)
 {
     typedef std::pair<RealmDurability, const char*> config_pair;
@@ -1798,7 +1814,7 @@ void run_benchmark(BenchmarkResults& results, bool force_full = false)
         if (required_reps > max_repetitions) {
             required_reps = max_repetitions;
         }
-        std::cout << "Req runs: " << required_reps << "  ";
+        std::cout << "Req runs: " << std::setw(4) << required_reps << "  ";
         for (size_t rep = 0; rep < required_reps; ++rep) {
             Timer t;
             run_benchmark_once(benchmark, group, t);
@@ -1823,7 +1839,7 @@ int benchmark_common_tasks_main()
     BenchmarkResults results(40, results_file_stem.c_str());
 
 #define BENCH(B) run_benchmark<B>(results)
-#define BENCH2(B,mode) run_benchmark<B>(results, mode)
+#define BENCH2(B, mode) run_benchmark<B>(results, mode)
 
     BENCH2(BenchmarkEmptyCommit, true);
     BENCH2(BenchmarkEmptyCommit, false);

@@ -72,7 +72,6 @@ jobWrapper {
             androidArm64Debug       : doAndroidBuildInDocker('arm64-v8a', 'Debug', false),
             threadSanitizer         : doCheckSanity('Debug', '1000', 'thread'),
             addressSanitizer        : doCheckSanity('Debug', '1000', 'address'),
-            performance             : buildPerformance()
         ]
         if (releaseTesting) {
             extendedChecks = [
@@ -81,7 +80,7 @@ jobWrapper {
                 buildUwpx64Debug        : doBuildWindows('Debug', true, 'x64', false),
                 androidArmeabiRelease   : doAndroidBuildInDocker('armeabi-v7a', 'Release', true),
                 coverage                : doBuildCoverage(),
-                // performance             : buildPerformance(),
+                performance             : buildPerformance(),
                 valgrind                : doCheckValgrind()
             ]
             parallelExecutors.putAll(extendedChecks)

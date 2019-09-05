@@ -41,12 +41,14 @@ using DBRef = realm::DBRef;
 using DBRef = std::shared_ptr<realm::SharedGroup>;
 class RdTrans : public realm::ReadTransaction {
 public:
-    RdTrans(DBRef ref) : realm::ReadTransaction(*ref) {};
+    RdTrans(DBRef ref)
+        : realm::ReadTransaction(*ref){};
 };
 
 class WrtTrans : public realm::WriteTransaction {
 public:
-    WrtTrans(DBRef ref) : realm::WriteTransaction(*ref) {};
+    WrtTrans(DBRef ref)
+        : realm::WriteTransaction(*ref){};
 };
 using TransactionRef = std::unique_ptr<WrtTrans>;
 #endif

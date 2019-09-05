@@ -51,7 +51,7 @@ void create_realm_with_data(std::string file_name, size_t data_size)
 {
     delete_file_if_exists(file_name);
     DBRef sg = create_new_shared_group(file_name, RealmDurability::Full, nullptr); // DB::create(file_name);
-    WrtTrans tr(sg);    //TransactionRef tr = sg->start_write();
+    WrtTrans tr(sg); // TransactionRef tr = sg->start_write();
     TableRef table = tr.add_table("t0");
     auto c0 = table->add_column(type_Binary, "bin_col_0");
     std::string blob(data_size, 'a');
