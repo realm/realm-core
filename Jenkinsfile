@@ -472,7 +472,7 @@ def doBuildMacOs(String buildType, boolean runTests) {
             def buildTests = runTests ? '' : '-DREALM_NO_TESTS=1'
 
             dir("build-macos-${buildType}") {
-                withEnv(['DEVELOPER_DIR=/Applications/Xcode-9.4.app/Contents/Developer/']) {
+                withEnv(['DEVELOPER_DIR=/Applications/Xcode-10.3.app/Contents/Developer/']) {
                     // This is a dirty trick to work around a bug in xcode
                     // It will hang if launched on the same project (cmake trying the compiler out)
                     // in parallel.
@@ -530,8 +530,7 @@ def doBuildAppleDevice(String sdk, String buildType) {
         node('osx') {
             getArchive()
 
-            withEnv(['DEVELOPER_DIR=/Applications/Xcode-9.4.app/Contents/Developer/',
-                     'XCODE10_DEVELOPER_DIR=/Applications/Xcode-10.app/Contents/Developer/']) {
+            withEnv(['DEVELOPER_DIR=/Applications/Xcode-10.3.app/Contents/Developer/']) {
                 retry(3) {
                     timeout(time: 15, unit: 'MINUTES') {
                         runAndCollectWarnings(parser:'clang', script: """
