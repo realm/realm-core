@@ -7,6 +7,7 @@ fix_xcode_try_compile()
 set_common_xcode_attributes()
 
 set(REALM_SKIP_SHARED_LIB ON)
+set(CPACK_SYSTEM_NAME "ios")
 
 set(CMAKE_OSX_SYSROOT "iphoneos")
 

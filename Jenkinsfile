@@ -473,7 +473,7 @@ def doBuildMacOs(String buildType, boolean runTests) {
 
             def buildTests = runTests ? '' : '-DREALM_NO_TESTS=1'
 
-            dir("build-macos-${buildType}") {
+            dir("build-macosx-${buildType}") {
                 withEnv(['DEVELOPER_DIR=/Applications/Xcode-10.3.app/Contents/Developer/']) {
                     // This is a dirty trick to work around a bug in xcode
                     // It will hang if launched on the same project (cmake trying the compiler out)
@@ -482,7 +482,7 @@ def doBuildMacOs(String buildType, boolean runTests) {
                         timeout(time: 2, unit: 'MINUTES') {
                             sh """
                                     rm -rf *
-                                    cmake -D CMAKE_TOOLCHAIN_FILE=../tools/cmake/macos.toolchain.cmake \\
+                                    cmake -D CMAKE_TOOLCHAIN_FILE=../tools/cmake/macosx.toolchain.cmake \\
                                           -D CMAKE_BUILD_TYPE=${buildType} \\
                                           -D REALM_VERSION=${gitDescribeVersion} \\
                                           ${buildTests} -G Ninja ..
@@ -494,16 +494,16 @@ def doBuildMacOs(String buildType, boolean runTests) {
                 }
             }
 
-            archiveArtifacts("build-macos-${buildType}/*.tar.gz")
+            archiveArtifacts("build-macosx-${buildType}/*.tar.gz")
 
-            def stashName = "macos___${buildType}"
-            stash includes:"build-macos-${buildType}/*.tar.gz", name:stashName
+            def stashName = "macosx___${buildType}"
+            stash includes:"build-macosx-${buildType}/*.tar.gz", name:stashName
             cocoaStashes << stashName
             publishingStashes << stashName
 
             if (runTests) {
                 try {
-                    dir("build-macos-${buildType}") {
+                    dir("build-macosx-${buildType}") {
                         def environment = environment()
                         environment << 'UNITTEST_PROGRESS=1'
                         withEnv(environment) {
@@ -518,9 +518,9 @@ def doBuildMacOs(String buildType, boolean runTests) {
                     // recordTests expects the test results xml file in a build-dir/test/ folder
                     sh """
                         mkdir -p build-dir/test
-                        cp build-macos-${buildType}/test/unit-test-report.xml build-dir/test/
+                        cp build-macosx-${buildType}/test/unit-test-report.xml build-dir/test/
                     """
-                    recordTests("macos_${buildType}")
+                    recordTests("macosx_${buildType}")
                 }
             }
         }
