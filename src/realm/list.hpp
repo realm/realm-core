@@ -91,8 +91,13 @@ public:
     virtual Mixed sum(size_t* return_cnt = nullptr) const = 0;
     virtual Mixed avg(size_t* return_cnt = nullptr) const = 0;
 
+    // Modifies a vector if indices so that they refer to values sorted according
+    // to the specified sort order
     virtual void sort(std::vector<size_t>& indices, bool ascending = true) const = 0;
-    virtual void distinct(std::vector<size_t>& indices) const = 0;
+    // Modifies a vector if indices so that they refer to distinct values.
+    // If 'sort_order' is supplied, the indices will refer to values in sort order,
+    // otherwise the indices will be in original order.
+    virtual void distinct(std::vector<size_t>& indices, util::Optional<bool> sort_order = util::none) const = 0;
 
     bool is_empty() const
     {
@@ -340,7 +345,7 @@ public:
     Mixed avg(size_t* return_cnt = nullptr) const final;
 
     void sort(std::vector<size_t>& indices, bool ascending = true) const final;
-    void distinct(std::vector<size_t>& indices) const final;
+    void distinct(std::vector<size_t>& indices, util::Optional<bool> sort_order = util::none) const final;
 
     T get(size_t ndx) const
     {

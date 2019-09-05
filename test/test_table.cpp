@@ -3240,6 +3240,12 @@ TEST(Table_ListOfPrimitivesDistinct)
 
     list.distinct(indices);
     cmp();
+    list.distinct(indices, true);
+    std::sort(distinct_values.begin(), distinct_values.end(), std::less<int64_t>());
+    cmp();
+    list.distinct(indices, false);
+    std::sort(distinct_values.begin(), distinct_values.end(), std::greater<int64_t>());
+    cmp();
 }
 
 TEST(Table_object_merge_nodes)
