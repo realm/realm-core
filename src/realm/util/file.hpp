@@ -1102,6 +1102,8 @@ inline bool File::try_lock_shared()
 inline File::MapBase::MapBase() noexcept
 {
     m_addr = nullptr;
+    m_size = 0;
+    m_reservation_size = 0;
 }
 
 inline File::MapBase::~MapBase() noexcept

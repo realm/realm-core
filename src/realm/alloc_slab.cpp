@@ -1212,20 +1212,23 @@ void SlabAlloc::update_reader_view(size_t file_size)
         if (file_size < old_slab_base) {
             size_t section_start_offset = get_section_base(old_num_sections - 1);
             size_t section_size = file_size - section_start_offset;
-            auto ok = m_mappings[mapping_index].extend(m_file, File::access_ReadOnly, section_size);
-            ok = randomly_false_in_debug(ok);
+            //auto ok = m_mappings[mapping_index].extend(m_file, File::access_ReadOnly, section_size);
+            //ok = randomly_false_in_debug(ok);
+            auto ok = false;
             if (!ok) {
                 requires_new_translation = true;
                 size_t section_reservation = get_section_base(old_num_sections) - section_start_offset;
                 // save the old mapping/keep it open
                 OldMapping oldie(m_youngest_live_version, m_mappings[mapping_index]);
                 m_old_mappings.emplace_back(std::move(oldie));
-                m_mappings[mapping_index].reserve(m_file, File::access_ReadOnly, section_start_offset,
-                                                  section_reservation);
-                ok = m_mappings[mapping_index].extend(m_file, File::access_ReadOnly, section_size);
+                //m_mappings[mapping_index].reserve(m_file, File::access_ReadOnly, section_start_offset,
+                //                                  section_reservation);
+                //ok = m_mappings[mapping_index].extend(m_file, File::access_ReadOnly, section_size);
+                m_mappings[mapping_index] =
+                    util::File::Map<char>(m_file, section_start_offset, File::access_ReadOnly, section_size);
                 m_mapping_version++;
             }
-            REALM_ASSERT(ok);
+            // REALM_ASSERT(ok);
         }
         else { // extension stretches over multiple sections:
 
@@ -1234,8 +1237,9 @@ void SlabAlloc::update_reader_view(size_t file_size)
             if (old_baseline < old_slab_base) {
                 size_t section_start_offset = get_section_base(old_num_sections - 1);
                 size_t section_size = old_slab_base - section_start_offset;
-                auto ok = m_mappings[mapping_index].extend(m_file, File::access_ReadOnly, section_size);
-                ok = randomly_false_in_debug(ok);
+                //auto ok = m_mappings[mapping_index].extend(m_file, File::access_ReadOnly, section_size);
+                //ok = randomly_false_in_debug(ok);
+                bool ok = false;
                 if (!ok) {
                     // we could not extend the old mapping, so replace it with a full, new one
                     requires_new_translation = true;
@@ -1284,9 +1288,10 @@ void SlabAlloc::update_reader_view(size_t file_size)
                     section_start_offset;
                 size_t section_size = file_size - section_start_offset;
                 util::File::Map<char> mapping;
-                mapping.reserve(m_file, File::access_ReadOnly, section_start_offset, section_reservation);
-                auto ok = mapping.extend(m_file, File::access_ReadOnly, section_size);
-                REALM_ASSERT(ok); // should allways succeed, as this is the first extend()
+                mapping = util::File::Map<char>(m_file, section_start_offset, File::access_ReadOnly, section_size);
+                //mapping.reserve(m_file, File::access_ReadOnly, section_start_offset, section_reservation);
+                //auto ok = mapping.extend(m_file, File::access_ReadOnly, section_size);
+                //REALM_ASSERT(ok); // should allways succeed, as this is the first extend()
                 m_mappings[num_full_mappings] = std::move(mapping);
             }
         }
@@ -1371,6 +1376,7 @@ void SlabAlloc::rebuild_translations(bool requires_new_translation, size_t old_n
         new_translation_table = new RefTranslation[m_translation_table_size];
         for (int i = 0; i < m_sections_in_compatibility_mapping; ++i) {
             new_translation_table[i].mapping_addr = m_compatibility_mapping.get_addr() + get_section_base(i);
+            REALM_ASSERT(new_translation_table[i].mapping_addr);
 #if REALM_ENABLE_ENCRYPTION
             new_translation_table[i].encrypted_mapping = m_compatibility_mapping.get_encrypted_mapping();
 #endif
@@ -1380,6 +1386,7 @@ void SlabAlloc::rebuild_translations(bool requires_new_translation, size_t old_n
     for (size_t k = old_num_sections; k < num_mappings; ++k) {
         auto i = k + m_sections_in_compatibility_mapping;
         new_translation_table[i].mapping_addr = m_mappings[k].get_addr();
+        REALM_ASSERT(new_translation_table[i].mapping_addr);
 #if REALM_ENABLE_ENCRYPTION
         new_translation_table[i].encrypted_mapping = m_mappings[k].get_encrypted_mapping();
 #endif
@@ -1387,6 +1394,7 @@ void SlabAlloc::rebuild_translations(bool requires_new_translation, size_t old_n
     for (size_t k = 0; k < free_space_size; ++k) {
         char* base = m_slabs[k].addr;
         auto i = num_mappings + m_sections_in_compatibility_mapping + k;
+        REALM_ASSERT(base);
 #if REALM_ENABLE_ENCRYPTION
         new_translation_table[i] = {base, nullptr};
 #else

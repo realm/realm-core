@@ -1047,7 +1047,7 @@ void* File::map_fixed(AccessMode a, void* address, size_t size, int /* map_flags
     // windows, no encryption - this is not supported, see explanation in alloc_slab.cpp,
     // above the method 'update_reader_view()'
     REALM_ASSERT(false);
-    return nullptr;
+    return MAP_FAILED;
 #else
     // unencrypted - mmap part of already reserved space
     return realm::util::mmap_fixed(m_fd, address, size, a, offset, m_encryption_key.get());
@@ -1079,7 +1079,7 @@ void* File::map_fixed(AccessMode a, void* address, size_t size, EncryptedFileMap
 #else
     // no encryption - unsupported on windows
     REALM_ASSERT(false);
-    return nullptr;
+    return MAP_FAILED;
 #endif
 }
 
@@ -1457,22 +1457,22 @@ void File::MapBase::map(const File& f, AccessMode a, size_t size, int map_flags,
 
 void File::MapBase::unmap() noexcept
 {
-    if (!m_addr || !m_reservation_size)
+    if (!m_addr)
         return;
+    REALM_ASSERT(m_reservation_size);
+    REALM_ASSERT(m_size);
+    REALM_ASSERT(m_reservation_size >= m_size);
     File::unmap(m_addr, m_reservation_size);
     m_addr = nullptr;
     m_size = m_reservation_size = 0;
 #if REALM_ENABLE_ENCRYPTION
     m_encrypted_mapping = nullptr;
 #endif
-    m_fd = -1;
 }
 
 void File::MapBase::remap(const File& f, AccessMode a, size_t size, int map_flags)
 {
     REALM_ASSERT(m_addr);
-    REALM_ASSERT(m_size == size);
-    REALM_ASSERT(m_reservation_size == size);
     m_addr = f.remap(m_addr, m_size, a, size, map_flags);
     m_size = size;
     m_reservation_size = size;
@@ -1494,6 +1494,7 @@ void File::MapBase::reserve(const File& f, AccessMode a, size_t offset_in_file, 
 #if REALM_ENABLE_ENCRYPTION
     m_encrypted_mapping = nullptr;
     if (f.get_encryption_key()) {
+        REALM_ASSERT(false);
         is_encrypted = true;
         m_size = m_reservation_size = reservation_size;
         m_addr = f.map(a, reservation_size, m_encrypted_mapping, 0, offset_in_file);
@@ -1504,12 +1505,14 @@ void File::MapBase::reserve(const File& f, AccessMode a, size_t offset_in_file, 
         m_reservation_size = 0;
         m_addr = nullptr; // no-op on windows
 #else
+//        reservation_size = 4096;
 //        m_addr = f.map_reserve(a, reservation_size, offset_in_file);
 //        m_reservation_size = reservation_size;
         m_addr = nullptr;
         m_reservation_size = 0;
 #endif
     }
+    std::cerr << "Reserving " << reservation_size << " @ " << offset_in_file << " -> " << m_addr << std::endl;
     m_offset = offset_in_file;
     m_fd = f.m_fd;
 }
@@ -1523,6 +1526,7 @@ bool File::MapBase::extend(const File& f, AccessMode a, size_t new_size)
 
 #if REALM_ENABLE_ENCRYPTION
     if (f.get_encryption_key()) {
+        REALM_ASSERT(false);
         // if the new size extends beyond reservation and encryption is enabled,
         // we cannot extend, so fail.
         if (new_size > m_reservation_size)
@@ -1539,6 +1543,8 @@ bool File::MapBase::extend(const File& f, AccessMode a, size_t new_size)
         auto desired_address = reinterpret_cast<char*>(m_addr) + m_size;
         auto desired_offset = m_offset + m_size;
         auto request_size = new_size - m_size;
+        std::cerr << "Extending " << request_size << " from " << desired_offset << " @ " << (void*)desired_address << std::endl;
+        std::cerr << "        - New mapping " << m_addr << " size " << new_size << std::endl;
         addr = f.map_fixed(access_ReadOnly, desired_address, request_size, 0, desired_offset);
         if (addr != MAP_FAILED) {
             REALM_ASSERT_RELEASE(addr == desired_address);
@@ -1546,17 +1552,22 @@ bool File::MapBase::extend(const File& f, AccessMode a, size_t new_size)
     }
     else {
         // we are free to mmap at any address so let the system decide
+        std::cerr << "Mapping " << new_size << " from " << m_offset << std::endl;
         addr = f.map(a, new_size, 0, m_offset);
+        std::cerr << "                  - @ " << addr << std::endl;
         if (addr != MAP_FAILED)
             m_addr = addr;
     }
     if (addr != MAP_FAILED) {
         m_size = new_size;
+        //for (int j = 0; j < m_size; ++j)
+        //    volatile char c = (reinterpret_cast<char*>(m_addr))[j];
         if (m_size > m_reservation_size)
             m_reservation_size = m_size;
         return true;
     }
     else {
+        std::cerr << " ** Mapping failed ** " << std::endl;
         return false;
     }
 }
