@@ -1154,7 +1154,7 @@ ref_type Cluster::insert(ObjKey k, const FieldValues& init_values, ClusterNode::
         }
         // Key value is bigger than all other values, should be put last
         ndx = sz;
-        if (k.value > int(sz)) {
+        if (k.value > int(sz) && sz < cluster_node_size) {
             ensure_general_form();
         }
     }
