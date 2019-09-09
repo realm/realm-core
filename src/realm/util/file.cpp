@@ -1461,7 +1461,7 @@ void File::MapBase::unmap() noexcept
     REALM_ASSERT(m_size);
     File::unmap(m_addr, m_size);
     m_addr = nullptr;
-    m_size = m_size = 0;
+    m_size = 0;
 #if REALM_ENABLE_ENCRYPTION
     m_encrypted_mapping = nullptr;
 #endif
