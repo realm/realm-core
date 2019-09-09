@@ -1126,21 +1126,7 @@ inline bool randomly_false_in_debug(bool x)
   which extends beyond the last page of a file, the result is undefined, so we can't do that.
   We don't want to extend the file in increments as large as the chunk size.
 
-  The approach chosen on unixes is to only reserve a *virtual address range* large enough for
-  a chunk, and then gradually re-map it as the file grows. Having reserved it first, we're
-  guaranteed that the remapping operation will succeed. This allows us to ensure that any
-  existing mapping continues to stay valid even as new mappings are added. This is crucial
-  for sharing the mapping between multiple readers.
-
-  Unfortunately, there are no similar guarantees on Windows. On Windows you *can* reserve
-  address space for a full chunk, but you cannot remap only a portion of it. Only the full
-  section. Furthermore, you have to first release the reserved address space and then map
-  the file. This conceivably allows a different thread asking for virtual memory to grab
-  it between it is released and the file is mapped. Another complication is that on Windows
-  you cannot subdivide or coalesce a mapping range, because established mappings are identified
-  solely by their starting address, not as a range.
-
-  On Windows we choose to grow by creating a new larger memory mapping, which replaces the
+  As the file grows, we grow the mapping by creating a new larger one, which replaces the
   old one in the mapping table. However, we must keep the old mapping open, because older
   read transactions will continue to use it. Hence, the replaced mappings are accumulated
   and only cleaned out once we know that no transaction can refer to them anymore.
@@ -1151,18 +1137,6 @@ inline bool randomly_false_in_debug(bool x)
   The binding to the file is done by software. This allows us to "cheat" and allocate
   entire sections. With encryption, it doesn't matter if the mapped memory logically
   extends beyond the end of file, because it will not be accessed.
-
-  The following "branching out" is placed in "file.cpp":
-
-  Operation:   Encryption:           No encryption, Unixes:     No encryption, Windows:
-
-  reserve      allocate req          reserve chunk              no-op
-  extend       no-op                 remap part of reservation  allocate req (*)
-  mmap         allocate req          allocate req               allocate req
-
-  (*) If the mapping is already established for part of the requested area, then
-      extend() fail, and we must preserve the earlier mapping as described above,
-      then create a new one.
 
   Growing/Changing the mapping table.
 
@@ -1198,7 +1172,7 @@ void SlabAlloc::update_reader_view(size_t file_size)
     REALM_ASSERT_DEBUG(is_free_space_clean());
     bool requires_new_translation = false;
 
-    // Extend mapping by adding sections, or by extending sections
+    // Extend mapping by adding sections, potentially replacing older sections
     size_t old_baseline = m_baseline.load(std::memory_order_relaxed);
     auto old_slab_base = align_size_to_section_boundary(old_baseline);
     size_t old_num_sections = get_section_index(old_slab_base);

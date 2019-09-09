@@ -713,7 +713,6 @@ public:
         m_size = other.m_size;
         m_offset = other.m_offset;
         m_fd = other.m_fd;
-        other.m_fd = -1;
         other.m_offset = 0;
         other.m_addr = nullptr;
         other.m_size = 0;
