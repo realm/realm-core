@@ -612,14 +612,9 @@ private:
 
         // Use
         void map(const File&, AccessMode, size_t size, int map_flags, size_t offset = 0);
-        void reserve(const File&, AccessMode, size_t offset_in_file, size_t reservation_size);
         void remap(const File&, AccessMode, size_t size, int map_flags);
         void unmap() noexcept;
         void sync();
-        // extends a mapping to a larger size and at the existing virtual
-        // memory address. Returns false if failed. Chance of success is
-        // higher if virtual address space has been reserved in advance.
-        bool extend(const File&, AccessMode, size_t new_size);
 #if REALM_ENABLE_ENCRYPTION
         mutable util::EncryptedFileMapping* m_encrypted_mapping = nullptr;
         inline util::EncryptedFileMapping* get_encrypted_mapping() const
@@ -698,16 +693,6 @@ public:
 
     explicit Map(const File&, size_t offset, AccessMode = access_ReadOnly, size_t size = sizeof(T),
                  int map_flags = 0);
-
-    /// Reserve memory for later map extensions
-    void reserve(const File& f, AccessMode am, size_t offset_in_file, size_t reservation_size)
-    {
-        MapBase::reserve(f, am, offset_in_file, reservation_size);
-    }
-    bool extend(const File& f, AccessMode am, size_t new_size)
-    {
-        return MapBase::extend(f, am, new_size);
-    }
 
     /// Create an instance that is not initially attached to a memory
     /// mapped file.
