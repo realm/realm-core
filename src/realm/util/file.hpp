@@ -598,7 +598,6 @@ private:
     struct MapBase {
         void* m_addr = nullptr;
         mutable size_t m_size = 0;
-        mutable size_t m_reservation_size = -1;
         size_t m_offset = 0;
         FileDesc m_fd;
 
@@ -612,14 +611,9 @@ private:
 
         // Use
         void map(const File&, AccessMode, size_t size, int map_flags, size_t offset = 0);
-        void reserve(const File&, AccessMode, size_t offset_in_file, size_t reservation_size);
         void remap(const File&, AccessMode, size_t size, int map_flags);
         void unmap() noexcept;
         void sync();
-        // extends a mapping to a larger size and at the existing virtual
-        // memory address. Returns false if failed.
-        // The mapping must have been reserved in advance
-        bool extend(const File&, AccessMode, size_t new_size);
 #if REALM_ENABLE_ENCRYPTION
         mutable util::EncryptedFileMapping* m_encrypted_mapping = nullptr;
         inline util::EncryptedFileMapping* get_encrypted_mapping() const
@@ -699,16 +693,6 @@ public:
     explicit Map(const File&, size_t offset, AccessMode = access_ReadOnly, size_t size = sizeof(T),
                  int map_flags = 0);
 
-    /// Reserve memory for later map extensions
-    void reserve(const File& f, AccessMode am, size_t offset_in_file, size_t reservation_size)
-    {
-        MapBase::reserve(f, am, offset_in_file, reservation_size);
-    }
-    bool extend(const File& f, AccessMode am, size_t new_size)
-    {
-        return MapBase::extend(f, am, new_size);
-    }
-
     /// Create an instance that is not initially attached to a memory
     /// mapped file.
     Map() noexcept;
@@ -727,11 +711,10 @@ public:
             unmap();
         m_addr = other.get_addr();
         m_size = other.m_size;
-        m_reservation_size = other.m_reservation_size;
         m_offset = other.m_offset;
+        m_fd = other.m_fd;
         other.m_offset = 0;
-        other.m_reservation_size = 0;
-        other.m_addr = 0;
+        other.m_addr = nullptr;
         other.m_size = 0;
 #if REALM_ENABLE_ENCRYPTION
         m_encrypted_mapping = other.m_encrypted_mapping;
@@ -1100,6 +1083,7 @@ inline bool File::try_lock_shared()
 inline File::MapBase::MapBase() noexcept
 {
     m_addr = nullptr;
+    m_size = 0;
 }
 
 inline File::MapBase::~MapBase() noexcept
