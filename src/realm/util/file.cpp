@@ -1449,7 +1449,6 @@ void File::MapBase::map(const File& f, AccessMode a, size_t size, int map_flags,
     m_addr = f.map(a, size, map_flags, offset);
 #endif
     m_size = size;
-    m_reservation_size = size;
     m_fd = f.m_fd;
     m_offset = offset;
 }
@@ -1459,12 +1458,10 @@ void File::MapBase::unmap() noexcept
 {
     if (!m_addr)
         return;
-    REALM_ASSERT(m_reservation_size);
     REALM_ASSERT(m_size);
-    REALM_ASSERT(m_reservation_size >= m_size);
-    File::unmap(m_addr, m_reservation_size);
+    File::unmap(m_addr, m_size);
     m_addr = nullptr;
-    m_size = m_reservation_size = 0;
+    m_size = m_size = 0;
 #if REALM_ENABLE_ENCRYPTION
     m_encrypted_mapping = nullptr;
 #endif
@@ -1475,7 +1472,6 @@ void File::MapBase::remap(const File& f, AccessMode a, size_t size, int map_flag
     REALM_ASSERT(m_addr);
     m_addr = f.remap(m_addr, m_size, a, size, map_flags);
     m_size = size;
-    m_reservation_size = size;
 }
 
 void File::MapBase::sync()

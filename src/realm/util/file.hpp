@@ -598,7 +598,6 @@ private:
     struct MapBase {
         void* m_addr = nullptr;
         mutable size_t m_size = 0;
-        mutable size_t m_reservation_size = -1;
         size_t m_offset = 0;
         FileDesc m_fd;
 
@@ -712,12 +711,10 @@ public:
             unmap();
         m_addr = other.get_addr();
         m_size = other.m_size;
-        m_reservation_size = other.m_reservation_size;
         m_offset = other.m_offset;
         m_fd = other.m_fd;
         other.m_fd = -1;
         other.m_offset = 0;
-        other.m_reservation_size = 0;
         other.m_addr = nullptr;
         other.m_size = 0;
 #if REALM_ENABLE_ENCRYPTION
@@ -1088,7 +1085,6 @@ inline File::MapBase::MapBase() noexcept
 {
     m_addr = nullptr;
     m_size = 0;
-    m_reservation_size = 0;
 }
 
 inline File::MapBase::~MapBase() noexcept
