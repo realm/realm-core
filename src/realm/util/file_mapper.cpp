@@ -634,7 +634,7 @@ void* mmap_fixed(FileDesc fd, void* address_request, size_t size, File::AccessMo
 // we have to map it read/write regardless of the request.
 // FIXME: Make this work for windows!
 #ifdef _WIN32
-        return MAP_FAILED;
+        return nullptr;
 #else
         return ::mmap(address_request, size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE | MAP_FIXED, -1, 0);
 #endif
@@ -688,7 +688,7 @@ void* mmap_fixed(FileDesc fd, void* address_request, size_t size, File::AccessMo
     static_cast<void>(enc_key); // FIXME: Consider removing this parameter
 #ifdef _WIN32
     REALM_ASSERT(false);
-    return MAP_FAILED; // silence warning
+    return nullptr; // silence warning
 #else
     auto prot = PROT_READ;
     if (access == File::access_ReadWrite)

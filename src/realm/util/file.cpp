@@ -1047,7 +1047,7 @@ void* File::map_fixed(AccessMode a, void* address, size_t size, int /* map_flags
     // windows, no encryption - this is not supported, see explanation in alloc_slab.cpp,
     // above the method 'update_reader_view()'
     REALM_ASSERT(false);
-    return MAP_FAILED;
+    return nullptr;
 #else
     // unencrypted - mmap part of already reserved space
     return realm::util::mmap_fixed(m_fd, address, size, a, offset, m_encryption_key.get());
@@ -1079,7 +1079,7 @@ void* File::map_fixed(AccessMode a, void* address, size_t size, EncryptedFileMap
 #else
     // no encryption - unsupported on windows
     REALM_ASSERT(false);
-    return MAP_FAILED;
+    return nullptr;
 #endif
 }
 
