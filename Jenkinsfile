@@ -81,7 +81,7 @@ jobWrapper {
                 androidArmeabiRelease   : doAndroidBuildInDocker('armeabi-v7a', 'Release', true),
                 coverage                : doBuildCoverage(),
                 performance             : buildPerformance(),
-                valgrind                : doCheckValgrind()
+                // valgrind                : doCheckValgrind()
             ]
             parallelExecutors.putAll(extendedChecks)
         }
