@@ -31,6 +31,7 @@
 #include <realm/util/file.hpp>
 #include <realm/util/scope_exit.hpp>
 #include <realm/util/uri.hpp>
+#include <realm/obj.hpp>
 
 #include <stdexcept>
 #include <vector>
@@ -38,18 +39,10 @@
 using namespace realm;
 using namespace realm::_impl;
 
-namespace {
-sync::ObjectID id_for_row(Group& group, RowExpr row)
-{
-    return sync::object_id_for_row(group, *row.get_table(), row.get_index());
-}
-} // anonymous namespace
-
 AdminRealmListener::AdminRealmListener(std::string local_root_dir, SyncConfig sync_config_template)
 : m_local_root_dir(std::move(local_root_dir))
 , m_sync_config_template(std::move(sync_config_template))
 {
-    m_config.cache = false;
     m_config.path = util::File::resolve("realms.realm", m_local_root_dir);
     // We explicitly set the schema to avoid a race condition where the Admin Realm may
     // have been created but its schema may not have been uploaded to the server yet.
@@ -75,10 +68,11 @@ void AdminRealmListener::start()
         // If we've finished downloading the Realm, just re-report all the files listed in it
         auto& group = realm->read_group();
         auto& table = *ObjectStore::table_for_object_type(group, "RealmFile");
-        size_t path_col_ndx = table.get_column_index("path");
+        auto path_col_key = table.get_column_key("path");
 
-        for (size_t i = 0, size = table.size(); i < size; ++i)
-            register_realm(id_for_row(group, table[i]), table.get_string(path_col_ndx, i));
+        for (auto& obj : table) {
+            register_realm(table.get_object_id(obj.get_key()), obj.get<String>(path_col_key));
+        }
         return;
     }
 
@@ -122,11 +116,11 @@ void AdminRealmListener::start()
                 if (!self)
                     return;
 
-                auto& group = self->m_results.get_realm()->read_group();
-                size_t path_col_ndx = self->m_results.get(0).get_column_index("path");
+                auto& table = self->m_results.get_tableview().get_parent();
+                auto path_col_key = table.get_column_key("path");
                 for (auto i : c.deletions.as_indexes()) {
-                    auto row = self->m_results.get(i);
-                    self->unregister_realm(id_for_row(group, row), row.get_string(path_col_ndx));
+                    auto obj = self->m_results.get(i);
+                    self->unregister_realm(table.get_object_id(obj.get_key()), obj.get<StringData>(path_col_key));
                 }
             }
 
@@ -141,20 +135,20 @@ void AdminRealmListener::start()
                 if (self->m_results.size() == 0)
                     return;
 
-                auto& group = self->m_results.get_realm()->read_group();
-                size_t path_col_ndx = self->m_results.get(0).get_column_index("path");
+                auto& table = self->m_results.get_tableview().get_parent();
+                auto path_col_key = table.get_column_key("path");
 
                 if (!initial_sent) {
                     for (size_t i = 0, size = self->m_results.size(); i < size; ++i) {
-                        auto row = self->m_results.get(i);
-                        self->register_realm(id_for_row(group, row), row.get_string(path_col_ndx));
+                        auto obj = self->m_results.get(i);
+                        self->register_realm(table.get_object_id(obj.get_key()), obj.get<StringData>(path_col_key));
                     }
                     initial_sent = true;
                 }
                 else {
                     for (auto i : c.insertions.as_indexes()) {
-                        auto row = self->m_results.get(i);
-                        self->register_realm(id_for_row(group, row), row.get_string(path_col_ndx));
+                        auto obj = self->m_results.get(i);
+                        self->register_realm(table.get_object_id(obj.get_key()), obj.get<StringData>(path_col_key));
                     }
                 }
             }
@@ -190,7 +184,6 @@ Realm::Config AdminRealmListener::get_config(StringData virtual_path, StringData
     config.sync_config = std::make_unique<SyncConfig>(m_sync_config_template);
     config.sync_config->reference_realm_url += virtual_path.data();
     config.schema_mode = SchemaMode::Additive;
-    config.cache = false;
     config.automatic_change_notifications = false;
     return config;
 }

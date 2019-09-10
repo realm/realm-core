@@ -28,6 +28,7 @@
 #include <realm/impl/transact_log.hpp>
 #include <realm/impl/input_stream.hpp>
 #include <realm/util/base64.hpp>
+#include <realm/object_id.hpp>
 
 #include <json.hpp>
 #include <unordered_map>
@@ -46,7 +47,6 @@ bool equals(nlohmann::json const& a, nlohmann::json const& b) {
 
 using namespace realm;
 
-using ObjectID = sync::ObjectID;
 using Instruction = sync::Instruction;
 
 namespace {
@@ -60,10 +60,10 @@ static PropertyType from_core_type(DataType type)
         case type_String:    return PropertyType::String;
         case type_Binary:    return PropertyType::Data;
         case type_Timestamp: return PropertyType::Date;
-        case type_Mixed:     return PropertyType::Any;
+        case type_OldMixed:  return PropertyType::Any;
         case type_Link:      return PropertyType::Object | PropertyType::Nullable;
         case type_LinkList:  return PropertyType::Object | PropertyType::Array;
-        case type_Table:     REALM_ASSERT(false && "Use ObjectSchema::from_core_type if subtables are a possibility");
+        case type_OldTable:  REALM_ASSERT(false && "Use ObjectSchema::from_core_type if subtables are a possibility");
         default: REALM_UNREACHABLE();
     }
 }
@@ -74,7 +74,7 @@ public:
 
     ChangesetCookerInstructionHandler(const Group &group, util::Logger& logger, util::AppendBuffer<char>& out_buffer)
     : m_group(group)
-    , m_table_info(m_group)
+    , m_table_info(static_cast<Transaction&>(const_cast<Group&>(m_group)))
     , m_logger(logger)
     , m_out_buffer(out_buffer)
     {
@@ -193,12 +193,13 @@ public:
                     return it->second;
                 }
 
-                size_t row = sync::row_for_object_id(m_table_info, table, object_id);
-                REALM_ASSERT(row != npos);
-                if (is_nullable(primary_key->type) && table.is_null(primary_key->table_column, row)) {
+                auto obj_key = table.get_obj_key(object_id);
+                auto obj = table.get_object(obj_key);
+                REALM_ASSERT(obj);
+                if (is_nullable(primary_key->type) && obj.is_null(primary_key->column_key)) {
                     return nullptr;
                 }
-                return table.get_int(primary_key->table_column, row);
+                return obj.get<int64_t>(primary_key->column_key);
             }
             else if (primary_key->type == PropertyType::String) {
                 auto& string_primaries = m_string_primaries[object_type];
@@ -207,9 +208,10 @@ public:
                     return it->second;
                 }
 
-                size_t row = sync::row_for_object_id(m_table_info, table, object_id);
-                REALM_ASSERT(row != npos);
-                StringData value = table.get_string(primary_key->table_column, row);
+                auto obj_key = table.get_obj_key(object_id);
+                auto obj = table.get_object(obj_key);
+                REALM_ASSERT(obj);
+                StringData value = obj.get<StringData>(primary_key->column_key);
                 if (value.is_null())
                     return nullptr;
                 return std::string(value);
@@ -235,7 +237,7 @@ public:
             }
             it = m_schema.emplace(std::piecewise_construct,
                                   std::forward_as_tuple(object_type),
-                                  std::forward_as_tuple(m_group, object_type, out_table->get_index_in_group())).first;
+                                  std::forward_as_tuple(m_group, object_type, out_table->get_key())).first;
         }
 
         out_object_schema = &it->second;
@@ -421,8 +423,8 @@ public:
             }
 
 
-            case type_Table:
-            case type_Mixed:
+            case type_OldTable:
+            case type_OldMixed:
             case type_LinkList:
             case type_OldDateTime:
                 REALM_TERMINATE("Unsupported data type.");
@@ -461,7 +463,7 @@ public:
                     {"object_type", get_string(instr.link_target_table)}
                 });
             }
-            else if (instr.type == type_Table) {
+            else if (instr.type == type_OldTable) {
                 // FIXME: Arrays of primitives are not yet supported.
             }
             else {
@@ -559,7 +561,7 @@ public:
     }
 };
 
-class ChangesetCooker final : public sync::ClientHistory::ChangesetCooker {
+class ChangesetCooker final : public sync::ClientReplication::ChangesetCooker {
 public:
     ChangesetCooker(util::Logger& logger) : m_logger(logger) { }
 
@@ -588,8 +590,8 @@ public:
     using AdminRealmListener::start;
 
 private:
-    void register_realm(sync::ObjectID, StringData virtual_path) override;
-    void unregister_realm(sync::ObjectID, StringData) override {}
+    void register_realm(ObjectID, StringData virtual_path) override;
+    void unregister_realm(ObjectID, StringData) override {}
     void error(std::exception_ptr) override {} // FIXME
     void download_complete() override {}
 
@@ -627,7 +629,7 @@ Realm::Config Adapter::Impl::get_config(StringData virtual_path, util::Optional<
     return config;
 }
 
-void Adapter::Impl::register_realm(sync::ObjectID, StringData virtual_path) {
+void Adapter::Impl::register_realm(ObjectID, StringData virtual_path) {
     std::string path = virtual_path;
     if (!std::regex_match(path, m_regex))
         return;
@@ -650,8 +652,8 @@ Adapter::Adapter(std::function<void(std::string)> realm_changed, std::regex rege
 }
 
 util::Optional<util::AppendBuffer<char>> Adapter::current(std::string realm_path) {
-    auto history = realm::sync::make_client_history(get_config(realm_path, util::none).path);
-    SharedGroup sg(*history);
+    auto history = realm::sync::make_client_replication(get_config(realm_path, util::none).path);
+    auto db = DB::create(*history);
 
     auto progress = history->get_cooked_progress();
     if (progress.changeset_index >= history->get_num_cooked_changesets()) {
@@ -664,8 +666,8 @@ util::Optional<util::AppendBuffer<char>> Adapter::current(std::string realm_path
 }
 
 void Adapter::advance(std::string realm_path) {
-    auto history = realm::sync::make_client_history(get_config(realm_path, util::none).path);
-    SharedGroup sg(*history);
+    auto history = realm::sync::make_client_replication(get_config(realm_path, util::none).path);
+    auto db = DB::create(*history);
 
     auto progress = history->get_cooked_progress();
     if (progress.changeset_index < history->get_num_cooked_changesets()) {

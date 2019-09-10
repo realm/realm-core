@@ -40,8 +40,8 @@ public:
 
     Realm::Config get_config(StringData virtual_path, StringData id = nullptr) const;
 
-    virtual void register_realm(sync::ObjectID id, StringData virtual_path) = 0;
-    virtual void unregister_realm(sync::ObjectID id, StringData virtual_path) = 0;
+    virtual void register_realm(ObjectID id, StringData virtual_path) = 0;
+    virtual void unregister_realm(ObjectID id, StringData virtual_path) = 0;
     virtual void download_complete() = 0;
     virtual void error(std::exception_ptr) = 0;
 

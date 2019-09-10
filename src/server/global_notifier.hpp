@@ -24,10 +24,8 @@
 #include "sync/sync_config.hpp"
 
 namespace realm {
-class SyncUser;
-namespace sync {
 struct ObjectID;
-}
+class SyncUser;
 
 /// Used to listen for changes across all, or a subset of all Realms on a
 /// particular sync server.
@@ -94,13 +92,13 @@ public:
 private:
     ChangeNotification(std::shared_ptr<GlobalNotifier::Impl> notifier,
                        std::string virtual_path,
-                       sync::ObjectID realm_id,
+                       ObjectID realm_id,
                        Realm::Config config,
                        VersionID old_version, VersionID new_version);
     ChangeNotification(std::shared_ptr<GlobalNotifier::Impl> notifier,
                        std::string virtual_path,
-                       sync::ObjectID realm_id);
-    sync::ObjectID m_realm_id;
+                       ObjectID realm_id);
+    ObjectID m_realm_id;
     Realm::Config m_config;
     VersionID m_old_version;
     VersionID m_new_version;
