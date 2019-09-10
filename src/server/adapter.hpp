@@ -60,6 +60,7 @@ public:
             case InstructionType::AddType:          return "ADD_TYPE";
             case InstructionType::AddProperties:    return "ADD_PROPERTIES";
         }
+        return {};
     }
 
     util::Optional<util::AppendBuffer<char>> current(std::string realm_path);
