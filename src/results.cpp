@@ -129,15 +129,8 @@ size_t Results::size()
         case Mode::Empty:    return 0;
         case Mode::Table:    return m_table->size();
         case Mode::List:
-            if (m_descriptor_ordering.will_apply_distinct()) {
-                bool needs_update = m_list->has_changed();
-                if (!m_list_indices) {
-                    m_list_indices = std::make_shared<std::vector<size_t>>();
-                    needs_update = true;
-                }
-                if (needs_update) {
-                    m_list->distinct(*m_list_indices);
-                }
+            if (!m_descriptor_ordering.is_empty()) {
+                evaluate_sort_and_distinct_on_list();
                 return m_list_indices->size();
             }
             return m_list->size();
@@ -184,6 +177,37 @@ auto& Results::list_as() const
     return static_cast<Lst<T>&>(*m_list);
 }
 
+void Results::evaluate_sort_and_distinct_on_list()
+{
+    bool needs_update = m_list->has_changed();
+    if (!m_list_indices) {
+        m_list_indices = std::make_shared<std::vector<size_t>>();
+        needs_update = true;
+    }
+    if (needs_update) {
+        util::Optional<bool> sort_order;
+        bool do_distinct = false;
+        auto sz = m_descriptor_ordering.size();
+        for (size_t i = 0; i < sz; i++) {
+            auto descr = m_descriptor_ordering[i];
+            if (descr->get_type() == DescriptorType::Sort) {
+                sort_order = static_cast<const SortDescriptor*>(descr)->is_ascending(0);
+            }
+            if (descr->get_type() == DescriptorType::Distinct) {
+                do_distinct = true;
+            }
+        }
+
+        if (do_distinct) {
+            m_list->distinct(*m_list_indices, sort_order);
+        }
+        else {
+            REALM_ASSERT(sort_order);
+            m_list->sort(*m_list_indices, *sort_order);
+        }
+    }
+}
+
 template<typename T>
 util::Optional<T> Results::try_get(size_t ndx)
 {
@@ -194,25 +218,9 @@ util::Optional<T> Results::try_get(size_t ndx)
                 return list_as<T>().get(ndx);
         }
         else {
-            bool needs_update = m_list->has_changed();
-            if (!m_list_indices) {
-                m_list_indices = std::make_shared<std::vector<size_t>>();
-                needs_update = true;
-            }
-            if (needs_update) {
-                if (m_descriptor_ordering.will_apply_distinct()) {
-                    m_list->distinct(*m_list_indices);
-                }
-                else {
-                    auto s = m_descriptor_ordering[0];
-                    REALM_ASSERT(s->get_type() == DescriptorType::Sort);
-                    auto sort_desc = static_cast<const SortDescriptor*>(s);
-                    auto ascending = sort_desc->is_ascending(0);
-                    REALM_ASSERT(ascending);
-                    m_list->sort(*m_list_indices, *ascending);
-                }
-            }
-            return list_as<T>().get(m_list_indices->at(ndx));
+            evaluate_sort_and_distinct_on_list();
+            if (ndx < m_list_indices->size())
+                return list_as<T>().get(m_list_indices->at(ndx));
         }
     }
     return util::none;

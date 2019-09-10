@@ -213,6 +213,13 @@ public:
     // not make the session reconnect.
     void set_multiplex_identifier(std::string multiplex_identity);
 
+    // See SyncConfig::url_prefix
+    //
+    // This method allows to override this value after the session is created but before it is bound
+    // because of Realm Cloud's token refresh service returning the sync worker ingress path with the token response.
+    // Prefer using the SyncConfig field in all other cases.
+    void set_url_prefix(std::string url_prefix);
+
     // Inform the sync session that it should close.
     void close();
 

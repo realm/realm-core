@@ -297,6 +297,8 @@ private:
 
     template<typename T>
     auto& list_as() const;
+
+    void evaluate_sort_and_distinct_on_list();
 };
 
 template<typename Fn>

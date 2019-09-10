@@ -521,12 +521,12 @@ TEST_CASE("thread safe reference") {
             r->commit_transaction();
 
             auto& table = *get_table(*r, "string object");
-            auto results = list.as_results().distinct({"self"}); // FIXME .sort({{"self", true}});
+            auto results = list.as_results().distinct({"self"}).sort({{"self", true}});
 
             REQUIRE(results.size() == 3);
-            REQUIRE(results.get<int64_t>(0) == 3);
+            REQUIRE(results.get<int64_t>(0) == 1);
             REQUIRE(results.get<int64_t>(1) == 2);
-            REQUIRE(results.get<int64_t>(2) == 1);
+            REQUIRE(results.get<int64_t>(2) == 3);
 
             auto ref = ThreadSafeReference(results);
             std::thread([ref = std::move(ref), config]() mutable {
@@ -534,9 +534,9 @@ TEST_CASE("thread safe reference") {
                 Results results = ref.resolve<Results>(r);
 
                 REQUIRE(results.size() == 3);
-                REQUIRE(results.get<int64_t>(0) == 3);
+                REQUIRE(results.get<int64_t>(0) == 1);
                 REQUIRE(results.get<int64_t>(1) == 2);
-                REQUIRE(results.get<int64_t>(2) == 1);
+                REQUIRE(results.get<int64_t>(2) == 3);
 
                 r->begin_transaction();
                 auto table = get_table(*r, "int array");
@@ -551,9 +551,9 @@ TEST_CASE("thread safe reference") {
             }).join();
 
             REQUIRE(results.size() == 3);
-            REQUIRE(results.get<int64_t>(0) == 3);
+            REQUIRE(results.get<int64_t>(0) == 1);
             REQUIRE(results.get<int64_t>(1) == 2);
-            REQUIRE(results.get<int64_t>(2) == 1);
+            REQUIRE(results.get<int64_t>(2) == 3);
 
             r->refresh();
 
