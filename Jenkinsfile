@@ -504,14 +504,8 @@ def doBuildMacOs(String buildType, boolean runTests) {
             if (runTests) {
                 try {
                     dir("build-macosx-${buildType}") {
-                        def environment = environment()
-                        environment << 'UNITTEST_PROGRESS=1'
-                        withEnv(environment) {
-                        sh """
-                            cd test
-                            ./${buildType}/realm-tests.app/Contents/MacOS/realm-tests
-                            cp $TMPDIR/unit-test-report.xml .
-                        """
+                        withEnv(environment()) {
+                            sh 'UNITTEST_PROGRESS=1 ./test/realm-tests'
                         }
                     }
                 } finally {
