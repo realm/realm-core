@@ -1,19 +1,12 @@
-# NEXT RELEASE
+# 6.0.0-alpha.18 Release notes
 
 ### Enhancements
 * We now reserve way less virtual address space. ([#3384](https://github.com/realm/realm-core/pull/3384))
 
-### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
- 
-### Breaking changes
-* None.
-
 -----------
 
 ### Internals
-* None.
+* You can now do sort as part of distinct on Lists.
 
 ----------------------------------------------
 
