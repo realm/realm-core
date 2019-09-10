@@ -113,6 +113,8 @@ struct SyncError {
 };
 
 struct SyncConfig {
+    using ProxyConfig = sync::Session::Config::ProxyConfig;
+
     std::shared_ptr<SyncUser> user;
     // The URL of the Realm, or of the reference Realm if partial sync is being used.
     // The URL that will be used when connecting to the object server is that returned by `realm_url()`,
@@ -127,6 +129,7 @@ struct SyncConfig {
     bool client_validate_ssl = true;
     util::Optional<std::string> ssl_trust_certificate_path = none;
     std::function<sync::Session::SSLVerifyCallback> ssl_verify_callback = nullptr;
+    util::Optional<ProxyConfig> proxy_config = none;
     bool is_partial = false;
     util::Optional<std::string> custom_partial_sync_identifier = none;
 
@@ -135,6 +138,8 @@ struct SyncConfig {
     util::Optional<std::string> authorization_header_name = none;
     std::map<std::string, std::string> custom_http_headers;
 
+    // Set the URL path prefix sync will use when opening a websocket for this session. Default is `/realm-sync`.
+    // Useful when the sync worker sits behind a firewall or load-balancer that rewrites incoming requests.
     util::Optional<std::string> url_prefix = none;
 
     // The name of the directory which Realms should be backed up to following

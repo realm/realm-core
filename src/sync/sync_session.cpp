@@ -599,6 +599,7 @@ void SyncSession::handle_error(SyncError error)
             case ClientError::unknown_message:
             case ClientError::bad_serial_transact_status:
             case ClientError::bad_object_id_substitutions:
+            case ClientError::http_tunnel_failed:
                 // Don't do anything special for these errors.
                 // Future functionality may require special-case handling for existing
                 // errors, or newly introduced error codes.
@@ -656,6 +657,7 @@ void SyncSession::create_sync_session()
     session_config.verify_servers_ssl_certificate = m_config.client_validate_ssl;
     session_config.ssl_trust_certificate_path = m_config.ssl_trust_certificate_path;
     session_config.ssl_verify_callback = m_config.ssl_verify_callback;
+    session_config.proxy_config = m_config.proxy_config;
     session_config.multiplex_ident = m_multiplex_identity;
 
     if (m_config.authorization_header_name) {
@@ -833,6 +835,11 @@ void SyncSession::override_server(std::string address, int port)
 void SyncSession::set_multiplex_identifier(std::string multiplex_identity)
 {
     m_multiplex_identity = std::move(multiplex_identity);
+}
+
+void SyncSession::set_url_prefix(std::string url_prefix)
+{
+    m_config.url_prefix = std::move(url_prefix);
 }
 
 SyncSession::PublicState SyncSession::get_public_state() const
