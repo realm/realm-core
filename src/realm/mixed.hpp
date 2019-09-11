@@ -162,6 +162,7 @@ public:
     float get_float() const;
     double get_double() const;
     StringData get_string() const;
+    BinaryData get_binary() const;
     Timestamp get_timestamp() const;
 
     bool is_null() const;
@@ -376,6 +377,11 @@ inline BinaryData Mixed::get<BinaryData>() const noexcept
 {
     REALM_ASSERT(get_type() == type_Binary);
     return BinaryData(str_val, ushort_val);
+}
+
+inline BinaryData Mixed::get_binary() const
+{
+    return get<BinaryData>();
 }
 
 template <>

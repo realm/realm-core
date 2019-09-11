@@ -40,6 +40,11 @@ public:
 
     void create();
 
+    bool is_attached() const
+    {
+        return m_arr->is_attached();
+    }
+
     ref_type get_ref() const
     {
         return m_arr->get_ref();
