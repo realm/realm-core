@@ -1,16 +1,4 @@
-# NEXT RELEASE
-
-### Enhancements
-* None.
-
-### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
- 
-### Breaking changes
-* None.
-
------------
+# 5.23.4 Release notes
 
 ### Internals
 * The release binaries for Apple platforms are now built with Xcode 10.0 (up from 9.4).
@@ -23,7 +11,7 @@
 ### Fixed
 * If a signal interrupted a msync() call, Core would throw an exception. This behavior has new been changed to retry the system call instead. (Issue [#3352](https://github.com/realm/realm-core/issues/3352))
 * Fixed a bug in sum() or average() of == and != queries on integer columns sometimes returning an incorrect result. ([#3356](https://github.com/realm/realm-core/pull/3356), since the beginning).
- 
+
 -----------
 
 ### Internals
