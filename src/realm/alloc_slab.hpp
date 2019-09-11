@@ -505,7 +505,7 @@ private:
 
     // grow the slab area.
     // returns a free block large enough to handle the request.
-    FreeBlock* grow_slab();
+    FreeBlock* grow_slab(int size);
     // create a single free chunk with "BetweenBlocks" at both ends and a
     // single free chunk between them. This free chunk will be of size:
     //   slab_size - 2 * sizeof(BetweenBlocks)
@@ -798,6 +798,12 @@ void SlabAlloc::for_all_free_entries(Func f) const
                 bb = reinterpret_cast<BetweenBlocks*>(reinterpret_cast<char*>(bb) + sizeof(BetweenBlocks) - size);
                 ref -= size;
             }
+        }
+        // any gaps in ref-space is reported as a free block to the validator:
+        auto next_ref = align_size_to_section_boundary(ref);
+        if (next_ref > ref) {
+            f(ref, next_ref - ref);
+            ref = next_ref;
         }
     }
 }

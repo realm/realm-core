@@ -166,7 +166,7 @@ SlabAlloc::Slab::~Slab()
 {
     total_slab_allocated.fetch_sub(size, std::memory_order_relaxed);
     if (addr)
-        util::munmap(addr, 1UL << section_shift);
+        util::munmap(addr, size);
 }
 
 void SlabAlloc::detach() noexcept
@@ -413,7 +413,7 @@ SlabAlloc::FreeBlock* SlabAlloc::allocate_block(int size)
         block = pop_freelist_entry(list);
     }
     else {
-        block = grow_slab();
+        block = grow_slab(size);
     }
     FreeBlock* remaining = break_block(block, size);
     if (remaining)
@@ -481,15 +481,21 @@ SlabAlloc::FreeBlock* SlabAlloc::merge_blocks(FreeBlock* first, FreeBlock* last)
     return first;
 }
 
-SlabAlloc::FreeBlock* SlabAlloc::grow_slab()
+SlabAlloc::FreeBlock* SlabAlloc::grow_slab(int size)
 {
-    // Allocate new slab. We allocate a full section but use mmap, so it'll
-    // be paged in on demand.
-    size_t new_size = 1UL << section_shift;
+    // Allocate new slab.
+    // - Allways allocate at least 1MB
+    // - Double allocation amount, but
+    // - Never allocate more than a full section (64MB)
+    size_t already_allocated = get_allocated_size();
+    size_t new_size = 1024*1024;
+    if (size > new_size) new_size = size;
+    if (new_size < already_allocated) new_size = already_allocated;
+    if (new_size > 64 * 1024 * 1024) new_size = 64 * 1024 * 1024;
 
     ref_type ref;
     if (m_slabs.empty()) {
-        ref = align_size_to_section_boundary(m_baseline.load(std::memory_order_relaxed));
+        ref = m_baseline.load(std::memory_order_relaxed);
     }
     else {
         // Find size of memory that has been modified (through copy-on-write) in current write transaction
@@ -497,7 +503,7 @@ SlabAlloc::FreeBlock* SlabAlloc::grow_slab()
         REALM_ASSERT_DEBUG_EX(curr_ref_end >= m_baseline, curr_ref_end, m_baseline, get_file_path_for_assertions());
         ref = curr_ref_end;
     }
-
+    ref = align_size_to_section_boundary(ref);
     size_t ref_end = ref;
     if (REALM_UNLIKELY(int_add_with_overflow_detect(ref_end, new_size))) {
         throw MaximumFileSizeExceeded("AllocSlab slab ref_end size overflow: " + util::to_string(ref) + " + " +
@@ -505,7 +511,6 @@ SlabAlloc::FreeBlock* SlabAlloc::grow_slab()
     }
 
     REALM_ASSERT(matches_section_boundary(ref));
-    REALM_ASSERT(matches_section_boundary(ref_end));
 
     std::lock_guard<std::mutex> lock(m_mapping_mutex);
     // Create new slab and add to list of slabs
