@@ -131,6 +131,7 @@ public:
     Mixed(ObjectId) noexcept;
     Mixed(util::Optional<ObjectId>) noexcept;
     Mixed(ObjKey) noexcept;
+    Mixed(ObjLink) noexcept;
 
     // These are shortcuts for Mixed(StringData(c_str)), and are
     // needed to avoid unwanted implicit conversion of char* to bool.
@@ -168,6 +169,7 @@ public:
     StringData get_string() const;
     BinaryData get_binary() const;
     Timestamp get_timestamp() const;
+    ObjLink get_link() const;
 
     bool is_null() const;
     int compare(const Mixed& b) const;
@@ -202,6 +204,7 @@ private:
         Timestamp date_val;
         ObjectId id_val;
         Decimal128 decimal_val;
+        ObjLink link_val;
     };
 };
 
@@ -347,6 +350,17 @@ inline Mixed::Mixed(ObjKey v) noexcept
     }
 }
 
+inline Mixed::Mixed(ObjLink v) noexcept
+{
+    if (v) {
+        m_type = type_TypedLink + 1;
+        link_val = v;
+    }
+    else {
+        m_type = 0;
+    }
+}
+
 template <>
 inline int64_t Mixed::get<int64_t>() const noexcept
 {
@@ -450,6 +464,18 @@ inline ObjKey Mixed::get<ObjKey>() const noexcept
 {
     REALM_ASSERT(get_type() == type_Link);
     return ObjKey(int_val);
+}
+
+template <>
+inline ObjLink Mixed::get<ObjLink>() const noexcept
+{
+    REALM_ASSERT(get_type() == type_TypedLink);
+    return link_val;
+}
+
+inline ObjLink Mixed::get_link() const
+{
+    return get<ObjLink>();
 }
 
 inline bool Mixed::is_null() const

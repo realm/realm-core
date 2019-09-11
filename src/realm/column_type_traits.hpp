@@ -28,6 +28,7 @@
 namespace realm {
 
 struct ObjKey;
+struct ObjLink;
 class Decimal128;
 class ObjectId;
 class Mixed;
@@ -48,6 +49,7 @@ class ArrayKeyNonNullable;
 class ArrayDecimal128;
 class ArrayObjectId;
 class ArrayObjectIdNull;
+class ArrayTypedLink;
 template <class>
 class BasicArray;
 template <class>
@@ -129,13 +131,20 @@ struct ColumnTypeTraits<ObjKey> {
 template <>
 struct ColumnTypeTraits<Mixed> {
     using cluster_leaf_type = ArrayMixed;
-    static const DataType id = type_OldMixed;
-    static const ColumnType column_id = col_type_OldMixed;
+    static const DataType id = type_Mixed;
+    static const ColumnType column_id = col_type_Mixed;
 };
 
 template <>
 struct ColumnTypeTraits<Link> {
     static const ColumnType column_id = col_type_Link;
+};
+
+template <>
+struct ColumnTypeTraits<ObjLink> {
+    using cluster_leaf_type = ArrayTypedLink;
+    static const DataType id = type_TypedLink;
+    static const ColumnType column_id = col_type_TypedLink;
 };
 
 template <>

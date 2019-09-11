@@ -30,6 +30,8 @@
 #include <realm/array_timestamp.hpp>
 #include <realm/array_object_id.hpp>
 #include <realm/array_decimal128.hpp>
+#include <realm/array_mixed.hpp>
+#include <realm/array_typed_link.hpp>
 
 #ifdef _MSC_VER
 #pragma warning(disable : 4250) // Suppress 'inherits ... via dominance' on MSVC
@@ -541,11 +543,16 @@ public:
 
     void insert_any(size_t ndx, Mixed val) override
     {
-        if (val.is_null()) {
-            insert_null(ndx);
+        if constexpr (std::is_same_v<T, Mixed>) {
+            insert(ndx, val);
         }
         else {
-            insert(ndx, val.get<typename RemoveOptional<T>::type>());
+            if (val.is_null()) {
+                insert_null(ndx);
+            }
+            else {
+                insert(ndx, val.get<typename RemoveOptional<T>::type>());
+            }
         }
     }
 
@@ -565,64 +572,16 @@ public:
         insert(size(), value);
     }
 
-    T set(size_t ndx, T value)
-    {
-        REALM_ASSERT_DEBUG(!update_if_needed());
+    T set(size_t ndx, T value);
 
-        if (value_is_null(value) && !m_nullable)
-            throw LogicError(LogicError::column_not_nullable);
-
-        // get will check for ndx out of bounds
-        T old = get(ndx);
-        if (old != value) {
-            ensure_writeable();
-            do_set(ndx, value);
-            m_obj.bump_content_version();
-        }
-        if (Replication* repl = this->m_const_obj->get_replication()) {
-            set_repl(repl, ndx, value);
-        }
-        return old;
-    }
-
-    void insert(size_t ndx, T value)
-    {
-        REALM_ASSERT_DEBUG(!update_if_needed());
-
-        if (value_is_null(value) && !m_nullable)
-            throw LogicError(LogicError::column_not_nullable);
-
-        ensure_created();
-        if (ndx > m_tree->size()) {
-            throw std::out_of_range("Index out of range");
-        }
-        ensure_writeable();
-        if (Replication* repl = this->m_const_obj->get_replication()) {
-            insert_repl(repl, ndx, value);
-        }
-        do_insert(ndx, value);
-        m_obj.bump_content_version();
-    }
+    void insert(size_t ndx, T value);
 
     T remove(LstIterator<T>& it)
     {
         return remove(ConstLstBase::adjust(it.m_ndx));
     }
 
-    T remove(size_t ndx)
-    {
-        REALM_ASSERT_DEBUG(!update_if_needed());
-        ensure_writeable();
-        if (Replication* repl = this->m_const_obj->get_replication()) {
-            ConstLstBase::erase_repl(repl, ndx);
-        }
-        T old = get(ndx);
-        do_remove(ndx);
-        ConstLstBase::adj_remove(ndx);
-        m_obj.bump_content_version();
-
-        return old;
-    }
+    T remove(size_t ndx);
 
     void remove(size_t from, size_t to) override
     {
@@ -754,6 +713,62 @@ Lst<T>& Lst<T>::operator=(const BPlusTree<T>& other)
     return *this;
 }
 
+template <class T>
+T Lst<T>::set(size_t ndx, T value)
+{
+    REALM_ASSERT_DEBUG(!update_if_needed());
+
+    if (value_is_null(value) && !m_nullable)
+        throw LogicError(LogicError::column_not_nullable);
+
+    // get will check for ndx out of bounds
+    T old = get(ndx);
+    if (old != value) {
+        ensure_writeable();
+        do_set(ndx, value);
+        m_obj.bump_content_version();
+    }
+    if (Replication* repl = this->m_const_obj->get_replication()) {
+        set_repl(repl, ndx, value);
+    }
+    return old;
+}
+
+template <class T>
+T Lst<T>::remove(size_t ndx)
+{
+    REALM_ASSERT_DEBUG(!update_if_needed());
+    ensure_writeable();
+    if (Replication* repl = this->m_const_obj->get_replication()) {
+        ConstLstBase::erase_repl(repl, ndx);
+    }
+    T old = get(ndx);
+    do_remove(ndx);
+    ConstLstBase::adj_remove(ndx);
+    m_obj.bump_content_version();
+
+    return old;
+}
+
+template <class T>
+void Lst<T>::insert(size_t ndx, T value)
+{
+    REALM_ASSERT_DEBUG(!update_if_needed());
+
+    if (value_is_null(value) && !m_nullable)
+        throw LogicError(LogicError::column_not_nullable);
+
+    ensure_created();
+    if (ndx > m_tree->size()) {
+        throw std::out_of_range("Index out of range");
+    }
+    ensure_writeable();
+    if (Replication* repl = this->m_const_obj->get_replication()) {
+        insert_repl(repl, ndx, value);
+    }
+    do_insert(ndx, value);
+    m_obj.bump_content_version();
+}
 
 template <>
 void Lst<ObjKey>::do_set(size_t ndx, ObjKey target_key);
@@ -766,6 +781,24 @@ void Lst<ObjKey>::do_remove(size_t ndx);
 
 template <>
 void Lst<ObjKey>::clear();
+
+template <>
+void Lst<ObjLink>::do_set(size_t ndx, ObjLink target_key);
+
+template <>
+void Lst<ObjLink>::do_insert(size_t ndx, ObjLink target_key);
+
+template <>
+void Lst<ObjLink>::do_remove(size_t ndx);
+
+template <>
+void Lst<Mixed>::do_set(size_t ndx, Mixed target_key);
+
+template <>
+void Lst<Mixed>::do_insert(size_t ndx, Mixed target_key);
+
+template <>
+void Lst<Mixed>::do_remove(size_t ndx);
 
 // Translate from userfacing index to internal index.
 size_t virtual2real(const std::vector<size_t>& vec, size_t ndx);

@@ -153,7 +153,7 @@ TEST(ArrayMixed_Basics)
 TEST(Mixed_Table)
 {
     Table t;
-    auto col_data = t.add_column(type_OldMixed, "data");
+    auto col_data = t.add_column(type_Mixed, "data");
     auto obj0 = t.create_object().set(col_data, Mixed(5));
     auto obj1 = t.create_object().set(col_data, Mixed("Hello"));
     CHECK_EQUAL(obj0.get_any(col_data), Mixed(5));

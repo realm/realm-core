@@ -207,10 +207,13 @@ std::string create_column_name(DataType t)
         case type_Link:
             str = "link_";
             break;
+        case type_TypedLink:
+            str = "typed_link_";
+            break;
         case type_LinkList:
             str = "link_list_";
             break;
-        case type_OldMixed:
+        case type_Mixed:
             str = "any_";
             break;
         case type_OldDateTime:

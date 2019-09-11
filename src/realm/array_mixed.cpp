@@ -143,6 +143,14 @@ Mixed ArrayMixed::get(size_t ndx) const
                 raw.w[1] = m_int_pairs.get(payload_ndx + 1);
                 return Mixed(Decimal128(raw));
             }
+            case type_TypedLink: {
+                ensure_int_pair_array();
+                payload_ndx <<= 1;
+                REALM_ASSERT(payload_ndx + 1 < m_int_pairs.size());
+                ObjLink ret{TableKey(uint32_t(m_int_pairs.get(payload_ndx))),
+                            ObjKey(m_int_pairs.get(payload_ndx + 1))};
+                return Mixed(ret);
+            }
             default:
                 break;
         }
@@ -392,6 +400,15 @@ int64_t ArrayMixed::store(const Mixed& value)
             auto t = value.get<Decimal128>();
             m_int_pairs.add(t.raw()->w[0]);
             m_int_pairs.add(t.raw()->w[1]);
+            val = int64_t(ndx << s_data_shift) | (payload_idx_pair << s_payload_idx_shift);
+            break;
+        }
+        case type_TypedLink: {
+            ensure_int_pair_array();
+            size_t ndx = m_int_pairs.size() / 2;
+            auto t = value.get<ObjLink>();
+            m_int_pairs.add(int64_t(t.get_table_key().value));
+            m_int_pairs.add(t.get_obj_key().value);
             val = int64_t(ndx << s_data_shift) | (payload_idx_pair << s_payload_idx_shift);
             break;
         }
