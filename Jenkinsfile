@@ -91,9 +91,9 @@ jobWrapper {
     if (isPublishingRun) {
         stage('BuildPackages') {
             parallelExecutors = [
-                buildMacOsDebug     : doBuildMacOs('Debug', false),
+                buildMacOsDebug     : doBuildMacOs('MinSizeDebug', false),
                 buildMacOsRelease   : doBuildMacOs('Release', false),
-                buildCatalystDebug  : doBuildMacOsCatalyst('Debug'),
+                buildCatalystDebug  : doBuildMacOsCatalyst('MinSizeDebug'),
                 buildCatalystRelease: doBuildMacOsCatalyst('Release'),
 
                 buildWin32Debug     : doBuildWindows('Debug', false, 'Win32', false),
