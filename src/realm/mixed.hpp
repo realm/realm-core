@@ -102,7 +102,7 @@ namespace realm {
 class Mixed {
 public:
     Mixed() noexcept
-        : m_type(DataType(null_type))
+        : m_type(0)
     {
     }
 
@@ -149,8 +149,8 @@ public:
 
     DataType get_type() const noexcept
     {
-        REALM_ASSERT(m_type != null_type);
-        return DataType(m_type);
+        REALM_ASSERT(m_type);
+        return DataType(m_type - 1);
     }
 
     template <class T>
@@ -179,16 +179,18 @@ private:
     template <class Ch, class Tr>
     friend std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>&, const Mixed&);
 
-    static constexpr int null_type = 0x0f;
-    uint8_t m_type;
+    uint32_t m_type;
+    union {
+        int32_t short_val;
+        uint32_t ushort_val;
+    };
 
     union {
         int64_t int_val;
         bool bool_val;
         float float_val;
         double double_val;
-        StringData string_val;
-        Timestamp date_val;
+        const char* str_val;
     };
 };
 
@@ -196,120 +198,123 @@ private:
 
 inline Mixed::Mixed(int64_t v) noexcept
 {
-    m_type = type_Int;
+    m_type = type_Int + 1;
     int_val = v;
 }
 
 inline Mixed::Mixed(bool v) noexcept
 {
-    m_type = type_Bool;
+    m_type = type_Bool + 1;
     bool_val = v;
 }
 
 inline Mixed::Mixed(float v) noexcept
 {
-    m_type = type_Float;
+    m_type = type_Float + 1;
     float_val = v;
 }
 
 inline Mixed::Mixed(double v) noexcept
 {
-    m_type = type_Double;
+    m_type = type_Double + 1;
     double_val = v;
 }
 
 inline Mixed::Mixed(util::Optional<int64_t> v) noexcept
 {
     if (v) {
-        m_type = type_Int;
+        m_type = type_Int + 1;
         int_val = *v;
     }
     else {
-        m_type = null_type;
+        m_type = 0;
     }
 }
 
 inline Mixed::Mixed(util::Optional<bool> v) noexcept
 {
     if (v) {
-        m_type = type_Bool;
+        m_type = type_Bool + 1;
         bool_val = *v;
     }
     else {
-        m_type = null_type;
+        m_type = 0;
     }
 }
 
 inline Mixed::Mixed(util::Optional<float> v) noexcept
 {
     if (v) {
-        m_type = type_Float;
+        m_type = type_Float + 1;
         float_val = *v;
     }
     else {
-        m_type = null_type;
+        m_type = 0;
     }
 }
 
 inline Mixed::Mixed(util::Optional<double> v) noexcept
 {
     if (v) {
-        m_type = type_Double;
+        m_type = type_Double + 1;
         double_val = *v;
     }
     else {
-        m_type = null_type;
+        m_type = 0;
     }
 }
 
 inline Mixed::Mixed(StringData v) noexcept
 {
     if (!v.is_null()) {
-        m_type = type_String;
-        string_val = v;
+        m_type = type_String + 1;
+        str_val = v.data();
+        ushort_val = uint32_t(v.size());
     }
     else {
-        m_type = null_type;
+        m_type = 0;
     }
 }
 
 inline Mixed::Mixed(BinaryData v) noexcept
 {
     if (!v.is_null()) {
-        m_type = type_Binary;
-        string_val = StringData(v.data(), v.size());
+        m_type = type_Binary + 1;
+        str_val = v.data();
+        ushort_val = uint32_t(v.size());
     }
     else {
-        m_type = null_type;
+        m_type = 0;
     }
 }
 
 inline Mixed::Mixed(Timestamp v) noexcept
 {
     if (!v.is_null()) {
-        m_type = type_Timestamp;
-        date_val = v;
+        m_type = type_Timestamp + 1;
+        int_val = v.get_seconds();
+        short_val = v.get_nanoseconds();
     }
     else {
-        m_type = null_type;
+        m_type = 0;
     }
 }
 
 inline Mixed::Mixed(ObjKey v) noexcept
 {
     if (v) {
-        m_type = type_Link;
+        m_type = type_Link + 1;
         int_val = v.value;
     }
     else {
-        m_type = null_type;
+        m_type = 0;
     }
 }
 
 template <>
 inline int64_t Mixed::get<int64_t>() const noexcept
 {
-    REALM_ASSERT(m_type == type_Int);
+    REALM_ASSERT(get_type() == type_Int);
     return int_val;
 }
 
@@ -321,7 +326,7 @@ inline int64_t Mixed::get_int() const
 template <>
 inline bool Mixed::get<bool>() const noexcept
 {
-    REALM_ASSERT(m_type == type_Bool);
+    REALM_ASSERT(get_type() == type_Bool);
     return bool_val;
 }
 
@@ -333,7 +338,7 @@ inline bool Mixed::get_bool() const
 template <>
 inline float Mixed::get<float>() const noexcept
 {
-    REALM_ASSERT(m_type == type_Float);
+    REALM_ASSERT(get_type() == type_Float);
     return float_val;
 }
 
@@ -345,7 +350,7 @@ inline float Mixed::get_float() const
 template <>
 inline double Mixed::get<double>() const noexcept
 {
-    REALM_ASSERT(m_type == type_Double);
+    REALM_ASSERT(get_type() == type_Double);
     return double_val;
 }
 
@@ -357,8 +362,8 @@ inline double Mixed::get_double() const
 template <>
 inline StringData Mixed::get<StringData>() const noexcept
 {
-    REALM_ASSERT(m_type == type_String);
-    return string_val;
+    REALM_ASSERT(get_type() == type_String);
+    return StringData(str_val, ushort_val);
 }
 
 inline StringData Mixed::get_string() const
@@ -369,15 +374,15 @@ inline StringData Mixed::get_string() const
 template <>
 inline BinaryData Mixed::get<BinaryData>() const noexcept
 {
-    REALM_ASSERT(m_type == type_Binary);
-    return BinaryData(string_val.data(), string_val.size());
+    REALM_ASSERT(get_type() == type_Binary);
+    return BinaryData(str_val, ushort_val);
 }
 
 template <>
 inline Timestamp Mixed::get<Timestamp>() const noexcept
 {
-    REALM_ASSERT(m_type == type_Timestamp);
-    return date_val;
+    REALM_ASSERT(get_type() == type_Timestamp);
+    return Timestamp(int_val, short_val);
 }
 
 inline Timestamp Mixed::get_timestamp() const
@@ -388,26 +393,13 @@ inline Timestamp Mixed::get_timestamp() const
 template <>
 inline ObjKey Mixed::get<ObjKey>() const noexcept
 {
-    REALM_ASSERT(m_type == type_Link);
+    REALM_ASSERT(get_type() == type_Link);
     return ObjKey(int_val);
 }
 
 inline bool Mixed::is_null() const
 {
-    if (m_type == null_type)
-        return true;
-
-    switch (get_type()) {
-        case type_String:
-            return get<StringData>().is_null();
-        case type_Timestamp:
-            return get<Timestamp>().is_null();
-        case type_Link:
-            return get<ObjKey>() == null_key;
-        default:
-            break;
-    }
-    return false;
+    return (m_type == 0);
 }
 
 namespace {
@@ -480,36 +472,41 @@ template <class Ch, class Tr>
 inline std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, const Mixed& m)
 {
     out << "Mixed(";
-    switch (m.m_type) {
-        case type_Int:
-            out << m.int_val;
-            break;
-        case type_Bool:
-            out << (m.bool_val ? "true" : "false");
-            break;
-        case type_Float:
-            out << m.float_val;
-            break;
-        case type_Double:
-            out << m.double_val;
-            break;
-        case type_String:
-            out << m.string_val;
-            break;
-        case type_Binary:
-            out << BinaryData(m.string_val.data(), m.string_val.size());
-            break;
-        case type_Timestamp:
-            out << m.date_val;
-            break;
-        case type_Link:
-            out << ObjKey(m.int_val);
-            break;
-        case type_OldDateTime:
-        case type_OldTable:
-        case type_OldMixed:
-        case type_LinkList:
-            REALM_ASSERT(false);
+    if (m.is_null()) {
+        out << "null";
+    }
+    else {
+        switch (m.get_type()) {
+            case type_Int:
+                out << m.int_val;
+                break;
+            case type_Bool:
+                out << (m.bool_val ? "true" : "false");
+                break;
+            case type_Float:
+                out << m.float_val;
+                break;
+            case type_Double:
+                out << m.double_val;
+                break;
+            case type_String:
+                out << StringData(m.str_val, m.short_val);
+                break;
+            case type_Binary:
+                out << BinaryData(m.str_val, m.short_val);
+                break;
+            case type_Timestamp:
+                out << Timestamp(m.int_val, m.short_val);
+                break;
+            case type_Link:
+                out << ObjKey(m.int_val);
+                break;
+            case type_OldDateTime:
+            case type_OldTable:
+            case type_OldMixed:
+            case type_LinkList:
+                REALM_ASSERT(false);
+        }
     }
     out << ")";
     return out;
