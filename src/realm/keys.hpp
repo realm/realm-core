@@ -27,16 +27,16 @@
 namespace realm {
 
 struct TableKey {
-    static constexpr int64_t null_value = uint64_t(-1) >> 1; // free top bit
+    static constexpr uint32_t null_value = uint32_t(-1) >> 1; // free top bit
     constexpr TableKey()
         : value(null_value)
     {
     }
-    explicit TableKey(int64_t val)
+    explicit TableKey(uint32_t val)
         : value(val)
     {
     }
-    TableKey& operator=(int64_t val)
+    TableKey& operator=(uint32_t val)
     {
         value = val;
         return *this;
@@ -57,7 +57,7 @@ struct TableKey {
     {
         return value != null_value;
     }
-    int64_t value;
+    uint32_t value;
 };
 
 

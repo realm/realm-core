@@ -398,8 +398,8 @@ TableKey Spec::get_opposite_link_table_key(size_t column_ndx) const noexcept
 
     uint64_t table_ref = uint64_t(tagged_value) >> 1;
 
-    REALM_ASSERT(!util::int_cast_has_overflow<size_t>(table_ref));
-    return TableKey(table_ref);
+    REALM_ASSERT(!util::int_cast_has_overflow<uint32_t>(table_ref));
+    return TableKey(uint32_t(table_ref));
 }
 
 size_t Spec::get_origin_column_ndx(size_t backlink_col_ndx) const noexcept

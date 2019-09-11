@@ -414,7 +414,7 @@ TableKey Table::get_key_direct(Allocator& alloc, ref_type top_ref)
     table_top.init_from_ref(top_ref);
     if (table_top.size() > 3) {
         RefOrTagged rot = table_top.get_as_ref_or_tagged(top_position_for_key);
-        return TableKey(rot.get_as_int());
+        return TableKey(int32_t(rot.get_as_int()));
     }
     else {
         return TableKey();
@@ -448,7 +448,7 @@ void Table::init(ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent, bo
         rot = RefOrTagged::make_tagged(ndx_in_parent);
         m_top.set(top_position_for_key, rot);
     }
-    m_key = TableKey(rot.get_as_int());
+    m_key = TableKey(int32_t(rot.get_as_int()));
 
     // index setup relies on column mapping being up to date:
     build_column_mapping();
@@ -3186,7 +3186,7 @@ void Table::set_opposite_column(ColKey col_key, TableKey opposite_table, ColKey 
 
 TableKey Table::get_opposite_table_key(ColKey col_key) const
 {
-    return TableKey(m_opposite_table.get(col_key.get_index().val));
+    return TableKey(int32_t(m_opposite_table.get(col_key.get_index().val)));
 }
 
 bool Table::links_to_self(ColKey col_key) const
