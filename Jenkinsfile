@@ -530,7 +530,7 @@ def doBuildMacOsCatalyst(String buildType) {
                 withEnv(['DEVELOPER_DIR=/Applications/Xcode-11.app/Contents/Developer/']) {
                     sh """
                             rm -rf *
-                            cmake -D CMAKE_TOOLCHAIN_FILE=../tools/cmake/catalyst.toolchain.cmake \\
+                            cmake -D CMAKE_TOOLCHAIN_FILE=../tools/cmake/maccatalyst.toolchain.cmake \\
                                   -D CMAKE_BUILD_TYPE=${buildType} \\
                                   -D REALM_VERSION=${gitDescribeVersion} \\
                                   -D REALM_SKIP_SHARED_LIB=ON \\
