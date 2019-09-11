@@ -94,18 +94,6 @@ else
               -G Xcode ..
     }
 
-    if [ "${OS}" == "watchos" ] && [ -n "${XCODE10_DEVELOPER_DIR}" ]; then
-        mkdir -p "build-${OS}-${BUILD_TYPE}-64"
-        pushd "build-${OS}-${BUILD_TYPE}-64" || exit 1
-        (
-            export DEVELOPER_DIR="$XCODE10_DEVELOPER_DIR"
-            configure_xcode
-            xcodebuild -sdk "${SDK}os" -configuration "${BUILD_TYPE}" ARCHS='arm64_32'
-        )
-        ARM64_32_LIB="$(pwd)/src/realm/${BUILD_TYPE}-${SDK}os/librealm${suffix}.a"
-        popd
-    fi
-
     mkdir -p "build-${OS}-${BUILD_TYPE}"
     cd "build-${OS}-${BUILD_TYPE}" || exit 1
 
@@ -121,8 +109,7 @@ else
     lipo -create \
          -output "src/realm/${BUILD_TYPE}/librealm${suffix}.a" \
          "src/realm/${BUILD_TYPE}-${SDK}os/librealm${suffix}.a" \
-         "src/realm/${BUILD_TYPE}-${SDK}simulator/librealm${suffix}.a" \
-         $ARM64_32_LIB
+         "src/realm/${BUILD_TYPE}-${SDK}simulator/librealm${suffix}.a"
     lipo -create \
          -output "src/realm/parser/${BUILD_TYPE}/librealm-parser${suffix}.a" \
          "src/realm/parser/${BUILD_TYPE}-${SDK}os/librealm-parser${suffix}.a" \
