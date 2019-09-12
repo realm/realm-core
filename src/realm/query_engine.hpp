@@ -1887,7 +1887,7 @@ public:
     }
 
 private:
-    template <class ArrayType, class ElementType>
+    template <class ArrayType>
     size_t find_first_in(ArrayType& array, size_t begin, size_t end);
 
     size_t _find_first_local(size_t start, size_t end) override;
