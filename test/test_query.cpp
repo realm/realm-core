@@ -12165,5 +12165,58 @@ TEST(Query_LinkListIntPastOneIsNull)
     CHECK_EQUAL(q.count(), 1);
 }
 
+TEST(Query_StringOrShortStrings)
+{
+    Group g;
+    TableRef table = g.add_table("table");
+    auto col_value = table->add_column(type_String, "value");
+
+    std::string strings[] = {"0", "1", "2"};
+    for (auto& str : strings) {
+        table->set_string(col_value, table->add_empty_row(), str);
+    }
+
+    for (auto& str : strings) {
+        Query q = table->where().group().equal(col_value, str).Or().equal(col_value, "not present").end_group();
+        CHECK_EQUAL(q.count(), 1);
+    }
+}
+
+TEST(Query_StringOrMediumStrings)
+{
+    Group g;
+    TableRef table = g.add_table("table");
+    auto col_value = table->add_column(type_String, "value");
+
+    std::string strings[] = {"0", "1", "2"};
+    for (auto& str : strings) {
+        str.resize(16, str[0]); // Make the strings long enough to require ArrayStringLong
+        table->set_string(col_value, table->add_empty_row(), str);
+    }
+
+    for (auto& str : strings) {
+        Query q = table->where().group().equal(col_value, str).Or().equal(col_value, "not present").end_group();
+        CHECK_EQUAL(q.count(), 1);
+    }
+}
+
+TEST(Query_StringOrLongStrings)
+{
+    Group g;
+    TableRef table = g.add_table("table");
+    auto col_value = table->add_column(type_String, "value");
+
+    std::string strings[] = {"0", "1", "2"};
+    for (auto& str : strings) {
+        str.resize(64, str[0]); // Make the strings long enough to require ArrayBigBlobs
+        table->set_string(col_value, table->add_empty_row(), str);
+    }
+
+    for (auto& str : strings) {
+        Query q = table->where().group().equal(col_value, str).Or().equal(col_value, "not present").end_group();
+        CHECK_EQUAL(q.count(), 1);
+    }
+}
+
 
 #endif // TEST_QUERY

@@ -4,9 +4,8 @@
 * None.
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
- 
+* Chained OR equals queries on an unindexed string column failed to match any results if any of the strings were 64 bytes or longer. ([PR #3386](https://github.com/realm/realm-core/pull/3386), since 5.17.0).
+
 ### Breaking changes
 * None.
 

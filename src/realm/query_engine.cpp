@@ -350,9 +350,8 @@ void StringNode<Equal>::consume_condition(StringNode<Equal>* other)
 }
 
 // Requirements of template types:
-// ArrayType must support: size() -> size_t, and get(size_t) -> ElementType
-// ElementType must be convertable to a StringData via data() and size()
-template <class ArrayType, class ElementType>
+// ArrayType must support: size() -> size_t, and get_string(size_t) -> Stringdata
+template <class ArrayType>
 size_t StringNode<Equal>::find_first_in(ArrayType& array, size_t begin, size_t end)
 {
     if (m_needles.empty())
@@ -372,19 +371,17 @@ size_t StringNode<Equal>::find_first_in(ArrayType& array, size_t begin, size_t e
     // with N==100k
     if (m_needles.size() < 20) {
         for (size_t i = begin; i < end; ++i) {
-            ElementType element = array.get(i);
-            StringData value_2{element.data(), element.size()};
+            StringData element = array.get_string(i);
             for (auto it = m_needles.begin(); it != not_in_set; ++it) {
-                if (*it == value_2)
+                if (*it == element)
                     return i;
             }
         }
     }
     else {
         for (size_t i = begin; i < end; ++i) {
-            ElementType element = array.get(i);
-            StringData value_2{element.data(), element.size()};
-            if (m_needles.find(value_2) != not_in_set)
+            StringData element = array.get_string(i);
+            if (m_needles.find(element) != not_in_set)
                 return i;
         }
     }
@@ -415,14 +412,11 @@ size_t StringNode<Equal>::_find_first_local(size_t start, size_t end)
 
         if (multi_target_search) {
             if (m_leaf_type == StringColumn::leaf_type_Small)
-                s = find_first_in<const ArrayString&, StringData>(static_cast<const ArrayString&>(*m_leaf),
-                                                                  s - m_leaf_start, end2);
+                s = find_first_in(static_cast<const ArrayString&>(*m_leaf), s - m_leaf_start, end2);
             else if (m_leaf_type == StringColumn::leaf_type_Medium)
-                s = find_first_in<const ArrayStringLong&, StringData>(static_cast<const ArrayStringLong&>(*m_leaf),
-                                                                      s - m_leaf_start, end2);
+                s = find_first_in(static_cast<const ArrayStringLong&>(*m_leaf), s - m_leaf_start, end2);
             else
-                s = find_first_in<const ArrayBigBlobs&, BinaryData>(static_cast<const ArrayBigBlobs&>(*m_leaf),
-                                                                    s - m_leaf_start, end2);
+                s = find_first_in(static_cast<const ArrayBigBlobs&>(*m_leaf), s - m_leaf_start, end2);
         }
         else {
             if (m_leaf_type == StringColumn::leaf_type_Small)
