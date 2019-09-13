@@ -278,7 +278,7 @@ void StringNode<Equal>::_search_index_init()
             // todo: Apparently we can't use m_index.get_alloc() because it uses default allocator which
             // simply makes
             // translate(x) = x. Shouldn't it inherit owner column's allocator?!
-            m_index_matches.reset(new IntegerColumn(m_table->get_alloc(), res.payload)); // Throws
+            m_index_matches.reset(new IntegerColumn(m_table->get_alloc(), ref_type(res.payload))); // Throws
             m_results_start = res.start_ndx;
             m_results_end = res.end_ndx;
             m_actual_key = ObjKey(m_index_matches->get(m_results_start));

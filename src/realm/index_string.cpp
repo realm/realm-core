@@ -180,7 +180,7 @@ int64_t IndexArray::from_list<index_FindAll_nocopy>(StringData value, InternalFi
     --upper;
     // Single result if upper matches lower
     if (upper == lower) {
-        result_ref.payload = to_size_t(*lower);
+        result_ref.payload = *lower;
         return size_t(FindRes_single);
     }
 
@@ -188,7 +188,7 @@ int64_t IndexArray::from_list<index_FindAll_nocopy>(StringData value, InternalFi
     ObjKey last_key = ObjKey(*upper);
     str = column.get_index_data(last_key, buffer);
     if (str == value) {
-        result_ref.payload = key_values.get_ref();
+        result_ref.payload = from_ref(key_values.get_ref());
         result_ref.start_ndx = lower.get_position();
         result_ref.end_ndx = upper.get_position() + 1; // one past last match
         return size_t(FindRes_column);
@@ -199,7 +199,7 @@ int64_t IndexArray::from_list<index_FindAll_nocopy>(StringData value, InternalFi
     // checked the last item manually.
     upper = std::upper_bound(lower, upper, value, slc);
 
-    result_ref.payload = to_ref(key_values.get_ref());
+    result_ref.payload = from_ref(key_values.get_ref());
     result_ref.start_ndx = lower.get_position();
     result_ref.end_ndx = upper.get_position();
     return size_t(FindRes_column);
@@ -272,7 +272,7 @@ int64_t IndexArray::index_string(StringData value, InternalFindResult& result_re
             StringConversionBuffer buffer;
             StringData str = column.get_index_data(ObjKey(key_value), buffer);
             if (str == value) {
-                result_ref.payload = size_t(key_value);
+                result_ref.payload = key_value;
                 return first ? key_value : get_count ? 1 : FindRes_single;
             }
             return local_not_found;
