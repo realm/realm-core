@@ -449,7 +449,7 @@ void SlabAlloc::rebuild_freelists_from_slab()
     for (const auto& e : m_slabs) {
         FreeBlock* entry = slab_to_entry(e, ref_start);
         push_freelist_entry(entry);
-        ref_start = e.ref_end;
+        ref_start = align_size_to_section_boundary(e.ref_end);
     }
 }
 
@@ -484,14 +484,17 @@ SlabAlloc::FreeBlock* SlabAlloc::merge_blocks(FreeBlock* first, FreeBlock* last)
 SlabAlloc::FreeBlock* SlabAlloc::grow_slab(int size)
 {
     // Allocate new slab.
-    // - Allways allocate at least 1MB
-    // - Double allocation amount, but
+    // - Always allocate at least 128K
+    // - When allocating, allocate as much as we already have, but
     // - Never allocate more than a full section (64MB)
+    constexpr int minimal_alloc = 128 * 1024;
+    constexpr int maximal_alloc = 1 << section_shift;
+    size += 2 * sizeof(BetweenBlocks);
+    size_t new_size = minimal_alloc;
+    while (new_size < uint64_t(size)) new_size += minimal_alloc;
     size_t already_allocated = get_allocated_size();
-    size_t new_size = 1024*1024;
-    if (size > new_size) new_size = size;
     if (new_size < already_allocated) new_size = already_allocated;
-    if (new_size > 64 * 1024 * 1024) new_size = 64 * 1024 * 1024;
+    if (new_size > maximal_alloc) new_size = maximal_alloc;
 
     ref_type ref;
     if (m_slabs.empty()) {
@@ -1100,6 +1103,7 @@ void SlabAlloc::reset_free_space_tracking()
             m_slabs.pop_back();
         }
         else {
+            std::cerr << "Break" << std::endl;
             break;
         }
     }
