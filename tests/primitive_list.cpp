@@ -288,8 +288,10 @@ TEMPLATE_TEST_CASE("primitive list", ::Int, ::Bool, ::Float, ::Double, ::String,
         }},
     };
     auto r = Realm::get_shared_realm(config);
+    auto r2 = Realm::get_shared_realm(config);
 
     auto table = r->read_group().get_table("class_object");
+    auto table2 = r2->read_group().get_table("class_object");
     r->begin_transaction();
     table->add_empty_row();
 
@@ -776,6 +778,17 @@ TEMPLATE_TEST_CASE("primitive list", ::Int, ::Bool, ::Float, ::Double, ::String,
             r->commit_transaction();
             advance_and_notify(*r);
             REQUIRE(calls == 4);
+        }
+
+        SECTION("deleting containing row before first run of notifier") {
+            auto token = list.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+                change = c;
+            });
+            r2->begin_transaction();
+            table2->move_last_over(0);
+            r2->commit_transaction();
+            advance_and_notify(*r);
+            REQUIRE(change.deletions.count() == values.size());
         }
     }
 
