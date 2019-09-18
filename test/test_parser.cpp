@@ -385,7 +385,7 @@ Query verify_query(test_util::unit_test::TestContext& test_context, TableRef t, 
 
     CHECK_EQUAL(q.count(), num_results);
     std::string description = q.get_description();
-    // std::cerr << "original: " << query_string << "\tdescribed: " << description << "\n";
+    std::cerr << "original: " << query_string << "\tdescribed: " << description << "\n";
     Query q2 = t->where();
 
     parser::ParserResult res2 = realm::parser::parse(description);
@@ -1845,6 +1845,28 @@ TEST(Parser_NegativeAgg)
     verify_query(test_context, t, "items.@max.price_decimal == -4.0", 1);   // person0
     verify_query(test_context, t, "items.@sum.price_decimal == -25.5", 2);  // person0, person2
     verify_query(test_context, t, "items.@avg.price_decimal == -6.375", 1); // person0
+}
+
+ONLY(Parser_collection_aggregates_on_list_of_primitives)
+{
+    Group g;
+    TableRef t = g.add_table("table");
+
+    auto col_int_list = t->add_column_list(type_Int, "integers");
+
+    size_t num_objects = 10;
+    for (size_t i = 0; i < num_objects; ++i) {
+        Obj obj = t->create_object();
+        obj.get_list<Int>(col_int_list).add(i);
+    }
+//    auto query = t->get_subtable(int_col, 2)->column<Int>(0) > 225;
+
+    Query q = t->where();
+
+    verify_query(test_context, t, "integers.@count == 0", 0);
+    verify_query(test_context, t, "integers.@count == 1", num_objects);
+
+    // verify_query(test_context, t, "integers == 0", 1);
 }
 
 TEST(Parser_SortAndDistinctSerialisation)

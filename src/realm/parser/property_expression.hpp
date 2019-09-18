@@ -34,6 +34,7 @@ struct PropertyExpression
     ColKey get_dest_col_key() const;
     ConstTableRef get_dest_table() const;
     bool dest_type_is_backlink() const;
+    bool dest_type_is_list_of_primitives() const;
 
     PropertyExpression(Query& q, const std::string& key_path_string, parser::KeyPathMapping& mapping);
 
@@ -56,6 +57,12 @@ inline bool PropertyExpression::dest_type_is_backlink() const
 {
     REALM_ASSERT_DEBUG(link_chain.size() > 0);
     return link_chain.back().is_backlink;
+}
+
+inline bool PropertyExpression::dest_type_is_list_of_primitives() const
+{
+    REALM_ASSERT_DEBUG(link_chain.size() > 0);
+    return link_chain.back().is_list_of_primitives;
 }
 
 inline ColKey PropertyExpression::get_dest_col_key() const

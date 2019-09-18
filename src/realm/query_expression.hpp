@@ -2905,9 +2905,9 @@ public:
 
     void get_lists(size_t index, Value<ref_type>& destination, size_t nb_elements);
 
-    std::string description(util::serializer::SerialisationState&) const
+    std::string description(util::serializer::SerialisationState& state) const
     {
-        throw SerialisationError("Serialisation of query expressions involving subtables is not yet supported.");
+        return state.describe_columns(m_link_map, m_column_key);
     }
 
     bool links_exist() const
@@ -2991,9 +2991,9 @@ public:
         destination.import(v);
     }
 
-    virtual std::string description(util::serializer::SerialisationState&) const override
+    virtual std::string description(util::serializer::SerialisationState& state) const override
     {
-        throw SerialisationError("Serialisation of subtable expressions is not yet supported.");
+        return ColumnListBase::description(state);
     }
 
     SizeOperator<SizeOfList> size();

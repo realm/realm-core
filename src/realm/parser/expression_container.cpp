@@ -29,6 +29,7 @@ ExpressionContainer::ExpressionContainer(Query& query, const parser::Expression&
 {
     if (e.type == parser::Expression::Type::KeyPath) {
         PropertyExpression pe(query, e.s, mapping);
+        bool primitive_list = pe.dest_type_is_list_of_primitives();
         switch (e.collection_op) {
             case parser::Expression::KeyPathOp::Min:
                 type = ExpressionInternal::exp_OpMin;
@@ -62,7 +63,12 @@ ExpressionContainer::ExpressionContainer(Query& query, const parser::Expression&
             case parser::Expression::KeyPathOp::SizeBinary:
                 if (pe.get_dest_type() == type_LinkList || pe.get_dest_type() == type_Link) {
                     type = ExpressionInternal::exp_OpCount;
-                    storage = CollectionOperatorExpression<parser::Expression::KeyPathOp::Count>(
+                    storage = CollectionOperatorExpression<parser::Expression::KeyPathOp::Count, false>(
+                        std::move(pe), e.op_suffix, mapping);
+                }
+                else if (pe.dest_type_is_list_of_primitives()) {
+                    type = ExpressionInternal::exp_OpCount;
+                    storage = CollectionOperatorExpression<parser::Expression::KeyPathOp::Count, true>(
                         std::move(pe), e.op_suffix, mapping);
                 }
                 else if (pe.get_dest_type() == type_String) {
@@ -138,10 +144,10 @@ CollectionOperatorExpression<parser::Expression::KeyPathOp::Avg>& ExpressionCont
     REALM_ASSERT_DEBUG(type == ExpressionInternal::exp_OpAvg);
     return util::any_cast<CollectionOperatorExpression<parser::Expression::KeyPathOp::Avg>&>(storage);
 }
-CollectionOperatorExpression<parser::Expression::KeyPathOp::Count>& ExpressionContainer::get_count()
+CollectionOperatorExpression<parser::Expression::KeyPathOp::Count, true>& ExpressionContainer::get_count()
 {
     REALM_ASSERT_DEBUG(type == ExpressionInternal::exp_OpCount);
-    return util::any_cast<CollectionOperatorExpression<parser::Expression::KeyPathOp::Count>&>(storage);
+    return util::any_cast<CollectionOperatorExpression<parser::Expression::KeyPathOp::Count, true>&>(storage);
 }
 CollectionOperatorExpression<parser::Expression::KeyPathOp::BacklinkCount>& ExpressionContainer::get_backlink_count()
 {

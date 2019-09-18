@@ -60,7 +60,7 @@ bool KeyPathMapping::has_mapping(ConstTableRef table, std::string name)
 
 // This may be premature optimisation, but it'll be super fast and it doesn't
 // bother dragging in anything locale specific for case insensitive comparisons.
-bool is_backlinks_prefix(std::string& s)
+bool is_backlinks_prefix(const std::string& s)
 {
     return s.size() == 6 && s[0] == '@' && (s[1] == 'l' || s[1] == 'L') && (s[2] == 'i' || s[2] == 'I') &&
            (s[3] == 'n' || s[3] == 'N') && (s[4] == 'k' || s[4] == 'K') && (s[5] == 's' || s[5] == 'S');
@@ -123,12 +123,15 @@ KeyPathElement KeyPathMapping::process_next_path(ConstTableRef table, KeyPath& k
 
     DataType cur_col_type = table->get_column_type(col_key);
 
+    bool is_primitive_list = table->get_column_attr(col_key).test(ColumnAttr::col_attr_List);
+
     index++;
     KeyPathElement element;
     element.table = table;
     element.col_key = col_key;
     element.col_type = cur_col_type;
     element.is_backlink = false;
+    element.is_list_of_primitives = is_primitive_list;
     return element;
 }
 

@@ -28,12 +28,14 @@
 namespace realm {
 namespace parser {
 
-template <typename RetType, parser::Expression::KeyPathOp AggOpType, class Enable = void>
+template <typename RetType, parser::Expression::KeyPathOp AggOpType, bool PrimitiveList, class Enable = void>
 struct CollectionOperatorGetter;
 
-template <parser::Expression::KeyPathOp OpType>
-struct CollectionOperatorExpression
-{
+template <typename RetType, parser::Expression::KeyPathOp AggOpType, class Enable = void>
+struct ListOfPrimitivesOperatorGetter;
+
+template <parser::Expression::KeyPathOp OpType, bool PrimitiveList = false>
+struct CollectionOperatorExpression {
     static constexpr parser::Expression::KeyPathOp operation_type = OpType;
     std::function<LinkChain()> link_chain_getter;
     PropertyExpression pe;
@@ -106,27 +108,38 @@ struct CollectionOperatorExpression
     template <typename T>
     auto value_of_type_for_query() const
     {
-        return CollectionOperatorGetter<T, OpType>::convert(*this);
+        return CollectionOperatorGetter<T, OpType, PrimitiveList>::convert(*this);
     }
 };
-
 
 // Certain operations are disabled for some types (eg. a sum of timestamps is invalid).
 // The operations that are supported have a specialisation with std::enable_if for that type below
 // any type/operation combination that is not specialised will get the runtime error from the following
 // default implementation. The return type is just a dummy to make things compile.
-template <typename RetType, parser::Expression::KeyPathOp AggOpType, class Enable>
+template <typename RetType, parser::Expression::KeyPathOp AggOpType, bool PrimitiveList, class Enable>
 struct CollectionOperatorGetter {
-    static Columns<RetType> convert(const CollectionOperatorExpression<AggOpType>& op) {
+    static Columns<RetType> convert(const CollectionOperatorExpression<AggOpType, PrimitiveList>& op)
+    {
         throw std::runtime_error(util::format("Predicate error: comparison of type '%1' with result of '%2' is not supported.",
                                               type_to_str<RetType>(),
                                               collection_operator_to_str(op.operation_type)));
     }
 };
 
+template <typename RetType, parser::Expression::KeyPathOp AggOpType, class Enable>
+struct ListOfPrimitivesOperatorGetter {
+    static Columns<RetType> convert(const CollectionOperatorExpression<AggOpType>& op)
+    {
+        throw std::runtime_error(util::format(
+            "Predicate error: comparison of type '%1' with result of '%2' is not supported for a list of primitives.",
+            type_to_str<RetType>(), collection_operator_to_str(op.operation_type)));
+    }
+};
+
+
 template <typename RetType>
 struct CollectionOperatorGetter<
-    RetType, parser::Expression::KeyPathOp::Min,
+    RetType, parser::Expression::KeyPathOp::Min, false
     typename std::enable_if_t<realm::is_any<RetType, Int, Float, Double, Decimal128>::value>> {
     static SubColumnAggregate<RetType, aggregate_operations::Minimum<RetType> > convert(const CollectionOperatorExpression<parser::Expression::KeyPathOp::Min>& expr)
     {
@@ -147,7 +160,7 @@ struct CollectionOperatorGetter<
 
 template <typename RetType>
 struct CollectionOperatorGetter<
-    RetType, parser::Expression::KeyPathOp::Max,
+    RetType, parser::Expression::KeyPathOp::Max, false,
     typename std::enable_if_t<realm::is_any<RetType, Int, Float, Double, Decimal128>::value>> {
     static SubColumnAggregate<RetType, aggregate_operations::Maximum<RetType> > convert(const CollectionOperatorExpression<parser::Expression::KeyPathOp::Max>& expr)
     {
@@ -168,7 +181,7 @@ struct CollectionOperatorGetter<
 
 template <typename RetType>
 struct CollectionOperatorGetter<
-    RetType, parser::Expression::KeyPathOp::Sum,
+    RetType, parser::Expression::KeyPathOp::Sum, false,
     typename std::enable_if_t<realm::is_any<RetType, Int, Float, Double, Decimal128>::value>> {
     static SubColumnAggregate<RetType, aggregate_operations::Sum<RetType> > convert(const CollectionOperatorExpression<parser::Expression::KeyPathOp::Sum>& expr)
     {
@@ -189,7 +202,7 @@ struct CollectionOperatorGetter<
 
 template <typename RetType>
 struct CollectionOperatorGetter<
-    RetType, parser::Expression::KeyPathOp::Avg,
+    RetType, parser::Expression::KeyPathOp::Avg, false,
     typename std::enable_if_t<realm::is_any<RetType, Int, Float, Double, Decimal128>::value>> {
     static SubColumnAggregate<RetType, aggregate_operations::Average<RetType> > convert(const CollectionOperatorExpression<parser::Expression::KeyPathOp::Avg>& expr)
     {
@@ -210,7 +223,7 @@ struct CollectionOperatorGetter<
 
 template <typename RetType>
 struct CollectionOperatorGetter<
-    RetType, parser::Expression::KeyPathOp::Count,
+    RetType, parser::Expression::KeyPathOp::Count, false,
     typename std::enable_if_t<realm::is_any<RetType, Int, Float, Double, Decimal128>::value>> {
     static LinkCount convert(const CollectionOperatorExpression<parser::Expression::KeyPathOp::Count>& expr)
     {
@@ -225,10 +238,21 @@ struct CollectionOperatorGetter<
     }
 };
 
+template <typename RetType>
+struct CollectionOperatorGetter<
+    RetType, parser::Expression::KeyPathOp::Count, true,
+    typename std::enable_if_t<realm::is_any<RetType, Int, Float, Double, Decimal128>::value>> {
+    static SizeOperator<SizeOfList>
+    convert(const CollectionOperatorExpression<parser::Expression::KeyPathOp::Count, true>& expr)
+    {
+        return expr.link_chain_getter().template column<Lst<RetType>>(expr.pe.get_dest_col_key()).size();
+    }
+};
+
 
 template <typename RetType>
 struct CollectionOperatorGetter<
-    RetType, parser::Expression::KeyPathOp::BacklinkCount,
+    RetType, parser::Expression::KeyPathOp::BacklinkCount, false,
     typename std::enable_if_t<realm::is_any<RetType, Int, Float, Double, Decimal128>::value>> {
     static BacklinkCount<Int>
     convert(const CollectionOperatorExpression<parser::Expression::KeyPathOp::BacklinkCount>& expr)
@@ -254,7 +278,7 @@ struct CollectionOperatorGetter<
 
 
 template <>
-struct CollectionOperatorGetter<Int, parser::Expression::KeyPathOp::SizeString>{
+struct CollectionOperatorGetter<Int, parser::Expression::KeyPathOp::SizeString, false> {
     static SizeOperator<String> convert(const CollectionOperatorExpression<parser::Expression::KeyPathOp::SizeString>& expr)
     {
         return expr.link_chain_getter().template column<String>(expr.pe.get_dest_col_key()).size();
@@ -262,7 +286,7 @@ struct CollectionOperatorGetter<Int, parser::Expression::KeyPathOp::SizeString>{
 };
 
 template <>
-struct CollectionOperatorGetter<Int, parser::Expression::KeyPathOp::SizeBinary>{
+struct CollectionOperatorGetter<Int, parser::Expression::KeyPathOp::SizeBinary, false> {
     static SizeOperator<Binary> convert(const CollectionOperatorExpression<parser::Expression::KeyPathOp::SizeBinary>& expr)
     {
         return expr.link_chain_getter().template column<Binary>(expr.pe.get_dest_col_key()).size();
