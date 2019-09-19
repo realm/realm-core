@@ -3193,7 +3193,7 @@ TEST(Parser_ChainedIntEqualQueries)
     verify_query(test_context, table, query, populated_data.size());
 }
 
-ONLY(Parser_TimestampNullable)
+TEST(Parser_TimestampNullable)
 {
     Group g;
     TableRef table = g.add_table("table");
@@ -3213,7 +3213,8 @@ ONLY(Parser_TimestampNullable)
       .equal(a_col_ndx, Timestamp(realm::null()))
       .end_group();
     std::string description = q.get_description();
-    CHECK_EQUAL(description, "(b == T200:0 and (a == T100:0 or NULL == a)");
+    CHECK(description.find("NULL") != std::string::npos);
+    CHECK_EQUAL(description, "b == T200:0 and (a == T100:0 or a == NULL)");
 }
 
 
