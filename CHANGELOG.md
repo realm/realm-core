@@ -5,6 +5,7 @@
 
 ### Fixed
 * Chained OR equals queries on an unindexed string column failed to match any results if any of the strings were 64 bytes or longer. ([PR #3386](https://github.com/realm/realm-core/pull/3386), since 5.17.0).
+* Fixed serialization of a query which looks for a null timestamp. This only affects query based sync. ([PR #3389](https://github.com/realm/realm-core/pull/3388), since v5.23.2).
 
 ### Breaking changes
 * None.

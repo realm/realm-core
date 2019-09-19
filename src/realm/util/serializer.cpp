@@ -99,6 +99,9 @@ std::string print_value<>(StringData data)
 template <>
 std::string print_value<>(realm::Timestamp t)
 {
+    if (t.is_null()) {
+        return "NULL";
+    }
     std::stringstream ss;
     ss << "T" << t.get_seconds() << ":" << t.get_nanoseconds();
     return ss.str();
