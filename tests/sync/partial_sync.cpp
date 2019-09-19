@@ -43,6 +43,8 @@
 #include <realm/parser/query_builder.hpp>
 #include <realm/util/optional.hpp>
 
+#include <condition_variable>
+
 using namespace realm;
 using namespace std::string_literals;
 
@@ -1235,5 +1237,179 @@ TEST_CASE("Creating/Updating subscriptions synchronously", "[sync]") {
 
         CHECK(subscriptions.size() == 6);
         CHECK(subscriptions.get(5).get_string(name_ndx) == "[object_b] number > 0");
+    }
+}
+
+TEST_CASE("Query-based sync schema initialization", "[sync]") {
+    if (!EventLoop::has_implementation())
+        return;
+    TestSyncManager init_sync_manager;
+
+    auto assert_schema = [](Realm& realm) {
+        auto& group = realm.read_group();
+        auto table = group.get_table("class___ResultSets");
+        REQUIRE(table);
+        CHECK(table->get_column_index("name") != npos);
+        CHECK(table->get_column_index("query") != npos);
+        CHECK(table->get_column_index("error_message") != npos);
+        CHECK(table->get_column_index("status") != npos);
+        CHECK(table->get_column_index("query_parse_counter") != npos);
+        CHECK(table->get_column_index("matches_property") != npos);
+        CHECK(table->get_column_index("created_at") != npos);
+        CHECK(table->get_column_index("updated_at") != npos);
+        CHECK(table->get_column_index("expires_at") != npos);
+        CHECK(table->get_column_index("time_to_live") != npos);
+    };
+
+    // Deliberately doesn't have all of the properties, to better mimick what the bindings do
+    ObjectSchema result_sets_schema{
+        "__ResultSets", {
+            {"name", PropertyType::String},
+            {"query", PropertyType::String},
+            {"error_message", PropertyType::String},
+            {"status", PropertyType::Int},
+            {"created_at", PropertyType::Date},
+            {"updated_at", PropertyType::Date},
+            {"time_to_live", PropertyType::Int|PropertyType::Nullable},
+            {"expires_at", PropertyType::Date|PropertyType::Nullable},
+        }
+    };
+    ObjectSchema other_schema{
+        "MyClass", {
+            {"value", PropertyType::Int},
+        }
+    };
+
+    SyncServer server;
+    SyncTestFile config(server, "test", true);
+
+    SECTION("open new Realm with schema defined") {
+        SECTION("including __ResultSets type") {
+            config.schema = Schema{result_sets_schema, other_schema};
+            assert_schema(*Realm::get_shared_realm(config));
+        }
+
+        SECTION("not including __ResultSets type") {
+            config.schema = Schema{other_schema};
+            assert_schema(*Realm::get_shared_realm(config));
+        }
+    }
+
+    SECTION("open existing local Realm with schema defined") {
+        Realm::get_shared_realm(config);
+
+        SECTION("including __ResultSets type") {
+            config.schema = Schema{result_sets_schema, other_schema};
+            assert_schema(*Realm::get_shared_realm(config));
+        }
+
+        SECTION("not including __ResultSets type") {
+            config.schema = Schema{other_schema};
+            assert_schema(*Realm::get_shared_realm(config));
+        }
+    }
+
+    auto wait_for = [](auto&& fn) {
+        std::condition_variable cv;
+        std::mutex wait_mutex;
+        bool wait_flag(false);
+        fn([&](auto) {
+            std::unique_lock<std::mutex> lock(wait_mutex);
+            wait_flag = true;
+            cv.notify_one();
+        });
+        std::unique_lock<std::mutex> lock(wait_mutex);
+        cv.wait(lock, [&]() { return wait_flag == true; });
+    };
+
+    auto initialize_local_realm = [&](auto&& fn) {
+        std::unique_ptr<Replication> history;
+        std::unique_ptr<SharedGroup> sg;
+        std::unique_ptr<Group> read_only_group;
+        Realm::open_with_config(config, history, sg, read_only_group, nullptr);
+        {
+            ReadTransaction rt(*sg);
+            REQUIRE(!rt.get_table("class___ResultSets"));
+        }
+
+        // Download the Realm so that the server creates the __ResultSets table
+        auto session = SyncManager::shared().get_session(config.path, *config.sync_config);
+        wait_for([&](auto&& completion) { session->wait_for_download_completion(completion); });
+
+        {
+            WriteTransaction wt(*sg);
+            auto table = wt.get_table("class___ResultSets");
+            REQUIRE(table);
+
+            // The server doesn't add the permissions subscriptions until we create one
+            // Fortunately it doesn't need to be a valid one, so we can just create an empty tow
+            REQUIRE(table->size() == 0);
+            sync::create_object(wt.get_group(), *table);
+
+            auto version = wt.commit();
+            SyncSession::OnlyForTesting::nonsync_transact_notify(*session, version);
+        }
+
+        // Sync the newly created subscription
+        wait_for([&](auto&& completion) { session->wait_for_upload_completion(completion); });
+        wait_for([&](auto&& completion) { session->wait_for_download_completion(completion); });
+
+        // Should now have a full set of auto-created subscriptions
+        {
+            ReadTransaction rt(*sg);
+            auto table = rt.get_table("class___ResultSets");
+            REQUIRE(table);
+            REQUIRE(table->size() == 6);
+        }
+
+        fn(*sg);
+    };
+
+    SECTION("open existing local Realm which has an older schema with schema defined") {
+        initialize_local_realm([](auto& sg) {
+            WriteTransaction wt(sg);
+            wt.get_table("class___ResultSets")->add_column(type_String, "name");
+            wt.commit();
+        });
+
+        SECTION("including __ResultSets type") {
+            config.schema = Schema{result_sets_schema, other_schema};
+            assert_schema(*Realm::get_shared_realm(config));
+        }
+
+        SECTION("not including __ResultSets type") {
+            config.schema = Schema{other_schema};
+            assert_schema(*Realm::get_shared_realm(config));
+        }
+    }
+
+    SECTION("open non-ObjectStore existing local Realm with schema defined") {
+        initialize_local_realm([](auto&) { });
+
+        SECTION("including __ResultSets type") {
+            config.schema = Schema{result_sets_schema, other_schema};
+            assert_schema(*Realm::get_shared_realm(config));
+        }
+
+        SECTION("not including __ResultSets type") {
+            config.schema = Schema{other_schema};
+            assert_schema(*Realm::get_shared_realm(config));
+        }
+    }
+
+    SECTION("open existing local Realm which has an older schema with dynamic schema") {
+        initialize_local_realm([](auto& sg) {
+            WriteTransaction wt(sg);
+            wt.get_table("class___ResultSets")->add_column(type_String, "name");
+            wt.commit();
+        });
+
+        assert_schema(*Realm::get_shared_realm(config));
+    }
+
+
+    SECTION("open non-ObjectStore existing local Realm with dynamic schema") {
+        initialize_local_realm([](auto&) { });
+        assert_schema(*Realm::get_shared_realm(config));
     }
 }
