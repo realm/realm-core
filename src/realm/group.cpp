@@ -714,9 +714,9 @@ void Group::rename_table(size_t table_ndx, StringData new_name, bool require_uni
 
 class Group::DefaultTableWriter : public Group::TableWriter {
 public:
-    DefaultTableWriter(const Group& group, bool write_history)
+    DefaultTableWriter(const Group& group, bool has_write_history)
         : m_group(group)
-        , m_write_history(write_history)
+        , m_write_history(has_write_history)
     {
     }
     ref_type write_names(_impl::OutputStream& out) override
