@@ -487,8 +487,6 @@ SlabAlloc::FreeBlock* SlabAlloc::grow_slab(int size)
     // - Always allocate at least 128K
     // - When allocating, allocate as much as we already have, but
     // - Never allocate more than a full section (64MB)
-    constexpr int minimal_alloc = 128 * 1024;
-    constexpr int maximal_alloc = 1 << section_shift;
     size += 2 * sizeof(BetweenBlocks);
     size_t new_size = minimal_alloc;
     while (new_size < uint64_t(size)) new_size += minimal_alloc;
@@ -1098,6 +1096,8 @@ void SlabAlloc::reset_free_space_tracking()
     // been commited to persistent space)
     m_free_read_only.clear();
 
+    // release slabs.. keep the initial allocation if it's a minimal allocation,
+    // otherwise release it as well. This saves map/unmap for small transactions.
     while (m_slabs.size() > 1) {
         if (reduce_fast_mapping_with_slab(m_slabs.back().addr)) {
             m_slabs.pop_back();
@@ -1106,7 +1106,11 @@ void SlabAlloc::reset_free_space_tracking()
             break;
         }
     }
-
+    if (m_slabs.size() == 1 && m_slabs[0].size > minimal_alloc) {
+        if (reduce_fast_mapping_with_slab(m_slabs.back().addr)) {
+            m_slabs.pop_back();
+        }
+    }
     rebuild_freelists_from_slab();
     m_free_space_state = free_space_Clean;
     m_commit_size = 0;

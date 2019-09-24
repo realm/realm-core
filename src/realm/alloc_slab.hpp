@@ -634,6 +634,8 @@ private:
         free_space_Dirty,
         free_space_Invalid,
     };
+    constexpr static int minimal_alloc = 128 * 1024;
+    constexpr static int maximal_alloc = 1 << section_shift;
 
     /// When set to free_space_Invalid, the free lists are no longer
     /// up-to-date. This happens if do_free() or
