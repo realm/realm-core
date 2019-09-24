@@ -754,9 +754,9 @@ void StringIndex::TreeInsert(size_t row_ndx, key_type key, size_t offset, String
 {
     NodeChange nc = do_insert(row_ndx, key, offset, value);
     switch (nc.type) {
-        case NodeChange::none:
+        case NodeChange::ChangeType::none:
             return;
-        case NodeChange::insert_before: {
+        case NodeChange::ChangeType::insert_before: {
             StringIndex new_node(inner_node_tag(), m_array->get_alloc());
             new_node.node_add_key(nc.ref1);
             new_node.node_add_key(get_ref());
@@ -764,7 +764,7 @@ void StringIndex::TreeInsert(size_t row_ndx, key_type key, size_t offset, String
             m_array->update_parent();
             return;
         }
-        case NodeChange::insert_after: {
+        case NodeChange::ChangeType::insert_after: {
             StringIndex new_node(inner_node_tag(), m_array->get_alloc());
             new_node.node_add_key(get_ref());
             new_node.node_add_key(nc.ref1);
@@ -772,7 +772,7 @@ void StringIndex::TreeInsert(size_t row_ndx, key_type key, size_t offset, String
             m_array->update_parent();
             return;
         }
-        case NodeChange::split: {
+        case NodeChange::ChangeType::split: {
             StringIndex new_node(inner_node_tag(), m_array->get_alloc());
             new_node.node_add_key(nc.ref1);
             new_node.node_add_key(nc.ref2);
@@ -808,32 +808,32 @@ StringIndex::NodeChange StringIndex::do_insert(size_t row_ndx, key_type key, siz
 
         // Insert item
         NodeChange nc = target.do_insert(row_ndx, key, offset, value);
-        if (nc.type == NodeChange::none) {
+        if (nc.type == NodeChange::ChangeType::none) {
             // update keys
             key_type last_key = target.get_last_key();
             keys.set(node_ndx, last_key);
-            return NodeChange::none; // no new nodes
+            return NodeChange::ChangeType::none; // no new nodes
         }
 
-        if (nc.type == NodeChange::insert_after) {
+        if (nc.type == NodeChange::ChangeType::insert_after) {
             ++node_ndx;
             ++refs_ndx;
         }
 
         // If there is room, just update node directly
         if (keys.size() < REALM_MAX_BPNODE_SIZE) {
-            if (nc.type == NodeChange::split) {
+            if (nc.type == NodeChange::ChangeType::split) {
                 node_insert_split(node_ndx, nc.ref2);
             }
             else {
                 node_insert(node_ndx, nc.ref1); // ::INSERT_BEFORE/AFTER
             }
-            return NodeChange::none;
+            return NodeChange::ChangeType::none;
         }
 
         // Else create new node
         StringIndex new_node(inner_node_tag(), alloc);
-        if (nc.type == NodeChange::split) {
+        if (nc.type == NodeChange::ChangeType::split) {
             // update offset for left node
             key_type last_key = target.get_last_key();
             keys.set(node_ndx, last_key);
@@ -848,11 +848,11 @@ StringIndex::NodeChange StringIndex::do_insert(size_t row_ndx, key_type key, siz
 
         switch (node_ndx) {
             case 0: // insert before
-                return NodeChange(NodeChange::insert_before, new_node.get_ref());
+                return NodeChange(NodeChange::ChangeType::insert_before, new_node.get_ref());
             case REALM_MAX_BPNODE_SIZE: // insert after
-                if (nc.type == NodeChange::split)
-                    return NodeChange(NodeChange::split, get_ref(), new_node.get_ref());
-                return NodeChange(NodeChange::insert_after, new_node.get_ref());
+                if (nc.type == NodeChange::ChangeType::split)
+                    return NodeChange(NodeChange::ChangeType::split, get_ref(), new_node.get_ref());
+                return NodeChange(NodeChange::ChangeType::insert_after, new_node.get_ref());
             default: // split
                 // Move items after split to new node
                 size_t len = m_array->size();
@@ -862,7 +862,7 @@ StringIndex::NodeChange StringIndex::do_insert(size_t row_ndx, key_type key, siz
                 }
                 keys.truncate(node_ndx);
                 m_array->truncate(refs_ndx);
-                return NodeChange(NodeChange::split, get_ref(), new_node.get_ref());
+                return NodeChange(NodeChange::ChangeType::split, get_ref(), new_node.get_ref());
         }
     }
     else {
@@ -877,7 +877,7 @@ StringIndex::NodeChange StringIndex::do_insert(size_t row_ndx, key_type key, siz
         // See if we can fit entry into current leaf
         // Works if there is room or it can join existing entries
         if (leaf_insert(row_ndx, key, offset, value, noextend))
-            return NodeChange::none;
+            return NodeChange::ChangeType::none;
 
         // Create new list for item (a leaf)
         StringIndex new_list(m_target_column, alloc);
@@ -888,11 +888,11 @@ StringIndex::NodeChange StringIndex::do_insert(size_t row_ndx, key_type key, siz
 
         // insert before
         if (ndx == 0)
-            return NodeChange(NodeChange::insert_before, new_list.get_ref());
+            return NodeChange(NodeChange::ChangeType::insert_before, new_list.get_ref());
 
         // insert after
         if (ndx == old_offsets_size)
-            return NodeChange(NodeChange::insert_after, new_list.get_ref());
+            return NodeChange(NodeChange::ChangeType::insert_after, new_list.get_ref());
 
         // split
         Array new_keys(alloc);
@@ -908,7 +908,7 @@ StringIndex::NodeChange StringIndex::do_insert(size_t row_ndx, key_type key, siz
         old_keys.truncate(ndx);
         m_array->truncate(ndx + 1);
 
-        return NodeChange(NodeChange::split, get_ref(), new_list.get_ref());
+        return NodeChange(NodeChange::ChangeType::split, get_ref(), new_list.get_ref());
     }
 }
 
