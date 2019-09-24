@@ -13,7 +13,11 @@
 -----------
 
 ### Internals
+
 * VersionID comparison operators are now const qualified ([PR #3391](https://github.com/realm/realm-core/pull/3391)).
+
+* Exception `util::File::AccessError`, and it's derivatives such as `util::File::NotFound`, will now include a stacktrace in the message returned by the `what()` method.
+
 
 ----------------------------------------------
 
