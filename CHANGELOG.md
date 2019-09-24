@@ -13,7 +13,7 @@
 -----------
 
 ### Internals
-* None.
+* Exception `util::File::AccessError`, and it's derivatives such as `util::File::NotFound`, will now include a stacktrace in the message returned by the `what()` method.
 
 ----------------------------------------------
 
