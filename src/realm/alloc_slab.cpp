@@ -1103,7 +1103,6 @@ void SlabAlloc::reset_free_space_tracking()
             m_slabs.pop_back();
         }
         else {
-            std::cerr << "Break" << std::endl;
             break;
         }
     }
