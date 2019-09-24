@@ -13,7 +13,7 @@
 -----------
 
 ### Internals
-* None.
+* Fixed several warnings found by newer clang compilers. ([#3393](https://github.com/realm/realm-core/issues/3393)).
 
 ----------------------------------------------
 
