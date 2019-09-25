@@ -1106,44 +1106,46 @@ Obj& Obj::set_null(ColKey col_key, bool is_default)
     ColumnType col_type = col_key.get_type();
     // Links need special handling
     if (col_type == col_type_Link) {
-        return set(col_key, null_key);
+        set(col_key, null_key);
     }
-    auto attrs = col_key.get_attrs();
-    if (REALM_UNLIKELY(!attrs.test(col_attr_Nullable))) {
-        throw LogicError(LogicError::column_not_nullable);
-    }
+    else {
+        auto attrs = col_key.get_attrs();
+        if (REALM_UNLIKELY(!attrs.test(col_attr_Nullable))) {
+            throw LogicError(LogicError::column_not_nullable);
+        }
 
-    update_if_needed();
-    ensure_writeable();
+        update_if_needed();
+        ensure_writeable();
 
-    if (StringIndex* index = m_table->get_search_index(col_key)) {
-        index->set(m_key, null{});
-    }
+        if (StringIndex* index = m_table->get_search_index(col_key)) {
+            index->set(m_key, null{});
+        }
 
-    switch (col_type) {
-        case col_type_Int:
-            do_set_null<ArrayIntNull>(col_key);
-            break;
-        case col_type_Bool:
-            do_set_null<ArrayBoolNull>(col_key);
-            break;
-        case col_type_Float:
-            do_set_null<ArrayFloatNull>(col_key);
-            break;
-        case col_type_Double:
-            do_set_null<ArrayDoubleNull>(col_key);
-            break;
-        case col_type_String:
-            do_set_null<ArrayString>(col_key);
-            break;
-        case col_type_Binary:
-            do_set_null<ArrayBinary>(col_key);
-            break;
-        case col_type_Timestamp:
-            do_set_null<ArrayTimestamp>(col_key);
-            break;
-        default:
-            break;
+        switch (col_type) {
+            case col_type_Int:
+                do_set_null<ArrayIntNull>(col_key);
+                break;
+            case col_type_Bool:
+                do_set_null<ArrayBoolNull>(col_key);
+                break;
+            case col_type_Float:
+                do_set_null<ArrayFloatNull>(col_key);
+                break;
+            case col_type_Double:
+                do_set_null<ArrayDoubleNull>(col_key);
+                break;
+            case col_type_String:
+                do_set_null<ArrayString>(col_key);
+                break;
+            case col_type_Binary:
+                do_set_null<ArrayBinary>(col_key);
+                break;
+            case col_type_Timestamp:
+                do_set_null<ArrayTimestamp>(col_key);
+                break;
+            default:
+                break;
+        }
     }
 
     if (Replication* repl = get_replication())
