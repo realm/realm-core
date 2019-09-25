@@ -520,6 +520,32 @@ TEST(Json_LinkCycles)
     CHECK(json_test(ss.str(), "expected_json_link_cycles5", generate_all));
 }
 
+TEST(Json_Nulls)
+{
+    Group group;
+
+    TableRef table1 = group.add_table("table1");
+
+    constexpr bool is_nullable = true;
+    size_t str_col_ndx = table1->add_column(type_String, "str_col", is_nullable);
+    size_t bool_col_ndx = table1->add_column(type_Bool, "bool_col", is_nullable);
+    size_t int_col_ndx = table1->add_column(type_Int, "int_col", is_nullable);
+    size_t timestamp_col_ndx = table1->add_column(type_Timestamp, "timestamp_col", is_nullable);
+
+    // add one row, populated manually
+    size_t row_1_ndx = table1->add_empty_row();
+    table1->set_string(str_col_ndx, row_1_ndx, "Hello");
+    table1->set_bool(bool_col_ndx, row_1_ndx, false);
+    table1->set_int(int_col_ndx, row_1_ndx, 1);
+    table1->set_timestamp(timestamp_col_ndx, row_1_ndx, Timestamp{1, 1});
+    // add one row with default null values
+    table1->add_empty_row();
+
+    std::stringstream ss;
+    table1->to_json(ss);
+    CHECK(json_test(ss.str(), "expected_json_nulls", generate_all));
+}
+
 } // anonymous namespace
 
 #endif // TEST_TABLE

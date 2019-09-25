@@ -4,8 +4,7 @@
 * None.
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Null values were not printed correctly when using json serialisation. ([PR #3399](https://github.com/realm/realm-core/issues/3399)).
  
 ### Breaking changes
 * None.
