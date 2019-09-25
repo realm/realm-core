@@ -100,6 +100,14 @@ protected:
     friend class Table;
 };
 
+
+inline ConstTableRef::ConstTableRef(const TableRef& other)
+    : m_table(other.m_table)
+    , m_instance_version(other.m_instance_version)
+{
+}
+
+
 inline std::ostream& operator<<(std::ostream& o, const ConstTableRef& tr)
 {
     return tr.print(o);

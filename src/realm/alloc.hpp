@@ -243,12 +243,12 @@ protected:
 
     inline uint_fast64_t get_instance_version() noexcept
     {
-        return m_instance_versioning_counter.load(std::memory_order_acquire);
+        return m_instance_versioning_counter.load(std::memory_order_relaxed);
     }
 
     inline void bump_instance_version() noexcept
     {
-        m_instance_versioning_counter.fetch_add(1, std::memory_order_acq_rel);
+        m_instance_versioning_counter.fetch_add(1, std::memory_order_relaxed);
     }
 
 private:
