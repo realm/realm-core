@@ -31,7 +31,7 @@ class SyncLoggerFactory;
 
 class Adapter {
 public:
-    Adapter(std::function<void(std::string)> realm_changed, std::regex regex,
+    Adapter(std::function<void(std::string)> realm_changed, std::function<bool(const std::string&)> should_watch_realm_predicate,
             std::string local_root_dir, SyncConfig sync_config_template);
 
     enum class InstructionType {

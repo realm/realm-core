@@ -580,7 +580,7 @@ private:
 
 class Adapter::Impl final : public AdminRealmListener {
 public:
-    Impl(std::function<void(std::string)> realm_changed, std::regex regex,
+    Impl(std::function<void(std::string)> realm_changed, std::function<bool(const std::string&)> should_watch_realm_predicate,
          std::string local_root_dir, SyncConfig sync_config_template);
 
     Realm::Config get_config(StringData virtual_path, util::Optional<Schema> schema) const;
@@ -601,19 +601,19 @@ private:
     const std::shared_ptr<ChangesetCooker> m_transformer;
 
     const std::function<void(std::string)> m_realm_changed;
-    const std::regex m_regex;
+    const std::function<bool(const std::string&)> m_should_watch_realm_predicate;
 
     std::vector<std::shared_ptr<_impl::RealmCoordinator>> m_realms;
 
 };
 
-Adapter::Impl::Impl(std::function<void(std::string)> realm_changed, std::regex regex,
+Adapter::Impl::Impl(std::function<void(std::string)> realm_changed, std::function<bool(const std::string&)> should_watch_realm_predicate,
                     std::string local_root_dir, SyncConfig sync_config_template)
 : AdminRealmListener(std::move(local_root_dir), std::move(sync_config_template))
 , m_logger(SyncManager::shared().make_logger())
 , m_transformer(std::make_shared<ChangesetCooker>(*m_logger))
 , m_realm_changed(std::move(realm_changed))
-, m_regex(std::move(regex))
+, m_should_watch_realm_predicate(std::move(should_watch_realm_predicate))
 {
 }
 
@@ -629,7 +629,7 @@ Realm::Config Adapter::Impl::get_config(StringData virtual_path, util::Optional<
 
 void Adapter::Impl::register_realm(sync::ObjectID, StringData virtual_path) {
     std::string path = virtual_path;
-    if (!std::regex_match(path, m_regex))
+    if (!m_should_watch_realm_predicate(path))
         return;
 
     auto coordinator = _impl::RealmCoordinator::get_coordinator(get_config(path, util::none));
@@ -641,9 +641,9 @@ void Adapter::Impl::register_realm(sync::ObjectID, StringData virtual_path) {
     m_realms.push_back(coordinator);
 }
 
-Adapter::Adapter(std::function<void(std::string)> realm_changed, std::regex regex,
+Adapter::Adapter(std::function<void(std::string)> realm_changed, std::function<bool(const std::string&)> should_watch_realm_predicate,
                  std::string local_root_dir, SyncConfig sync_config_template)
-: m_impl(std::make_shared<Adapter::Impl>(std::move(realm_changed), std::move(regex),
+: m_impl(std::make_shared<Adapter::Impl>(std::move(realm_changed), std::move(should_watch_realm_predicate),
                                          std::move(local_root_dir), std::move(sync_config_template)))
 {
     m_impl->start();
