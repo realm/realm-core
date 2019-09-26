@@ -5183,143 +5183,148 @@ void Table::to_json_row(size_t row_ndx, std::ostream& out, size_t link_depth,
         out << "\"" << name << "\":";
 
         DataType type = get_column_type(i);
-        switch (type) {
-            case type_Int:
-                out << get_int(i, row_ndx);
-                break;
-            case type_Bool:
-                out << (get_bool(i, row_ndx) ? "true" : "false");
-                break;
-            case type_Float:
-                out_floats<float>(out, get_float(i, row_ndx));
-                break;
-            case type_Double:
-                out_floats<double>(out, get_double(i, row_ndx));
-                break;
-            case type_String:
-                out << "\"" << get_string(i, row_ndx) << "\"";
-                break;
-            case type_OldDateTime:
-                out << "\"";
-                out_olddatetime(out, get_olddatetime(i, row_ndx));
-                out << "\"";
-                break;
-            case type_Binary:
-                out << "\"";
-                out_binary(out, get_binary(i, row_ndx));
-                out << "\"";
-                break;
-            case type_Timestamp:
-                out << "\"";
-                out_timestamp(out, get_timestamp(i, row_ndx));
-                out << "\"";
-                break;
-            case type_Table:
-                get_subtable(i, row_ndx)->to_json(out);
-                break;
-            case type_Mixed: {
-                DataType mtype = get_mixed_type(i, row_ndx);
-                if (mtype == type_Table) {
+        if (type != type_Link && type != type_LinkList && is_nullable(i) && is_null(i, row_ndx)) {
+            out << "null";
+        }
+        else {
+            switch (type) {
+                case type_Int:
+                    out << get_int(i, row_ndx);
+                    break;
+                case type_Bool:
+                    out << (get_bool(i, row_ndx) ? "true" : "false");
+                    break;
+                case type_Float:
+                    out_floats<float>(out, get_float(i, row_ndx));
+                    break;
+                case type_Double:
+                    out_floats<double>(out, get_double(i, row_ndx));
+                    break;
+                case type_String:
+                    out << "\"" << get_string(i, row_ndx) << "\"";
+                    break;
+                case type_OldDateTime:
+                    out << "\"";
+                    out_olddatetime(out, get_olddatetime(i, row_ndx));
+                    out << "\"";
+                    break;
+                case type_Binary:
+                    out << "\"";
+                    out_binary(out, get_binary(i, row_ndx));
+                    out << "\"";
+                    break;
+                case type_Timestamp:
+                    out << "\"";
+                    out_timestamp(out, get_timestamp(i, row_ndx));
+                    out << "\"";
+                    break;
+                case type_Table:
                     get_subtable(i, row_ndx)->to_json(out);
-                }
-                else {
-                    Mixed m = get_mixed(i, row_ndx);
-                    switch (mtype) {
-                        case type_Int:
-                            out << m.get_int();
-                            break;
-                        case type_Bool:
-                            out << (m.get_bool() ? "true" : "false");
-                            break;
-                        case type_Float:
-                            out_floats<float>(out, m.get_float());
-                            break;
-                        case type_Double:
-                            out_floats<double>(out, m.get_double());
-                            break;
-                        case type_String:
-                            out << "\"" << m.get_string() << "\"";
-                            break;
-                        case type_OldDateTime:
-                            out << "\"";
-                            out_olddatetime(out, m.get_olddatetime());
-                            out << "\"";
-                            break;
-                        case type_Binary:
-                            out << "\"";
-                            out_binary(out, m.get_binary());
-                            out << "\"";
-                            break;
-                        case type_Timestamp:
-                            out << "\"";
-                            out_timestamp(out, m.get_timestamp());
-                            out << "\"";
-                            break;
-                        case type_Table:
-                        case type_Mixed:
-                        case type_Link:
-                        case type_LinkList:
-                            REALM_ASSERT(false);
-                            break;
+                    break;
+                case type_Mixed: {
+                    DataType mtype = get_mixed_type(i, row_ndx);
+                    if (mtype == type_Table) {
+                        get_subtable(i, row_ndx)->to_json(out);
                     }
+                    else {
+                        Mixed m = get_mixed(i, row_ndx);
+                        switch (mtype) {
+                            case type_Int:
+                                out << m.get_int();
+                                break;
+                            case type_Bool:
+                                out << (m.get_bool() ? "true" : "false");
+                                break;
+                            case type_Float:
+                                out_floats<float>(out, m.get_float());
+                                break;
+                            case type_Double:
+                                out_floats<double>(out, m.get_double());
+                                break;
+                            case type_String:
+                                out << "\"" << m.get_string() << "\"";
+                                break;
+                            case type_OldDateTime:
+                                out << "\"";
+                                out_olddatetime(out, m.get_olddatetime());
+                                out << "\"";
+                                break;
+                            case type_Binary:
+                                out << "\"";
+                                out_binary(out, m.get_binary());
+                                out << "\"";
+                                break;
+                            case type_Timestamp:
+                                out << "\"";
+                                out_timestamp(out, m.get_timestamp());
+                                out << "\"";
+                                break;
+                            case type_Table:
+                            case type_Mixed:
+                            case type_Link:
+                            case type_LinkList:
+                                REALM_ASSERT(false);
+                                break;
+                        }
+                    }
+                    break;
                 }
-                break;
-            }
-            case type_Link: {
-                LinkColumnBase& clb = const_cast<Table*>(this)->get_column_link_base(i);
-                LinkColumn& cl = static_cast<LinkColumn&>(clb);
-                Table& table = cl.get_target_table();
+                case type_Link: {
+                    LinkColumnBase& clb = const_cast<Table*>(this)->get_column_link_base(i);
+                    LinkColumn& cl = static_cast<LinkColumn&>(clb);
+                    Table& table = cl.get_target_table();
 
-                if (!cl.is_null_link(row_ndx)) {
+                    if (!cl.is_null_link(row_ndx)) {
+                        ref_type lnk = clb.get_ref();
+                        if ((link_depth == 0) || (link_depth == not_found &&
+                                                  std::find(followed.begin(), followed.end(), lnk) != followed.end())) {
+                            out << "\"" << cl.get_link(row_ndx) << "\"";
+                            break;
+                        }
+                        else {
+                            out << "[";
+                            followed.push_back(clb.get_ref());
+                            size_t new_depth = link_depth == not_found ? not_found : link_depth - 1;
+                            table.to_json_row(cl.get_link(row_ndx), out, new_depth, renames, followed);
+                            out << "]";
+                        }
+                    }
+                    else {
+                        out << "[]";
+                    }
+
+                    break;
+                }
+                case type_LinkList: {
+                    LinkColumnBase& clb = const_cast<Table*>(this)->get_column_link_base(i);
+                    LinkListColumn& cll = static_cast<LinkListColumn&>(clb);
+                    Table& table = cll.get_target_table();
+                    LinkViewRef lv = cll.get(row_ndx);
+
                     ref_type lnk = clb.get_ref();
-                    if ((link_depth == 0) || (link_depth == not_found &&
-                                              std::find(followed.begin(), followed.end(), lnk) != followed.end())) {
-                        out << "\"" << cl.get_link(row_ndx) << "\"";
+                    if ((link_depth == 0) ||
+                        (link_depth == not_found && std::find(followed.begin(), followed.end(), lnk) != followed.end())) {
+                        out << "{\"table\": \"" << cll.get_target_table().get_name() << "\", \"rows\": [";
+                        cll.to_json_row(row_ndx, out);
+                        out << "]}";
                         break;
                     }
                     else {
                         out << "[";
-                        followed.push_back(clb.get_ref());
-                        size_t new_depth = link_depth == not_found ? not_found : link_depth - 1;
-                        table.to_json_row(cl.get_link(row_ndx), out, new_depth, renames, followed);
+                        for (size_t link_ndx = 0; link_ndx < lv->size(); link_ndx++) {
+                            if (link_ndx > 0)
+                                out << ", ";
+                            followed.push_back(lnk);
+                            size_t new_depth = link_depth == not_found ? not_found : link_depth - 1;
+                            table.to_json_row(lv->get(link_ndx).get_index(), out, new_depth, renames, followed);
+                        }
                         out << "]";
                     }
-                }
-                else {
-                    out << "[]";
-                }
 
-                break;
-            }
-            case type_LinkList: {
-                LinkColumnBase& clb = const_cast<Table*>(this)->get_column_link_base(i);
-                LinkListColumn& cll = static_cast<LinkListColumn&>(clb);
-                Table& table = cll.get_target_table();
-                LinkViewRef lv = cll.get(row_ndx);
-
-                ref_type lnk = clb.get_ref();
-                if ((link_depth == 0) ||
-                    (link_depth == not_found && std::find(followed.begin(), followed.end(), lnk) != followed.end())) {
-                    out << "{\"table\": \"" << cll.get_target_table().get_name() << "\", \"rows\": [";
-                    cll.to_json_row(row_ndx, out);
-                    out << "]}";
                     break;
                 }
-                else {
-                    out << "[";
-                    for (size_t link_ndx = 0; link_ndx < lv->size(); link_ndx++) {
-                        if (link_ndx > 0)
-                            out << ", ";
-                        followed.push_back(lnk);
-                        size_t new_depth = link_depth == not_found ? not_found : link_depth - 1;
-                        table.to_json_row(lv->get(link_ndx).get_index(), out, new_depth, renames, followed);
-                    }
-                    out << "]";
-                }
-
-                break;
-            }
-        } // switch ends
+            } // switch ends
+        } // not null
     }
     out << "}";
 }
