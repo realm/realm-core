@@ -753,7 +753,12 @@ void Lst<String>::insert_repl(Replication* repl, size_t ndx, StringData value)
         repl->list_insert_null(*this, ndx);
     }
     else {
-        repl->list_insert_string(*this, ndx, value);
+        // HACK: This is to circumvent a problem in Sync(5) where the ArrayInsert instruction
+        // will not insert the value, but only insert an empty row
+        // The problem exists for all types, but currently workaround is only needed for strings
+        // (required to make a realm-js test pass)
+        repl->list_insert_null(*this, ndx);
+        repl->list_set_string(*this, ndx, value);
     }
 }
 
