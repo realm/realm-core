@@ -677,6 +677,12 @@ inline char* TransactLogEncoder::encode<int64_t>(char* ptr, int64_t inst)
 }
 
 template <>
+inline char* TransactLogEncoder::encode<uint32_t>(char* ptr, uint32_t inst)
+{
+    return encode_int<uint32_t>(ptr, inst);
+}
+
+template <>
 inline char* TransactLogEncoder::encode<size_t>(char* ptr, size_t inst)
 {
     return encode_int<size_t>(ptr, inst);
@@ -1188,7 +1194,7 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
         case instr_SelectTable: {
             int levels = read_int<int>(); // Throws
             REALM_ASSERT(levels == 0);
-            TableKey key = TableKey(read_int<int64_t>());
+            TableKey key = TableKey(read_int<uint32_t>());
             if (!handler.select_table(key)) // Throws
                 parser_error();
             return;
@@ -1263,19 +1269,19 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
             return;
         }
         case instr_InsertGroupLevelTable: {
-            TableKey table_key = TableKey(read_int<size_t>()); // Throws
+            TableKey table_key = TableKey(read_int<uint32_t>()); // Throws
             if (!handler.insert_group_level_table(table_key))  // Throws
                 parser_error();
             return;
         }
         case instr_EraseGroupLevelTable: {
-            TableKey table_key = TableKey(read_int<size_t>());                 // Throws
+            TableKey table_key = TableKey(read_int<uint32_t>());               // Throws
             if (!handler.erase_group_level_table(table_key))                   // Throws
                 parser_error();
             return;
         }
         case instr_RenameGroupLevelTable: {
-            TableKey table_key = TableKey(read_int<size_t>());          // Throws
+            TableKey table_key = TableKey(read_int<uint32_t>());        // Throws
             if (!handler.rename_group_level_table(table_key))           // Throws
                 parser_error();
             return;
