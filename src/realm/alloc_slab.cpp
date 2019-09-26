@@ -484,15 +484,24 @@ SlabAlloc::FreeBlock* SlabAlloc::merge_blocks(FreeBlock* first, FreeBlock* last)
 SlabAlloc::FreeBlock* SlabAlloc::grow_slab(int size)
 {
     // Allocate new slab.
-    // - Always allocate at least 128K
+    // - Always allocate at least 128K. This is also the amount of
+    //   memory that we allow the slab allocator to keep between
+    //   transactions. Allowing it to keep a small amount between
+    //   transactions makes very small transactions faster by avoiding
+    //   repeated unmap/mmap system calls.
     // - When allocating, allocate as much as we already have, but
-    // - Never allocate more than a full section (64MB)
+    // - Never allocate more than a full section (64MB). This policy
+    //   leads to gradual allocation of larger and larger blocks until
+    //   we reach allocation of entire sections.
     size += 2 * sizeof(BetweenBlocks);
     size_t new_size = minimal_alloc;
-    while (new_size < uint64_t(size)) new_size += minimal_alloc;
+    while (new_size < uint64_t(size))
+        new_size += minimal_alloc;
     size_t already_allocated = get_allocated_size();
-    if (new_size < already_allocated) new_size = already_allocated;
-    if (new_size > maximal_alloc) new_size = maximal_alloc;
+    if (new_size < already_allocated)
+        new_size = already_allocated;
+    if (new_size > maximal_alloc)
+        new_size = maximal_alloc;
 
     ref_type ref;
     if (m_slabs.empty()) {
@@ -1098,18 +1107,12 @@ void SlabAlloc::reset_free_space_tracking()
 
     // release slabs.. keep the initial allocation if it's a minimal allocation,
     // otherwise release it as well. This saves map/unmap for small transactions.
-    while (m_slabs.size() > 1) {
-        if (reduce_fast_mapping_with_slab(m_slabs.back().addr)) {
-            m_slabs.pop_back();
-        }
-        else {
-            break;
-        }
-    }
-    if (m_slabs.size() == 1 && m_slabs[0].size > minimal_alloc) {
-        if (reduce_fast_mapping_with_slab(m_slabs.back().addr)) {
-            m_slabs.pop_back();
-        }
+    while (m_slabs.size() > 1 || (m_slabs.size() == 1 && m_slabs[0].size > minimal_alloc)) {
+        auto& last_slab = m_slabs.back();
+        auto& last_translation = m_ref_translation_ptr[m_translation_table_size - 1];
+        REALM_ASSERT(last_translation.mapping_addr == last_slab.addr);
+        --m_translation_table_size;
+        m_slabs.pop_back();
     }
     rebuild_freelists_from_slab();
     m_free_space_state = free_space_Clean;
@@ -1312,16 +1315,6 @@ void SlabAlloc::extend_fast_mapping_with_slab(char* address)
     new_fast_mapping[m_translation_table_size - 1] = {address};
 #endif
     m_ref_translation_ptr = new_fast_mapping;
-}
-
-bool SlabAlloc::reduce_fast_mapping_with_slab(char* address)
-{
-    bool ret = false;
-    if (m_ref_translation_ptr[m_translation_table_size - 1].mapping_addr == address) {
-        --m_translation_table_size;
-        ret = true;
-    }
-    return ret;
 }
 
 void SlabAlloc::rebuild_translations(bool requires_new_translation, size_t old_num_sections)
