@@ -629,7 +629,7 @@ TEST(StringIndex_FindAllNoCopy2_Int)
 
         if (real == 1) {
             CHECK_EQUAL(res, FindRes_single);
-            CHECK_EQUAL(i, ints[results.payload]);
+            CHECK_EQUAL(i, ints[size_t(results.payload)]);
         }
         else if (real > 1) {
             CHECK_EQUAL(FindRes_column, res);
@@ -670,7 +670,7 @@ TEST(StringIndex_FindAllNoCopy2_IntNull)
 
         if (real == 1) {
             CHECK_EQUAL(res, FindRes_single);
-            CHECK_EQUAL(ints[t], ints[results.payload]);
+            CHECK_EQUAL(ints[t], ints[size_t(results.payload)]);
         }
         else if (real > 1) {
             CHECK_EQUAL(FindRes_column, res);
@@ -1822,6 +1822,16 @@ TEST_TYPES(StringIndex_Rover, string_column, nullable_string_column, enum_column
     ndx.find_all(results, "rover", true);
     CHECK_EQUAL(results.size(), 2);
     check_result_order(results, test_context);
+}
+
+TEST(StringIndex_QuerySingleObject)
+{
+    Group g;
+    auto table = g.add_table_with_primary_key("class_StringClass", type_String, "name", true);
+    auto obj = table->create_object_with_primary_key("Foo");
+
+    auto q = table->where().equal(table->get_column_key("name"), "Foo", true);
+    CHECK_EQUAL(q.count(), 1);
 }
 
 #endif // TEST_INDEX_STRING
