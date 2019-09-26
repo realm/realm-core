@@ -1857,7 +1857,7 @@ void Group::verify() const
 
     // Check the consistency of the allocation of the mutable memory that has
     // been marked as free
-    m_alloc.for_all_free_entries([&](ref_type ref, int sz) { mem_usage_2.add_mutable(ref, sz); });
+    m_alloc.for_all_free_entries([&](ref_type ref, size_t sz) { mem_usage_2.add_mutable(ref, sz); });
     mem_usage_2.canonicalize();
     mem_usage_1.add(mem_usage_2);
     mem_usage_1.canonicalize();

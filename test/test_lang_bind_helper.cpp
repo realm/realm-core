@@ -336,6 +336,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
     rt->advance_read();
     CHECK(version != foo->get_content_version());
     rt->verify();
+    cols = foo->get_column_keys();
     CHECK_EQUAL(2, foo->get_column_count());
     CHECK_EQUAL(type_Int, foo->get_column_type(cols[0]));
     CHECK_EQUAL(type_String, foo->get_column_type(cols[1]));
