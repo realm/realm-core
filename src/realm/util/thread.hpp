@@ -376,22 +376,50 @@ private:
 
 
 class RaceDetector {
-    std::atomic<bool> busy;
+    std::atomic<int> busy;
 
 public:
     RaceDetector()
     {
-        busy.store(false);
+        busy.store(0);
     }
-    void enter()
+    void enter_write()
     {
-        bool already_busy = busy.exchange(true, std::memory_order_acq_rel);
-        if (already_busy)
-            throw std::runtime_error("Race detected - critical section busy on entry");
+        int expected = 0; // not used for either reading or writing
+        int desired = -1; // locked for writing
+        if (!busy.compare_exchange_strong(expected, desired, std::memory_order_relaxed, std::memory_order_relaxed)) {
+            if (expected < 0)
+                throw std::runtime_error("Race detected - New write hit active write");
+            if (expected > 0)
+                throw std::runtime_error("Race detected - New write hit one or more active reads");
+        }
     }
-    void leave()
+    void leave_write()
     {
-        busy.store(false, std::memory_order_release);
+        busy.store(0, std::memory_order_relaxed);
+    }
+    void enter_read()
+    {
+        int seen_value = busy.load(std::memory_order_relaxed);
+        while (1) {
+            if (seen_value < 0) {
+                throw std::runtime_error("Race detected - New read hit active write");
+            }
+            int desired = seen_value + 1;
+            if (busy.compare_exchange_weak(seen_value, desired, std::memory_order_relaxed, std::memory_order_relaxed)) {
+                return;
+            }
+        }
+    }
+    void leave_read()
+    {
+        int seen_value = busy.load(std::memory_order_relaxed);
+        while (1) {
+            int desired = seen_value - 1;
+            if (busy.compare_exchange_weak(seen_value, desired, std::memory_order_relaxed, std::memory_order_relaxed)) {
+                return;
+            }
+        }
     }
     friend class CriticalSection;
 };
@@ -403,11 +431,26 @@ public:
     CriticalSection(RaceDetector& race)
         : rd(race)
     {
-        rd.enter();
+        rd.enter_write();
     }
     ~CriticalSection()
     {
-        rd.leave();
+        rd.leave_write();
+    }
+};
+
+class ReaderSection {
+    RaceDetector& rd;
+
+public:
+    ReaderSection(RaceDetector& race)
+        : rd(race)
+    {
+        rd.enter_read();
+    }
+    ~ReaderSection()
+    {
+        rd.leave_read();
     }
 };
 
