@@ -228,7 +228,7 @@ enum IndexMethod {
 struct InternalFindResult {
     // Reference to a IntegerColumn containing result rows, or a single row
     // value if the result is FindRes_single.
-    size_t payload;
+    int64_t payload;
     // Offset into the result column to start at.
     size_t start_ndx;
     // Offset index in the result column to end at.

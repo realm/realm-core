@@ -505,7 +505,7 @@ private:
 
     // grow the slab area.
     // returns a free block large enough to handle the request.
-    FreeBlock* grow_slab();
+    FreeBlock* grow_slab(int size);
     // create a single free chunk with "BetweenBlocks" at both ends and a
     // single free chunk between them. This free chunk will be of size:
     //   slab_size - 2 * sizeof(BetweenBlocks)
@@ -619,9 +619,6 @@ private:
     // Add a translation covering a new section in the slab area. The translation is always
     // added at the end.
     void extend_fast_mapping_with_slab(char* address);
-    // Remove last entry from mapping. It is assumed that it will contain the address given.
-    // if this is not the case, the mapping will not be removed and false will be returned
-    bool reduce_fast_mapping_with_slab(char* address);
     // Prepare the initial mapping for a file which requires use of the compatibility mapping
     void setup_compatibility_mapping(size_t file_size);
 
@@ -634,6 +631,8 @@ private:
         free_space_Dirty,
         free_space_Invalid,
     };
+    constexpr static int minimal_alloc = 128 * 1024;
+    constexpr static int maximal_alloc = 1 << section_shift;
 
     /// When set to free_space_Invalid, the free lists are no longer
     /// up-to-date. This happens if do_free() or
@@ -798,6 +797,12 @@ void SlabAlloc::for_all_free_entries(Func f) const
                 bb = reinterpret_cast<BetweenBlocks*>(reinterpret_cast<char*>(bb) + sizeof(BetweenBlocks) - size);
                 ref -= size;
             }
+        }
+        // any gaps in ref-space is reported as a free block to the validator:
+        auto next_ref = align_size_to_section_boundary(ref);
+        if (next_ref > ref) {
+            f(ref, next_ref - ref);
+            ref = next_ref;
         }
     }
 }
