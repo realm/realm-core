@@ -832,11 +832,11 @@ Table* Group::create_table_accessor(size_t table_ndx)
     }
     if (table) {
         table->revive(get_repl(), m_alloc, m_is_writable);
-        table->init(ref, this, table_ndx, m_is_writable);
+        table->init(ref, this, table_ndx, m_is_writable, is_frozen());
     }
     else {
         std::unique_ptr<Table> new_table(new Table(get_repl(), m_alloc));             // Throws
-        new_table->init(ref, this, table_ndx, m_is_writable);                         // Throws
+        new_table->init(ref, this, table_ndx, m_is_writable, is_frozen());            // Throws
         table = new_table.release();
     }
     m_table_accessors[table_ndx] = table;

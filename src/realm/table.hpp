@@ -359,6 +359,9 @@ public:
     /// links.
     bool is_group_level() const noexcept;
 
+    /// A Table accessor obtained from a frozen transaction is also frozen.
+    bool is_frozen() const noexcept { return m_is_frozen; }
+
     /// If this table is a group-level table, then this function returns the
     /// index of this table within the group. Otherwise it returns realm::npos.
     size_t get_index_in_group() const noexcept;
@@ -700,6 +703,7 @@ private:
     mutable util::Optional<ColKey> m_primary_key_col;
     Replication* const* m_repl;
     static Replication* g_dummy_replication;
+    bool m_is_frozen = false;
 
     void batch_erase_rows(const KeyColumn& keys);
     void do_remove_object(ObjKey key);
@@ -740,7 +744,7 @@ private:
     Table(Replication* const* repl, Allocator&);
     void revive(Replication* const* repl, Allocator& new_allocator, bool writable);
 
-    void init(ref_type top_ref, ArrayParent*, size_t ndx_in_parent, bool is_writable);
+    void init(ref_type top_ref, ArrayParent*, size_t ndx_in_parent, bool is_writable, bool is_frozen);
 
     void set_key(TableKey key);
 
@@ -1229,7 +1233,7 @@ inline Table::Table(Allocator& alloc)
     ref_type ref = create_empty_table(m_alloc); // Throws
     ArrayParent* parent = nullptr;
     size_t ndx_in_parent = 0;
-    init(ref, parent, ndx_in_parent, true);
+    init(ref, parent, ndx_in_parent, true, false);
 }
 
 inline Table::Table(Replication* const* repl, Allocator& alloc)

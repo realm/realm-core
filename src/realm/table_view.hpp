@@ -284,6 +284,9 @@ public:
     // it, it too will become outdated.
     bool is_in_sync() const override;
 
+    // A TableView is frozen if it is a) obtained from a query against a frozen table
+    // and b) is synchronized (is_in_sync())
+    bool is_frozen() { return m_table->is_frozen() && is_in_sync(); }
     // Tells if this TableView depends on a LinkList or row that has been deleted.
     bool depends_on_deleted_object() const;
 
