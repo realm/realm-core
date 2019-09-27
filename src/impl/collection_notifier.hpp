@@ -62,7 +62,7 @@ public:
         bool is_list;
     };
     struct RelatedTable {
-        int64_t table_key;
+        decltype(TableKey::value) table_key;
         std::vector<OutgoingLink> links;
     };
 

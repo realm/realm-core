@@ -18,7 +18,7 @@ if [ "${TMPDIR}" = "" ]; then
 fi
 
 echo "TMPDIR: ${TMPDIR}"
-rm -rf ${TMPDIR}/realm*
+ls "${TMPDIR}/realm*" | while read filename; do rm -rf "$filename"; done
 rm -rf coverage.build
 mkdir -p coverage.build
 cd coverage.build
