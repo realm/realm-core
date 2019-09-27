@@ -143,7 +143,7 @@ public:
     bool evaluate(T func) const
     {
         Cluster cluster(0, get_alloc(), *get_tree_top());
-        cluster.init_from_mem(m_mem);
+        cluster.init(m_mem);
         return func(&cluster, m_row_ndx);
     }
 

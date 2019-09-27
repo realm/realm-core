@@ -10191,5 +10191,22 @@ TEST(Query_LinkListIntPastOneIsNull)
     CHECK_EQUAL(q.count(), 1);
 }
 
+TEST(Query_LinkView_StrIndex)
+{
+    Group g;
+    auto table_foo = g.add_table_with_primary_key("class_Foo", type_String, "id");
+    auto col_id = table_foo->get_column_key("id");
+
+    auto table_bar = g.add_table("class_Bar");
+    auto col_list = table_bar->add_column_link(type_LinkList, "link", *table_foo);
+
+    auto foo = table_foo->create_object_with_primary_key("97625fdc-d3f8-4c45-9a4d-dc8c83c657a1");
+    auto bar = table_bar->create_object();
+    auto ll = bar.get_linklist(col_list);
+    ll.add(foo.get_key());
+
+    auto q = table_foo->where(ll).equal(col_id, "97625fdc-d3f8-4c45-9a4d-dc8c83c657a1");
+    CHECK_EQUAL(q.count(), 1);
+}
 
 #endif // TEST_QUERY

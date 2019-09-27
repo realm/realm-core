@@ -652,6 +652,12 @@ char* TransactLogEncoder::encode_int(char* ptr, T value)
     return ++ptr;
 }
 
+template <class T>
+inline char* TransactLogEncoder::encode(char* ptr, T inst)
+{
+    return encode_int<T>(ptr, inst);
+}
+
 template <>
 inline char* TransactLogEncoder::encode<TableKey>(char* ptr, TableKey key)
 {
@@ -665,27 +671,15 @@ inline char* TransactLogEncoder::encode<ColKey>(char* ptr, ColKey key)
 }
 
 template <>
+inline char* TransactLogEncoder::encode<ObjKey>(char* ptr, ObjKey key)
+{
+    return encode_int<int64_t>(ptr, key.value);
+}
+
+template <>
 inline char* TransactLogEncoder::encode<Instruction>(char* ptr, Instruction inst)
 {
     return encode_int<int64_t>(ptr, inst);
-}
-
-template <>
-inline char* TransactLogEncoder::encode<int64_t>(char* ptr, int64_t inst)
-{
-    return encode_int<int64_t>(ptr, inst);
-}
-
-template <>
-inline char* TransactLogEncoder::encode<uint32_t>(char* ptr, uint32_t inst)
-{
-    return encode_int<uint32_t>(ptr, inst);
-}
-
-template <>
-inline char* TransactLogEncoder::encode<size_t>(char* ptr, size_t inst)
-{
-    return encode_int<size_t>(ptr, inst);
 }
 
 template <class T>
@@ -804,7 +798,7 @@ inline void TransactLogConvenientEncoder::rename_column(const Table* t, ColKey c
 
 inline bool TransactLogEncoder::modify_object(ColKey col_key, ObjKey key)
 {
-    append_simple_instr(instr_Set, col_key, key.value); // Throws
+    append_simple_instr(instr_Set, col_key, key); // Throws
     return true;
 }
 
@@ -998,7 +992,7 @@ inline void TransactLogConvenientEncoder::list_insert_timestamp(const Lst<Timest
 
 inline bool TransactLogEncoder::create_object(ObjKey key)
 {
-    append_simple_instr(instr_CreateObject, key.value); // Throws
+    append_simple_instr(instr_CreateObject, key); // Throws
     return true;
 }
 
@@ -1010,7 +1004,7 @@ inline void TransactLogConvenientEncoder::create_object(const Table* t, ObjKey k
 
 inline bool TransactLogEncoder::remove_object(ObjKey key)
 {
-    append_simple_instr(instr_RemoveObject, key.value); // Throws
+    append_simple_instr(instr_RemoveObject, key); // Throws
     return true;
 }
 
