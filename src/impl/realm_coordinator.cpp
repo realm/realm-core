@@ -25,6 +25,7 @@
 #include "binding_context.hpp"
 #include "object_schema.hpp"
 #include "object_store.hpp"
+#include "property.hpp"
 #include "schema.hpp"
 #include "thread_safe_reference.hpp"
 
@@ -279,6 +280,37 @@ void RealmCoordinator::do_get_realm(Realm::Config config, std::shared_ptr<Realm>
 
     realm_lock.unlock();
     if (schema) {
+#if REALM_ENABLE_SYNC && REALM_PLATFORM_JAVA
+        // Workaround for https://github.com/realm/realm-java/issues/6619
+        // Between Realm Java 5.10.0 and 5.13.0 created_at/updated_at was optional
+        // when created from Java, even though the Object Store code specified them as
+        // required. Due to how the Realm was initialized, this wasn't a problem before
+        // 5.13.0, but after that the Object Store initializer code was changed causing
+        // problems when Java clients upgraded. In order to prevent older clients from
+        // breaking with a schema mismatch when upgrading we thus fix the schema in transit.
+        // This means that schema reported back from Realm will be different than the one
+        // specified in the Java model class, but this seemed like the approach with the
+        // least amount of disadvantages.
+        if (realm->is_partial()) {
+            auto& new_schema = schema.value();
+            auto current_schema = realm->schema();
+            auto current_resultsets_schema_obj = current_schema.find("__ResultSets");
+            if (current_resultsets_schema_obj != current_schema.end()) {
+                Property* p = current_resultsets_schema_obj->property_for_public_name("created_at");
+                if (is_nullable(p->type)) {
+                    auto it = new_schema.find("__ResultSets");
+                    if (it != new_schema.end()) {
+                        auto created_at_property = it->property_for_public_name("created_at");
+                        auto updated_at_property = it->property_for_public_name("updated_at");
+                        if (created_at_property && updated_at_property) {
+                            created_at_property->type = created_at_property->type | PropertyType::Nullable;
+                            updated_at_property->type = updated_at_property->type | PropertyType::Nullable;
+                        }
+                    }
+                }
+            }
+        }
+#endif
         realm->update_schema(std::move(*schema), config.schema_version, std::move(migration_function),
                              std::move(initialization_function));
     }
