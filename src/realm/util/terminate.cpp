@@ -45,10 +45,10 @@
 // extern "C" and noinline so that a readable message shows up in the stack trace
 // of the crash
 // prototype here to silence warning
-extern "C" REALM_NORETURN REALM_NOINLINE void please_report_this_error_to_help_at_realm_dot_io();
+extern "C" REALM_NORETURN REALM_NOINLINE void please_report_this_error_to_github();
 
 // LCOV_EXCL_START
-extern "C" REALM_NORETURN REALM_NOINLINE void please_report_this_error_to_help_at_realm_dot_io()
+extern "C" REALM_NORETURN REALM_NOINLINE void please_report_this_error_to_github()
 {
     std::abort();
 }
@@ -108,7 +108,7 @@ REALM_NORETURN static void terminate_internal(std::stringstream& ss) noexcept
 {
     util::Backtrace::capture().print(ss);
 
-    ss << "!!! IMPORTANT: Please send this log and info about Realm SDK version and other relevant reproduction info to help@realm.io.";
+    ss << "!!! IMPORTANT: Please create a github issue at realm/realm-core with this log, info about Realm SDK version and other relevant reproduction info.";
     if (termination_notification_callback) {
         termination_notification_callback(ss.str().c_str());
     }
