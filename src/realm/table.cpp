@@ -5203,11 +5203,6 @@ void Table::to_json_row(size_t row_ndx, std::ostream& out, size_t link_depth,
                 case type_String:
                     out << "\"" << get_string(i, row_ndx) << "\"";
                     break;
-                case type_OldDateTime:
-                    out << "\"";
-                    out_olddatetime(out, get_olddatetime(i, row_ndx));
-                    out << "\"";
-                    break;
                 case type_Binary:
                     out << "\"";
                     out_binary(out, get_binary(i, row_ndx));
@@ -5218,48 +5213,46 @@ void Table::to_json_row(size_t row_ndx, std::ostream& out, size_t link_depth,
                     out_timestamp(out, get_timestamp(i, row_ndx));
                     out << "\"";
                     break;
-                case type_Table:
-                    get_subtable(i, row_ndx)->to_json(out);
-                    break;
-                case type_Mixed: {
-                    DataType mtype = get_mixed_type(i, row_ndx);
-                    if (mtype == type_Table) {
-                        get_subtable(i, row_ndx)->to_json(out);
-                    }
-                    else {
-                        Mixed m = get_mixed(i, row_ndx);
-                        switch (mtype) {
+                case type_Table: {
+                    auto sub_table = get_subtable(i, row_ndx);
+                    auto sz = sub_table->size();
+                    auto list_type = sub_table->get_column_type(0);
+                    out << "[";
+                    for (size_t j = 0; j < sz; j++) {
+                        if (sub_table->is_null(0, j))
+                            continue;
+
+                        if (j > 0)
+                            out << ", ";
+
+                        switch (list_type) {
                             case type_Int:
-                                out << m.get_int();
+                                out << sub_table->get_int(0, j);
                                 break;
                             case type_Bool:
-                                out << (m.get_bool() ? "true" : "false");
+                                out << (sub_table->get_bool(0, j) ? "true" : "false");
                                 break;
                             case type_Float:
-                                out_floats<float>(out, m.get_float());
+                                out_floats<float>(out, sub_table->get_float(0, j));
                                 break;
                             case type_Double:
-                                out_floats<double>(out, m.get_double());
+                                out_floats<double>(out, sub_table->get_double(0, j));
                                 break;
                             case type_String:
-                                out << "\"" << m.get_string() << "\"";
-                                break;
-                            case type_OldDateTime:
-                                out << "\"";
-                                out_olddatetime(out, m.get_olddatetime());
-                                out << "\"";
+                                out << "\"" << sub_table->get_string(0, j) << "\"";
                                 break;
                             case type_Binary:
                                 out << "\"";
-                                out_binary(out, m.get_binary());
+                                out_binary(out, sub_table->get_binary(0, j));
                                 out << "\"";
                                 break;
                             case type_Timestamp:
                                 out << "\"";
-                                out_timestamp(out, m.get_timestamp());
+                                out_timestamp(out, sub_table->get_timestamp(0, j));
                                 out << "\"";
                                 break;
                             case type_Table:
+                            case type_OldDateTime:
                             case type_Mixed:
                             case type_Link:
                             case type_LinkList:
@@ -5267,6 +5260,7 @@ void Table::to_json_row(size_t row_ndx, std::ostream& out, size_t link_depth,
                                 break;
                         }
                     }
+                    out << "]";
                     break;
                 }
                 case type_Link: {
@@ -5323,6 +5317,9 @@ void Table::to_json_row(size_t row_ndx, std::ostream& out, size_t link_depth,
 
                     break;
                 }
+                case type_Mixed:
+                case type_OldDateTime:
+                    break;
             } // switch ends
         } // not null
     }

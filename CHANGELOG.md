@@ -5,6 +5,7 @@
 
 ### Fixed
 * Null values were not printed correctly when using json serialisation. ([PR #3399](https://github.com/realm/realm-core/issues/3399)).
+* ListOfPrimitives were not printed correctly when using json serialisation. ([#3408](https://github.com/realm/realm-core/issues/3408)).
  
 ### Breaking changes
 * None.
