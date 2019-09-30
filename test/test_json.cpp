@@ -86,9 +86,10 @@ void setup_multi_table(Table& table, size_t rows, size_t sub_rows, bool fixed_su
     // Create table with all column types
     {
         DescriptorRef sub1;
+        DescriptorRef sub2;
         table.add_column(type_Int, "int");                 //  0
         table.add_column(type_Bool, "bool");               //  1
-        table.add_column(type_OldDateTime, "date");        //  2
+        table.add_column(type_Timestamp, "date");          //  2
         table.add_column(type_Float, "float");             //  3
         table.add_column(type_Double, "double");           //  4
         table.add_column(type_String, "string");           //  5
@@ -96,10 +97,10 @@ void setup_multi_table(Table& table, size_t rows, size_t sub_rows, bool fixed_su
         table.add_column(type_String, "string_big_blobs"); //  7
         table.add_column(type_String, "string_enum");      //  8 - becomes StringEnumColumn
         table.add_column(type_Binary, "binary");           //  9
-        table.add_column(type_Table, "tables", &sub1);     // 10
-        table.add_column(type_Mixed, "mixed");             // 11
+        table.add_column(type_Table, "integers", &sub1);   // 10
+        table.add_column(type_Table, "strings", &sub2);    // 11
         sub1->add_column(type_Int, "sub_first");
-        sub1->add_column(type_String, "sub_second");
+        sub2->add_column(type_String, "sub_second");
     }
 
     table.add_empty_row(rows);
@@ -111,7 +112,7 @@ void setup_multi_table(Table& table, size_t rows, size_t sub_rows, bool fixed_su
     for (size_t i = 0; i < rows; ++i)
         table.set_bool(1, i, (i % 2 ? true : false));
     for (size_t i = 0; i < rows; ++i)
-        table.set_olddatetime(2, i, 12345);
+        table.set_timestamp(2, i, Timestamp(12345, 0));
     for (size_t i = 0; i < rows; ++i) {
         int64_t sign = (i % 2 == 0) ? 1 : -1;
         table.set_float(3, i, 123.456f * sign);
@@ -162,58 +163,21 @@ void setup_multi_table(Table& table, size_t rows, size_t sub_rows, bool fixed_su
     }
     for (size_t i = 0; i < rows; ++i)
         table.set_binary(9, i, BinaryData("binary", 7));
+
     for (size_t i = 0; i < rows; ++i) {
         int64_t sign = (i % 2 == 0) ? 1 : -1;
         size_t n = sub_rows;
         if (!fixed_subtab_sizes)
             n += i;
         for (size_t j = 0; j != n; ++j) {
-            TableRef subtable = table.get_subtable(10, i);
+            TableRef sub_integers = table.get_subtable(10, i);
+            TableRef sub_strings = table.get_subtable(11, i);
             int64_t val = -123 + i * j * 1234 * sign;
-            subtable->insert_empty_row(j);
-            subtable->set_int(0, j, val);
-            subtable->set_string(1, j, "sub");
-        }
-    }
-    for (size_t i = 0; i < rows; ++i) {
-        int64_t sign = (i % 2 == 0) ? 1 : -1;
-        switch (i % 8) {
-            case 0:
-                table.set_mixed(11, i, false);
-                break;
-            case 1:
-                table.set_mixed(11, i, int64_t(i * i * sign));
-                break;
-            case 2:
-                table.set_mixed(11, i, "string");
-                break;
-            case 3:
-                table.set_mixed(11, i, OldDateTime(123456789));
-                break;
-            case 4:
-                table.set_mixed(11, i, BinaryData("binary", 7));
-                break;
-            case 5: {
-                // Add subtable to mixed column
-                // We can first set schema and contents when the entire
-                // row has been inserted
-                table.set_mixed(11, i, Mixed::subtable_tag());
-                TableRef subtable = table.get_subtable(11, i);
-                subtable->add_column(type_Int, "first");
-                subtable->add_column(type_String, "second");
-                for (size_t j = 0; j != 2; ++j) {
-                    subtable->insert_empty_row(j);
-                    subtable->set_int(0, j, i * i * j * sign);
-                    subtable->set_string(1, j, "mixed sub");
-                }
-                break;
-            }
-            case 6:
-                table.set_mixed(11, i, float(123.1 * i * sign));
-                break;
-            case 7:
-                table.set_mixed(11, i, double(987.65 * i * sign));
-                break;
+            std::string str = "sub_" + util::to_string(val);
+            sub_integers->insert_empty_row(j);
+            sub_integers->set_int(0, j, val);
+            sub_strings->insert_empty_row(j);
+            sub_strings->set_string(0, j, str);
         }
     }
 
@@ -274,6 +238,7 @@ TEST(Json_NoLinks)
 
     std::stringstream ss;
     table.to_json(ss);
+    // std::cout << ss.str();
     CHECK(json_test(ss.str(), "expect_json", false));
 
     return;
