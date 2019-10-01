@@ -69,7 +69,6 @@ jobWrapper {
 //             checkWin32Debug         : doBuildWindows('Debug', false, 'Win32', true),
 //             checkWin64Release       : doBuildWindows('Release', false, 'x64', true),
 //             iosDebug                : doBuildAppleDevice('ios', 'MinSizeDebug'),
-            androidArm64Debug                : doAndroidBuildInDocker('arm64-v8a', 'Debug', true, false),
             androidArm64DebugWithEncryption  : doAndroidBuildInDocker('arm64-v8a', 'Debug', true, true),
             threadSanitizer         : doCheckSanity('Debug', '1000', 'thread'),
             addressSanitizer        : doCheckSanity('Debug', '1000', 'address')
@@ -360,7 +359,6 @@ def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmula
                                 publishingStashes << stashName
                             }
                             try {
-                                def enableEncryption = (runTestsWithEncryption) ? 'UNITTEST_ENCRYPT_ALL=1' : ''
                                 sh '''
                                    cd $(find . -type d -maxdepth 1 -name build-android*)
                                    adb connect emulator
@@ -370,7 +368,7 @@ def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmula
                                    find test -type f -name "*.realm" -maxdepth 1 -exec adb push {} /data/local/tmp \\;
                                    find test -type f -name "*.txt" -maxdepth 1 -exec adb push {} /data/local/tmp \\;
                                    adb root
-                                   adb shell \'cd /data/local/tmp; UNITTEST_PROGRESS=1 ${enableEncryption} ./realm-tests || echo __ADB_FAIL__\' | tee adb.log
+                                   adb shell \'cd /data/local/tmp; UNITTEST_PROGRESS=1 UNITTEST_ENCRYPT_ALL=1 ./realm-tests || echo __ADB_FAIL__\' | tee adb.log
                                    ! grep __ADB_FAIL__ adb.log
                                '''
                             } finally {
