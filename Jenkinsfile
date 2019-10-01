@@ -69,8 +69,8 @@ jobWrapper {
 //             checkWin32Debug         : doBuildWindows('Debug', false, 'Win32', true),
 //             checkWin64Release       : doBuildWindows('Release', false, 'x64', true),
 //             iosDebug                : doBuildAppleDevice('ios', 'MinSizeDebug'),
-            androidArm64Debug       : doAndroidBuildInDocker('arm64-v8a', 'Debug', true, false),
-            androidArm64Debug       : doAndroidBuildInDocker('arm64-v8a', 'Debug', true, true),
+            androidArm64Debug                : doAndroidBuildInDocker('arm64-v8a', 'Debug', true, false),
+            androidArm64DebugWithEncryption  : doAndroidBuildInDocker('arm64-v8a', 'Debug', true, true),
             threadSanitizer         : doCheckSanity('Debug', '1000', 'thread'),
             addressSanitizer        : doCheckSanity('Debug', '1000', 'address')
         ]
