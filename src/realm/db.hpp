@@ -551,6 +551,8 @@ public:
         return promote_to_write(&o, nonblocking);
     }
     TransactionRef freeze();
+    // Frozen transactions are created by freeze() or DB::start_frozen()
+    bool is_frozen() const noexcept override { return m_transact_stage == DB::transact_Frozen; }
     TransactionRef duplicate();
 
     _impl::History* get_history() const;

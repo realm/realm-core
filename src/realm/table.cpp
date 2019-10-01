@@ -422,8 +422,10 @@ TableKey Table::get_key_direct(Allocator& alloc, ref_type top_ref)
 }
 
 
-void Table::init(ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent, bool is_writable)
+void Table::init(ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent, bool is_writable, bool is_frozen)
 {
+    REALM_ASSERT(!(is_writable && is_frozen));
+    m_is_frozen = is_frozen;
     m_alloc.set_read_only(!is_writable);
     // Load from allocated memory
     m_top.set_parent(parent, ndx_in_parent);

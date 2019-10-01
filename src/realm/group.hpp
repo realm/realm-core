@@ -218,7 +218,8 @@ public:
     /// other than open(), and is_attached() on an unattached instance
     /// results in undefined behavior.
     bool is_attached() const noexcept;
-
+    /// A group is frozen only if it is actually a frozen transaction.
+    virtual bool is_frozen() const noexcept { return false; }
     /// Returns true if, and only if the number of tables in this
     /// group is zero.
     bool is_empty() const noexcept;

@@ -82,14 +82,18 @@ namespace {
 
 void work_on_frozen(TestContext& test_context, TransactionRef frozen)
 {
+    CHECK(frozen->is_frozen());
     CHECK_THROW(frozen->promote_to_write(), LogicError);
     auto table = frozen->get_table("my_table");
+    CHECK(table->is_frozen());
     auto col = table->get_column_key("my_col_1");
     int64_t sum = 0;
     for (auto i : *table) {
         sum += i.get<int64_t>(col);
     }
     CHECK_EQUAL(sum, 1000 / 2 * 999);
+    TableView tv = table->where().not_equal(col, 42).find_all();
+    CHECK(tv.is_frozen());
 }
 
 TEST(Transactions_Frozen)
@@ -101,12 +105,23 @@ TEST(Transactions_Frozen)
     {
         auto wt = db->start_write();
         auto table = wt->add_table("my_table");
-        table->add_column(type_Int, "my_col_1");
+        auto col = table->add_column(type_Int, "my_col_1");
         for (int j = 0; j < 1000; ++j) {
             table->create_object().set_all(j);
         }
         wt->commit_and_continue_as_read();
         frozen = wt->freeze();
+        auto imported_table = frozen->import_copy_of(table);
+        CHECK(imported_table->is_frozen());
+        TableView tv = table->where().not_equal(col, 42).find_all();
+        CHECK(!tv.is_frozen());
+        auto imported = frozen->import_copy_of(tv, PayloadPolicy::Move);
+        CHECK(frozen->is_frozen());
+        CHECK(imported->is_frozen());
+        auto imported2 = frozen->import_copy_of(tv, PayloadPolicy::Stay);
+        CHECK(!imported2->is_frozen());
+        imported2->sync_if_needed();
+        CHECK(imported2->is_frozen());
     }
     // create multiple threads, all doing read-only work on Frozen
     const int num_threads = 100;

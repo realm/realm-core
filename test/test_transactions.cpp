@@ -233,6 +233,7 @@ TEST(Transactions_StateChanges)
     Lst<int64_t> list = obj.get_list<int64_t>(lcol);
     list.add(5);
     list.add(7);
+    CHECK(!writer->is_frozen());
     // verify that we cannot freeze a write transaction
     CHECK_THROW(writer->freeze(), realm::LogicError);
     writer->commit_and_continue_as_read();
@@ -242,6 +243,7 @@ TEST(Transactions_StateChanges)
     CHECK_THROW(obj.set(col, 100), realm::LogicError);
     // verify that we can freeze a read transaction
     TransactionRef frozen = writer->freeze();
+    CHECK(frozen->is_frozen());
     // verify that we can handover an accessor directly to the frozen transaction.
     auto frozen_obj = frozen->import_copy_of(obj);
     // verify that we can read the correct value(s)

@@ -318,7 +318,7 @@ inline Obj& Obj::set(ColKey col_key, int value, bool is_default)
 template <>
 inline Obj& Obj::set(ColKey col_key, uint_fast64_t value, bool is_default)
 {
-    int_fast64_t value_2;
+    int_fast64_t value_2 = 0;
     if (REALM_UNLIKELY(int_cast_with_overflow_detect(value, value_2))) {
         REALM_TERMINATE("Unsigned integer too big.");
     }
