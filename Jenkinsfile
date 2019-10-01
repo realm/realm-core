@@ -63,12 +63,12 @@ jobWrapper {
 
     stage('Checking') {
         parallelExecutors = [
-            checkLinuxDebug         : doCheckInDocker('Debug'),
-            checkLinuxDebugNoEncryp : doCheckInDocker('Debug', '4', 'OFF'),
-            checkMacOsRelease       : doBuildMacOs('Release', true),
-            checkWin32Debug         : doBuildWindows('Debug', false, 'Win32', true),
-            checkWin64Release       : doBuildWindows('Release', false, 'x64', true),
-            iosDebug                : doBuildAppleDevice('ios', 'MinSizeDebug'),
+//             checkLinuxDebug         : doCheckInDocker('Debug'),
+//             checkLinuxDebugNoEncryp : doCheckInDocker('Debug', '4', 'OFF'),
+//             checkMacOsRelease       : doBuildMacOs('Release', true),
+//             checkWin32Debug         : doBuildWindows('Debug', false, 'Win32', true),
+//             checkWin64Release       : doBuildWindows('Release', false, 'x64', true),
+//             iosDebug                : doBuildAppleDevice('ios', 'MinSizeDebug'),
             androidArm64Debug       : doAndroidBuildInDocker('arm64-v8a', 'Debug', true, false),
             androidArm64Debug       : doAndroidBuildInDocker('arm64-v8a', 'Debug', true, true),
             threadSanitizer         : doCheckSanity('Debug', '1000', 'thread'),
@@ -76,13 +76,13 @@ jobWrapper {
         ]
         if (releaseTesting) {
             extendedChecks = [
-                checkLinuxRelease       : doCheckInDocker('Release'),
-                checkMacOsDebug         : doBuildMacOs('Debug', true),
-                buildUwpx64Debug        : doBuildWindows('Debug', true, 'x64', false),
+//                 checkLinuxRelease       : doCheckInDocker('Release'),
+//                 checkMacOsDebug         : doBuildMacOs('Debug', true),
+//                 buildUwpx64Debug        : doBuildWindows('Debug', true, 'x64', false),
                 androidArmeabiRelease   : doAndroidBuildInDocker('armeabi-v7a', 'Release', true, false),
-                coverage                : doBuildCoverage(),
-                performance             : buildPerformance(),
-                valgrind                : doCheckValgrind()
+//                 coverage                : doBuildCoverage(),
+//                 performance             : buildPerformance(),
+//                 valgrind                : doCheckValgrind()
             ]
             parallelExecutors.putAll(extendedChecks)
         }
@@ -368,7 +368,8 @@ def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmula
                                    find test -type f -name "*.json" -maxdepth 1 -exec adb push {} /data/local/tmp \\;
                                    find test -type f -name "*.realm" -maxdepth 1 -exec adb push {} /data/local/tmp \\;
                                    find test -type f -name "*.txt" -maxdepth 1 -exec adb push {} /data/local/tmp \\;
-                                   adb shell \'cd /data/local/tmp; UNITTEST_PROGRESS=1 ./realm-tests || echo __ADB_FAIL__\' | tee adb.log
+                                   adb root
+                                   adb shell \'cd /data/local/tmp; UNITTEST_PROGRESS=1 ${runTestsWithEncryption ? 'UNITTEST_ENCRYPT_ALL' : ''} ./realm-tests || echo __ADB_FAIL__\' | tee adb.log
                                    ! grep __ADB_FAIL__ adb.log
                                '''
                             } finally {
