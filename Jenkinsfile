@@ -69,7 +69,8 @@ jobWrapper {
             checkWin32Debug         : doBuildWindows('Debug', false, 'Win32', true),
             checkWin64Release       : doBuildWindows('Release', false, 'x64', true),
             iosDebug                : doBuildAppleDevice('ios', 'MinSizeDebug'),
-            androidArm64Debug       : doAndroidBuildInDocker('arm64-v8a', 'Debug', false),
+            androidArm64Debug       : doAndroidBuildInDocker('arm64-v8a', 'Debug', true, false),
+            androidArm64Debug       : doAndroidBuildInDocker('arm64-v8a', 'Debug', true, true),
             threadSanitizer         : doCheckSanity('Debug', '1000', 'thread'),
             addressSanitizer        : doCheckSanity('Debug', '1000', 'address')
         ]
@@ -78,7 +79,7 @@ jobWrapper {
                 checkLinuxRelease       : doCheckInDocker('Release'),
                 checkMacOsDebug         : doBuildMacOs('Debug', true),
                 buildUwpx64Debug        : doBuildWindows('Debug', true, 'x64', false),
-                androidArmeabiRelease   : doAndroidBuildInDocker('armeabi-v7a', 'Release', true),
+                androidArmeabiRelease   : doAndroidBuildInDocker('armeabi-v7a', 'Release', true, false),
                 coverage                : doBuildCoverage(),
                 performance             : buildPerformance(),
                 valgrind                : doCheckValgrind()
@@ -319,7 +320,7 @@ def doCheckValgrind() {
     }
 }
 
-def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmulator) {
+def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmulator, boolean runTestsWithEncryption) {
     def cores = 4
     return {
         node('docker') {
@@ -329,6 +330,10 @@ def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmula
             def buildEnv = docker.build('realm-core-android:snapshot', '-f android.Dockerfile .')
             def environment = environment()
             environment << 'UNITTEST_PROGRESS=1'
+            if (runTestsWithEncryption) {
+                environment << 'UNITTEST_ENCRYPT_ALL=1'
+            }
+
             withEnv(environment) {
                 if(!runTestsInEmulator) {
                     buildEnv.inside {
