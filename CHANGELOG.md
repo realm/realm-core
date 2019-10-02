@@ -1,18 +1,16 @@
-# NEXT RELEASE
+# 6.0.0-alpha.19 Release notes
 
 ### Enhancements
-* None.
+* Further reduction of the use of virtual address space. ([#3392](https://github.com/realm/realm-core/pull/3392))
 
 ### Fixed
 * Creating an equal query on a string column with an index confined by a list view would give wrong results ([#333](https://github.com/realm/realm-core-private/issues/333), since v6.0.0-alpha.0)
+* Setting a null on a link would not get replicated. ([#334](https://github.com/realm/realm-core-private/issues/334), since v6.0.0-alpha.0)
  
-### Breaking changes
-* None.
-
 -----------
 
 ### Internals
-* None.
+* A workaround for the problem that values inserted/added on a list-of-primitives were not stored on the server has been added for strings.
 
 ----------------------------------------------
 
