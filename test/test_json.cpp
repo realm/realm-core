@@ -196,7 +196,7 @@ TEST(Json_NoLinks)
 
     std::stringstream ss;
     table.to_json(ss);
-    CHECK(json_test(ss.str(), "expect_json", false));
+    CHECK(json_test(ss.str(), "expect_json", generate_all));
 
     return;
 }

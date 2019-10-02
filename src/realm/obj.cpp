@@ -516,26 +516,22 @@ void out_mixed(std::ostream& out, const Mixed& val)
 void ConstObj::to_json(std::ostream& out, size_t link_depth, std::map<std::string, std::string>& renames,
                        std::vector<ColKey>& followed) const
 {
+    StringData name = "_key";
+    if (renames[name] != "")
+        name = renames[name];
     out << "{";
-    bool first = true;
+    out << "\"" << name << "\":" << this->m_key.value;
     auto col_keys = m_table->get_column_keys();
     for (auto ck : col_keys) {
         if (is_null(ck))
             continue;
 
-        if (first) {
-            first = false;
-        }
-        else {
-            out << ",";
-        }
-
-        StringData name = m_table->get_column_name(ck);
+        name = m_table->get_column_name(ck);
         DataType type = DataType(ck.get_type());
         if (renames[name] != "")
             name = renames[name];
 
-        out << "\"" << name << "\":";
+        out << ",\"" << name << "\":";
 
         if (ck.get_attrs().test(col_attr_List)) {
             if (type == type_LinkList) {
@@ -547,7 +543,7 @@ void ConstObj::to_json(std::ostream& out, size_t link_depth, std::map<std::strin
                     out << "{\"table\": \"" << get_target_table(ck)->get_name() << "\", \"rows\": [";
                     for (size_t i = 0; i < sz; i++) {
                         if (i > 0)
-                            out << ", ";
+                            out << ",";
                         out << ll.get(i).value;
                     }
                     out << "]}";
@@ -576,7 +572,7 @@ void ConstObj::to_json(std::ostream& out, size_t link_depth, std::map<std::strin
                         continue;
 
                     if (i > 0)
-                        out << ", ";
+                        out << ",";
 
                     out_mixed(out, val);
                 }
