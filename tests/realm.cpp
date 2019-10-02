@@ -427,16 +427,19 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
     SyncTestFile config2(server, "default");
     config2.schema = config.schema;
 
+    std::mutex mutex;
     SECTION("can open synced Realms that don't already exist") {
         std::atomic<bool> called{false};
         auto task = Realm::get_synchronized_realm(config);
         task->start([&](auto ref, auto error) {
+            std::lock_guard<std::mutex> lock(mutex);
             REQUIRE(!error);
             called = true;
 
             REQUIRE(Realm::get_shared_realm(std::move(ref))->read_group().get_table("class_object"));
         });
         util::EventLoop::main().run_until([&]{ return called.load(); });
+        std::lock_guard<std::mutex> lock(mutex);
         REQUIRE(called);
     }
 
@@ -452,12 +455,14 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
         std::atomic<bool> called{false};
         auto task = Realm::get_synchronized_realm(config);
         task->start([&](auto ref, auto error) {
+            std::lock_guard<std::mutex> lock(mutex);
             REQUIRE(!error);
             called = true;
 
             REQUIRE(Realm::get_shared_realm(std::move(ref))->read_group().get_table("class_object"));
         });
         util::EventLoop::main().run_until([&]{ return called.load(); });
+        std::lock_guard<std::mutex> lock(mutex);
         REQUIRE(called);
     }
 
@@ -475,12 +480,14 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
         std::atomic<bool> called{false};
         auto task = Realm::get_synchronized_realm(config);
         task->start([&](auto ref, auto error) {
+            std::lock_guard<std::mutex> lock(mutex);
             REQUIRE(!error);
             called = true;
 
             REQUIRE(Realm::get_shared_realm(std::move(ref))->read_group().get_table("class_object")->size() == 1);
         });
         util::EventLoop::main().run_until([&]{ return called.load(); });
+        std::lock_guard<std::mutex> lock(mutex);
         REQUIRE(called);
     }
 
@@ -498,10 +505,12 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
         std::atomic<bool> called{false};
         auto task = Realm::get_synchronized_realm(config);
         task->start([&](auto, auto error) {
+            std::lock_guard<std::mutex> lock(mutex);
             REQUIRE(!error);
             called = true;
         });
         util::EventLoop::main().run_until([&]{ return called.load(); });
+        std::lock_guard<std::mutex> lock(mutex);
         REQUIRE(called);
 
         // No subscriptions, so no objects

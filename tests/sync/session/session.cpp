@@ -556,9 +556,9 @@ TEST_CASE("sync: encrypt local realm file", "[sync]") {
             std::atomic<bool> handler_called(false);
             auto session = SyncManager::shared().get_session(config.path, *config.sync_config);
             EventLoop::main().run_until([&] { return sessions_are_active(*session); });
-            CHECK(session->wait_for_download_completion([&](auto) {
+            session->wait_for_download_completion([&](auto) {
                 handler_called = true;
-            }));
+            });
             EventLoop::main().run_until([&] { return handler_called == true; });
             session->close();
             EventLoop::main().run_until([&] { return sessions_are_inactive(*session); });
@@ -736,3 +736,497 @@ TEST_CASE("sync: Migration from Sync 1.x to Sync 2.x", "[sync]") {
     }
 }
 #endif
+
+TEST_CASE("sync: client resync") {
+    using namespace std::literals::chrono_literals;
+    if (!EventLoop::has_implementation())
+        return;
+
+    SyncManager::shared().configure(tmp_dir(), SyncManager::MetadataMode::NoMetadata);
+
+    SyncServer server;
+    SyncTestFile config(server, "default");
+    config.schema = Schema{
+        {"object", {
+            {"value", PropertyType::Int},
+        }},
+        {"link target", {
+            {"value", PropertyType::Int},
+        }},
+        {"pk link target", {
+            {"pk", PropertyType::Int, Property::IsPrimary{true}},
+            {"value", PropertyType::Int},
+        }},
+        {"link origin", {
+            {"id", PropertyType::Int},
+            {"link", PropertyType::Object|PropertyType::Nullable, "link target"},
+            {"pk link", PropertyType::Object|PropertyType::Nullable, "pk link target"},
+            {"list", PropertyType::Object|PropertyType::Array, "link target"},
+            {"pk list", PropertyType::Object|PropertyType::Array, "pk link target"},
+        }},
+    };
+    SyncTestFile config2(server, "default");
+
+    auto get_table = [](Realm& realm, StringData object_type) {
+        return ObjectStore::table_for_object_type(realm.read_group(), object_type);
+    };
+    auto create_object = [&](Realm& realm, StringData object_type) -> Obj {
+        auto table = get_table(realm, object_type);
+        REQUIRE(table);
+        return table->create_object();
+    };
+
+    auto setup = [&](auto fn) {
+        auto realm = Realm::get_shared_realm(config);
+        realm->begin_transaction();
+        fn(*realm);
+        realm->commit_transaction();
+        wait_for_upload(*realm);
+    };
+
+    auto trigger_client_reset = [&](auto local, auto remote) -> std::shared_ptr<Realm> {
+        auto realm = Realm::get_shared_realm(config);
+        auto session = SyncManager::shared().get_session(realm->config().path, *realm->config().sync_config);
+        {
+            realm->begin_transaction();
+
+            auto obj = create_object(*realm, "object");
+            auto col = obj.get_table()->get_column_key("value");
+            obj.set(col, 1);
+            obj.set(col, 2);
+            obj.set(col, 3);
+            realm->commit_transaction();
+
+            wait_for_upload(*realm);
+            session->log_out();
+
+            // Make a change while offline so that log compaction will cause a
+            // client reset
+            realm->begin_transaction();
+            obj.set(col, 4);
+            local(*realm);
+            realm->commit_transaction();
+        }
+
+        // Make writes from another client while advancing the time so that
+        // the server performs log compaction
+        {
+            auto realm2 = Realm::get_shared_realm(config2);
+
+            for (int i = 0; i < 2; ++i) {
+                wait_for_download(*realm2);
+                realm2->begin_transaction();
+                auto table = get_table(*realm2, "object");
+                auto col = table->get_column_key("value");
+                table->begin()->set(col, i + 5);
+                realm2->commit_transaction();
+                wait_for_upload(*realm2);
+                server.advance_clock(10s);
+            }
+
+            realm2->begin_transaction();
+            remote(*realm2);
+            realm2->commit_transaction();
+            wait_for_upload(*realm2);
+            server.advance_clock(10s);
+            realm2->close();
+        }
+
+        // Resuming sync on the first realm should now result in a client reset
+        session->revive_if_needed();
+        return realm;
+    };
+
+    SECTION("should trigger error callback when mode is manual") {
+        config.sync_config->client_resync_mode = ClientResyncMode::Manual;
+        std::atomic<bool> called{false};
+        config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
+            REQUIRE(error.is_client_reset_requested());
+            called = true;
+        };
+
+        auto realm = trigger_client_reset([](auto&){}, [](auto&){});
+
+        EventLoop::main().run_until([&] { return called.load(); });
+    }
+
+    config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError) {
+        FAIL("Error handler should not have been called");
+    };
+
+    SECTION("should discard local changeset when mode is discard") {
+        config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
+
+        auto realm = trigger_client_reset([](auto&){}, [](auto&){});
+        wait_for_download(*realm);
+        realm->refresh(); // FIXME: sync needs to notify
+
+        CHECK(ObjectStore::table_for_object_type(realm->read_group(), "object")->begin()->get<Int>("value") == 6);
+    }
+
+    SECTION("should recover local changeset when mode is recover") {
+        config.sync_config->client_resync_mode = ClientResyncMode::Recover;
+        config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError) {
+            FAIL("Error handler should not have been called");
+        };
+
+        auto realm = trigger_client_reset([](auto&){}, [](auto&){});
+        wait_for_download(*realm);
+        realm->refresh();
+
+        CHECK(ObjectStore::table_for_object_type(realm->read_group(), "object")->begin()->get<Int>("value") == 4);
+    }
+
+    SECTION("should honor encryption key for downloaded Realm") {
+        config.encryption_key.resize(64, 'a');
+        config.sync_config->realm_encryption_key = std::array<char, 64>();
+        config.sync_config->realm_encryption_key->fill('a');
+        config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
+
+        auto realm = trigger_client_reset([](auto&){}, [](auto&){});
+        wait_for_download(*realm);
+        realm->close();
+
+        REQUIRE_NOTHROW(Realm::get_shared_realm(config));
+    }
+
+    config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
+
+    SECTION("add table in discarded transaction") {
+        auto realm = trigger_client_reset([](auto& realm) {
+            realm.update_schema({
+                {"object2", {
+                    {"value2", PropertyType::Int},
+                }},
+            }, 0, nullptr, nullptr, true);
+            ObjectStore::table_for_object_type(realm.read_group(), "object2")->create_object();
+        }, [](auto&){});
+        wait_for_download(*realm);
+        REQUIRE_NOTHROW(realm->refresh());
+        auto table = ObjectStore::table_for_object_type(realm->read_group(), "object2");
+        REQUIRE(table);
+        REQUIRE(table->size() == 0);
+    }
+
+    SECTION("add column in discarded transaction") {
+        auto realm = trigger_client_reset([](auto& realm) {
+            realm.update_schema({
+                {"object", {
+                    {"value2", PropertyType::Int},
+                }},
+            }, 0, nullptr, nullptr, true);
+            ObjectStore::table_for_object_type(realm.read_group(), "object")->begin()->set("value2", 123);
+        }, [](auto&){});
+        wait_for_download(*realm);
+        REQUIRE_NOTHROW(realm->refresh());
+        auto table = ObjectStore::table_for_object_type(realm->read_group(), "object");
+        REQUIRE(table->get_column_count() == 2);
+        REQUIRE(table->begin()->get<Int>("value2") == 0);
+    }
+
+    config.sync_config->client_resync_mode = ClientResyncMode::Recover;
+
+    SECTION("add table without pk in recovered transaction") {
+        auto realm = trigger_client_reset([](auto& realm) {
+            realm.update_schema({
+                {"object2", {
+                    {"value2", PropertyType::Int},
+                }},
+            }, 0, nullptr, nullptr, true);
+            ObjectStore::table_for_object_type(realm.read_group(), "object2")->create_object();
+        }, [](auto&){});
+        wait_for_download(*realm);
+        REQUIRE_NOTHROW(realm->refresh());
+        auto table = ObjectStore::table_for_object_type(realm->read_group(), "object2");
+        REQUIRE(table);
+        REQUIRE(table->size() == 1);
+    }
+
+    SECTION("add table pk in recovered transaction") {
+        auto realm = trigger_client_reset([](auto& realm) {
+            realm.update_schema({
+                {"object2", {
+                    {"pk", PropertyType::Int|PropertyType::Nullable, Property::IsPrimary{true}},
+                }},
+            }, 0, nullptr, nullptr, true);
+            auto table = ObjectStore::table_for_object_type(realm.read_group(), "object2");
+            table->create_object_with_primary_key(Mixed());
+            table->create_object_with_primary_key(Mixed(1));
+        }, [](auto&){});
+        wait_for_download(*realm);
+        REQUIRE_NOTHROW(realm->refresh());
+        auto table = ObjectStore::table_for_object_type(realm->read_group(), "object2");
+        REQUIRE(table);
+        REQUIRE(table->size() == 2);
+    }
+
+    SECTION("add column in recovered transaction") {
+        auto realm = trigger_client_reset([](auto& realm) {
+            realm.update_schema({
+                {"object", {
+                    {"value2", PropertyType::Int},
+                    {"array", PropertyType::Int|PropertyType::Array},
+                    {"link", PropertyType::Object|PropertyType::Nullable, "object"},
+                }},
+            }, 0, nullptr, nullptr, true);
+            auto table = ObjectStore::table_for_object_type(realm.read_group(), "object");
+            table->begin()->set(table->get_column_key("value2"), 123);
+        }, [](auto&){});
+        wait_for_download(*realm);
+        REQUIRE_NOTHROW(realm->refresh());
+        auto table = ObjectStore::table_for_object_type(realm->read_group(), "object");
+        REQUIRE(table->get_column_count() == 4);
+        REQUIRE(table->begin()->get<Int>(table->get_column_key("value2")) == 123);
+    }
+
+    SECTION("compatible schema changes in both remote and recovered transactions") {
+        auto realm = trigger_client_reset([](auto& realm) {
+            realm.update_schema({
+                {"object", {
+                    {"value2", PropertyType::Int},
+                }},
+                {"object2", {
+                    {"link", PropertyType::Object|PropertyType::Nullable, "object"},
+                }},
+            }, 0, nullptr, nullptr, true);
+        }, [](auto& realm) {
+            realm.update_schema({
+                {"object", {
+                    {"value2", PropertyType::Int},
+                }},
+                {"object2", {
+                    {"link", PropertyType::Object|PropertyType::Nullable, "object"},
+                }},
+            }, 0, nullptr, nullptr, true);
+        });
+        wait_for_download(*realm);
+        REQUIRE_NOTHROW(realm->refresh());
+    }
+
+    SECTION("incompatible schema changes in remote and recovered transactions") {
+        auto realm = trigger_client_reset([](auto& realm) {
+            realm.update_schema({
+                {"object", {
+                    {"value2", PropertyType::Float},
+                }},
+            }, 0, nullptr, nullptr, true);
+        }, [](auto& realm) {
+            realm.update_schema({
+                {"object", {
+                    {"value2", PropertyType::Int},
+                }},
+            }, 0, nullptr, nullptr, true);
+        });
+        wait_for_download(*realm);
+        REQUIRE_THROWS_WITH(realm->refresh(),
+                            Catch::Matchers::Contains("Property 'object.value2' has been changed from 'float' to 'int'"));
+    }
+
+    SECTION("add object in recovered transaction") {
+        Obj obj;
+        auto realm = trigger_client_reset([&](auto& realm) {
+            auto table = ObjectStore::table_for_object_type(realm.read_group(), "object");
+            obj = table->create_object();
+
+            realm.update_schema({
+                {"object", {
+                    {"value2", PropertyType::Int},
+                }},
+            }, 0, nullptr, nullptr, true);
+            obj.set("value2", 123);
+        }, [](auto&){});
+        wait_for_download(*realm);
+        REQUIRE_NOTHROW(realm->refresh());
+        auto table = ObjectStore::table_for_object_type(realm->read_group(), "object");
+        REQUIRE(table->get_column_count() == 2);
+        REQUIRE(table->begin()->get<Int>("value2") == 123);
+    }
+
+    SECTION("delete object in recovered transaction") {
+        auto realm = trigger_client_reset([&](auto& realm) {
+            ObjectStore::table_for_object_type(realm.read_group(), "object")->clear();
+        }, [](auto&){});
+        wait_for_download(*realm);
+        REQUIRE_NOTHROW(realm->refresh());
+        auto table = ObjectStore::table_for_object_type(realm->read_group(), "object");
+        REQUIRE(table->size() == 0);
+    }
+
+    SECTION("list insertions in recovered transaction") {
+        ObjKey k0, k1, k2;
+        setup([&](auto& realm) {
+            k0 = create_object(realm, "link target").set("value", 1).get_key();
+            k1 = create_object(realm, "link target").set("value", 2).get_key();
+            k2 = create_object(realm, "link target").set("value", 3).get_key();
+
+            Obj o = create_object(realm, "link origin");
+            auto list = o.get_linklist(o.get_table()->get_column_key("list"));
+            list.add(k0);
+            list.add(k1);
+            list.add(k2);
+        });
+
+        auto realm = trigger_client_reset([&](auto& realm) {
+            auto table = get_table(realm, "link origin");
+            auto list = table->begin()->get_linklist(table->get_column_key("list"));
+            list.add(k0);
+            list.insert(0, k2);
+            list.insert(0, k1);
+        }, [](auto&){});
+        wait_for_download(*realm);
+        REQUIRE_NOTHROW(realm->refresh());
+
+        auto table = get_table(*realm, "link origin");
+        auto list = table->begin()->get_linklist(table->get_column_key("list"));
+        REQUIRE(list.size() == 6);
+        REQUIRE(list.get_object(0).get<Int>("value") == 2);
+        REQUIRE(list.get_object(1).get<Int>("value") == 3);
+        REQUIRE(list.get_object(2).get<Int>("value") == 1);
+        REQUIRE(list.get_object(3).get<Int>("value") == 2);
+        REQUIRE(list.get_object(4).get<Int>("value") == 3);
+        REQUIRE(list.get_object(5).get<Int>("value") == 1);
+    }
+
+    SECTION("list deletions in recovered transaction") {
+        ObjKey k0, k1, k2;
+        setup([&](auto& realm) {
+            k0 = create_object(realm, "link target").set("value", 1).get_key();
+            k1 = create_object(realm, "link target").set("value", 2).get_key();
+            k2 = create_object(realm, "link target").set("value", 3).get_key();
+
+            Obj o = create_object(realm, "link origin");
+            auto list = o.get_linklist(o.get_table()->get_column_key("list"));
+            list.add(k0);
+            list.add(k1);
+            list.add(k2);
+        });
+
+        auto realm = trigger_client_reset([&](auto& realm) {
+            auto table = get_table(realm, "link origin");
+            auto list = table->begin()->get_linklist(table->get_column_key("list"));
+            list.remove(1);
+        }, [](auto&){});
+        wait_for_download(*realm);
+        REQUIRE_NOTHROW(realm->refresh());
+
+        auto table = get_table(*realm, "link origin");
+        auto list = table->begin()->get_linklist(table->get_column_key("list"));
+        REQUIRE(list.size() == 2);
+        REQUIRE(list.get_object(0).get<Int>("value") == 1);
+        REQUIRE(list.get_object(1).get<Int>("value") == 3);
+    }
+
+    SECTION("list clear in recovered transaction") {
+        ObjKey k0, k1, k2;
+        setup([&](auto& realm) {
+            k0 = create_object(realm, "link target").set("value", 1).get_key();
+            k1 = create_object(realm, "link target").set("value", 2).get_key();
+            k2 = create_object(realm, "link target").set("value", 3).get_key();
+
+            Obj o = create_object(realm, "link origin");
+            auto list = o.get_linklist(o.get_table()->get_column_key("list"));
+            list.add(k0);
+            list.add(k1);
+            list.add(k2);
+        });
+
+        auto realm = trigger_client_reset([&](auto& realm) {
+            auto table = get_table(realm, "link origin");
+            auto list = table->begin()->get_linklist(table->get_column_key("list"));
+            list.clear();
+        }, [&](auto& realm){
+            auto key = get_table(realm, "link target")->begin()->get_key();
+            auto table = get_table(realm, "link origin");
+            auto list = table->begin()->get_linklist(table->get_column_key("list"));
+            list.add(key);
+        });
+        wait_for_download(*realm);
+        REQUIRE_NOTHROW(realm->refresh());
+
+        auto table = get_table(*realm, "link origin");
+        auto list = table->begin()->get_linklist(table->get_column_key("list"));
+        REQUIRE(list.size() == 0);
+    }
+
+    SECTION("conflicting primary key creations") {
+        auto realm = trigger_client_reset([&](auto& realm) {
+            auto table = get_table(realm, "pk link target");
+            table->create_object_with_primary_key(1).set("value", 1);
+            table->create_object_with_primary_key(2).set("value", 2);
+            table->create_object_with_primary_key(3).set("value", 3);
+        }, [&](auto& realm){
+            auto table = get_table(realm, "pk link target");
+            table->create_object_with_primary_key(1).set("value", 1);
+            table->create_object_with_primary_key(2).set("value", 4);
+            table->create_object_with_primary_key(5).set("value", 5);
+        });
+        wait_for_download(*realm);
+        REQUIRE_NOTHROW(realm->refresh());
+
+        auto table = get_table(*realm, "pk link target");
+        REQUIRE(table->size() == 4);
+        auto it = table->begin();
+        REQUIRE(it->get<Int>("value") == 1);
+        REQUIRE((++it)->get<Int>("value") == 2);
+        REQUIRE((++it)->get<Int>("value") == 3);
+        REQUIRE((++it)->get<Int>("value") == 5);
+    }
+
+    SECTION("link to remotely deleted object") {
+        setup([&](auto& realm) {
+            auto k0 = create_object(realm, "link target").set("value", 1).get_key();
+            create_object(realm, "link target").set("value", 2);
+            create_object(realm, "link target").set("value", 3);
+
+            Obj o = create_object(realm, "link origin");
+            o.set("link", k0);
+        });
+
+        auto realm = trigger_client_reset([&](auto& realm) {
+            auto key = get_table(realm, "link target")->get_object(1).get_key();
+            auto table = get_table(realm, "link origin");
+            table->begin()->set("link", key);
+        }, [&](auto& realm){
+            auto table = get_table(realm, "link target");
+            table->get_object(1).remove();
+        });
+        wait_for_download(*realm);
+        REQUIRE_NOTHROW(realm->refresh());
+
+        // Link set is discarded entirely (as opposed to being set to nil)
+        auto origin = get_table(*realm, "link origin");
+        auto target = get_table(*realm, "link target");
+        auto key = origin->begin()->get<ObjKey>("link");
+        auto obj = target->get_object(key);
+        REQUIRE(obj.get<Int>("value") == 1);
+    }
+
+    SECTION("add remotely deleted object to list") {
+        ObjKey k0, k1, k2;
+        setup([&](auto& realm) {
+            k0 = create_object(realm, "link target").set("value", 1).get_key();
+            k1 = create_object(realm, "link target").set("value", 2).get_key();
+            k2 = create_object(realm, "link target").set("value", 3).get_key();
+
+            Obj o = create_object(realm, "link origin");
+            o.get_linklist("list").add(k0);
+        });
+
+        auto realm = trigger_client_reset([&](auto& realm) {
+            auto key = get_table(realm, "link target")->get_object(1).get_key();
+            auto table = get_table(realm, "link origin");
+            auto list = table->begin()->get_linklist("list");
+            list.add(key);
+        }, [&](auto& realm){
+            auto table = get_table(realm, "link target");
+            table->get_object(1).remove();
+        });
+        wait_for_download(*realm);
+        REQUIRE_NOTHROW(realm->refresh());
+
+        auto table = get_table(*realm, "link origin");
+        auto list = table->begin()->get_linklist("list");
+        REQUIRE(list.size() == 1);
+        REQUIRE(list.get_object(0).get<Int>("value") == 1);
+    }
+}

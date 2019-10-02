@@ -46,9 +46,9 @@ TEST_CASE("SyncSession: wait_for_download_completion() API", "[sync]") {
                                     [](auto, auto) { });
         EventLoop::main().run_until([&] { return sessions_are_active(*session); });
         // Register the download-completion notification
-        CHECK(session->wait_for_download_completion([&](auto) {
+        session->wait_for_download_completion([&](auto) {
             handler_called = true;
-        }));
+        });
         EventLoop::main().run_until([&] { return handler_called == true; });
     }
 
@@ -63,9 +63,9 @@ TEST_CASE("SyncSession: wait_for_download_completion() API", "[sync]") {
                                                                               },
                                                                               [](auto, auto) { });
         // Register the download-completion notification
-        REQUIRE(session->wait_for_download_completion([&](auto) {
+        session->wait_for_download_completion([&](auto) {
             handler_called = true;
-        }));
+        });
         EventLoop::main().run_until([&] { return login_handler_called == true; });
         REQUIRE(session);
         REQUIRE(handler_called == false);
@@ -88,9 +88,9 @@ TEST_CASE("SyncSession: wait_for_download_completion() API", "[sync]") {
         user->log_out();
         EventLoop::main().run_until([&] { return sessions_are_inactive(*session); });
         // Register the download-completion notification
-        REQUIRE(session->wait_for_download_completion([&](auto) {
+        session->wait_for_download_completion([&](auto) {
             handler_called = true;
-        }));
+        });
         spin_runloop();
         REQUIRE(handler_called == false);
         // Log the user back in
@@ -113,10 +113,10 @@ TEST_CASE("SyncSession: wait_for_download_completion() API", "[sync]") {
                                                                               },
                                                                               [&](auto, auto) { ++error_count; });
         // Register the download-completion notification
-        REQUIRE(session->wait_for_download_completion([&](std::error_code error) {
+        session->wait_for_download_completion([&](std::error_code error) {
             REQUIRE(error == util::error::operation_aborted);
             handler_called = true;
-        }));
+        });
         EventLoop::main().run_until([&] { return login_handler_called == true; });
         REQUIRE(handler_called == false);
         // Now trigger an error
@@ -147,9 +147,9 @@ TEST_CASE("SyncSession: wait_for_upload_completion() API", "[sync]") {
                                     [](auto, auto) { });
         EventLoop::main().run_until([&] { return sessions_are_active(*session); });
         // Register the upload-completion notification
-        CHECK(session->wait_for_upload_completion([&](auto) {
+        session->wait_for_upload_completion([&](auto) {
             handler_called = true;
-        }));
+        });
         EventLoop::main().run_until([&] { return handler_called == true; });
     }
 
@@ -164,9 +164,9 @@ TEST_CASE("SyncSession: wait_for_upload_completion() API", "[sync]") {
                                                                               },
                                                                               [](auto, auto) { });
         // Register the upload-completion notification
-        REQUIRE(session->wait_for_upload_completion([&](auto) {
+        session->wait_for_upload_completion([&](auto) {
             handler_called = true;
-        }));
+        });
         EventLoop::main().run_until([&] { return login_handler_called == true; });
         REQUIRE(session);
         REQUIRE(handler_called == false);
@@ -189,9 +189,9 @@ TEST_CASE("SyncSession: wait_for_upload_completion() API", "[sync]") {
         user->log_out();
         EventLoop::main().run_until([&] { return sessions_are_inactive(*session); });
         // Register the upload-completion notification
-        REQUIRE(session->wait_for_upload_completion([&](auto) {
+        session->wait_for_upload_completion([&](auto) {
             handler_called = true;
-        }));
+        });
         spin_runloop();
         REQUIRE(handler_called == false);
         // Log the user back in
@@ -214,10 +214,10 @@ TEST_CASE("SyncSession: wait_for_upload_completion() API", "[sync]") {
                                                                               },
                                                                               [&](auto, auto) { ++error_count; });
         // Register the upload-completion notification
-        REQUIRE(session->wait_for_upload_completion([&](std::error_code error) {
+        session->wait_for_upload_completion([&](std::error_code error) {
             REQUIRE(error == util::error::operation_aborted);
             handler_called = true;
-        }));
+        });
         EventLoop::main().run_until([&] { return login_handler_called == true; });
         REQUIRE(handler_called == false);
         // Now trigger an error
