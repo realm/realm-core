@@ -3709,7 +3709,7 @@ TEST(Query_DescriptorsWillApply)
     CHECK(!ordering.will_apply_include());
     CHECK(!ordering.will_limit_to_zero());
 
-    ordering.append_include(IncludeDescriptor(*t1, {{LinkPathPart{t1_link_col, t1}}}));
+    ordering.append_include(IncludeDescriptor(t1, {{LinkPathPart{t1_link_col, t1}}}));
     CHECK(ordering.will_apply_sort());
     CHECK(ordering.will_apply_distinct());
     CHECK(ordering.will_apply_limit());
@@ -4142,7 +4142,7 @@ TEST(Query_SortDistinctOrderThroughHandover)
         tv.sort(SortDescriptor({{t1_int_col}}, {false}));
         tv.distinct(DistinctDescriptor({{t1_str_col}}));
         tv.limit(LimitDescriptor(0));
-        tv.include(IncludeDescriptor(*t1, {{{t1_link_col, t1}}}));
+        tv.include(IncludeDescriptor(t1, {{{t1_link_col, t1}}}));
         CHECK_EQUAL(tv.size(), results.size());
         auto tr = g->duplicate();
         auto tv2 = tr->import_copy_of(tv, PayloadPolicy::Stay);
@@ -4529,7 +4529,7 @@ TEST(Query_IncludeDescriptorSelfLinks)
     { // test single backlink path from the same table: INCLUDE(@links.t1.t1_link_self)
         TableView tv = t1->where().less(t1_int_col, 6).find_all();
         tv.sort(t1_int_col);
-        tv.include(IncludeDescriptor(*t1, {{{t1_link_self_col, t1}}}));
+        tv.include(IncludeDescriptor(t1, {{{t1_link_self_col, t1}}}));
 
         IncludeDescriptor includes = tv.get_include_descriptors();
         std::vector<size_t> expected_values;
@@ -4555,7 +4555,7 @@ TEST(Query_IncludeDescriptorSelfLinks)
     { // test a backlink chain of size two from the same table: INCLUDE(t1_link_self.@links.t1.t1_link_self)
         TableView tv = t1->where().less(t1_int_col, 6).find_all();
         tv.sort(t1_int_col);
-        tv.include(IncludeDescriptor(*t1, {{{t1_link_self_col}, {t1_link_self_col, t1}}}));
+        tv.include(IncludeDescriptor(t1, {{{t1_link_self_col}, {t1_link_self_col, t1}}}));
 
         IncludeDescriptor includes = tv.get_include_descriptors();
         std::vector<size_t> expected_values;
@@ -4577,7 +4577,7 @@ TEST(Query_IncludeDescriptorSelfLinks)
       // INCLUDE(t1_link_self.t1_link_self.@links.t1.t1_link_self)
         TableView tv = t1->where().less(t1_int_col, 6).find_all();
         tv.sort(t1_int_col);
-        tv.include(IncludeDescriptor(*t1, {{{t1_link_self_col}, {t1_link_self_col}, {t1_link_self_col, t1}}}));
+        tv.include(IncludeDescriptor(t1, {{{t1_link_self_col}, {t1_link_self_col}, {t1_link_self_col, t1}}}));
 
         IncludeDescriptor includes = tv.get_include_descriptors();
         std::vector<size_t> expected_values;
@@ -4646,7 +4646,7 @@ TEST(Query_IncludeDescriptorOtherLinks)
     { // test single backlink path from t2: INCLUDE(@links.t2.t2_link_t1)
         TableView tv = t1->where().less(t1_int_col, 6).find_all();
         tv.sort(t1_int_col);
-        tv.include(IncludeDescriptor(*t1, {{{t2_link_t1_col, t2}}}));
+        tv.include(IncludeDescriptor(t1, {{{t2_link_t1_col, t2}}}));
 
         IncludeDescriptor includes = tv.get_include_descriptors();
         std::vector<size_t> expected_t2_values;
@@ -4729,7 +4729,7 @@ TEST(Query_IncludeDescriptorOtherLists)
     { // test single backlink path from t2 list: INCLUDE(@links.t2.t2_list_t1_col)
         TableView tv = t1->where().less(t1_int_col, 6).find_all();
         tv.sort(t1_int_col);
-        tv.include(IncludeDescriptor(*t1, {{{t2_list_t1_col, t2}}}));
+        tv.include(IncludeDescriptor(t1, {{{t2_list_t1_col, t2}}}));
 
         IncludeDescriptor includes = tv.get_include_descriptors();
         std::vector<size_t> expected_t2_values;
@@ -4876,7 +4876,7 @@ TEST(Query_IncludeDescriptorLinkAndListTranslation)
     };
 
     DescriptorOrdering ordering;
-    ordering.append_include(IncludeDescriptor(*t1, {{{t1_link_t2_col}, {t2_list_t3_col}, {t4_link_t3_col, t4}}}));
+    ordering.append_include(IncludeDescriptor(t1, {{{t1_link_t2_col}, {t2_list_t3_col}, {t4_link_t3_col, t4}}}));
     ordering.append_sort(SortDescriptor({{t1_int_col}}));
     check_include(ordering);
 }
