@@ -352,7 +352,6 @@ IncludeDescriptor::IncludeDescriptor(ConstTableRef table, const std::vector<std:
 {
     m_column_keys.resize(column_links.size());
     m_backlink_sources.resize(column_links.size());
-    using tf = _impl::TableFriend;
     Group* group = table->get_parent_group();
     for (size_t i = 0; i < m_column_keys.size(); ++i) { // for each path:
         auto& columns = m_column_keys[i];
