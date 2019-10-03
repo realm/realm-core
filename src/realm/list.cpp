@@ -681,90 +681,83 @@ void Lst<ObjKey>::set_repl(Replication* repl, size_t ndx, ObjKey key)
 template <>
 void Lst<Int>::insert_repl(Replication* repl, size_t ndx, int64_t value)
 {
-    // HACK: This is to circumvent a problem in Sync(5) where the ArrayInsert instruction
-    // will not insert the value, but only insert an empty row
-    repl->list_insert_null(*this, ndx);
-    repl->list_set_int(*this, ndx, value);
+    repl->list_insert_int(*this, ndx, value);
 }
 
 template <>
 void Lst<util::Optional<Int>>::insert_repl(Replication* repl, size_t ndx, util::Optional<Int> value)
 {
-    // HACK: This is to circumvent a problem in Sync(5) where the ArrayInsert instruction
-    // will not insert the value, but only insert an empty row
-    repl->list_insert_null(*this, ndx);
     if (value) {
-        repl->list_set_int(*this, ndx, *value);
+        repl->list_insert_int(*this, ndx, *value);
+    }
+    else {
+        repl->list_insert_null(*this, ndx);
     }
 }
 
 template <>
 void Lst<Bool>::insert_repl(Replication* repl, size_t ndx, bool value)
 {
-    // HACK: This is to circumvent a problem in Sync(5) where the ArrayInsert instruction
-    // will not insert the value, but only insert an empty row
-    repl->list_insert_null(*this, ndx);
-    repl->list_set_bool(*this, ndx, value);
+    repl->list_insert_bool(*this, ndx, value);
 }
 
 template <>
 void Lst<util::Optional<bool>>::insert_repl(Replication* repl, size_t ndx, util::Optional<bool> value)
 {
-    // HACK: This is to circumvent a problem in Sync(5) where the ArrayInsert instruction
-    // will not insert the value, but only insert an empty row
-    repl->list_insert_null(*this, ndx);
     if (value) {
-        repl->list_set_bool(*this, ndx, *value);
+        repl->list_insert_bool(*this, ndx, *value);
+    }
+    else {
+        repl->list_insert_null(*this, ndx);
     }
 }
 
 template <>
 void Lst<Float>::insert_repl(Replication* repl, size_t ndx, float value)
 {
-    // HACK: This is to circumvent a problem in Sync(5) where the ArrayInsert instruction
-    // will not insert the value, but only insert an empty row
-    repl->list_insert_null(*this, ndx);
-    repl->list_set_float(*this, ndx, value);
+    repl->list_insert_float(*this, ndx, value);
 }
 
 template <>
 void Lst<util::Optional<Float>>::insert_repl(Replication* repl, size_t ndx, util::Optional<Float> value)
 {
-    // HACK: This is to circumvent a problem in Sync(5) where the ArrayInsert instruction
-    // will not insert the value, but only insert an empty row
-    repl->list_insert_null(*this, ndx);
     if (value) {
-        repl->list_set_float(*this, ndx, *value);
+        repl->list_insert_float(*this, ndx, *value);
+    }
+    else {
+        repl->list_insert_null(*this, ndx);
     }
 }
 
 template <>
 void Lst<Double>::insert_repl(Replication* repl, size_t ndx, double value)
 {
-    // HACK: This is to circumvent a problem in Sync(5) where the ArrayInsert instruction
-    // will not insert the value, but only insert an empty row
-    repl->list_insert_null(*this, ndx);
-    repl->list_set_double(*this, ndx, value);
+    repl->list_insert_double(*this, ndx, value);
 }
 
 template <>
 void Lst<util::Optional<Double>>::insert_repl(Replication* repl, size_t ndx, util::Optional<Double> value)
 {
-    // HACK: This is to circumvent a problem in Sync(5) where the ArrayInsert instruction
-    // will not insert the value, but only insert an empty row
-    repl->list_insert_null(*this, ndx);
     if (value) {
-        repl->list_set_double(*this, ndx, *value);
+        repl->list_insert_double(*this, ndx, *value);
+    }
+    else {
+        repl->list_insert_null(*this, ndx);
     }
 }
 
 template <>
 void Lst<String>::insert_repl(Replication* repl, size_t ndx, StringData value)
 {
-    // HACK: This is to circumvent a problem in Sync(5) where the ArrayInsert instruction
-    // will not insert the value, but only insert an empty row
-    repl->list_insert_null(*this, ndx);
-    if (!value.is_null()) {
+    if (value.is_null()) {
+        repl->list_insert_null(*this, ndx);
+    }
+    else {
+        // HACK: This is to circumvent a problem in Sync(5) where the ArrayInsert instruction
+        // will not insert the value, but only insert an empty row
+        // The problem exists for all types, but currently workaround is only needed for strings
+        // (required to make a realm-js test pass)
+        repl->list_insert_null(*this, ndx);
         repl->list_set_string(*this, ndx, value);
     }
 }
@@ -772,22 +765,22 @@ void Lst<String>::insert_repl(Replication* repl, size_t ndx, StringData value)
 template <>
 void Lst<Binary>::insert_repl(Replication* repl, size_t ndx, BinaryData value)
 {
-    // HACK: This is to circumvent a problem in Sync(5) where the ArrayInsert instruction
-    // will not insert the value, but only insert an empty row
-    repl->list_insert_null(*this, ndx);
-    if (!value.is_null()) {
-        repl->list_set_binary(*this, ndx, value);
+    if (value.is_null()) {
+        repl->list_insert_null(*this, ndx);
+    }
+    else {
+        repl->list_insert_binary(*this, ndx, value);
     }
 }
 
 template <>
 void Lst<Timestamp>::insert_repl(Replication* repl, size_t ndx, Timestamp value)
 {
-    // HACK: This is to circumvent a problem in Sync(5) where the ArrayInsert instruction
-    // will not insert the value, but only insert an empty row
-    repl->list_insert_null(*this, ndx);
-    if (!value.is_null()) {
-        repl->list_set_timestamp(*this, ndx, value);
+    if (value.is_null()) {
+        repl->list_insert_null(*this, ndx);
+    }
+    else {
+        repl->list_insert_timestamp(*this, ndx, value);
     }
 }
 
