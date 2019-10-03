@@ -1,3 +1,10 @@
+# 6.0.0-alpha.21 Release notes
+
+### Internals
+* Reverting the changes made in the previous release. The fix will be done in Sync instead
+
+----------------------------------------------
+
 # 6.0.0-alpha.20 Release notes
 
 ### Internals
