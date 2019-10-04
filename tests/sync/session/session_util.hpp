@@ -82,6 +82,7 @@ std::shared_ptr<SyncSession> sync_session_with_bind_handler(SyncServer& server, 
     // File should not be deleted when we leave this function
     config.persist();
 
+    config.sync_config->client_resync_mode = ClientResyncMode::Manual;
     if (schema) {
         config.schema = *schema;
     }

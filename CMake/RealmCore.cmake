@@ -52,18 +52,6 @@ else()
     set(SSL_LIBRARIES OpenSSL::SSL)
 endif()
 
-
-set(MAKE_FLAGS "REALM_HAVE_CONFIG=1")
-
-if(SANITIZER_FLAGS)
-    set(MAKE_FLAGS ${MAKE_FLAGS} "EXTRA_CFLAGS=${SANITIZER_FLAGS}" "EXTRA_LDFLAGS=${SANITIZER_FLAGS}")
-endif()
-
-ProcessorCount(NUM_JOBS)
-if(NOT NUM_JOBS EQUAL 0)
-    set(MAKE_FLAGS ${MAKE_FLAGS} "-j${NUM_JOBS}")
-endif()
-
 if (${CMAKE_VERSION} VERSION_GREATER "3.4.0")
     set(USES_TERMINAL_BUILD USES_TERMINAL_BUILD 1)
 endif()
@@ -239,11 +227,11 @@ macro(build_realm_core)
         INSTALL_COMMAND ""
         CONFIGURE_COMMAND ${CMAKE_COMMAND} -E make_directory build.debug
                         && cd build.debug
-                        && cmake -D CMAKE_BUILD_TYPE=Debug -G Ninja ..
+                        && cmake -D CMAKE_BUILD_TYPE=Debug ${CORE_SANITIZER_FLAGS} -G Ninja ..
                         && cd ..
                         && ${CMAKE_COMMAND} -E make_directory build.release
                         && cd build.release
-                        && cmake -D CMAKE_BUILD_TYPE=RelWithDebInfo -G Ninja ..
+                        && cmake -D CMAKE_BUILD_TYPE=RelWithDebInfo ${CORE_SANITIZER_FLAGS} -G Ninja ..
 
         BUILD_COMMAND cd build.debug
                    && ninja Core QueryParser
@@ -319,25 +307,26 @@ macro(build_realm_sync)
     ExternalProject_Get_Property(realm-core SOURCE_DIR)
     set(core_directory ${SOURCE_DIR})
 
+    separate_arguments(sync_cfg_args UNIX_COMMAND "-DOPENSSL_ROOT_DIR=${OPENSSL_ROOT_DIR} -DREALM_BUILD_DOGLESS=OFF ${CORE_SANITIZER_FLAGS} -G Ninja")
     ExternalProject_Add(realm-sync-lib
         DEPENDS realm-core
         PREFIX ${sync_prefix_directory}
         BUILD_IN_SOURCE 1
         UPDATE_DISCONNECTED 1
-        BUILD_COMMAND cd build.debug
-                   && ninja Sync SyncServer
-                   && cd ..
-                   && cd build.release
-                   && ninja Sync SyncServer
+        INSTALL_COMMAND ""
         CONFIGURE_COMMAND ${CMAKE_COMMAND} -E make_directory build.debug
                         && cd build.debug
-                        && cmake -DCMAKE_BUILD_TYPE=Debug -DREALM_BUILD_DOGLESS=OFF -DOPENSSL_ROOT_DIR=/usr -DREALM_CORE_BUILDTREE=${core_directory}/build.debug -G Ninja ..
+                        && cmake -DCMAKE_BUILD_TYPE=Debug -DREALM_CORE_BUILDTREE=${core_directory}/build.debug ${sync_cfg_args} ..
                         && cd ..
                         && ${CMAKE_COMMAND} -E make_directory build.release
                         && cd build.release
-                        && cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo -DREALM_BUILD_DOGLESS=OFF -DOPENSSL_ROOT_DIR=/usr -DREALM_CORE_BUILDTREE=${core_directory}/build.release -G Ninja ..
-        INSTALL_COMMAND ""
-        ${USES_TERMINAL_BUILD}
+                        && cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo -DREALM_CORE_BUILDTREE=${core_directory}/build.release ${sync_cfg_args}  ..
+        BUILD_COMMAND cd build.debug
+                        && ninja Sync SyncServer
+                        && cd ..
+                        && cd build.release
+                        && ninja Sync SyncServer
+             ${USES_TERMINAL_BUILD}
         ${ARGN}
         )
 

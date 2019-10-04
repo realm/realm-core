@@ -31,7 +31,7 @@ class SyncLoggerFactory;
 
 class Adapter {
 public:
-    Adapter(std::function<void(std::string)> realm_changed, std::regex regex,
+    Adapter(std::function<void(std::string)> realm_changed, std::function<bool(const std::string&)> should_watch_realm_predicate,
             std::string local_root_dir, SyncConfig sync_config_template);
 
     enum class InstructionType {
@@ -48,7 +48,7 @@ public:
     };
 
     static std::string instruction_type_string(InstructionType type) {
-        switch(type) {
+        switch (type) {
             case InstructionType::Insert:           return "INSERT";
             case InstructionType::Delete:           return "DELETE";
             case InstructionType::Set:              return "SET";
@@ -60,6 +60,7 @@ public:
             case InstructionType::AddType:          return "ADD_TYPE";
             case InstructionType::AddProperties:    return "ADD_PROPERTIES";
         }
+        REALM_COMPILER_HINT_UNREACHABLE();
         return {};
     }
 
