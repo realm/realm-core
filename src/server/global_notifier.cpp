@@ -278,8 +278,8 @@ util::Optional<GlobalNotifier::ChangeNotification> GlobalNotifier::next_changed_
     }
 
     auto realm = next->coordinator->get_realm();
-    TransactionRef transaction = Realm::Internal::get_transaction_ref(*realm);
-    auto old_version = transaction->get_version_of_current_transaction();
+    auto& transaction = Realm::Internal::get_transaction(*realm);
+    auto old_version = transaction.get_version_of_current_transaction();
     return ChangeNotification(m_impl, next->virtual_path, next->realm_id,
                               next->coordinator->get_config(),
                               old_version, next->versions.front());
