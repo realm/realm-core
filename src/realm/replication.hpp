@@ -66,6 +66,7 @@ public:
     /// \param shared_group The assocoated SharedGroup object.
     virtual void initialize(DB& shared_group) = 0;
 
+
     /// Called by the associated SharedGroup object when a session is
     /// initiated. A *session* is a sequence of of temporally overlapping
     /// accesses to a specific Realm file, where each access consists of a
@@ -346,15 +347,19 @@ public:
     /// constraint.
     virtual bool is_sync_agent() const noexcept;
 
-    virtual ~Replication() noexcept
-    {
-    }
-
     template <class T>
     void set(const Table*, ColKey col_key, ObjKey key, T value, _impl::Instruction variant);
 
+    ~Replication() override;
+
 protected:
+    DB* m_db = nullptr;
     Replication(_impl::TransactLogStream& stream);
+
+    void register_db(DB* owner)
+    {
+        m_db = owner;
+    }
 
     //@{
 
@@ -384,6 +389,7 @@ protected:
     virtual void do_clear_interrupt() noexcept = 0;
 
     friend class _impl::TransactReverser;
+    friend class DB;
 };
 
 class Replication::Interrupted : public std::exception {
