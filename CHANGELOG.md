@@ -1,19 +1,15 @@
-# NEXT RELEASE
-
-### Enhancements
-* None.
-
-### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
- 
-### Breaking changes
-* None.
-
------------
+# 6.0.0-alpha.21 Release notes
 
 ### Internals
-* None.
+* Reverting the changes made in the previous release. The fix will be done in Sync instead
+
+----------------------------------------------
+
+# 6.0.0-alpha.20 Release notes
+
+### Internals
+* Workaround added for the issues around ArrayInsert in the legacy
+  sync implementation.
 
 ----------------------------------------------
 
