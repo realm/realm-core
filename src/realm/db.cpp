@@ -1327,6 +1327,11 @@ void DB::open(Replication& repl, const DBOptions options)
 
     set_replication(&repl);
 
+    // Register the DB using this replication object. If the replication object is
+    // deleted before the DB object, the replication object should call set_replication(nullptr)
+    // on the DB. This will prevent the DB from calling the replication object when it closes.
+    repl.register_db(this);
+
     std::string file = repl.get_database_path();
     bool no_create = false;
     bool is_backend = false;
@@ -1471,6 +1476,10 @@ size_t DB::get_allocated_size() const
 DB::~DB() noexcept
 {
     close();
+
+    if (m_replication) {
+        m_replication->register_db(nullptr);
+    }
 }
 
 void DB::close() noexcept
@@ -1485,9 +1494,7 @@ void DB::close_internal(std::unique_lock<InterprocessMutex> lock) noexcept
 
     SharedInfo* info = m_file_map.get_addr();
     {
-        bool is_sync_agent = false;
-        if (Replication* repl = get_replication())
-            is_sync_agent = repl->is_sync_agent();
+        bool is_sync_agent = m_replication ? m_replication->is_sync_agent() : false;
 
         if (!lock.owns_lock())
             lock.lock();
@@ -1514,8 +1521,8 @@ void DB::close_internal(std::unique_lock<InterprocessMutex> lock) noexcept
                 catch (...) {
                 } // ignored on purpose.
             }
-            if (Replication* repl = get_replication())
-                repl->terminate_session();
+            if (m_replication)
+                m_replication->terminate_session();
         }
         lock.unlock();
     }
@@ -2599,4 +2606,12 @@ DBRef DB::create(Replication& repl, const DBOptions options)
     DBRef retval = std::make_shared<DBInit>(options);
     retval->open(repl, options);
     return retval;
+}
+
+// HACK: Somewhat misplaced, but we have no replication.cpp
+Replication::~Replication()
+{
+    if (m_db) {
+        m_db->set_replication(nullptr);
+    }
 }
