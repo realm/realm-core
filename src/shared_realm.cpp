@@ -803,10 +803,10 @@ bool Realm::can_deliver_notifications() const noexcept
 
 uint64_t Realm::get_schema_version(const Realm::Config &config)
 {
-    auto coordinator = RealmCoordinator::get_coordinator(config);
+    auto coordinator = RealmCoordinator::get_coordinator(config.path);
     auto version = coordinator->get_schema_version();
     if (version == ObjectStore::NotVersioned)
-        version = ObjectStore::get_schema_version(*coordinator->begin_read());
+        version = ObjectStore::get_schema_version(coordinator->get_realm(config)->read_group());
     return version;
 }
 
