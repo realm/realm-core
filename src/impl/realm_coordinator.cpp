@@ -429,18 +429,6 @@ void RealmCoordinator::open_db()
         options.allow_file_format_upgrade = !m_config.disable_format_upgrade
                                          && m_config.schema_mode != SchemaMode::ResetFile;
         m_db = DB::create(*m_history, options);
-
-        if (!m_config.should_compact_on_launch_function)
-            return;
-
-        size_t free_space = 0;
-        size_t used_space = 0;
-        if (auto tr = m_db->start_write(false)) {
-            tr->commit();
-            m_db->get_stats(free_space, used_space);
-        }
-        if (free_space > 0 && m_config.should_compact_on_launch_function(free_space + used_space, used_space))
-            m_db->compact();
     }
     catch (realm::FileFormatUpgradeRequired const&) {
         if (m_config.schema_mode != SchemaMode::ResetFile) {
@@ -478,6 +466,18 @@ void RealmCoordinator::open_db()
     catch (...) {
         translate_file_exception(m_config.path, m_config.immutable());
     }
+
+    if (!m_config.should_compact_on_launch_function)
+        return;
+
+    size_t free_space = 0;
+    size_t used_space = 0;
+    if (auto tr = m_db->start_write(false)) {
+        tr->commit();
+        m_db->get_stats(free_space, used_space);
+    }
+    if (free_space > 0 && m_config.should_compact_on_launch_function(free_space + used_space, used_space))
+        m_db->compact();
 }
 
 void RealmCoordinator::close()
