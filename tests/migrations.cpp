@@ -16,7 +16,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "catch.hpp"
+#include "catch2/catch.hpp"
 
 #include "util/test_file.hpp"
 
@@ -65,12 +65,12 @@ void verify_schema(Realm& r, int line)
     for (auto&& object_schema : r.schema()) {
         auto table = ObjectStore::table_for_object_type(r.read_group(), object_schema.name);
         REQUIRE(table);
-        CAPTURE(object_schema.name)
+        CAPTURE(object_schema.name);
         std::string primary_key = ObjectStore::get_primary_key_for_object(r.read_group(), object_schema.name);
         REQUIRE(primary_key == object_schema.primary_key);
         for (auto&& prop : object_schema.persisted_properties) {
             size_t col = table->get_column_index(prop.name);
-            CAPTURE(prop.name)
+            CAPTURE(prop.name);
             REQUIRE(col != npos);
             REQUIRE(col == prop.table_column);
             REQUIRE(to_underlying(ObjectSchema::from_core_type(*table->get_descriptor(), col)) ==

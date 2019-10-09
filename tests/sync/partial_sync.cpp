@@ -934,7 +934,6 @@ TEST_CASE("Query-based Sync link behaviour", "[sync]") {
         const ObjectSchema os_c = *realm->schema().find("link_target");
         TableRef table_a = ObjectStore::table_for_object_type(realm->read_group(), "object_a");
         TableRef table_c = ObjectStore::table_for_object_type(realm->read_group(), "link_target");
-        const auto& link_prop = *os_a.property_for_name("link");
         partial_sync::SubscriptionOptions options;
         std::vector<StringData> keypaths = { "@links.class_object_a.link" };
         parser::KeyPathMapping mapping;
@@ -951,7 +950,6 @@ TEST_CASE("Query-based Sync link behaviour", "[sync]") {
         const ObjectSchema os_c = *realm->schema().find("link_target");
         TableRef table_a = ObjectStore::table_for_object_type(realm->read_group(), "object_a");
         TableRef table_c = ObjectStore::table_for_object_type(realm->read_group(), "link_target");
-        const auto& link_prop = *os_a.property_for_name("link");
         partial_sync::SubscriptionOptions options;
         std::vector<StringData> keypaths = { "parents" };
         parser::KeyPathMapping mapping;
@@ -969,7 +967,6 @@ TEST_CASE("Query-based Sync link behaviour", "[sync]") {
         const ObjectSchema os_c = *realm->schema().find("link_target");
         TableRef table_a = ObjectStore::table_for_object_type(realm->read_group(), "object_a");
         TableRef table_c = ObjectStore::table_for_object_type(realm->read_group(), "link_target");
-        const auto& link_prop = *os_a.property_for_name("link");
         partial_sync::SubscriptionOptions options;
         std::vector<StringData> keypaths = { "parents" };
         parser::KeyPathMapping mapping;
@@ -983,7 +980,6 @@ TEST_CASE("Query-based Sync link behaviour", "[sync]") {
         const ObjectSchema os_c = *realm->schema().find("link_target");
         TableRef table_a = ObjectStore::table_for_object_type(realm->read_group(), "object_a");
         TableRef table_c = ObjectStore::table_for_object_type(realm->read_group(), "link_target");
-        const auto& link_prop = *os_a.property_for_name("link");
         partial_sync::SubscriptionOptions options;
         std::vector<StringData> keypaths = { "id" };
         parser::KeyPathMapping mapping;
@@ -997,7 +993,6 @@ TEST_CASE("Query-based Sync link behaviour", "[sync]") {
         const ObjectSchema os_c = *realm->schema().find("link_target");
         TableRef table_a = ObjectStore::table_for_object_type(realm->read_group(), "object_a");
         TableRef table_c = ObjectStore::table_for_object_type(realm->read_group(), "link_target");
-        const auto& link_prop = *os_a.property_for_name("link");
         partial_sync::SubscriptionOptions options;
         std::vector<StringData> keypaths = { "a_property_which_does_not_exist" };
         parser::KeyPathMapping mapping;

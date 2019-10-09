@@ -16,11 +16,10 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "catch.hpp"
+#include "catch2/catch.hpp"
 
 #include "util/event_loop.hpp"
 #include "util/index_helpers.hpp"
-#include "util/templated_test_case.hpp"
 #include "util/test_file.hpp"
 
 #include "binding_context.hpp"
@@ -168,15 +167,18 @@ bool operator==(List const& list, std::vector<T> const& values) {
 }
 
 template<typename T>
-bool operator==(Results& results, std::vector<T> const& values) {
-    if (results.size() != values.size())
+bool operator==(Results const& results, std::vector<T> const& values) {
+    // FIXME: this is only necessary because Results::size() and ::get() are not const
+    Results copy{results};
+    if (copy.size() != values.size())
         return false;
     for (size_t i = 0; i < values.size(); ++i) {
-        if (results.get<T>(i) != values[i])
+        if (copy.get<T>(i) != values[i])
             return false;
     }
     return true;
 }
+
 }
 
 struct StringifyingContext {
@@ -271,7 +273,7 @@ auto greater::operator()<Timestamp&, Timestamp&>(Timestamp& a, Timestamp& b) con
     return a > b;
 }
 
-TEMPLATE_TEST_CASE("primitive list", ::Int, ::Bool, ::Float, ::Double, ::String, ::Binary, ::Date,
+TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::Double, ::String, ::Binary, ::Date,
                    BoxedOptional<::Int>, BoxedOptional<::Bool>, BoxedOptional<::Float>, BoxedOptional<::Double>,
                    UnboxedOptional<::String>, UnboxedOptional<::Binary>, UnboxedOptional<::Date>) {
     auto values = TestType::values();

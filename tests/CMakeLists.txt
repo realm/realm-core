@@ -3,7 +3,6 @@ include_directories(../external/catch/single_include .)
 set(HEADERS
     util/event_loop.hpp
     util/index_helpers.hpp
-    util/templated_test_case.hpp
     util/test_file.hpp
     util/test_utils.hpp
 )

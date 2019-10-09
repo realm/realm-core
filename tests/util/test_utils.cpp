@@ -60,4 +60,15 @@ std::vector<char> make_test_encryption_key(const char start) {
     return vector;
 }
 
+// FIXME: Catch2 limitation on old compilers (currently our android CI)
+// https://github.com/catchorg/Catch2/blob/master/docs/limitations.md#clangg----skipping-leaf-sections-after-an-exception
+void catch2_ensure_section_run_workaround(bool did_run_a_section, std::string section_name, std::function<void()> func) {
+    if (did_run_a_section) {
+        func();
+    }
+    else {
+        std::cout << "Skipping test section '" << section_name << "' on this run." << std::endl;
+    }
+}
+
 }

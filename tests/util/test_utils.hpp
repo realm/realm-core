@@ -19,8 +19,10 @@
 #ifndef REALM_TEST_UTILS_HPP
 #define REALM_TEST_UTILS_HPP
 
-#include "catch.hpp"
+#include "catch2/catch.hpp"
 #include <realm/util/file.hpp>
+
+#include <functional>
 
 namespace realm {
 
@@ -29,6 +31,7 @@ bool create_dummy_realm(std::string path);
 void reset_test_directory(const std::string& base_path);
 std::string tmp_dir();
 std::vector<char> make_test_encryption_key(const char start = 0);
+void catch2_ensure_section_run_workaround(bool did_run_a_section, std::string section_name, std::function<void()> func);
 
 } // namespace realm
 

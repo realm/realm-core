@@ -19,7 +19,7 @@
 #ifndef REALM_SYNC_TEST_UTILS_HPP
 #define REALM_SYNC_TEST_UTILS_HPP
 
-#include "catch.hpp"
+#include "catch2/catch.hpp"
 
 #include "sync/impl/sync_file.hpp"
 #include "sync/impl/sync_metadata.hpp"
