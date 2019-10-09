@@ -264,85 +264,79 @@ TEST_CASE("collection_change: move()") {
     }
 }
 
-TEST_CASE("collection_change: calculate() unsorted") {
+TEST_CASE("collection_change: calculate() table order") {
     _impl::CollectionChangeBuilder c;
 
     auto all_modified = [](size_t) { return true; };
     auto none_modified = [](size_t) { return false; };
     const auto npos = size_t(-1);
-    IndexSet empty;
+    bool in_table_order = true;
 
     SECTION("returns an empty set when input and output are identical") {
-        c = _impl::CollectionChangeBuilder::calculate({1, 2, 3}, {1, 2, 3}, none_modified, empty);
+        c = _impl::CollectionChangeBuilder::calculate({1, 2, 3}, {1, 2, 3}, none_modified, in_table_order);
         REQUIRE(c.empty());
     }
 
     SECTION("marks all as inserted when prev is empty") {
-        c = _impl::CollectionChangeBuilder::calculate({}, {1, 2, 3}, all_modified, empty);
+        c = _impl::CollectionChangeBuilder::calculate({}, {1, 2, 3}, all_modified, in_table_order);
         REQUIRE_INDICES(c.insertions, 0, 1, 2);
     }
 
     SECTION("marks all as deleted when new is empty") {
-        c = _impl::CollectionChangeBuilder::calculate({1, 2, 3}, {}, all_modified, empty);
+        c = _impl::CollectionChangeBuilder::calculate({1, 2, 3}, {}, all_modified, in_table_order);
         REQUIRE_INDICES(c.deletions, 0, 1, 2);
     }
 
     SECTION("marks npos rows in prev as deleted") {
-        c = _impl::CollectionChangeBuilder::calculate({-1, 1, 2, 3, -1}, {1, 2, 3}, all_modified, empty);
+        c = _impl::CollectionChangeBuilder::calculate({-1, 1, 2, 3, -1}, {1, 2, 3}, all_modified, in_table_order);
         REQUIRE_INDICES(c.deletions, 0, 4);
     }
 
     SECTION("marks modified rows which do not move as modified") {
-        c = _impl::CollectionChangeBuilder::calculate({1, 2, 3}, {1, 2, 3}, all_modified, empty);
+        c = _impl::CollectionChangeBuilder::calculate({1, 2, 3}, {1, 2, 3}, all_modified, in_table_order);
         REQUIRE_INDICES(c.modifications, 0, 1, 2);
     }
 
     SECTION("does not mark unmodified rows as modified") {
-        c = _impl::CollectionChangeBuilder::calculate({1, 2, 3}, {1, 2, 3}, none_modified, empty);
+        c = _impl::CollectionChangeBuilder::calculate({1, 2, 3}, {1, 2, 3}, none_modified, in_table_order);
         REQUIRE(c.modifications.empty());
     }
 
     SECTION("marks newly added rows as insertions") {
-        c = _impl::CollectionChangeBuilder::calculate({2, 3}, {1, 2, 3}, all_modified, empty);
+        c = _impl::CollectionChangeBuilder::calculate({2, 3}, {1, 2, 3}, all_modified, in_table_order);
         REQUIRE_INDICES(c.insertions, 0);
 
-        c = _impl::CollectionChangeBuilder::calculate({1, 3}, {1, 2, 3}, all_modified, empty);
+        c = _impl::CollectionChangeBuilder::calculate({1, 3}, {1, 2, 3}, all_modified, in_table_order);
         REQUIRE_INDICES(c.insertions, 1);
 
-        c = _impl::CollectionChangeBuilder::calculate({1, 2}, {1, 2, 3}, all_modified, empty);
+        c = _impl::CollectionChangeBuilder::calculate({1, 2}, {1, 2, 3}, all_modified, in_table_order);
         REQUIRE_INDICES(c.insertions, 2);
     }
 
     SECTION("marks removed rows as deleted") {
-        c = _impl::CollectionChangeBuilder::calculate({1, 2, 3}, {1, 2}, all_modified, empty);
+        c = _impl::CollectionChangeBuilder::calculate({1, 2, 3}, {1, 2}, all_modified, in_table_order);
         REQUIRE_INDICES(c.deletions, 2);
 
-        c = _impl::CollectionChangeBuilder::calculate({1, 2, 3}, {1, 3}, all_modified, empty);
+        c = _impl::CollectionChangeBuilder::calculate({1, 2, 3}, {1, 3}, all_modified, in_table_order);
         REQUIRE_INDICES(c.deletions, 1);
 
-        c = _impl::CollectionChangeBuilder::calculate({1, 2, 3}, {2, 3}, all_modified, empty);
+        c = _impl::CollectionChangeBuilder::calculate({1, 2, 3}, {2, 3}, all_modified, in_table_order);
         REQUIRE_INDICES(c.deletions, 0);
     }
 
     SECTION("marks rows as both inserted and deleted") {
-        c = _impl::CollectionChangeBuilder::calculate({1, 2, 3}, {1, 3, 4}, all_modified, empty);
+        c = _impl::CollectionChangeBuilder::calculate({1, 2, 3}, {1, 3, 4}, all_modified, in_table_order);
         REQUIRE_INDICES(c.deletions, 1);
         REQUIRE_INDICES(c.insertions, 2);
         REQUIRE(c.moves.empty());
     }
 
-    IndexSet all = {0, 1, 2, 3, 4, 5, 6, 7, 7, 8, 10};
-    SECTION("marks rows as modified even if they moved") {
-        c = _impl::CollectionChangeBuilder::calculate({5, 3}, {3, 5}, all_modified, all);
-        REQUIRE_MOVES(c, {1, 0});
-        REQUIRE_INDICES(c.modifications, 0, 1);
-    }
-
     SECTION("does not mark rows as modified if they are new") {
-        c = _impl::CollectionChangeBuilder::calculate({3}, {3, 5}, all_modified, all);
+        c = _impl::CollectionChangeBuilder::calculate({3}, {3, 5}, all_modified, in_table_order);
         REQUIRE_INDICES(c.modifications, 0);
     }
 
+#if 0 // FIXME: these tests might be applicable to LinkingObjects
     SECTION("reports moves which can be produced by move_last_over()") {
         auto calc = [&](std::vector<int64_t> values) {
             return _impl::CollectionChangeBuilder::calculate(values, {1, 2, 3}, none_modified, all);
@@ -362,6 +356,7 @@ TEST_CASE("collection_change: calculate() unsorted") {
         c = _impl::CollectionChangeBuilder::calculate({3, 1, 2}, {1, 2, 3}, none_modified, IndexSet{3});
         REQUIRE_MOVES(c, {0, 2});
     }
+#endif
 }
 
 TEST_CASE("collection_change: calculate() sorted") {
