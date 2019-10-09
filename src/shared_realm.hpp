@@ -399,9 +399,6 @@ private:
     // that's actually fully working
     bool m_dynamic_schema = true;
 
-    // File format versions populated when a file format upgrade takes place during realm opening
-    int upgrade_initial_version = 0, upgrade_final_version = 0;
-
     // True while sending the notifications caused by advancing the read
     // transaction version, to avoid recursive notifications where possible
     bool m_is_sending_notifications = false;

@@ -214,7 +214,7 @@ ThreadSafeReference RealmCoordinator::get_unbound_realm()
 }
 
 void RealmCoordinator::do_get_realm(Realm::Config config, std::shared_ptr<Realm>& realm,
-                  std::unique_lock<std::mutex>& realm_lock, bool bind_to_context)
+                                    std::unique_lock<std::mutex>& realm_lock, bool bind_to_context)
 {
     open_db();
 
@@ -428,14 +428,6 @@ void RealmCoordinator::open_db()
         options.encryption_key = m_config.encryption_key.data();
         options.allow_file_format_upgrade = !m_config.disable_format_upgrade
                                          && m_config.schema_mode != SchemaMode::ResetFile;
-#if 0 // FIXME: needed by js only
-        options.upgrade_callback = [&](int from_version, int to_version) {
-            if (realm) {
-                realm->upgrade_initial_version = from_version;
-                realm->upgrade_final_version = to_version;
-            }
-        };
-#endif
         m_db = DB::create(*m_history, options);
 
         if (!m_config.should_compact_on_launch_function)

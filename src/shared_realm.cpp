@@ -826,15 +826,6 @@ void Realm::close()
     m_coordinator = nullptr;
 }
 
-util::Optional<int> Realm::file_format_upgraded_from_version() const
-{
-    if (upgrade_initial_version != upgrade_final_version) {
-        return upgrade_initial_version;
-    }
-    return util::none;
-}
-
-
 AuditInterface* Realm::audit_context() const noexcept
 {
     return m_coordinator ? m_coordinator->audit_context() : nullptr;
