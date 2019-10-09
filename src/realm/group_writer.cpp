@@ -114,6 +114,7 @@ bool GroupWriter::MapWindow::extends_to_match(util::File& f, ref_type start_ref,
         return false;
     size_t window_size = get_window_size(f, start_ref, size);
     // FIXME: Add a remap which will work with a offset different from 0
+    m_map.sync();
     m_map.unmap();
     m_map.map(f, File::access_ReadWrite, window_size, 0, m_base_ref);
     return true;
@@ -824,8 +825,14 @@ ref_type GroupWriter::write_array(const char* data, size_t size, uint32_t checks
     REALM_ASSERT_RELEASE(is_aligned(dest_addr));
     window->encryption_read_barrier(dest_addr, size);
     memcpy(dest_addr, &checksum, 4);
+/*
+    for (unsigned i = 4; i < size; ++i) {
+        dest_addr[i] = data[i];
+        sched_yield();
+    }
+    sched_yield();
+*/
     memcpy(dest_addr + 4, data + 4, size - 4);
-
     window->encryption_write_barrier(dest_addr, size);
     // return ref of the written array
     ref_type ref = to_ref(pos);
