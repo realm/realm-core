@@ -56,10 +56,10 @@ Results::Results(std::shared_ptr<Realm> r, std::shared_ptr<LstBase> list)
 }
 
 Results::Results(std::shared_ptr<Realm> r, std::shared_ptr<LstBase> list, DescriptorOrdering o)
-    : m_realm(std::move(r))
-    , m_descriptor_ordering(std::move(o))
-    , m_list(list)
-    , m_mode(Mode::List)
+: m_realm(std::move(r))
+, m_descriptor_ordering(std::move(o))
+, m_list(std::move(list))
+, m_mode(Mode::List)
 {
 }
 
@@ -74,7 +74,7 @@ Results::Results(std::shared_ptr<Realm> r, TableView tv, DescriptorOrdering o)
 
 Results::Results(std::shared_ptr<Realm> r, std::shared_ptr<LnkLst> lv, util::Optional<Query> q, SortDescriptor s)
 : m_realm(std::move(r))
-, m_link_list(lv)
+, m_link_list(std::move(lv))
 , m_mode(Mode::LinkList)
 {
     m_table = TableRef(&m_link_list->get_target_table());
@@ -128,13 +128,10 @@ size_t Results::size()
     switch (m_mode) {
         case Mode::Empty:    return 0;
         case Mode::Table:    return m_table->size();
-        case Mode::List:
-            if (!m_descriptor_ordering.is_empty()) {
-                evaluate_sort_and_distinct_on_list();
-                return m_list_indices->size();
-            }
-            return m_list->size();
         case Mode::LinkList: return m_link_list->size();
+        case Mode::List:
+            evaluate_sort_and_distinct_on_list();
+            return m_list_indices ? m_list_indices->size() : m_list->size();
         case Mode::Query:
             m_query.sync_view_if_needed();
             if (!m_descriptor_ordering.will_apply_distinct())
@@ -179,33 +176,38 @@ auto& Results::list_as() const
 
 void Results::evaluate_sort_and_distinct_on_list()
 {
+    if (m_descriptor_ordering.is_empty())
+        return;
+
     bool needs_update = m_list->has_changed();
     if (!m_list_indices) {
-        m_list_indices = std::make_shared<std::vector<size_t>>();
+        m_list_indices = std::vector<size_t>{};
         needs_update = true;
     }
-    if (needs_update) {
-        util::Optional<bool> sort_order;
-        bool do_distinct = false;
-        auto sz = m_descriptor_ordering.size();
-        for (size_t i = 0; i < sz; i++) {
-            auto descr = m_descriptor_ordering[i];
-            if (descr->get_type() == DescriptorType::Sort) {
-                sort_order = static_cast<const SortDescriptor*>(descr)->is_ascending(0);
-            }
-            if (descr->get_type() == DescriptorType::Distinct) {
-                do_distinct = true;
-            }
-        }
+    if (!needs_update)
+        return;
+    if (m_list->is_empty()) {
+        m_list_indices->clear();
+        return;
+    }
 
-        if (do_distinct) {
-            m_list->distinct(*m_list_indices, sort_order);
+    util::Optional<bool> sort_order;
+    bool do_distinct = false;
+    auto sz = m_descriptor_ordering.size();
+    for (size_t i = 0; i < sz; i++) {
+        auto descr = m_descriptor_ordering[i];
+        if (descr->get_type() == DescriptorType::Sort) {
+            sort_order = static_cast<const SortDescriptor*>(descr)->is_ascending(0);
         }
-        else {
-            REALM_ASSERT(sort_order);
-            m_list->sort(*m_list_indices, *sort_order);
+        if (descr->get_type() == DescriptorType::Distinct) {
+            do_distinct = true;
         }
     }
+
+    if (do_distinct)
+        m_list->distinct(*m_list_indices, sort_order);
+    else if (sort_order)
+        m_list->sort(*m_list_indices, *sort_order);
 }
 
 template<typename T>
@@ -213,14 +215,14 @@ util::Optional<T> Results::try_get(size_t ndx)
 {
     validate_read();
     if (m_mode == Mode::List) {
-        if (m_descriptor_ordering.is_empty()) {
-            if (ndx < m_list->size())
-                return list_as<T>().get(ndx);
+        evaluate_sort_and_distinct_on_list();
+        if (m_list_indices) {
+            if (ndx < m_list_indices->size())
+                return list_as<T>().get((*m_list_indices)[ndx]);
         }
         else {
-            evaluate_sort_and_distinct_on_list();
-            if (ndx < m_list_indices->size())
-                return list_as<T>().get(m_list_indices->at(ndx));
+            if (ndx < m_list->size())
+                return list_as<T>().get(ndx);
         }
     }
     return util::none;
@@ -237,13 +239,11 @@ util::Optional<Obj> Results::try_get(size_t row_ndx)
         case Mode::Table:
             if (row_ndx < m_table->size())
                 return const_cast<Table&>(*m_table).get_object(row_ndx);
-//                return realm::get<T>(*m_table, row_ndx);
             break;
         case Mode::LinkList:
             if (update_linklist()) {
                 if (row_ndx < m_link_list->size())
                     return m_link_list->get_object(row_ndx);
-//                    return realm::get<T>(*m_table, m_link_list->get(row_ndx).get_index());
                 break;
             }
             REALM_FALLTHROUGH;
@@ -255,7 +255,6 @@ util::Optional<Obj> Results::try_get(size_t row_ndx)
             if (m_update_policy == UpdatePolicy::Never && !m_table_view.is_obj_valid(row_ndx))
                 return Obj{};
             return m_table_view.get(row_ndx);
-//            return realm::get<T>(*m_table, m_table_view.get(row_ndx).get_index());
     }
     return util::none;
 }
@@ -401,11 +400,16 @@ size_t Results::index_of(Query&& q)
     return row ? index_of(const_cast<Table&>(*m_table).get_object(row)) : not_found;
 }
 
-void Results::prepare_for_aggregate(ColKey column, const char* name)
+DataType Results::prepare_for_aggregate(ColKey column, const char* name)
 {
+    DataType type;
     switch (m_mode) {
-        case Mode::Empty: break;
-        case Mode::Table: break;
+        case Mode::Table:
+            type = m_table->get_column_type(column);
+            break;
+        case Mode::List:
+            type = m_list->get_table()->get_column_type(m_list->get_col_key());
+            break;
         case Mode::LinkList:
             m_query = this->get_query();
             m_mode = Mode::Query;
@@ -413,78 +417,149 @@ void Results::prepare_for_aggregate(ColKey column, const char* name)
         case Mode::Query:
         case Mode::TableView:
             evaluate_query_if_needed();
+            type = m_table->get_column_type(column);
             break;
         default:
             REALM_COMPILER_HINT_UNREACHABLE();
     }
-    switch (m_table->get_column_type(column)) {
+    switch (type) {
         case type_Timestamp: case type_Double: case type_Float: case type_Int: break;
-        default: throw UnsupportedColumnTypeException{column, m_table, name};
+        default: throw UnsupportedColumnTypeException{column, *m_table, name};
+    }
+    return type;
+}
+
+namespace {
+template<typename T, typename Table>
+struct AggregateHelper;
+
+template<typename Table>
+struct AggregateHelper<int64_t, Table> {
+    Table& table;
+    Mixed min(ColKey col, ObjKey* obj)   { return table.minimum_int(col, obj);   }
+    Mixed max(ColKey col, ObjKey* obj)   { return table.maximum_int(col, obj);   }
+    Mixed sum(ColKey col)                { return table.sum_int(col);            }
+    Mixed avg(ColKey col, size_t* count) { return table.average_int(col, count); }
+};
+
+template<typename Table>
+struct AggregateHelper<double, Table> {
+    Table& table;
+    Mixed min(ColKey col, ObjKey* obj)   { return table.minimum_double(col, obj);   }
+    Mixed max(ColKey col, ObjKey* obj)   { return table.maximum_double(col, obj);   }
+    Mixed sum(ColKey col)                { return table.sum_double(col);            }
+    Mixed avg(ColKey col, size_t* count) { return table.average_double(col, count); }
+};
+
+template<typename Table>
+struct AggregateHelper<float, Table> {
+    Table& table;
+    Mixed min(ColKey col, ObjKey* obj)   { return table.minimum_float(col, obj);   }
+    Mixed max(ColKey col, ObjKey* obj)   { return table.maximum_float(col, obj);   }
+    Mixed sum(ColKey col)                { return table.sum_float(col);            }
+    Mixed avg(ColKey col, size_t* count) { return table.average_float(col, count); }
+};
+
+template<typename Table>
+struct AggregateHelper<Timestamp, Table> {
+    Table& table;
+    Mixed min(ColKey col, ObjKey* obj) { return table.minimum_timestamp(col, obj);   }
+    Mixed max(ColKey col, ObjKey* obj) { return table.maximum_timestamp(col, obj);   }
+    Mixed sum(ColKey col)          { throw Results::UnsupportedColumnTypeException{col, table, "sum"}; }
+    Mixed avg(ColKey col, size_t*) { throw Results::UnsupportedColumnTypeException{col, table, "avg"}; }
+};
+
+struct ListAggregateHelper {
+    LstBase& list;
+    Mixed min(ColKey, size_t* ndx)   { return list.min(ndx);   }
+    Mixed max(ColKey, size_t* ndx)   { return list.max(ndx);   }
+    Mixed sum(ColKey)                { return list.sum();      }
+    Mixed avg(ColKey, size_t* count) { return list.avg(count); }
+};
+
+template<> struct AggregateHelper<int64_t, LstBase&> : ListAggregateHelper
+{ AggregateHelper(LstBase& l) : ListAggregateHelper{l} {} };
+template<> struct AggregateHelper<double,  LstBase&> : ListAggregateHelper
+{ AggregateHelper(LstBase& l) : ListAggregateHelper{l} {} };
+template<> struct AggregateHelper<float,   LstBase&> : ListAggregateHelper
+{ AggregateHelper(LstBase& l) : ListAggregateHelper{l} {} };
+
+template<>
+struct AggregateHelper<Timestamp, LstBase&> : ListAggregateHelper {
+    AggregateHelper(LstBase& l) : ListAggregateHelper{l} {}
+    Mixed sum(ColKey)          { throw Results::UnsupportedColumnTypeException{list.get_col_key(), *list.get_table(), "sum"}; }
+    Mixed avg(ColKey, size_t*) { throw Results::UnsupportedColumnTypeException{list.get_col_key(), *list.get_table(), "avg"}; }
+};
+
+template<typename Table, typename Func>
+Mixed call_with_helper(Func&& func, Table&& table, DataType type)
+{
+    switch (type) {
+        case type_Timestamp: return func(AggregateHelper<Timestamp, Table>{table});
+        case type_Double:    return func(AggregateHelper<double, Table>{table});
+        case type_Float:     return func(AggregateHelper<Float, Table>{table});
+        case type_Int:       return func(AggregateHelper<Int, Table>{table});
+        default: REALM_COMPILER_HINT_UNREACHABLE();
     }
 }
 
-template<typename Int, typename Float, typename Double, typename Timestamp>
-util::Optional<Mixed> Results::aggregate(ColKey column,
-                                         const char* name,
-                                         Int agg_int, Float agg_float,
-                                         Double agg_double, Timestamp agg_timestamp)
+struct ReturnIndexHelper {
+    ObjKey key;
+    size_t index = npos;
+    operator ObjKey*() { return &key; }
+    operator size_t*() { return &index; }
+    operator bool() { return key || index != npos; }
+};
+} // anonymous namespace
+
+template<typename AggregateFunction>
+util::Optional<Mixed> Results::aggregate(ColKey column, const char* name,
+                                         AggregateFunction&& func)
 {
     validate_read();
-    if (!m_table)
+    if (!m_table && !m_list)
         return none;
-    prepare_for_aggregate(column, name);
 
-    auto do_agg = [&](auto const& getter) {
-        return Mixed(m_mode == Mode::Table ? getter(*m_table) : getter(m_table_view));
-    };
-    switch (m_table->get_column_type(column)) {
-        case type_Timestamp: return do_agg(agg_timestamp);
-        case type_Double:    return do_agg(agg_double);
-        case type_Float:     return do_agg(agg_float);
-        case type_Int:       return do_agg(agg_int);
-        default: REALM_COMPILER_HINT_UNREACHABLE();
+    auto type = prepare_for_aggregate(column, name);
+    switch (m_mode) {
+        case Mode::Table:
+            return call_with_helper(func, *m_table, type);
+        case Mode::List:
+            return call_with_helper(func, *m_list, type);
+        default:
+            return call_with_helper(func, m_table_view, type);
     }
 }
 
 util::Optional<Mixed> Results::max(ColKey column)
 {
-    ObjKey return_ndx;
-    auto results = aggregate(column, "max",
-                             [&](auto const& table) { return table.maximum_int(column, &return_ndx); },
-                             [&](auto const& table) { return table.maximum_float(column, &return_ndx); },
-                             [&](auto const& table) { return table.maximum_double(column, &return_ndx); },
-                             [&](auto const& table) { return table.maximum_timestamp(column, &return_ndx); });
+    ReturnIndexHelper return_ndx;
+    auto results = aggregate(column, "max", [&](auto&& helper) {
+        return helper.max(column, return_ndx);
+    });
     return return_ndx ? results : none;
 }
 
 util::Optional<Mixed> Results::min(ColKey column)
 {
-    ObjKey return_ndx;
-    auto results = aggregate(column, "min",
-                             [&](auto const& table) { return table.minimum_int(column, &return_ndx); },
-                             [&](auto const& table) { return table.minimum_float(column, &return_ndx); },
-                             [&](auto const& table) { return table.minimum_double(column, &return_ndx); },
-                             [&](auto const& table) { return table.minimum_timestamp(column, &return_ndx); });
+    ReturnIndexHelper return_ndx;
+    auto results = aggregate(column, "min", [&](auto&& helper) {
+        return helper.min(column, return_ndx);
+    });
     return return_ndx ? results : none;
 }
 
 util::Optional<Mixed> Results::sum(ColKey column)
 {
-    return aggregate(column, "sum",
-                     [=](auto const& table) { return table.sum_int(column); },
-                     [=](auto const& table) { return table.sum_float(column); },
-                     [=](auto const& table) { return table.sum_double(column); },
-                     [=](auto const&) -> Timestamp { throw UnsupportedColumnTypeException{column, m_table, "sum"}; });
+    return aggregate(column, "sum", [&](auto&& helper) { return helper.sum(column); });
 }
 
 util::Optional<double> Results::average(ColKey column)
 {
     size_t value_count = 0;
-    auto results = aggregate(column, "average",
-                             [&](auto const& table) { return table.average_int(column, &value_count); },
-                             [&](auto const& table) { return table.average_float(column, &value_count); },
-                             [&](auto const& table) { return table.average_double(column, &value_count); },
-                             [&](auto const&) -> Timestamp { throw UnsupportedColumnTypeException{column, m_table, "average"}; });
+    auto results = aggregate(column, "average", [&](auto&& helper) {
+        return helper.avg(column, &value_count);
+    });
     return value_count == 0 ? none : util::make_optional(results->get_double());
 }
 
@@ -876,26 +951,33 @@ Results::OutOfBoundsIndexException::OutOfBoundsIndexException(size_t r, size_t c
 : std::out_of_range(util::format("Requested index %1 greater than max %2", r, c - 1))
 , requested(r), valid_count(c) {}
 
-static std::string unsupported_operation_msg(ColKey column, const Table* table, const char* operation)
+static std::string unsupported_operation_msg(ColKey column, Table const& table, const char* operation)
 {
-    auto type = ObjectSchema::from_core_type(*table, column);
+    auto type = ObjectSchema::from_core_type(table, column);
     const char* column_type = string_for_property_type(type & ~PropertyType::Array);
     if (!is_array(type))
         return util::format("Cannot %1 property '%2': operation not supported for '%3' properties",
-                            operation, table->get_column_name(column), column_type);
+                            operation, table.get_column_name(column), column_type);
     return util::format("Cannot %1 '%2' array: operation not supported",
                         operation, column_type);
 }
 
-Results::UnsupportedColumnTypeException::UnsupportedColumnTypeException(ColKey column, const Table* table, const char* operation)
+Results::UnsupportedColumnTypeException::UnsupportedColumnTypeException(ColKey column, Table const& table,
+                                                                        const char* operation)
 : std::logic_error(unsupported_operation_msg(column, table, operation))
 , column_key(column)
-, column_name(table->get_column_name(column))
-, property_type(ObjectSchema::from_core_type(*table, ColKey(column)) & ~PropertyType::Array)
+, column_name(table.get_column_name(column))
+, property_type(ObjectSchema::from_core_type(table, ColKey(column)) & ~PropertyType::Array)
 {
 }
 
-Results::InvalidPropertyException::InvalidPropertyException(const std::string& object_type, const std::string& property_name)
+Results::UnsupportedColumnTypeException::UnsupportedColumnTypeException(ColKey column, TableView const& tv,
+                                                                        const char* operation)
+: UnsupportedColumnTypeException(column, tv.ObjList::get_parent(), operation)
+{
+}
+
+Results::InvalidPropertyException::InvalidPropertyException(StringData object_type, StringData property_name)
 : std::logic_error(util::format("Property '%1.%2' does not exist", object_type, property_name))
 , object_type(object_type), property_name(property_name)
 {

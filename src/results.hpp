@@ -68,11 +68,8 @@ public:
     // Returned query will not be valid if the current mode is Empty
     Query get_query() const;
 
-    // Get a list object containing the same rows as this Result
-    const LstBase* get_list() const
-    {
-        return m_list.get();
-    }
+    // Get the Lst this Results is derived from, if any
+    const LstBase* get_list() const { return m_list.get(); }
 
     // Get the list of sort and distinct operations applied for this Results.
     DescriptorOrdering const& get_descriptor_ordering() const noexcept { return m_descriptor_ordering; }
@@ -84,9 +81,6 @@ public:
     StringData get_object_type() const noexcept;
 
     PropertyType get_type() const;
-
-    // Get the LinkList this Results is derived from, if any
-//    LinkListRef get_linkview() const { return m_link_view; }
 
     // Get the size of this results
     // Can be either O(1) or O(N) depending on the state of things
@@ -204,12 +198,13 @@ public:
         StringData column_name;
         PropertyType property_type;
 
-        UnsupportedColumnTypeException(ColKey column, const Table* table, const char* operation);
+        UnsupportedColumnTypeException(ColKey column, Table const& table, const char* operation);
+        UnsupportedColumnTypeException(ColKey column, TableView const& tv, const char* operation);
     };
 
     // The property request does not exist in the schema
     struct InvalidPropertyException : public std::logic_error {
-        InvalidPropertyException(const std::string& object_type, const std::string& property_name);
+        InvalidPropertyException(StringData object_type, StringData property_name);
         const std::string object_type;
         const std::string property_name;
 	};
@@ -265,7 +260,7 @@ private:
     DescriptorOrdering m_descriptor_ordering;
     std::shared_ptr<LnkLst> m_link_list;
     std::shared_ptr<LstBase> m_list;
-    std::shared_ptr<std::vector<size_t>> m_list_indices;
+    util::Optional<std::vector<size_t>> m_list_indices;
 
     _impl::CollectionNotifier::Handle<_impl::ResultsNotifier> m_notifier;
 
@@ -285,12 +280,10 @@ private:
     template<typename T>
     util::Optional<T> try_get(size_t);
 
-    template<typename Int, typename Float, typename Double, typename Timestamp>
-    util::Optional<Mixed> aggregate(ColKey column,
-                                    const char* name,
-                                    Int agg_int, Float agg_float,
-                                    Double agg_double, Timestamp agg_timestamp);
-    void prepare_for_aggregate(ColKey column, const char* name);
+    template<typename AggregateFunction>
+    util::Optional<Mixed> aggregate(ColKey column, const char* name,
+                                    AggregateFunction&& func);
+    DataType prepare_for_aggregate(ColKey column, const char* name);
 
     template<typename Fn>
     auto dispatch(Fn&&) const;
