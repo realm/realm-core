@@ -261,6 +261,8 @@ public:
     {
         // std::cout << "expanding to " << new_entries << std::endl;
         // dump();
+        REALM_ASSERT_RELEASE(entries >= 32);
+        REALM_ASSERT_RELEASE(new_entries > entries);
         for (uint32_t i = entries; i < new_entries; i++) {
             data[i].version = 1;
             data[i].count.store(1, std::memory_order_relaxed);
