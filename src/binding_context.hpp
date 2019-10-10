@@ -156,7 +156,7 @@ public:
     // in each ObserverState with information about what changes were made.
     struct ObserverState {
         // Table and row which is observed
-        int64_t table_key;
+        uint32_t table_key;
         int64_t obj_key;
 
         // Opaque userdata for the delegate's use
