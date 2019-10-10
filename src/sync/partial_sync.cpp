@@ -20,9 +20,9 @@
 
 #include "impl/collection_notifier.hpp"
 #include "impl/notification_wrapper.hpp"
-#include "impl/object_accessor_impl.hpp"
 #include "impl/realm_coordinator.hpp"
 #include "object_schema.hpp"
+#include "object_store.hpp"
 #include "results.hpp"
 #include "shared_realm.hpp"
 #include "sync/impl/work_queue.hpp"
@@ -807,9 +807,8 @@ SubscriptionState Subscription::state() const
 
     // In some cases the subscription already exists. In that case we just report the state of the __ResultSets object.
     if (auto object = result_set_object()) {
-        CppContext context;
-        auto state = static_cast<SubscriptionState>(any_cast<int64_t>(object->get_property_value<util::Any>(context, property_status)));
-        auto updated_at = any_cast<Timestamp>(object->get_property_value<util::Any>(context, property_updated_at));
+        auto state = static_cast<SubscriptionState>(object->get_column_value<int64_t>(property_status));
+        auto updated_at = object->get_column_value<Timestamp>(property_updated_at);
 
         if (updated_at < m_wrapper_created_at) {
             // If the `updated_at` property on an existing subscription wasn't updated after the wrapper was created,
@@ -850,8 +849,7 @@ std::exception_ptr Subscription::error() const
         return error;
 
     if (auto object = result_set_object()) {
-        CppContext context;
-        auto message = any_cast<std::string>(object->get_property_value<util::Any>(context, "error_message"));
+        auto message = object->get_column_value<StringData>("error_message");
         if (message.size())
             return make_exception_ptr(std::runtime_error(message));
     }
