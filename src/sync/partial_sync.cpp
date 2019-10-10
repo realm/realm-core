@@ -347,10 +347,10 @@ Obj write_subscription(std::string const& object_type, std::string const& name, 
     }
 
     // Find existing subscription (if any)
-    auto row_ndx = table->find_first_string(columns.name, name);
+    auto obj_key = table->find_first_string(columns.name, name);
     Obj subscription;
-    if (row_ndx) {
-        subscription = table->get_object(row_ndx);
+    if (obj_key) {
+        subscription = table->get_object(obj_key);
         // Check that we don't attempt to replace an existing query with a query on a new type.
         // There is nothing that prevents Sync from handling this, but allowing it will complicate
         // Binding API's, so for now it is disallowed.
@@ -403,8 +403,6 @@ Obj write_subscription(std::string const& object_type, std::string const& name, 
         subscription.set(columns.expires_at, calculate_expiry_date(now, *time_to_live_ms));
     }
 
-    // Fetch subscription first and return it. Cleanup needs to be performed after as it might delete subscription
-    // causing the row_ndx to change.
     cleanup_subscriptions(group, now);
     return subscription;
 }
