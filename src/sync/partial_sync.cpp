@@ -517,7 +517,6 @@ struct Subscription::Notifier : public _impl::CollectionNotifier {
     {
     }
 
-    void release_data() noexcept override { }
     void run() override
     {
         std::unique_lock<std::mutex> lock(m_mutex);
