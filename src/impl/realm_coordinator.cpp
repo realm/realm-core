@@ -378,14 +378,6 @@ REALM_NOINLINE void translate_file_exception(StringData path, bool immutable)
 } // namespace _impl
 } // namespace realm
 
-#if REALM_ENABLE_SYNC
-static bool is_nonupgradable_history(IncompatibleHistories const& ex)
-{
-    // FIXME: Replace this with a proper specific exception type once Core adds support for it.
-    return std::string(ex.what()).find(std::string("Incompatible histories. Nonupgradable history schema")) != npos;
-}
-#endif
-
 void RealmCoordinator::open_db()
 {
     if (m_db || m_read_only_group)
@@ -446,21 +438,7 @@ void RealmCoordinator::open_db()
     }
 #if REALM_ENABLE_SYNC
     catch (IncompatibleHistories const& ex) {
-        if (!server_synchronization_mode || !is_nonupgradable_history(ex))
-            translate_file_exception(m_config.path, m_config.immutable()); // Throws
-
-        // Move the Realm file into the recovery directory.
-        std::string recovery_directory = SyncManager::shared().recovery_directory_path(m_config.sync_config ? m_config.sync_config->recovery_directory : none);
-        std::string new_realm_path = util::reserve_unique_file_name(recovery_directory, "synced-realm-XXXXXXX");
-        util::File::move(m_config.path, new_realm_path);
-
-        const char* message = "The local copy of this synced Realm was created with an incompatible version of "
-                              "Realm. It has been moved aside, and the Realm will be re-downloaded the next time it "
-                              "is opened. You should write a handler for this error that uses the provided "
-                              "configuration to open the old Realm in read-only mode to recover any pending changes "
-                              "and then remove the Realm file.";
-        throw RealmFileException(RealmFileException::Kind::IncompatibleSyncedRealm, std::move(new_realm_path),
-                                 message, ex.what());
+        translate_file_exception(m_config.path, m_config.immutable()); // Throws
     }
 #endif // REALM_ENABLE_SYNC
     catch (...) {
