@@ -403,11 +403,16 @@ bool ConstTableView::depends_on_deleted_object() const
 }
 
 // Return version of whatever this TableView depends on
-TableVersions ConstTableView::get_dependencies() const
+const TableVersions& ConstTableView::get_dependencies() const
+{
+    m_get_dependencies_buffer.clear();
+    get_dependencies(m_get_dependencies_buffer);
+    return m_get_dependencies_buffer;
+}
+
+void ConstTableView::get_dependencies(TableVersions& ret) const
 {
     check_cookie();
-
-    TableVersions ret;
 
     if (m_linklist_source) {
         // m_linkview_source is set when this TableView was created by LinkView::get_as_sorted_view().
@@ -423,7 +428,7 @@ TableVersions ConstTableView::get_dependencies() const
         }
     }
     else if (m_query.m_table) {
-        ret = m_query.get_outside_versions();
+        m_query.get_outside_versions(ret);
     }
     else {
         // This TableView was created by Table::get_distinct_view()
@@ -434,8 +439,6 @@ TableVersions ConstTableView::get_dependencies() const
     if (m_table) {
         m_descriptor_ordering.get_versions(m_table->get_parent_group(), ret);
     }
-
-    return ret;
 }
 
 bool ConstTableView::is_in_sync() const

@@ -1769,9 +1769,8 @@ Query Query::operator!()
     return q;
 }
 
-TableVersions Query::get_outside_versions() const
+void Query::get_outside_versions(TableVersions& versions) const
 {
-    TableVersions versions;
     if (m_table) {
         if (m_table_keys.empty()) {
             // Store primary table info
@@ -1793,13 +1792,9 @@ TableVersions Query::get_outside_versions() const
             }
         }
         if (m_view) {
-            TableVersions view_versions = m_view->get_dependencies();
-            for (auto e : view_versions) {
-                versions.push_back(e);
-            }
+            m_view->get_dependencies(versions);
         }
     }
-    return versions;
 }
 
 TableVersions Query::sync_view_if_needed() const
@@ -1807,7 +1802,9 @@ TableVersions Query::sync_view_if_needed() const
     if (m_view) {
         m_view->sync_if_needed();
     }
-    return get_outside_versions();
+    TableVersions ret;
+    get_outside_versions(ret);
+    return ret;
 }
 
 QueryGroup::QueryGroup(const QueryGroup& other)
