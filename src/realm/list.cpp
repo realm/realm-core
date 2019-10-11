@@ -549,16 +549,11 @@ void LnkLst::get_dependencies(TableVersions& versions) const
     }
 }
 
-TableVersions LnkLst::sync_if_needed() const
+void LnkLst::sync_if_needed() const
 {
-    TableVersions versions;
     if (this->is_attached()) {
         const_cast<LnkLst*>(this)->update_if_needed();
-        auto table = get_table();
-        auto version = table->get_content_version();
-        versions.emplace_back(table->get_key(), version);
     }
-    return versions;
 }
 
 namespace realm {

@@ -448,13 +448,12 @@ bool ConstTableView::is_in_sync() const
     return !m_table ? false : m_last_seen_versions == get_dependencies();
 }
 
-TableVersions ConstTableView::sync_if_needed() const
+void ConstTableView::sync_if_needed() const
 {
     if (!is_in_sync()) {
         // FIXME: Is this a reasonable handling of constness?
         const_cast<ConstTableView*>(this)->do_sync();
     }
-    return m_last_seen_versions;
 }
 
 

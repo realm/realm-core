@@ -841,7 +841,7 @@ private:
     friend class ConstTableView;
     friend class Query;
     void get_dependencies(TableVersions&) const override;
-    TableVersions sync_if_needed() const override;
+    void sync_if_needed() const override;
 };
 
 template <typename U>

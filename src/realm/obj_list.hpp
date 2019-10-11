@@ -84,8 +84,11 @@ public:
     template <class T>
     size_t find_first(ColKey column_key, T value);
 
+    // Get the versions of all tables which this list depends on
+    TableVersions get_dependency_versions() const;
+
     // These three methods are overridden by TableView and ObjList/LnkLst.
-    virtual TableVersions sync_if_needed() const = 0;
+    virtual void sync_if_needed() const = 0;
     virtual void get_dependencies(TableVersions&) const = 0;
     virtual bool is_in_sync() const = 0;
     void check_cookie() const

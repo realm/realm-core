@@ -301,7 +301,7 @@ public:
     //
     // This will make the TableView empty and in sync with the highest possible table version
     // if the TableView depends on an object (LinkView or row) that has been deleted.
-    TableVersions sync_if_needed() const override;
+    void sync_if_needed() const override;
 
     // Sort m_key_values according to one column
     void sort(ColKey column, bool ascending = true);
