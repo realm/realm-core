@@ -521,7 +521,7 @@ void ConstTableView::limit(LimitDescriptor lim)
     do_sync();
 }
 
-void ConstTableView::apply_descriptor_ordering(DescriptorOrdering new_ordering)
+void ConstTableView::apply_descriptor_ordering(const DescriptorOrdering& new_ordering)
 {
     m_descriptor_ordering = new_ordering;
     m_descriptor_ordering.collect_dependencies(m_table);

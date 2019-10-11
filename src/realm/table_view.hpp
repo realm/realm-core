@@ -322,7 +322,7 @@ public:
 
     // Replace the order of sort and distinct operations, bypassing manually
     // calling sort and distinct. This is a convenience method for bindings.
-    void apply_descriptor_ordering(DescriptorOrdering new_ordering);
+    void apply_descriptor_ordering(const DescriptorOrdering& new_ordering);
 
     // Gets a readable and parsable string which completely describes the sort and
     // distinct operations applied to this view.

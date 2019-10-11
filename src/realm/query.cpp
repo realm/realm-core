@@ -1408,15 +1408,13 @@ TableView Query::find_all(const DescriptorOrdering& descriptor)
 #if REALM_METRICS
     std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_FindAll);
 #endif
+    if (descriptor.is_empty()) {
+        return find_all();
+    }
+
     const size_t default_start = 0;
     const size_t default_end = size_t(-1);
     const size_t default_limit = size_t(-1);
-
-    if (descriptor.is_empty()) {
-        TableView ret(*m_table, *this, default_start, default_end, default_limit);
-        find_all(ret);
-        return ret;
-    }
 
     bool only_limit = true;
     size_t min_limit = size_t(-1);
@@ -1432,9 +1430,7 @@ TableView Query::find_all(const DescriptorOrdering& descriptor)
         }
     }
     if (only_limit) {
-        TableView ret(*m_table, *this, default_start, default_end, min_limit);
-        find_all(ret, default_start, default_end, min_limit);
-        return ret;
+        return find_all(default_start, default_end, min_limit);
     }
 
     TableView ret(*m_table, *this, default_start, default_end, default_limit);
