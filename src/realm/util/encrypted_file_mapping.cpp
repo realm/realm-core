@@ -533,6 +533,29 @@ void EncryptedFileMapping::write_page(size_t local_page_ndx) noexcept
         m_chunk_dont_scan[chunk_ndx] = 0;
 }
 
+void EncryptedFileMapping::write_and_update_all(size_t local_page_ndx, size_t begin_offset, size_t end_offset) noexcept
+{
+    // Go through all other mappings of this file and copy changes into those mappings
+    size_t page_ndx_in_file = local_page_ndx + m_first_page;
+    for (size_t i = 0; i < m_file.mappings.size(); ++i) {
+        EncryptedFileMapping* m = m_file.mappings[i];
+        if (m != this && m->contains_page(page_ndx_in_file)) {
+            size_t shadow_local_page_ndx = page_ndx_in_file - m->m_first_page;
+            if (is(m->m_page_state[shadow_local_page_ndx], UpToDate)) { // only keep up to data pages up to date
+                memcpy(m->page_addr(shadow_local_page_ndx) + begin_offset,
+                       page_addr(local_page_ndx) + begin_offset,
+                       end_offset - begin_offset);
+            } else
+                m->mark_outdated(shadow_local_page_ndx);
+        }
+    }
+    set(m_page_state[local_page_ndx], Dirty);
+    size_t chunk_ndx = local_page_ndx >> page_to_chunk_shift;
+    if (m_chunk_dont_scan[chunk_ndx])
+        m_chunk_dont_scan[chunk_ndx] = 0;
+}
+
+
 void EncryptedFileMapping::validate_page(size_t local_page_ndx) noexcept
 {
 #ifdef REALM_DEBUG
@@ -734,14 +757,33 @@ void EncryptedFileMapping::write_barrier(const void* addr, size_t size) noexcept
     REALM_ASSERT(m_access == File::access_ReadWrite);
 
     size_t first_accessed_local_page = get_local_index_of_address(addr);
-    size_t last_accessed_local_page = get_local_index_of_address(addr, size == 0 ? 0 : size - 1);
+    size_t first_offset = ((const char*) addr) - page_addr(first_accessed_local_page);
+    const char* last_accessed_address = ((const char*) addr) + (size == 0 ? 0 : size - 1);
+    size_t last_accessed_local_page = get_local_index_of_address(last_accessed_address);
     size_t pages_size = m_page_state.size();
 
-    for (size_t idx = first_accessed_local_page; idx <= last_accessed_local_page && idx < pages_size; ++idx) {
+    if (first_accessed_local_page < pages_size) {
+        REALM_ASSERT(is(m_page_state[first_accessed_local_page], UpToDate));
+        //write_page(first_accessed_local_page);
+        if (first_accessed_local_page == last_accessed_local_page) {
+            size_t last_offset = last_accessed_address - page_addr(first_accessed_local_page);
+            write_and_update_all(first_accessed_local_page, first_offset, last_offset + 1);
+        }
+        else
+            write_and_update_all(first_accessed_local_page, first_offset, 1 << m_page_shift);
+    }
+    for (size_t idx = first_accessed_local_page + 1; idx < last_accessed_local_page && idx < pages_size; ++idx) {
         // Pages written must earlier on have been decrypted
         // by a call to read_barrier().
         REALM_ASSERT(is(m_page_state[idx], UpToDate));
-        write_page(idx);
+        //write_page(idx);
+        write_and_update_all(idx, 0, 1 << m_page_shift);
+    }
+    if (first_accessed_local_page < last_accessed_local_page && last_accessed_local_page < pages_size) {
+        REALM_ASSERT(is(m_page_state[last_accessed_local_page], UpToDate));
+        //write_page(last_accessed_local_page);
+        size_t last_offset = last_accessed_address - page_addr(last_accessed_local_page);
+        write_and_update_all(last_accessed_local_page, 0, last_offset + 1);
     }
 }
 
