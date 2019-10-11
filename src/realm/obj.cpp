@@ -134,7 +134,8 @@ bool ConstObj::is_valid() const
 {
     // Cache valid state. If once invalid, it can never become valid again
     if (m_valid)
-        m_valid = (m_table->get_instance_version() == m_instance_version) && m_table->is_valid(m_key);
+        m_valid = (m_table->get_instance_version() == m_instance_version)
+               && (m_table->get_storage_version(m_instance_version) == m_storage_version || m_table->is_valid(m_key));
 
     return m_valid;
 }
