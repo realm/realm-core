@@ -2260,6 +2260,7 @@ bool SharedGroup::grow_reader_mapping(uint_fast32_t index)
         // handle mapping expansion if required
         SharedInfo* r_info = m_reader_map.get_addr();
         m_local_max_entry = r_info->readers.get_num_entries();
+        REALM_ASSERT(index < m_local_max_entry);
         size_t info_size = sizeof(SharedInfo) + r_info->readers.compute_required_space(m_local_max_entry);
         // std::cout << "Growing reader mapping to " << infosize << std::endl;
         m_reader_map.remap(m_file, util::File::access_ReadWrite, info_size); // Throws
@@ -2316,7 +2317,7 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
         // the cleanup process may access the entire ring buffer, so make sure it is mapped.
         // this is not ensured as part of begin_read, which only makes sure that the current
         // last entry in the buffer is available.
-        if (grow_reader_mapping(r_info->readers.get_num_entries())) { // throws
+        if (grow_reader_mapping(r_info->readers.get_num_entries() - 1)) { // throws
             r_info = m_reader_map.get_addr();
         }
         r_info->readers.cleanup();
