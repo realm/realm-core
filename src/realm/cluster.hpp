@@ -199,6 +199,7 @@ public:
     {
         return 0;
     }
+    static size_t node_size_from_header(Allocator& alloc, const char* header);
     size_t node_size() const override
     {
         if (!is_attached()) {

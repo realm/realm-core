@@ -643,6 +643,11 @@ public:
 
     static void get_three(const char* data, size_t ndx, ref_type& v0, ref_type& v1, ref_type& v2) noexcept;
 
+    static RefOrTagged get_as_ref_or_tagged(const char* header, size_t ndx) noexcept
+    {
+        return get(header, ndx);
+    }
+
     /// Get the number of bytes currently in use by this array. This
     /// includes the array header, but it does not include allocated
     /// bytes corresponding to excess capacity. The result is

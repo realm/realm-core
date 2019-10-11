@@ -367,10 +367,11 @@ ObjKey ClusterNodeInner::get(size_t ndx, ClusterNode::State& state) const
         bool child_is_leaf = !Array::get_is_inner_bptree_node_from_header(child_header);
         size_t sub_tree_size;
         if (child_is_leaf) {
-            Cluster leaf(key_offset + m_offset, m_alloc, m_tree_top);
-            leaf.init(MemRef(child_header, child_ref, m_alloc));
-            sub_tree_size = leaf.get_tree_size();
+            sub_tree_size = Cluster::node_size_from_header(m_alloc, child_header);
             if (ndx < sub_tree_size) {
+                Cluster leaf(key_offset + m_offset, m_alloc, m_tree_top);
+                leaf.init(MemRef(child_header, child_ref, m_alloc));
+                REALM_ASSERT(sub_tree_size == leaf.get_tree_size());
                 return leaf.get(ndx, state);
             }
         }
@@ -404,10 +405,7 @@ size_t ClusterNodeInner::get_ndx(ObjKey key, size_t ndx) const
         for (unsigned i = 0; i < child_info.ndx; i++) {
             ref_type ref = _get_child_ref(i);
             char* header = m_alloc.translate(ref);
-            MemRef mem(header, ref, m_alloc);
-            Cluster leaf(0, m_alloc, m_tree_top);
-            leaf.init(mem);
-            ndx += leaf.get_tree_size();
+            ndx += Cluster::node_size_from_header(m_alloc, header);
         }
         Cluster leaf(child_info.offset + m_offset, m_alloc, m_tree_top);
         leaf.init(child_info.mem);
@@ -619,11 +617,8 @@ size_t ClusterNodeInner::update_sub_tree_size()
         ref_type ref = _get_child_ref(i);
         char* header = m_alloc.translate(ref);
         bool child_is_leaf = !Array::get_is_inner_bptree_node_from_header(header);
-        MemRef mem(header, ref, m_alloc);
         if (child_is_leaf) {
-            Cluster leaf(0, m_alloc, m_tree_top);
-            leaf.init(mem);
-            sub_tree_size += leaf.get_tree_size();
+            sub_tree_size += Cluster::node_size_from_header(m_alloc, header);
         }
         else {
             sub_tree_size += size_t(Array::get(header, s_sub_tree_size)) >> 1;
@@ -813,6 +808,17 @@ MemRef Cluster::ensure_writeable(ObjKey)
 {
     copy_on_write();
     return get_mem();
+}
+
+size_t Cluster::node_size_from_header(Allocator& alloc, const char* header)
+{
+    auto rot = Array::get_as_ref_or_tagged(header, s_key_ref_or_size_index);
+    if (rot.is_tagged()) {
+        return size_t(rot.get_as_int());
+    }
+    else {
+        return Array::get_size_from_header(alloc.translate(rot.get_as_ref()));
+    }
 }
 
 namespace realm {
