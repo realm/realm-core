@@ -450,7 +450,7 @@ void RealmCoordinator::open_db()
 
     size_t free_space = 0;
     size_t used_space = 0;
-    if (auto tr = m_db->start_write(false)) {
+    if (auto tr = m_db->start_write(true)) {
         tr->commit();
         m_db->get_stats(free_space, used_space);
     }
