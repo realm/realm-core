@@ -149,7 +149,6 @@ stage('prepare') {
     sh 'git clean -ffdx -e .????????'
     sshagent(['realm-ci-ssh']) {
       sh 'git submodule update --init --recursive'
-      sh 'cd external/catch && python scripts/generateSingleHeader.py' // FIXME: remove after upgrading to catch > 2.9.2
     }
 
     gitTag = readGitTag()
