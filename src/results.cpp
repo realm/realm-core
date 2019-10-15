@@ -366,25 +366,17 @@ template<typename T>
 size_t Results::index_of(T const& value)
 {
     validate_read();
-    switch (m_mode) {
-        case Mode::Empty:
-            return not_found;
-        case Mode::Table:
-            throw std::runtime_error("not implemented");
-            // return m_table->find_first(0, value);
-            return 0;
-        case Mode::List:
-            return list_as<T>().find_first(value);
-        case Mode::LinkList:
-            return 0;
-        case Mode::Query:
-        case Mode::TableView:
-            throw std::runtime_error("not implemented");
-            evaluate_query_if_needed();
-            // return m_table_view.find_first(0, value);
-            return 0;
+    if (m_mode != Mode::List)
+        return not_found; // Non-List results can only ever contain Objects
+    evaluate_sort_and_distinct_on_list();
+    if (m_list_indices) {
+        for (size_t i = 0; i < m_list_indices->size(); ++i) {
+            if (list_as<T>().get((*m_list_indices)[i]) == value)
+                return i;
+        }
+        return not_found;
     }
-    REALM_COMPILER_HINT_UNREACHABLE();
+    return list_as<T>().find_first(value);
 }
 
 size_t Results::index_of(Query&& q)
