@@ -265,7 +265,7 @@ public:
     void append(const IncludeDescriptor& other);
     void
     report_included_backlinks(const Table* origin, ObjKey object,
-                              std::function<void(const Table*, const std::unordered_set<ObjKey>&)> reporter) const;
+                              util::FunctionRef<void(const Table*, const std::unordered_set<ObjKey>&)> reporter) const;
 
     Sorter sorter(Table const&, const IndexPairs&) const override
     {

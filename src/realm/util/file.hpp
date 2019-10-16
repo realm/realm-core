@@ -43,9 +43,10 @@ namespace std {
 #endif
 
 #include <realm/utilities.hpp>
+#include <realm/util/assert.hpp>
 #include <realm/util/backtrace.hpp>
 #include <realm/util/features.h>
-#include <realm/util/assert.hpp>
+#include <realm/util/function_ref.hpp>
 #include <realm/util/safe_int_ops.hpp>
 
 
@@ -526,7 +527,7 @@ public:
     /// string is interpreted as a relative path.
     static std::string resolve(const std::string& path, const std::string& base_dir);
 
-    using ForEachHandler = std::function<bool(const std::string& file, const std::string& dir)>;
+    using ForEachHandler = util::FunctionRef<bool(const std::string& file, const std::string& dir)>;
 
     /// Scan the specified directory recursivle, and report each file
     /// (nondirectory entry) via the specified handler.

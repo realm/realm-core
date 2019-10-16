@@ -824,7 +824,7 @@ bool Table::has_search_index(ColKey col_key) const noexcept
     return m_index_accessors[col_key.get_index().val] != nullptr;
 }
 
-void Table::migrate_column_info(std::function<void()> commit_and_continue)
+void Table::migrate_column_info(util::FunctionRef<void()> commit_and_continue)
 {
     bool changes = false;
     TableKey tk = (get_name() == "pk") ? TableKey(0) : get_key();
@@ -840,7 +840,7 @@ void Table::migrate_column_info(std::function<void()> commit_and_continue)
 // Delete the indexes stored in the columns array and create corresponding
 // entries in m_index_accessors array. This also has the effect that the columns
 // array after this step does not have extra entries for certain columns
-void Table::migrate_indexes(std::function<void()> commit_and_continue)
+void Table::migrate_indexes(util::FunctionRef<void()> commit_and_continue)
 {
     if (ref_type top_ref = m_top.get_as_ref(top_position_for_columns)) {
         bool changes = false;
@@ -878,7 +878,7 @@ void Table::migrate_indexes(std::function<void()> commit_and_continue)
 // This is information about origin/target tables in relation to links
 // This information is now held in "opposite" arrays directly in Table structure
 // At the same time the backlink columns are destroyed
-void Table::migrate_subspec(std::function<void()> commit_and_continue)
+void Table::migrate_subspec(util::FunctionRef<void()> commit_and_continue)
 {
     if (!m_spec.has_subspec())
         return;
@@ -934,7 +934,7 @@ void Table::migrate_subspec(std::function<void()> commit_and_continue)
 }
 
 
-void Table::convert_links_from_ndx_to_key(std::function<void()> commit_and_continue)
+void Table::convert_links_from_ndx_to_key(util::FunctionRef<void()> commit_and_continue)
 {
     if (ref_type top_ref = m_top.get_as_ref(top_position_for_columns)) {
         bool changes = false;
@@ -1131,10 +1131,10 @@ void copy_list<Timestamp>(ref_type sub_table_ref, Obj& obj, ColKey col, Allocato
 
 } // namespace
 
-void Table::create_columns(std::function<void()> commit_and_continue)
+void Table::create_columns(util::FunctionRef<void()> commit_and_continue)
 {
     size_t cnt;
-    ClusterTree::TraverseFunction get_column_cnt = [&cnt](const Cluster* cluster) {
+    auto get_column_cnt = [&cnt](const Cluster* cluster) {
         cnt = cluster->nb_columns();
         return true;
     };
@@ -1149,7 +1149,7 @@ void Table::create_columns(std::function<void()> commit_and_continue)
     }
 }
 
-void Table::migrate_objects(std::function<void()> commit_and_continue)
+void Table::migrate_objects(util::FunctionRef<void()> commit_and_continue)
 {
     ref_type top_ref = m_top.get_as_ref(top_position_for_columns);
     if (!top_ref) {
@@ -1365,7 +1365,7 @@ void Table::migrate_objects(std::function<void()> commit_and_continue)
 #endif
 }
 
-void Table::migrate_links(std::function<void()> commit_and_continue)
+void Table::migrate_links(util::FunctionRef<void()> commit_and_continue)
 {
     ref_type top_ref = m_top.get_as_ref(top_position_for_columns);
     if (!top_ref) {
@@ -1777,7 +1777,7 @@ ObjKey Table::find_first(ColKey col_key, T value) const
     using LeafType = typename ColumnTypeTraits<T>::cluster_leaf_type;
     LeafType leaf(get_alloc());
 
-    ClusterTree::TraverseFunction f = [&key, &col_key, &value, &leaf](const Cluster* cluster) {
+    auto f = [&key, &col_key, &value, &leaf](const Cluster* cluster) {
         cluster->init_leaf(col_key, &leaf);
         size_t row = leaf.find_first(value, 0, cluster->node_size());
         if (row != realm::npos) {
@@ -1804,7 +1804,7 @@ ObjKey Table::find_first(ColKey col_key, ObjKey value) const
     using LeafType = typename ColumnTypeTraits<ObjKey>::cluster_leaf_type;
     LeafType leaf(get_alloc());
 
-    ClusterTree::TraverseFunction f = [&key, &col_key, &value, &leaf](const Cluster* cluster) {
+    auto f = [&key, &col_key, &value, &leaf](const Cluster* cluster) {
         cluster->init_leaf(col_key, &leaf);
         size_t row = leaf.find_first(value, 0, cluster->node_size());
         if (row != realm::npos) {
@@ -2999,7 +2999,7 @@ void Table::change_nullability(ColKey key_from, ColKey key_to, bool throw_on_nul
 {
     Allocator& allocator = this->get_alloc();
     bool from_nullability = is_nullable(key_from);
-    ClusterTree::UpdateFunction func = [key_from, key_to, throw_on_null, from_nullability,
+    auto func = [key_from, key_to, throw_on_null, from_nullability,
                                         &allocator](Cluster* cluster) {
         size_t sz = cluster->node_size();
 
@@ -3032,7 +3032,7 @@ void Table::change_nullability_list(ColKey key_from, ColKey key_to, bool throw_o
 {
     Allocator& allocator = this->get_alloc();
     bool from_nullability = is_nullable(key_from);
-    ClusterTree::UpdateFunction func = [key_from, key_to, throw_on_null, from_nullability,
+    auto func = [key_from, key_to, throw_on_null, from_nullability,
                                         &allocator](Cluster* cluster) {
         size_t sz = cluster->node_size();
 

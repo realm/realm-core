@@ -3294,7 +3294,7 @@ TEST(Table_object_forward_iterator)
     }
 
     size_t tree_size = 0;
-    ClusterTree::TraverseFunction f = [&tree_size](const Cluster* cluster) {
+    auto f = [&tree_size](const Cluster* cluster) {
         tree_size += cluster->node_size();
         return false;
     };

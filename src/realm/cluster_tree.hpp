@@ -20,6 +20,7 @@
 #define REALM_CLUSTER_TREE_HPP
 
 #include <realm/obj.hpp>
+#include <realm/util/function_ref.hpp>
 
 namespace realm {
 
@@ -27,8 +28,8 @@ class ClusterTree {
 public:
     class ConstIterator;
     class Iterator;
-    using TraverseFunction = std::function<bool(const Cluster*)>;
-    using UpdateFunction = std::function<void(Cluster*)>;
+    using TraverseFunction = util::FunctionRef<bool(const Cluster*)>;
+    using UpdateFunction = util::FunctionRef<void(Cluster*)>;
 
     ClusterTree(Table* owner, Allocator& alloc);
     static MemRef create_empty_cluster(Allocator& alloc);
@@ -139,9 +140,9 @@ public:
     bool get_leaf(ObjKey key, ClusterNode::IteratorState& state) const noexcept;
     // Visit all leaves and call the supplied function. Stop when function returns true.
     // Not allowed to modify the tree
-    bool traverse(TraverseFunction& func) const;
+    bool traverse(TraverseFunction func) const;
     // Visit all leaves and call the supplied function. The function can modify the leaf.
-    void update(UpdateFunction& func);
+    void update(UpdateFunction func);
 
     void enumerate_string_column(ColKey col_key);
     void dump_objects()

@@ -84,8 +84,8 @@ public:
         return m_sub_tree_depth;
     }
 
-    bool traverse(ClusterTree::TraverseFunction& func, int64_t) const;
-    void update(ClusterTree::UpdateFunction& func, int64_t);
+    bool traverse(ClusterTree::TraverseFunction func, int64_t) const;
+    void update(ClusterTree::UpdateFunction func, int64_t);
 
     size_t node_size() const override
     {
@@ -633,7 +633,7 @@ size_t ClusterNodeInner::update_sub_tree_size()
     return sub_tree_size;
 }
 
-bool ClusterNodeInner::traverse(ClusterTree::TraverseFunction& func, int64_t key_offset) const
+bool ClusterNodeInner::traverse(ClusterTree::TraverseFunction func, int64_t key_offset) const
 {
     auto sz = node_size();
 
@@ -661,7 +661,7 @@ bool ClusterNodeInner::traverse(ClusterTree::TraverseFunction& func, int64_t key
     return false;
 }
 
-void ClusterNodeInner::update(ClusterTree::UpdateFunction& func, int64_t key_offset)
+void ClusterNodeInner::update(ClusterTree::UpdateFunction func, int64_t key_offset)
 {
     auto sz = node_size();
 
@@ -1888,7 +1888,7 @@ bool ClusterTree::get_leaf(ObjKey key, ClusterNode::IteratorState& state) const 
     }
 }
 
-bool ClusterTree::traverse(TraverseFunction& func) const
+bool ClusterTree::traverse(TraverseFunction func) const
 {
     if (m_root->is_leaf()) {
         return func(static_cast<Cluster*>(m_root.get()));
@@ -1898,7 +1898,7 @@ bool ClusterTree::traverse(TraverseFunction& func) const
     }
 }
 
-void ClusterTree::update(UpdateFunction& func)
+void ClusterTree::update(UpdateFunction func)
 {
     if (m_root->is_leaf()) {
         func(static_cast<Cluster*>(m_root.get()));
@@ -1916,7 +1916,7 @@ void ClusterTree::enumerate_string_column(ColKey col_key)
     ArrayString leaf(alloc);
     keys.create();
 
-    ClusterTree::TraverseFunction collect_strings = [col_key, &leaf, &keys](const Cluster* cluster) {
+    auto collect_strings = [col_key, &leaf, &keys](const Cluster* cluster) {
         cluster->init_leaf(col_key, &leaf);
         size_t sz = leaf.size();
         size_t key_size = keys.size();
@@ -1932,7 +1932,7 @@ void ClusterTree::enumerate_string_column(ColKey col_key)
         return false; // Continue
     };
 
-    ClusterTree::UpdateFunction upgrade = [col_key, &keys](Cluster* cluster) {
+    auto upgrade = [col_key, &keys](Cluster* cluster) {
         cluster->upgrade_string_to_enum(col_key, keys);
     };
 
@@ -1982,7 +1982,7 @@ void ClusterTree::remove_links()
     state.m_group = m_owner->get_parent_group();
     Allocator& alloc = get_alloc();
     // This function will add objects that should be deleted to 'state'
-    ClusterTree::TraverseFunction func = [this, &state, &alloc](const Cluster* cluster) {
+    auto func = [this, &state, &alloc](const Cluster* cluster) {
         auto remove_link_from_column = [&](ColKey col_key) {
             // Prevent making changes to table that is going to be removed anyway
             // Furthermore it is a prerequisite for using 'traverse' that the tree

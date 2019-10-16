@@ -21,7 +21,7 @@
 
 #include <realm/column_type_traits.hpp>
 #include <realm/timestamp.hpp>
-#include <iostream>
+#include <realm/util/function_ref.hpp>
 
 namespace realm {
 
@@ -41,14 +41,14 @@ public:
     };
 
     // Insert an element at 'insert_pos'. May cause node to be split
-    using InsertFunc = std::function<size_t(BPlusTreeNode*, size_t insert_pos)>;
+    using InsertFunc = util::FunctionRef<size_t(BPlusTreeNode*, size_t insert_pos)>;
     // Access element at 'ndx'. Insertion/deletion not allowed
-    using AccessFunc = std::function<void(BPlusTreeNode*, size_t ndx)>;
+    using AccessFunc = util::FunctionRef<void(BPlusTreeNode*, size_t ndx)>;
     // Erase element at erase_pos. May cause nodes to be merged
-    using EraseFunc = std::function<size_t(BPlusTreeNode*, size_t erase_pos)>;
+    using EraseFunc = util::FunctionRef<size_t(BPlusTreeNode*, size_t erase_pos)>;
     // Function to be called for all leaves in the tree until the function
     // returns 'true'. 'offset' gives index of the first element in the leaf.
-    using TraverseFunc = std::function<bool(BPlusTreeNode*, size_t offset)>;
+    using TraverseFunc = util::FunctionRef<bool(BPlusTreeNode*, size_t offset)>;
 
     BPlusTreeNode(BPlusTreeBase* tree)
         : m_tree(tree)
@@ -76,10 +76,10 @@ public:
     // Size of subtree
     virtual size_t get_tree_size() const = 0;
 
-    virtual ref_type bptree_insert(size_t n, State& state, InsertFunc&) = 0;
-    virtual void bptree_access(size_t n, AccessFunc&) = 0;
-    virtual size_t bptree_erase(size_t n, EraseFunc&) = 0;
-    virtual bool bptree_traverse(TraverseFunc&) = 0;
+    virtual ref_type bptree_insert(size_t n, State& state, InsertFunc) = 0;
+    virtual void bptree_access(size_t n, AccessFunc) = 0;
+    virtual size_t bptree_erase(size_t n, EraseFunc) = 0;
+    virtual bool bptree_traverse(TraverseFunc) = 0;
 
     // Move elements over in new node, starting with element at position 'ndx'.
     // If this is an inner node, the index offsets should be adjusted with 'adj'
@@ -108,10 +108,10 @@ public:
         return true;
     }
 
-    ref_type bptree_insert(size_t n, State& state, InsertFunc&) override;
-    void bptree_access(size_t n, AccessFunc&) override;
-    size_t bptree_erase(size_t n, EraseFunc&) override;
-    bool bptree_traverse(TraverseFunc&) override;
+    ref_type bptree_insert(size_t n, State& state, InsertFunc) override;
+    void bptree_access(size_t n, AccessFunc) override;
+    size_t bptree_erase(size_t n, EraseFunc) override;
+    bool bptree_traverse(TraverseFunc) override;
     void verify() const override
     {
     }
@@ -233,8 +233,8 @@ protected:
         m_cached_leaf_end += incr;
     }
 
-    void bptree_insert(size_t n, BPlusTreeNode::InsertFunc& func);
-    void bptree_erase(size_t n, BPlusTreeNode::EraseFunc& func);
+    void bptree_insert(size_t n, BPlusTreeNode::InsertFunc func);
+    void bptree_erase(size_t n, BPlusTreeNode::EraseFunc func);
 
     // Create an un-attached leaf node
     virtual std::unique_ptr<BPlusTreeLeaf> create_leaf_node() = 0;
@@ -399,7 +399,7 @@ public:
 
     void insert(size_t n, T value)
     {
-        BPlusTreeNode::InsertFunc func = [value](BPlusTreeNode* node, size_t ndx) {
+        auto func = [value](BPlusTreeNode* node, size_t ndx) {
             LeafNode* leaf = static_cast<LeafNode*>(node);
             leaf->LeafArray::insert(ndx, value);
             return leaf->size();
@@ -417,7 +417,7 @@ public:
         else {
             T value;
 
-            BPlusTreeNode::AccessFunc func = [&value](BPlusTreeNode* node, size_t ndx) {
+            auto func = [&value](BPlusTreeNode* node, size_t ndx) {
                 LeafNode* leaf = static_cast<LeafNode*>(node);
                 value = leaf->get(ndx);
             };
@@ -433,7 +433,7 @@ public:
         std::vector<T> all_values;
         all_values.reserve(m_size);
 
-        BPlusTreeNode::TraverseFunc func = [&all_values](BPlusTreeNode* node, size_t) {
+        auto func = [&all_values](BPlusTreeNode* node, size_t) {
             LeafNode* leaf = static_cast<LeafNode*>(node);
             size_t sz = leaf->size();
             for (size_t i = 0; i < sz; i++) {
@@ -449,7 +449,7 @@ public:
 
     void set(size_t n, T value)
     {
-        BPlusTreeNode::AccessFunc func = [value](BPlusTreeNode* node, size_t ndx) {
+        auto func = [value](BPlusTreeNode* node, size_t ndx) {
             LeafNode* leaf = static_cast<LeafNode*>(node);
             leaf->set(ndx, value);
         };
@@ -469,7 +469,7 @@ public:
 
     void erase(size_t n)
     {
-        BPlusTreeNode::EraseFunc func = [](BPlusTreeNode* node, size_t ndx) {
+        auto func = [](BPlusTreeNode* node, size_t ndx) {
             LeafNode* leaf = static_cast<LeafNode*>(node);
             leaf->LeafArray::erase(ndx);
             return leaf->size();
@@ -495,7 +495,7 @@ public:
         m_size = 0;
     }
 
-    void traverse(BPlusTreeNode::TraverseFunc& func) const
+    void traverse(BPlusTreeNode::TraverseFunc func) const
     {
         if (m_root) {
             m_root->bptree_traverse(func);
@@ -506,7 +506,7 @@ public:
     {
         size_t result = realm::npos;
 
-        BPlusTreeNode::TraverseFunc func = [&result, value](BPlusTreeNode* node, size_t offset) {
+        auto func = [&result, value](BPlusTreeNode* node, size_t offset) {
             LeafNode* leaf = static_cast<LeafNode*>(node);
             size_t sz = leaf->size();
             auto i = leaf->find_first(value, 0, sz);
@@ -526,7 +526,7 @@ public:
     {
         std::string indent(" ", level * 2);
 
-        BPlusTreeNode::TraverseFunc func = [&o, indent](BPlusTreeNode* node, size_t) {
+        auto func = [&o, indent](BPlusTreeNode* node, size_t) {
             LeafNode* leaf = static_cast<LeafNode*>(node);
             size_t sz = leaf->size();
             for (size_t i = 0; i < sz; i++) {
@@ -616,7 +616,7 @@ typename ColumnTypeTraits<T>::sum_type bptree_sum(const BPlusTree<T>& tree, size
     ResultType result{};
     size_t cnt = 0;
 
-    BPlusTreeNode::TraverseFunc func = [&result, &cnt](BPlusTreeNode* node, size_t) {
+    auto func = [&result, &cnt](BPlusTreeNode* node, size_t) {
         auto leaf = static_cast<typename BPlusTree<T>::LeafNode*>(node);
         size_t sz = leaf->size();
         for (size_t i = 0; i < sz; i++) {
@@ -643,7 +643,7 @@ typename ColumnTypeTraits<T>::minmax_type bptree_maximum(const BPlusTree<T>& tre
     using ResultType = typename AggregateResultType<T, act_Max>::result_type;
     ResultType max = std::numeric_limits<ResultType>::min();
 
-    BPlusTreeNode::TraverseFunc func = [&max, return_ndx](BPlusTreeNode* node, size_t offset) {
+    auto func = [&max, return_ndx](BPlusTreeNode* node, size_t offset) {
         auto leaf = static_cast<typename BPlusTree<T>::LeafNode*>(node);
         size_t sz = leaf->size();
         for (size_t i = 0; i < sz; i++) {
@@ -672,7 +672,7 @@ typename ColumnTypeTraits<T>::minmax_type bptree_minimum(const BPlusTree<T>& tre
     using ResultType = typename AggregateResultType<T, act_Max>::result_type;
     ResultType min = std::numeric_limits<ResultType>::max();
 
-    BPlusTreeNode::TraverseFunc func = [&min, return_ndx](BPlusTreeNode* node, size_t offset) {
+    auto func = [&min, return_ndx](BPlusTreeNode* node, size_t offset) {
         auto leaf = static_cast<typename BPlusTree<T>::LeafNode*>(node);
         size_t sz = leaf->size();
         for (size_t i = 0; i < sz; i++) {

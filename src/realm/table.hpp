@@ -27,6 +27,7 @@
 #include <mutex>
 
 #include <realm/util/features.h>
+#include <realm/util/function_ref.hpp>
 #include <realm/util/thread.hpp>
 #include <realm/table_ref.hpp>
 #include <realm/list.hpp>
@@ -314,7 +315,7 @@ public:
         return m_clusters.dump_objects();
     }
 
-    bool traverse_clusters(ClusterTree::TraverseFunction& func) const
+    bool traverse_clusters(ClusterTree::TraverseFunction func) const
     {
         return m_clusters.traverse(func);
     }
@@ -712,14 +713,14 @@ private:
     void populate_search_index(ColKey col_key);
 
     // Migration support
-    void migrate_column_info(std::function<void()>);
-    void migrate_indexes(std::function<void()>);
-    void migrate_subspec(std::function<void()>);
-    void convert_links_from_ndx_to_key(std::function<void()>);
+    void migrate_column_info(util::FunctionRef<void()>);
+    void migrate_indexes(util::FunctionRef<void()>);
+    void migrate_subspec(util::FunctionRef<void()>);
+    void convert_links_from_ndx_to_key(util::FunctionRef<void()>);
     ref_type get_oid_column_ref() const;
-    void create_columns(std::function<void()>);
-    void migrate_objects(std::function<void()>);
-    void migrate_links(std::function<void()>);
+    void create_columns(util::FunctionRef<void()>);
+    void migrate_objects(util::FunctionRef<void()>);
+    void migrate_links(util::FunctionRef<void()>);
     void finalize_migration();
 
     /// Disable copying assignment.
