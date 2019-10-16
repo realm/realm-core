@@ -1724,8 +1724,9 @@ Query& Query::and_query(Query&& q)
         add_node(std::move(q.m_groups[0].m_root_node));
 
         if (q.m_source_link_list) {
-            REALM_ASSERT(!m_source_link_list || m_source_link_list == q.m_source_link_list);
+            REALM_ASSERT(!m_source_link_list || *m_source_link_list == *q.m_source_link_list);
             m_source_link_list = std::move(q.m_source_link_list);
+            m_view = m_source_link_list.get();
         }
     }
 

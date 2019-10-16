@@ -129,6 +129,11 @@ public:
         return m_col_key;
     }
 
+    bool operator==(const ConstLstBase& other) const
+    {
+        return get_key() == other.get_key() && get_col_key() == other.get_col_key();
+    }
+
 protected:
     template <class>
     friend class LstIterator;

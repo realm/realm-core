@@ -10262,4 +10262,31 @@ TEST(Query_StringOrLongStrings)
     }
 }
 
+TEST(Query_LinkViewAnd)
+{
+    Group g;
+
+    TableRef child_table = g.add_table("child");
+    auto col_child_id = child_table->add_column(type_Int, "id");
+    auto col_child_name = child_table->add_column(type_String, "name");
+
+    auto k0 = child_table->create_object().set(col_child_id, 3).set(col_child_name, "Adam").get_key();
+    auto k1 = child_table->create_object().set(col_child_id, 2).set(col_child_name, "Jeff").get_key();
+
+    TableRef parent_table = g.add_table("parent");
+    auto col_parent_children = parent_table->add_column_link(type_LinkList, "children", *child_table);
+
+    auto parent_obj = parent_table->create_object();
+    auto children = parent_obj.get_linklist(col_parent_children);
+    children.add(k0);
+    children.add(k1);
+
+    Query q1 = child_table->where(children).equal(col_child_id, 3);
+    Query q2 = child_table->where(children).equal(col_child_name, "Jeff");
+    CHECK_EQUAL(k0, q1.find());
+    CHECK_EQUAL(k1, q2.find());
+    q1.and_query(q2);
+    CHECK_NOT(q1.find());
+}
+
 #endif // TEST_QUERY
