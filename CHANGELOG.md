@@ -4,8 +4,7 @@
 * None.
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Opening a file where the size is a multiplum of 64 MB will crash. ([#3418](https://github.com/realm/realm-core/issues/3418), since v6.0.0-alpha.0)
  
 ### Breaking changes
 * None.

@@ -933,9 +933,9 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
     }
     else {
         update_reader_view(size);
+        REALM_ASSERT(m_mappings.size());
         m_data = m_mappings[0].get_addr();
     }
-    REALM_ASSERT(m_mappings.size());
     dg.release();  // Do not detach
     fcg.release(); // Do not close
 #if REALM_ENABLE_ENCRYPTION
@@ -954,6 +954,9 @@ void SlabAlloc::setup_compatibility_mapping(size_t file_size)
     // even though the compatibility mapping may extend further.
     m_baseline = get_section_base(m_sections_in_compatibility_mapping);
     update_reader_view(file_size);
+    if (m_mappings.size() == 0) {
+        rebuild_translations(true, m_sections_in_compatibility_mapping);
+    }
 }
 
 void SlabAlloc::note_reader_start(const void* reader_id)
@@ -1179,7 +1182,8 @@ inline bool randomly_false_in_debug(bool x)
 void SlabAlloc::update_reader_view(size_t file_size)
 {
     std::lock_guard<std::mutex> lock(m_mapping_mutex);
-    if (file_size <= m_baseline.load(std::memory_order_relaxed)) {
+    size_t old_baseline = m_baseline.load(std::memory_order_relaxed);
+    if (file_size <= old_baseline) {
         return;
     }
     REALM_ASSERT_EX(file_size % 8 == 0, file_size, get_file_path_for_assertions()); // 8-byte alignment required
@@ -1188,7 +1192,6 @@ void SlabAlloc::update_reader_view(size_t file_size)
     bool requires_new_translation = false;
 
     // Extend mapping by adding sections, potentially replacing older sections
-    size_t old_baseline = m_baseline.load(std::memory_order_relaxed);
     auto old_slab_base = align_size_to_section_boundary(old_baseline);
     size_t old_num_sections = get_section_index(old_slab_base);
     REALM_ASSERT(m_mappings.size() == old_num_sections - m_sections_in_compatibility_mapping);
