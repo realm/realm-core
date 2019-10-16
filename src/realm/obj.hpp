@@ -33,6 +33,7 @@ class Replication;
 class TableView;
 class ConstLstBase;
 class LstBase;
+struct ObjectID;
 
 template <class>
 class ConstLstIf;
@@ -75,6 +76,8 @@ public:
     {
         return m_key;
     }
+
+    ObjectID get_object_id() const;
 
     const Table* get_table() const
     {

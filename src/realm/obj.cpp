@@ -48,6 +48,11 @@ ConstObj::ConstObj(const ClusterTree* tree_top, MemRef mem, ObjKey key, size_t r
     m_storage_version = tree_top->get_storage_version(m_instance_version);
 }
 
+ObjectID ConstObj::get_object_id() const
+{
+    return m_table->get_object_id(m_key);
+}
+
 const ClusterTree* ConstObj::get_tree_top() const
 {
     return &m_table->m_clusters;
