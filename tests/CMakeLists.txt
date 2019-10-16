@@ -67,3 +67,4 @@ create_coverage_target(generate-coverage tests)
 add_custom_target(run-tests USES_TERMINAL DEPENDS tests COMMAND ./tests)
 
 add_subdirectory(notifications-fuzzer)
+add_subdirectory(benchmarks)
