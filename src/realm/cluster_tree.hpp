@@ -34,7 +34,6 @@ public:
     static MemRef create_empty_cluster(Allocator& alloc);
 
     ClusterTree(ClusterTree&&) = default;
-    ClusterTree& operator=(ClusterTree&&) = default;
 
     // Disable copying, this is not allowed.
     ClusterTree& operator=(const ClusterTree&) = delete;
