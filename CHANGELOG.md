@@ -15,6 +15,36 @@
 ### Internals
 * None.
 
+Besides the changes above, this release includes changes introduced by v5.23.4 to v5.23.5:
+
+| # 5.23.5 Release notes
+| 
+| ### Enhancements
+| * None.
+| 
+| ### Fixed
+| * Chained OR equals queries on an unindexed string column failed to match any results if any of the strings were 64 bytes or longer. ([PR #3386](https://| github.com/realm/realm-core/pull/3386), since 5.17.0).
+| * Fixed serialization of a query which looks for a null timestamp. This only affects query based sync. ([PR #3389](https://github.com/realm/realm-core/pull/| 3388), since v5.23.2).
+| 
+| ### Breaking changes
+| * None.
+| 
+| -----------
+| 
+| ### Internals
+| 
+| * VersionID comparison operators are now const qualified ([PR #3391](https://github.com/realm/realm-core/pull/3391)).
+| * Exception `util::File::AccessError`, and it's derivatives such as `util::File::NotFound`, will now include a stacktrace in the message returned by the `what| ()` method. ([PR #3394](https://github.com/realm/realm-core/pull/3394))
+| 
+| 
+| ----------------------------------------------
+| 
+| # 5.23.4 Release notes
+| 
+| ### Internals
+| * The release binaries for Apple platforms are now built with Xcode 10.0 (up from 9.4).
+| * Add a Catalyst/UIKit for Mac library to the Cocoa release package.
+
 ----------------------------------------------
 
 # 6.0.0-alpha.21 Release notes

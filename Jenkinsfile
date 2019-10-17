@@ -91,8 +91,10 @@ jobWrapper {
     if (isPublishingRun) {
         stage('BuildPackages') {
             parallelExecutors = [
-                buildMacOsDebug     : doBuildMacOs('Debug', false),
+                buildMacOsDebug     : doBuildMacOs('MinSizeDebug', false),
                 buildMacOsRelease   : doBuildMacOs('Release', false),
+                buildCatalystDebug  : doBuildMacOsCatalyst('MinSizeDebug'),
+                buildCatalystRelease: doBuildMacOsCatalyst('Release'),
 
                 buildWin32Debug     : doBuildWindows('Debug', false, 'Win32', false),
                 buildWin32Release   : doBuildWindows('Release', false, 'Win32', false),
@@ -471,8 +473,8 @@ def doBuildMacOs(String buildType, boolean runTests) {
 
             def buildTests = runTests ? '' : '-DREALM_NO_TESTS=1'
 
-            dir("build-macos-${buildType}") {
-                withEnv(['DEVELOPER_DIR=/Applications/Xcode-9.4.app/Contents/Developer/']) {
+            dir("build-macosx-${buildType}") {
+                withEnv(['DEVELOPER_DIR=/Applications/Xcode-10.app/Contents/Developer/']) {
                     // This is a dirty trick to work around a bug in xcode
                     // It will hang if launched on the same project (cmake trying the compiler out)
                     // in parallel.
@@ -480,52 +482,71 @@ def doBuildMacOs(String buildType, boolean runTests) {
                         timeout(time: 2, unit: 'MINUTES') {
                             sh """
                                     rm -rf *
-                                    cmake -D CMAKE_TOOLCHAIN_FILE=../tools/cmake/macos.toolchain.cmake \\
+                                    cmake -D CMAKE_TOOLCHAIN_FILE=../tools/cmake/macosx.toolchain.cmake \\
                                           -D CMAKE_BUILD_TYPE=${buildType} \\
                                           -D REALM_VERSION=${gitDescribeVersion} \\
-                                          ${buildTests} -G Xcode ..
+                                          ${buildTests} -G Ninja ..
                                 """
                         }
                     }
 
-                    runAndCollectWarnings(parser: 'clang', script: """
-                            xcodebuild -sdk macosx \\
-                                       -configuration ${buildType} \\
-                                       -target package \\
-                                       ONLY_ACTIVE_ARCH=NO
-                            """)
+                    runAndCollectWarnings(parser: 'clang', script: 'ninja package')
                 }
             }
 
-            archiveArtifacts("build-macos-${buildType}/*.tar.gz")
+            archiveArtifacts("build-macosx-${buildType}/*.tar.gz")
 
-            def stashName = "macos___${buildType}"
-            stash includes:"build-macos-${buildType}/*.tar.gz", name:stashName
+            def stashName = "macosx___${buildType}"
+            stash includes:"build-macosx-${buildType}/*.tar.gz", name:stashName
             cocoaStashes << stashName
             publishingStashes << stashName
 
             if (runTests) {
                 try {
-                    dir("build-macos-${buildType}") {
-                        def environment = environment()
-                        environment << 'UNITTEST_PROGRESS=1'
-                        withEnv(environment) {
-                        sh """
-                            cd test
-                            ./${buildType}/realm-tests.app/Contents/MacOS/realm-tests
-                            cp $TMPDIR/unit-test-report.xml .
-                        """
+                    dir("build-macosx-${buildType}") {
+                        withEnv(environment()) {
+                            sh 'UNITTEST_PROGRESS=1 ./test/realm-tests'
                         }
                     }
                 } finally {
                     // recordTests expects the test results xml file in a build-dir/test/ folder
                     sh """
                         mkdir -p build-dir/test
-                        cp build-macos-${buildType}/test/unit-test-report.xml build-dir/test/
+                        cp build-macosx-${buildType}/test/unit-test-report.xml build-dir/test/
                     """
-                    recordTests("macos_${buildType}")
+                    recordTests("macosx_${buildType}")
                 }
             }
+        }
+    }
+}
+
+def doBuildMacOsCatalyst(String buildType) {
+    return {
+        node('osx') {
+            getArchive()
+
+            dir("build-maccatalyst-${buildType}") {
+                withEnv(['DEVELOPER_DIR=/Applications/Xcode-11.app/Contents/Developer/']) {
+                    sh """
+                            rm -rf *
+                            cmake -D CMAKE_TOOLCHAIN_FILE=../tools/cmake/maccatalyst.toolchain.cmake \\
+                                  -D CMAKE_BUILD_TYPE=${buildType} \\
+                                  -D REALM_VERSION=${gitDescribeVersion} \\
+                                  -D REALM_SKIP_SHARED_LIB=ON \\
+                                  -D REALM_BUILD_LIB_ONLY=ON \\
+                                  -G Ninja ..
+                        """
+                    runAndCollectWarnings(parser: 'clang', script: 'ninja package')
+                }
+            }
+
+            archiveArtifacts("build-maccatalyst-${buildType}/*.tar.gz")
+
+            def stashName = "maccatalyst__${buildType}"
+            stash includes:"build-maccatalyst-${buildType}/*.tar.gz", name:stashName
+            cocoaStashes << stashName
+            publishingStashes << stashName
         }
     }
 }
@@ -535,8 +556,7 @@ def doBuildAppleDevice(String sdk, String buildType) {
         node('osx') {
             getArchive()
 
-            withEnv(['DEVELOPER_DIR=/Applications/Xcode-9.4.app/Contents/Developer/',
-                     'XCODE10_DEVELOPER_DIR=/Applications/Xcode-10.app/Contents/Developer/']) {
+            withEnv(['DEVELOPER_DIR=/Applications/Xcode-10.app/Contents/Developer/']) {
                 retry(3) {
                     timeout(time: 15, unit: 'MINUTES') {
                         runAndCollectWarnings(parser:'clang', script: """
