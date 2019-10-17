@@ -44,10 +44,17 @@ public:
     constexpr FunctionRef() noexcept = delete;
 
     // FunctionRef is copyable and moveable.
+#if defined(__GNUC__) && __GNUC__ == 4 && __GNUC_MINOR__ <= 9 && !defined(__clang__)
+    FunctionRef(FunctionRef<Return(Args...)> const&) noexcept = default;
+    FunctionRef<Return(Args...)>& operator=(const FunctionRef<Return(Args...)>&) noexcept = default;
+    FunctionRef(FunctionRef<Return(Args...)>&&) noexcept = default;
+    FunctionRef<Return(Args...)>& operator=(FunctionRef<Return(Args...)>&&) noexcept = default;
+#else
     constexpr FunctionRef(FunctionRef<Return(Args...)> const&) noexcept = default;
     constexpr FunctionRef<Return(Args...)>& operator=(const FunctionRef<Return(Args...)>&) noexcept = default;
     constexpr FunctionRef(FunctionRef<Return(Args...)>&&) noexcept = default;
     constexpr FunctionRef<Return(Args...)>& operator=(FunctionRef<Return(Args...)>&&) noexcept = default;
+#endif
 
     // Construct a FunctionRef which wraps the given callable.
     template <typename F>
