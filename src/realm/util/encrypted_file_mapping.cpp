@@ -758,8 +758,8 @@ void EncryptedFileMapping::write_barrier(const void* addr, size_t size) noexcept
 
     REALM_ASSERT(m_access == File::access_ReadWrite);
     size_t first_accessed_local_page = get_local_index_of_address(addr);
-    size_t first_offset = ((const char*) addr) - page_addr(first_accessed_local_page);
-    const char* last_accessed_address = ((const char*) addr) + (size == 0 ? 0 : size - 1);
+    size_t first_offset = static_cast<const char*>(addr) - page_addr(first_accessed_local_page);
+    const char* last_accessed_address = static_cast<const char*>(addr) + (size == 0 ? 0 : size - 1);
     size_t last_accessed_local_page = get_local_index_of_address(last_accessed_address);
     size_t pages_size = m_page_state.size();
 

@@ -636,7 +636,7 @@ File::SizeType File::get_size() const
     File::SizeType size = get_size_static(m_fd);
 
     if (m_encryption_key) {
-        size_t ret_size = encrypted_size_to_data_size(size);
+        File::SizeType ret_size = encrypted_size_to_data_size(size);
         return ret_size;
     }
     else
