@@ -347,13 +347,12 @@ void BaseDescriptor::Sorter::cache_first_column(IndexPairs& v)
     }
 }
 
-IncludeDescriptor::IncludeDescriptor(const Table& table, const std::vector<std::vector<LinkPathPart>>& column_links)
+IncludeDescriptor::IncludeDescriptor(ConstTableRef table, const std::vector<std::vector<LinkPathPart>>& column_links)
     : ColumnsDescriptor()
 {
     m_column_keys.resize(column_links.size());
     m_backlink_sources.resize(column_links.size());
-    using tf = _impl::TableFriend;
-    Group* group(tf::get_parent_group(table));
+    Group* group = table->get_parent_group();
     for (size_t i = 0; i < m_column_keys.size(); ++i) { // for each path:
         auto& columns = m_column_keys[i];
         auto& links = column_links[i];
@@ -362,7 +361,7 @@ IncludeDescriptor::IncludeDescriptor(const Table& table, const std::vector<std::
 
         columns.reserve(links.size());
         backlink_source.reserve(links.size());
-        const Table* cur_table = &table;
+        ConstTableRef cur_table = table;
         size_t link_ndx = 0;
         for (auto link : links) {  // follow path, one link at a time:
             auto col_type = link.column_key.get_type();
@@ -370,7 +369,7 @@ IncludeDescriptor::IncludeDescriptor(const Table& table, const std::vector<std::
             backlink_source.push_back(link.from);
             if (TableKey from_table_key = link.from) { // backlink
                 // must point back to cur_table:
-                Table* from_table = group->get_table(from_table_key);
+                TableRef from_table = group->get_table(from_table_key);
                 REALM_ASSERT_DEBUG(cur_table == from_table->get_opposite_table(link.column_key));
                 if (Table::is_link_type(col_type)) {
                     // FIXME: How can this ever be true - ref assert above...

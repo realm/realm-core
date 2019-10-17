@@ -873,7 +873,7 @@ void apply_ordering(DescriptorOrdering& ordering, ConstTableRef target, const pa
                 }
                 properties.emplace_back(std::move(links));
             }
-            ordering.append_include(IncludeDescriptor{*target, properties});
+            ordering.append_include(IncludeDescriptor{target, properties});
             mapping.set_allow_backlinks(backlink_paths_allowed);
         }
         else {
