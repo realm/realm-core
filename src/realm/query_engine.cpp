@@ -334,19 +334,17 @@ size_t StringNode<Equal>::_find_first_local(size_t start, size_t end)
         // with N==100k
         if (m_needles.size() < 20) {
             for (size_t i = start; i < end; ++i) {
-                auto element = m_leaf_ptr->get(i);
-                StringData value_2{element.data(), element.size()};
+                StringData element = m_leaf_ptr->get(i);
                 for (auto it = m_needles.begin(); it != not_in_set; ++it) {
-                    if (*it == value_2)
+                    if (*it == element)
                         return i;
                 }
             }
         }
         else {
             for (size_t i = start; i < end; ++i) {
-                auto element = m_leaf_ptr->get(i);
-                StringData value_2{element.data(), element.size()};
-                if (m_needles.find(value_2) != not_in_set)
+                StringData element = m_leaf_ptr->get(i);
+                if (m_needles.find(element) != not_in_set)
                     return i;
             }
         }

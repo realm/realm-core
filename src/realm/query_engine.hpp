@@ -1617,11 +1617,6 @@ protected:
     size_t m_results_start;
     size_t m_results_end;
 
-    inline BinaryData str_to_bin(const StringData& s) noexcept
-    {
-        return BinaryData(s.data(), s.size());
-    }
-
     virtual ObjKey get_key(size_t ndx) = 0;
     virtual void _search_index_init() = 0;
     virtual size_t _find_first_local(size_t start, size_t end) = 0;

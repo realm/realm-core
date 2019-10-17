@@ -3308,5 +3308,30 @@ TEST(Parser_ChainedIntEqualQueries)
     verify_query(test_context, table, query, populated_data.size());
 }
 
+TEST(Parser_TimestampNullable)
+{
+    Group g;
+    TableRef table = g.add_table("table");
+    auto a_col_key = table->add_column(type_Timestamp, "a", false);
+    auto b_col_key = table->add_column(type_Timestamp, "b", false);
+    auto obj_0 = table->create_object();
+    auto obj_1 = table->create_object();
+    obj_0.set(a_col_key, Timestamp(7, 0));
+    obj_1.set(a_col_key, Timestamp(7, 0));
+    obj_0.set(b_col_key, Timestamp(17, 0));
+    obj_1.set(b_col_key, Timestamp(17, 0));
+
+    Query q = table->where()
+      .equal(b_col_key, Timestamp(200, 0))
+      .group()
+      .equal(a_col_key, Timestamp(100, 0))
+      .Or()
+      .equal(a_col_key, Timestamp(realm::null()))
+      .end_group();
+    std::string description = q.get_description();
+    CHECK(description.find("NULL") != std::string::npos);
+    CHECK_EQUAL(description, "b == T200:0 and (a == T100:0 or a == NULL)");
+}
+
 
 #endif // TEST_PARSER
