@@ -347,7 +347,7 @@ protected:
     // - Table::get_backlink_view()
     // Return the version of the source it was created from.
     void get_dependencies(TableVersions&) const override;
-    const TableVersions& get_dependencies() const;
+    const TableVersions& get_dependency_versions() const;
 
     void do_sync();
 

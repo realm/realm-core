@@ -54,7 +54,7 @@ ConstTableView::ConstTableView(const ConstTableView& src, Transaction* tr, Paylo
     */
 
     if (was_in_sync)
-        m_last_seen_versions = get_dependencies();
+        m_last_seen_versions = get_dependency_versions();
     else
         m_last_seen_versions.clear();
     m_table = tr->import_copy_of(src.m_table);
@@ -403,7 +403,7 @@ bool ConstTableView::depends_on_deleted_object() const
 }
 
 // Return version of whatever this TableView depends on
-const TableVersions& ConstTableView::get_dependencies() const
+const TableVersions& ConstTableView::get_dependency_versions() const
 {
     m_get_dependencies_buffer.clear();
     get_dependencies(m_get_dependencies_buffer);
@@ -445,7 +445,7 @@ bool ConstTableView::is_in_sync() const
 {
     check_cookie();
 
-    return !m_table ? false : m_last_seen_versions == get_dependencies();
+    return !m_table ? false : m_last_seen_versions == get_dependency_versions();
 }
 
 void ConstTableView::sync_if_needed() const
@@ -462,7 +462,7 @@ void TableView::remove(size_t row_ndx)
     REALM_ASSERT(m_table);
     REALM_ASSERT(row_ndx < m_key_values->size());
 
-    bool sync_to_keep = m_last_seen_versions == get_dependencies();
+    bool sync_to_keep = m_last_seen_versions == get_dependency_versions();
 
     ObjKey key = m_key_values->get(row_ndx);
 
@@ -475,7 +475,7 @@ void TableView::remove(size_t row_ndx)
     // It is important to not accidentally bring us in sync, if we were
     // not in sync to start with:
     if (sync_to_keep)
-        m_last_seen_versions = get_dependencies();
+        m_last_seen_versions = get_dependency_versions();
 
     // Adjustment of row indexes greater than the removed index is done by
     // adj_row_acc_move_over or adj_row_acc_erase_row as sideeffect of the actual
@@ -487,7 +487,7 @@ void TableView::clear()
 {
     REALM_ASSERT(m_table);
 
-    bool sync_to_keep = m_last_seen_versions == get_dependencies();
+    bool sync_to_keep = m_last_seen_versions == get_dependency_versions();
 
     _impl::TableFriend::batch_erase_rows(get_parent(), *m_key_values); // Throws
 
@@ -496,7 +496,7 @@ void TableView::clear()
     // It is important to not accidentally bring us in sync, if we were
     // not in sync to start with:
     if (sync_to_keep)
-        m_last_seen_versions = get_dependencies();
+        m_last_seen_versions = get_dependency_versions();
 }
 
 void ConstTableView::distinct(ColKey column)
@@ -612,7 +612,7 @@ void ConstTableView::do_sync()
 
     do_sort(m_descriptor_ordering);
 
-    m_last_seen_versions = get_dependencies();
+    m_last_seen_versions = get_dependency_versions();
 }
 
 bool ConstTableView::is_in_table_order() const
