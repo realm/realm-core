@@ -1716,20 +1716,35 @@ struct IterateTableByIndexNoPrimaryKey : Benchmark {
     {
         WrtTrans tr(db);
         TableRef t = tr.add_table(name());
+#ifdef REALM_CLUSTER_IF
         for (int i = 0; i < row_count; ++i)
             t->create_object();
+#else
+        t->add_column(type_Int, "dummy");
+        t->add_empty_row(row_count);
+#endif
         tr.commit();
 
         m_tr.reset(new WrtTrans(db));
         m_table = m_tr->get_table(name());
+    }
+    void after_all(DBRef) override
+    {
+        m_tr.reset();
     }
     void before_each(DBRef) override {}
     void after_each(DBRef) override {}
 
     void operator()(DBRef) override
     {
-        for (size_t i = 0, size = m_table->size(); i < size; ++i)
+        for (size_t i = 0, size = m_table->size(); i < size; ++i) {
+#ifdef REALM_CLUSTER_IF
             m_table->get_object(i);
+#else
+            Row r = m_table->get(i);
+            static_cast<void>(r);
+#endif
+        }
     }
 };
 
@@ -1742,9 +1757,18 @@ struct IterateTableByIndexIntPrimaryKey : IterateTableByIndexNoPrimaryKey {
     void before_all(DBRef db) override
     {
         WrtTrans tr(db);
+#ifdef REALM_CLUSTER_IF
         TableRef t = tr.get_group().add_table_with_primary_key("class_table", type_Int, "pk", false);
         for (int i = 0; i < row_count; ++i)
             t->create_object_with_primary_key(i);
+#else
+        TableRef t = tr.add_table("class_table");
+        t->add_column(type_Int, "pk");
+        t->add_empty_row(row_count);
+        for (int i = 0; i < row_count; ++i)
+            t->set_int(0, i, i);
+        t->add_search_index(0);
+#endif
         tr.commit();
 
         m_tr.reset(new WrtTrans(db));
@@ -1761,9 +1785,19 @@ struct IterateTableByIndexStringPrimaryKey : IterateTableByIndexNoPrimaryKey {
     void before_all(DBRef db) override
     {
         WrtTrans tr(db);
+
+#ifdef REALM_CLUSTER_IF
         TableRef t = tr.get_group().add_table_with_primary_key("class_table", type_String, "pk", false);
         for (int i = 0; i < row_count; ++i)
-            t->create_object_with_primary_key(std::to_string(i));
+            t->create_object_with_primary_key(util::to_string(i).c_str());
+#else
+        TableRef t = tr.add_table("class_table");
+        t->add_column(type_String, "pk");
+        t->add_empty_row(row_count);
+        for (int i = 0; i < row_count; ++i)
+            t->set_string(0, i, util::to_string(i).c_str());
+        t->add_search_index(0);
+#endif
         tr.commit();
 
         m_tr.reset(new WrtTrans(db));
