@@ -1408,15 +1408,13 @@ TableView Query::find_all(const DescriptorOrdering& descriptor)
 #if REALM_METRICS
     std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_FindAll);
 #endif
+    if (descriptor.is_empty()) {
+        return find_all();
+    }
+
     const size_t default_start = 0;
     const size_t default_end = size_t(-1);
     const size_t default_limit = size_t(-1);
-
-    if (descriptor.is_empty()) {
-        TableView ret(*m_table, *this, default_start, default_end, default_limit);
-        find_all(ret);
-        return ret;
-    }
 
     bool only_limit = true;
     size_t min_limit = size_t(-1);
@@ -1432,9 +1430,7 @@ TableView Query::find_all(const DescriptorOrdering& descriptor)
         }
     }
     if (only_limit) {
-        TableView ret(*m_table, *this, default_start, default_end, min_limit);
-        find_all(ret, default_start, default_end, min_limit);
-        return ret;
+        return find_all(default_start, default_end, min_limit);
     }
 
     TableView ret(*m_table, *this, default_start, default_end, default_limit);
@@ -1770,9 +1766,8 @@ Query Query::operator!()
     return q;
 }
 
-TableVersions Query::get_outside_versions() const
+void Query::get_outside_versions(TableVersions& versions) const
 {
-    TableVersions versions;
     if (m_table) {
         if (m_table_keys.empty()) {
             // Store primary table info
@@ -1794,13 +1789,9 @@ TableVersions Query::get_outside_versions() const
             }
         }
         if (m_view) {
-            TableVersions view_versions = m_view->get_dependencies();
-            for (auto e : view_versions) {
-                versions.push_back(e);
-            }
+            m_view->get_dependencies(versions);
         }
     }
-    return versions;
 }
 
 TableVersions Query::sync_view_if_needed() const
@@ -1808,7 +1799,9 @@ TableVersions Query::sync_view_if_needed() const
     if (m_view) {
         m_view->sync_if_needed();
     }
-    return get_outside_versions();
+    TableVersions ret;
+    get_outside_versions(ret);
+    return ret;
 }
 
 QueryGroup::QueryGroup(const QueryGroup& other)

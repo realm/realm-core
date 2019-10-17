@@ -263,7 +263,7 @@ public:
         return m_table;
     }
 
-    TableVersions get_outside_versions() const;
+    void get_outside_versions(TableVersions&) const;
 
     // True if matching rows are guaranteed to be returned in table order.
     bool produces_results_in_table_order() const

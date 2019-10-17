@@ -301,7 +301,7 @@ public:
     //
     // This will make the TableView empty and in sync with the highest possible table version
     // if the TableView depends on an object (LinkView or row) that has been deleted.
-    TableVersions sync_if_needed() const override;
+    void sync_if_needed() const override;
 
     // Sort m_key_values according to one column
     void sort(ColKey column, bool ascending = true);
@@ -322,7 +322,7 @@ public:
 
     // Replace the order of sort and distinct operations, bypassing manually
     // calling sort and distinct. This is a convenience method for bindings.
-    void apply_descriptor_ordering(DescriptorOrdering new_ordering);
+    void apply_descriptor_ordering(const DescriptorOrdering& new_ordering);
 
     // Gets a readable and parsable string which completely describes the sort and
     // distinct operations applied to this view.
@@ -346,7 +346,8 @@ protected:
     // - Table::get_distinct_view()
     // - Table::get_backlink_view()
     // Return the version of the source it was created from.
-    TableVersions get_dependencies() const override;
+    void get_dependencies(TableVersions&) const override;
+    const TableVersions& get_dependency_versions() const;
 
     void do_sync();
 
@@ -375,6 +376,7 @@ protected:
     size_t m_limit = size_t(-1);
 
     mutable TableVersions m_last_seen_versions;
+    mutable TableVersions m_get_dependencies_buffer;
 
 private:
     KeyColumn m_table_view_key_values; // We should generally not use this name

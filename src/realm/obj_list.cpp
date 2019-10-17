@@ -121,3 +121,10 @@ void ObjList::assign(KeyColumn* key_values, const Table* parent)
     m_key_values = key_values;
     m_table = ConstTableRef(parent);
 }
+
+TableVersions ObjList::get_dependency_versions() const
+{
+    TableVersions ret;
+    get_dependencies(ret);
+    return ret;
+}

@@ -541,26 +541,19 @@ LnkLst::LnkLst(const Obj& owner, ColKey col_key)
 {
 }
 
-TableVersions LnkLst::get_dependencies() const
+void LnkLst::get_dependencies(TableVersions& versions) const
 {
-    TableVersions versions;
     if (is_attached()) {
         auto table = get_table();
         versions.emplace_back(table->get_key(), table->get_content_version());
     }
-    return versions;
 }
 
-TableVersions LnkLst::sync_if_needed() const
+void LnkLst::sync_if_needed() const
 {
-    TableVersions versions;
     if (this->is_attached()) {
         const_cast<LnkLst*>(this)->update_if_needed();
-        auto table = get_table();
-        auto version = table->get_content_version();
-        versions.emplace_back(table->get_key(), version);
     }
-    return versions;
 }
 
 namespace realm {
