@@ -770,11 +770,11 @@ void EncryptedFileMapping::write_barrier(const void* addr, size_t size) noexcept
             write_and_update_all(first_accessed_local_page, first_offset, last_offset + 1);
         }
         else
-            write_and_update_all(first_accessed_local_page, first_offset, 1 << m_page_shift);
+            write_and_update_all(first_accessed_local_page, first_offset, static_cast<size_t>(1) << m_page_shift);
     }
     for (size_t idx = first_accessed_local_page + 1; idx < last_accessed_local_page && idx < pages_size; ++idx) {
         REALM_ASSERT(is(m_page_state[idx], UpToDate));
-        write_and_update_all(idx, 0, 1 << m_page_shift);
+        write_and_update_all(idx, 0, static_cast<size_t>(1) << m_page_shift);
     }
     if (first_accessed_local_page < last_accessed_local_page && last_accessed_local_page < pages_size) {
         REALM_ASSERT(is(m_page_state[last_accessed_local_page], UpToDate));
