@@ -1932,9 +1932,7 @@ void ClusterTree::enumerate_string_column(ColKey col_key)
         return false; // Continue
     };
 
-    auto upgrade = [col_key, &keys](Cluster* cluster) {
-        cluster->upgrade_string_to_enum(col_key, keys);
-    };
+    auto upgrade = [col_key, &keys](Cluster* cluster) { cluster->upgrade_string_to_enum(col_key, keys); };
 
     // Populate 'keys' array
     traverse(collect_strings);

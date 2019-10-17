@@ -59,10 +59,10 @@ public:
     // Construct a FunctionRef which wraps the given callable.
     template <typename F>
     constexpr FunctionRef(F&& f) noexcept
-    : m_obj(const_cast<void*>(reinterpret_cast<const void*>(std::addressof(f))))
-    , m_callback([](void* obj, Args... args) -> Return {
-        return (*reinterpret_cast<typename std::add_pointer<F>::type>(obj))(std::forward<Args>(args)...);
-    })
+        : m_obj(const_cast<void*>(reinterpret_cast<const void*>(std::addressof(f))))
+        , m_callback([](void* obj, Args... args) -> Return {
+            return (*reinterpret_cast<typename std::add_pointer<F>::type>(obj))(std::forward<Args>(args)...);
+        })
     {
     }
 

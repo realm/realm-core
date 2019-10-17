@@ -263,9 +263,9 @@ public:
         return DescriptorType::Include;
     }
     void append(const IncludeDescriptor& other);
-    void
-    report_included_backlinks(const Table* origin, ObjKey object,
-                              util::FunctionRef<void(const Table*, const std::unordered_set<ObjKey>&)> reporter) const;
+    void report_included_backlinks(
+        const Table* origin, ObjKey object,
+        util::FunctionRef<void(const Table*, const std::unordered_set<ObjKey>&)> reporter) const;
 
     Sorter sorter(Table const&, const IndexPairs&) const override
     {

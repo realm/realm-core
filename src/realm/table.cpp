@@ -2999,8 +2999,7 @@ void Table::change_nullability(ColKey key_from, ColKey key_to, bool throw_on_nul
 {
     Allocator& allocator = this->get_alloc();
     bool from_nullability = is_nullable(key_from);
-    auto func = [key_from, key_to, throw_on_null, from_nullability,
-                                        &allocator](Cluster* cluster) {
+    auto func = [key_from, key_to, throw_on_null, from_nullability, &allocator](Cluster* cluster) {
         size_t sz = cluster->node_size();
 
         typename ColumnTypeTraits<F>::cluster_leaf_type from_arr(allocator);
@@ -3032,8 +3031,7 @@ void Table::change_nullability_list(ColKey key_from, ColKey key_to, bool throw_o
 {
     Allocator& allocator = this->get_alloc();
     bool from_nullability = is_nullable(key_from);
-    auto func = [key_from, key_to, throw_on_null, from_nullability,
-                                        &allocator](Cluster* cluster) {
+    auto func = [key_from, key_to, throw_on_null, from_nullability, &allocator](Cluster* cluster) {
         size_t sz = cluster->node_size();
 
         ArrayInteger from_arr(allocator);
