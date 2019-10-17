@@ -74,10 +74,10 @@ public:
         return size_t(back()) >> 1;
     }
 
-    ref_type bptree_insert(size_t n, State& state, InsertFunc&) override;
-    void bptree_access(size_t n, AccessFunc&) override;
-    size_t bptree_erase(size_t n, EraseFunc&) override;
-    bool bptree_traverse(TraverseFunc&) override;
+    ref_type bptree_insert(size_t n, State& state, InsertFunc) override;
+    void bptree_access(size_t n, AccessFunc) override;
+    size_t bptree_erase(size_t n, EraseFunc) override;
+    bool bptree_traverse(TraverseFunc) override;
     void verify() const override;
 
     // Other modifiers
@@ -150,7 +150,7 @@ BPlusTreeNode::~BPlusTreeNode()
 
 /****************************** BPlusTreeLeaf ********************************/
 
-ref_type BPlusTreeLeaf::bptree_insert(size_t ndx, State& state, InsertFunc& func)
+ref_type BPlusTreeLeaf::bptree_insert(size_t ndx, State& state, InsertFunc func)
 {
     size_t leaf_size = get_node_size();
     REALM_ASSERT_DEBUG(leaf_size <= REALM_MAX_BPNODE_SIZE);
@@ -180,17 +180,17 @@ ref_type BPlusTreeLeaf::bptree_insert(size_t ndx, State& state, InsertFunc& func
     return new_leaf->get_ref();
 }
 
-void BPlusTreeLeaf::bptree_access(size_t ndx, AccessFunc& func)
+void BPlusTreeLeaf::bptree_access(size_t ndx, AccessFunc func)
 {
     func(this, ndx);
 }
 
-size_t BPlusTreeLeaf::bptree_erase(size_t ndx, EraseFunc& func)
+size_t BPlusTreeLeaf::bptree_erase(size_t ndx, EraseFunc func)
 {
     return func(this, ndx);
 }
 
-bool BPlusTreeLeaf::bptree_traverse(TraverseFunc& func)
+bool BPlusTreeLeaf::bptree_traverse(TraverseFunc func)
 {
     return func(this, 0);
 }
@@ -230,7 +230,7 @@ void BPlusTreeInner::init_from_mem(MemRef mem)
     }
 }
 
-void BPlusTreeInner::bptree_access(size_t n, AccessFunc& func)
+void BPlusTreeInner::bptree_access(size_t n, AccessFunc func)
 {
     size_t child_ndx;
     size_t child_offset;
@@ -262,7 +262,7 @@ void BPlusTreeInner::bptree_access(size_t n, AccessFunc& func)
     }
 }
 
-ref_type BPlusTreeInner::bptree_insert(size_t ndx, State& state, InsertFunc& func)
+ref_type BPlusTreeInner::bptree_insert(size_t ndx, State& state, InsertFunc func)
 {
     size_t child_ndx;
     size_t child_offset;
@@ -313,7 +313,7 @@ ref_type BPlusTreeInner::bptree_insert(size_t ndx, State& state, InsertFunc& fun
     return insert_child(child_ndx, new_sibling_ref, state);
 }
 
-size_t BPlusTreeInner::bptree_erase(size_t n, EraseFunc& func)
+size_t BPlusTreeInner::bptree_erase(size_t n, EraseFunc func)
 {
     ensure_offsets();
 
@@ -419,7 +419,7 @@ size_t BPlusTreeInner::bptree_erase(size_t n, EraseFunc& func)
     return num_children;
 }
 
-bool BPlusTreeInner::bptree_traverse(TraverseFunc& func)
+bool BPlusTreeInner::bptree_traverse(TraverseFunc func)
 {
     size_t sz = get_node_size();
     for (size_t i = 0; i < sz; i++) {
@@ -709,7 +709,7 @@ void BPlusTreeBase::replace_root(std::unique_ptr<BPlusTreeNode> new_root)
     m_root = std::move(new_root);
 }
 
-void BPlusTreeBase::bptree_insert(size_t n, BPlusTreeNode::InsertFunc& func)
+void BPlusTreeBase::bptree_insert(size_t n, BPlusTreeNode::InsertFunc func)
 {
     size_t bptree_size = m_root->get_tree_size();
     if (n == bptree_size) {
@@ -735,7 +735,7 @@ void BPlusTreeBase::bptree_insert(size_t n, BPlusTreeNode::InsertFunc& func)
     }
 }
 
-void BPlusTreeBase::bptree_erase(size_t n, BPlusTreeNode::EraseFunc& func)
+void BPlusTreeBase::bptree_erase(size_t n, BPlusTreeNode::EraseFunc func)
 {
     size_t root_size = m_root->bptree_erase(n, func);
     while (!m_root->is_leaf() && root_size == 1) {

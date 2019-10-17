@@ -900,8 +900,7 @@ R Query::aggregate(ColKey column_key, size_t* resultcount, ObjKey* return_ndx) c
             auto node = root_node();
             bool nullable = m_table->is_nullable(column_key);
 
-            using TRV = ClusterTree::TraverseFunction;
-            TRV f = [column_key, nullable, &leaf, &node, &st, this](const Cluster* cluster) {
+            auto f = [column_key, nullable, &leaf, &node, &st, this](const Cluster* cluster) {
                 size_t e = cluster->node_size();
                 node->set_cluster(cluster);
                 cluster->init_leaf(column_key, &leaf);
@@ -1236,7 +1235,7 @@ ObjKey Query::find()
     else {
         auto node = root_node();
         ObjKey key;
-        ClusterTree::TraverseFunction f = [&node, &key](const Cluster* cluster) {
+        auto f = [&node, &key](const Cluster* cluster) {
             size_t end = cluster->node_size();
             node->set_cluster(cluster);
             size_t res = node->find_first(0, end);
@@ -1279,7 +1278,7 @@ void Query::find_all(ConstTableView& ret, size_t begin, size_t end, size_t limit
         if (!has_conditions()) {
             KeyColumn* refs = ret.m_key_values;
 
-            ClusterTree::TraverseFunction f = [&begin, &end, &limit, refs](const Cluster* cluster) {
+            auto f = [&begin, &end, &limit, refs](const Cluster* cluster) {
                 size_t e = cluster->node_size();
                 if (begin < e) {
                     if (e > end) {
@@ -1307,7 +1306,7 @@ void Query::find_all(ConstTableView& ret, size_t begin, size_t end, size_t limit
             auto node = root_node();
             QueryState<int64_t> st(act_FindAll, ret.m_key_values, limit);
 
-            ClusterTree::TraverseFunction f = [&begin, &end, &node, &st, this](const Cluster* cluster) {
+            auto f = [&begin, &end, &node, &st, this](const Cluster* cluster) {
                 size_t e = cluster->node_size();
                 if (begin < e) {
                     if (e > end) {
@@ -1376,7 +1375,7 @@ size_t Query::do_count(size_t limit) const
         auto node = root_node();
         QueryState<int64_t> st(act_Count, limit);
 
-        ClusterTree::TraverseFunction f = [&node, &st, this](const Cluster* cluster) {
+        auto f = [&node, &st, this](const Cluster* cluster) {
             size_t e = cluster->node_size();
             node->set_cluster(cluster);
             st.m_key_offset = cluster->get_offset();

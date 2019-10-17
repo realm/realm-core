@@ -157,6 +157,7 @@ set(REALM_INSTALL_UTIL_HEADERS
     util/fifo_helper.hpp
     util/file.hpp
     util/file_mapper.hpp
+    util/function_ref.hpp
     util/hex_dump.hpp
     util/inspect.hpp
     util/interprocess_condvar.hpp

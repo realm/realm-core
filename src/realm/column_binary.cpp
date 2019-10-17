@@ -34,7 +34,7 @@ BinaryData BinaryColumn::get_at(size_t ndx, size_t& pos) const noexcept
     else {
         BinaryData value;
 
-        BPlusTreeNode::AccessFunc func = [&value, &pos](BPlusTreeNode* node, size_t ndx_in_leaf) {
+        auto func = [&value, &pos](BPlusTreeNode* node, size_t ndx_in_leaf) {
             LeafNode* leaf = static_cast<LeafNode*>(node);
             value = leaf->get_at(ndx_in_leaf, pos);
         };

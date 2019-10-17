@@ -465,7 +465,7 @@ void IncludeDescriptor::append(const IncludeDescriptor& other)
 
 void IncludeDescriptor::report_included_backlinks(
     const Table* origin, ObjKey obj,
-    std::function<void(const Table*, const std::unordered_set<ObjKey>&)> reporter) const
+    util::FunctionRef<void(const Table*, const std::unordered_set<ObjKey>&)> reporter) const
 {
     REALM_ASSERT_DEBUG(origin);
     REALM_ASSERT_DEBUG(obj);

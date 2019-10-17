@@ -443,8 +443,8 @@ TEST(Query_TableInitialization)
 
     enum class Mode { Direct, Link, LinkList };
 
-    // note: using std::function<> rather than auto&& here for the sake of compilation speed
-    auto test_query_expression = [&](std::function<Table&()> get_table, Mode mode) {
+    // note: using FunctionRef rather than auto&& here for the sake of compilation speed
+    auto test_query_expression = [&](util::FunctionRef<Table&()> get_table, Mode mode) {
         auto test_operator = [&](auto&& op, auto&& column, auto&& v) {
             if (mode != Mode::LinkList)
                 helper([&](Query&, auto&& test) { test(op(column(), column())); });

@@ -33,7 +33,7 @@ R Table::aggregate(ColKey column_key, T value, size_t* resultcount, ObjKey* retu
     QueryState<ResultType> st(action);
     LeafType leaf(get_alloc());
 
-    ClusterTree::TraverseFunction f = [value, &leaf, column_key, &st, nullable](const Cluster* cluster) {
+    auto f = [value, &leaf, column_key, &st, nullable](const Cluster* cluster) {
         // direct aggregate on the leaf
         cluster->init_leaf(column_key, &leaf);
         Aggregate<action, T> aggr(leaf, nullable);

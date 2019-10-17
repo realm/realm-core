@@ -1288,7 +1288,7 @@ TEST(LangBindHelper_AdvanceReadTransact_CascadeRemove_ColumnLink)
     ObjKey target_key0, target_key1;
     ConstObj target_obj0, target_obj1;
 
-    auto perform_change = [&](std::function<void(Table&)> func) {
+    auto perform_change = [&](util::FunctionRef<void(Table&)> func) {
         // Ensure there are two rows in each table, with each row in `origin`
         // pointing to the corresponding row in `target`
         {
@@ -1378,7 +1378,7 @@ TEST(LangBindHelper_AdvanceReadTransact_CascadeRemove_ColumnLinkList)
 
     ConstRow target_row_0, target_row_1;
 
-    auto perform_change = [&](std::function<void(Table&)> func) {
+    auto perform_change = [&](util::FunctionRef<void(Table&)> func) {
         // Ensure there are two rows in each table, with the first row in `origin`
         // linking to the first row in `target`, and the second row in `origin`
         // linking to both rows in `target`
@@ -1439,7 +1439,7 @@ TEST(LangBindHelper_AdvanceReadTransact_CascadeRemove_ColumnLinkList)
     ObjKey target_key0, target_key1;
     ConstObj target_obj0, target_obj1;
 
-    auto perform_change = [&](std::function<void(Table&)> func) {
+    auto perform_change = [&](util::FunctionRef<void(Table&)> func) {
         // Ensure there are two rows in each table, with each row in `origin`
         // pointing to the corresponding row in `target`
         {
