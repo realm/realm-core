@@ -1,18 +1,15 @@
-# NEXT RELEASE
-
-### Enhancements
-* None.
+# 6.0.0-alpha.22 Release notes
 
 ### Fixed
 * Opening a file where the size is a multiplum of 64 MB will crash. ([#3418](https://github.com/realm/realm-core/issues/3418), since v6.0.0-alpha.0)
+* If a Replication object was deleted before the DB object the program would crash. ([#3416](https://github.com/realm/realm-core/issues/3416), since v6.0.0-alpha.0)
+* Migration of a nullable list would fail.
+* Using Query::and_query could crash. (Used by List::filter in realm-object-store)
  
-### Breaking changes
-* None.
-
 -----------
 
 ### Internals
-* None.
+* Several performance improvements.
 
 Besides the changes above, this release includes changes introduced by v5.23.4 to v5.23.5:
 
