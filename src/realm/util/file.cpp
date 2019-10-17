@@ -708,7 +708,7 @@ void File::prealloc(size_t size)
     size_t new_size = size;
     if (m_encryption_key) {
         new_size = static_cast<size_t>(data_size_to_encrypted_size(size));
-        REALM_ASSERT(size == encrypted_size_to_data_size(new_size));
+        REALM_ASSERT(size == static_cast<size_t>(encrypted_size_to_data_size(new_size)));
         if (new_size < size) {
             throw util::runtime_error("File size overflow: data_size_to_encrypted_size("
                                       + realm::util::to_string(size) + ") == " + realm::util::to_string(new_size));
@@ -729,6 +729,7 @@ void File::prealloc(size_t size)
     };
 
     auto consume_space_interlocked = [&] {
+#if REALM_ENABLE_ENCRYPTION
         if (m_encryption_key) {
             // We need to prevent concurrent calls to lseek from the encryption layer
             // while we're writing to the file to extend it. Otherwise an intervening
@@ -739,6 +740,9 @@ void File::prealloc(size_t size)
         else {
             manually_consume_space();
         }
+#else
+        manually_consume_space();
+#endif
     };
 
 #if defined(_POSIX_C_SOURCE) && _POSIX_C_SOURCE >= 200112L // POSIX.1-2001 version
