@@ -260,7 +260,6 @@ GroupWriter::~GroupWriter() = default;
 size_t GroupWriter::get_file_size() const noexcept
 {
     auto sz = to_size_t(m_alloc.get_file().get_size());
-    REALM_ASSERT(m_alloc.matches_section_boundary(sz));
     return sz;
 }
 
@@ -828,13 +827,6 @@ ref_type GroupWriter::write_array(const char* data, size_t size, uint32_t checks
     REALM_ASSERT_RELEASE(is_aligned(dest_addr));
     window->encryption_read_barrier(dest_addr, size);
     memcpy(dest_addr, &checksum, 4);
-/*
-    for (unsigned i = 4; i < size; ++i) {
-        dest_addr[i] = data[i];
-        sched_yield();
-    }
-    sched_yield();
-*/
     memcpy(dest_addr + 4, data + 4, size - 4);
     window->encryption_write_barrier(dest_addr, size);
     // return ref of the written array

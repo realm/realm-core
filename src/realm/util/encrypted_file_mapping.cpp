@@ -754,8 +754,9 @@ void EncryptedFileMapping::sync() noexcept
 
 void EncryptedFileMapping::write_barrier(const void* addr, size_t size) noexcept
 {
-    REALM_ASSERT(m_access == File::access_ReadWrite);
+    // Propagate changes to all other decrypted pages mapping the same memory
 
+    REALM_ASSERT(m_access == File::access_ReadWrite);
     size_t first_accessed_local_page = get_local_index_of_address(addr);
     size_t first_offset = ((const char*) addr) - page_addr(first_accessed_local_page);
     const char* last_accessed_address = ((const char*) addr) + (size == 0 ? 0 : size - 1);
@@ -764,7 +765,6 @@ void EncryptedFileMapping::write_barrier(const void* addr, size_t size) noexcept
 
     if (first_accessed_local_page < pages_size) {
         REALM_ASSERT(is(m_page_state[first_accessed_local_page], UpToDate));
-        //write_page(first_accessed_local_page);
         if (first_accessed_local_page == last_accessed_local_page) {
             size_t last_offset = last_accessed_address - page_addr(first_accessed_local_page);
             write_and_update_all(first_accessed_local_page, first_offset, last_offset + 1);
@@ -773,15 +773,11 @@ void EncryptedFileMapping::write_barrier(const void* addr, size_t size) noexcept
             write_and_update_all(first_accessed_local_page, first_offset, 1 << m_page_shift);
     }
     for (size_t idx = first_accessed_local_page + 1; idx < last_accessed_local_page && idx < pages_size; ++idx) {
-        // Pages written must earlier on have been decrypted
-        // by a call to read_barrier().
         REALM_ASSERT(is(m_page_state[idx], UpToDate));
-        //write_page(idx);
         write_and_update_all(idx, 0, 1 << m_page_shift);
     }
     if (first_accessed_local_page < last_accessed_local_page && last_accessed_local_page < pages_size) {
         REALM_ASSERT(is(m_page_state[last_accessed_local_page], UpToDate));
-        //write_page(last_accessed_local_page);
         size_t last_offset = last_accessed_address - page_addr(last_accessed_local_page);
         write_and_update_all(last_accessed_local_page, 0, last_offset + 1);
     }
