@@ -259,7 +259,9 @@ GroupWriter::~GroupWriter() = default;
 
 size_t GroupWriter::get_file_size() const noexcept
 {
-    return to_size_t(m_alloc.get_file().get_size());
+    auto sz = to_size_t(m_alloc.get_file().get_size());
+    REALM_ASSERT(m_alloc.matches_section_boundary(sz));
+    return sz;
 }
 
 void GroupWriter::sync_all_mappings()
@@ -792,6 +794,7 @@ GroupWriter::FreeListElement GroupWriter::extend_free_space(size_t requested_siz
     // lock at this time, and in non-transactional mode it is the responsibility
     // of the user to ensure non-concurrent file mutation.
     m_alloc.resize_file(new_file_size); // Throws
+    REALM_ASSERT(new_file_size <= get_file_size());
 #if REALM_ALLOC_DEBUG
     std::cout << "        ** File extension to " << new_file_size << "     after request for " << requested_size
               << std::endl;

@@ -635,8 +635,11 @@ File::SizeType File::get_size() const
     REALM_ASSERT_RELEASE(is_attached());
     File::SizeType size = get_size_static(m_fd);
 
-    if (m_encryption_key)
-        return encrypted_size_to_data_size(size);
+    if (m_encryption_key) {
+        size_t ret_size = encrypted_size_to_data_size(size);
+        REALM_ASSERT_RELEASE(size = data_size_to_encrypted_size(ret_size));
+        return ret_size;
+    }
     else
         return size;
 }
@@ -706,6 +709,7 @@ void File::prealloc(size_t size)
     size_t new_size = size;
     if (m_encryption_key) {
         new_size = static_cast<size_t>(data_size_to_encrypted_size(size));
+        REALM_ASSERT(size == encrypted_size_to_data_size(new_size));
         if (new_size < size) {
             throw util::runtime_error("File size overflow: data_size_to_encrypted_size("
                                       + realm::util::to_string(size) + ") == " + realm::util::to_string(new_size));
@@ -713,9 +717,10 @@ void File::prealloc(size_t size)
     }
 
     auto manually_consume_space = [&]() {
+        UniqueLock lock(util::mapping_mutex);
         constexpr size_t chunk_size = 4096;
-        int64_t original_size = get_size_static(m_fd);
-        seek(original_size);
+        int64_t original_size = get_size_static(m_fd); // raw size
+        seek(original_size); // seek to end - or?
         size_t num_bytes = size_t(new_size - original_size);
         std::string zeros(chunk_size, '\0');
         while (num_bytes > 0) {
