@@ -191,6 +191,7 @@ inline auto& List::as<Obj>() const
 template<typename Fn>
 auto List::dispatch(Fn&& fn) const
 {
+    verify_attached();
     return switch_on_type(get_type(), std::forward<Fn>(fn));
 }
 

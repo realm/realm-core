@@ -399,9 +399,6 @@ private:
     // that's actually fully working
     bool m_dynamic_schema = true;
 
-    // File format versions populated when a file format upgrade takes place during realm opening
-    int upgrade_initial_version = 0, upgrade_final_version = 0;
-
     // True while sending the notifications caused by advancing the read
     // transaction version, to avoid recursive notifications where possible
     bool m_is_sending_notifications = false;
@@ -460,9 +457,6 @@ public:
         IncompatibleLockFile,
         /** Thrown if the file needs to be upgraded to a new format, but upgrades have been explicitly disabled. */
         FormatUpgradeRequired,
-        /** Thrown if the local copy of a synced Realm file was created using an incompatible version of Realm.
-         The specified path is where the local file was moved for recovery. */
-        IncompatibleSyncedRealm,
     };
     RealmFileException(Kind kind, std::string path, std::string message, std::string underlying)
     : std::runtime_error(std::move(message)), m_kind(kind), m_path(std::move(path)), m_underlying(std::move(underlying)) {}

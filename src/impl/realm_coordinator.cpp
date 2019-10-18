@@ -75,6 +75,18 @@ std::shared_ptr<RealmCoordinator> RealmCoordinator::get_coordinator(const Realm:
     return coordinator;
 }
 
+std::shared_ptr<RealmCoordinator> RealmCoordinator::get_existing_coordinator(StringData path)
+{
+    std::lock_guard<std::mutex> lock(s_coordinator_mutex);
+
+    auto& weak_coordinator = s_coordinators_per_path[path];
+    if (auto coordinator = weak_coordinator.lock()) {
+        return coordinator;
+    }
+
+    return {};
+}
+
 void RealmCoordinator::create_sync_session(bool force_client_resync, bool validate_sync_history)
 {
 #if REALM_ENABLE_SYNC
@@ -214,7 +226,7 @@ ThreadSafeReference RealmCoordinator::get_unbound_realm()
 }
 
 void RealmCoordinator::do_get_realm(Realm::Config config, std::shared_ptr<Realm>& realm,
-                  std::unique_lock<std::mutex>& realm_lock, bool bind_to_context)
+                                    std::unique_lock<std::mutex>& realm_lock, bool bind_to_context)
 {
     open_db();
 
@@ -378,14 +390,6 @@ REALM_NOINLINE void translate_file_exception(StringData path, bool immutable)
 } // namespace _impl
 } // namespace realm
 
-#if REALM_ENABLE_SYNC
-static bool is_nonupgradable_history(IncompatibleHistories const& ex)
-{
-    // FIXME: Replace this with a proper specific exception type once Core adds support for it.
-    return std::string(ex.what()).find(std::string("Incompatible histories. Nonupgradable history schema")) != npos;
-}
-#endif
-
 void RealmCoordinator::open_db()
 {
     if (m_db || m_read_only_group)
@@ -428,27 +432,7 @@ void RealmCoordinator::open_db()
         options.encryption_key = m_config.encryption_key.data();
         options.allow_file_format_upgrade = !m_config.disable_format_upgrade
                                          && m_config.schema_mode != SchemaMode::ResetFile;
-#if 0 // FIXME: needed by js only
-        options.upgrade_callback = [&](int from_version, int to_version) {
-            if (realm) {
-                realm->upgrade_initial_version = from_version;
-                realm->upgrade_final_version = to_version;
-            }
-        };
-#endif
         m_db = DB::create(*m_history, options);
-
-        if (!m_config.should_compact_on_launch_function)
-            return;
-
-        size_t free_space = 0;
-        size_t used_space = 0;
-        if (auto tr = m_db->start_write(false)) {
-            tr->commit();
-            m_db->get_stats(free_space, used_space);
-        }
-        if (free_space > 0 && m_config.should_compact_on_launch_function(free_space + used_space, used_space))
-            m_db->compact();
     }
     catch (realm::FileFormatUpgradeRequired const&) {
         if (m_config.schema_mode != SchemaMode::ResetFile) {
@@ -466,26 +450,24 @@ void RealmCoordinator::open_db()
     }
 #if REALM_ENABLE_SYNC
     catch (IncompatibleHistories const& ex) {
-        if (!server_synchronization_mode || !is_nonupgradable_history(ex))
-            translate_file_exception(m_config.path, m_config.immutable()); // Throws
-
-        // Move the Realm file into the recovery directory.
-        std::string recovery_directory = SyncManager::shared().recovery_directory_path(m_config.sync_config ? m_config.sync_config->recovery_directory : none);
-        std::string new_realm_path = util::reserve_unique_file_name(recovery_directory, "synced-realm-XXXXXXX");
-        util::File::move(m_config.path, new_realm_path);
-
-        const char* message = "The local copy of this synced Realm was created with an incompatible version of "
-                              "Realm. It has been moved aside, and the Realm will be re-downloaded the next time it "
-                              "is opened. You should write a handler for this error that uses the provided "
-                              "configuration to open the old Realm in read-only mode to recover any pending changes "
-                              "and then remove the Realm file.";
-        throw RealmFileException(RealmFileException::Kind::IncompatibleSyncedRealm, std::move(new_realm_path),
-                                 message, ex.what());
+        translate_file_exception(m_config.path, m_config.immutable()); // Throws
     }
 #endif // REALM_ENABLE_SYNC
     catch (...) {
         translate_file_exception(m_config.path, m_config.immutable());
     }
+
+    if (!m_config.should_compact_on_launch_function)
+        return;
+
+    size_t free_space = 0;
+    size_t used_space = 0;
+    if (auto tr = m_db->start_write(true)) {
+        tr->commit();
+        m_db->get_stats(free_space, used_space);
+    }
+    if (free_space > 0 && m_config.should_compact_on_launch_function(free_space + used_space, used_space))
+        m_db->compact();
 }
 
 void RealmCoordinator::close()

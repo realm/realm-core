@@ -90,6 +90,6 @@ inline IncludeDescriptor generate_include_from_keypaths(std::vector<StringData> 
         }
         properties.push_back(std::move(links));
     }
-    return IncludeDescriptor{*base_table, properties};
+    return IncludeDescriptor{base_table, properties};
 }
 }

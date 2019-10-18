@@ -276,12 +276,15 @@ void SyncMetadataManager::make_file_action_metadata(StringData original_name,
     // This function can't use get_shared_realm() because it's called on a
     // background thread and that's currently not supported by the libuv
     // implementation of EventLoopSignal
-    std::unique_ptr<Group> read_only_group;
-    auto realm = _impl::RealmCoordinator::get_coordinator(m_metadata_config)->get_realm();
-    realm->begin_transaction();
+    auto coordinator = _impl::RealmCoordinator::get_coordinator(m_metadata_config);
+    auto group_ptr = coordinator->begin_read();
+    auto& group = *group_ptr;
+    REALM_ASSERT(typeid(group) == typeid(Transaction));
+    auto& transaction = static_cast<Transaction&>(group);
+    transaction.promote_to_write();
 
     // Retrieve or create the row for this object.
-    TableRef table = ObjectStore::table_for_object_type(realm->read_group(), c_sync_fileActionMetadata);
+    TableRef table = ObjectStore::table_for_object_type(group, c_sync_fileActionMetadata);
 
     auto& schema = m_file_action_schema;
     auto obj_key = table->find_first_string(schema.idx_original_name, original_name);
@@ -297,7 +300,7 @@ void SyncMetadataManager::make_file_action_metadata(StringData original_name,
     obj.set(schema.idx_action, static_cast<int64_t>(action));
     obj.set(schema.idx_url, url);
     obj.set(schema.idx_user_identity, local_uuid);
-    realm->commit_transaction();
+    transaction.commit();
 }
 
 util::Optional<SyncFileActionMetadata> SyncMetadataManager::get_file_action_metadata(StringData original_name) const

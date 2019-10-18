@@ -519,50 +519,50 @@ UnsupportedSchemaChange::UnsupportedSchemaChange()
 }
 
 namespace transaction {
-void advance(Transaction& sg, BindingContext*, VersionID version)
+void advance(Transaction& tr, BindingContext*, VersionID version)
 {
     TransactLogValidator validator;
-    sg.advance_read(&validator, version);
+    tr.advance_read(&validator, version);
 }
 
-void advance(const std::shared_ptr<Transaction>& sg, BindingContext* context, NotifierPackage& notifiers)
+void advance(const std::shared_ptr<Transaction>& tr, BindingContext* context, NotifierPackage& notifiers)
 {
-    advance_with_notifications(context, sg, [&](auto&&... args) {
-        sg->advance_read(std::move(args)..., notifiers.version().value_or(VersionID{}));
+    advance_with_notifications(context, tr, [&](auto&&... args) {
+        tr->advance_read(std::move(args)..., notifiers.version().value_or(VersionID{}));
     }, notifiers);
 }
 
-void begin(const std::shared_ptr<Transaction>& sg, BindingContext* context, NotifierPackage& notifiers)
+void begin(const std::shared_ptr<Transaction>& tr, BindingContext* context, NotifierPackage& notifiers)
 {
-    advance_with_notifications(context, sg, [&](auto&&... args) {
-        sg->promote_to_write(std::move(args)...);
+    advance_with_notifications(context, tr, [&](auto&&... args) {
+        tr->promote_to_write(std::move(args)...);
     }, notifiers);
 }
 
-void cancel(Transaction& sg, BindingContext* context)
+void cancel(Transaction& tr, BindingContext* context)
 {
     std::vector<BindingContext::ObserverState> observers;
     if (context) {
         observers = context->get_observed_rows();
     }
     if (observers.empty()) {
-        sg.rollback_and_continue_as_read();
+        tr.rollback_and_continue_as_read();
         return;
     }
 
     _impl::NotifierPackage notifiers;
-    KVOTransactLogObserver o(observers, context, notifiers, sg);
-    sg.rollback_and_continue_as_read(&o);
+    KVOTransactLogObserver o(observers, context, notifiers, tr);
+    tr.rollback_and_continue_as_read(&o);
 }
 
-void advance(Transaction& sg, TransactionChangeInfo& info, VersionID version)
+void advance(Transaction& tr, TransactionChangeInfo& info, VersionID version)
 {
     if (!info.track_all && info.tables.empty() && info.lists.empty()) {
-        sg.advance_read(version);
+        tr.advance_read(version);
     }
     else {
         TransactLogObserver o(info);
-        sg.advance_read(&o, version);
+        tr.advance_read(&o, version);
     }
 }
 

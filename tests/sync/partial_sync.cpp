@@ -939,7 +939,7 @@ TEST_CASE("Query-based Sync link behaviour", "[sync]") {
         TableRef table_c = ObjectStore::table_for_object_type(realm->read_group(), "link_target");
         const auto& link_prop = *os_a.property_for_name("link");
         partial_sync::SubscriptionOptions options;
-        options.inclusions = IncludeDescriptor(*table_c, {{LinkPathPart(link_prop.column_key, table_a)}});
+        options.inclusions = IncludeDescriptor(table_c, {{LinkPathPart(link_prop.column_key, table_a)}});
         auto subscription = subscribe_and_wait("TRUEPREDICATE", partial_config, "link_target", options, [&c_objects](Results results, std::exception_ptr) {
             // all a objects that have a valid link, no b objects, all c objects
             REQUIRE(verify_results(results.get_realm(),

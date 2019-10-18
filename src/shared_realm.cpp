@@ -803,10 +803,10 @@ bool Realm::can_deliver_notifications() const noexcept
 
 uint64_t Realm::get_schema_version(const Realm::Config &config)
 {
-    auto coordinator = RealmCoordinator::get_coordinator(config);
+    auto coordinator = RealmCoordinator::get_coordinator(config.path);
     auto version = coordinator->get_schema_version();
     if (version == ObjectStore::NotVersioned)
-        version = ObjectStore::get_schema_version(*coordinator->begin_read());
+        version = ObjectStore::get_schema_version(coordinator->get_realm(config)->read_group());
     return version;
 }
 
@@ -825,15 +825,6 @@ void Realm::close()
     m_binding_context = nullptr;
     m_coordinator = nullptr;
 }
-
-util::Optional<int> Realm::file_format_upgraded_from_version() const
-{
-    if (upgrade_initial_version != upgrade_final_version) {
-        return upgrade_initial_version;
-    }
-    return util::none;
-}
-
 
 AuditInterface* Realm::audit_context() const noexcept
 {

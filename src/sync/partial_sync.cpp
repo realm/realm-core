@@ -20,9 +20,9 @@
 
 #include "impl/collection_notifier.hpp"
 #include "impl/notification_wrapper.hpp"
-#include "impl/object_accessor_impl.hpp"
 #include "impl/realm_coordinator.hpp"
 #include "object_schema.hpp"
+#include "object_store.hpp"
 #include "results.hpp"
 #include "shared_realm.hpp"
 #include "sync/impl/work_queue.hpp"
@@ -347,10 +347,10 @@ Obj write_subscription(std::string const& object_type, std::string const& name, 
     }
 
     // Find existing subscription (if any)
-    auto row_ndx = table->find_first_string(columns.name, name);
+    auto obj_key = table->find_first_string(columns.name, name);
     Obj subscription;
-    if (row_ndx) {
-        subscription = table->get_object(row_ndx);
+    if (obj_key) {
+        subscription = table->get_object(obj_key);
         // Check that we don't attempt to replace an existing query with a query on a new type.
         // There is nothing that prevents Sync from handling this, but allowing it will complicate
         // Binding API's, so for now it is disallowed.
@@ -403,8 +403,6 @@ Obj write_subscription(std::string const& object_type, std::string const& name, 
         subscription.set(columns.expires_at, calculate_expiry_date(now, *time_to_live_ms));
     }
 
-    // Fetch subscription first and return it. Cleanup needs to be performed after as it might delete subscription
-    // causing the row_ndx to change.
     cleanup_subscriptions(group, now);
     return subscription;
 }
@@ -519,7 +517,6 @@ struct Subscription::Notifier : public _impl::CollectionNotifier {
     {
     }
 
-    void release_data() noexcept override { }
     void run() override
     {
         std::unique_lock<std::mutex> lock(m_mutex);
@@ -807,9 +804,8 @@ SubscriptionState Subscription::state() const
 
     // In some cases the subscription already exists. In that case we just report the state of the __ResultSets object.
     if (auto object = result_set_object()) {
-        CppContext context;
-        auto state = static_cast<SubscriptionState>(any_cast<int64_t>(object->get_property_value<util::Any>(context, property_status)));
-        auto updated_at = any_cast<Timestamp>(object->get_property_value<util::Any>(context, property_updated_at));
+        auto state = static_cast<SubscriptionState>(object->get_column_value<int64_t>(property_status));
+        auto updated_at = object->get_column_value<Timestamp>(property_updated_at);
 
         if (updated_at < m_wrapper_created_at) {
             // If the `updated_at` property on an existing subscription wasn't updated after the wrapper was created,
@@ -850,8 +846,7 @@ std::exception_ptr Subscription::error() const
         return error;
 
     if (auto object = result_set_object()) {
-        CppContext context;
-        auto message = any_cast<std::string>(object->get_property_value<util::Any>(context, "error_message"));
+        auto message = object->get_column_value<StringData>("error_message");
         if (message.size())
             return make_exception_ptr(std::runtime_error(message));
     }

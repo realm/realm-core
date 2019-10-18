@@ -49,25 +49,24 @@ Permissions::AsyncOperationHandler make_handler_extracting_property(std::string 
         if (exception) {
             callback(none, exception);
         } else {
-            CppContext context;
-            auto token = any_cast<std::string>(object->get_property_value<util::Any>(context, property));
-            callback(util::make_optional<std::string>(std::move(token)), nullptr);
+            auto token = object->get_column_value<StringData>(property);
+            callback(util::make_optional<std::string>(token), nullptr);
         }
     };
 }
 
-AccessLevel extract_access_level(Object& permission, CppContext& context)
+AccessLevel extract_access_level(Object& permission)
 {
-    auto may_manage = permission.get_property_value<util::Any>(context, "mayManage");
-    if (may_manage.has_value() && any_cast<bool>(may_manage))
+    auto may_manage = permission.get_column_value<util::Optional<bool>>("mayManage");
+    if (may_manage && *may_manage)
         return AccessLevel::Admin;
 
-    auto may_write = permission.get_property_value<util::Any>(context, "mayWrite");
-    if (may_write.has_value() && any_cast<bool>(may_write))
+    auto may_write = permission.get_column_value<util::Optional<bool>>("mayWrite");
+    if (may_write && *may_write)
         return AccessLevel::Write;
 
-    auto may_read = permission.get_property_value<util::Any>(context, "mayRead");
-    if (may_read.has_value() && any_cast<bool>(may_read))
+    auto may_read = permission.get_column_value<util::Optional<bool>>("mayRead");
+    if (may_read && *may_read)
         return AccessLevel::Read;
 
     return AccessLevel::None;
@@ -89,11 +88,10 @@ int64_t ns_since_unix_epoch(const system_clock::time_point& point)
 
 Permission::Permission(Object& permission)
 {
-    CppContext context;
-    path = any_cast<std::string>(permission.get_property_value<util::Any>(context, "path"));
-    access = extract_access_level(permission, context);
-    condition = Condition(any_cast<std::string>(permission.get_property_value<util::Any>(context, "userId")));
-    updated_at = any_cast<Timestamp>(permission.get_property_value<util::Any>(context, "updatedAt"));
+    path = permission.get_column_value<StringData>("path");
+    access = extract_access_level(permission);
+    condition = Condition(permission.get_column_value<StringData>("userId"));
+    updated_at = permission.get_column_value<Timestamp>("updatedAt");
 }
 
 Permission::Permission(std::string path, AccessLevel access, Condition condition, Timestamp updated_at)
@@ -242,7 +240,6 @@ void Permissions::perform_async_operation(const std::string& object_type,
                                           const ConfigMaker& make_config)
 {;
     auto realm = Permissions::management_realm(std::move(user), make_config);
-    CppContext context;
 
     // Get the current time.
     int64_t ns_since_epoch = ns_since_unix_epoch(system_clock::now());
@@ -258,6 +255,7 @@ void Permissions::perform_async_operation(const std::string& object_type,
 
     // Write the permission object.
     realm->begin_transaction();
+    CppContext context;
     auto raw = Object::create<util::Any>(context, realm, *realm->schema().find(object_type), std::move(props), false);
     auto object = std::make_shared<_impl::NotificationWrapper<Object>>(std::move(raw));
     realm->commit_transaction();
@@ -272,20 +270,17 @@ void Permissions::perform_async_operation(const std::string& object_type,
             return;
         }
 
-        CppContext context;
-        auto status_code = object->get_property_value<util::Any>(context, "statusCode");
-        if (!status_code.has_value()) {
+        auto status_code = object->get_column_value<util::Optional<int64_t>>("statusCode");
+        if (!status_code) {
             // Continue waiting for the sync server to complete the operation.
             return;
         }
 
         // Determine whether an error happened or not.
-        if (auto code = any_cast<long long>(status_code)) {
+        if (auto code = *status_code) {
             // The permission change failed because an error was returned from the server.
-            auto status = object->get_property_value<util::Any>(context, "statusMessage");
-            std::string error_str = (status.has_value()
-                                     ? any_cast<std::string>(status)
-                                     : util::format("Error code: %1", code));
+            auto status = object->get_column_value<StringData>("statusMessage");
+            std::string error_str = status ? std::string(status) : util::format("Error code: %1", code);
             handler(nullptr, std::make_exception_ptr(PermissionActionException(error_str, code)));
         }
         else {

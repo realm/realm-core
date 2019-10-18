@@ -119,47 +119,15 @@ bool ResultsNotifier::need_to_run()
 
 void ResultsNotifier::calculate_changes()
 {
-    int64_t table_key = m_query->get_table()->get_key().value;
     if (has_run() && have_callbacks()) {
-        CollectionChangeBuilder* changes = nullptr;
-        /*
-        if (table_key == npos)
-            changes = &m_changes;
-        else if (table_ndx < m_info->tables.size())
-            changes = &m_info->tables[table_ndx];
-         */
-        auto it = m_info->tables.find(table_key);
-        if (it != m_info->tables.end())
-            changes = &it->second;
-
         std::vector<int64_t> next_rows;
         next_rows.reserve(m_run_tv.size());
         for (size_t i = 0; i < m_run_tv.size(); ++i)
             next_rows.push_back(m_run_tv[i].get_key().value);
 
-        util::Optional<IndexSet> move_candidates;
-        /*
-         // This still maybe applies to List-derived queries?
-        if (changes) {
-            auto const& moves = changes->moves;
-            for (auto& idx : m_previous_rows) {
-                if (changes->deletions.contains(idx)) {
-                    // check if this deletion was actually a move
-                    auto it = lower_bound(begin(moves), end(moves), idx,
-                                          [](auto const& a, auto b) { return a.from < b; });
-                    idx = it != moves.end() && it->from == idx ? it->to : npos;
-                }
-                else
-                    idx = changes->insertions.shift(changes->deletions.unshift(idx));
-            }
-            if (m_target_is_in_table_order && !m_descriptor_ordering.will_apply_sort())
-                move_candidates = changes->insertions;
-        }
-         */
-
         m_changes = CollectionChangeBuilder::calculate(m_previous_rows, next_rows,
                                                        get_modification_checker(*m_info, *m_query->get_table()),
-                                                       move_candidates);
+                                                       m_target_is_in_table_order);
 
         m_previous_rows = std::move(next_rows);
     }
@@ -186,7 +154,8 @@ void ResultsNotifier::run()
     m_query->sync_view_if_needed();
     m_run_tv = m_query->find_all();
     m_run_tv.apply_descriptor_ordering(m_descriptor_ordering);
-    m_last_seen_version = m_run_tv.sync_if_needed();
+    m_run_tv.sync_if_needed();
+    m_last_seen_version = m_run_tv.get_dependency_versions();
 
     calculate_changes();
 }

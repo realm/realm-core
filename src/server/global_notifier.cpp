@@ -93,8 +93,7 @@ public:
         ObjectID realm_id;
         std::string virtual_path;
         std::shared_ptr<_impl::RealmCoordinator> coordinator;
-        std::unique_ptr<Replication> history;
-        std::unique_ptr<DB> db;
+        TransactionRef transaction;
         std::queue<VersionID> versions;
         bool pending_deletion = false;
 
@@ -155,12 +154,19 @@ void GlobalNotifier::Impl::register_realm(ObjectID id, StringData path) {
             return;
 
         std::lock_guard<std::mutex> l(m_work_queue_mutex);
-        if (info->db) {
+        if (info->transaction) {
             m_logger->trace("Global notifier: sync transaction on (%1): Realm already open", info->virtual_path);
         }
         else {
             m_logger->trace("Global notifier: sync transaction on (%1): opening Realm", info->virtual_path);
-            info->coordinator->begin_read(old_version);
+            std::unique_ptr<Group> read_only_group;
+            auto config = info->coordinator->get_config();
+            config.force_sync_history = true; // FIXME: needed?
+            config.schema = util::none;
+            info->coordinator->open_with_config(config);
+            auto group_ptr = info->coordinator->begin_read(old_version);
+            REALM_ASSERT(std::dynamic_pointer_cast<Transaction>(group_ptr));
+            info->transaction = std::static_pointer_cast<Transaction>(group_ptr);
         }
         info->versions.push(new_version);
         if (info->versions.size() == 1) {
@@ -211,16 +217,14 @@ void GlobalNotifier::Impl::release_version(ObjectID id, VersionID old_version, V
         }
     }
     else {
-        auto realm = info.coordinator->get_realm();
-        TransactionRef transaction = Realm::Internal::get_transaction_ref(*realm);
-        REALM_ASSERT(transaction->get_version_of_current_transaction() == old_version);
+        Transaction& tr = *info.transaction.get();
+        REALM_ASSERT(tr.get_version_of_current_transaction() == old_version);
 
         REALM_ASSERT(!info.versions.empty() && info.versions.front() == new_version);
         info.versions.pop();
 
         if (info.versions.empty()) {
-            info.db = nullptr;
-            info.history = nullptr;
+            info.transaction = nullptr;
             m_logger->trace("Global notifier: release version on (%1): no pending versions", info.virtual_path);
 
             if (info.pending_deletion) {
@@ -229,9 +233,7 @@ void GlobalNotifier::Impl::release_version(ObjectID id, VersionID old_version, V
             }
         }
         else {
-            auto realm = info.coordinator->get_realm();
-            auto transaction = Realm::Internal::get_transaction_ref(*realm);
-            transaction::advance(*transaction, realm->m_binding_context.get(), new_version);
+            tr.advance_read(new_version);
             m_work_queue.push(&info);
             m_logger->trace("Global notifier: release version on (%1): enqueuing next version", info.virtual_path);
         }
@@ -277,9 +279,7 @@ util::Optional<GlobalNotifier::ChangeNotification> GlobalNotifier::next_changed_
         return ChangeNotification(m_impl, next->virtual_path, next->realm_id);
     }
 
-    auto realm = next->coordinator->get_realm();
-    auto& transaction = Realm::Internal::get_transaction(*realm);
-    auto old_version = transaction.get_version_of_current_transaction();
+    auto old_version = next->transaction->get_version_of_current_transaction();
     return ChangeNotification(m_impl, next->virtual_path, next->realm_id,
                               next->coordinator->get_config(),
                               old_version, next->versions.front());

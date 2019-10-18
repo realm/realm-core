@@ -324,7 +324,9 @@ Results List::sort(std::vector<std::pair<std::string, bool>> const& keypaths) co
 Results List::filter(Query q) const
 {
     verify_attached();
-    return Results(m_realm, std::dynamic_pointer_cast<LnkLst>(m_list_base), get_query().and_query(std::move(q)));
+    Query tmp(get_query());
+    tmp.and_query(std::move(q));
+    return Results(m_realm, std::dynamic_pointer_cast<LnkLst>(m_list_base), std::move(tmp));
 }
 
 Results List::as_results() const
