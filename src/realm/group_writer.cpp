@@ -869,7 +869,11 @@ void GroupWriter::commit(ref_type new_top_ref)
     using type_1 = std::remove_reference<decltype(file_header.m_file_format[0])>::type;
     REALM_ASSERT(!util::int_cast_has_overflow<type_1>(file_format_version));
     file_header.m_top_ref[slot_selector] = new_top_ref;
-    file_header.m_file_format[slot_selector] = type_1(file_format_version);
+    if (type_1(file_format_version) != file_header.m_file_format[slot_selector]) {
+        file_header.m_file_format[slot_selector] = type_1(file_format_version);
+        window->encryption_write_barrier(&file_header.m_file_format[slot_selector],
+                                         sizeof(file_header.m_file_format[slot_selector]));
+    }
 
     // When running the test suite, device synchronization is disabled
     bool disable_sync = get_disable_sync_to_disk() || m_durability == Durability::Unsafe;
@@ -880,7 +884,8 @@ void GroupWriter::commit(ref_type new_top_ref)
 
     // Make sure that that all data relating to the new snapshot is written to
     // stable storage before flipping the slot selector
-    window->encryption_write_barrier(&file_header, sizeof file_header);
+    window->encryption_write_barrier(&file_header.m_top_ref[slot_selector], 
+                                     sizeof(file_header.m_top_ref[slot_selector]));
     if (!disable_sync)
         sync_all_mappings();
 
@@ -890,7 +895,7 @@ void GroupWriter::commit(ref_type new_top_ref)
 
     // Write new selector to disk
     // FIXME: we might optimize this to write of a single page?
-    window->encryption_write_barrier(&file_header, sizeof file_header);
+    window->encryption_write_barrier(&file_header.m_flags, sizeof(file_header.m_flags));
     if (!disable_sync)
         window->sync();
 }
