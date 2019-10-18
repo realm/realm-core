@@ -155,7 +155,7 @@ void ResultsNotifier::run()
     m_run_tv = m_query->find_all();
     m_run_tv.apply_descriptor_ordering(m_descriptor_ordering);
     m_run_tv.sync_if_needed();
-    m_last_seen_version = m_run_tv.get_dependency_versions();
+    m_last_seen_version = m_run_tv.ObjList::get_dependency_versions();
 
     calculate_changes();
 }

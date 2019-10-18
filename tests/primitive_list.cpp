@@ -520,11 +520,10 @@ TEMPLATE_TEST_CASE("primitive list", ::Int, ::Bool, ::Float, ::Double, ::String,
     }
 
     SECTION("find()") {
-        // cast to T needed for vector<bool>'s wonky proxy
         for (size_t i = 0; i < values.size(); ++i) {
             CAPTURE(i);
-            REQUIRE(list.find(static_cast<T>(values[i])) == i);
-            REQUIRE(results.index_of(static_cast<T>(values[i])) == i);
+            REQUIRE(list.find<T>(values[i]) == i);
+            REQUIRE(results.index_of<T>(values[i]) == i);
 
             REQUIRE(list.find(ctx, TestType::to_any(values[i])) == i);
             REQUIRE(results.index_of(ctx, TestType::to_any(values[i])) == i);
@@ -542,27 +541,23 @@ TEMPLATE_TEST_CASE("primitive list", ::Int, ::Bool, ::Float, ::Double, ::String,
         REQUIRE(list.find(ctx, TestType::to_any(values[0])) == npos);
         REQUIRE(results.index_of(ctx, TestType::to_any(values[0])) == npos);
     }
-#if 0
     SECTION("sorted index_of()") {
-        auto subtable = table->get_subtable(0, 0);
-
         auto sorted = list.sort({{"self", true}});
         std::sort(begin(values), end(values), less());
         for (size_t i = 0; i < values.size(); ++i) {
             CAPTURE(i);
-            auto q = TestType::unwrap(values[i], [&] (auto v) { return table->get_subtable(0, 0)->column<W>(0) == v; });
-            REQUIRE(sorted.index_of(std::move(q)) == i);
+            REQUIRE(sorted.index_of<T>(values[i]) == i);
         }
 
         sorted = list.sort({{"self", false}});
         std::sort(begin(values), end(values), greater());
         for (size_t i = 0; i < values.size(); ++i) {
             CAPTURE(i);
-            auto q = TestType::unwrap(values[i], [&] (auto v) { return table->get_subtable(0, 0)->column<W>(0) == v; });
-            REQUIRE(sorted.index_of(std::move(q)) == i);
+            REQUIRE(sorted.index_of<T>(values[i]) == i);
         }
     }
 
+#if 0
     SECTION("filtered index_of()") {
         REQUIRE_THROWS(results.index_of(table->get(0)));
         auto q = TestType::unwrap(values[0], [&] (auto v) { return table->get_subtable(0, 0)->column<W>(0) != v; });

@@ -411,10 +411,7 @@ TEST_CASE("list") {
             advance_and_notify(*r);
             advance_and_notify(*r2);
 
-#if 0
-            // FIXME: not working
-            REQUIRE_INDICES(changes1.modifications, target_keys[0], 2);
-#endif
+            REQUIRE_INDICES(changes1.modifications, 0, 2);
             REQUIRE_INDICES(changes2.modifications, 3);
         }
 
