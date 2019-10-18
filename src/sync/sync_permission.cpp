@@ -280,7 +280,7 @@ void Permissions::perform_async_operation(const std::string& object_type,
         if (auto code = *status_code) {
             // The permission change failed because an error was returned from the server.
             auto status = object->get_column_value<StringData>("statusMessage");
-            std::string error_str = status ? status : util::format("Error code: %1", code);
+            std::string error_str = status ? std::string(status) : util::format("Error code: %1", code);
             handler(nullptr, std::make_exception_ptr(PermissionActionException(error_str, code)));
         }
         else {
