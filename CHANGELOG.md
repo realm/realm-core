@@ -1,19 +1,7 @@
-# NEXT RELEASE
-
-### Enhancements
-* None.
-
-### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
- 
-### Breaking changes
-* None.
-
------------
+# 6.0.0-alpha.23 Release notes
 
 ### Internals
-* None.
+* ConstTableView::get_dependency_versions() is now public. Needed by realm-object-store.
 
 ----------------------------------------------
 
