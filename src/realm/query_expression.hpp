@@ -2118,8 +2118,8 @@ public:
             }
             else {
                 std::vector<size_t> links = m_link_map.get_links(index);
-                constexpr bool only_unary_links = false;
-                Value<T> v = make_value_for_link<T>(only_unary_links, links.size());
+                constexpr bool has_only_unary_links = false;
+                Value<T> v = make_value_for_link<T>(has_only_unary_links, links.size());
                 for (size_t t = 0; t < links.size(); t++) {
                     size_t link_to = links[t];
                     v.m_storage.set(t, m_link_map.target_table()->template get<T>(col, link_to));

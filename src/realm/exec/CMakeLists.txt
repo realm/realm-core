@@ -37,6 +37,13 @@ set_target_properties(RealmBrowser PROPERTIES
 )
 target_link_libraries(RealmBrowser Core)
 
+add_executable(Realm2JSON EXCLUDE_FROM_ALL realm2json.cpp )
+set_target_properties(Realm2JSON PROPERTIES
+    OUTPUT_NAME "realm2json"
+    DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX}
+)
+target_link_libraries(Realm2JSON Core)
+
 add_executable(RealmDump EXCLUDE_FROM_ALL realm_dump.c)
 set_target_properties(RealmDump PROPERTIES
     OUTPUT_NAME "realm-dump"
