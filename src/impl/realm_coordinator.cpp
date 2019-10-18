@@ -75,6 +75,18 @@ std::shared_ptr<RealmCoordinator> RealmCoordinator::get_coordinator(const Realm:
     return coordinator;
 }
 
+std::shared_ptr<RealmCoordinator> RealmCoordinator::get_existing_coordinator(StringData path)
+{
+    std::lock_guard<std::mutex> lock(s_coordinator_mutex);
+
+    auto& weak_coordinator = s_coordinators_per_path[path];
+    if (auto coordinator = weak_coordinator.lock()) {
+        return coordinator;
+    }
+
+    return {};
+}
+
 void RealmCoordinator::create_sync_session(bool force_client_resync, bool validate_sync_history)
 {
 #if REALM_ENABLE_SYNC

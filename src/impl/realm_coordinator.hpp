@@ -51,6 +51,8 @@ public:
     static std::shared_ptr<RealmCoordinator> get_coordinator(StringData path);
     // Get the coordinator for the given config, creating it if neccesary
     static std::shared_ptr<RealmCoordinator> get_coordinator(const Realm::Config&);
+    // Get the coordinator for the given path, or null if there is none
+    static std::shared_ptr<RealmCoordinator> get_existing_coordinator(StringData path);
 
     // Get a thread-local shared Realm with the given configuration
     // If the Realm is already open on another thread, validates that the given
