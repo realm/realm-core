@@ -302,6 +302,14 @@ public:
     // This will make the TableView empty and in sync with the highest possible table version
     // if the TableView depends on an object (LinkView or row) that has been deleted.
     void sync_if_needed() const override;
+    // Return the version of the source it was created from.
+    TableVersions get_dependency_versions() const
+    {
+        TableVersions ret;
+        get_dependencies(ret);
+        return ret;
+    }
+
 
     // Sort m_key_values according to one column
     void sort(ColKey column, bool ascending = true);
@@ -345,9 +353,8 @@ protected:
     // - Query::find_all()
     // - Table::get_distinct_view()
     // - Table::get_backlink_view()
-    // Return the version of the source it was created from.
+
     void get_dependencies(TableVersions&) const override;
-    const TableVersions& get_dependency_versions() const;
 
     void do_sync();
 
@@ -376,7 +383,6 @@ protected:
     size_t m_limit = size_t(-1);
 
     mutable TableVersions m_last_seen_versions;
-    mutable TableVersions m_get_dependencies_buffer;
 
 private:
     KeyColumn m_table_view_key_values; // We should generally not use this name
