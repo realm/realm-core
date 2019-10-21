@@ -12272,11 +12272,16 @@ TEST(Query_LinksWithIndex)
     auto ll = foo->get_linklist(col_foo, ndx);
     ll->add(2);
     ll->add(4);
+
     Query q1 =
         origin->link(col_linklist).link(col_link).backlink(*foo, col_foo).column<String>(col_location) == "Fyn";
     CHECK_EQUAL(q.find(), 0);
     Query q2 = origin->link(col_linklist).link(col_link).backlink(*foo, col_foo).column<Int>(col_score) == 5;
     CHECK_EQUAL(q.find(), 0);
+
+    // Make sure that changes in the table are reflected in the query result
+    middle->set_link(col_link, 3, 1);
+    CHECK_EQUAL(q.find(), 1);
 }
 
 

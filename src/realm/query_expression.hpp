@@ -381,6 +381,11 @@ public:
     {
     }
 
+    virtual double init()
+    {
+        return 50.0; // Default dT
+    }
+
     virtual size_t find_first(size_t start, size_t end) const = 0;
     virtual void set_base_table(const Table* table) = 0;
     virtual void verify_column() const = 0;
@@ -3958,6 +3963,7 @@ inline Mixed get_mixed(const Value<T>& val)
 template <>
 inline Mixed get_mixed(const Value<RowIndex>&)
 {
+    REALM_ASSERT(false);
     return Mixed();
 }
 
@@ -3986,6 +3992,11 @@ public:
     {
         m_left->set_base_table(table);
         m_right->set_base_table(table);
+    }
+
+    double init() override
+    {
+        double dT = m_left_is_const ? 10.0 : 50.0;
         if (std::is_same<TCond, Equal>::value && m_left_is_const && m_right->has_search_index()) {
             if (m_left_value.m_storage.is_null(0)) {
                 m_matches = m_right->find_all(util::Optional<Mixed>());
@@ -4001,7 +4012,10 @@ public:
             m_has_matches = true;
             m_index_get = 0;
             m_index_end = m_matches.size();
+            dT = 0;
         }
+
+        return dT;
     }
 
     void verify_column() const override
