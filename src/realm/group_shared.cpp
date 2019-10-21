@@ -2319,7 +2319,7 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
 
         // the cleanup process may access the entire ring buffer, so make sure it is mapped.
         // this is not ensured as part of begin_read, which only makes sure that the current
-        // last entry in the buffer is available.
+        // last entry in the buffer is available. (Last entry is a get_num_entries() - 1).
         if (grow_reader_mapping(r_info->readers.get_num_entries() - 1)) { // throws
             r_info = m_reader_map.get_addr();
         }

@@ -1384,10 +1384,9 @@ void SlabAlloc::resize_file(size_t new_file_size)
     std::lock_guard<Mutex> lock(m_file_mappings->m_mutex);
     REALM_ASSERT_EX(matches_section_boundary(new_file_size), new_file_size, get_file_path_for_assertions());
     m_file_mappings->m_file.prealloc(new_file_size); // Throws
-    auto from_get_size = m_file_mappings->m_file.get_size();
     // resizing is done based on the logical file size. It is ok for the file
     // to actually be bigger, but never smaller.
-    REALM_ASSERT(new_file_size <= static_cast<size_t>(from_get_size));
+    REALM_ASSERT(new_file_size <= static_cast<size_t>(m_file_mappings->m_file.get_size()));
     bool disable_sync = get_disable_sync_to_disk() || m_cfg.disable_sync;
     if (!disable_sync)
         m_file_mappings->m_file.sync(); // Throws

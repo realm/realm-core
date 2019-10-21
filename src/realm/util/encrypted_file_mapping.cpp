@@ -545,8 +545,10 @@ void EncryptedFileMapping::write_and_update_all(size_t local_page_ndx, size_t be
                 memcpy(m->page_addr(shadow_local_page_ndx) + begin_offset,
                        page_addr(local_page_ndx) + begin_offset,
                        end_offset - begin_offset);
-            } else
+            }
+            else {
                 m->mark_outdated(shadow_local_page_ndx);
+            }
         }
     }
     set(m_page_state[local_page_ndx], Dirty);
@@ -763,6 +765,7 @@ void EncryptedFileMapping::write_barrier(const void* addr, size_t size) noexcept
     size_t last_accessed_local_page = get_local_index_of_address(last_accessed_address);
     size_t pages_size = m_page_state.size();
 
+    // propagate changes to first page (update may be partial, may also be to last page)
     if (first_accessed_local_page < pages_size) {
         REALM_ASSERT(is(m_page_state[first_accessed_local_page], UpToDate));
         if (first_accessed_local_page == last_accessed_local_page) {
@@ -772,10 +775,12 @@ void EncryptedFileMapping::write_barrier(const void* addr, size_t size) noexcept
         else
             write_and_update_all(first_accessed_local_page, first_offset, static_cast<size_t>(1) << m_page_shift);
     }
+    // propagate changes to pages between first and last page (update only full pages)
     for (size_t idx = first_accessed_local_page + 1; idx < last_accessed_local_page && idx < pages_size; ++idx) {
         REALM_ASSERT(is(m_page_state[idx], UpToDate));
         write_and_update_all(idx, 0, static_cast<size_t>(1) << m_page_shift);
     }
+    // propagate changes to the last page (update may be partial)
     if (first_accessed_local_page < last_accessed_local_page && last_accessed_local_page < pages_size) {
         REALM_ASSERT(is(m_page_state[last_accessed_local_page], UpToDate));
         size_t last_offset = last_accessed_address - page_addr(last_accessed_local_page);

@@ -868,7 +868,7 @@ void GroupWriter::commit(ref_type new_top_ref)
     int file_format_version = m_group.get_file_format_version();
     using type_1 = std::remove_reference<decltype(file_header.m_file_format[0])>::type;
     REALM_ASSERT(!util::int_cast_has_overflow<type_1>(file_format_version));
-    file_header.m_top_ref[slot_selector] = new_top_ref;
+    // only write the file format field if necessary (optimization)
     if (type_1(file_format_version) != file_header.m_file_format[slot_selector]) {
         file_header.m_file_format[slot_selector] = type_1(file_format_version);
         window->encryption_write_barrier(&file_header.m_file_format[slot_selector],
@@ -877,6 +877,7 @@ void GroupWriter::commit(ref_type new_top_ref)
 
     // When running the test suite, device synchronization is disabled
     bool disable_sync = get_disable_sync_to_disk() || m_durability == Durability::Unsafe;
+    file_header.m_top_ref[slot_selector] = new_top_ref;
 
 #if REALM_METRICS
     std::unique_ptr<MetricTimer> fsync_timer = Metrics::report_fsync_time(m_group);
