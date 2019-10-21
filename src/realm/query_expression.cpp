@@ -17,8 +17,51 @@
  **************************************************************************/
 
 #include <realm/query_expression.hpp>
+#include <realm/group.hpp>
 
 namespace realm {
+
+std::vector<size_t> LinkMap::get_origin_ndxs(size_t index, size_t column) const
+{
+    if (column == m_link_columns.size()) {
+        return {index};
+    }
+    std::vector<size_t> ndxs = get_origin_ndxs(index, column + 1);
+    std::vector<size_t> ret;
+    auto origin_col = m_link_column_indexes[column];
+    auto origin = m_tables[column];
+    auto link_type = m_link_types[column];
+    if (link_type == col_type_BackLink) {
+        auto table_ndx = origin->m_spec->get_opposite_link_table_ndx(origin_col);
+        auto link_table = origin->get_parent_group()->get_table(table_ndx);
+        size_t link_col_ndx = origin->m_spec->get_origin_column_ndx(origin_col);
+        auto forward_type = link_table->get_column_type(link_col_ndx);
+
+        for (size_t ndx : ndxs) {
+            if (forward_type == type_Link) {
+                ret.push_back(link_table->get_link(link_col_ndx, ndx));
+            }
+            else {
+                REALM_ASSERT(forward_type == type_LinkList);
+                auto ll = link_table->get_linklist(link_col_ndx, ndx);
+                auto sz = ll->size();
+                for (size_t i = 0; i < sz; i++) {
+                    ret.push_back(ll->get(i).get_index());
+                }
+            }
+        }
+    }
+    else {
+        auto target = m_tables[column + 1];
+        for (size_t ndx : ndxs) {
+            auto cnt = target->get_backlink_count(ndx, *origin, origin_col);
+            for (size_t i = 0; i < cnt; i++) {
+                ret.push_back(target->get_backlink(ndx, *origin, origin_col, i));
+            }
+        }
+    }
+    return ret;
+}
 
 void Columns<Link>::evaluate(size_t index, ValueBase& destination)
 {

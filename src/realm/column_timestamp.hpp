@@ -113,6 +113,11 @@ public:
         return npos;
     }
 
+    void find_all(IntegerColumn&, Timestamp, size_t, size_t) const
+    {
+        // Dummy implementation
+    }
+
     typedef Timestamp value_type;
 
 private:
