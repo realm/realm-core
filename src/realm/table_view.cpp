@@ -402,14 +402,6 @@ bool ConstTableView::depends_on_deleted_object() const
     return false;
 }
 
-// Return version of whatever this TableView depends on
-const TableVersions& ConstTableView::get_dependency_versions() const
-{
-    m_get_dependencies_buffer.clear();
-    get_dependencies(m_get_dependencies_buffer);
-    return m_get_dependencies_buffer;
-}
-
 void ConstTableView::get_dependencies(TableVersions& ret) const
 {
     check_cookie();
