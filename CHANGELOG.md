@@ -4,9 +4,14 @@
 * None.
 
 ### Fixed
+* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* A race between extending the file and activity in the encryption layer could lead to crash and corruption.
+  This race has been fixed. The bug was introduced with version 5.3.0 and may hit on Android, if encryption is
+  in use. It could also affect Linux on file systems where posix prealloc() is unsupported.
+  ([PR #3427](https://github.com/realm/realm-core/issues/3427), since 5.3.0)
 * Null values were not printed correctly when using json serialisation. ([PR #3399](https://github.com/realm/realm-core/issues/3399)).
 * ListOfPrimitives were not printed correctly when using json serialisation. ([#3408](https://github.com/realm/realm-core/issues/3408)).
- 
+
 ### Breaking changes
 * None.
 

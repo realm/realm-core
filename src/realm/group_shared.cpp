@@ -1178,6 +1178,7 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
 
                 SharedInfo* r_info = m_reader_map.get_addr();
                 size_t file_size = alloc.get_baseline();
+                REALM_ASSERT(m_group.m_alloc.matches_section_boundary(file_size));
                 r_info->init_versioning(top_ref, file_size, version);
             }
             else { // Not the session initiator
@@ -1821,6 +1822,8 @@ void SharedGroup::grab_read_lock(ReadLockInfo& read_lock, VersionID version_id)
             read_lock.m_version = r.version;
             read_lock.m_top_ref = to_size_t(r.current_top);
             read_lock.m_file_size = to_size_t(r.filesize);
+            REALM_ASSERT(m_group.m_alloc.matches_section_boundary(read_lock.m_file_size));
+            REALM_ASSERT(read_lock.m_file_size > read_lock.m_top_ref);
             return;
         }
     }
@@ -1855,6 +1858,8 @@ void SharedGroup::grab_read_lock(ReadLockInfo& read_lock, VersionID version_id)
         read_lock.m_version = r.version;
         read_lock.m_top_ref = to_size_t(r.current_top);
         read_lock.m_file_size = to_size_t(r.filesize);
+        REALM_ASSERT(m_group.m_alloc.matches_section_boundary(read_lock.m_file_size));
+        REALM_ASSERT(read_lock.m_file_size > read_lock.m_top_ref);
         return;
     }
 }
@@ -2258,6 +2263,7 @@ bool SharedGroup::grow_reader_mapping(uint_fast32_t index)
         // handle mapping expansion if required
         SharedInfo* r_info = m_reader_map.get_addr();
         m_local_max_entry = r_info->readers.get_num_entries();
+        REALM_ASSERT(index < m_local_max_entry);
         size_t info_size = sizeof(SharedInfo) + r_info->readers.compute_required_space(m_local_max_entry);
         // std::cout << "Growing reader mapping to " << infosize << std::endl;
         m_reader_map.remap(m_file, util::File::access_ReadWrite, info_size); // Throws
@@ -2313,8 +2319,8 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
 
         // the cleanup process may access the entire ring buffer, so make sure it is mapped.
         // this is not ensured as part of begin_read, which only makes sure that the current
-        // last entry in the buffer is available.
-        if (grow_reader_mapping(r_info->readers.get_num_entries())) { // throws
+        // last entry in the buffer is available. (Last entry is a get_num_entries() - 1).
+        if (grow_reader_mapping(r_info->readers.get_num_entries() - 1)) { // throws
             r_info = m_reader_map.get_addr();
         }
         r_info->readers.cleanup();
@@ -2379,6 +2385,8 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
         }
         Ringbuffer::ReadCount& r = r_info->readers.get_next();
         r.current_top = new_top_ref;
+        REALM_ASSERT(m_group.m_alloc.matches_section_boundary(new_file_size));
+        REALM_ASSERT(new_top_ref < new_file_size);
         r.filesize = new_file_size;
         r.version = new_version;
         r_info->readers.use_next();

@@ -136,6 +136,7 @@ private:
     bool copy_up_to_date_page(size_t local_page_ndx) noexcept;
     void refresh_page(size_t local_page_ndx);
     void write_page(size_t local_page_ndx) noexcept;
+    void write_and_update_all(size_t local_page_ndx, size_t begin_offset, size_t end_offset) noexcept;
     void reclaim_page(size_t page_ndx);
     void validate_page(size_t local_page_ndx) noexcept;
     void validate() noexcept;

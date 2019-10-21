@@ -1109,7 +1109,10 @@ inline void File::MapBase::remap(const File& f, AccessMode a, size_t size, int m
 {
     REALM_ASSERT(m_addr);
 
-    m_addr = f.remap(m_addr, m_size, a, size, map_flags);
+    //m_addr = f.remap(m_addr, m_size, a, size, map_flags);
+    // missing sync() here?
+    unmap();
+    map(f, a, size, map_flags);
     m_size = size;
     m_fd = f.m_fd;
 }

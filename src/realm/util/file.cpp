@@ -635,8 +635,10 @@ File::SizeType File::get_size() const
     REALM_ASSERT_RELEASE(is_attached());
     File::SizeType size = get_size_static(m_fd);
 
-    if (m_encryption_key)
-        return encrypted_size_to_data_size(size);
+    if (m_encryption_key) {
+        File::SizeType ret_size = encrypted_size_to_data_size(size);
+        return ret_size;
+    }
     else
         return size;
 }
@@ -706,6 +708,7 @@ void File::prealloc(size_t size)
     size_t new_size = size;
     if (m_encryption_key) {
         new_size = static_cast<size_t>(data_size_to_encrypted_size(size));
+        REALM_ASSERT(size == static_cast<size_t>(encrypted_size_to_data_size(new_size)));
         if (new_size < size) {
             throw util::runtime_error("File size overflow: data_size_to_encrypted_size("
                                       + realm::util::to_string(size) + ") == " + realm::util::to_string(new_size));
@@ -714,7 +717,7 @@ void File::prealloc(size_t size)
 
     auto manually_consume_space = [&]() {
         constexpr size_t chunk_size = 4096;
-        int64_t original_size = get_size_static(m_fd);
+        int64_t original_size = get_size_static(m_fd); // raw size
         seek(original_size);
         size_t num_bytes = size_t(new_size - original_size);
         std::string zeros(chunk_size, '\0');
@@ -725,10 +728,27 @@ void File::prealloc(size_t size)
         }
     };
 
+    auto consume_space_interlocked = [&] {
+#if REALM_ENABLE_ENCRYPTION
+        if (m_encryption_key) {
+            // We need to prevent concurrent calls to lseek from the encryption layer
+            // while we're writing to the file to extend it. Otherwise an intervening
+            // lseek may redirect the writing process, causing file corruption.
+            UniqueLock lock(util::mapping_mutex);
+            manually_consume_space();
+        }
+        else {
+            manually_consume_space();
+        }
+#else
+        manually_consume_space();
+#endif
+    };
+
 #if defined(_POSIX_C_SOURCE) && _POSIX_C_SOURCE >= 200112L // POSIX.1-2001 version
     // Mostly Linux only
     if (!prealloc_if_supported(0, new_size)) {
-        manually_consume_space();
+        consume_space_interlocked();
     }
 #else // Non-atomic fallback
 #if REALM_PLATFORM_APPLE
@@ -767,7 +787,7 @@ void File::prealloc(size_t size)
                 // space. Worst case, this might also fail, but there is also a chance it will succeed. We don't
                 // call this in the first place because using fcntl(F_PREALLOCATE) will be faster if it works (it has
                 // been reliable on HSF+).
-                manually_consume_space();
+                consume_space_interlocked();
             } else {
                 std::string msg = util::format("fcntl() inside prealloc() failed allocating %1 bytes, new_size=%2, cur_size=%3, allocated_size=%4, event: ",
                                                to_allocate, new_size, statbuf.st_size, allocated_size);
@@ -791,7 +811,7 @@ void File::prealloc(size_t size)
     }
 #elif REALM_ANDROID || defined(_WIN32)
 
-    manually_consume_space();
+    consume_space_interlocked();
 
 #else
     #error Please check if/how your OS supports file preallocation
