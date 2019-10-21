@@ -2004,6 +2004,7 @@ class ExpressionNode : public ParentNode {
 public:
     ExpressionNode(std::unique_ptr<Expression>);
 
+    void init() override;
     size_t find_first_local(size_t start, size_t end) override;
 
     void table_changed() override;
