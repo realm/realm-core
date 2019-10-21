@@ -2,6 +2,7 @@
 
 ### Enhancements
 * Performance improved for queries comparing a constant value to a property over unary link path (eg: "someLink.Id == 42"). ([#3670](https://github.com/realm/realm-core/issues/3370))
+* Performance significantly improved when making a query on the property of a linked table, when the property is indexed.
 
 # 5.14.0 Release notes
 

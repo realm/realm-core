@@ -130,6 +130,8 @@ The Columns class encapsulates all this into a simple class that, for any type T
 #include <realm/column_link.hpp>
 #include <realm/column_linklist.hpp>
 #include <realm/column_table.hpp>
+#include <realm/column_string.hpp>
+#include <realm/column_timestamp.hpp>
 #include <realm/column_type_traits.hpp>
 #include <realm/impl/sequential_getter.hpp>
 #include <realm/link_view.hpp>
@@ -139,6 +141,7 @@ The Columns class encapsulates all this into a simple class that, for any type T
 #include <realm/util/serializer.hpp>
 
 #include <numeric>
+#include <algorithm>
 
 // Normally, if a next-generation-syntax condition is supported by the old query_engine.hpp, a query_engine node is
 // created because it's faster (by a factor of 5 - 10). Because many of our existing next-generation-syntax unit
@@ -378,6 +381,11 @@ public:
     {
     }
 
+    virtual double init()
+    {
+        return 50.0; // Default dT
+    }
+
     virtual size_t find_first(size_t start, size_t end) const = 0;
     virtual void set_base_table(const Table* table) = 0;
     virtual void verify_column() const = 0;
@@ -432,6 +440,16 @@ public:
     virtual bool has_constant_evaluation() const
     {
         return false;
+    }
+
+    virtual bool has_search_index() const
+    {
+        return false;
+    }
+
+    virtual std::vector<size_t> find_all(util::Optional<Mixed>) const
+    {
+        return {};
     }
 
     virtual void evaluate(size_t index, ValueBase& destination) = 0;
@@ -1927,6 +1945,8 @@ public:
         return res;
     }
 
+    std::vector<size_t> get_origin_ndxs(size_t index, size_t column = 0) const;
+
     size_t count_links(size_t row)
     {
         CountLinks counter;
@@ -2018,7 +2038,6 @@ private:
         }
     }
 
-
     void get_links(size_t row, std::vector<size_t>& result) const
     {
         MakeLinkVector mlv = MakeLinkVector(result);
@@ -2088,6 +2107,36 @@ public:
             m_link_map.set_base_table(table);
             m_column = &m_link_map.target_table()->get_column_base(m_column_ndx);
         }
+    }
+
+    bool has_search_index() const override
+    {
+        return m_link_map.target_table()->has_search_index(m_column_ndx);
+    }
+
+    std::vector<size_t> find_all(util::Optional<Mixed> value) const override
+    {
+        std::vector<size_t> ret;
+        ref_type ref = IntegerColumn::create(Allocator::get_default());
+        IntegerColumn result;
+        result.init_from_ref(Allocator::get_default(), ref);
+
+        T val{};
+        if (value) {
+            val = value->get<T>();
+        }
+
+        auto col = dynamic_cast<const typename ColumnTypeTraits<T>::column_type*>(m_column);
+        col->find_all(result, val, 0, realm::npos);
+
+        auto sz = result.size();
+        for (size_t i = 0; i < sz; i++) {
+            auto ndxs = m_link_map.get_origin_ndxs(size_t(result.get(i)));
+            ret.insert(ret.end(), ndxs.begin(), ndxs.end());
+        }
+        result.destroy();
+
+        return ret;
     }
 
     void verify_column() const override
@@ -3173,6 +3222,45 @@ public:
         }
     }
 
+    bool has_search_index() const override
+    {
+        return m_link_map.target_table()->has_search_index(m_column_ndx);
+    }
+
+    std::vector<size_t> find_all(util::Optional<Mixed> value) const override
+    {
+        std::vector<size_t> ret;
+        ref_type ref = IntegerColumn::create(Allocator::get_default());
+        IntegerColumn result;
+        result.init_from_ref(Allocator::get_default(), ref);
+        if (m_nullable && std::is_same<typename ColType::value_type, int64_t>::value) {
+            util::Optional<int64_t> val;
+            if (value) {
+                val = value->get_int();
+            }
+            auto sgc = static_cast<SequentialGetter<IntNullColumn>*>(m_sg.get());
+            sgc->m_column->find_all(result, val, 0, realm::npos);
+        }
+        else {
+            T val{};
+            if (value) {
+                val = value->get<T>();
+            }
+            auto sgc = static_cast<SequentialGetter<ColType>*>(m_sg.get());
+            sgc->m_column->find_all(result, val, 0, realm::npos);
+        }
+
+        auto sz = result.size();
+        for (size_t i = 0; i < sz; i++) {
+            auto ndxs = m_link_map.get_origin_ndxs(size_t(result.get(i)));
+            ret.insert(ret.end(), ndxs.begin(), ndxs.end());
+        }
+        result.destroy();
+
+        return ret;
+    }
+
+
     void verify_column() const override
     {
         // verify links
@@ -3865,6 +3953,27 @@ private:
     std::unique_ptr<TRight> m_right;
 };
 
+namespace {
+template <class T>
+inline Mixed get_mixed(const Value<T>& val)
+{
+    return Mixed(val.m_storage[0]);
+}
+
+template <>
+inline Mixed get_mixed(const Value<RowIndex>&)
+{
+    REALM_ASSERT(false);
+    return Mixed();
+}
+
+template <>
+inline Mixed get_mixed(const Value<int>& val)
+{
+    return Mixed(int64_t(val.m_storage[0]));
+}
+} // namespace
+
 template <class TCond, class T, class TLeft, class TRight>
 class Compare : public Expression {
 public:
@@ -3883,6 +3992,30 @@ public:
     {
         m_left->set_base_table(table);
         m_right->set_base_table(table);
+    }
+
+    double init() override
+    {
+        double dT = m_left_is_const ? 10.0 : 50.0;
+        if (std::is_same<TCond, Equal>::value && m_left_is_const && m_right->has_search_index()) {
+            if (m_left_value.m_storage.is_null(0)) {
+                m_matches = m_right->find_all(util::Optional<Mixed>());
+            }
+            else {
+                m_matches = m_right->find_all(get_mixed(m_left_value));
+            }
+            // Sort
+            std::sort(m_matches.begin(), m_matches.end());
+            // Remove all duplicates
+            m_matches.erase(std::unique(m_matches.begin(), m_matches.end()), m_matches.end());
+
+            m_has_matches = true;
+            m_index_get = 0;
+            m_index_end = m_matches.size();
+            dT = 0;
+        }
+
+        return dT;
     }
 
     void verify_column() const override
@@ -3907,6 +4040,28 @@ public:
 
     size_t find_first(size_t start, size_t end) const override
     {
+        if (m_has_matches) {
+            if (m_index_end == 0)
+                return not_found;
+
+            if (start <= m_index_last_start)
+                m_index_get = 0;
+            else
+                m_index_last_start = start;
+
+            while (m_index_get < m_index_end) {
+                size_t ndx = m_matches[m_index_get];
+                if (ndx >= end) {
+                    break;
+                }
+                m_index_get++;
+                if (ndx >= start) {
+                    return ndx;
+                }
+            }
+            return not_found;
+        }
+
         size_t match;
 
         Value<T> left;
@@ -3979,6 +4134,11 @@ private:
     std::unique_ptr<TRight> m_right;
     bool m_left_is_const;
     Value<T> m_left_value;
+    bool m_has_matches = false;
+    std::vector<size_t> m_matches;
+    mutable size_t m_index_get = 0;
+    mutable size_t m_index_last_start = 0;
+    size_t m_index_end = 0;
 };
 }
 #endif // REALM_QUERY_EXPRESSION_HPP
