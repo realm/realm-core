@@ -2131,7 +2131,7 @@ public:
 
         auto sz = result.size();
         for (size_t i = 0; i < sz; i++) {
-            auto ndxs = m_link_map.get_origin_ndxs(result.get(i));
+            auto ndxs = m_link_map.get_origin_ndxs(size_t(result.get(i)));
             ret.insert(ret.end(), ndxs.begin(), ndxs.end());
         }
         result.destroy();
@@ -3252,7 +3252,7 @@ public:
 
         auto sz = result.size();
         for (size_t i = 0; i < sz; i++) {
-            auto ndxs = m_link_map.get_origin_ndxs(result.get(i));
+            auto ndxs = m_link_map.get_origin_ndxs(size_t(result.get(i)));
             ret.insert(ret.end(), ndxs.begin(), ndxs.end());
         }
         result.destroy();
