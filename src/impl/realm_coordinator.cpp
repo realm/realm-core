@@ -1007,7 +1007,6 @@ void RealmCoordinator::advance_to_ready(Realm& realm)
             if (*version == current_version) {
                 if (realm.m_binding_context)
                     realm.m_binding_context->will_send_notifications();
-                notifiers.deliver(*sg);
                 notifiers.after_advance();
                 if (realm.m_binding_context)
                     realm.m_binding_context->did_send_notifications();
@@ -1107,14 +1106,6 @@ void RealmCoordinator::process_available_async(Realm& realm)
             return;
     }
 
-    // Skip delivering if the Realm isn't in a read transaction
-    if (in_read) {
-        auto& sg = Realm::Internal::get_transaction(realm);
-        for (auto& notifier : notifiers)
-            notifier->deliver(sg);
-    }
-
-    // but still call the change callbacks
     for (auto& notifier : notifiers)
         notifier->after_advance();
 

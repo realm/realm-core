@@ -33,14 +33,9 @@ public:
 private:
     TableKey m_table;
     ObjKey m_obj;
-
-    // The actual change, calculated in run() and delivered in prepare_handover()
-    CollectionChangeBuilder m_change;
     TransactionChangeInfo* m_info;
 
     void run() override;
-
-    void do_prepare_handover(Transaction&) override;
 
     bool do_add_required_change_info(TransactionChangeInfo& info) override;
 };

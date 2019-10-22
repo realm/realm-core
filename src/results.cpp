@@ -314,15 +314,17 @@ void Results::evaluate_query_if_needed(bool wants_notifications)
                 break;
             }
             m_query.sync_view_if_needed();
-            m_table_view = m_query.find_all(m_descriptor_ordering);
+            if (m_update_policy == UpdatePolicy::Auto)
+                m_table_view = m_query.find_all(m_descriptor_ordering);
             m_mode = Mode::TableView;
             REALM_FALLTHROUGH;
         case Mode::TableView:
-            if (wants_notifications)
+            if (wants_notifications && !m_notifier)
                 prepare_async(ForCallback{false});
             else if (m_notifier)
                 m_notifier->get_tableview(m_table_view);
-            m_table_view.sync_if_needed();
+            if (m_update_policy == UpdatePolicy::Auto)
+                m_table_view.sync_if_needed();
             if (auto audit = m_realm->audit_context())
                 audit->record_query(m_realm->read_transaction_version(), m_table_view);
             break;
@@ -578,6 +580,7 @@ void Results::clear()
                 case UpdatePolicy::Auto:
                     m_table_view.clear();
                     break;
+                case UpdatePolicy::AsyncOnly:
                 case UpdatePolicy::Never: {
                     // Copy the TableView because a frozen Results shouldn't let its size() change.
                     TableView copy(m_table_view);
@@ -623,6 +626,9 @@ Query Results::get_query() const
         case Mode::List:
             return m_query;
         case Mode::TableView: {
+            if (const_cast<Query&>(m_query).get_table())
+                return m_query;
+
             // A TableView has an associated Query if it was produced by Query::find_all. This is indicated
             // by TableView::get_query returning a Query with a non-null table.
             Query query = m_table_view.get_query();

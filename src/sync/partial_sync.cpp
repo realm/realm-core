@@ -523,18 +523,8 @@ struct Subscription::Notifier : public _impl::CollectionNotifier {
         if (m_has_results_to_deliver) {
             // Mark the object as being modified so that CollectionNotifier is aware
             // that there are changes to deliver.
-            m_changes.modify(0);
+            m_change.modify(0);
         }
-    }
-
-    void deliver(Transaction&) override
-    {
-        std::unique_lock<std::mutex> lock(m_mutex);
-        m_error = m_pending_error;
-        m_pending_error = nullptr;
-
-        m_state = m_pending_state;
-        m_has_results_to_deliver = false;
     }
 
     void finished_subscribing(std::exception_ptr error)
@@ -585,23 +575,23 @@ struct Subscription::Notifier : public _impl::CollectionNotifier {
 private:
     void do_attach_to(Transaction&) override { }
 
-    void do_prepare_handover(Transaction&) override
-    {
-        add_changes(std::move(m_changes));
-    }
-
     bool do_add_required_change_info(_impl::TransactionChangeInfo&) override { return false; }
     bool prepare_to_deliver() override
     {
         std::lock_guard<std::mutex> lock(m_mutex);
-        return m_has_results_to_deliver;
+        m_error = m_pending_error;
+        m_pending_error = nullptr;
+
+        m_state = m_pending_state;
+        bool had_results = m_has_results_to_deliver;
+        m_has_results_to_deliver = false;
+        return had_results;
 
     }
 
     _impl::RealmCoordinator *m_coordinator;
 
     mutable std::mutex m_mutex;
-    _impl::CollectionChangeBuilder m_changes;
     std::exception_ptr m_pending_error = nullptr;
     std::exception_ptr m_error = nullptr;
     bool m_has_results_to_deliver = false;

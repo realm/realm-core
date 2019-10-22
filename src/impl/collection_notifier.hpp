@@ -145,10 +145,6 @@ public:
     // precondition: RealmCoordinator::m_notifier_mutex is locked
     bool package_for_delivery();
 
-    // Deliver the new state to the target collection using the given Transaction
-    // precondition: RealmCoordinator::m_notifier_mutex is unlocked
-    virtual void deliver(Transaction&) { }
-
     // Pass the given error to all registered callbacks, then remove them
     // precondition: RealmCoordinator::m_notifier_mutex is unlocked
     void deliver_error(std::exception_ptr);
@@ -191,9 +187,12 @@ protected:
     bool all_related_tables_covered(const TableVersions& versions);
     std::function<bool (size_t)> get_modification_checker(TransactionChangeInfo const&, Table const&);
 
+    // The actual change, calculated in run() and delivered in prepare_handover()
+    CollectionChangeBuilder m_change;
+
 private:
     virtual void do_attach_to(Transaction&) { }
-    virtual void do_prepare_handover(Transaction&) = 0;
+    virtual void do_prepare_handover(Transaction&) { }
     virtual bool do_add_required_change_info(TransactionChangeInfo&) = 0;
     virtual bool prepare_to_deliver() { return true; }
 

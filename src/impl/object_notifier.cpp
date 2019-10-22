@@ -62,8 +62,3 @@ void ObjectNotifier::run()
             m_change.columns[col.first].add(0);
     }
 }
-
-void ObjectNotifier::do_prepare_handover(Transaction&)
-{
-    add_changes(std::move(m_change));
-}

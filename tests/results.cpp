@@ -975,6 +975,126 @@ TEST_CASE("notifications: skip") {
     }
 }
 
+TEST_CASE("notifications: TableView delivery") {
+    _impl::RealmCoordinator::assert_no_open_realms();
+
+    InMemoryTestFile config;
+    config.automatic_change_notifications = false;
+
+    auto r = Realm::get_shared_realm(config);
+    r->update_schema({
+        {"object", {
+            {"value", PropertyType::Int}
+        }},
+    });
+
+    auto coordinator = _impl::RealmCoordinator::get_coordinator(config.path);
+    auto table = r->read_group().get_table("class_object");
+    auto col = table->get_column_key("value");
+
+    r->begin_transaction();
+    for (int i = 0; i < 10; ++i)
+        table->create_object().set(col, i * 2);
+    r->commit_transaction();
+
+    Results results(r, table->where());
+    results.set_update_policy(Results::UpdatePolicy::AsyncOnly);
+
+    SECTION("Initial run never happens with no callbacks") {
+        advance_and_notify(*r);
+        REQUIRE(results.get_mode() == Results::Mode::Query);
+    }
+
+    results.evaluate_query_if_needed();
+    // Create and immediately remove a callback so that the notifier gets created
+    // even though we have automatic change notifications disabled
+    static_cast<void>(results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {}));
+    REQUIRE(results.get_mode() == Results::Mode::TableView);
+    REQUIRE(results.size() == 0);
+
+    auto make_local_change = [&] {
+        r->begin_transaction();
+        table->create_object();
+        r->commit_transaction();
+    };
+
+    auto make_remote_change = [&] {
+        auto r2 = coordinator->get_realm();
+        r2->begin_transaction();
+        r2->read_group().get_table("class_object")->create_object();
+        r2->commit_transaction();
+    };
+
+    SECTION("does not update after local change with no on_change") {
+        make_local_change();
+        REQUIRE(results.size() == 0);
+    }
+
+    SECTION("TV is delivered when no commit is made") {
+        advance_and_notify(*r);
+        REQUIRE(results.get_mode() == Results::Mode::TableView);
+        REQUIRE(results.size() == 10);
+    }
+
+    SECTION("TV is not delivered when notifier version > local version") {
+        make_remote_change();
+        r->refresh();
+        REQUIRE(results.size() == 0);
+    }
+
+    SECTION("TV is delivered when notifier version = local version") {
+        make_remote_change();
+        advance_and_notify(*r);
+        REQUIRE(results.size() == 11);
+    }
+
+    SECTION("TV is delivered when previous TV wasn't used due to never refreshing") {
+        // These two generate TVs that never get used
+        make_remote_change();
+        on_change_but_no_notify(*r);
+        make_remote_change();
+        on_change_but_no_notify(*r);
+
+        // But we generate a third one anyway because the main thread never even
+        // got a chance to use them, rather than it not wanting them
+        make_remote_change();
+        advance_and_notify(*r);
+
+        REQUIRE(results.size() == 13);
+    }
+
+    SECTION("TV is not delivered when main thread refreshed but previous TV was not used") {
+        // First run generates a TV that's unused
+        make_remote_change();
+        advance_and_notify(*r);
+
+        // When the second run is delivered we discover first run wasn't used
+        make_remote_change();
+        advance_and_notify(*r);
+
+        // And then third one doesn't run at all
+        make_remote_change();
+        advance_and_notify(*r);
+
+        // And we can't use the old TV because it's out of date
+        REQUIRE(results.size() == 0);
+
+        // We don't start implicitly updating again even after it is used
+        make_remote_change();
+        advance_and_notify(*r);
+        REQUIRE(results.size() == 0);
+    }
+
+    SECTION("TV can be delivered in a write transaction") {
+        make_remote_change();
+        advance_and_notify(*r);
+        r->begin_transaction();
+        REQUIRE(results.size() == 11);
+        r->cancel_transaction();
+    }
+}
+
+
 #if REALM_PLATFORM_APPLE && NOTIFIER_BACKGROUND_ERRORS
 TEST_CASE("notifications: async error handling") {
     _impl::RealmCoordinator::assert_no_open_realms();
