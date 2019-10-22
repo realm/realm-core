@@ -910,6 +910,7 @@ public:
             IntegerNodeBase<ColType>::m_condition_column->find_all(*m_result, this->m_value, 0, realm::npos);
             m_index_get = 0;
             m_index_end = m_result->size();
+            IntegerNodeBase<ColType>::m_dT = 0;
         }
     }
 
@@ -2374,6 +2375,7 @@ class ExpressionNode : public ParentNode {
 public:
     ExpressionNode(std::unique_ptr<Expression>);
 
+    void init() override;
     size_t find_first_local(size_t start, size_t end) override;
 
     void table_changed() override;

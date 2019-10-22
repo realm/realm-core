@@ -12218,5 +12218,81 @@ TEST(Query_StringOrLongStrings)
     }
 }
 
+TEST(Query_LinksWithIndex)
+{
+    Group g;
+
+    TableRef target = g.add_table("target");
+    auto col_value = target->add_column(type_String, "value");
+    auto col_date = target->add_column(type_Timestamp, "date");
+    target->add_search_index(col_value);
+    target->add_search_index(col_date);
+
+    TableRef foo = g.add_table("foo");
+    auto col_foo = foo->add_column_link(type_LinkList, "linklist", *target);
+    auto col_location = foo->add_column(type_String, "location");
+    auto col_score = foo->add_column(type_Int, "score");
+    foo->add_search_index(col_location);
+    foo->add_search_index(col_score);
+
+    TableRef middle = g.add_table("middle");
+    auto col_link = middle->add_column_link(type_Link, "link", *target);
+
+    TableRef origin = g.add_table("origin");
+    auto col_linklist = origin->add_column_link(type_LinkList, "linklist", *middle);
+
+    std::string strings[] = {"Copenhagen", "Aarhus", "Odense", "Aalborg", "Faaborg"};
+    auto now = std::chrono::system_clock::now();
+    std::chrono::seconds d{0};
+    for (auto& str : strings) {
+        auto ndx =  target->add_empty_row();
+        target->set_string(col_value, ndx, str);
+        target->set_timestamp(col_date, ndx, Timestamp(now + d));
+        d = d + std::chrono::seconds{1};
+    }
+
+    middle->add_empty_row(5);
+
+    middle->set_link(col_link, 0, 0);
+    middle->set_link(col_link, 1, 2);
+    middle->set_link(col_link, 2, 2);
+    middle->set_link(col_link, 3, 2);
+    middle->set_link(col_link, 4, 3);
+
+    origin->add_empty_row(5);
+
+    origin->get_linklist(col_linklist, 0)->add(3);
+    origin->get_linklist(col_linklist, 1)->add(1);
+    origin->get_linklist(col_linklist, 1)->add(2);
+    origin->get_linklist(col_linklist, 2)->add(4);
+    origin->get_linklist(col_linklist, 3)->add(3);
+    origin->get_linklist(col_linklist, 4)->add(0);
+
+    Query q = origin->link(col_linklist).link(col_link).column<String>(col_value) == "Odense";
+    CHECK_EQUAL(q.find(), 0);
+    auto tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 3);
+
+    auto ndx = foo->add_empty_row();
+    foo->set_string(col_location, ndx, "Fyn");
+    foo->set_int(col_score, ndx, 5);
+    auto ll = foo->get_linklist(col_foo, ndx);
+    ll->add(2);
+    ll->add(4);
+
+    Query q1 =
+        origin->link(col_linklist).link(col_link).backlink(*foo, col_foo).column<String>(col_location) == "Fyn";
+    CHECK_EQUAL(q1.find(), 0);
+    Query q2 = origin->link(col_linklist).link(col_link).backlink(*foo, col_foo).column<Int>(col_score) == 5;
+    CHECK_EQUAL(q2.find(), 0);
+
+    // Make sure that changes in the table are reflected in the query result
+    middle->set_link(col_link, 3, 1);
+    CHECK_EQUAL(q.find(), 1);
+
+    q = origin->link(col_linklist).link(col_link).column<Timestamp>(col_date) == Timestamp(now);
+    CHECK_EQUAL(q.find(), 4);
+}
+
 
 #endif // TEST_QUERY

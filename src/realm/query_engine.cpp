@@ -633,13 +633,19 @@ size_t NotNode::find_first_no_overlap(size_t start, size_t end)
 ExpressionNode::ExpressionNode(std::unique_ptr<Expression> expression)
 : m_expression(std::move(expression))
 {
-    m_dD = 10.0;
+    m_dD = 100.0;
     m_dT = 50.0;
 }
 
 void ExpressionNode::table_changed()
 {
     m_expression->set_base_table(m_table.get());
+}
+
+void ExpressionNode::init()
+{
+    ParentNode::init();
+    m_dT = m_expression->init();
 }
 
 std::string ExpressionNode::describe(util::serializer::SerialisationState& state) const

@@ -113,6 +113,15 @@ public:
         return npos;
     }
 
+    void find_all(IntegerColumn& result, Timestamp value, size_t begin, size_t end) const
+    {
+        if (m_search_index && begin == 0 && end == npos) {
+            m_search_index->find_all(result, value); // Throws
+            return;
+        }
+        REALM_ASSERT(false);
+    }
+
     typedef Timestamp value_type;
 
 private:

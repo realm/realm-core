@@ -734,7 +734,7 @@ void File::prealloc(size_t size)
             // We need to prevent concurrent calls to lseek from the encryption layer
             // while we're writing to the file to extend it. Otherwise an intervening
             // lseek may redirect the writing process, causing file corruption.
-            UniqueLock lock(util::mapping_mutex);
+            UniqueLock lck(util::mapping_mutex);
             manually_consume_space();
         }
         else {
