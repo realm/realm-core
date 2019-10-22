@@ -104,6 +104,7 @@ public:
     void find_all(IntegerColumn&, BinaryData, size_t, size_t) const
     {
         // Dummy implementation
+        REALM_ASSERT(false);
     }
 
 
