@@ -16,9 +16,10 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "catch.hpp"
+#include "catch2/catch.hpp"
 
 #include "util/test_file.hpp"
+#include "util/test_utils.hpp"
 
 #include "list.hpp"
 #include "object.hpp"
@@ -232,7 +233,10 @@ TEST_CASE("thread safe reference") {
         ColKey col = num.get_object_schema().property_for_name("value")->column_key;
         REQUIRE(num.obj().get<Int>(col) == 7);
         auto ref = ThreadSafeReference(num);
+        bool did_run_section = false;
+
         SECTION("same realm") {
+            did_run_section = true;
             {
                 Object num = ref.resolve<Object>(r);
                 REQUIRE(num.obj().get<Int>(col) == 7);
@@ -244,6 +248,7 @@ TEST_CASE("thread safe reference") {
             REQUIRE(num.obj().get<Int>(col) == 9);
         }
         SECTION("different realm") {
+            did_run_section = true;
             {
                 SharedRealm r = Realm::get_shared_realm(config);
                 Object num = ref.resolve<Object>(r);
@@ -255,8 +260,11 @@ TEST_CASE("thread safe reference") {
             }
             REQUIRE(num.obj().get<Int>(col) == 7);
         }
-        r->refresh();
-        REQUIRE(num.obj().get<Int>(col) == 9);
+        catch2_ensure_section_run_workaround(did_run_section, "same thread", [&](){
+            r->begin_transaction(); // advance to latest version by starting a write
+            REQUIRE(num.obj().get<Int>(col) == 9);
+            r->cancel_transaction();
+        });
     }
 
     SECTION("passing over") {
@@ -520,7 +528,6 @@ TEST_CASE("thread safe reference") {
             List list(r, obj.obj(), col);
             r->commit_transaction();
 
-            auto& table = *get_table(*r, "string object");
             auto results = list.as_results().distinct({"self"}).sort({{"self", true}});
 
             REQUIRE(results.size() == 3);

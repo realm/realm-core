@@ -16,7 +16,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "catch.hpp"
+#include "catch2/catch.hpp"
 
 #include "impl/collection_notifier.hpp"
 
@@ -269,7 +269,6 @@ TEST_CASE("collection_change: calculate() table order") {
 
     auto all_modified = [](size_t) { return true; };
     auto none_modified = [](size_t) { return false; };
-    const auto npos = size_t(-1);
     bool in_table_order = true;
 
     SECTION("returns an empty set when input and output are identical") {
@@ -364,7 +363,6 @@ TEST_CASE("collection_change: calculate() sorted") {
 
     auto all_modified = [](size_t) { return true; };
     auto none_modified = [](size_t) { return false; };
-    const auto npos = size_t(-1);
 
     SECTION("returns an empty set when input and output are identical") {
         c = _impl::CollectionChangeBuilder::calculate({1, 2, 3}, {1, 2, 3}, none_modified);
