@@ -62,7 +62,7 @@ CFPtr<CFMutableDictionaryRef> build_search_dictionary(CFStringRef account, CFStr
 
     CFDictionaryAddValue(d.get(), kSecClass, kSecClassGenericPassword);
     CFDictionaryAddValue(d.get(), kSecReturnData, kCFBooleanTrue);
-    CFDictionaryAddValue(d.get(), kSecAttrAccessible, kSecAttrAccessibleAlways);
+    CFDictionaryAddValue(d.get(), kSecAttrAccessible, kSecAttrAccessibleAfterFirstUnlock);
     CFDictionaryAddValue(d.get(), kSecAttrAccount, account);
     CFDictionaryAddValue(d.get(), kSecAttrService, service);
 #if !TARGET_IPHONE_SIMULATOR
