@@ -1415,7 +1415,6 @@ TEST_CASE("SharedRealm: compact on launch") {
 
     SECTION("compact function does not get invoked if realm is open on another thread") {
         // Confirm expected sizes before and after opening the Realm
-        size_t size_before = size_t(File(config.path).get_size());
         r = Realm::get_shared_realm(config);
         REQUIRE(num_opens == 2);
         std::thread([&]{

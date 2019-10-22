@@ -63,7 +63,7 @@ TEST_CASE("sync: Connection state changes", "[sync]") {
         EventLoop::main().run_until([&] { return sessions_are_connected(*session); });
 
         std::atomic<bool> listener_called(false);
-        auto token = session->register_connection_change_callback([&](SyncSession::ConnectionState, SyncSession::ConnectionState) {
+        session->register_connection_change_callback([&](SyncSession::ConnectionState, SyncSession::ConnectionState) {
             listener_called = true;
         });
 
@@ -87,7 +87,7 @@ TEST_CASE("sync: Connection state changes", "[sync]") {
             listener1_called = true;
         });
         session->unregister_connection_change_callback(token1);
-        auto token2 = session->register_connection_change_callback([&](SyncSession::ConnectionState , SyncSession::ConnectionState) {
+        session->register_connection_change_callback([&](SyncSession::ConnectionState , SyncSession::ConnectionState) {
             listener2_called = true;
         });
 
