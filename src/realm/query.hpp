@@ -335,8 +335,8 @@ private:
     template <Action action, typename T, typename R>
     R aggregate(ColKey column_key, size_t* resultcount = nullptr, ObjKey* return_ndx = nullptr) const;
 
-    void aggregate_internal(Action TAction, DataType TSourceColumn, bool nullable, ParentNode* pn, QueryStateBase* st,
-                            size_t start, size_t end, ArrayPayload* source_column) const;
+    void aggregate_internal(ParentNode* pn, QueryStateBase* st, size_t start, size_t end,
+                            ArrayPayload* source_column) const;
 
     void find_all(ConstTableView& tv, size_t start = 0, size_t end = size_t(-1), size_t limit = size_t(-1)) const;
     size_t do_count(size_t limit = size_t(-1)) const;
