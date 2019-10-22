@@ -29,7 +29,7 @@
 #include "results.hpp"
 #include "schema.hpp"
 
-#include <realm/group_shared.hpp>
+#include <realm/db.hpp>
 #include <realm/query_engine.hpp>
 #include <realm/query_expression.hpp>
 
@@ -72,7 +72,6 @@ TEST_CASE("Benchmark object", "[benchmark]") {
 
     InMemoryTestFile config;
     config.automatic_change_notifications = false;
-    config.cache = false;
     config.schema = Schema{
         {"all types", {
             {"pk", PropertyType::Int, Property::IsPrimary{true}},
@@ -190,6 +189,8 @@ TEST_CASE("Benchmark object", "[benchmark]") {
 
         advance_and_notify(*r);
         int64_t update_int = 1;
+        ColKey col_int = table->get_column_key("int");
+        REQUIRE(col_int);
         BENCHMARK_ADVANCED("update object")(Catch::Benchmark::Chronometer meter) {
             r->begin_transaction();
             meter.measure([&d, &all_types, &update_int, &r] {
@@ -201,7 +202,7 @@ TEST_CASE("Benchmark object", "[benchmark]") {
             r->commit_transaction();
             advance_and_notify(*r);
             REQUIRE(result.size() == 1);
-            REQUIRE(result.get(0).get_int(2) == update_int);
+            REQUIRE(result.get(0).get<Int>(col_int) == update_int);
             update_int++;
         };
     }

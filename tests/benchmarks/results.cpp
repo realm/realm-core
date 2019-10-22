@@ -27,7 +27,7 @@
 #include "results.hpp"
 #include "schema.hpp"
 
-#include <realm/group_shared.hpp>
+#include <realm/db.hpp>
 #include <realm/query_engine.hpp>
 #include <realm/query_expression.hpp>
 
@@ -35,7 +35,6 @@ using namespace realm;
 
 TEST_CASE("Benchmark results", "[benchmark]") {
     InMemoryTestFile config;
-    config.cache = false;
     config.schema = Schema{
         {"object", {
             {"value", PropertyType::Int},
@@ -56,15 +55,16 @@ TEST_CASE("Benchmark results", "[benchmark]") {
     Results r(realm, *table);
 
     realm->begin_transaction();
-    table->add_empty_row(4);
-    table2->add_empty_row(4);
+    ObjKeys table_keys;
+    ObjKeys table2_keys;
+    table->create_objects(4, table_keys);
+    table2->create_objects(4, table2_keys);
+    ColKey col_link = table->get_column_key("link");
+    ColKey col_value = table->get_column_key("value");
+    ColKey col_link2 = table2->get_column_key("link");
     for (int i = 0; i < 4; ++i) {
-        table->set_int(0, i, (i + 2) % 4);
-        table->set_bool(1, i, i % 2);
-        table->set_link(3, i, 3 - i);
-
-        table2->set_int(0, i, (i + 1) % 4);
-        table2->set_link(1, i, i);
+        table->get_object(table_keys[i]).set_all((i + 2) % 4, bool(i % 2)).set(col_link, table2_keys[3 - i]);
+        table2->get_object(table2_keys[i]).set_all((i + 1) % 4).set(col_link2, table_keys[i]);
     }
     realm->commit_transaction();
     /*
@@ -76,19 +76,19 @@ TEST_CASE("Benchmark results", "[benchmark]") {
      | 3     | 1     | 1    | 1          | 2               |
      */
 
-    #define REQUIRE_ORDER(sort, ...) do { \
-        std::vector<size_t> expected = {__VA_ARGS__}; \
-        auto results = sort; \
-        REQUIRE(results.size() == expected.size()); \
-        for (size_t i = 0; i < expected.size(); ++i) \
-            REQUIRE(results.get(i).get_index() == expected[i]); \
-    } while (0)
+#define REQUIRE_ORDER(sort, ...) do { \
+ObjKeys expected({__VA_ARGS__}); \
+auto results = sort; \
+REQUIRE(results.size() == expected.size()); \
+for (size_t i = 0; i < expected.size(); ++i) \
+REQUIRE(results.get(i).get_key() == expected[i]); \
+} while (0)
 
     SECTION("basics") {
 
-        REQUIRE(r.filter(Query(table->where().less(0, 2))).size() == 2);
+        REQUIRE(r.filter(Query(table->where().less(col_value, 2))).size() == 2);
         BENCHMARK("basic filter") {
-            return r.filter(Query(table->where().less(0, 2))).size();
+            return r.filter(Query(table->where().less(col_value, 2))).size();
         };
 
         REQUIRE_ORDER((r.sort({{"value", true}})), 2, 3, 0, 1);
