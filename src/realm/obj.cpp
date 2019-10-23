@@ -477,6 +477,10 @@ inline void out_floats(std::ostream& out, T value)
 
 void out_mixed(std::ostream& out, const Mixed& val)
 {
+    if (val.is_null()) {
+        out << "null";
+        return;
+    }
     switch (val.get_type()) {
         case type_Int:
             out << val.get<Int>();
@@ -529,9 +533,6 @@ void ConstObj::to_json(std::ostream& out, size_t link_depth, std::map<std::strin
     out << "\"" << name << "\":" << this->m_key.value;
     auto col_keys = m_table->get_column_keys();
     for (auto ck : col_keys) {
-        if (is_null(ck))
-            continue;
-
         name = m_table->get_column_name(ck);
         DataType type = DataType(ck.get_type());
         if (renames[name] != "")
@@ -546,7 +547,7 @@ void ConstObj::to_json(std::ostream& out, size_t link_depth, std::map<std::strin
 
                 if ((link_depth == 0) ||
                     (link_depth == not_found && std::find(followed.begin(), followed.end(), ck) != followed.end())) {
-                    out << "{\"table\": \"" << get_target_table(ck)->get_name() << "\", \"rows\": [";
+                    out << "{\"table\": \"" << get_target_table(ck)->get_name() << "\", \"keys\": [";
                     for (size_t i = 0; i < sz; i++) {
                         if (i > 0)
                             out << ",";
@@ -573,32 +574,34 @@ void ConstObj::to_json(std::ostream& out, size_t link_depth, std::map<std::strin
 
                 out << "[";
                 for (size_t i = 0; i < sz; i++) {
-                    auto val = list->get_any(i);
-                    if (val.is_null())
-                        continue;
-
                     if (i > 0)
                         out << ",";
 
-                    out_mixed(out, val);
+                    out_mixed(out, list->get_any(i));
                 }
                 out << "]";
             }
         }
         else {
             if (type == type_Link) {
-                auto obj = get_linked_object(ck);
-                if ((link_depth == 0) ||
-                    (link_depth == not_found && std::find(followed.begin(), followed.end(), ck) != followed.end())) {
-                    out << "\"" << obj.get_key().value << "\"";
-                    break;
+                auto k = get<ObjKey>(ck);
+                if (k) {
+                    auto obj = get_linked_object(ck);
+                    if ((link_depth == 0) ||
+                        (link_depth == not_found && std::find(followed.begin(), followed.end(), ck) != followed.end())) {
+                        out << "{\"table\": \"" << get_target_table(ck)->get_name() << "\", \"key\": " << obj.get_key().value << "}";
+                        break;
+                    }
+                    else {
+                        out << "[";
+                        followed.push_back(ck);
+                        size_t new_depth = link_depth == not_found ? not_found : link_depth - 1;
+                        obj.to_json(out, new_depth, renames, followed);
+                        out << "]";
+                    }
                 }
                 else {
-                    out << "[";
-                    followed.push_back(ck);
-                    size_t new_depth = link_depth == not_found ? not_found : link_depth - 1;
-                    obj.to_json(out, new_depth, renames, followed);
-                    out << "]";
+                    out << "null";
                 }
             }
             else {

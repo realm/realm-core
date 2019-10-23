@@ -10289,4 +10289,77 @@ TEST(Query_LinkViewAnd)
     CHECK_NOT(q1.find());
 }
 
+TEST(Query_LinksWithIndex)
+{
+    Group g;
+
+    TableRef target = g.add_table("target");
+    auto col_value = target->add_column(type_String, "value");
+    auto col_date = target->add_column(type_Timestamp, "date");
+    target->add_search_index(col_value);
+    target->add_search_index(col_date);
+
+    TableRef foo = g.add_table("foo");
+    auto col_foo = foo->add_column_link(type_LinkList, "linklist", *target);
+    auto col_location = foo->add_column(type_String, "location");
+    auto col_score = foo->add_column(type_Int, "score");
+    foo->add_search_index(col_location);
+    foo->add_search_index(col_score);
+
+    TableRef middle = g.add_table("middle");
+    auto col_link = middle->add_column_link(type_Link, "link", *target);
+
+    TableRef origin = g.add_table("origin");
+    auto col_linklist = origin->add_column_link(type_LinkList, "linklist", *middle);
+
+    std::vector<StringData> strings{"Copenhagen", "Aarhus", "Odense", "Aalborg", "Faaborg"};
+    auto now = std::chrono::system_clock::now();
+    std::chrono::seconds d{0};
+    for (auto& str : strings) {
+        target->create_object().set(col_value, str).set(col_date, Timestamp(now + d));
+        d = d + std::chrono::seconds{1};
+    }
+
+    auto m0 = middle->create_object().set(col_link, target->find_first(col_value, strings[0])).get_key();
+    auto m1 = middle->create_object().set(col_link, target->find_first(col_value, strings[2])).get_key();
+    auto m2 = middle->create_object().set(col_link, target->find_first(col_value, strings[2])).get_key();
+    auto m3 = middle->create_object().set(col_link, target->find_first(col_value, strings[2])).get_key();
+    auto m4 = middle->create_object().set(col_link, target->find_first(col_value, strings[3])).get_key();
+
+    auto obj0 = origin->create_object();
+    obj0.get_linklist(col_linklist).add(m3);
+
+    auto obj1 = origin->create_object();
+    auto ll1 = obj1.get_linklist(col_linklist);
+    ll1.add(m1);
+    ll1.add(m2);
+
+    origin->create_object().get_linklist(col_linklist).add(m4);
+    origin->create_object().get_linklist(col_linklist).add(m3);
+    auto obj4 = origin->create_object();
+    obj4.get_linklist(col_linklist).add(m0);
+
+    Query q = origin->link(col_linklist).link(col_link).column<String>(col_value) == "Odense";
+    CHECK_EQUAL(q.find(), obj0.get_key());
+    auto tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 3);
+
+    auto ll = foo->create_object().set(col_location, "Fyn").set(col_score, 5).get_linklist(col_foo);
+    ll.add(target->find_first(col_value, strings[2]));
+    ll.add(target->find_first(col_value, strings[4]));
+
+    Query q1 =
+        origin->link(col_linklist).link(col_link).backlink(*foo, col_foo).column<String>(col_location) == "Fyn";
+    CHECK_EQUAL(q1.find(),  obj0.get_key());
+    Query q2 = origin->link(col_linklist).link(col_link).backlink(*foo, col_foo).column<Int>(col_score) == 5;
+    CHECK_EQUAL(q2.find(),  obj0.get_key());
+
+    // Make sure that changes in the table are reflected in the query result
+    middle->get_object(m3).set(col_link, target->find_first(col_value, strings[1]));
+    CHECK_EQUAL(q.find(), obj1.get_key());
+
+    q = origin->link(col_linklist).link(col_link).column<Timestamp>(col_date) == Timestamp(now);
+    CHECK_EQUAL(q.find(), obj4.get_key());
+}
+
 #endif // TEST_QUERY

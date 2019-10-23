@@ -1131,7 +1131,11 @@ inline void File::Map<T>::unmap() noexcept
 template <class T>
 inline T* File::Map<T>::remap(const File& f, AccessMode a, size_t size, int map_flags)
 {
-    MapBase::remap(f, a, size, map_flags);
+    //MapBase::remap(f, a, size, map_flags);
+    // missing sync() here?
+    unmap();
+    map(f, a, size, map_flags);
+
     return static_cast<T*>(m_addr);
 }
 

@@ -1151,6 +1151,7 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
 
                 SharedInfo* r_info = m_reader_map.get_addr();
                 size_t file_size = alloc.get_baseline();
+                // REALM_ASSERT(m_alloc.matches_section_boundary(file_size));
                 r_info->init_versioning(top_ref, file_size, version);
             }
             else { // Not the session initiator
@@ -1835,6 +1836,8 @@ void DB::grab_read_lock(ReadLockInfo& read_lock, VersionID version_id)
             read_lock.m_top_ref = to_size_t(r.current_top);
             read_lock.m_file_size = to_size_t(r.filesize);
             ++m_transaction_count;
+            // REALM_ASSERT(m_alloc.matches_section_boundary(read_lock.m_file_size));
+            REALM_ASSERT(read_lock.m_file_size > read_lock.m_top_ref);
             return;
         }
     }
@@ -1870,6 +1873,8 @@ void DB::grab_read_lock(ReadLockInfo& read_lock, VersionID version_id)
         read_lock.m_top_ref = to_size_t(r.current_top);
         read_lock.m_file_size = to_size_t(r.filesize);
         ++m_transaction_count;
+        // REALM_ASSERT(m_alloc.matches_section_boundary(read_lock.m_file_size));
+        REALM_ASSERT(read_lock.m_file_size > read_lock.m_top_ref);
         return;
     }
 }
@@ -2061,6 +2066,7 @@ bool DB::grow_reader_mapping(uint_fast32_t index)
         // handle mapping expansion if required
         SharedInfo* r_info = m_reader_map.get_addr();
         m_local_max_entry = r_info->readers.get_num_entries();
+        REALM_ASSERT(index < m_local_max_entry);
         size_t info_size = sizeof(SharedInfo) + r_info->readers.compute_required_space(m_local_max_entry);
         // std::cout << "Growing reader mapping to " << infosize << std::endl;
         m_reader_map.remap(m_file, util::File::access_ReadWrite, info_size); // Throws
@@ -2118,8 +2124,8 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction)
 
         // the cleanup process may access the entire ring buffer, so make sure it is mapped.
         // this is not ensured as part of begin_read, which only makes sure that the current
-        // last entry in the buffer is available.
-        if (grow_reader_mapping(r_info->readers.get_num_entries())) { // throws
+        // last entry in the buffer is available. (Last entry is a get_num_entries() - 1).
+        if (grow_reader_mapping(r_info->readers.get_num_entries() - 1)) { // throws
             r_info = m_reader_map.get_addr();
         }
         r_info->readers.cleanup();
@@ -2201,6 +2207,8 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction)
             r.filesize = new_file_size;
             r.version = new_version;
             r_info->readers.use_next();
+            // REALM_ASSERT(m_alloc.matches_section_boundary(new_file_size));
+            REALM_ASSERT(new_top_ref < new_file_size);
         }
         // At this point, the ringbuffer has been succesfully updated, and the next writer
         // can safely proceed once the writemutex has been lifted.

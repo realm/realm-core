@@ -701,6 +701,7 @@ public:
             auto index = ParentNode::m_table->get_search_index(ParentNode::m_condition_column_key);
             index->find_all(m_result, BaseType::m_value);
             m_result_get = 0;
+            IntegerNodeBase<LeafType>::m_dT = 0;
         }
     }
 
@@ -2165,6 +2166,7 @@ class ExpressionNode : public ParentNode {
 public:
     ExpressionNode(std::unique_ptr<Expression>);
 
+    void init() override;
     size_t find_first_local(size_t start, size_t end) override;
 
     void table_changed() override;

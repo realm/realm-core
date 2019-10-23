@@ -167,6 +167,49 @@ void LinkMap::map_links(size_t column, size_t row, LinkMapFunction& lm) const
     }
 }
 
+std::vector<ObjKey> LinkMap::get_origin_ndxs(ObjKey key, size_t column) const
+{
+    if (column == m_link_types.size()) {
+        return {key};
+    }
+    std::vector<ObjKey> keys = get_origin_ndxs(key, column + 1);
+    std::vector<ObjKey> ret;
+    auto origin_col = m_link_column_keys[column];
+    auto origin = m_tables[column];
+    auto link_type = m_link_types[column];
+    if (link_type == col_type_BackLink) {
+        auto link_table = origin->get_opposite_table(origin_col);
+        ColKey link_col_ndx = origin->get_opposite_column(origin_col);
+        auto forward_type = link_table->get_column_type(link_col_ndx);
+
+        for (auto k : keys) {
+            ConstObj o = link_table->get_object(k);
+            if (forward_type == type_Link) {
+                ret.push_back(o.get<ObjKey>(link_col_ndx));
+            }
+            else {
+                REALM_ASSERT(forward_type == type_LinkList);
+                auto ll = o.get_linklist(link_col_ndx);
+                auto sz = ll.size();
+                for (size_t i = 0; i < sz; i++) {
+                    ret.push_back(ll.get(i));
+                }
+            }
+        }
+    }
+    else {
+        auto target = m_tables[column + 1];
+        for (auto k : keys) {
+            ConstObj o = target->get_object(k);
+            auto cnt = o.get_backlink_count(*origin, origin_col);
+            for (size_t i = 0; i < cnt; i++) {
+                ret.push_back(o.get_backlink(*origin, origin_col, i));
+            }
+        }
+    }
+    return ret;
+}
+
 void Columns<Link>::evaluate(size_t index, ValueBase& destination)
 {
     // Destination must be of Key type. It only makes sense to
