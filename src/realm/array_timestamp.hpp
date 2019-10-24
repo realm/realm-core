@@ -34,6 +34,9 @@ public:
     using Array::get_parent;
     using Array::get_ndx_in_parent;
     using Array::get_ref;
+#ifdef REALM_DEBUG
+    using Array::verify;
+#endif
 
     static Timestamp default_value(bool nullable)
     {

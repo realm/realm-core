@@ -83,6 +83,8 @@ public:
     /// slower.
     static BinaryData get(const char* header, size_t ndx, Allocator& alloc) noexcept;
 
+    void verify() const;
+
 private:
     static constexpr size_t small_blob_max_size = 64;
 

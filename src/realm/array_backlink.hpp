@@ -79,6 +79,7 @@ public:
     {
         Array::truncate_and_destroy_children(0);
     }
+    void verify() const;
 };
 }
 

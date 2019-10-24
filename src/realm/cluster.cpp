@@ -824,12 +824,12 @@ size_t Cluster::node_size_from_header(Allocator& alloc, const char* header)
 namespace realm {
 
 template <class T>
-inline void Cluster::set_spec(T&, ColKey::Idx)
+inline void Cluster::set_spec(T&, ColKey::Idx) const
 {
 }
 
 template <>
-inline void Cluster::set_spec(ArrayString& arr, ColKey::Idx col_ndx)
+inline void Cluster::set_spec(ArrayString& arr, ColKey::Idx col_ndx) const
 {
     auto spec_ndx = m_tree_top.get_owner()->leaf_ndx2spec_ndx(col_ndx);
     arr.set_spec(const_cast<Spec*>(&m_tree_top.get_spec()), spec_ndx);
@@ -1033,6 +1033,19 @@ void Cluster::move(size_t ndx, ClusterNode* new_node, int64_t offset)
 
 Cluster::~Cluster()
 {
+}
+
+const Table* Cluster::get_owning_table() const
+{
+    return m_tree_top.get_owner();
+}
+
+ColKey Cluster::get_col_key(size_t ndx_in_parent) const
+{
+    ColKey::Idx col_ndx{unsigned(ndx_in_parent - 1)}; // <- leaf_index here. Opaque.
+    auto col_key = get_owning_table()->leaf_ndx2colkey(col_ndx);
+    REALM_ASSERT(col_key.get_index().val == col_ndx.val);
+    return col_key;
 }
 
 void Cluster::ensure_general_form()
@@ -1452,6 +1465,88 @@ void Cluster::add_leaf(ColKey col_key, ref_type ref)
     auto col_ndx = col_key.get_index();
     REALM_ASSERT((col_ndx.val + 1) == size());
     Array::insert(col_ndx.val + 1, from_ref(ref));
+}
+
+template <typename ArrayType>
+void Cluster::verify(ref_type ref, size_t index) const
+{
+    ArrayType arr(get_alloc());
+    set_spec(arr, ColKey::Idx{unsigned(index) - 1});
+    arr.set_parent(const_cast<Cluster *>(this), index);
+    arr.init_from_ref(ref);
+    arr.verify();
+}
+
+void Cluster::verify() const
+{
+#ifdef REALM_DEBUG
+    auto& spec = m_tree_top.get_spec();
+    for (size_t i = 0; i < spec.get_column_count(); i++) {
+        size_t col = spec.get_key(i).get_index().val + s_first_col_index;
+        ref_type ref = Array::get_as_ref(col);
+        auto attr = spec.get_column_attr(i);
+        if (attr.test(col_attr_List)) {
+            // FIXME: implement
+            continue;
+        }
+
+        bool nullable = attr.test(col_attr_Nullable);
+        switch (spec.get_column_type(i)) {
+            case col_type_Int:
+                if (nullable) {
+                    verify<ArrayIntNull>(ref, col);
+                }
+                else {
+                    verify<Array>(ref, col);
+                }
+                break;
+            case col_type_Bool:
+                if (nullable) {
+                    verify<ArrayBoolNull>(ref, col);
+                }
+                else {
+                    verify<ArrayBool>(ref, col);
+                }
+                break;
+            case col_type_Float:
+                if (nullable) {
+                    verify<ArrayFloatNull>(ref, col);
+                }
+                else {
+                    verify<ArrayFloat>(ref, col);
+                }
+                break;
+            case col_type_Double:
+                if (nullable) {
+                    verify<ArrayDoubleNull>(ref, col);
+                }
+                else {
+                    verify<ArrayDouble>(ref, col);
+                }
+                break;
+            case col_type_String:
+                verify<ArrayString>(ref, col);
+                break;
+            case col_type_Binary:
+                verify<ArrayBinary>(ref, col);
+                break;
+            case col_type_Timestamp:
+                verify<ArrayTimestamp>(ref, col);
+                break;
+            case col_type_Link:
+                verify<ArrayKey>(ref, col);
+                break;
+            case col_type_LinkList:
+                verify<ArrayKey>(ref, col);
+                break;
+            case col_type_BackLink:
+                verify<ArrayBacklink>(ref, col);
+                break;
+            default:
+                break;
+        }
+    }
+#endif
 }
 
 // LCOV_EXCL_START
@@ -2040,6 +2135,16 @@ void ClusterTree::remove_links()
     traverse(func);
 
     m_owner->remove_recursive(state);
+}
+
+void ClusterTree::verify() const
+{
+#ifdef REALM_DEBUG
+    traverse([](const Cluster *cluster) {
+        cluster->verify();
+        return false;
+    });
+#endif
 }
 
 

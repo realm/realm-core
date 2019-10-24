@@ -424,3 +424,23 @@ ArrayString::Type ArrayString::upgrade_leaf(size_t value_size)
 
     return m_type;
 }
+
+void ArrayString::verify() const
+{
+#ifdef REALM_DEBUG
+    switch (m_type) {
+        case Type::small_strings:
+            static_cast<ArrayStringShort*>(m_arr)->verify();
+            break;
+        case Type::medium_strings:
+            static_cast<ArraySmallBlobs*>(m_arr)->verify();
+            break;
+        case Type::big_strings:
+            static_cast<ArrayBigBlobs*>(m_arr)->verify();
+            break;
+        case Type::enum_strings:
+            static_cast<ArrayInteger*>(m_arr)->verify();
+            break;
+    }
+#endif
+}

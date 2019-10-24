@@ -969,7 +969,6 @@ private:
     friend class Transaction;
     friend class Cluster;
     friend class ClusterTree;
-    friend class ArrayBacklink;
     friend class ColKeyIterator;
     friend class ConstObj;
     friend class Obj;
