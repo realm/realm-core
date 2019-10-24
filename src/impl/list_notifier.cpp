@@ -102,8 +102,3 @@ void ListNotifier::run()
         }
     }
 }
-
-void ListNotifier::do_prepare_handover(Transaction&)
-{
-    add_changes(std::move(m_change));
-}

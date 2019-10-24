@@ -292,17 +292,27 @@ private:
     std::map<_impl::RealmCoordinator*, std::weak_ptr<_impl::RealmCoordinator>> m_published_coordinators;
 } s_worker;
 
-void advance_and_notify(Realm& realm)
+void on_change_but_no_notify(Realm& realm)
 {
     s_worker.on_change(_impl::RealmCoordinator::get_existing_coordinator(realm.config().path));
+}
+
+void advance_and_notify(Realm& realm)
+{
+    on_change_but_no_notify(realm);
     realm.notify();
 }
 
 #else // REALM_HAVE_CLANG_FEATURE(thread_sanitizer)
 
-void advance_and_notify(Realm& realm)
+void on_change_but_no_notify(Realm& realm)
 {
     _impl::RealmCoordinator::get_coordinator(realm.config().path)->on_change();
+}
+
+void advance_and_notify(Realm& realm)
+{
+    on_change_but_no_notify(realm);
     realm.notify();
 }
 #endif

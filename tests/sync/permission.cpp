@@ -247,7 +247,6 @@ TEST_CASE("Object-level Permissions") {
             auto obj_key = role_table->find_first_string(role_table->get_column_key("name"), "everyone");
             REQUIRE(obj_key);
             auto everyone = role_table->get_object(obj_key);
-            auto n = everyone.get_linklist(role_table->get_column_key("members")).find_first(user.obj().get_key());
             REQUIRE(everyone.get_linklist(role_table->get_column_key("members")).find_first(user.obj().get_key()) != npos);
 
             r->commit_transaction();

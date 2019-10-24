@@ -43,13 +43,9 @@ private:
     // when the LinkView itself is deleted
     size_t m_prev_size;
 
-    // The actual change, calculated in run() and delivered in prepare_handover()
-    CollectionChangeBuilder m_change;
     TransactionChangeInfo* m_info;
 
     void run() override;
-
-    void do_prepare_handover(Transaction&) override;
 
     void do_attach_to(Transaction& sg) override;
 

@@ -310,6 +310,8 @@ void CollectionNotifier::prepare_handover()
     REALM_ASSERT(m_sg);
     m_sg_version = m_sg->get_version_of_current_transaction();
     do_prepare_handover(*m_sg);
+    add_changes(std::move(m_change));
+    REALM_ASSERT(m_change.empty());
     m_has_run = true;
 
 #ifdef REALM_DEBUG
@@ -478,24 +480,13 @@ void NotifierPackage::before_advance()
         notifier->before_advance();
 }
 
-void NotifierPackage::deliver(Transaction& sg)
+void NotifierPackage::after_advance()
 {
     if (m_error) {
         for (auto& notifier : m_notifiers)
             notifier->deliver_error(m_error);
         return;
     }
-    // Can't deliver while in a write transaction
-    if (sg.get_transact_stage() != DB::transact_Reading)
-        return;
-    for (auto& notifier : m_notifiers)
-        notifier->deliver(sg);
-}
-
-void NotifierPackage::after_advance()
-{
-    if (m_error)
-        return;
     for (auto& notifier : m_notifiers)
         notifier->after_advance();
 }

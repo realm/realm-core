@@ -246,12 +246,15 @@ public:
     // avoid running the query twice for size() and other accessors.
     void evaluate_query_if_needed(bool wants_notifications = true);
 
-private:
     enum class UpdatePolicy {
-        Auto,  // Update automatically to reflect changes in the underlying data.
-        Never, // Never update.
+        Auto,      // Update automatically to reflect changes in the underlying data.
+        AsyncOnly, // Only update via ResultsNotifier and never run queries synchronously
+        Never,     // Never update.
     };
+    // For tests only. Use snapshot() for normal uses.
+    void set_update_policy(UpdatePolicy policy) { m_update_policy = policy; }
 
+private:
     std::shared_ptr<Realm> m_realm;
     mutable const ObjectSchema *m_object_schema = nullptr;
     Query m_query;

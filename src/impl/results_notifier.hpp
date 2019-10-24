@@ -40,9 +40,11 @@ private:
     // The TableView resulting from running the query. Will be detached unless
     // the query was (re)run since the last time the handover object was created
     TableView m_run_tv;
+
+    TransactionRef m_handover_transaction;
     std::unique_ptr<TableView> m_handover_tv;
+    TransactionRef m_delivered_transaction;
     std::unique_ptr<TableView> m_delivered_tv;
-    VersionID m_delivered_tv_version;
 
     // The table version from the last time the query was run. Used to avoid
     // rerunning the query when there's no chance of it changing.
@@ -51,14 +53,11 @@ private:
     // The rows from the previous run of the query, for calculating diffs
     std::vector<int64_t> m_previous_rows;
 
-    // The changeset calculated during run() and delivered in do_prepare_handover()
-    CollectionChangeBuilder m_changes;
     TransactionChangeInfo* m_info = nullptr;
     bool m_results_were_used = true;
 
     bool need_to_run();
     void calculate_changes();
-    void deliver(Transaction&) override;
 
     void run() override;
     void do_prepare_handover(Transaction&) override;

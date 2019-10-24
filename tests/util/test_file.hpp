@@ -75,6 +75,7 @@ struct InMemoryTestFile : TestFile {
 };
 
 void advance_and_notify(realm::Realm& realm);
+void on_change_but_no_notify(realm::Realm& realm);
 
 #if REALM_ENABLE_SYNC
 
