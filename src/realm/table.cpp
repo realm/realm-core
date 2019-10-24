@@ -345,19 +345,36 @@ ColKey Table::insert_column_link(ColKey col_key, DataType type, StringData name,
 
 void Table::remove_recursive(CascadeState& cascade_state)
 {
-    // recursive remove not relevant for free standing tables
-    if (Group* group = get_parent_group()) {
-        if (group->has_cascade_notification_handler()) {
-            cascade_state.m_group = group;
-        }
+    Group* group = get_parent_group();
+    REALM_ASSERT(group);
+    cascade_state.m_group = group;
 
-        while (!cascade_state.m_to_be_deleted.empty()) {
-            auto obj = cascade_state.m_to_be_deleted.back();
+    do {
+        cascade_state.send_notifications();
+
+        for (auto& l : cascade_state.m_to_be_nullified) {
+            Obj obj = group->get_table(l.origin_table)->get_object(l.origin_key);
+            obj.nullify_link(l.origin_col_key, l.old_target_key);
+        }
+        cascade_state.m_to_be_nullified.clear();
+
+        auto to_delete = std::move(cascade_state.m_to_be_deleted);
+        for (auto obj : to_delete) {
             auto table = group->get_table(obj.first);
-            cascade_state.m_to_be_deleted.pop_back();
             // This might add to the list of objects that should be deleted
             table->m_clusters.erase(obj.second, cascade_state);
         }
+        nullify_links(cascade_state);
+    } while (!cascade_state.m_to_be_deleted.empty() || !cascade_state.m_to_be_nullified.empty());
+}
+
+void Table::nullify_links(CascadeState& cascade_state)
+{
+    Group* group = get_parent_group();
+    REALM_ASSERT(group);
+    for (auto& to_delete : cascade_state.m_to_be_deleted) {
+        auto table = group->get_table(to_delete.first);
+        table->m_clusters.nullify_links(to_delete.second, cascade_state);
     }
 }
 
@@ -1604,15 +1621,20 @@ void Table::batch_erase_rows(const KeyColumn& keys)
     vec.erase(unique(vec.begin(), vec.end()), vec.end());
 
     if (m_spec.has_strong_link_columns() || (g && g->has_cascade_notification_handler())) {
-        CascadeState state(CascadeState::Mode::strong);
-        state.m_group = g;
+        CascadeState state(CascadeState::Mode::Strong, g);
         std::for_each(vec.begin(), vec.end(),
                       [this, &state](ObjKey k) { state.m_to_be_deleted.emplace_back(m_key, k); });
+        nullify_links(state);
         remove_recursive(state);
     }
     else {
-        CascadeState state(CascadeState::Mode::none);
-        std::for_each(vec.begin(), vec.end(), [this, &state](ObjKey k) { m_clusters.erase(k, state); });
+        CascadeState state(CascadeState::Mode::None, g);
+        for (auto k : vec) {
+            if (g) {
+                m_clusters.nullify_links(k, state);
+            }
+            m_clusters.erase(k, state);
+        }
     }
 }
 
@@ -1621,7 +1643,8 @@ void Table::clear()
 {
     size_t old_size = size();
 
-    m_clusters.clear();
+    CascadeState state(CascadeState::Mode::Strong, get_parent_group());
+    m_clusters.clear(state);
 
     bump_content_version();
     bump_storage_version();
@@ -2787,26 +2810,21 @@ void Table::create_objects(const std::vector<ObjKey>& keys)
     }
 }
 
-// Called by replication with mode = none
-void Table::do_remove_object(ObjKey key)
-{
-    CascadeState state(CascadeState::Mode::none);
-    state.m_to_be_deleted.emplace_back(m_key, key);
-    remove_recursive(state);
-}
-
 void Table::remove_object(ObjKey key)
 {
     Group* g = get_parent_group();
 
     if (m_spec.has_strong_link_columns() || (g && g->has_cascade_notification_handler())) {
-        CascadeState state(CascadeState::Mode::strong);
-        state.m_group = g;
+        CascadeState state(CascadeState::Mode::Strong, g);
         state.m_to_be_deleted.emplace_back(m_key, key);
+        nullify_links(state);
         remove_recursive(state);
     }
     else {
-        CascadeState state(CascadeState::Mode::none);
+        CascadeState state(CascadeState::Mode::None, g);
+        if (g) {
+            m_clusters.nullify_links(key, state);
+        }
         m_clusters.erase(key, state);
     }
 }
@@ -2815,13 +2833,14 @@ void Table::remove_object_recursive(ObjKey key)
 {
     size_t table_ndx = get_index_in_group();
     if (table_ndx != realm::npos) {
-        CascadeState state(CascadeState::Mode::all);
+        CascadeState state(CascadeState::Mode::All, get_parent_group());
         state.m_to_be_deleted.emplace_back(m_key, key);
+        nullify_links(state);
         remove_recursive(state);
     }
     else {
         // No links in freestanding table
-        CascadeState state(CascadeState::Mode::none);
+        CascadeState state(CascadeState::Mode::None);
         m_clusters.erase(key, state);
     }
 }

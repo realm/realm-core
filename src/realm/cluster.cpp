@@ -110,6 +110,7 @@ public:
     ObjKey get(size_t ndx, State& state) const override;
     size_t get_ndx(ObjKey key, size_t ndx) const override;
     size_t erase(ObjKey k, CascadeState& state) override;
+    void nullify_incoming_links(ObjKey key, CascadeState& state) override;
     void add(ref_type ref, int64_t key_value = 0);
 
     // Reset first (and only!) child ref and return the previous value
@@ -474,6 +475,13 @@ size_t ClusterNodeInner::erase(ObjKey key, CascadeState& state)
         }
 
         return node_size();
+    });
+}
+
+void ClusterNodeInner::nullify_incoming_links(ObjKey key, CascadeState& state)
+{
+    recurse<void>(key, [&state](ClusterNode* node, ChildInfo& child_info) {
+        node->nullify_incoming_links(child_info.key, state);
     });
 }
 
@@ -1253,9 +1261,11 @@ inline void Cluster::do_erase_key(size_t ndx, ColKey col_key, CascadeState& stat
     values.set_parent(this, col_ndx.val + s_first_col_index);
     values.init_from_parent();
 
-    ObjKey key = values.get(ndx);
-    if (key != null_key) {
-        remove_backlinks(get_real_key(ndx), col_key, {key}, state);
+    if (state.m_mode == CascadeState::Mode::None) {
+        ObjKey key = values.get(ndx);
+        if (key != null_key) {
+            remove_backlinks(get_real_key(ndx), col_key, {key}, state);
+        }
     }
     values.erase(ndx);
 }
@@ -1270,74 +1280,56 @@ size_t Cluster::get_ndx(ObjKey k, size_t ndx) const
         }
     }
     else {
-        if (k.value >= (Array::get(s_key_ref_or_size_index) >> 1)) {
+        index = size_t(k.value);
+        if (index >= get_as_ref_or_tagged(s_key_ref_or_size_index).get_as_int()) {
             throw InvalidKey("Key not found");
         }
-        index = size_t(k.value);
     }
     return index + ndx;
 }
 
 size_t Cluster::erase(ObjKey key, CascadeState& state)
 {
-    size_t ndx;
-    if (m_keys.is_attached()) {
-        ndx = m_keys.lower_bound(uint64_t(key.value));
-        if (ndx == m_keys.size() || m_keys.get(ndx) != uint64_t(key.value)) {
-            throw InvalidKey("Key not found");
-        }
-    }
-    else {
-        ndx = size_t(key.value);
-        if (ndx >= get_as_ref_or_tagged(0).get_as_int()) {
-            throw InvalidKey("Key not found");
-        }
-    }
-
-    const Spec& spec = m_tree_top.get_spec();
-    size_t num_cols = spec.get_column_count();
-    size_t num_public_cols = spec.get_public_column_count();
-    // We must start with backlink columns in case the corresponding link
-    // columns are in the same table so that we can nullify links before
-    // erasing rows in the link columns.
-    //
-    // This phase also generates replication instructions documenting the side-
-    // effects of deleting the object (i.e. link nullifications). These instructions
-    // must come before the actual deletion of the object, but at the same time
-    // the Replication object may need a consistent view of the row (not including
-    // link columns). Therefore we first nullify links to this object, then
-    // generate the instruction, and then delete the row in the remaining columns.
-
-    for (size_t col_ndx = num_public_cols; col_ndx < num_cols; col_ndx++) {
-        ColKey col_key = m_tree_top.get_owner()->spec_ndx2colkey(col_ndx);
-        ColKey::Idx leaf_ndx = col_key.get_index();
-        auto type = col_key.get_type();
-        REALM_ASSERT(type == col_type_BackLink);
-        ArrayBacklink values(m_alloc);
-        values.set_parent(this, leaf_ndx.val + s_first_col_index);
-        values.init_from_parent();
-        // Ensure that Cluster is writable and able to hold references to nodes in
-        // the slab area before nullifying or deleting links. These operation may
-        // both have the effect that other objects may be constructed and manipulated.
-        // If those other object are in the same cluster that the object to be deleted
-        // is in, then that will cause another accessor to this cluster to be created.
-        // It would lead to an error if the cluster node was relocated without it being
-        // reflected in the context here.
-        values.copy_on_write();
-        values.nullify_fwd_links(ndx, state);
-    }
-
+    size_t ndx = get_ndx(key, 0);
     ObjKey real_key = get_real_key(ndx);
     auto table = m_tree_top.get_owner();
-    if (state.notification_handler()) {
-        Group::CascadeNotification notifications;
-        notifications.rows.emplace_back(table->get_key(), real_key);
-        state.send_notifications(notifications);
-    }
-
     const_cast<Table*>(table)->free_local_id_after_hash_collision(real_key);
     if (Replication* repl = table->get_repl()) {
         repl->remove_object(table, real_key);
+    }
+
+    // If we're performing cascading deletions, we need to remove all backlinks
+    // before erasing any values from the array, or else the checks for if
+    // there's any remaining backlinks will check the wrong row for columns
+    // which have already had values erased from.
+    if (state.m_mode != CascadeState::Mode::None) {
+        auto remove_backlinks_from_column = [&](ColKey col_key) {
+            auto col_ndx = col_key.get_index();
+            auto col_type = col_key.get_type();
+            if (col_type == col_type_Link) {
+                ArrayKey values(m_alloc);
+                values.set_parent(this, col_ndx.val + s_first_col_index);
+                values.init_from_parent();
+                ObjKey link_target = values.get(ndx);
+                if (link_target != null_key) {
+                    remove_backlinks(get_real_key(ndx), col_key, {link_target}, state);
+                }
+            }
+            else if (col_type == col_type_LinkList) {
+                ArrayInteger values(m_alloc);
+                values.set_parent(this, col_ndx.val + s_first_col_index);
+                values.init_from_parent();
+                if (ref_type ref = values.get_as_ref(ndx)) {
+                    BPlusTree<ObjKey> links(m_alloc);
+                    links.init_from_ref(ref);
+                    if (links.size() > 0) {
+                        remove_backlinks(ObjKey(key.value + m_offset), col_key, links.get_all(), state);
+                    }
+                }
+            }
+            return false;
+        };
+        m_tree_top.get_owner()->for_each_public_column(remove_backlinks_from_column);
     }
 
     auto erase_in_column = [&](ColKey col_key) {
@@ -1351,7 +1343,7 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
             ref_type ref = values.get(ndx);
 
             if (ref) {
-                if (col_type == col_type_LinkList) {
+                if (state.m_mode == CascadeState::Mode::None && col_type == col_type_LinkList) {
                     BPlusTree<ObjKey> links(m_alloc);
                     links.init_from_ref(ref);
                     if (links.size() > 0) {
@@ -1423,6 +1415,44 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
     }
 
     return node_size();
+}
+
+void Cluster::nullify_incoming_links(ObjKey key, CascadeState& state)
+{
+    size_t ndx = get_ndx(key, 0);
+
+    const Spec& spec = m_tree_top.get_spec();
+    size_t num_cols = spec.get_column_count();
+    size_t num_public_cols = spec.get_public_column_count();
+    // We must start with backlink columns in case the corresponding link
+    // columns are in the same table so that we can nullify links before
+    // erasing rows in the link columns.
+    //
+    // This phase also generates replication instructions documenting the side-
+    // effects of deleting the object (i.e. link nullifications). These instructions
+    // must come before the actual deletion of the object, but at the same time
+    // the Replication object may need a consistent view of the row (not including
+    // link columns). Therefore we first nullify links to this object, then
+    // generate the instruction, and then delete the row in the remaining columns.
+
+    for (size_t col_ndx = num_public_cols; col_ndx < num_cols; col_ndx++) {
+        ColKey col_key = m_tree_top.get_owner()->spec_ndx2colkey(col_ndx);
+        ColKey::Idx leaf_ndx = col_key.get_index();
+        auto type = col_key.get_type();
+        REALM_ASSERT(type == col_type_BackLink);
+        ArrayBacklink values(m_alloc);
+        values.set_parent(this, leaf_ndx.val + s_first_col_index);
+        values.init_from_parent();
+        // Ensure that Cluster is writable and able to hold references to nodes in
+        // the slab area before nullifying or deleting links. These operation may
+        // both have the effect that other objects may be constructed and manipulated.
+        // If those other object are in the same cluster that the object to be deleted
+        // is in, then that will cause another accessor to this cluster to be created.
+        // It would lead to an error if the cluster node was relocated without it being
+        // reflected in the context here.
+        values.copy_on_write();
+        values.nullify_fwd_links(ndx, state);
+    }
 }
 
 void Cluster::upgrade_string_to_enum(ColKey col_key, ArrayString& keys)
@@ -1664,25 +1694,13 @@ void Cluster::remove_backlinks(ObjKey origin_key, ColKey origin_col_key, const s
     const Table* origin_table = m_tree_top.get_owner();
     TableRef target_table = origin_table->get_opposite_table(origin_col_key);
     ColKey backlink_col_key = origin_table->get_opposite_column(origin_col_key);
-
-    CascadeState::Mode mode = state.m_mode;
     bool strong_links = (origin_table->get_link_type(origin_col_key) == link_Strong);
-    bool only_strong_links = (mode == CascadeState::Mode::strong);
 
     for (auto key : keys) {
         if (key != null_key) {
             Obj target_obj = target_table->get_object(key);
             bool last_removed = target_obj.remove_one_backlink(backlink_col_key, origin_key); // Throws
-
-            // Check if the object should be cascade deleted
-            if (mode != CascadeState::none && (mode == CascadeState::all || (strong_links && last_removed))) {
-                bool has_backlinks = target_obj.has_backlinks(only_strong_links);
-
-                if (!has_backlinks) {
-                    // Object has no more backlinks - add to list for deletion
-                    state.m_to_be_deleted.emplace_back(target_table->get_key(), key);
-                }
-            }
+            state.enqueue_for_cascade(target_obj, strong_links, last_removed);
         }
     }
 }
@@ -1767,7 +1785,7 @@ bool ClusterTree::update_from_parent(size_t old_baseline) noexcept
     return was_updated;
 }
 
-void ClusterTree::clear()
+void ClusterTree::clear(CascadeState& state)
 {
     size_t num_cols = get_spec().get_public_column_count();
     for (size_t col_ndx = 0; col_ndx < num_cols; col_ndx++) {
@@ -1777,7 +1795,9 @@ void ClusterTree::clear()
         }
     }
 
-    remove_links(); // This will also delete objects loosing their last strong link
+    if (state.m_group) {
+        remove_all_links(state); // This will also delete objects loosing their last strong link
+    }
 
     m_root->destroy_deep();
 
@@ -2065,10 +2085,8 @@ const Spec& ClusterTree::get_spec() const
     return tf::get_spec(*m_owner);
 }
 
-void ClusterTree::remove_links()
+void ClusterTree::remove_all_links(CascadeState& state)
 {
-    CascadeState state(CascadeState::Mode::strong);
-    state.m_group = m_owner->get_parent_group();
     Allocator& alloc = get_alloc();
     // This function will add objects that should be deleted to 'state'
     auto func = [this, &state, &alloc](const Cluster* cluster) {
@@ -2094,9 +2112,9 @@ void ClusterTree::remove_links()
                 ArrayInteger values(alloc);
                 cluster->init_leaf(col_key, &values);
                 size_t sz = values.size();
+                BPlusTree<ObjKey> links(alloc);
                 for (size_t i = 0; i < sz; i++) {
                     if (ref_type ref = values.get_as_ref(i)) {
-                        BPlusTree<ObjKey> links(alloc);
                         links.init_from_ref(ref);
                         if (links.size() > 0) {
                             cluster->remove_backlinks(cluster->get_real_key(i), col_key, links.get_all(), state);
@@ -2137,6 +2155,11 @@ void ClusterTree::verify() const
 #endif
 }
 
+void ClusterTree::nullify_links(ObjKey obj_key, CascadeState &state)
+{
+    REALM_ASSERT(state.m_group);
+    m_root->nullify_incoming_links(obj_key, state);
+}
 
 ClusterTree::ConstIterator::ConstIterator(const ClusterTree& t, size_t ndx)
     : m_tree(t)

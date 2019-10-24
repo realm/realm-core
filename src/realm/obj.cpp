@@ -1039,8 +1039,6 @@ bool Obj::replace_backlink(ColKey col_key, ObjKey old_key, ObjKey new_key, Casca
 
 bool Obj::remove_backlink(ColKey col_key, ObjKey old_key, CascadeState& state)
 {
-    bool recurse = false;
-
     const Table* origin_table = m_table;
 
     REALM_ASSERT(origin_table->valid_column(col_key));
@@ -1049,24 +1047,14 @@ bool Obj::remove_backlink(ColKey col_key, ObjKey old_key, CascadeState& state)
     REALM_ASSERT(target_table->valid_column(backlink_col_key));
 
     bool strong_links = (origin_table->get_link_type(col_key) == link_Strong);
-    CascadeState::Mode mode = state.m_mode;
 
     if (old_key != realm::null_key) {
         Obj target_obj = target_table->get_object(old_key);
         bool last_removed = target_obj.remove_one_backlink(backlink_col_key, m_key); // Throws
-
-        // Check if the object should be cascade deleted
-        if (mode != CascadeState::none && (mode == CascadeState::all || (strong_links && last_removed))) {
-            bool have_backlinks = target_obj.has_backlinks(state.m_mode == CascadeState::strong);
-
-            if (!have_backlinks) {
-                state.m_to_be_deleted.emplace_back(target_table->get_key(), old_key);
-                recurse = true;
-            }
-        }
+        return state.enqueue_for_cascade(target_obj, strong_links, last_removed);
     }
 
-    return recurse;
+    return false;
 }
 
 

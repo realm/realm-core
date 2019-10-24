@@ -66,7 +66,8 @@ public:
     {
         return m_size;
     }
-    void clear();
+    void clear(CascadeState&);
+    void nullify_links(ObjKey, CascadeState&);
     bool is_empty() const noexcept
     {
         return size() == 0;
@@ -171,7 +172,7 @@ private:
     std::unique_ptr<ClusterNode> get_node(ref_type ref) const;
 
     size_t get_column_index(StringData col_name) const;
-    void remove_links();
+    void remove_all_links(CascadeState&);
 };
 
 class ClusterTree::ConstIterator {

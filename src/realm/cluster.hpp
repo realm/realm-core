@@ -141,6 +141,9 @@ public:
     /// Erase element identified by 'key'
     virtual size_t erase(ObjKey key, CascadeState& state) = 0;
 
+    /// Nullify links pointing to element identified by 'key'
+    virtual void nullify_incoming_links(ObjKey key, CascadeState& state) = 0;
+
     /// Move elements from position 'ndx' to 'new_node'. The new node is supposed
     /// to be a sibling positioned right after this one. All key values must
     /// be subtracted 'key_adj'
@@ -243,6 +246,7 @@ public:
     ObjKey get(size_t, State& state) const override;
     size_t get_ndx(ObjKey key, size_t ndx) const override;
     size_t erase(ObjKey k, CascadeState& state) override;
+    void nullify_incoming_links(ObjKey key, CascadeState& state) override;
     void upgrade_string_to_enum(ColKey col, ArrayString& keys);
 
     void init_leaf(ColKey col, ArrayPayload* leaf) const;
