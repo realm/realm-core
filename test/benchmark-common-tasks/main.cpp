@@ -1703,6 +1703,108 @@ struct BenchmarkInitiatorOpen : public BenchmarkNonInitiatorOpen {
     }
 };
 
+
+struct IterateTableByIndexNoPrimaryKey : Benchmark {
+    const char* name() const override
+    {
+        return "IterateTableByIndexNoPrimaryKey";
+    }
+
+    static const int row_count = 100'000;
+
+    void before_all(DBRef db) override
+    {
+        WrtTrans tr(db);
+        TableRef t = tr.add_table(name());
+#ifdef REALM_CLUSTER_IF
+        for (int i = 0; i < row_count; ++i)
+            t->create_object();
+#else
+        t->add_column(type_Int, "dummy");
+        t->add_empty_row(row_count);
+#endif
+        tr.commit();
+
+        m_tr.reset(new WrtTrans(db));
+        m_table = m_tr->get_table(name());
+    }
+    void after_all(DBRef) override
+    {
+        m_tr.reset();
+    }
+    void before_each(DBRef) override {}
+    void after_each(DBRef) override {}
+
+    void operator()(DBRef) override
+    {
+        for (size_t i = 0, size = m_table->size(); i < size; ++i) {
+#ifdef REALM_CLUSTER_IF
+            m_table->get_object(i);
+#else
+            Row r = m_table->get(i);
+            static_cast<void>(r);
+#endif
+        }
+    }
+};
+
+struct IterateTableByIndexIntPrimaryKey : IterateTableByIndexNoPrimaryKey {
+    const char* name() const override
+    {
+        return "IterateTableByIndexIntPrimaryKey";
+    }
+
+    void before_all(DBRef db) override
+    {
+        WrtTrans tr(db);
+#ifdef REALM_CLUSTER_IF
+        TableRef t = tr.get_group().add_table_with_primary_key("class_table", type_Int, "pk", false);
+        for (int i = 0; i < row_count; ++i)
+            t->create_object_with_primary_key(i);
+#else
+        TableRef t = tr.add_table("class_table");
+        t->add_column(type_Int, "pk");
+        t->add_empty_row(row_count);
+        for (int i = 0; i < row_count; ++i)
+            t->set_int(0, i, i);
+        t->add_search_index(0);
+#endif
+        tr.commit();
+
+        m_tr.reset(new WrtTrans(db));
+        m_table = m_tr->get_table("class_table");
+    }
+};
+
+struct IterateTableByIndexStringPrimaryKey : IterateTableByIndexNoPrimaryKey {
+    const char* name() const override
+    {
+        return "IterateTableByIndexStringPrimaryKey";
+    }
+
+    void before_all(DBRef db) override
+    {
+        WrtTrans tr(db);
+
+#ifdef REALM_CLUSTER_IF
+        TableRef t = tr.get_group().add_table_with_primary_key("class_table", type_String, "pk", false);
+        for (int i = 0; i < row_count; ++i)
+            t->create_object_with_primary_key(util::to_string(i).c_str());
+#else
+        TableRef t = tr.add_table("class_table");
+        t->add_column(type_String, "pk");
+        t->add_empty_row(row_count);
+        for (int i = 0; i < row_count; ++i)
+            t->set_string(0, i, util::to_string(i).c_str());
+        t->add_search_index(0);
+#endif
+        tr.commit();
+
+        m_tr.reset(new WrtTrans(db));
+        m_table = m_tr->get_table("class_table");
+    }
+};
+
 const char* to_lead_cstr(RealmDurability level)
 {
     switch (level) {
@@ -1847,6 +1949,10 @@ int benchmark_common_tasks_main()
     BENCH2(BenchmarkInitiatorOpen, true);
     BENCH2(AddTable, true);
     BENCH2(AddTable, false);
+
+    BENCH(IterateTableByIndexNoPrimaryKey);
+    BENCH(IterateTableByIndexIntPrimaryKey);
+    BENCH(IterateTableByIndexStringPrimaryKey);
 
     BENCH(BenchmarkSort);
     BENCH(BenchmarkSortInt);
