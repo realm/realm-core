@@ -44,8 +44,9 @@ if [ -z ${REALM_MAX_BPNODE_SIZE} ]; then
     REALM_MAX_BPNODE_SIZE=$(python -c "import random; print (random.randint(4,999), 1000)[bool(random.randint(0,1))]")
 fi
 cmake -D REALM_AFL=ON \
-      -D CMAKE_C_COMPILER=afl-gcc \
-      -D CMAKE_CXX_COMPILER=afl-g++ \
+      -D CMAKE_BUILD_TYPE=Release \
+      -D CMAKE_C_COMPILER=afl-clang \
+      -D CMAKE_CXX_COMPILER=afl-clang++ \
       -D REALM_MAX_BPNODE_SIZE="${REALM_MAX_BPNODE_SIZE}" \
       -D REALM_ENABLE_ENCRYPTION=ON \
       -G Ninja \
