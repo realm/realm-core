@@ -90,10 +90,10 @@ public:
     size_t find_first(Mixed value, size_t begin = 0, size_t end = realm::npos) const noexcept;
 
 private:
-    enum PayloadIdx { s_primary_index, s_int_index, s_int_pair_index, s_str_index, s_root_size };
+    enum { payload_idx_type, payload_idx_int, payload_idx_pair, payload_idx_str, payload_idx_size };
 
-    static constexpr int64_t s_data_type_mask = 0x1f;   // 00011111
-    static constexpr int64_t s_payload_idx_mask = 0xe0; // 11100000
+    static constexpr int64_t s_data_type_mask = 0b0001'1111;
+    static constexpr int64_t s_payload_idx_mask = 0b1110'0000;
     static constexpr int64_t s_payload_idx_shift = 5;
     static constexpr int64_t s_data_shift = 8;
 

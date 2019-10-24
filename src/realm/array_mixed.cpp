@@ -28,12 +28,12 @@ ArrayMixed::ArrayMixed(Allocator& a)
     , m_int_pairs(a)
     , m_strings(a)
 {
-    m_composite.set_parent(this, s_primary_index);
+    m_composite.set_parent(this, payload_idx_type);
 }
 
 void ArrayMixed::create()
 {
-    Array::create(type_HasRefs, false, s_root_size);
+    Array::create(type_HasRefs, false, payload_idx_size);
     m_composite.create(type_Normal);
     m_composite.update_parent();
 }
@@ -85,45 +85,49 @@ void ArrayMixed::set_null(size_t ndx)
 Mixed ArrayMixed::get(size_t ndx) const
 {
     int64_t val = m_composite.get(ndx);
-    int64_t int_val = val >> s_data_shift;
-    size_t payload_ndx = size_t(int_val);
-    DataType type = DataType((val & s_data_type_mask) - 1);
-    switch (type) {
-        case type_Int: {
-            if (val & s_payload_idx_mask) {
-                ensure_int_array();
-                return Mixed(m_ints.get(payload_ndx));
+
+    if (val) {
+        int64_t int_val = val >> s_data_shift;
+        size_t payload_ndx = size_t(int_val);
+        DataType type = DataType((val & s_data_type_mask) - 1);
+        switch (type) {
+            case type_Int: {
+                if (val & s_payload_idx_mask) {
+                    ensure_int_array();
+                    return Mixed(m_ints.get(payload_ndx));
+                }
+                return Mixed(int_val);
             }
-            return Mixed(int_val);
+            case type_Bool:
+                return Mixed(int_val != 0);
+            case type_Float:
+                ensure_int_array();
+                return Mixed(type_punning<float>(m_ints.get(payload_ndx)));
+            case type_Double:
+                ensure_int_array();
+                return Mixed(type_punning<double>(m_ints.get(payload_ndx)));
+            case type_String: {
+                ensure_string_array();
+                REALM_ASSERT(size_t(int_val) < m_strings.size());
+                return Mixed(m_strings.get(payload_ndx));
+            }
+            case type_Binary: {
+                ensure_string_array();
+                REALM_ASSERT(size_t(int_val) < m_strings.size());
+                auto s = m_strings.get(payload_ndx);
+                return Mixed(BinaryData(s.data(), s.size()));
+            }
+            case type_Timestamp: {
+                ensure_int_pair_array();
+                payload_ndx <<= 1;
+                REALM_ASSERT(payload_ndx + 1 < m_int_pairs.size());
+                return Mixed(Timestamp(m_int_pairs.get(payload_ndx), int32_t(m_int_pairs.get(payload_ndx + 1))));
+            }
+            default:
+                break;
         }
-        case type_Bool:
-            return Mixed(int_val != 0);
-        case type_Float:
-            ensure_int_array();
-            return Mixed(type_punning<float>(m_ints.get(payload_ndx)));
-        case type_Double:
-            ensure_int_array();
-            return Mixed(type_punning<double>(m_ints.get(payload_ndx)));
-        case type_String: {
-            ensure_string_array();
-            REALM_ASSERT(size_t(int_val) < m_strings.size());
-            return Mixed(m_strings.get(payload_ndx));
-        }
-        case type_Binary: {
-            ensure_string_array();
-            REALM_ASSERT(size_t(int_val) < m_strings.size());
-            auto s = m_strings.get(payload_ndx);
-            return Mixed(BinaryData(s.data(), s.size()));
-        }
-        case type_Timestamp: {
-            ensure_int_pair_array();
-            payload_ndx <<= 1;
-            REALM_ASSERT(payload_ndx + 1 < m_int_pairs.size());
-            return Mixed(Timestamp(m_int_pairs.get(payload_ndx), int32_t(m_int_pairs.get(payload_ndx + 1))));
-        }
-        default:
-            break;
     }
+
     return {};
 }
 
@@ -189,19 +193,19 @@ void ArrayMixed::ensure_array_accessor(Array& arr, size_t ndx_in_parent) const
 
 void ArrayMixed::ensure_int_array() const
 {
-    ensure_array_accessor(m_ints, s_int_index);
+    ensure_array_accessor(m_ints, payload_idx_int);
 }
 
 void ArrayMixed::ensure_int_pair_array() const
 {
-    ensure_array_accessor(m_int_pairs, s_int_pair_index);
+    ensure_array_accessor(m_int_pairs, payload_idx_pair);
 }
 
 void ArrayMixed::ensure_string_array() const
 {
     if (!m_strings.is_attached()) {
-        ref_type ref = get_as_ref(s_str_index);
-        m_strings.set_parent(const_cast<ArrayMixed*>(this), s_str_index);
+        ref_type ref = get_as_ref(payload_idx_str);
+        m_strings.set_parent(const_cast<ArrayMixed*>(this), payload_idx_str);
         if (ref) {
             m_strings.init_from_ref(ref);
         }
@@ -295,7 +299,7 @@ int64_t ArrayMixed::store(const Mixed& value)
                 ensure_int_array();
                 size_t ndx = m_ints.size();
                 m_ints.add(int_val);
-                val = int64_t(ndx << s_data_shift) | (s_int_index << s_payload_idx_shift);
+                val = int64_t(ndx << s_data_shift) | (payload_idx_int << s_payload_idx_shift);
             }
             break;
         }
@@ -306,21 +310,21 @@ int64_t ArrayMixed::store(const Mixed& value)
             ensure_int_array();
             size_t ndx = m_ints.size();
             m_ints.add(type_punning<int64_t>(value.get_float()));
-            val = int64_t(ndx << s_data_shift) | (s_int_index << s_payload_idx_shift);
+            val = int64_t(ndx << s_data_shift) | (payload_idx_int << s_payload_idx_shift);
             break;
         }
         case type_Double: {
             ensure_int_array();
             size_t ndx = m_ints.size();
             m_ints.add(type_punning<int64_t>(value.get_double()));
-            val = int64_t(ndx << s_data_shift) | (s_int_index << s_payload_idx_shift);
+            val = int64_t(ndx << s_data_shift) | (payload_idx_int << s_payload_idx_shift);
             break;
         }
         case type_String: {
             ensure_string_array();
             size_t ndx = m_strings.size();
             m_strings.add(value.get_string());
-            val = int64_t(ndx << s_data_shift) | (s_str_index << s_payload_idx_shift);
+            val = int64_t(ndx << s_data_shift) | (payload_idx_str << s_payload_idx_shift);
             break;
         }
         case type_Binary: {
@@ -328,7 +332,7 @@ int64_t ArrayMixed::store(const Mixed& value)
             size_t ndx = m_strings.size();
             auto bin = value.get<Binary>();
             m_strings.add(StringData(bin.data(), bin.size()));
-            val = int64_t(ndx << s_data_shift) | (s_str_index << s_payload_idx_shift);
+            val = int64_t(ndx << s_data_shift) | (payload_idx_str << s_payload_idx_shift);
             break;
         }
         case type_Timestamp: {
@@ -337,7 +341,7 @@ int64_t ArrayMixed::store(const Mixed& value)
             auto t = value.get_timestamp();
             m_int_pairs.add(t.get_seconds());
             m_int_pairs.add(t.get_nanoseconds());
-            val = int64_t(ndx << s_data_shift) | (s_int_pair_index << s_payload_idx_shift);
+            val = int64_t(ndx << s_data_shift) | (payload_idx_pair << s_payload_idx_shift);
             break;
         }
         default:
