@@ -4,9 +4,8 @@
 * None.
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
- 
+* macOS binaries were built with the incorrect deployment target (10.14 rather than 10.9). ([Cocoa #6299](https://github.com/realm/realm-cocoa/issues/6299), since 5.23.4).
+
 ### Breaking changes
 * None.
 
