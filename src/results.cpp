@@ -551,7 +551,7 @@ util::Optional<Mixed> Results::sum(ColKey column)
 util::Optional<double> Results::average(ColKey column)
 {
     size_t value_count = 0;
-    auto results = aggregate(column, "average", [&](auto&& helper) {
+    auto results = aggregate(column, "avg", [&](auto&& helper) {
         return helper.avg(column, &value_count);
     });
     return value_count == 0 ? none : util::make_optional(results->get_double());
