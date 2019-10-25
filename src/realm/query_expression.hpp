@@ -134,8 +134,10 @@ The Columns class encapsulates all this into a simple class that, for any type T
 #include <realm/array_list.hpp>
 #include <realm/array_key.hpp>
 #include <realm/array_bool.hpp>
+#include <realm/column_integer.hpp>
 #include <realm/column_type_traits.hpp>
 #include <realm/table.hpp>
+#include <realm/index_string.hpp>
 #include <realm/query.hpp>
 #include <realm/list.hpp>
 #include <realm/metrics/query_info.hpp>
@@ -143,6 +145,7 @@ The Columns class encapsulates all this into a simple class that, for any type T
 #include <realm/util/serializer.hpp>
 
 #include <numeric>
+#include <algorithm>
 
 // Normally, if a next-generation-syntax condition is supported by the old query_engine.hpp, a query_engine node is
 // created because it's faster (by a factor of 5 - 10). Because many of our existing next-generation-syntax unit
@@ -339,6 +342,11 @@ public:
     {
     }
 
+    virtual double init()
+    {
+        return 50.0; // Default dT
+    }
+
     virtual size_t find_first(size_t start, size_t end) const = 0;
     virtual void set_base_table(const Table* table) = 0;
     virtual void set_cluster(const Cluster*) = 0;
@@ -397,6 +405,16 @@ public:
     virtual bool has_constant_evaluation() const
     {
         return false;
+    }
+
+    virtual bool has_search_index() const
+    {
+        return false;
+    }
+
+    virtual std::vector<ObjKey> find_all(Mixed) const
+    {
+        return {};
     }
 
     virtual void evaluate(size_t index, ValueBase& destination) = 0;
@@ -1871,6 +1889,8 @@ public:
         return res;
     }
 
+    std::vector<ObjKey> get_origin_ndxs(ObjKey key, size_t column = 0) const;
+
     size_t count_links(size_t row) const
     {
         CountLinks counter;
@@ -2007,6 +2027,32 @@ public:
             cluster->init_leaf(m_column_key, m_array_ptr.get());
             m_leaf_ptr = m_array_ptr.get();
         }
+    }
+
+    bool has_search_index() const override
+    {
+        return m_link_map.get_target_table()->has_search_index(m_column_key);
+    }
+
+    std::vector<ObjKey> find_all(Mixed value) const override
+    {
+        std::vector<ObjKey> ret;
+        std::vector<ObjKey> result;
+
+        T val{};
+        if (!value.is_null()) {
+            val = value.get<T>();
+        }
+
+        StringIndex* index = m_link_map.get_target_table()->get_search_index(m_column_key);
+        index->find_all(result, val);
+
+        for (ObjKey k : result) {
+            auto ndxs = m_link_map.get_origin_ndxs(k);
+            ret.insert(ret.end(), ndxs.begin(), ndxs.end());
+        }
+
+        return ret;
     }
 
     void collect_dependencies(std::vector<TableKey>& tables) const override
@@ -3078,6 +3124,41 @@ public:
         }
     }
 
+    bool has_search_index() const override
+    {
+        return m_link_map.get_target_table()->has_search_index(m_column_key);
+    }
+
+    std::vector<ObjKey> find_all(Mixed value) const override
+    {
+        std::vector<ObjKey> ret;
+        std::vector<ObjKey> result;
+
+        if (m_nullable && std::is_same<T, int64_t>::value) {
+            util::Optional<int64_t> val;
+            if (!value.is_null()) {
+                val = value.get_int();
+            }
+            StringIndex* index = m_link_map.get_target_table()->get_search_index(m_column_key);
+            index->find_all(result, val);
+        }
+        else {
+            T val{};
+            if (!value.is_null()) {
+                val = value.get<T>();
+            }
+            StringIndex* index = m_link_map.get_target_table()->get_search_index(m_column_key);
+            index->find_all(result, val);
+        }
+
+        for (auto k : result) {
+            auto ndxs = m_link_map.get_origin_ndxs(k);
+            ret.insert(ret.end(), ndxs.begin(), ndxs.end());
+        }
+
+        return ret;
+    }
+
     void collect_dependencies(std::vector<TableKey>& tables) const override
     {
         m_link_map.collect_dependencies(tables);
@@ -3741,6 +3822,20 @@ private:
     std::unique_ptr<TRight> m_right;
 };
 
+namespace {
+template <class T>
+inline Mixed get_mixed(const Value<T>& val)
+{
+    return Mixed(val.m_storage[0]);
+}
+
+template <>
+inline Mixed get_mixed(const Value<int>& val)
+{
+    return Mixed(int64_t(val.m_storage[0]));
+}
+} // namespace
+
 template <class TCond, class T, class TLeft, class TRight>
 class Compare : public Expression {
 public:
@@ -3763,8 +3858,37 @@ public:
 
     void set_cluster(const Cluster* cluster) override
     {
-        m_left->set_cluster(cluster);
-        m_right->set_cluster(cluster);
+        if (m_has_matches) {
+            m_cluster = cluster;
+        }
+        else {
+            m_left->set_cluster(cluster);
+            m_right->set_cluster(cluster);
+        }
+    }
+
+    double init() override
+    {
+        double dT = m_left_is_const ? 10.0 : 50.0;
+        if (std::is_same<TCond, Equal>::value && m_left_is_const && m_right->has_search_index()) {
+            if (m_left_value.m_storage.is_null(0)) {
+                m_matches = m_right->find_all(Mixed());
+            }
+            else {
+                m_matches = m_right->find_all(get_mixed(m_left_value));
+            }
+            // Sort
+            std::sort(m_matches.begin(), m_matches.end());
+            // Remove all duplicates
+            m_matches.erase(std::unique(m_matches.begin(), m_matches.end()), m_matches.end());
+
+            m_has_matches = true;
+            m_index_get = 0;
+            m_index_end = m_matches.size();
+            dT = 0;
+        }
+
+        return dT;
     }
 
     // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression
@@ -3789,6 +3913,30 @@ public:
 
     size_t find_first(size_t start, size_t end) const override
     {
+        if (m_has_matches) {
+            if (m_index_get < m_index_end && start < end) {
+                ObjKey first_key = m_cluster->get_real_key(start);
+                auto actual_key = m_matches[m_index_get];
+
+                // skip through keys which are in "earlier" leafs than the one selected by start..end:
+                while (first_key > actual_key) {
+                    m_index_get++;
+                    if (m_index_get == m_index_end)
+                        return not_found;
+                    actual_key = m_matches[m_index_get];
+                }
+                // if actual key is bigger than last key, it is not in this leaf
+                ObjKey last_key = m_cluster->get_real_key(end - 1);
+                if (actual_key > last_key)
+                    return not_found;
+
+                // key is known to be in this leaf, so find key whithin leaf keys
+                return m_cluster->lower_bound_key(ObjKey(actual_key.value - m_cluster->get_offset()));
+
+            }
+            return not_found;
+        }
+
         size_t match;
 
         Value<T> left;
@@ -3849,8 +3997,13 @@ private:
 
     std::unique_ptr<TLeft> m_left;
     std::unique_ptr<TRight> m_right;
+    const Cluster* m_cluster;
     bool m_left_is_const;
     Value<T> m_left_value;
+    bool m_has_matches = false;
+    std::vector<ObjKey> m_matches;
+    mutable size_t m_index_get = 0;
+    size_t m_index_end = 0;
 };
 }
 #endif // REALM_QUERY_EXPRESSION_HPP

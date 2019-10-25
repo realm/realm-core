@@ -771,7 +771,8 @@ inline size_t SlabAlloc::get_lower_section_boundary(size_t start_pos) const noex
 
 inline bool SlabAlloc::matches_section_boundary(size_t pos) const noexcept
 {
-    return pos == get_lower_section_boundary(pos);
+    auto boundary = get_lower_section_boundary(pos);
+    return pos == boundary;
 }
 
 template <typename Func>

@@ -90,10 +90,11 @@ void setup_multi_table(Table& table, size_t rows)
     table.add_column(type_Double, "double");                               //  4
     table.add_column(type_String, "string");                               //  5
     table.add_column(type_String, "string_long");                          //  6
-    ColKey string_big = table.add_column(type_String, "string_big_blobs"); //  7
-    ColKey string_enum = table.add_column(type_String, "string_enum");     //  8 - becomes StringEnumColumn
-    ColKey binary = table.add_column(type_Binary, "binary");               //  9
-    ColKey int_list = table.add_column_list(type_Int, "integers");
+    ColKey col_string_big = table.add_column(type_String, "string_big_blobs"); //  7
+    ColKey col_string_enum = table.add_column(type_String, "string_enum");     //  8 - becomes StringEnumColumn
+    ColKey col_binary = table.add_column(type_Binary, "binary");               //  9
+    ColKey col_int_list = table.add_column_list(type_Int, "integers");
+    ColKey col_string_list = table.add_column_list(type_String, "strings");
 
     std::vector<std::string> strings;
     for (size_t i = 0; i < rows; ++i) {
@@ -112,33 +113,37 @@ void setup_multi_table(Table& table, size_t rows)
                 s += " very long string.........";
                 for (int j = 0; j != 4; ++j)
                     s += " big blobs big blobs big blobs"; // +30
-                obj.set(string_big, s);
+                obj.set(col_string_big, s);
                 break;
             }
             case 1:
-                obj.set(string_big, "");
+                obj.set(col_string_big, "");
                 break;
         }
         switch (i % 3) {
             case 0:
-                obj.set(string_enum, "enum1");
+                obj.set(col_string_enum, "enum1");
                 break;
             case 1:
-                obj.set(string_enum, "enum2");
+                obj.set(col_string_enum, "enum2");
                 break;
             case 2:
-                obj.set(string_enum, "enum3");
+                obj.set(col_string_enum, "enum3");
                 break;
         }
-        obj.set(binary, BinaryData("binary", 7));
-        auto list = obj.get_list<Int>(int_list);
+        obj.set(col_binary, BinaryData("binary", 7));
+        auto int_list = obj.get_list<Int>(col_int_list);
+        auto str_list = obj.get_list<String>(col_string_list);
         for (size_t n = 0; n < i % 5; n++) {
-            list.add(n);
+            int64_t val = -123 + i * n * 1234 * sign;
+            std::string str = "sub_" + util::to_string(val);
+            int_list.add(val);
+            str_list.add(str);
         }
     }
 
     // We also want a StringEnumColumn
-    table.enumerate_string_column(string_enum);
+    table.enumerate_string_column(col_string_enum);
 }
 
 bool json_test(std::string json, std::string expected_file, bool generate)
@@ -419,6 +424,33 @@ TEST(Json_LinkCycles)
     tv.to_json(ss, 2);
     CHECK(json_test(ss.str(), "expected_json_link_cycles5", generate_all));
 }
+
+TEST(Json_Nulls)
+{
+    Group group;
+
+    TableRef table1 = group.add_table("table1");
+
+    constexpr bool is_nullable = true;
+    ColKey str_col_ndx = table1->add_column(type_String, "str_col", is_nullable);
+    ColKey bool_col_ndx = table1->add_column(type_Bool, "bool_col", is_nullable);
+    ColKey int_col_ndx = table1->add_column(type_Int, "int_col", is_nullable);
+    ColKey timestamp_col_ndx = table1->add_column(type_Timestamp, "timestamp_col", is_nullable);
+
+    // add one row, populated manually
+    auto obj = table1->create_object();
+    obj.set(str_col_ndx, "Hello");
+    obj.set(bool_col_ndx, false);
+    obj.set(int_col_ndx, 1);
+    obj.set(timestamp_col_ndx, Timestamp{1, 1});
+    // add one row with default null values
+    table1->create_object();
+
+    std::stringstream ss;
+    table1->to_json(ss);
+    CHECK(json_test(ss.str(), "expected_json_nulls", generate_all));
+}
+
 } // anonymous namespace
 
 #endif // TEST_TABLE

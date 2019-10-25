@@ -114,6 +114,7 @@ bool GroupWriter::MapWindow::extends_to_match(util::File& f, ref_type start_ref,
         return false;
     size_t window_size = get_window_size(f, start_ref, size);
     // FIXME: Add a remap which will work with a offset different from 0
+    m_map.sync();
     m_map.unmap();
     m_map.map(f, File::access_ReadWrite, window_size, 0, m_base_ref);
     return true;
@@ -262,7 +263,8 @@ GroupWriter::~GroupWriter() = default;
 
 size_t GroupWriter::get_file_size() const noexcept
 {
-    return to_size_t(m_alloc.get_file().get_size());
+    auto sz = to_size_t(m_alloc.get_file().get_size());
+    return sz;
 }
 
 void GroupWriter::sync_all_mappings()
@@ -818,6 +820,7 @@ GroupWriter::FreeListElement GroupWriter::extend_free_space(size_t requested_siz
     // lock at this time, and in non-transactional mode it is the responsibility
     // of the user to ensure non-concurrent file mutation.
     m_alloc.resize_file(new_file_size); // Throws
+    REALM_ASSERT(new_file_size <= get_file_size());
 #if REALM_ALLOC_DEBUG
     std::cout << "        ** File extension to " << new_file_size << "     after request for " << requested_size
               << std::endl;
@@ -854,7 +857,6 @@ ref_type GroupWriter::write_array(const char* data, size_t size, uint32_t checks
     window->encryption_read_barrier(dest_addr, size);
     memcpy(dest_addr, &checksum, 4);
     memcpy(dest_addr + 4, data + 4, size - 4);
-
     window->encryption_write_barrier(dest_addr, size);
     // return ref of the written array
     ref_type ref = to_ref(pos);
@@ -895,11 +897,16 @@ void GroupWriter::commit(ref_type new_top_ref)
     int file_format_version = m_group.get_file_format_version();
     using type_1 = std::remove_reference<decltype(file_header.m_file_format[0])>::type;
     REALM_ASSERT(!util::int_cast_has_overflow<type_1>(file_format_version));
-    file_header.m_top_ref[slot_selector] = new_top_ref;
-    file_header.m_file_format[slot_selector] = type_1(file_format_version);
+    // only write the file format field if necessary (optimization)
+    if (type_1(file_format_version) != file_header.m_file_format[slot_selector]) {
+        file_header.m_file_format[slot_selector] = type_1(file_format_version);
+        window->encryption_write_barrier(&file_header.m_file_format[slot_selector],
+                                         sizeof(file_header.m_file_format[slot_selector]));
+    }
 
     // When running the test suite, device synchronization is disabled
     bool disable_sync = get_disable_sync_to_disk() || m_durability == Durability::Unsafe;
+    file_header.m_top_ref[slot_selector] = new_top_ref;
 
 #if REALM_METRICS
     std::unique_ptr<MetricTimer> fsync_timer = Metrics::report_fsync_time(m_group);
@@ -907,7 +914,8 @@ void GroupWriter::commit(ref_type new_top_ref)
 
     // Make sure that that all data relating to the new snapshot is written to
     // stable storage before flipping the slot selector
-    window->encryption_write_barrier(&file_header, sizeof file_header);
+    window->encryption_write_barrier(&file_header.m_top_ref[slot_selector], 
+                                     sizeof(file_header.m_top_ref[slot_selector]));
     if (!disable_sync)
         sync_all_mappings();
 
@@ -917,7 +925,7 @@ void GroupWriter::commit(ref_type new_top_ref)
 
     // Write new selector to disk
     // FIXME: we might optimize this to write of a single page?
-    window->encryption_write_barrier(&file_header, sizeof file_header);
+    window->encryption_write_barrier(&file_header.m_flags, sizeof(file_header.m_flags));
     if (!disable_sync)
         window->sync();
 }

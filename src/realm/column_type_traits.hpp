@@ -29,7 +29,6 @@ namespace realm {
 
 struct ObjKey;
 class Timestamp;
-class OldDateTime;
 class ArraySmallBlobs;
 class ArrayString;
 class ArrayStringShort;
