@@ -25,6 +25,7 @@
 #include "sync/sync_user.hpp"
 
 #include <realm/sync/client.hpp>
+#include <realm/db_options.hpp>
 #include <realm/sync/protocol.hpp>
 
 #include "impl/realm_coordinator.hpp"
@@ -415,21 +416,23 @@ SyncSession::SyncSession(SyncClient& client, std::string realm_path, SyncConfig 
     // as a side effect of opening a `Realm`. In that case, the sync history has already been validated by the
     // act of opening the `Realm` so it's not necessary to repeat it here.
     if (m_config.validate_sync_history) {
-        Realm::Config realm_config;
-        realm_config.path = m_realm_path;
-        realm_config.schema_mode = SchemaMode::Additive;
-        realm_config.force_sync_history = true;
-        // realm_config.cache = false;
+        DBOptions options;
 
         if (m_config.realm_encryption_key) {
-            realm_config.encryption_key.resize(64);
-            std::copy(m_config.realm_encryption_key->begin(), m_config.realm_encryption_key->end(),
-                      realm_config.encryption_key.begin());
+            options.encryption_key = m_config.realm_encryption_key->begin();
         }
+#if REALM_ENABLE_SYNC
+        auto history = sync::make_client_replication(m_realm_path);
+#else
+        REALM_TERMINATE("Realm was not built with sync enabled");
+#endif
 
         // FIXME: Opening a Realm only to discard it is relatively expensive. It may be preferable to have
         // realm-sync open the Realm when the `sync::Session` is created since it can continue to use it.
-        _impl::RealmCoordinator::get_coordinator(m_realm_path)->open_with_config(realm_config);
+
+        // We use the core method directly as we don't want to modify the coordinator that might exist at this
+        // point (especially overwriting the config)
+        DB::create(*history, options);
    }
 }
 
