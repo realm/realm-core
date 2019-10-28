@@ -193,10 +193,10 @@ protected:
     const Spec& get_spec() const;
 
     template <typename U>
-    U _get(ColKey::Idx col_ndx) const;
+    U _get(ColKey::Idx col_ndx, uint64_t current_version) const;
 
     template <class T>
-    int cmp(const ConstObj& other, ColKey::Idx col_ndx) const;
+    int cmp(const ConstObj& other, ColKey::Idx col_ndx, uint64_t current_version) const;
     int cmp(const ConstObj& other, ColKey::Idx col_ndx) const;
     size_t get_backlink_count(ColKey backlink_col) const;
     ObjKey get_backlink(ColKey backlink_col, size_t backlink_ndx) const;

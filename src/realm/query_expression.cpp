@@ -263,7 +263,7 @@ void ColumnListBase::get_lists(size_t index, Value<ref_type>& destination, size_
             destination.init(true, sz);
             for (size_t t = 0; t < sz; t++) {
                 ConstObj obj = m_link_map.get_target_table()->get_object(links[t]);
-                ref_type val = to_ref(obj._get<int64_t>(m_column_key.get_index()));
+                ref_type val = to_ref(obj.get<int64_t>(m_column_key)); // maybe optimize to avoid column validity check?
                 destination.m_storage.set(t, val);
             }
         }

@@ -167,7 +167,7 @@ ConstLstBase::~ConstLstBase()
 ref_type ConstLstBase::get_child_ref(size_t) const noexcept
 {
     try {
-        return to_ref(m_const_obj->_get<int64_t>(m_col_key.get_index()));
+        return to_ref(m_const_obj->get<int64_t>(m_col_key)); // possibly optimize to avoid col key valid check?
     }
     catch (const InvalidKey&) {
         return ref_type(0);

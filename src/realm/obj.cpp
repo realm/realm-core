@@ -74,10 +74,10 @@ Replication* ConstObj::get_replication() const
 }
 
 template <class T>
-inline int ConstObj::cmp(const ConstObj& other, ColKey::Idx col_ndx) const
+inline int ConstObj::cmp(const ConstObj& other, ColKey::Idx col_ndx, uint64_t current_version) const
 {
-    T val1 = _get<T>(col_ndx);
-    T val2 = other._get<T>(col_ndx);
+    T val1 = _get<T>(col_ndx, current_version);
+    T val2 = other._get<T>(col_ndx, current_version);
     if (val1 < val2) {
         return -1;
     }
@@ -89,6 +89,7 @@ inline int ConstObj::cmp(const ConstObj& other, ColKey::Idx col_ndx) const
 
 int ConstObj::cmp(const ConstObj& other, ColKey col_key) const
 {
+    auto current_version = get_alloc().get_storage_version(m_instance_version);
     ColKey::Idx col_ndx = col_key.get_index();
     ColumnAttrMask attr = col_key.get_attrs();
     REALM_ASSERT(!attr.test(col_attr_List)); // TODO: implement comparison of lists
@@ -96,23 +97,23 @@ int ConstObj::cmp(const ConstObj& other, ColKey col_key) const
     switch (DataType(col_key.get_type())) {
         case type_Int:
             if (attr.test(col_attr_Nullable))
-                return cmp<util::Optional<Int>>(other, col_ndx);
+                return cmp<util::Optional<Int>>(other, col_ndx, current_version);
             else
-                return cmp<Int>(other, col_ndx);
+                return cmp<Int>(other, col_ndx, current_version);
         case type_Bool:
-            return cmp<Bool>(other, col_ndx);
+            return cmp<Bool>(other, col_ndx, current_version);
         case type_Float:
-            return cmp<Float>(other, col_ndx);
+            return cmp<Float>(other, col_ndx, current_version);
         case type_Double:
-            return cmp<Double>(other, col_ndx);
+            return cmp<Double>(other, col_ndx, current_version);
         case type_String:
-            return cmp<String>(other, col_ndx);
+            return cmp<String>(other, col_ndx, current_version);
         case type_Binary:
-            return cmp<Binary>(other, col_ndx);
+            return cmp<Binary>(other, col_ndx, current_version);
         case type_Timestamp:
-            return cmp<Timestamp>(other, col_ndx);
+            return cmp<Timestamp>(other, col_ndx, current_version);
         case type_Link:
-            return cmp<ObjKey>(other, col_ndx);
+            return cmp<ObjKey>(other, col_ndx, current_version);
         case type_OldDateTime:
         case type_OldTable:
         case type_OldMixed:
@@ -230,18 +231,20 @@ bool ConstObj::update_if_needed() const
 template <class T>
 T ConstObj::get(ColKey col_key) const
 {
+    auto current_version = get_alloc().get_storage_version(m_instance_version);
     m_table->report_invalid_key(col_key);
     ColumnType type = col_key.get_type();
     REALM_ASSERT(type == ColumnTypeTraits<T>::column_id);
 
-    return _get<T>(col_key.get_index());
+    return _get<T>(col_key.get_index(), current_version);
 }
 
 template <class T>
-T ConstObj::_get(ColKey::Idx col_ndx) const
+T ConstObj::_get(ColKey::Idx col_ndx, uint64_t current_version) const
 {
-    update_if_needed();
-
+    if (current_version != m_storage_version) {
+        update();
+    }
     typename ColumnTypeTraits<T>::cluster_leaf_type values(get_alloc());
     ref_type ref = to_ref(Array::get(m_mem.get_addr(), col_ndx.val + 1));
     values.init_from_ref(ref);
@@ -250,15 +253,13 @@ T ConstObj::_get(ColKey::Idx col_ndx) const
 }
 
 template <>
-int64_t ConstObj::_get<int64_t>(ColKey::Idx col_ndx) const
+int64_t ConstObj::_get<int64_t>(ColKey::Idx col_ndx, uint64_t current_version) const
 {
     // manual inline of is_in_sync():
     auto& alloc = get_alloc();
-    auto current_version = alloc.get_storage_version(m_instance_version);
     if (current_version != m_storage_version) {
         update();
     }
-
     ref_type ref = to_ref(Array::get(m_mem.get_addr(), col_ndx.val + 1));
     char* header = alloc.translate(ref);
     int width = Array::get_width_from_header(header);
@@ -267,11 +268,10 @@ int64_t ConstObj::_get<int64_t>(ColKey::Idx col_ndx) const
 }
 
 template <>
-StringData ConstObj::_get<StringData>(ColKey::Idx col_ndx) const
+StringData ConstObj::_get<StringData>(ColKey::Idx col_ndx, uint64_t current_version) const
 {
     // manual inline of is_in_sync():
     auto& alloc = get_alloc();
-    auto current_version = alloc.get_storage_version(m_instance_version);
     if (current_version != m_storage_version) {
         update();
     }
@@ -292,11 +292,10 @@ StringData ConstObj::_get<StringData>(ColKey::Idx col_ndx) const
 }
 
 template <>
-BinaryData ConstObj::_get<BinaryData>(ColKey::Idx col_ndx) const
+BinaryData ConstObj::_get<BinaryData>(ColKey::Idx col_ndx, uint64_t current_version) const
 {
     // manual inline of is_in_sync():
     auto& alloc = get_alloc();
-    auto current_version = alloc.get_storage_version(m_instance_version);
     if (current_version != m_storage_version) {
         update();
     }
