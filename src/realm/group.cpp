@@ -817,14 +817,15 @@ Table* Group::create_table_accessor(size_t table_ndx)
     Table* table = 0;
     {
         std::lock_guard<std::mutex> lg(g_table_recycler_mutex);
-        if (g_table_recycler_2.empty()) {
+        // always reverse chunks of suitable size, never smaller than g_table_recycling_delay
+        if (g_table_recycler_2.empty() && g_table_recycler_1.size() > g_table_recycling_delay) {
             while (!g_table_recycler_1.empty()) {
                 auto t = g_table_recycler_1.back();
                 g_table_recycler_1.pop_back();
                 g_table_recycler_2.push_back(t);
             }
         }
-        if (g_table_recycler_2.size() + g_table_recycler_1.size() > g_table_recycling_delay) {
+        if (!g_table_recycler_2.empty()) {
             table = g_table_recycler_2.back();
             table->fully_detach();
             g_table_recycler_2.pop_back();
@@ -1502,6 +1503,7 @@ void Group::flush_accessors_for_commit()
 void Group::refresh_dirty_accessors()
 {
     if (!m_tables.is_attached()) {
+        for (auto& e: m_table_accessors) { REALM_ASSERT(e == nullptr); }
         m_table_accessors.clear();
         return;
     }
