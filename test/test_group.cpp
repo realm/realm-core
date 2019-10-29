@@ -1214,9 +1214,9 @@ TEST(Group_ToJSON)
     g.to_json(out);
     std::string str = out.str();
     CHECK(str.length() > 0);
-    CHECK_EQUAL("{\"test\":[{\"_key\":0,\"first\":\"jeff\",\"second\":1,\"third\":true,\"fourth\":2},{\"_key\":1,"
+    CHECK_EQUAL("{\n\"test\":[{\"_key\":0,\"first\":\"jeff\",\"second\":1,\"third\":true,\"fourth\":2},{\"_key\":1,"
                 "\"first\":\"jim\","
-                "\"second\":1,\"third\":true,\"fourth\":2}]}",
+                "\"second\":1,\"third\":true,\"fourth\":2}]\n}\n",
                 str);
 }
 
