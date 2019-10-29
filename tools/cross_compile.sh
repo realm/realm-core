@@ -9,7 +9,7 @@ SCRIPT=$(basename "${BASH_SOURCE[0]}")
 CORES=$(getconf _NPROCESSORS_ONLN)
 
 function usage {
-    echo "$Usage: ${SCRIPT} -t <build_type> -o <target_os> -v <version> [-a <android_abi>]"
+    echo "$Usage: ${SCRIPT} -t <build_type> -o <target_os> -v <version> [-a <android_abi>] [-f <cmake_flags>]"
     echo ""
     echo "Arguments:"
     echo "   build_type=<Release|Debug|MinSizeDebug>"
@@ -19,7 +19,7 @@ function usage {
 }
 
 # Parse the options
-while getopts ":o:a:t:v:" opt; do
+while getopts ":o:a:t:v:f:" opt; do
     case "${opt}" in
         o)
             OS=${OPTARG}
@@ -44,6 +44,7 @@ while getopts ":o:a:t:v:" opt; do
             [ "${BUILD_TYPE}" == "Release" ] || usage
             ;;
         v) VERSION=${OPTARG};;
+        f) CMAKE_FLAGS=${OPTARG};;
         *) usage;;
     esac
 done
@@ -72,6 +73,7 @@ if [ "${OS}" == "android" ]; then
           -D REALM_ENABLE_ENCRYPTION=1 \
           -D REALM_VERSION="${VERSION}" \
           -D CPACK_SYSTEM_NAME="Android-${ARCH}" \
+          ${CMAKE_FLAGS} \
           ..
 
     make -j "${CORES}" -l "${CORES}" VERBOSE=1
@@ -91,6 +93,7 @@ else
               -D REALM_NO_TESTS=1 \
               -D REALM_VERSION="${VERSION}" \
               -D CPACK_SYSTEM_NAME="${SDK}os" \
+              ${CMAKE_FLAGS} \
               -G Xcode ..
     }
 
