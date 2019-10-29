@@ -16,7 +16,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "catch.hpp"
+#include "catch2/catch.hpp"
 
 #include "sync/session/session_util.hpp"
 
@@ -27,7 +27,6 @@
 #include "schema.hpp"
 
 #include "util/event_loop.hpp"
-#include "util/templated_test_case.hpp"
 #include "util/test_utils.hpp"
 
 #include <realm/util/scope_exit.hpp>

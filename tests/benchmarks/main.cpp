@@ -1,6 +1,6 @@
 ////////////////////////////////////////////////////////////////////////////
 //
-// Copyright 2016 Realm Inc.
+// Copyright 2019 Realm Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,6 +15,8 @@
 // limitations under the License.
 //
 ////////////////////////////////////////////////////////////////////////////
+
+#define CATCH_CONFIG_ENABLE_BENCHMARKING
 
 // FIXME: the nextafter define below can be removed once we upgrade to an
 // Android ndk version which has support for std::nextafter (absent in ndk r10e)

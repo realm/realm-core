@@ -16,7 +16,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "catch.hpp"
+#include "catch2/catch.hpp"
 #include "sync/session/session_util.hpp"
 #include "util/event_loop.hpp"
 #include "util/test_utils.hpp"
