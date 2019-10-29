@@ -465,6 +465,8 @@ ObjKey ConstObj::get_backlink(ColKey backlink_col, size_t backlink_ndx) const
 }
 
 namespace {
+const char escapes[] = "\b\f\n\r\t\"";
+std::map<char, std::string> translate{{'\b', "\\b"}, {'\f', "\\f"}, {'\n', "\\n"}, {'\r', "\\r"}, {'\t', "\\t"}, {'\\', "\\\\"}};
 
 template <class T>
 inline void out_floats(std::ostream& out, T value)
@@ -494,9 +496,16 @@ void out_mixed(std::ostream& out, const Mixed& val)
         case type_Double:
             out_floats<double>(out, val.get<double>());
             break;
-        case type_String:
-            out << "\"" << val.get<String>() << "\"";
+        case type_String: {
+            std::string str = val.get<String>();
+            size_t p = str.find_first_of(escapes);
+            while (p != std::string::npos) {
+                str = str.substr(0, p) + translate[str[p]] + str.substr(p + 1);
+                p = str.find_first_of(escapes);
+            }
+            out << "\"" << str << "\"";
             break;
+        }
         case type_Binary: {
             out << "\"";
             auto bin = val.get<Binary>();
