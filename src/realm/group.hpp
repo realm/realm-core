@@ -1034,7 +1034,7 @@ void Group::to_json(S& out, size_t link_depth, std::map<std::string, std::string
     std::map<std::string, std::string> renames2;
     renames = renames ? renames : &renames2;
 
-    out << "{";
+    out << "{" << std::endl;
 
     auto keys = get_table_keys();
     for (size_t i = 0; i < keys.size(); ++i) {
@@ -1051,9 +1051,10 @@ void Group::to_json(S& out, size_t link_depth, std::map<std::string, std::string
         out << "\"" << name << "\"";
         out << ":";
         table->to_json(out, link_depth, renames);
+        out << std::endl;
     }
 
-    out << "}";
+    out << "}" << std::endl;
 }
 
 inline void Group::init_array_parents() noexcept

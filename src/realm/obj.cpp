@@ -590,7 +590,6 @@ void ConstObj::to_json(std::ostream& out, size_t link_depth, std::map<std::strin
                     if ((link_depth == 0) ||
                         (link_depth == not_found && std::find(followed.begin(), followed.end(), ck) != followed.end())) {
                         out << "{\"table\": \"" << get_target_table(ck)->get_name() << "\", \"key\": " << obj.get_key().value << "}";
-                        break;
                     }
                     else {
                         out << "[";
