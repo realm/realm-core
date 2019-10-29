@@ -227,6 +227,7 @@ target_compile_definitions(CoreObjects PRIVATE
   "$<$<CXX_COMPILER_ID:MSVC>:_CRT_SECURE_NO_WARNINGS>"
   "$<$<CXX_COMPILER_ID:MSVC>:_SCL_SECURE_NO_WARNINGS>"
 )
+target_compile_options(CoreObjects PRIVATE ${REALM_SANITIZER_FLAGS})
 
 set(REALM_OBJECT_FILES $<TARGET_OBJECTS:CoreObjects>)
 
@@ -266,6 +267,9 @@ target_compile_definitions(Core PUBLIC
   "$<$<CXX_COMPILER_ID:MSVC>:_CRT_SECURE_NO_WARNINGS>"
   "$<$<CXX_COMPILER_ID:MSVC>:_SCL_SECURE_NO_WARNINGS>"
 )
+
+target_compile_options(Core PUBLIC ${REALM_SANITIZER_FLAGS})
+target_link_options(Core PUBLIC ${REALM_SANITIZER_FLAGS})
 
 # GCC<5.1 does not adhere to the C++11 ABI for std::string but some systems
 # still produce non-compliant C++11 ABI even with newer version of GCC (Centos 6 for example).
