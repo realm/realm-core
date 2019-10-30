@@ -105,7 +105,7 @@ static void subscribe_to_all(std::shared_ptr<Realm> const& r)
         {"updated_at", Timestamp(0, 0)},
         {"expires_at", Timestamp()},
         {"time_to_live", {}},
-    }, false);
+    });
 
     r->commit_transaction();
 

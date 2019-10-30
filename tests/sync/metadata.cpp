@@ -96,12 +96,12 @@ TEST_CASE("sync_metadata: migration", "[sync]") {
                 { "identity", identity_1 },
                 { "marked_for_removal", false },
                 { "user_token", token }
-            }, false);
+            });
             Object::create<util::Any>(context, realm, user_metadata_schema, AnyDict{
                 { "identity", identity_2 },
                 { "marked_for_removal", false },
                 { "auth_server_url", auth_server_url }
-            }, false);
+            });
             realm->commit_transaction();
         }
         // Open v2 metadata
@@ -157,13 +157,13 @@ TEST_CASE("sync_metadata: migration", "[sync]") {
                 { "marked_for_removal", false },
                 { "user_token", token },
                 { "user_is_admin", false }
-            }, false);
+            });
             Object::create<util::Any>(context, realm, user_metadata_schema, AnyDict{
                 { "identity", identity_2 },
                 { "marked_for_removal", false },
                 { "auth_server_url", auth_server_url },
                 { "user_is_admin", true }
-            }, false);
+            });
             realm->commit_transaction();
         }
         // Open v2 metadata
