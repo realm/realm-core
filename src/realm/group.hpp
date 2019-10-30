@@ -671,7 +671,11 @@ private:
     // number of tables held back before being recycled. We hold back recycling
     // the latest to increase the probability of detecting race conditions
     // without crashing.
-    const static int g_table_recycling_delay = 100;
+#ifdef REALM_DEBUG
+    const static int g_table_recycling_delay = 1;
+#else
+    const static int g_table_recycling_delay = 500;
+#endif
     static std::mutex g_table_recycler_mutex;
 
     struct shared_tag {

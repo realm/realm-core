@@ -455,7 +455,8 @@ EncryptedFileMapping::~EncryptedFileMapping()
 char* EncryptedFileMapping::page_addr(size_t local_page_ndx) const noexcept
 {
     REALM_ASSERT_EX(local_page_ndx < m_page_state.size(), local_page_ndx, m_page_state.size());
-    return (reinterpret_cast<char*>(local_page_ndx << m_page_shift) + reinterpret_cast<uintptr_t>(m_addr));
+    return (reinterpret_cast<char*>(m_addr)) + (local_page_ndx << m_page_shift);
+//    return (reinterpret_cast<char*>(local_page_ndx << m_page_shift) + reinterpret_cast<uintptr_t>(m_addr));
 }
 
 void EncryptedFileMapping::mark_outdated(size_t local_page_ndx) noexcept
@@ -533,6 +534,11 @@ void EncryptedFileMapping::write_page(size_t local_page_ndx) noexcept
         m_chunk_dont_scan[chunk_ndx] = 0;
 }
 
+void _memcpy(char* dest, char* src, size_t size) {
+    char* limit = dest + size;
+    while (dest < limit) { *dest++ = *src++; }
+}
+
 void EncryptedFileMapping::write_and_update_all(size_t local_page_ndx, size_t begin_offset, size_t end_offset) noexcept
 {
     // Go through all other mappings of this file and copy changes into those mappings
@@ -542,7 +548,7 @@ void EncryptedFileMapping::write_and_update_all(size_t local_page_ndx, size_t be
         if (m != this && m->contains_page(page_ndx_in_file)) {
             size_t shadow_local_page_ndx = page_ndx_in_file - m->m_first_page;
             if (is(m->m_page_state[shadow_local_page_ndx], UpToDate)) { // only keep up to data pages up to date
-                memcpy(m->page_addr(shadow_local_page_ndx) + begin_offset,
+                _memcpy(m->page_addr(shadow_local_page_ndx) + begin_offset,
                        page_addr(local_page_ndx) + begin_offset,
                        end_offset - begin_offset);
             }

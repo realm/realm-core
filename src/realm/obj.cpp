@@ -233,8 +233,10 @@ T ConstObj::get(ColKey col_key) const
 {
     auto current_version = get_alloc().get_storage_version(m_instance_version);
     m_table->report_invalid_key(col_key);
-    ColumnType type = col_key.get_type();
-    REALM_ASSERT(type == ColumnTypeTraits<T>::column_id);
+    // We would like to assert the invariant below, but can't, as this method
+    // is called in situations, where it is OK to fail - but nok ok to assert.
+    // ColumnType type = col_key.get_type();
+    //REALM_ASSERT(type == ColumnTypeTraits<T>::column_id);
 
     return _get<T>(col_key.get_index(), current_version);
 }
