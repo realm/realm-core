@@ -56,8 +56,8 @@ public:
     void set_addr(char* addr);
 
 private:
-    char* m_addr;
-    ref_type m_ref;
+    char* m_addr = nullptr;
+    ref_type m_ref = 0;
 #if REALM_ENABLE_MEMDEBUG
     // Allocator that created m_ref. Used to verify that the ref is valid whenever you call
     // get_ref()/get_addr and that it e.g. has not been free'ed
@@ -224,6 +224,13 @@ protected:
             throw LogicError(LogicError::detached_accessor);
         }
         return m_storage_versioning_counter.load(std::memory_order_acquire);
+    }
+
+    void check_instance_version(uint64_t instance_version)
+    {
+        if (instance_version != m_instance_versioning_counter) {
+            throw LogicError(LogicError::detached_accessor);
+        }
     }
 
     inline void bump_storage_version() noexcept

@@ -34,13 +34,14 @@ public:
     {
     }
     ConstTableRef(const TableRef& other);
+    ConstTableRef(const ConstTableRef& other);
     ConstTableRef(std::nullptr_t) {}
-
+    ConstTableRef& operator=(const ConstTableRef& other);
+    ConstTableRef& operator=(const TableRef& other);
     const Table* operator->() const;
-    const Table& operator*() const
-    {
-        return *m_table;
-    }
+    const Table* checked() const;
+    const Table* unchecked() const { return m_table; }
+    const Table& operator*() const;
     explicit ConstTableRef(const Table* t_ptr);
     ConstTableRef()
     {
@@ -48,7 +49,7 @@ public:
     operator bool() const;
     operator const Table*() const
     {
-        return m_table;
+        return checked();
     }
 
     bool operator==(const ConstTableRef& other) const
@@ -77,14 +78,14 @@ protected:
 class TableRef : public ConstTableRef {
 public:
     Table* operator->() const;
-    Table& operator*() const
-    {
-        return *m_table;
-    }
+    Table* checked() const;
+    Table* unchecked() const { return m_table; }
+    Table& operator*() const;
     operator Table*() const
     {
-        return m_table;
+        return checked();
     }
+
     explicit TableRef(Table* t_ptr)
         : ConstTableRef(t_ptr)
     {
@@ -94,7 +95,11 @@ public:
         : ConstTableRef()
     {
     }
-
+    TableRef& operator=(const TableRef& other)
+    {
+        ConstTableRef::operator=(other);
+        return *this;
+    }
 protected:
     friend class Group;
     friend class Table;
@@ -107,6 +112,24 @@ inline ConstTableRef::ConstTableRef(const TableRef& other)
 {
 }
 
+inline ConstTableRef::ConstTableRef(const ConstTableRef& other)
+    : m_table(other.m_table), m_instance_version(other.m_instance_version)
+{
+}
+
+inline ConstTableRef& ConstTableRef::operator=(const ConstTableRef& other)
+{
+    m_table = other.m_table;
+    m_instance_version = other.m_instance_version;
+    return *this;
+}
+
+inline ConstTableRef& ConstTableRef::operator=(const TableRef& other)
+{
+    m_table = other.m_table;
+    m_instance_version = other.m_instance_version;
+    return *this;
+}
 
 inline std::ostream& operator<<(std::ostream& o, const ConstTableRef& tr)
 {

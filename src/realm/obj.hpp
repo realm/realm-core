@@ -67,6 +67,16 @@ public:
     {
     }
     ConstObj(const ClusterTree* tree_top, MemRef mem, ObjKey key, size_t row_ndx);
+    ConstObj& operator=(const ConstObj& other)
+    {
+        m_table = other.m_table;
+        m_mem = other.m_mem;
+        m_row_ndx = other.m_row_ndx;
+        m_storage_version = other.m_storage_version;
+        m_instance_version = other.m_instance_version;
+        m_valid = other.m_valid;
+        return *this;
+    }
 
     Allocator& get_alloc() const;
 
@@ -76,20 +86,15 @@ public:
     {
         return m_key;
     }
-
+    const TableRef get_table() const { return m_table; }
     ObjectID get_object_id() const;
-
-    const Table* get_table() const
-    {
-        return m_table;
-    }
 
     Replication* get_replication() const;
 
     // Check if this object is default constructed
     explicit operator bool() const
     {
-        return m_table != nullptr;
+        return m_table.checked() != nullptr;
     }
 
     // Check if the object is still alive
@@ -173,7 +178,7 @@ protected:
     friend class ConstTableView;
     friend class Transaction;
 
-    const Table* m_table;
+    TableRef m_table;
     ObjKey m_key;
     mutable MemRef m_mem;
     mutable size_t m_row_ndx;

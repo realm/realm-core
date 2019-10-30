@@ -827,6 +827,7 @@ Table* Group::create_table_accessor(size_t table_ndx)
         }
         if (!g_table_recycler_2.empty()) {
             table = g_table_recycler_2.back();
+            REALM_ASSERT(table != nullptr);
             table->fully_detach();
             g_table_recycler_2.pop_back();
         }
@@ -848,6 +849,7 @@ Table* Group::create_table_accessor(size_t table_ndx)
 
 void Group::recycle_table_accessor(Table* to_be_recycled)
 {
+    REALM_ASSERT(to_be_recycled != nullptr);
     std::lock_guard<std::mutex> lg(g_table_recycler_mutex);
     g_table_recycler_1.push_back(to_be_recycled);
 }

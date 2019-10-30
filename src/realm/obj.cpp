@@ -38,7 +38,7 @@ namespace realm {
 /********************************* ConstObj **********************************/
 
 ConstObj::ConstObj(const ClusterTree* tree_top, MemRef mem, ObjKey key, size_t row_ndx)
-    : m_table(tree_top->get_owner())
+    : m_table(const_cast<Table*>(tree_top->get_owner()))
     , m_key(key)
     , m_mem(mem)
     , m_row_ndx(row_ndx)
@@ -60,7 +60,7 @@ const ClusterTree* ConstObj::get_tree_top() const
 
 Allocator& ConstObj::get_alloc() const
 {
-    return m_table->m_alloc;
+    return m_table.unchecked()->m_alloc;
 }
 
 const Spec& ConstObj::get_spec() const
@@ -139,16 +139,21 @@ bool ConstObj::operator==(const ConstObj& other) const
 bool ConstObj::is_valid() const
 {
     // Cache valid state. If once invalid, it can never become valid again
-    if (m_valid)
-        m_valid = (m_table->get_instance_version() == m_instance_version)
-               && (m_table->get_storage_version(m_instance_version) == m_storage_version || m_table->is_valid(m_key));
-
+    if (m_valid) {
+        Table* t = m_table.checked();
+        if (t == nullptr) { 
+            m_valid = false; 
+        }
+        else {
+            m_valid = (t->get_storage_version(m_instance_version) == m_storage_version) || t->is_valid(m_key);
+        }
+    }
     return m_valid;
 }
 
 void ConstObj::remove()
 {
-    const_cast<Table*>(get_table())->remove_object(m_key);
+    m_table->remove_object(m_key);
 }
 
 Mixed ConstObj::get_any(ColKey col_key) const
@@ -181,6 +186,7 @@ Mixed ConstObj::get_any(ColKey col_key) const
     }
     return {};
 }
+
 
 ColKey ConstObj::get_column_key(StringData col_name) const
 {

@@ -36,7 +36,7 @@ ConstTableRef::operator bool() const
 const Table* ConstTableRef::operator->() const
 {
     if (!operator bool()) {
-        throw realm::NoSuchTable();
+        throw realm::LogicError(LogicError::detached_accessor);
     }
     return m_table;
 }
@@ -44,9 +44,41 @@ const Table* ConstTableRef::operator->() const
 Table* TableRef::operator->() const
 {
     if (!operator bool()) {
-        throw realm::NoSuchTable();
+        throw realm::LogicError(LogicError::detached_accessor);
     }
     return m_table;
+}
+
+const Table* ConstTableRef::checked() const
+{
+    if (!operator bool()) {
+        throw realm::LogicError(LogicError::detached_accessor);
+    }
+    return m_table;
+}
+
+Table* TableRef::checked() const
+{
+    if (!operator bool()) {
+        throw realm::LogicError(LogicError::detached_accessor);
+    }
+    return m_table;
+}
+
+const Table& ConstTableRef::operator*() const
+{
+    if (!operator bool()) {
+        throw realm::LogicError(LogicError::detached_accessor);
+    }
+    return *m_table;
+}
+
+Table& TableRef::operator*() const
+{
+    if (!operator bool()) {
+        throw realm::LogicError(LogicError::detached_accessor);
+    }
+    return *m_table;
 }
 
 
