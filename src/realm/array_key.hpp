@@ -42,9 +42,7 @@ public:
     using Array::erase;
     using Array::clear;
     using Array::destroy;
-#ifdef REALM_DEBUG
     using Array::verify;
-#endif
 
     ArrayKeyBase(Allocator& allocator)
         : Array(allocator)

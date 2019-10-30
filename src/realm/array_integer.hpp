@@ -105,9 +105,9 @@ public:
     {
     }
 
-    void create()
+    void create(size_t sz = 0)
     {
-        ArrayInteger::create(type_HasRefs);
+        Array::create(type_HasRefs, false, sz, 0);
     }
 
     void add(ref_type value)
@@ -129,6 +129,7 @@ public:
     {
         return to_ref(Array::get(ndx));
     }
+    void verify() const;
 };
 
 class ArrayIntNull : public Array, public ArrayPayload {

@@ -34,9 +34,6 @@ public:
     using Array::get_parent;
     using Array::get_ndx_in_parent;
     using Array::get_ref;
-#ifdef REALM_DEBUG
-    using Array::verify;
-#endif
 
     static Timestamp default_value(bool nullable)
     {
@@ -105,6 +102,8 @@ public:
 
     size_t find_first(Timestamp value, size_t begin, size_t end) const noexcept;
 
+    void verify() const;
+
 private:
     ArrayIntNull m_seconds;
     ArrayInteger m_nanoseconds;
@@ -127,6 +126,7 @@ inline size_t ArrayTimestamp::find_first(Timestamp value, size_t begin, size_t e
 {
     return find_first<Equal>(value, begin, end);
 }
+
 
 template <>
 class QueryState<Timestamp> : public QueryStateBase {

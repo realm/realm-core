@@ -278,7 +278,7 @@ private:
     template <class T>
     void set_spec(T&, ColKey::Idx) const;
     template <class ArrayType>
-    void verify(ref_type ref, size_t index) const;
+    void verify(ref_type ref, size_t index, util::Optional<size_t>& sz) const;
 };
 
 }

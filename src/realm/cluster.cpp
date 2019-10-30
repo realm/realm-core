@@ -725,8 +725,8 @@ void Cluster::create(size_t nb_leaf_columns)
         auto type = col_key.get_type();
         auto attr = col_key.get_attrs();
         if (attr.test(col_attr_List)) {
-            ArrayInteger arr(m_alloc);
-            arr.create(type_HasRefs);
+            ArrayRef arr(m_alloc);
+            arr.create();
             arr.set_parent(this, col_ndx.val + s_first_col_index);
             arr.update_parent();
             return false;
@@ -896,7 +896,7 @@ void Cluster::insert_row(size_t ndx, ObjKey k, const FieldValues& init_values)
 
         if (attr.test(col_attr_List)) {
             REALM_ASSERT(init_value.is_null());
-            ArrayInteger arr(m_alloc);
+            ArrayRef arr(m_alloc);
             arr.set_parent(this, col_ndx.val + s_first_col_index);
             arr.init_from_parent();
             arr.insert(ndx, 0);
@@ -975,7 +975,7 @@ void Cluster::move(size_t ndx, ClusterNode* new_node, int64_t offset)
         auto type = col_key.get_type();
 
         if (attr.test(col_attr_List)) {
-            do_move<ArrayInteger>(ndx, col_key, new_leaf);
+            do_move<ArrayRef>(ndx, col_key, new_leaf);
             return false;
         }
 
@@ -1085,8 +1085,8 @@ void Cluster::insert_column(ColKey col_key)
     if (attr.test(col_attr_List)) {
         size_t sz = node_size();
 
-        ArrayInteger arr(m_alloc);
-        arr.Array::create(type_HasRefs, false, sz, 0);
+        ArrayRef arr(m_alloc);
+        arr.create(sz);
         auto col_ndx = col_key.get_index();
         unsigned idx = col_ndx.val + s_first_col_index;
         if (idx == size())
@@ -1345,10 +1345,10 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
         auto col_ndx = col_key.get_index();
         auto attr = col_key.get_attrs();
         if (attr.test(col_attr_List)) {
-            ArrayInteger values(m_alloc);
+            ArrayRef values(m_alloc);
             values.set_parent(this, col_ndx.val + s_first_col_index);
             values.init_from_parent();
-            ref_type ref = values.get_as_ref(ndx);
+            ref_type ref = values.get(ndx);
 
             if (ref) {
                 if (col_type == col_type_LinkList) {
@@ -1468,25 +1468,33 @@ void Cluster::add_leaf(ColKey col_key, ref_type ref)
 }
 
 template <typename ArrayType>
-void Cluster::verify(ref_type ref, size_t index) const
+void Cluster::verify(ref_type ref, size_t index, util::Optional<size_t>& sz) const
 {
     ArrayType arr(get_alloc());
     set_spec(arr, ColKey::Idx{unsigned(index) - 1});
     arr.set_parent(const_cast<Cluster *>(this), index);
     arr.init_from_ref(ref);
     arr.verify();
+    if (sz) {
+        REALM_ASSERT(arr.size() == *sz);
+    }
+    else {
+        sz = arr.size();
+    }
 }
 
 void Cluster::verify() const
 {
 #ifdef REALM_DEBUG
     auto& spec = m_tree_top.get_spec();
+    util::Optional<size_t> sz;
     for (size_t i = 0; i < spec.get_column_count(); i++) {
         size_t col = spec.get_key(i).get_index().val + s_first_col_index;
         ref_type ref = Array::get_as_ref(col);
         auto attr = spec.get_column_attr(i);
         if (attr.test(col_attr_List)) {
             // FIXME: implement
+            verify<ArrayRef>(ref, col, sz);
             continue;
         }
 
@@ -1494,53 +1502,35 @@ void Cluster::verify() const
         switch (spec.get_column_type(i)) {
             case col_type_Int:
                 if (nullable) {
-                    verify<ArrayIntNull>(ref, col);
+                    verify<ArrayIntNull>(ref, col, sz);
                 }
                 else {
-                    verify<Array>(ref, col);
+                    verify<ArrayInteger>(ref, col, sz);
                 }
                 break;
             case col_type_Bool:
-                if (nullable) {
-                    verify<ArrayBoolNull>(ref, col);
-                }
-                else {
-                    verify<ArrayBool>(ref, col);
-                }
+                verify<ArrayBoolNull>(ref, col, sz);
                 break;
             case col_type_Float:
-                if (nullable) {
-                    verify<ArrayFloatNull>(ref, col);
-                }
-                else {
-                    verify<ArrayFloat>(ref, col);
-                }
+                verify<ArrayFloatNull>(ref, col, sz);
                 break;
             case col_type_Double:
-                if (nullable) {
-                    verify<ArrayDoubleNull>(ref, col);
-                }
-                else {
-                    verify<ArrayDouble>(ref, col);
-                }
+                verify<ArrayDoubleNull>(ref, col, sz);
                 break;
             case col_type_String:
-                verify<ArrayString>(ref, col);
+                verify<ArrayString>(ref, col, sz);
                 break;
             case col_type_Binary:
-                verify<ArrayBinary>(ref, col);
+                verify<ArrayBinary>(ref, col, sz);
                 break;
             case col_type_Timestamp:
-                verify<ArrayTimestamp>(ref, col);
+                verify<ArrayTimestamp>(ref, col, sz);
                 break;
             case col_type_Link:
-                verify<ArrayKey>(ref, col);
-                break;
-            case col_type_LinkList:
-                verify<ArrayKey>(ref, col);
+                verify<ArrayKey>(ref, col, sz);
                 break;
             case col_type_BackLink:
-                verify<ArrayBacklink>(ref, col);
+                verify<ArrayBacklink>(ref, col, sz);
                 break;
             default:
                 break;

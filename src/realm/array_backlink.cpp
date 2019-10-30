@@ -215,7 +215,7 @@ void ArrayBacklink::verify() const
         }
     }
 
-    // Verify that each foward link has a corresponding backlink
+    // Verify that each forward link has a corresponding backlink
     auto verify_backlink = [&](ObjKey src, ObjKey target_key) {
         if (!target_key) {
             return;

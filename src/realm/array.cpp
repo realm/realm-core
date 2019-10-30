@@ -1759,6 +1759,23 @@ void Array::report_memory_usage_2(MemUsageHandler& handler) const
     }
 }
 
+void Array::verify() const
+{
+#ifdef REALM_DEBUG
+    REALM_ASSERT(is_attached());
+
+    REALM_ASSERT(m_width == 0 || m_width == 1 || m_width == 2 || m_width == 4 || m_width == 8 || m_width == 16 ||
+                 m_width == 32 || m_width == 64);
+
+    if (!get_parent())
+        return;
+
+    // Check that parent is set correctly
+    ref_type ref_in_parent = get_ref_from_parent();
+    REALM_ASSERT_3(ref_in_parent, ==, m_ref);
+#endif
+}
+
 
 #ifdef REALM_DEBUG
 
@@ -1771,21 +1788,6 @@ void Array::print() const
         std::cout << get(i);
     }
     std::cout << "\n";
-}
-
-void Array::verify() const
-{
-    REALM_ASSERT(is_attached());
-
-    REALM_ASSERT(m_width == 0 || m_width == 1 || m_width == 2 || m_width == 4 || m_width == 8 || m_width == 16 ||
-                 m_width == 32 || m_width == 64);
-
-    if (!get_parent())
-        return;
-
-    // Check that parent is set correctly
-    ref_type ref_in_parent = get_ref_from_parent();
-    REALM_ASSERT_3(ref_in_parent, ==, m_ref);
 }
 
 namespace {

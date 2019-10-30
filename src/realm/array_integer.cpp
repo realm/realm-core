@@ -70,6 +70,15 @@ bool ArrayInteger::minmax(size_t from, size_t to, uint64_t maxdiff, int64_t* min
     }
 }
 
+void ArrayRef::verify() const
+{
+#ifdef REALM_DEBUG
+    Array::verify();
+    REALM_ASSERT(has_refs());
+#endif
+}
+
+
 MemRef ArrayIntNull::create_array(Type type, bool context_flag, size_t size, Allocator& alloc)
 {
     // Create an array with null value as the first element
