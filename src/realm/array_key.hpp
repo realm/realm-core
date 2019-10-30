@@ -42,6 +42,7 @@ public:
     using Array::erase;
     using Array::clear;
     using Array::destroy;
+    using Array::verify;
 
     ArrayKeyBase(Allocator& allocator)
         : Array(allocator)

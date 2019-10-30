@@ -675,9 +675,10 @@ public:
 
     void stats(MemStats& stats_dest) const noexcept;
 
+    void verify() const;
+
 #ifdef REALM_DEBUG
     void print() const;
-    void verify() const;
     typedef size_t (*LeafVerifier)(MemRef, Allocator&);
     void verify_bptree(LeafVerifier) const;
     typedef void (*LeafDumper)(MemRef, Allocator&, std::ostream&, int level);

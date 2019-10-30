@@ -149,10 +149,7 @@ public:
     {
         m_root->dump_objects(0, "");
     }
-    void verify() const
-    {
-        // TODO: implement
-    }
+    void verify() const;
 
 private:
     friend class ConstObj;

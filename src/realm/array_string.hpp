@@ -109,6 +109,8 @@ public:
     /// slower.
     static StringData get(const char* header, size_t ndx, Allocator& alloc) noexcept;
 
+    void verify() const;
+
 private:
     static constexpr size_t small_string_max_size = 15;  // ArrayStringShort
     static constexpr size_t medium_string_max_size = 63; // ArrayStringLong

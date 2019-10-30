@@ -725,8 +725,8 @@ void Cluster::create(size_t nb_leaf_columns)
         auto type = col_key.get_type();
         auto attr = col_key.get_attrs();
         if (attr.test(col_attr_List)) {
-            ArrayInteger arr(m_alloc);
-            arr.create(type_HasRefs);
+            ArrayRef arr(m_alloc);
+            arr.create();
             arr.set_parent(this, col_ndx.val + s_first_col_index);
             arr.update_parent();
             return false;
@@ -824,12 +824,12 @@ size_t Cluster::node_size_from_header(Allocator& alloc, const char* header)
 namespace realm {
 
 template <class T>
-inline void Cluster::set_spec(T&, ColKey::Idx)
+inline void Cluster::set_spec(T&, ColKey::Idx) const
 {
 }
 
 template <>
-inline void Cluster::set_spec(ArrayString& arr, ColKey::Idx col_ndx)
+inline void Cluster::set_spec(ArrayString& arr, ColKey::Idx col_ndx) const
 {
     auto spec_ndx = m_tree_top.get_owner()->leaf_ndx2spec_ndx(col_ndx);
     arr.set_spec(const_cast<Spec*>(&m_tree_top.get_spec()), spec_ndx);
@@ -896,7 +896,7 @@ void Cluster::insert_row(size_t ndx, ObjKey k, const FieldValues& init_values)
 
         if (attr.test(col_attr_List)) {
             REALM_ASSERT(init_value.is_null());
-            ArrayInteger arr(m_alloc);
+            ArrayRef arr(m_alloc);
             arr.set_parent(this, col_ndx.val + s_first_col_index);
             arr.init_from_parent();
             arr.insert(ndx, 0);
@@ -975,7 +975,7 @@ void Cluster::move(size_t ndx, ClusterNode* new_node, int64_t offset)
         auto type = col_key.get_type();
 
         if (attr.test(col_attr_List)) {
-            do_move<ArrayInteger>(ndx, col_key, new_leaf);
+            do_move<ArrayRef>(ndx, col_key, new_leaf);
             return false;
         }
 
@@ -1035,6 +1035,19 @@ Cluster::~Cluster()
 {
 }
 
+const Table* Cluster::get_owning_table() const
+{
+    return m_tree_top.get_owner();
+}
+
+ColKey Cluster::get_col_key(size_t ndx_in_parent) const
+{
+    ColKey::Idx col_ndx{unsigned(ndx_in_parent - 1)}; // <- leaf_index here. Opaque.
+    auto col_key = get_owning_table()->leaf_ndx2colkey(col_ndx);
+    REALM_ASSERT(col_key.get_index().val == col_ndx.val);
+    return col_key;
+}
+
 void Cluster::ensure_general_form()
 {
     if (!m_keys.is_attached()) {
@@ -1072,8 +1085,8 @@ void Cluster::insert_column(ColKey col_key)
     if (attr.test(col_attr_List)) {
         size_t sz = node_size();
 
-        ArrayInteger arr(m_alloc);
-        arr.Array::create(type_HasRefs, false, sz, 0);
+        ArrayRef arr(m_alloc);
+        arr.create(sz);
         auto col_ndx = col_key.get_index();
         unsigned idx = col_ndx.val + s_first_col_index;
         if (idx == size())
@@ -1332,10 +1345,10 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
         auto col_ndx = col_key.get_index();
         auto attr = col_key.get_attrs();
         if (attr.test(col_attr_List)) {
-            ArrayInteger values(m_alloc);
+            ArrayRef values(m_alloc);
             values.set_parent(this, col_ndx.val + s_first_col_index);
             values.init_from_parent();
-            ref_type ref = values.get_as_ref(ndx);
+            ref_type ref = values.get(ndx);
 
             if (ref) {
                 if (col_type == col_type_LinkList) {
@@ -1452,6 +1465,78 @@ void Cluster::add_leaf(ColKey col_key, ref_type ref)
     auto col_ndx = col_key.get_index();
     REALM_ASSERT((col_ndx.val + 1) == size());
     Array::insert(col_ndx.val + 1, from_ref(ref));
+}
+
+template <typename ArrayType>
+void Cluster::verify(ref_type ref, size_t index, util::Optional<size_t>& sz) const
+{
+    ArrayType arr(get_alloc());
+    set_spec(arr, ColKey::Idx{unsigned(index) - 1});
+    arr.set_parent(const_cast<Cluster *>(this), index);
+    arr.init_from_ref(ref);
+    arr.verify();
+    if (sz) {
+        REALM_ASSERT(arr.size() == *sz);
+    }
+    else {
+        sz = arr.size();
+    }
+}
+
+void Cluster::verify() const
+{
+#ifdef REALM_DEBUG
+    auto& spec = m_tree_top.get_spec();
+    util::Optional<size_t> sz;
+    for (size_t i = 0; i < spec.get_column_count(); i++) {
+        size_t col = spec.get_key(i).get_index().val + s_first_col_index;
+        ref_type ref = Array::get_as_ref(col);
+        auto attr = spec.get_column_attr(i);
+        if (attr.test(col_attr_List)) {
+            // FIXME: implement
+            verify<ArrayRef>(ref, col, sz);
+            continue;
+        }
+
+        bool nullable = attr.test(col_attr_Nullable);
+        switch (spec.get_column_type(i)) {
+            case col_type_Int:
+                if (nullable) {
+                    verify<ArrayIntNull>(ref, col, sz);
+                }
+                else {
+                    verify<ArrayInteger>(ref, col, sz);
+                }
+                break;
+            case col_type_Bool:
+                verify<ArrayBoolNull>(ref, col, sz);
+                break;
+            case col_type_Float:
+                verify<ArrayFloatNull>(ref, col, sz);
+                break;
+            case col_type_Double:
+                verify<ArrayDoubleNull>(ref, col, sz);
+                break;
+            case col_type_String:
+                verify<ArrayString>(ref, col, sz);
+                break;
+            case col_type_Binary:
+                verify<ArrayBinary>(ref, col, sz);
+                break;
+            case col_type_Timestamp:
+                verify<ArrayTimestamp>(ref, col, sz);
+                break;
+            case col_type_Link:
+                verify<ArrayKey>(ref, col, sz);
+                break;
+            case col_type_BackLink:
+                verify<ArrayBacklink>(ref, col, sz);
+                break;
+            default:
+                break;
+        }
+    }
+#endif
 }
 
 // LCOV_EXCL_START
@@ -2040,6 +2125,16 @@ void ClusterTree::remove_links()
     traverse(func);
 
     m_owner->remove_recursive(state);
+}
+
+void ClusterTree::verify() const
+{
+#ifdef REALM_DEBUG
+    traverse([](const Cluster *cluster) {
+        cluster->verify();
+        return false;
+    });
+#endif
 }
 
 

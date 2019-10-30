@@ -207,3 +207,15 @@ bool ArrayBinary::upgrade_leaf(size_t value_size)
     m_is_big = true;
     return true;
 }
+
+void ArrayBinary::verify() const
+{
+#ifdef REALM_DEBUG
+    if (!m_is_big) {
+        static_cast<ArraySmallBlobs*>(m_arr)->verify();
+    }
+    else {
+        static_cast<ArrayBigBlobs*>(m_arr)->verify();
+    }
+#endif
+}
