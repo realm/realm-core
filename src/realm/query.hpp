@@ -84,10 +84,10 @@ struct QueryGroup {
 
 class Query final {
 public:
-    Query(const Table& table, ConstTableView* tv = nullptr);
-    Query(const Table& table, std::unique_ptr<ConstTableView>);
-    Query(const Table& table, const LnkLst& list);
-    Query(const Table& table, LnkLstPtr&& list);
+    Query(TableRef table, ConstTableView* tv = nullptr);
+    Query(TableRef table, std::unique_ptr<ConstTableView>);
+    Query(TableRef table, const LnkLst& list);
+    Query(TableRef table, LnkLstPtr&& list);
     Query();
     Query(std::unique_ptr<Expression>);
     ~Query() noexcept;
@@ -258,7 +258,7 @@ public:
     int set_threads(unsigned int threadcount);
 #endif
 
-    ConstTableRef& get_table()
+    TableRef& get_table()
     {
         return m_table;
     }

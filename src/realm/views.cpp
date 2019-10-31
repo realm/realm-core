@@ -191,12 +191,12 @@ DescriptorExport SortDescriptor::export_for_handover() const
     return out;
 }
 
-std::string SortDescriptor::get_description(ConstTableRef attached_table) const
+std::string SortDescriptor::get_description(TableRef attached_table) const
 {
     std::string description = "SORT(";
     for (size_t i = 0; i < m_columns.size(); ++i) {
         const size_t chain_size = m_columns[i].size();
-        ConstTableRef cur_link_table = attached_table;
+        TableRef cur_link_table = attached_table;
         for (size_t j = 0; j < chain_size; ++j) {
             size_t col_ndx = m_columns[i][j]->get_column_index();
             REALM_ASSERT_DEBUG(col_ndx < cur_link_table->get_column_count());
@@ -223,12 +223,12 @@ std::string SortDescriptor::get_description(ConstTableRef attached_table) const
     return description;
 }
 
-std::string ColumnsDescriptor::description_for_prefix(std::string prefix, ConstTableRef attached_table) const
+std::string ColumnsDescriptor::description_for_prefix(std::string prefix, TableRef attached_table) const
 {
     std::string description = prefix + "(";
     for (size_t i = 0; i < m_columns.size(); ++i) {
         const size_t chain_size = m_columns[i].size();
-        ConstTableRef cur_link_table = attached_table;
+        TableRef cur_link_table = attached_table;
         for (size_t j = 0; j < chain_size; ++j) {
             size_t col_ndx = m_columns[i][j]->get_column_index();
             REALM_ASSERT_DEBUG(col_ndx < cur_link_table->get_column_count());
@@ -248,7 +248,7 @@ std::string ColumnsDescriptor::description_for_prefix(std::string prefix, ConstT
 }
 
 
-std::string ColumnsDescriptor::get_description(ConstTableRef attached_table) const
+std::string ColumnsDescriptor::get_description(TableRef attached_table) const
 {
     return description_for_prefix("DISTINCT", attached_table);
 }
@@ -301,7 +301,7 @@ LimitDescriptor::LimitDescriptor(size_t limit)
 {
 }
 
-std::string LimitDescriptor::get_description(ConstTableRef) const
+std::string LimitDescriptor::get_description(TableRef) const
 {
     return "LIMIT(" + serializer::print_value(m_limit) + ")";
 }
@@ -387,21 +387,21 @@ IncludeDescriptor::IncludeDescriptor(const Table& table, const std::vector<std::
     }
 }
 
-std::string IncludeDescriptor::get_description(ConstTableRef attached_table) const
+std::string IncludeDescriptor::get_description(TableRef attached_table) const
 {
     realm::util::serializer::SerialisationState basic_serialiser;
     std::string description = "INCLUDE(";
     for (size_t i = 0; i < m_columns.size(); ++i) {
         auto chain = m_columns[i];
         const size_t chain_size = chain.size();
-        ConstTableRef cur_link_table = attached_table;
+        TableRef cur_link_table = attached_table;
         for (size_t j = 0; j < chain_size; ++j) {
             if (j != 0) {
                 description += realm::util::serializer::value_separator;
             }
 
             size_t col_ndx = chain[j]->get_column_index();
-            if (ConstTableRef from_table = m_backlink_sources[i][j]) { // backlink
+            if (TableRef from_table = m_backlink_sources[i][j]) { // backlink
                 REALM_ASSERT_DEBUG(col_ndx < from_table->get_column_count());
                 REALM_ASSERT_DEBUG(from_table->get_link_target(col_ndx)->get_name() == cur_link_table->get_name());
                 description += basic_serialiser.get_backlink_column_name(from_table, col_ndx);
@@ -440,7 +440,7 @@ DescriptorExport IncludeDescriptor::export_for_handover() const
         REALM_ASSERT_EX(m_backlink_sources[i].size() == chain_size, m_backlink_sources[i].size(), chain_size);
         for (size_t j = 0; j < chain_size; ++j) {
             auto col_ndx = m_columns[i][j]->get_column_index();
-            if (ConstTableRef from_table = m_backlink_sources[i][j]) {
+            if (TableRef from_table = m_backlink_sources[i][j]) {
                 indices.push_back(DescriptorLinkPath{col_ndx, from_table->get_index_in_group(), true});
             }
             else {
@@ -515,7 +515,7 @@ void IncludeDescriptor::report_included_backlinks(
                     // in the IncludeDescriptor constructor so this should never happen
                     REALM_UNREACHABLE();
                 }
-                ConstTableRef linked_table = table->get_link_target(col_ndx);
+                TableRef linked_table = table->get_link_target(col_ndx);
                 table = linked_table.get();
             }
             rows_to_explore = results_of_next_table;
@@ -693,7 +693,7 @@ IncludeDescriptor DescriptorOrdering::compile_included_backlinks() const
     return includes; // this might be empty: see is_valid()
 }
 
-std::string DescriptorOrdering::get_description(ConstTableRef target_table) const
+std::string DescriptorOrdering::get_description(TableRef target_table) const
 {
     std::string description = "";
     for (auto it = m_descriptors.begin(); it != m_descriptors.end(); ++it) {

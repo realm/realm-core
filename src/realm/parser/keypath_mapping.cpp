@@ -23,7 +23,7 @@
 namespace realm {
 namespace parser {
 
-std::size_t TableAndColHash::operator()(const std::pair<ConstTableRef, std::string>& p) const
+std::size_t TableAndColHash::operator()(const std::pair<TableRef, std::string>& p) const
 {
     // in practice, table names are unique between tables and column names are unique within a table
     std::string combined = std::string(p.first->get_name()) + p.second;
@@ -37,7 +37,7 @@ KeyPathMapping::KeyPathMapping()
 {
 }
 
-bool KeyPathMapping::add_mapping(ConstTableRef table, std::string name, std::string alias)
+bool KeyPathMapping::add_mapping(TableRef table, std::string name, std::string alias)
 {
     if (m_mapping.find({table, name}) == m_mapping.end()) {
         m_mapping[{table, name}] = alias;
@@ -46,14 +46,14 @@ bool KeyPathMapping::add_mapping(ConstTableRef table, std::string name, std::str
     return false;
 }
 
-void KeyPathMapping::remove_mapping(ConstTableRef table, std::string name)
+void KeyPathMapping::remove_mapping(TableRef table, std::string name)
 {
     auto it = m_mapping.find({table, name});
     REALM_ASSERT_DEBUG(it != m_mapping.end());
     m_mapping.erase(it);
 }
 
-bool KeyPathMapping::has_mapping(ConstTableRef table, std::string name)
+bool KeyPathMapping::has_mapping(TableRef table, std::string name)
 {
     return m_mapping.find({table, name}) != m_mapping.end();
 }
@@ -66,7 +66,7 @@ bool is_backlinks_prefix(std::string& s)
            (s[3] == 'n' || s[3] == 'N') && (s[4] == 'k' || s[4] == 'K') && (s[5] == 's' || s[5] == 'S');
 }
 
-KeyPathElement KeyPathMapping::process_next_path(ConstTableRef table, KeyPath& keypath, size_t& index)
+KeyPathElement KeyPathMapping::process_next_path(TableRef table, KeyPath& keypath, size_t& index)
 {
     REALM_ASSERT_DEBUG(index < keypath.size());
 
@@ -142,7 +142,7 @@ void KeyPathMapping::set_backlink_class_prefix(std::string prefix)
     m_backlink_class_prefix = prefix;
 }
 
-LinkChain KeyPathMapping::link_chain_getter(ConstTableRef table, const std::vector<KeyPathElement>& links)
+LinkChain KeyPathMapping::link_chain_getter(TableRef table, const std::vector<KeyPathElement>& links)
 {
     LinkChain lc(table);
     if (links.empty()) {

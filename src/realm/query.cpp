@@ -37,8 +37,8 @@ Query::Query()
     create();
 }
 
-Query::Query(const Table& table, const LnkLst& list)
-    : m_table((const_cast<Table&>(table)).get_table_ref())
+Query::Query(TableRef table, const LnkLst& list)
+    : m_table(table)
     , m_source_link_list(list.clone())
 {
     m_view = m_source_link_list.get();
@@ -46,12 +46,12 @@ Query::Query(const Table& table, const LnkLst& list)
     if (m_view)
         m_view->check_cookie();
 #endif
-    REALM_ASSERT_DEBUG(&list.get_target_table() == m_table);
+    REALM_ASSERT_DEBUG(list.get_target_table() == m_table);
     create();
 }
 
-Query::Query(const Table& table, LnkLstPtr&& ll)
-    : m_table((const_cast<Table&>(table)).get_table_ref())
+Query::Query(TableRef table, LnkLstPtr&& ll)
+    : m_table(table)
     , m_source_link_list(std::move(ll))
 {
     m_view = m_source_link_list.get();
@@ -59,12 +59,12 @@ Query::Query(const Table& table, LnkLstPtr&& ll)
     if (m_view)
         m_view->check_cookie();
 #endif
-    REALM_ASSERT_DEBUG(&ll->get_target_table() == m_table);
+    REALM_ASSERT_DEBUG(ll->get_target_table() == m_table);
     create();
 }
 
-Query::Query(const Table& table, ConstTableView* tv)
-    : m_table((const_cast<Table&>(table)).get_table_ref())
+Query::Query(TableRef table, ConstTableView* tv)
+    : m_table(table)
     , m_view(tv)
     , m_source_table_view(tv)
 {
@@ -75,8 +75,8 @@ Query::Query(const Table& table, ConstTableView* tv)
     create();
 }
 
-Query::Query(const Table& table, std::unique_ptr<ConstTableView> tv)
-    : m_table((const_cast<Table&>(table)).get_table_ref())
+Query::Query(TableRef table, std::unique_ptr<ConstTableView> tv)
+    : m_table(table)
     , m_view(tv.get())
     , m_source_table_view(tv.get())
     , m_owned_source_table_view(std::move(tv))
@@ -1338,7 +1338,7 @@ TableView Query::find_all(size_t start, size_t end, size_t limit)
     std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_FindAll);
 #endif
 
-    TableView ret(*m_table, *this, start, end, limit);
+    TableView ret(m_table, *this, start, end, limit);
     ret.do_sync();
     return ret;
 }
@@ -1432,7 +1432,7 @@ TableView Query::find_all(const DescriptorOrdering& descriptor)
         return find_all(default_start, default_end, min_limit);
     }
 
-    TableView ret(*m_table, *this, default_start, default_end, default_limit);
+    TableView ret(m_table, *this, default_start, default_end, default_limit);
     ret.apply_descriptor_ordering(descriptor);
     return ret;
 }
@@ -1458,7 +1458,7 @@ size_t Query::count(const DescriptorOrdering& descriptor)
         return do_count(limit);
     }
 
-    TableView ret(*m_table, *this, start, end, limit);
+    TableView ret(m_table, *this, start, end, limit);
     ret.apply_descriptor_ordering(descriptor);
     return ret.size();
 }
@@ -1730,7 +1730,7 @@ Query& Query::and_query(Query&& q)
 
 Query Query::operator||(const Query& q)
 {
-    Query q2(*m_table);
+    Query q2(m_table);
     q2.and_query(*this);
     q2.Or();
     q2.and_query(q);
@@ -1747,7 +1747,7 @@ Query Query::operator&&(const Query& q)
     if (!q.root_node())
         return *this;
 
-    Query q2(*m_table);
+    Query q2(m_table);
     q2.and_query(*this);
     q2.and_query(q);
 
@@ -1759,7 +1759,7 @@ Query Query::operator!()
 {
     if (!root_node())
         throw util::runtime_error("negation of empty query is not supported");
-    Query q(*this->m_table);
+    Query q(this->m_table);
     q.Not();
     q.and_query(*this);
     return q;

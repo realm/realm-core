@@ -409,8 +409,8 @@ void ConstTableView::get_dependencies(TableVersions& ret) const
     if (m_linklist_source) {
         // m_linkview_source is set when this TableView was created by LinkView::get_as_sorted_view().
         if (m_linklist_source->is_attached()) {
-            Table& table = m_linklist_source->get_target_table();
-            ret.emplace_back(table.get_key(), table.get_content_version());
+            Table* table = m_linklist_source->get_target_table().checked();
+            ret.emplace_back(table->get_key(), table->get_content_version());
         }
     }
     else if (m_source_column_key) {
@@ -462,7 +462,7 @@ void TableView::remove(size_t row_ndx)
     m_key_values->erase(row_ndx);
 
     // Delete row in origin table
-    get_parent().remove_object(key);
+    get_parent()->remove_object(key);
 
     // It is important to not accidentally bring us in sync, if we were
     // not in sync to start with:

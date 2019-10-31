@@ -30,7 +30,7 @@ namespace realm {
 namespace parser {
 
 struct KeyPathElement {
-    ConstTableRef table;
+    TableRef table;
     ColKey col_key;
     DataType col_type;
     bool is_backlink;
@@ -46,7 +46,7 @@ public:
 };
 
 struct TableAndColHash {
-    std::size_t operator()(const std::pair<ConstTableRef, std::string>& p) const;
+    std::size_t operator()(const std::pair<TableRef, std::string>& p) const;
 };
 
 
@@ -57,22 +57,22 @@ class KeyPathMapping {
 public:
     KeyPathMapping();
     // returns true if added, false if duplicate key already exists
-    bool add_mapping(ConstTableRef table, std::string name, std::string alias);
-    void remove_mapping(ConstTableRef table, std::string name);
-    bool has_mapping(ConstTableRef table, std::string name);
-    KeyPathElement process_next_path(ConstTableRef table, KeyPath& path, size_t& index);
+    bool add_mapping(TableRef table, std::string name, std::string alias);
+    void remove_mapping(TableRef table, std::string name);
+    bool has_mapping(TableRef table, std::string name);
+    KeyPathElement process_next_path(TableRef table, KeyPath& path, size_t& index);
     void set_allow_backlinks(bool allow);
     bool backlinks_allowed() const
     {
         return m_allow_backlinks;
     }
     void set_backlink_class_prefix(std::string prefix);
-    static LinkChain link_chain_getter(ConstTableRef table, const std::vector<KeyPathElement>& links);
+    static LinkChain link_chain_getter(TableRef table, const std::vector<KeyPathElement>& links);
 
 protected:
     bool m_allow_backlinks;
     std::string m_backlink_class_prefix;
-    std::unordered_map<std::pair<ConstTableRef, std::string>, std::string, TableAndColHash> m_mapping;
+    std::unordered_map<std::pair<TableRef, std::string>, std::string, TableAndColHash> m_mapping;
 };
 
 } // namespace parser

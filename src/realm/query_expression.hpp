@@ -474,7 +474,7 @@ Query create(L left, const Subexpr2<R>& right)
                    (std::is_same<L, BinaryData>::value && std::is_same<R, BinaryData>::value)) &&
         !column->links_exist()) {
         const Table* t = column->get_base_table();
-        Query q = Query(*t);
+        Query q = Query(TableRef(t));
 
         if (std::is_same<Cond, Less>::value)
             q.greater(column->column_key(), _impl::only_numeric<R>(left));
@@ -626,7 +626,7 @@ public:
             !right_col->is_nullable() && !left_col->links_exist() && !right_col->links_exist() &&
             !std::is_same<L, Timestamp>::value) {
             const Table* t = left_col->get_base_table();
-            Query q = Query(*t);
+            Query q = Query(TableRef(t));
 
             if (std::numeric_limits<L>::is_integer) {
                 if (std::is_same<Cond, Less>::value)
@@ -3006,8 +3006,8 @@ Query compare(const Subexpr2<Link>& left, const ConstObj& obj)
             // to "ALL linklist != row" rather than the "ANY linklist != row" semantics we're after.
             if (link_map.m_link_types[0] == col_type_Link ||
                 (link_map.m_link_types[0] == col_type_LinkList && std::is_same<Operator, Equal>::value)) {
-                const Table* t = column->get_base_table();
-                Query query(*t);
+                TableRef t = TableRef(column->get_base_table());
+                Query query(t);
 
                 if (std::is_same<Operator, NotEqual>::value) {
                     // Negate the following `links_to`.

@@ -29,7 +29,7 @@ namespace parser {
 PropertyExpression::PropertyExpression(Query& q, const std::string& key_path_string, parser::KeyPathMapping& mapping)
     : query(q)
 {
-    ConstTableRef cur_table = query.get_table();
+    TableRef cur_table = query.get_table();
     KeyPath key_path = key_path_from_string(key_path_string);
     size_t index = 0;
 

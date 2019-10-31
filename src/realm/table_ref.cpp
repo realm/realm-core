@@ -51,7 +51,10 @@ Table* TableRef::operator->() const
 
 const Table* ConstTableRef::checked() const
 {
-    if (!operator bool()) {
+    if (m_table == nullptr) {
+        throw realm::NoSuchTable();
+    }
+    if (m_table->get_instance_version() != m_instance_version) {
         throw realm::LogicError(LogicError::detached_accessor);
     }
     return m_table;
@@ -59,8 +62,33 @@ const Table* ConstTableRef::checked() const
 
 Table* TableRef::checked() const
 {
-    if (!operator bool()) {
+    if (m_table == nullptr) {
+        throw realm::NoSuchTable();
+    }
+    if (m_table->get_instance_version() != m_instance_version) {
         throw realm::LogicError(LogicError::detached_accessor);
+    }
+    return m_table;
+}
+
+const Table* ConstTableRef::checked_or_null() const
+{
+    if (m_table == nullptr) {
+        return m_table;
+    }
+    if (m_table->get_instance_version() != m_instance_version) {
+        return nullptr;
+    }
+    return m_table;
+}
+
+Table* TableRef::checked_or_null() const
+{
+    if (m_table == nullptr) {
+        return m_table;
+    }
+    if (m_table->get_instance_version() != m_instance_version) {
+        return nullptr;
     }
     return m_table;
 }

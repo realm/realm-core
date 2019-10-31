@@ -65,7 +65,7 @@ struct CollectionOperatorExpression
                 util::format("The '%1' operation must be used on a list property, but '%2' is not a list",
                              util::collection_operator_to_str(OpType), list_property_name));
 
-            ConstTableRef post_link_table;
+            TableRef post_link_table;
             if (pe.dest_type_is_backlink()) {
                 post_link_table = pe.get_dest_table();
             }

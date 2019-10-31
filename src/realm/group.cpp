@@ -605,7 +605,7 @@ void Group::update_num_objects()
         m_total_rows = 0;
         auto keys = get_table_keys();
         for (auto key : keys) {
-            ConstTableRef t = get_table(key);
+            TableRef t = get_table(key);
             m_total_rows += t->size();
         }
     }
@@ -925,11 +925,11 @@ void Group::remove_table(size_t table_ndx, TableKey key)
     m_table_names.set(table_ndx, {}); // Throws
     m_table_accessors[table_ndx] = nullptr;
     --m_num_tables;
-
+    Table* t(table);
     table->detach();
     // Destroy underlying node structure
     Array::destroy_deep(ref, m_alloc);
-    recycle_table_accessor(table);
+    recycle_table_accessor(t);
 }
 
 
@@ -1292,8 +1292,8 @@ bool Group::operator==(const Group& g) const
         if (table_name_1 != table_name_2)
             return false;
 
-        ConstTableRef table_1 = get_table(keys_this[i]);
-        ConstTableRef table_2 = g.get_table(keys_g[i]);
+        TableRef table_1 = get_table(keys_this[i]);
+        TableRef table_2 = g.get_table(keys_g[i]);
         if (*table_1 != *table_2)
             return false;
     }
@@ -1770,7 +1770,7 @@ void Group::verify() const
     {
         auto keys = get_table_keys();
         for (auto key : keys) {
-            ConstTableRef table = get_table(key);
+            TableRef table = get_table(key);
             REALM_ASSERT_3(table->get_key().value, ==, key.value);
             table->verify();
         }
@@ -1984,7 +1984,7 @@ void Group::to_dot(std::ostream& out) const
     // Tables
     auto keys = get_table_keys();
     for (auto key : keys) {
-        ConstTableRef table = get_table(key);
+        TableRef table = get_table(key);
         StringData name = get_table_name(key);
         table->to_dot(out, name);
     }

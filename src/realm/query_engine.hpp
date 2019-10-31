@@ -184,10 +184,10 @@ public:
 
     void set_table(const Table& table)
     {
-        if (&table == m_table)
+        if (&table == m_table.unchecked()) // specifically ask for unchecked conversion, since nullptr is ok.
             return;
 
-        m_table = ConstTableRef(&table);
+        m_table = TableRef(&table);
         if (m_condition_column_key != ColKey()) {
             m_condition_column_name = m_table->get_column_name(m_condition_column_key);
         }
@@ -315,7 +315,7 @@ public:
 protected:
     typedef bool (ParentNode::*Column_action_specialized)(QueryStateBase*, ArrayPayload*, size_t);
     Column_action_specialized m_column_action_specializer = nullptr;
-    ConstTableRef m_table = ConstTableRef();
+    TableRef m_table = TableRef();
     const Cluster* m_cluster = nullptr;
     QueryStateBase* m_state = nullptr;
     std::string error_code;

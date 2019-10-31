@@ -33,7 +33,7 @@ class ConstTableView;
 class ObjList {
 public:
     ObjList(KeyColumn* key_values);
-    ObjList(KeyColumn* key_values, const Table* parent);
+    ObjList(KeyColumn* key_values, TableRef parent);
 
     virtual ~ObjList()
     {
@@ -42,9 +42,9 @@ public:
 #endif
     }
 
-    const Table& get_parent() const noexcept
+    const TableRef get_parent() const noexcept
     {
-        return *m_table;
+        return m_table;
     }
 
     virtual size_t size() const;
@@ -103,7 +103,7 @@ protected:
     static const uint64_t cookie_expected = 0x7765697677777777ull; // 0x77656976 = 'view'; 0x77777777 = '7777' = alive
 
     // Null if, and only if, the view is detached.
-    mutable ConstTableRef m_table;
+    mutable TableRef m_table;
     KeyColumn* m_key_values = nullptr;
     size_t m_limit_count = 0;
     uint64_t m_debug_cookie;

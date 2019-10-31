@@ -895,7 +895,7 @@ void Table::migrate_subspec(util::FunctionRef<void()> commit_and_continue)
             if (is_link_type(col_type)) {
                 auto target_key = m_spec.get_opposite_link_table_key(col_ndx);
                 auto target_table = group->get_table(target_key);
-                Spec& target_spec = _impl::TableFriend::get_spec(*target_table);
+                Spec& target_spec = _impl::TableFriend::get_spec(target_table);
                 // The target table spec may already be migrated.
                 // If it has, the new functions should be used.
                 ColKey backlink_col_key = target_spec.has_subspec()
@@ -913,7 +913,7 @@ void Table::migrate_subspec(util::FunctionRef<void()> commit_and_continue)
                 auto origin_key = m_spec.get_opposite_link_table_key(col_ndx);
                 size_t origin_col_ndx = m_spec.get_origin_column_ndx(col_ndx);
                 auto origin_table = group->get_table(origin_key);
-                Spec& origin_spec = _impl::TableFriend::get_spec(*origin_table);
+                Spec& origin_spec = _impl::TableFriend::get_spec(origin_table);
                 ColKey origin_col_key = origin_spec.get_key(origin_col_ndx);
                 REALM_ASSERT(is_link_type(origin_col_key.get_type()));
                 if (m_opposite_table.get(col_ndx) != origin_key.value) {
@@ -1976,7 +1976,7 @@ ConstTableView Table::find_all_null(ColKey col_key) const
 
 TableView Table::get_distinct_view(ColKey col_key)
 {
-    TableView tv(TableView::DistinctView, *this, col_key);
+    TableView tv(TableView::DistinctView, TableRef(this), col_key);
     tv.do_sync();
     return tv;
 }
@@ -2304,19 +2304,19 @@ void Table::print() const
                 std::cout << "String     ";
                 break;
             case col_type_Link: {
-                ConstTableRef target_table = get_opposite_table(i);
+                TableRef target_table = get_opposite_table(i);
                 const StringData target_name = target_table->get_name();
                 std::cout << "L->" << std::setw(7) << std::string(target_name).substr(0, 7) << " ";
                 break;
             }
             case col_type_LinkList: {
-                ConstTableRef target_table = get_opposite_table(i);
+                TableRef target_table = get_opposite_table(i);
                 const StringData target_name = target_table->get_name();
                 std::cout << "LL->" << std::setw(6) << std::string(target_name).substr(0, 6) << " ";
                 break;
             }
             case col_type_BackLink: {
-                ConstTableRef target_table = get_opposite_table(i);
+                TableRef target_table = get_opposite_table(i);
                 const StringData target_name = target_table->get_name();
                 std::cout << "BL->" << std::setw(6) << std::string(target_name).substr(0, 6) << " ";
                 break;
@@ -2799,11 +2799,11 @@ Table::Iterator Table::end()
     return Iterator(m_clusters, size());
 }
 
-TableRef _impl::TableFriend::get_opposite_link_table(const Table& table, ColKey col_key)
+TableRef _impl::TableFriend::get_opposite_link_table(const TableRef table, ColKey col_key)
 {
     TableRef ret;
     if (col_key) {
-        return table.get_opposite_table(col_key);
+        return table->get_opposite_table(col_key);
     }
     return ret;
 }
@@ -2881,7 +2881,7 @@ Table::BacklinkOrigin Table::find_backlink_origin(ColKey backlink_col) const noe
         else {
             Group* current_group = get_parent_group();
             if (current_group) {
-                ConstTableRef linked_table_ref = current_group->get_table(linked_table_key);
+                TableRef linked_table_ref = current_group->get_table(linked_table_key);
                 return {{linked_table_ref, linked_column_key}};
             }
         }

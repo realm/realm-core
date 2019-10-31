@@ -172,13 +172,13 @@ public:
 
 
     /// Construct empty view, ready for addition of row indices.
-    ConstTableView(const Table* parent);
-    ConstTableView(const Table* parent, Query& query, size_t start, size_t end, size_t limit);
-    ConstTableView(const Table* parent, ColKey column, const ConstObj& obj);
-    ConstTableView(const Table* parent, ConstLnkLstPtr link_list);
+    ConstTableView(TableRef parent);
+    ConstTableView(const TableRef parent, Query& query, size_t start, size_t end, size_t limit);
+    ConstTableView(const TableRef parent, ColKey column, const ConstObj& obj);
+    ConstTableView(const TableRef parent, ConstLnkLstPtr link_list);
 
     enum DistinctViewTag { DistinctView };
-    ConstTableView(DistinctViewTag, const Table* parent, ColKey column_key);
+    ConstTableView(DistinctViewTag, const TableRef parent, ColKey column_key);
 
     /// Copy constructor.
     ConstTableView(const ConstTableView&);
@@ -362,7 +362,7 @@ protected:
     ColKey m_source_column_key;
     // The target object that rows in this view link to.
     ObjKey m_linked_obj_key;
-    ConstTableRef m_linked_table;
+    TableRef m_linked_table;
 
     // If this TableView was created from a LinkList, then this reference points to it. Otherwise it's 0
     mutable ConstLnkLstPtr m_linklist_source;
@@ -411,9 +411,9 @@ public:
 
     TableView() = default;
 
-    Table& get_parent() noexcept
+    TableRef get_parent() noexcept
     {
-        return const_cast<Table&>(*m_table);
+        return m_table;
     }
 
     // Rows
@@ -453,11 +453,11 @@ public:
     }
 
 private:
-    TableView(Table& parent);
-    TableView(Table& parent, Query& query, size_t start, size_t end, size_t limit);
-    TableView(Table& parent, ConstLnkLstPtr);
+    TableView(TableRef parent);
+    TableView(TableRef parent, Query& query, size_t start, size_t end, size_t limit);
+    TableView(TableRef parent, ConstLnkLstPtr);
 
-    TableView(DistinctViewTag, Table& parent, ColKey column_key);
+    TableView(DistinctViewTag, TableRef parent, ColKey column_key);
 
     friend class ConstTableView;
     friend class Table;
@@ -471,7 +471,7 @@ private:
 // ================================================================================================
 // ConstTableView Implementation:
 
-inline ConstTableView::ConstTableView(const Table* parent)
+inline ConstTableView::ConstTableView(TableRef parent)
     : ObjList(&m_table_view_key_values, parent) // Throws
     , m_table_view_key_values(Allocator::get_default())
 {
@@ -481,7 +481,7 @@ inline ConstTableView::ConstTableView(const Table* parent)
     }
 }
 
-inline ConstTableView::ConstTableView(const Table* parent, Query& query, size_t start, size_t end, size_t lim)
+inline ConstTableView::ConstTableView(const TableRef parent, Query& query, size_t start, size_t end, size_t lim)
     : ObjList(&m_table_view_key_values, parent)
     , m_query(query)
     , m_start(start)
@@ -492,7 +492,7 @@ inline ConstTableView::ConstTableView(const Table* parent, Query& query, size_t 
     m_table_view_key_values.create();
 }
 
-inline ConstTableView::ConstTableView(const Table* src_table, ColKey src_column_key, const ConstObj& obj)
+inline ConstTableView::ConstTableView(const TableRef src_table, ColKey src_column_key, const ConstObj& obj)
     : ObjList(&m_table_view_key_values, src_table) // Throws
     , m_source_column_key(src_column_key)
     , m_linked_obj_key(obj.get_key())
@@ -506,7 +506,7 @@ inline ConstTableView::ConstTableView(const Table* src_table, ColKey src_column_
     }
 }
 
-inline ConstTableView::ConstTableView(DistinctViewTag, const Table* parent, ColKey column_key)
+inline ConstTableView::ConstTableView(DistinctViewTag, const TableRef parent, ColKey column_key)
     : ObjList(&m_table_view_key_values, parent) // Throws
     , m_distinct_column_source(column_key)
     , m_table_view_key_values(Allocator::get_default())
@@ -518,7 +518,7 @@ inline ConstTableView::ConstTableView(DistinctViewTag, const Table* parent, ColK
     }
 }
 
-inline ConstTableView::ConstTableView(const Table* parent, ConstLnkLstPtr link_list)
+inline ConstTableView::ConstTableView(const TableRef parent, ConstLnkLstPtr link_list)
     : ObjList(&m_table_view_key_values, parent) // Throws
     , m_linklist_source(std::move(link_list))
     , m_table_view_key_values(Allocator::get_default())
@@ -667,23 +667,23 @@ inline void TableView::remove_last()
         remove(size() - 1);
 }
 
-inline TableView::TableView(Table& parent)
-    : ConstTableView(&parent)
+inline TableView::TableView(TableRef parent)
+    : ConstTableView(parent)
 {
 }
 
-inline TableView::TableView(Table& parent, Query& query, size_t start, size_t end, size_t lim)
-    : ConstTableView(&parent, query, start, end, lim)
+inline TableView::TableView(TableRef parent, Query& query, size_t start, size_t end, size_t lim)
+    : ConstTableView(parent, query, start, end, lim)
 {
 }
 
-inline TableView::TableView(Table& parent, ConstLnkLstPtr link_list)
-    : ConstTableView(&parent, std::move(link_list))
+inline TableView::TableView(TableRef parent, ConstLnkLstPtr link_list)
+    : ConstTableView(parent, std::move(link_list))
 {
 }
 
-inline TableView::TableView(ConstTableView::DistinctViewTag, Table& parent, ColKey column_key)
-    : ConstTableView(ConstTableView::DistinctView, &parent, column_key)
+inline TableView::TableView(ConstTableView::DistinctViewTag, TableRef parent, ColKey column_key)
+    : ConstTableView(ConstTableView::DistinctView, parent, column_key)
 {
 }
 
@@ -693,7 +693,7 @@ inline Obj TableView::get(size_t row_ndx)
     REALM_ASSERT_ROW(row_ndx);
     ObjKey key(m_key_values->get(row_ndx));
     REALM_ASSERT(key != realm::null_key);
-    return get_parent().get_object(key);
+    return get_parent()->get_object(key);
 }
 
 inline Obj TableView::front()

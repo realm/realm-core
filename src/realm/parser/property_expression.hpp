@@ -32,7 +32,7 @@ struct PropertyExpression
     std::vector<KeyPathElement> link_chain;
     DataType get_dest_type() const;
     ColKey get_dest_col_key() const;
-    ConstTableRef get_dest_table() const;
+    TableRef get_dest_table() const;
     bool dest_type_is_backlink() const;
 
     PropertyExpression(Query& q, const std::string& key_path_string, parser::KeyPathMapping& mapping);
@@ -64,7 +64,7 @@ inline ColKey PropertyExpression::get_dest_col_key() const
     return link_chain.back().col_key;
 }
 
-inline ConstTableRef PropertyExpression::get_dest_table() const
+inline TableRef PropertyExpression::get_dest_table() const
 {
     REALM_ASSERT_DEBUG(link_chain.size() > 0);
     return link_chain.back().table;

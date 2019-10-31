@@ -39,7 +39,7 @@ struct SubqueryExpression {
     std::vector<KeyPathElement> link_chain;
     DataType get_dest_type() const;
     ColKey get_dest_col_key() const;
-    ConstTableRef get_dest_table() const;
+    TableRef get_dest_table() const;
     bool dest_type_is_backlink() const;
 
 
@@ -74,7 +74,7 @@ inline ColKey SubqueryExpression::get_dest_col_key() const
     return link_chain.back().col_key;
 }
 
-inline ConstTableRef SubqueryExpression::get_dest_table() const
+inline TableRef SubqueryExpression::get_dest_table() const
 {
     REALM_ASSERT_DEBUG(link_chain.size() > 0);
     return link_chain.back().table;

@@ -1976,8 +1976,9 @@ size_t ClusterTree::get_column_index(StringData col_name) const
 
 const Spec& ClusterTree::get_spec() const
 {
-    typedef _impl::TableFriend tf;
-    return tf::get_spec(*m_owner);
+//    typedef _impl::TableFriend tf;
+//    return tf::get_spec(m_owner);
+    return m_owner->m_spec;
 }
 
 void ClusterTree::remove_links()

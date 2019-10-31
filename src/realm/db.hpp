@@ -559,7 +559,7 @@ public:
 
     // direct handover of accessor instances
     Obj import_copy_of(const ConstObj& original); // slicing is OK for Obj/ConstObj
-    TableRef import_copy_of(const ConstTableRef original);
+    TableRef import_copy_of(const TableRef original);
     LnkLst import_copy_of(const ConstLnkLst& original);
     LstBasePtr import_copy_of(const LstBase& original);
     LnkLstPtr import_copy_of(const LnkLstPtr& original);
@@ -662,12 +662,12 @@ public:
         return trans->has_table(name);
     }
 
-    ConstTableRef get_table(TableKey key) const
+    TableRef get_table(TableKey key) const
     {
         return trans->get_table(key); // Throws
     }
 
-    ConstTableRef get_table(StringData name) const
+    TableRef get_table(StringData name) const
     {
         return trans->get_table(name); // Throws
     }

@@ -23,11 +23,12 @@
 #include <unordered_set>
 #include <realm/cluster.hpp>
 #include <realm/mixed.hpp>
+#include <realm/table_ref.hpp>
 
 namespace realm {
 
 class SortDescriptor;
-class ConstTableRef;
+class TableRef;
 class Group;
 
 enum class DescriptorType { Sort, Distinct, Limit, Include };
@@ -39,7 +40,7 @@ struct LinkPathPart {
     {
     }
     // Constructor for backward links. Source table must be a valid table.
-    LinkPathPart(ColKey col_key, ConstTableRef source);
+    LinkPathPart(ColKey col_key, TableRef source);
     // Each step in the path can be a forward or a backward link.
     // In case of a backlink, the column_key indicates the origin link column
     // (the forward link column in the origin table), not the backlink column
@@ -73,7 +74,7 @@ public:
     class Sorter {
     public:
         Sorter(std::vector<std::vector<ColKey>> const& columns, std::vector<bool> const& ascending,
-               Table const& root_table, const IndexPairs& indexes);
+               TableRef root_table, const IndexPairs& indexes);
         Sorter()
         {
         }
@@ -116,11 +117,11 @@ public:
     BaseDescriptor() = default;
     virtual ~BaseDescriptor() = default;
     virtual bool is_valid() const noexcept = 0;
-    virtual std::string get_description(ConstTableRef attached_table) const = 0;
+    virtual std::string get_description(TableRef attached_table) const = 0;
     virtual std::unique_ptr<BaseDescriptor> clone() const = 0;
     virtual DescriptorType get_type() const = 0;
     virtual void collect_dependencies(const Table* table, std::vector<TableKey>& table_keys) const = 0;
-    virtual Sorter sorter(Table const& table, const IndexPairs& indexes) const = 0;
+    virtual Sorter sorter(TableRef table, const IndexPairs& indexes) const = 0;
     // Do what you have to do
     virtual void execute(IndexPairs& v, const Sorter& predicate, const BaseDescriptor* next) const = 0;
 };
@@ -166,10 +167,10 @@ public:
         return DescriptorType::Distinct;
     }
 
-    Sorter sorter(Table const& table, const IndexPairs& indexes) const override;
+    Sorter sorter(TableRef table, const IndexPairs& indexes) const override;
     void execute(IndexPairs& v, const Sorter& predicate, const BaseDescriptor* next) const override;
 
-    std::string get_description(ConstTableRef attached_table) const override;
+    std::string get_description(TableRef attached_table) const override;
 };
 
 
@@ -199,11 +200,11 @@ public:
 
     void merge_with(SortDescriptor&& other);
 
-    Sorter sorter(Table const& table, const IndexPairs& indexes) const override;
+    Sorter sorter(TableRef table, const IndexPairs& indexes) const override;
 
     void execute(IndexPairs& v, const Sorter& predicate, const BaseDescriptor* next) const override;
 
-    std::string get_description(ConstTableRef attached_table) const override;
+    std::string get_description(TableRef attached_table) const override;
 
 private:
     std::vector<bool> m_ascending;
@@ -222,7 +223,7 @@ public:
     {
         return m_limit != size_t(-1);
     }
-    std::string get_description(ConstTableRef attached_table) const override;
+    std::string get_description(TableRef attached_table) const override;
     std::unique_ptr<BaseDescriptor> clone() const override;
     size_t get_limit() const noexcept
     {
@@ -234,7 +235,7 @@ public:
         return DescriptorType::Limit;
     }
 
-    Sorter sorter(Table const&, const IndexPairs&) const override
+    Sorter sorter(TableRef, const IndexPairs&) const override
     {
         return Sorter();
     }
@@ -254,9 +255,9 @@ public:
     // This constructor may throw an InvalidPathError exception if the path is not valid.
     // A valid path consists of any number of connected link/list/backlink paths and always ends with a backlink
     // column.
-    IncludeDescriptor(ConstTableRef table, const std::vector<std::vector<LinkPathPart>>& link_paths);
+    IncludeDescriptor(TableRef table, const std::vector<std::vector<LinkPathPart>>& link_paths);
     ~IncludeDescriptor() = default;
-    std::string get_description(ConstTableRef attached_table) const override;
+    std::string get_description(TableRef attached_table) const override;
     std::unique_ptr<BaseDescriptor> clone() const override;
     DescriptorType get_type() const override
     {
@@ -267,7 +268,7 @@ public:
         const Table* origin, ObjKey object,
         util::FunctionRef<void(const Table*, const std::unordered_set<ObjKey>&)> reporter) const;
 
-    Sorter sorter(Table const&, const IndexPairs&) const override
+    Sorter sorter(TableRef, const IndexPairs&) const override
     {
         return Sorter();
     }
@@ -314,7 +315,7 @@ public:
     bool will_apply_distinct() const;
     bool will_apply_limit() const;
     bool will_apply_include() const;
-    std::string get_description(ConstTableRef target_table) const;
+    std::string get_description(TableRef target_table) const;
     IncludeDescriptor compile_included_backlinks() const;
     void collect_dependencies(const Table* table);
     void get_versions(const Group* group, TableVersions& versions) const;

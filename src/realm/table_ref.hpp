@@ -40,6 +40,7 @@ public:
     ConstTableRef& operator=(const TableRef& other);
     const Table* operator->() const;
     const Table* checked() const;
+    const Table* checked_or_null() const;
     const Table* unchecked() const { return m_table; }
     const Table& operator*() const;
     explicit ConstTableRef(const Table* t_ptr);
@@ -79,6 +80,7 @@ class TableRef : public ConstTableRef {
 public:
     Table* operator->() const;
     Table* checked() const;
+    Table* checked_or_null() const;
     Table* unchecked() const { return m_table; }
     Table& operator*() const;
     operator Table*() const
@@ -87,6 +89,10 @@ public:
     }
 
     explicit TableRef(Table* t_ptr)
+        : ConstTableRef(t_ptr)
+    {
+    }
+    explicit TableRef(const Table* t_ptr)
         : ConstTableRef(t_ptr)
     {
     }

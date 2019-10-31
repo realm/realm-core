@@ -2523,7 +2523,7 @@ Obj Transaction::import_copy_of(const ConstObj& original)
     return {};
 }
 
-TableRef Transaction::import_copy_of(ConstTableRef original)
+TableRef Transaction::import_copy_of(TableRef original)
 {
     TableKey tk = original->get_key();
     return get_table(tk);

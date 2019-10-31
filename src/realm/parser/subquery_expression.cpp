@@ -31,7 +31,7 @@ SubqueryExpression::SubqueryExpression(Query& q, const std::string& key_path_str
     : var_name(variable_name)
     , query(q)
 {
-    ConstTableRef cur_table = query.get_table();
+    TableRef cur_table = query.get_table();
     KeyPath key_path = key_path_from_string(key_path_string);
     size_t index = 0;
 
@@ -60,7 +60,7 @@ SubqueryExpression::SubqueryExpression(Query& q, const std::string& key_path_str
             realm_precondition(element.col_type == type_LinkList,
                                util::format("A subquery must operate on a list property, but '%1' is type '%2'",
                                             element.table->get_column_name(element.col_key), dest_type));
-            ConstTableRef subquery_table;
+            TableRef subquery_table;
             if (element.is_backlink) {
                 subquery_table = element.table; // advance through backlink
             }

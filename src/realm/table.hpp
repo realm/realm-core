@@ -83,7 +83,7 @@ public:
     /// This constructor should be used only when placing a table
     /// instance on the stack, and it is then the responsibility of
     /// the application that there are no objects of type TableRef or
-    /// ConstTableRef that refer to it, or to any of its subtables,
+    /// TableRef that refer to it, or to any of its subtables,
     /// when it goes out of scope.
     Table(Allocator& = Allocator::get_default());
 
@@ -93,7 +93,7 @@ public:
     /// This constructor should be used only when placing a table
     /// instance on the stack, and it is then the responsibility of
     /// the application that there are no objects of type TableRef or
-    /// ConstTableRef that refer to it, or to any of its subtables,
+    /// TableRef that refer to it, or to any of its subtables,
     /// when it goes out of scope.
     Table(const Table&, Allocator& = Allocator::get_default());
 
@@ -125,7 +125,7 @@ public:
     ColumnAttrMask get_column_attr(ColKey column_key) const noexcept;
     ColKey get_column_key(StringData name) const noexcept;
     ColKeys get_column_keys() const;
-    typedef util::Optional<std::pair<ConstTableRef, ColKey>> BacklinkOrigin;
+    typedef util::Optional<std::pair<TableRef, ColKey>> BacklinkOrigin;
     BacklinkOrigin find_backlink_origin(StringData origin_table_name, StringData origin_col_name) const noexcept;
     BacklinkOrigin find_backlink_origin(ColKey backlink_col) const noexcept;
     //@}
@@ -344,7 +344,7 @@ public:
 
 
     TableRef get_link_target(ColKey column_key) noexcept;
-    ConstTableRef get_link_target(ColKey column_key) const noexcept;
+    TableRef get_link_target(ColKey column_key) const noexcept;
 
     static const size_t max_string_size = 0xFFFFF8 - Array::header_size - 1;
     static const size_t max_binary_size = 0xFFFFF8 - Array::header_size;
@@ -577,19 +577,19 @@ public:
     // need to be sorted, and, resulting view retains its order.
     Query where(ConstTableView* tv = nullptr)
     {
-        return Query(*this, tv);
+        return Query(TableRef(this), tv);
     }
 
     // FIXME: We need a ConstQuery class or runtime check against modifications in read transaction.
     Query where(ConstTableView* tv = nullptr) const
     {
-        return Query(*this, tv);
+        return Query(TableRef(this), tv);
     }
 
     // Perform queries on a LinkView. The returned Query holds a reference to list.
     Query where(const LnkLst& list) const
     {
-        return Query(*this, list);
+        return Query(TableRef(this), list);
     }
 
     //@{
@@ -628,9 +628,9 @@ public:
     {
         return TableRef(this);
     }
-    ConstTableRef get_table_ref() const
+    TableRef get_table_ref() const
     {
-        return ConstTableRef(this);
+        return TableRef(this);
     }
 
     /// \brief Compare two tables for equality.
@@ -1330,7 +1330,7 @@ inline size_t Table::size() const noexcept
 }
 
 
-inline ConstTableRef Table::get_link_target(ColKey col_key) const noexcept
+inline TableRef Table::get_link_target(ColKey col_key) const noexcept
 {
     return const_cast<Table*>(this)->get_link_target(col_key);
 }
@@ -1457,31 +1457,26 @@ struct LinkTargetInfo {
 // not all of the non-public parts of the Table class.
 class _impl::TableFriend {
 public:
-    static Spec& get_spec(Table& table) noexcept
+    static Spec& get_spec(TableRef table) noexcept
     {
-        return table.m_spec;
+        return table->m_spec;
     }
 
-    static const Spec& get_spec(const Table& table) noexcept
+    static TableRef get_opposite_link_table(TableRef table, ColKey col_key);
+
+    static Group* get_parent_group(TableRef table) noexcept
     {
-        return table.m_spec;
+        return table->get_parent_group();
     }
 
-    static TableRef get_opposite_link_table(const Table& table, ColKey col_key);
-
-    static Group* get_parent_group(const Table& table) noexcept
+    static void remove_recursive(TableRef table, CascadeState& rows)
     {
-        return table.get_parent_group();
+        table->remove_recursive(rows); // Throws
     }
 
-    static void remove_recursive(Table& table, CascadeState& rows)
+    static void batch_erase_rows(TableRef table, const KeyColumn& keys)
     {
-        table.remove_recursive(rows); // Throws
-    }
-
-    static void batch_erase_rows(Table& table, const KeyColumn& keys)
-    {
-        table.batch_erase_rows(keys); // Throws
+        table->batch_erase_rows(keys); // Throws
     }
 };
 

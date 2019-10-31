@@ -120,7 +120,7 @@ public:
         }
         return false;
     }
-    const Table* get_table() const
+    const TableRef get_table() const
     {
         return m_const_obj->get_table();
     }
@@ -814,9 +814,9 @@ public:
     {
         return std::make_unique<LnkLst>(m_obj, m_col_key);
     }
-    Table& get_target_table() const
+    TableRef get_target_table() const
     {
-        return const_cast<Table&>(*m_table);
+        return m_table;
     }
     bool is_in_sync() const override
     {

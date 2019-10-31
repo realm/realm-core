@@ -328,14 +328,14 @@ public:
     StringData get_table_name(TableKey key) const;
 
     TableRef get_table(TableKey key);
-    ConstTableRef get_table(TableKey key) const;
+    TableRef get_table(TableKey key) const;
 
     // Catch some implicit conversions
     TableRef get_table(int) = delete;
-    ConstTableRef get_table(int) const = delete;
+    TableRef get_table(int) const = delete;
 
     TableRef get_table(StringData name);
-    ConstTableRef get_table(StringData name) const;
+    TableRef get_table(StringData name) const;
 
     TableRef add_table(StringData name, bool require_unique_name = true);
     TableRef add_table_with_primary_key(StringData name, DataType pk_type, StringData pk_name, bool nullable = false);
@@ -985,14 +985,14 @@ inline TableRef Group::get_table(TableKey key)
     return TableRef(table);
 }
 
-inline ConstTableRef Group::get_table(TableKey key) const
+inline TableRef Group::get_table(TableKey key) const
 {
     if (!is_attached())
         throw LogicError(LogicError::detached_accessor);
     std::lock_guard<std::mutex> lock(m_accessor_mutex);
     auto ndx = key2ndx_checked(key);
     const Table* table = do_get_table(ndx); // Throws
-    return ConstTableRef(table);
+    return TableRef(table);
 }
 
 inline TableRef Group::get_table(StringData name)
@@ -1004,13 +1004,13 @@ inline TableRef Group::get_table(StringData name)
     return TableRef(table);
 }
 
-inline ConstTableRef Group::get_table(StringData name) const
+inline TableRef Group::get_table(StringData name) const
 {
     if (!is_attached())
         throw LogicError(LogicError::detached_accessor);
     std::lock_guard<std::mutex> lock(m_accessor_mutex);
     const Table* table = do_get_table(name); // Throws
-    return ConstTableRef(table);
+    return TableRef(table);
 }
 
 inline TableRef Group::add_table(StringData name, bool require_unique_name)
@@ -1048,7 +1048,7 @@ void Group::to_json(S& out, size_t link_depth, std::map<std::string, std::string
         if (m[name] != "")
             name = m[name];
 
-        ConstTableRef table = get_table(key);
+        TableRef table = get_table(key);
 
         if (i)
             out << ",";

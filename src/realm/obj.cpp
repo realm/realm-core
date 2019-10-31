@@ -140,7 +140,7 @@ bool ConstObj::is_valid() const
 {
     // Cache valid state. If once invalid, it can never become valid again
     if (m_valid) {
-        Table* t = m_table.checked();
+        Table* t = m_table.checked_or_null();
         if (t == nullptr) { 
             m_valid = false; 
         }
@@ -200,7 +200,12 @@ TableKey ConstObj::get_table_key() const
 
 TableRef ConstObj::get_target_table(ColKey col_key) const
 {
-    return _impl::TableFriend::get_opposite_link_table(*m_table, col_key);
+    // Apparently, this can be called on a default constructed Obj.
+    // If so, the target table must also be a null table.
+    if (is_valid())
+        return _impl::TableFriend::get_opposite_link_table(m_table, col_key);
+    else
+        return TableRef();
 }
 
 Obj::Obj(ClusterTree* tree_top, MemRef mem, ObjKey key, size_t row_ndx)
@@ -437,7 +442,7 @@ ObjKey ConstObj::get_backlink(const Table& origin, ColKey origin_col_key, size_t
     return get_backlink(backlink_col_key, backlink_ndx);
 }
 
-TableView ConstObj::get_backlink_view(Table* src_table, ColKey src_col_key)
+TableView ConstObj::get_backlink_view(TableRef src_table, ColKey src_col_key)
 {
     TableView tv(src_table, src_col_key, *this);
     tv.do_sync();

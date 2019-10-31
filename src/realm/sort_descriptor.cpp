@@ -23,7 +23,7 @@
 
 using namespace realm;
 
-LinkPathPart::LinkPathPart(ColKey col_key, ConstTableRef source)
+LinkPathPart::LinkPathPart(ColKey col_key, TableRef source)
     : column_key(col_key)
     , from(source->get_key())
 {
@@ -49,7 +49,7 @@ void ColumnsDescriptor::collect_dependencies(const Table* table, std::vector<Tab
             const Table* t = table;
             for (size_t i = 0; i < sz - 1; i++) {
                 ColKey col = columns[i];
-                ConstTableRef target_table;
+                TableRef target_table;
                 if (t->get_column_type(col) == type_Link) {
                     target_table = t->get_link_target(col);
                 }
@@ -62,12 +62,12 @@ void ColumnsDescriptor::collect_dependencies(const Table* table, std::vector<Tab
     }
 }
 
-std::string DistinctDescriptor::get_description(ConstTableRef attached_table) const
+std::string DistinctDescriptor::get_description(TableRef attached_table) const
 {
     std::string description = "DISTINCT(";
     for (size_t i = 0; i < m_column_keys.size(); ++i) {
         const size_t chain_size = m_column_keys[i].size();
-        ConstTableRef cur_link_table = attached_table;
+        TableRef cur_link_table = attached_table;
         for (size_t j = 0; j < chain_size; ++j) {
             ColKey col_key = m_column_keys[i][j];
             StringData col_name = cur_link_table->get_column_name(col_key);
@@ -85,12 +85,12 @@ std::string DistinctDescriptor::get_description(ConstTableRef attached_table) co
     return description;
 }
 
-std::string SortDescriptor::get_description(ConstTableRef attached_table) const
+std::string SortDescriptor::get_description(TableRef attached_table) const
 {
     std::string description = "SORT(";
     for (size_t i = 0; i < m_column_keys.size(); ++i) {
         const size_t chain_size = m_column_keys[i].size();
-        ConstTableRef cur_link_table = attached_table;
+        TableRef cur_link_table = attached_table;
         for (size_t j = 0; j < chain_size; ++j) {
             ColKey col_key = m_column_keys[i][j];
             StringData col_name = cur_link_table->get_column_name(col_key);
@@ -142,7 +142,7 @@ void SortDescriptor::merge_with(SortDescriptor&& other)
 
 
 BaseDescriptor::Sorter::Sorter(std::vector<std::vector<ColKey>> const& column_lists,
-                               std::vector<bool> const& ascending, Table const& root_table, const IndexPairs& indexes)
+                               std::vector<bool> const& ascending, TableRef root_table, const IndexPairs& indexes)
 {
     REALM_ASSERT(!column_lists.empty());
     REALM_ASSERT_EX(column_lists.size() == ascending.size(), column_lists.size(), ascending.size());
@@ -155,11 +155,11 @@ BaseDescriptor::Sorter::Sorter(std::vector<std::vector<ColKey>> const& column_li
         REALM_ASSERT_EX(!columns.empty(), i);
 
         if (sz == 1) { // no link chain
-            m_columns.emplace_back(&root_table, columns[0], ascending[i]);
+            m_columns.emplace_back(root_table, columns[0], ascending[i]);
             continue;
         }
 
-        std::vector<const Table*> tables = {&root_table};
+        std::vector<const Table*> tables = {root_table.checked() };
         tables.resize(sz);
         for (size_t j = 0; j + 1 < sz; ++j) {
             tables[j]->report_invalid_key(columns[j]);
@@ -194,7 +194,7 @@ BaseDescriptor::Sorter::Sorter(std::vector<std::vector<ColKey>> const& column_li
     }
 }
 
-BaseDescriptor::Sorter DistinctDescriptor::sorter(Table const& table, const IndexPairs& indexes) const
+BaseDescriptor::Sorter DistinctDescriptor::sorter(TableRef table, const IndexPairs& indexes) const
 {
     REALM_ASSERT(!m_column_keys.empty());
     std::vector<bool> ascending(m_column_keys.size(), true);
@@ -232,7 +232,7 @@ void IncludeDescriptor::execute(IndexPairs&, const Sorter&, const BaseDescriptor
     // does nothing.
 }
 
-BaseDescriptor::Sorter SortDescriptor::sorter(Table const& table, const IndexPairs& indexes) const
+BaseDescriptor::Sorter SortDescriptor::sorter(TableRef table, const IndexPairs& indexes) const
 {
     REALM_ASSERT(!m_column_keys.empty());
     return Sorter(m_column_keys, m_ascending, table, indexes);
@@ -254,7 +254,7 @@ void SortDescriptor::execute(IndexPairs& v, const Sorter& predicate, const BaseD
     }
 }
 
-std::string LimitDescriptor::get_description(ConstTableRef) const
+std::string LimitDescriptor::get_description(TableRef) const
 {
     return "LIMIT(" + serializer::print_value(m_limit) + ")";
 }
@@ -347,7 +347,7 @@ void BaseDescriptor::Sorter::cache_first_column(IndexPairs& v)
     }
 }
 
-IncludeDescriptor::IncludeDescriptor(ConstTableRef table, const std::vector<std::vector<LinkPathPart>>& column_links)
+IncludeDescriptor::IncludeDescriptor(TableRef table, const std::vector<std::vector<LinkPathPart>>& column_links)
     : ColumnsDescriptor()
 {
     m_column_keys.resize(column_links.size());
@@ -361,7 +361,7 @@ IncludeDescriptor::IncludeDescriptor(ConstTableRef table, const std::vector<std:
 
         columns.reserve(links.size());
         backlink_source.reserve(links.size());
-        ConstTableRef cur_table = table;
+        TableRef cur_table = table;
         size_t link_ndx = 0;
         for (auto link : links) {  // follow path, one link at a time:
             auto col_type = link.column_key.get_type();
@@ -410,16 +410,16 @@ IncludeDescriptor::IncludeDescriptor(ConstTableRef table, const std::vector<std:
     }
 }
 
-std::string IncludeDescriptor::get_description(ConstTableRef attached_table) const
+std::string IncludeDescriptor::get_description(TableRef attached_table) const
 {
     realm::util::serializer::SerialisationState basic_serialiser;
     std::string description = "INCLUDE(";
     using tf = _impl::TableFriend;
-    Group* group(tf::get_parent_group(*attached_table));
+    Group* group(tf::get_parent_group(attached_table));
     for (size_t i = 0; i < m_column_keys.size(); ++i) {
         auto& chain = m_column_keys[i];
         const size_t chain_size = chain.size();
-        ConstTableRef cur_link_table = attached_table;
+        TableRef cur_link_table = attached_table;
         for (size_t j = 0; j < chain_size; ++j) {
             if (j != 0) {
                 description += realm::util::serializer::value_separator;
@@ -427,7 +427,7 @@ std::string IncludeDescriptor::get_description(ConstTableRef attached_table) con
 
             auto col_key = chain[j];
             if (auto from_table_key = m_backlink_sources[i][j]) { // backlink
-                ConstTableRef from_table = group->get_table(from_table_key);
+                TableRef from_table = group->get_table(from_table_key);
                 REALM_ASSERT_DEBUG(from_table->valid_column(col_key));
                 REALM_ASSERT_DEBUG(from_table->get_link_target(col_key) == cur_link_table);
                 description += basic_serialiser.get_backlink_column_name(from_table, col_key);
@@ -469,8 +469,7 @@ void IncludeDescriptor::report_included_backlinks(
 {
     REALM_ASSERT_DEBUG(origin);
     REALM_ASSERT_DEBUG(obj);
-    using tf = _impl::TableFriend;
-    Group* group(tf::get_parent_group(*origin));
+    Group* group = origin->get_parent_group();
 
     for (size_t i = 0; i < m_column_keys.size(); ++i) {
         const Table* table = origin;
@@ -522,7 +521,7 @@ void IncludeDescriptor::report_included_backlinks(
                     // in the IncludeDescriptor constructor so this should never happen
                     REALM_UNREACHABLE();
                 }
-                ConstTableRef linked_table = table->get_link_target(col_key);
+                TableRef linked_table = table->get_link_target(col_key);
                 table = linked_table;
             }
             objkeys_to_explore = results_of_next_table;
@@ -679,7 +678,7 @@ IncludeDescriptor DescriptorOrdering::compile_included_backlinks() const
     return includes; // this might be empty: see is_valid()
 }
 
-std::string DescriptorOrdering::get_description(ConstTableRef target_table) const
+std::string DescriptorOrdering::get_description(TableRef target_table) const
 {
     std::string description = "";
     for (auto it = m_descriptors.begin(); it != m_descriptors.end(); ++it) {
