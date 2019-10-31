@@ -18,6 +18,7 @@
 
 #define CATCH_CONFIG_ENABLE_BENCHMARKING
 
+#include "util/index_helpers.hpp"
 #include "util/test_file.hpp"
 #include "util/test_utils.hpp"
 
@@ -62,7 +63,66 @@ struct TestContext : CppContext {
     bool allow_missing(util::Any) { return false; }
 };
 
+TEST_CASE("Benchmark index change calculations", "[benchmark]") {
+    _impl::CollectionChangeBuilder c;
 
+    auto all_modified = [](size_t) { return true; };
+    auto none_modified = [](size_t) { return false; };
+
+    SECTION("reports inserts/deletes for simple reorderings") {
+        auto calc = [&](std::vector<int64_t> old_rows, std::vector<int64_t> new_rows, std::function<bool (size_t)> modifications) {
+            return _impl::CollectionChangeBuilder::calculate(old_rows, new_rows, modifications);
+        };
+        std::vector<int64_t> indices = {};
+        constexpr size_t indices_size = 10000;
+        indices.reserve(indices_size);
+        for (size_t i = 0; i < indices_size; ++i) {
+            indices.push_back(i);
+        }
+
+        BENCHMARK("no changes") {
+            c = calc(indices, indices, none_modified);
+        };
+        REQUIRE(c.insertions.empty());
+        REQUIRE(c.deletions.empty());
+
+        BENCHMARK("all modified") {
+            c = calc(indices, indices, all_modified);
+        };
+        REQUIRE(c.insertions.empty());
+        REQUIRE(c.deletions.empty());
+
+        BENCHMARK("calc 1") {
+            c = calc({1, 2, 3}, {1, 3, 2}, none_modified);
+        };
+        REQUIRE_INDICES(c.insertions, 1);
+        REQUIRE_INDICES(c.deletions, 2);
+
+        BENCHMARK("calc 2") {
+            c = calc({1, 2, 3}, {2, 1, 3}, none_modified);
+        };
+        REQUIRE_INDICES(c.insertions, 0);
+        REQUIRE_INDICES(c.deletions, 1);
+
+        BENCHMARK("calc 3") {
+            c = calc({1, 2, 3}, {2, 3, 1}, none_modified);
+        };
+        REQUIRE_INDICES(c.insertions, 2);
+        REQUIRE_INDICES(c.deletions, 0);
+
+        BENCHMARK("calc 4") {
+            c = calc({1, 2, 3}, {3, 1, 2}, none_modified);
+        };
+        REQUIRE_INDICES(c.insertions, 0);
+        REQUIRE_INDICES(c.deletions, 2);
+
+        BENCHMARK("calc 5") {
+            c = calc({1, 2, 3}, {3, 2, 1}, none_modified);
+        };
+        REQUIRE_INDICES(c.insertions, 0, 1);
+        REQUIRE_INDICES(c.deletions, 1, 2);
+    }
+}
 
 TEST_CASE("Benchmark object", "[benchmark]") {
     using namespace std::string_literals;
@@ -113,13 +173,6 @@ TEST_CASE("Benchmark object", "[benchmark]") {
     config.schema_version = 0;
     auto r = Realm::get_shared_realm(config);
     TestContext d(r);
-
-    auto create_person = [&](util::Any&& value, bool update, bool update_only_diff = false) {
-        r->begin_transaction();
-        auto obj = Object::create(d, r, *r->schema().find("person"), value, update, update_only_diff);
-        r->commit_transaction();
-        return obj;
-    };
 
     SECTION("create object") {
         r->begin_transaction();
@@ -212,27 +265,294 @@ TEST_CASE("Benchmark object", "[benchmark]") {
         Results result(r, *table);
         size_t num_calls = 0;
         size_t num_insertions = 0;
+        size_t num_deletions = 0;
+        size_t num_modifications = 0;
         auto token = result.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
             num_insertions += c.insertions.count();
+            num_deletions += c.deletions.count();
+            num_modifications += c.modifications_new.count();
             ++num_calls;
         });
 
         advance_and_notify(*r);
         int64_t pk = 0;
+        ObjectSchema person_schema = *r->schema().find("person");
+        constexpr size_t num_objects = 100;
+        constexpr bool update = false;
+        constexpr bool update_only_diff = false;
+
         BENCHMARK_ADVANCED("create notifications")(Catch::Benchmark::Chronometer meter) {
-            std::stringstream name;
-            name << "person_" << pk++;
-            AnyDict person {
-                {"name", name.str()},
-                {"age", pk},
-            };
-            create_person(person, true, false);
+            r->begin_transaction();
+            result.clear();
+            r->commit_transaction();
+            advance_and_notify(*r);
+            num_insertions = 0;
+            num_modifications = 0;
+            num_deletions = 0;
+
+            r->begin_transaction();
+            for (size_t i = 0; i < num_objects; ++i) {
+                std::stringstream name;
+                name << "person_" << i;
+                AnyDict person {
+                    {"name", name.str()},
+                    {"age", static_cast<int64_t>(i)},
+                };
+                Object::create(d, r, person_schema, Any(person), update, update_only_diff);
+            }
+            r->commit_transaction();
             meter.measure([&r] {
                 advance_and_notify(*r);
             });
-            REQUIRE(static_cast<int64_t>(num_calls) == pk + 1);
-            REQUIRE(static_cast<int64_t>(num_insertions) == pk);
+            REQUIRE(num_insertions == num_objects);
+            REQUIRE(num_modifications == 0);
+            REQUIRE(num_deletions == 0);
+            REQUIRE(result.size() == num_objects);
+        };
+
+        r->begin_transaction();
+        result.clear();
+        r->commit_transaction();
+        advance_and_notify(*r);
+        pk = 0;
+        num_calls = 0;
+
+        BENCHMARK_ADVANCED("delete notifications")(Catch::Benchmark::Chronometer meter) {
+            r->begin_transaction();
+            result.clear();
+            r->commit_transaction();
+            advance_and_notify(*r);
+            num_insertions = 0;
+            num_modifications = 0;
+            num_deletions = 0;
+
+            r->begin_transaction();
+            for (size_t i = 0; i < num_objects; ++i) {
+                std::stringstream name;
+                name << "person_" << i;
+                AnyDict person {
+                    {"name", name.str()},
+                    {"age", static_cast<int64_t>(i)},
+                };
+                Object::create(d, r, person_schema, Any(person), update, update_only_diff);
+            }
+            r->commit_transaction();
+            advance_and_notify(*r);
+            REQUIRE(num_insertions == num_objects);
+            REQUIRE(num_modifications == 0);
+            REQUIRE(num_deletions == 0);
+            REQUIRE(result.size() == num_objects);
+
+            r->begin_transaction();
+            result.clear();
+            r->commit_transaction();
+
+            meter.measure([&r] {
+                advance_and_notify(*r);
+            });
+            REQUIRE(num_insertions == num_objects);
+            REQUIRE(num_modifications == 0);
+            REQUIRE(num_deletions == num_objects);
+            REQUIRE(result.size() == 0);
+        };
+
+        BENCHMARK_ADVANCED("modify notifications")(Catch::Benchmark::Chronometer meter) {
+            r->begin_transaction();
+            result.clear();
+            r->commit_transaction();
+            advance_and_notify(*r);
+            num_insertions = 0;
+            num_modifications = 0;
+            num_deletions = 0;
+
+            r->begin_transaction();
+            for (size_t i = 0; i < num_objects; ++i) {
+                std::stringstream name;
+                name << "person_" << i;
+                AnyDict person {
+                    {"name", name.str()},
+                    {"age", static_cast<int64_t>(i)},
+                };
+                Object::create(d, r, person_schema, Any(person), update, update_only_diff);
+            }
+            r->commit_transaction();
+            advance_and_notify(*r);
+            REQUIRE(result.size() == num_objects);
+            REQUIRE(num_insertions == num_objects);
+            REQUIRE(num_modifications == 0);
+            REQUIRE(num_deletions == 0);
+            num_insertions = 0;
+            num_modifications = 0;
+            num_deletions = 0;
+
+            r->begin_transaction();
+            for (size_t i = 0; i < num_objects; ++i) {
+                std::stringstream name;
+                name << "person_" << i;
+                AnyDict person {
+                    {"name", name.str()},
+                    {"age", static_cast<int64_t>(i + 1)}, // age differs
+                };
+                constexpr bool do_update = true;
+                Object::create(d, r, person_schema, Any(person), do_update, update_only_diff);
+            }
+            r->commit_transaction();
+
+            meter.measure([&r] {
+                advance_and_notify(*r);
+            });
+            REQUIRE(num_insertions == 0);
+            REQUIRE(num_modifications == num_objects);
+            REQUIRE(num_deletions == 0);
+            REQUIRE(result.size() == num_objects);
+        };
+    }
+
+    SECTION("change notifications sorted") {
+        auto table = r->read_group().get_table("class_person");
+        auto age_col = table->get_column_key("age");
+        Results result = Results(r, *table).sort({{"age", true}});
+        size_t num_insertions = 0;
+        size_t num_deletions = 0;
+        size_t num_modifications = 0;
+        auto token = result.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+            num_insertions += c.insertions.count();
+            num_deletions += c.deletions.count();
+            num_modifications += c.modifications_new.count();
+        });
+
+        advance_and_notify(*r);
+        ObjectSchema person_schema = *r->schema().find("person");
+        constexpr bool update = false;
+        constexpr bool update_only_diff = false;
+        auto add_objects = [&](size_t num_objects, size_t start_index = 0) {
+            r->begin_transaction();
+            for (size_t i = 0; i < num_objects; ++i) {
+                size_t index = i + start_index;
+                std::stringstream name;
+                name << "person_" << index;
+                AnyDict person {
+                    {"name", name.str()},
+                    {"age", static_cast<int64_t>(index)},
+                };
+                Object::create(d, r, person_schema, Any(person), update, update_only_diff);
+            }
+            r->commit_transaction();
+        };
+
+        BENCHMARK_ADVANCED("prepend insertions")(Catch::Benchmark::Chronometer meter) {
+            constexpr size_t num_initial_objects = 100;
+            constexpr size_t num_prepend_objects = 100;
+            r->begin_transaction();
+            result.clear();
+            r->commit_transaction();
+            advance_and_notify(*r);
+            add_objects(num_initial_objects, num_prepend_objects);
+            advance_and_notify(*r);
+
+            add_objects(num_prepend_objects, 0);
+
+            num_insertions = 0;
+            num_modifications = 0;
+            num_deletions = 0;
+
+            meter.measure([&r] {
+                advance_and_notify(*r);
+            });
+            REQUIRE(num_insertions == num_prepend_objects);
+            REQUIRE(num_modifications == 0);
+            REQUIRE(num_deletions == 0);
+            REQUIRE(result.size() == num_prepend_objects + num_initial_objects);
+            REQUIRE(result.get(0).get<int64_t>(age_col) == 0);
+            REQUIRE(result.get(result.size() - 1).get<int64_t>(age_col) == num_prepend_objects + num_initial_objects - 1);
+        };
+
+        BENCHMARK_ADVANCED("insert even, insert odd")(Catch::Benchmark::Chronometer meter) {
+            constexpr size_t num_objects = 100;
+            r->begin_transaction();
+            result.clear();
+            r->commit_transaction();
+            advance_and_notify(*r);
+
+            // insert even
+            r->begin_transaction();
+            for (size_t i = 0; i < num_objects; ++i) {
+                size_t index = i * 2;
+                std::stringstream name;
+                name << "person_" << index;
+                AnyDict person {
+                    {"name", name.str()},
+                    {"age", static_cast<int64_t>(index)},
+                };
+                Object::create(d, r, person_schema, Any(person), update, update_only_diff);
+            }
+            r->commit_transaction();
+            advance_and_notify(*r);
+
+            // insert odd
+            r->begin_transaction();
+            for (size_t i = 0; i < num_objects; ++i) {
+                size_t index = i * 2 + 1;
+                std::stringstream name;
+                name << "person_" << index;
+                AnyDict person {
+                    {"name", name.str()},
+                    {"age", static_cast<int64_t>(index)},
+                };
+                Object::create(d, r, person_schema, Any(person), update, update_only_diff);
+            }
+            r->commit_transaction();
+
+            num_insertions = 0;
+            num_modifications = 0;
+            num_deletions = 0;
+
+            meter.measure([&r] {
+                advance_and_notify(*r);
+            });
+            REQUIRE(num_insertions == num_objects);
+            REQUIRE(num_modifications == 0);
+            REQUIRE(num_deletions == 0);
+            REQUIRE(result.size() == num_objects * 2);
+            REQUIRE(result.get(0).get<int64_t>(age_col) == 0);
+            REQUIRE(result.get(1).get<int64_t>(age_col) == 1);
+            REQUIRE(result.get(result.size() - 1).get<int64_t>(age_col) == num_objects * 2 - 1);
+        };
+
+        BENCHMARK_ADVANCED("insert, delete odds")(Catch::Benchmark::Chronometer meter) {
+            constexpr size_t num_objects = 200;
+            r->begin_transaction();
+            result.clear();
+            r->commit_transaction();
+            advance_and_notify(*r);
+
+            // insert
+            add_objects(num_objects);
+            advance_and_notify(*r);
+
+            // remove odds
+            r->begin_transaction();
+            for (size_t i = result.size(); i > 0; --i) {
+                if (i % 2 == 1) {
+                    Obj odd = result.get(i);
+                    odd.remove();
+                }
+            }
+            r->commit_transaction();
+
+            num_insertions = 0;
+            num_modifications = 0;
+            num_deletions = 0;
+
+            meter.measure([&r] {
+                advance_and_notify(*r);
+            });
+            REQUIRE(num_insertions == 0);
+            REQUIRE(num_modifications == 0);
+            REQUIRE(num_deletions == num_objects / 2);
+            REQUIRE(result.size() == num_objects / 2);
+            REQUIRE(result.get(0).get<int64_t>(age_col) == 0);
+            REQUIRE(result.get(1).get<int64_t>(age_col) == 2);
         };
     }
 }
-
