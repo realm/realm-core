@@ -187,6 +187,23 @@ StringData ArrayString::get(size_t ndx) const
     return {};
 }
 
+StringData ArrayString::get_legacy(size_t ndx) const
+{
+    switch (m_type) {
+        case Type::small_strings:
+            return static_cast<ArrayStringShort*>(m_arr)->get(ndx);
+        case Type::medium_strings:
+            return static_cast<ArraySmallBlobs*>(m_arr)->get_string_legacy(ndx);
+        case Type::big_strings:
+            return static_cast<ArrayBigBlobs*>(m_arr)->get_string(ndx);
+        case Type::enum_strings: {
+            size_t index = size_t(static_cast<ArrayInteger*>(m_arr)->get(ndx));
+            return m_string_enum_values->get(index);
+        }
+    }
+    return {};
+}
+
 bool ArrayString::is_null(size_t ndx) const
 {
     switch (m_type) {

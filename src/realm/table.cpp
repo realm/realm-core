@@ -1010,6 +1010,33 @@ ref_type Table::get_oid_column_ref() const
 
 namespace {
 
+class LegacyStringColumn : public BPlusTree<StringData> {
+public:
+    LegacyStringColumn(Allocator& alloc)
+        : BPlusTree(alloc)
+    {
+    }
+
+    StringData get_legacy(size_t n) const
+    {
+        if (m_cached_leaf_begin <= n && n < m_cached_leaf_end) {
+            return m_leaf_cache.get_legacy(n - m_cached_leaf_begin);
+        }
+        else {
+            StringData value;
+
+            auto func = [&value](BPlusTreeNode* node, size_t ndx) {
+                auto leaf = static_cast<LeafNode*>(node);
+                value = leaf->get_legacy(ndx);
+            };
+
+            m_root->bptree_access(n, func);
+
+            return value;
+        }
+    }
+};
+
 // We need an accessor that can read old Timestamp columns.
 // The new BPlusTree<Timestamp> uses a different layout
 class LegacyTS : private Array {
@@ -1081,7 +1108,7 @@ Mixed get_val_from_column(size_t ndx, ColumnType col_type, bool nullable, BPlusT
             return Mixed{static_cast<BPlusTree<double>*>(accessor)->get(ndx)};
             break;
         case col_type_String:
-            return Mixed{static_cast<BPlusTree<String>*>(accessor)->get(ndx)};
+            return Mixed{static_cast<LegacyStringColumn*>(accessor)->get_legacy(ndx)};
             break;
         case col_type_Binary:
             return Mixed{static_cast<BPlusTree<Binary>*>(accessor)->get(ndx)};
@@ -1107,6 +1134,24 @@ void copy_list(ref_type sub_table_ref, Obj& obj, ColKey col, Allocator& alloc)
         auto l = obj.get_list<T>(col);
         for (size_t j = 0; j < list_size; j++) {
             l.add(from_list.get(j));
+        }
+    }
+}
+
+template <>
+void copy_list<String>(ref_type sub_table_ref, Obj& obj, ColKey col, Allocator& alloc)
+{
+    if (sub_table_ref) {
+        // Actual list is in the columns array position 0
+        Array cols(alloc);
+        cols.init_from_ref(sub_table_ref);
+        LegacyStringColumn from_list(alloc);
+        from_list.set_parent(&cols, 0);
+        from_list.init_from_parent();
+        size_t list_size = from_list.size();
+        auto l = obj.get_list<String>(col);
+        for (size_t j = 0; j < list_size; j++) {
+            l.add(from_list.get_legacy(j));
         }
     }
 }
@@ -1212,7 +1257,7 @@ void Table::migrate_objects(util::FunctionRef<void()> commit_and_continue)
                     acc = std::make_unique<BPlusTree<double>>(m_alloc);
                     break;
                 case col_type_String:
-                    acc = std::make_unique<BPlusTree<String>>(m_alloc);
+                    acc = std::make_unique<LegacyStringColumn>(m_alloc);
                     break;
                 case col_type_Binary:
                     acc = std::make_unique<BPlusTree<Binary>>(m_alloc);
