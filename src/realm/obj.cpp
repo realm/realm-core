@@ -465,8 +465,8 @@ ObjKey ConstObj::get_backlink(ColKey backlink_col, size_t backlink_ndx) const
 }
 
 namespace {
-const char escapes[] = "\b\f\n\r\t\"";
-std::map<char, std::string> translate{{'\b', "\\b"}, {'\f', "\\f"}, {'\n', "\\n"}, {'\r', "\\r"}, {'\t', "\\t"}, {'\\', "\\\\"}};
+const char to_be_escaped[] = "\"\n\r\t\f\\\b";
+const char encoding[] = "\"nrtf\\b";
 
 template <class T>
 inline void out_floats(std::ostream& out, T value)
@@ -497,13 +497,18 @@ void out_mixed(std::ostream& out, const Mixed& val)
             out_floats<double>(out, val.get<double>());
             break;
         case type_String: {
+            out << "\"";
             std::string str = val.get<String>();
-            size_t p = str.find_first_of(escapes);
+            size_t p = str.find_first_of(to_be_escaped);
             while (p != std::string::npos) {
-                str = str.substr(0, p) + translate[str[p]] + str.substr(p + 1);
-                p = str.find_first_of(escapes);
+                char c = str[p];
+                auto found = strchr(to_be_escaped, c);
+                REALM_ASSERT(found);
+                out << str.substr(0, p) << '\\' << encoding[found - to_be_escaped];
+                str = str.substr(p + 1);
+                p = str.find_first_of(to_be_escaped);
             }
-            out << "\"" << str << "\"";
+            out << str << "\"";
             break;
         }
         case type_Binary: {
