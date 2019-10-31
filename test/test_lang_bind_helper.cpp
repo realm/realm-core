@@ -5809,4 +5809,41 @@ TEST(LangBindHelper_ImportDetachedLinkList)
     CHECK_EQUAL(tv_1->size(), 0);
 }
 
+TEST(LangBindHelper_SearchIndexAccessor)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    auto hist = make_in_realm_history(path);
+    DBRef db = DB::create(*hist);
+    ColKey col_name;
+
+    auto tr = db->start_write();
+    {
+        auto persons = tr->add_table("person");
+        col_name = persons->add_column(type_String, "name");
+        persons->add_search_index(col_name);
+        persons->create_object().set(col_name, "Per");
+    }
+    tr->commit_and_continue_as_read();
+
+    tr->promote_to_write();
+    {
+        auto persons = tr->get_table("person");
+        persons->remove_column(col_name);
+        auto col_age = persons->add_column(type_Int, "age");
+        persons->add_search_index(col_age);
+        // Index referring to col_age is now at position 0
+        persons->create_object().set(col_age, 47);
+    }
+    // The index accessor must be refreshed with old ColKey (col_name)
+    tr->rollback_and_continue_as_read();
+
+    tr->promote_to_write();
+    {
+        auto persons = tr->get_table("person");
+        // Index accssor uses its ColKey to find value in table
+        persons->create_object().set(col_name, "Poul");
+    }
+    tr->commit();
+}
+
 #endif

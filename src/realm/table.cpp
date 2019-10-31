@@ -2257,7 +2257,9 @@ void Table::refresh_index_accessors()
             m_index_accessors[col_ndx] = nullptr;
         }
         else if (has_old_accessor && ref != 0) { // still there, refresh:
-            m_index_accessors[col_ndx]->refresh_accessor_tree();
+            auto col_key = m_leaf_ndx2colkey[col_ndx];
+            ClusterColumn virtual_col(&m_clusters, col_key);
+            m_index_accessors[col_ndx]->refresh_accessor_tree(virtual_col);
         }
         else if (!has_old_accessor && ref != 0) { // new index!
             auto col_key = m_leaf_ndx2colkey[col_ndx];

@@ -294,6 +294,12 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
             char instr = get_next(s) % COUNT;
             iteration++;
 
+            /* This can help when debugging
+            if (log) {
+                *log << iteration << " ";
+            }
+            */
+
             if (instr == ADD_TABLE && wt->size() < max_tables) {
                 std::string name = create_table_name();
                 if (log) {
@@ -343,9 +349,12 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 bool nullable = (get_next(s) % 2 == 0);
                 if (log) {
                     *log << "wt->get_table(" << table_key << ")->add_column(DataType(" << int(type) << "), \"" << name
-                         << "\", " << (nullable ? "true" : "false") << ");\n";
+                         << "\", " << (nullable ? "true" : "false") << ");";
                 }
-                wt->get_table(table_key)->add_column(type, name, nullable);
+                auto col = wt->get_table(table_key)->add_column(type, name, nullable);
+                if (log) {
+                    *log << " // -> " << col << "\n";
+                }
             }
             else if (instr == REMOVE_COLUMN && wt->size() > 0) {
                 TableKey table_key = wt->get_table_keys()[get_next(s) % wt->size()];
@@ -412,9 +421,12 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 std::string name = create_column_name(type_Link);
                 if (log) {
                     *log << "wt->get_table(" << table_key_1 << ")->add_column_link(type_Link, \"" << name
-                         << "\", *wt->get_table(" << table_key_2 << "));\n";
+                         << "\", *wt->get_table(" << table_key_2 << "));";
                 }
-                t1->add_column_link(type_Link, name, *t2);
+                auto col = t1->add_column_link(type_Link, name, *t2);
+                if (log) {
+                    *log << " // -> " << col << "\n";
+                }
             }
             else if (instr == ADD_COLUMN_LINK_LIST && wt->size() >= 2) {
                 TableKey table_key_1 = wt->get_table_keys()[get_next(s) % wt->size()];
@@ -424,9 +436,12 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 std::string name = create_column_name(type_LinkList);
                 if (log) {
                     *log << "wt->get_table(" << table_key_1 << ")->add_column_link(type_LinkList, \"" << name
-                         << "\", *wt->get_table(" << table_key_2 << "));\n";
+                         << "\", *wt->get_table(" << table_key_2 << "));";
                 }
-                t1->add_column_link(type_LinkList, name, *t2);
+                auto col = t1->add_column_link(type_LinkList, name, *t2);
+                if (log) {
+                    *log << " // -> " << col << "\n";
+                }
             }
             else if (instr == SET && wt->size() > 0) {
                 TableKey table_key = wt->get_table_keys()[get_next(s) % wt->size()];
