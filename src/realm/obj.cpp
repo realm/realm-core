@@ -32,6 +32,7 @@
 #include "realm/spec.hpp"
 #include "realm/table_view.hpp"
 #include "realm/replication.hpp"
+#include "realm/util/base64.hpp"
 
 namespace realm {
 
@@ -514,10 +515,12 @@ void out_mixed(std::ostream& out, const Mixed& val)
         case type_Binary: {
             out << "\"";
             auto bin = val.get<Binary>();
-            const char* p = bin.data();
-            for (size_t i = 0; i < bin.size(); ++i) {
-                out << std::setw(2) << std::setfill('0') << std::hex << static_cast<unsigned int>(p[i]) << std::dec;
-            }
+            const char* start = bin.data();
+            const size_t len = bin.size();
+            util::StringBuffer encode_buffer;
+            encode_buffer.resize(util::base64_encoded_size(len));
+            util::base64_encode(start, len, encode_buffer.data(), encode_buffer.size());
+            out << encode_buffer.str();
             out << "\"";
             break;
         }

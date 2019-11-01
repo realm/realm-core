@@ -1374,6 +1374,24 @@ TEST_IF(Upgrade_Database_9_10, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SI
 
         --iter;
     }
+    if (REALM_MAX_BPNODE_SIZE == 1000) {
+        auto sg = DB::create(*hist);
+        std::stringstream out;
+        sg->start_read()->to_json(out, 0);
+        std::ifstream expect("expect_test_upgrade_database_9_to_10.json");
+        std::string str1;
+        std::string str2;
+        expect >> str1;
+        out >> str2;
+        while (expect) {
+            if (str1 != str2) {
+                CHECK_EQUAL(str1, str2);
+                break;
+            }
+            expect >> str1;
+            out >> str2;
+        }
+    }
 
 #else
     // NOTE: This code must be executed from an old file-format-version 9
