@@ -419,7 +419,7 @@ SyncSession::SyncSession(SyncClient& client, std::string realm_path, SyncConfig 
         DBOptions options;
 
         if (m_config.realm_encryption_key) {
-            options.encryption_key = m_config.realm_encryption_key->begin();
+            options.encryption_key = m_config.realm_encryption_key->data();
         }
 #if REALM_ENABLE_SYNC
         auto history = sync::make_client_replication(m_realm_path);
