@@ -900,13 +900,16 @@ R Query::aggregate(ColKey column_key, size_t* resultcount, ObjKey* return_ndx) c
             auto node = root_node();
             bool nullable = m_table->is_nullable(column_key);
 
-            auto f = [column_key, nullable, &leaf, &node, &st, this](const Cluster* cluster) {
+            for (size_t c = 0; c < node->m_children.size(); c++)
+                node->m_children[c]->aggregate_local_prepare(action, ColumnTypeTraits<T>::id, nullable);
+
+            auto f = [column_key, &leaf, &node, &st, this](const Cluster* cluster) {
                 size_t e = cluster->node_size();
                 node->set_cluster(cluster);
                 cluster->init_leaf(column_key, &leaf);
                 st.m_key_offset = cluster->get_offset();
                 st.m_key_values = cluster->get_key_array();
-                aggregate_internal(action, ColumnTypeTraits<T>::id, nullable, node, &st, 0, e, &leaf);
+                aggregate_internal(node, &st, 0, e, &leaf);
                 // Continue
                 return false;
             };
@@ -941,30 +944,19 @@ R Query::aggregate(ColKey column_key, size_t* resultcount, ObjKey* return_ndx) c
 *                                                                                                             *
 **************************************************************************************************************/
 
-void Query::aggregate_internal(Action TAction, DataType TSourceColumn, bool nullable, ParentNode* pn,
-                               QueryStateBase* st, size_t start, size_t end, ArrayPayload* source_column) const
+void Query::aggregate_internal(ParentNode* pn, QueryStateBase* st, size_t start, size_t end,
+                               ArrayPayload* source_column) const
 {
-    if (end == not_found)
-        end = m_table->size();
-
-    for (size_t c = 0; c < pn->m_children.size(); c++)
-        pn->m_children[c]->aggregate_local_prepare(TAction, TSourceColumn, nullable);
-
-    size_t td;
-
     while (start < end) {
         auto score_compare = [](const ParentNode* a, const ParentNode* b) { return a->cost() < b->cost(); };
         size_t best = std::distance(pn->m_children.begin(),
                                     std::min_element(pn->m_children.begin(), pn->m_children.end(), score_compare));
 
-        // Find a large amount of local matches in best condition
-        td = pn->m_children[best]->m_dT == 0.0 ? end : (start + 1000 > end ? end : start + 1000);
-
         // Executes start...end range of a query and will stay inside the condition loop of the node it was called
         // on. Can be called on any node; yields same result, but different performance. Returns prematurely if
         // condition of called node has evaluated to true local_matches number of times.
         // Return value is the next row for resuming aggregating (next row that caller must call aggregate_local on)
-        start = pn->m_children[best]->aggregate_local(st, start, td, findlocals, source_column);
+        start = pn->m_children[best]->aggregate_local(st, start, end, findlocals, source_column);
 
         // Make remaining conditions compute their m_dD (statistics)
         for (size_t c = 0; c < pn->m_children.size() && start < end; c++) {
@@ -977,7 +969,7 @@ void Query::aggregate_internal(Action TAction, DataType TSourceColumn, bool null
 
                 // Limit to bestdist in order not to skip too large parts of index nodes
                 size_t maxD = pn->m_children[c]->m_dT == 0.0 ? end - start : bestdist;
-                td = pn->m_children[c]->m_dT == 0.0 ? end : (start + maxD > end ? end : start + maxD);
+                size_t td = pn->m_children[c]->m_dT == 0.0 ? end : (start + maxD > end ? end : start + maxD);
                 start = pn->m_children[c]->aggregate_local(st, start, td, probe_matches, source_column);
             }
         }
@@ -1306,6 +1298,9 @@ void Query::find_all(ConstTableView& ret, size_t begin, size_t end, size_t limit
             auto node = root_node();
             QueryState<int64_t> st(act_FindAll, ret.m_key_values, limit);
 
+            for (size_t c = 0; c < node->m_children.size(); c++)
+                node->m_children[c]->aggregate_local_prepare(act_FindAll, type_Int, false);
+
             auto f = [&begin, &end, &node, &st, this](const Cluster* cluster) {
                 size_t e = cluster->node_size();
                 if (begin < e) {
@@ -1315,8 +1310,7 @@ void Query::find_all(ConstTableView& ret, size_t begin, size_t end, size_t limit
                     node->set_cluster(cluster);
                     st.m_key_offset = cluster->get_offset();
                     st.m_key_values = cluster->get_key_array();
-                    DataType col_id = ColumnTypeTraits<int64_t>::id;
-                    aggregate_internal(act_FindAll, col_id, false, node, &st, begin, e, nullptr);
+                    aggregate_internal(node, &st, begin, e, nullptr);
                     begin = 0;
                 }
                 else {
@@ -1375,13 +1369,15 @@ size_t Query::do_count(size_t limit) const
         auto node = root_node();
         QueryState<int64_t> st(act_Count, limit);
 
+        for (size_t c = 0; c < node->m_children.size(); c++)
+            node->m_children[c]->aggregate_local_prepare(act_Count, type_Int, false);
+
         auto f = [&node, &st, this](const Cluster* cluster) {
             size_t e = cluster->node_size();
             node->set_cluster(cluster);
             st.m_key_offset = cluster->get_offset();
             st.m_key_values = cluster->get_key_array();
-            DataType col_id = ColumnTypeTraits<int64_t>::id;
-            aggregate_internal(act_Count, col_id, false, node, &st, 0, e, nullptr);
+            aggregate_internal(node, &st, 0, e, nullptr);
             // Stop if limit or end is reached
             return st.m_match_count == st.m_limit;
         };
