@@ -132,8 +132,7 @@ public:
 
     // Primary key columns
     ColKey get_primary_key_column() const;
-    void set_primary_key_column(ColKey col) const;
-    void remove_primary_key_column() const;
+    void set_primary_key_column(ColKey col);
     void validate_primary_column_uniqueness() const;
 
     //@{
@@ -701,7 +700,7 @@ private:
     Array m_opposite_table;  // 7th slot in m_top
     Array m_opposite_column; // 8th slot in m_top
     std::vector<StringIndex*> m_index_accessors;
-    mutable util::Optional<ColKey> m_primary_key_col;
+    ColKey m_primary_key_col;
     Replication* const* m_repl;
     static Replication* g_dummy_replication;
     bool m_is_frozen = false;
@@ -945,7 +944,8 @@ private:
     static constexpr int top_position_for_opposite_column = 8;
     static constexpr int top_position_for_sequence_number = 9;
     static constexpr int top_position_for_collision_map = 10;
-    static constexpr int top_array_size = 11;
+    static constexpr int top_position_for_pk_col = 11;
+    static constexpr int top_array_size = 12;
 
     enum { s_collision_map_lo = 0, s_collision_map_hi = 1, s_collision_map_local_id = 2, s_collision_map_num_slots };
 
@@ -1231,6 +1231,11 @@ inline Table::Table(Allocator& alloc)
     , m_opposite_column(m_alloc)
     , m_repl(&g_dummy_replication)
 {
+    m_spec.set_parent(&m_top, top_position_for_spec);
+    m_index_refs.set_parent(&m_top, top_position_for_search_indexes);
+    m_opposite_table.set_parent(&m_top, top_position_for_opposite_table);
+    m_opposite_column.set_parent(&m_top, top_position_for_opposite_column);
+
     ref_type ref = create_empty_table(m_alloc); // Throws
     ArrayParent* parent = nullptr;
     size_t ndx_in_parent = 0;
@@ -1247,6 +1252,10 @@ inline Table::Table(Replication* const* repl, Allocator& alloc)
     , m_opposite_column(m_alloc)
     , m_repl(repl)
 {
+    m_spec.set_parent(&m_top, top_position_for_spec);
+    m_index_refs.set_parent(&m_top, top_position_for_search_indexes);
+    m_opposite_table.set_parent(&m_top, top_position_for_opposite_table);
+    m_opposite_column.set_parent(&m_top, top_position_for_opposite_column);
 }
 
 inline void Table::revive(Replication* const* repl, Allocator& alloc, bool writable)

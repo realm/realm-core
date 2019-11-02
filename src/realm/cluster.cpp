@@ -1732,9 +1732,7 @@ void ClusterTree::replace_root(std::unique_ptr<ClusterNode> new_root)
 {
     if (new_root != m_root) {
         // Maintain parent.
-        ArrayParent* parent = m_root->get_parent();
-        size_t ndx_in_parent = m_root->get_ndx_in_parent();
-        new_root->set_parent(parent, ndx_in_parent);
+        new_root->set_parent(&m_owner->m_top, Table::top_position_for_cluster_tree);
         new_root->update_parent(); // Throws
         m_root = std::move(new_root);
     }
@@ -1743,18 +1741,14 @@ void ClusterTree::replace_root(std::unique_ptr<ClusterNode> new_root)
 void ClusterTree::init_from_ref(ref_type ref)
 {
     auto new_root = create_root_from_ref(m_alloc, ref);
-    if (m_root) {
-        ArrayParent* parent = m_root->get_parent();
-        size_t ndx_in_parent = m_root->get_ndx_in_parent();
-        new_root->set_parent(parent, ndx_in_parent);
-    }
+    new_root->set_parent(&m_owner->m_top, Table::top_position_for_cluster_tree);
     m_root = std::move(new_root);
     m_size = m_root->get_tree_size();
 }
 
 void ClusterTree::init_from_parent()
 {
-    ref_type ref = m_root->get_ref_from_parent();
+    ref_type ref = m_owner->m_top.get_as_ref(Table::top_position_for_cluster_tree);
     init_from_ref(ref);
 }
 

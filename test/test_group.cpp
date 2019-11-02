@@ -2091,15 +2091,10 @@ TEST(Group_PrimaryKeyCol)
     ColKey primary_key_column = table->get_primary_key_column();
     CHECK(primary_key_column);
     CHECK(table->has_search_index(primary_key_column));
-    auto pk = g.get_table("pk");
-    auto pk_table = pk->get_column_key("pk_table");
-    auto pk_property = pk->get_column_key("pk_property");
-    CHECK_EQUAL(pk->begin()->get<String>(pk_table), "foo");
-    CHECK_EQUAL(pk->begin()->get<String>(pk_property), "primary");
+
     auto obj = table->create_object_with_primary_key({1});
     CHECK_EQUAL(obj.get<Int>(primary_key_column), 1);
     g.remove_table(table->get_key());
-    CHECK_EQUAL(pk->size(), 0);
 
     table = g.add_table_with_primary_key("class_foo", type_String, "primary");
     primary_key_column = table->get_primary_key_column();
@@ -2107,6 +2102,7 @@ TEST(Group_PrimaryKeyCol)
     CHECK(table->has_search_index(primary_key_column));
     obj = table->create_object_with_primary_key({"Exactly!"});
     CHECK_EQUAL(obj.get<String>(primary_key_column), "Exactly!");
+    g.validate_primary_column_uniqueness();
 }
 
 #endif // TEST_GROUP
