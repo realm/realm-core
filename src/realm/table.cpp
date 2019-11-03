@@ -383,7 +383,7 @@ void Table::remove_column(ColKey col_key)
         repl->erase_column(this, col_key); // Throws
 
     if (col_key == m_primary_key_col) {
-        m_primary_key_col = ColKey();
+        set_primary_key_column(ColKey());
     }
     bump_content_version();
     bump_storage_version();
@@ -1839,6 +1839,39 @@ ObjKey Table::find_first(ColKey col_key, T value) const
 namespace realm {
 
 template <>
+ObjKey Table::find_first(ColKey col_key, StringData value) const
+{
+    if (REALM_UNLIKELY(!valid_column(col_key)))
+        throw InvalidKey("Non-existing column");
+
+    if (StringIndex* index = get_search_index(col_key)) {
+        return index->find_first(value);
+    }
+
+    if (col_key.get_type() == col_type_String && col_key == m_primary_key_col) {
+        ObjectID object_id{value};
+        return global_to_local_object_id_hashed(object_id);
+    }
+
+    ObjKey key;
+    ArrayString leaf(get_alloc());
+
+    auto f = [&key, &col_key, &value, &leaf](const Cluster* cluster) {
+        cluster->init_leaf(col_key, &leaf);
+        size_t row = leaf.find_first(value, 0, cluster->node_size());
+        if (row != realm::npos) {
+            key = cluster->get_real_key(row);
+            return true;
+        }
+        return false;
+    };
+
+    traverse_clusters(f);
+
+    return key;
+}
+
+template <>
 ObjKey Table::find_first(ColKey col_key, ObjKey value) const
 {
     if (REALM_UNLIKELY(!valid_column(col_key)))
@@ -2935,15 +2968,35 @@ ColKey Table::get_primary_key_column() const
 
 void Table::set_primary_key_column(ColKey col_key)
 {
-    m_top.set(top_position_for_pk_col, RefOrTagged::make_tagged(col_key.value));
+    if (col_key) {
+        if (REALM_UNLIKELY(!valid_column(col_key)))
+            throw InvalidKey("Non-existing column");
+
+        m_top.set(top_position_for_pk_col, RefOrTagged::make_tagged(col_key.value));
+    }
+    else {
+        m_top.set(top_position_for_pk_col, 0);
+    }
+
     m_primary_key_col = col_key;
 }
 
 void Table::validate_primary_column_uniqueness() const
 {
     auto col = get_primary_key_column();
-    if (col && get_distinct_view(col).size() != size()) {
-        throw DuplicatePrimaryKeyValueException(get_name(), get_column_name(col));
+    if (this->has_search_index(col)) {
+        if (col && get_distinct_view(col).size() != size()) {
+            throw DuplicatePrimaryKeyValueException(get_name(), get_column_name(col));
+        }
+    }
+    else {
+        for (auto o : *this) {
+            auto pk_val = o.get_any(col);
+            ObjectID object_id{pk_val};
+            if (global_to_local_object_id_hashed(object_id) != o.get_key()) {
+                throw std::runtime_error("Invalid primary key column");
+            }
+        }
     }
 }
 
