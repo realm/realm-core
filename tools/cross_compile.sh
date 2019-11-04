@@ -5,9 +5,6 @@ set -e
 #Set Script Name variable
 SCRIPT=$(basename "${BASH_SOURCE[0]}")
 
-# Number of cores
-CORES=$(getconf _NPROCESSORS_ONLN)
-
 function usage {
     echo "$Usage: ${SCRIPT} -t <build_type> -o <target_os> -v <version> [-a <android_abi>] [-f <cmake_flags>]"
     echo ""
@@ -73,11 +70,13 @@ if [ "${OS}" == "android" ]; then
           -D REALM_ENABLE_ENCRYPTION=1 \
           -D REALM_VERSION="${VERSION}" \
           -D CPACK_SYSTEM_NAME="Android-${ARCH}" \
+          -D CMAKE_MAKE_PROGRAM=ninja \
+          -G Ninja \
           ${CMAKE_FLAGS} \
           ..
 
-    make -j "${CORES}" -l "${CORES}" VERBOSE=1
-    make package
+    ninja -v
+    ninja package
 else
     case "${OS}" in
         ios) SDK="iphone";;
