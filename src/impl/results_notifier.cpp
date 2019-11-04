@@ -124,7 +124,7 @@ void ResultsNotifier::calculate_changes()
         std::vector<int64_t> next_rows;
         next_rows.reserve(m_run_tv.size());
         for (size_t i = 0; i < m_run_tv.size(); ++i)
-            next_rows.push_back(m_run_tv[i].get_key().value);
+            next_rows.push_back(m_run_tv.get_key(i).value);
 
         m_change = CollectionChangeBuilder::calculate(m_previous_rows, next_rows,
                                                       get_modification_checker(*m_info, *m_query->get_table()),
@@ -135,7 +135,7 @@ void ResultsNotifier::calculate_changes()
     else {
         m_previous_rows.resize(m_run_tv.size());
         for (size_t i = 0; i < m_run_tv.size(); ++i)
-            m_previous_rows[i] = m_run_tv[i].get_key().value;
+            m_previous_rows[i] = m_run_tv.get_key(i).value;
     }
 }
 
