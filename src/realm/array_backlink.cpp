@@ -46,7 +46,6 @@ void ArrayBacklink::nullify_fwd_links(size_t ndx, CascadeState& state)
     // determine the source table/col - which is the one holding the forward links
     TableRef source_table = target_table->get_opposite_table(target_col_key);
     ColKey src_col_key = target_table->get_opposite_column(target_col_key);
-    source_table->bump_content_version();
 
     // Now follow all backlinks to their origin and clear forward links.
     if ((value & 1) != 0) {
