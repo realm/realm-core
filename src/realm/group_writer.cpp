@@ -561,10 +561,27 @@ void GroupWriter::read_in_freelist()
     }
 
     free_in_file.merge_adjacent_entries_in_freelist();
+#ifdef REALM_DEBUG
+    poison_free_space(free_in_file);
+#endif
     // Previous step produces - potentially - some entries with size of zero. These
     // entries will be skipped in the next step.
     free_in_file.move_free_in_file_to_size_map(m_size_map);
 }
+
+void GroupWriter::poison_free_space(FreeList& free_in_file)
+{
+    for (auto& e : free_in_file) {
+        if (e.size) {
+            MapWindow* window = get_window(e.ref, e.size);
+            char* addr = window->translate(e.ref);
+            window->encryption_read_barrier(addr, e.size);
+            memset(addr, -1, e.size);
+            window->encryption_write_barrier(addr, e.size);
+        }
+    }
+}
+
 
 size_t GroupWriter::recreate_freelist(size_t reserve_pos)
 {

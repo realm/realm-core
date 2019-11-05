@@ -126,6 +126,7 @@ private:
     using FreeListElement = std::multimap<size_t, size_t>::iterator;
 
     void read_in_freelist();
+    void poison_free_space(FreeList& free_in_file);
     size_t recreate_freelist(size_t reserve_pos);
     // Currently cached memory mappings. We keep as many as 16 1MB windows
     // open for writing. The allocator will favor sequential allocation
