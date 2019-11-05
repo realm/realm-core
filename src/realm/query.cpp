@@ -328,11 +328,11 @@ struct MakeConditionNode<StringNode<Cond>> {
 template <class Cond, class T>
 std::unique_ptr<ParentNode> make_condition_node(const Table& table, ColKey column_key, T value)
 {
-    DataType type = table.get_column_type(column_key);
-    bool is_nullable = table.is_nullable(column_key);
+    table.check_column(column_key);
+    DataType type = DataType(column_key.get_type());
     switch (type) {
         case type_Int: {
-            if (is_nullable) {
+            if (column_key.get_attrs().test(col_attr_Nullable)) {
                 return MakeConditionNode<IntegerNode<ArrayIntNull, Cond>>::make(column_key, value);
             }
             else {
@@ -366,8 +366,9 @@ std::unique_ptr<ParentNode> make_condition_node(const Table& table, ColKey colum
 template <class Cond>
 std::unique_ptr<ParentNode> make_size_condition_node(const Table& table, ColKey column_key, int64_t value)
 {
-    DataType type = table.get_column_type(column_key);
-    ColumnAttrMask attr = table.get_column_attr(column_key);
+    table.check_column(column_key);
+    DataType type = DataType(column_key.get_type());
+    ColumnAttrMask attr = column_key.get_attrs();
 
     if (attr.test(col_attr_List)) {
         switch (type) {
