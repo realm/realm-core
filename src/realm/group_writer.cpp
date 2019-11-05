@@ -612,8 +612,24 @@ size_t GroupWriter::recreate_freelist(size_t reserve_pos)
         for (size_t i = 0; i < limit; ++i) {
             const auto& free_space = free_in_file[i];
             auto ref = free_space.ref;
-            REALM_ASSERT_RELEASE_EX(prev_ref + prev_size <= ref, prev_ref, prev_size, ref, i, limit,
-                                    m_alloc.get_file_path_for_assertions());
+            if (REALM_UNLIKELY(prev_ref + prev_size > ref)) {
+                // Check if we are freeing arrays already in 'm_not_free_in_file'
+                for (const auto& elem : new_free_space) {
+                    ref_type free_ref = elem.first;
+                    size_t free_sz = elem.second;
+                    for (const auto& locked : m_not_free_in_file) {
+                        REALM_ASSERT_RELEASE_EX(free_ref < locked.ref || free_ref >= (locked.ref + locked.size),
+                                                locked.ref, locked.size, locked.released_at_version, free_ref,
+                                                m_current_version, m_alloc.get_file_path_for_assertions());
+                        REALM_ASSERT_RELEASE_EX(locked.ref < free_ref || locked.ref >= (free_ref + free_sz),
+                                                locked.ref, locked.released_at_version, free_ref, free_sz,
+                                                m_current_version, m_alloc.get_file_path_for_assertions());
+                    }
+                }
+
+                REALM_ASSERT_RELEASE_EX(prev_ref + prev_size <= ref, prev_ref, prev_size, ref, i, limit,
+                                        m_alloc.get_file_path_for_assertions());
+            }
             if (reserve_pos == ref) {
                 reserve_ndx = i;
             }
