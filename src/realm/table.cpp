@@ -376,8 +376,7 @@ ColKey Table::insert_column(ColKey col_key, DataType type, StringData name, bool
 
 void Table::remove_column(ColKey col_key)
 {
-    if (REALM_UNLIKELY(!valid_column(col_key)))
-        throw InvalidKey("Non-existing column");
+    check_column(col_key);
 
     if (Replication* repl = get_repl())
         repl->erase_column(this, col_key); // Throws
@@ -393,8 +392,7 @@ void Table::remove_column(ColKey col_key)
 
 void Table::rename_column(ColKey col_key, StringData name)
 {
-    if (REALM_UNLIKELY(!valid_column(col_key)))
-        throw InvalidKey("Non-existing column");
+    check_column(col_key);
 
     auto col_ndx = colkey2spec_ndx(col_key);
     m_spec.rename_column(col_ndx, name); // Throws
@@ -554,8 +552,7 @@ void Table::populate_search_index(ColKey col_key)
 
 void Table::add_search_index(ColKey col_key)
 {
-    if (REALM_UNLIKELY(!valid_column(col_key)))
-        throw InvalidKey("No such column");
+    check_column(col_key);
     size_t column_ndx = col_key.get_index().val;
 
     // Early-out if already indexed
@@ -592,8 +589,7 @@ void Table::add_search_index(ColKey col_key)
 
 void Table::remove_search_index(ColKey col_key)
 {
-    if (REALM_UNLIKELY(!valid_column(col_key)))
-        throw InvalidKey("No such column");
+    check_column(col_key);
     auto column_ndx = col_key.get_index();
 
     // Early-out if non-indexed
@@ -618,8 +614,7 @@ void Table::remove_search_index(ColKey col_key)
 
 void Table::enumerate_string_column(ColKey col_key)
 {
-    if (REALM_UNLIKELY(!valid_column(col_key)))
-        throw InvalidKey("No such column");
+    check_column(col_key);
     size_t column_ndx = colkey2spec_ndx(col_key);
     ColumnType type = col_key.get_type();
     if (type == col_type_String && !m_spec.is_string_enum_type(column_ndx)) {
@@ -669,7 +664,7 @@ ColKey Table::insert_root_column(ColKey col_key, DataType type, StringData name,
 
 void Table::erase_root_column(ColKey col_key)
 {
-    REALM_ASSERT(valid_column(col_key));
+    check_column(col_key);
     ColumnType col_type = col_key.get_type();
     if (is_link_type(col_type)) {
         auto target_table = get_opposite_table(col_key);
@@ -1811,8 +1806,7 @@ Timestamp Table::maximum_timestamp(ColKey col_key, ObjKey* return_ndx) const
 template <class T>
 ObjKey Table::find_first(ColKey col_key, T value) const
 {
-    if (REALM_UNLIKELY(!valid_column(col_key)))
-        throw InvalidKey("Non-existing column");
+    check_column(col_key);
 
     if (StringIndex* index = get_search_index(col_key)) {
         return index->find_first(value);
@@ -1842,8 +1836,7 @@ namespace realm {
 template <>
 ObjKey Table::find_first(ColKey col_key, ObjKey value) const
 {
-    if (REALM_UNLIKELY(!valid_column(col_key)))
-        throw InvalidKey("Non-existing column");
+    check_column(col_key);
 
     ObjKey key;
     using LeafType = typename ColumnTypeTraits<ObjKey>::cluster_leaf_type;

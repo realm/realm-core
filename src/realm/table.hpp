@@ -153,7 +153,8 @@ public:
                               LinkType link_type = link_Weak);
     void remove_column(ColKey col_key);
     void rename_column(ColKey col_key, StringData new_name);
-    bool valid_column(ColKey col_key) const;
+    bool valid_column(ColKey col_key) const noexcept;
+    void check_column(ColKey col_key) const;
     //@}
 
     /// There are two kinds of links, 'weak' and 'strong'. A strong link is one
@@ -1424,7 +1425,7 @@ inline ColKey Table::leaf_ndx2colkey(ColKey::Idx leaf_ndx) const
         return ColKey();
 }
 
-bool inline Table::valid_column(ColKey col_key) const
+bool inline Table::valid_column(ColKey col_key) const noexcept
 {
     if (col_key == ColKey())
         return false;
@@ -1432,6 +1433,12 @@ bool inline Table::valid_column(ColKey col_key) const
     if (leaf_idx.val >= m_leaf_ndx2colkey.size())
         return false;
     return col_key == m_leaf_ndx2colkey[leaf_idx.val];
+}
+
+inline void Table::check_column(ColKey col_key) const
+{
+    if (REALM_UNLIKELY(!valid_column(col_key)))
+        throw InvalidKey("No such column");
 }
 
 // This class groups together information about the target of a link column
