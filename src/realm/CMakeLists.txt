@@ -318,29 +318,33 @@ endif()
 
 if(UNIX AND NOT APPLE)
     if(ANDROID)
-        string(TOLOWER "${CMAKE_BUILD_TYPE}" BUILD_TYPE)
-        set(OPENSSL_FILENAME "openssl-${BUILD_TYPE}-${ANDROID_OPENSSL_VERSION}-${ANDROID_OPENSSL_BUILD_NUMBER}-Android-${ANDROID_ABI}")
-        set(OPENSSL_URL "http://static.realm.io/downloads/openssl/${ANDROID_OPENSSL_VERSION}/Android/${ANDROID_ABI}/${OPENSSL_FILENAME}.tar.gz")
-
-        message(STATUS "Downloading OpenSSL...")
-        file(DOWNLOAD "${OPENSSL_URL}" "${CMAKE_BINARY_DIR}/${OPENSSL_FILENAME}.tar.gz")
-
-        message(STATUS "Uncompressing OpenSSL...")
-        execute_process(COMMAND ${CMAKE_COMMAND} -E tar xfz "${OPENSSL_FILENAME}.tar.gz")
-
-        set(OPENSSL_ROOT_DIR "${CMAKE_BINARY_DIR}/${OPENSSL_FILENAME}")
-        set(OPENSSL_INCLUDE_DIR "${OPENSSL_ROOT_DIR}/include")
-        set(OPENSSL_CRYPTO_LIBRARY "${OPENSSL_ROOT_DIR}/lib/libcrypto.a")
-        install(
-            DIRECTORY ${OPENSSL_ROOT_DIR}
-            DESTINATION .
-            COMPONENT devel)
+        set(OPENSSL_URL "http://static.realm.io/downloads/openssl/${OPENSSL_VERSION}/Android/${CMAKE_ANDROID_ARCH_ABI}/openssl.tgz")
+    else()
+        set(OPENSSL_URL "http://static.realm.io/downloads/openssl/${OPENSSL_VERSION}/Linux/x86_64/openssl.tgz")
     endif()
-    find_package(OpenSSL REQUIRED)
-    target_include_directories(CoreObjects PUBLIC ${OPENSSL_INCLUDE_DIR})
-    target_link_libraries(Core INTERFACE OpenSSL::Crypto)
+
+    message(STATUS "Getting ${OPENSSL_URL}...")
+    file(DOWNLOAD "${OPENSSL_URL}" "${CMAKE_CURRENT_BINARY_DIR}/openssl/openssl.tgz" STATUS download_status)
+
+    list(GET download_status 0 status_code)
+    if (NOT "${status_code}" STREQUAL "0")
+        message(FATAL_ERROR "Downloading ${url}... Failed. Status: ${download_status}")
+    endif()
+
+    message(STATUS "Uncompressing OpenSSL...")
+    execute_process(
+        COMMAND ${CMAKE_COMMAND} -E tar xfz "openssl.tgz"
+        WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/openssl"
+    )
+
+    set(OpenSSL_DIR "${CMAKE_CURRENT_BINARY_DIR}/openssl/lib/cmake/OpenSSL")
+    find_package(OpenSSL REQUIRED CONFIG)
+    get_target_property(OPENSSL_INCLUDE_DIR OpenSSL::Crypto INTERFACE_INCLUDE_DIRECTORIES)
+
+    target_include_directories(CoreObjects SYSTEM PUBLIC ${OPENSSL_INCLUDE_DIR})
+    target_link_libraries(Core PUBLIC OpenSSL::Crypto)
     if(NOT REALM_SKIP_SHARED_LIB)
-        target_link_libraries(CoreShared PRIVATE OpenSSL::Crypto)
+        target_link_libraries(CoreShared PUBLIC OpenSSL::Crypto)
     endif()
 endif()
 

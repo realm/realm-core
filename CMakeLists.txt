@@ -99,6 +99,7 @@ set_property(DIRECTORY APPEND PROPERTY COMPILE_OPTIONS
     $<$<CONFIG:MinSizeDebug>:-g>
 )
 
+set(OPENSSL_VERSION "1.1.1b")
 
 set(CMAKE_DEBUG_POSTFIX "-dbg")
 set(CMAKE_MINSIZEDEBUG_POSTFIX "-dbg")
@@ -146,8 +147,6 @@ endif()
 if(APPLE)
     find_library(Foundation Foundation)
 elseif(ANDROID)
-    set(ANDROID_OPENSSL_VERSION "1.0.2k")
-    set(ANDROID_OPENSSL_BUILD_NUMBER "1")
     list(APPEND PLATFORM_LIBRARIES log android)
 endif()
 
