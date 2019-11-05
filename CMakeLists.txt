@@ -73,7 +73,7 @@ else()
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wpedantic -Wundef -Wshadow")
     # TODO: Remove this when fixed
     if(ANDROID)
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-maybe-uninitialized -Wno-uninitialized")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-uninitialized")
     elseif(${CMAKE_CXX_COMPILER_ID} MATCHES ".*[Cc]lang")
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wunreachable-code -Wshorten-64-to-32 -Wold-style-cast -Wconditional-uninitialized -Wextra-semi -Wno-nested-anon-types")
     endif()
@@ -88,6 +88,19 @@ else()
     endif()
 
     use_faster_linker()
+endif()
+
+if(ANDROID)
+    # Optimize for size vs. performance for Android. The has the following implications:
+    # - Replace `-O3` with `-Oz`.
+    # - Add `-ffunction-sections` and `-fdata-sections`. This requires that `-Wl,-gc-sections` are used when creating
+    #   the final .so file.
+    # - `-fstrict-aliasing` is inherited from NDK r10e.
+    # - `-fomit-frame-pointer` is inherited from NDK r10e.
+    #
+    # On some architectures char is unsigned by default. Make it signed
+    set(CMAKE_CXX_FLAGS_RELEASE "-Oz -DNDEBUG")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fdata-sections -ffunction-sections -fomit-frame-pointer -fsigned-char -fstrict-aliasing -funwind-tables -no-canonical-prefixes")
 endif()
 
 # Add REALM_DEBUG=1 to compile definitions for Debug / MinSizeDebug targets
