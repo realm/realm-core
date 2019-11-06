@@ -1261,11 +1261,9 @@ inline void Cluster::do_erase_key(size_t ndx, ColKey col_key, CascadeState& stat
     values.set_parent(this, col_ndx.val + s_first_col_index);
     values.init_from_parent();
 
-    if (state.m_mode == CascadeState::Mode::None) {
-        ObjKey key = values.get(ndx);
-        if (key != null_key) {
-            remove_backlinks(get_real_key(ndx), col_key, {key}, state);
-        }
+    ObjKey key = values.get(ndx);
+    if (key != null_key) {
+        remove_backlinks(get_real_key(ndx), col_key, {key}, state);
     }
     values.erase(ndx);
 }
@@ -1298,52 +1296,20 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
         repl->remove_object(table, real_key);
     }
 
-    // If we're performing cascading deletions, we need to remove all backlinks
-    // before erasing any values from the array, or else the checks for if
-    // there's any remaining backlinks will check the wrong row for columns
-    // which have already had values erased from.
-    if (state.m_mode != CascadeState::Mode::None) {
-        auto remove_backlinks_from_column = [&](ColKey col_key) {
-            auto col_ndx = col_key.get_index();
-            auto col_type = col_key.get_type();
-            if (col_type == col_type_Link) {
-                ArrayKey values(m_alloc);
-                values.set_parent(this, col_ndx.val + s_first_col_index);
-                values.init_from_parent();
-                ObjKey link_target = values.get(ndx);
-                if (link_target != null_key) {
-                    remove_backlinks(get_real_key(ndx), col_key, {link_target}, state);
-                }
-            }
-            else if (col_type == col_type_LinkList) {
-                ArrayInteger values(m_alloc);
-                values.set_parent(this, col_ndx.val + s_first_col_index);
-                values.init_from_parent();
-                if (ref_type ref = values.get_as_ref(ndx)) {
-                    BPlusTree<ObjKey> links(m_alloc);
-                    links.init_from_ref(ref);
-                    if (links.size() > 0) {
-                        remove_backlinks(ObjKey(key.value + m_offset), col_key, links.get_all(), state);
-                    }
-                }
-            }
-            return false;
-        };
-        m_tree_top.get_owner()->for_each_public_column(remove_backlinks_from_column);
-    }
+    std::vector<ColKey> backlink_column_keys;
 
     auto erase_in_column = [&](ColKey col_key) {
         auto col_type = col_key.get_type();
-        auto col_ndx = col_key.get_index();
         auto attr = col_key.get_attrs();
         if (attr.test(col_attr_List)) {
+            auto col_ndx = col_key.get_index();
             ArrayRef values(m_alloc);
             values.set_parent(this, col_ndx.val + s_first_col_index);
             values.init_from_parent();
             ref_type ref = values.get(ndx);
 
             if (ref) {
-                if (state.m_mode == CascadeState::Mode::None && col_type == col_type_LinkList) {
+                if (col_type == col_type_LinkList) {
                     BPlusTree<ObjKey> links(m_alloc);
                     links.init_from_ref(ref);
                     if (links.size() > 0) {
@@ -1389,7 +1355,16 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
                 do_erase_key(ndx, col_key, state);
                 break;
             case col_type_BackLink:
-                do_erase<ArrayBacklink>(ndx, col_key);
+                if (state.m_mode == CascadeState::Mode::None) {
+                    do_erase<ArrayBacklink>(ndx, col_key);
+                }
+                else {
+                    // Postpone the deletion of backlink entries or else the
+                    // checks for if there's any remaining backlinks will
+                    // check the wrong row for columns which have already
+                    // had values erased from them.
+                    backlink_column_keys.push_back(col_key);
+                }
                 break;
             default:
                 REALM_ASSERT(false);
@@ -1398,6 +1373,10 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
         return false;
     };
     m_tree_top.get_owner()->for_each_and_every_column(erase_in_column);
+
+    // Any remaining backlink columns to erase from?
+    for (auto k : backlink_column_keys)
+        do_erase<ArrayBacklink>(ndx, k);
 
     if (m_keys.is_attached()) {
         m_keys.erase(ndx);

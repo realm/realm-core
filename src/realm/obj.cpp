@@ -385,7 +385,7 @@ bool ConstObj::has_backlinks(bool only_strong_links) const
         // Find origin table and column for this backlink column
         TableRef origin_table = target_table->get_opposite_table(backlink_col_key);
         ColKey origin_col = target_table->get_opposite_column(backlink_col_key);
-        if (!only_strong_links || origin_table->get_link_type(origin_col) == link_Strong) {
+        if (!only_strong_links || origin_col.get_attrs().test(col_attr_StrongLinks)) {
             auto cnt = get_backlink_count(*origin_table, origin_col);
             if (cnt)
                 return true;
@@ -403,7 +403,7 @@ size_t ConstObj::get_backlink_count(bool only_strong_links) const
         // Find origin table and column for this backlink column
         TableRef origin_table = target_table->get_opposite_table(backlink_col_key);
         ColKey origin_col = target_table->get_opposite_column(backlink_col_key);
-        if (!only_strong_links || origin_table->get_link_type(origin_col) == link_Strong) {
+        if (!only_strong_links || origin_col.get_attrs().test(col_attr_StrongLinks)) {
             cnt += get_backlink_count(*origin_table, origin_col);
         }
         return false;
