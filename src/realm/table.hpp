@@ -1270,6 +1270,7 @@ private:
 
     void bind_ptr() const noexcept;
     void unbind_ptr() const noexcept;
+    bool has_references() const noexcept;
 
     void register_view(const TableViewBase* view);
     void unregister_view(const TableViewBase* view) noexcept;
@@ -1738,6 +1739,11 @@ inline void Table::unbind_ptr() const noexcept
     else {
         delete this;
     }
+}
+
+inline bool Table::has_references() const noexcept
+{
+    return m_ref_count.load() > 0;
 }
 
 inline void Table::register_view(const TableViewBase* view)
@@ -2787,6 +2793,11 @@ public:
     static void unregister_view(Table& table, const TableViewBase* view) noexcept
     {
         table.unregister_view(view);
+    }
+
+    static bool has_references(const Table& table) noexcept
+    {
+        return table.has_references();
     }
 };
 
