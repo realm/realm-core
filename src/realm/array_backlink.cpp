@@ -27,51 +27,40 @@ using namespace realm;
 void ArrayBacklink::nullify_fwd_links(size_t ndx, CascadeState& state)
 {
     uint64_t value = Array::get(ndx);
-    if (value != 0) {
-        // Naming: Links go from source to target.
-        // Backlinks go from target to source.
-        // This array holds backlinks, hence it is the target.
-        // The table which holds the corresponding fwd links is the source.
+    if (value == 0) {
+        return;
+    }
 
-        // determine target table, column and key.
-        REALM_ASSERT_DEBUG(dynamic_cast<Cluster*>(get_parent()));
-        auto cluster = static_cast<Cluster*>(get_parent());
-        const Table* target_table = cluster->get_owning_table();
-        ColKey target_col_key = cluster->get_col_key(get_ndx_in_parent());
-        ObjKey target_key = cluster->get_real_key(ndx);
+    // Naming: Links go from source to target.
+    // Backlinks go from target to source.
+    // This array holds backlinks, hence it is the target.
+    // The table which holds the corresponding fwd links is the source.
 
-        // determine the source table/col - which is the one holding the forward links
-        TableRef source_table = target_table->get_opposite_table(target_col_key);
-        TableKey src_table_key = source_table->get_key();
-        ColKey src_col_key = target_table->get_opposite_column(target_col_key);
-        source_table->bump_content_version();
-        Group::CascadeNotification notifications;
-        // Now follow all backlinks to their origin and clear forward links.
-        if ((value & 1) != 0) {
-            // just a single one
-            notifications.links.emplace_back(src_table_key, src_col_key, ObjKey(value >> 1), target_key);
-        }
-        else {
-            // There is more than one backlink - Iterate through them all
-            ref_type ref = to_ref(value);
-            Array backlink_list(m_alloc);
-            backlink_list.init_from_ref(ref);
+    // determine target table, column and key.
+    REALM_ASSERT_DEBUG(dynamic_cast<Cluster*>(get_parent()));
+    auto cluster = static_cast<Cluster*>(get_parent());
+    const Table* target_table = cluster->get_owning_table();
+    ColKey target_col_key = cluster->get_col_key(get_ndx_in_parent());
+    ObjKey target_key = cluster->get_real_key(ndx);
 
-            size_t sz = backlink_list.size();
-            for (size_t i = 0; i < sz; i++) {
-                notifications.links.emplace_back(src_table_key, src_col_key, ObjKey(backlink_list.get(i)),
-                                                 target_key);
-            }
-        }
+    // determine the source table/col - which is the one holding the forward links
+    TableRef source_table = target_table->get_opposite_table(target_col_key);
+    ColKey src_col_key = target_table->get_opposite_column(target_col_key);
 
-        if (state.notification_handler()) {
-            state.send_notifications(notifications);
-        }
+    // Now follow all backlinks to their origin and clear forward links.
+    if ((value & 1) != 0) {
+        // just a single one
+        state.enqueue_for_nullification(*source_table, src_col_key, ObjKey(value >> 1), target_key);
+    }
+    else {
+        // There is more than one backlink - Iterate through them all
+        ref_type ref = to_ref(value);
+        Array backlink_list(m_alloc);
+        backlink_list.init_from_ref(ref);
 
-        // Nullify links
-        for (auto& l : notifications.links) {
-            Obj obj = source_table->get_object(l.origin_key);
-            obj.nullify_link(src_col_key, target_key);
+        size_t sz = backlink_list.size();
+        for (size_t i = 0; i < sz; i++) {
+            state.enqueue_for_nullification(*source_table, src_col_key, ObjKey(backlink_list.get(i)), target_key);
         }
     }
 }

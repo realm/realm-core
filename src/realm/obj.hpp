@@ -262,13 +262,15 @@ public:
     LstBasePtr get_listbase_ptr(ColKey col_key) const;
 
 private:
+    friend class ArrayBacklink;
+    friend class CascadeState;
     friend class Cluster;
     friend class ConstLstBase;
-    friend class ArrayBacklink;
     friend class ConstObj;
     template <class>
     friend class Lst;
     friend class LnkLst;
+    friend class Table;
 
     Obj(const ConstObj& other)
         : ConstObj(other)

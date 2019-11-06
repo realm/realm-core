@@ -1358,45 +1358,6 @@ TEST(Group_Commit_Update_Integer_Index)
     CHECK(t->find_first_int(col, (0 + 1) * 0xeeeeeeeeeeeeeeeeULL) == k0);
 }
 
-namespace {
-struct ReferenceNotifications : public Group::CascadeNotification {
-    bool check(TableKey tk, ObjKey k)
-    {
-        auto it = rows.begin();
-        while (it != rows.end()) {
-            if (it->table_key == tk && it->key == k) {
-                rows.erase(it);
-                return true;
-            }
-            ++it;
-        }
-        return false;
-    }
-
-    bool check(TableKey tk, ColKey ck, ObjKey k, ObjKey otk)
-    {
-        auto it = links.begin();
-        while (it != links.end()) {
-            if (it->origin_table == tk && it->origin_col_key == ck && it->origin_key == k &&
-                it->old_target_key == otk) {
-                links.erase(it);
-                return true;
-            }
-            ++it;
-        }
-        return false;
-    }
-    bool all_reported()
-    {
-        bool ret = rows.empty() && links.empty();
-        if (!ret) {
-            rows.clear();
-            links.clear();
-        }
-        return ret;
-    }
-};
-}
 
 TEST(Group_CascadeNotify_SimpleWeak)
 {
@@ -1405,46 +1366,51 @@ TEST(Group_CascadeNotify_SimpleWeak)
     Group g(path, 0, Group::mode_ReadWrite);
     TableRef t = g.add_table("target");
     t->add_column(type_Int, "int");
-
-    // Add some extra rows so that the indexes being tested aren't all 0
-    std::vector<ObjKey> t_keys;
-    t->create_objects(100, t_keys);
-
-    ReferenceNotifications expected_notifications;
-    g.set_cascade_notification_handler([&](const Group::CascadeNotification& notification) {
-        for (auto r : notification.rows) {
-            CHECK(expected_notifications.check(r.table_key, r.key));
-            auto table = g.get_table(r.table_key);
-            CHECK(table->is_valid(r.key));
-        }
-        for (auto l : notification.links) {
-            CHECK(expected_notifications.check(l.origin_table, l.origin_col_key, l.origin_key, l.old_target_key));
-        }
-    });
-
-    // remove_object() on a table with no (back)links just sends that single
-    // row in the notification
-    expected_notifications.rows.emplace_back(t->get_key(), t_keys[5]);
-    t->remove_object(t_keys[5]);
-    t_keys.erase(t_keys.begin() + 5);
-    CHECK(expected_notifications.all_reported());
-
-    // Add another table which links to the target table
     TableRef origin = g.add_table("origin");
     auto col_link = origin->add_column_link(type_Link, "link", *t);
     auto col_link_list = origin->add_column_link(type_LinkList, "linklist", *t);
 
+    std::vector<ObjKey> t_keys;
+    t->create_objects(100, t_keys);
+
+    bool called = false;
+    g.set_cascade_notification_handler([&](const Group::CascadeNotification&) { called = true; });
+    t->remove_object(t_keys[5]);
+    t_keys.erase(t_keys.begin() + 5);
+    CHECK(called);
+
+    // remove_object() on a table with no (back)links just sends that single
+    // row in the notification
+    called = false;
+    g.set_cascade_notification_handler([&](const Group::CascadeNotification& notification) {
+        called = true;
+        CHECK_EQUAL(0, notification.links.size());
+        CHECK_EQUAL(1, notification.rows.size());
+        CHECK_EQUAL(t->get_key(), notification.rows[0].table_key);
+        CHECK_EQUAL(t_keys[5], notification.rows[0].key);
+    });
+    t->remove_object(t_keys[5]);
+    t_keys.erase(t_keys.begin() + 5);
+    CHECK(called);
+
     std::vector<ObjKey> o_keys;
     origin->create_objects(100, o_keys);
 
-    // move_last_over() on an un-linked-to row should still just send that row
+    // remove_object() on an un-linked-to row should still just send that row
     // in the notification
-    expected_notifications.rows.emplace_back(t->get_key(), t_keys[5]);
+    called = false;
+    g.set_cascade_notification_handler([&](const Group::CascadeNotification& notification) {
+        called = true;
+        CHECK_EQUAL(0, notification.links.size());
+        CHECK_EQUAL(1, notification.rows.size());
+        CHECK_EQUAL(t->get_key(), notification.rows[0].table_key);
+        CHECK_EQUAL(t_keys[5], notification.rows[0].key);
+    });
     t->remove_object(t_keys[5]);
     t_keys.erase(t_keys.begin() + 5);
-    CHECK(expected_notifications.all_reported());
+    CHECK(called);
 
-    // move_last_over() on a linked-to row should send information about the
+    // remove_object() on a linked-to row should send information about the
     // links which had linked to it
     // rows are arbitrarily different to make things less likely to pass by coincidence
     Obj obj10 = origin->get_object(o_keys[10]);
@@ -1453,22 +1419,43 @@ TEST(Group_CascadeNotify_SimpleWeak)
     LnkLstPtr lv = obj15.get_linklist_ptr(col_link_list);
     lv->add(t_keys[11]);
     lv->add(t_keys[30]);
-    expected_notifications.rows.emplace_back(t->get_key(), t_keys[11]);
-    expected_notifications.links.emplace_back(origin->get_key(), col_link, o_keys[10], t_keys[11]);
-    expected_notifications.links.emplace_back(origin->get_key(), col_link_list, o_keys[15], t_keys[11]);
+    called = false;
+    g.set_cascade_notification_handler([&](const Group::CascadeNotification& notification) {
+        called = true;
+        CHECK_EQUAL(1, notification.rows.size());
+        CHECK_EQUAL(t->get_key(), notification.rows[0].table_key);
+        CHECK_EQUAL(t_keys[11], notification.rows[0].key);
+
+        CHECK_EQUAL(2, notification.links.size());
+
+        CHECK_EQUAL(col_link, notification.links[0].origin_col_key);
+        CHECK_EQUAL(o_keys[10], notification.links[0].origin_key);
+        CHECK_EQUAL(t_keys[11], notification.links[0].old_target_key);
+
+        CHECK_EQUAL(col_link_list, notification.links[1].origin_col_key);
+        CHECK_EQUAL(o_keys[15], notification.links[1].origin_key);
+        CHECK_EQUAL(t_keys[11], notification.links[1].old_target_key);
+    });
     t->remove_object(t_keys[11]);
     t_keys.erase(t_keys.begin() + 11);
-    CHECK(expected_notifications.all_reported());
+    CHECK(called);
 
-    // move_last_over() on the origin table just sends the row being removed
+    // remove_object() on the origin table just sends the row being removed
     // because the links are weak
     obj10.set(col_link, t_keys[11]);
-    expected_notifications.rows.emplace_back(origin->get_key(), o_keys[10]);
+    called = false;
+    g.set_cascade_notification_handler([&](const Group::CascadeNotification& notification) {
+        called = true;
+        CHECK_EQUAL(1, notification.rows.size());
+        CHECK_EQUAL(origin->get_key(), notification.rows[0].table_key);
+        CHECK_EQUAL(o_keys[10], notification.rows[0].key);
+
+        CHECK_EQUAL(0, notification.links.size());
+    });
     origin->remove_object(o_keys[10]);
     o_keys.erase(o_keys.begin() + 10);
-    CHECK(expected_notifications.all_reported());
+    CHECK(called);
 }
-
 
 TEST(Group_CascadeNotify_SimpleStrong)
 {
@@ -1477,81 +1464,50 @@ TEST(Group_CascadeNotify_SimpleStrong)
     Group g(path, 0, Group::mode_ReadWrite);
     TableRef t = g.add_table("target");
     t->add_column(type_Int, "int");
-
-    // Add some extra rows so that the indexes being tested aren't all 0
-    std::vector<ObjKey> t_keys;
-    t->create_objects(100, t_keys);
-
-    ReferenceNotifications expected_notifications;
-    g.set_cascade_notification_handler([&](const Group::CascadeNotification& notification) {
-        for (auto r : notification.rows) {
-            CHECK(expected_notifications.check(r.table_key, r.key));
-            auto table = g.get_table(r.table_key);
-            CHECK(table->is_valid(r.key));
-        }
-        for (auto l : notification.links) {
-            CHECK(expected_notifications.check(l.origin_table, l.origin_col_key, l.origin_key, l.old_target_key));
-        }
-    });
-
-    // remove_object() on a table with no (back)links just sends that single
-    // row in the notification
-    expected_notifications.rows.emplace_back(t->get_key(), t_keys[5]);
-    t->remove_object(t_keys[5]);
-    t_keys.erase(t_keys.begin() + 5);
-    CHECK(expected_notifications.all_reported());
-
-    // Add another table which links to the target table
     TableRef origin = g.add_table("origin");
     auto col_link = origin->add_column_link(type_Link, "link", *t, link_Strong);
     auto col_link_list = origin->add_column_link(type_LinkList, "linklist", *t, link_Strong);
 
-    std::vector<ObjKey> o_keys;
+    std::vector<ObjKey> t_keys, o_keys;
+    t->create_objects(100, t_keys);
     origin->create_objects(100, o_keys);
 
-    // move_last_over() on an un-linked-to row should still just send that row
-    // in the notification
-    expected_notifications.rows.emplace_back(t->get_key(), t_keys[5]);
-    t->remove_object(t_keys[5]);
-    t_keys.erase(t_keys.begin() + 5);
-    CHECK(expected_notifications.all_reported());
-
-    // move_last_over() on a linked-to row should send information about the
-    // links which had linked to it
-    // rows are arbitrarily different to make things less likely to pass by coincidence
-    Obj obj10 = origin->get_object(o_keys[10]);
-    Obj obj15 = origin->get_object(o_keys[15]);
-    obj10.set(col_link, t_keys[11]);
-    LnkLstPtr lv = obj15.get_linklist_ptr(col_link_list);
-    lv->add(t_keys[11]);
-    lv->add(t_keys[30]);
-    expected_notifications.rows.emplace_back(t->get_key(), t_keys[11]);
-    expected_notifications.links.emplace_back(origin->get_key(), col_link, o_keys[10], t_keys[11]);
-    expected_notifications.links.emplace_back(origin->get_key(), col_link_list, o_keys[15], t_keys[11]);
-    t->remove_object(t_keys[11]);
-    t_keys.erase(t_keys.begin() + 11);
-    CHECK(expected_notifications.all_reported());
-
-    // move_last_over() on the origin table with strong links lists the target
+    // remove_object() on the origin table with strong links lists the target
     // rows that are removed
     Obj obj12 = origin->get_object(o_keys[12]);
     Obj obj13 = origin->get_object(o_keys[13]);
     obj12.set(col_link, t_keys[50]);
-    lv = obj12.get_linklist_ptr(col_link_list);
+    auto lv = obj12.get_linklist_ptr(col_link_list);
     lv->add(t_keys[60]);
     lv->add(t_keys[61]);
     lv->add(t_keys[61]);
     lv->add(t_keys[62]);
     obj13.set(col_link, t_keys[62]); // hold on to 62
     // 50, 60 and 61 should be removed; 62 should not as there's still a strong link
-    expected_notifications.rows.emplace_back(origin->get_key(), o_keys[12]);
-    expected_notifications.rows.emplace_back(t->get_key(), t_keys[50]);
-    expected_notifications.rows.emplace_back(t->get_key(), t_keys[60]);
-    expected_notifications.rows.emplace_back(t->get_key(), t_keys[61]);
-    origin->remove_object(o_keys[12]);
-    CHECK(expected_notifications.all_reported());
+    int calls = 0;
+    g.set_cascade_notification_handler([&](const Group::CascadeNotification& notification) {
+        CHECK_EQUAL(0, notification.links.size());
 
-    // Indirect nullifications: move_last_over() on a row with the last strong
+        if (calls == 0) {
+            CHECK_EQUAL(1, notification.rows.size());
+            CHECK_EQUAL(origin->get_key(), notification.rows[0].table_key);
+            CHECK_EQUAL(o_keys[12], notification.rows[0].key);
+        }
+        else if (calls == 1) {
+            CHECK_EQUAL(3, notification.rows.size());
+            for (auto& row : notification.rows)
+                CHECK_EQUAL(t->get_key(), row.table_key);
+            CHECK_EQUAL(t_keys[50], notification.rows[0].key);
+            CHECK_EQUAL(t_keys[60], notification.rows[1].key);
+            CHECK_EQUAL(t_keys[61], notification.rows[2].key);
+        }
+
+        ++calls;
+    });
+    origin->remove_object(o_keys[12]);
+    CHECK_EQUAL(calls, 2);
+
+    // Indirect nullifications: remove_object() on a row with the last strong
     // links to a row that still has weak links to it
     auto col_link_weak = origin->add_column_link(type_Link, "link2", *t);
     auto col_link_list_weak = origin->add_column_link(type_LinkList, "linklist2", *t);
@@ -1574,7 +1530,6 @@ TEST(Group_CascadeNotify_SimpleStrong)
     obj25.set(col_link_weak, t_keys[31]);
     obj25.get_linklist(col_link_list_weak).add(t_keys[30]);
 
-    // obj30 and obj31 are now linked by both strong and weak links
     CHECK_EQUAL(1, obj30.get_backlink_count(*origin, col_link));
     CHECK_EQUAL(0, obj30.get_backlink_count(*origin, col_link_list));
     CHECK_EQUAL(0, obj30.get_backlink_count(*origin, col_link_weak));
@@ -1584,15 +1539,34 @@ TEST(Group_CascadeNotify_SimpleStrong)
     CHECK_EQUAL(1, obj31.get_backlink_count(*origin, col_link_weak));
     CHECK_EQUAL(0, obj31.get_backlink_count(*origin, col_link_list_weak));
 
-    // As obj20 has strong links to obj30 and obj31 those should be deleted and
-    // the weak links should be reported broken
-    expected_notifications.rows.emplace_back(origin->get_key(), o_keys[20]);
-    expected_notifications.rows.emplace_back(t->get_key(), t_keys[30]);
-    expected_notifications.rows.emplace_back(t->get_key(), t_keys[31]);
-    expected_notifications.links.emplace_back(origin->get_key(), col_link_list_weak, o_keys[25], t_keys[30]);
-    expected_notifications.links.emplace_back(origin->get_key(), col_link_weak, o_keys[25], t_keys[31]);
+    calls = 0;
+    g.set_cascade_notification_handler([&](const Group::CascadeNotification& notification) {
+        if (calls == 0) {
+            CHECK_EQUAL(0, notification.links.size());
+            CHECK_EQUAL(1, notification.rows.size());
+            CHECK_EQUAL(origin->get_key(), notification.rows[0].table_key);
+            CHECK_EQUAL(o_keys[20], notification.rows[0].key);
+        }
+        else if (calls == 1) {
+            CHECK_EQUAL(2, notification.links.size());
+            CHECK_EQUAL(2, notification.rows.size());
+            CHECK_EQUAL(t->get_key(), notification.rows[0].table_key);
+            CHECK_EQUAL(t_keys[30], notification.rows[0].key);
+            CHECK_EQUAL(t->get_key(), notification.rows[1].table_key);
+            CHECK_EQUAL(t_keys[31], notification.rows[1].key);
+
+            CHECK_EQUAL(col_link_list_weak, notification.links[0].origin_col_key);
+            CHECK_EQUAL(o_keys[25], notification.links[0].origin_key);
+            CHECK_EQUAL(t_keys[30], notification.links[0].old_target_key);
+
+            CHECK_EQUAL(col_link_weak, notification.links[1].origin_col_key);
+            CHECK_EQUAL(o_keys[25], notification.links[1].origin_key);
+            CHECK_EQUAL(t_keys[31], notification.links[1].old_target_key);
+        }
+        ++calls;
+    });
     origin->remove_object(o_keys[20]);
-    CHECK(expected_notifications.all_reported());
+    CHECK_EQUAL(calls, 2);
 }
 
 
@@ -1603,33 +1577,25 @@ TEST(Group_CascadeNotify_TableClearWeak)
     Group g(path, 0, Group::mode_ReadWrite);
     TableRef t = g.add_table("target");
     t->add_column(type_Int, "int");
-
-    std::vector<ObjKey> t_keys;
-    t->create_objects(10, t_keys);
-
-    // clear() does not list the rows in the table being cleared because it
-    // would be expensive and mostly pointless to do so
-    ReferenceNotifications expected_notifications;
-    g.set_cascade_notification_handler([&](const Group::CascadeNotification& notification) {
-        for (auto r : notification.rows) {
-            CHECK(expected_notifications.check(r.table_key, r.key));
-            auto table = g.get_table(r.table_key);
-            CHECK(table->is_valid(r.key));
-        }
-        for (auto l : notification.links) {
-            CHECK(expected_notifications.check(l.origin_table, l.origin_col_key, l.origin_key, l.old_target_key));
-        }
-    });
-    t->clear();
-    t_keys.clear();
-    CHECK(expected_notifications.all_reported());
-
-    // Add another table which links to the target table
     TableRef origin = g.add_table("origin");
     auto col_link = origin->add_column_link(type_Link, "link", *t);
     auto col_link_list = origin->add_column_link(type_LinkList, "linklist", *t);
 
-    std::vector<ObjKey> o_keys;
+    std::vector<ObjKey> t_keys, o_keys;
+    t->create_objects(10, t_keys);
+
+    // clear() does not list the rows in the table being cleared because it
+    // would be expensive and mostly pointless to do so
+    bool called = false;
+    g.set_cascade_notification_handler([&](const Group::CascadeNotification& notification) {
+        called = true;
+        CHECK_EQUAL(0, notification.links.size());
+        CHECK_EQUAL(0, notification.rows.size());
+    });
+    t->clear();
+    t_keys.clear();
+    CHECK(called);
+
     origin->create_objects(10, o_keys);
     t->create_objects(10, t_keys);
 
@@ -1638,16 +1604,28 @@ TEST(Group_CascadeNotify_TableClearWeak)
     origin->get_object(o_keys[3]).get_linklist(col_link_list).add(t_keys[4]);
     origin->get_object(o_keys[5]).get_linklist(col_link_list).add(t_keys[4]);
 
-    expected_notifications.links.emplace_back(origin->get_key(), col_link, o_keys[1], t_keys[2]);
-    expected_notifications.links.emplace_back(origin->get_key(), col_link_list, o_keys[3], t_keys[4]);
-    expected_notifications.links.emplace_back(origin->get_key(), col_link_list, o_keys[5], t_keys[4]);
+    called = false;
+    g.set_cascade_notification_handler([&](const Group::CascadeNotification& notification) {
+        called = true;
+        CHECK_EQUAL(0, notification.rows.size());
+
+        CHECK_EQUAL(3, notification.links.size());
+        CHECK_EQUAL(col_link, notification.links[0].origin_col_key);
+        CHECK_EQUAL(o_keys[1], notification.links[0].origin_key);
+        CHECK_EQUAL(t_keys[2], notification.links[0].old_target_key);
+
+        CHECK_EQUAL(col_link_list, notification.links[1].origin_col_key);
+        CHECK_EQUAL(o_keys[3], notification.links[1].origin_key);
+        CHECK_EQUAL(t_keys[4], notification.links[1].old_target_key);
+
+        CHECK_EQUAL(col_link_list, notification.links[2].origin_col_key);
+        CHECK_EQUAL(o_keys[5], notification.links[2].origin_key);
+        CHECK_EQUAL(t_keys[4], notification.links[2].old_target_key);
+    });
     t->clear();
     t_keys.clear();
-    CHECK(expected_notifications.all_reported());
+    CHECK(called);
     g.verify();
-
-    t->create_objects(10, t_keys);
-    CHECK(expected_notifications.all_reported());
 }
 
 TEST(Group_CascadeNotify_TableClearStrong)
@@ -1657,67 +1635,35 @@ TEST(Group_CascadeNotify_TableClearStrong)
     Group g(path, 0, Group::mode_ReadWrite);
     TableRef t = g.add_table("target");
     t->add_column(type_Int, "int");
-
-    std::vector<ObjKey> t_keys;
-    t->create_objects(10, t_keys);
-
-    // clear() does not list the rows in the table being cleared because it
-    // would be expensive and mostly pointless to do so
-    ReferenceNotifications expected_notifications;
-    g.set_cascade_notification_handler([&](const Group::CascadeNotification& notification) {
-        for (auto r : notification.rows) {
-            CHECK(expected_notifications.check(r.table_key, r.key));
-            auto table = g.get_table(r.table_key);
-            CHECK(table->is_valid(r.key));
-        }
-        for (auto l : notification.links) {
-            CHECK(expected_notifications.check(l.origin_table, l.origin_col_key, l.origin_key, l.old_target_key));
-        }
-    });
-    t->clear();
-    t_keys.clear();
-    CHECK(expected_notifications.all_reported());
-
-    // Add another table which links to the target table
     TableRef origin = g.add_table("origin");
     auto col_link = origin->add_column_link(type_Link, "link", *t, link_Strong);
     auto col_link_list = origin->add_column_link(type_LinkList, "linklist", *t, link_Strong);
 
-    std::vector<ObjKey> o_keys;
-    origin->create_objects(10, o_keys);
+    std::vector<ObjKey> t_keys, o_keys;
     t->create_objects(10, t_keys);
+    origin->create_objects(10, o_keys);
 
-    // clear() does report nullified links
     origin->get_object(o_keys[1]).set(col_link, t_keys[2]);
     origin->get_object(o_keys[3]).get_linklist(col_link_list).add(t_keys[4]);
     origin->get_object(o_keys[5]).get_linklist(col_link_list).add(t_keys[4]);
-
-    expected_notifications.links.emplace_back(origin->get_key(), col_link, o_keys[1], t_keys[2]);
-    expected_notifications.links.emplace_back(origin->get_key(), col_link_list, o_keys[3], t_keys[4]);
-    expected_notifications.links.emplace_back(origin->get_key(), col_link_list, o_keys[5], t_keys[4]);
-    t->clear();
-    t_keys.clear();
-    CHECK(expected_notifications.all_reported());
-    g.verify();
-
-    t->create_objects(10, t_keys);
-    // and cascaded deletions
     origin->get_object(o_keys[1]).set(col_link, t_keys[2]);
-    auto ll = origin->get_object(o_keys[3]).get_linklist(col_link_list);
-    ll.add(t_keys[4]);
-    ll.add(t_keys[4]);
+    origin->get_object(o_keys[3]).get_linklist(col_link_list).add(t_keys[4]);
 
-    expected_notifications.rows.emplace_back(t->get_key(), t_keys[2]);
-    expected_notifications.rows.emplace_back(t->get_key(), t_keys[4]);
+    int calls = 0;
+    g.set_cascade_notification_handler([&](const Group::CascadeNotification& notification) {
+        ++calls;
+        // Only the cascaded deletions and not the direct table clear are reported
+        CHECK_EQUAL(2, notification.rows.size());
+        CHECK_EQUAL(t->get_key(), notification.rows[0].table_key);
+        CHECK_EQUAL(t->get_key(), notification.rows[1].table_key);
+        CHECK_EQUAL(t_keys[2], notification.rows[0].key);
+        CHECK_EQUAL(t_keys[4], notification.rows[1].key);
+
+        // No links were nullified because all the linking objects were deleted
+        CHECK_EQUAL(0, notification.links.size());
+    });
     origin->clear();
-    CHECK(expected_notifications.all_reported());
-
-    ll = origin->create_object().get_linklist(col_link_list);
-    ll.add(t_keys[5]);
-    ll.add(t_keys[5]);
-    expected_notifications.rows.emplace_back(t->get_key(), t_keys[5]);
-    ll.clear();
-    CHECK(expected_notifications.all_reported());
+    CHECK_EQUAL(calls, 1);
 }
 
 TEST(Group_CascadeNotify_TableViewClearWeak)
@@ -1727,39 +1673,26 @@ TEST(Group_CascadeNotify_TableViewClearWeak)
     Group g(path, 0, Group::mode_ReadWrite);
     TableRef t = g.add_table("target");
     t->add_column(type_Int, "int");
-
-    std::vector<ObjKey> t_keys;
-    t->create_objects(10, t_keys);
-
-    // No link columns, so remove() is used
-    // Unlike clearing a table, the rows removed by the clear() are included in
-    // the notification so that cascaded deletions and direct deletions don't
-    // need to be handled separately
-    ReferenceNotifications expected_notifications;
-    g.set_cascade_notification_handler([&](const Group::CascadeNotification& notification) {
-        for (auto r : notification.rows) {
-            CHECK(expected_notifications.check(r.table_key, r.key));
-            auto table = g.get_table(r.table_key);
-            CHECK(table->is_valid(r.key));
-        }
-        for (auto l : notification.links) {
-            CHECK(expected_notifications.check(l.origin_table, l.origin_col_key, l.origin_key, l.old_target_key));
-        }
-    });
-
-    for (auto k : t_keys) {
-        expected_notifications.rows.emplace_back(t->get_key(), k);
-    }
-    t->where().find_all().clear();
-    t_keys.clear();
-    CHECK(expected_notifications.all_reported());
-
-    // Add another table which links to the target table
     TableRef origin = g.add_table("origin");
     auto col_link = origin->add_column_link(type_Link, "link", *t);
     auto col_link_list = origin->add_column_link(type_LinkList, "linklist", *t);
 
-    std::vector<ObjKey> o_keys;
+    std::vector<ObjKey> t_keys, o_keys;
+    t->create_objects(10, t_keys);
+
+    // Unlike clearing a table, the rows removed by the clear() are included in
+    // the notification so that cascaded deletions and direct deletions don't
+    // need to be handled separately
+    int calls = 0;
+    g.set_cascade_notification_handler([&](const Group::CascadeNotification& notification) {
+        calls++;
+        CHECK_EQUAL(0, notification.links.size());
+        CHECK_EQUAL(10, notification.rows.size());
+    });
+    t->where().find_all().clear();
+    t_keys.clear();
+    CHECK_EQUAL(calls, 1);
+
     origin->create_objects(10, o_keys);
     t->create_objects(10, t_keys);
 
@@ -1767,14 +1700,22 @@ TEST(Group_CascadeNotify_TableViewClearWeak)
     origin->get_object(o_keys[1]).set(col_link, t_keys[2]);
     origin->get_object(o_keys[3]).get_linklist(col_link_list).add(t_keys[4]);
 
-    for (auto k : t_keys) {
-        expected_notifications.rows.emplace_back(t->get_key(), k);
-    }
-    expected_notifications.links.emplace_back(origin->get_key(), col_link, o_keys[1], t_keys[2]);
-    expected_notifications.links.emplace_back(origin->get_key(), col_link_list, o_keys[3], t_keys[4]);
+    g.set_cascade_notification_handler([&](const Group::CascadeNotification& notification) {
+        calls++;
+        CHECK_EQUAL(10, notification.rows.size());
+        CHECK_EQUAL(2, notification.links.size());
+
+        CHECK_EQUAL(col_link, notification.links[0].origin_col_key);
+        CHECK_EQUAL(o_keys[1], notification.links[0].origin_key);
+        CHECK_EQUAL(t_keys[2], notification.links[0].old_target_key);
+
+        CHECK_EQUAL(col_link_list, notification.links[1].origin_col_key);
+        CHECK_EQUAL(o_keys[3], notification.links[1].origin_key);
+        CHECK_EQUAL(t_keys[4], notification.links[1].old_target_key);
+    });
     t->where().find_all().clear();
     t_keys.clear();
-    CHECK(expected_notifications.all_reported());
+    CHECK_EQUAL(calls, 2);
 }
 
 
@@ -1785,66 +1726,80 @@ TEST(Group_CascadeNotify_TableViewClearStrong)
     Group g(path, 0, Group::mode_ReadWrite);
     TableRef t = g.add_table("target");
     t->add_column(type_Int, "int");
-
-    std::vector<ObjKey> t_keys;
-    t->create_objects(10, t_keys);
-
-    // No link columns, so remove() is used
-    // Unlike clearing a table, the rows removed by the clear() are included in
-    // the notification so that cascaded deletions and direct deletions don't
-    // need to be handled separately
-    ReferenceNotifications expected_notifications;
-    g.set_cascade_notification_handler([&](const Group::CascadeNotification& notification) {
-        for (auto r : notification.rows) {
-            CHECK(expected_notifications.check(r.table_key, r.key));
-            auto table = g.get_table(r.table_key);
-            CHECK(table->is_valid(r.key));
-        }
-        for (auto l : notification.links) {
-            CHECK(expected_notifications.check(l.origin_table, l.origin_col_key, l.origin_key, l.old_target_key));
-        }
-    });
-
-    for (auto k : t_keys) {
-        expected_notifications.rows.emplace_back(t->get_key(), k);
-    }
-    t->where().find_all().clear();
-    t_keys.clear();
-    CHECK(expected_notifications.all_reported());
-
-    // Add another table which links to the target table
     TableRef origin = g.add_table("origin");
     auto col_link = origin->add_column_link(type_Link, "link", *t, link_Strong);
     auto col_link_list = origin->add_column_link(type_LinkList, "linklist", *t, link_Strong);
 
-    std::vector<ObjKey> o_keys;
+    std::vector<ObjKey> t_keys, o_keys;
+    t->create_objects(10, t_keys);
     origin->create_objects(10, o_keys);
-    t->create_objects(10, t_keys);
 
-    // should list which links were nullified
+    // should included cascaded deletions
     origin->get_object(o_keys[1]).set(col_link, t_keys[2]);
     origin->get_object(o_keys[3]).get_linklist(col_link_list).add(t_keys[4]);
 
-    for (auto k : t_keys) {
-        expected_notifications.rows.emplace_back(t->get_key(), k);
-    }
-    expected_notifications.links.emplace_back(origin->get_key(), col_link, o_keys[1], t_keys[2]);
-    expected_notifications.links.emplace_back(origin->get_key(), col_link_list, o_keys[3], t_keys[4]);
-    t->where().find_all().clear();
-    t_keys.clear();
-    CHECK(expected_notifications.all_reported());
-
-    t->create_objects(10, t_keys);
-    origin->get_object(o_keys[1]).set(col_link, t_keys[2]);
-    origin->get_object(o_keys[3]).get_linklist(col_link_list).add(t_keys[4]);
-
-    for (auto k : o_keys) {
-        expected_notifications.rows.emplace_back(origin->get_key(), k);
-    }
-    expected_notifications.rows.emplace_back(t->get_key(), t_keys[2]);
-    expected_notifications.rows.emplace_back(t->get_key(), t_keys[4]);
+    int calls = 0;
+    g.set_cascade_notification_handler([&](const Group::CascadeNotification& notification) {
+        if (calls == 0) {
+            // First notification reports direct deletions
+            CHECK_EQUAL(0, notification.links.size());
+            CHECK_EQUAL(10, notification.rows.size());
+            for (int i = 0; i < 10; ++i) {
+                CHECK_EQUAL(origin->get_key(), notification.rows[i].table_key);
+            }
+        }
+        else {
+            // Second notification reports cascades
+            CHECK_EQUAL(0, notification.links.size());
+            CHECK_EQUAL(2, notification.rows.size());
+            CHECK_EQUAL(t->get_key(), notification.rows[0].table_key);
+            CHECK_EQUAL(t->get_key(), notification.rows[1].table_key);
+            CHECK_EQUAL(t_keys[2], notification.rows[0].key);
+            CHECK_EQUAL(t_keys[4], notification.rows[1].key);
+        }
+        calls++;
+    });
     origin->where().find_all().clear();
-    CHECK(expected_notifications.all_reported());
+    CHECK_EQUAL(calls, 2);
+}
+
+
+static ObjKey make_tree(Table& table, ObjKey parent, int depth)
+{
+    if (depth >= 5)
+        return {};
+    auto obj = table.create_object();
+    auto left = make_tree(table, obj.get_key(), depth + 1);
+    auto right = make_tree(table, obj.get_key(), depth + 1);
+    obj.set_all(left, right, parent);
+    return obj.get_key();
+}
+
+TEST(Group_CascadeNotify_TreeCascade)
+{
+    GROUP_TEST_PATH(path);
+
+    Group g(path, 0, Group::mode_ReadWrite);
+    TableRef t = g.add_table("table");
+    t->add_column_link(type_Link, "left", *t, link_Strong);
+    t->add_column_link(type_Link, "right", *t, link_Strong);
+    t->add_column_link(type_Link, "parent", *t, link_Weak);
+
+    auto root = make_tree(*t, {}, 0);
+    CHECK_EQUAL(t->size(), 31);
+
+    int calls = 0;
+    g.set_cascade_notification_handler([&](const Group::CascadeNotification& notification) {
+        // Each notification reports removing one more level of the tree, so
+        // number of rows and links nullfied doubles each time
+        CHECK_EQUAL(notification.rows.size(), 1 << calls);
+        CHECK_EQUAL(notification.links.size(), calls == 4 ? 0 : 2 << calls);
+        CHECK_EQUAL(t->size(), 32 - (1 << calls));
+        calls++;
+    });
+    t->remove_object(root);
+    CHECK_EQUAL(calls, 5);
+    CHECK_EQUAL(t->size(), 0);
 }
 
 TEST(Group_WriteEmpty)
@@ -2039,24 +1994,16 @@ TEST(Group_RemoveRecursive)
     target->create_objects(3, keys);
     target->get_object(keys[0]).set(link_col_t, keys[1]);
     target->get_object(keys[1]).set(link_col_t, keys[2]);
-
-    ReferenceNotifications expected_notifications;
+    int calls = 0;
     g.set_cascade_notification_handler([&](const Group::CascadeNotification& notification) {
-        for (auto r : notification.rows) {
-            CHECK(expected_notifications.check(r.table_key, r.key));
-            auto table = g.get_table(r.table_key);
-            CHECK(table->is_valid(r.key));
-        }
-        for (auto l : notification.links) {
-            CHECK(expected_notifications.check(l.origin_table, l.origin_col_key, l.origin_key, l.old_target_key));
-        }
+        CHECK_EQUAL(notification.rows.size(), 1);
+        CHECK_EQUAL(0, notification.links.size());
+        CHECK_EQUAL(target_key, notification.rows[0].table_key);
+        CHECK_EQUAL(keys[calls], notification.rows[0].key);
+        calls++;
     });
-
-    for (auto k : keys) {
-        expected_notifications.rows.emplace_back(target_key, k);
-    }
     target->remove_object_recursive(keys[0]);
-    CHECK(expected_notifications.all_reported());
+    CHECK_EQUAL(calls, 3);
     CHECK_EQUAL(target->size(), 0);
 
     // 3 rows linked together in circle
@@ -2066,21 +2013,24 @@ TEST(Group_RemoveRecursive)
     target->get_object(keys[1]).set(link_col_t, keys[2]);
     target->get_object(keys[2]).set(link_col_t, keys[0]);
 
-    for (auto k : keys) {
-        expected_notifications.rows.emplace_back(target_key, k);
-    }
-    expected_notifications.links.emplace_back(target_key, link_col_t, keys[2], keys[0]);
+    calls = 0;
+    g.set_cascade_notification_handler([&](const Group::CascadeNotification& notification) {
+        // First deletion nullifies the link from 2 -> 0, none others do
+        CHECK_EQUAL(calls == 0, notification.links.size());
+        CHECK_EQUAL(notification.rows.size(), 1);
+        CHECK_EQUAL(target_key, notification.rows[0].table_key);
+        CHECK_EQUAL(keys[calls], notification.rows[0].key);
+        calls++;
+    });
     target->remove_object_recursive(keys[0]);
-    CHECK(expected_notifications.all_reported());
+    CHECK_EQUAL(calls, 3);
     CHECK_EQUAL(target->size(), 0);
 
     // Object linked to itself
     k0 = target->create_object().get_key();
     target->get_object(k0).set(link_col_t, k0);
-    expected_notifications.rows.emplace_back(target->get_key(), k0);
-    expected_notifications.links.emplace_back(target_key, link_col_t, k0, k0);
+    g.set_cascade_notification_handler(nullptr);
     target->remove_object_recursive(k0);
-    CHECK(expected_notifications.all_reported());
     CHECK_EQUAL(target->size(), 0);
 }
 

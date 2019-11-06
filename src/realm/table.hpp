@@ -707,7 +707,6 @@ private:
     bool m_is_frozen = false;
 
     void batch_erase_rows(const KeyColumn& keys);
-    void do_remove_object(ObjKey key);
     size_t do_set_link(ColKey col_key, size_t row_ndx, size_t target_row_ndx);
 
     void populate_search_index(ColKey col_key);
@@ -812,6 +811,7 @@ private:
     /// the reference to the underlying memory.
     static ref_type create_empty_table(Allocator&, TableKey = TableKey());
 
+    void nullify_links(CascadeState&);
     void remove_recursive(CascadeState&);
     //@{
 
