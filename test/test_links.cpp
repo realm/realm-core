@@ -1042,6 +1042,9 @@ TEST(Links_Transactions)
     CHECK(tim.is_null(dog_col));
 }
 
+#if !REALM_ANDROID // FIXME
+// When compiling for Android (armeabi-v7a) you will get this error:
+// internal compiler error: in possible_polymorphic_call_targets, at ipa-devirt.c:1556
 TEST(Links_RemoveTargetRows)
 {
     Group group;
@@ -1088,6 +1091,7 @@ TEST(Links_RemoveTargetRows)
     CHECK(target->is_empty());
     CHECK(links.is_empty());
 }
+#endif
 
 TEST(Links_ClearColumnWithTwoLevelBptree)
 {
