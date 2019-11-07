@@ -58,8 +58,7 @@
 #include <cstring> // for memset
 
 #if REALM_PLATFORM_APPLE
-#include <mach/mach.h>
-#include <mach/exc.h>
+#include <dispatch/dispatch.h>
 #endif
 
 #if REALM_ANDROID
@@ -107,6 +106,7 @@ struct mapping_and_addr {
 };
 
 util::Mutex& mapping_mutex = *(new util::Mutex);
+namespace {
 std::vector<mapping_and_addr>& mappings_by_addr = *new std::vector<mapping_and_addr>;
 std::vector<mappings_for_file>& mappings_by_file = *new std::vector<mappings_for_file>;
 static unsigned int file_reclaim_index = 0;
@@ -205,18 +205,71 @@ private:
     int m_refresh_count = 0;
 };
 
-static std::unique_ptr<std::thread> reclaimer_thread;
-static std::atomic<bool> reclaimer_shutdown(false);
 static DefaultGovernor default_governor;
 static PageReclaimGovernor* governor = &default_governor;
 
-void reclaimer_loop();
+void reclaim_pages();
 
-void inline ensure_reclaimer_thread_runs() {
+#if !REALM_PLATFORM_APPLE
+static std::atomic<bool> reclaimer_shutdown(false);
+static std::unique_ptr<std::thread> reclaimer_thread;
+
+static void ensure_reclaimer_thread_runs()
+{
     if (reclaimer_thread == nullptr) {
-        reclaimer_thread.reset(new std::thread(reclaimer_loop));
+        reclaimer_thread = std::make_unique<std::thread>([] {
+            while (!reclaimer_shutdown) {
+                reclaim_pages();
+                millisleep(1000);
+            }
+        });
     }
 }
+
+struct ReclaimerThreadStopper {
+    ~ReclaimerThreadStopper()
+    {
+            if (reclaimer_thread) {
+                reclaimer_shutdown = true;
+                reclaimer_thread->join();
+            }
+    }
+} reclaimer_thread_stopper;
+#else // REALM_PLATFORM_APPLE
+static dispatch_source_t reclaimer_timer;
+static dispatch_queue_t reclaimer_queue;
+
+static void ensure_reclaimer_thread_runs()
+{
+    if (!reclaimer_timer) {
+        if (__builtin_available(iOS 10, macOS 12, tvOS 10, watchOS 3, *)) {
+            reclaimer_queue = dispatch_queue_create_with_target("io.realm.page-reclaimer", DISPATCH_QUEUE_SERIAL,
+                                                                dispatch_get_global_queue(QOS_CLASS_BACKGROUND, 0));
+        }
+        else {
+            reclaimer_queue = dispatch_queue_create("io.realm.page-reclaimer", DISPATCH_QUEUE_SERIAL);
+        }
+        reclaimer_timer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, reclaimer_queue);
+        dispatch_source_set_timer(reclaimer_timer, DISPATCH_TIME_NOW, NSEC_PER_SEC, NSEC_PER_SEC);
+        dispatch_source_set_event_handler(reclaimer_timer, ^{ reclaim_pages(); });
+        dispatch_resume(reclaimer_timer);
+    }
+}
+
+struct ReclaimerThreadStopper {
+    ~ReclaimerThreadStopper()
+    {
+        if (reclaimer_timer) {
+            dispatch_source_cancel(reclaimer_timer);
+            // Block until any currently-running timer tasks are done
+            dispatch_sync(reclaimer_queue, ^{});
+            dispatch_release(reclaimer_timer);
+            dispatch_release(reclaimer_queue);
+        }
+    }
+} reclaimer_thread_stopper;
+#endif
+} // anonymous namespace
 
 void set_page_reclaim_governor(PageReclaimGovernor* new_governor)
 {
@@ -238,21 +291,6 @@ decrypted_memory_stats_t get_decrypted_memory_stats()
     retval.reclaimer_workload = reclaimer_workload.load() * page_size();
     return retval;
 }
-
-struct ReclaimerThreadStopper {
-    ReclaimerThreadStopper()
-    {
-    }
-    ~ReclaimerThreadStopper()
-    {
-    	if (reclaimer_thread) {
-    		reclaimer_shutdown = true;
-    		reclaimer_thread->join();
-    	}
-    }
-};
-
-ReclaimerThreadStopper reclaimer_thread_stopper;
 
 void encryption_note_reader_start(SharedFileInfo& info, const void* reader_id)
 {
@@ -282,6 +320,7 @@ void encryption_note_reader_end(SharedFileInfo& info, const void* reader_id) noe
         }
 }
 
+namespace {
 size_t collect_total_workload() // must be called under lock
 {
     size_t total = 0;
@@ -416,15 +455,6 @@ void reclaim_pages()
 }
 
 
-void reclaimer_loop()
-{
-    while (!reclaimer_shutdown) {
-        reclaim_pages();
-        millisleep(1000);
-    }
-}
-
-
 mapping_and_addr* find_mapping_for_addr(void* addr, size_t size)
 {
     for (size_t i = 0; i < mappings_by_addr.size(); ++i) {
@@ -436,6 +466,7 @@ mapping_and_addr* find_mapping_for_addr(void* addr, size_t size)
 
     return 0;
 }
+} // anonymous namespace
 
 SharedFileInfo* get_file_info_for_file(File& file)
 {
@@ -460,6 +491,7 @@ SharedFileInfo* get_file_info_for_file(File& file)
         return it->info.get();
 }
 
+namespace {
 EncryptedFileMapping* add_mapping(void* addr, size_t size, FileDesc fd, size_t file_offset, File::AccessMode access,
                                   const char* encryption_key)
 {
@@ -584,6 +616,7 @@ void remove_mapping(void* addr, size_t size)
         }
     }
 }
+} // anonymous namespace
 
 void* mmap_anon(size_t size)
 {
