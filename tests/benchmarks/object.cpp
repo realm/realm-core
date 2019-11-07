@@ -277,7 +277,7 @@ TEST_CASE("Benchmark object", "[benchmark]") {
         advance_and_notify(*r);
         int64_t pk = 0;
         ObjectSchema person_schema = *r->schema().find("person");
-        constexpr size_t num_objects = 100;
+        constexpr size_t num_objects = 1000;
         constexpr bool update = false;
         constexpr bool update_only_diff = false;
 
@@ -441,8 +441,8 @@ TEST_CASE("Benchmark object", "[benchmark]") {
         };
 
         BENCHMARK_ADVANCED("prepend insertions")(Catch::Benchmark::Chronometer meter) {
-            constexpr size_t num_initial_objects = 100;
-            constexpr size_t num_prepend_objects = 100;
+            constexpr size_t num_initial_objects = 1000;
+            constexpr size_t num_prepend_objects = 1000;
             r->begin_transaction();
             result.clear();
             r->commit_transaction();
@@ -468,7 +468,7 @@ TEST_CASE("Benchmark object", "[benchmark]") {
         };
 
         BENCHMARK_ADVANCED("insert even, insert odd")(Catch::Benchmark::Chronometer meter) {
-            constexpr size_t num_objects = 100;
+            constexpr size_t num_objects = 1000;
             r->begin_transaction();
             result.clear();
             r->commit_transaction();
@@ -520,7 +520,7 @@ TEST_CASE("Benchmark object", "[benchmark]") {
         };
 
         BENCHMARK_ADVANCED("insert, delete odds")(Catch::Benchmark::Chronometer meter) {
-            constexpr size_t num_objects = 200;
+            constexpr size_t num_objects = 800;
             r->begin_transaction();
             result.clear();
             r->commit_transaction();
@@ -532,7 +532,7 @@ TEST_CASE("Benchmark object", "[benchmark]") {
 
             // remove odds
             r->begin_transaction();
-            for (size_t i = result.size(); i > 0; --i) {
+            for (size_t i = result.size() - 1; i > 0; --i) {
                 if (i % 2 == 1) {
                     Obj odd = result.get(i);
                     odd.remove();
@@ -553,6 +553,79 @@ TEST_CASE("Benchmark object", "[benchmark]") {
             REQUIRE(result.size() == num_objects / 2);
             REQUIRE(result.get(0).get<int64_t>(age_col) == 0);
             REQUIRE(result.get(1).get<int64_t>(age_col) == 2);
+        };
+
+
+        constexpr size_t num_objects = 1000;
+        r->begin_transaction();
+        result.clear();
+        r->commit_transaction();
+        advance_and_notify(*r);
+        add_objects(num_objects);
+        advance_and_notify(*r);
+
+        BENCHMARK_ADVANCED("modify all")(Catch::Benchmark::Chronometer meter) {
+            r->begin_transaction();
+            for (size_t i = 0; i < table->size(); ++i) {
+                Obj obj = table->get_object(i);
+                obj.set(age_col, obj.get<int64_t>(age_col) + 1);
+            }
+            r->commit_transaction();
+
+            num_insertions = 0;
+            num_modifications = 0;
+            num_deletions = 0;
+
+            meter.measure([&r] {
+                advance_and_notify(*r);
+            });
+            REQUIRE(num_insertions == 0);
+            REQUIRE(num_modifications == num_objects);
+            REQUIRE(num_deletions == 0);
+            REQUIRE(result.size() == num_objects);
+        };
+
+        BENCHMARK_ADVANCED("modify odds")(Catch::Benchmark::Chronometer meter) {
+            r->begin_transaction();
+            result.clear();
+            r->commit_transaction();
+            advance_and_notify(*r);
+
+            r->begin_transaction();
+            for (size_t i = 0; i < num_objects; ++i) {
+                std::stringstream name;
+                name << "person_" << i;
+                AnyDict person {
+                    {"name", name.str()},
+                    {"age", static_cast<int64_t>(i * 2)},
+                };
+                Object::create(d, r, person_schema, Any(person), update, update_only_diff);
+            }
+            r->commit_transaction();
+
+            advance_and_notify(*r);
+
+            r->begin_transaction();
+            for (size_t i = 0; i < table->size(); ++i) {
+                Obj obj = table->get_object(i);
+                int64_t age = obj.get<int64_t>(age_col);
+                if ((age >> 1) % 2 == 1) {
+                    obj.set(age_col, age - 1);
+                }
+            }
+            r->commit_transaction();
+
+            num_insertions = 0;
+            num_modifications = 0;
+            num_deletions = 0;
+
+            meter.measure([&r] {
+                advance_and_notify(*r);
+            });
+            REQUIRE(num_insertions == 0);
+            REQUIRE(num_modifications == num_objects / 2);
+            REQUIRE(num_deletions == 0);
+            REQUIRE(result.size() == num_objects);
         };
     }
 }
