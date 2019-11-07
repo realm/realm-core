@@ -295,6 +295,20 @@ private:
     auto& list_as() const;
 
     void evaluate_sort_and_distinct_on_list();
+
+    class IteratorWrapper {
+    public:
+        IteratorWrapper() = default;
+        IteratorWrapper(IteratorWrapper const&);
+        IteratorWrapper& operator=(IteratorWrapper const&);
+        IteratorWrapper(IteratorWrapper&&) = default;
+        IteratorWrapper& operator=(IteratorWrapper&&) = default;
+
+        Obj get(Table const& table, size_t ndx);
+    private:
+        std::unique_ptr<Table::ConstIterator> m_it;
+        size_t m_ndx = 0;
+    } m_table_iterator;
 };
 
 template<typename Fn>

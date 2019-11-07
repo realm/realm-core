@@ -228,6 +228,43 @@ util::Optional<T> Results::try_get(size_t ndx)
     return util::none;
 }
 
+Results::IteratorWrapper::IteratorWrapper(IteratorWrapper const& rgt)
+{
+    *this = rgt;
+}
+
+Results::IteratorWrapper& Results::IteratorWrapper::operator=(IteratorWrapper const& rgt)
+{
+    m_ndx = rgt.m_ndx;
+    if (rgt.m_it)
+        m_it = std::make_unique<Table::ConstIterator>(*rgt.m_it);
+    return *this;
+}
+
+Obj Results::IteratorWrapper::get(Table const& table, size_t ndx)
+{
+    // Using a Table iterator is much faster for sequential access into a table
+    // than indexing into it, but aren't random access and there's nontrivial
+    // overhead to creating one. Experimentally you need to read at least 3
+    // rows for an iterator to be faster, it's very unlikely that trying to use
+    // an iterator for random-access cases will be worthwhile, and it stops
+    // being faster to increment a pre-existing iterator if it's more than
+    // 50-100 rows away.
+    // As such we only create iterators when starting from index 0 and only
+    // advance pre-existing iterators if they're within 50 rows of the
+    // requested index.
+    if (ndx == 0 && (!m_it || m_ndx != 0) && table.size() > 2) {
+        m_it = std::make_unique<Table::ConstIterator>(table.begin());
+        m_ndx = 0;
+    }
+    if (!m_it || ndx < m_ndx || ndx > m_ndx + 50)
+        return const_cast<Table&>(table).get_object(ndx);
+
+    *m_it += ndx - m_ndx;
+    m_ndx = ndx;
+    return **m_it;
+}
+
 template<>
 util::Optional<Obj> Results::try_get(size_t row_ndx)
 {
@@ -238,7 +275,7 @@ util::Optional<Obj> Results::try_get(size_t row_ndx)
             break;
         case Mode::Table:
             if (row_ndx < m_table->size())
-                return const_cast<Table&>(*m_table).get_object(row_ndx);
+                return m_table_iterator.get(*m_table, row_ndx);
             break;
         case Mode::LinkList:
             if (update_linklist()) {
