@@ -77,15 +77,14 @@ TEST_CASE("Benchmark results", "[benchmark]") {
      */
 
 #define REQUIRE_ORDER(sort, ...) do { \
-ObjKeys expected({__VA_ARGS__}); \
-auto results = sort; \
-REQUIRE(results.size() == expected.size()); \
-for (size_t i = 0; i < expected.size(); ++i) \
-REQUIRE(results.get(i).get_key() == expected[i]); \
-} while (0)
+    ObjKeys expected({__VA_ARGS__}); \
+    auto results = sort; \
+    REQUIRE(results.size() == expected.size()); \
+    for (size_t i = 0; i < expected.size(); ++i) \
+        REQUIRE(results.get(i).get_key() == expected[i]); \
+    } while (0)
 
     SECTION("basics") {
-
         REQUIRE(r.filter(Query(table->where().less(col_value, 2))).size() == 2);
         BENCHMARK("basic filter") {
             return r.filter(Query(table->where().less(col_value, 2))).size();
@@ -119,6 +118,40 @@ REQUIRE(results.get(i).get_key() == expected[i]); \
         REQUIRE(r.distinct({{"bool"}}).size() == 2);
         BENCHMARK("distinct bool") {
             return r.distinct({{"bool"}});
+        };
+    }
+
+    SECTION("iteration") {
+        const int additional_row_count = 10000;
+        realm->begin_transaction();
+        table->create_objects(additional_row_count, table_keys);
+        for (int i = 0; i < additional_row_count; ++i)
+            table->get_object(table_keys[i]).set_all((i + 2) % 4, bool(i % 2));
+        realm->commit_transaction();
+
+        BENCHMARK("Table forwards") {
+            for (size_t i = 0, size = r.size(); i < size; ++i) {
+                Obj o = r.get<Obj>(i);
+            }
+        };
+
+        BENCHMARK("Table reverse") {
+            for (size_t i = 0, size = r.size(); i < size; ++i) {
+                Obj o = r.get<Obj>(size - i - 1);
+            }
+        };
+
+        auto tv = r.snapshot();
+        BENCHMARK("TableView forwards") {
+            for (size_t i = 0, size = r.size(); i < size; ++i) {
+                Obj o = tv.get<Obj>(i);
+            }
+        };
+
+        BENCHMARK("TableView reverse") {
+            for (size_t i = 0, size = r.size(); i < size; ++i) {
+                Obj o = tv.get<Obj>(size - i - 1);
+            }
         };
     }
 }

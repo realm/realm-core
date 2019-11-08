@@ -2716,6 +2716,54 @@ struct ResultsFromLinkView {
     }
 };
 
+TEMPLATE_TEST_CASE("results: get()", "", ResultsFromTable, ResultsFromQuery, ResultsFromTableView, ResultsFromLinkView) {
+    InMemoryTestFile config;
+    config.automatic_change_notifications = false;
+
+    auto r = Realm::get_shared_realm(config);
+    r->update_schema({
+        {"object", {
+            {"value", PropertyType::Int},
+        }},
+        {"linking_object", {
+            {"link", PropertyType::Array|PropertyType::Object, "object"}
+        }},
+    });
+
+    auto table = r->read_group().get_table("class_object");
+    ColKey col_value = table->get_column_key("value");
+
+    r->begin_transaction();
+    for (int i = 0; i < 10; ++i)
+        table->create_object().set_all(i);
+    r->commit_transaction();
+
+    Results results = TestType::call(r, table);
+
+    SECTION("sequential in increasing order") {
+        for (int i = 0; i < 10; ++i)
+            CHECK(results.get<Obj>(i).get<int64_t>(col_value) == i);
+        for (int i = 0; i < 10; ++i)
+            CHECK(results.get<Obj>(i).get<int64_t>(col_value) == i);
+        CHECK_THROWS(results.get(11));
+    }
+    SECTION("sequential in decreasing order") {
+        for (int i = 9; i >= 0; --i)
+            CHECK(results.get<Obj>(i).get<int64_t>(col_value) == i);
+        for (int i = 9; i >= 0; --i)
+            CHECK(results.get<Obj>(i).get<int64_t>(col_value) == i);
+    }
+    SECTION("random order") {
+        int indexes[10];
+        std::iota(std::begin(indexes), std::end(indexes), 0);
+        std::random_device rd;
+        std::mt19937 g(rd());
+        std::shuffle(std::begin(indexes), std::end(indexes), std::mt19937(rd()));
+        for (auto index : indexes)
+            CHECK(results.get<Obj>(index).get<int64_t>(col_value) == index);
+    }
+}
+
 TEMPLATE_TEST_CASE("results: aggregate", "[query][aggregate]", ResultsFromTable, ResultsFromQuery, ResultsFromTableView, ResultsFromLinkView) {
     InMemoryTestFile config;
     config.automatic_change_notifications = false;
