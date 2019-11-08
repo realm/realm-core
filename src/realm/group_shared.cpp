@@ -184,6 +184,7 @@ template <typename T>
 bool atomic_one_if_zero(std::atomic<T>& counter)
 {
     T old_val = counter.fetch_add(1, std::memory_order_acquire);
+    REALM_ASSERT((old_val & 1) == 0);
     if (old_val != 0) {
         counter.fetch_sub(1, std::memory_order_relaxed);
         return false;
