@@ -3339,7 +3339,7 @@ TEST(Table_object_forward_iterator)
     table.remove_object(key);
     CHECK_EQUAL(val, it1->get<int64_t>(c0));
 
-    val = (it1 + 1)->get<int64_t>(c0);
+    val = (it1 + 2)->get<int64_t>(c0);
     table.remove_object(it1);
     CHECK_THROW_ANY(it1->get<int64_t>(c0));
     // Still invalid
@@ -3347,7 +3347,7 @@ TEST(Table_object_forward_iterator)
     it1 += 0;
     // Still invalid
     CHECK_THROW_ANY(it1->get<int64_t>(c0));
-    it1 += 1;
+    it1 += 2;
     CHECK_EQUAL(val, it1->get<int64_t>(c0));
 }
 
@@ -4937,6 +4937,41 @@ TEST(Table_MultipleObjs) {
     list_1.add(obj_key);
     CHECK_EQUAL(list_1.get(0), obj_key);
     CHECK_EQUAL(list_2.get(0), obj_key);
+}
+
+TEST(Table_IteratorRandomAccess)
+{
+    Table t;
+
+    ObjKeys keys;
+    t.create_objects(1000, keys);
+
+    auto key = keys.begin();
+    auto iter = t.begin();
+    auto end = t.end();
+    for (size_t pos = 0; (pos + 3) < 1000; pos += 3) {
+        CHECK_EQUAL(iter->get_key(), *key);
+        iter += 3;
+        key += 3;
+    }
+
+    // random access
+    std::vector<int> indexes(1000);
+    std::iota(indexes.begin(), indexes.end(), 0);
+    std::random_device rd;
+    std::mt19937 g(rd());
+    std::shuffle(std::begin(indexes), std::end(indexes), std::mt19937(rd()));
+    iter = t.begin();
+    for (auto index : indexes) {
+        CHECK_EQUAL(keys[index], iter[index].get_key());
+    }
+
+    auto iter200 = iter + 200;
+    CHECK_EQUAL(keys[200], iter200->get_key());
+    ++iter; // Now points to element 1
+    CHECK_EQUAL(keys[201], iter[200].get_key());
+    CHECK_EQUAL(keys[201], iter200[1].get_key());
+    CHECK_EQUAL(keys[1], iter->get_key());
 }
 
 #endif // TEST_TABLE

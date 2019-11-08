@@ -202,6 +202,14 @@ void ClusterNode::IteratorState::clear()
     m_current_index = size_t(-1);
 }
 
+void ClusterNode::IteratorState::init(const ConstObj& obj)
+{
+    m_current_leaf.init(obj.m_mem);
+    m_current_index = obj.m_row_ndx;
+    m_key_offset = obj.get_key().value - m_current_leaf.get_key_value(obj.m_row_ndx);
+    m_current_leaf.set_offset(m_key_offset);
+}
+
 void ClusterNode::get(ObjKey k, ClusterNode::State& state) const
 {
     if (!k || !try_get(k, state)) {
@@ -2139,27 +2147,54 @@ ClusterTree::ConstIterator::ConstIterator(const ClusterTree& t, size_t ndx)
     , m_leaf(0, t.get_alloc(), t)
     , m_state(m_leaf)
     , m_instance_version(t.get_instance_version())
+    , m_leaf_invalid(false)
+    , m_position(ndx)
 {
-    if (ndx == 0) {
+    auto sz = t.size();
+    if (ndx >= sz) {
+        // end
+        m_position = sz;
+        m_leaf_invalid = true;
+    }
+    else if (ndx == 0) {
         // begin
         m_key = load_leaf(ObjKey(0));
+        m_leaf_start_pos = 0;
     }
     else {
-        // end
-        m_key = null_key;
+        m_obj = const_cast<ClusterTree&>(m_tree).get(ndx);
+        m_key = m_obj.get_key();
+        m_state.init(m_obj);
+        m_leaf_start_pos = ndx - m_state.m_current_index;
     }
-    m_leaf_invalid = !m_key;
 }
 
-ClusterTree::ConstIterator::ConstIterator(const ClusterTree& t, ObjKey key)
-    : m_tree(t)
-    , m_leaf(0, t.get_alloc(), t)
+ClusterTree::ConstIterator::ConstIterator(const ConstIterator& other)
+    : m_tree(other.m_tree)
+    , m_leaf(0, m_tree.get_alloc(), m_tree)
     , m_state(m_leaf)
-    , m_instance_version(t.get_instance_version())
-    , m_key(key)
+    , m_instance_version(m_tree.get_instance_version())
+    , m_key(other.m_key)
+    , m_leaf_invalid(other.m_leaf_invalid)
+    , m_position(other.m_position)
 {
-    auto k = load_leaf(m_key);
-    m_leaf_invalid = (k != m_key);
+    if (m_key) {
+        auto k = load_leaf(m_key);
+        if (k != m_key)
+            throw std::runtime_error("ConstIterator copy failed");
+    }
+    m_leaf_start_pos = m_position -  m_state.m_current_index;
+}
+
+size_t ClusterTree::ConstIterator::get_position()
+{
+    try {
+        return m_tree.get_ndx(m_key);
+    }
+    catch (...) {
+        throw std::runtime_error("Outdated iterator");
+    }
+    return 0;
 }
 
 ObjKey ClusterTree::ConstIterator::load_leaf(ObjKey key) const
@@ -2177,13 +2212,45 @@ ObjKey ClusterTree::ConstIterator::load_leaf(ObjKey key) const
     }
 }
 
+auto ClusterTree::ConstIterator::operator[](size_t n) -> reference
+{
+    if (m_storage_version != m_tree.get_storage_version(m_instance_version)) {
+        // reload
+        m_position = get_position(); // Will throw if base object is deleted
+        load_leaf(m_key);
+        m_leaf_start_pos = m_position - m_state.m_current_index;
+    }
+
+    auto abs_pos = n + m_position;
+
+    if (n < m_leaf_start_pos || n >= (m_leaf_start_pos + m_leaf.node_size())) {
+        if (abs_pos >= m_tree.size()) {
+            throw std::out_of_range("Index out of range");
+        }
+        // Find cluster holding requested position
+        m_obj = const_cast<ClusterTree&>(m_tree).get(abs_pos);
+        m_state.init(m_obj);
+        m_leaf_start_pos = abs_pos - m_state.m_current_index;
+    }
+    else {
+        m_state.m_current_index = (abs_pos - m_leaf_start_pos);
+        auto key = m_leaf.get_real_key(m_state.m_current_index);
+        new (&m_obj) Obj(const_cast<ClusterTree*>(&m_tree), m_leaf.get_mem(), key, m_state.m_current_index);
+    }
+
+    // The state no longer corresponds to m_key
+    m_leaf_invalid = true;
+
+    return m_obj;
+}
+
 ClusterTree::ConstIterator::pointer Table::ConstIterator::operator->() const
 {
     if (m_leaf_invalid || m_storage_version != m_tree.get_storage_version(m_instance_version)) {
         ObjKey k = load_leaf(m_key);
         m_leaf_invalid = (k != m_key);
         if (m_leaf_invalid) {
-            throw std::runtime_error("Object does not exist");
+            throw std::runtime_error("Outdated iterator");
         }
         // Object still exists, but storage version changed so update
         new (&m_obj) Obj(const_cast<ClusterTree*>(&m_tree), m_leaf.get_mem(), m_key, m_state.m_current_index);
@@ -2196,29 +2263,6 @@ ClusterTree::ConstIterator::pointer Table::ConstIterator::operator->() const
     }
 
     return &m_obj;
-}
-
-ClusterTree::ConstIterator& Table::ConstIterator::operator++()
-{
-    if (m_leaf_invalid || m_storage_version != m_tree.get_storage_version(m_instance_version)) {
-        ObjKey k = load_leaf(m_key);
-        if (k != m_key) {
-            // Objects was deleted. k points to the next object
-            m_key = k;
-            m_leaf_invalid = !m_key;
-            return *this;
-        }
-    }
-
-    m_state.m_current_index++;
-    if (m_state.m_current_index == m_leaf.node_size()) {
-        m_key = load_leaf(ObjKey(m_key.value + 1));
-        m_leaf_invalid = !m_key;
-    }
-    else {
-        m_key = m_leaf.get_real_key(m_state.m_current_index);
-    }
-    return *this;
 }
 
 ClusterTree::ConstIterator& Table::ConstIterator::operator+=(ptrdiff_t adj)
@@ -2236,10 +2280,12 @@ ClusterTree::ConstIterator& Table::ConstIterator::operator+=(ptrdiff_t adj)
         if (k != m_key) {
             // Objects was deleted. k points to the next object
             m_key = k;
+            m_position = m_tree.get_ndx(m_key);
             n--;
         }
     }
-    while (n != 0) {
+    if (n > 0) {
+        m_position += n;
         size_t left_in_leaf = m_leaf.node_size() - m_state.m_current_index;
         if (n < left_in_leaf) {
             m_state.m_current_index += n;
@@ -2247,12 +2293,15 @@ ClusterTree::ConstIterator& Table::ConstIterator::operator+=(ptrdiff_t adj)
             n = 0;
         }
         else {
-            // load next leaf
-            n -= left_in_leaf;
-            m_key = m_leaf.get_real_key(m_state.m_current_index + left_in_leaf - 1);
-            m_key = load_leaf(ObjKey(m_key.value + 1));
-            if (!m_key) {
-                break;
+            if (m_position < m_tree.size()) {
+                m_obj = const_cast<ClusterTree&>(m_tree).get(m_position);
+                m_key = m_obj.get_key();
+                m_state.init(m_obj);
+                m_leaf_start_pos = m_position - m_state.m_current_index;
+            }
+            else {
+                m_key = ObjKey();
+                m_position = m_tree.size();
             }
         }
     }
