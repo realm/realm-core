@@ -354,8 +354,8 @@ public:
     /// \throw BadVersion Thrown by begin_read() if the specified version does
     /// not correspond to a bound (or tethered) snapshot.
 
-    const Group& begin_read(VersionID version = VersionID());
-    void end_read() noexcept;
+    const Group& begin_read(VersionID version = VersionID(), bool dont_lock = false);
+    void end_read(bool dont_lock = false) noexcept;
     Group& begin_write();
     // Return true (and take the write lock) if there is no other write
     // in progress. In case of contention return false immediately.
@@ -637,14 +637,14 @@ private:
     /// this function fails. Also, why is it useful to promise anything about
     /// detection of bad versions? Can we really promise enough to make such a
     /// promise useful to the caller?
-    void grab_read_lock(ReadLockInfo&, VersionID);
+    void grab_read_lock(ReadLockInfo&, VersionID, bool dont_lock = false);
 
     // Release a specific read lock. The read lock MUST have been obtained by a
     // call to grab_read_lock().
-    void release_read_lock(ReadLockInfo&) noexcept;
+    void release_read_lock(ReadLockInfo&, bool dont_lock = false) noexcept;
 
-    void do_begin_read(VersionID, bool writable);
-    void do_end_read() noexcept;
+    void do_begin_read(VersionID, bool writable, bool dont_lock);
+    void do_end_read(bool dont_lock) noexcept;
     /// return true if write transaction can commence, false otherwise.
     bool do_try_begin_write();
     void do_begin_write();

@@ -1373,7 +1373,7 @@ bool SharedGroup::compact(bool bump_version_number, util::Optional<const char*> 
         // Using begin_read here ensures that we have access to the latest entry
         // in the ringbuffer. We need to have access to that later to update top_ref and file_size.
         // This is also needed to attach the group (get the proper top pointer, etc)
-        begin_read(); // Throws
+        begin_read(VersionID(), true /* don't lock - we've already done that */); // Throws
 
         // Compact by writing a new file holding only live data, then renaming the new file
         // so it becomes the database file, replacing the old one in the process.
@@ -1402,7 +1402,7 @@ bool SharedGroup::compact(bool bump_version_number, util::Optional<const char*> 
             REALM_ASSERT_3(rc.version, ==, info->latest_version_number);
             static_cast<void>(rc); // rc unused if ENABLE_ASSERTION is unset
         }
-        end_read();
+        end_read(true /* don't lock - we've already done that */);
         // We need to release any shared mapping *before* releasing the control mutex.
         // When someone attaches to the new database file, they *must* *not* see and
         // reuse any existing memory mapping of the stale file.
@@ -1790,8 +1790,10 @@ SharedGroup::VersionID SharedGroup::get_version_of_current_transaction()
 }
 
 
-void SharedGroup::release_read_lock(ReadLockInfo& read_lock) noexcept
+void SharedGroup::release_read_lock(ReadLockInfo& read_lock, bool dont_lock) noexcept
 {
+    std::unique_lock<InterprocessMutex> lock; // (m_controlmutex); // Throws
+    if (!dont_lock) lock = std::move(std::unique_lock<InterprocessMutex>(m_controlmutex));
     // The release may be tried on a version imported from a different thread,
     // hence generated on a different shared group, which may have memory mapped
     // a larger ringbuffer than we - so make sure we've mapped enough of the
@@ -1803,8 +1805,10 @@ void SharedGroup::release_read_lock(ReadLockInfo& read_lock) noexcept
 }
 
 
-void SharedGroup::grab_read_lock(ReadLockInfo& read_lock, VersionID version_id)
+void SharedGroup::grab_read_lock(ReadLockInfo& read_lock, VersionID version_id, bool dont_lock)
 {
+    std::unique_lock<InterprocessMutex> lock; // (m_controlmutex); // Throws
+    if (!dont_lock) lock = std::move(std::unique_lock<InterprocessMutex>(m_controlmutex));
     if (version_id.version == std::numeric_limits<version_type>::max()) {
         for (;;) {
             SharedInfo* r_info = m_reader_map.get_addr();
@@ -1865,14 +1869,14 @@ void SharedGroup::grab_read_lock(ReadLockInfo& read_lock, VersionID version_id)
 }
 
 
-const Group& SharedGroup::begin_read(VersionID version_id)
+const Group& SharedGroup::begin_read(VersionID version_id, bool dont_lock)
 {
     if (m_transact_stage != transact_Ready)
         throw LogicError(LogicError::wrong_transact_state);
 
     bool writable = false;
 
-    do_begin_read(version_id, writable); // Throws
+    do_begin_read(version_id, writable, dont_lock); // Throws
 
     if (Replication* repl = m_group.get_replication()) {
         version_type current_version = m_read_lock.m_version;
@@ -1887,14 +1891,14 @@ const Group& SharedGroup::begin_read(VersionID version_id)
 #ifdef _MSC_VER
 #pragma warning (disable: 4297) // throw in noexcept
 #endif
-void SharedGroup::end_read() noexcept
+void SharedGroup::end_read(bool dont_lock) noexcept
 {
     if (m_transact_stage == transact_Ready)
         return; // Idempotency
 
     REALM_ASSERT(m_transact_stage == transact_Reading);
 
-    do_end_read();
+    do_end_read(dont_lock);
 
     set_transact_stage(transact_Ready);
 }
@@ -1914,7 +1918,8 @@ Group& SharedGroup::begin_write()
         // write mutex.
         VersionID version_id = VersionID(); // Latest available snapshot
         bool writable = true;
-        do_begin_read(version_id, writable); // Throws
+        bool dont_lock = false;
+        do_begin_read(version_id, writable, dont_lock); // Throws
 
         if (Replication* repl = m_group.get_replication()) {
             version_type current_version = m_read_lock.m_version;
@@ -1945,7 +1950,8 @@ bool SharedGroup::try_begin_write(Group* &group)
         // write mutex.
         VersionID version_id = VersionID(); // Latest available snapshot
         bool writable = true;
-        do_begin_read(version_id, writable); // Throws
+        bool dont_lock = false;
+        do_begin_read(version_id, writable, dont_lock); // Throws
 
         if (Replication* repl = m_group.get_replication()) {
             version_type current_version = m_read_lock.m_version;
@@ -1988,7 +1994,7 @@ SharedGroup::version_type SharedGroup::commit()
     using gf = _impl::GroupFriend;
     gf::reset_free_space_tracking(m_group); // Throws
 
-    do_end_read();
+    do_end_read(false);
     m_read_lock = lock_after_commit;
     set_transact_stage(transact_Ready);
     return new_version;
@@ -2005,7 +2011,7 @@ void SharedGroup::rollback() noexcept
     REALM_ASSERT(m_transact_stage == transact_Writing);
 
     do_end_write();
-    do_end_read();
+    do_end_read(false);
 
     if (Replication* repl = m_group.get_replication())
         repl->abort_transact();
@@ -2046,13 +2052,13 @@ std::shared_ptr<Metrics> SharedGroup::get_metrics()
 #endif // REALM_METRICS
 }
 
-void SharedGroup::do_begin_read(VersionID version_id, bool writable)
+void SharedGroup::do_begin_read(VersionID version_id, bool writable, bool dont_lock)
 {
     // FIXME: BadVersion must be thrown in every case where the specified
     // version is not tethered in accordance with the documentation of
     // begin_read().
 
-    grab_read_lock(m_read_lock, version_id); // Throws
+    grab_read_lock(m_read_lock, version_id, dont_lock); // Throws
     ReadLockUnlockGuard g(*this, m_read_lock);
 
     m_group.m_alloc.note_reader_start(this);
@@ -2063,10 +2069,10 @@ void SharedGroup::do_begin_read(VersionID version_id, bool writable)
 }
 
 
-void SharedGroup::do_end_read() noexcept
+void SharedGroup::do_end_read(bool dont_lock) noexcept
 {
     REALM_ASSERT(m_read_lock.m_version != std::numeric_limits<version_type>::max());
-    release_read_lock(m_read_lock);
+    release_read_lock(m_read_lock, dont_lock);
     using gf = _impl::GroupFriend;
     gf::detach(m_group);
     m_group.m_alloc.note_reader_end(this);
@@ -2315,6 +2321,7 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
     // of the current session.
     uint_fast64_t oldest_version;
     {
+        std::lock_guard<InterprocessMutex> lock(m_controlmutex);
         SharedInfo* r_info = m_reader_map.get_addr();
 
         // the cleanup process may access the entire ring buffer, so make sure it is mapped.
@@ -2370,6 +2377,7 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
     // to the database. The flag "commit_in_critical_phase" is used to prevent such updates.
     info->commit_in_critical_phase = 1;
     {
+        std::lock_guard<InterprocessMutex> lock(m_controlmutex);
         SharedInfo* r_info = m_reader_map.get_addr();
         if (r_info->readers.is_full()) {
             // buffer expansion
@@ -2390,12 +2398,10 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
         r.filesize = new_file_size;
         r.version = new_version;
         r_info->readers.use_next();
-    }
-    // At this point, the ringbuffer has been succesfully updated, and the next writer
-    // can safely proceed once the writemutex has been lifted.
-    info->commit_in_critical_phase = 0;
-    {
-        std::lock_guard<InterprocessMutex> lock(m_controlmutex);
+
+        // At this point, the ringbuffer has been succesfully updated, and the next writer
+        // can safely proceed once the writemutex has been lifted.
+        info->commit_in_critical_phase = 0;
         info->number_of_versions = new_version - oldest_version + 1;
         info->latest_version_number = new_version;
 
