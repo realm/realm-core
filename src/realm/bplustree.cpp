@@ -673,7 +673,6 @@ BPlusTreeBase& BPlusTreeBase::operator=(BPlusTreeBase&& rhs)
     if (m_root)
         m_root->change_owner(this);
     m_size = rhs.m_size;
-    invalidate_leaf_cache();
 
     return *this;
 }
@@ -698,6 +697,7 @@ void BPlusTreeBase::destroy()
         Array::destroy_deep(ref, m_alloc);
         m_root = nullptr;
     }
+    invalidate_leaf_cache();
 }
 
 void BPlusTreeBase::replace_root(std::unique_ptr<BPlusTreeNode> new_root)

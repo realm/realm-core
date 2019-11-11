@@ -234,4 +234,13 @@ size_t ArrayTimestamp::find_first<NotEqual>(Timestamp value, size_t begin, size_
     }
     return not_found;
 }
+
+void ArrayTimestamp::verify() const
+{
+#ifdef REALM_DEBUG
+    m_seconds.verify();
+    m_nanoseconds.verify();
+    REALM_ASSERT(m_seconds.size() == m_nanoseconds.size());
+#endif
+}
 } // namespace realm

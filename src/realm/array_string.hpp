@@ -94,6 +94,7 @@ public:
     }
     void insert(size_t ndx, StringData value);
     StringData get(size_t ndx) const;
+    StringData get_legacy(size_t ndx) const;
     bool is_null(size_t ndx) const;
     void erase(size_t ndx);
     void move(ArrayString& dst, size_t ndx);
@@ -108,6 +109,8 @@ public:
     /// you need to get multiple values, then this method will be
     /// slower.
     static StringData get(const char* header, size_t ndx, Allocator& alloc) noexcept;
+
+    void verify() const;
 
 private:
     static constexpr size_t small_string_max_size = 15;  // ArrayStringShort

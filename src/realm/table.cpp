@@ -345,19 +345,36 @@ ColKey Table::insert_column_link(ColKey col_key, DataType type, StringData name,
 
 void Table::remove_recursive(CascadeState& cascade_state)
 {
-    // recursive remove not relevant for free standing tables
-    if (Group* group = get_parent_group()) {
-        if (group->has_cascade_notification_handler()) {
-            cascade_state.m_group = group;
-        }
+    Group* group = get_parent_group();
+    REALM_ASSERT(group);
+    cascade_state.m_group = group;
 
-        while (!cascade_state.m_to_be_deleted.empty()) {
-            auto obj = cascade_state.m_to_be_deleted.back();
+    do {
+        cascade_state.send_notifications();
+
+        for (auto& l : cascade_state.m_to_be_nullified) {
+            Obj obj = group->get_table(l.origin_table)->get_object(l.origin_key);
+            obj.nullify_link(l.origin_col_key, l.old_target_key);
+        }
+        cascade_state.m_to_be_nullified.clear();
+
+        auto to_delete = std::move(cascade_state.m_to_be_deleted);
+        for (auto obj : to_delete) {
             auto table = group->get_table(obj.first);
-            cascade_state.m_to_be_deleted.pop_back();
             // This might add to the list of objects that should be deleted
             table->m_clusters.erase(obj.second, cascade_state);
         }
+        nullify_links(cascade_state);
+    } while (!cascade_state.m_to_be_deleted.empty() || !cascade_state.m_to_be_nullified.empty());
+}
+
+void Table::nullify_links(CascadeState& cascade_state)
+{
+    Group* group = get_parent_group();
+    REALM_ASSERT(group);
+    for (auto& to_delete : cascade_state.m_to_be_deleted) {
+        auto table = group->get_table(to_delete.first);
+        table->m_clusters.nullify_links(to_delete.second, cascade_state);
     }
 }
 
@@ -376,14 +393,13 @@ ColKey Table::insert_column(ColKey col_key, DataType type, StringData name, bool
 
 void Table::remove_column(ColKey col_key)
 {
-    if (REALM_UNLIKELY(!valid_column(col_key)))
-        throw InvalidKey("Non-existing column");
+    check_column(col_key);
 
     if (Replication* repl = get_repl())
         repl->erase_column(this, col_key); // Throws
 
-    if (m_primary_key_col && col_key == *m_primary_key_col) {
-        remove_primary_key_column();
+    if (col_key == m_primary_key_col) {
+        set_primary_key_column(ColKey());
     }
     bump_content_version();
     bump_storage_version();
@@ -393,8 +409,7 @@ void Table::remove_column(ColKey col_key)
 
 void Table::rename_column(ColKey col_key, StringData name)
 {
-    if (REALM_UNLIKELY(!valid_column(col_key)))
-        throw InvalidKey("Non-existing column");
+    check_column(col_key);
 
     auto col_ndx = colkey2spec_ndx(col_key);
     m_spec.rename_column(col_ndx, name); // Throws
@@ -431,7 +446,6 @@ void Table::init(ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent, bo
     m_top.set_parent(parent, ndx_in_parent);
     m_top.init_from_ref(top_ref);
 
-    m_spec.set_parent(&m_top, top_position_for_spec);
     m_spec.init_from_parent();
 
     while (m_top.size() < top_array_size) {
@@ -439,14 +453,15 @@ void Table::init(ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent, bo
     }
 
     if (m_top.get_as_ref(top_position_for_cluster_tree) == 0) {
+        // This is an upgrade - create cluster
         MemRef mem = ClusterTree::create_empty_cluster(m_top.get_alloc()); // Throws
         m_top.set_as_ref(top_position_for_cluster_tree, mem.get_ref());
     }
-    m_clusters.init_from_ref(m_top.get_as_ref(top_position_for_cluster_tree));
-    m_clusters.set_parent(&m_top, top_position_for_cluster_tree);
+    m_clusters.init_from_parent();
 
     RefOrTagged rot = m_top.get_as_ref_or_tagged(top_position_for_key);
     if (!rot.is_tagged()) {
+        // Create table key
         rot = RefOrTagged::make_tagged(ndx_in_parent);
         m_top.set(top_position_for_key, rot);
     }
@@ -454,9 +469,6 @@ void Table::init(ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent, bo
 
     // index setup relies on column mapping being up to date:
     build_column_mapping();
-    m_index_refs.set_parent(&m_top, top_position_for_search_indexes);
-    m_opposite_table.set_parent(&m_top, top_position_for_opposite_table);
-    m_opposite_column.set_parent(&m_top, top_position_for_opposite_column);
     if (m_top.get_as_ref(top_position_for_search_indexes) == 0) {
         // This is an upgrade - create the necessary arrays
         bool context_flag = false;
@@ -488,7 +500,8 @@ void Table::init(ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent, bo
     else
         m_in_file_version_at_transaction_boundary = rot_version.get_as_int();
 
-    m_primary_key_col = null();
+    auto rot_pk_key = m_top.get_as_ref_or_tagged(top_position_for_pk_col);
+    m_primary_key_col = rot_pk_key.is_tagged() ? ColKey(rot_pk_key.get_as_int()) : ColKey();
 }
 
 
@@ -554,8 +567,7 @@ void Table::populate_search_index(ColKey col_key)
 
 void Table::add_search_index(ColKey col_key)
 {
-    if (REALM_UNLIKELY(!valid_column(col_key)))
-        throw InvalidKey("No such column");
+    check_column(col_key);
     size_t column_ndx = col_key.get_index().val;
 
     // Early-out if already indexed
@@ -592,8 +604,7 @@ void Table::add_search_index(ColKey col_key)
 
 void Table::remove_search_index(ColKey col_key)
 {
-    if (REALM_UNLIKELY(!valid_column(col_key)))
-        throw InvalidKey("No such column");
+    check_column(col_key);
     auto column_ndx = col_key.get_index();
 
     // Early-out if non-indexed
@@ -618,8 +629,7 @@ void Table::remove_search_index(ColKey col_key)
 
 void Table::enumerate_string_column(ColKey col_key)
 {
-    if (REALM_UNLIKELY(!valid_column(col_key)))
-        throw InvalidKey("No such column");
+    check_column(col_key);
     size_t column_ndx = colkey2spec_ndx(col_key);
     ColumnType type = col_key.get_type();
     if (type == col_type_String && !m_spec.is_string_enum_type(column_ndx)) {
@@ -669,7 +679,7 @@ ColKey Table::insert_root_column(ColKey col_key, DataType type, StringData name,
 
 void Table::erase_root_column(ColKey col_key)
 {
-    REALM_ASSERT(valid_column(col_key));
+    check_column(col_key);
     ColumnType col_type = col_key.get_type();
     if (is_link_type(col_type)) {
         auto target_table = get_opposite_table(col_key);
@@ -1010,6 +1020,33 @@ ref_type Table::get_oid_column_ref() const
 
 namespace {
 
+class LegacyStringColumn : public BPlusTree<StringData> {
+public:
+    LegacyStringColumn(Allocator& alloc)
+        : BPlusTree(alloc)
+    {
+    }
+
+    StringData get_legacy(size_t n) const
+    {
+        if (m_cached_leaf_begin <= n && n < m_cached_leaf_end) {
+            return m_leaf_cache.get_legacy(n - m_cached_leaf_begin);
+        }
+        else {
+            StringData value;
+
+            auto func = [&value](BPlusTreeNode* node, size_t ndx) {
+                auto leaf = static_cast<LeafNode*>(node);
+                value = leaf->get_legacy(ndx);
+            };
+
+            m_root->bptree_access(n, func);
+
+            return value;
+        }
+    }
+};
+
 // We need an accessor that can read old Timestamp columns.
 // The new BPlusTree<Timestamp> uses a different layout
 class LegacyTS : private Array {
@@ -1081,7 +1118,7 @@ Mixed get_val_from_column(size_t ndx, ColumnType col_type, bool nullable, BPlusT
             return Mixed{static_cast<BPlusTree<double>*>(accessor)->get(ndx)};
             break;
         case col_type_String:
-            return Mixed{static_cast<BPlusTree<String>*>(accessor)->get(ndx)};
+            return Mixed{static_cast<LegacyStringColumn*>(accessor)->get_legacy(ndx)};
             break;
         case col_type_Binary:
             return Mixed{static_cast<BPlusTree<Binary>*>(accessor)->get(ndx)};
@@ -1107,6 +1144,24 @@ void copy_list(ref_type sub_table_ref, Obj& obj, ColKey col, Allocator& alloc)
         auto l = obj.get_list<T>(col);
         for (size_t j = 0; j < list_size; j++) {
             l.add(from_list.get(j));
+        }
+    }
+}
+
+template <>
+void copy_list<String>(ref_type sub_table_ref, Obj& obj, ColKey col, Allocator& alloc)
+{
+    if (sub_table_ref) {
+        // Actual list is in the columns array position 0
+        Array cols(alloc);
+        cols.init_from_ref(sub_table_ref);
+        LegacyStringColumn from_list(alloc);
+        from_list.set_parent(&cols, 0);
+        from_list.init_from_parent();
+        size_t list_size = from_list.size();
+        auto l = obj.get_list<String>(col);
+        for (size_t j = 0; j < list_size; j++) {
+            l.add(from_list.get_legacy(j));
         }
     }
 }
@@ -1212,7 +1267,7 @@ void Table::migrate_objects(util::FunctionRef<void()> commit_and_continue)
                     acc = std::make_unique<BPlusTree<double>>(m_alloc);
                     break;
                 case col_type_String:
-                    acc = std::make_unique<BPlusTree<String>>(m_alloc);
+                    acc = std::make_unique<LegacyStringColumn>(m_alloc);
                     break;
                 case col_type_Binary:
                     acc = std::make_unique<BPlusTree<Binary>>(m_alloc);
@@ -1535,6 +1590,7 @@ ref_type Table::create_empty_table(Allocator& alloc, TableKey key)
     }
     top.add(0); // Sequence number
     top.add(0); // Collision_map
+    top.add(0); // pk col key
 
     REALM_ASSERT(top.size() == top_array_size);
 
@@ -1559,15 +1615,20 @@ void Table::batch_erase_rows(const KeyColumn& keys)
     vec.erase(unique(vec.begin(), vec.end()), vec.end());
 
     if (m_spec.has_strong_link_columns() || (g && g->has_cascade_notification_handler())) {
-        CascadeState state(CascadeState::Mode::strong);
-        state.m_group = g;
+        CascadeState state(CascadeState::Mode::Strong, g);
         std::for_each(vec.begin(), vec.end(),
                       [this, &state](ObjKey k) { state.m_to_be_deleted.emplace_back(m_key, k); });
+        nullify_links(state);
         remove_recursive(state);
     }
     else {
-        CascadeState state(CascadeState::Mode::none);
-        std::for_each(vec.begin(), vec.end(), [this, &state](ObjKey k) { m_clusters.erase(k, state); });
+        CascadeState state(CascadeState::Mode::None, g);
+        for (auto k : vec) {
+            if (g) {
+                m_clusters.nullify_links(k, state);
+            }
+            m_clusters.erase(k, state);
+        }
     }
 }
 
@@ -1576,7 +1637,8 @@ void Table::clear()
 {
     size_t old_size = size();
 
-    m_clusters.clear();
+    CascadeState state(CascadeState::Mode::Strong, get_parent_group());
+    m_clusters.clear(state);
 
     bump_content_version();
     bump_storage_version();
@@ -1766,8 +1828,7 @@ Timestamp Table::maximum_timestamp(ColKey col_key, ObjKey* return_ndx) const
 template <class T>
 ObjKey Table::find_first(ColKey col_key, T value) const
 {
-    if (REALM_UNLIKELY(!valid_column(col_key)))
-        throw InvalidKey("Non-existing column");
+    check_column(col_key);
 
     if (StringIndex* index = get_search_index(col_key)) {
         return index->find_first(value);
@@ -1795,10 +1856,42 @@ ObjKey Table::find_first(ColKey col_key, T value) const
 namespace realm {
 
 template <>
-ObjKey Table::find_first(ColKey col_key, ObjKey value) const
+ObjKey Table::find_first(ColKey col_key, StringData value) const
 {
     if (REALM_UNLIKELY(!valid_column(col_key)))
         throw InvalidKey("Non-existing column");
+
+    if (StringIndex* index = get_search_index(col_key)) {
+        return index->find_first(value);
+    }
+
+    if (col_key.get_type() == col_type_String && col_key == m_primary_key_col) {
+        ObjectID object_id{value};
+        return global_to_local_object_id_hashed(object_id);
+    }
+
+    ObjKey key;
+    ArrayString leaf(get_alloc());
+
+    auto f = [&key, &col_key, &value, &leaf](const Cluster* cluster) {
+        cluster->init_leaf(col_key, &leaf);
+        size_t row = leaf.find_first(value, 0, cluster->node_size());
+        if (row != realm::npos) {
+            key = cluster->get_real_key(row);
+            return true;
+        }
+        return false;
+    };
+
+    traverse_clusters(f);
+
+    return key;
+}
+
+template <>
+ObjKey Table::find_first(ColKey col_key, ObjKey value) const
+{
+    check_column(col_key);
 
     ObjKey key;
     using LeafType = typename ColumnTypeTraits<ObjKey>::cluster_leaf_type;
@@ -2159,29 +2252,19 @@ void Table::refresh_content_version()
 
 void Table::refresh_accessor_tree()
 {
-    if (m_top.is_attached()) {
-        // Root table (free-standing table, group-level table, or subtable with
-        // independent descriptor)
-        m_top.init_from_parent();
-        m_spec.init_from_parent();
-        if (m_top.size() > top_position_for_cluster_tree) {
-            m_clusters.init_from_parent();
-        }
-        if (m_top.size() > top_position_for_search_indexes) {
-            m_index_refs.init_from_parent();
-        }
-        if (m_top.size() > top_position_for_opposite_table) {
-            m_opposite_table.init_from_parent();
-        }
-        if (m_top.size() > top_position_for_opposite_column) {
-            m_opposite_column.init_from_parent();
-        }
-        refresh_content_version();
-        bump_storage_version();
-        build_column_mapping();
-
-        m_primary_key_col = null();
-    }
+    REALM_ASSERT(m_top.is_attached());
+    m_top.init_from_parent();
+    m_spec.init_from_parent();
+    REALM_ASSERT(m_top.size() > top_position_for_pk_col);
+    m_clusters.init_from_parent();
+    m_index_refs.init_from_parent();
+    m_opposite_table.init_from_parent();
+    m_opposite_column.init_from_parent();
+    auto rot_pk_key = m_top.get_as_ref_or_tagged(top_position_for_pk_col);
+    m_primary_key_col = rot_pk_key.is_tagged() ? ColKey(rot_pk_key.get_as_int()) : ColKey();
+    refresh_content_version();
+    bump_storage_version();
+    build_column_mapping();
     refresh_index_accessors();
 }
 
@@ -2212,7 +2295,9 @@ void Table::refresh_index_accessors()
             m_index_accessors[col_ndx] = nullptr;
         }
         else if (has_old_accessor && ref != 0) { // still there, refresh:
-            m_index_accessors[col_ndx]->refresh_accessor_tree();
+            auto col_key = m_leaf_ndx2colkey[col_ndx];
+            ClusterColumn virtual_col(&m_clusters, col_key);
+            m_index_accessors[col_ndx]->refresh_accessor_tree(virtual_col);
         }
         else if (!has_old_accessor && ref != 0) { // new index!
             auto col_key = m_leaf_ndx2colkey[col_ndx];
@@ -2740,26 +2825,21 @@ void Table::create_objects(const std::vector<ObjKey>& keys)
     }
 }
 
-// Called by replication with mode = none
-void Table::do_remove_object(ObjKey key)
-{
-    CascadeState state(CascadeState::Mode::none);
-    state.m_to_be_deleted.emplace_back(m_key, key);
-    remove_recursive(state);
-}
-
 void Table::remove_object(ObjKey key)
 {
     Group* g = get_parent_group();
 
     if (m_spec.has_strong_link_columns() || (g && g->has_cascade_notification_handler())) {
-        CascadeState state(CascadeState::Mode::strong);
-        state.m_group = g;
+        CascadeState state(CascadeState::Mode::Strong, g);
         state.m_to_be_deleted.emplace_back(m_key, key);
+        nullify_links(state);
         remove_recursive(state);
     }
     else {
-        CascadeState state(CascadeState::Mode::none);
+        CascadeState state(CascadeState::Mode::None, g);
+        if (g) {
+            m_clusters.nullify_links(key, state);
+        }
         m_clusters.erase(key, state);
     }
 }
@@ -2768,13 +2848,14 @@ void Table::remove_object_recursive(ObjKey key)
 {
     size_t table_ndx = get_index_in_group();
     if (table_ndx != realm::npos) {
-        CascadeState state(CascadeState::Mode::all);
+        CascadeState state(CascadeState::Mode::All, get_parent_group());
         state.m_to_be_deleted.emplace_back(m_key, key);
+        nullify_links(state);
         remove_recursive(state);
     }
     else {
         // No links in freestanding table
-        CascadeState state(CascadeState::Mode::none);
+        CascadeState state(CascadeState::Mode::None);
         m_clusters.erase(key, state);
     }
 }
@@ -2894,78 +2975,40 @@ Table::BacklinkOrigin Table::find_backlink_origin(ColKey backlink_col) const noe
 
 ColKey Table::get_primary_key_column() const
 {
-    if (!m_primary_key_col) {
-        StringData table_name = get_name();
-        if (table_name == Group::g_primary_key_table_name) {
-            // The column "pk_table" is the "primary key" of the pk table.
-            m_primary_key_col = Group::g_pk_table;
-        }
-        else {
-            m_primary_key_col = ColKey();
-
-            if (auto pk = get_parent_group()->get_table(Group::g_primary_key_table_name)) {
-                if (table_name.begins_with(Group::g_class_name_prefix)) {
-                    // Only tables created by the Object Store can have primary keys.
-                    StringData class_name = table_name.substr(Group::g_class_name_prefix_len);
-
-                    if (ObjKey entry = pk->find_first_string(Group::g_pk_table, class_name)) {
-                        StringData pk_column_name = pk->get_object(entry).get<StringData>(Group::g_pk_property);
-                        m_primary_key_col = get_column_key(pk_column_name);
-                    }
-                }
-            }
-        }
-    }
-
-    return *m_primary_key_col;
+    return m_primary_key_col;
 }
 
-void Table::set_primary_key_column(ColKey col_key) const
+void Table::set_primary_key_column(ColKey col_key)
 {
-    TableRef pk = get_parent_group()->get_pk_table();
+    if (col_key) {
+        if (REALM_UNLIKELY(!valid_column(col_key)))
+            throw InvalidKey("Non-existing column");
 
-    auto table_name = get_name();
-    if (!table_name.begins_with(Group::g_class_name_prefix)) {
-        REALM_TERMINATE("Only Object Store tables can have primary keys (must begin with 'class_').");
-    }
-
-    StringData class_name = table_name.substr(Group::g_class_name_prefix_len);
-    StringData column_name = get_column_name(col_key);
-
-    ObjKey row = pk->find_first_string(Group::g_pk_table, class_name);
-    if (!row) {
-        // Schema-breaking change; if this was illegal, it should have been detected
-        // by checks at higher levels. Here we let it through.
-        pk->create_object(pk->get_next_key())
-            .set(Group::g_pk_table, class_name)
-            .set(Group::g_pk_property, column_name);
+        m_top.set(top_position_for_pk_col, RefOrTagged::make_tagged(col_key.value));
     }
     else {
-        pk->get_object(row).set(Group::g_pk_property, column_name);
+        m_top.set(top_position_for_pk_col, 0);
     }
-    m_primary_key_col = col_key;
-}
 
-void Table::remove_primary_key_column() const
-{
-    auto table_name = get_name();
-    REALM_ASSERT(table_name.begins_with(Group::g_class_name_prefix));
-    StringData class_name = table_name.substr(Group::g_class_name_prefix_len);
-    TableRef pk = get_parent_group()->get_pk_table();
-    if (pk) {
-        ObjKey row = pk->find_first_string(Group::g_pk_table, class_name);
-        if (row) {
-            pk->remove_object(row);
-        }
-    }
-    m_primary_key_col = ColKey();
+    m_primary_key_col = col_key;
 }
 
 void Table::validate_primary_column_uniqueness() const
 {
     auto col = get_primary_key_column();
-    if (col && get_distinct_view(col).size() != size()) {
-        throw DuplicatePrimaryKeyValueException(get_name(), get_column_name(col));
+    if (this->has_search_index(col)) {
+        if (col && get_distinct_view(col).size() != size()) {
+            throw DuplicatePrimaryKeyValueException(get_name(), get_column_name(col));
+        }
+    }
+    else {
+        for (auto o : *this) {
+            auto pk_val = o.get_any(col);
+            ObjectID object_id{pk_val};
+            if (global_to_local_object_id_hashed(object_id) != o.get_key()) {
+                throw std::runtime_error("Invalid primary key column");
+            }
+        }
     }
 }
 

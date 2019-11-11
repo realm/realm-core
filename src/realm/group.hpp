@@ -564,13 +564,8 @@ protected:
     }
 
 private:
-    static constexpr char g_primary_key_table_name[] = "pk";
-    static constexpr char g_primary_key_class_column_name[] = "pk_table";
-    static constexpr char g_primary_key_property_column_name[] = "pk_property";
     static constexpr char g_class_name_prefix[] = "class_";
     static constexpr size_t g_class_name_prefix_len = 6;
-    static constexpr ColKey g_pk_table{0x20000};
-    static constexpr ColKey g_pk_property{0x40020001};
 
     // nullptr, if we're sharing an allocator provided during initialization
     std::unique_ptr<SlabAlloc> m_local_alloc;
@@ -860,8 +855,7 @@ private:
     size_t key2ndx(TableKey key) const;
     size_t key2ndx_checked(TableKey key) const;
     void set_size() const noexcept;
-
-    TableRef get_pk_table();
+    void remove_pk_table();
 
     friend class Table;
     friend class GroupWriter;
@@ -1038,7 +1032,7 @@ void Group::to_json(S& out, size_t link_depth, std::map<std::string, std::string
     std::map<std::string, std::string> renames2;
     renames = renames ? renames : &renames2;
 
-    out << "{";
+    out << "{" << std::endl;
 
     auto keys = get_table_keys();
     for (size_t i = 0; i < keys.size(); ++i) {
@@ -1055,9 +1049,10 @@ void Group::to_json(S& out, size_t link_depth, std::map<std::string, std::string
         out << "\"" << name << "\"";
         out << ":";
         table->to_json(out, link_depth, renames);
+        out << std::endl;
     }
 
-    out << "}";
+    out << "}" << std::endl;
 }
 
 inline void Group::init_array_parents() noexcept
@@ -1305,10 +1300,30 @@ public:
 
 class CascadeState {
 public:
-    enum Mode { all, strong, none };
+    enum class Mode {
+        /// If we remove the last link to an object, delete that object, even if
+        /// the link we removed was not a strong link
+        All,
+        /// If we remove the last link to an object, delete that object only if
+        /// the link we removed was a strong link
+        Strong,
+        /// Never delete objects due to removing links
+        None
+    };
 
-    CascadeState(Mode mode = Mode::strong) noexcept
+    struct Link {
+        TableKey origin_table;     ///< A group-level table.
+        ColKey origin_col_key;     ///< Link column being nullified.
+        ObjKey origin_key;         ///< Row in column being nullified.
+        /// The target row index which is being removed. Mostly relevant for
+        /// LinkList (to know which entries are being removed), but also
+        /// valid for Link.
+        ObjKey old_target_key;
+    };
+
+    CascadeState(Mode mode = Mode::Strong, Group* g = nullptr) noexcept
         : m_mode(mode)
+        , m_group(g)
     {
     }
 
@@ -1316,6 +1331,7 @@ public:
     Mode m_mode;
 
     std::vector<std::pair<TableKey, ObjKey>> m_to_be_deleted;
+    std::vector<Link> m_to_be_nullified;
     Group* m_group = nullptr;
 
     bool notification_handler() const noexcept
@@ -1327,6 +1343,49 @@ public:
     {
         REALM_ASSERT_DEBUG(notification_handler());
         m_group->send_cascade_notification(notifications);
+    }
+
+    bool enqueue_for_cascade(const Obj& target_obj, bool link_is_strong, bool last_removed)
+    {
+        // Check if the object should be cascade deleted
+        if (m_mode == Mode::None && last_removed) {
+            return false;
+        }
+        if (m_mode == Mode::All || link_is_strong) {
+            bool has_backlinks = target_obj.has_backlinks(m_mode == Mode::Strong);
+            if (!has_backlinks) {
+                // Object has no more backlinks - add to list for deletion
+                m_to_be_deleted.emplace_back(target_obj.get_table()->get_key(), target_obj.get_key());
+                return true;
+            }
+        }
+        return false;
+    }
+
+    void enqueue_for_nullification(Table& src_table, ColKey src_col_key, ObjKey origin_key, ObjKey target_key)
+    {
+        // Nullify immediately if we don't need to send cascade notifications
+        if (!notification_handler()) {
+            Obj obj = src_table.get_object(origin_key);
+            obj.nullify_link(src_col_key, target_key);
+            return;
+        }
+
+        // Otherwise enqueue it
+        m_to_be_nullified.push_back({src_table.get_key(), src_col_key, origin_key, target_key});
+    }
+
+    void send_notifications()
+    {
+        if (!notification_handler()) {
+            return;
+        }
+        Group::CascadeNotification notification;
+        for (auto& o : m_to_be_deleted)
+            notification.rows.emplace_back(o.first, o.second);
+        for (auto& l : m_to_be_nullified)
+            notification.links.emplace_back(l.origin_table, l.origin_col_key, l.origin_key, l.old_target_key);
+        send_notifications(notification);
     }
 };
 

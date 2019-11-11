@@ -72,10 +72,6 @@ public:
     /// underlying node. It is not owned by the accessor.
     void create();
 
-    // Old database files will not have the m_nulls array, so we need code paths for
-    // backwards compatibility for these cases.
-    bool legacy_array_type() const noexcept;
-
     //@{
     /// Overriding functions of Array
     void init_from_ref(ref_type) noexcept;
@@ -125,9 +121,12 @@ public:
     bool update_from_parent(size_t old_baseline) noexcept;
 
 private:
+    friend class ArrayString;
     ArrayInteger m_offsets;
     ArrayBlob m_blob;
-    ArrayInteger m_nulls;
+    Array m_nulls;
+
+    StringData get_string_legacy(size_t ndx) const;
 };
 
 
@@ -170,20 +169,6 @@ inline bool ArraySmallBlobs::is_empty() const noexcept
     return m_offsets.is_empty();
 }
 
-// Old database files will not have the m_nulls array, so we need code paths for
-// backwards compatibility for these cases. We can test if m_nulls exists by looking
-// at number of references in this ArraySmallBlobs.
-inline bool ArraySmallBlobs::legacy_array_type() const noexcept
-{
-    if (Array::size() == 3)
-        return false; // New database file
-    else if (Array::size() == 2)
-        return true; // Old database file
-    else
-        REALM_ASSERT(false); // Should never happen
-    return false;
-}
-
 inline size_t ArraySmallBlobs::size() const noexcept
 {
     return m_offsets.size();
@@ -193,7 +178,7 @@ inline BinaryData ArraySmallBlobs::get(size_t ndx) const noexcept
 {
     REALM_ASSERT_3(ndx, <, m_offsets.size());
 
-    if (!legacy_array_type() && m_nulls.get(ndx)) {
+    if (m_nulls.get(ndx)) {
         return BinaryData();
     }
     else {
@@ -209,15 +194,9 @@ inline BinaryData ArraySmallBlobs::get(size_t ndx) const noexcept
 
 inline bool ArraySmallBlobs::is_null(size_t ndx) const
 {
-    REALM_ASSERT_3(ndx, <, m_offsets.size());
+    REALM_ASSERT_3(ndx, <, m_nulls.size());
 
-    if (!legacy_array_type() && m_nulls.get(ndx)) {
-        return true;
-    }
-    else {
-        // Old database file (non-nullable column should never return null)
-        return false;
-    }
+    return m_nulls.get(ndx) != 0;
 }
 
 inline StringData ArraySmallBlobs::get_string(size_t ndx) const
@@ -261,24 +240,21 @@ inline void ArraySmallBlobs::truncate(size_t new_size)
 
     m_offsets.truncate(new_size);
     m_blob.truncate(sz);
-    if (!legacy_array_type())
-        m_nulls.truncate(new_size);
+    m_nulls.truncate(new_size);
 }
 
 inline void ArraySmallBlobs::clear()
 {
     m_blob.clear();
     m_offsets.clear();
-    if (!legacy_array_type())
-        m_nulls.clear();
+    m_nulls.clear();
 }
 
 inline void ArraySmallBlobs::destroy()
 {
     m_blob.destroy();
     m_offsets.destroy();
-    if (!legacy_array_type())
-        m_nulls.destroy();
+    m_nulls.destroy();
     Array::destroy();
 }
 
@@ -295,8 +271,7 @@ inline bool ArraySmallBlobs::update_from_parent(size_t old_baseline) noexcept
     if (res) {
         m_blob.update_from_parent(old_baseline);
         m_offsets.update_from_parent(old_baseline);
-        if (!legacy_array_type())
-            m_nulls.update_from_parent(old_baseline);
+        m_nulls.update_from_parent(old_baseline);
     }
     return res;
 }

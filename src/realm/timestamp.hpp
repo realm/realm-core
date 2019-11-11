@@ -190,15 +190,21 @@ template <class C, class T>
 inline std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& out, const Timestamp& d)
 {
     auto seconds = time_t(d.get_seconds());
-    struct tm* t = gmtime(&seconds);
-    if (t) {
-        // We need a buffer for formatting dates (and binary to hex). Max
-        // size is 20 bytes (incl zero byte) "YYYY-MM-DD HH:MM:SS"\0
+    struct tm buf;
+#ifdef _MSC_VER
+    bool success = gmtime_s(&buf, &seconds) == 0;
+#else
+    bool success = gmtime_r(&seconds, &buf) != nullptr;
+#endif
+    if (success) {
+        // We need a buffer for formatting dates.
+        // Max size is 20 bytes (incl terminating zero) "YYYY-MM-DD HH:MM:SS"\0
         char buffer[30];
-        size_t res = strftime(buffer, 30, "%Y-%m-%d %H:%M:%S", t);
-        if (res)
+        if (strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", &buf)) {
             out << buffer;
+        }
     }
+
     return out;
 }
 // LCOV_EXCL_STOP

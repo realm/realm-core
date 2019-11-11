@@ -141,6 +141,9 @@ public:
     /// Erase element identified by 'key'
     virtual size_t erase(ObjKey key, CascadeState& state) = 0;
 
+    /// Nullify links pointing to element identified by 'key'
+    virtual void nullify_incoming_links(ObjKey key, CascadeState& state) = 0;
+
     /// Move elements from position 'ndx' to 'new_node'. The new node is supposed
     /// to be a sibling positioned right after this one. All key values must
     /// be subtracted 'key_adj'
@@ -166,9 +169,6 @@ public:
     }
 
 protected:
-    friend class ArrayBacklink;
-    friend class ObjList;
-
     const ClusterTree& m_tree_top;
     ClusterKeyArray m_keys;
     uint64_t m_offset;
@@ -231,6 +231,9 @@ public:
         return size_t(key.value);
     }
 
+    const Table* get_owning_table() const;
+    ColKey get_col_key(size_t ndx_in_parent) const;
+
     void ensure_general_form() override;
     void insert_column(ColKey col) override; // Does not move columns!
     void remove_column(ColKey col) override; // Does not move columns - may leave a 'hole'
@@ -243,11 +246,13 @@ public:
     ObjKey get(size_t, State& state) const override;
     size_t get_ndx(ObjKey key, size_t ndx) const override;
     size_t erase(ObjKey k, CascadeState& state) override;
+    void nullify_incoming_links(ObjKey key, CascadeState& state) override;
     void upgrade_string_to_enum(ColKey col, ArrayString& keys);
 
     void init_leaf(ColKey col, ArrayPayload* leaf) const;
     void add_leaf(ColKey col, ref_type ref);
 
+    void verify() const;
     void dump_objects(int64_t key_offset, std::string lead) const override;
 
 private:
@@ -275,7 +280,9 @@ private:
     void do_erase_key(size_t ndx, ColKey col, CascadeState& state);
     void do_insert_key(size_t ndx, ColKey col, Mixed init_val, ObjKey origin_key);
     template <class T>
-    void set_spec(T&, ColKey::Idx);
+    void set_spec(T&, ColKey::Idx) const;
+    template <class ArrayType>
+    void verify(ref_type ref, size_t index, util::Optional<size_t>& sz) const;
 };
 
 }

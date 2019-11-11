@@ -27,54 +27,40 @@ using namespace realm;
 void ArrayBacklink::nullify_fwd_links(size_t ndx, CascadeState& state)
 {
     uint64_t value = Array::get(ndx);
-    if (value != 0) {
-        // Naming: Links go from source to target.
-        // Backlinks go from target to source.
-        // This array holds backlinks, hence it is the target.
-        // The table which holds the corresponding fwd links is the source.
+    if (value == 0) {
+        return;
+    }
 
-        // determine target table, column and key.
-        REALM_ASSERT_DEBUG(dynamic_cast<Cluster*>(get_parent()));
-        auto cluster = static_cast<Cluster*>(get_parent());
-        const Table* target_table = cluster->m_tree_top.get_owner();
-        ColKey::Idx target_col_ndx{unsigned(get_ndx_in_parent() - 1)}; // <- leaf_index here. Opaque.
-        auto target_col_key = target_table->leaf_ndx2colkey(target_col_ndx);
-        REALM_ASSERT(target_col_key.get_index().val == target_col_ndx.val);
+    // Naming: Links go from source to target.
+    // Backlinks go from target to source.
+    // This array holds backlinks, hence it is the target.
+    // The table which holds the corresponding fwd links is the source.
 
-        ObjKey target_key = cluster->get_real_key(ndx);
+    // determine target table, column and key.
+    REALM_ASSERT_DEBUG(dynamic_cast<Cluster*>(get_parent()));
+    auto cluster = static_cast<Cluster*>(get_parent());
+    const Table* target_table = cluster->get_owning_table();
+    ColKey target_col_key = cluster->get_col_key(get_ndx_in_parent());
+    ObjKey target_key = cluster->get_real_key(ndx);
 
-        // determine the source table/col - which is the one holding the forward links
-        TableRef source_table = target_table->get_opposite_table(target_col_key);
-        TableKey src_table_key = source_table->get_key();
-        ColKey src_col_key = target_table->get_opposite_column(target_col_key);
-        source_table->bump_content_version();
-        Group::CascadeNotification notifications;
-        // Now follow all backlinks to their origin and clear forward links.
-        if ((value & 1) != 0) {
-            // just a single one
-            notifications.links.emplace_back(src_table_key, src_col_key, ObjKey(value >> 1), target_key);
-        }
-        else {
-            // There is more than one backlink - Iterate through them all
-            ref_type ref = to_ref(value);
-            Array backlink_list(m_alloc);
-            backlink_list.init_from_ref(ref);
+    // determine the source table/col - which is the one holding the forward links
+    TableRef source_table = target_table->get_opposite_table(target_col_key);
+    ColKey src_col_key = target_table->get_opposite_column(target_col_key);
 
-            size_t sz = backlink_list.size();
-            for (size_t i = 0; i < sz; i++) {
-                notifications.links.emplace_back(src_table_key, src_col_key, ObjKey(backlink_list.get(i)),
-                                                 target_key);
-            }
-        }
+    // Now follow all backlinks to their origin and clear forward links.
+    if ((value & 1) != 0) {
+        // just a single one
+        state.enqueue_for_nullification(*source_table, src_col_key, ObjKey(value >> 1), target_key);
+    }
+    else {
+        // There is more than one backlink - Iterate through them all
+        ref_type ref = to_ref(value);
+        Array backlink_list(m_alloc);
+        backlink_list.init_from_ref(ref);
 
-        if (state.notification_handler()) {
-            state.send_notifications(notifications);
-        }
-
-        // Nullify links
-        for (auto& l : notifications.links) {
-            Obj obj = source_table->get_object(l.origin_key);
-            obj.nullify_link(src_col_key, target_key);
+        size_t sz = backlink_list.size();
+        for (size_t i = 0; i < sz; i++) {
+            state.enqueue_for_nullification(*source_table, src_col_key, ObjKey(backlink_list.get(i)), target_key);
         }
     }
 }
@@ -188,4 +174,62 @@ ObjKey ArrayBacklink::get_backlink(size_t ndx, size_t index) const
 
     REALM_ASSERT(index < backlink_list.size());
     return ObjKey(backlink_list.get(index));
+}
+
+void ArrayBacklink::verify() const
+{
+#ifdef REALM_DEBUG
+    Array::verify();
+
+    REALM_ASSERT(dynamic_cast<Cluster*>(get_parent()));
+    auto cluster = static_cast<Cluster*>(get_parent());
+    const Table* target_table = cluster->get_owning_table();
+    ColKey target_col_key = cluster->get_col_key(get_ndx_in_parent());
+
+    TableRef src_table = target_table->get_opposite_table(target_col_key);
+    ColKey src_col_key = target_table->get_opposite_column(target_col_key);
+
+    // Verify that each backlink has a corresponding forward link
+    ColumnAttrMask src_attr = src_col_key.get_attrs();
+    for (size_t i = 0; i < size(); ++i) {
+        ObjKey target_key = cluster->get_real_key(i);
+        for (size_t j = 0, count = get_backlink_count(i); j < count; ++j) {
+            Obj src_obj = src_table->get_object(get_backlink(i, j));
+            if (src_attr.test(col_attr_List)) {
+                REALM_ASSERT(src_obj.get_list<ObjKey>(src_col_key).find_first(target_key) != npos);
+            }
+            else {
+                REALM_ASSERT(src_obj.get<ObjKey>(src_col_key) == target_key);
+            }
+        }
+    }
+
+    // Verify that each forward link has a corresponding backlink
+    auto verify_backlink = [&](ObjKey src, ObjKey target_key) {
+        if (!target_key) {
+            return;
+        }
+        REALM_ASSERT(target_table->is_valid(target_key));
+        Obj target = target_table->get_object(target_key);
+        size_t count = target.get_backlink_count(*src_table, src_col_key);
+        REALM_ASSERT(count > 0);
+        for (size_t i = 0; i < count; ++i) {
+            if (target.get_backlink(target_col_key, i)  == src) {
+                return;
+            }
+        }
+        REALM_ASSERT(false);
+    };
+    for (auto src_obj : *src_table) {
+        if (src_attr.test(col_attr_List)) {
+            auto list = src_obj.get_list<ObjKey>(src_col_key);
+            for (size_t i = 0; i < list.size(); ++i) {
+                verify_backlink(src_obj.get_key(), list.get(i));
+            }
+        }
+        else {
+            verify_backlink(src_obj.get_key(), src_obj.get<ObjKey>(src_col_key));
+        }
+    }
+#endif
 }

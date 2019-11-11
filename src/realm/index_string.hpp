@@ -190,7 +190,7 @@ public:
     size_t get_ndx_in_parent() const noexcept;
     void set_ndx_in_parent(size_t ndx_in_parent) noexcept;
     void update_from_parent(size_t old_baseline) noexcept;
-    void refresh_accessor_tree();
+    void refresh_accessor_tree(const ClusterColumn& target_column);
     ref_type get_ref() const noexcept;
 
     // StringIndex interface:
@@ -619,9 +619,10 @@ inline bool StringIndex::is_attached() const noexcept
     return m_array->is_attached();
 }
 
-inline void StringIndex::refresh_accessor_tree()
+inline void StringIndex::refresh_accessor_tree(const ClusterColumn& target_column)
 {
     m_array->init_from_parent();
+    m_target_column = target_column;
 }
 
 inline ref_type StringIndex::get_ref() const noexcept

@@ -110,6 +110,7 @@ public:
     ObjKey get(size_t ndx, State& state) const override;
     size_t get_ndx(ObjKey key, size_t ndx) const override;
     size_t erase(ObjKey k, CascadeState& state) override;
+    void nullify_incoming_links(ObjKey key, CascadeState& state) override;
     void add(ref_type ref, int64_t key_value = 0);
 
     // Reset first (and only!) child ref and return the previous value
@@ -477,6 +478,13 @@ size_t ClusterNodeInner::erase(ObjKey key, CascadeState& state)
     });
 }
 
+void ClusterNodeInner::nullify_incoming_links(ObjKey key, CascadeState& state)
+{
+    recurse<void>(key, [&state](ClusterNode* node, ChildInfo& child_info) {
+        node->nullify_incoming_links(child_info.key, state);
+    });
+}
+
 void ClusterNodeInner::ensure_general_form()
 {
     if (!m_keys.is_attached()) {
@@ -725,8 +733,8 @@ void Cluster::create(size_t nb_leaf_columns)
         auto type = col_key.get_type();
         auto attr = col_key.get_attrs();
         if (attr.test(col_attr_List)) {
-            ArrayInteger arr(m_alloc);
-            arr.create(type_HasRefs);
+            ArrayRef arr(m_alloc);
+            arr.create();
             arr.set_parent(this, col_ndx.val + s_first_col_index);
             arr.update_parent();
             return false;
@@ -824,12 +832,12 @@ size_t Cluster::node_size_from_header(Allocator& alloc, const char* header)
 namespace realm {
 
 template <class T>
-inline void Cluster::set_spec(T&, ColKey::Idx)
+inline void Cluster::set_spec(T&, ColKey::Idx) const
 {
 }
 
 template <>
-inline void Cluster::set_spec(ArrayString& arr, ColKey::Idx col_ndx)
+inline void Cluster::set_spec(ArrayString& arr, ColKey::Idx col_ndx) const
 {
     auto spec_ndx = m_tree_top.get_owner()->leaf_ndx2spec_ndx(col_ndx);
     arr.set_spec(const_cast<Spec*>(&m_tree_top.get_spec()), spec_ndx);
@@ -896,7 +904,7 @@ void Cluster::insert_row(size_t ndx, ObjKey k, const FieldValues& init_values)
 
         if (attr.test(col_attr_List)) {
             REALM_ASSERT(init_value.is_null());
-            ArrayInteger arr(m_alloc);
+            ArrayRef arr(m_alloc);
             arr.set_parent(this, col_ndx.val + s_first_col_index);
             arr.init_from_parent();
             arr.insert(ndx, 0);
@@ -975,7 +983,7 @@ void Cluster::move(size_t ndx, ClusterNode* new_node, int64_t offset)
         auto type = col_key.get_type();
 
         if (attr.test(col_attr_List)) {
-            do_move<ArrayInteger>(ndx, col_key, new_leaf);
+            do_move<ArrayRef>(ndx, col_key, new_leaf);
             return false;
         }
 
@@ -1035,6 +1043,19 @@ Cluster::~Cluster()
 {
 }
 
+const Table* Cluster::get_owning_table() const
+{
+    return m_tree_top.get_owner();
+}
+
+ColKey Cluster::get_col_key(size_t ndx_in_parent) const
+{
+    ColKey::Idx col_ndx{unsigned(ndx_in_parent - 1)}; // <- leaf_index here. Opaque.
+    auto col_key = get_owning_table()->leaf_ndx2colkey(col_ndx);
+    REALM_ASSERT(col_key.get_index().val == col_ndx.val);
+    return col_key;
+}
+
 void Cluster::ensure_general_form()
 {
     if (!m_keys.is_attached()) {
@@ -1072,8 +1093,8 @@ void Cluster::insert_column(ColKey col_key)
     if (attr.test(col_attr_List)) {
         size_t sz = node_size();
 
-        ArrayInteger arr(m_alloc);
-        arr.Array::create(type_HasRefs, false, sz, 0);
+        ArrayRef arr(m_alloc);
+        arr.create(sz);
         auto col_ndx = col_key.get_index();
         unsigned idx = col_ndx.val + s_first_col_index;
         if (idx == size())
@@ -1257,85 +1278,35 @@ size_t Cluster::get_ndx(ObjKey k, size_t ndx) const
         }
     }
     else {
-        if (k.value >= (Array::get(s_key_ref_or_size_index) >> 1)) {
+        index = size_t(k.value);
+        if (index >= get_as_ref_or_tagged(s_key_ref_or_size_index).get_as_int()) {
             throw InvalidKey("Key not found");
         }
-        index = size_t(k.value);
     }
     return index + ndx;
 }
 
 size_t Cluster::erase(ObjKey key, CascadeState& state)
 {
-    size_t ndx;
-    if (m_keys.is_attached()) {
-        ndx = m_keys.lower_bound(uint64_t(key.value));
-        if (ndx == m_keys.size() || m_keys.get(ndx) != uint64_t(key.value)) {
-            throw InvalidKey("Key not found");
-        }
-    }
-    else {
-        ndx = size_t(key.value);
-        if (ndx >= get_as_ref_or_tagged(0).get_as_int()) {
-            throw InvalidKey("Key not found");
-        }
-    }
-
-    const Spec& spec = m_tree_top.get_spec();
-    size_t num_cols = spec.get_column_count();
-    size_t num_public_cols = spec.get_public_column_count();
-    // We must start with backlink columns in case the corresponding link
-    // columns are in the same table so that we can nullify links before
-    // erasing rows in the link columns.
-    //
-    // This phase also generates replication instructions documenting the side-
-    // effects of deleting the object (i.e. link nullifications). These instructions
-    // must come before the actual deletion of the object, but at the same time
-    // the Replication object may need a consistent view of the row (not including
-    // link columns). Therefore we first nullify links to this object, then
-    // generate the instruction, and then delete the row in the remaining columns.
-
-    for (size_t col_ndx = num_public_cols; col_ndx < num_cols; col_ndx++) {
-        ColKey col_key = m_tree_top.get_owner()->spec_ndx2colkey(col_ndx);
-        ColKey::Idx leaf_ndx = col_key.get_index();
-        auto type = col_key.get_type();
-        REALM_ASSERT(type == col_type_BackLink);
-        ArrayBacklink values(m_alloc);
-        values.set_parent(this, leaf_ndx.val + s_first_col_index);
-        values.init_from_parent();
-        // Ensure that Cluster is writable and able to hold references to nodes in
-        // the slab area before nullifying or deleting links. These operation may
-        // both have the effect that other objects may be constructed and manipulated.
-        // If those other object are in the same cluster that the object to be deleted
-        // is in, then that will cause another accessor to this cluster to be created.
-        // It would lead to an error if the cluster node was relocated without it being
-        // reflected in the context here.
-        values.copy_on_write();
-        values.nullify_fwd_links(ndx, state);
-    }
-
+    size_t ndx = get_ndx(key, 0);
     ObjKey real_key = get_real_key(ndx);
     auto table = m_tree_top.get_owner();
-    if (state.notification_handler()) {
-        Group::CascadeNotification notifications;
-        notifications.rows.emplace_back(table->get_key(), real_key);
-        state.send_notifications(notifications);
-    }
-
     const_cast<Table*>(table)->free_local_id_after_hash_collision(real_key);
     if (Replication* repl = table->get_repl()) {
         repl->remove_object(table, real_key);
     }
 
+    std::vector<ColKey> backlink_column_keys;
+
     auto erase_in_column = [&](ColKey col_key) {
         auto col_type = col_key.get_type();
-        auto col_ndx = col_key.get_index();
         auto attr = col_key.get_attrs();
         if (attr.test(col_attr_List)) {
-            ArrayInteger values(m_alloc);
+            auto col_ndx = col_key.get_index();
+            ArrayRef values(m_alloc);
             values.set_parent(this, col_ndx.val + s_first_col_index);
             values.init_from_parent();
-            ref_type ref = values.get_as_ref(ndx);
+            ref_type ref = values.get(ndx);
 
             if (ref) {
                 if (col_type == col_type_LinkList) {
@@ -1384,7 +1355,16 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
                 do_erase_key(ndx, col_key, state);
                 break;
             case col_type_BackLink:
-                do_erase<ArrayBacklink>(ndx, col_key);
+                if (state.m_mode == CascadeState::Mode::None) {
+                    do_erase<ArrayBacklink>(ndx, col_key);
+                }
+                else {
+                    // Postpone the deletion of backlink entries or else the
+                    // checks for if there's any remaining backlinks will
+                    // check the wrong row for columns which have already
+                    // had values erased from them.
+                    backlink_column_keys.push_back(col_key);
+                }
                 break;
             default:
                 REALM_ASSERT(false);
@@ -1393,6 +1373,10 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
         return false;
     };
     m_tree_top.get_owner()->for_each_and_every_column(erase_in_column);
+
+    // Any remaining backlink columns to erase from?
+    for (auto k : backlink_column_keys)
+        do_erase<ArrayBacklink>(ndx, k);
 
     if (m_keys.is_attached()) {
         m_keys.erase(ndx);
@@ -1410,6 +1394,44 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
     }
 
     return node_size();
+}
+
+void Cluster::nullify_incoming_links(ObjKey key, CascadeState& state)
+{
+    size_t ndx = get_ndx(key, 0);
+
+    const Spec& spec = m_tree_top.get_spec();
+    size_t num_cols = spec.get_column_count();
+    size_t num_public_cols = spec.get_public_column_count();
+    // We must start with backlink columns in case the corresponding link
+    // columns are in the same table so that we can nullify links before
+    // erasing rows in the link columns.
+    //
+    // This phase also generates replication instructions documenting the side-
+    // effects of deleting the object (i.e. link nullifications). These instructions
+    // must come before the actual deletion of the object, but at the same time
+    // the Replication object may need a consistent view of the row (not including
+    // link columns). Therefore we first nullify links to this object, then
+    // generate the instruction, and then delete the row in the remaining columns.
+
+    for (size_t col_ndx = num_public_cols; col_ndx < num_cols; col_ndx++) {
+        ColKey col_key = m_tree_top.get_owner()->spec_ndx2colkey(col_ndx);
+        ColKey::Idx leaf_ndx = col_key.get_index();
+        auto type = col_key.get_type();
+        REALM_ASSERT(type == col_type_BackLink);
+        ArrayBacklink values(m_alloc);
+        values.set_parent(this, leaf_ndx.val + s_first_col_index);
+        values.init_from_parent();
+        // Ensure that Cluster is writable and able to hold references to nodes in
+        // the slab area before nullifying or deleting links. These operation may
+        // both have the effect that other objects may be constructed and manipulated.
+        // If those other object are in the same cluster that the object to be deleted
+        // is in, then that will cause another accessor to this cluster to be created.
+        // It would lead to an error if the cluster node was relocated without it being
+        // reflected in the context here.
+        values.copy_on_write();
+        values.nullify_fwd_links(ndx, state);
+    }
 }
 
 void Cluster::upgrade_string_to_enum(ColKey col_key, ArrayString& keys)
@@ -1452,6 +1474,78 @@ void Cluster::add_leaf(ColKey col_key, ref_type ref)
     auto col_ndx = col_key.get_index();
     REALM_ASSERT((col_ndx.val + 1) == size());
     Array::insert(col_ndx.val + 1, from_ref(ref));
+}
+
+template <typename ArrayType>
+void Cluster::verify(ref_type ref, size_t index, util::Optional<size_t>& sz) const
+{
+    ArrayType arr(get_alloc());
+    set_spec(arr, ColKey::Idx{unsigned(index) - 1});
+    arr.set_parent(const_cast<Cluster *>(this), index);
+    arr.init_from_ref(ref);
+    arr.verify();
+    if (sz) {
+        REALM_ASSERT(arr.size() == *sz);
+    }
+    else {
+        sz = arr.size();
+    }
+}
+
+void Cluster::verify() const
+{
+#ifdef REALM_DEBUG
+    auto& spec = m_tree_top.get_spec();
+    util::Optional<size_t> sz;
+    for (size_t i = 0; i < spec.get_column_count(); i++) {
+        size_t col = spec.get_key(i).get_index().val + s_first_col_index;
+        ref_type ref = Array::get_as_ref(col);
+        auto attr = spec.get_column_attr(i);
+        if (attr.test(col_attr_List)) {
+            // FIXME: implement
+            verify<ArrayRef>(ref, col, sz);
+            continue;
+        }
+
+        bool nullable = attr.test(col_attr_Nullable);
+        switch (spec.get_column_type(i)) {
+            case col_type_Int:
+                if (nullable) {
+                    verify<ArrayIntNull>(ref, col, sz);
+                }
+                else {
+                    verify<ArrayInteger>(ref, col, sz);
+                }
+                break;
+            case col_type_Bool:
+                verify<ArrayBoolNull>(ref, col, sz);
+                break;
+            case col_type_Float:
+                verify<ArrayFloatNull>(ref, col, sz);
+                break;
+            case col_type_Double:
+                verify<ArrayDoubleNull>(ref, col, sz);
+                break;
+            case col_type_String:
+                verify<ArrayString>(ref, col, sz);
+                break;
+            case col_type_Binary:
+                verify<ArrayBinary>(ref, col, sz);
+                break;
+            case col_type_Timestamp:
+                verify<ArrayTimestamp>(ref, col, sz);
+                break;
+            case col_type_Link:
+                verify<ArrayKey>(ref, col, sz);
+                break;
+            case col_type_BackLink:
+                verify<ArrayBacklink>(ref, col, sz);
+                break;
+            default:
+                break;
+        }
+    }
+#endif
 }
 
 // LCOV_EXCL_START
@@ -1579,25 +1673,13 @@ void Cluster::remove_backlinks(ObjKey origin_key, ColKey origin_col_key, const s
     const Table* origin_table = m_tree_top.get_owner();
     TableRef target_table = origin_table->get_opposite_table(origin_col_key);
     ColKey backlink_col_key = origin_table->get_opposite_column(origin_col_key);
-
-    CascadeState::Mode mode = state.m_mode;
     bool strong_links = (origin_table->get_link_type(origin_col_key) == link_Strong);
-    bool only_strong_links = (mode == CascadeState::Mode::strong);
 
     for (auto key : keys) {
         if (key != null_key) {
             Obj target_obj = target_table->get_object(key);
             bool last_removed = target_obj.remove_one_backlink(backlink_col_key, origin_key); // Throws
-
-            // Check if the object should be cascade deleted
-            if (mode != CascadeState::none && (mode == CascadeState::all || (strong_links && last_removed))) {
-                bool has_backlinks = target_obj.has_backlinks(only_strong_links);
-
-                if (!has_backlinks) {
-                    // Object has no more backlinks - add to list for deletion
-                    state.m_to_be_deleted.emplace_back(target_table->get_key(), key);
-                }
-            }
+            state.enqueue_for_cascade(target_obj, strong_links, last_removed);
         }
     }
 }
@@ -1647,9 +1729,7 @@ void ClusterTree::replace_root(std::unique_ptr<ClusterNode> new_root)
 {
     if (new_root != m_root) {
         // Maintain parent.
-        ArrayParent* parent = m_root->get_parent();
-        size_t ndx_in_parent = m_root->get_ndx_in_parent();
-        new_root->set_parent(parent, ndx_in_parent);
+        new_root->set_parent(&m_owner->m_top, Table::top_position_for_cluster_tree);
         new_root->update_parent(); // Throws
         m_root = std::move(new_root);
     }
@@ -1658,18 +1738,14 @@ void ClusterTree::replace_root(std::unique_ptr<ClusterNode> new_root)
 void ClusterTree::init_from_ref(ref_type ref)
 {
     auto new_root = create_root_from_ref(m_alloc, ref);
-    if (m_root) {
-        ArrayParent* parent = m_root->get_parent();
-        size_t ndx_in_parent = m_root->get_ndx_in_parent();
-        new_root->set_parent(parent, ndx_in_parent);
-    }
+    new_root->set_parent(&m_owner->m_top, Table::top_position_for_cluster_tree);
     m_root = std::move(new_root);
     m_size = m_root->get_tree_size();
 }
 
 void ClusterTree::init_from_parent()
 {
-    ref_type ref = m_root->get_ref_from_parent();
+    ref_type ref = m_owner->m_top.get_as_ref(Table::top_position_for_cluster_tree);
     init_from_ref(ref);
 }
 
@@ -1682,7 +1758,7 @@ bool ClusterTree::update_from_parent(size_t old_baseline) noexcept
     return was_updated;
 }
 
-void ClusterTree::clear()
+void ClusterTree::clear(CascadeState& state)
 {
     size_t num_cols = get_spec().get_public_column_count();
     for (size_t col_ndx = 0; col_ndx < num_cols; col_ndx++) {
@@ -1692,7 +1768,9 @@ void ClusterTree::clear()
         }
     }
 
-    remove_links(); // This will also delete objects loosing their last strong link
+    if (state.m_group) {
+        remove_all_links(state); // This will also delete objects loosing their last strong link
+    }
 
     m_root->destroy_deep();
 
@@ -1981,10 +2059,8 @@ const Spec& ClusterTree::get_spec() const
     return m_owner->m_spec;
 }
 
-void ClusterTree::remove_links()
+void ClusterTree::remove_all_links(CascadeState& state)
 {
-    CascadeState state(CascadeState::Mode::strong);
-    state.m_group = m_owner->get_parent_group();
     Allocator& alloc = get_alloc();
     // This function will add objects that should be deleted to 'state'
     auto func = [this, &state, &alloc](const Cluster* cluster) {
@@ -2010,9 +2086,9 @@ void ClusterTree::remove_links()
                 ArrayInteger values(alloc);
                 cluster->init_leaf(col_key, &values);
                 size_t sz = values.size();
+                BPlusTree<ObjKey> links(alloc);
                 for (size_t i = 0; i < sz; i++) {
                     if (ref_type ref = values.get_as_ref(i)) {
-                        BPlusTree<ObjKey> links(alloc);
                         links.init_from_ref(ref);
                         if (links.size() > 0) {
                             cluster->remove_backlinks(cluster->get_real_key(i), col_key, links.get_all(), state);
@@ -2043,6 +2119,21 @@ void ClusterTree::remove_links()
     m_owner->remove_recursive(state);
 }
 
+void ClusterTree::verify() const
+{
+#ifdef REALM_DEBUG
+    traverse([](const Cluster *cluster) {
+        cluster->verify();
+        return false;
+    });
+#endif
+}
+
+void ClusterTree::nullify_links(ObjKey obj_key, CascadeState &state)
+{
+    REALM_ASSERT(state.m_group);
+    m_root->nullify_incoming_links(obj_key, state);
+}
 
 ClusterTree::ConstIterator::ConstIterator(const ClusterTree& t, size_t ndx)
     : m_tree(t)

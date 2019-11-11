@@ -522,6 +522,21 @@ public:
         return result;
     }
 
+    template <typename Func>
+    void find_all(T value, Func&& callback) const noexcept
+    {
+        auto func = [&callback, value](BPlusTreeNode* node, size_t offset) {
+            LeafNode* leaf = static_cast<LeafNode*>(node);
+            size_t i = -1, sz = leaf->size();
+            while ((i = leaf->find_first(value, i + 1, sz)) < sz) {
+                callback(i + offset);
+            }
+            return false;
+        };
+
+        m_root->bptree_traverse(func);
+    }
+
     void dump_values(std::ostream& o, int level) const
     {
         std::string indent(" ", level * 2);

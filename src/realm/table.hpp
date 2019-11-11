@@ -132,8 +132,7 @@ public:
 
     // Primary key columns
     ColKey get_primary_key_column() const;
-    void set_primary_key_column(ColKey col) const;
-    void remove_primary_key_column() const;
+    void set_primary_key_column(ColKey col);
     void validate_primary_column_uniqueness() const;
 
     //@{
@@ -153,7 +152,8 @@ public:
                               LinkType link_type = link_Weak);
     void remove_column(ColKey col_key);
     void rename_column(ColKey col_key, StringData new_name);
-    bool valid_column(ColKey col_key) const;
+    bool valid_column(ColKey col_key) const noexcept;
+    void check_column(ColKey col_key) const;
     //@}
 
     /// There are two kinds of links, 'weak' and 'strong'. A strong link is one
@@ -701,13 +701,12 @@ private:
     Array m_opposite_table;  // 7th slot in m_top
     Array m_opposite_column; // 8th slot in m_top
     std::vector<StringIndex*> m_index_accessors;
-    mutable util::Optional<ColKey> m_primary_key_col;
+    ColKey m_primary_key_col;
     Replication* const* m_repl;
     static Replication* g_dummy_replication;
     bool m_is_frozen = false;
 
     void batch_erase_rows(const KeyColumn& keys);
-    void do_remove_object(ObjKey key);
     size_t do_set_link(ColKey col_key, size_t row_ndx, size_t target_row_ndx);
 
     void populate_search_index(ColKey col_key);
@@ -812,6 +811,7 @@ private:
     /// the reference to the underlying memory.
     static ref_type create_empty_table(Allocator&, TableKey = TableKey());
 
+    void nullify_links(CascadeState&);
     void remove_recursive(CascadeState&);
     //@{
 
@@ -945,7 +945,8 @@ private:
     static constexpr int top_position_for_opposite_column = 8;
     static constexpr int top_position_for_sequence_number = 9;
     static constexpr int top_position_for_collision_map = 10;
-    static constexpr int top_array_size = 11;
+    static constexpr int top_position_for_pk_col = 11;
+    static constexpr int top_array_size = 12;
 
     enum { s_collision_map_lo = 0, s_collision_map_hi = 1, s_collision_map_local_id = 2, s_collision_map_num_slots };
 
@@ -969,7 +970,6 @@ private:
     friend class Transaction;
     friend class Cluster;
     friend class ClusterTree;
-    friend class ArrayBacklink;
     friend class ColKeyIterator;
     friend class ConstObj;
     friend class Obj;
@@ -1232,6 +1232,11 @@ inline Table::Table(Allocator& alloc)
     , m_opposite_column(m_alloc)
     , m_repl(&g_dummy_replication)
 {
+    m_spec.set_parent(&m_top, top_position_for_spec);
+    m_index_refs.set_parent(&m_top, top_position_for_search_indexes);
+    m_opposite_table.set_parent(&m_top, top_position_for_opposite_table);
+    m_opposite_column.set_parent(&m_top, top_position_for_opposite_column);
+
     ref_type ref = create_empty_table(m_alloc); // Throws
     ArrayParent* parent = nullptr;
     size_t ndx_in_parent = 0;
@@ -1248,6 +1253,10 @@ inline Table::Table(Replication* const* repl, Allocator& alloc)
     , m_opposite_column(m_alloc)
     , m_repl(repl)
 {
+    m_spec.set_parent(&m_top, top_position_for_spec);
+    m_index_refs.set_parent(&m_top, top_position_for_search_indexes);
+    m_opposite_table.set_parent(&m_top, top_position_for_opposite_table);
+    m_opposite_column.set_parent(&m_top, top_position_for_opposite_column);
 }
 
 inline void Table::revive(Replication* const* repl, Allocator& alloc, bool writable)
@@ -1425,7 +1434,7 @@ inline ColKey Table::leaf_ndx2colkey(ColKey::Idx leaf_ndx) const
         return ColKey();
 }
 
-bool inline Table::valid_column(ColKey col_key) const
+bool inline Table::valid_column(ColKey col_key) const noexcept
 {
     if (col_key == ColKey())
         return false;
@@ -1433,6 +1442,12 @@ bool inline Table::valid_column(ColKey col_key) const
     if (leaf_idx.val >= m_leaf_ndx2colkey.size())
         return false;
     return col_key == m_leaf_ndx2colkey[leaf_idx.val];
+}
+
+inline void Table::check_column(ColKey col_key) const
+{
+    if (REALM_UNLIKELY(!valid_column(col_key)))
+        throw InvalidKey("No such column");
 }
 
 // This class groups together information about the target of a link column

@@ -40,10 +40,6 @@ public:
     ClusterTree& operator=(const ClusterTree&) = delete;
     ClusterTree(const ClusterTree&) = delete;
 
-    void set_parent(ArrayParent* parent, size_t ndx_in_parent) noexcept
-    {
-        m_root->set_parent(parent, ndx_in_parent);
-    }
     bool is_attached() const
     {
         return m_root->is_attached();
@@ -66,7 +62,8 @@ public:
     {
         return m_size;
     }
-    void clear();
+    void clear(CascadeState&);
+    void nullify_links(ObjKey, CascadeState&);
     bool is_empty() const noexcept
     {
         return size() == 0;
@@ -149,10 +146,7 @@ public:
     {
         m_root->dump_objects(0, "");
     }
-    void verify() const
-    {
-        // TODO: implement
-    }
+    void verify() const;
 
 private:
     friend class ConstObj;
@@ -174,7 +168,7 @@ private:
     std::unique_ptr<ClusterNode> get_node(ref_type ref) const;
 
     size_t get_column_index(StringData col_name) const;
-    void remove_links();
+    void remove_all_links(CascadeState&);
 };
 
 class ClusterTree::ConstIterator {

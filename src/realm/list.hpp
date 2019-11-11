@@ -377,6 +377,12 @@ public:
             return not_found;
         return m_tree->find_first(value);
     }
+    template <typename Func>
+    void find_all(T value, Func&& func) const
+    {
+        if (m_valid && init_from_parent())
+            m_tree->find_all(value, std::forward<Func>(func));
+    }
     const BPlusTree<T>& get_tree() const
     {
         return *m_tree;
@@ -835,6 +841,7 @@ public:
     }
 
     using Lst<ObjKey>::find_first;
+    using Lst<ObjKey>::find_all;
 
     TableView get_sorted_view(SortDescriptor order) const;
     TableView get_sorted_view(ColKey column_key, bool ascending = true) const;

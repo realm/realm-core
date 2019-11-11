@@ -410,4 +410,25 @@ TEST(BinaryColumn_get_at)
     c.destroy();
 }
 
+TEST(BPlusTree_LeafCache)
+{
+    BPlusTree<Int> tree(Allocator::get_default());
+    tree.create();
+    for (int i = 0; i < 1001; i++) {
+        tree.add(i);
+    }
+
+    CHECK_EQUAL(tree.get(0), 0); // Caches leaf 0..1000
+
+    tree.clear(); // After the fix, the cache is invalidated here
+
+    for (int i = 0; i < 1001; i++) {
+        tree.add(i);
+    }
+    for (int i = 0; i < 1001; i++) {
+        CHECK_EQUAL(tree.get(i), i);
+    }
+    tree.destroy();
+}
+
 #endif // TEST_BPLUS_TREE

@@ -54,13 +54,8 @@ Initialization initialization;
 
 } // anonymous namespace
 
-constexpr char Group::g_primary_key_table_name[];
-constexpr char Group::g_primary_key_class_column_name[];
-constexpr char Group::g_primary_key_property_column_name[];
 constexpr char Group::g_class_name_prefix[];
 constexpr size_t Group::g_class_name_prefix_len;
-constexpr ColKey Group::g_pk_table;
-constexpr ColKey Group::g_pk_property;
 
 Group::Group()
     : m_local_alloc(new SlabAlloc)
@@ -221,6 +216,23 @@ void Group::set_size() const noexcept
     m_num_tables = retval;
 }
 
+void Group::remove_pk_table()
+{
+    TableRef pk_table = get_table("pk");
+    if (pk_table) {
+        ColKey col_table = pk_table->get_column_key("pk_table");
+        ColKey col_prop = pk_table->get_column_key("pk_property");
+        for (auto pk_obj : *pk_table) {
+            auto object_type = pk_obj.get<String>(col_table);
+            auto name = std::string(g_class_name_prefix) + std::string(object_type);
+            auto table = get_table(name);
+            auto pk_col_name = pk_obj.get<String>(col_prop);
+            auto pk_col = table->get_column_key(pk_col_name);
+            table->set_primary_key_column(pk_col);
+        }
+        this->remove_table("pk");
+    }
+}
 
 TableKey Group::ndx2key(size_t ndx) const
 {
@@ -380,6 +392,7 @@ void Transaction::upgrade_file_format(int target_file_format_version)
         for (auto k : table_keys) {
             get_table(k)->migrate_links(commit_and_continue);
         }
+        remove_pk_table();
     }
 }
 
@@ -704,8 +717,10 @@ TableRef Group::add_table_with_primary_key(StringData name, DataType pk_type, St
         table = do_add_table(name, true);
 
         ColKey pk_col = table->add_column(pk_type, pk_name, nullable);
-        table->add_search_index(pk_col);
         table->set_primary_key_column(pk_col);
+        if (pk_type != type_String) {
+            table->add_search_index(pk_col);
+        }
     }
     else {
 #ifdef REALM_DEBUG
@@ -893,10 +908,6 @@ void Group::remove_table(size_t table_ndx, TableKey key)
     // columns.
     if (table->is_cross_table_link_target())
         throw CrossTableLinkTarget();
-
-    if (table->get_primary_key_column()) {
-        table->remove_primary_key_column();
-    }
 
     // There is no easy way for Group::TransactAdvancer to handle removal of
     // tables that contain foreign target table link columns, because that
@@ -1884,30 +1895,12 @@ void Group::verify() const
 #endif
 }
 
-TableRef Group::get_pk_table()
-{
-    TableRef pk = get_table(g_primary_key_table_name);
-
-    if (!pk) {
-        pk = add_table(g_primary_key_table_name);
-        pk->insert_column(g_pk_table, type_String, g_primary_key_class_column_name);
-        pk->insert_column(g_pk_property, type_String, g_primary_key_property_column_name);
-        pk->add_search_index(g_pk_table);
-    }
-
-    return pk;
-}
-
 void Group::validate_primary_column_uniqueness() const
 {
-    auto pk_table = get_table(g_primary_key_table_name);
-    if (pk_table) {
-        for (auto pk_obj : *pk_table) {
-            auto object_type = pk_obj.get<String>(g_pk_table);
-            auto name = std::string(g_class_name_prefix) + std::string(object_type);
-            auto table = get_table(name);
-            table->validate_primary_column_uniqueness();
-        }
+    auto table_keys = this->get_table_keys();
+    for (auto tk : table_keys) {
+        auto table = get_table(tk);
+        table->validate_primary_column_uniqueness();
     }
 }
 

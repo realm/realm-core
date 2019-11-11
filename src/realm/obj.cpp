@@ -32,6 +32,7 @@
 #include "realm/spec.hpp"
 #include "realm/table_view.hpp"
 #include "realm/replication.hpp"
+#include "realm/util/base64.hpp"
 
 namespace realm {
 
@@ -396,7 +397,7 @@ bool ConstObj::has_backlinks(bool only_strong_links) const
         // Find origin table and column for this backlink column
         TableRef origin_table = target_table->get_opposite_table(backlink_col_key);
         ColKey origin_col = target_table->get_opposite_column(backlink_col_key);
-        if (!only_strong_links || origin_table->get_link_type(origin_col) == link_Strong) {
+        if (!only_strong_links || origin_col.get_attrs().test(col_attr_StrongLinks)) {
             auto cnt = get_backlink_count(*origin_table, origin_col);
             if (cnt)
                 return true;
@@ -414,7 +415,7 @@ size_t ConstObj::get_backlink_count(bool only_strong_links) const
         // Find origin table and column for this backlink column
         TableRef origin_table = target_table->get_opposite_table(backlink_col_key);
         ColKey origin_col = target_table->get_opposite_column(backlink_col_key);
-        if (!only_strong_links || origin_table->get_link_type(origin_col) == link_Strong) {
+        if (!only_strong_links || origin_col.get_attrs().test(col_attr_StrongLinks)) {
             cnt += get_backlink_count(*origin_table, origin_col);
         }
         return false;
@@ -477,6 +478,8 @@ ObjKey ConstObj::get_backlink(ColKey backlink_col, size_t backlink_ndx) const
 }
 
 namespace {
+const char to_be_escaped[] = "\"\n\r\t\f\\\b";
+const char encoding[] = "\"nrtf\\b";
 
 template <class T>
 inline void out_floats(std::ostream& out, T value)
@@ -506,16 +509,30 @@ void out_mixed(std::ostream& out, const Mixed& val)
         case type_Double:
             out_floats<double>(out, val.get<double>());
             break;
-        case type_String:
-            out << "\"" << val.get<String>() << "\"";
+        case type_String: {
+            out << "\"";
+            std::string str = val.get<String>();
+            size_t p = str.find_first_of(to_be_escaped);
+            while (p != std::string::npos) {
+                char c = str[p];
+                auto found = strchr(to_be_escaped, c);
+                REALM_ASSERT(found);
+                out << str.substr(0, p) << '\\' << encoding[found - to_be_escaped];
+                str = str.substr(p + 1);
+                p = str.find_first_of(to_be_escaped);
+            }
+            out << str << "\"";
             break;
+        }
         case type_Binary: {
             out << "\"";
             auto bin = val.get<Binary>();
-            const char* p = bin.data();
-            for (size_t i = 0; i < bin.size(); ++i) {
-                out << std::setw(2) << std::setfill('0') << std::hex << static_cast<unsigned int>(p[i]) << std::dec;
-            }
+            const char* start = bin.data();
+            const size_t len = bin.size();
+            util::StringBuffer encode_buffer;
+            encode_buffer.resize(util::base64_encoded_size(len));
+            util::base64_encode(start, len, encode_buffer.data(), encode_buffer.size());
+            out << encode_buffer.str();
             out << "\"";
             break;
         }
@@ -602,7 +619,6 @@ void ConstObj::to_json(std::ostream& out, size_t link_depth, std::map<std::strin
                     if ((link_depth == 0) ||
                         (link_depth == not_found && std::find(followed.begin(), followed.end(), ck) != followed.end())) {
                         out << "{\"table\": \"" << get_target_table(ck)->get_name() << "\", \"key\": " << obj.get_key().value << "}";
-                        break;
                     }
                     else {
                         out << "[";
@@ -1035,8 +1051,6 @@ bool Obj::replace_backlink(ColKey col_key, ObjKey old_key, ObjKey new_key, Casca
 
 bool Obj::remove_backlink(ColKey col_key, ObjKey old_key, CascadeState& state)
 {
-    bool recurse = false;
-
     const Table* origin_table = m_table;
 
     REALM_ASSERT(origin_table->valid_column(col_key));
@@ -1045,24 +1059,14 @@ bool Obj::remove_backlink(ColKey col_key, ObjKey old_key, CascadeState& state)
     REALM_ASSERT(target_table->valid_column(backlink_col_key));
 
     bool strong_links = (origin_table->get_link_type(col_key) == link_Strong);
-    CascadeState::Mode mode = state.m_mode;
 
     if (old_key != realm::null_key) {
         Obj target_obj = target_table->get_object(old_key);
         bool last_removed = target_obj.remove_one_backlink(backlink_col_key, m_key); // Throws
-
-        // Check if the object should be cascade deleted
-        if (mode != CascadeState::none && (mode == CascadeState::all || (strong_links && last_removed))) {
-            bool have_backlinks = target_obj.has_backlinks(state.m_mode == CascadeState::strong);
-
-            if (!have_backlinks) {
-                state.m_to_be_deleted.emplace_back(target_table->get_key(), old_key);
-                recurse = true;
-            }
-        }
+        return state.enqueue_for_cascade(target_obj, strong_links, last_removed);
     }
 
-    return recurse;
+    return false;
 }
 
 

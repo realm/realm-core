@@ -3911,6 +3911,7 @@ TEST(Table_PrimaryKeyString)
     DBRef sg = DB::create(path);
     auto wt = sg->start_write();
     TableRef t0 = wt->add_table_with_primary_key("class_t0", type_String, "pk");
+    auto pk_col = t0->get_primary_key_column();
 
     auto t1 = steady_clock::now();
     CALLGRIND_START_INSTRUMENTATION;
@@ -3920,9 +3921,23 @@ TEST(Table_PrimaryKeyString)
         t0->create_object_with_primary_key(pk);
     }
 
-    CALLGRIND_STOP_INSTRUMENTATION;
     auto t2 = steady_clock::now();
+
+    for (int i = 0; i < nb_rows; ++i) {
+        std::string pk = "KEY_" + util::to_string(i);
+        ObjKey k = t0->find_first(pk_col, StringData(pk));
+#ifdef REALM_DEBUG
+        CHECK(t0->is_valid(k));
+#else
+        CHECK(k);
+#endif
+    }
+
+    CALLGRIND_STOP_INSTRUMENTATION;
+    auto t3 = steady_clock::now();
     std::cout << "   insertion time: " << duration_cast<nanoseconds>(t2 - t1).count() / nb_rows << " ns/key"
+              << std::endl;
+    std::cout << "   lookup time: " << duration_cast<nanoseconds>(t3 - t2).count() / nb_rows << " ns/key"
               << std::endl;
     wt->commit();
 }

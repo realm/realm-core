@@ -265,29 +265,37 @@ void StringNode<Equal>::_search_index_init()
     FindRes fr;
     InternalFindResult res;
 
-    auto index = ParentNode::m_table->get_search_index(ParentNode::m_condition_column_key);
-    fr = index->find_all_no_copy(StringData(StringNodeBase::m_value), res);
+    if (ParentNode::m_table->get_primary_key_column() == ParentNode::m_condition_column_key) {
+        m_actual_key =
+            ParentNode::m_table->find_first(ParentNode::m_condition_column_key, StringData(StringNodeBase::m_value));
+        m_results_start = 0;
+        m_results_end = 1;
+    }
+    else {
+        auto index = ParentNode::m_table->get_search_index(ParentNode::m_condition_column_key);
+        fr = index->find_all_no_copy(StringData(StringNodeBase::m_value), res);
 
-    switch (fr) {
-        case FindRes_single:
-            m_actual_key = ObjKey(res.payload);
-            m_results_start = 0;
-            m_results_end = 1;
-            break;
-        case FindRes_column:
-            // todo: Apparently we can't use m_index.get_alloc() because it uses default allocator which
-            // simply makes
-            // translate(x) = x. Shouldn't it inherit owner column's allocator?!
-            m_index_matches.reset(new IntegerColumn(m_table->get_alloc(), ref_type(res.payload))); // Throws
-            m_results_start = res.start_ndx;
-            m_results_end = res.end_ndx;
-            m_actual_key = ObjKey(m_index_matches->get(m_results_start));
-            break;
-        case FindRes_not_found:
-            m_index_matches.reset();
-            m_results_start = 0;
-            m_results_end = 0;
-            break;
+        switch (fr) {
+            case FindRes_single:
+                m_actual_key = ObjKey(res.payload);
+                m_results_start = 0;
+                m_results_end = 1;
+                break;
+            case FindRes_column:
+                // todo: Apparently we can't use m_index.get_alloc() because it uses default allocator which
+                // simply makes
+                // translate(x) = x. Shouldn't it inherit owner column's allocator?!
+                m_index_matches.reset(new IntegerColumn(m_table->get_alloc(), ref_type(res.payload))); // Throws
+                m_results_start = res.start_ndx;
+                m_results_end = res.end_ndx;
+                m_actual_key = ObjKey(m_index_matches->get(m_results_start));
+                break;
+            case FindRes_not_found:
+                m_index_matches.reset();
+                m_results_start = 0;
+                m_results_end = 0;
+                break;
+        }
     }
 }
 

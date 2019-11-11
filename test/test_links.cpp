@@ -919,6 +919,9 @@ TEST(Links_LinkList_FindByOrigin)
     CHECK_EQUAL(not_found, links->find_first(key2));
     CHECK_EQUAL(not_found, links2->find_first(key2));
 
+    links->find_all(key2, [&](size_t) { CHECK(false); });
+    links2->find_all(key2, [&](size_t) { CHECK(false); });
+
     links->add(key2);
     links->add(key1);
     links->add(key0);
@@ -930,10 +933,24 @@ TEST(Links_LinkList_FindByOrigin)
     CHECK_EQUAL(1, links2->find_first(key1));
     CHECK_EQUAL(2, links2->find_first(key0));
 
+    int calls = 0;
+    links->find_all(key2, [&](size_t i) { CHECK_EQUAL(i, 0); ++calls; });
+    CHECK_EQUAL(calls, 1);
+    calls = 0;
+    links2->find_all(key0, [&](size_t i) { CHECK_EQUAL(i, 2); ++calls; });
+    CHECK_EQUAL(calls, 1);
+
     links->remove(0);
 
     CHECK_EQUAL(not_found, links->find_first(key2));
     CHECK_EQUAL(not_found, links2->find_first(key2));
+
+    links->add(key0);
+    links->add(key0);
+
+    calls = 0;
+    links->find_all(key0, [&](size_t i) { CHECK(i >= 1); ++calls; });
+    CHECK_EQUAL(calls, 3);
 }
 
 
@@ -1026,6 +1043,8 @@ TEST(Links_Transactions)
 }
 
 #if !REALM_ANDROID // FIXME
+// When compiling for Android (armeabi-v7a) you will get this error:
+// internal compiler error: in possible_polymorphic_call_targets, at ipa-devirt.c:1556
 TEST(Links_RemoveTargetRows)
 {
     Group group;

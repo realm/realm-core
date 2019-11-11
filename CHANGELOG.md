@@ -1,7 +1,7 @@
 # NEXT RELEASE
 
 ### Enhancements
-* Improve performance of looking up objects in a Table by index. ([#3423](https://github.com/realm/realm-core/pull/3423))
+* None.
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
@@ -14,6 +14,47 @@
 
 ### Internals
 * None.
+
+----------------------------------------------
+
+# 6.0.0-alpha.24 Release notes
+
+### Enhancements
+* Improve performance of looking up objects in a Table by index. ([#3423](https://github.com/realm/realm-core/pull/3423))
+* Cascade notifications are sent in batches. Enhances performance of KVO notifications.
+
+### Fixed
+* macOS binaries were built with the incorrect deployment target (10.14 rather than 10.9). ([Cocoa #6299](https://github.com/realm/realm-cocoa/issues/6299), since 5.23.4).
+* Upgrading medium sized string columns to new file format would not be done correctly.
+* BPlusTree used in lists and TableViews could in some rare cases give wrong values or crash. ([#3449](https://github.com/realm/realm-core/issues/3449))
+
+### Breaking changes
+* None.
+
+-----------
+
+### Internals
+* None.
+
+Besides the changes above, this release includes changes introduced by v5.23.6:
+
+| # 5.23.6 Release notes
+| 
+| ### Enhancements
+| * Performance significantly improved when making a query on the property of a linked table, when the property is indexed.
+| 
+| ### Fixed
+| * A race between extending the file and activity in the encryption layer could lead to crash and corruption.
+|   This race has been fixed. The bug was introduced with version 5.3.0 and may hit on Android, if encryption is
+|   in use. It could also affect Linux on file systems where posix prealloc() is unsupported.
+|   ([PR #3427](https://github.com/realm/realm-core/issues/3427), since 5.3.0)
+| * Null values were not printed correctly when using json serialisation. ([PR #3399](https://github.com/realm/realm-core/issues/3399)).
+| * ListOfPrimitives were not printed correctly when using json serialisation. ([#3408](https://github.com/realm/realm-core/issues/3408)).
+| 
+| -----------
+| 
+| ### Internals
+| * Fixed several warnings found by newer clang compilers. ([#3393](https://github.com/realm/realm-core/issues/3393)).
 
 ----------------------------------------------
 
