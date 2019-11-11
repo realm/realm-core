@@ -46,6 +46,7 @@
 #include <realm/replication.hpp>
 #include <realm/table_view.hpp>
 #include <realm/query_engine.hpp>
+#include "realm/util/base64.hpp"
 
 /// \page AccessorConsistencyLevels
 ///
@@ -5102,6 +5103,8 @@ void Table::to_json_row(size_t row_ndx, std::ostream& out, size_t link_depth,
 
 
 namespace {
+const char to_be_escaped[] = "\"\n\r\t\f\\\b";
+const char encoding[] = "\"nrtf\\b";
 
 inline void out_olddatetime(std::ostream& out, OldDateTime value)
 {
@@ -5132,13 +5135,29 @@ inline void out_timestamp(std::ostream& out, Timestamp value)
     }
 }
 
+inline void out_string(std::ostream& out, const StringData val)
+{
+    std::string str(val);
+    size_t p = str.find_first_of(to_be_escaped);
+    while (p != std::string::npos) {
+        char c = str[p];
+        auto found = strchr(to_be_escaped, c);
+        REALM_ASSERT(found);
+        out << str.substr(0, p) << '\\' << encoding[found - to_be_escaped];
+        str = str.substr(p + 1);
+        p = str.find_first_of(to_be_escaped);
+    }
+    out << str;
+}
+
 inline void out_binary(std::ostream& out, const BinaryData bin)
 {
-    const char* p = bin.data();
-
-    for (size_t i = 0; i < bin.size(); ++i) {
-        out << std::setw(2) << std::setfill('0') << std::hex << static_cast<unsigned int>(p[i]) << std::dec;
-    }
+    const char* start = bin.data();
+    const size_t len = bin.size();
+    util::StringBuffer encode_buffer;
+    encode_buffer.resize(util::base64_encoded_size(len));
+    util::base64_encode(start, len, encode_buffer.data(), encode_buffer.size());
+    out << encode_buffer.str();
 }
 
 template <class T>
@@ -5155,13 +5174,17 @@ void out_floats(std::ostream& out, T value)
 void Table::to_json(std::ostream& out, size_t link_depth, std::map<std::string, std::string>* renames) const
 {
     // Represent table as list of objects
+    auto tv = where().find_all();
+    if (get_column_name(0) == "!OID") {
+        tv.sort(0);
+    }
     out << "[";
 
     size_t row_count = size();
     for (size_t r = 0; r < row_count; ++r) {
         if (r > 0)
             out << ",";
-        to_json_row(r, out, link_depth, renames);
+        to_json_row(tv.get_source_ndx(r), out, link_depth, renames);
     }
 
     out << "]";
@@ -5173,20 +5196,139 @@ void Table::to_json_row(size_t row_ndx, std::ostream& out, size_t link_depth,
     out << "{";
     size_t column_count = get_column_count();
     for (size_t i = 0; i < column_count; ++i) {
+        std::string name = get_column_name(i);
+        if (!has_shared_type()) {
+            if (i == 0) {
+                if (name == "!OID") {
+                    name = "_key";
+                }
+                else {
+                    std::string n = "_key";
+                    if (renames[n] != "")
+                        n = renames[n];
+                    out << "\"" << n << "\":" << row_ndx << ",";
+                }
+            }
+        }
+
         if (i > 0)
             out << ",";
 
-        StringData name = get_column_name(i);
         if (renames[name] != "")
             name = renames[name];
 
         out << "\"" << name << "\":";
 
         DataType type = get_column_type(i);
-        if (type != type_Link && type != type_LinkList && is_nullable(i) && is_null(i, row_ndx)) {
-            out << "null";
+        if (type == type_Link) {
+            LinkColumnBase& clb = const_cast<Table*>(this)->get_column_link_base(i);
+            LinkColumn& cl = static_cast<LinkColumn&>(clb);
+            Table& table = cl.get_target_table();
+
+            if (!cl.is_null_link(row_ndx)) {
+                ref_type clb_ref = clb.get_ref();
+                if ((link_depth == 0) || (link_depth == not_found &&
+                                          std::find(followed.begin(), followed.end(), clb_ref) != followed.end())) {
+                    size_t lnk = cl.get_link(row_ndx);
+                    if (table.get_column_name(0) == "!OID") {
+                        lnk = size_t(table.get_int(0, lnk));
+                    }
+                    out << "{\"table\": \"" << table.get_name() << "\", \"key\": " << lnk << "}";
+                }
+                else {
+                    out << "[";
+                    followed.push_back(clb_ref);
+                    size_t new_depth = link_depth == not_found ? not_found : link_depth - 1;
+                    table.to_json_row(cl.get_link(row_ndx), out, new_depth, renames, followed);
+                    out << "]";
+                }
+            }
+            else {
+                out << "null";
+            }
+        }
+        else if (type == type_LinkList) {
+            LinkColumnBase& clb = const_cast<Table*>(this)->get_column_link_base(i);
+            LinkListColumn& cll = static_cast<LinkListColumn&>(clb);
+            Table& table = cll.get_target_table();
+            LinkViewRef lv = cll.get(row_ndx);
+
+            ref_type clb_ref = clb.get_ref();
+            if ((link_depth == 0) ||
+                (link_depth == not_found && std::find(followed.begin(), followed.end(), clb_ref) != followed.end())) {
+                out << "{\"table\": \"" << cll.get_target_table().get_name() << "\", \"keys\": [";
+                cll.to_json_row(row_ndx, out);
+                out << "]}";
+            }
+            else {
+                out << "[";
+                for (size_t link_ndx = 0; link_ndx < lv->size(); link_ndx++) {
+                    if (link_ndx > 0)
+                        out << ",";
+                    followed.push_back(clb_ref);
+                    size_t new_depth = link_depth == not_found ? not_found : link_depth - 1;
+                    table.to_json_row(lv->get(link_ndx).get_index(), out, new_depth, renames, followed);
+                }
+                out << "]";
+            }
+        }
+        else if (type == type_Table) {
+            auto list = get_subtable(i, row_ndx);
+            auto list_type = list->get_column_type(0);
+            auto sz = list->size();
+            out << "[";
+            for (size_t r = 0; r < sz; r++) {
+                if (r > 0) {
+                    out << ",";
+                }
+                if (list->is_null(0, r)) {
+                    out << "null";
+                    continue;
+                }
+                switch (list_type) {
+                    case type_Int:
+                        out << list->get_int(0, r);
+                        break;
+                    case type_Bool:
+                        out << (list->get_bool(0, r) ? "true" : "false");
+                        break;
+                    case type_Float:
+                        out_floats<float>(out, list->get_float(0, r));
+                        break;
+                    case type_Double:
+                        out_floats<double>(out, list->get_double(0, r));
+                        break;
+                    case type_String:
+                        out << "\"";
+                        out_string(out, list->get_string(0, r));
+                        out << "\"";
+                        break;
+                    case type_Binary:
+                        out << "\"";
+                        out_binary(out, list->get_binary(0, r));
+                        out << "\"";
+                        break;
+                    case type_Timestamp:
+                        out << "\"";
+                        out_timestamp(out, list->get_timestamp(0, r));
+                        out << "\"";
+                        break;
+                    case type_OldDateTime:
+                    case type_Table:
+                    case type_Mixed:
+                    case type_Link:
+                    case type_LinkList:
+                        REALM_ASSERT(false);
+                        break;
+                }
+            }
+            out << "]";
         }
         else {
+            if (is_null(i, row_ndx)) {
+                out << "null";
+                continue;
+            }
             switch (type) {
                 case type_Int:
                     out << get_int(i, row_ndx);
@@ -5201,7 +5343,9 @@ void Table::to_json_row(size_t row_ndx, std::ostream& out, size_t link_depth,
                     out_floats<double>(out, get_double(i, row_ndx));
                     break;
                 case type_String:
-                    out << "\"" << get_string(i, row_ndx) << "\"";
+                    out << "\"";
+                    out_string(out, get_string(i, row_ndx));
+                    out << "\"";
                     break;
                 case type_Binary:
                     out << "\"";
@@ -5213,115 +5357,14 @@ void Table::to_json_row(size_t row_ndx, std::ostream& out, size_t link_depth,
                     out_timestamp(out, get_timestamp(i, row_ndx));
                     out << "\"";
                     break;
-                case type_Table: {
-                    auto sub_table = get_subtable(i, row_ndx);
-                    auto sz = sub_table->size();
-                    auto list_type = sub_table->get_column_type(0);
-                    out << "[";
-                    for (size_t j = 0; j < sz; j++) {
-                        if (sub_table->is_null(0, j))
-                            continue;
-
-                        if (j > 0)
-                            out << ", ";
-
-                        switch (list_type) {
-                            case type_Int:
-                                out << sub_table->get_int(0, j);
-                                break;
-                            case type_Bool:
-                                out << (sub_table->get_bool(0, j) ? "true" : "false");
-                                break;
-                            case type_Float:
-                                out_floats<float>(out, sub_table->get_float(0, j));
-                                break;
-                            case type_Double:
-                                out_floats<double>(out, sub_table->get_double(0, j));
-                                break;
-                            case type_String:
-                                out << "\"" << sub_table->get_string(0, j) << "\"";
-                                break;
-                            case type_Binary:
-                                out << "\"";
-                                out_binary(out, sub_table->get_binary(0, j));
-                                out << "\"";
-                                break;
-                            case type_Timestamp:
-                                out << "\"";
-                                out_timestamp(out, sub_table->get_timestamp(0, j));
-                                out << "\"";
-                                break;
-                            case type_Table:
-                            case type_OldDateTime:
-                            case type_Mixed:
-                            case type_Link:
-                            case type_LinkList:
-                                REALM_ASSERT(false);
-                                break;
-                        }
-                    }
-                    out << "]";
-                    break;
-                }
-                case type_Link: {
-                    LinkColumnBase& clb = const_cast<Table*>(this)->get_column_link_base(i);
-                    LinkColumn& cl = static_cast<LinkColumn&>(clb);
-                    Table& table = cl.get_target_table();
-
-                    if (!cl.is_null_link(row_ndx)) {
-                        ref_type lnk = clb.get_ref();
-                        if ((link_depth == 0) || (link_depth == not_found &&
-                                                  std::find(followed.begin(), followed.end(), lnk) != followed.end())) {
-                            out << "\"" << cl.get_link(row_ndx) << "\"";
-                            break;
-                        }
-                        else {
-                            out << "[";
-                            followed.push_back(clb.get_ref());
-                            size_t new_depth = link_depth == not_found ? not_found : link_depth - 1;
-                            table.to_json_row(cl.get_link(row_ndx), out, new_depth, renames, followed);
-                            out << "]";
-                        }
-                    }
-                    else {
-                        out << "[]";
-                    }
-
-                    break;
-                }
-                case type_LinkList: {
-                    LinkColumnBase& clb = const_cast<Table*>(this)->get_column_link_base(i);
-                    LinkListColumn& cll = static_cast<LinkListColumn&>(clb);
-                    Table& table = cll.get_target_table();
-                    LinkViewRef lv = cll.get(row_ndx);
-
-                    ref_type lnk = clb.get_ref();
-                    if ((link_depth == 0) ||
-                        (link_depth == not_found && std::find(followed.begin(), followed.end(), lnk) != followed.end())) {
-                        out << "{\"table\": \"" << cll.get_target_table().get_name() << "\", \"rows\": [";
-                        cll.to_json_row(row_ndx, out);
-                        out << "]}";
-                        break;
-                    }
-                    else {
-                        out << "[";
-                        for (size_t link_ndx = 0; link_ndx < lv->size(); link_ndx++) {
-                            if (link_ndx > 0)
-                                out << ", ";
-                            followed.push_back(lnk);
-                            size_t new_depth = link_depth == not_found ? not_found : link_depth - 1;
-                            table.to_json_row(lv->get(link_ndx).get_index(), out, new_depth, renames, followed);
-                        }
-                        out << "]";
-                    }
-
-                    break;
-                }
-                case type_Mixed:
                 case type_OldDateTime:
+                case type_Table:
+                case type_Mixed:
+                case type_Link:
+                case type_LinkList:
                     break;
             } // switch ends
-        } // not null
+        }
     }
     out << "}";
 }

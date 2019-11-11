@@ -403,11 +403,16 @@ ref_type LinkListColumn::get_child_ref(size_t child_ndx) const noexcept
 
 void LinkListColumn::to_json_row(size_t row_ndx, std::ostream& out) const
 {
+    Table& table = get_target_table();
+    bool has_oid = table.get_column_name(0) == "!OID";
     LinkViewRef links1 = const_cast<LinkListColumn*>(this)->get(row_ndx);
     for (size_t t = 0; t < links1->size(); t++) {
         if (t > 0)
-            out << ", ";
+            out << ",";
         size_t target = links1->get(t).get_index();
+        if (has_oid) {
+            target = size_t(table.get_int(0, target));
+        }
         out << target;
     }
 }

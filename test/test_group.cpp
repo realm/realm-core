@@ -1788,14 +1788,20 @@ TEST(Group_ToJSON)
     TableRef table = g.add_table("test");
     test_table_add_columns(table);
 
-    add(table, "jeff", 1, true, Wed);
-    add(table, "jim", 1, true, Wed);
+    add(table, "plain string", 1, true, Wed);
+    // Test that control characters are correctly escaped
+    add(table, "\"key\":\t123,\n\"value\":\tjim", 1, true, Wed);
     std::ostringstream out;
     g.to_json(out);
     std::string str = out.str();
     CHECK(str.length() > 0);
-    CHECK_EQUAL("{\"test\":[{\"first\":\"jeff\",\"second\":1,\"third\":true,\"fourth\":2},{\"first\":\"jim\","
-                "\"second\":1,\"third\":true,\"fourth\":2}]}",
+    CHECK_EQUAL("{\n\"test\":"
+                "["
+                "{\"_key\":0,\"first\":\"plain string\",\"second\":1,\"third\":true,\"fourth\":2},"
+                "{\"_key\":1,\"first\":\"\\\"key\\\":\\t123,\\n\\\"value\\\":\\tjim\",\"second\":1,\"third\":true,"
+                "\"fourth\":2}"
+                "]\n"
+                "}\n",
                 str);
 }
 
