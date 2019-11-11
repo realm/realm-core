@@ -72,7 +72,7 @@ using realm::test_util::crypt_key;
 // `experiments/testcase.cpp` and then run `sh build.sh
 // check-testcase` (or one of its friends) from the command line.
 
-TEST_IF(Transactions_LargeMappingChange, REALM_ANDROID == 0)
+TEST_IF(Transactions_LargeMappingChange, REALM_ANDROID == 0 && TEST_DURATION > 0)
 {
     SHARED_GROUP_TEST_PATH(path);
     DBRef sg = DB::create(path);
@@ -134,7 +134,7 @@ struct Header {
     uint8_t m_flags;
 };
 
-TEST(Transactions_LargeUpgrade)
+TEST_IF(Transactions_LargeUpgrade, TEST_DURATION > 0)
 {
     SHARED_GROUP_TEST_PATH(path);
     DBRef sg = DB::create(path);

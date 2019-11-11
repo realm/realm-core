@@ -1710,6 +1710,10 @@ TableRef Table::get_link_target(ColKey col_key) noexcept
 
 size_t Table::count_int(ColKey col_key, int64_t value) const
 {
+    if (auto index = this->get_search_index(col_key)) {
+        return index->count(value);
+    }
+
     size_t count;
     if (is_nullable(col_key)) {
         aggregate<act_Count, util::Optional<int64_t>, int64_t>(col_key, value, &count);
@@ -1733,6 +1737,9 @@ size_t Table::count_double(ColKey col_key, double value) const
 }
 size_t Table::count_string(ColKey col_key, StringData value) const
 {
+    if (auto index = this->get_search_index(col_key)) {
+        return index->count(value);
+    }
     size_t count;
     aggregate<act_Count, StringData, StringData>(col_key, value, &count);
     return count;
