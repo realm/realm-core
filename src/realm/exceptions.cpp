@@ -22,11 +22,10 @@
 
 using namespace realm;
 
-DuplicatePrimaryKeyValueException::DuplicatePrimaryKeyValueException(std::string object_type, std::string property)
-    : logic_error(
-          util::format("Primary key property '%1.%2' has duplicate values after migration.", object_type, property))
-    , m_object_type(object_type)
-    , m_property(property)
+DuplicatePrimaryKeyValueException::DuplicatePrimaryKeyValueException(std::string obj_type, std::string prop)
+    : logic_error(util::format("Primary key property '%1.%2' has duplicate values after migration.", obj_type, prop))
+    , m_object_type(obj_type)
+    , m_property(prop)
 {
 }
 
