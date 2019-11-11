@@ -40,10 +40,6 @@ public:
     ClusterTree& operator=(const ClusterTree&) = delete;
     ClusterTree(const ClusterTree&) = delete;
 
-    void set_parent(ArrayParent* parent, size_t ndx_in_parent) noexcept
-    {
-        m_root->set_parent(parent, ndx_in_parent);
-    }
     bool is_attached() const
     {
         return m_root->is_attached();
