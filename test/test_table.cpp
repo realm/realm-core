@@ -2579,10 +2579,10 @@ TEST(Table_DetachedAccessor)
     Obj obj1 = table->create_object();
     group.remove_table("table");
 
-    CHECK_THROW(table->clear(), NoSuchTable);
-    CHECK_THROW(table->add_search_index(col_int), NoSuchTable);
-    CHECK_THROW(table->remove_search_index(col_int), NoSuchTable);
-    CHECK_THROW(table->get_object(key0), NoSuchTable);
+    CHECK_THROW(table->clear(), LogicError);
+    CHECK_THROW(table->add_search_index(col_int), LogicError);
+    CHECK_THROW(table->remove_search_index(col_int), LogicError);
+    CHECK_THROW(table->get_object(key0), LogicError);
     CHECK_THROW_ANY(obj1.set(col_str, "hello"));
 }
 
@@ -4373,7 +4373,7 @@ TEST(Table_getLinkType)
     CHECK_THROW(table->get_link_type(col_int), LogicError);
 
     g.remove_table("table");
-    CHECK_THROW(table->get_link_type(col_weak_link), NoSuchTable);
+    CHECK_THROW(table->get_link_type(col_weak_link), LogicError);
 }
 
 
