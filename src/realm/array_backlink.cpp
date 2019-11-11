@@ -193,7 +193,8 @@ void ArrayBacklink::verify() const
     ColumnAttrMask src_attr = src_col_key.get_attrs();
     for (size_t i = 0; i < size(); ++i) {
         ObjKey target_key = cluster->get_real_key(i);
-        for (size_t j = 0, count = get_backlink_count(i); j < count; ++j) {
+        auto cnt = get_backlink_count(i);
+        for (size_t j = 0; j < cnt; ++j) {
             Obj src_obj = src_table->get_object(get_backlink(i, j));
             if (src_attr.test(col_attr_List)) {
                 REALM_ASSERT(src_obj.get_list<ObjKey>(src_col_key).find_first(target_key) != npos);
