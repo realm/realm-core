@@ -116,10 +116,10 @@ ConstObj ObjList::try_get_object(size_t row_ndx) const
     return m_table->is_valid(key) ? m_table->get_object(key) : ConstObj();
 }
 
-void ObjList::assign(KeyColumn* key_values, const Table* parent)
+void ObjList::assign(KeyColumn* key_values, const TableRef parent)
 {
     m_key_values = key_values;
-    m_table = TableRef(parent);
+    m_table = parent;
 }
 
 TableVersions ObjList::get_dependency_versions() const

@@ -108,7 +108,7 @@ protected:
     size_t m_limit_count = 0;
     uint64_t m_debug_cookie;
 
-    void assign(KeyColumn* key_values, const Table* parent);
+    void assign(KeyColumn* key_values, const TableRef parent);
 
     void do_sort(const DescriptorOrdering&);
     void detach() const noexcept // may have to remove const
