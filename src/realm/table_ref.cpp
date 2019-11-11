@@ -21,40 +21,20 @@
 
 namespace realm {
 
-ConstTableRef::ConstTableRef(const Table* t_ptr)
+TableRef::TableRef(const Table* t_ptr)
     : m_table(const_cast<Table*>(t_ptr))
     , m_instance_version(t_ptr ? t_ptr->get_instance_version() : 0)
 {
 }
 
-ConstTableRef::operator bool() const
+TableRef::operator bool() const
 {
     return m_table != nullptr && m_table->get_instance_version() == m_instance_version;
-}
-
-
-const Table* ConstTableRef::operator->() const
-{
-    if (!operator bool()) {
-        throw realm::LogicError(LogicError::detached_accessor);
-    }
-    return m_table;
 }
 
 Table* TableRef::operator->() const
 {
     if (!operator bool()) {
-        throw realm::LogicError(LogicError::detached_accessor);
-    }
-    return m_table;
-}
-
-const Table* ConstTableRef::checked() const
-{
-    if (m_table == nullptr) {
-        throw realm::NoSuchTable();
-    }
-    if (m_table->get_instance_version() != m_instance_version) {
         throw realm::LogicError(LogicError::detached_accessor);
     }
     return m_table;
@@ -71,17 +51,6 @@ Table* TableRef::checked() const
     return m_table;
 }
 
-const Table* ConstTableRef::checked_or_null() const
-{
-    if (m_table == nullptr) {
-        return m_table;
-    }
-    if (m_table->get_instance_version() != m_instance_version) {
-        return nullptr;
-    }
-    return m_table;
-}
-
 Table* TableRef::checked_or_null() const
 {
     if (m_table == nullptr) {
@@ -91,14 +60,6 @@ Table* TableRef::checked_or_null() const
         return nullptr;
     }
     return m_table;
-}
-
-const Table& ConstTableRef::operator*() const
-{
-    if (!operator bool()) {
-        throw realm::LogicError(LogicError::detached_accessor);
-    }
-    return *m_table;
 }
 
 Table& TableRef::operator*() const

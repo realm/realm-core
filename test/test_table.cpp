@@ -3840,7 +3840,7 @@ TEST(Table_CollisionMapping)
 
         {
             ReadTransaction rt{sg};
-            ConstTableRef t0 = rt.get_table("class_t0");
+            TableRef t0 = rt.get_table("class_t0");
             // Check that at least one object exists where the 63rd bit is set.
             size_t num_object_keys_with_63rd_bit_set = 0;
             uint64_t bit63 = 0x4000000000000000;

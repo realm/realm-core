@@ -26,39 +26,33 @@ namespace realm {
 
 
 class Table;
-class TableRef;
 
-class ConstTableRef {
+class TableRef {
 public:
-    ~ConstTableRef()
-    {
-    }
-    ConstTableRef(const TableRef& other);
-    ConstTableRef(const ConstTableRef& other);
-    ConstTableRef(std::nullptr_t) {}
-    ConstTableRef& operator=(const ConstTableRef& other);
-    ConstTableRef& operator=(const TableRef& other);
-    const Table* operator->() const;
-    const Table* checked() const;
-    const Table* checked_or_null() const;
-    const Table* unchecked() const { return m_table; }
-    const Table& operator*() const;
-    explicit ConstTableRef(const Table* t_ptr);
-    ConstTableRef()
-    {
-    }
+    Table* operator->() const;
+    Table* checked() const;
+    Table* checked_or_null() const;
+    Table* unchecked() const { return m_table; }
+    Table& operator*() const;
     operator bool() const;
-    operator const Table*() const
+    operator Table*() const
     {
         return checked();
     }
 
-    bool operator==(const ConstTableRef& other) const
+    explicit TableRef(const Table* t_ptr);
+    TableRef(const TableRef&) noexcept;
+    TableRef(std::nullptr_t) {}
+    TableRef()
+    {
+    }
+    TableRef& operator=(const TableRef& other);
+    bool operator==(const TableRef& other) const
     {
         return m_table == other.m_table && m_instance_version == other.m_instance_version;
     }
 
-    bool operator!=(const ConstTableRef& other) const
+    bool operator!=(const TableRef& other) const
     {
         return !(*this == other);
     }
@@ -71,73 +65,25 @@ public:
 protected:
     Table* m_table = nullptr;
     uint64_t m_instance_version = 0;
-
-    friend class Group;
-    friend class Table;
-};
-
-class TableRef : public ConstTableRef {
-public:
-    Table* operator->() const;
-    Table* checked() const;
-    Table* checked_or_null() const;
-    Table* unchecked() const { return m_table; }
-    Table& operator*() const;
-    operator Table*() const
-    {
-        return checked();
-    }
-
-    explicit TableRef(Table* t_ptr)
-        : ConstTableRef(t_ptr)
-    {
-    }
-    explicit TableRef(const Table* t_ptr)
-        : ConstTableRef(t_ptr)
-    {
-    }
-    TableRef(std::nullptr_t) {}
-    TableRef()
-        : ConstTableRef()
-    {
-    }
-    TableRef& operator=(const TableRef& other)
-    {
-        ConstTableRef::operator=(other);
-        return *this;
-    }
-protected:
     friend class Group;
     friend class Table;
 };
 
 
-inline ConstTableRef::ConstTableRef(const TableRef& other)
+inline TableRef::TableRef(const TableRef& other) noexcept
     : m_table(other.m_table)
     , m_instance_version(other.m_instance_version)
 {
 }
 
-inline ConstTableRef::ConstTableRef(const ConstTableRef& other)
-    : m_table(other.m_table), m_instance_version(other.m_instance_version)
-{
-}
-
-inline ConstTableRef& ConstTableRef::operator=(const ConstTableRef& other)
+inline TableRef& TableRef::operator=(const TableRef& other)
 {
     m_table = other.m_table;
     m_instance_version = other.m_instance_version;
     return *this;
 }
 
-inline ConstTableRef& ConstTableRef::operator=(const TableRef& other)
-{
-    m_table = other.m_table;
-    m_instance_version = other.m_instance_version;
-    return *this;
-}
-
-inline std::ostream& operator<<(std::ostream& o, const ConstTableRef& tr)
+inline std::ostream& operator<<(std::ostream& o, const TableRef& tr)
 {
     return tr.print(o);
 }

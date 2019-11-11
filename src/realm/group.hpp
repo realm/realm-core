@@ -672,7 +672,7 @@ private:
     // the latest to increase the probability of detecting race conditions
     // without crashing.
 #ifdef REALM_DEBUG
-    const static int g_table_recycling_delay = 1;
+    const static int g_table_recycling_delay = 1000;
 #else
     const static int g_table_recycling_delay = 500;
 #endif

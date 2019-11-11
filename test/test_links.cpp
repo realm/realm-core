@@ -995,8 +995,8 @@ TEST(Links_Transactions)
     }
 
     auto rt = db->start_read();
-    ConstTableRef owners = rt->get_table("owners");
-    ConstTableRef dogs = rt->get_table("dogs");
+    TableRef owners = rt->get_table("owners");
+    TableRef dogs = rt->get_table("dogs");
     ConstObj tim = owners->get_object(tim_key);
     CHECK_NOT(tim.is_null(dog_col));
     CHECK_EQUAL(harvey_key, tim.get<ObjKey>(dog_col));

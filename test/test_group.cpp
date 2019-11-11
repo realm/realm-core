@@ -400,8 +400,8 @@ TEST(Group_AddTable)
 TEST(Group_AddTable2)
 {
     Group group;
-    TableRef a = group.add_table("a");
-    TableRef b = group.add_table("b");
+    group.add_table("a");
+    group.add_table("b");
     CHECK_EQUAL(2, group.size());
     CHECK_THROW(group.add_table("b"), TableNameInUse);
     CHECK_EQUAL(2, group.size());

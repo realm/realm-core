@@ -144,7 +144,7 @@ TEST_IF(Upgrade_Database_2_3, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
 
         DB sg(temp_copy);
         ReadTransaction rt(sg);
-        ConstTableRef t = rt.get_table("table");
+        TableRef t = rt.get_table("table");
 
         CHECK(t->has_search_index(0));
         CHECK(t->has_search_index(1));
@@ -239,7 +239,7 @@ TEST_IF(Upgrade_Database_2_3, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
         std::unique_ptr<Replication> hist = make_in_realm_history(temp_copy);
         DB sg(*hist);
         ReadTransaction rt(sg);
-        ConstTableRef t = rt.get_table("table");
+        TableRef t = rt.get_table("table");
 
         CHECK(t->has_search_index(0));
         CHECK(t->has_search_index(1));
@@ -303,7 +303,7 @@ TEST_IF(Upgrade_Database_2_Backwards_Compatible, REALM_MAX_BPNODE_SIZE == 4 || R
     for (size_t tbl = 0; tbl < 2; tbl++) {
         ReadTransaction rt(g);
 
-        ConstTableRef t = rt.get_table(tbl);
+        TableRef t = rt.get_table(tbl);
 
         size_t f;
 
@@ -1092,7 +1092,7 @@ TEST_IF(Upgrade_Database_6_7, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
         auto rt = sg->start_read();
         CHECK_EQUAL(rt->get_history_schema_version(), hist->get_history_schema_version());
 
-        ConstTableRef t = rt->get_table("table");
+        TableRef t = rt->get_table("table");
         auto col = t->get_column_key("value");
         CHECK(t);
         CHECK_EQUAL(t->size(), 1);
@@ -1134,7 +1134,7 @@ TEST_IF(Upgrade_Database_7_8, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
         auto rt = sg->start_read();
         CHECK_EQUAL(rt->get_history_schema_version(), hist->get_history_schema_version());
 
-        ConstTableRef t = rt->get_table("table");
+        TableRef t = rt->get_table("table");
         auto col = t->get_column_key("value");
         CHECK(t);
         CHECK_EQUAL(t->size(), 1);
@@ -1177,7 +1177,7 @@ TEST_IF(Upgrade_Database_8_9, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
         auto rt = sg->start_read();
         CHECK_EQUAL(rt->get_history_schema_version(), hist->get_history_schema_version());
 
-        ConstTableRef t = rt->get_table("table");
+        TableRef t = rt->get_table("table");
         auto col_int = t->get_column_key("value");
         auto col_str = t->get_column_key("str_col");
         CHECK(t);
@@ -1226,8 +1226,8 @@ TEST_IF(Upgrade_Database_9_10, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SI
 
             ReadTransaction rt(sg);
 
-            ConstTableRef t = rt.get_table("table");
-            ConstTableRef o = rt.get_table("other");
+            TableRef t = rt.get_table("table");
+            TableRef o = rt.get_table("other");
             rt.get_group().verify();
 
             CHECK(t);

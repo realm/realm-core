@@ -313,7 +313,7 @@ struct BenchmarkDistinctStringManyDupes : BenchmarkWithStringsManyDup {
 
     void operator()(DBRef)
     {
-        ConstTableRef table = m_table;
+        TableRef table = m_table;
         REALM_ASSERT_RELEASE(table->has_search_index(m_col));
         ConstTableView view = table->get_distinct_view(m_col);
     }
@@ -327,7 +327,7 @@ struct BenchmarkFindAllStringFewDupes : BenchmarkWithStringsFewDup {
 
     void operator()(DBRef)
     {
-        ConstTableRef table = m_table;
+        TableRef table = m_table;
         ConstTableView view = table->where().equal(m_col, StringData("10", 2)).find_all();
     }
 };
@@ -340,7 +340,7 @@ struct BenchmarkFindAllStringManyDupes : BenchmarkWithStringsManyDup {
 
     void operator()(DBRef)
     {
-        ConstTableRef table = m_table;
+        TableRef table = m_table;
         ConstTableView view = table->where().equal(m_col, StringData("10", 2)).find_all();
     }
 };
@@ -353,7 +353,7 @@ struct BenchmarkFindFirstStringFewDupes : BenchmarkWithStringsFewDup {
 
     void operator()(DBRef)
     {
-        ConstTableRef table = m_table;
+        TableRef table = m_table;
         std::vector<std::string> strs = {
             "10", "20", "30", "40", "50", "60", "70", "80", "90", "100",
         };
@@ -445,7 +445,7 @@ struct BenchmarkFindFirstStringManyDupes : BenchmarkWithStringsManyDup {
 
     void operator()(DBRef)
     {
-        ConstTableRef table = m_table;
+        TableRef table = m_table;
         std::vector<std::string> strs = {
             "10", "20", "30", "40", "50", "60", "70", "80", "90", "100",
         };
@@ -542,7 +542,7 @@ struct BenchmarkQueryTimestampGreater : BenchmarkWithTimestamps {
 
     void operator()(DBRef)
     {
-        ConstTableRef table = m_table;
+        TableRef table = m_table;
         Query query = table->where().greater(m_col, needle);
         TableView results = query.find_all();
         REALM_ASSERT_EX(results.size() == values.size() - num_results_to_needle - 1, results.size(), num_results_to_needle, values.size());
@@ -614,7 +614,7 @@ struct BenchmarkQueryTimestampGreaterEqual : BenchmarkWithTimestamps {
 
     void operator()(DBRef)
     {
-        ConstTableRef table = m_table;
+        TableRef table = m_table;
         Query query = table->where().greater_equal(m_col, needle);
         TableView results = query.find_all();
         REALM_ASSERT_EX(results.size() == values.size() - num_results_to_needle, results.size(), num_results_to_needle, values.size());
@@ -636,7 +636,7 @@ struct BenchmarkQueryTimestampLess : BenchmarkWithTimestamps {
 
     void operator()(DBRef)
     {
-        ConstTableRef table = m_table;
+        TableRef table = m_table;
         Query query = table->where().less(m_col, needle);
         TableView results = query.find_all();
         REALM_ASSERT_EX(results.size() == num_results_to_needle, results.size(), num_results_to_needle, values.size());
@@ -657,7 +657,7 @@ struct BenchmarkQueryTimestampLessEqual : BenchmarkWithTimestamps {
 
     void operator()(DBRef)
     {
-        ConstTableRef table = m_table;
+        TableRef table = m_table;
         Query query = table->where().less_equal(m_col, needle);
         TableView results = query.find_all();
         REALM_ASSERT_EX(results.size() == num_results_to_needle + 1, results.size(), num_results_to_needle, values.size());
@@ -679,7 +679,7 @@ struct BenchmarkQueryTimestampEqual : BenchmarkWithTimestamps {
 
     void operator()(DBRef)
     {
-        ConstTableRef table = m_table;
+        TableRef table = m_table;
         Query query = table->where().equal(m_col, needle);
         TableView results = query.find_all();
         REALM_ASSERT_EX(results.size() == values.count(needle), results.size(), num_results_to_needle, values.count(needle), values.size());
@@ -700,7 +700,7 @@ struct BenchmarkQueryTimestampNotEqual : BenchmarkWithTimestamps {
 
     void operator()(DBRef)
     {
-        ConstTableRef table = m_table;
+        TableRef table = m_table;
         Query query = table->where().not_equal(m_col, needle);
         TableView results = query.find_all();
         REALM_ASSERT_EX(results.size() == values.size() - values.count(needle) + num_nulls_added, results.size(), values.size(), values.count(needle));
@@ -722,7 +722,7 @@ struct BenchmarkQueryTimestampNotNull : BenchmarkWithTimestamps {
 
     void operator()(DBRef)
     {
-        ConstTableRef table = m_table;
+        TableRef table = m_table;
         Query query = table->where().not_equal(m_col, realm::null());
         TableView results = query.find_all();
         REALM_ASSERT_EX(results.size() == values.size(), results.size(), num_nulls_added, num_results_to_needle, values.size());
@@ -743,7 +743,7 @@ struct BenchmarkQueryTimestampEqualNull : BenchmarkWithTimestamps {
     }
     void operator()(DBRef)
     {
-        ConstTableRef table = m_table;
+        TableRef table = m_table;
         Query query = table->where().equal(m_col, realm::null());
         TableView results = query.find_all();
         REALM_ASSERT_EX(results.size() == num_nulls_added, results.size(), num_nulls_added, values.size());
@@ -875,7 +875,7 @@ struct BenchmarkWithIntUIDsRandomOrderSeqAccess : BenchmarkWithIntsTable {
     }
     void operator()(DBRef)
     {
-        ConstTableRef t = m_table;
+        TableRef t = m_table;
         volatile uint64_t sum = 0;
         for (size_t i = 0; i < 100000; ++i) {
 #ifdef REALM_CLUSTER_IF
@@ -1018,7 +1018,7 @@ struct BenchmarkQueryChainedOrInts : BenchmarkWithIntsTable {
 
     void operator()(DBRef)
     {
-        ConstTableRef table = m_table;
+        TableRef table = m_table;
         Query query = table->where();
         for (size_t i = 0; i < values_to_query.size(); ++i) {
             query.Or().equal(m_col, values_to_query[i]);
@@ -1054,7 +1054,7 @@ struct BenchmarkQueryIntEquality : BenchmarkQueryChainedOrInts {
 
     void operator()(DBRef)
     {
-        ConstTableRef table = m_table;
+        TableRef table = m_table;
         for (int k = 0; k < 1000; k++) {
             Query query = table->where().equal(m_col, k);
             TableView results = query.find_all();
@@ -1087,7 +1087,7 @@ struct BenchmarkQuery : BenchmarkWithStrings {
 
     void operator()(DBRef)
     {
-        ConstTableRef table = m_table;
+        TableRef table = m_table;
         ConstTableView view = table->find_all_string(m_col, "200");
     }
 };
@@ -1133,7 +1133,7 @@ struct BenchmarkQueryChainedOrStrings : BenchmarkWithStringsTable {
 
     void operator()(DBRef)
     {
-        ConstTableRef table = m_table;
+        TableRef table = m_table;
         Query query = table->where();
         for (size_t i = 0; i < values_to_query.size(); ++i) {
             query.Or().equal(m_col, values_to_query[i]);
@@ -1153,7 +1153,7 @@ struct BenchmarkSort : BenchmarkWithStrings {
 
     void operator()(DBRef)
     {
-        ConstTableRef table = m_table;
+        TableRef table = m_table;
         ConstTableView view = table->get_sorted_view(m_col);
     }
 };
@@ -1182,7 +1182,7 @@ struct BenchmarkSortInt : BenchmarkWithInts {
 
     void operator()(DBRef)
     {
-        ConstTableRef table = m_table;
+        TableRef table = m_table;
         ConstTableView view = table->get_sorted_view(m_col);
     }
 };
@@ -1216,7 +1216,7 @@ struct BenchmarkDistinctIntFewDupes : BenchmarkWithIntsTable {
 
     void operator()(DBRef)
     {
-        ConstTableRef table = m_table;
+        TableRef table = m_table;
         REALM_ASSERT_RELEASE(table->has_search_index(m_col));
         ConstTableView view = table->get_distinct_view(m_col);
     }
@@ -1251,7 +1251,7 @@ struct BenchmarkDistinctIntManyDupes : BenchmarkWithIntsTable {
 
     void operator()(DBRef)
     {
-        ConstTableRef table = m_table;
+        TableRef table = m_table;
         REALM_ASSERT_RELEASE(table->has_search_index(m_col));
         ConstTableView view = table->get_distinct_view(m_col);
     }
@@ -1288,7 +1288,7 @@ struct BenchmarkGetString : BenchmarkWithStrings {
 
     void operator()(DBRef)
     {
-        ConstTableRef table = m_table;
+        TableRef table = m_table;
 
         volatile int dummy = 0;
 #ifdef REALM_CLUSTER_IF
@@ -1349,7 +1349,7 @@ struct BenchmarkGetLongString : BenchmarkWithLongStrings {
 
     void operator()(DBRef)
     {
-        ConstTableRef table = m_table;
+        TableRef table = m_table;
         volatile int dummy = 0;
 #ifdef REALM_CLUSTER_IF
         for (auto obj : *table) {
@@ -1394,7 +1394,7 @@ struct BenchmarkQueryLongString : BenchmarkWithStrings {
 
     void operator()(DBRef)
     {
-        ConstTableRef table = m_table;
+        TableRef table = m_table;
         StringData str(long_string);
         ok = true;
         auto q = table->where().equal(m_col, str);
@@ -1475,7 +1475,7 @@ struct BenchmarkQueryInsensitiveString : BenchmarkWithStringsTable {
     void before_each(DBRef group)
     {
         m_tr.reset(new WrtTrans(group)); // just go get a nonconst TableRef..
-        ConstTableRef table = m_tr->get_table(name());
+        TableRef table = m_tr->get_table(name());
         size_t target_row = rand() % table->size();
 #ifdef REALM_CLUSTER_IF
         ConstObj obj = table->get_object(m_keys[target_row]);
@@ -1489,7 +1489,7 @@ struct BenchmarkQueryInsensitiveString : BenchmarkWithStringsTable {
 
     void operator()(DBRef)
     {
-        ConstTableRef table = m_table;
+        TableRef table = m_table;
         StringData str(needle);
         for (int i = 0; i < 1000; ++i) {
             Query q = table->where().equal(m_col, str, false);
@@ -1565,7 +1565,7 @@ struct BenchmarkQueryNot : Benchmark {
 
     void operator()(DBRef)
     {
-        ConstTableRef table = m_table;
+        TableRef table = m_table;
         Query q = table->where();
         q.not_equal(m_col, 2); // never found, = worst case
         TableView results = q.find_all();
@@ -1605,7 +1605,7 @@ struct BenchmarkGetLinkList : Benchmark {
 
     void operator()(DBRef)
     {
-        ConstTableRef table = m_table;
+        TableRef table = m_table;
 #ifdef REALM_CLUSTER_IF
         std::vector<ConstLnkLstPtr> linklists(rows);
         for (size_t i = 0; i < rows; ++i) {

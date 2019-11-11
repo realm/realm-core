@@ -848,7 +848,7 @@ TEST(Shared_try_begin_write)
     {
         // Verify that the thread transaction commit succeeded.
         auto rt = sg->start_read();
-        ConstTableRef t = rt->get_table(rt->get_table_keys()[0]);
+        TableRef t = rt->get_table(rt->get_table_keys()[0]);
         CHECK(t->get_name() == StringData("table"));
         CHECK(t->get_column_name(t->get_column_keys()[0]) == StringData("string_col"));
         CHECK(t->size() == 1000);
@@ -1063,10 +1063,10 @@ TEST(Shared_ManyReaders)
             read_transactions[i] = shared_groups[i]->start_read();
             read_transactions[i]->verify();
             {
-                ConstTableRef test_1 = read_transactions[i]->get_table("test_1");
+                TableRef test_1 = read_transactions[i]->get_table("test_1");
                 CHECK_EQUAL(1u, test_1->size());
                 CHECK_EQUAL(i, test_1->begin()->get<Int>(col_int));
-                ConstTableRef test_2 = read_transactions[i]->get_table("test_2");
+                TableRef test_2 = read_transactions[i]->get_table("test_2");
                 int n_1 = i * 1;
                 int n_2 = i * 18;
                 CHECK_EQUAL(n_1 + n_2, test_2->size());
@@ -1101,10 +1101,10 @@ TEST(Shared_ManyReaders)
 
         // Check isolation between read transactions
         for (int i = 0; i < 2 * N; ++i) {
-            ConstTableRef test_1 = read_transactions[i]->get_table("test_1");
+            TableRef test_1 = read_transactions[i]->get_table("test_1");
             CHECK_EQUAL(1, test_1->size());
             CHECK_EQUAL(i, test_1->begin()->get<Int>(col_int));
-            ConstTableRef test_2 = read_transactions[i]->get_table("test_2");
+            TableRef test_2 = read_transactions[i]->get_table("test_2");
             int n_1 = i * 1;
             int n_2 = i * 18;
             CHECK_EQUAL(n_1 + n_2, test_2->size());
@@ -1131,10 +1131,10 @@ TEST(Shared_ManyReaders)
                 wt.commit();
             }
             {
-                ConstTableRef test_1 = read_transactions[i]->get_table("test_1");
+                TableRef test_1 = read_transactions[i]->get_table("test_1");
                 CHECK_EQUAL(1, test_1->size());
                 CHECK_EQUAL(i, test_1->begin()->get<Int>(col_int));
-                ConstTableRef test_2 = read_transactions[i]->get_table("test_2");
+                TableRef test_2 = read_transactions[i]->get_table("test_2");
                 int n_1 = i * 1;
                 int n_2 = i * 18;
                 CHECK_EQUAL(n_1 + n_2, test_2->size());
@@ -1157,11 +1157,11 @@ TEST(Shared_ManyReaders)
             read_transactions[i]->verify();
 #endif
             {
-                ConstTableRef test_1 = read_transactions[i]->get_table("test_1");
+                TableRef test_1 = read_transactions[i]->get_table("test_1");
                 CHECK_EQUAL(1u, test_1->size());
                 int i_2 = 2 * N + i;
                 CHECK_EQUAL(i_2, test_1->begin()->get<Int>(col_int));
-                ConstTableRef test_2 = read_transactions[i]->get_table("test_2");
+                TableRef test_2 = read_transactions[i]->get_table("test_2");
                 int n_1 = i * 1;
                 int n_2 = i * 18;
                 CHECK_EQUAL(n_1 + n_2, test_2->size());
@@ -1210,11 +1210,11 @@ TEST(Shared_ManyReaders)
                 wt.commit();
             }
             {
-                ConstTableRef test_1 = read_transactions[i]->get_table("test_1");
+                TableRef test_1 = read_transactions[i]->get_table("test_1");
                 CHECK_EQUAL(1, test_1->size());
                 int i_2 = i < 2 * N ? i : 2 * N + i;
                 CHECK_EQUAL(i_2, test_1->begin()->get<Int>(col_int));
-                ConstTableRef test_2 = read_transactions[i]->get_table("test_2");
+                TableRef test_2 = read_transactions[i]->get_table("test_2");
                 int n_1 = i * 1;
                 int n_2 = i * 18;
                 CHECK_EQUAL(n_1 + n_2, test_2->size());
@@ -1237,10 +1237,10 @@ TEST(Shared_ManyReaders)
 #if !defined(_WIN32) || TEST_DURATION > 0
                 rt.get_group().verify();
 #endif
-                ConstTableRef test_1 = rt.get_table("test_1");
+                TableRef test_1 = rt.get_table("test_1");
                 CHECK_EQUAL(1, test_1->size());
                 CHECK_EQUAL(3 * 8 * N, test_1->begin()->get<Int>(col_int));
-                ConstTableRef test_2 = rt.get_table("test_2");
+                TableRef test_2 = rt.get_table("test_2");
                 int n_1 = 8 * N * 1;
                 int n_2 = 8 * N * 18;
                 CHECK_EQUAL(n_1 + n_2, test_2->size());
@@ -1263,10 +1263,10 @@ TEST(Shared_ManyReaders)
 #if !defined(_WIN32) || TEST_DURATION > 0
             rt.get_group().verify();
 #endif
-            ConstTableRef test_1 = rt.get_table("test_1");
+            TableRef test_1 = rt.get_table("test_1");
             CHECK_EQUAL(1, test_1->size());
             CHECK_EQUAL(3 * 8 * N, test_1->begin()->get<Int>(col_int));
-            ConstTableRef test_2 = rt.get_table("test_2");
+            TableRef test_2 = rt.get_table("test_2");
             int n_1 = 8 * N * 1;
             int n_2 = 8 * N * 18;
             CHECK_EQUAL(n_1 + n_2, test_2->size());
@@ -1520,7 +1520,7 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
         rt.get_group().verify();
         CHECK(!rt.has_table("alpha"));
         CHECK(rt.has_table("beta"));
-        ConstTableRef table = rt.get_table("beta");
+        TableRef table = rt.get_table("beta");
         CHECK_EQUAL(process_count, table->get_int(0, 0));
     }
 }
@@ -1793,7 +1793,7 @@ TEST(Shared_ClearColumnWithBasicArrayRootLeaf)
     {
         DBRef sg = DB::create(path, false, DBOptions(crypt_key()));
         ReadTransaction rt(sg);
-        ConstTableRef test = rt.get_table("Test");
+        TableRef test = rt.get_table("Test");
         auto col = test->get_column_key("foo");
         CHECK_EQUAL(727.2, test->get_object(ObjKey(7)).get<Double>(col));
     }
@@ -3601,7 +3601,7 @@ TEST(Shared_ConstObject)
     writer->commit();
 
     TransactionRef reader = sg_w->start_read();
-    ConstTableRef t2 = reader->get_table("Foo");
+    TableRef t2 = reader->get_table("Foo");
     ConstObj obj = t2->get_object(ObjKey(47));
     CHECK_EQUAL(obj.get<int64_t>(c), 5);
 }
@@ -3635,7 +3635,7 @@ TEST(Shared_ConstObjectIterator)
 
     // Now ensure that we can create a ConstIterator
     TransactionRef reader = sg->start_read();
-    ConstTableRef t3 = reader->get_table("Foo");
+    TableRef t3 = reader->get_table("Foo");
     auto i3 = t3->begin();
     CHECK_EQUAL(i3->get<int64_t>(col), 7);
     ++i3;
@@ -3654,7 +3654,7 @@ TEST(Shared_ConstList)
     writer->commit();
 
     TransactionRef reader = sg->start_read();
-    ConstTableRef t2 = reader->get_table("Foo");
+    TableRef t2 = reader->get_table("Foo");
     ConstObj obj = t2->get_object(ObjKey(47));
     auto list1 = obj.get_list<int64_t>(list_col);
 
@@ -3695,7 +3695,7 @@ TEST_IF(Shared_DecryptExisting, REALM_ENABLE_ENCRYPTION)
         std::unique_ptr<Replication> hist_w(make_in_realm_history(temp_copy));
         auto db = DB::create(*hist_w, DBOptions(crypt_key(true)));
         auto rt = db->start_read();
-        ConstTableRef table = rt->get_table("table");
+        TableRef table = rt->get_table("table");
         auto o1 = *table->begin();
         std::string s1 = o1.get<StringData>(table->get_column_key("string"));
         std::string s2 = std::string(size_t(1.5 * page_size()), 'a');

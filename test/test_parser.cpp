@@ -2075,7 +2075,7 @@ TEST(Parser_Limit)
 
     // handover
     auto reader = sg->start_read();
-    ConstTableRef peopleRead = reader->get_table("person");
+    TableRef peopleRead = reader->get_table("person");
 
     TableView items = peopleRead->where().find_all();
     CHECK_EQUAL(items.size(), 3);

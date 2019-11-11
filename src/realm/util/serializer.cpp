@@ -132,7 +132,7 @@ std::string print_value<>(realm::ObjKey k)
 // This assumes that columns can start with '$' and that we might one day want to support
 // referencing the parent table columns in the subquery. This is currently disabled by an assertion in the
 // core SubQuery constructor.
-std::string SerialisationState::get_variable_name(ConstTableRef table)
+std::string SerialisationState::get_variable_name(TableRef table)
 {
     std::string guess_prefix = "$";
     const char start_char = 'x';
@@ -166,7 +166,7 @@ std::string SerialisationState::get_variable_name(ConstTableRef table)
     }
 }
 
-std::string SerialisationState::get_column_name(ConstTableRef table, ColKey col_key)
+std::string SerialisationState::get_column_name(TableRef table, ColKey col_key)
 {
     ColumnType col_type = table->get_real_column_type(col_key);
     if (col_type == col_type_BackLink) {
@@ -183,7 +183,7 @@ std::string SerialisationState::get_column_name(ConstTableRef table, ColKey col_
     return "";
 }
 
-std::string SerialisationState::describe_column(ConstTableRef table, ColKey col_key)
+std::string SerialisationState::describe_column(TableRef table, ColKey col_key)
 {
     if (table && col_key) {
         std::string desc;
@@ -196,7 +196,7 @@ std::string SerialisationState::describe_column(ConstTableRef table, ColKey col_
     return "";
 }
 
-std::string SerialisationState::get_backlink_column_name(ConstTableRef from, ColKey col_key)
+std::string SerialisationState::get_backlink_column_name(TableRef from, ColKey col_key)
 {
     ColumnType col_type = col_key.get_type();
     REALM_ASSERT_EX(col_type == col_type_Link || col_type == col_type_LinkList, col_type);

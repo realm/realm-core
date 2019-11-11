@@ -110,7 +110,7 @@ TEST_IF(Transactions_LargeMappingChange, REALM_ANDROID == 0)
     }
     {
         TransactionRef tr = sg->start_read();
-        ConstTableRef table = tr->get_table("test");
+        TableRef table = tr->get_table("test");
         auto col = table->get_column_key("binary");
         for (auto& o : *table) {
             auto data = o.get<BinaryData>(col);
@@ -174,7 +174,7 @@ TEST(Transactions_LargeUpgrade)
         // compat mapping is in effect for this part of the test
         {
             TransactionRef g = sg->start_read();
-            ConstTableRef tr = g->get_table("test");
+            TableRef tr = g->get_table("test");
             auto col = tr->get_column_key("binary");
             for (auto it = tr->begin(); it != tr->end(); ++it) {
                 auto data = it->get<BinaryData>(col);
@@ -208,7 +208,7 @@ TEST(Transactions_LargeUpgrade)
     sg = DB::create(path); // when opened again, compatibility mapping is NOT in use:
     {
         TransactionRef g = sg->start_read();
-        ConstTableRef tr = g->get_table("test");
+        TableRef tr = g->get_table("test");
         auto col = tr->get_column_key("binary");
         for (auto it = tr->begin(); it != tr->end(); ++it) {
             auto data = it->get<BinaryData>(col);
@@ -603,7 +603,7 @@ void query_phase(SharedGroup& sg_w)
         //std::cout << "growth phase " << j << std::endl;
         ReadTransaction wt(sg_w);
         const Group& g = wt.get_group();
-        ConstTableRef t = g.get_table("spoink");
+        TableRef t = g.get_table("spoink");
         TableView tv = t->where().equal(0,"gylle").find_all();
     }
 }
@@ -615,7 +615,7 @@ void partial_read_phase(SharedGroup& sg_w)
         //std::cout << "growth phase " << j << std::endl;
         ReadTransaction wt(sg_w);
         const Group& g = wt.get_group();
-        ConstTableRef t = g.get_table("spoink");
+        TableRef t = g.get_table("spoink");
         int max = t->size();
         for (int z = 0; z < max/100; ++z) {
             t->get_string(0,z);

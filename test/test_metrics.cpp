@@ -355,7 +355,6 @@ TEST(Metrics_QueryOrAndNot)
 
     auto wt = sg->start_write();
     TableRef person = wt->get_table(person_table_name);
-    TableRef pet = wt->get_table(pet_table_name);
     CHECK(bool(person));
 
     CHECK_EQUAL(person->get_column_count(), 8);
@@ -562,7 +561,6 @@ TEST(Metrics_LinkListQueries)
 
     auto wt = sg->start_write();
     TableRef person = wt->get_table(person_table_name);
-    TableRef pet = wt->get_table(pet_table_name);
     CHECK(bool(person));
 
     CHECK_EQUAL(person->get_column_count(), 8);
@@ -1012,7 +1010,7 @@ NONCONCURRENT_TEST(Metrics_NumDecryptedPagesWithoutEncryption)
 
     {
         auto tr = sg->start_write();
-        auto table = tr->add_table("table");
+        tr->add_table("table");
 
         // we need this here because other unit tests might be using encryption and we need a guarantee
         // that the global pages are from this shared group only.
@@ -1057,7 +1055,7 @@ NONCONCURRENT_TEST_IF(Metrics_NumDecryptedPagesWithEncryption, REALM_ENABLE_ENCR
 
     {
         auto tr = sg->start_write();
-        auto table = tr->add_table("table");
+        tr->add_table("table");
 
         NoPageReclaimGovernor gov;
         realm::util::set_page_reclaim_governor(&gov);

@@ -304,7 +304,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
     // Try to advance after a propper rollback
     {
         WriteTransaction wt(sg_w);
-        TableRef foo_w = wt.add_table("bad");
+        wt.add_table("bad");
         // Implicit rollback
     }
     rt->advance_read();
@@ -324,7 +324,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
     rt->advance_read();
     rt->verify();
     CHECK_EQUAL(1, rt->size());
-    ConstTableRef foo = rt->get_table("foo");
+    TableRef foo = rt->get_table("foo");
     CHECK_EQUAL(1, foo->get_column_count());
     auto cols = foo->get_column_keys();
     CHECK_EQUAL(type_Int, foo->get_column_type(cols[0]));
@@ -418,7 +418,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
     CHECK_EQUAL("a", obj0.get<StringData>(cols[1]));
     CHECK_EQUAL("b", obj1.get<StringData>(cols[1]));
     CHECK_EQUAL(foo, rt->get_table("foo"));
-    ConstTableRef bar = rt->get_table("bar");
+    TableRef bar = rt->get_table("bar");
     cols = bar->get_column_keys();
     CHECK_EQUAL(3, bar->get_column_count());
     CHECK_EQUAL(type_Int, bar->get_column_type(cols[0]));
@@ -678,8 +678,8 @@ TEST(LangBindHelper_AdvanceReadTransact_InsertTable)
     DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
     TransactionRef rt = sg->start_read();
 
-    ConstTableRef table1 = rt->get_table("table1");
-    ConstTableRef table2 = rt->get_table("table2");
+    TableRef table1 = rt->get_table("table1");
+    TableRef table2 = rt->get_table("table2");
 
     {
         std::unique_ptr<Replication> hist_w(realm::make_in_realm_history(path));
@@ -718,13 +718,11 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkColumnInNewTable)
     DBRef sg_w = DB::create(hist, DBOptions(crypt_key()));
     {
         WriteTransaction wt(sg_w);
-        TableRef a = wt.get_or_add_table("a");
+        wt.get_or_add_table("a");
         wt.commit();
     }
 
     TransactionRef rt = sg->start_read();
-    ConstTableRef a_r = rt->get_table("a");
-
     {
         WriteTransaction wt(sg_w);
         TableRef a_w = wt.get_table("a");
@@ -766,7 +764,7 @@ TEST(LangBindHelper_AdvanceReadTransact_EnumeratedStrings)
     }
     rt->advance_read();
     rt->verify();
-    ConstTableRef table = rt->get_table("t");
+    TableRef table = rt->get_table("t");
     CHECK_EQUAL(0, table->get_num_unique_values(c0));
     CHECK_EQUAL(0, table->get_num_unique_values(c1)); // Not yet "optimized"
     CHECK_EQUAL(0, table->get_num_unique_values(c2));
@@ -819,7 +817,7 @@ TEST(LangBindHelper_AdvanceReadTransact_SearchIndex)
     }
     rt->advance_read();
     rt->verify();
-    ConstTableRef table = rt->get_table("t");
+    TableRef table = rt->get_table("t");
     CHECK(table->has_search_index(col_int));
     CHECK_NOT(table->has_search_index(col_str1));
     CHECK(table->has_search_index(col_str2));
@@ -1077,7 +1075,6 @@ TEST(LangBindHelper_ConcurrentLinkViewDeletes)
     deleter.start([&] { deleter_thread(queue); });
     for (int i = 0; i < max_refs; ++i) {
         TableRef origin = rt->get_table("origin");
-        TableRef target = rt->get_table("target");
         int ndx = random.draw_int_mod(table_size);
         Obj o = origin->get_object(o_keys[ndx]);
         LnkLstPtr lw = o.get_linklist_ptr(ck);
@@ -1118,8 +1115,6 @@ TEST(LangBindHelper_AdvanceReadTransact_InsertLink)
     }
     rt->advance_read();
     rt->verify();
-    ConstTableRef origin = rt->get_table("origin");
-    ConstTableRef target = rt->get_table("target");
     {
         WriteTransaction wt(sg);
         TableRef origin_w = wt.get_table("origin");
@@ -1197,11 +1192,11 @@ TEST(LangBindHelper_AdvanceReadTransact_RemoveTableWithColumns)
     rt->verify();
 
     CHECK_EQUAL(5, rt->size());
-    ConstTableRef alpha = rt->get_table("alpha");
-    ConstTableRef beta = rt->get_table("beta");
-    ConstTableRef gamma = rt->get_table("gamma");
-    ConstTableRef delta = rt->get_table("delta");
-    ConstTableRef epsilon = rt->get_table("epsilon");
+    TableRef alpha = rt->get_table("alpha");
+    TableRef beta = rt->get_table("beta");
+    TableRef gamma = rt->get_table("gamma");
+    TableRef delta = rt->get_table("delta");
+    TableRef epsilon = rt->get_table("epsilon");
 
     // Remove table with columns, but no link columns, and table is not a link
     // target.
@@ -2169,7 +2164,7 @@ TEST(LangBindHelper_RollbackAndContinueAsRead)
         {
             // rollback of group level table insertion
             group->promote_to_write();
-            TableRef o = group->get_or_add_table("nullermand");
+            group->get_or_add_table("nullermand");
             TableRef o2 = group->get_table("nullermand");
             REALM_ASSERT(o2);
             group->rollback_and_continue_as_read();
@@ -2216,7 +2211,7 @@ TEST(LangBindHelper_RollbackAndContinueAsReadGroupLevelTableRemoval)
     auto reader = sg->start_read();
     {
         reader->promote_to_write();
-        TableRef origin = reader->get_or_add_table("a_table");
+        reader->get_or_add_table("a_table");
         reader->commit_and_continue_as_read();
     }
     reader->verify();
@@ -2359,8 +2354,6 @@ TEST(LangBindHelper_RollbackTableRemove)
     {
         group->promote_to_write();
         CHECK_EQUAL(2, group->size());
-        TableRef alpha = group->get_table("alpha");
-        TableRef beta = group->get_table("beta");
         group->remove_table("beta");
         CHECK_NOT(group->has_table("beta"));
         group->rollback_and_continue_as_read();
@@ -2416,7 +2409,7 @@ TEST(LangBindHelper_ContinuousTransactions_RollbackTableRemoval)
     DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
     auto group = sg->start_read();
     group->promote_to_write();
-    TableRef filler = group->get_or_add_table("filler");
+    group->get_or_add_table("filler");
     TableRef table = group->get_or_add_table("table");
     auto col = table->add_column(type_Int, "i");
     Obj o = table->create_object();
@@ -2910,7 +2903,7 @@ TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
         auto table_b = wt.add_table("B");
         table_b->add_column(type_Int, "bussemand");
         table_b->create_object().set_all(99);
-        auto table_c = wt.add_table("C");
+        wt.add_table("C");
         wt.commit();
     }
     // FIXME: Use separate arrays for reader and writer threads for safety and readability.
@@ -3018,7 +3011,7 @@ TEST(LangBindHelper_ImplicitTransactions_InterProcess)
         DBRef sg = DB::create(*hist);
         for (;;) {
             TransactionRef rt = sg->start_read()
-            ConstTableRef tr = rt.get_table("table");
+            TableRef tr = rt.get_table("table");
             if (tr->get_int(0, 0) == read_process_count) break;
             sched_yield();
         }
@@ -3091,7 +3084,7 @@ TEST(LangBindHelper_ImplicitTransactions_ContinuedUseOfTable)
     group_w->verify();
 
     group->advance_read();
-    ConstTableRef table = group->get_table("table");
+    TableRef table = group->get_table("table");
     CHECK_EQUAL(1, table->size());
     group->verify();
 
@@ -3126,7 +3119,6 @@ TEST(LangBindHelper_ImplicitTransactions_ContinuedUseOfLinkList)
     group_w->verify();
 
     group->advance_read();
-    ConstTableRef table = group->get_table("table");
     auto link_list = obj.get_linklist(col);
     CHECK_EQUAL(1, link_list.size());
     group->verify();
@@ -3196,7 +3188,7 @@ TEST(LangBindHelper_ImplicitTransactions_SearchIndex)
     group_w->verify();
 
     rt->advance_read();
-    ConstTableRef table = rt->get_table("table");
+    TableRef table = rt->get_table("table");
     auto obj = table->get_object(ok);
     CHECK_EQUAL(1, obj.get<int64_t>(c0));
     CHECK_EQUAL("2", obj.get<StringData>(c1));
@@ -4039,7 +4031,7 @@ void do_read_verify(std::string path) {
         TransactionRef rt =
             sg->start_read() if (rt.get_version() <= 2) continue; // let the writers make some initial data
         Group& group = const_cast<Group&>(rt.get_group());
-        ConstTableRef t = rt->get_table(0);
+        TableRef t = rt->get_table(0);
         size_t num_rows = t->size();
         for (size_t r = 0; r < num_rows; ++r) {
             int64_t num_chars = t->get_int(0, r);
@@ -4749,7 +4741,7 @@ TEST(LangBindHelper_Compact)
     }
     {
         ReadTransaction r(sg);
-        ConstTableRef table = r.get_table("test");
+        TableRef table = r.get_table("test");
         CHECK_EQUAL(N, table->size());
     }
     {
@@ -4757,7 +4749,7 @@ TEST(LangBindHelper_Compact)
     }
     {
         ReadTransaction r(sg);
-        ConstTableRef table = r.get_table("test");
+        TableRef table = r.get_table("test");
         CHECK_EQUAL(N, table->size());
     }
     {
@@ -4799,7 +4791,7 @@ TEST(LangBindHelper_CompactLargeEncryptedFile)
         std::unique_ptr<Replication> hist(make_in_realm_history(path));
         DBRef sg = DB::create(*hist, DBOptions(crypt_key(true)));
         ReadTransaction r(sg);
-        ConstTableRef table = r.get_table("test");
+        TableRef table = r.get_table("test");
         CHECK_EQUAL(N, table->size());
     }
 }
@@ -4932,7 +4924,6 @@ TEST(LangBindHelper_HandoverFuzzyTest)
 
     auto rt = sg->start_read();
     // Create and export query
-    TableRef owner = rt->get_table("Owner");
     TableRef dog = rt->get_table("Dog");
 
     realm::Query query = dog->link(c3).column<String>(c0) == "owner" + to_string(rand() % numberOfOwner);
@@ -5032,7 +5023,6 @@ TEST(LangBindHelper_TableViewClear)
     {
         tr->promote_to_write();
 
-        TableRef history = tr->get_table("history");
         TableRef line = tr->get_table("line");
 
         //    number_of_line = 2;
@@ -5316,7 +5306,7 @@ TEST(LangbindHelper_GroupWriter_EdgeCaseAssert)
     t2->add_column_link(type_LinkList, "dtkiipajqdsfglbptieibknaoeeohqdlhftqmlriphobspjr", *t1);
     std::vector<ObjKey> keys;
     t1->create_objects(375, keys);
-    auto t3 = g_w->add_table("pnsidlijqeddnsgaesiijrrqedkdktmfekftogjccerhpeil");
+    g_w->add_table("pnsidlijqeddnsgaesiijrrqedkdktmfekftogjccerhpeil");
     g_r->close();
     g_w->commit();
     REALM_ASSERT_RELEASE(sg->compact());
