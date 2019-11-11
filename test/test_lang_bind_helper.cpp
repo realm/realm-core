@@ -4854,7 +4854,7 @@ TEST(LangBindHelper_TableViewAggregateAfterAdvanceRead)
 
 // Tests handover of a Query. Especially it tests if next-gen-syntax nodes are deep copied correctly by
 // executing an imported query multiple times in parallel
-TEST(LangBindHelper_HandoverFuzzyTest)
+TEST_IF(LangBindHelper_HandoverFuzzyTest, TEST_DURATION > 0)
 {
     SHARED_GROUP_TEST_PATH(path);
 
