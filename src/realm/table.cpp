@@ -1223,9 +1223,10 @@ void Table::migrate_objects(util::FunctionRef<void()> commit_and_continue)
     std::map<ColKey, std::unique_ptr<BPlusTree<int64_t>>> list_accessors;
     std::vector<size_t> cols_to_destroy;
     bool has_link_columns = false;
+    size_t nb_columns = m_spec.get_public_column_count();
 
     // helper function to determine the number of objects in the table
-    size_t number_of_objects = size_t(-1);
+    size_t number_of_objects = (nb_columns == 0) ? 0 : size_t(-1);
     auto update_size = [&number_of_objects](size_t s) {
         if (number_of_objects == size_t(-1)) {
             number_of_objects = s;
@@ -1235,7 +1236,6 @@ void Table::migrate_objects(util::FunctionRef<void()> commit_and_continue)
         }
     };
 
-    size_t nb_columns = m_spec.get_public_column_count();
     for (size_t col_ndx = 0; col_ndx < nb_columns; col_ndx++) {
         ColKey col_key = m_spec.get_key(col_ndx);
         ColumnAttrMask attr = m_spec.get_column_attr(col_ndx);
@@ -1460,8 +1460,8 @@ void Table::migrate_links(util::FunctionRef<void()> commit_and_continue)
             }
         }
     }
-    bool use_oid = (m_spec.get_column_name(0) == "!OID");
     if (sz != size_t(-1)) {
+        bool use_oid = (m_spec.get_column_name(0) == "!OID");
         BPlusTree<Int> oid_column(m_alloc);
         if (use_oid) {
             oid_column.init_from_ref(to_ref(col_refs.get(0)));
@@ -1502,7 +1502,7 @@ void Table::finalize_migration()
         Array::destroy_deep(ref, m_alloc);
         m_top.set(top_position_for_columns, 0);
     }
-    if (m_spec.get_column_name(0) == "!OID") {
+    if (m_spec.get_public_column_count() > 0 && m_spec.get_column_name(0) == "!OID") {
         remove_column(m_spec.get_key(0));
     }
 }
