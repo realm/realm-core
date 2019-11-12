@@ -23,13 +23,13 @@ RUN yum -y install \
  
 # Install CMake
 RUN cd /opt \
-    && wget https://cmake.org/files/v3.7/cmake-3.7.2-Linux-x86_64.tar.gz \
-    && tar zxvf cmake-3.7.2-Linux-x86_64.tar.gz
+    && wget https://cmake.org/files/v3.15/cmake-3.15.2-Linux-x86_64.tar.gz \
+    && tar zxvf cmake-3.15.2-Linux-x86_64.tar.gz
 
-ENV PATH "$PATH:/opt/cmake-3.7.2-Linux-x86_64/bin"
+ENV PATH "/opt/cmake-3.15.2-Linux-x86_64/bin:$PATH"
 
 # Install ninja
-RUN wget https://github.com/ninja-build/ninja/releases/download/v1.7.2/ninja-linux.zip \
+RUN wget https://github.com/ninja-build/ninja/releases/download/v1.9.0/ninja-linux.zip \
     && unzip ninja-linux.zip \
     && chmod a+x ninja \
     && mv ninja /usr/bin
