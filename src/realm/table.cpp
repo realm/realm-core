@@ -1149,6 +1149,29 @@ void copy_list(ref_type sub_table_ref, Obj& obj, ColKey col, Allocator& alloc)
 }
 
 template <>
+void copy_list<util::Optional<Bool>>(ref_type sub_table_ref, Obj& obj, ColKey col, Allocator& alloc)
+{
+    if (sub_table_ref) {
+        // Actual list is in the columns array position 0
+        Array cols(alloc);
+        cols.init_from_ref(sub_table_ref);
+        BPlusTree<util::Optional<Int>> from_list(alloc);
+        from_list.set_parent(&cols, 0);
+        from_list.init_from_parent();
+        size_t list_size = from_list.size();
+        auto l = obj.get_list<util::Optional<Bool>>(col);
+        for (size_t j = 0; j < list_size; j++) {
+            util::Optional<Bool> val;
+            auto int_val = from_list.get(j);
+            if (int_val) {
+                val = (*int_val != 0);
+            }
+            l.add(val);
+        }
+    }
+}
+
+template <>
 void copy_list<String>(ref_type sub_table_ref, Obj& obj, ColKey col, Allocator& alloc)
 {
     if (sub_table_ref) {
@@ -1366,9 +1389,22 @@ void Table::migrate_objects(util::FunctionRef<void()> commit_and_continue)
         // Then update possible list types
         for (auto& it : list_accessors) {
             switch (it.first.get_type()) {
-                case col_type_Int:
+                case col_type_Int: {
+                    if (it.first.get_attrs().test(col_attr_Nullable)) {
+                        copy_list<util::Optional<int64_t>>(to_ref(it.second->get(row_ndx)), obj, it.first, m_alloc);
+                    }
+                    else {
+                        copy_list<int64_t>(to_ref(it.second->get(row_ndx)), obj, it.first, m_alloc);
+                    }
+                    break;
+                }
                 case col_type_Bool:
-                    copy_list<int64_t>(to_ref(it.second->get(row_ndx)), obj, it.first, m_alloc);
+                    if (it.first.get_attrs().test(col_attr_Nullable)) {
+                        copy_list<util::Optional<Bool>>(to_ref(it.second->get(row_ndx)), obj, it.first, m_alloc);
+                    }
+                    else {
+                        copy_list<Bool>(to_ref(it.second->get(row_ndx)), obj, it.first, m_alloc);
+                    }
                     break;
                 case col_type_Float:
                     copy_list<float>(to_ref(it.second->get(row_ndx)), obj, it.first, m_alloc);
