@@ -1234,8 +1234,8 @@ TEST_IF(Upgrade_Database_9_10, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SI
         }
         ReadTransaction rt(sg);
 
-        ConstTableRef t = rt.get_table("table");
-        ConstTableRef o = rt.get_table("other");
+        TableRef t = rt.get_table("table");
+        TableRef o = rt.get_table("other");
         rt.get_group().verify();
 
         CHECK(t);
