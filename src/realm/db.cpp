@@ -2513,7 +2513,7 @@ TransactionRef DB::start_write(bool nonblocking)
 
 Obj Transaction::import_copy_of(const ConstObj& original)
 {
-    if (bool(original)) {
+    if (bool(original) && original.is_valid()) {
         TableKey tk = original.get_table_key();
         ObjKey rk = original.get_key();
         auto table = get_table(tk);

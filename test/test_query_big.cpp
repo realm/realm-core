@@ -286,7 +286,7 @@ TEST(Query_TableInitialization)
         obj.get_linklist(col_list).add(keys[i]);
         obj.get_list<Int>(col_list_int).add(i);
     }
-    Obj obj0 = table.get_object(keys[0]);
+    // Obj obj0 = table.get_object(keys[0]);
     wt->commit_and_continue_as_read();
 
     // Save this version so we can go back to it before every test
@@ -507,15 +507,17 @@ TEST(Query_TableInitialization)
 
         auto link_col = [&] { return get_table().template column<Link>(col_link); };
         auto list_col = [&] { return get_table().template column<Link>(col_list); };
+        auto get_obj0 = [&] { return get_table().get_object(keys[0]); };
 
         if (mode == Mode::Direct) { // link equality over links isn't implemented
             helper([&](Query&, auto&& test) { test(link_col().is_null()); });
             helper([&](Query&, auto&& test) { test(link_col().is_not_null()); });
-            helper([&](Query&, auto&& test) { test(link_col() == obj0); });
-            helper([&](Query&, auto&& test) { test(link_col() != obj0); });
 
-            helper([&](Query&, auto&& test) { test(list_col() == obj0); });
-            helper([&](Query&, auto&& test) { test(list_col() != obj0); });
+            helper([&](Query&, auto&& test) { test(link_col() == get_obj0()); });
+            helper([&](Query&, auto&& test) { test(link_col() != get_obj0()); });
+
+            helper([&](Query&, auto&& test) { test(list_col() == get_obj0()); });
+            helper([&](Query&, auto&& test) { test(list_col() != get_obj0()); });
         }
 
         helper([&](Query&, auto&& test) { test(list_col().count() == 1); });

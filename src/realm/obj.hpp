@@ -79,9 +79,10 @@ public:
 
     ObjectID get_object_id() const;
 
-    const Table* get_table() const
+    ConstTableRef get_table() const
     {
-        return m_table;
+        check_valid();
+        return ConstTableRef(m_table);
     }
 
     Replication* get_replication() const;
@@ -94,6 +95,8 @@ public:
 
     // Check if the object is still alive
     bool is_valid() const;
+    // Will throw if object is not valid
+    void check_valid() const;
     // Delete object from table. Object is invalid afterwards.
     void remove();
 
@@ -209,6 +212,13 @@ public:
     {
     }
     Obj(ClusterTree* tree_top, MemRef mem, ObjKey key, size_t row_ndx);
+
+    TableRef get_table() const
+    {
+        check_valid();
+        return TableRef(const_cast<Table*>(m_table));
+    }
+
 
     template <typename U>
     Obj& set(ColKey col_key, U value, bool is_default = false);

@@ -415,7 +415,7 @@ void Lst<ObjKey>::do_set(size_t ndx, ObjKey target_key)
     m_tree->set(ndx, target_key);
 
     if (recurse) {
-        auto table = const_cast<Table*>(m_obj.get_table());
+        auto table = m_obj.get_table();
         _impl::TableFriend::remove_recursive(*table, state); // Throws
     }
 }
@@ -437,7 +437,7 @@ void Lst<ObjKey>::do_remove(size_t ndx)
     m_tree->erase(ndx);
 
     if (recurse) {
-        auto table = const_cast<Table*>(m_obj.get_table());
+        auto table = m_obj.get_table();
         _impl::TableFriend::remove_recursive(*table, state); // Throws
     }
 }
@@ -447,7 +447,7 @@ void Lst<ObjKey>::clear()
 {
     update_if_needed();
     if (size() > 0) {
-        Table* origin_table = const_cast<Table*>(m_obj.get_table());
+        auto origin_table = m_obj.get_table();
 
         if (Replication* repl = m_const_obj->get_replication())
             repl->list_clear(*this); // Throws
