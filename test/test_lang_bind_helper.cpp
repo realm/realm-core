@@ -4806,6 +4806,21 @@ TEST(LangBindHelper_CompactLargeEncryptedFile)
 }
 #endif
 
+TEST(LangBindHelper_CloseDBvsTransactions)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key(true)));
+    auto tr0 = sg->start_read();
+    auto tr1 = sg->start_write();
+    CHECK(tr1->add_table("possible"));
+    sg->close(); // closing the DB before closing transactions are OK
+    CHECK(!sg->is_attached());
+    CHECK(!tr0->is_attached());
+    CHECK(!tr1->is_attached());
+    CHECK_THROW(sg->start_read(), LogicError);
+}
+
 TEST(LangBindHelper_TableViewAggregateAfterAdvanceRead)
 {
     SHARED_GROUP_TEST_PATH(path);
