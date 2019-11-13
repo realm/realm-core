@@ -5,6 +5,9 @@
 
 ### Fixed
 * macOS binaries were built with the incorrect deployment target (10.14 rather than 10.9). ([Cocoa #6299](https://github.com/realm/realm-cocoa/issues/6299), since 5.23.4).
+* Subtable accessors could be double-deleted if the last reference was released from a different
+  thread at the wrong time. This would typically manifest as "pthread_mutex_destroy() failed", but
+  could also result in other kinds of crashes. ([Cocoa #6333](https://github.com/realm/realm-cocoa/issues/6333)).
 
 ### Breaking changes
 * None.

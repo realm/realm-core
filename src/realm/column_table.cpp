@@ -258,20 +258,33 @@ void SubtableColumnBase::SubtableMap::recursive_mark() noexcept
 
 void SubtableColumnBase::SubtableMap::refresh_accessor_tree()
 {
+    typedef _impl::TableFriend tf;
+
     // iterate backwards by index because entries may be removed during iteration
     for (size_t i = m_entries.size(); i > 0; --i) {
         const auto& entry = m_entries[i - 1];
-        // Must hold a counted reference while refreshing
-        TableRef table(entry.m_table);
-        typedef _impl::TableFriend tf;
-        tf::set_ndx_in_parent(*table, entry.m_subtable_ndx);
-        if (tf::is_marked(*table)) {
-            tf::refresh_accessor_tree(*table);
+        auto& table = *entry.m_table;
+
+        // If the table's refcount is 0 then that means that unbind_ptr() is
+        // currently waiting on m_subtable_map_lock on another thread, and will
+        // delete the Table as soon as we release that lock. In this scenario,
+        // we do not want to bump Table's refcount, as decrementing it back to
+        // 0 will then result in us deleting the Table, and the other thread
+        // also deleting the Table.
+        // If the refcount is nonzero then we need to bump it to ensure that
+        // nothing we do below releases it while we're using it.
+        TableRef ref;
+        if (tf::has_references(table)) {
+            ref.reset(&table);
+        }
+        tf::set_ndx_in_parent(table, entry.m_subtable_ndx);
+        if (tf::is_marked(table)) {
+            tf::refresh_accessor_tree(table);
             bool bump_global = false;
-            tf::bump_version(*table, bump_global);
+            tf::bump_version(table, bump_global);
         }
         else {
-            tf::refresh_spec_accessor(*table);
+            tf::refresh_spec_accessor(table);
         }
     }
 }
