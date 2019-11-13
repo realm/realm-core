@@ -1910,7 +1910,8 @@ ObjKey Table::find_first(ColKey col_key, StringData value) const
 
     if (col_key.get_type() == col_type_String && col_key == m_primary_key_col) {
         ObjectID object_id{value};
-        return global_to_local_object_id_hashed(object_id);
+        ObjKey k = global_to_local_object_id_hashed(object_id);
+        return is_valid(k) ? k : ObjKey();
     }
 
     ObjKey key;

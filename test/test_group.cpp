@@ -2049,6 +2049,7 @@ TEST(Group_PrimaryKeyCol)
     table = g.add_table_with_primary_key("class_foo", type_String, "primary");
     primary_key_column = table->get_primary_key_column();
     CHECK(primary_key_column);
+    CHECK_NOT(table->find_first(primary_key_column, StringData("Exactly!")));
     obj = table->create_object_with_primary_key({"Exactly!"});
     CHECK_EQUAL(obj.get<String>(primary_key_column), "Exactly!");
     auto k = table->find_first(primary_key_column, StringData("Exactly!"));
