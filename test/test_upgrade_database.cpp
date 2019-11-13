@@ -1201,6 +1201,10 @@ TEST_IF(Upgrade_Database_8_9, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
 #endif // TEST_READ_UPGRADE_MODE
 }
 
+namespace {
+constexpr bool generate_json = false;
+}
+
 TEST_IF(Upgrade_Database_9_10, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZE == 1000)
 {
     size_t nb_rows = (REALM_MAX_BPNODE_SIZE == 4) ? 50 : 500;
@@ -1236,17 +1240,21 @@ TEST_IF(Upgrade_Database_9_10, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SI
 
         ConstTableRef t = rt.get_table("table");
         ConstTableRef o = rt.get_table("other");
+        ConstTableRef e = rt.get_table("empty");
         rt.get_group().verify();
 
         CHECK(t);
         CHECK(o);
         CHECK_EQUAL(t->size(), nb_rows + 1);
         CHECK_EQUAL(o->size(), 25);
+        CHECK_EQUAL(e->size(), 0);
 
         auto t_col_keys = t->get_column_keys();
-        CHECK_EQUAL(t_col_keys.size(), 13);
+        CHECK_EQUAL(t_col_keys.size(), 14);
         auto o_col_keys = o->get_column_keys();
         CHECK_EQUAL(o_col_keys.size(), 2);
+        auto e_col_keys = e->get_column_keys();
+        CHECK_EQUAL(e_col_keys.size(), 0);
 
         auto col_int = t_col_keys[0];
         auto col_int_null = t_col_keys[1];
@@ -1261,6 +1269,7 @@ TEST_IF(Upgrade_Database_9_10, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SI
         auto col_link = t_col_keys[10];
         auto col_linklist = t_col_keys[11];
         auto col_int_list = t_col_keys[12];
+        auto col_int_null_list = t_col_keys[13];
         auto col_val = o_col_keys[0];
         auto col_str_list = o_col_keys[1];
 
@@ -1293,6 +1302,8 @@ TEST_IF(Upgrade_Database_9_10, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SI
         CHECK_EQUAL(t->get_column_type(col_linklist), type_LinkList);
         CHECK_EQUAL(t->get_column_type(col_int_list), type_Int);
         CHECK(t->get_column_attr(col_int_list).test(col_attr_List));
+        CHECK_EQUAL(t->get_column_type(col_int_null_list), type_Int);
+        CHECK(t->get_column_attr(col_int_null_list).test(col_attr_List));
         CHECK_EQUAL(o->get_column_type(col_val), type_Int);
         CHECK_EQUAL(o->get_column_type(col_str_list), type_String);
         CHECK(col_str_list.get_attrs().test(col_attr_List));
@@ -1310,6 +1321,7 @@ TEST_IF(Upgrade_Database_9_10, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SI
         CHECK_EQUAL(t->is_nullable(col_link), true);
         CHECK_EQUAL(t->is_nullable(col_linklist), false);
         CHECK_EQUAL(t->is_nullable(col_int_list), false);
+        CHECK_EQUAL(t->is_nullable(col_int_null_list), true);
 
         CHECK_EQUAL(t->has_search_index(col_string), false);
         CHECK_EQUAL(t->has_search_index(col_string_i), true);
@@ -1348,6 +1360,12 @@ TEST_IF(Upgrade_Database_9_10, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SI
         CHECK_EQUAL(int_list.get(0), 24);
         CHECK_EQUAL(int_list.get(17), 41);
 
+        auto int_null_list = obj23.get_list<util::Optional<Int>>(col_int_null_list);
+        CHECK(!int_null_list.is_empty());
+        CHECK_EQUAL(int_null_list.size(), 10);
+        CHECK_EQUAL(int_null_list.get(1), 5);
+        CHECK_NOT(int_null_list.get(5));
+
         CHECK_EQUAL(obj27.get<Bool>(col_bool), true);
         std::string bin("abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwx");
         CHECK_EQUAL(obj27.get<Binary>(col_binary), BinaryData(bin));
@@ -1376,6 +1394,10 @@ TEST_IF(Upgrade_Database_9_10, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SI
     }
     if (REALM_MAX_BPNODE_SIZE == 1000) {
         auto sg = DB::create(*hist);
+        if (generate_json) {
+            std::ofstream expect("expect_test_upgrade_database_9_to_10.json");
+            sg->start_read()->to_json(expect, 0);
+        }
         std::stringstream out;
         sg->start_read()->to_json(out, 0);
         std::ifstream expect("expect_test_upgrade_database_9_to_10.json");
@@ -1400,6 +1422,7 @@ TEST_IF(Upgrade_Database_9_10, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SI
     Group g;
     TableRef t = g.add_table("table");
     TableRef o = g.add_table("other");
+    g.add_table("empty");
     size_t col_int = t->add_column(type_Int, "int");
     size_t col_int_null = t->add_column(type_Int, "int", true); // Duplicate name
     size_t col_bool = t->add_column(type_Bool, "");             // Missing name
@@ -1412,14 +1435,19 @@ TEST_IF(Upgrade_Database_9_10, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SI
     size_t col_date = t->add_column(type_Timestamp, "date");
     size_t col_link = t->add_column_link(type_Link, "link", *t);
     size_t col_linklist = t->add_column_link(type_LinkList, "linklist", *o);
+
     DescriptorRef subdesc;
     size_t col_int_list = t->add_column(type_Table, "integers", false, &subdesc);
     subdesc->add_column(type_Int, "list");
-    t->add_search_index(col_string_i);
+
+    size_t col_int_null_list = t->add_column(type_Table, "intnulls", false, &subdesc);
+    subdesc->add_column(type_Int, "list", nullptr, true);
 
     size_t col_val = o->add_column(type_Int, "val");
     size_t col_string_list = o->add_column(type_Table, "strings", false, &subdesc);
     subdesc->add_column(type_String, "list", nullptr, true);
+
+    t->add_search_index(col_string_i);
 
     t->add_empty_row(nb_rows);
     o->add_empty_row(25);
@@ -1470,6 +1498,15 @@ TEST_IF(Upgrade_Database_9_10, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SI
                     st->set_int(0, j, j + i % 30);
                 }
                 st->remove(0);
+            }
+            // ListOfOptionals
+            if (i == 23) {
+                auto st = t->get_subtable(col_int_null_list, i);
+                st->add_empty_row(10);
+                for (int j = 0; j < 10; j++) {
+                    if (j != 5)
+                        st->set_int(0, j, 5 * j);
+                }
             }
         }
     }
