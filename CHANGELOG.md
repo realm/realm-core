@@ -1,19 +1,18 @@
-# NEXT RELEASE
+# 6.0.0-alpha.25 Release notes
 
 ### Enhancements
 * None.
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Upgrading a realm file with a table with no columns would fail ([#3470](https://github.com/realm/realm-core/issues/3470))
  
 ### Breaking changes
-* None.
+* Table file layout changed. Will not be able to read files produced by ealier 6.0.0 alpha versions.
 
 -----------
 
 ### Internals
-* None.
+* pk table removed. Primary key column is stored in Table structure.
 
 ----------------------------------------------
 
