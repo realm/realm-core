@@ -1833,6 +1833,8 @@ TEST(StringIndex_QuerySingleObject)
 
     auto q = table->where().equal(table->get_column_key("name"), "Foo", true);
     CHECK_EQUAL(q.count(), 1);
+    q = table->where().equal(table->get_column_key("name"), "Bar", true);
+    CHECK_EQUAL(q.count(), 0);
 }
 
 #endif // TEST_INDEX_STRING

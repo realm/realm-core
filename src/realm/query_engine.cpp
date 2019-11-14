@@ -269,7 +269,7 @@ void StringNode<Equal>::_search_index_init()
         m_actual_key =
             ParentNode::m_table->find_first(ParentNode::m_condition_column_key, StringData(StringNodeBase::m_value));
         m_results_start = 0;
-        m_results_end = 1;
+        m_results_end = m_actual_key ? 1 : 0;
     }
     else {
         auto index = ParentNode::m_table->get_search_index(ParentNode::m_condition_column_key);
