@@ -1495,16 +1495,24 @@ void DB::release_all_read_locks() noexcept
     m_local_locks_held.clear();
 }
 
-void DB::close() noexcept
+// Note: close() and close_internal() may be called from the DB::~DB().
+// in that case, they will not throw. Throwing can only happen if called
+// directly.
+void DB::close()
 {
     close_internal(std::unique_lock<InterprocessMutex>(m_controlmutex, std::defer_lock));
 }
 
-void DB::close_internal(std::unique_lock<InterprocessMutex> lock) noexcept
+void DB::close_internal(std::unique_lock<InterprocessMutex> lock)
 {
     if (!is_attached())
         return;
 
+    {
+        std::lock_guard<std::recursive_mutex> local_lock(m_mutex);
+        if (m_write_transaction_open)
+            throw LogicError(LogicError::wrong_transact_state);
+    }
     SharedInfo* info = m_file_map.get_addr();
     {
         bool is_sync_agent = m_replication ? m_replication->is_sync_agent() : false;
@@ -2018,6 +2026,8 @@ void DB::do_end_write() noexcept
     info->next_served++;
     m_pick_next_writer.notify_all();
 
+    std::lock_guard<std::recursive_mutex> local_lock(m_mutex);
+    m_write_transaction_open = false;
     m_writemutex.unlock();
 }
 
@@ -2056,6 +2066,8 @@ Replication::version_type DB::do_commit(Transaction& transaction)
 
 DB::version_type Transaction::commit_and_continue_as_read()
 {
+    if (!is_attached())
+        throw LogicError(LogicError::wrong_transact_state);
     if (m_transact_stage != DB::transact_Writing)
         throw LogicError(LogicError::wrong_transact_state);
 
@@ -2443,6 +2455,8 @@ size_t Transaction::get_commit_size() const
 
 DB::version_type Transaction::commit()
 {
+    if (!is_attached())
+        throw LogicError(LogicError::wrong_transact_state);
     if (m_transact_stage != DB::transact_Writing)
         throw LogicError(LogicError::wrong_transact_state);
 
@@ -2471,6 +2485,8 @@ DB::version_type Transaction::commit()
 
 void Transaction::commit_and_continue_writing()
 {
+    if (!is_attached())
+        throw LogicError(LogicError::wrong_transact_state);
     if (m_transact_stage != DB::transact_Writing)
         throw LogicError(LogicError::wrong_transact_state);
 
@@ -2520,8 +2536,6 @@ DB::VersionID Transaction::get_version_of_current_transaction()
 
 TransactionRef DB::start_write(bool nonblocking)
 {
-    if (!is_attached())
-        throw LogicError(LogicError::wrong_transact_state);
     if (nonblocking) {
         bool succes = do_try_begin_write();
         if (!succes) {
@@ -2530,6 +2544,14 @@ TransactionRef DB::start_write(bool nonblocking)
     }
     else {
         do_begin_write();
+    }
+    {
+        std::lock_guard<std::recursive_mutex> local_lock(m_mutex);
+        if (!is_attached()) {
+            do_end_write();
+            throw LogicError(LogicError::wrong_transact_state);
+        }
+        m_write_transaction_open = true;
     }
     ReadLockInfo read_lock;
     Transaction* tr;

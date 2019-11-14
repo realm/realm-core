@@ -106,13 +106,20 @@ public:
     // instance, open another DB object on the same file. But you don't.
     DB(const DB&) = delete;
     DB& operator=(const DB&) = delete;
-    /// Close any open database. Calling close() is thread-safe with respect to
+    /// Close an open database. Calling close() is thread-safe with respect to
     /// other calls to close and with respect to deleting transactions or calling
     /// close on transactions. Calling close() leaves transactions (and any associated
     /// accessors) in a defunct state and the actual close() operation is not
     /// interlocked with access through those accessors, so any access through accessors
     /// may constitute a race with a call to close().
-    void close() noexcept;
+    /// Calling close() while a write transaction is active will throw LogicError::wrong_transact_state
+    /// (Technically this could be left as undefined behaviour, but throwing allows us to
+    ///  more precisely pinpoint this problem).
+    /// Instead of using DB::close() to release resources, we recommend using transactions
+    /// to control release as follows:
+    ///  * explicitly close() transactions at earliest time possible and
+    ///  * explicitly nullify any DBRefs you may have.
+    void close();
 
     bool is_attached() const noexcept;
 
@@ -365,12 +372,12 @@ private:
     util::File::Map<SharedInfo> m_file_map; // Never remapped, provides access to everything but the ringbuffer
     util::File::Map<SharedInfo> m_reader_map; // provides access to ringbuffer, remapped as needed when it grows
     bool m_wait_for_change_enabled = true; // Initially wait_for_change is enabled
+    bool m_write_transaction_open = false;
     std::string m_lockfile_path;
     std::string m_lockfile_prefix;
     std::string m_db_path;
     std::string m_coordination_dir;
     const char* m_key;
-    //    TransactStage m_transact_stage;
     int m_file_format_version = 0;
     util::InterprocessMutex m_writemutex;
 #ifdef REALM_ASYNC_DAEMON
@@ -497,7 +504,7 @@ private:
         m_alloc.reset_free_space_tracking();
     }
 
-    void close_internal(std::unique_lock<InterprocessMutex>) noexcept;
+    void close_internal(std::unique_lock<InterprocessMutex>);
     friend class Transaction;
 };
 

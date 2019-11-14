@@ -4814,7 +4814,10 @@ TEST(LangBindHelper_CloseDBvsTransactions)
     auto tr0 = sg->start_read();
     auto tr1 = sg->start_write();
     CHECK(tr1->add_table("possible"));
-    sg->close(); // closing the DB before closing transactions are OK
+    // write transactions must be closed (one way or the other) before DB::close
+    CHECK_THROW(sg->close(), LogicError);
+    tr1->rollback();
+    sg->close(); // closing the DB explicitly while there are open read transactions is OK
     CHECK(!sg->is_attached());
     CHECK(!tr0->is_attached());
     CHECK(!tr1->is_attached());
