@@ -325,8 +325,11 @@ ConstObj ConstObj::get_linked_object(ColKey link_col_key) const
 {
     TableRef target_table = get_target_table(link_col_key);
     ObjKey key = get<ObjKey>(link_col_key);
-
-    return target_table->get_object(key);
+    ConstObj obj;
+    if (key) {
+        obj = target_table->get_object(key);
+    }
+    return obj;
 }
 
 template <class T>
