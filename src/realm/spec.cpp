@@ -239,6 +239,13 @@ bool Spec::convert_column_attributes()
                 changes = true;
                 break;
             }
+            case col_type_Link:
+                if (!attr.test(col_attr_Nullable)) {
+                    attr.set(col_attr_Nullable);
+                    m_attr.set(column_ndx, attr.m_value);
+                    changes = true;
+                }
+                break;
             case col_type_LinkList:
                 if (!attr.test(col_attr_List)) {
                     attr.set(col_attr_List);
