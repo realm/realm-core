@@ -1149,6 +1149,29 @@ void copy_list(ref_type sub_table_ref, Obj& obj, ColKey col, Allocator& alloc)
 }
 
 template <>
+void copy_list<util::Optional<Bool>>(ref_type sub_table_ref, Obj& obj, ColKey col, Allocator& alloc)
+{
+    if (sub_table_ref) {
+        // Actual list is in the columns array position 0
+        Array cols(alloc);
+        cols.init_from_ref(sub_table_ref);
+        BPlusTree<util::Optional<Int>> from_list(alloc);
+        from_list.set_parent(&cols, 0);
+        from_list.init_from_parent();
+        size_t list_size = from_list.size();
+        auto l = obj.get_list<util::Optional<Bool>>(col);
+        for (size_t j = 0; j < list_size; j++) {
+            util::Optional<Bool> val;
+            auto int_val = from_list.get(j);
+            if (int_val) {
+                val = (*int_val != 0);
+            }
+            l.add(val);
+        }
+    }
+}
+
+template <>
 void copy_list<String>(ref_type sub_table_ref, Obj& obj, ColKey col, Allocator& alloc)
 {
     if (sub_table_ref) {
@@ -1223,9 +1246,10 @@ void Table::migrate_objects(util::FunctionRef<void()> commit_and_continue)
     std::map<ColKey, std::unique_ptr<BPlusTree<int64_t>>> list_accessors;
     std::vector<size_t> cols_to_destroy;
     bool has_link_columns = false;
+    size_t nb_columns = m_spec.get_public_column_count();
 
     // helper function to determine the number of objects in the table
-    size_t number_of_objects = size_t(-1);
+    size_t number_of_objects = (nb_columns == 0) ? 0 : size_t(-1);
     auto update_size = [&number_of_objects](size_t s) {
         if (number_of_objects == size_t(-1)) {
             number_of_objects = s;
@@ -1235,7 +1259,6 @@ void Table::migrate_objects(util::FunctionRef<void()> commit_and_continue)
         }
     };
 
-    size_t nb_columns = m_spec.get_public_column_count();
     for (size_t col_ndx = 0; col_ndx < nb_columns; col_ndx++) {
         ColKey col_key = m_spec.get_key(col_ndx);
         ColumnAttrMask attr = m_spec.get_column_attr(col_ndx);
@@ -1366,9 +1389,22 @@ void Table::migrate_objects(util::FunctionRef<void()> commit_and_continue)
         // Then update possible list types
         for (auto& it : list_accessors) {
             switch (it.first.get_type()) {
-                case col_type_Int:
+                case col_type_Int: {
+                    if (it.first.get_attrs().test(col_attr_Nullable)) {
+                        copy_list<util::Optional<int64_t>>(to_ref(it.second->get(row_ndx)), obj, it.first, m_alloc);
+                    }
+                    else {
+                        copy_list<int64_t>(to_ref(it.second->get(row_ndx)), obj, it.first, m_alloc);
+                    }
+                    break;
+                }
                 case col_type_Bool:
-                    copy_list<int64_t>(to_ref(it.second->get(row_ndx)), obj, it.first, m_alloc);
+                    if (it.first.get_attrs().test(col_attr_Nullable)) {
+                        copy_list<util::Optional<Bool>>(to_ref(it.second->get(row_ndx)), obj, it.first, m_alloc);
+                    }
+                    else {
+                        copy_list<Bool>(to_ref(it.second->get(row_ndx)), obj, it.first, m_alloc);
+                    }
                     break;
                 case col_type_Float:
                     copy_list<float>(to_ref(it.second->get(row_ndx)), obj, it.first, m_alloc);
@@ -1460,8 +1496,8 @@ void Table::migrate_links(util::FunctionRef<void()> commit_and_continue)
             }
         }
     }
-    bool use_oid = (m_spec.get_column_name(0) == "!OID");
     if (sz != size_t(-1)) {
+        bool use_oid = (m_spec.get_column_name(0) == "!OID");
         BPlusTree<Int> oid_column(m_alloc);
         if (use_oid) {
             oid_column.init_from_ref(to_ref(col_refs.get(0)));
@@ -1502,7 +1538,7 @@ void Table::finalize_migration()
         Array::destroy_deep(ref, m_alloc);
         m_top.set(top_position_for_columns, 0);
     }
-    if (m_spec.get_column_name(0) == "!OID") {
+    if (m_spec.get_public_column_count() > 0 && m_spec.get_column_name(0) == "!OID") {
         remove_column(m_spec.get_key(0));
     }
 }
@@ -1709,6 +1745,10 @@ TableRef Table::get_link_target(ColKey col_key) noexcept
 
 size_t Table::count_int(ColKey col_key, int64_t value) const
 {
+    if (auto index = this->get_search_index(col_key)) {
+        return index->count(value);
+    }
+
     size_t count;
     if (is_nullable(col_key)) {
         aggregate<act_Count, util::Optional<int64_t>, int64_t>(col_key, value, &count);
@@ -1732,6 +1772,9 @@ size_t Table::count_double(ColKey col_key, double value) const
 }
 size_t Table::count_string(ColKey col_key, StringData value) const
 {
+    if (auto index = this->get_search_index(col_key)) {
+        return index->count(value);
+    }
     size_t count;
     aggregate<act_Count, StringData, StringData>(col_key, value, &count);
     return count;
@@ -1867,7 +1910,8 @@ ObjKey Table::find_first(ColKey col_key, StringData value) const
 
     if (col_key.get_type() == col_type_String && col_key == m_primary_key_col) {
         ObjectID object_id{value};
-        return global_to_local_object_id_hashed(object_id);
+        ObjKey k = global_to_local_object_id_hashed(object_id);
+        return is_valid(k) ? k : ObjKey();
     }
 
     ObjKey key;

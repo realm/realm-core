@@ -2347,7 +2347,7 @@ TEST(Query_OnTableView_where)
     }
 }
 
-TEST(Query_StrIndex3)
+TEST_IF(Query_StrIndex3, TEST_DURATION > 0)
 {
     // Create two columns where query match-density varies alot throughout the rows. This forces the query engine to
     // jump back and forth between the two conditions and test edge cases in these transitions. Tests combinations of
@@ -10019,7 +10019,7 @@ TEST(Query_IntOrQueryOptimisation)
     CHECK_EQUAL(q.count(), 3);
 }
 
-TEST(Query_IntOrQueryPerformance)
+TEST_IF(Query_IntOrQueryPerformance, TEST_DURATION > 0)
 {
     using std::chrono::duration_cast;
     using std::chrono::microseconds;

@@ -45,6 +45,8 @@ jobWrapper {
         println "Target branch: ${targetBranch}"
 
         releaseTesting = targetBranch.contains('release')
+        isMaster = currentBranch.contains('master')
+        longRunningTests = isMaster || currentBranch.contains('next-major')
         isPublishingRun = false
         if (gitTag) {
             isPublishingRun = currentBranch.contains('release')
@@ -53,8 +55,9 @@ jobWrapper {
         echo "Pull request: ${isPullRequest ? 'yes' : 'no'}"
         echo "Release Run: ${releaseTesting ? 'yes' : 'no'}"
         echo "Publishing Run: ${isPublishingRun ? 'yes' : 'no'}"
+        echo "Long running test: ${longRunningTests ? 'yes' : 'no'}"
 
-        if (['master'].contains(env.BRANCH_NAME)) {
+        if (isMaster) {
             // If we're on master, instruct the docker image builds to push to the
             // cache registry
             env.DOCKER_PUSH = "1"
@@ -64,7 +67,7 @@ jobWrapper {
     stage('Checking') {
         parallelExecutors = [
             checkLinuxDebug         : doCheckInDocker('Debug'),
-            checkLinuxDebugNoEncryp : doCheckInDocker('Debug', '4', 'OFF'),
+            checkLinuxDebugNoEncryp : doCheckInDocker('Release', '4', 'OFF'),
             checkMacOsRelease       : doBuildMacOs('Release', true),
             checkWin32Debug         : doBuildWindows('Debug', false, 'Win32', true),
             checkWin64Release       : doBuildWindows('Release', false, 'x64', true),
@@ -178,6 +181,7 @@ def doCheckInDocker(String buildType, String maxBpNodeSize = '1000', String enab
             getArchive()
             def buildEnv = docker.build 'realm-core:snapshot'
             def environment = environment()
+            def cxx_flags = longRunningTests ? ' -D CMAKE_CXX_FLAGS="-DTEST_DURATION=1"' : ''
             environment << 'UNITTEST_PROGRESS=1'
             withEnv(environment) {
                 buildEnv.inside() {
@@ -185,7 +189,7 @@ def doCheckInDocker(String buildType, String maxBpNodeSize = '1000', String enab
                         sh """
                            mkdir build-dir
                            cd build-dir
-                           cmake -D CMAKE_BUILD_TYPE=${buildType} -D REALM_MAX_BPNODE_SIZE=${maxBpNodeSize} -DREALM_ENABLE_ENCRYPTION=${enableEncryption} -G Ninja ..
+                           cmake -D CMAKE_BUILD_TYPE=${buildType}${cxx_flags} -D REALM_MAX_BPNODE_SIZE=${maxBpNodeSize} -DREALM_ENABLE_ENCRYPTION=${enableEncryption} -G Ninja ..
                         """
                         runAndCollectWarnings(script: "cd build-dir && ninja")
                         sh """
@@ -471,7 +475,8 @@ def doBuildMacOs(String buildType, boolean runTests) {
         node('osx') {
             getArchive()
 
-            def buildTests = runTests ? '' : '-DREALM_NO_TESTS=1'
+            def buildTests = runTests ? '' : ' -DREALM_NO_TESTS=1'
+            def cxx_flags = longRunningTests ? ' -D CMAKE_CXX_FLAGS="-DTEST_DURATION=1"' : ''
 
             dir("build-macosx-${buildType}") {
                 withEnv(['DEVELOPER_DIR=/Applications/Xcode-10.app/Contents/Developer/']) {
@@ -484,8 +489,8 @@ def doBuildMacOs(String buildType, boolean runTests) {
                                     rm -rf *
                                     cmake -D CMAKE_TOOLCHAIN_FILE=../tools/cmake/macosx.toolchain.cmake \\
                                           -D CMAKE_BUILD_TYPE=${buildType} \\
-                                          -D REALM_VERSION=${gitDescribeVersion} \\
-                                          ${buildTests} -G Ninja ..
+                                          -D REALM_VERSION=${gitDescribeVersion}\\
+                                          ${buildTests}${cxx_flags} -G Ninja ..
                                 """
                         }
                     }

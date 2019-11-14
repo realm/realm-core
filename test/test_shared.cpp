@@ -998,7 +998,7 @@ void add_int(Table& table, ColKey col, int64_t diff)
 } // anonymous namespace
 
 #if !REALM_ANDROID // FIXME
-TEST(Shared_ManyReaders)
+TEST_IF(Shared_ManyReaders, TEST_DURATION > 0)
 {
     // This test was written primarily to expose a former bug in
     // SharedGroup::end_read(), where the lock-file was not remapped
@@ -2955,11 +2955,15 @@ NONCONCURRENT_TEST(Shared_StaticFuzzTestRunSanityCheck)
     }
     else {
         // Number of fuzzy tests
+#if TEST_DURATION == 0
         const size_t iterations = 3;
+#else
+        const size_t iterations = 1000;
+#endif
 
         // Number of instructions in each test
         // Changing this strongly affects the test suite run time
-        const size_t instructions = 2000;
+        const size_t instructions = 200;
 
         for (size_t counter = 0; counter < iterations; counter++) {
             // You can use your own seed if you have observed a crashing unit test that

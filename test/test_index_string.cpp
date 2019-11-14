@@ -908,7 +908,7 @@ StringData create_string_with_nuls(const size_t bits, const size_t length, char*
 
 
 // Test for generated strings of length 1..16 with all combinations of embedded NUL bytes
-TEST_TYPES(StringIndex_EmbeddedZeroesCombinations, string_column, nullable_string_column)
+TEST_TYPES_IF(StringIndex_EmbeddedZeroesCombinations, TEST_DURATION > 1, string_column, nullable_string_column)
 {
     TEST_TYPE test_resources;
     typename TEST_TYPE::ColumnTestType& col = test_resources.get_column();
@@ -1704,7 +1704,8 @@ std::string create_random_a_string(size_t max_len) {
 
 
 // Excluded when run with valgrind because it takes a long time
-TEST_TYPES_IF(StringIndex_Insensitive_Fuzz, !running_with_valgrind, string_column, nullable_string_column, enum_column, nullable_enum_column)
+TEST_TYPES_IF(StringIndex_Insensitive_Fuzz, TEST_DURATION > 1, string_column, nullable_string_column, enum_column,
+              nullable_enum_column)
 {
     const size_t max_str_len = 9;
     const size_t iters = 3;
@@ -1832,6 +1833,8 @@ TEST(StringIndex_QuerySingleObject)
 
     auto q = table->where().equal(table->get_column_key("name"), "Foo", true);
     CHECK_EQUAL(q.count(), 1);
+    q = table->where().equal(table->get_column_key("name"), "Bar", true);
+    CHECK_EQUAL(q.count(), 0);
 }
 
 #endif // TEST_INDEX_STRING

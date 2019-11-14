@@ -90,6 +90,7 @@ inline int ConstObj::cmp(const ConstObj& other, ColKey::Idx col_ndx) const
 
 int ConstObj::cmp(const ConstObj& other, ColKey col_key) const
 {
+    other.check_valid();
     ColKey::Idx col_ndx = col_key.get_index();
     ColumnAttrMask attr = col_key.get_attrs();
     REALM_ASSERT(!attr.test(col_attr_List)); // TODO: implement comparison of lists
@@ -146,9 +147,15 @@ bool ConstObj::is_valid() const
     return m_valid;
 }
 
+void ConstObj::check_valid() const
+{
+    if (!is_valid())
+        throw std::runtime_error("Object not alive");
+}
+
 void ConstObj::remove()
 {
-    const_cast<Table*>(get_table())->remove_object(m_key);
+    const_cast<Table*>(m_table)->remove_object(m_key);
 }
 
 Mixed ConstObj::get_any(ColKey col_key) const

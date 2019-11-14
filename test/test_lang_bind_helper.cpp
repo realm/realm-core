@@ -2049,15 +2049,15 @@ TEST(LangBindHelper_AdvanceReadTransact_ErrorInObserver)
     ColKey col;
     Obj obj;
     // Add some initial data and then begin a read transaction at that version
-    {
-        WriteTransaction wt(sg);
-        TableRef table = wt.add_table("Table");
-        col = table->add_column(type_Int, "int");
-        obj = table->create_object().set_all(10);
-        wt.commit();
-    }
-    auto g = sg->start_read();
+    auto wt1 = sg->start_write();
+    TableRef table = wt1->add_table("Table");
+    col = table->add_column(type_Int, "int");
+    auto obj2 = table->create_object().set_all(10);
+    wt1->commit_and_continue_as_read();
 
+    auto g = sg->start_read();     // must follow commit, to see table just created
+    obj = g->import_copy_of(obj2); // cannot be imported if table does not exist
+    wt1->end_read();               // wt1 must live long enough to support import_copy_of of obj2
     // Modify the data with a different SG so that we can determine which version
     // the read transaction is using
     {
@@ -4869,7 +4869,7 @@ TEST(LangBindHelper_TableViewAggregateAfterAdvanceRead)
 
 // Tests handover of a Query. Especially it tests if next-gen-syntax nodes are deep copied correctly by
 // executing an imported query multiple times in parallel
-TEST(LangBindHelper_HandoverFuzzyTest)
+TEST_IF(LangBindHelper_HandoverFuzzyTest, TEST_DURATION > 0)
 {
     SHARED_GROUP_TEST_PATH(path);
 
