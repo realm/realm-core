@@ -13,6 +13,7 @@
 
 ### Internals
 * pk table removed. Primary key column is stored in Table structure.
+* Search index is not added to primary key string columns. Will compute key directly from primary key value.
 
 ----------------------------------------------
 

@@ -3024,10 +3024,25 @@ ColKey Table::get_primary_key_column() const
 
 void Table::set_primary_key_column(ColKey col_key)
 {
-    if (col_key) {
-        if (REALM_UNLIKELY(!valid_column(col_key)))
-            throw InvalidKey("Non-existing column");
+    if (col_key != m_primary_key_col) {
+        if (col_key) {
+            check_column(col_key);
 
+            if (Replication* repl = get_repl()) {
+                if (repl->get_history_type() == Replication::HistoryType::hist_SyncClient) {
+                    throw std::logic_error("Cannot change pk column in sync client");
+                }
+            }
+
+            add_search_index(col_key);
+        }
+        do_set_primary_key_column(col_key);
+    }
+}
+
+void Table::do_set_primary_key_column(ColKey col_key)
+{
+    if (col_key) {
         m_top.set(top_position_for_pk_col, RefOrTagged::make_tagged(col_key.value));
     }
     else {
@@ -3039,18 +3054,19 @@ void Table::set_primary_key_column(ColKey col_key)
 
 void Table::validate_primary_column_uniqueness() const
 {
-    auto col = get_primary_key_column();
-    if (this->has_search_index(col)) {
-        if (col && get_distinct_view(col).size() != size()) {
-            throw DuplicatePrimaryKeyValueException(get_name(), get_column_name(col));
+    if (ColKey col = get_primary_key_column()) {
+        if (this->has_search_index(col)) {
+            if (col && get_distinct_view(col).size() != size()) {
+                throw DuplicatePrimaryKeyValueException(get_name(), get_column_name(col));
+            }
         }
-    }
-    else {
-        for (auto o : *this) {
-            auto pk_val = o.get_any(col);
-            ObjectID object_id{pk_val};
-            if (global_to_local_object_id_hashed(object_id) != o.get_key()) {
-                throw std::runtime_error("Invalid primary key column");
+        else {
+            for (auto o : *this) {
+                auto pk_val = o.get_any(col);
+                ObjectID object_id{pk_val};
+                if (global_to_local_object_id_hashed(object_id) != o.get_key()) {
+                    throw std::runtime_error("Invalid primary key column");
+                }
             }
         }
     }
