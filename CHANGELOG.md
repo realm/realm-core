@@ -1,7 +1,23 @@
-# 6.0.0-alpha.25 Release notes
+# NEXT RELEASE
 
 ### Enhancements
 * None.
+
+### Fixed
+* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* None.
+ 
+### Breaking changes
+* None.
+
+-----------
+
+### Internals
+* None.
+
+----------------------------------------------
+
+# 6.0.0-alpha.25 Release notes
 
 ### Fixed
 * Upgrading a realm file with a table with no columns would fail ([#3470](https://github.com/realm/realm-core/issues/3470))
