@@ -287,15 +287,8 @@ void SyncMetadataManager::make_file_action_metadata(StringData original_name,
     TableRef table = ObjectStore::table_for_object_type(group, c_sync_fileActionMetadata);
 
     auto& schema = m_file_action_schema;
-    auto obj_key = table->find_first_string(schema.idx_original_name, original_name);
-    Obj obj;
-    if (!obj_key) {
-        obj = table->create_object();
-        obj.set(schema.idx_original_name, original_name);
-    }
-    else {
-        obj = table->get_object(obj_key);
-    }
+    Obj obj = table->create_object_with_primary_key(original_name);
+
     obj.set(schema.idx_new_name, new_name);
     obj.set(schema.idx_action, static_cast<int64_t>(action));
     obj.set(schema.idx_url, url);

@@ -48,9 +48,7 @@ const char * const c_versionColumnName = "version";
 const char c_object_table_prefix[] = "class_";
 
 void create_metadata_tables(Group& group) {
-    // The tables 'pk' and 'metadata' are treated specially by Sync. The 'pk' table
-    // is populated by `sync::create_table` and friends, while the 'metadata' table
-    // is simply ignored.
+    // The 'metadata' table is simply ignored by Sync
     TableRef metadata_table = group.get_or_add_table(c_metadataTableName);
 
     if (metadata_table->get_column_count() == 0) {
@@ -196,14 +194,12 @@ StringData ObjectStore::get_primary_key_for_object(Group const& group, StringDat
 
 void ObjectStore::set_primary_key_for_object(Group& group, StringData object_type, StringData primary_key) {
     auto t = table_for_object_type(group, object_type);
+    ColKey pk_col;
     if (primary_key.size()) {
-        auto col = t->get_column_key(primary_key);
-        REALM_ASSERT(col);
-        t->set_primary_key_column(col);
+        pk_col = t->get_column_key(primary_key);
+        REALM_ASSERT(pk_col);
     }
-    else {
-        t->remove_primary_key_column();
-    }
+    t->set_primary_key_column(pk_col);
 }
 
 StringData ObjectStore::object_type_for_table_name(StringData table_name) {
@@ -579,7 +575,7 @@ static void apply_post_migration_changes(Group& group,
                 t.validate_primary_column_uniqueness();
             }
             else {
-                t.remove_primary_key_column();
+                t.set_primary_key_column(ColKey());
             }
         }
 
@@ -769,6 +765,7 @@ util::Optional<Property> ObjectStore::property_for_column_index(ConstTableRef& t
     Property property;
     property.name = column_name;
     property.type = ObjectSchema::from_core_type(*table, column_key);
+    property.is_primary = table->get_primary_key_column() == column_key;
     property.is_indexed = table->has_search_index(column_key);
     property.column_key = column_key;
 

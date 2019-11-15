@@ -38,7 +38,6 @@ TEST_CASE("ObjectStore: table_name_for_object_type()") {
     }
 }
 
-#if 1
 TEST_CASE("ObjectStore:: property_for_column_index()") {
     SECTION("Property should match the schema") {
         Schema schema = {
@@ -72,15 +71,7 @@ TEST_CASE("ObjectStore:: property_for_column_index()") {
                 continue;
             }
             auto actual_property = *object_schema.property_for_name(property->name);
-
-            // property_for_column_index won't read the pk info, but it will set the is_index to true for pk.
-            // Property could be created with is_indexed = false , is_primary = true.
-            if (actual_property.is_primary) {
-                actual_property.is_primary = false;
-                actual_property.is_indexed = true;
-            }
             REQUIRE(property.value() == actual_property);
         }
    }
 }
-#endif
