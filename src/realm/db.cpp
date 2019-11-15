@@ -1498,12 +1498,12 @@ void DB::release_all_read_locks() noexcept
 // Note: close() and close_internal() may be called from the DB::~DB().
 // in that case, they will not throw. Throwing can only happen if called
 // directly.
-void DB::close()
+void DB::close(bool allow_open_read_transactions)
 {
-    close_internal(std::unique_lock<InterprocessMutex>(m_controlmutex, std::defer_lock));
+    close_internal(std::unique_lock<InterprocessMutex>(m_controlmutex, std::defer_lock), allow_open_read_transactions);
 }
 
-void DB::close_internal(std::unique_lock<InterprocessMutex> lock)
+void DB::close_internal(std::unique_lock<InterprocessMutex> lock, bool allow_open_read_transactions)
 {
     if (!is_attached())
         return;
@@ -1511,6 +1511,8 @@ void DB::close_internal(std::unique_lock<InterprocessMutex> lock)
     {
         std::lock_guard<std::recursive_mutex> local_lock(m_mutex);
         if (m_write_transaction_open)
+            throw LogicError(LogicError::wrong_transact_state);
+        if (!allow_open_read_transactions && m_transaction_count)
             throw LogicError(LogicError::wrong_transact_state);
     }
     SharedInfo* info = m_file_map.get_addr();

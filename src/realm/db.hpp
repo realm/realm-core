@@ -107,19 +107,21 @@ public:
     DB(const DB&) = delete;
     DB& operator=(const DB&) = delete;
     /// Close an open database. Calling close() is thread-safe with respect to
-    /// other calls to close and with respect to deleting transactions or calling
-    /// close on transactions. Calling close() leaves transactions (and any associated
+    /// other calls to close and with respect to deleting transactions.
+    /// Calling close() while a write transaction is open is an error and close()
+    /// will throw a LogicError::wrong_transact_state.
+    /// Calling close() while a read transaction is open is by default treated
+    /// in the same way, but close(true) will allow the error to be ignored and
+    /// release resources despite open read transactions.
+    /// As successfull call to close() leaves transactions (and any associated
     /// accessors) in a defunct state and the actual close() operation is not
     /// interlocked with access through those accessors, so any access through accessors
     /// may constitute a race with a call to close().
-    /// Calling close() while a write transaction is active will throw LogicError::wrong_transact_state
-    /// (Technically this could be left as undefined behaviour, but throwing allows us to
-    ///  more precisely pinpoint this problem).
     /// Instead of using DB::close() to release resources, we recommend using transactions
     /// to control release as follows:
     ///  * explicitly close() transactions at earliest time possible and
     ///  * explicitly nullify any DBRefs you may have.
-    void close();
+    void close(bool allow_open_read_transactions = false);
 
     bool is_attached() const noexcept;
 
@@ -504,7 +506,7 @@ private:
         m_alloc.reset_free_space_tracking();
     }
 
-    void close_internal(std::unique_lock<InterprocessMutex>);
+    void close_internal(std::unique_lock<InterprocessMutex>, bool allow_open_read_transactions);
     friend class Transaction;
 };
 
