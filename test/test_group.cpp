@@ -2056,8 +2056,14 @@ TEST(Group_PrimaryKeyCol)
     CHECK_EQUAL(k, obj.get_key());
     g.validate_primary_column_uniqueness();
     ColKey col2 = table->add_column(type_String, "secondary");
+
+    // Index will be created for new primary column
     table->set_primary_key_column(col2);
-    CHECK_THROW_ANY(g.validate_primary_column_uniqueness());
+    g.validate_primary_column_uniqueness();
+    obj = table->create_object_with_primary_key({"FooBar"});
+    primary_key_column = table->get_primary_key_column();
+    k = table->find_first(primary_key_column, StringData("FooBar"));
+    CHECK_EQUAL(k, obj.get_key());
 }
 
 #endif // TEST_GROUP

@@ -717,7 +717,7 @@ TableRef Group::add_table_with_primary_key(StringData name, DataType pk_type, St
         table = do_add_table(name, true);
 
         ColKey pk_col = table->add_column(pk_type, pk_name, nullable);
-        table->set_primary_key_column(pk_col);
+        table->do_set_primary_key_column(pk_col);
         if (pk_type != type_String) {
             table->add_search_index(pk_col);
         }

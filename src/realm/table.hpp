@@ -765,6 +765,7 @@ private:
     void erase_backlink_column(ColKey backlink_col_key);
 
     void set_opposite_column(ColKey col_key, TableKey opposite_table, ColKey opposite_column);
+    void do_set_primary_key_column(ColKey col_key);
 
     ObjKey get_next_key();
     /// Some Object IDs are generated as a tuple of the client_file_ident and a
