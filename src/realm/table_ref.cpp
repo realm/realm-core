@@ -36,6 +36,13 @@ ConstTableRef::operator bool() const
     return m_table != nullptr && m_table->get_instance_version() == m_instance_version;
 }
 
+const Table& ConstTableRef::operator*() const
+{
+    if (!operator bool()) {
+        throw realm::NoSuchTable();
+    }
+    return *m_table;
+}
 
 const Table* ConstTableRef::operator->() const
 {
@@ -43,6 +50,14 @@ const Table* ConstTableRef::operator->() const
         throw realm::NoSuchTable();
     }
     return m_table;
+}
+
+Table& TableRef::operator*() const
+{
+    if (!operator bool()) {
+        throw realm::NoSuchTable();
+    }
+    return *m_table;
 }
 
 Table* TableRef::operator->() const

@@ -37,10 +37,7 @@ public:
     ConstTableRef(std::nullptr_t) {}
 
     const Table* operator->() const;
-    const Table& operator*() const
-    {
-        return *m_table;
-    }
+    const Table& operator*() const;
     ConstTableRef()
     {
     }
@@ -82,10 +79,7 @@ protected:
 class TableRef : public ConstTableRef {
 public:
     Table* operator->() const;
-    Table& operator*() const
-    {
-        return *m_table;
-    }
+    Table& operator*() const;
     Table* unchecked_ptr() const
     {
         return m_table;
