@@ -42,7 +42,7 @@ void LinkMap::set_base_table(const Table* table)
 
         m_link_types.push_back(type);
         REALM_ASSERT(table->valid_column(link_column_key));
-        table = table->get_opposite_table(link_column_key);
+        table = table->get_opposite_table(link_column_key).unchecked_ptr();
         m_tables.push_back(table);
     }
 }

@@ -1132,7 +1132,7 @@ TEST(TableView_Backlinks)
     {
         // Links
         Obj obj = source->get_object(keys[2]);
-        TableView tv = obj.get_backlink_view(links, col_link);
+        TableView tv = obj.get_backlink_view(links.unchecked_ptr(), col_link);
 
         CHECK_EQUAL(tv.size(), 0);
 
@@ -1145,7 +1145,7 @@ TEST(TableView_Backlinks)
     {
         // LinkViews
         Obj obj = source->get_object(keys[2]);
-        TableView tv = obj.get_backlink_view(links, col_linklist);
+        TableView tv = obj.get_backlink_view(links.unchecked_ptr(), col_linklist);
 
         CHECK_EQUAL(tv.size(), 0);
 
@@ -1180,7 +1180,7 @@ TEST(TableView_BacklinksAfterMoveAssign)
     {
         // Links
         Obj obj = source->get_object(keys[2]);
-        TableView tv_source = obj.get_backlink_view(links, col_link);
+        TableView tv_source = obj.get_backlink_view(links.unchecked_ptr(), col_link);
         TableView tv;
         tv = std::move(tv_source);
 
@@ -1195,7 +1195,7 @@ TEST(TableView_BacklinksAfterMoveAssign)
     {
         // LinkViews
         Obj obj = source->get_object(keys[2]);
-        TableView tv_source = obj.get_backlink_view(links, col_linklist);
+        TableView tv_source = obj.get_backlink_view(links.unchecked_ptr(), col_linklist);
         TableView tv;
         tv = std::move(tv_source);
 
@@ -1616,7 +1616,7 @@ TEST(TableView_IsInTableOrder)
     CHECK_EQUAL(false, tv.is_in_table_order());
 
     // Backlinks are not guaranteed to be in table order.
-    tv = obj7.get_backlink_view(source, col_link);
+    tv = obj7.get_backlink_view(source.unchecked_ptr(), col_link);
     CHECK_EQUAL(false, tv.is_in_table_order());
 
     // Views derived from a LinkView are not guaranteed to be in table order.

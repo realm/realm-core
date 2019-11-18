@@ -437,7 +437,7 @@ TEST(Parser_ConstrainedQuery)
     list_0.add(obj0.get_key());
     list_0.add(obj1.get_key());
 
-    TableView tv = obj0.get_backlink_view(t, list_col);
+    TableView tv = obj0.get_backlink_view(t.unchecked_ptr(), list_col);
     Query q(*t, &tv);
     CHECK_EQUAL(q.count(), 1);
     q.and_query(t->column<Int>(int_col) <= 0);
@@ -2136,7 +2136,7 @@ TEST(Parser_IncludeDescriptor)
 
     std::vector<std::string> expected_include_names;
     auto reporter = [&](const Table* table, const std::unordered_set<ObjKey>& objs) {
-        CHECK(table == people);
+        CHECK(table == people.unchecked_ptr());
         CHECK_EQUAL(expected_include_names.size(), objs.size());
         for (auto obj : objs) {
             std::string obj_value = table->get_object(obj).get<String>(name_col);
@@ -2146,11 +2146,11 @@ TEST(Parser_IncludeDescriptor)
     };
 
     expected_include_names = {"Adam"};
-    includes.report_included_backlinks(accounts, tv.get_key(0), reporter);
+    includes.report_included_backlinks(accounts.unchecked_ptr(), tv.get_key(0), reporter);
     expected_include_names = {"Ben"};
-    includes.report_included_backlinks(accounts, tv.get_key(1), reporter);
+    includes.report_included_backlinks(accounts.unchecked_ptr(), tv.get_key(1), reporter);
     expected_include_names = {"Frank"};
-    includes.report_included_backlinks(accounts, tv.get_key(2), reporter);
+    includes.report_included_backlinks(accounts.unchecked_ptr(), tv.get_key(2), reporter);
 
     // Error checking
     std::string message;
@@ -2231,8 +2231,8 @@ TEST(Parser_IncludeDescriptorMultiple)
     std::vector<std::string> expected_people_names;
     std::vector<std::string> expected_language_names;
     auto reporter = [&](const Table* table, const std::unordered_set<ObjKey>& rows) {
-        CHECK(table == people || table == languages);
-        if (table == people) {
+        CHECK(table == people.unchecked_ptr() || table == languages.unchecked_ptr());
+        if (table == people.unchecked_ptr()) {
             CHECK_EQUAL(expected_people_names.size(), rows.size());
             for (auto row : rows) {
                 std::string row_value = table->get_object(row).get<StringData>(name_col);
@@ -2240,7 +2240,7 @@ TEST(Parser_IncludeDescriptorMultiple)
                       expected_people_names.end());
             }
         }
-        else if (table == languages) {
+        else if (table == languages.unchecked_ptr()) {
             CHECK_EQUAL(expected_language_names.size(), rows.size());
             if (expected_language_names.size() != rows.size()) {
                 throw std::runtime_error("blob");
@@ -2258,13 +2258,13 @@ TEST(Parser_IncludeDescriptorMultiple)
         CHECK(includes.is_valid());
         expected_people_names = {"Adam"};
         expected_language_names = {"English", "French"};
-        includes.report_included_backlinks(accounts, tv.get_key(0), reporter);
+        includes.report_included_backlinks(accounts.unchecked_ptr(), tv.get_key(0), reporter);
         expected_people_names = {"Ben"};
         expected_language_names = {"English", "French"};
-        includes.report_included_backlinks(accounts, tv.get_key(1), reporter);
+        includes.report_included_backlinks(accounts.unchecked_ptr(), tv.get_key(1), reporter);
         expected_people_names = {"Frank"};
         expected_language_names = {"Danish", "English"};
-        includes.report_included_backlinks(accounts, tv.get_key(2), reporter);
+        includes.report_included_backlinks(accounts.unchecked_ptr(), tv.get_key(2), reporter);
     }
     {
         parser::KeyPathMapping mapping;
@@ -2287,13 +2287,13 @@ TEST(Parser_IncludeDescriptorMultiple)
 
         expected_people_names = {"Adam"};
         expected_language_names = {"English", "French"};
-        includes.report_included_backlinks(accounts, tv.get_key(0), reporter);
+        includes.report_included_backlinks(accounts.unchecked_ptr(), tv.get_key(0), reporter);
         expected_people_names = {"Ben"};
         expected_language_names = {"English", "French"};
-        includes.report_included_backlinks(accounts, tv.get_key(1), reporter);
+        includes.report_included_backlinks(accounts.unchecked_ptr(), tv.get_key(1), reporter);
         expected_people_names = {"Frank"};
         expected_language_names = {"Danish", "English"};
-        includes.report_included_backlinks(accounts, tv.get_key(2), reporter);
+        includes.report_included_backlinks(accounts.unchecked_ptr(), tv.get_key(2), reporter);
     }
     {
         parser::KeyPathMapping mapping;
@@ -2329,13 +2329,13 @@ TEST(Parser_IncludeDescriptorMultiple)
 
         expected_people_names = {"Adam"};
         expected_language_names = {"English", "French"};
-        includes.report_included_backlinks(accounts, tv.get_key(0), reporter);
+        includes.report_included_backlinks(accounts.unchecked_ptr(), tv.get_key(0), reporter);
         expected_people_names = {"Ben"};
         expected_language_names = {"English", "French"};
-        includes.report_included_backlinks(accounts, tv.get_key(1), reporter);
+        includes.report_included_backlinks(accounts.unchecked_ptr(), tv.get_key(1), reporter);
         expected_people_names = {"Frank"};
         expected_language_names = {"Danish", "English"};
-        includes.report_included_backlinks(accounts, tv.get_key(2), reporter);
+        includes.report_included_backlinks(accounts.unchecked_ptr(), tv.get_key(2), reporter);
 
         std::string message;
         CHECK_THROW_ANY_GET_MESSAGE(realm::parser::parse_include_path(""), message);
@@ -2373,14 +2373,14 @@ TEST(Parser_IncludeDescriptorDeepLinks)
     size_t cur_ndx_to_check = 0;
     std::vector<std::string> expected_include_names;
     auto reporter = [&](const Table* table, const std::unordered_set<ObjKey>& rows) {
-        CHECK(table == people);
+        CHECK(table == people.unchecked_ptr());
         CHECK_EQUAL(1, rows.size());
         std::string row_value = table->get_object(*rows.begin()).get<String>(name_col);
         CHECK_EQUAL(row_value, expected_include_names[cur_ndx_to_check++]);
     };
 
     expected_include_names = {"John", "Mark", "Jonathan", "Eli"};
-    includes.report_included_backlinks(people, tv.get_key(0), reporter);
+    includes.report_included_backlinks(people.unchecked_ptr(), tv.get_key(0), reporter);
 }
 
 

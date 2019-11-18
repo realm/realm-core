@@ -45,7 +45,7 @@ public:
     {
     }
     operator bool() const;
-    operator const Table*() const
+    const Table* unchecked_ptr() const
     {
         return m_table;
     }
@@ -86,7 +86,7 @@ public:
     {
         return *m_table;
     }
-    operator Table*() const
+    Table* unchecked_ptr() const
     {
         return m_table;
     }

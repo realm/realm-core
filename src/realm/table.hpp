@@ -1141,7 +1141,7 @@ private:
         REALM_ASSERT(m_current_table->valid_column(ck));
         ColumnType type = ck.get_type();
         if (type == col_type_LinkList || type == col_type_Link || type == col_type_BackLink) {
-            m_current_table = m_current_table->get_opposite_table(ck);
+            m_current_table = m_current_table->get_opposite_table(ck).unchecked_ptr();
         }
         else {
             // Only last column in link chain is allowed to be non-link

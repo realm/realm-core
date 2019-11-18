@@ -3534,7 +3534,7 @@ public:
         : m_query(std::move(query))
         , m_link_map(link_column.link_map())
     {
-        REALM_ASSERT(m_link_map.get_target_table() == m_query.get_table());
+        REALM_ASSERT(m_link_map.get_target_table() == m_query.get_table().unchecked_ptr());
     }
 
     SubQueryCount count() const

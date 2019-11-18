@@ -85,7 +85,7 @@ TEST(Links_Columns)
     CHECK_EQUAL(1, obj1.get_backlink_count(*table1, col_link2));
     CHECK_EQUAL(table_1_keys[0], obj1.get_backlink(*table1, col_link2, 0));
 
-    auto tv = obj1.get_backlink_view(table1, col_link2);
+    auto tv = obj1.get_backlink_view(table1.unchecked_ptr(), col_link2);
     CHECK_EQUAL(tv.size(), 1);
 
     // remove a column (moving link column back)'

@@ -46,7 +46,7 @@ Query::Query(const Table& table, const LnkLst& list)
     if (m_view)
         m_view->check_cookie();
 #endif
-    REALM_ASSERT_DEBUG(&list.get_target_table() == m_table);
+    REALM_ASSERT_DEBUG(&list.get_target_table() == m_table.unchecked_ptr());
     create();
 }
 
@@ -59,7 +59,7 @@ Query::Query(const Table& table, LnkLstPtr&& ll)
     if (m_view)
         m_view->check_cookie();
 #endif
-    REALM_ASSERT_DEBUG(&ll->get_target_table() == m_table);
+    REALM_ASSERT_DEBUG(&ll->get_target_table() == m_table.unchecked_ptr());
     create();
 }
 

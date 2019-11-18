@@ -531,7 +531,7 @@ inline ConstTableView::ConstTableView(const Table* parent, ConstLnkLstPtr link_l
 }
 
 inline ConstTableView::ConstTableView(const ConstTableView& tv)
-    : ObjList(&m_table_view_key_values, tv.m_table)
+    : ObjList(&m_table_view_key_values, tv.m_table.unchecked_ptr())
     , m_source_column_key(tv.m_source_column_key)
     , m_linked_obj_key(tv.m_linked_obj_key)
     , m_linked_table(tv.m_linked_table)
@@ -549,7 +549,7 @@ inline ConstTableView::ConstTableView(const ConstTableView& tv)
 }
 
 inline ConstTableView::ConstTableView(ConstTableView&& tv) noexcept
-    : ObjList(&m_table_view_key_values, tv.m_table)
+    : ObjList(&m_table_view_key_values, tv.m_table.unchecked_ptr())
     , m_source_column_key(tv.m_source_column_key)
     , m_linked_obj_key(tv.m_linked_obj_key)
     , m_linked_table(tv.m_linked_table)
@@ -647,7 +647,7 @@ inline ConstTableView& ConstTableView::operator=(const ConstTableView& tv)
 template <class T>
 ConstTableView ObjList::find_all(ColKey column_key, T value)
 {
-    ConstTableView tv(m_table);
+    ConstTableView tv(m_table.unchecked_ptr());
     auto keys = tv.m_key_values;
     for_each([column_key, value, &keys](ConstObj& o) {
         if (o.get<T>(column_key) == value) {

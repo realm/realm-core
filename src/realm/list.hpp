@@ -122,7 +122,7 @@ public:
     }
     const Table* get_table() const
     {
-        return m_const_obj->get_table();
+        return m_const_obj->get_table().unchecked_ptr();
     }
     ColKey get_col_key() const
     {
@@ -800,19 +800,20 @@ public:
     LnkLst(const LnkLst& other)
         : ConstLstBase(other.m_col_key, &m_obj)
         , Lst<ObjKey>(other)
-        , ObjList(this->m_tree.get(), m_obj.get_target_table(m_col_key))
+        , ObjList(this->m_tree.get(), m_obj.get_target_table(m_col_key).unchecked_ptr())
     {
     }
     LnkLst(LnkLst&& other)
         : ConstLstBase(other.m_col_key, &m_obj)
         , Lst<ObjKey>(std::move(other))
-        , ObjList(this->m_tree.get(), m_obj.get_target_table(m_col_key))
+        , ObjList(this->m_tree.get(), m_obj.get_target_table(m_col_key).unchecked_ptr())
     {
     }
     LnkLst& operator=(const LnkLst& other)
     {
         Lst<ObjKey>::operator=(other);
-        this->ObjList::assign(this->m_tree.get(), m_obj.get_target_table(m_col_key));
+        this->ObjList::assign(this->m_tree.get(),
+                              m_obj.get_target_table(m_col_key).cast_away_const().unchecked_ptr());
         return *this;
     }
 

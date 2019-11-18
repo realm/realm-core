@@ -56,7 +56,7 @@ void ColumnsDescriptor::collect_dependencies(const Table* table, std::vector<Tab
                 if (!target_table)
                     return;
                 table_keys.push_back(target_table->get_key());
-                t = target_table;
+                t = target_table.unchecked_ptr();
             }
         }
     }
@@ -167,7 +167,7 @@ BaseDescriptor::Sorter::Sorter(std::vector<std::vector<ColKey>> const& column_li
                 // Only last column in link chain is allowed to be non-link
                 throw LogicError(LogicError::type_mismatch);
             }
-            tables[j + 1] = tables[j]->get_link_target(columns[j]);
+            tables[j + 1] = tables[j]->get_link_target(columns[j]).unchecked_ptr();
         }
 
         m_columns.emplace_back(tables.back(), columns.back(), ascending[i]);
@@ -523,7 +523,7 @@ void IncludeDescriptor::report_included_backlinks(
                     REALM_UNREACHABLE();
                 }
                 ConstTableRef linked_table = table->get_link_target(col_key);
-                table = linked_table;
+                table = linked_table.unchecked_ptr();
             }
             objkeys_to_explore = results_of_next_table;
         }

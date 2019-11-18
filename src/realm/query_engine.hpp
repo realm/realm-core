@@ -184,7 +184,7 @@ public:
 
     void set_table(const Table& table)
     {
-        if (&table == m_table)
+        if (&table == m_table.unchecked_ptr())
             return;
 
         m_table = ConstTableRef::unsafe_create(&table);

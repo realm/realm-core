@@ -2156,7 +2156,7 @@ const Table* Table::get_link_chain_target(const std::vector<ColKey>& link_chain)
         REALM_ASSERT(table->valid_column(link_chain[t]));
         ColumnType type = table->get_real_column_type(link_chain[t]);
         if (type == col_type_LinkList || type == col_type_Link || type == col_type_BackLink) {
-            table = table->get_opposite_table(link_chain[t]);
+            table = table->get_opposite_table(link_chain[t]).unchecked_ptr();
         }
         else {
             // Only last column in link chain is allowed to be non-link

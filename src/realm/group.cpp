@@ -937,7 +937,7 @@ void Group::remove_table(size_t table_ndx, TableKey key)
     table->detach();
     // Destroy underlying node structure
     Array::destroy_deep(ref, m_alloc);
-    recycle_table_accessor(table);
+    recycle_table_accessor(table.unchecked_ptr());
 }
 
 
