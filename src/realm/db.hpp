@@ -93,7 +93,10 @@ using DBRef = std::shared_ptr<DB>;
 
 class DB : public std::enable_shared_from_this<DB> {
 public:
-    // Create a DB and associate it with a file.
+    // Create a DB and associate it with a file. DB Objects can only be associated with one file,
+    // the association determined on creation of the DB Object. The association can be broken by
+    // calling DB::close(), but after that no new association can be established. To reopen the
+    // file (or another file), a new DB object is needed.
     static DBRef create(const std::string& file, bool no_create = false, const DBOptions options = DBOptions());
     static DBRef create(Replication& repl, const DBOptions options = DBOptions());
 
@@ -103,10 +106,22 @@ public:
     // instance, open another DB object on the same file. But you don't.
     DB(const DB&) = delete;
     DB& operator=(const DB&) = delete;
-    /// Close any open database. Close() is not thread-safe with respect to other calls to close().
-    /// We recommend releasing any DBref and explicitly closing all transactions instead of explicitly
-    /// closing the DB object.
-    void close() noexcept;
+    /// Close an open database. Calling close() is thread-safe with respect to
+    /// other calls to close and with respect to deleting transactions.
+    /// Calling close() while a write transaction is open is an error and close()
+    /// will throw a LogicError::wrong_transact_state.
+    /// Calling close() while a read transaction is open is by default treated
+    /// in the same way, but close(true) will allow the error to be ignored and
+    /// release resources despite open read transactions.
+    /// As successfull call to close() leaves transactions (and any associated
+    /// accessors) in a defunct state and the actual close() operation is not
+    /// interlocked with access through those accessors, so any access through accessors
+    /// may constitute a race with a call to close().
+    /// Instead of using DB::close() to release resources, we recommend using transactions
+    /// to control release as follows:
+    ///  * explicitly close() transactions at earliest time possible and
+    ///  * explicitly nullify any DBRefs you may have.
+    void close(bool allow_open_read_transactions = false);
 
     bool is_attached() const noexcept;
 
@@ -182,7 +197,7 @@ public:
     version_type get_version_of_latest_snapshot();
 
     /// Thrown by start_read() if the specified version does not correspond to a
-    /// bound (or tethered) snapshot.
+    /// bound (AKA tethered) snapshot.
     struct BadVersion;
 
 
@@ -194,7 +209,7 @@ public:
     TransactionRef start_write(bool nonblocking = false);
 
 
-    // report statistics of last commit done on THIS shared group.
+    // report statistics of last commit done on THIS DB.
     // The free space reported is what can be expected to be freed
     // by compact(). This may not correspond to the space which is free
     // at the point where get_stats() is called, since that will include
@@ -245,7 +260,7 @@ public:
     ///
     /// FIXME: This function is not yet implemented in an exception-safe manner,
     /// therefore, if it throws, the application should not attempt to
-    /// continue. If may not even be safe to destroy the SharedGroup object.
+    /// continue. If may not even be safe to destroy the DB object.
     ///
     /// WARNING / FIXME: compact() should NOT be exposed publicly on Windows
     /// because it's not crash safe! It may corrupt your database if something fails
@@ -258,11 +273,15 @@ public:
 #endif
 
 /// Once created, accessors belong to a transaction and can only be used for
-/// access as long as that transaction is still active.
+/// access as long as that transaction is still active. Copies of accessors
+/// can be created in association with another transaction, the importing transaction,
+/// using said transactions import_copy_of method. This process is called
+/// accessor import. Prior to Core 6, the corresponding mechanism was known
+/// as "handover".
 ///
-/// For TableViews, there are 3 forms of handover determined by the PayloadPolicy.
+/// For TableViews, there are 3 forms of import determined by the PayloadPolicy.
 ///
-/// - with payload move: the payload is handed over and ends up as a payload
+/// - with payload move: the payload imported ends up as a payload
 ///   held by the accessor at the importing side. The accessor on the
 ///   exporting side will rerun its query and generate a new payload, if
 ///   TableView::sync_if_needed() is called. If the original payload was in
@@ -270,7 +289,7 @@ public:
 ///   side. This is indicated to handover_export() by the argument
 ///   PayloadPolicy::Move
 ///
-/// - with payload copy: a copy of the payload is handed over, so both the
+/// - with payload copy: a copy of the payload is imported, so both the
 ///   accessors on the exporting side *and* the accessors created at the
 ///   importing side has their own payload. This is indicated to
 ///   handover_export() by the argument PayloadPolicy::Copy
@@ -281,24 +300,24 @@ public:
 ///   of a new payload. This form of handover is indicated to
 ///   handover_export() by the argument PayloadPolicy::Stay.
 ///
-/// For all other (non-TableView) accessors, handover is done with payload
+/// For all other (non-TableView) accessors, importing is done with payload
 /// copy, since the payload is trivial.
 ///
-/// Handover *without* payload is useful when you want to ship a tableview
+/// Importing *without* payload is useful when you want to ship a tableview
 /// with its query for execution in a background thread. Handover with
 /// *payload move* is useful when you want to transfer the result back.
 ///
-/// Handover *without* payload or with payload copy is guaranteed *not* to
+/// Importing *without* payload or with payload copy is guaranteed *not* to
 /// change the accessors on the exporting side.
 ///
-/// Handover is *not* thread safe and should be carried out
+/// Importing is *not* thread safe and should be carried out
 /// by the thread that "owns" the involved accessors.
 ///
-/// Handover is transitive:
-/// If the object being handed over depends on other views
-/// (table- or link- ), those objects will be handed over as well. The mode
-/// of handover (payload copy, payload move, without payload) is applied
-/// recursively. Note: If you are handing over a tableview dependent upon
+/// Importing is transitive:
+/// If the object being imported depends on other views
+/// (table- or link- ), those objects will be imported as well. The mode
+/// (payload copy, payload move, without payload) is applied
+/// recursively. Note: If you are importing a tableview dependent upon
 /// another tableview and using MutableSourcePayload::Move,
 /// you are on thin ice!
 ///
@@ -327,6 +346,8 @@ public:
     // It is safe to delete those returned files/directories in the call_with_lock's callback.
     static std::vector<std::pair<std::string, bool>> get_core_files(const std::string& realm_path);
 
+protected:
+    explicit DB(const DBOptions& options); // Is this ever used?
 
 private:
     std::recursive_mutex m_mutex;
@@ -347,17 +368,18 @@ private:
     size_t m_free_space = 0;
     size_t m_locked_space = 0;
     size_t m_used_space = 0;
-    uint_fast32_t m_local_max_entry = 0;
+    uint_fast32_t m_local_max_entry = 0; // highest version observed by this DB
+    std::vector<ReadLockInfo> m_local_locks_held; // tracks all read locks held by this DB
     util::File m_file;
-    util::File::Map<SharedInfo> m_file_map; // Never remapped
-    util::File::Map<SharedInfo> m_reader_map;
+    util::File::Map<SharedInfo> m_file_map; // Never remapped, provides access to everything but the ringbuffer
+    util::File::Map<SharedInfo> m_reader_map; // provides access to ringbuffer, remapped as needed when it grows
     bool m_wait_for_change_enabled = true; // Initially wait_for_change is enabled
+    bool m_write_transaction_open = false;
     std::string m_lockfile_path;
     std::string m_lockfile_prefix;
     std::string m_db_path;
     std::string m_coordination_dir;
     const char* m_key;
-    //    TransactStage m_transact_stage;
     int m_file_format_version = 0;
     util::InterprocessMutex m_writemutex;
 #ifdef REALM_ASYNC_DAEMON
@@ -374,10 +396,6 @@ private:
     std::function<void(int, int)> m_upgrade_callback;
 
     std::shared_ptr<metrics::Metrics> m_metrics;
-protected:
-    explicit DB(const DBOptions& options);
-
-private:
     /// Attach this DB instance to the specified database file.
     ///
     /// While at least one instance of DB exists for a specific
@@ -395,11 +413,8 @@ private:
     /// created (unless this is set to true.) When multiple threads are involved,
     /// it is safe to let the first thread, that gets to it, create the file.
     ///
-    /// \param options See SharedGroupOptions for details of each option.
+    /// \param options See DBOptions for details of each option.
     /// Sensible defaults are provided if this parameter is left out.
-    ///
-    /// Calling open() on a DB instance that is already in the attached
-    /// state has undefined behavior.
     ///
     /// \throw util::File::AccessError If the file could not be opened. If the
     /// reason corresponds to one of the exception types that are derived from
@@ -457,6 +472,10 @@ private:
     // call to grab_read_lock().
     void release_read_lock(ReadLockInfo&) noexcept;
 
+    // Release all read locks held by this DB object. After release, further calls to
+    // release_read_lock for locks already released must be avoided.
+    void release_all_read_locks() noexcept;
+
     /// return true if write transaction can commence, false otherwise.
     bool do_try_begin_write();
     void do_begin_write();
@@ -487,7 +506,7 @@ private:
         m_alloc.reset_free_space_tracking();
     }
 
-    void close_internal(std::unique_lock<InterprocessMutex>) noexcept;
+    void close_internal(std::unique_lock<InterprocessMutex>, bool allow_open_read_transactions);
     friend class Transaction;
 };
 
@@ -516,6 +535,10 @@ public:
         return db->get_version_of_latest_snapshot();
     }
     void close();
+    bool is_attached()
+    {
+        return m_transact_stage != DB::transact_Ready && db->is_attached();
+    }
 
     /// Get the approximate size of the data that would be written to the file if
     /// a commit were done at this point. The reported size will always be bigger

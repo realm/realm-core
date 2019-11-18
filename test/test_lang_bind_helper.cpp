@@ -4806,6 +4806,27 @@ TEST(LangBindHelper_CompactLargeEncryptedFile)
 }
 #endif
 
+TEST(LangBindHelper_CloseDBvsTransactions)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key(true)));
+    auto tr0 = sg->start_read();
+    auto tr1 = sg->start_write();
+    CHECK(tr1->add_table("possible"));
+    // write transactions must be closed (one way or the other) before DB::close
+    CHECK_THROW(sg->close(), LogicError);
+    tr1->rollback();
+    // closing the DB explicitly while there are open read transactions will fail
+    CHECK_THROW(sg->close(), LogicError); 
+    // unless we explicitly ask for it to succeed()
+    sg->close(true); 
+    CHECK(!sg->is_attached());
+    CHECK(!tr0->is_attached());
+    CHECK(!tr1->is_attached());
+    CHECK_THROW(sg->start_read(), LogicError);
+}
+
 TEST(LangBindHelper_TableViewAggregateAfterAdvanceRead)
 {
     SHARED_GROUP_TEST_PATH(path);

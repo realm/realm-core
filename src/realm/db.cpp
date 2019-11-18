@@ -1483,16 +1483,38 @@ DB::~DB() noexcept
     }
 }
 
-void DB::close() noexcept
+void DB::release_all_read_locks() noexcept
 {
-    close_internal(std::unique_lock<InterprocessMutex>(m_controlmutex, std::defer_lock));
+    std::lock_guard<std::recursive_mutex> local_lock(m_mutex);
+    SharedInfo* r_info = m_reader_map.get_addr();
+    for (auto& read_lock: m_local_locks_held) {
+        --m_transaction_count;
+        const Ringbuffer::ReadCount& r = r_info->readers.get(read_lock.m_reader_idx);
+        atomic_double_dec(r.count);
+    }
+    m_local_locks_held.clear();
 }
 
-void DB::close_internal(std::unique_lock<InterprocessMutex> lock) noexcept
+// Note: close() and close_internal() may be called from the DB::~DB().
+// in that case, they will not throw. Throwing can only happen if called
+// directly.
+void DB::close(bool allow_open_read_transactions)
+{
+    close_internal(std::unique_lock<InterprocessMutex>(m_controlmutex, std::defer_lock), allow_open_read_transactions);
+}
+
+void DB::close_internal(std::unique_lock<InterprocessMutex> lock, bool allow_open_read_transactions)
 {
     if (!is_attached())
         return;
 
+    {
+        std::lock_guard<std::recursive_mutex> local_lock(m_mutex);
+        if (m_write_transaction_open)
+            throw LogicError(LogicError::wrong_transact_state);
+        if (!allow_open_read_transactions && m_transaction_count)
+            throw LogicError(LogicError::wrong_transact_state);
+    }
     SharedInfo* info = m_file_map.get_addr();
     {
         bool is_sync_agent = m_replication ? m_replication->is_sync_agent() : false;
@@ -1507,7 +1529,7 @@ void DB::close_internal(std::unique_lock<InterprocessMutex> lock) noexcept
             REALM_ASSERT(info->sync_agent_present);
             info->sync_agent_present = 0; // Set to false
         }
-
+        release_all_read_locks();
         --info->num_participants;
         bool end_of_session = info->num_participants == 0;
         // std::cerr << "closing" << std::endl;
@@ -1808,6 +1830,22 @@ void DB::upgrade_file_format(bool allow_file_format_upgrade, int target_file_for
 void DB::release_read_lock(ReadLockInfo& read_lock) noexcept
 {
     std::lock_guard<std::recursive_mutex> lock(m_mutex);
+    bool found_match = false;
+    // simple linear search and move-last-over if a match is found.
+    // common case should have only a modest number of transactions in play..
+    for (size_t j = 0; j < m_local_locks_held.size(); ++j) {
+        if (m_local_locks_held[j].m_version == read_lock.m_version) {
+            m_local_locks_held[j] = m_local_locks_held.back();
+            m_local_locks_held.pop_back();
+            found_match = true;
+            break;
+        }
+    }
+    if (!found_match) {
+        REALM_ASSERT(!is_attached());
+        // it's OK, someone called close() and all locks where released
+        return;
+    }
     --m_transaction_count;
     SharedInfo* r_info = m_reader_map.get_addr();
     const Ringbuffer::ReadCount& r = r_info->readers.get(read_lock.m_reader_idx);
@@ -1818,6 +1856,7 @@ void DB::release_read_lock(ReadLockInfo& read_lock) noexcept
 void DB::grab_read_lock(ReadLockInfo& read_lock, VersionID version_id)
 {
     std::lock_guard<std::recursive_mutex> lock(m_mutex);
+    REALM_ASSERT_RELEASE(is_attached());
     if (version_id.version == std::numeric_limits<version_type>::max()) {
         for (;;) {
             SharedInfo* r_info = m_reader_map.get_addr();
@@ -1835,6 +1874,7 @@ void DB::grab_read_lock(ReadLockInfo& read_lock, VersionID version_id)
             read_lock.m_version = r.version;
             read_lock.m_top_ref = to_size_t(r.current_top);
             read_lock.m_file_size = to_size_t(r.filesize);
+            m_local_locks_held.emplace_back(read_lock);
             ++m_transaction_count;
             // REALM_ASSERT(m_alloc.matches_section_boundary(read_lock.m_file_size));
             REALM_ASSERT(read_lock.m_file_size > read_lock.m_top_ref);
@@ -1872,6 +1912,7 @@ void DB::grab_read_lock(ReadLockInfo& read_lock, VersionID version_id)
         read_lock.m_version = r.version;
         read_lock.m_top_ref = to_size_t(r.current_top);
         read_lock.m_file_size = to_size_t(r.filesize);
+        m_local_locks_held.emplace_back(read_lock);
         ++m_transaction_count;
         // REALM_ASSERT(m_alloc.matches_section_boundary(read_lock.m_file_size));
         REALM_ASSERT(read_lock.m_file_size > read_lock.m_top_ref);
@@ -1987,6 +2028,8 @@ void DB::do_end_write() noexcept
     info->next_served++;
     m_pick_next_writer.notify_all();
 
+    std::lock_guard<std::recursive_mutex> local_lock(m_mutex);
+    m_write_transaction_open = false;
     m_writemutex.unlock();
 }
 
@@ -2025,6 +2068,8 @@ Replication::version_type DB::do_commit(Transaction& transaction)
 
 DB::version_type Transaction::commit_and_continue_as_read()
 {
+    if (!is_attached())
+        throw LogicError(LogicError::wrong_transact_state);
     if (m_transact_stage != DB::transact_Writing)
         throw LogicError(LogicError::wrong_transact_state);
 
@@ -2271,6 +2316,8 @@ void TransactionDeleter(Transaction* t)
 
 TransactionRef DB::start_read(VersionID version_id)
 {
+    if (!is_attached())
+        throw LogicError(LogicError::wrong_transact_state);
     ReadLockInfo read_lock;
     grab_read_lock(read_lock, version_id);
     ReadLockGuard g(*this, read_lock);
@@ -2282,6 +2329,8 @@ TransactionRef DB::start_read(VersionID version_id)
 
 TransactionRef DB::start_frozen(VersionID version_id)
 {
+    if (!is_attached())
+        throw LogicError(LogicError::wrong_transact_state);
     ReadLockInfo read_lock;
     grab_read_lock(read_lock, version_id);
     ReadLockGuard g(*this, read_lock);
@@ -2378,6 +2427,11 @@ _impl::History* Transaction::get_history() const
 
 void Transaction::rollback()
 {
+    // rollback may happen as a consequence of exception handling in cases where
+    // the DB has detached. If so, just back out without trying to change state.
+    // the DB object has already been closed and no further processing is possible.
+    if (!is_attached())
+        return; 
     if (m_transact_stage == DB::transact_Ready)
         return; // Idempotency
 
@@ -2403,6 +2457,8 @@ size_t Transaction::get_commit_size() const
 
 DB::version_type Transaction::commit()
 {
+    if (!is_attached())
+        throw LogicError(LogicError::wrong_transact_state);
     if (m_transact_stage != DB::transact_Writing)
         throw LogicError(LogicError::wrong_transact_state);
 
@@ -2431,6 +2487,8 @@ DB::version_type Transaction::commit()
 
 void Transaction::commit_and_continue_writing()
 {
+    if (!is_attached())
+        throw LogicError(LogicError::wrong_transact_state);
     if (m_transact_stage != DB::transact_Writing)
         throw LogicError(LogicError::wrong_transact_state);
 
@@ -2488,6 +2546,14 @@ TransactionRef DB::start_write(bool nonblocking)
     }
     else {
         do_begin_write();
+    }
+    {
+        std::lock_guard<std::recursive_mutex> local_lock(m_mutex);
+        if (!is_attached()) {
+            do_end_write();
+            throw LogicError(LogicError::wrong_transact_state);
+        }
+        m_write_transaction_open = true;
     }
     ReadLockInfo read_lock;
     Transaction* tr;
