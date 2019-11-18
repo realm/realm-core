@@ -972,7 +972,7 @@ inline TableRef Group::get_table(TableKey key)
     std::lock_guard<std::mutex> lock(m_accessor_mutex);
     auto ndx = key2ndx_checked(key);
     Table* table = do_get_table(ndx); // Throws
-    return TableRef(table);
+    return TableRef(table, table ? table->m_alloc.get_instance_version() : 0);
 }
 
 inline ConstTableRef Group::get_table(TableKey key) const
@@ -982,7 +982,7 @@ inline ConstTableRef Group::get_table(TableKey key) const
     std::lock_guard<std::mutex> lock(m_accessor_mutex);
     auto ndx = key2ndx_checked(key);
     const Table* table = do_get_table(ndx); // Throws
-    return ConstTableRef(table);
+    return ConstTableRef(table, table ? table->m_alloc.get_instance_version() : 0);
 }
 
 inline TableRef Group::get_table(StringData name)
@@ -991,7 +991,7 @@ inline TableRef Group::get_table(StringData name)
         throw LogicError(LogicError::detached_accessor);
     std::lock_guard<std::mutex> lock(m_accessor_mutex);
     Table* table = do_get_table(name); // Throws
-    return TableRef(table);
+    return TableRef(table, table ? table->m_alloc.get_instance_version() : 0);
 }
 
 inline ConstTableRef Group::get_table(StringData name) const
@@ -1000,7 +1000,7 @@ inline ConstTableRef Group::get_table(StringData name) const
         throw LogicError(LogicError::detached_accessor);
     std::lock_guard<std::mutex> lock(m_accessor_mutex);
     const Table* table = do_get_table(name); // Throws
-    return ConstTableRef(table);
+    return ConstTableRef(table, table ? table->m_alloc.get_instance_version() : 0);
 }
 
 inline TableRef Group::add_table(StringData name, bool require_unique_name)
@@ -1008,7 +1008,7 @@ inline TableRef Group::add_table(StringData name, bool require_unique_name)
     if (!is_attached())
         throw LogicError(LogicError::detached_accessor);
     Table* table = do_add_table(name, require_unique_name); // Throws
-    return TableRef(table);
+    return TableRef(table, table ? table->m_alloc.get_instance_version() : 0);
 }
 
 inline TableRef Group::get_or_add_table(StringData name, bool* was_added)
@@ -1016,7 +1016,7 @@ inline TableRef Group::get_or_add_table(StringData name, bool* was_added)
     if (!is_attached())
         throw LogicError(LogicError::detached_accessor);
     Table* table = do_get_or_add_table(name, was_added); // Throws
-    return TableRef(table);
+    return TableRef(table, table ? table->m_alloc.get_instance_version() : 0);
 }
 
 template <class S>

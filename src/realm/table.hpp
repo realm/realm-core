@@ -626,11 +626,11 @@ public:
     // Get a reference to this table
     TableRef get_table_ref()
     {
-        return TableRef(this);
+        return TableRef::unsafe_create(this);
     }
     ConstTableRef get_table_ref() const
     {
-        return ConstTableRef(this);
+        return ConstTableRef::unsafe_create(this);
     }
 
     /// \brief Compare two tables for equality.

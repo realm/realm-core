@@ -82,7 +82,7 @@ public:
     ConstTableRef get_table() const
     {
         check_valid();
-        return ConstTableRef(m_table);
+        return ConstTableRef::unsafe_create(m_table);
     }
 
     Replication* get_replication() const;
@@ -217,7 +217,7 @@ public:
     TableRef get_table() const
     {
         check_valid();
-        return TableRef(const_cast<Table*>(m_table));
+        return ConstTableRef::unsafe_create(m_table).cast_away_const();
     }
 
 

@@ -187,7 +187,7 @@ public:
         if (&table == m_table)
             return;
 
-        m_table = ConstTableRef(&table);
+        m_table = ConstTableRef::unsafe_create(&table);
         if (m_condition_column_key != ColKey()) {
             m_condition_column_name = m_table->get_column_name(m_condition_column_key);
         }

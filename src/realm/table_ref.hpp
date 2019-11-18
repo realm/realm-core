@@ -41,7 +41,6 @@ public:
     {
         return *m_table;
     }
-    explicit ConstTableRef(const Table* t_ptr);
     ConstTableRef()
     {
     }
@@ -65,13 +64,19 @@ public:
     {
         return o << "TableRef(" << m_table << ", " << m_instance_version << ")";
     }
+    TableRef cast_away_const() const;
+    static ConstTableRef unsafe_create(const Table* t_ptr);
 
 protected:
+    explicit ConstTableRef(const Table* t_ptr, uint64_t instance_version)
+        : m_table(const_cast<Table*>(t_ptr))
+        , m_instance_version(instance_version)
+    {
+    }
+    friend class Group; // only Group::get_table() and friends can safely create a TableRef
+
     Table* m_table = nullptr;
     uint64_t m_instance_version = 0;
-
-    friend class Group;
-    friend class Table;
 };
 
 class TableRef : public ConstTableRef {
@@ -85,19 +90,20 @@ public:
     {
         return m_table;
     }
-    explicit TableRef(Table* t_ptr)
-        : ConstTableRef(t_ptr)
-    {
-    }
     TableRef(std::nullptr_t) {}
     TableRef()
         : ConstTableRef()
     {
     }
+    static TableRef unsafe_create(Table* t_ptr);
 
-protected:
-    friend class Group;
-    friend class Table;
+private:
+    explicit TableRef(Table* t_ptr, uint64_t instance_version)
+        : ConstTableRef(t_ptr, instance_version)
+    {
+    }
+    friend class Group; // only Group::get_table() and friends can safely create a TableRef
+    friend class ConstTableRef;
 };
 
 
@@ -107,6 +113,10 @@ inline ConstTableRef::ConstTableRef(const TableRef& other)
 {
 }
 
+inline TableRef ConstTableRef::cast_away_const() const
+{
+    return TableRef(m_table, m_instance_version);
+}
 
 inline std::ostream& operator<<(std::ostream& o, const ConstTableRef& tr)
 {

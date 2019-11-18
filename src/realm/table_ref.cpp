@@ -21,10 +21,14 @@
 
 namespace realm {
 
-ConstTableRef::ConstTableRef(const Table* t_ptr)
-    : m_table(const_cast<Table*>(t_ptr))
-    , m_instance_version(t_ptr ? t_ptr->get_instance_version() : 0)
+ConstTableRef ConstTableRef::unsafe_create(const Table* t_ptr)
 {
+    return ConstTableRef(const_cast<Table*>(t_ptr), t_ptr ? t_ptr->get_instance_version() : 0);
+}
+
+TableRef TableRef::unsafe_create(Table* t_ptr)
+{
+    return TableRef(t_ptr, t_ptr ? t_ptr->get_instance_version() : 0);
 }
 
 ConstTableRef::operator bool() const

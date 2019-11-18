@@ -732,7 +732,7 @@ TableRef Group::add_table_with_primary_key(StringData name, DataType pk_type, St
 #endif // REALM_DEBUG
     }
 
-    return TableRef(table);
+    return TableRef(table, table ? table->m_alloc.get_instance_version() : 0);
 }
 
 Table* Group::do_add_table(StringData name, bool require_unique_name)
