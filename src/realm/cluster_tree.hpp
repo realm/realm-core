@@ -181,22 +181,27 @@ public:
 
     ConstIterator(const ClusterTree& t, size_t ndx);
     ConstIterator(const ClusterTree& t, ObjKey key);
-    ConstIterator(Iterator&&);
     ConstIterator(const ConstIterator& other)
         : ConstIterator(other.m_tree, other.m_key)
     {
     }
-    ConstIterator& operator=(ConstIterator&& other)
+    ConstIterator& operator=(const ConstIterator& other)
     {
         REALM_ASSERT(&m_tree == &other.m_tree);
         m_key = other.m_key;
+        m_leaf_invalid = other.m_leaf_invalid;
         return *this;
     }
     reference operator*() const
     {
         return *operator->();
     }
+    // If the object pointed to by the iterator is deleted, you will get an exception if
+    // you try to dereference the iterator before advancing it.
     pointer operator->() const;
+    // Advance the iterator to the next object in the table. This also holds if the object
+    // pointed to is deleted. That is - you will get the same result of advancing no matter
+    // if the previous object is deleted or not.
     ConstIterator& operator++();
     ConstIterator& operator+=(ptrdiff_t adj);
     ConstIterator operator+(ptrdiff_t adj)
@@ -216,8 +221,9 @@ protected:
     mutable Cluster m_leaf;
     mutable ClusterNode::IteratorState m_state;
     mutable uint64_t m_instance_version = uint64_t(-1);
-    mutable ObjKey m_key;
-    mutable std::aligned_storage<sizeof(Obj), alignof(Obj)>::type m_obj_cache_storage;
+    ObjKey m_key;
+    mutable bool m_leaf_invalid;
+    mutable Obj m_obj;
 
     ObjKey load_leaf(ObjKey key) const;
 };

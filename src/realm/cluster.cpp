@@ -2148,6 +2148,7 @@ ClusterTree::ConstIterator::ConstIterator(const ClusterTree& t, size_t ndx)
         // end
         m_key = null_key;
     }
+    m_leaf_invalid = !m_key;
 }
 
 ClusterTree::ConstIterator::ConstIterator(const ClusterTree& t, ObjKey key)
@@ -2157,6 +2158,8 @@ ClusterTree::ConstIterator::ConstIterator(const ClusterTree& t, ObjKey key)
     , m_instance_version(t.get_instance_version())
     , m_key(key)
 {
+    auto k = load_leaf(m_key);
+    m_leaf_invalid = (k != m_key);
 }
 
 ObjKey ClusterTree::ConstIterator::load_leaf(ObjKey key) const
@@ -2176,31 +2179,41 @@ ObjKey ClusterTree::ConstIterator::load_leaf(ObjKey key) const
 
 ClusterTree::ConstIterator::pointer Table::ConstIterator::operator->() const
 {
-    if (m_storage_version != m_tree.get_storage_version(m_instance_version)) {
+    if (m_leaf_invalid || m_storage_version != m_tree.get_storage_version(m_instance_version)) {
         ObjKey k = load_leaf(m_key);
-        if (k != m_key)
-            throw std::out_of_range("Object was deleted");
+        m_leaf_invalid = (k != m_key);
+        if (m_leaf_invalid) {
+            throw std::runtime_error("Object does not exist");
+        }
+        // Object still exists, but storage version changed so update
+        new (&m_obj) Obj(const_cast<ClusterTree*>(&m_tree), m_leaf.get_mem(), m_key, m_state.m_current_index);
     }
 
     REALM_ASSERT(m_leaf.is_attached());
 
-    return new (&m_obj_cache_storage)
-        Obj(const_cast<ClusterTree*>(&m_tree), m_leaf.get_mem(), m_key, m_state.m_current_index);
+    if (m_key != m_obj.get_key()) {
+        new (&m_obj) Obj(const_cast<ClusterTree*>(&m_tree), m_leaf.get_mem(), m_key, m_state.m_current_index);
+    }
+
+    return &m_obj;
 }
 
 ClusterTree::ConstIterator& Table::ConstIterator::operator++()
 {
-    if (m_storage_version != m_tree.get_storage_version(m_instance_version)) {
+    if (m_leaf_invalid || m_storage_version != m_tree.get_storage_version(m_instance_version)) {
         ObjKey k = load_leaf(m_key);
         if (k != m_key) {
             // Objects was deleted. k points to the next object
             m_key = k;
+            m_leaf_invalid = !m_key;
             return *this;
         }
     }
+
     m_state.m_current_index++;
     if (m_state.m_current_index == m_leaf.node_size()) {
         m_key = load_leaf(ObjKey(m_key.value + 1));
+        m_leaf_invalid = !m_key;
     }
     else {
         m_key = m_leaf.get_real_key(m_state.m_current_index);
@@ -2212,13 +2225,21 @@ ClusterTree::ConstIterator& Table::ConstIterator::operator+=(ptrdiff_t adj)
 {
     // If you have to jump far away and thus have to load many leaves,
     // this function will be slow
-
     REALM_ASSERT(adj >= 0);
-    size_t n = size_t(adj);
-    if (m_storage_version != m_tree.get_storage_version(m_instance_version)) {
-        load_leaf(m_key);
+    if (adj == 0) {
+        return *this;
     }
-    while (n != 0 && m_key != null_key) {
+
+    size_t n = size_t(adj);
+    if (m_leaf_invalid || m_storage_version != m_tree.get_storage_version(m_instance_version)) {
+        ObjKey k = load_leaf(m_key);
+        if (k != m_key) {
+            // Objects was deleted. k points to the next object
+            m_key = k;
+            n--;
+        }
+    }
+    while (n != 0) {
         size_t left_in_leaf = m_leaf.node_size() - m_state.m_current_index;
         if (n < left_in_leaf) {
             m_state.m_current_index += n;
@@ -2230,7 +2251,11 @@ ClusterTree::ConstIterator& Table::ConstIterator::operator+=(ptrdiff_t adj)
             n -= left_in_leaf;
             m_key = m_leaf.get_real_key(m_state.m_current_index + left_in_leaf - 1);
             m_key = load_leaf(ObjKey(m_key.value + 1));
+            if (!m_key) {
+                break;
+            }
         }
     }
+    m_leaf_invalid = !m_key;
     return *this;
 }

@@ -3338,8 +3338,17 @@ TEST(Table_object_forward_iterator)
     int64_t val = it1->get<int64_t>(c0);
     table.remove_object(key);
     CHECK_EQUAL(val, it1->get<int64_t>(c0));
+
+    val = (it1 + 1)->get<int64_t>(c0);
     table.remove_object(it1);
     CHECK_THROW_ANY(it1->get<int64_t>(c0));
+    // Still invalid
+    CHECK_THROW_ANY(it1->get<int64_t>(c0));
+    it1 += 0;
+    // Still invalid
+    CHECK_THROW_ANY(it1->get<int64_t>(c0));
+    it1 += 1;
+    CHECK_EQUAL(val, it1->get<int64_t>(c0));
 }
 
 TEST(Table_object_by_index)

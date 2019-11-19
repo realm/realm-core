@@ -5,7 +5,7 @@
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* The way the Table iterator was used in ObjectStore could result in an exception if the element recently accessed was deleted. ([#3482](https://github.com/realm/realm-core/issues/3482), since 6.0.0-alpha.0)
  
 ### Breaking changes
 * None.
