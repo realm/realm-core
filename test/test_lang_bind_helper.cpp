@@ -3917,13 +3917,15 @@ TEST(LangBindHelper_HandoverTableViewWithLnkLst)
             if (detached == 1)
                 table2->remove_object(o.get_key());
 
-            tv = q.find_all(); // tv = { 0, 2 }
+            tv = q.find_all(); // tv = { 0, 2 } (only first iteration)
             CHECK(tv.is_in_sync());
             group_w->commit_and_continue_as_read();
             tr = group_w->duplicate();
             CHECK(tv.is_in_sync());
             tv2 = tr->import_copy_of(tv, PayloadPolicy::Copy);
             q2 = tr->import_copy_of(q, PayloadPolicy::Copy);
+            auto tv3a = q.find_all();
+            auto tv3b = q2->find_all();
         }
         {
             auto tv3 = q2->find_all();

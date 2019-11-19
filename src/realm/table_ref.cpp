@@ -36,35 +36,41 @@ ConstTableRef::operator bool() const
     return m_table != nullptr && m_table->get_instance_version() == m_instance_version;
 }
 
-const Table& ConstTableRef::operator*() const
+void ConstTableRef::check() const
 {
-    if (!operator bool()) {
+    if (m_table == nullptr) {
         throw realm::NoSuchTable();
     }
+    if (m_table->get_instance_version() != m_instance_version) {
+        // we cannot distinguish between removal of a table and expiration of the
+        // tableref due to other changes. In the latter cases, we'd like to throw
+        // a logic error: detached accessor. But in the former case, a user REALLY
+        // would expect a NoSuchTable. So we choose that:
+        throw realm::NoSuchTable();
+    }
+}
+
+const Table& ConstTableRef::operator*() const
+{
+    check();
     return *m_table;
 }
 
 const Table* ConstTableRef::operator->() const
 {
-    if (!operator bool()) {
-        throw realm::NoSuchTable();
-    }
+    check();
     return m_table;
 }
 
 Table& TableRef::operator*() const
 {
-    if (!operator bool()) {
-        throw realm::NoSuchTable();
-    }
+    check();
     return *m_table;
 }
 
 Table* TableRef::operator->() const
 {
-    if (!operator bool()) {
-        throw realm::NoSuchTable();
-    }
+    check();
     return m_table;
 }
 

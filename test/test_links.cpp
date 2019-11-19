@@ -242,7 +242,7 @@ TEST(Links_SetLinkLogicErrors)
     CHECK_THROW(obj.set(col0, ObjKey(10)), InvalidKey);
 
     group.remove_table("origin");
-    CHECK_LOGIC_ERROR(obj.set(col0, ObjKey(10)), LogicError::detached_accessor);
+    CHECK_THROW(obj.set(col0, ObjKey(10)), realm::NoSuchTable);
 }
 
 

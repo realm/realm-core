@@ -455,6 +455,7 @@ public:
     // Report the current storage version. This is a 64-bit value which is bumped
     // whenever the location in memory of any part of the table changes.
     uint_fast64_t get_storage_version(uint64_t instance_version) const;
+    uint_fast64_t get_storage_version() const;
     void bump_storage_version() const noexcept;
     void bump_content_version() const noexcept;
 
@@ -1172,6 +1173,11 @@ inline uint_fast64_t Table::get_instance_version() const noexcept
 inline uint_fast64_t Table::get_storage_version(uint64_t instance_version) const
 {
     return m_alloc.get_storage_version(instance_version);
+}
+
+inline uint_fast64_t Table::get_storage_version() const
+{
+    return m_alloc.get_storage_version();
 }
 
 

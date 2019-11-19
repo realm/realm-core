@@ -38,15 +38,14 @@ namespace realm {
 
 /********************************* ConstObj **********************************/
 
-ConstObj::ConstObj(const ClusterTree* tree_top, MemRef mem, ObjKey key, size_t row_ndx)
-    : m_table(tree_top->get_owner())
+ConstObj::ConstObj(ConstTableRef table, MemRef mem, ObjKey key, size_t row_ndx)
+    : m_table(table)
     , m_key(key)
     , m_mem(mem)
     , m_row_ndx(row_ndx)
     , m_valid(true)
 {
-    m_instance_version = tree_top->get_instance_version();
-    m_storage_version = tree_top->get_storage_version(m_instance_version);
+    m_storage_version = get_alloc().get_storage_version();
 }
 
 ObjectID ConstObj::get_object_id() const
@@ -56,17 +55,28 @@ ObjectID ConstObj::get_object_id() const
 
 const ClusterTree* ConstObj::get_tree_top() const
 {
-    return &m_table->m_clusters;
+    return &m_table.unchecked_ptr()->m_clusters;
 }
 
 Allocator& ConstObj::get_alloc() const
 {
+    // Do a "checked" deref to table to ensure the instance_version is correct.
+    // Even if removed from the public API, this should *not* be optimized away,
+    // because it is used internally in situations, where we want stale table refs
+    // to be detected.
     return m_table->m_alloc;
+}
+
+Allocator& ConstObj::_get_alloc() const
+{
+    // Bypass check of table instance version. To be used only in contexts,
+    // where instance version match has already been established (e.g _get<>)
+    return m_table.unchecked_ptr()->m_alloc;
 }
 
 const Spec& ConstObj::get_spec() const
 {
-    return m_table->m_spec;
+    return m_table.unchecked_ptr()->m_spec;
 }
 
 Replication* ConstObj::get_replication() const
@@ -141,8 +151,8 @@ bool ConstObj::is_valid() const
 {
     // Cache valid state. If once invalid, it can never become valid again
     if (m_valid)
-        m_valid = (m_table->get_instance_version() == m_instance_version)
-               && (m_table->get_storage_version(m_instance_version) == m_storage_version || m_table->is_valid(m_key));
+        m_valid = bool(m_table) && (m_table.unchecked_ptr()->get_storage_version() == m_storage_version ||
+                                    m_table.unchecked_ptr()->is_valid(m_key));
 
     return m_valid;
 }
@@ -155,7 +165,7 @@ void ConstObj::check_valid() const
 
 void ConstObj::remove()
 {
-    const_cast<Table*>(m_table)->remove_object(m_key);
+    m_table.cast_away_const()->remove_object(m_key);
 }
 
 Mixed ConstObj::get_any(ColKey col_key) const
@@ -201,15 +211,20 @@ TableKey ConstObj::get_table_key() const
 
 TableRef ConstObj::get_target_table(ColKey col_key) const
 {
-    return _impl::TableFriend::get_opposite_link_table(*m_table, col_key);
+    if (m_table) {
+        return _impl::TableFriend::get_opposite_link_table(*m_table.unchecked_ptr(), col_key);
+    }
+    else {
+        return TableRef();
+    }
 }
 
-Obj::Obj(ClusterTree* tree_top, MemRef mem, ObjKey key, size_t row_ndx)
-    : ConstObj(tree_top, mem, key, row_ndx)
+Obj::Obj(TableRef table, MemRef mem, ObjKey key, size_t row_ndx)
+    : ConstObj(table, mem, key, row_ndx)
 {
 }
 
-bool ConstObj::update() const
+inline bool ConstObj::update() const
 {
     // Get a new object from key
     ConstObj new_obj = get_tree_top()->get(m_key);
@@ -221,14 +236,22 @@ bool ConstObj::update() const
     }
     // Always update versions
     m_storage_version = new_obj.m_storage_version;
-    m_instance_version = new_obj.m_instance_version;
-
+    m_table = new_obj.m_table;
     return changes;
+}
+
+inline bool ConstObj::_update_if_needed() const
+{
+    auto current_version = _get_alloc().get_storage_version();
+    if (current_version != m_storage_version) {
+        return update();
+    }
+    return false;
 }
 
 bool ConstObj::update_if_needed() const
 {
-    auto current_version = get_alloc().get_storage_version(m_instance_version);
+    auto current_version = get_alloc().get_storage_version();
     if (current_version != m_storage_version) {
         return update();
     }
@@ -248,7 +271,7 @@ T ConstObj::get(ColKey col_key) const
 template <class T>
 T ConstObj::_get(ColKey::Idx col_ndx) const
 {
-    update_if_needed();
+    _update_if_needed();
 
     typename ColumnTypeTraits<T>::cluster_leaf_type values(get_alloc());
     ref_type ref = to_ref(Array::get(m_mem.get_addr(), col_ndx.val + 1));
@@ -261,8 +284,8 @@ template <>
 int64_t ConstObj::_get<int64_t>(ColKey::Idx col_ndx) const
 {
     // manual inline of is_in_sync():
-    auto& alloc = get_alloc();
-    auto current_version = alloc.get_storage_version(m_instance_version);
+    auto& alloc = _get_alloc();
+    auto current_version = alloc.get_storage_version();
     if (current_version != m_storage_version) {
         update();
     }
@@ -278,8 +301,8 @@ template <>
 StringData ConstObj::_get<StringData>(ColKey::Idx col_ndx) const
 {
     // manual inline of is_in_sync():
-    auto& alloc = get_alloc();
-    auto current_version = alloc.get_storage_version(m_instance_version);
+    auto& alloc = _get_alloc();
+    auto current_version = alloc.get_storage_version();
     if (current_version != m_storage_version) {
         update();
     }
@@ -303,8 +326,8 @@ template <>
 BinaryData ConstObj::_get<BinaryData>(ColKey::Idx col_ndx) const
 {
     // manual inline of is_in_sync():
-    auto& alloc = get_alloc();
-    auto current_version = alloc.get_storage_version(m_instance_version);
+    auto& alloc = _get_alloc();
+    auto current_version = alloc.get_storage_version();
     if (current_version != m_storage_version) {
         update();
     }
@@ -390,11 +413,11 @@ bool ConstObj::is_null(ColKey col_key) const
 // Figure out if this object has any remaining backlinkss
 bool ConstObj::has_backlinks(bool only_strong_links) const
 {
-    const Table* target_table = m_table;
+    const Table& target_table = *m_table;
     auto look_for_backlinks = [&](ColKey backlink_col_key) {
         // Find origin table and column for this backlink column
-        TableRef origin_table = target_table->get_opposite_table(backlink_col_key);
-        ColKey origin_col = target_table->get_opposite_column(backlink_col_key);
+        TableRef origin_table = target_table.get_opposite_table(backlink_col_key);
+        ColKey origin_col = target_table.get_opposite_column(backlink_col_key);
         if (!only_strong_links || origin_col.get_attrs().test(col_attr_StrongLinks)) {
             auto cnt = get_backlink_count(*origin_table, origin_col);
             if (cnt)
@@ -407,12 +430,12 @@ bool ConstObj::has_backlinks(bool only_strong_links) const
 
 size_t ConstObj::get_backlink_count(bool only_strong_links) const
 {
-    const Table* target_table = m_table;
+    const Table& target_table = *m_table;
     size_t cnt = 0;
     auto look_for_backlinks = [&](ColKey backlink_col_key) {
         // Find origin table and column for this backlink column
-        TableRef origin_table = target_table->get_opposite_table(backlink_col_key);
-        ColKey origin_col = target_table->get_opposite_column(backlink_col_key);
+        TableRef origin_table = target_table.get_opposite_table(backlink_col_key);
+        ColKey origin_col = target_table.get_opposite_column(backlink_col_key);
         if (!only_strong_links || origin_col.get_attrs().test(col_attr_StrongLinks)) {
             cnt += get_backlink_count(*origin_table, origin_col);
         }
@@ -652,7 +675,7 @@ bool Obj::ensure_writeable()
     Allocator& alloc = get_alloc();
     if (alloc.is_read_only(m_mem.get_ref())) {
         m_mem = const_cast<ClusterTree*>(get_tree_top())->ensure_writeable(m_key);
-        m_storage_version = alloc.get_storage_version(m_instance_version);
+        m_storage_version = alloc.get_storage_version();
         return true;
     }
     return false;
@@ -752,7 +775,7 @@ Obj& Obj::set<int64_t>(ColKey col_key, int64_t value, bool is_default)
     }
 
     if (Replication* repl = get_replication()) {
-        repl->set_int(m_table, col_key, m_key, value,
+        repl->set_int(m_table.unchecked_ptr(), col_key, m_key, value,
                       is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
     }
 
@@ -808,7 +831,7 @@ Obj& Obj::add_int(ColKey col_key, int64_t value)
     }
 
     if (Replication* repl = get_replication()) {
-        repl->add_int(m_table, col_key, m_key, value); // Throws
+        repl->add_int(m_table.unchecked_ptr(), col_key, m_key, value); // Throws
     }
 
     return *this;
@@ -848,7 +871,7 @@ Obj& Obj::set<ObjKey>(ColKey col_key, ObjKey target_key, bool is_default)
         values.set(m_row_ndx, target_key);
 
         if (Replication* repl = get_replication()) {
-            repl->set(m_table, col_key, m_key, target_key,
+            repl->set(m_table.unchecked_ptr(), col_key, m_key, target_key,
                       is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
         }
 
@@ -925,7 +948,7 @@ Obj& Obj::set(ColKey col_key, T value, bool is_default)
     values.set(m_row_ndx, value);
 
     if (Replication* repl = get_replication())
-        repl->set<T>(m_table, col_key, m_key, value,
+        repl->set<T>(m_table.unchecked_ptr(), col_key, m_key, value,
                      is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
 
     return *this;
@@ -1021,7 +1044,7 @@ void Obj::nullify_link(ColKey origin_col_key, ObjKey target_key)
         links.set(m_row_ndx, ObjKey{});
 
         if (Replication* repl = get_replication())
-            repl->nullify_link(m_table, origin_col_key, m_key); // Throws
+            repl->nullify_link(m_table.unchecked_ptr(), origin_col_key, m_key); // Throws
     }
     alloc.bump_content_version();
 }
@@ -1049,14 +1072,14 @@ bool Obj::replace_backlink(ColKey col_key, ObjKey old_key, ObjKey new_key, Casca
 
 bool Obj::remove_backlink(ColKey col_key, ObjKey old_key, CascadeState& state)
 {
-    const Table* origin_table = m_table;
+    const Table& origin_table = *m_table;
 
-    REALM_ASSERT(origin_table->valid_column(col_key));
+    REALM_ASSERT(origin_table.valid_column(col_key));
     TableRef target_table = get_target_table(col_key);
     ColKey backlink_col_key = m_table->get_opposite_column(col_key);
     REALM_ASSERT(target_table->valid_column(backlink_col_key));
 
-    bool strong_links = (origin_table->get_link_type(col_key) == link_Strong);
+    bool strong_links = (origin_table.get_link_type(col_key) == link_Strong);
 
     if (old_key != realm::null_key) {
         Obj target_obj = target_table->get_object(old_key);
@@ -1168,7 +1191,8 @@ Obj& Obj::set_null(ColKey col_key, bool is_default)
     }
 
     if (Replication* repl = get_replication())
-        repl->set_null(m_table, col_key, m_key, is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
+        repl->set_null(m_table.unchecked_ptr(), col_key, m_key,
+                       is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
 
     return *this;
 }

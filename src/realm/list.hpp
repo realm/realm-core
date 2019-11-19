@@ -819,7 +819,12 @@ public:
 
     LnkLstPtr clone() const
     {
-        return std::make_unique<LnkLst>(m_obj, m_col_key);
+        if (m_obj.is_valid()) {
+            return std::make_unique<LnkLst>(m_obj, m_col_key);
+        }
+        else {
+            return std::make_unique<LnkLst>();
+        }
     }
     Table& get_target_table() const
     {

@@ -62,11 +62,10 @@ public:
         : m_table(nullptr)
         , m_row_ndx(size_t(-1))
         , m_storage_version(-1)
-        , m_instance_version(-1)
         , m_valid(false)
     {
     }
-    ConstObj(const ClusterTree* tree_top, MemRef mem, ObjKey key, size_t row_ndx);
+    ConstObj(ConstTableRef table, MemRef mem, ObjKey key, size_t row_ndx);
 
     Allocator& get_alloc() const;
 
@@ -81,8 +80,7 @@ public:
 
     ConstTableRef get_table() const
     {
-        check_valid();
-        return ConstTableRef::unsafe_create(m_table);
+        return m_table;
     }
 
     Replication* get_replication() const;
@@ -177,16 +175,18 @@ protected:
     friend class Transaction;
     friend struct ClusterNode::IteratorState;
 
-    const Table* m_table;
+    mutable ConstTableRef m_table;
     ObjKey m_key;
     mutable MemRef m_mem;
     mutable size_t m_row_ndx;
     mutable uint64_t m_storage_version;
-    mutable uint64_t m_instance_version;
     mutable bool m_valid;
 
+    Allocator& _get_alloc() const;
     bool update() const;
+    // update if needed - with and without check of table instance version:
     bool update_if_needed() const;
+    bool _update_if_needed() const; // no check, use only when already checked
     template <class T>
     bool do_is_null(ColKey::Idx col_ndx) const;
 
@@ -212,12 +212,11 @@ public:
     Obj()
     {
     }
-    Obj(ClusterTree* tree_top, MemRef mem, ObjKey key, size_t row_ndx);
+    Obj(TableRef table, MemRef mem, ObjKey key, size_t row_ndx);
 
     TableRef get_table() const
     {
-        check_valid();
-        return ConstTableRef::unsafe_create(m_table).cast_away_const();
+        return m_table.cast_away_const();
     }
 
 

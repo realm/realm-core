@@ -1883,7 +1883,7 @@ Obj ClusterTree::insert(ObjKey k, const FieldValues& values)
         }
     }
 
-    return Obj(this, state.mem, k, state.index);
+    return Obj(ConstTableRef::unsafe_create(table).cast_away_const(), state.mem, k, state.index);
 }
 
 bool ClusterTree::is_valid(ObjKey k) const
@@ -1896,14 +1896,14 @@ ConstObj ClusterTree::get(ObjKey k) const
 {
     ClusterNode::State state;
     m_root->get(k, state);
-    return ConstObj(this, state.mem, k, state.index);
+    return ConstObj(ConstTableRef::unsafe_create(get_owner()), state.mem, k, state.index);
 }
 
 Obj ClusterTree::get(ObjKey k)
 {
     ClusterNode::State state;
     m_root->get(k, state);
-    return Obj(this, state.mem, k, state.index);
+    return Obj(ConstTableRef::unsafe_create(get_owner()).cast_away_const(), state.mem, k, state.index);
 }
 
 ConstObj ClusterTree::get(size_t ndx) const
@@ -1913,7 +1913,7 @@ ConstObj ClusterTree::get(size_t ndx) const
     }
     ClusterNode::State state;
     ObjKey k = m_root->get(ndx, state);
-    return ConstObj(this, state.mem, k, state.index);
+    return ConstObj(ConstTableRef::unsafe_create(get_owner()), state.mem, k, state.index);
 }
 
 Obj ClusterTree::get(size_t ndx)
@@ -1923,7 +1923,7 @@ Obj ClusterTree::get(size_t ndx)
     }
     ClusterNode::State state;
     ObjKey k = m_root->get(ndx, state);
-    return Obj(this, state.mem, k, state.index);
+    return Obj(ConstTableRef::unsafe_create(get_owner()).cast_away_const(), state.mem, k, state.index);
 }
 
 size_t ClusterTree::get_ndx(ObjKey k) const
@@ -2236,7 +2236,8 @@ auto ClusterTree::ConstIterator::operator[](size_t n) -> reference
     else {
         m_state.m_current_index = (abs_pos - m_leaf_start_pos);
         auto key = m_leaf.get_real_key(m_state.m_current_index);
-        new (&m_obj) Obj(const_cast<ClusterTree*>(&m_tree), m_leaf.get_mem(), key, m_state.m_current_index);
+        new (&m_obj) Obj(ConstTableRef::unsafe_create(m_tree.get_owner()).cast_away_const(), m_leaf.get_mem(), key,
+                         m_state.m_current_index);
     }
 
     // The state no longer corresponds to m_key
@@ -2254,13 +2255,15 @@ ClusterTree::ConstIterator::pointer Table::ConstIterator::operator->() const
             throw std::runtime_error("Outdated iterator");
         }
         // Object still exists, but storage version changed so update
-        new (&m_obj) Obj(const_cast<ClusterTree*>(&m_tree), m_leaf.get_mem(), m_key, m_state.m_current_index);
+        new (&m_obj) Obj(ConstTableRef::unsafe_create(m_tree.get_owner()).cast_away_const(), m_leaf.get_mem(), m_key,
+                         m_state.m_current_index);
     }
 
     REALM_ASSERT(m_leaf.is_attached());
 
     if (m_key != m_obj.get_key()) {
-        new (&m_obj) Obj(const_cast<ClusterTree*>(&m_tree), m_leaf.get_mem(), m_key, m_state.m_current_index);
+        new (&m_obj) Obj(ConstTableRef::unsafe_create(m_tree.get_owner()).cast_away_const(), m_leaf.get_mem(), m_key,
+                         m_state.m_current_index);
     }
 
     return &m_obj;

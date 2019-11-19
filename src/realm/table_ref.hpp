@@ -35,7 +35,6 @@ public:
     }
     ConstTableRef(const TableRef& other);
     ConstTableRef(std::nullptr_t) {}
-
     const Table* operator->() const;
     const Table& operator*() const;
     ConstTableRef()
@@ -65,6 +64,7 @@ public:
     static ConstTableRef unsafe_create(const Table* t_ptr);
 
 protected:
+    void check() const;
     explicit ConstTableRef(const Table* t_ptr, uint64_t instance_version)
         : m_table(const_cast<Table*>(t_ptr))
         , m_instance_version(instance_version)
