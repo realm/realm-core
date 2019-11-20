@@ -537,7 +537,7 @@ void LnkLst::remove_all_target_rows()
 LnkLst::LnkLst(const Obj& owner, ColKey col_key)
     : ConstLstBase(col_key, &m_obj)
     , Lst<ObjKey>(owner, col_key)
-    , ObjList(this->m_tree.get(), m_obj.get_target_table(m_col_key).unchecked_ptr())
+    , ObjList(this->m_tree.get(), m_obj.get_target_table(m_col_key))
 {
 }
 

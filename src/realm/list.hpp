@@ -800,13 +800,13 @@ public:
     LnkLst(const LnkLst& other)
         : ConstLstBase(other.m_col_key, &m_obj)
         , Lst<ObjKey>(other)
-        , ObjList(this->m_tree.get(), m_obj.get_target_table(m_col_key).unchecked_ptr())
+        , ObjList(this->m_tree.get(), m_obj.get_target_table(m_col_key))
     {
     }
     LnkLst(LnkLst&& other)
         : ConstLstBase(other.m_col_key, &m_obj)
         , Lst<ObjKey>(std::move(other))
-        , ObjList(this->m_tree.get(), m_obj.get_target_table(m_col_key).unchecked_ptr())
+        , ObjList(this->m_tree.get(), m_obj.get_target_table(m_col_key))
     {
     }
     LnkLst& operator=(const LnkLst& other)

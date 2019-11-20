@@ -89,8 +89,8 @@ ObjList::ObjList(KeyColumn* key_values)
 {
 }
 
-ObjList::ObjList(KeyColumn* key_values, const Table* parent)
-    : m_table(ConstTableRef::unsafe_create(parent))
+ObjList::ObjList(KeyColumn* key_values, ConstTableRef parent)
+    : m_table(parent)
     , m_key_values(key_values)
 #ifdef REALM_COOKIE_CHECK
     , m_debug_cookie(cookie_expected)

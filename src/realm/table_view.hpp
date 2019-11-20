@@ -472,7 +472,7 @@ private:
 // ConstTableView Implementation:
 
 inline ConstTableView::ConstTableView(const Table* parent)
-    : ObjList(&m_table_view_key_values, parent) // Throws
+    : ObjList(&m_table_view_key_values, ConstTableRef::unsafe_create(parent)) // Throws
     , m_table_view_key_values(Allocator::get_default())
 {
     m_table_view_key_values.create();
@@ -482,7 +482,7 @@ inline ConstTableView::ConstTableView(const Table* parent)
 }
 
 inline ConstTableView::ConstTableView(const Table* parent, Query& query, size_t start, size_t end, size_t lim)
-    : ObjList(&m_table_view_key_values, parent)
+    : ObjList(&m_table_view_key_values, ConstTableRef::unsafe_create(parent))
     , m_query(query)
     , m_start(start)
     , m_end(end)
@@ -493,7 +493,7 @@ inline ConstTableView::ConstTableView(const Table* parent, Query& query, size_t 
 }
 
 inline ConstTableView::ConstTableView(const Table* src_table, ColKey src_column_key, const ConstObj& obj)
-    : ObjList(&m_table_view_key_values, src_table) // Throws
+    : ObjList(&m_table_view_key_values, ConstTableRef::unsafe_create(src_table)) // Throws
     , m_source_column_key(src_column_key)
     , m_linked_obj_key(obj.get_key())
     , m_linked_table(obj.get_table())
@@ -507,7 +507,7 @@ inline ConstTableView::ConstTableView(const Table* src_table, ColKey src_column_
 }
 
 inline ConstTableView::ConstTableView(DistinctViewTag, const Table* parent, ColKey column_key)
-    : ObjList(&m_table_view_key_values, parent) // Throws
+    : ObjList(&m_table_view_key_values, ConstTableRef::unsafe_create(parent)) // Throws
     , m_distinct_column_source(column_key)
     , m_table_view_key_values(Allocator::get_default())
 {
@@ -519,7 +519,7 @@ inline ConstTableView::ConstTableView(DistinctViewTag, const Table* parent, ColK
 }
 
 inline ConstTableView::ConstTableView(const Table* parent, ConstLnkLstPtr link_list)
-    : ObjList(&m_table_view_key_values, parent) // Throws
+    : ObjList(&m_table_view_key_values, ConstTableRef::unsafe_create(parent)) // Throws
     , m_linklist_source(std::move(link_list))
     , m_table_view_key_values(Allocator::get_default())
 {
@@ -531,7 +531,7 @@ inline ConstTableView::ConstTableView(const Table* parent, ConstLnkLstPtr link_l
 }
 
 inline ConstTableView::ConstTableView(const ConstTableView& tv)
-    : ObjList(&m_table_view_key_values, tv.m_table.unchecked_ptr())
+    : ObjList(&m_table_view_key_values, tv.m_table)
     , m_source_column_key(tv.m_source_column_key)
     , m_linked_obj_key(tv.m_linked_obj_key)
     , m_linked_table(tv.m_linked_table)
@@ -549,7 +549,7 @@ inline ConstTableView::ConstTableView(const ConstTableView& tv)
 }
 
 inline ConstTableView::ConstTableView(ConstTableView&& tv) noexcept
-    : ObjList(&m_table_view_key_values, tv.m_table.unchecked_ptr())
+    : ObjList(&m_table_view_key_values, tv.m_table)
     , m_source_column_key(tv.m_source_column_key)
     , m_linked_obj_key(tv.m_linked_obj_key)
     , m_linked_table(tv.m_linked_table)

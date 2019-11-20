@@ -33,7 +33,7 @@ class ConstTableView;
 class ObjList {
 public:
     ObjList(KeyColumn* key_values);
-    ObjList(KeyColumn* key_values, const Table* parent);
+    ObjList(KeyColumn* key_values, ConstTableRef parent);
 
     virtual ~ObjList()
     {
