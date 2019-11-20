@@ -598,7 +598,7 @@ TEST(Group_RemoveTableWithColumns)
     Obj obj = delta->create_object();
     ObjKey k = obj.get_key();
     beta->create_object().set<ObjKey>(col_link, k);
-    auto view = obj.get_backlink_view(beta.unchecked_ptr(), col_link);
+    auto view = obj.get_backlink_view(beta, col_link);
     CHECK_EQUAL(view.size(), 1);
 
     // Remove table with columns, but no link columns, and table is not a link

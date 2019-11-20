@@ -4323,7 +4323,7 @@ TEST(LangBindHelper_HandoverTableViewFromBacklink)
     group_w->commit_and_continue_as_read();
 
     for (int i = 0; i < 100; ++i) {
-        TableView tv = source->get_object(i).get_backlink_view(links.unchecked_ptr(), col);
+        TableView tv = source->get_object(i).get_backlink_view(links, col);
         CHECK(tv.is_attached());
         CHECK_EQUAL(1, tv.size());
         ObjKey o_key = source->get_object(i).get_key();
@@ -4356,7 +4356,7 @@ TEST(LangBindHelper_HandoverOutOfSyncTableViewFromBacklinksToDeletedRow)
 
     links->create_object().set_all(obj_t.get_key());
 
-    TableView tv = obj_t.get_backlink_view(links.unchecked_ptr(), col);
+    TableView tv = obj_t.get_backlink_view(links, col);
     CHECK_EQUAL(true, tv.is_attached());
     CHECK_EQUAL(true, tv.is_in_sync());
     CHECK_EQUAL(false, tv.depends_on_deleted_object());
