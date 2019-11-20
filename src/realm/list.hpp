@@ -812,8 +812,7 @@ public:
     LnkLst& operator=(const LnkLst& other)
     {
         Lst<ObjKey>::operator=(other);
-        this->ObjList::assign(this->m_tree.get(),
-                              m_obj.get_target_table(m_col_key).cast_away_const().unchecked_ptr());
+        this->ObjList::assign(this->m_tree.get(), m_obj.get_target_table(m_col_key));
         return *this;
     }
 
