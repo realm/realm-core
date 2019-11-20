@@ -1714,6 +1714,63 @@ TEST_CASE("notifications: results") {
             REQUIRE_INDICES(change.deletions, 1);
         }
 
+        SECTION("clearing the table marks all rows as deleted") {
+            size_t num_expected_deletes = results.size();
+            write([&] {
+                table->clear();
+            });
+            REQUIRE(notification_calls == 2);
+            REQUIRE(change.deletions.count() == num_expected_deletes);
+        }
+
+        SECTION("clear insert clear marks the correct rows as deleted") {
+            size_t num_expected_deletes = results.size();
+            write([&] {
+                table->clear();
+            });
+            REQUIRE(notification_calls == 2);
+            REQUIRE(change.deletions.count() == num_expected_deletes);
+            write([&] {
+                table->create_object().set(col_value, 3);
+                table->create_object().set(col_value, 4);
+                table->create_object().set(col_value, 5);
+            });
+            REQUIRE(notification_calls == 3);
+            REQUIRE_INDICES(change.insertions, 0, 1, 2);
+            REQUIRE(change.deletions.empty());
+            write([&] {
+                table->clear();
+            });
+            REQUIRE(notification_calls == 4);
+            REQUIRE_INDICES(change.deletions, 0, 1, 2);
+            REQUIRE(change.insertions.empty());
+            REQUIRE(change.modifications.empty());
+        }
+
+        SECTION("delete insert clear marks the correct rows as deleted") {
+            size_t num_expected_deletes = results.size();
+            write([&] {
+                results.clear(); // delete all 4 matches
+            });
+            REQUIRE(notification_calls == 2);
+            REQUIRE(change.deletions.count() == num_expected_deletes);
+            write([&] {
+                table->create_object({57}).set(col_value, 3);
+                table->create_object({58}).set(col_value, 4);
+                table->create_object({59}).set(col_value, 5);
+            });
+            REQUIRE(notification_calls == 3);
+            REQUIRE_INDICES(change.insertions, 0, 1, 2);
+            REQUIRE(change.deletions.empty());
+            write([&] {
+                table->clear();
+            });
+            REQUIRE(notification_calls == 4);
+            REQUIRE_INDICES(change.deletions, 0, 1, 2);
+            REQUIRE(change.insertions.empty());
+            REQUIRE(change.modifications.empty());
+        }
+
         SECTION("modifying a matching row to change its position sends insert+delete") {
             write([&] {
                 table->get_object(object_keys[2]).set(col_value, 9);

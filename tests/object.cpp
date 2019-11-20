@@ -160,9 +160,10 @@ TEST_CASE("object") {
     SECTION("add_notification_callback()") {
         auto table = r->read_group().get_table("class_table");
         auto col_keys = table->get_column_keys();
+        ObjKeys object_keys({3, 4, 7, 9, 10, 21, 24, 34, 42, 50});
         r->begin_transaction();
         for (int i = 0; i < 10; ++i)
-            table->create_object().set_all(i);
+            table->create_object(object_keys[i]).set_all(i);
         r->commit_transaction();
 
         auto r2 = coordinator.get_realm();
@@ -200,6 +201,21 @@ TEST_CASE("object") {
         SECTION("deleting the object sends a change notification") {
             auto token = require_change();
             write([&] { obj.remove(); });
+            REQUIRE_INDICES(change.deletions, 0);
+        }
+
+        SECTION("clearing the table sends a change notification") {
+            auto token = require_change();
+            write([&] { table->clear(); });
+            REQUIRE_INDICES(change.deletions, 0);
+        }
+
+        SECTION("clearing the table sends a change notification to the last object") {
+            obj = table->get_object(table->size() - 1);
+            object = Object(r, obj);
+
+            auto token = require_change();
+            write([&] { table->clear(); });
             REQUIRE_INDICES(change.deletions, 0);
         }
 
