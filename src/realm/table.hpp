@@ -627,11 +627,13 @@ public:
     // Get a reference to this table
     TableRef get_table_ref()
     {
-        return TableRef::unsafe_create(this);
+        REALM_ASSERT(bool(m_own_ref));
+        return m_own_ref;
     }
     ConstTableRef get_table_ref() const
     {
-        return ConstTableRef::unsafe_create(this);
+        REALM_ASSERT(bool(m_own_ref));
+        return m_own_ref;
     }
 
     /// \brief Compare two tables for equality.
@@ -706,6 +708,7 @@ private:
     Replication* const* m_repl;
     static Replication* g_dummy_replication;
     bool m_is_frozen = false;
+    TableRef m_own_ref;
 
     void batch_erase_rows(const KeyColumn& keys);
     size_t do_set_link(ColKey col_key, size_t row_ndx, size_t target_row_ndx);
@@ -1238,6 +1241,7 @@ inline Table::Table(Allocator& alloc)
     , m_opposite_table(m_alloc)
     , m_opposite_column(m_alloc)
     , m_repl(&g_dummy_replication)
+    , m_own_ref(TableRef::unsafe_create(this))
 {
     m_spec.set_parent(&m_top, top_position_for_spec);
     m_index_refs.set_parent(&m_top, top_position_for_search_indexes);
@@ -1259,6 +1263,7 @@ inline Table::Table(Replication* const* repl, Allocator& alloc)
     , m_opposite_table(m_alloc)
     , m_opposite_column(m_alloc)
     , m_repl(repl)
+    , m_own_ref(TableRef::unsafe_create(this))
 {
     m_spec.set_parent(&m_top, top_position_for_spec);
     m_index_refs.set_parent(&m_top, top_position_for_search_indexes);
@@ -1271,6 +1276,7 @@ inline void Table::revive(Replication* const* repl, Allocator& alloc, bool writa
     m_alloc.switch_underlying_allocator(alloc);
     m_alloc.update_from_underlying_allocator(writable);
     m_repl = repl;
+    m_own_ref = TableRef::unsafe_create(this);
 
     // since we're rebinding to a new table, we'll bump version counters
     // FIXME
