@@ -2113,7 +2113,7 @@ ConstTableView Table::find_all_null(ColKey col_key) const
 
 TableView Table::get_distinct_view(ColKey col_key)
 {
-    TableView tv(TableView::DistinctView, *this, col_key);
+    TableView tv(TableView::DistinctView, get_table_ref(), col_key);
     tv.do_sync();
     return tv;
 }

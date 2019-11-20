@@ -466,7 +466,7 @@ ObjKey ConstObj::get_backlink(const Table& origin, ColKey origin_col_key, size_t
 
 TableView ConstObj::get_backlink_view(TableRef src_table, ColKey src_col_key)
 {
-    TableView tv(src_table.unchecked_ptr(), src_col_key, *this);
+    TableView tv(src_table, src_col_key, *this);
     tv.do_sync();
     return tv;
 }

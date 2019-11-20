@@ -46,7 +46,7 @@ Query::Query(const Table& table, const LnkLst& list)
     if (m_view)
         m_view->check_cookie();
 #endif
-    REALM_ASSERT_DEBUG(&list.get_target_table() == m_table.unchecked_ptr());
+    REALM_ASSERT_DEBUG(list.get_target_table() == m_table);
     create();
 }
 
@@ -59,7 +59,7 @@ Query::Query(const Table& table, LnkLstPtr&& ll)
     if (m_view)
         m_view->check_cookie();
 #endif
-    REALM_ASSERT_DEBUG(&ll->get_target_table() == m_table.unchecked_ptr());
+    REALM_ASSERT_DEBUG(ll->get_target_table() == m_table);
     create();
 }
 
@@ -1333,7 +1333,7 @@ TableView Query::find_all(size_t start, size_t end, size_t limit)
     std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_FindAll);
 #endif
 
-    TableView ret(*m_table, *this, start, end, limit);
+    TableView ret(m_table, *this, start, end, limit);
     ret.do_sync();
     return ret;
 }
@@ -1429,7 +1429,7 @@ TableView Query::find_all(const DescriptorOrdering& descriptor)
         return find_all(default_start, default_end, min_limit);
     }
 
-    TableView ret(*m_table, *this, default_start, default_end, default_limit);
+    TableView ret(m_table, *this, default_start, default_end, default_limit);
     ret.apply_descriptor_ordering(descriptor);
     return ret;
 }
@@ -1455,7 +1455,7 @@ size_t Query::count(const DescriptorOrdering& descriptor)
         return do_count(limit);
     }
 
-    TableView ret(*m_table, *this, start, end, limit);
+    TableView ret(m_table, *this, start, end, limit);
     ret.apply_descriptor_ordering(descriptor);
     return ret.size();
 }

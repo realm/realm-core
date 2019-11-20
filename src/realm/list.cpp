@@ -502,7 +502,7 @@ template void Lst<ObjKey>::clear();
 Obj LnkLst::get_object(size_t ndx)
 {
     ObjKey k = get(ndx);
-    return get_target_table().get_object(k);
+    return get_target_table()->get_object(k);
 }
 
 TableView LnkLst::get_sorted_view(SortDescriptor order) const
@@ -524,13 +524,13 @@ void LnkLst::remove_target_row(size_t link_ndx)
     // Deleting the object will automatically remove all links
     // to it. So we do not have to manually remove the deleted link
     ObjKey k = get(link_ndx);
-    get_target_table().remove_object(k);
+    get_target_table()->remove_object(k);
 }
 
 void LnkLst::remove_all_target_rows()
 {
     if (is_attached()) {
-        _impl::TableFriend::batch_erase_rows(get_target_table(), *this->m_tree);
+        _impl::TableFriend::batch_erase_rows(*get_target_table(), *this->m_tree);
     }
 }
 

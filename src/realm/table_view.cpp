@@ -409,7 +409,7 @@ void ConstTableView::get_dependencies(TableVersions& ret) const
     if (m_linklist_source) {
         // m_linkview_source is set when this TableView was created by LinkView::get_as_sorted_view().
         if (m_linklist_source->is_attached()) {
-            Table& table = m_linklist_source->get_target_table();
+            Table& table = *m_linklist_source->get_target_table();
             ret.emplace_back(table.get_key(), table.get_content_version());
         }
     }

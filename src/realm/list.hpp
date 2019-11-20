@@ -826,9 +826,9 @@ public:
             return std::make_unique<LnkLst>();
         }
     }
-    Table& get_target_table() const
+    TableRef get_target_table() const
     {
-        return const_cast<Table&>(*m_table);
+        return m_table.cast_away_const();
     }
     bool is_in_sync() const override
     {
