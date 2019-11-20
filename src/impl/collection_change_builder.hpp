@@ -24,9 +24,65 @@
 #include <realm/util/optional.hpp>
 
 #include <unordered_map>
+#include <unordered_set>
+#include <vector>
 
 namespace realm {
 namespace _impl {
+
+class ObjectChangeSet {
+public:
+    using ColKeyType = uint64_t;
+    using ObjectKeyType = int64_t;
+    using ObjectSet = std::unordered_set<ObjectKeyType>;
+    using ObjectMapToColumnList = std::unordered_map<ObjectKeyType, std::vector<ColKeyType>>;
+
+    ObjectChangeSet() = default;
+    ObjectChangeSet(ObjectChangeSet const&) = default;
+    ObjectChangeSet(ObjectChangeSet&&) = default;
+    ObjectChangeSet& operator=(ObjectChangeSet const&) = default;
+    ObjectChangeSet& operator=(ObjectChangeSet&&) = default;
+
+    void insertions_add(ObjectKeyType obj);
+    void modifications_add(ObjectKeyType obj, ColKeyType col = -1);
+    void deletions_add(ObjectKeyType obj);
+    void clear(size_t old_size);
+
+    bool insertions_remove(ObjectKeyType obj);
+    bool modifications_remove(ObjectKeyType obj);
+    bool deletions_remove(ObjectKeyType obj);
+
+    bool insertions_contains(ObjectKeyType obj) const;
+    bool modifications_contains(ObjectKeyType obj) const;
+    bool deletions_contains(ObjectKeyType obj) const;
+    // if the specified object has not been modified, returns util::Optional::None
+    // if the object has been modified, returns the begin and end const_iterator into a vector of columns
+    using ColKeyIterator = std::vector<ColKeyType>::const_iterator;
+    util::Optional<std::pair<ColKeyIterator, ColKeyIterator>> get_columns_modified(ObjectKeyType obj) const;
+
+    bool insertions_empty() const noexcept { return m_insertions.empty(); }
+    bool modifications_empty() const noexcept { return m_modifications.empty(); }
+    bool deletions_empty() const noexcept { return m_deletions.empty(); }
+
+    size_t insertions_size() const noexcept { return m_insertions.size(); }
+    size_t modifications_size() const noexcept { return m_modifications.size(); }
+    size_t deletions_size() const noexcept { return m_deletions.size(); }
+
+    bool empty() const noexcept
+    {
+        return m_deletions.empty() && m_insertions.empty() && m_modifications.empty() && !m_clear_did_occur;
+    }
+
+    void merge(ObjectChangeSet&& other);
+    void verify();
+
+private:
+    ObjectSet m_deletions;
+    ObjectSet m_insertions;
+    ObjectMapToColumnList m_modifications;
+    bool m_clear_did_occur = false;
+};
+
 class CollectionChangeBuilder : public CollectionChangeSet {
 public:
     CollectionChangeBuilder(CollectionChangeBuilder const&) = default;

@@ -50,7 +50,7 @@ struct ListChangeInfo {
 
 struct TransactionChangeInfo {
     std::vector<ListChangeInfo> lists;
-    std::unordered_map<int64_t, CollectionChangeBuilder> tables;
+    std::unordered_map<int64_t, ObjectChangeSet> tables;
     bool track_all;
     bool schema_changed;
 };
@@ -79,7 +79,7 @@ private:
     TransactionChangeInfo const& m_info;
     Table const& m_root_table;
     const int64_t m_root_table_key;
-    IndexSet const* const m_root_modifications;
+    ObjectChangeSet const* const m_root_object_changes;
     std::unordered_map<int64_t, IndexSet> m_not_modified;
     std::vector<RelatedTable> const& m_related_tables;
 

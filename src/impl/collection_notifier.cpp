@@ -58,14 +58,14 @@ CollectionNotifier::get_modification_checker(TransactionChangeInfo const& info,
     // deletions which were not linked to by any row in the linking table
     auto table_modified = [&](auto& tbl) {
         auto it = info.tables.find(tbl.table_key);
-        return it != info.tables.end() && !it->second.modifications.empty();
+        return it != info.tables.end() && !it->second.modifications_empty();
     };
     if (!any_of(begin(m_related_tables), end(m_related_tables), table_modified)) {
         return [](size_t) { return false; };
     }
     if (m_related_tables.size() == 1) {
-        auto& modifications = info.tables.find(m_related_tables[0].table_key)->second.modifications;
-        return [&](size_t row) { return modifications.contains(row); };
+        auto& object_set = info.tables.find(m_related_tables[0].table_key)->second;
+        return [&](size_t row) { return object_set.modifications_contains(row); };
     }
 
     return DeepChangeChecker(info, root_table, m_related_tables);
@@ -99,9 +99,9 @@ DeepChangeChecker::DeepChangeChecker(TransactionChangeInfo const& info,
 : m_info(info)
 , m_root_table(root_table)
 , m_root_table_key(root_table.get_key().value)
-, m_root_modifications([&] {
+, m_root_object_changes([&] {
     auto it = info.tables.find(m_root_table_key);
-    return it != info.tables.end() ? &it->second.modifications : nullptr;
+    return it != info.tables.end() ? &it->second : nullptr;
 }())
 , m_related_tables(related_tables)
 {
@@ -166,7 +166,7 @@ bool DeepChangeChecker::check_row(Table const& table, int64_t key, size_t depth)
     int64_t table_key = table.get_key().value;
     if (depth > 0) {
         auto it = m_info.tables.find(table_key);
-        if (it != m_info.tables.end() && it->second.modifications.contains(key))
+        if (it != m_info.tables.end() && it->second.modifications_contains(key))
             return true;
     }
     auto& not_modified = m_not_modified[table_key];
@@ -181,7 +181,7 @@ bool DeepChangeChecker::check_row(Table const& table, int64_t key, size_t depth)
 
 bool DeepChangeChecker::operator()(int64_t key)
 {
-    if (m_root_modifications && m_root_modifications->contains(key))
+    if (m_root_object_changes && m_root_object_changes->modifications_contains(key))
         return true;
     return check_row(m_root_table, key, 0);
 }

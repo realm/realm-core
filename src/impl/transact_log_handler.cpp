@@ -102,16 +102,16 @@ void KVOAdapter::before(Transaction& sg)
             continue;
 
         auto const& table = it->second;
-        auto idx = observer.obj_key;
-        if (table.deletions.contains(idx)) {
+        auto key = observer.obj_key;
+        if (table.deletions_contains(key)) {
             m_invalidated.push_back(observer.info);
             continue;
         }
-        if (table.modifications.contains(idx)) {
-            observer.changes.reserve(table.columns.size());
-            for (auto& c : table.columns) {
-                if (c.second.contains(idx))
-                    observer.changes[c.first].kind = BindingContext::ColumnInfo::Kind::Set;
+        auto column_modifications = table.get_columns_modified(key);
+        if (column_modifications) {
+            observer.changes.reserve(column_modifications->second - column_modifications->first);
+            for (auto it = column_modifications->first; it != column_modifications->second; ++it) {
+                observer.changes[*it].kind = BindingContext::ColumnInfo::Kind::Set;
             }
         }
     }
@@ -126,7 +126,7 @@ void KVOAdapter::before(Transaction& sg)
         }
         // If the containing row was deleted then changes will be empty
         if (list.observer->changes.empty()) {
-            REALM_ASSERT_DEBUG(tables[list.observer->table_key].deletions.contains(list.observer->obj_key));
+            REALM_ASSERT_DEBUG(tables[list.observer->table_key].deletions_contains(list.observer->obj_key));
             continue;
         }
         // otherwise the column should have been marked as modified
@@ -258,7 +258,7 @@ struct TransactLogValidator : public TransactLogValidationMixin {
 class TransactLogObserver : public TransactLogValidationMixin {
     _impl::TransactionChangeInfo& m_info;
     _impl::CollectionChangeBuilder* m_active_list = nullptr;
-    _impl::CollectionChangeBuilder* m_active_table = nullptr;
+    _impl::ObjectChangeSet* m_active_table = nullptr;
 
     _impl::CollectionChangeBuilder* find_list(ObjKey obj, ColKey col)
     {
@@ -363,7 +363,7 @@ public:
     bool create_object(ObjKey key)
     {
         if (m_active_table)
-            m_active_table->insertions.add(key.value);
+            m_active_table->insertions_add(key.value);
         return true;
     }
 
@@ -371,10 +371,9 @@ public:
     {
         if (!m_active_table)
             return true;
-        if (!m_active_table->insertions.contains(key.value))
-            m_active_table->deletions.add(key.value);
-        m_active_table->insertions.remove(key.value);
-        m_active_table->modifications.remove(key.value);
+        if (!m_active_table->insertions_remove(key.value))
+            m_active_table->deletions_add(key.value);
+        m_active_table->modifications_remove(key.value);
 
         for (size_t i = 0; i < m_info.lists.size(); ++i) {
             auto& list = m_info.lists[i];
@@ -394,7 +393,7 @@ public:
     bool modify_object(ColKey col, ObjKey key)
     {
         if (m_active_table)
-            m_active_table->modify(key.value, col.value);
+            m_active_table->modifications_add(key.value, col.value);
         return true;
     }
 
