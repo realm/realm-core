@@ -120,9 +120,9 @@ public:
         }
         return false;
     }
-    const Table* get_table() const
+    ConstTableRef get_table() const
     {
-        return m_const_obj->get_table().unchecked_ptr();
+        return m_const_obj->get_table();
     }
     ColKey get_col_key() const
     {

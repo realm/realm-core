@@ -56,7 +56,7 @@ bool TransactLogEncoder::select_list(ColKey col_key, ObjKey key)
 
 void TransactLogConvenientEncoder::do_select_list(const ConstLstBase& list)
 {
-    select_table(list.get_table());
+    select_table(list.get_table().unchecked_ptr());
     ColKey col_key = list.get_col_key();
     ObjKey key = list.ConstLstBase::get_key();
 
