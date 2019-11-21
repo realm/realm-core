@@ -84,10 +84,10 @@ struct QueryGroup {
 
 class Query final {
 public:
-    Query(const Table& table, ConstTableView* tv = nullptr);
-    Query(const Table& table, std::unique_ptr<ConstTableView>);
-    Query(const Table& table, const LnkLst& list);
-    Query(const Table& table, LnkLstPtr&& list);
+    Query(ConstTableRef table, ConstTableView* tv = nullptr);
+    Query(ConstTableRef table, std::unique_ptr<ConstTableView>);
+    Query(ConstTableRef table, const LnkLst& list);
+    Query(ConstTableRef table, LnkLstPtr&& list);
     Query();
     Query(std::unique_ptr<Expression>);
     ~Query() noexcept;

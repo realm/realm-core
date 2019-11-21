@@ -8995,12 +8995,12 @@ TEST(Query_MoveDoesntDoubleDelete)
     Table table;
 
     {
-        Query q1(table, std::unique_ptr<ConstTableView>(new TableView()));
+        Query q1(table.get_table_ref(), std::unique_ptr<ConstTableView>(new TableView()));
         Query q2 = std::move(q1);
     }
 
     {
-        Query q1(table, std::unique_ptr<ConstTableView>(new TableView()));
+        Query q1(table.get_table_ref(), std::unique_ptr<ConstTableView>(new TableView()));
         Query q2;
         q2 = std::move(q1);
     }
@@ -9200,7 +9200,7 @@ TEST(Query_CopyRestrictingTableViewWhenOwned)
     Table table;
 
     {
-        Query q1(table, std::unique_ptr<ConstTableView>(new TableView()));
+        Query q1(table.get_table_ref(), std::unique_ptr<ConstTableView>(new TableView()));
         Query q2(q1);
 
         // Reset the source query, destroying the original TableView.
@@ -9211,7 +9211,7 @@ TEST(Query_CopyRestrictingTableViewWhenOwned)
     }
 
     {
-        Query q1(table, std::unique_ptr<ConstTableView>(new TableView()));
+        Query q1(table.get_table_ref(), std::unique_ptr<ConstTableView>(new TableView()));
         Query q2;
         q2 = q1;
 
