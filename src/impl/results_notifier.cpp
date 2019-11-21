@@ -70,6 +70,11 @@ ResultsNotifier::ResultsNotifier(Results& target)
 void ResultsNotifier::release_data() noexcept
 {
     m_query = {};
+    m_run_tv = {};
+    m_handover_tv = {};
+    m_handover_transaction = {};
+    m_delivered_tv = {};
+    m_delivered_transaction = {};
     CollectionNotifier::release_data();
 }
 

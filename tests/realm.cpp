@@ -755,29 +755,60 @@ TEST_CASE("SharedRealm: schema updating from external changes") {
     }
 }
 
-TEST_CASE("SharedRealm: closed realm") {
+TEST_CASE("SharedRealm: close()") {
     TestFile config;
     config.schema_version = 1;
     config.schema = Schema{
         {"object", {
             {"value", PropertyType::Int}
         }},
+        {"list", {
+            {"list", PropertyType::Object|PropertyType::Array, "object"}
+        }},
     };
 
     auto realm = Realm::get_shared_realm(config);
-    realm->close();
 
-    REQUIRE(realm->is_closed());
+    SECTION("all functions throw ClosedRealmException after close") {
+        realm->close();
 
-    REQUIRE_THROWS_AS(realm->read_group(), ClosedRealmException);
-    REQUIRE_THROWS_AS(realm->begin_transaction(), ClosedRealmException);
-    REQUIRE(!realm->is_in_transaction());
-    REQUIRE_THROWS_AS(realm->commit_transaction(), InvalidTransactionException);
-    REQUIRE_THROWS_AS(realm->cancel_transaction(), InvalidTransactionException);
+        REQUIRE(realm->is_closed());
 
-    REQUIRE_THROWS_AS(realm->refresh(), ClosedRealmException);
-    REQUIRE_THROWS_AS(realm->invalidate(), ClosedRealmException);
-    REQUIRE_THROWS_AS(realm->compact(), ClosedRealmException);
+        REQUIRE_THROWS_AS(realm->read_group(), ClosedRealmException);
+        REQUIRE_THROWS_AS(realm->begin_transaction(), ClosedRealmException);
+        REQUIRE(!realm->is_in_transaction());
+        REQUIRE_THROWS_AS(realm->commit_transaction(), InvalidTransactionException);
+        REQUIRE_THROWS_AS(realm->cancel_transaction(), InvalidTransactionException);
+
+        REQUIRE_THROWS_AS(realm->refresh(), ClosedRealmException);
+        REQUIRE_THROWS_AS(realm->invalidate(), ClosedRealmException);
+        REQUIRE_THROWS_AS(realm->compact(), ClosedRealmException);
+    }
+
+    SECTION("fully closes database file even with live notifiers") {
+        auto& group = realm->read_group();
+        realm->begin_transaction();
+        auto obj = ObjectStore::table_for_object_type(group, "list")->create_object();
+        realm->commit_transaction();
+
+        Results results(realm, *ObjectStore::table_for_object_type(group, "object"));
+        List list(realm, obj.get_linklist("list"));
+        Object object(realm, obj);
+
+        auto obj_token = object.add_notification_callback([](CollectionChangeSet, std::exception_ptr) {});
+        auto list_token = list.add_notification_callback([](CollectionChangeSet, std::exception_ptr) {});
+        auto results_token = results.add_notification_callback([](CollectionChangeSet, std::exception_ptr) {});
+
+        // Perform a dummy transaction to ensure the notifiers actually acquire
+        // resources that need to be closed
+        realm->begin_transaction();
+        realm->commit_transaction();
+
+        realm->close();
+
+        // Verify that we're able to acquire an exclusive lock
+        REQUIRE(DB::call_with_lock(config.path, [](auto) {}));
+    }
 }
 
 TEST_CASE("ShareRealm: in-memory mode from buffer") {
