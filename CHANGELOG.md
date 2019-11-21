@@ -8,6 +8,8 @@
 * Subtable accessors could be double-deleted if the last reference was released from a different
   thread at the wrong time. This would typically manifest as "pthread_mutex_destroy() failed", but
   could also result in other kinds of crashes. ([Cocoa #6333](https://github.com/realm/realm-cocoa/issues/6333)).
+* Sorting float or double columns containing NaN values had inconsistent results and would sometimes
+  crash due to out-of-bounds memory accesses. ([Cocoa #6357](https://github.com/realm/realm-cocoa/issues/6357)).
 
 ### Breaking changes
 * None.

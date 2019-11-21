@@ -21,6 +21,7 @@
 
 #include <cstdint> // unint8_t etc
 #include <cstdlib> // size_t
+#include <cmath>
 #include <vector>
 #include <memory>
 
@@ -882,6 +883,45 @@ int ColumnBase::compare_values(const Column* column, size_t row1, size_t row2) n
     auto a = column->get(row1);
     auto b = column->get(row2);
     return a == b ? 0 : a < b ? 1 : -1;
+}
+
+namespace _impl {
+template <int> struct IntTypeForSize;
+template <> struct IntTypeForSize<1> { using type = uint8_t; };
+template <> struct IntTypeForSize<2> { using type = uint16_t; };
+template <> struct IntTypeForSize<4> { using type = uint32_t; };
+template <> struct IntTypeForSize<8> { using type = uint64_t; };
+
+template <typename Float>
+int compare_float(Float a_raw, Float b_raw)
+{
+    // nans (and by extension nulls) are treated as being less than all non-nan values
+    bool a_nan = std::isnan(a_raw);
+    bool b_nan = std::isnan(b_raw);
+    if (a_nan != b_nan) {
+        return a_nan ? 1 : -1;
+    }
+
+    // Compare the values as ints, which gives correct results for IEEE floats
+    // and bypasses the usual behavior of nans not being comparable to each other
+    using IntType = typename _impl::IntTypeForSize<sizeof(Float)>::type;
+    IntType a = 0, b = 0;
+    memcpy(&a, &a_raw, sizeof(Float));
+    memcpy(&b, &b_raw, sizeof(Float));
+    return a == b ? 0 : a < b ? 1 : -1;
+}
+} // namespace _impl
+
+template <>
+inline int ColumnBase::compare_values<Column<float>>(const Column<float>* column, size_t row1, size_t row2) noexcept
+{
+    return _impl::compare_float(column->get(row1), column->get(row2));
+}
+
+template <>
+inline int ColumnBase::compare_values<Column<double>>(const Column<double>* column, size_t row1, size_t row2) noexcept
+{
+    return _impl::compare_float(column->get(row1), column->get(row2));
 }
 
 template <class T>
