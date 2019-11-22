@@ -89,6 +89,8 @@ using unit_test::TestContext;
 // `experiments/testcase.cpp` and then run `sh build.sh
 // check-testcase` (or one of its friends) from the command line.
 
+extern unsigned int unit_test_random_seed;
+
 namespace {
 
 // copy and convert values between nullable/not nullable as expressed by types
@@ -4956,14 +4958,30 @@ TEST(Table_IteratorRandomAccess)
     }
 
     // random access
-    std::vector<int> indexes(1000);
-    std::iota(indexes.begin(), indexes.end(), 0);
-    std::random_device rd;
-    std::mt19937 g(rd());
-    std::shuffle(std::begin(indexes), std::end(indexes), std::mt19937(rd()));
-    iter = t.begin();
-    for (auto index : indexes) {
-        CHECK_EQUAL(keys[index], iter[index].get_key());
+    for (int j = 0; j < 5; j++) {
+        std::vector<size_t> random_idx(keys.size());
+        std::iota(random_idx.begin(), random_idx.end(), 0);
+        // unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
+        // std::cout << "Seed " << seed << std::endl;
+        std::shuffle(random_idx.begin(), random_idx.end(), std::mt19937(unit_test_random_seed));
+        iter = t.begin();
+        int i = 0;
+        for (auto index : random_idx) {
+            if (index < keys.size()) {
+                auto k = keys[index];
+                if (i == 4) {
+                    t.remove_object(k);
+                    keys.erase(keys.begin() + index);
+                    if (index == 0)
+                        iter = t.begin();
+                    i = 0;
+                }
+                else {
+                    CHECK_EQUAL(k, iter[index].get_key());
+                }
+                i++;
+            }
+        }
     }
 
     auto iter200 = iter + 200;

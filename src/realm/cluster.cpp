@@ -2194,7 +2194,7 @@ size_t ClusterTree::ConstIterator::get_position()
     catch (...) {
         throw std::runtime_error("Outdated iterator");
     }
-    return 0;
+    return 0; // dummy
 }
 
 ObjKey ClusterTree::ConstIterator::load_leaf(ObjKey key) const
@@ -2203,6 +2203,7 @@ ObjKey ClusterTree::ConstIterator::load_leaf(ObjKey key) const
     // 'key' may or may not exist. If it does not exist, state is updated
     // to point to the next object in line.
     if (m_tree.get_leaf(key, m_state)) {
+        m_leaf_start_pos = m_position - m_state.m_current_index;
         // Get the actual key value
         return m_leaf.get_real_key(m_state.m_current_index);
     }
@@ -2218,12 +2219,12 @@ auto ClusterTree::ConstIterator::operator[](size_t n) -> reference
         // reload
         m_position = get_position(); // Will throw if base object is deleted
         load_leaf(m_key);
-        m_leaf_start_pos = m_position - m_state.m_current_index;
     }
 
     auto abs_pos = n + m_position;
 
-    if (n < m_leaf_start_pos || n >= (m_leaf_start_pos + m_leaf.node_size())) {
+    auto leaf_node_size = m_leaf.node_size();
+    if (abs_pos < m_leaf_start_pos || abs_pos >= (m_leaf_start_pos + leaf_node_size)) {
         if (abs_pos >= m_tree.size()) {
             throw std::out_of_range("Index out of range");
         }
