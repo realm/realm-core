@@ -89,6 +89,8 @@ using unit_test::TestContext;
 // `experiments/testcase.cpp` and then run `sh build.sh
 // check-testcase` (or one of its friends) from the command line.
 
+extern unsigned int unit_test_random_seed;
+
 namespace {
 
 // copy and convert values between nullable/not nullable as expressed by types
@@ -3338,8 +3340,17 @@ TEST(Table_object_forward_iterator)
     int64_t val = it1->get<int64_t>(c0);
     table.remove_object(key);
     CHECK_EQUAL(val, it1->get<int64_t>(c0));
+
+    val = (it1 + 2)->get<int64_t>(c0);
     table.remove_object(it1);
     CHECK_THROW_ANY(it1->get<int64_t>(c0));
+    // Still invalid
+    CHECK_THROW_ANY(it1->get<int64_t>(c0));
+    it1 += 0;
+    // Still invalid
+    CHECK_THROW_ANY(it1->get<int64_t>(c0));
+    it1 += 2;
+    CHECK_EQUAL(val, it1->get<int64_t>(c0));
 }
 
 TEST(Table_object_by_index)
@@ -4928,6 +4939,57 @@ TEST(Table_MultipleObjs) {
     list_1.add(obj_key);
     CHECK_EQUAL(list_1.get(0), obj_key);
     CHECK_EQUAL(list_2.get(0), obj_key);
+}
+
+TEST(Table_IteratorRandomAccess)
+{
+    Table t;
+
+    ObjKeys keys;
+    t.create_objects(1000, keys);
+
+    auto key = keys.begin();
+    auto iter = t.begin();
+    auto end = t.end();
+    for (size_t pos = 0; (pos + 3) < 1000; pos += 3) {
+        CHECK_EQUAL(iter->get_key(), *key);
+        iter += 3;
+        key += 3;
+    }
+
+    // random access
+    for (int j = 0; j < 5; j++) {
+        std::vector<size_t> random_idx(keys.size());
+        std::iota(random_idx.begin(), random_idx.end(), 0);
+        // unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
+        // std::cout << "Seed " << seed << std::endl;
+        std::shuffle(random_idx.begin(), random_idx.end(), std::mt19937(unit_test_random_seed));
+        iter = t.begin();
+        int i = 0;
+        for (auto index : random_idx) {
+            if (index < keys.size()) {
+                auto k = keys[index];
+                if (i == 4) {
+                    t.remove_object(k);
+                    keys.erase(keys.begin() + index);
+                    if (index == 0)
+                        iter = t.begin();
+                    i = 0;
+                }
+                else {
+                    CHECK_EQUAL(k, iter[index].get_key());
+                }
+                i++;
+            }
+        }
+    }
+
+    auto iter200 = iter + 200;
+    CHECK_EQUAL(keys[200], iter200->get_key());
+    ++iter; // Now points to element 1
+    CHECK_EQUAL(keys[201], iter[200].get_key());
+    CHECK_EQUAL(keys[201], iter200[1].get_key());
+    CHECK_EQUAL(keys[1], iter->get_key());
 }
 
 #endif // TEST_TABLE

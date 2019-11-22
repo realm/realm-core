@@ -180,30 +180,44 @@ public:
     typedef const Obj& reference;
 
     ConstIterator(const ClusterTree& t, size_t ndx);
-    ConstIterator(const ClusterTree& t, ObjKey key);
-    ConstIterator(Iterator&&);
-    ConstIterator(const ConstIterator& other)
-        : ConstIterator(other.m_tree, other.m_key)
-    {
-    }
-    ConstIterator& operator=(ConstIterator&& other)
+    ConstIterator(const ConstIterator& other);
+
+    ConstIterator& operator=(const ConstIterator& other)
     {
         REALM_ASSERT(&m_tree == &other.m_tree);
+        m_position = other.m_position;
         m_key = other.m_key;
+        m_leaf_invalid = true;
+
         return *this;
     }
+    // Random access relative to iterator position.
+    reference operator[](size_t n);
     reference operator*() const
     {
         return *operator->();
     }
+    // If the object pointed to by the iterator is deleted, you will get an exception if
+    // you try to dereference the iterator before advancing it.
     pointer operator->() const;
-    ConstIterator& operator++();
+    // Advance the iterator to the next object in the table. This also holds if the object
+    // pointed to is deleted. That is - you will get the same result of advancing no matter
+    // if the previous object is deleted or not.
+    ConstIterator& operator++()
+    {
+        operator+=(1);
+        return *this;
+    }
+
     ConstIterator& operator+=(ptrdiff_t adj);
+
     ConstIterator operator+(ptrdiff_t adj)
     {
-        ConstIterator tmp(*this);
-        tmp += adj;
-        return tmp;
+        return ConstIterator(m_tree, get_position() + adj);
+    }
+    bool operator==(const ConstIterator& rhs) const
+    {
+        return m_key == rhs.m_key;
     }
     bool operator!=(const ConstIterator& rhs) const
     {
@@ -216,10 +230,14 @@ protected:
     mutable Cluster m_leaf;
     mutable ClusterNode::IteratorState m_state;
     mutable uint64_t m_instance_version = uint64_t(-1);
-    mutable ObjKey m_key;
-    mutable std::aligned_storage<sizeof(Obj), alignof(Obj)>::type m_obj_cache_storage;
+    ObjKey m_key;
+    mutable bool m_leaf_invalid;
+    mutable size_t m_position;
+    mutable size_t m_leaf_start_pos = size_t(-1);
+    mutable Obj m_obj;
 
     ObjKey load_leaf(ObjKey key) const;
+    size_t get_position();
 };
 
 class ClusterTree::Iterator : public ClusterTree::ConstIterator {
@@ -231,10 +249,6 @@ public:
 
     Iterator(const ClusterTree& t, size_t ndx)
         : ConstIterator(t, ndx)
-    {
-    }
-    Iterator(const ClusterTree& t, ObjKey key)
-        : ConstIterator(t, key)
     {
     }
 
@@ -256,9 +270,7 @@ public:
     }
     Iterator operator+(ptrdiff_t adj)
     {
-        Iterator tmp(*this);
-        tmp.ConstIterator::operator+=(adj);
-        return tmp;
+        return Iterator(m_tree, get_position() + adj);
     }
 };
 }

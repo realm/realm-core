@@ -175,6 +175,7 @@ protected:
     friend class LinkMap;
     friend class ConstTableView;
     friend class Transaction;
+    friend struct ClusterNode::IteratorState;
 
     const Table* m_table;
     ObjKey m_key;

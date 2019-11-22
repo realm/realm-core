@@ -3079,13 +3079,8 @@ TEST(Query_FindAllRangeOrMonkey2)
                 a.push_back(it->get_key());
             ++it;
         }
-        size_t s1 = a.size();
-        size_t s2 = tv1.size();
-        if (s1 != s2) {
-            printf("Error\n");
-        }
 
-        CHECK_EQUAL(s1, s2);
+        CHECK_EQUAL(a.size(), tv1.size());
         for (size_t t = 0; t < a.size(); t++) {
             CHECK_EQUAL(tv1.get_key(t), a[t]);
         }
