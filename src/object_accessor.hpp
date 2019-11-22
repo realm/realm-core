@@ -41,7 +41,7 @@
 namespace realm {
 template <typename ValueType, typename ContextType>
 void Object::set_property_value(ContextType& ctx, StringData prop_name,
-                                ValueType value, bool try_update)
+                                ValueType value, CreatePolicy policy)
 {
     verify_attached();
     m_realm->verify_in_write();
@@ -53,7 +53,7 @@ void Object::set_property_value(ContextType& ctx, StringData prop_name,
     if (property.is_primary && !m_realm->is_in_migration())
         throw ModifyPrimaryKeyException(m_object_schema->name, property.name);
 
-    set_property_value_impl(ctx, property, value, try_update, false, false);
+    set_property_value_impl(ctx, property, value, policy, false);
 }
 
 template <typename ValueType, typename ContextType>
@@ -76,16 +76,15 @@ struct ValueUpdater {
     ValueType& value;
     Obj& obj;
     ColKey col;
-    bool try_update;
-    bool update_only_diff;
+    CreatePolicy policy;
     bool is_default;
 
     void operator()(Obj*)
     {
         ContextType child_ctx(ctx, property);
         auto curr_link = obj.get<ObjKey>(col);
-        auto link = child_ctx.template unbox<Obj>(value, true, try_update, update_only_diff, curr_link);
-        if (!update_only_diff || curr_link != link.get_key()) {
+        auto link = child_ctx.template unbox<Obj>(value, policy, curr_link);
+        if (policy != CreatePolicy::UpdateModified || curr_link != link.get_key()) {
             obj.set(col, link.get_key());
         }
     }
@@ -94,7 +93,7 @@ struct ValueUpdater {
     void operator()(T*)
     {
         auto new_val = ctx.template unbox<T>(value);
-        if (!update_only_diff || obj.get<T>(col) != new_val) {
+        if (policy != CreatePolicy::UpdateModified || obj.get<T>(col) != new_val) {
             obj.set(col, new_val, is_default);
         }
     }
@@ -103,13 +102,13 @@ struct ValueUpdater {
 
 template <typename ValueType, typename ContextType>
 void Object::set_property_value_impl(ContextType& ctx, const Property &property,
-                                     ValueType value, bool try_update, bool update_only_diff, bool is_default)
+                                     ValueType value, CreatePolicy policy, bool is_default)
 {
     ctx.will_change(*this, property);
 
     ColKey col{property.column_key};
     if (is_nullable(property.type) && ctx.is_null(value)) {
-        if (!update_only_diff || !m_obj.is_null(col)) {
+        if (policy != CreatePolicy::UpdateModified || !m_obj.is_null(col)) {
             if (property.type == PropertyType::Object) {
                 if (!is_default)
                     m_obj.set_null(col);
@@ -129,13 +128,13 @@ void Object::set_property_value_impl(ContextType& ctx, const Property &property,
 
         ContextType child_ctx(ctx, property);
         List list(m_realm, m_obj, col);
-        list.assign(child_ctx, value, try_update, update_only_diff);
+        list.assign(child_ctx, value, policy);
         ctx.did_change();
         return;
     }
 
     ValueUpdater<ValueType, ContextType> updater{ctx, property, value,
-        m_obj, col, try_update, update_only_diff, is_default};
+        m_obj, col, policy, is_default};
     switch_on_type(property.type, updater);
     ctx.did_change();
 }
@@ -179,17 +178,17 @@ ValueType Object::get_property_value_impl(ContextType& ctx, const Property &prop
 template<typename ValueType, typename ContextType>
 Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
                       StringData object_type, ValueType value,
-                      bool try_update, bool update_only_diff, ObjKey current_obj, Obj* out_row)
+                      CreatePolicy policy, ObjKey current_obj, Obj* out_row)
 {
     auto object_schema = realm->schema().find(object_type);
     REALM_ASSERT(object_schema != realm->schema().end());
-    return create(ctx, realm, *object_schema, value, try_update, update_only_diff, current_obj, out_row);
+    return create(ctx, realm, *object_schema, value, policy, current_obj, out_row);
 }
 
 template<typename ValueType, typename ContextType>
 Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
                       ObjectSchema const& object_schema, ValueType value,
-                      bool try_update,  bool update_only_diff, ObjKey current_obj, Obj* out_row)
+                      CreatePolicy policy, ObjKey current_obj, Obj* out_row)
 {
     realm->verify_in_write();
 
@@ -214,7 +213,7 @@ Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
         }
         auto key = get_for_primary_key_impl(ctx, *table, *primary_prop, *primary_value);
         if (key) {
-            if (try_update)
+            if (policy != CreatePolicy::ForceCreate)
                 obj = table->get_object(key);
             else if (realm->is_in_migration()) {
                 // Creating objects with duplicate primary keys is allowed in migrations
@@ -245,7 +244,7 @@ Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
         }
     }
     else {
-        if (update_only_diff && current_obj) {
+        if (policy == CreatePolicy::UpdateModified && current_obj) {
             obj = table->get_object(current_obj);
         }
         else {
@@ -277,7 +276,7 @@ Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
                 throw MissingPropertyValueException(object_schema.name, prop.name);
         }
         if (v)
-            object.set_property_value_impl(ctx, prop, *v, try_update, update_only_diff, is_default);
+            object.set_property_value_impl(ctx, prop, *v, policy, is_default);
     }
 #if REALM_ENABLE_SYNC
     if (realm->is_partial() && object_schema.name == "__User") {

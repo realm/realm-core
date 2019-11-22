@@ -321,6 +321,15 @@ std::shared_ptr<AsyncOpenTask> RealmCoordinator::get_synchronized_realm(Realm::C
     return std::make_shared<AsyncOpenTask>(shared_from_this(), m_sync_session);
 }
 
+void RealmCoordinator::create_session(const Realm::Config& config)
+{
+    REALM_ASSERT(config.sync_config);
+    std::unique_lock<std::mutex> lock(m_realm_mutex);
+    set_config(config);
+    bool exists = File::exists(m_config.path);
+    create_sync_session(!config.sync_config->is_partial && !exists, exists);
+}
+
 void RealmCoordinator::open_with_config(Realm::Config config)
 {
     set_config(config);
@@ -860,6 +869,7 @@ void RealmCoordinator::run_async_notifiers()
     clean_up_dead_notifiers();
 
     if (m_notifiers.empty() && m_new_notifiers.empty()) {
+        m_notifier_cv.notify_all();
         return;
     }
 
@@ -870,6 +880,7 @@ void RealmCoordinator::run_async_notifiers()
     if (m_async_error) {
         std::move(m_new_notifiers.begin(), m_new_notifiers.end(), std::back_inserter(m_notifiers));
         m_new_notifiers.clear();
+        m_notifier_cv.notify_all();
         return;
     }
 

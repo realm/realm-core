@@ -127,7 +127,7 @@ public:
     // is true, `current_row` may hold a reference to the object that should
     // be compared against.
     template<typename T>
-    T unbox(util::Any& v, bool /*create*/= false, bool /*update*/= false, bool /*update_only_diff*/ = false, ObjKey /*current_row*/ = ObjKey()) const { return any_cast<T>(v); }
+    T unbox(util::Any& v, CreatePolicy = CreatePolicy::Skip, ObjKey /*current_row*/ = ObjKey()) const { return any_cast<T>(v); }
 
     bool is_null(util::Any const& v) const noexcept { return !v.has_value(); }
     util::Any null_value() const noexcept { return {}; }
@@ -159,7 +159,7 @@ inline util::Any CppContext::box(Obj obj) const
 }
 
 template<>
-inline StringData CppContext::unbox(util::Any& v, bool, bool, bool, ObjKey) const
+inline StringData CppContext::unbox(util::Any& v, CreatePolicy, ObjKey) const
 {
     if (!v.has_value())
         return StringData();
@@ -168,7 +168,7 @@ inline StringData CppContext::unbox(util::Any& v, bool, bool, bool, ObjKey) cons
 }
 
 template<>
-inline BinaryData CppContext::unbox(util::Any& v, bool, bool, bool, ObjKey) const
+inline BinaryData CppContext::unbox(util::Any& v, CreatePolicy, ObjKey) const
 {
     if (!v.has_value())
         return BinaryData();
@@ -177,45 +177,45 @@ inline BinaryData CppContext::unbox(util::Any& v, bool, bool, bool, ObjKey) cons
 }
 
 template<>
-inline Obj CppContext::unbox(util::Any& v, bool create, bool update, bool update_only_diff, ObjKey current_row) const
+inline Obj CppContext::unbox(util::Any& v, CreatePolicy policy, ObjKey current_obj) const
 {
     if (auto object = any_cast<Object>(&v))
         return object->obj();
     if (auto obj = any_cast<Obj>(&v))
         return *obj;
-    if (!create)
+    if (policy == CreatePolicy::Skip)
         return Obj();
 
     REALM_ASSERT(object_schema);
-    return Object::create(const_cast<CppContext&>(*this), realm, *object_schema, v, update, update_only_diff, current_row).obj();
+    return Object::create(const_cast<CppContext&>(*this), realm, *object_schema, v, policy, current_obj).obj();
 }
 
 template<>
-inline util::Optional<bool> CppContext::unbox(util::Any& v, bool, bool, bool, ObjKey) const
+inline util::Optional<bool> CppContext::unbox(util::Any& v, CreatePolicy, ObjKey) const
 {
     return v.has_value() ? util::make_optional(unbox<bool>(v)) : util::none;
 }
 
 template<>
-inline util::Optional<int64_t> CppContext::unbox(util::Any& v, bool, bool, bool, ObjKey) const
+inline util::Optional<int64_t> CppContext::unbox(util::Any& v, CreatePolicy, ObjKey) const
 {
     return v.has_value() ? util::make_optional(unbox<int64_t>(v)) : util::none;
 }
 
 template<>
-inline util::Optional<double> CppContext::unbox(util::Any& v, bool, bool, bool, ObjKey) const
+inline util::Optional<double> CppContext::unbox(util::Any& v, CreatePolicy, ObjKey) const
 {
     return v.has_value() ? util::make_optional(unbox<double>(v)) : util::none;
 }
 
 template<>
-inline util::Optional<float> CppContext::unbox(util::Any& v, bool, bool, bool, ObjKey) const
+inline util::Optional<float> CppContext::unbox(util::Any& v, CreatePolicy, ObjKey) const
 {
     return v.has_value() ? util::make_optional(unbox<float>(v)) : util::none;
 }
 
 template<>
-inline Mixed CppContext::unbox(util::Any&, bool, bool, bool, ObjKey) const
+inline Mixed CppContext::unbox(util::Any&, CreatePolicy, ObjKey) const
 {
     throw std::logic_error("'Any' type is unsupported");
 }
