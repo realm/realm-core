@@ -191,15 +191,18 @@ public:
 
         return *this;
     }
+
+    // If the object pointed to by the iterator is deleted, you will get an exception if
+    // you try to dereference the iterator before advancing it.
+
     // Random access relative to iterator position.
     reference operator[](size_t n);
     reference operator*() const
     {
         return *operator->();
     }
-    // If the object pointed to by the iterator is deleted, you will get an exception if
-    // you try to dereference the iterator before advancing it.
     pointer operator->() const;
+
     // Advance the iterator to the next object in the table. This also holds if the object
     // pointed to is deleted. That is - you will get the same result of advancing no matter
     // if the previous object is deleted or not.
