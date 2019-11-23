@@ -2281,7 +2281,7 @@ ClusterTree::ConstIterator& Table::ConstIterator::operator+=(ptrdiff_t adj)
         if (k != m_key) {
             // Objects was deleted. k points to the next object
             m_key = k;
-            m_position = m_tree.get_ndx(m_key);
+            m_position = m_key ? m_tree.get_ndx(m_key) : m_tree.size();
             n--;
         }
     }
