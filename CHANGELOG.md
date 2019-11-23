@@ -1,23 +1,4 @@
-# NEXT RELEASE
-
-### Enhancements
-* None.
-
-### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
- 
-### Breaking changes
-* None.
-
------------
-
-### Internals
-* None.
-
-----------------------------------------------
-
-# 6.0.0-alpha.26 Release notes
+# 6.0.0-alpha.27 Release notes
 
 ### Enhancements
 * Table iterator to support random access. If the object that iterator points to is deleted, the iterator must be advanced or renewed before used for table access.
@@ -25,6 +6,12 @@
 
 ### Fixed
 * The way the Table iterator was used in ObjectStore could result in an exception if the element recently accessed was deleted. ([#3482](https://github.com/realm/realm-core/issues/3482), since 6.0.0-alpha.0)
+
+----------------------------------------------
+
+# 6.0.0-alpha.26 Release notes
+
+This release was never published
  
 ----------------------------------------------
 
