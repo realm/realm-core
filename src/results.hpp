@@ -307,7 +307,6 @@ private:
         Obj get(Table const& table, size_t ndx);
     private:
         std::unique_ptr<Table::ConstIterator> m_it;
-        size_t m_ndx = 0;
     } m_table_iterator;
 };
 
