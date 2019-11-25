@@ -598,7 +598,11 @@ uint64_t File::get_file_pos(FileDesc fd)
 
     return uint64_t(res.QuadPart);
 #else
-    return lseek(fd, 0, SEEK_CUR);
+    auto pos = lseek(fd, 0, SEEK_CUR);
+    if (pos < 0) {
+        throw std::system_error(errno, std::system_category(), "lseek() failed");
+    }
+    return uint64_t(pos);
 #endif
 }
 
