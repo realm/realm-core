@@ -30,7 +30,6 @@
 using namespace realm;
 using namespace realm::util;
 
-// DISABLE until it can handle stable keys for Tables.
 #define TEST_FUZZ
 #ifdef TEST_FUZZ
 // Determines whether or not to run the shared group verify function
@@ -267,25 +266,22 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
         *log << "SHARED_GROUP_TEST_PATH(path);\n";
 
         *log << "const char* key = " << printable_key << ";\n";
-        *log << "std::unique_ptr<Replication> hist_r(make_in_realm_history(path));\n";
-        *log << "std::unique_ptr<Replication> hist_w(make_in_realm_history(path));\n";
+        *log << "std::unique_ptr<Replication> hist(make_in_realm_history(path));\n";
 
-        *log << "DBRef db_r = DB::create(*hist_r, DBOptions(key));\n";
-        *log << "DBRef db_w = DB::create(*hist_w, DBOptions(key));\n";
-        *log << "auto wt = db_w->start_write();\n";
-        *log << "auto rt = db_r->start_read();\n";
+        *log << "DBRef db = DB::create(*hist, DBOptions(key));\n";
+        *log << "auto wt = db->start_write();\n";
+        *log << "auto rt = db->start_read();\n";
         *log << "std::vector<TableView> table_views;\n";
 
         *log << "\n";
     }
 
-    std::unique_ptr<Replication> hist_r(make_in_realm_history(path));
-    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
 
-    DBRef db_r = DB::create(*hist_r, DBOptions(encryption_key));
-    DBRef db_w = DB::create(*hist_w, DBOptions(encryption_key));
-    auto wt = db_w->start_write();
-    auto rt = db_r->start_read();
+    DBOptions options(encryption_key);
+    DBRef db = DB::create(*hist, options);
+    auto wt = db->start_write();
+    auto rt = db->start_read();
     std::vector<TableView> table_views;
 
     try {
@@ -647,41 +643,25 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 REALM_DO_IF_VERIFY(log, rt->verify());
             }
             else if (instr == CLOSE_AND_REOPEN) {
-                bool read_group = get_next(s) % 2 == 0;
-                if (read_group) {
-                    if (log) {
-                        *log << "rt = nullptr;\n";
-                        *log << "db_r->close();\n";
-                    }
-                    rt = nullptr; // transactions must be done/closed before closing the DB.
-                    db_r->close();
-                    if (log) {
-                        *log << "db_r = DB::create(*hist_r, DBOptions(key));\n";
-                    }
-                    db_r = DB::create(*hist_r, DBOptions(encryption_key));
-                    if (log) {
-                        *log << "rt = db_r->start_read();\n";
-                    }
-                    rt = db_r->start_read();
-                    REALM_DO_IF_VERIFY(log, rt->verify());
+                if (log) {
+                    *log << "wt = nullptr;\n";
+                    *log << "rt = nullptr;\n";
+                    *log << "db->close();\n";
                 }
-                else {
-                    if (log) {
-                        *log << "wt = nullptr;\n";
-                        *log << "db_w->close();\n";
-                    }
-                    wt = nullptr;
-                    db_w->close();
-                    if (log) {
-                        *log << "db_w = DB::create(*hist_w, DBOptions(key));\n";
-                    }
-                    db_w = DB::create(*hist_w, DBOptions(encryption_key));
-                    if (log) {
-                        *log << "wt = db_w->start_write();\n";
-                    }
-                    wt = db_w->start_write();
-                    REALM_DO_IF_VERIFY(log, wt->verify());
+                wt = nullptr; // transactions must be done/closed before closing the DB.
+                rt = nullptr;
+                db->close();
+                if (log) {
+                    *log << "db = DB::create(*hist, DBOptions(key));\n";
                 }
+                db = DB::create(*hist, DBOptions(encryption_key));
+                if (log) {
+                    *log << "wt = db_w->start_write();\n";
+                    *log << "rt = db->start_read();\n";
+                }
+                rt = db->start_read();
+                wt = db->start_write();
+                REALM_DO_IF_VERIFY(log, rt->verify());
             }
             else if (instr == GET_ALL_COLUMN_NAMES && wt->size() > 0) {
                 // try to fuzz find this: https://github.com/realm/realm-core/issues/1769
