@@ -136,6 +136,12 @@ public:
     Results snapshot() const &;
     Results snapshot() &&;
 
+    // Returns a frozen copy of this result
+    Results freeze(SharedRealm realm);
+
+    // Returns whether or not this Results is frozen.
+    bool is_frozen();
+
     // Get the min/max/average/sum of the given column
     // All but sum() returns none when there are zero matching rows
     // sum() returns 0, except for when it returns none

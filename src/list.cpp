@@ -430,6 +430,7 @@ bool List::operator==(List const& rgt) const noexcept
 NotificationToken List::add_notification_callback(CollectionChangeCallback cb) &
 {
     verify_attached();
+    m_realm->verify_notifications_available();
     // Adding a new callback to a notifier which had all of its callbacks
     // removed does not properly reinitialize the notifier. Work around this by
     // recreating it instead.
@@ -443,6 +444,16 @@ NotificationToken List::add_notification_callback(CollectionChangeCallback cb) &
         RealmCoordinator::register_notifier(m_notifier);
     }
     return {m_notifier, m_notifier->add_callback(std::move(cb))};
+}
+
+List List::freeze(std::shared_ptr<Realm> frozen_realm)
+{
+    return List(frozen_realm, *frozen_realm->transaction().import_copy_of(*m_list_base));
+}
+
+bool List::is_frozen()
+{
+    return m_realm->is_frozen();
 }
 
 List::OutOfBoundsIndexException::OutOfBoundsIndexException(size_t r, size_t c)

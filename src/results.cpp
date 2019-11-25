@@ -870,7 +870,6 @@ Results Results::snapshot() const &
 Results Results::snapshot() &&
 {
     validate_read();
-
     switch (m_mode) {
         case Mode::Empty:
             return Results();
@@ -894,24 +893,16 @@ Results Results::snapshot() &&
 
 void Results::prepare_async(ForCallback force)
 {
-    if (m_notifier) {
+    if (m_notifier)
         return;
-    }
-    if (m_realm->config().immutable()) {
-        if (force)
-            throw InvalidTransactionException("Cannot create asynchronous query for immutable Realms");
+    if (!m_realm->verify_notifications_available(force))
         return;
-    }
-    if (m_realm->is_in_transaction()) {
-        if (force)
-            throw InvalidTransactionException("Cannot create asynchronous query while in a write transaction");
-        return;
-    }
     if (m_update_policy == UpdatePolicy::Never) {
         if (force)
             throw std::logic_error("Cannot create asynchronous query for snapshotted Results.");
         return;
     }
+
     if (!force) {
         // Don't do implicit background updates if we can't actually deliver them
         if (!m_realm->can_deliver_notifications())
@@ -977,6 +968,38 @@ REALM_RESULTS_TYPE(util::Optional<float>)
 REALM_RESULTS_TYPE(util::Optional<double>)
 
 #undef REALM_RESULTS_TYPE
+
+Results Results::freeze(SharedRealm frozen_realm)
+{
+    switch (m_mode) {
+        case Mode::Empty:
+            return Results();
+        case Mode::Table:
+            return Results(frozen_realm, *frozen_realm->transaction().import_copy_of(m_table));
+        case Mode::List: {
+            return Results(frozen_realm, frozen_realm->transaction().import_copy_of(*m_list), m_descriptor_ordering);
+        }
+        case Mode::LinkList: {
+            std::shared_ptr<LnkLst> frozen_ll(frozen_realm->transaction().import_copy_of(std::make_unique<LnkLst>(*m_link_list)).release());
+
+            // If query/sort was provided for the original Results, mode would have changed to Query, so no need
+            // include them here.
+            return Results(frozen_realm, frozen_ll);
+        }
+        case Mode::Query:
+            return Results(frozen_realm, *frozen_realm->transaction().import_copy_of(m_query, PayloadPolicy::Copy), m_descriptor_ordering);
+        case Mode::TableView:
+            auto results = Results(frozen_realm, *frozen_realm->transaction().import_copy_of(m_table_view, PayloadPolicy::Copy), m_descriptor_ordering);
+            results.m_table_view.sync_if_needed();
+            return results;
+    }
+    REALM_COMPILER_HINT_UNREACHABLE();
+}
+
+bool Results::is_frozen()
+{
+    return (m_realm) ? m_realm->is_frozen() : true;
+}
 
 Results::OutOfBoundsIndexException::OutOfBoundsIndexException(size_t r, size_t c)
 : std::out_of_range(util::format("Requested index %1 greater than max %2", r, c - 1))

@@ -197,7 +197,7 @@ void RealmCoordinator::set_config(const Realm::Config& config)
     }
 }
 
-std::shared_ptr<Realm> RealmCoordinator::get_realm(Realm::Config config)
+std::shared_ptr<Realm> RealmCoordinator::get_realm(Realm::Config config, util::Optional<VersionID> version)
 {
     // realm must be declared before lock so that the mutex is released before
     // we release the strong reference to realm, as Realm's destructor may want
@@ -205,7 +205,7 @@ std::shared_ptr<Realm> RealmCoordinator::get_realm(Realm::Config config)
     std::shared_ptr<Realm> realm;
     std::unique_lock<std::mutex> lock(m_realm_mutex);
     set_config(config);
-    do_get_realm(std::move(config), realm, lock);
+    do_get_realm(std::move(config), realm, version, lock);
     return realm;
 }
 
@@ -213,7 +213,7 @@ std::shared_ptr<Realm> RealmCoordinator::get_realm()
 {
     std::shared_ptr<Realm> realm;
     std::unique_lock<std::mutex> lock(m_realm_mutex);
-    do_get_realm(m_config, realm, lock);
+    do_get_realm(m_config, realm, none, lock);
     return realm;
 }
 
@@ -221,11 +221,12 @@ ThreadSafeReference RealmCoordinator::get_unbound_realm()
 {
     std::shared_ptr<Realm> realm;
     std::unique_lock<std::mutex> lock(m_realm_mutex);
-    do_get_realm(m_config, realm, lock, false);
+    do_get_realm(m_config, realm, none, lock, false);
     return ThreadSafeReference(realm);
 }
 
 void RealmCoordinator::do_get_realm(Realm::Config config, std::shared_ptr<Realm>& realm,
+                                    util::Optional<VersionID> version,
                                     std::unique_lock<std::mutex>& realm_lock, bool bind_to_context)
 {
     open_db();
@@ -236,7 +237,7 @@ void RealmCoordinator::do_get_realm(Realm::Config config, std::shared_ptr<Realm>
     auto audit_factory = std::move(config.audit_factory);
     config.schema = {};
 
-    realm = Realm::make_shared_realm(std::move(config), shared_from_this());
+    realm = Realm::make_shared_realm(std::move(config), version, shared_from_this());
     if (!m_notifier && !m_config.immutable() && m_config.automatic_change_notifications) {
         try {
             m_notifier = std::make_unique<ExternalCommitHelper>(*this);
@@ -485,12 +486,12 @@ void RealmCoordinator::close()
     m_db = nullptr;
 }
 
-std::shared_ptr<Group> RealmCoordinator::begin_read(VersionID version)
+std::shared_ptr<Group> RealmCoordinator::begin_read(VersionID version, bool frozen_transaction)
 {
     open_db();
     if (m_read_only_group)
         return m_read_only_group;
-    return m_db->start_read(version);
+    return (frozen_transaction) ? m_db->start_frozen(version) : m_db->start_read(version);
 }
 
 bool RealmCoordinator::get_cached_schema(Schema& schema, uint64_t& schema_version,

@@ -28,7 +28,7 @@ bool create_dummy_realm(std::string path) {
     Realm::Config config;
     config.path = path;
     try {
-        _impl::RealmCoordinator::get_coordinator(path)->get_realm(config);
+        _impl::RealmCoordinator::get_coordinator(path)->get_realm(config, none);
         REQUIRE_REALM_EXISTS(path);
         return true;
     } catch (std::exception&) {

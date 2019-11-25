@@ -27,6 +27,15 @@
 
 using namespace realm;
 
+Object Object::freeze(std::shared_ptr<Realm> frozen_realm) {
+    return Object(frozen_realm, frozen_realm->transaction().import_copy_of(m_obj));
+}
+
+bool Object::is_frozen()
+{
+    return m_realm->is_frozen();
+}
+
 InvalidatedObjectException::InvalidatedObjectException(const std::string& object_type)
 : std::logic_error("Accessing object of type " + object_type + " which has been invalidated or deleted")
 , object_type(object_type)
@@ -89,6 +98,7 @@ Object& Object::operator=(Object&&) = default;
 NotificationToken Object::add_notification_callback(CollectionChangeCallback callback) &
 {
     verify_attached();
+    m_realm->verify_notifications_available();
     if (!m_notifier) {
         m_notifier = std::make_shared<_impl::ObjectNotifier>(m_realm, m_obj.get_table()->get_key(), m_obj.get_key());
         _impl::RealmCoordinator::register_notifier(m_notifier);

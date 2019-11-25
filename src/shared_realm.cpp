@@ -57,8 +57,9 @@ namespace sync {
 using namespace realm;
 using namespace realm::_impl;
 
-Realm::Realm(Config config, std::shared_ptr<_impl::RealmCoordinator> coordinator, MakeSharedTag)
+Realm::Realm(Config config, util::Optional<VersionID> version, std::shared_ptr<_impl::RealmCoordinator> coordinator, MakeSharedTag)
 : m_config(std::move(config))
+, m_frozen_version(std::move(version))
 , m_execution_context(m_config.execution_context)
 {
     if (!coordinator->get_cached_schema(m_schema, m_schema_version, m_schema_transaction_version)) {
@@ -126,7 +127,7 @@ void Realm::Internal::begin_read(Realm& realm, VersionID version_id)
 void Realm::begin_read(VersionID version_id)
 {
     REALM_ASSERT(!m_group);
-    m_group = m_coordinator->begin_read(version_id);
+    m_group = m_coordinator->begin_read(version_id, bool(m_frozen_version));
     add_schema_change_handler();
     read_schema_from_group_if_needed();
 }
@@ -134,7 +135,15 @@ void Realm::begin_read(VersionID version_id)
 SharedRealm Realm::get_shared_realm(Config config)
 {
     auto coordinator = RealmCoordinator::get_coordinator(config.path);
-    return coordinator->get_realm(std::move(config));
+    return coordinator->get_realm(std::move(config), util::none);
+}
+
+SharedRealm Realm::get_frozen_realm(Config config, VersionID version)
+{
+    auto coordinator = RealmCoordinator::get_coordinator(config.path);
+    SharedRealm realm = coordinator->get_realm(std::move(config), util::Optional<VersionID>(version));
+    realm->set_auto_refresh(false);
+    return realm;
 }
 
 SharedRealm Realm::get_shared_realm(ThreadSafeReference ref, util::Optional<AbstractExecutionContextID> execution_context)
@@ -370,8 +379,7 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
             config.schema = util::none;
             // Don't go through the normal codepath for opening a Realm because
             // we're using a mismatched config
-            auto old_realm = std::make_shared<Realm>(std::move(config),
-                                                     m_coordinator, MakeSharedTag{});
+            auto old_realm = std::make_shared<Realm>(std::move(config), none, m_coordinator, MakeSharedTag{});
             migration_function(old_realm, shared_from_this(), m_schema);
         };
 
@@ -472,23 +480,31 @@ void Realm::notify_schema_changed()
     }
 }
 
-static void check_read_write(const Realm* realm)
+static void check_can_create_any_transaction(const Realm* realm)
 {
     if (realm->config().immutable()) {
         throw InvalidTransactionException("Can't perform transactions on read-only Realms.");
     }
 }
 
-static void check_write(const Realm* realm)
+static void check_can_create_write_transaction(const Realm* realm)
 {
     if (realm->config().immutable() || realm->config().read_only_alternative()) {
         throw InvalidTransactionException("Can't perform transactions on read-only Realms.");
+    }
+    if (realm->is_frozen()) {
+        throw InvalidTransactionException("Can't perform transactions on a frozen Realm");
+    }
+    if (!realm->is_closed() && realm->get_number_of_versions() > realm->config().max_number_of_active_versions) {
+        throw InvalidTransactionException(util::format("Number of active versions (%1) in the Realm exceeded the limit of %2",
+                realm->get_number_of_versions(),
+                realm->config().max_number_of_active_versions));
     }
 }
 
 void Realm::verify_thread() const
 {
-    if (!m_execution_context.contains<std::thread::id>())
+    if (m_frozen_version || !m_execution_context.contains<std::thread::id>())
         return;
 
     auto thread_id = m_execution_context.get<std::thread::id>();
@@ -510,12 +526,40 @@ void Realm::verify_open() const
     }
 }
 
+bool Realm::verify_notifications_available(bool throw_on_error) const
+{
+    if (is_frozen()) {
+        if (throw_on_error)
+            throw InvalidTransactionException("Notifications are not available on frozen lists since they do not change.");
+        return false;
+    }
+    if (config().immutable()) {
+        if (throw_on_error)
+            throw InvalidTransactionException("Cannot create asynchronous query for immutable Realms");
+        return false;
+    }
+    if (is_in_transaction()) {
+        if (throw_on_error)
+            throw InvalidTransactionException("Cannot create asynchronous query while in a write transaction");
+        return false;
+    }
+
+    return true;
+}
+
 VersionID Realm::read_transaction_version() const
 {
     verify_thread();
     verify_open();
-    check_read_write(this);
+    check_can_create_any_transaction(this);
     return static_cast<Transaction&>(*m_group).get_version_of_current_transaction();
+}
+
+uint_fast64_t Realm::get_number_of_versions() const
+{
+    verify_open();
+    check_can_create_any_transaction(this);
+    return m_coordinator->get_number_of_versions();
 }
 
 bool Realm::is_in_transaction() const noexcept
@@ -531,6 +575,9 @@ util::Optional<VersionID> Realm::current_transaction_version() const
     if (m_group) {
         ret = static_cast<Transaction&>(*m_group).get_version_of_current_transaction();
     }
+    else if (m_frozen_version) {
+        ret = m_frozen_version;
+    }
     return ret;
 }
 
@@ -541,6 +588,9 @@ void Realm::enable_wait_for_change()
 
 bool Realm::wait_for_change()
 {
+    if (m_frozen_version) {
+        return false;
+    }
     return m_group ? m_coordinator->wait_for_change(transaction_ref()) : false;
 }
 
@@ -552,7 +602,7 @@ void Realm::wait_for_change_release()
 void Realm::begin_transaction()
 {
     verify_thread();
-    check_write(this);
+    check_can_create_write_transaction(this);
 
     if (is_in_transaction()) {
         throw InvalidTransactionException("The Realm is already in a write transaction");
@@ -591,7 +641,7 @@ void Realm::begin_transaction()
 
 void Realm::commit_transaction()
 {
-    check_write(this);
+    check_can_create_write_transaction(this);
     verify_thread();
 
     if (!is_in_transaction()) {
@@ -613,7 +663,7 @@ void Realm::commit_transaction()
 
 void Realm::cancel_transaction()
 {
-    check_write(this);
+    check_can_create_write_transaction(this);
     verify_thread();
 
     if (!is_in_transaction()) {
@@ -628,7 +678,7 @@ void Realm::invalidate()
 {
     verify_open();
     verify_thread();
-    check_read_write(this);
+    check_can_create_any_transaction(this);
 
     if (m_is_sending_notifications) {
         return;
@@ -686,7 +736,7 @@ OwnedBinaryData Realm::write_copy()
 
 void Realm::notify()
 {
-    if (is_closed() || is_in_transaction()) {
+    if (is_closed() || is_in_transaction() || is_frozen()) {
         return;
     }
 
@@ -746,7 +796,12 @@ void Realm::notify()
 bool Realm::refresh()
 {
     verify_thread();
-    check_read_write(this);
+    check_can_create_any_transaction(this);
+
+    // Frozen Realms never change.
+    if (is_frozen()) {
+        return false;
+    }
 
     // can't be any new changes if we're in a write transaction
     if (is_in_transaction()) {
@@ -788,6 +843,15 @@ bool Realm::refresh()
     return true;
 }
 
+void Realm::set_auto_refresh(bool auto_refresh)
+{
+    if (is_frozen() && auto_refresh) {
+        throw std::logic_error("Auto-refresh cannot be enabled for frozen Realms.");
+    }
+    m_auto_refresh = auto_refresh;
+}
+
+
 bool Realm::can_deliver_notifications() const noexcept
 {
     if (m_config.immutable() || !m_config.automatic_change_notifications) {
@@ -806,8 +870,20 @@ uint64_t Realm::get_schema_version(const Realm::Config &config)
     auto coordinator = RealmCoordinator::get_coordinator(config.path);
     auto version = coordinator->get_schema_version();
     if (version == ObjectStore::NotVersioned)
-        version = ObjectStore::get_schema_version(coordinator->get_realm(config)->read_group());
+        version = ObjectStore::get_schema_version(coordinator->get_realm(config, util::none)->read_group());
     return version;
+}
+
+
+bool Realm::is_frozen() const
+{
+    bool result = bool(m_frozen_version);
+    REALM_ASSERT_DEBUG((result && m_group) ? m_group->is_frozen() : true);
+    return result;
+}
+
+SharedRealm Realm::freeze() {
+    return Realm::get_frozen_realm(m_config, read_transaction_version());
 }
 
 void Realm::close()

@@ -1940,7 +1940,7 @@ TEST_CASE("results: notifier with no callbacks") {
     config.automatic_change_notifications = false;
 
     auto coordinator = _impl::RealmCoordinator::get_coordinator(config.path);
-    auto r = coordinator->get_realm(std::move(config));
+    auto r = coordinator->get_realm(std::move(config), none);
     r->update_schema({
         {"object", {
             {"value", PropertyType::Int},

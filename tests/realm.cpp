@@ -1059,7 +1059,7 @@ TEST_CASE("SharedRealm: coordinator schema cache") {
     public:
         WriteTransaction wt;
         ExternalWriter(Realm::Config const& config)
-        : m_realm(_impl::RealmCoordinator::get_coordinator(config.path)->get_realm(config))
+        : m_realm(_impl::RealmCoordinator::get_coordinator(config.path)->get_realm(config, none))
         , wt(TestHelper::get_db(m_realm))
         {
         }

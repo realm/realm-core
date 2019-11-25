@@ -9,6 +9,7 @@ set(HEADERS
 
 set(SOURCES
     collection_change_indices.cpp
+    frozen_objects.cpp
     index_set.cpp
     list.cpp
     main.cpp
