@@ -2266,6 +2266,30 @@ ClusterTree::ConstIterator::pointer Table::ConstIterator::operator->() const
     return &m_obj;
 }
 
+ClusterTree::ConstIterator& Table::ConstIterator::operator++()
+{
+    if (m_leaf_invalid || m_storage_version != m_tree.get_storage_version(m_instance_version)) {
+        ObjKey k = load_leaf(m_key);
+        if (k != m_key) {
+            // Objects was deleted. k points to the next object
+            m_key = k;
+            m_leaf_invalid = !m_key;
+            return *this;
+        }
+    }
+
+    m_state.m_current_index++;
+    m_position++;
+    if (m_state.m_current_index == m_leaf.node_size()) {
+        m_key = load_leaf(ObjKey(m_key.value + 1));
+        m_leaf_invalid = !m_key;
+    }
+    else {
+        m_key = m_leaf.get_real_key(m_state.m_current_index);
+    }
+    return *this;
+}
+
 ClusterTree::ConstIterator& Table::ConstIterator::operator+=(ptrdiff_t adj)
 {
     // If you have to jump far away and thus have to load many leaves,

@@ -206,11 +206,7 @@ public:
     // Advance the iterator to the next object in the table. This also holds if the object
     // pointed to is deleted. That is - you will get the same result of advancing no matter
     // if the previous object is deleted or not.
-    ConstIterator& operator++()
-    {
-        operator+=(1);
-        return *this;
-    }
+    ConstIterator& operator++();
 
     ConstIterator& operator+=(ptrdiff_t adj);
 
