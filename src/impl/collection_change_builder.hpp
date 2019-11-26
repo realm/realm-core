@@ -35,7 +35,7 @@ public:
     using ColKeyType = uint64_t;
     using ObjectKeyType = int64_t;
     using ObjectSet = std::unordered_set<ObjectKeyType>;
-    using ObjectMapToColumnList = std::unordered_map<ObjectKeyType, std::vector<ColKeyType>>;
+    using ObjectMapToColumnSet = std::unordered_map<ObjectKeyType, std::unordered_set<ColKeyType>>;
 
     ObjectChangeSet() = default;
     ObjectChangeSet(ObjectChangeSet const&) = default;
@@ -57,7 +57,7 @@ public:
     bool deletions_contains(ObjectKeyType obj) const;
     // if the specified object has not been modified, returns util::Optional::None
     // if the object has been modified, returns the begin and end const_iterator into a vector of columns
-    using ColKeyIterator = std::vector<ColKeyType>::const_iterator;
+    using ColKeyIterator = std::unordered_set<ColKeyType>::const_iterator;
     util::Optional<std::pair<ColKeyIterator, ColKeyIterator>> get_columns_modified(ObjectKeyType obj) const;
 
     bool insertions_empty() const noexcept { return m_insertions.empty(); }
@@ -79,7 +79,7 @@ public:
 private:
     ObjectSet m_deletions;
     ObjectSet m_insertions;
-    ObjectMapToColumnList m_modifications;
+    ObjectMapToColumnSet m_modifications;
     bool m_clear_did_occur = false;
 };
 

@@ -34,6 +34,9 @@
 #include <realm/query_engine.hpp>
 #include <realm/query_expression.hpp>
 
+#include <memory>
+#include <vector>
+
 using namespace realm;
 
 struct TestContext : CppContext {
@@ -302,8 +305,9 @@ TEST_CASE("Benchmark object", "[benchmark]") {
             }
             r->commit_transaction();
             meter.measure([&r] {
-                advance_and_notify(*r);
+                on_change_but_no_notify(*r);
             });
+            r->notify();
             REQUIRE(num_insertions == num_objects);
             REQUIRE(num_modifications == 0);
             REQUIRE(num_deletions == 0);
@@ -348,8 +352,9 @@ TEST_CASE("Benchmark object", "[benchmark]") {
             r->commit_transaction();
 
             meter.measure([&r] {
-                advance_and_notify(*r);
+                on_change_but_no_notify(*r);
             });
+            r->notify();
             REQUIRE(num_insertions == num_objects);
             REQUIRE(num_modifications == 0);
             REQUIRE(num_deletions == num_objects);
@@ -399,12 +404,116 @@ TEST_CASE("Benchmark object", "[benchmark]") {
             r->commit_transaction();
 
             meter.measure([&r] {
-                advance_and_notify(*r);
+                on_change_but_no_notify(*r);
             });
+            r->notify();
             REQUIRE(num_insertions == 0);
             REQUIRE(num_modifications == num_objects);
             REQUIRE(num_deletions == 0);
             REQUIRE(result.size() == num_objects);
+        };
+    }
+
+    SECTION("merging notifications from different versions") {
+        advance_and_notify(*r);
+        ObjectSchema schema = *r->schema().find("all types");
+
+        r->begin_transaction();
+        AnyDict values {
+            {"pk", INT64_C(0)},
+            {"bool", true},
+            {"int", INT64_C(5)},
+            {"float", 2.2f},
+            {"double", 3.3},
+            {"string", "hello"s},
+            {"data", "olleh"s},
+            {"date", Timestamp(10, 20)},
+            {"object", AnyDict{{"value", INT64_C(10)}}},
+
+            {"bool array", AnyVec{true, false}},
+            {"int array", AnyVec{INT64_C(5), INT64_C(6)}},
+            {"float array", AnyVec{1.1f, 2.2f}},
+            {"double array", AnyVec{3.3, 4.4}},
+            {"string array", AnyVec{"a"s, "b"s, "c"s}},
+            {"data array", AnyVec{"d"s, "e"s, "f"s}},
+            {"date array", AnyVec{}},
+            {"object array", AnyVec{AnyDict{{"value", INT64_C(20)}}}},
+        };
+        constexpr bool update = false;
+        constexpr bool update_only_diff = false;
+        Object obj = Object::create(d, r, schema, Any(values), update, update_only_diff);
+        r->commit_transaction();
+        advance_and_notify(*r);
+
+        BENCHMARK_ADVANCED("object modify notifications")(Catch::Benchmark::Chronometer meter) {
+            struct CallbackState {
+                Object obj;
+                NotificationToken token;
+                size_t num_insertions = 0;
+                size_t num_deletions = 0;
+                size_t num_modifications = 0;
+                size_t num_calls = 0;
+            };
+            std::vector<CallbackState> notifiers;
+            auto get_object = [&] {
+                auto r = Realm::get_shared_realm(config);
+                auto obj = r->read_group().get_table("class_all types")->get_object(0);
+                return Object(r, obj);
+            };
+            auto change_object = [&] {
+                r->begin_transaction();
+                int64_t int_value = obj.get_column_value<int64_t>("int");
+                obj.set_column_value("int", int_value + 1);
+                obj.set_column_value("bool", !obj.get_column_value<bool>("bool"));
+                obj.set_column_value("float", obj.get_column_value<float>("float") + 1);
+                obj.set_column_value("double", obj.get_column_value<double>("double") + 1);
+                obj.set_column_value("string", int_value % 2 == 0 ? "even"s : "odd"s);
+                Timestamp ts = obj.get_column_value<Timestamp>("date");
+                obj.set_column_value("date", Timestamp{ts.get_seconds(), ts.get_nanoseconds() + 1});
+                r->commit_transaction();
+            };
+
+            notifiers.clear();
+            constexpr size_t num_modifications = 300;
+            for (size_t i = 0; i < num_modifications; ++i) {
+                Object o = get_object();
+                auto token = o.add_notification_callback([&notifiers, i](CollectionChangeSet c, std::exception_ptr) {
+                    notifiers[i].num_insertions += c.insertions.count();
+                    notifiers[i].num_modifications += c.modifications.count();
+                    notifiers[i].num_deletions += c.deletions.count();
+                    notifiers[i].num_calls++;
+                });
+                notifiers.push_back({std::move(o), std::move(token), 0, 0, 0, 0});
+                change_object();
+            }
+
+            REQUIRE(std::all_of(notifiers.begin(), notifiers.end(), [](auto& it) {
+                return it.num_calls == 0 && it.num_modifications == 0;
+            }));
+
+            // Each of the Objects now has a different source version and state at
+            // that version, so they should all see different changes despite
+            // being for the same Object
+            meter.measure([&] {
+                for (auto& notifier : notifiers)
+                    on_change_but_no_notify(*notifier.obj.get_realm());
+            });
+
+            for (auto& notifier : notifiers)
+                notifier.obj.get_realm()->notify();
+
+            REQUIRE(std::all_of(notifiers.begin(), notifiers.end(), [](auto& it) {
+                return it.num_calls == 1 && it.num_modifications == 1;
+            }));
+
+            // After making another change, they should all get the same notification
+            change_object();
+            for (auto& notifier : notifiers)
+                advance_and_notify(*notifier.obj.get_realm());
+
+            REQUIRE(std::all_of(notifiers.begin(), notifiers.end(), [](auto& it) {
+                return it.num_calls == 2 && it.num_modifications == 2;
+            }));
         };
     }
 
@@ -457,66 +566,15 @@ TEST_CASE("Benchmark object", "[benchmark]") {
             num_deletions = 0;
 
             meter.measure([&r] {
-                advance_and_notify(*r);
+                on_change_but_no_notify(*r);
             });
+            r->notify();
             REQUIRE(num_insertions == num_prepend_objects);
             REQUIRE(num_modifications == 0);
             REQUIRE(num_deletions == 0);
             REQUIRE(result.size() == num_prepend_objects + num_initial_objects);
             REQUIRE(result.get(0).get<int64_t>(age_col) == 0);
             REQUIRE(result.get(result.size() - 1).get<int64_t>(age_col) == num_prepend_objects + num_initial_objects - 1);
-        };
-
-        BENCHMARK_ADVANCED("insert even, insert odd")(Catch::Benchmark::Chronometer meter) {
-            constexpr size_t num_objects = 1000;
-            r->begin_transaction();
-            result.clear();
-            r->commit_transaction();
-            advance_and_notify(*r);
-
-            // insert even
-            r->begin_transaction();
-            for (size_t i = 0; i < num_objects; ++i) {
-                size_t index = i * 2;
-                std::stringstream name;
-                name << "person_" << index;
-                AnyDict person {
-                    {"name", name.str()},
-                    {"age", static_cast<int64_t>(index)},
-                };
-                Object::create(d, r, person_schema, Any(person), update, update_only_diff);
-            }
-            r->commit_transaction();
-            advance_and_notify(*r);
-
-            // insert odd
-            r->begin_transaction();
-            for (size_t i = 0; i < num_objects; ++i) {
-                size_t index = i * 2 + 1;
-                std::stringstream name;
-                name << "person_" << index;
-                AnyDict person {
-                    {"name", name.str()},
-                    {"age", static_cast<int64_t>(index)},
-                };
-                Object::create(d, r, person_schema, Any(person), update, update_only_diff);
-            }
-            r->commit_transaction();
-
-            num_insertions = 0;
-            num_modifications = 0;
-            num_deletions = 0;
-
-            meter.measure([&r] {
-                advance_and_notify(*r);
-            });
-            REQUIRE(num_insertions == num_objects);
-            REQUIRE(num_modifications == 0);
-            REQUIRE(num_deletions == 0);
-            REQUIRE(result.size() == num_objects * 2);
-            REQUIRE(result.get(0).get<int64_t>(age_col) == 0);
-            REQUIRE(result.get(1).get<int64_t>(age_col) == 1);
-            REQUIRE(result.get(result.size() - 1).get<int64_t>(age_col) == num_objects * 2 - 1);
         };
 
         BENCHMARK_ADVANCED("insert, delete odds")(Catch::Benchmark::Chronometer meter) {
@@ -545,8 +603,9 @@ TEST_CASE("Benchmark object", "[benchmark]") {
             num_deletions = 0;
 
             meter.measure([&r] {
-                advance_and_notify(*r);
+                on_change_but_no_notify(*r);
             });
+            r->notify();
             REQUIRE(num_insertions == 0);
             REQUIRE(num_modifications == 0);
             REQUIRE(num_deletions == num_objects / 2);
@@ -554,7 +613,6 @@ TEST_CASE("Benchmark object", "[benchmark]") {
             REQUIRE(result.get(0).get<int64_t>(age_col) == 0);
             REQUIRE(result.get(1).get<int64_t>(age_col) == 2);
         };
-
 
         constexpr size_t num_objects = 1000;
         r->begin_transaction();
@@ -577,8 +635,9 @@ TEST_CASE("Benchmark object", "[benchmark]") {
             num_deletions = 0;
 
             meter.measure([&r] {
-                advance_and_notify(*r);
+                on_change_but_no_notify(*r);
             });
+            r->notify();
             REQUIRE(num_insertions == 0);
             REQUIRE(num_modifications == num_objects);
             REQUIRE(num_deletions == 0);
@@ -620,8 +679,9 @@ TEST_CASE("Benchmark object", "[benchmark]") {
             num_deletions = 0;
 
             meter.measure([&r] {
-                advance_and_notify(*r);
+                on_change_but_no_notify(*r);
             });
+            r->notify();
             REQUIRE(num_insertions == 0);
             REQUIRE(num_modifications == num_objects / 2);
             REQUIRE(num_deletions == 0);

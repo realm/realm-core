@@ -109,7 +109,6 @@ void KVOAdapter::before(Transaction& sg)
         }
         auto column_modifications = table.get_columns_modified(key);
         if (column_modifications) {
-            observer.changes.reserve(column_modifications->second - column_modifications->first);
             for (auto it = column_modifications->first; it != column_modifications->second; ++it) {
                 observer.changes[*it].kind = BindingContext::ColumnInfo::Kind::Set;
             }

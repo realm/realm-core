@@ -663,7 +663,7 @@ void ObjectChangeSet::modifications_add(ObjectKeyType obj, ColKeyType col)
 {
     auto it = m_modifications.find(obj);
     if (it != m_modifications.end()) {
-        it->second.push_back(col);
+        it->second.insert(col);
     }
     else {
         m_modifications.insert({obj, {col}});
@@ -760,9 +760,19 @@ void ObjectChangeSet::merge(ObjectChangeSet&& other)
             ++it;
         }
     }
-    m_insertions.insert(other.m_insertions.begin(), other.m_insertions.end());
-    m_deletions.insert(other.m_deletions.begin(), other.m_deletions.end());
-    m_modifications.insert(other.m_modifications.begin(), other.m_modifications.end());
+    if (!other.m_insertions.empty()) {
+        m_insertions.insert(other.m_insertions.begin(), other.m_insertions.end());
+    }
+    if (!other.m_deletions.empty()) {
+        m_deletions.insert(other.m_deletions.begin(), other.m_deletions.end());
+    }
+    for (auto it = other.m_modifications.begin(); it != other.m_modifications.end(); ++it) {
+        auto insert_result = m_modifications.insert(*it);
+        if (!insert_result.second) {
+            // the insertion failed because the key already exists, merge in the other column values
+            insert_result.first->second.insert(it->second.begin(), it->second.end());
+        }
+    }
 
     verify();
 
