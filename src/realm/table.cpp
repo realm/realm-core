@@ -3029,7 +3029,12 @@ void Table::set_primary_key_column(ColKey col_key)
                 }
             }
 
-            add_search_index(col_key);
+            if (col_key.get_type() == col_type_String) {
+                remove_search_index(col_key);
+            }
+            else {
+                add_search_index(col_key);
+            }
         }
         do_set_primary_key_column(col_key);
     }
@@ -3051,17 +3056,15 @@ void Table::validate_primary_column_uniqueness() const
 {
     if (ColKey col = get_primary_key_column()) {
         if (this->has_search_index(col)) {
-            if (col && get_distinct_view(col).size() != size()) {
+            if (get_distinct_view(col).size() != size()) {
                 throw DuplicatePrimaryKeyValueException(get_name(), get_column_name(col));
             }
         }
         else {
-            for (auto o : *this) {
-                auto pk_val = o.get_any(col);
-                GlobalKey object_id{pk_val};
-                if (global_to_local_object_id_hashed(object_id) != o.get_key()) {
-                    throw std::runtime_error("Invalid primary key column");
-                }
+            TableView tv = where().find_all();
+            tv.distinct(col);
+            if (tv.size() != size()) {
+                throw DuplicatePrimaryKeyValueException(get_name(), get_column_name(col));
             }
         }
     }
