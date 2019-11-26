@@ -2034,7 +2034,7 @@ TEST(Group_RemoveRecursive)
     CHECK_EQUAL(target->size(), 0);
 }
 
-TEST(Group_PrimaryKeyCol)
+TEST(Group_IntPrimaryKeyCol)
 {
     Group g;
     TableRef table = g.add_table_with_primary_key("class_foo", type_Int, "primary");
@@ -2044,26 +2044,60 @@ TEST(Group_PrimaryKeyCol)
 
     auto obj = table->create_object_with_primary_key({1});
     CHECK_EQUAL(obj.get<Int>(primary_key_column), 1);
-    g.remove_table(table->get_key());
 
-    table = g.add_table_with_primary_key("class_foo", type_String, "primary");
-    primary_key_column = table->get_primary_key_column();
+    table->set_primary_key_column(ColKey{});
+    CHECK(table->get_primary_key_column() == ColKey{});
+    CHECK(table->has_search_index(primary_key_column));
+
+    table->remove_search_index(primary_key_column);
+    CHECK(table->get_primary_key_column() == ColKey{});
+    CHECK_NOT(table->has_search_index(primary_key_column));
+
+    table->set_primary_key_column(primary_key_column);
+    CHECK(table->get_primary_key_column() == primary_key_column);
+    CHECK(table->has_search_index(primary_key_column));
+}
+
+TEST(Group_StringPrimaryKeyCol)
+{
+    Group g;
+    TableRef table = g.add_table_with_primary_key("class_foo", type_String, "primary");
+    ColKey primary_key_column = table->get_primary_key_column();
     CHECK(primary_key_column);
-    CHECK_NOT(table->find_first(primary_key_column, StringData("Exactly!")));
-    obj = table->create_object_with_primary_key({"Exactly!"});
-    CHECK_EQUAL(obj.get<String>(primary_key_column), "Exactly!");
-    auto k = table->find_first(primary_key_column, StringData("Exactly!"));
-    CHECK_EQUAL(k, obj.get_key());
-    g.validate_primary_column_uniqueness();
+    ColKey col1 = primary_key_column;
     ColKey col2 = table->add_column(type_String, "secondary");
+    CHECK_NOT(table->find_first(primary_key_column, StringData("Exactly!")));
+    CHECK_NOT(table->has_search_index(primary_key_column));
 
-    // Index will be created for new primary column
+    auto obj1 = table->create_object_with_primary_key({"Exactly!"}).set(col2, "first");
+    CHECK_EQUAL(obj1.get<String>(primary_key_column), "Exactly!");
+    auto k = table->find_first(primary_key_column, StringData("Exactly!"));
+    CHECK_EQUAL(k, obj1.get_key());
+    g.validate_primary_column_uniqueness();
+
+    // Changing PK should not add an index to the new PK
     table->set_primary_key_column(col2);
     g.validate_primary_column_uniqueness();
-    obj = table->create_object_with_primary_key({"FooBar"});
-    primary_key_column = table->get_primary_key_column();
-    k = table->find_first(primary_key_column, StringData("FooBar"));
-    CHECK_EQUAL(k, obj.get_key());
+    CHECK(table->get_primary_key_column() == col2);
+    CHECK_NOT(table->has_search_index(col2));
+
+    auto obj2 = table->create_object_with_primary_key({"FooBar"}).set(col1, "second");
+    k = table->find_first(col2, StringData("FooBar"));
+    CHECK_EQUAL(k, obj2.get_key());
+    k = table->find_first(col2, StringData("first"));
+    CHECK_EQUAL(k, obj1.get_key());
+
+    // Changing PK should remove any existing index from the new PK
+    table->add_search_index(primary_key_column);
+    CHECK(table->get_primary_key_column() == col2);
+    CHECK(table->has_search_index(primary_key_column));
+    CHECK_NOT(table->has_search_index(col2));
+
+    table->set_primary_key_column(primary_key_column);
+    g.validate_primary_column_uniqueness();
+    CHECK(table->get_primary_key_column() == primary_key_column);
+    CHECK_NOT(table->has_search_index(primary_key_column));
+    CHECK_NOT(table->has_search_index(col2));
 }
 
 #endif // TEST_GROUP
