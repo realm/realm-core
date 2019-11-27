@@ -144,7 +144,7 @@ void KeyPathMapping::set_backlink_class_prefix(std::string prefix)
 
 LinkChain KeyPathMapping::link_chain_getter(ConstTableRef table, const std::vector<KeyPathElement>& links)
 {
-    LinkChain lc(table.unchecked_ptr());
+    LinkChain lc(table);
     if (links.empty()) {
         return lc;
     }
