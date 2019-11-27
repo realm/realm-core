@@ -180,8 +180,6 @@ TEST_CASE("Benchmark object", "[benchmark]") {
     SECTION("create object") {
         r->begin_transaction();
         ObjectSchema all_types = *r->schema().find("all types");
-        constexpr bool update = false;
-        constexpr bool update_only_diff = false;
 
         int64_t benchmark_pk = 0;
         BENCHMARK("create object") {
@@ -204,7 +202,7 @@ TEST_CASE("Benchmark object", "[benchmark]") {
                 {"data array", AnyVec{"d"s, "e"s, "f"s}},
                 {"date array", AnyVec{}},
                 {"object array", AnyVec{AnyDict{{"value", INT64_C(20)}}}},
-            }), update, update_only_diff);
+            }), CreatePolicy::ForceCreate);
         };
         r->commit_transaction();
     }
@@ -213,8 +211,6 @@ TEST_CASE("Benchmark object", "[benchmark]") {
         auto table = r->read_group().get_table("class_all types");
         r->begin_transaction();
         ObjectSchema all_types = *r->schema().find("all types");
-        constexpr bool update = false;
-        constexpr bool update_only_diff = false;
         auto obj = Object::create(d, r, all_types, util::Any(AnyDict{
             {"pk", INT64_C(0)},
             {"bool", true},
@@ -234,7 +230,7 @@ TEST_CASE("Benchmark object", "[benchmark]") {
             {"data array", AnyVec{"d"s, "e"s, "f"s}},
             {"date array", AnyVec{}},
             {"object array", AnyVec{AnyDict{{"value", INT64_C(20)}}}},
-        }), update, update_only_diff);
+        }), CreatePolicy::ForceCreate);
         r->commit_transaction();
 
         Results result(r, *table);
@@ -253,7 +249,7 @@ TEST_CASE("Benchmark object", "[benchmark]") {
                 auto shadow = Object::create(d, r, all_types, util::Any(AnyDict{
                     {"pk", INT64_C(0)},
                     {"int", update_int},
-                }), true, true);
+                }), CreatePolicy::UpdateModified);
             });
             r->commit_transaction();
             advance_and_notify(*r);
@@ -281,8 +277,6 @@ TEST_CASE("Benchmark object", "[benchmark]") {
         int64_t pk = 0;
         ObjectSchema person_schema = *r->schema().find("person");
         constexpr size_t num_objects = 1000;
-        constexpr bool update = false;
-        constexpr bool update_only_diff = false;
 
         BENCHMARK_ADVANCED("create notifications")(Catch::Benchmark::Chronometer meter) {
             r->begin_transaction();
@@ -301,7 +295,7 @@ TEST_CASE("Benchmark object", "[benchmark]") {
                     {"name", name.str()},
                     {"age", static_cast<int64_t>(i)},
                 };
-                Object::create(d, r, person_schema, Any(person), update, update_only_diff);
+                Object::create(d, r, person_schema, Any(person), CreatePolicy::ForceCreate);
             }
             r->commit_transaction();
             meter.measure([&r] {
@@ -338,7 +332,7 @@ TEST_CASE("Benchmark object", "[benchmark]") {
                     {"name", name.str()},
                     {"age", static_cast<int64_t>(i)},
                 };
-                Object::create(d, r, person_schema, Any(person), update, update_only_diff);
+                Object::create(d, r, person_schema, Any(person), CreatePolicy::ForceCreate);
             }
             r->commit_transaction();
             advance_and_notify(*r);
@@ -378,7 +372,7 @@ TEST_CASE("Benchmark object", "[benchmark]") {
                     {"name", name.str()},
                     {"age", static_cast<int64_t>(i)},
                 };
-                Object::create(d, r, person_schema, Any(person), update, update_only_diff);
+                Object::create(d, r, person_schema, Any(person), CreatePolicy::ForceCreate);
             }
             r->commit_transaction();
             advance_and_notify(*r);
@@ -398,8 +392,7 @@ TEST_CASE("Benchmark object", "[benchmark]") {
                     {"name", name.str()},
                     {"age", static_cast<int64_t>(i + 1)}, // age differs
                 };
-                constexpr bool do_update = true;
-                Object::create(d, r, person_schema, Any(person), do_update, update_only_diff);
+                Object::create(d, r, person_schema, Any(person), CreatePolicy::UpdateModified);
             }
             r->commit_transaction();
 
@@ -439,9 +432,7 @@ TEST_CASE("Benchmark object", "[benchmark]") {
             {"date array", AnyVec{}},
             {"object array", AnyVec{AnyDict{{"value", INT64_C(20)}}}},
         };
-        constexpr bool update = false;
-        constexpr bool update_only_diff = false;
-        Object obj = Object::create(d, r, schema, Any(values), update, update_only_diff);
+        Object obj = Object::create(d, r, schema, Any(values), CreatePolicy::ForceCreate);
         r->commit_transaction();
         advance_and_notify(*r);
 
@@ -496,11 +487,8 @@ TEST_CASE("Benchmark object", "[benchmark]") {
             // being for the same Object
             meter.measure([&] {
                 for (auto& notifier : notifiers)
-                    on_change_but_no_notify(*notifier.obj.get_realm());
+                    advance_and_notify(*notifier.obj.get_realm());
             });
-
-            for (auto& notifier : notifiers)
-                notifier.obj.get_realm()->notify();
 
             REQUIRE(std::all_of(notifiers.begin(), notifiers.end(), [](auto& it) {
                 return it.num_calls == 1 && it.num_modifications == 1;
@@ -532,8 +520,6 @@ TEST_CASE("Benchmark object", "[benchmark]") {
 
         advance_and_notify(*r);
         ObjectSchema person_schema = *r->schema().find("person");
-        constexpr bool update = false;
-        constexpr bool update_only_diff = false;
         auto add_objects = [&](size_t num_objects, size_t start_index = 0) {
             r->begin_transaction();
             for (size_t i = 0; i < num_objects; ++i) {
@@ -544,7 +530,7 @@ TEST_CASE("Benchmark object", "[benchmark]") {
                     {"name", name.str()},
                     {"age", static_cast<int64_t>(index)},
                 };
-                Object::create(d, r, person_schema, Any(person), update, update_only_diff);
+                Object::create(d, r, person_schema, Any(person), CreatePolicy::ForceCreate);
             }
             r->commit_transaction();
         };
@@ -658,7 +644,7 @@ TEST_CASE("Benchmark object", "[benchmark]") {
                     {"name", name.str()},
                     {"age", static_cast<int64_t>(i * 2)},
                 };
-                Object::create(d, r, person_schema, Any(person), update, update_only_diff);
+                Object::create(d, r, person_schema, Any(person), CreatePolicy::ForceCreate);
             }
             r->commit_transaction();
 
