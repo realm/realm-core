@@ -70,7 +70,8 @@ protected:
         , m_instance_version(instance_version)
     {
     }
-    friend class Group; // only Group::get_table() and friends can safely create a TableRef
+    friend class Group;
+    friend class Table;
 
     Table* m_table = nullptr;
     uint64_t m_instance_version = 0;
@@ -96,7 +97,8 @@ private:
         : ConstTableRef(t_ptr, instance_version)
     {
     }
-    friend class Group; // only Group::get_table() and friends can safely create a TableRef
+    friend class Group;
+    friend class Table;
     friend class ConstTableRef;
 };
 

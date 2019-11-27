@@ -1229,7 +1229,7 @@ inline Table::Table(Allocator& alloc)
     , m_opposite_table(m_alloc)
     , m_opposite_column(m_alloc)
     , m_repl(&g_dummy_replication)
-    , m_own_ref(TableRef::unsafe_create(this))
+    , m_own_ref(this, alloc.get_instance_version())
 {
     m_spec.set_parent(&m_top, top_position_for_spec);
     m_index_refs.set_parent(&m_top, top_position_for_search_indexes);
@@ -1251,7 +1251,7 @@ inline Table::Table(Replication* const* repl, Allocator& alloc)
     , m_opposite_table(m_alloc)
     , m_opposite_column(m_alloc)
     , m_repl(repl)
-    , m_own_ref(TableRef::unsafe_create(this))
+    , m_own_ref(this, alloc.get_instance_version())
 {
     m_spec.set_parent(&m_top, top_position_for_spec);
     m_index_refs.set_parent(&m_top, top_position_for_search_indexes);
@@ -1264,7 +1264,7 @@ inline void Table::revive(Replication* const* repl, Allocator& alloc, bool writa
     m_alloc.switch_underlying_allocator(alloc);
     m_alloc.update_from_underlying_allocator(writable);
     m_repl = repl;
-    m_own_ref = TableRef::unsafe_create(this);
+    m_own_ref = TableRef(this, m_alloc.get_instance_version());
 
     // since we're rebinding to a new table, we'll bump version counters
     // FIXME
