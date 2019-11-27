@@ -418,7 +418,7 @@ SlabAlloc::FreeBlock* SlabAlloc::allocate_block(int size)
     FreeBlock* remaining = break_block(block, size);
     if (remaining)
         push_freelist_entry(remaining);
-    REALM_ASSERT_EX(size_from_block(block) == size, size_from_block(block), size, get_file_path_for_assertions());
+    REALM_ASSERT_EX(size_from_block(block) >= size, size_from_block(block), size, get_file_path_for_assertions());
     return block;
 }
 
