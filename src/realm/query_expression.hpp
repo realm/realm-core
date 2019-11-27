@@ -1784,7 +1784,7 @@ struct CountBacklinks : public LinkMapFunction {
 
     bool consume(ObjKey key) override
     {
-        m_link_count += m_table->get_object(key).get_backlink_count();
+        m_link_count += m_table.unchecked_ptr()->get_object(key).get_backlink_count();
         return true;
     }
 
@@ -3240,7 +3240,7 @@ public:
     void evaluate(ObjKey key, ValueBase& destination) override
     {
         auto table = m_link_map.get_target_table();
-        auto obj = table->get_object(key);
+        auto obj = table.unchecked_ptr()->get_object(key);
         if (m_nullable && std::is_same<typename LeafType::value_type, int64_t>::value) {
             Value<int64_t> v(false, 1);
             v.m_storage.set(0, obj.template get<util::Optional<int64_t>>(m_column_key));

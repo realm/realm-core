@@ -888,7 +888,7 @@ R Query::aggregate(ColKey column_key, size_t* resultcount, ObjKey* return_ndx) c
 
     if (!has_conditions() && !m_view) {
         // use table aggregate
-        return m_table->aggregate<action, T, R>(column_key, T{}, resultcount, return_ndx);
+        return m_table.unchecked_ptr()->aggregate<action, T, R>(column_key, T{}, resultcount, return_ndx);
     }
     else {
 
@@ -897,7 +897,7 @@ R Query::aggregate(ColKey column_key, size_t* resultcount, ObjKey* return_ndx) c
         QueryState<ResultType> st(action);
 
         if (!m_view) {
-            LeafType leaf(m_table->get_alloc());
+            LeafType leaf(m_table.unchecked_ptr()->get_alloc());
             auto node = root_node();
             bool nullable = m_table->is_nullable(column_key);
 
@@ -915,7 +915,7 @@ R Query::aggregate(ColKey column_key, size_t* resultcount, ObjKey* return_ndx) c
                 return false;
             };
 
-            m_table->traverse_clusters(f);
+            m_table.unchecked_ptr()->traverse_clusters(f);
         }
         else {
             for (size_t t = 0; t < m_view->size(); t++) {
@@ -1212,7 +1212,7 @@ ObjKey Query::find()
             return null_key;
         }
         else
-            return m_table->size() == 0 ? null_key : m_table->begin()->get_key();
+            return m_table->size() == 0 ? null_key : m_table.unchecked_ptr()->begin()->get_key();
     }
 
     if (m_view) {
@@ -1645,7 +1645,7 @@ void Query::init() const
 size_t Query::find_internal(size_t start, size_t end) const
 {
     if (end == size_t(-1))
-        end = m_table->size();
+        end = m_table.unchecked_ptr()->size();
     if (start == end)
         return not_found;
 
@@ -1655,7 +1655,7 @@ size_t Query::find_internal(size_t start, size_t end) const
     else
         r = start; // user built an empty query; return any first
 
-    if (r == m_table->size())
+    if (r == m_table.unchecked_ptr()->size())
         return not_found;
     else
         return r;
@@ -1768,14 +1768,14 @@ void Query::get_outside_versions(TableVersions& versions) const
         if (m_table_keys.empty()) {
             // Store primary table info
             REALM_ASSERT_DEBUG(m_table);
-            m_table_keys.push_back(m_table->get_key());
+            m_table_keys.push_back(m_table.unchecked_ptr()->get_key());
 
             if (ParentNode* root = root_node())
                 root->get_link_dependencies(m_table_keys);
         }
-        versions.emplace_back(m_table->get_key(), m_table->get_content_version());
+        versions.emplace_back(m_table.unchecked_ptr()->get_key(), m_table.unchecked_ptr()->get_content_version());
 
-        if (Group* g = m_table->get_parent_group()) {
+        if (Group* g = m_table.unchecked_ptr()->get_parent_group()) {
             // update table versions for linked tables - first entry is primary table - skip it
             auto end = m_table_keys.end();
             auto it = m_table_keys.begin() + 1;
