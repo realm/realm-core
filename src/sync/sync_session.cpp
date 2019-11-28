@@ -577,6 +577,7 @@ void SyncSession::handle_error(SyncError error)
             case ProtocolError::diverging_histories:
             case ProtocolError::server_file_deleted:
             case ProtocolError::user_blacklisted:
+            case ProtocolError::client_file_expired:
                 next_state = NextStateAfterError::inactive;
                 update_error_and_mark_file_for_deletion(error, ShouldBackup::yes);
                 break;
