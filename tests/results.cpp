@@ -1755,9 +1755,9 @@ TEST_CASE("notifications: results") {
             REQUIRE(notification_calls == 2);
             REQUIRE(change.deletions.count() == num_expected_deletes);
             write([&] {
-                table->create_object({57}).set(col_value, 3);
-                table->create_object({58}).set(col_value, 4);
-                table->create_object({59}).set(col_value, 5);
+                table->create_object(ObjKey(57)).set(col_value, 3);
+                table->create_object(ObjKey(58)).set(col_value, 4);
+                table->create_object(ObjKey(59)).set(col_value, 5);
             });
             REQUIRE(notification_calls == 3);
             REQUIRE_INDICES(change.insertions, 0, 1, 2);
