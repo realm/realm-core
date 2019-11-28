@@ -3031,6 +3031,26 @@ void Table::set_primary_key_column(ColKey col_key)
 
             if (col_key.get_type() == col_type_String) {
                 remove_search_index(col_key);
+
+                // Rebuild table according to new primary key
+
+                ObjKeys old_keys;
+                old_keys.reserve(size());
+                for (auto& o : *this) {
+                    old_keys.push_back(o.get_key());
+                }
+
+                // m_primary_key_col must be set here in order to make
+                // create_object_with_primary_key work correctly
+                m_primary_key_col = col_key;
+
+                for (auto key : old_keys) {
+                    auto old_obj = get_object(key);
+                    Mixed pk(old_obj.get<String>(col_key));
+                    auto new_obj = create_object_with_primary_key(pk);
+                    new_obj.assign(old_obj);
+                    remove_object(key);
+                }
             }
             else {
                 add_search_index(col_key);

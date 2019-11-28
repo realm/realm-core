@@ -2085,7 +2085,8 @@ TEST(Group_StringPrimaryKeyCol)
     k = table->find_first(col2, StringData("FooBar"));
     CHECK_EQUAL(k, obj2.get_key());
     k = table->find_first(col2, StringData("first"));
-    CHECK_EQUAL(k, obj1.get_key());
+    CHECK_NOT(obj1.is_valid());
+    CHECK_EQUAL(table->get_object(k).get<String>(col1), "Exactly!");
 
     // Changing PK should remove any existing index from the new PK
     table->add_search_index(primary_key_column);
