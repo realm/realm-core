@@ -107,6 +107,7 @@ TEST(Alloc_1)
     set_capacity(mr2.get_addr(), 16);
     set_capacity(mr3.get_addr(), 256);
     set_capacity(mr4.get_addr(), 96);
+    set_capacity(mr5.get_addr(), 0x20000 - 32);
 
     // Are pointers 64bit aligned
     CHECK_EQUAL(0, intptr_t(mr1.get_addr()) & 0x7);
