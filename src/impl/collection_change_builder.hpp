@@ -68,6 +68,10 @@ public:
     size_t modifications_size() const noexcept { return m_modifications.size(); }
     size_t deletions_size() const noexcept { return m_deletions.size(); }
 
+    bool clear_did_occur() const noexcept
+    {
+        return m_clear_did_occur;
+    }
     bool empty() const noexcept
     {
         return m_deletions.empty() && m_insertions.empty() && m_modifications.empty() && !m_clear_did_occur;

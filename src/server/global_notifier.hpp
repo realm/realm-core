@@ -77,7 +77,7 @@ public:
     // The actual changes made, keyed on object name.
     // This will be empty if the Realm already existed before the
     // GlobalNotifier was started.
-    std::unordered_map<std::string, CollectionChangeSet> const& get_changes() const;
+    std::unordered_map<std::string, _impl::ObjectChangeSet> const& get_changes() const;
 
     ~ChangeNotification();
 
@@ -105,7 +105,7 @@ private:
     std::shared_ptr<GlobalNotifier::Impl> m_notifier;
     mutable std::shared_ptr<Realm> m_old_realm;
     mutable std::shared_ptr<Realm> m_new_realm;
-    mutable std::unordered_map<std::string, CollectionChangeSet> m_changes;
+    mutable std::unordered_map<std::string, _impl::ObjectChangeSet> m_changes;
     mutable bool m_have_calculated_changes = false;
 
     ChangeNotification() = default;

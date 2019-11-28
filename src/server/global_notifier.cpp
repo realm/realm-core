@@ -382,7 +382,7 @@ SharedRealm GlobalNotifier::ChangeNotification::get_new_realm() const
     return m_new_realm;
 }
 
-std::unordered_map<std::string, CollectionChangeSet> const& GlobalNotifier::ChangeNotification::get_changes() const
+std::unordered_map<std::string, _impl::ObjectChangeSet> const& GlobalNotifier::ChangeNotification::get_changes() const
 {
     if (m_have_calculated_changes)
         return m_changes;
@@ -408,7 +408,7 @@ std::unordered_map<std::string, CollectionChangeSet> const& GlobalNotifier::Chan
         if (!change.empty()) {
             auto name = ObjectStore::object_type_for_table_name(g.get_table_name(table_key));
             if (name) {
-                m_changes[name] = std::move(change).finalize();
+                m_changes[name] = std::move(change);
             }
         }
     }
