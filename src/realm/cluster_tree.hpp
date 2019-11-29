@@ -52,6 +52,7 @@ public:
     {
         return m_owner;
     }
+    TableRef get_table_ref() const;
     const Spec& get_spec() const;
 
     void init_from_ref(ref_type ref);
