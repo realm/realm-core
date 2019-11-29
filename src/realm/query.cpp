@@ -37,8 +37,8 @@ Query::Query()
     create();
 }
 
-Query::Query(const Table& table, const LnkLst& list)
-    : m_table((const_cast<Table&>(table)).get_table_ref())
+Query::Query(ConstTableRef table, const LnkLst& list)
+    : m_table(table.cast_away_const())
     , m_source_link_list(list.clone())
 {
     m_view = m_source_link_list.get();
@@ -50,8 +50,8 @@ Query::Query(const Table& table, const LnkLst& list)
     create();
 }
 
-Query::Query(const Table& table, LnkLstPtr&& ll)
-    : m_table((const_cast<Table&>(table)).get_table_ref())
+Query::Query(ConstTableRef table, LnkLstPtr&& ll)
+    : m_table(table.cast_away_const())
     , m_source_link_list(std::move(ll))
 {
     m_view = m_source_link_list.get();
@@ -63,8 +63,8 @@ Query::Query(const Table& table, LnkLstPtr&& ll)
     create();
 }
 
-Query::Query(const Table& table, ConstTableView* tv)
-    : m_table((const_cast<Table&>(table)).get_table_ref())
+Query::Query(ConstTableRef table, ConstTableView* tv)
+    : m_table(table.cast_away_const())
     , m_view(tv)
     , m_source_table_view(tv)
 {
@@ -75,8 +75,8 @@ Query::Query(const Table& table, ConstTableView* tv)
     create();
 }
 
-Query::Query(const Table& table, std::unique_ptr<ConstTableView> tv)
-    : m_table((const_cast<Table&>(table)).get_table_ref())
+Query::Query(ConstTableRef table, std::unique_ptr<ConstTableView> tv)
+    : m_table(table.cast_away_const())
     , m_view(tv.get())
     , m_source_table_view(tv.get())
     , m_owned_source_table_view(std::move(tv))
@@ -1727,7 +1727,7 @@ Query& Query::and_query(Query&& q)
 
 Query Query::operator||(const Query& q)
 {
-    Query q2(*m_table);
+    Query q2(m_table);
     q2.and_query(*this);
     q2.Or();
     q2.and_query(q);
@@ -1744,7 +1744,7 @@ Query Query::operator&&(const Query& q)
     if (!q.root_node())
         return *this;
 
-    Query q2(*m_table);
+    Query q2(m_table);
     q2.and_query(*this);
     q2.and_query(q);
 
@@ -1756,7 +1756,7 @@ Query Query::operator!()
 {
     if (!root_node())
         throw util::runtime_error("negation of empty query is not supported");
-    Query q(*this->m_table);
+    Query q(m_table);
     q.Not();
     q.and_query(*this);
     return q;

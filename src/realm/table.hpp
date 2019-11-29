@@ -578,19 +578,19 @@ public:
     // need to be sorted, and, resulting view retains its order.
     Query where(ConstTableView* tv = nullptr)
     {
-        return Query(*this, tv);
+        return Query(m_own_ref, tv);
     }
 
     // FIXME: We need a ConstQuery class or runtime check against modifications in read transaction.
     Query where(ConstTableView* tv = nullptr) const
     {
-        return Query(*this, tv);
+        return Query(m_own_ref, tv);
     }
 
     // Perform queries on a LinkView. The returned Query holds a reference to list.
     Query where(const LnkLst& list) const
     {
-        return Query(*this, list);
+        return Query(m_own_ref, list);
     }
 
     //@{
