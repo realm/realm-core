@@ -1711,11 +1711,6 @@ size_t Table::get_index_in_group() const noexcept
     return m_top.get_ndx_in_parent();
 }
 
-TableKey Table::get_key() const noexcept
-{
-    return m_key;
-}
-
 uint64_t Table::allocate_sequence_number()
 {
     RefOrTagged rot = m_top.get_as_ref_or_tagged(top_position_for_sequence_number);

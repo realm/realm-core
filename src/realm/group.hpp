@@ -938,6 +938,12 @@ inline bool Group::is_empty() const noexcept
     return size() == 0;
 }
 
+inline size_t Group::key2ndx(TableKey key) const
+{
+    size_t idx = key.value & 0xFFFF;
+    return idx;
+}
+
 inline StringData Group::get_table_name(TableKey key) const
 {
     size_t table_ndx = key2ndx_checked(key);
@@ -969,7 +975,6 @@ inline TableRef Group::get_table(TableKey key)
 {
     if (!is_attached())
         throw LogicError(LogicError::detached_accessor);
-    std::lock_guard<std::mutex> lock(m_accessor_mutex);
     auto ndx = key2ndx_checked(key);
     Table* table = do_get_table(ndx); // Throws
     return TableRef(table);
@@ -979,7 +984,6 @@ inline ConstTableRef Group::get_table(TableKey key) const
 {
     if (!is_attached())
         throw LogicError(LogicError::detached_accessor);
-    std::lock_guard<std::mutex> lock(m_accessor_mutex);
     auto ndx = key2ndx_checked(key);
     const Table* table = do_get_table(ndx); // Throws
     return ConstTableRef(table);
@@ -989,7 +993,6 @@ inline TableRef Group::get_table(StringData name)
 {
     if (!is_attached())
         throw LogicError(LogicError::detached_accessor);
-    std::lock_guard<std::mutex> lock(m_accessor_mutex);
     Table* table = do_get_table(name); // Throws
     return TableRef(table);
 }
@@ -998,7 +1001,6 @@ inline ConstTableRef Group::get_table(StringData name) const
 {
     if (!is_attached())
         throw LogicError(LogicError::detached_accessor);
-    std::lock_guard<std::mutex> lock(m_accessor_mutex);
     const Table* table = do_get_table(name); // Throws
     return ConstTableRef(table);
 }

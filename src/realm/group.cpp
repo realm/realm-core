@@ -251,22 +251,22 @@ TableKey Group::ndx2key(size_t ndx) const
 }
 
 
-size_t Group::key2ndx(TableKey key) const
-{
-    size_t idx = key.value & 0xFFFF;
-    return idx;
-}
-
-
 size_t Group::key2ndx_checked(TableKey key) const
 {
+    size_t idx = key2ndx(key);
+    // early out
+    // note: don't lock when accessing m_table_accessors, because if we miss a concurrently introduced table
+    // accessor, we'll just fall through to the slow path. Table accessors can be introduced concurrently,
+    // but never removed.
+    if (idx < m_table_accessors.size() && m_table_accessors[idx] && m_table_accessors[idx]->get_key() == key)
+        return idx;
+
     // FIXME: This is a temporary hack we should revisit.
     // The notion of a const group as it is now, is not really
     // useful. It is linked to a distinction between a read
     // and a write transaction. This distinction is likely to
     // be moved from compile time to run time.
     Allocator* alloc = const_cast<SlabAlloc*>(&m_alloc);
-    size_t idx = key2ndx(key);
     if (m_tables.is_attached() && idx < m_tables.size()) {
         RefOrTagged rot = m_tables.get_as_ref_or_tagged(idx);
         if (rot.is_ref() && rot.get_as_ref() && (Table::get_key_direct(*alloc, rot.get_as_ref()) == key)) {
@@ -686,9 +686,13 @@ Table* Group::do_get_table(size_t table_ndx)
     REALM_ASSERT(m_table_accessors.size() == m_tables.size());
     // Get table accessor from cache if it exists, else create
     Table* table = m_table_accessors[table_ndx];
-    if (!table)
-        table = create_table_accessor(table_ndx); // Throws
-
+    if (!table) {
+        // double-checked locking idiom
+        std::lock_guard<std::mutex> lock(m_accessor_mutex);
+        table = m_table_accessors[table_ndx];
+        if (!table)
+            table = create_table_accessor(table_ndx); // Throws
+    }
     return table;
 }
 

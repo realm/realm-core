@@ -1175,6 +1175,11 @@ inline uint_fast64_t Table::get_storage_version(uint64_t instance_version) const
 }
 
 
+inline TableKey Table::get_key() const noexcept
+{
+    return m_key;
+}
+
 inline void Table::bump_storage_version() const noexcept
 {
     return m_alloc.bump_storage_version();
