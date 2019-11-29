@@ -182,12 +182,12 @@ public:
             m_child->get_link_dependencies(tables);
     }
 
-    void set_table(const Table& table)
+    void set_table(ConstTableRef table)
     {
-        if (&table == m_table.unchecked_ptr())
+        if (table == m_table)
             return;
 
-        m_table = ConstTableRef::unsafe_create(&table);
+        m_table = table;
         if (m_condition_column_key != ColKey()) {
             m_condition_column_name = m_table->get_column_name(m_condition_column_key);
         }
@@ -1762,7 +1762,7 @@ public:
     void table_changed() override
     {
         for (auto& condition : m_conditions) {
-            condition->set_table(*m_table);
+            condition->set_table(m_table);
         }
     }
 
@@ -1949,7 +1949,7 @@ public:
 
     void table_changed() override
     {
-        m_condition->set_table(*m_table);
+        m_condition->set_table(m_table);
     }
 
     void cluster_changed() override

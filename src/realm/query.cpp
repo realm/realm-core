@@ -190,7 +190,7 @@ void Query::set_table(TableRef tr)
     if (m_table) {
         ParentNode* root = root_node();
         if (root)
-            root->set_table(*m_table);
+            root->set_table(m_table);
     }
 }
 
@@ -1667,7 +1667,7 @@ void Query::add_node(std::unique_ptr<ParentNode> node)
     using State = QueryGroup::State;
 
     if (m_table)
-        node->set_table(*m_table);
+        node->set_table(m_table);
 
     auto& current_group = m_groups.back();
     switch (current_group.m_state) {
