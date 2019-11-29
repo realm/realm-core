@@ -5,8 +5,9 @@
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
- 
+* Fixed assert in SlabAlloc::allocate_block() which could falsely trigger when requesting an allocation that
+  would be slightly smaller than the underlying free block. ([3490](https://github.com/realm/realm-core/issues/3490))
+
 ### Breaking changes
 * None.
 
