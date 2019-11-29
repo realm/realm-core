@@ -1769,7 +1769,6 @@ void Group::verify() const
     m_alloc.verify();
 
     if (!m_top.is_attached()) {
-        REALM_ASSERT(m_alloc.is_free_space_clean());
         return;
     }
 
@@ -1798,6 +1797,15 @@ void Group::verify() const
         }
     }
 
+    if (auto tr = dynamic_cast<const Transaction*>(this)) {
+        // This is a transaction
+        if (tr->get_transact_stage() == DB::TransactStage::transact_Reading) {
+            // Verifying the memory cannot be done from a read transaction
+            // There might be a write transaction running that has freed some
+            // memory that is seen as being in use in this transaction
+            return;
+        }
+    }
     size_t logical_file_size = to_size_t(m_top.get_as_ref_or_tagged(2).get_as_int());
     size_t ref_begin = sizeof(SlabAlloc::Header);
     ref_type real_immutable_ref_end = logical_file_size;
