@@ -98,12 +98,16 @@ TEST(Alloc_1)
     MemRef mr2 = alloc.alloc(16);
     MemRef mr3 = alloc.alloc(256);
     MemRef mr4 = alloc.alloc(96);
+    // This will grow the file with 0x20000, but the 32 bytes are not enough to
+    // create a new free block
+    MemRef mr5 = alloc.alloc(0x20000 - 32);
 
     // Set size in headers (needed for Alloc::free())
     set_capacity(mr1.get_addr(), 8);
     set_capacity(mr2.get_addr(), 16);
     set_capacity(mr3.get_addr(), 256);
     set_capacity(mr4.get_addr(), 96);
+    set_capacity(mr5.get_addr(), 0x20000 - 32);
 
     // Are pointers 64bit aligned
     CHECK_EQUAL(0, intptr_t(mr1.get_addr()) & 0x7);
@@ -121,6 +125,7 @@ TEST(Alloc_1)
     alloc.free_(mr4.get_ref(), mr4.get_addr());
     alloc.free_(mr1.get_ref(), mr1.get_addr());
     alloc.free_(mr2.get_ref(), mr2.get_addr());
+    alloc.free_(mr5.get_ref(), mr5.get_addr());
 
     // SlabAlloc destructor will verify that all is free'd
 }
