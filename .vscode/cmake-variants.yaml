@@ -1,0 +1,38 @@
+buildType:
+  default: debug
+  choices:
+    debug:
+      short: Debug
+      long: Emit debug information
+      buildType: Debug
+    release:
+      short: Release
+      long: Optimize generated code
+      buildType: Release
+
+enableSync:
+  default: no
+  choices:
+    no:
+      short: Disable Sync
+      long: Build without Realm Sync
+      settings:
+        REALM_ENABLE_SYNC: OFF
+    yes:
+      short: Enable Sync
+      long: Build with Realm Sync
+      settings:
+        REALM_ENABLE_SYNC: ON
+
+useLocalCoreAndSync:
+  default: no
+  choices:
+    no:
+      short: Download Core
+      long: Clone the realm-sync and realm-core repositories
+    yes:
+      short: Use Local Core
+      long: Use local checkouts of realm-core and realm-sync
+      settings:
+        REALM_CORE_PREFIX: ${workspaceRoot}/../realm-core
+        REALM_SYNC_PREFIX: ${workspaceRoot}/../realm-sync
