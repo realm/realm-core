@@ -177,8 +177,8 @@ Query::Query(const Query* source, Transaction* tr, PayloadPolicy policy)
 Query::Query(std::unique_ptr<Expression> expr)
     : Query()
 {
-    if (auto table = const_cast<Table*>(expr->get_base_table()))
-        set_table(table->get_table_ref());
+    if (auto table = expr->get_base_table())
+        set_table(table.cast_away_const());
 
     add_expression_node(std::move(expr));
 }

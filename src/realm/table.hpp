@@ -624,18 +624,6 @@ public:
     void to_json(std::ostream& out, size_t link_depth = 0,
                  std::map<std::string, std::string>* renames = nullptr) const;
 
-    // Get a reference to this table
-    TableRef get_table_ref()
-    {
-        REALM_ASSERT(bool(m_own_ref));
-        return m_own_ref;
-    }
-    ConstTableRef get_table_ref() const
-    {
-        REALM_ASSERT(bool(m_own_ref));
-        return m_own_ref;
-    }
-
     /// \brief Compare two tables for equality.
     ///
     /// Two tables are equal if they have equal descriptors
@@ -1099,7 +1087,7 @@ public:
             m_link_cols.push_back(col_key);
         }
 
-        return Columns<T>(col_key, m_base_table, m_link_cols);
+        return Columns<T>(col_key, ConstTableRef::unsafe_create(m_base_table), m_link_cols);
     }
     template <class T>
     Columns<T> column(const Table& origin, ColKey origin_col_key)
@@ -1109,7 +1097,7 @@ public:
         auto backlink_col_key = origin.get_opposite_column(origin_col_key);
         m_link_cols.push_back(backlink_col_key);
 
-        return Columns<T>(backlink_col_key, m_base_table, std::move(m_link_cols));
+        return Columns<T>(backlink_col_key, ConstTableRef::unsafe_create(m_base_table), std::move(m_link_cols));
     }
     template <class T>
     SubQuery<T> column(ColKey col_key, Query subquery)
@@ -1129,7 +1117,7 @@ public:
     template <class T>
     BacklinkCount<T> get_backlink_count()
     {
-        return BacklinkCount<T>(m_base_table, std::move(m_link_cols));
+        return BacklinkCount<T>(ConstTableRef::unsafe_create(m_base_table), std::move(m_link_cols));
     }
 
 private:

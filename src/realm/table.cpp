@@ -2113,7 +2113,7 @@ ConstTableView Table::find_all_null(ColKey col_key) const
 
 TableView Table::get_distinct_view(ColKey col_key)
 {
-    TableView tv(TableView::DistinctView, get_table_ref(), col_key);
+    TableView tv(TableView::DistinctView, m_own_ref, col_key);
     tv.do_sync();
     return tv;
 }
@@ -3001,7 +3001,7 @@ Table::BacklinkOrigin Table::find_backlink_origin(ColKey backlink_col) const noe
         TableKey linked_table_key = get_opposite_table_key(backlink_col);
         ColKey linked_column_key = get_opposite_column(backlink_col);
         if (linked_table_key == m_key) {
-            return {{get_table_ref(), linked_column_key}};
+            return {{m_own_ref, linked_column_key}};
         }
         else {
             Group* current_group = get_parent_group();

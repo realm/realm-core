@@ -348,12 +348,12 @@ public:
     }
 
     virtual size_t find_first(size_t start, size_t end) const = 0;
-    virtual void set_base_table(const Table* table) = 0;
+    virtual void set_base_table(ConstTableRef table) = 0;
     virtual void set_cluster(const Cluster*) = 0;
     virtual void collect_dependencies(std::vector<TableKey>&) const
     {
     }
-    virtual const Table* get_base_table() const = 0;
+    virtual ConstTableRef get_base_table() const = 0;
     virtual std::string description(util::serializer::SerialisationState& state) const = 0;
 
     virtual std::unique_ptr<Expression> clone(Transaction*) const = 0;
@@ -380,9 +380,7 @@ public:
     //
     // During thread-handover of a Query, set_base_table() is also called to make objects point at the new table
     // instead of the old one from the old thread.
-    virtual void set_base_table(const Table*)
-    {
-    }
+    virtual void set_base_table(ConstTableRef) {}
 
     virtual std::string description(util::serializer::SerialisationState& state) const = 0;
 
@@ -393,7 +391,7 @@ public:
     // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression
     // and
     // binds it to a Query at a later time
-    virtual const Table* get_base_table() const
+    virtual ConstTableRef get_base_table() const
     {
         return nullptr;
     }
@@ -473,8 +471,8 @@ Query create(L left, const Subexpr2<R>& right)
                    (std::is_same<L, StringData>::value && std::is_same<R, StringData>::value) ||
                    (std::is_same<L, BinaryData>::value && std::is_same<R, BinaryData>::value)) &&
         !column->links_exist()) {
-        const Table* t = column->get_base_table();
-        Query q = Query(t->get_table_ref());
+        ConstTableRef t = column->get_base_table();
+        Query q = Query(t);
 
         if (std::is_same<Cond, Less>::value)
             q.greater(column->column_key(), _impl::only_numeric<R>(left));
@@ -625,8 +623,8 @@ public:
         if (left_col && right_col && std::is_same<L, R>::value && !left_col->is_nullable() &&
             !right_col->is_nullable() && !left_col->links_exist() && !right_col->links_exist() &&
             !std::is_same<L, Timestamp>::value) {
-            const Table* t = left_col->get_base_table();
-            Query q = Query(t->get_table_ref());
+            ConstTableRef t = left_col->get_base_table();
+            Query q = Query(t);
 
             if (std::numeric_limits<L>::is_integer) {
                 if (std::is_same<Cond, Less>::value)
@@ -1116,13 +1114,11 @@ struct TrueExpression : Expression {
 
         return realm::not_found;
     }
-    void set_base_table(const Table*) override
-    {
-    }
+    void set_base_table(ConstTableRef) override {}
     void set_cluster(const Cluster*) override
     {
     }
-    const Table* get_base_table() const override
+    ConstTableRef get_base_table() const override
     {
         return nullptr;
     }
@@ -1142,9 +1138,7 @@ struct FalseExpression : Expression {
     {
         return realm::not_found;
     }
-    void set_base_table(const Table*) override
-    {
-    }
+    void set_base_table(ConstTableRef) override {}
     void set_cluster(const Cluster*) override
     {
     }
@@ -1152,7 +1146,7 @@ struct FalseExpression : Expression {
     {
         return "FALSEPREDICATE";
     }
-    const Table* get_base_table() const override
+    ConstTableRef get_base_table() const override
     {
         return nullptr;
     }
@@ -1783,7 +1777,7 @@ struct CountLinks : public LinkMapFunction {
 };
 
 struct CountBacklinks : public LinkMapFunction {
-    CountBacklinks(const Table* t)
+    CountBacklinks(ConstTableRef t)
         : m_table(t)
     {
     }
@@ -1799,7 +1793,7 @@ struct CountBacklinks : public LinkMapFunction {
         return m_link_count;
     }
 
-    const Table* m_table;
+    ConstTableRef m_table;
     size_t m_link_count = 0;
 };
 
@@ -1822,7 +1816,7 @@ iterator pattern. First solution can't exit, second solution requires internal s
 class LinkMap {
 public:
     LinkMap() = default;
-    LinkMap(const Table* table, std::vector<ColKey> columns)
+    LinkMap(ConstTableRef table, std::vector<ColKey> columns)
         : m_link_column_keys(std::move(columns))
     {
         set_base_table(table);
@@ -1846,7 +1840,7 @@ public:
         return m_link_column_keys.size() > 0;
     }
 
-    void set_base_table(const Table* table);
+    void set_base_table(ConstTableRef table);
 
     void set_cluster(const Cluster* cluster)
     {
@@ -1915,12 +1909,12 @@ public:
         return m_only_unary_links;
     }
 
-    const Table* get_base_table() const
+    ConstTableRef get_base_table() const
     {
         return m_tables.empty() ? nullptr : m_tables[0];
     }
 
-    const Table* get_target_table() const
+    ConstTableRef get_target_table() const
     {
         REALM_ASSERT(!m_tables.empty());
         return m_tables.back();
@@ -1943,7 +1937,7 @@ private:
 
     mutable std::vector<ColKey> m_link_column_keys;
     std::vector<ColumnType> m_link_types;
-    std::vector<const Table*> m_tables;
+    std::vector<ConstTableRef> m_tables;
     bool m_only_unary_links = true;
     // Leaf cache
     using LeafPtr = std::unique_ptr<ArrayPayload, PlacementDelete>;
@@ -1991,7 +1985,7 @@ Value<T> make_value_for_link(bool only_unary_links, size_t size)
 template <class T>
 class SimpleQuerySupport : public Subexpr2<T> {
 public:
-    SimpleQuerySupport(ColKey column, const Table* table, std::vector<ColKey> links = {})
+    SimpleQuerySupport(ColKey column, ConstTableRef table, std::vector<ColKey> links = {})
         : m_link_map(table, std::move(links))
         , m_column_key(column)
     {
@@ -2002,12 +1996,12 @@ public:
         return m_link_map.get_base_table()->is_nullable(m_column_key);
     }
 
-    const Table* get_base_table() const override
+    ConstTableRef get_base_table() const override
     {
         return m_link_map.get_base_table();
     }
 
-    void set_base_table(const Table* table) override
+    void set_base_table(ConstTableRef table) override
     {
         if (table != get_base_table()) {
             m_link_map.set_base_table(table);
@@ -2172,7 +2166,7 @@ class Columns<BinaryData> : public SimpleQuerySupport<BinaryData> {
 template <>
 class Columns<StringData> : public SimpleQuerySupport<StringData> {
 public:
-    Columns(ColKey column, const Table* table, std::vector<ColKey> links = {})
+    Columns(ColKey column, ConstTableRef table, std::vector<ColKey> links = {})
         : SimpleQuerySupport(column, table, links)
     {
     }
@@ -2303,7 +2297,7 @@ public:
     {
     }
 
-    void set_base_table(const Table* table) override
+    void set_base_table(ConstTableRef table) override
     {
         m_link_map.set_base_table(table);
     }
@@ -2320,7 +2314,7 @@ public:
 
     // Return main table of query (table on which table->where()... is invoked). Note that this is not the same as
     // any linked-to payload tables
-    const Table* get_base_table() const override
+    ConstTableRef get_base_table() const override
     {
         return m_link_map.get_base_table();
     }
@@ -2376,12 +2370,12 @@ public:
         return make_subexpr<LinkCount>(*this);
     }
 
-    const Table* get_base_table() const override
+    ConstTableRef get_base_table() const override
     {
         return m_link_map.get_base_table();
     }
 
-    void set_base_table(const Table* table) override
+    void set_base_table(ConstTableRef table) override
     {
         m_link_map.set_base_table(table);
     }
@@ -2424,7 +2418,7 @@ public:
         : m_link_map(std::move(link_map))
     {
     }
-    BacklinkCount(const Table* table, std::vector<ColKey> links = {})
+    BacklinkCount(ConstTableRef table, std::vector<ColKey> links = {})
         : m_link_map(table, std::move(links))
     {
     }
@@ -2439,12 +2433,12 @@ public:
         return make_subexpr<BacklinkCount<Int>>(*this);
     }
 
-    const Table* get_base_table() const override
+    ConstTableRef get_base_table() const override
     {
         return m_link_map.get_base_table();
     }
 
-    void set_base_table(const Table* table) override
+    void set_base_table(ConstTableRef table) override
     {
         m_link_map.set_base_table(table);
     }
@@ -2504,7 +2498,7 @@ public:
     }
 
     // See comment in base class
-    void set_base_table(const Table* table) override
+    void set_base_table(ConstTableRef table) override
     {
         m_expr->set_base_table(table);
     }
@@ -2516,7 +2510,7 @@ public:
 
     // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression
     // and binds it to a Query at a later time
-    const Table* get_base_table() const override
+    ConstTableRef get_base_table() const override
     {
         return m_expr->get_base_table();
     }
@@ -2574,11 +2568,9 @@ public:
     {
     }
 
-    void set_base_table(const Table*) override
-    {
-    }
+    void set_base_table(ConstTableRef) override {}
 
-    const Table* get_base_table() const override
+    ConstTableRef get_base_table() const override
     {
         return nullptr;
     }
@@ -2662,12 +2654,12 @@ public:
         return m_link_map;
     }
 
-    const Table* get_base_table() const override
+    ConstTableRef get_base_table() const override
     {
         return m_link_map.get_base_table();
     }
 
-    void set_base_table(const Table* table) override
+    void set_base_table(ConstTableRef table) override
     {
         m_link_map.set_base_table(table);
     }
@@ -2701,7 +2693,7 @@ private:
     friend class Table;
     friend class LinkChain;
 
-    Columns(ColKey column_key, const Table* table, const std::vector<ColKey>& links = {})
+    Columns(ColKey column_key, ConstTableRef table, const std::vector<ColKey>& links = {})
         : m_link_map(table, links)
     {
         static_cast<void>(column_key);
@@ -2725,7 +2717,7 @@ class Average;
 
 class ColumnListBase {
 public:
-    ColumnListBase(ColKey column_key, const Table* table, const std::vector<ColKey>& links)
+    ColumnListBase(ColKey column_key, ConstTableRef table, const std::vector<ColKey>& links)
         : m_column_key(column_key)
         , m_link_map(table, links)
     {
@@ -2778,12 +2770,12 @@ public:
         return make_subexpr<Columns<Lst<T>>>(*this);
     }
 
-    const Table* get_base_table() const override
+    ConstTableRef get_base_table() const override
     {
         return m_link_map.get_base_table();
     }
 
-    void set_base_table(const Table* table) override
+    void set_base_table(ConstTableRef table) override
     {
         m_link_map.set_base_table(table);
     }
@@ -2859,7 +2851,7 @@ private:
     friend class Table;
     friend class LinkChain;
 
-    Columns(ColKey column_key, const Table* table, const std::vector<ColKey>& links = {})
+    Columns(ColKey column_key, ConstTableRef table, const std::vector<ColKey>& links = {})
         : ColumnListBase(column_key, table, links)
     {
     }
@@ -2930,12 +2922,12 @@ public:
         return make_subexpr<ListColumnAggregate>(*this);
     }
 
-    const Table* get_base_table() const override
+    ConstTableRef get_base_table() const override
     {
         return m_list.get_base_table();
     }
 
-    void set_base_table(const Table* table) override
+    void set_base_table(ConstTableRef table) override
     {
         m_list.set_base_table(table);
     }
@@ -3006,8 +2998,8 @@ Query compare(const Subexpr2<Link>& left, const ConstObj& obj)
             // to "ALL linklist != row" rather than the "ANY linklist != row" semantics we're after.
             if (link_map.m_link_types[0] == col_type_Link ||
                 (link_map.m_link_types[0] == col_type_LinkList && std::is_same<Operator, Equal>::value)) {
-                const Table* t = column->get_base_table();
-                Query query(t->get_table_ref());
+                ConstTableRef t = column->get_base_table();
+                Query query(t);
 
                 if (std::is_same<Operator, NotEqual>::value) {
                     // Negate the following `links_to`.
@@ -3070,7 +3062,7 @@ class Columns : public Subexpr2<T> {
 public:
     using LeafType = typename ColumnTypeTraits<T>::cluster_leaf_type;
 
-    Columns(ColKey column, const Table* table, std::vector<ColKey> links = {})
+    Columns(ColKey column, ConstTableRef table, std::vector<ColKey> links = {})
         : m_link_map(table, std::move(links))
         , m_column_key(column)
         , m_nullable(m_link_map.get_target_table()->is_nullable(m_column_key))
@@ -3100,7 +3092,7 @@ public:
     }
 
     // See comment in base class
-    void set_base_table(const Table* table) override
+    void set_base_table(ConstTableRef table) override
     {
         if (table == get_base_table())
             return;
@@ -3166,7 +3158,7 @@ public:
 
     // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression
     // and binds it to a Query at a later time
-    const Table* get_base_table() const override
+    ConstTableRef get_base_table() const override
     {
         return m_link_map.get_base_table();
     }
@@ -3327,12 +3319,12 @@ public:
         return make_subexpr<SubColumns<T>>(*this);
     }
 
-    const Table* get_base_table() const override
+    ConstTableRef get_base_table() const override
     {
         return m_link_map.get_base_table();
     }
 
-    void set_base_table(const Table* table) override
+    void set_base_table(ConstTableRef table) override
     {
         m_link_map.set_base_table(table);
         m_column.set_base_table(m_link_map.get_target_table());
@@ -3398,12 +3390,12 @@ public:
         return make_subexpr<SubColumnAggregate>(*this);
     }
 
-    const Table* get_base_table() const override
+    ConstTableRef get_base_table() const override
     {
         return m_link_map.get_base_table();
     }
 
-    void set_base_table(const Table* table) override
+    void set_base_table(ConstTableRef table) override
     {
         m_link_map.set_base_table(table);
         m_column.set_base_table(m_link_map.get_target_table());
@@ -3462,12 +3454,12 @@ public:
     {
     }
 
-    const Table* get_base_table() const override
+    ConstTableRef get_base_table() const override
     {
         return m_link_map.get_base_table();
     }
 
-    void set_base_table(const Table* table) override
+    void set_base_table(ConstTableRef table) override
     {
         m_link_map.set_base_table(table);
     }
@@ -3499,7 +3491,7 @@ public:
     {
         REALM_ASSERT(m_link_map.get_base_table() != nullptr);
         std::string target = state.describe_columns(m_link_map, ColKey());
-        std::string var_name = state.get_variable_name(m_link_map.get_base_table()->get_table_ref());
+        std::string var_name = state.get_variable_name(m_link_map.get_base_table());
         state.subquery_prefix_list.push_back(var_name);
         std::string desc = "SUBQUERY(" + target + ", " + var_name + ", " + m_query.get_description(state) + ")" +
                            util::serializer::value_separator + "@count";
@@ -3534,7 +3526,7 @@ public:
         : m_query(std::move(query))
         , m_link_map(link_column.link_map())
     {
-        REALM_ASSERT(m_link_map.get_target_table() == m_query.get_table().unchecked_ptr());
+        REALM_ASSERT(m_link_map.get_target_table() == m_query.get_table());
     }
 
     SubQueryCount count() const
@@ -3680,7 +3672,7 @@ public:
     UnaryOperator& operator=(UnaryOperator&&) = default;
 
     // See comment in base class
-    void set_base_table(const Table* table) override
+    void set_base_table(ConstTableRef table) override
     {
         m_left->set_base_table(table);
     }
@@ -3697,7 +3689,7 @@ public:
 
     // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression
     // and binds it to a Query at a later time
-    const Table* get_base_table() const override
+    ConstTableRef get_base_table() const override
     {
         return m_left->get_base_table();
     }
@@ -3759,7 +3751,7 @@ public:
     Operator& operator=(Operator&&) = default;
 
     // See comment in base class
-    void set_base_table(const Table* table) override
+    void set_base_table(ConstTableRef table) override
     {
         m_left->set_base_table(table);
         m_right->set_base_table(table);
@@ -3774,16 +3766,16 @@ public:
     // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression
     // and
     // binds it to a Query at a later time
-    const Table* get_base_table() const override
+    ConstTableRef get_base_table() const override
     {
-        const Table* l = m_left->get_base_table();
-        const Table* r = m_right->get_base_table();
+        ConstTableRef l = m_left->get_base_table();
+        ConstTableRef r = m_right->get_base_table();
 
         // Queries do not support multiple different tables; all tables must be the same.
         REALM_ASSERT(l == nullptr || r == nullptr || l == r);
 
         // nullptr pointer means expression which isn't yet associated with any table, or is a Value<T>
-        return l ? l : r;
+        return bool(l) ? l : r;
     }
 
     // destination = operator(left, right)
@@ -3850,7 +3842,7 @@ public:
     }
 
     // See comment in base class
-    void set_base_table(const Table* table) override
+    void set_base_table(ConstTableRef table) override
     {
         m_left->set_base_table(table);
         m_right->set_base_table(table);
@@ -3893,16 +3885,16 @@ public:
 
     // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression
     // and binds it to a Query at a later time
-    const Table* get_base_table() const override
+    ConstTableRef get_base_table() const override
     {
-        const Table* l = m_left->get_base_table();
-        const Table* r = m_right->get_base_table();
+        ConstTableRef l = m_left->get_base_table();
+        ConstTableRef r = m_right->get_base_table();
 
         // All main tables in each subexpression of a query (table.columns() or table.link()) must be the same.
         REALM_ASSERT(l == nullptr || r == nullptr || l == r);
 
         // nullptr pointer means expression which isn't yet associated with any table, or is a Value<T>
-        return l ? l : r;
+        return (l) ? l : r;
     }
 
     void collect_dependencies(std::vector<TableKey>& tables) const override
