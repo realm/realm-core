@@ -1841,6 +1841,34 @@ TEST(Table_Sorted_Query_where)
 #endif
 }
 
+TEST_TYPES(Table_SortFloat, float, double)
+{
+    Table table;
+    auto col = table.add_column(std::is_same<TEST_TYPE, float>::value ? type_Float : type_Double, "value", true);
+    table.add_empty_row(900);
+    for (size_t i = 0; i < table.size(); i += 3) {
+        table.set(col, i, static_cast<TEST_TYPE>(-500.0 + i));
+        table.set_null(col, i + 1);
+        char nan_tag[] = {char('0' + i % 10), 0};
+        table.set(col, i + 2, static_cast<TEST_TYPE>(nan(nan_tag)));
+    }
+
+    TableView sorted = table.get_sorted_view(SortDescriptor{table, {{col}}, {true}});
+    CHECK_EQUAL(table.size(), sorted.size());
+
+    // nans should appear first (because the tag is less than the tag we use for nulls),
+    // followed by nulls, folllowed by the rest of the values in ascending order
+    for (size_t i = 0; i < 300; ++i) {
+        CHECK(std::isnan(sorted.get(i).get<TEST_TYPE>(col)));
+    }
+    for (size_t i = 300; i < 600; ++i) {
+        CHECK(sorted.get(i).is_null(col));
+    }
+    for (size_t i = 600; i + i < 900; ++i) {
+        CHECK_GREATER(sorted.get(i + 1).get<TEST_TYPE>(col), sorted.get(i).get<TEST_TYPE>(col));
+    }
+}
+
 TEST(Table_Multi_Sort)
 {
     Table table;
