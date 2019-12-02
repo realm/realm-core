@@ -266,13 +266,13 @@ void StringNode<Equal>::_search_index_init()
     InternalFindResult res;
 
     if (ParentNode::m_table->get_primary_key_column() == ParentNode::m_condition_column_key) {
-        m_actual_key =
-            ParentNode::m_table->find_first(ParentNode::m_condition_column_key, StringData(StringNodeBase::m_value));
+        m_actual_key = ParentNode::m_table.unchecked_ptr()->find_first(ParentNode::m_condition_column_key,
+                                                                       StringData(StringNodeBase::m_value));
         m_results_start = 0;
         m_results_end = m_actual_key ? 1 : 0;
     }
     else {
-        auto index = ParentNode::m_table->get_search_index(ParentNode::m_condition_column_key);
+        auto index = ParentNode::m_table.unchecked_ptr()->get_search_index(ParentNode::m_condition_column_key);
         fr = index->find_all_no_copy(StringData(StringNodeBase::m_value), res);
 
         switch (fr) {
@@ -285,7 +285,8 @@ void StringNode<Equal>::_search_index_init()
                 // todo: Apparently we can't use m_index.get_alloc() because it uses default allocator which
                 // simply makes
                 // translate(x) = x. Shouldn't it inherit owner column's allocator?!
-                m_index_matches.reset(new IntegerColumn(m_table->get_alloc(), ref_type(res.payload))); // Throws
+                m_index_matches.reset(
+                    new IntegerColumn(m_table.unchecked_ptr()->get_alloc(), ref_type(res.payload))); // Throws
                 m_results_start = res.start_ndx;
                 m_results_end = res.end_ndx;
                 m_actual_key = ObjKey(m_index_matches->get(m_results_start));
