@@ -4544,7 +4544,7 @@ TEST(Query_IncludeDescriptorSelfLinks)
             else {
                 expected_values = {i - 1}; // linked to by the previous row
             }
-            includes.report_included_backlinks(t1.unchecked_ptr(), tv.get_key(i), reporter);
+            includes.report_included_backlinks(t1, tv.get_key(i), reporter);
         }
     }
     { // test a backlink chain of size two from the same table: INCLUDE(t1_link_self.@links.t1.t1_link_self)
@@ -4565,7 +4565,7 @@ TEST(Query_IncludeDescriptorSelfLinks)
         CHECK_EQUAL(tv.size(), 6);
         for (size_t i = 0; i < tv.size(); ++i) {
             expected_values = {i}; // following a single link gives this row as a backlink
-            includes.report_included_backlinks(t1.unchecked_ptr(), tv.get_key(i), reporter);
+            includes.report_included_backlinks(t1, tv.get_key(i), reporter);
         }
     }
     { // test a backlink chain of size three from the same table:
@@ -4592,7 +4592,7 @@ TEST(Query_IncludeDescriptorSelfLinks)
             else {
                 expected_values = {i + 1}; // linked to by the next row in the chain (ndx + 1)
             }
-            includes.report_included_backlinks(t1.unchecked_ptr(), tv.get_key(i), reporter);
+            includes.report_included_backlinks(t1, tv.get_key(i), reporter);
         }
     }
 }
@@ -4657,15 +4657,15 @@ TEST(Query_IncludeDescriptorOtherLinks)
         CHECK_EQUAL(tv.size(), 6);
 
         expected_t2_values = {0, 3};
-        includes.report_included_backlinks(t1.unchecked_ptr(), tv.get_key(0), reporter);
+        includes.report_included_backlinks(t1, tv.get_key(0), reporter);
         expected_t2_values = {1};
-        includes.report_included_backlinks(t1.unchecked_ptr(), tv.get_key(1), reporter);
+        includes.report_included_backlinks(t1, tv.get_key(1), reporter);
         expected_t2_values = {2};
-        includes.report_included_backlinks(t1.unchecked_ptr(), tv.get_key(2), reporter);
+        includes.report_included_backlinks(t1, tv.get_key(2), reporter);
         expected_t2_values = {}; // last three results are not linked to
-        includes.report_included_backlinks(t1.unchecked_ptr(), tv.get_key(3), reporter);
-        includes.report_included_backlinks(t1.unchecked_ptr(), tv.get_key(4), reporter);
-        includes.report_included_backlinks(t1.unchecked_ptr(), tv.get_key(5), reporter);
+        includes.report_included_backlinks(t1, tv.get_key(3), reporter);
+        includes.report_included_backlinks(t1, tv.get_key(4), reporter);
+        includes.report_included_backlinks(t1, tv.get_key(5), reporter);
     }
 }
 
@@ -4740,15 +4740,15 @@ TEST(Query_IncludeDescriptorOtherLists)
         CHECK_EQUAL(tv.size(), 6);
 
         expected_t2_values = {0, 1, 2};
-        includes.report_included_backlinks(t1.unchecked_ptr(), tv.get_key(0), reporter);
+        includes.report_included_backlinks(t1, tv.get_key(0), reporter);
         expected_t2_values = {0, 1, 2};
-        includes.report_included_backlinks(t1.unchecked_ptr(), tv.get_key(1), reporter);
+        includes.report_included_backlinks(t1, tv.get_key(1), reporter);
         expected_t2_values = {4};
-        includes.report_included_backlinks(t1.unchecked_ptr(), tv.get_key(2), reporter);
+        includes.report_included_backlinks(t1, tv.get_key(2), reporter);
         expected_t2_values = {}; // nothing links to the last three rows
-        includes.report_included_backlinks(t1.unchecked_ptr(), tv.get_key(3), reporter);
-        includes.report_included_backlinks(t1.unchecked_ptr(), tv.get_key(4), reporter);
-        includes.report_included_backlinks(t1.unchecked_ptr(), tv.get_key(5), reporter);
+        includes.report_included_backlinks(t1, tv.get_key(3), reporter);
+        includes.report_included_backlinks(t1, tv.get_key(4), reporter);
+        includes.report_included_backlinks(t1, tv.get_key(5), reporter);
     }
 }
 
@@ -4857,17 +4857,17 @@ TEST(Query_IncludeDescriptorLinkAndListTranslation)
         CHECK_EQUAL(tv.size(), 6);
 
         expected_t4_values = {}; // nullified path by empty t2 list
-        includes.report_included_backlinks(t1.unchecked_ptr(), tv.get_key(0), reporter);
+        includes.report_included_backlinks(t1, tv.get_key(0), reporter);
         expected_t4_values = {}; // t4 does not link to 4,5,6 of t3
-        includes.report_included_backlinks(t1.unchecked_ptr(), tv.get_key(1), reporter);
+        includes.report_included_backlinks(t1, tv.get_key(1), reporter);
         expected_t4_values = {6};
-        includes.report_included_backlinks(t1.unchecked_ptr(), tv.get_key(2), reporter);
+        includes.report_included_backlinks(t1, tv.get_key(2), reporter);
         expected_t4_values = {3, 4, 5};
-        includes.report_included_backlinks(t1.unchecked_ptr(), tv.get_key(3), reporter);
+        includes.report_included_backlinks(t1, tv.get_key(3), reporter);
         expected_t4_values = {0, 1, 2, 3, 4};
-        includes.report_included_backlinks(t1.unchecked_ptr(), tv.get_key(4), reporter);
+        includes.report_included_backlinks(t1, tv.get_key(4), reporter);
         expected_t4_values = {}; // nullified path by null link in t1
-        includes.report_included_backlinks(t1.unchecked_ptr(), tv.get_key(5), reporter);
+        includes.report_included_backlinks(t1, tv.get_key(5), reporter);
     };
 
     DescriptorOrdering ordering;

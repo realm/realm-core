@@ -2146,11 +2146,11 @@ TEST(Parser_IncludeDescriptor)
     };
 
     expected_include_names = {"Adam"};
-    includes.report_included_backlinks(accounts.unchecked_ptr(), tv.get_key(0), reporter);
+    includes.report_included_backlinks(accounts, tv.get_key(0), reporter);
     expected_include_names = {"Ben"};
-    includes.report_included_backlinks(accounts.unchecked_ptr(), tv.get_key(1), reporter);
+    includes.report_included_backlinks(accounts, tv.get_key(1), reporter);
     expected_include_names = {"Frank"};
-    includes.report_included_backlinks(accounts.unchecked_ptr(), tv.get_key(2), reporter);
+    includes.report_included_backlinks(accounts, tv.get_key(2), reporter);
 
     // Error checking
     std::string message;
@@ -2258,13 +2258,13 @@ TEST(Parser_IncludeDescriptorMultiple)
         CHECK(includes.is_valid());
         expected_people_names = {"Adam"};
         expected_language_names = {"English", "French"};
-        includes.report_included_backlinks(accounts.unchecked_ptr(), tv.get_key(0), reporter);
+        includes.report_included_backlinks(accounts, tv.get_key(0), reporter);
         expected_people_names = {"Ben"};
         expected_language_names = {"English", "French"};
-        includes.report_included_backlinks(accounts.unchecked_ptr(), tv.get_key(1), reporter);
+        includes.report_included_backlinks(accounts, tv.get_key(1), reporter);
         expected_people_names = {"Frank"};
         expected_language_names = {"Danish", "English"};
-        includes.report_included_backlinks(accounts.unchecked_ptr(), tv.get_key(2), reporter);
+        includes.report_included_backlinks(accounts, tv.get_key(2), reporter);
     }
     {
         parser::KeyPathMapping mapping;
@@ -2287,13 +2287,13 @@ TEST(Parser_IncludeDescriptorMultiple)
 
         expected_people_names = {"Adam"};
         expected_language_names = {"English", "French"};
-        includes.report_included_backlinks(accounts.unchecked_ptr(), tv.get_key(0), reporter);
+        includes.report_included_backlinks(accounts, tv.get_key(0), reporter);
         expected_people_names = {"Ben"};
         expected_language_names = {"English", "French"};
-        includes.report_included_backlinks(accounts.unchecked_ptr(), tv.get_key(1), reporter);
+        includes.report_included_backlinks(accounts, tv.get_key(1), reporter);
         expected_people_names = {"Frank"};
         expected_language_names = {"Danish", "English"};
-        includes.report_included_backlinks(accounts.unchecked_ptr(), tv.get_key(2), reporter);
+        includes.report_included_backlinks(accounts, tv.get_key(2), reporter);
     }
     {
         parser::KeyPathMapping mapping;
@@ -2329,13 +2329,13 @@ TEST(Parser_IncludeDescriptorMultiple)
 
         expected_people_names = {"Adam"};
         expected_language_names = {"English", "French"};
-        includes.report_included_backlinks(accounts.unchecked_ptr(), tv.get_key(0), reporter);
+        includes.report_included_backlinks(accounts, tv.get_key(0), reporter);
         expected_people_names = {"Ben"};
         expected_language_names = {"English", "French"};
-        includes.report_included_backlinks(accounts.unchecked_ptr(), tv.get_key(1), reporter);
+        includes.report_included_backlinks(accounts, tv.get_key(1), reporter);
         expected_people_names = {"Frank"};
         expected_language_names = {"Danish", "English"};
-        includes.report_included_backlinks(accounts.unchecked_ptr(), tv.get_key(2), reporter);
+        includes.report_included_backlinks(accounts, tv.get_key(2), reporter);
 
         std::string message;
         CHECK_THROW_ANY_GET_MESSAGE(realm::parser::parse_include_path(""), message);
@@ -2380,7 +2380,7 @@ TEST(Parser_IncludeDescriptorDeepLinks)
     };
 
     expected_include_names = {"John", "Mark", "Jonathan", "Eli"};
-    includes.report_included_backlinks(people.unchecked_ptr(), tv.get_key(0), reporter);
+    includes.report_included_backlinks(people, tv.get_key(0), reporter);
 }
 
 

@@ -1048,14 +1048,14 @@ private:
 // It has member functions corresponding to the ones defined on Table.
 class LinkChain {
 public:
-    LinkChain(const Table* t)
-        : m_current_table(t)
+    LinkChain(ConstTableRef t)
+        : m_current_table(t.unchecked_ptr())
         , m_base_table(t)
     {
     }
     const Table* get_base_table()
     {
-        return m_base_table;
+        return m_base_table.unchecked_ptr();
     }
 
     LinkChain& link(ColKey link_column)
@@ -1087,7 +1087,7 @@ public:
             m_link_cols.push_back(col_key);
         }
 
-        return Columns<T>(col_key, ConstTableRef::unsafe_create(m_base_table), m_link_cols);
+        return Columns<T>(col_key, m_base_table, m_link_cols);
     }
     template <class T>
     Columns<T> column(const Table& origin, ColKey origin_col_key)
@@ -1097,7 +1097,7 @@ public:
         auto backlink_col_key = origin.get_opposite_column(origin_col_key);
         m_link_cols.push_back(backlink_col_key);
 
-        return Columns<T>(backlink_col_key, ConstTableRef::unsafe_create(m_base_table), std::move(m_link_cols));
+        return Columns<T>(backlink_col_key, m_base_table, std::move(m_link_cols));
     }
     template <class T>
     SubQuery<T> column(ColKey col_key, Query subquery)
@@ -1117,7 +1117,7 @@ public:
     template <class T>
     BacklinkCount<T> get_backlink_count()
     {
-        return BacklinkCount<T>(ConstTableRef::unsafe_create(m_base_table), std::move(m_link_cols));
+        return BacklinkCount<T>(m_base_table, std::move(m_link_cols));
     }
 
 private:
@@ -1125,7 +1125,7 @@ private:
 
     std::vector<ColKey> m_link_cols;
     const Table* m_current_table;
-    const Table* m_base_table;
+    ConstTableRef m_base_table;
 
     void add(ColKey ck)
     {
@@ -1229,7 +1229,7 @@ inline Table::Table(Allocator& alloc)
     , m_opposite_table(m_alloc)
     , m_opposite_column(m_alloc)
     , m_repl(&g_dummy_replication)
-    , m_own_ref(TableRef::unsafe_create(this))
+    , m_own_ref(this, alloc.get_instance_version())
 {
     m_spec.set_parent(&m_top, top_position_for_spec);
     m_index_refs.set_parent(&m_top, top_position_for_search_indexes);
@@ -1251,7 +1251,7 @@ inline Table::Table(Replication* const* repl, Allocator& alloc)
     , m_opposite_table(m_alloc)
     , m_opposite_column(m_alloc)
     , m_repl(repl)
-    , m_own_ref(TableRef::unsafe_create(this))
+    , m_own_ref(this, alloc.get_instance_version())
 {
     m_spec.set_parent(&m_top, top_position_for_spec);
     m_index_refs.set_parent(&m_top, top_position_for_search_indexes);
@@ -1264,7 +1264,7 @@ inline void Table::revive(Replication* const* repl, Allocator& alloc, bool writa
     m_alloc.switch_underlying_allocator(alloc);
     m_alloc.update_from_underlying_allocator(writable);
     m_repl = repl;
-    m_own_ref = TableRef::unsafe_create(this);
+    m_own_ref = TableRef(this, m_alloc.get_instance_version());
 
     // since we're rebinding to a new table, we'll bump version counters
     // FIXME
@@ -1284,14 +1284,14 @@ inline Allocator& Table::get_alloc() const
 template <class T>
 inline Columns<T> Table::column(ColKey col_key) const
 {
-    LinkChain lc(this);
+    LinkChain lc(m_own_ref);
     return lc.column<T>(col_key);
 }
 
 template <class T>
 inline Columns<T> Table::column(const Table& origin, ColKey origin_col_key) const
 {
-    LinkChain lc(this);
+    LinkChain lc(m_own_ref);
     return lc.column<T>(origin, origin_col_key);
 }
 
@@ -1304,20 +1304,20 @@ inline BacklinkCount<T> Table::get_backlink_count() const
 template <class T>
 SubQuery<T> Table::column(ColKey col_key, Query subquery) const
 {
-    LinkChain lc(this);
+    LinkChain lc(m_own_ref);
     return lc.column<T>(col_key, subquery);
 }
 
 template <class T>
 SubQuery<T> Table::column(const Table& origin, ColKey origin_col_key, Query subquery) const
 {
-    LinkChain lc(this);
+    LinkChain lc(m_own_ref);
     return lc.column<T>(origin, origin_col_key, subquery);
 }
 
 inline LinkChain Table::link(ColKey link_column) const
 {
-    LinkChain lc(this);
+    LinkChain lc(m_own_ref);
     lc.add(link_column);
 
     return lc;

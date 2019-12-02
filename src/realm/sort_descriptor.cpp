@@ -464,7 +464,7 @@ void IncludeDescriptor::append(const IncludeDescriptor& other)
 }
 
 void IncludeDescriptor::report_included_backlinks(
-    const Table* origin, ObjKey obj,
+    ConstTableRef origin, ObjKey obj,
     util::FunctionRef<void(const Table*, const std::unordered_set<ObjKey>&)> reporter) const
 {
     REALM_ASSERT_DEBUG(origin);
@@ -473,7 +473,7 @@ void IncludeDescriptor::report_included_backlinks(
     Group* group(tf::get_parent_group(*origin));
 
     for (size_t i = 0; i < m_column_keys.size(); ++i) {
-        const Table* table = origin;
+        const Table* table = origin.unchecked_ptr();
         std::unordered_set<ObjKey> objkeys_to_explore;
         objkeys_to_explore.insert(obj);
 
