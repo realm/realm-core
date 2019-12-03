@@ -54,6 +54,19 @@ TEST(ObjectID_FromString)
 
     // std::strtoull accepts the "0x" prefix. We don't.
     CHECK_THROW(ObjectID::from_string("{0x0-0x0}"), std::invalid_argument);
+    {
+        std::istringstream istr("{1-2}");
+        ObjectID oid;
+        istr >> oid;
+        CHECK_EQUAL(oid, ObjectID(1, 2));
+    }
+    {
+        std::istringstream istr("{1-2");
+        ObjectID oid;
+        istr >> oid;
+        CHECK(istr.rdstate() & std::istream::failbit);
+        CHECK_EQUAL(oid, ObjectID());
+    }
 }
 
 TEST(ObjectID_Compare)
