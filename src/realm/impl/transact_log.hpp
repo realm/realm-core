@@ -1158,7 +1158,7 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
     Instruction instr = Instruction(instr_ch);
     switch (instr) {
         case instr_Set: {
-            ColKey col_key = ColKey(read_int<size_t>()); // Throws
+            ColKey col_key = ColKey(read_int<int64_t>()); // Throws
             ObjKey key(read_int<int64_t>());             // Throws
             if (!handler.modify_object(col_key, key))    // Throws
                 parser_error();
@@ -1232,32 +1232,32 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
             return;
         }
         case instr_SelectList: {
-            ColKey col_key = ColKey(read_int<size_t>());                             // Throws
+            ColKey col_key = ColKey(read_int<int64_t>());                            // Throws
             ObjKey key = ObjKey(read_int<int64_t>());                                // Throws
             if (!handler.select_list(col_key, key))                                  // Throws
                 parser_error();
             return;
         }
         case instr_SetLinkType: {
-            ColKey col_key = ColKey(read_int<size_t>()); // Throws
-            if (!handler.set_link_type(col_key))         // Throws
+            ColKey col_key = ColKey(read_int<int64_t>()); // Throws
+            if (!handler.set_link_type(col_key))          // Throws
                 parser_error();
             return;
         }
         case instr_InsertColumn: {
-            ColKey col_key = ColKey(read_int<size_t>()); // Throws
+            ColKey col_key = ColKey(read_int<int64_t>()); // Throws
             if (!handler.insert_column(col_key))         // Throws
                 parser_error();
             return;
         }
         case instr_EraseColumn: {
-            ColKey col_key = ColKey(read_int<size_t>()); // Throws
+            ColKey col_key = ColKey(read_int<int64_t>()); // Throws
             if (!handler.erase_column(col_key))          // Throws
                 parser_error();
             return;
         }
         case instr_RenameColumn: {
-            ColKey col_key = ColKey(read_int<size_t>());    // Throws
+            ColKey col_key = ColKey(read_int<int64_t>());    // Throws
             if (!handler.rename_column(col_key))            // Throws
                 parser_error();
             return;
