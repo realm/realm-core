@@ -2113,7 +2113,7 @@ ConstTableView Table::find_all_null(ColKey col_key) const
 
 TableView Table::get_distinct_view(ColKey col_key)
 {
-    TableView tv(TableView::DistinctView, *this, col_key);
+    TableView tv(TableView::DistinctView, m_own_ref, col_key);
     tv.do_sync();
     return tv;
 }
@@ -2156,7 +2156,7 @@ const Table* Table::get_link_chain_target(const std::vector<ColKey>& link_chain)
         REALM_ASSERT(table->valid_column(link_chain[t]));
         ColumnType type = table->get_real_column_type(link_chain[t]);
         if (type == col_type_LinkList || type == col_type_Link || type == col_type_BackLink) {
-            table = table->get_opposite_table(link_chain[t]);
+            table = table->get_opposite_table(link_chain[t]).unchecked_ptr();
         }
         else {
             // Only last column in link chain is allowed to be non-link
@@ -3001,7 +3001,7 @@ Table::BacklinkOrigin Table::find_backlink_origin(ColKey backlink_col) const noe
         TableKey linked_table_key = get_opposite_table_key(backlink_col);
         ColKey linked_column_key = get_opposite_column(backlink_col);
         if (linked_table_key == m_key) {
-            return {{get_table_ref(), linked_column_key}};
+            return {{m_own_ref, linked_column_key}};
         }
         else {
             Group* current_group = get_parent_group();

@@ -37,8 +37,8 @@ Query::Query()
     create();
 }
 
-Query::Query(const Table& table, const LnkLst& list)
-    : m_table((const_cast<Table&>(table)).get_table_ref())
+Query::Query(ConstTableRef table, const LnkLst& list)
+    : m_table(table.cast_away_const())
     , m_source_link_list(list.clone())
 {
     m_view = m_source_link_list.get();
@@ -46,12 +46,12 @@ Query::Query(const Table& table, const LnkLst& list)
     if (m_view)
         m_view->check_cookie();
 #endif
-    REALM_ASSERT_DEBUG(&list.get_target_table() == m_table);
+    REALM_ASSERT_DEBUG(list.get_target_table() == m_table);
     create();
 }
 
-Query::Query(const Table& table, LnkLstPtr&& ll)
-    : m_table((const_cast<Table&>(table)).get_table_ref())
+Query::Query(ConstTableRef table, LnkLstPtr&& ll)
+    : m_table(table.cast_away_const())
     , m_source_link_list(std::move(ll))
 {
     m_view = m_source_link_list.get();
@@ -59,12 +59,12 @@ Query::Query(const Table& table, LnkLstPtr&& ll)
     if (m_view)
         m_view->check_cookie();
 #endif
-    REALM_ASSERT_DEBUG(&ll->get_target_table() == m_table);
+    REALM_ASSERT_DEBUG(ll->get_target_table() == m_table);
     create();
 }
 
-Query::Query(const Table& table, ConstTableView* tv)
-    : m_table((const_cast<Table&>(table)).get_table_ref())
+Query::Query(ConstTableRef table, ConstTableView* tv)
+    : m_table(table.cast_away_const())
     , m_view(tv)
     , m_source_table_view(tv)
 {
@@ -75,8 +75,8 @@ Query::Query(const Table& table, ConstTableView* tv)
     create();
 }
 
-Query::Query(const Table& table, std::unique_ptr<ConstTableView> tv)
-    : m_table((const_cast<Table&>(table)).get_table_ref())
+Query::Query(ConstTableRef table, std::unique_ptr<ConstTableView> tv)
+    : m_table(table.cast_away_const())
     , m_view(tv.get())
     , m_source_table_view(tv.get())
     , m_owned_source_table_view(std::move(tv))
@@ -177,8 +177,8 @@ Query::Query(const Query* source, Transaction* tr, PayloadPolicy policy)
 Query::Query(std::unique_ptr<Expression> expr)
     : Query()
 {
-    if (auto table = const_cast<Table*>(expr->get_base_table()))
-        set_table(table->get_table_ref());
+    if (auto table = expr->get_base_table())
+        set_table(table.cast_away_const());
 
     add_expression_node(std::move(expr));
 }
@@ -190,7 +190,7 @@ void Query::set_table(TableRef tr)
     if (m_table) {
         ParentNode* root = root_node();
         if (root)
-            root->set_table(*m_table);
+            root->set_table(m_table);
     }
 }
 
@@ -888,7 +888,7 @@ R Query::aggregate(ColKey column_key, size_t* resultcount, ObjKey* return_ndx) c
 
     if (!has_conditions() && !m_view) {
         // use table aggregate
-        return m_table->aggregate<action, T, R>(column_key, T{}, resultcount, return_ndx);
+        return m_table.unchecked_ptr()->aggregate<action, T, R>(column_key, T{}, resultcount, return_ndx);
     }
     else {
 
@@ -897,7 +897,7 @@ R Query::aggregate(ColKey column_key, size_t* resultcount, ObjKey* return_ndx) c
         QueryState<ResultType> st(action);
 
         if (!m_view) {
-            LeafType leaf(m_table->get_alloc());
+            LeafType leaf(m_table.unchecked_ptr()->get_alloc());
             auto node = root_node();
             bool nullable = m_table->is_nullable(column_key);
 
@@ -915,7 +915,7 @@ R Query::aggregate(ColKey column_key, size_t* resultcount, ObjKey* return_ndx) c
                 return false;
             };
 
-            m_table->traverse_clusters(f);
+            m_table.unchecked_ptr()->traverse_clusters(f);
         }
         else {
             for (size_t t = 0; t < m_view->size(); t++) {
@@ -1212,7 +1212,7 @@ ObjKey Query::find()
             return null_key;
         }
         else
-            return m_table->size() == 0 ? null_key : m_table->begin()->get_key();
+            return m_table->size() == 0 ? null_key : m_table.unchecked_ptr()->begin()->get_key();
     }
 
     if (m_view) {
@@ -1333,7 +1333,7 @@ TableView Query::find_all(size_t start, size_t end, size_t limit)
     std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_FindAll);
 #endif
 
-    TableView ret(*m_table, *this, start, end, limit);
+    TableView ret(m_table, *this, start, end, limit);
     ret.do_sync();
     return ret;
 }
@@ -1429,7 +1429,7 @@ TableView Query::find_all(const DescriptorOrdering& descriptor)
         return find_all(default_start, default_end, min_limit);
     }
 
-    TableView ret(*m_table, *this, default_start, default_end, default_limit);
+    TableView ret(m_table, *this, default_start, default_end, default_limit);
     ret.apply_descriptor_ordering(descriptor);
     return ret;
 }
@@ -1455,7 +1455,7 @@ size_t Query::count(const DescriptorOrdering& descriptor)
         return do_count(limit);
     }
 
-    TableView ret(*m_table, *this, start, end, limit);
+    TableView ret(m_table, *this, start, end, limit);
     ret.apply_descriptor_ordering(descriptor);
     return ret.size();
 }
@@ -1645,7 +1645,7 @@ void Query::init() const
 size_t Query::find_internal(size_t start, size_t end) const
 {
     if (end == size_t(-1))
-        end = m_table->size();
+        end = m_table.unchecked_ptr()->size();
     if (start == end)
         return not_found;
 
@@ -1655,7 +1655,7 @@ size_t Query::find_internal(size_t start, size_t end) const
     else
         r = start; // user built an empty query; return any first
 
-    if (r == m_table->size())
+    if (r == m_table.unchecked_ptr()->size())
         return not_found;
     else
         return r;
@@ -1667,7 +1667,7 @@ void Query::add_node(std::unique_ptr<ParentNode> node)
     using State = QueryGroup::State;
 
     if (m_table)
-        node->set_table(*m_table);
+        node->set_table(m_table);
 
     auto& current_group = m_groups.back();
     switch (current_group.m_state) {
@@ -1727,7 +1727,7 @@ Query& Query::and_query(Query&& q)
 
 Query Query::operator||(const Query& q)
 {
-    Query q2(*m_table);
+    Query q2(m_table);
     q2.and_query(*this);
     q2.Or();
     q2.and_query(q);
@@ -1744,7 +1744,7 @@ Query Query::operator&&(const Query& q)
     if (!q.root_node())
         return *this;
 
-    Query q2(*m_table);
+    Query q2(m_table);
     q2.and_query(*this);
     q2.and_query(q);
 
@@ -1756,7 +1756,7 @@ Query Query::operator!()
 {
     if (!root_node())
         throw util::runtime_error("negation of empty query is not supported");
-    Query q(*this->m_table);
+    Query q(m_table);
     q.Not();
     q.and_query(*this);
     return q;
@@ -1768,14 +1768,14 @@ void Query::get_outside_versions(TableVersions& versions) const
         if (m_table_keys.empty()) {
             // Store primary table info
             REALM_ASSERT_DEBUG(m_table);
-            m_table_keys.push_back(m_table->get_key());
+            m_table_keys.push_back(m_table.unchecked_ptr()->get_key());
 
             if (ParentNode* root = root_node())
                 root->get_link_dependencies(m_table_keys);
         }
-        versions.emplace_back(m_table->get_key(), m_table->get_content_version());
+        versions.emplace_back(m_table.unchecked_ptr()->get_key(), m_table.unchecked_ptr()->get_content_version());
 
-        if (Group* g = m_table->get_parent_group()) {
+        if (Group* g = m_table.unchecked_ptr()->get_parent_group()) {
             // update table versions for linked tables - first entry is primary table - skip it
             auto end = m_table_keys.end();
             auto it = m_table_keys.begin() + 1;

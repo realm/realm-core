@@ -120,7 +120,7 @@ public:
         }
         return false;
     }
-    const Table* get_table() const
+    ConstTableRef get_table() const
     {
         return m_const_obj->get_table();
     }
@@ -818,11 +818,16 @@ public:
 
     LnkLstPtr clone() const
     {
-        return std::make_unique<LnkLst>(m_obj, m_col_key);
+        if (m_obj.is_valid()) {
+            return std::make_unique<LnkLst>(m_obj, m_col_key);
+        }
+        else {
+            return std::make_unique<LnkLst>();
+        }
     }
-    Table& get_target_table() const
+    TableRef get_target_table() const
     {
-        return const_cast<Table&>(*m_table);
+        return m_table.cast_away_const();
     }
     bool is_in_sync() const override
     {

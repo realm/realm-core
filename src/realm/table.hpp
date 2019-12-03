@@ -455,6 +455,7 @@ public:
     // Report the current storage version. This is a 64-bit value which is bumped
     // whenever the location in memory of any part of the table changes.
     uint_fast64_t get_storage_version(uint64_t instance_version) const;
+    uint_fast64_t get_storage_version() const;
     void bump_storage_version() const noexcept;
     void bump_content_version() const noexcept;
 
@@ -577,19 +578,19 @@ public:
     // need to be sorted, and, resulting view retains its order.
     Query where(ConstTableView* tv = nullptr)
     {
-        return Query(*this, tv);
+        return Query(m_own_ref, tv);
     }
 
     // FIXME: We need a ConstQuery class or runtime check against modifications in read transaction.
     Query where(ConstTableView* tv = nullptr) const
     {
-        return Query(*this, tv);
+        return Query(m_own_ref, tv);
     }
 
     // Perform queries on a LinkView. The returned Query holds a reference to list.
     Query where(const LnkLst& list) const
     {
-        return Query(*this, list);
+        return Query(m_own_ref, list);
     }
 
     //@{
@@ -622,16 +623,6 @@ public:
     // Conversion
     void to_json(std::ostream& out, size_t link_depth = 0,
                  std::map<std::string, std::string>* renames = nullptr) const;
-
-    // Get a reference to this table
-    TableRef get_table_ref()
-    {
-        return TableRef(this);
-    }
-    ConstTableRef get_table_ref() const
-    {
-        return ConstTableRef(this);
-    }
 
     /// \brief Compare two tables for equality.
     ///
@@ -705,6 +696,7 @@ private:
     Replication* const* m_repl;
     static Replication* g_dummy_replication;
     bool m_is_frozen = false;
+    TableRef m_own_ref;
 
     void batch_erase_rows(const KeyColumn& keys);
     size_t do_set_link(ColKey col_key, size_t row_ndx, size_t target_row_ndx);
@@ -1056,14 +1048,14 @@ private:
 // It has member functions corresponding to the ones defined on Table.
 class LinkChain {
 public:
-    LinkChain(const Table* t)
-        : m_current_table(t)
+    LinkChain(ConstTableRef t)
+        : m_current_table(t.unchecked_ptr())
         , m_base_table(t)
     {
     }
     const Table* get_base_table()
     {
-        return m_base_table;
+        return m_base_table.unchecked_ptr();
     }
 
     LinkChain& link(ColKey link_column)
@@ -1133,7 +1125,7 @@ private:
 
     std::vector<ColKey> m_link_cols;
     const Table* m_current_table;
-    const Table* m_base_table;
+    ConstTableRef m_base_table;
 
     void add(ColKey ck)
     {
@@ -1141,7 +1133,7 @@ private:
         REALM_ASSERT(m_current_table->valid_column(ck));
         ColumnType type = ck.get_type();
         if (type == col_type_LinkList || type == col_type_Link || type == col_type_BackLink) {
-            m_current_table = m_current_table->get_opposite_table(ck);
+            m_current_table = m_current_table->get_opposite_table(ck).unchecked_ptr();
         }
         else {
             // Only last column in link chain is allowed to be non-link
@@ -1172,6 +1164,11 @@ inline uint_fast64_t Table::get_instance_version() const noexcept
 inline uint_fast64_t Table::get_storage_version(uint64_t instance_version) const
 {
     return m_alloc.get_storage_version(instance_version);
+}
+
+inline uint_fast64_t Table::get_storage_version() const
+{
+    return m_alloc.get_storage_version();
 }
 
 
@@ -1232,6 +1229,7 @@ inline Table::Table(Allocator& alloc)
     , m_opposite_table(m_alloc)
     , m_opposite_column(m_alloc)
     , m_repl(&g_dummy_replication)
+    , m_own_ref(this, alloc.get_instance_version())
 {
     m_spec.set_parent(&m_top, top_position_for_spec);
     m_index_refs.set_parent(&m_top, top_position_for_search_indexes);
@@ -1253,6 +1251,7 @@ inline Table::Table(Replication* const* repl, Allocator& alloc)
     , m_opposite_table(m_alloc)
     , m_opposite_column(m_alloc)
     , m_repl(repl)
+    , m_own_ref(this, alloc.get_instance_version())
 {
     m_spec.set_parent(&m_top, top_position_for_spec);
     m_index_refs.set_parent(&m_top, top_position_for_search_indexes);
@@ -1265,6 +1264,7 @@ inline void Table::revive(Replication* const* repl, Allocator& alloc, bool writa
     m_alloc.switch_underlying_allocator(alloc);
     m_alloc.update_from_underlying_allocator(writable);
     m_repl = repl;
+    m_own_ref = TableRef(this, m_alloc.get_instance_version());
 
     // since we're rebinding to a new table, we'll bump version counters
     // FIXME
@@ -1284,14 +1284,14 @@ inline Allocator& Table::get_alloc() const
 template <class T>
 inline Columns<T> Table::column(ColKey col_key) const
 {
-    LinkChain lc(this);
+    LinkChain lc(m_own_ref);
     return lc.column<T>(col_key);
 }
 
 template <class T>
 inline Columns<T> Table::column(const Table& origin, ColKey origin_col_key) const
 {
-    LinkChain lc(this);
+    LinkChain lc(m_own_ref);
     return lc.column<T>(origin, origin_col_key);
 }
 
@@ -1304,20 +1304,20 @@ inline BacklinkCount<T> Table::get_backlink_count() const
 template <class T>
 SubQuery<T> Table::column(ColKey col_key, Query subquery) const
 {
-    LinkChain lc(this);
+    LinkChain lc(m_own_ref);
     return lc.column<T>(col_key, subquery);
 }
 
 template <class T>
 SubQuery<T> Table::column(const Table& origin, ColKey origin_col_key, Query subquery) const
 {
-    LinkChain lc(this);
+    LinkChain lc(m_own_ref);
     return lc.column<T>(origin, origin_col_key, subquery);
 }
 
 inline LinkChain Table::link(ColKey link_column) const
 {
-    LinkChain lc(this);
+    LinkChain lc(m_own_ref);
     lc.add(link_column);
 
     return lc;

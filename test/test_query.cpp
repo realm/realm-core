@@ -4529,7 +4529,7 @@ TEST(Query_IncludeDescriptorSelfLinks)
         IncludeDescriptor includes = tv.get_include_descriptors();
         std::vector<size_t> expected_values;
         auto reporter = [&](const Table* table, std::unordered_set<ObjKey> keys) {
-            CHECK(table == t1);
+            CHECK(table == t1.unchecked_ptr());
             CHECK_EQUAL(expected_values.size(), keys.size());
             for (auto key : keys) {
                 int64_t row_value = table->get_object(key).get<Int>(t1_int_col);
@@ -4555,7 +4555,7 @@ TEST(Query_IncludeDescriptorSelfLinks)
         IncludeDescriptor includes = tv.get_include_descriptors();
         std::vector<size_t> expected_values;
         auto reporter = [&](const Table* table, std::unordered_set<ObjKey> keys) {
-            CHECK(table == t1);
+            CHECK(table == t1.unchecked_ptr());
             CHECK_EQUAL(expected_values.size(), keys.size());
             for (auto key : keys) {
                 int64_t row_value = table->get_object(key).get<Int>(t1_int_col);
@@ -4577,7 +4577,7 @@ TEST(Query_IncludeDescriptorSelfLinks)
         IncludeDescriptor includes = tv.get_include_descriptors();
         std::vector<size_t> expected_values;
         auto reporter = [&](const Table* table, std::unordered_set<ObjKey> keys) {
-            CHECK(table == t1);
+            CHECK(table == t1.unchecked_ptr());
             CHECK_EQUAL(expected_values.size(), keys.size());
             for (auto key : keys) {
                 int64_t row_value = table->get_object(key).get<Int>(t1_int_col);
@@ -4646,7 +4646,7 @@ TEST(Query_IncludeDescriptorOtherLinks)
         IncludeDescriptor includes = tv.get_include_descriptors();
         std::vector<size_t> expected_t2_values;
         auto reporter = [&](const Table* table, std::unordered_set<ObjKey> keys) {
-            CHECK(table == t2);
+            CHECK(table == t2.unchecked_ptr());
             CHECK_EQUAL(expected_t2_values.size(), keys.size());
             for (auto key : keys) {
                 int64_t row_value = table->get_object(key).get<Int>(t2_int_col);
@@ -4729,7 +4729,7 @@ TEST(Query_IncludeDescriptorOtherLists)
         IncludeDescriptor includes = tv.get_include_descriptors();
         std::vector<size_t> expected_t2_values;
         auto reporter = [&](const Table* table, std::unordered_set<ObjKey> keys) {
-            CHECK(table == t2);
+            CHECK(table == t2.unchecked_ptr());
             CHECK_EQUAL(expected_t2_values.size(), keys.size());
             for (auto key : keys) {
                 int64_t row_value = table->get_object(key).get<Int>(t2_int_col);
@@ -4846,7 +4846,7 @@ TEST(Query_IncludeDescriptorLinkAndListTranslation)
 
         std::vector<size_t> expected_t4_values;
         auto reporter = [&](const Table* table, std::unordered_set<ObjKey> keys) {
-            CHECK(table == t4);
+            CHECK(table == t4.unchecked_ptr());
             CHECK_EQUAL(expected_t4_values.size(), keys.size());
             for (auto key : keys) {
                 int64_t row_value = table->get_object(key).get<Int>(t4_int_col);
@@ -8993,14 +8993,14 @@ TEST(Query_SubQueries)
 TEST(Query_MoveDoesntDoubleDelete)
 {
     Table table;
-
+    ConstTableRef ref = ConstTableRef::unsafe_create(&table);
     {
-        Query q1(table, std::unique_ptr<ConstTableView>(new TableView()));
+        Query q1(ref, std::unique_ptr<ConstTableView>(new TableView()));
         Query q2 = std::move(q1);
     }
 
     {
-        Query q1(table, std::unique_ptr<ConstTableView>(new TableView()));
+        Query q1(ref, std::unique_ptr<ConstTableView>(new TableView()));
         Query q2;
         q2 = std::move(q1);
     }
@@ -9198,9 +9198,9 @@ TEST(Query_Timestamp_Null)
 TEST(Query_CopyRestrictingTableViewWhenOwned)
 {
     Table table;
-
+    ConstTableRef ref = ConstTableRef::unsafe_create(&table);
     {
-        Query q1(table, std::unique_ptr<ConstTableView>(new TableView()));
+        Query q1(ref, std::unique_ptr<ConstTableView>(new TableView()));
         Query q2(q1);
 
         // Reset the source query, destroying the original TableView.
@@ -9211,7 +9211,7 @@ TEST(Query_CopyRestrictingTableViewWhenOwned)
     }
 
     {
-        Query q1(table, std::unique_ptr<ConstTableView>(new TableView()));
+        Query q1(ref, std::unique_ptr<ConstTableView>(new TableView()));
         Query q2;
         q2 = q1;
 

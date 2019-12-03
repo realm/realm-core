@@ -922,7 +922,7 @@ TEST(LinkList_FindNotNullLink)
     }
 
     // This is how the Cocoa bindings do it normally:
-    Query q0 = ll.get_target_table().where(ll);
+    Query q0 = ll.get_target_table()->where(ll);
     q0.and_query(q0.get_table()->column<Link>(col_link).is_null());
     CHECK_EQUAL(0, q0.find_all().size());
 
@@ -933,7 +933,7 @@ TEST(LinkList_FindNotNullLink)
     CHECK_EQUAL(6, q2.find_all().size());
 
     // This is how the Cocoa bindings to the "Not":
-    Query q1 = ll.get_target_table().where(ll);
+    Query q1 = ll.get_target_table()->where(ll);
     q1.Not();
     q1.and_query(q1.get_table()->column<Link>(col_link).is_null());
     CHECK_EQUAL(6, q1.find_all().size());

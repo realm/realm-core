@@ -21,7 +21,7 @@
 
 namespace realm {
 
-void LinkMap::set_base_table(const Table* table)
+void LinkMap::set_base_table(ConstTableRef table)
 {
     if (table == get_base_table())
         return;
@@ -42,7 +42,7 @@ void LinkMap::set_base_table(const Table* table)
 
         m_link_types.push_back(type);
         REALM_ASSERT(table->valid_column(link_column_key));
-        table = table->get_opposite_table(link_column_key);
+        table = table.unchecked_ptr()->get_opposite_table(link_column_key);
         m_tables.push_back(table);
     }
 }
@@ -62,7 +62,7 @@ std::string LinkMap::description(util::serializer::SerialisationState& state) co
     std::string s;
     for (size_t i = 0; i < m_link_column_keys.size(); ++i) {
         if (i < m_tables.size() && m_tables[i]) {
-            s += state.get_column_name(m_tables[i]->get_table_ref(), m_link_column_keys[i]);
+            s += state.get_column_name(m_tables[i], m_link_column_keys[i]);
             if (i != m_link_column_keys.size() - 1) {
                 s += util::serializer::value_separator;
             }
@@ -183,7 +183,7 @@ std::vector<ObjKey> LinkMap::get_origin_ndxs(ObjKey key, size_t column) const
         auto forward_type = link_table->get_column_type(link_col_ndx);
 
         for (auto k : keys) {
-            ConstObj o = link_table->get_object(k);
+            ConstObj o = link_table.unchecked_ptr()->get_object(k);
             if (forward_type == type_Link) {
                 ret.push_back(o.get<ObjKey>(link_col_ndx));
             }

@@ -409,7 +409,7 @@ void ConstTableView::get_dependencies(TableVersions& ret) const
     if (m_linklist_source) {
         // m_linkview_source is set when this TableView was created by LinkView::get_as_sorted_view().
         if (m_linklist_source->is_attached()) {
-            Table& table = m_linklist_source->get_target_table();
+            Table& table = *m_linklist_source->get_target_table();
             ret.emplace_back(table.get_key(), table.get_content_version());
         }
     }
@@ -501,7 +501,7 @@ void ConstTableView::distinct(ColKey column)
 void ConstTableView::distinct(DistinctDescriptor columns)
 {
     m_descriptor_ordering.append_distinct(std::move(columns));
-    m_descriptor_ordering.collect_dependencies(m_table);
+    m_descriptor_ordering.collect_dependencies(m_table.unchecked_ptr());
 
     do_sync();
 }
@@ -515,7 +515,7 @@ void ConstTableView::limit(LimitDescriptor lim)
 void ConstTableView::apply_descriptor_ordering(const DescriptorOrdering& new_ordering)
 {
     m_descriptor_ordering = new_ordering;
-    m_descriptor_ordering.collect_dependencies(m_table);
+    m_descriptor_ordering.collect_dependencies(m_table.unchecked_ptr());
 
     do_sync();
 }
@@ -546,7 +546,7 @@ void ConstTableView::sort(ColKey column, bool ascending)
 void ConstTableView::sort(SortDescriptor order)
 {
     m_descriptor_ordering.append_sort(std::move(order));
-    m_descriptor_ordering.collect_dependencies(m_table);
+    m_descriptor_ordering.collect_dependencies(m_table.unchecked_ptr());
 
     do_sort(m_descriptor_ordering);
 }

@@ -182,12 +182,12 @@ public:
             m_child->get_link_dependencies(tables);
     }
 
-    void set_table(const Table& table)
+    void set_table(ConstTableRef table)
     {
-        if (&table == m_table)
+        if (table == m_table)
             return;
 
-        m_table = ConstTableRef(&table);
+        m_table = table;
         if (m_condition_column_key != ColKey()) {
             m_condition_column_name = m_table->get_column_name(m_condition_column_key);
         }
@@ -272,7 +272,7 @@ public:
     {
         ColKey column_key;
         if (column_name.size() > 0) {
-            column_key = m_table->get_column_key(column_name);
+            column_key = m_table.unchecked_ptr()->get_column_key(column_name);
             if (column_key == ColKey()) {
                 throw LogicError(LogicError::column_does_not_exist);
             }
@@ -322,7 +322,7 @@ protected:
 
     ColumnType get_real_column_type(ColKey key)
     {
-        return m_table->get_real_column_type(key);
+        return m_table.unchecked_ptr()->get_real_column_type(key);
     }
 
 private:
@@ -514,7 +514,7 @@ protected:
         // the object has the same address. (As in this case)
         m_array_ptr = nullptr;
         // Create new Leaf
-        m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) LeafType(m_table->get_alloc()));
+        m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) LeafType(m_table.unchecked_ptr()->get_alloc()));
         m_cluster->init_leaf(this->m_condition_column_key, m_array_ptr.get());
         m_leaf_ptr = m_array_ptr.get();
     }
@@ -877,7 +877,7 @@ public:
         // the object has the same address. (As in this case)
         m_array_ptr = nullptr;
         // Create new Leaf
-        m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) LeafType(m_table->get_alloc()));
+        m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) LeafType(m_table.unchecked_ptr()->get_alloc()));
         m_cluster->init_leaf(this->m_condition_column_key, m_array_ptr.get());
         m_leaf_ptr = m_array_ptr.get();
     }
@@ -958,7 +958,7 @@ public:
         // called after the constructor is called and that is unfortunate if
         // the object has the same address. (As in this case)
         m_array_ptr = nullptr;
-        m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) LeafType(m_table->get_alloc()));
+        m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) LeafType(m_table.unchecked_ptr()->get_alloc()));
         m_cluster->init_leaf(this->m_condition_column_key, m_array_ptr.get());
         m_leaf_ptr = m_array_ptr.get();
     }
@@ -1022,7 +1022,7 @@ public:
         // called after the constructor is called and that is unfortunate if
         // the object has the same address. (As in this case)
         m_array_ptr = nullptr;
-        m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) ArrayList(m_table->get_alloc()));
+        m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) ArrayList(m_table.unchecked_ptr()->get_alloc()));
         m_cluster->init_leaf(this->m_condition_column_key, m_array_ptr.get());
         m_leaf_ptr = m_array_ptr.get();
     }
@@ -1038,7 +1038,7 @@ public:
         for (size_t s = start; s < end; ++s) {
             ref_type ref = m_leaf_ptr->get(s);
             if (ref) {
-                ListType list(m_table->get_alloc());
+                ListType list(m_table.unchecked_ptr()->get_alloc());
                 list.init_from_ref(ref);
                 int64_t sz = list.size();
                 if (TConditionFunction()(sz, m_value))
@@ -1093,7 +1093,7 @@ public:
     void cluster_changed() override
     {
         m_array_ptr = nullptr;
-        m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) ArrayBinary(m_table->get_alloc()));
+        m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) ArrayBinary(m_table.unchecked_ptr()->get_alloc()));
         m_cluster->init_leaf(this->m_condition_column_key, m_array_ptr.get());
         m_leaf_ptr = m_array_ptr.get();
     }
@@ -1163,7 +1163,7 @@ public:
     void cluster_changed() override
     {
         m_array_ptr = nullptr;
-        m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) ArrayBoolNull(m_table->get_alloc()));
+        m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) ArrayBoolNull(m_table.unchecked_ptr()->get_alloc()));
         m_cluster->init_leaf(this->m_condition_column_key, m_array_ptr.get());
         m_leaf_ptr = m_array_ptr.get();
     }
@@ -1226,7 +1226,7 @@ public:
     void cluster_changed() override
     {
         m_array_ptr = nullptr;
-        m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) ArrayTimestamp(m_table->get_alloc()));
+        m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) ArrayTimestamp(m_table.unchecked_ptr()->get_alloc()));
         m_cluster->init_leaf(this->m_condition_column_key, m_array_ptr.get());
         m_leaf_ptr = m_array_ptr.get();
     }
@@ -1289,9 +1289,9 @@ public:
 
     void table_changed() override
     {
-        m_is_string_enum = m_table->is_enumerated(m_condition_column_key);
-        m_has_search_index = m_table->has_search_index(m_condition_column_key) ||
-                             m_table->get_primary_key_column() == m_condition_column_key;
+        m_is_string_enum = m_table.unchecked_ptr()->is_enumerated(m_condition_column_key);
+        m_has_search_index = m_table.unchecked_ptr()->has_search_index(m_condition_column_key) ||
+                             m_table.unchecked_ptr()->get_primary_key_column() == m_condition_column_key;
     }
 
     void cluster_changed() override
@@ -1302,7 +1302,7 @@ public:
         // the object has the same address. (As in this case)
         m_array_ptr = nullptr;
         // Create new Leaf
-        m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) ArrayString(m_table->get_alloc()));
+        m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) ArrayString(m_table.unchecked_ptr()->get_alloc()));
         m_cluster->init_leaf(this->m_condition_column_key, m_array_ptr.get());
         m_leaf_ptr = m_array_ptr.get();
     }
@@ -1762,7 +1762,7 @@ public:
     void table_changed() override
     {
         for (auto& condition : m_conditions) {
-            condition->set_table(*m_table);
+            condition->set_table(m_table);
         }
     }
 
@@ -1949,7 +1949,7 @@ public:
 
     void table_changed() override
     {
-        m_condition->set_table(*m_table);
+        m_condition->set_table(m_table);
     }
 
     void cluster_changed() override
@@ -2062,12 +2062,12 @@ public:
     void cluster_changed() override
     {
         m_array_ptr1 = nullptr;
-        m_array_ptr1 = LeafPtr(new (&m_leaf_cache_storage1) LeafType(m_table->get_alloc()));
+        m_array_ptr1 = LeafPtr(new (&m_leaf_cache_storage1) LeafType(m_table.unchecked_ptr()->get_alloc()));
         this->m_cluster->init_leaf(this->m_condition_column_key1, m_array_ptr1.get());
         m_leaf_ptr1 = m_array_ptr1.get();
 
         m_array_ptr2 = nullptr;
-        m_array_ptr2 = LeafPtr(new (&m_leaf_cache_storage2) LeafType(m_table->get_alloc()));
+        m_array_ptr2 = LeafPtr(new (&m_leaf_cache_storage2) LeafType(m_table.unchecked_ptr()->get_alloc()));
         this->m_cluster->init_leaf(this->m_condition_column_key2, m_array_ptr2.get());
         m_leaf_ptr2 = m_array_ptr2.get();
     }
@@ -2205,7 +2205,7 @@ public:
 
     void table_changed() override
     {
-        m_column_type = m_table->get_column_type(m_condition_column_key);
+        m_column_type = m_table.unchecked_ptr()->get_column_type(m_condition_column_key);
         REALM_ASSERT(m_column_type == type_Link || m_column_type == type_LinkList);
     }
 
@@ -2213,10 +2213,10 @@ public:
     {
         m_array_ptr = nullptr;
         if (m_column_type == type_Link) {
-            m_array_ptr = LeafPtr(new (&m_storage.m_list) ArrayKey(m_table->get_alloc()));
+            m_array_ptr = LeafPtr(new (&m_storage.m_list) ArrayKey(m_table.unchecked_ptr()->get_alloc()));
         }
         else if (m_column_type == type_LinkList) {
-            m_array_ptr = LeafPtr(new (&m_storage.m_linklist) ArrayList(m_table->get_alloc()));
+            m_array_ptr = LeafPtr(new (&m_storage.m_linklist) ArrayList(m_table.unchecked_ptr()->get_alloc()));
         }
         m_cluster->init_leaf(this->m_condition_column_key, m_array_ptr.get());
         m_leaf_ptr = m_array_ptr.get();
@@ -2250,7 +2250,7 @@ public:
             }
         }
         else if (m_column_type == type_LinkList) {
-            ArrayKeyNonNullable arr(m_table->get_alloc());
+            ArrayKeyNonNullable arr(m_table.unchecked_ptr()->get_alloc());
             for (size_t i = start; i < end; i++) {
                 if (ref_type ref = static_cast<const ArrayList*>(m_leaf_ptr)->get(i)) {
                     arr.init_from_ref(ref);

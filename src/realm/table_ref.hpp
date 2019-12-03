@@ -35,18 +35,13 @@ public:
     }
     ConstTableRef(const TableRef& other);
     ConstTableRef(std::nullptr_t) {}
-
     const Table* operator->() const;
-    const Table& operator*() const
-    {
-        return *m_table;
-    }
-    explicit ConstTableRef(const Table* t_ptr);
+    const Table& operator*() const;
     ConstTableRef()
     {
     }
     operator bool() const;
-    operator const Table*() const
+    const Table* unchecked_ptr() const
     {
         return m_table;
     }
@@ -65,39 +60,48 @@ public:
     {
         return o << "TableRef(" << m_table << ", " << m_instance_version << ")";
     }
+    TableRef cast_away_const() const;
+    static ConstTableRef unsafe_create(const Table* t_ptr);
 
 protected:
-    Table* m_table = nullptr;
-    uint64_t m_instance_version = 0;
-
+    void check() const;
+    explicit ConstTableRef(const Table* t_ptr, uint64_t instance_version)
+        : m_table(const_cast<Table*>(t_ptr))
+        , m_instance_version(instance_version)
+    {
+    }
     friend class Group;
     friend class Table;
+    friend class ClusterTree;
+
+    Table* m_table = nullptr;
+    uint64_t m_instance_version = 0;
 };
 
 class TableRef : public ConstTableRef {
 public:
     Table* operator->() const;
-    Table& operator*() const
-    {
-        return *m_table;
-    }
-    operator Table*() const
+    Table& operator*() const;
+    Table* unchecked_ptr() const
     {
         return m_table;
-    }
-    explicit TableRef(Table* t_ptr)
-        : ConstTableRef(t_ptr)
-    {
     }
     TableRef(std::nullptr_t) {}
     TableRef()
         : ConstTableRef()
     {
     }
+    static TableRef unsafe_create(Table* t_ptr);
 
-protected:
+private:
+    explicit TableRef(Table* t_ptr, uint64_t instance_version)
+        : ConstTableRef(t_ptr, instance_version)
+    {
+    }
     friend class Group;
     friend class Table;
+    friend class ClusterTree;
+    friend class ConstTableRef;
 };
 
 
@@ -107,6 +111,10 @@ inline ConstTableRef::ConstTableRef(const TableRef& other)
 {
 }
 
+inline TableRef ConstTableRef::cast_away_const() const
+{
+    return TableRef(m_table, m_instance_version);
+}
 
 inline std::ostream& operator<<(std::ostream& o, const ConstTableRef& tr)
 {

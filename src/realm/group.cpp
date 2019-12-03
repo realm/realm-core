@@ -732,7 +732,7 @@ TableRef Group::add_table_with_primary_key(StringData name, DataType pk_type, St
 #endif // REALM_DEBUG
     }
 
-    return TableRef(table);
+    return TableRef(table, table ? table->m_alloc.get_instance_version() : 0);
 }
 
 Table* Group::do_add_table(StringData name, bool require_unique_name)
@@ -937,7 +937,7 @@ void Group::remove_table(size_t table_ndx, TableKey key)
     table->detach();
     // Destroy underlying node structure
     Array::destroy_deep(ref, m_alloc);
-    recycle_table_accessor(table);
+    recycle_table_accessor(table.unchecked_ptr());
 }
 
 

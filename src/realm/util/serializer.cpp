@@ -218,12 +218,12 @@ std::string SerialisationState::describe_columns(const LinkMap& link_map, ColKey
         }
         desc += link_map.description(*this);
     }
-    const Table* target = link_map.get_target_table();
+    ConstTableRef target = link_map.get_target_table();
     if (target && target_col_key) {
         if (!desc.empty()) {
             desc += util::serializer::value_separator;
         }
-        desc += get_column_name(target->get_table_ref(), target_col_key);
+        desc += get_column_name(target, target_col_key);
     }
     return desc;
 }
