@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 6.0.0-beta.0 Release notes
 
 ### Enhancements
 * Ability to stream into an ObjectId added.
@@ -9,12 +9,8 @@
   would be slightly smaller than the underlying free block. ([3490](https://github.com/realm/realm-core/issues/3490))
 
 ### Breaking changes
-* None.
-
------------
-
-### Internals
-* None.
+* Implicit conversion between Table* and TableRef is removed. It you want to get a raw Table* from a TableRef, you will
+  have to call TableRef::unchecked_ptr(). Several API functions now take a ConstTableRef instead of a 'const Table*'.
 
 ----------------------------------------------
 
