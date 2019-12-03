@@ -788,6 +788,25 @@ inline void CondVar::notify_all() noexcept
 #endif
 }
 
+// helpers which can ensure atomic access to memory which has not itself been declared atomic.
+// This can be used to e.g. ensure atomic access to members of a vector. Vectors does not
+// fully allow atomic members because operations on vector may relocate the underlying memory.
+// use with care!
+template <typename T>
+T load_atomic(T& t_ref, std::memory_order order)
+{
+    std::atomic<T>* t_ptr = reinterpret_cast<std::atomic<T>*>(&t_ref);
+    T t = atomic_load_explicit(t_ptr, order);
+    return t;
+}
+
+template <typename T>
+void store_atomic(T& t_ref, T value, std::memory_order order)
+{
+    std::atomic<T>* t_ptr = reinterpret_cast<std::atomic<T>*>(&t_ref);
+    atomic_store_explicit(t_ptr, value, order);
+}
+
 
 } // namespace util
 } // namespace realm
