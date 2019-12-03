@@ -22,6 +22,7 @@
 #include <realm/util/sha_crypto.hpp>
 #include <iomanip>
 #include <ostream>
+#include <istream>
 #include <sstream>
 #include <cctype>
 
@@ -34,6 +35,29 @@ std::ostream& operator<<(std::ostream& os, const ObjectID& object_id)
               << std::setfill(' ') << std::setw(0);
 }
 
+std::istream& operator>>(std::istream& in, ObjectID& object_id)
+{
+    try {
+        std::istream::sentry sentry{in};
+        if (REALM_LIKELY(sentry)) {
+            std::string string;
+            char ch;
+            in.get(ch);
+            while (REALM_LIKELY(in)) {
+                string.push_back(ch); // Throws
+                if (REALM_LIKELY(ch == '}'))
+                    break;
+                in.get(ch);
+            }
+            object_id = ObjectID::from_string(string);
+        }
+    }
+    catch (const util::invalid_argument&) {
+        object_id = ObjectID();
+        in.setstate(std::ios_base::failbit);
+    }
+    return in;
+}
 std::string ObjectID::to_string() const
 {
     std::ostringstream ss;

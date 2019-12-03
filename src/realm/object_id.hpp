@@ -111,6 +111,11 @@ struct ObjectID {
         return !(*this == other);
     }
 
+    explicit constexpr operator bool() const noexcept
+    {
+        return (*this != ObjectID{});
+    }
+
     // Generate a local key from the ObjectID. If the object is created
     // in this realm (sync_file_id == hi) then 0 is used for hi. In this
     // way we achieves that objects created before first contact with the
@@ -137,6 +142,7 @@ private:
 };
 
 std::ostream& operator<<(std::ostream&, const ObjectID&);
+std::istream& operator>>(std::istream&, ObjectID&);
 
 } // namespace realm
 
