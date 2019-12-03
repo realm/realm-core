@@ -170,8 +170,10 @@ void TableKeyIterator::load_key()
     while (m_index_in_group < max_index_in_group) {
         RefOrTagged rot = g.m_tables.get_as_ref_or_tagged(m_index_in_group);
         if (rot.is_ref()) {
-            if (m_index_in_group < g.m_table_accessors.size() && g.m_table_accessors[m_index_in_group]) {
-                m_table_key = g.m_table_accessors[m_index_in_group]->get_key();
+            Table* t;
+            if (m_index_in_group < g.m_table_accessors.size() &&
+                (t = load_atomic(g.m_table_accessors[m_index_in_group], std::memory_order_relaxed))) {
+                m_table_key = t->get_key();
             }
             else {
                 m_table_key = Table::get_key_direct(g.m_tables.get_alloc(), rot.get_as_ref());
@@ -237,7 +239,7 @@ void Group::remove_pk_table()
 TableKey Group::ndx2key(size_t ndx) const
 {
     REALM_ASSERT(is_attached());
-    Table* accessor = m_table_accessors[ndx];
+    Table* accessor = load_atomic(m_table_accessors[ndx], std::memory_order_relaxed);
     if (accessor)
         return accessor->get_key(); // fast path
 
@@ -250,17 +252,20 @@ TableKey Group::ndx2key(size_t ndx) const
     return Table::get_key_direct(m_tables.get_alloc(), ref);
 }
 
-
 size_t Group::key2ndx_checked(TableKey key) const
 {
     size_t idx = key2ndx(key);
     // early out
     // note: don't lock when accessing m_table_accessors, because if we miss a concurrently introduced table
     // accessor, we'll just fall through to the slow path. Table accessors can be introduced concurrently,
-    // but never removed.
-    if (idx < m_table_accessors.size() && m_table_accessors[idx] && m_table_accessors[idx]->get_key() == key)
-        return idx;
-
+    // but never removed. The following is only safe because 'm_table_accessors' will not be relocated
+    // concurrently. (We aim to be safe in face of concurrent access to a frozen transaction, where tables
+    // cannot be added or removed. All other races are undefined behaviour)
+    if (idx < m_table_accessors.size()) {
+        Table* tbl = load_atomic(m_table_accessors[idx], std::memory_order_relaxed);
+        if (tbl && tbl->get_key() == key)
+            return idx;
+    }
     // FIXME: This is a temporary hack we should revisit.
     // The notion of a const group as it is now, is not really
     // useful. It is linked to a distinction between a read
@@ -685,7 +690,7 @@ Table* Group::do_get_table(size_t table_ndx)
 {
     REALM_ASSERT(m_table_accessors.size() == m_tables.size());
     // Get table accessor from cache if it exists, else create
-    Table* table = m_table_accessors[table_ndx];
+    Table* table = load_atomic(m_table_accessors[table_ndx], std::memory_order_relaxed);
     if (!table) {
         // double-checked locking idiom
         std::lock_guard<std::mutex> lock(m_accessor_mutex);
@@ -858,7 +863,8 @@ Table* Group::create_table_accessor(size_t table_ndx)
         new_table->init(ref, this, table_ndx, m_is_writable, is_frozen());            // Throws
         table = new_table.release();
     }
-    m_table_accessors[table_ndx] = table;
+    // must be atomic to allow concurrent probing of the m_table_accessors vector.
+    store_atomic(m_table_accessors[table_ndx], table, std::memory_order_relaxed);
     table->refresh_index_accessors();
     return table;
 }
