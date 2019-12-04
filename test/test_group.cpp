@@ -2066,13 +2066,21 @@ TEST(Group_StringPrimaryKeyCol)
     CHECK(primary_key_column);
     ColKey col1 = primary_key_column;
     ColKey col2 = table->add_column(type_String, "secondary");
+    ColKey list_col = table->add_column_list(type_Float, "floats");
     CHECK_NOT(table->find_first(primary_key_column, StringData("Exactly!")));
     CHECK_NOT(table->has_search_index(primary_key_column));
 
     auto obj1 = table->create_object_with_primary_key({"Exactly!"}).set(col2, "first");
+    table->create_object_with_primary_key({"Paul"}).set(col2, "John");
+    table->create_object_with_primary_key({"John"}).set(col2, "Paul");
+    table->create_object_with_primary_key({"George"}).set(col2, "George");
     CHECK_EQUAL(obj1.get<String>(primary_key_column), "Exactly!");
     auto k = table->find_first(primary_key_column, StringData("Exactly!"));
     CHECK_EQUAL(k, obj1.get_key());
+    auto list = obj1.get_list<Float>(list_col);
+    for (int f = 0; f < 10; f++) {
+        list.add(float(f) / 2.f);
+    }
     g.validate_primary_column_uniqueness();
 
     // Changing PK should not add an index to the new PK
@@ -2086,7 +2094,15 @@ TEST(Group_StringPrimaryKeyCol)
     CHECK_EQUAL(k, obj2.get_key());
     k = table->find_first(col2, StringData("first"));
     CHECK_NOT(obj1.is_valid());
-    CHECK_EQUAL(table->get_object(k).get<String>(col1), "Exactly!");
+    obj1 = table->get_object(k);
+    CHECK_EQUAL(obj1.get<String>(col1), "Exactly!");
+    list = obj1.get_list<Float>(list_col);
+    CHECK_EQUAL(list.size(), 10);
+    CHECK_EQUAL(list.get(5), 2.5f);
+    CHECK_EQUAL(table->size(), 5);
+    CHECK(table->find_first(col2, StringData("Paul")));
+    CHECK(table->find_first(col2, StringData("John")));
+    CHECK(table->find_first(col2, StringData("George")));
 
     // Changing PK should remove any existing index from the new PK
     table->add_search_index(primary_key_column);
