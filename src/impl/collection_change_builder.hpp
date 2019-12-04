@@ -32,7 +32,7 @@ namespace _impl {
 
 class ObjectChangeSet {
 public:
-    using ColKeyType = uint64_t;
+    using ColKeyType = int64_t;
     using ObjectKeyType = int64_t;
     using ObjectSet = std::unordered_set<ObjectKeyType>;
     using ObjectMapToColumnSet = std::unordered_map<ObjectKeyType, std::unordered_set<ColKeyType>>;
