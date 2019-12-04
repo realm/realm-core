@@ -9395,7 +9395,7 @@ TEST(Query_AccountForRestrictingViews)
         CHECK_EQUAL(44, results[0].get<Int>(col_id));
 
         // Create query based on restricting view
-        Query q = Query(results.get_parent().where(&results));
+        Query q = Query(results.get_parent()->where(&results));
         ObjKey obj_key = q.find();
         CHECK_EQUAL(obj_key, results.get_key(0));
     }

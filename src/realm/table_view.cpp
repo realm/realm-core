@@ -462,7 +462,7 @@ void TableView::remove(size_t row_ndx)
     m_key_values->erase(row_ndx);
 
     // Delete row in origin table
-    get_parent().remove_object(key);
+    get_parent()->remove_object(key);
 
     // It is important to not accidentally bring us in sync, if we were
     // not in sync to start with:
@@ -481,7 +481,7 @@ void TableView::clear()
 
     bool sync_to_keep = m_last_seen_versions == get_dependency_versions();
 
-    _impl::TableFriend::batch_erase_rows(get_parent(), *m_key_values); // Throws
+    _impl::TableFriend::batch_erase_rows(*get_parent(), *m_key_values); // Throws
 
     m_key_values->clear();
 
