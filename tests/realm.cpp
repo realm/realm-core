@@ -791,7 +791,7 @@ TEST_CASE("SharedRealm: close()") {
         auto obj = ObjectStore::table_for_object_type(group, "list")->create_object();
         realm->commit_transaction();
 
-        Results results(realm, *ObjectStore::table_for_object_type(group, "object"));
+        Results results(realm, ObjectStore::table_for_object_type(group, "object"));
         List list(realm, obj.get_linklist("list"));
         Object object(realm, obj);
 
@@ -1438,7 +1438,7 @@ TEST_CASE("SharedRealm: compact on launch") {
         REQUIRE(r->read_group().get_table("class_object")->size() == count);
 
         // Registering for a collection notification shouldn't crash when compact on launch is used.
-        Results results(r, *r->read_group().get_table("class_object"));
+        Results results(r, r->read_group().get_table("class_object"));
         results.add_notification_callback([](CollectionChangeSet const&, std::exception_ptr) { });
         r->close();
     }

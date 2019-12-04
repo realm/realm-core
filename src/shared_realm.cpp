@@ -989,7 +989,7 @@ ComputedPrivileges Realm::get_privileges(ConstObj const& obj)
     if (!init_permission_cache())
         return static_cast<ComputedPrivileges>(s_allObjectPrivileges);
 
-    const Table* table = obj.get_table();
+    auto table = obj.get_table();
     auto object_type = ObjectStore::object_type_for_table_name(table->get_name());
     sync::GlobalID global_id{object_type, table->get_object_id(obj.get_key())};
     auto privileges = inherited_mask(m_permissions_cache->get_realm_privileges())

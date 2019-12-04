@@ -559,7 +559,7 @@ TEST_CASE("object") {
 
         auto table = r->read_group().get_table("class_person");
         REQUIRE(table->size() == 5);
-        Results result(r, *table);
+        Results result(r, table);
         auto token = result.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
             change = c;
             callback_called = true;
@@ -621,7 +621,7 @@ TEST_CASE("object") {
         });
 
         auto obj_table = r->read_group().get_table("class_all types");
-        Results result(r, *obj_table);
+        Results result(r, obj_table);
         bool callback_called;
         bool results_callback_called;
         bool sub_callback_called;
@@ -698,7 +698,7 @@ TEST_CASE("object") {
         Object obj = create(dict);
 
         auto obj_table = r->read_group().get_table("class_all types");
-        Results result(r, *obj_table);
+        Results result(r, obj_table);
         auto token1 = result.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
             callback_called = true;
         });
@@ -873,13 +873,13 @@ TEST_CASE("object") {
     SECTION("getters and setters") {
         r->begin_transaction();
 
-        auto& table = *r->read_group().get_table("class_all types");
-        table.create_object();
-        Object obj(r, *r->schema().find("all types"), *table.begin());
+        auto table = r->read_group().get_table("class_all types");
+        table->create_object();
+        Object obj(r, *r->schema().find("all types"), *table->begin());
 
-        auto& link_table = *r->read_group().get_table("class_link target");
-        link_table.create_object();
-        Object linkobj(r, *r->schema().find("link target"), *link_table.begin());
+        auto link_table = r->read_group().get_table("class_link target");
+        link_table->create_object();
+        Object linkobj(r, *r->schema().find("link target"), *link_table->begin());
 
         obj.set_property_value(d, "bool", util::Any(true));
         REQUIRE(any_cast<bool>(obj.get_property_value<util::Any>(d, "bool")) == true);
