@@ -3348,7 +3348,7 @@ TEST(LangBindHelper_SubqueryHandoverDependentViews)
             }
             writer->commit_and_continue_as_read();
             tv1 = table->where().less_equal(col0, 50).find_all();
-            Query qq = tv1.get_parent().where(&tv1);
+            Query qq = tv1.get_parent()->where(&tv1);
             reader = writer->duplicate();
             qq2 = reader->import_copy_of(qq, PayloadPolicy::Copy);
             CHECK(tv1.is_attached());
@@ -3387,7 +3387,7 @@ TEST(LangBindHelper_HandoverPartialQuery)
             }
             writer->commit_and_continue_as_read();
             tv1 = table->where().less_equal(col0, 50).find_all();
-            Query qq = tv1.get_parent().where(&tv1);
+            Query qq = tv1.get_parent()->where(&tv1);
             reader = writer->duplicate();
             qq2 = reader->import_copy_of(qq, PayloadPolicy::Copy);
             CHECK(tv1.is_attached());
@@ -3426,7 +3426,7 @@ TEST(LangBindHelper_HandoverNestedTableViews)
             writer->commit_and_continue_as_read();
             // Create a TableView tv2 that is backed by a Query that is restricted to rows from TableView tv1.
             TableView tv1 = table->where().less_equal(col, 50).find_all();
-            TableView tv2 = tv1.get_parent().where(&tv1).find_all();
+            TableView tv2 = tv1.get_parent()->where(&tv1).find_all();
             CHECK(tv2.is_in_sync());
             reader = writer->duplicate();
             tv = reader->import_copy_of(tv2, PayloadPolicy::Move);
