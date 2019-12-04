@@ -4,7 +4,6 @@
 * Ability to stream into an ObjectId added.
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Fixed assert in SlabAlloc::allocate_block() which could falsely trigger when requesting an allocation that
   would be slightly smaller than the underlying free block. ([3490](https://github.com/realm/realm-core/issues/3490))
 
@@ -58,34 +57,6 @@ This release was never published
 * Upgrading medium sized string columns to new file format would not be done correctly.
 * BPlusTree used in lists and TableViews could in some rare cases give wrong values or crash. ([#3449](https://github.com/realm/realm-core/issues/3449))
 
-### Breaking changes
-* None.
-
------------
-
-### Internals
-* None.
-
-Besides the changes above, this release includes changes introduced by v5.23.6:
-
-| # 5.23.6 Release notes
-| 
-| ### Enhancements
-| * Performance significantly improved when making a query on the property of a linked table, when the property is indexed.
-| 
-| ### Fixed
-| * A race between extending the file and activity in the encryption layer could lead to crash and corruption.
-|   This race has been fixed. The bug was introduced with version 5.3.0 and may hit on Android, if encryption is
-|   in use. It could also affect Linux on file systems where posix prealloc() is unsupported.
-|   ([PR #3427](https://github.com/realm/realm-core/issues/3427), since 5.3.0)
-| * Null values were not printed correctly when using json serialisation. ([PR #3399](https://github.com/realm/realm-core/issues/3399)).
-| * ListOfPrimitives were not printed correctly when using json serialisation. ([#3408](https://github.com/realm/realm-core/issues/3408)).
-| 
-| -----------
-| 
-| ### Internals
-| * Fixed several warnings found by newer clang compilers. ([#3393](https://github.com/realm/realm-core/issues/3393)).
-
 ----------------------------------------------
 
 # 6.0.0-alpha.23 Release notes
@@ -107,36 +78,6 @@ Besides the changes above, this release includes changes introduced by v5.23.6:
 
 ### Internals
 * Several performance improvements.
-
-Besides the changes above, this release includes changes introduced by v5.23.4 to v5.23.5:
-
-| # 5.23.5 Release notes
-| 
-| ### Enhancements
-| * None.
-| 
-| ### Fixed
-| * Chained OR equals queries on an unindexed string column failed to match any results if any of the strings were 64 bytes or longer. ([PR #3386](https://| github.com/realm/realm-core/pull/3386), since 5.17.0).
-| * Fixed serialization of a query which looks for a null timestamp. This only affects query based sync. ([PR #3389](https://github.com/realm/realm-core/pull/| 3388), since v5.23.2).
-| 
-| ### Breaking changes
-| * None.
-| 
-| -----------
-| 
-| ### Internals
-| 
-| * VersionID comparison operators are now const qualified ([PR #3391](https://github.com/realm/realm-core/pull/3391)).
-| * Exception `util::File::AccessError`, and it's derivatives such as `util::File::NotFound`, will now include a stacktrace in the message returned by the `what| ()` method. ([PR #3394](https://github.com/realm/realm-core/pull/3394))
-| 
-| 
-| ----------------------------------------------
-| 
-| # 5.23.4 Release notes
-| 
-| ### Internals
-| * The release binaries for Apple platforms are now built with Xcode 10.0 (up from 9.4).
-| * Add a Catalyst/UIKit for Mac library to the Cocoa release package.
 
 ----------------------------------------------
 
@@ -194,21 +135,6 @@ Besides the changes above, this release includes changes introduced by v5.23.4 t
 ### Internals
 * sort() and distinct() added to the List interface
 
-Besides the changes above, this release includes changes introduced by v5.23.3:
-
-| # 5.23.3 Release notes
-| 
-| ### Fixed
-| * If a signal interrupted a msync() call, Core would throw an exception. This behavior has new been changed to retry the system call instead. (Issue [#3352](https://github.com/| realm/realm-core/issues/3352))
-| * Fixed a bug in sum() or average() of == and != queries on integer columns sometimes returning an incorrect result. ([#3356](https://github.com/realm/realm-core/pull/3356), since | the beginning).
-|  
-| -----------
-| 
-| ### Internals
-| * Changed the metrics timers to more precisely report in nanoseconds, instead of seconds. ([#3359](https://github.com/realm/realm-core/issues/3359))
-| * Better performance when cloud query metrics are turned on, by not acquiring a backtrace on query serialization errors (permissions queries). ([#3361](https://github.com/realm/| realm-core/issues/3361)).
-| * Performance improved for queries comparing a constant value to a property over unary link path (eg: "someLink.Id == 42"). ([#3670](https://github.com/realm/realm-core/issues/3370))
-
 ----------------------------------------------
 
 # 6.0.0-alpha.16 Release notes
@@ -222,36 +148,6 @@ Besides the changes above, this release includes changes introduced by v5.23.3:
 ### Internals
 * Fixes unittest Shared_WaitForChange which could deadlock.
   ([#3346] https://github.com/realm/realm-core/issues/3346)
-
-Besides the changes above, this release includes changes introduced by v5.23.1 to v5.23.2:
-
-| # 5.23.2 Release notes
-| 
-| ### Fixed
-| * Named pipes on Android are now created with 0666 permissions instead of 0600. This fixes a bug
-|   on Huawei devices which caused named pipes to change owners during app upgrades causing
-|   subsequent `ACCESS DENIED` errors. This should have not practical security implications.
-|   (Issue [#3328](https://github.com/realm/realm-core/pull/3328))
-|  
-| -----------
-| 
-| ### Internals
-| * The release binaries for Apple platforms are now built with Xcode 9.4 (up from 9.2).
-| * Performance of queries on Timestamp is improved
-| 
-| ----------------------------------------------
-| 
-| # 5.23.1 Release notes
-| 
-| ### Fixed
-| * Fixed the metrics throwing an exception when a query cannot be serialised. Now it reports the 
-|   exception message as the description.
-|   ([#3031](https://github.com/realm/realm-sync/issues/3031), since v3.2.0)
-| * Queries involving an indexed int column which were constrained by a LinkList with an order
-|   different from the table's order would give incorrect results.
-|   ([#3307](https://github.com/realm/realm-core/issues/3307), since v5.19.0)
-| * Queries involving an indexed int column had a memory leak if run multiple times.
-    ([#6186](https://github.com/realm/realm-cocoa/issues/6186)), since v5.19.0)
 
 ----------------------------------------------
 
@@ -289,56 +185,6 @@ Besides the changes above, this release includes changes introduced by v5.23.1 t
 ### Enhancements
 * Small improvements in pk handling to support ObjectStore
 
-### Fixed
-* None.
- 
------------
-
-### Internals
-* None.
-
-Besides the changes above, this release includes changes introduced by v5.22.0 to v5.23.0:
-
-| # 5.23.0 Release notes
-| 
-| ### Enhancements
-| * Add a Swift Package Manager package ([#3308](https://github.com/realm/realm-core/pull/3308)).
-| 
-| ### Fixed
-| * Constructing an `IncludeDescriptor` made unnecessary table comparisons. This resulted in poor performance for subscriptions
-|   using the `includeLinkingObjects` functionality. ([#3311](https://github.com/realm/realm-core/issues/3311), since v5.18.0)
-|  
-| ### Breaking changes
-| * None.
-| 
-| -----------
-| 
-| ### Internals
-| * None.
-| 
-| ----------------------------------------------
-| 
-| # 5.22.0 Release notes
-| 
-| ### Enhancements
-| 
-| * Expose the ability to follow links while printing a TableView in JSON format.
-|   TableView::to_json() now supports the same arguments as Table::to_json().
-|   ([#3301](https://github.com/realm/realm-core/pull/3301))
-| 
-| ### Fixed
-| * None.
-|  
-| ### Breaking changes
-| * None.
-| 
-| -----------
-| 
-| ### Internals
-| * Fixed an inconsistency in the use of the `REALM_METRICS` compile time option. Now core consumers are able
-|   to use `SharedGroup::get_metrics()` regardless of whether or not metrics are compiled in. A null pointer
-|   is returned if the feature has been disabled at compile time.
-
 ----------------------------------------------
 
 # 6.0.0-alpha.11 Release notes
@@ -369,24 +215,6 @@ Besides the changes above, this release includes changes introduced by v5.22.0 t
 ### Fixed
 * Fixed replication of null timestamps in list
  
------------
-
-Besides the changes above, this release includes changes introduced by v5.21.0:
-
-| # 5.21.0 Release notes
-|
-| ### Enhancements
-| * Added support for unicode characters in realm path and filenames for Windows. Contribution by @rajivshah3.
-|   ([#3293](https://github.com/realm/realm-core/pull/3293))
-|
-| -----------
-|
-| ### Internals
-| * Introduced new feature test macros for address and thread sanitizers in
-|  `<realm/util/features.h>`.
-| * Added Realm file path to Allocator assertions ([3283](https://github.com/realm/realm-core/issues/3283)).
-|
-
 ----------------------------------------------
 
 # 6.0.0-alpha.8 Release notes
@@ -400,68 +228,6 @@ Besides the changes above, this release includes changes introduced by v5.21.0:
   sync::create_table...() and sync::create_object...() functions now map directly to a
   core function.
 
-Besides the changes above, this release includes changes introduced by v5.18.0 to v5.20.0:
-
-| # 5.20.0 Release notes
-|
-| ### Enhancements
-| * Added the ability to convert a std::chrono::time_point to a Timestamp and
-|   vice versa. This allows us to make calculations using std::chrono::duration.
-|
-| ### Fixed
-| * Slab usage was reported wrong by SlabAlloc::get_total_slab_size() ([#3284](https://github.com/realm/realm-core/pull/3284)
-|   This caused ROS to incorectly report "exabytes" of memory used for slab.
-| * The control of the page reclaimer did not limit the page reclaimers workload correctly. This could lead
-|   to the reclaimer not running as much as intended. This is not believed to have been visible to end users.
-|   This bug also caused ROS to occasionally report odd metrics for the reclaimer.
-|   ([#3285](https://github.com/realm/realm-core/pull/3285))
-| * When opening an encrypted file via SharedGroup::open(), it could wrongly fail and indicate a file corruption
-|   although the file was ok.
-|   ([#3267](https://github.com/realm/realm-core/issues/3267), since core v5.12.2)
-|
-| ----------------------------------------------
-|
-| # 5.19.1 Release notes
-|
-| ### Fixed
-| * Freelist would keep growing with a decreased commit performance as a result.
-|   ([2927](https://github.com/realm/realm-sync/issues/2927))
-| * Fixed an incorrect debug mode assertion which could be triggered when generating the description of an IncludeDescriptor.
-|  ([PR #3276](https://github.com/realm/realm-core/pull/3276) since v5.18.0). 
-| ----------------------------------------------
-| # 5.19.0 Release notes
-|
-| ### Enhancements
-| * Improved query performance for unindexed integer columns when the query has a chain of OR conditions.
-|   This will improve performance of "IN" queries generated by SDKs.
-|   ([PR #2888](https://github.com/realm/realm-sync/issues/2888).
-| * Use search index in queries on integer columns (equality only). This will improve performance of
-|   queries on integer primary key properties for example. ([PR #3272](https://github.com/realm/realm-core/pull/3272)).
-| * Number of 8 byte blocks in freelist is minimized. This will result in a shorter freelist.
-|
-| ### Fixed
-| * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-| * Writing a snapshot to file via Group::write() could produce a file with some parts not
-|   reachable from top array (a memory leak). ([#2911](https://github.com/realm/realm-sync/issues/2911))
-| * Fixed a bug in queries on a string column with more than two "or" equality conditions when the last condition also had an
-|   "and" clause. For example: `first == "a" || (first == "b" && second == 1)` would be incorrectly evaluated as
-|   `(first == "a" || first == "b")`. ([#3271](https://github.com/realm/realm-core/pull/3271), since v5.17.0)
-|
-| # 5.18.0 Release notes
-|
-| ### Enhancements
-| * Adds support for a new IncludeDescriptor type which describes arbitrary link paths
-|   on a TableView. Applying this to a TableView does not modify the results, but gives
-|   users the ability to use the reporting method to find rows in a different table that
-|   are connected by backlinks. This is intended for sync subscriptions.
-| * Enhances LinksToNode so that it can check links to multiple targets. This can be utilized
-|   in permissions check in sync.
-|
-| -----------
-|
-| ### Internals
-| * The release binaries for Apple platforms are now built with Xcode 9.2 (up from 8.3.3).
-
 ----------------------------------------------
 
 # 6.0.0-alpha.7 Release notes
@@ -470,9 +236,6 @@ Besides the changes above, this release includes changes introduced by v5.18.0 t
 * Ability to get/set Mixed on ConstObj/Obj.
 * Now able to migrate files with Sync histories.
 
-### Fixed
-* None.
- 
 -----------
 
 ### Internals
@@ -482,162 +245,20 @@ Besides the changes above, this release includes changes introduced by v5.18.0 t
 
 # 6.0.0-alpha.6 Release notes
 
-### Fixed
-* None.
- 
 -----------
 
 ### Internals
 * Column keys cannot be used across tables. If a key is obtained from one table, it can only be
   used in relation to that table.
 
-Besides the changes above, this release includes changes introduced by v5.16.0 and up
-until v5.17.0
-
-| # 5.17.0 Release notes
-| 
-| ### Enhancements
-| * Improved query performance for unindexed string columns when the query has a chain of OR conditions.
-|   This will improve performance of "IN" queries generated by SDKs.
-|   ([PR #3250](https://github.com/realm/realm-core/pull/3250).
-| 
-| ### Fixed
-| * Making a query that compares two integer properties could cause a segmentation fault on the server.
-|   ([#3253](https://github.com/realm/realm-core/issues/3253))
-|  
-| -----------
-| 
-| ### Internals
-| * The protocol for updating Replication/History is changed. The Replication object will be initialized
-|   in every transaction. A new parameter will tell if it is a write- or readtransaction. A new function -
-|   History::ensure_updated can be called in places where the history object needs to be up-to-date. The 
-|   function will use a flag to ensure that the object is only updated once per transaction.
-| 
-| ----------------------------------------------
-| 
-| # 5.16.0 Release notes
-| 
-| ### Enhancements
-| * Improved performance of encryption and decryption significantly by utilizing hardware optimized encryption functions.
-|   ([#293](https://github.com/realm/realm-core-private/issues/293))
-| * Added the ability to write a Group with the history stripped.
-|   ([#3245](https://github.com/realm/realm-core/pull/3245))
-| 
-| ### Fixed
-| * Nothing
-| 
-| -----------
-| 
-| ### Internals
-| * Size of decrypted memory and of currently reserved slab is now available outside of the
-|   metrics system (to which they were added in 5.15.0). This allows us to get the current
-|   values independently from transactions start or end (the metrics system is only updated
-|   at transaction boundaries).
-|   ([3240] https://github.com/realm/realm-core/pull/3240)
-| * Current target and workload set for the page reclaimer is now also available from `get_decrypted_memory_stats()`
-|   ([3246] https://github.com/realm/realm-core/pull/3246)
-| * Default heuristic for reclaiming pages holding decrypted data has been changed, now
-|   limiting amount to same as current use of the buffer cache. Previously the limit was
-|   half of buffer cache usage. This heuristic may still not be good enough for some scenarios
-|   and we recommend monitoring and explicitly setting a better target in cases where we reclaim
-|   more memory than nescessary.
-|   (also [3240] https://github.com/realm/realm-core/pull/3240)
-| * Now publishing a TSAN compatible linux build.
 ----------------------------------------------
 
 # 6.0.0-alpha.5 Release notes
 
-### Fixed
-* None.
- 
 -----------
 
 ### Internals
 * realm-browser now able to read Core-6 files and print values for even more columns
-
-Besides the changes above, this release includes changes introduced by v5.12.7 and up
-until v5.15.0
-
-| # 5.15.0 Release notes
-| 
-| ### Enhancements
-| * Metrics history is now capped to a configurable buffer size with a default of 10000 entries.
-|   If this is exceeded without being consumed, only the most recent entries are stored. This
-|   prevents excessive memory growth if users turn on metrics but don't use it.
-| * Metrics transaction objects now store the number of decrypted pages currently in memory.
-| * SharedGroup::get_stats includes an optional parameter to get size of currently locked | memory.
-| * Metrics now exposes the table name of queries which have been run.
-| 
-| ### Fixed
-| * When shutting down the server you could sometimes experience a crash with | "realm::util::Mutex::lock_failed"
-|   in the stacktrace.
-|   ([#3237](https://github.com/realm/realm-core/pull/3237), since v5.12.5)
-| 
-| ### Internal
-| * Fix a race between the encryption page reclaim governor running and setting a governor.
-|   This only affects applications which actually set the governor to something custom which no | one does yet.
-|   ([#3239](https://github.com/realm/realm-core/issues/3239), since v5.12.2)
-| 
-| ----------------------------------------------
-| 
-| # 5.14.0 Release notes
-| 
-| ### Enhancements
-| * Add assertion to prevent translating a ref value that is not 8 byte aligned. This will allow
-|   us to detect file corruptions at an earlier stage.
-| * You can now get size of the commit being built and the size of currently allocated slab area.
-| * The amount of memory held by SharedGroup is minimized as most of it will be freed after each commit.
-| 
-| ### Fixed
-| * Compacting a realm into an encrypted file could take a really long time. The process is now optimized by adjusting the write
-|   buffer size relative to the used space in the realm.
-|   ([#2754](https://github.com/realm/realm-sync/issues/2754))
-| * Creating an object after creating an object with the int primary key of "null" would hit an assertion failure.
-|   ([#3227](https://github.com/realm/realm-core/pull/3227)).
-| 
-| ----------------------------------------------
-| 
-| # 5.13.0 Release notes
-| 
-| ### Enhancements
-| * The parser now supports readable timestamps with a 'T' separator in addition to the originally supported "@" separator.
-|   For example: "startDate > 1981-11-01T23:59:59:1". ([#3198](https://github.com/realm/realm-core/issues/3198)).
-| 
-| ### Fixed
-| * If, in debug mode, you try to compute the used space on a newly compacted realm (with empty free list), the program will
-|   abort. ([#1171](https://github.com/realm/realm-sync/issues/2724), since v5.12.0)
-|  
-| -----------
-| 
-| ### Internals
-| * For convenience, `parser::parse` now accepts a `StringData` type instead of just `std::string`.
-| * Parsing a query which uses the 'between' operator now gives a better error message indicating
-|   that support is not yet implemented. ([#3198](https://github.com/realm/realm-core/issues/3198)).
-| 
-| ----------------------------------------------
-| 
-| # 5.12.7 Release notes
-| 
-| ### Enhancements
-| * Instead of asserting, an `InvalidDatabase` exception is thrown when a realm file is opened 
-|   with an invalid top ref. Name of problematic file is included in exception message.
-| 
-| ### Fixed
-| * A bug was fixed in `realm::util::DirScanner` that could cause it to sometimes
-|   skip directory entries due to faulty error handling around `readdir()`.
-|   (Issue [realm-sync#2699](https://github.com/realm/realm-sync/issues/2699), since 5.12.5).
-|  
-| ### Breaking changes
-| * None.
-| 
-| -----------
-| 
-| ### Internals
-| * Improved performance on `find_first` for small string arrays (ArrayString). This will improve the table name lookup
-|   performance.
-| * Upgrade pegtl to 2.6.1. Several issues fixed.
-| * Introduced Durability::Unsafe, which disables sync'ing to disk. Using this option, 
-|   a platform crash may corrupt the realm file. Use only, if you'r OK with this.
 
 ----------------------------------------------
 
@@ -656,259 +277,7 @@ until v5.15.0
 * All read transactions will have a separate history object. Read transactions
   use the object stored in the Replication object.
 
-Besides the changes above, this release includes changes introduced by v5.12.1 and up
-until v5.12.6
-
-| # 5.12.6 Release notes
-| 
-| ### Enhancements
-| * None.
-| 
-| ### Fixed
-| * On AWS Lambda we may throw an "Operation not permitted" exception when calling posix_fallocate().
-|   A slower workaround has been supplied.
-|   ([#3193](https://github.com/realm/realm-core/issues/3293))
-|  
-| ### Breaking changes
-| * None.
-| 
-| -----------
-| 
-| ### Internals
-| * None.
-| 
-| ----------------------------------------------
-| 
-| # 5.12.5 Release notes
-| 
-| ### Enhancements
-| * None.
-| 
-| ### Fixed
-| * When loading the realm binary from within the realm-js SDK, core could hang on Windows as described in
-|   https://github.com/realm/realm-js/issues/2169.
-|   ([#3188](https://github.com/realm/realm-core/pull/3188, since 5.12.2)
-| 
-| ### Breaking changes
-| * None.
-| 
-| -----------
-| 
-| ### Internals
-| * Fixed warnings reported by GCC 8.
-| * Replaced call to the deprecated `readdir_r()` with `readdir()`.
-| * Compilation without encryption now possible
-| 
-| ----------------------------------------------
-| 
-| # 5.12.4 Release notes
-| 
-| ### Enhancements
-| * None.
-| 
-| ### Fixed
-| * A segmentation fault would occur when calling Group:get_used_space() for a realm file
-|   with no commits. This method would usually only be called from sync/ROS to calculate
-|   and report state size.
-|   ([#3182](https://github.com/realm/realm-core/issues/3182), since v5.12.0)
-| 
-| ### Breaking changes
-| * None.
-| 
-| ----------------------------------------------
-| 
-| # 5.12.3 Release notes
-| 
-| ### Enhancements
-| * None.
-| 
-| ### Fixed
-| * Added assertions around use of invalid refs and sizes. Helps in narrowing down the causes for
-|   asserts like `ref != 0` and `(chunk_pos % 8) == 0`
-| 
-| ### Breaking changes
-| * None.
-| 
-| -----------
-| 
-| ### Internals
-| * None.
-| 
-| ----------------------------------------------
-| 
-| # 5.12.2 Release notes
-| 
-| ### Enhancements
-| * None
-| 
-| ### Fixed
-| * If encryption was enabled, decrypted pages were not released until the file was closed, causing 
-|   excessive usage of memory.
-|   A page reclaim daemon thread has been added, which will work to release decrypted pages back to
-|   the operating system. To control it, a governing function can be installed. The governing function
-|   sets the target for the page reclaimer. If no governing function is installed, the system will attempt
-|   to keep the memory usage below any of the following:
-|   
-|         - 1/4 of physical memory available on the platform as reported by "/proc/meminfo"
-|         - 1/4 of allowed memory available as indicated by "/sys/fs/cgroup/memory/memory_limit_in_bytes"
-|         - 1/2 of what is used by the buffer cache as indicated by "/sys/fs/cgroup/memory/memory.stat"
-|         - A target directly specified as "target <number of bytes>" in a configuration file specified
-|           by the environment variable REALM_PAGE_GOVERNOR_CFG.
-|   if none of the above is available, or if a target of -1 is given, the feature is disabled.
-|   ([#3123](https://github.com/realm/realm-core/issues/3123))
-| 
-| -----------
-| 
-| ### Internals
-| * None.
-| 
-| ----------------------------------------------
-| 
-| # 5.12.1 Release notes
-| 
-| ### Enhancements
-| * Illegal freeing of in-file-memory is now detected when freeing is
-|   actually done. This will make it easier to find the root cause of
-|   some file corruption issues.
-| 
-| ### Fixed
-| * None.
-| 
-| ### Breaking changes
-| * None.
-| 
-| -----------
-| 
-| ### Internals
-| * None.
-| 
-| ----------------------------------------------
-
 # 6.0.0-alpha.3 Release notes
-
-This release includes only changes introduced by v5.10.2 and up until v5.12.0
-
-| # 5.12.0 Release notes
-| 
-| ### Enhancements
-| * Added Group::get_used_space() which will return the size of the data taken up by the current
-|   commit. This is in contrast to the number returned by SharedGroup::get_stats() which will
-|   return the size of the last commit done in that SharedGroup. If the commits are the same,
-|   the number will of course be the same.
-|   Issue [#259](https://github.com/realm/realm-core-private/issues/259)
-| 
-| ### Fixed
-| * None.
-| 
-| ### Breaking changes
-| * The way the Linux binaries are delivered is changed. They are now distributed
-|   like the rest of the binaries with two packages (devel/runtime) per build type.
-|   The file names follow this scheme:
-|   realm-core-<buildType>-<release>-Linux-{devel|runtime}.tar.gz
-|   For Linux the following build types are published: Debug, Release, RelAssert
-|   and RelASAN.
-| 
-| -----------
-| 
-| ### Internals
-| * Replication::get_database_path() is made const.
-| * TrivialReplication::get_database_path() is made public.
-| * Added better compatibility for custom allocators with standard library
-|   containers on GCC 4.9.
-| 
-| ----------------------------------------------
-| 
-| # 5.11.3 Release notes
-| 
-| ### Compatibility
-| * File format: ver. 9
-|   Upgrades automatically from previous formats.
-|   Can open realms down to file format version 7 in ReadOnly mode (without upgrade).
-| 
-| -----------
-| 
-| ### Internals
-| * Improved assertion checking in release mode in order to detect any corruption
-|   of our freelist earlier and prevent bogus allocations from a corrupted freelist
-|   from leading to subsequent corruption of other parts of the file.
-| 
-| ----------------------------------------------
-| 
-| # 5.11.2 Release notes
-| 
-| ### Compatibility
-| * File format: ver. 9
-|   Upgrades automatically from previous formats.
-|   Can open realms down to file format version 7 in ReadOnly mode (without upgrade).
-| 
-| -----------
-| 
-| ### Internals
-| * Releases no longer include RPM and DEB packages.
-| * Releases now include RelWithDebInfo+ASAN and RelWithDebInfo+Assertions tarballs for linux.
-|   [#3112](https://github.com/realm/realm-core/pull/3112).
-| 
-| ----------------------------------------------
-| 
-| # 5.11.1 Release notes
-| 
-| ### Compatibility
-| * File format: ver. 9
-|   Upgrades automatically from previous formats.
-|   Can open realms down to file format version 7 in ReadOnly mode (without upgrade).
-| 
-| -----------
-| 
-| ### Internals
-| * Fixed a bug in the use of placement new on MSVC, where the implementation is
-|   buggy. This bug only affected version 5.11.0.
-|   PR [#3109](https://github.com/realm/realm-core/pull/3109)
-| * Made improvements to the custom allocation interfaces introduced in 5.11.0,
-|   which should make them more convenient and use slightly less memory.
-|   PR [#3108](https://github.com/realm/realm-core/pull/3108)
-| 
-| ----------------------------------------------
-| 
-| # 5.11.0 Release notes
-| 
-| ### Compatibility
-| * File format: ver. 9
-|   Upgrades automatically from previous formats.
-|   Can open realms down to file format version 7 in ReadOnly mode (without upgrade).
-| 
-| -----------
-| 
-| ### Internals
-| * Added support for custom heap allocators
-|   PR [#3106](https://github.com/realm/realm-core/pull/3106).
-| 
-| ----------------------------------------------
-| 
-| # 5.10.3 Release notes
-|
-| ### Fixed
-| * When a sort or distinct over links was done on an already-sorted TableView,
-|   the link translation map was done using the unsorted rows, resulting in the
-|   second sort/distinct being done with the incorrect values.
-|   PR [#3102](https://github.com/realm/realm-core/pull/3102).
-|
-| ### Compatibility
-| * File format: ver. 9 (upgrades automatically from previous formats)
-|
-| -----------
-|
-| ### Internals
-|
-| * Will assert if someone tries to free a null ref.
-|   Issue [#254](https://github.com/realm/realm-core-private/issues/254) and the like.
-|
-| ----------------------------------------------
-|
-| # 5.10.2 Release notes
-|
-| ### Enhancements
-|
-| * Add an arm64_32 slice to the watchOS build.
 
 ----------------------------------------------
 
@@ -931,45 +300,6 @@ This release includes only changes introduced by v5.10.2 and up until v5.12.0
 
 * Object keys are now allowed to use all 64 bits. Only illegal value is 0xFFFFFFFFFFFFFFFF
   which is the encoding of a null-value.
-
-----------------------------------------------
-
-Besides the changes above, this release includes changes introduced by v5.9.0 and up
-until v5.10.1
-
-| # 5.10.1 Release notes
-| 
-| ### Internals
-| 
-| * Stack trace also available when throwing std:: exceptions.
-| 
-| ----------------------------------------------
-| 
-| # 5.10.0 Release notes
-| 
-| ### Enhancements
-| 
-| * Allow compact to take an optional output encryption key.
-|   PR [#3090](https://github.com/realm/realm-core/pull/3090).
-| 
-| ----------------------------------------------
-| 
-| # 5.9.0 Release notes
-| 
-| ### Enhancements
-| 
-| * Allow a version number in Group::write which will cause a file with (sync)
-|   history to be written.
-| 
-| -----------
-| 
-| ### Internals
-| 
-| * Most exception types now report the stack trace of the point where they were
-|   thrown in their `what()` message. This is intended to aid debugging.
-|   Additionally, assertion failures on Linux now report their stack traces as
-|   well, similar to Apple platforms. Recording stack traces is only supported on
-|   Linux (non-Android) and Apple platforms for now.
 
 ----------------------------------------------
 
@@ -998,152 +328,6 @@ until v5.10.1
   optimization when some columns have a search index. Then you don't have to first insert
   the default value in the index and subsequently the real value.
 * Many small enhancements required by ObjectStore and Sync.
-
-----------------------------------------------
-
-Besides the changes above, this release also includes changes introduced by v5.5.0 and
-up until v5.8.0
-  
-| # 5.8.0 Release notes
-| 
-| ### Bugfixes
-| 
-| * Fix a crash on some platforms when using the query parser to look for a string
-|   or binary object which has a certain combination of non-printable characters.
-| 
-| ### Enhancements
-| 
-| * Support limiting queries via `DescriptorOrdering::set_limit` and by supporting
-|   "LIMIT(x)" in string queries.
-|   Issue [realm_sync:#2223](https://github.com/realm/realm-sync/issues/2223)
-| 
-| - ---------------------------------------------
-|   
-| # 5.7.2 Release notes
-| 
-| ### Bugfixes
-| 
-| * Fix a use-after-free when an observer is passed to rollback_and_continue_as_read().
-| 
-| ### Enhancements
-| 
-| * More informative InvalidDatabase exception messages
-|   Issue [#3075](https://github.com/realm/realm-core/issues/3075).
-| 
-| ----------------------------------------------
-| 
-| # 5.7.1 Release notes
-| 
-| ### Bugfixes
-| 
-| * Fix crash in Group::compute_aggregated_byte_size() when applied on an empty
-|   realm file. (Issue #3072)
-| 
-| - ---------------------------------------------
-|  
-| # 5.7.0 Release notes
-| 
-| ### Enhancements
-| 
-| * Improved Group::compute_aggregated_byte_size() allowing us to differentiate
-|   between state, history and freelists.
-|   (Issue #3063)
-| 
-| ----------------------------------------------
-| 
-| # 5.6.5 Release notes
-| 
-| ### Enhancements
-| 
-| * Improved scalability for the slab allocator. This allows for larger
-|   transactions. (PR #3067)
-| 
-| ----------------------------------------------
-| 
-| # 5.6.4 Release notes
-| 
-| ### Enhancements
-| 
-| * Add Table::add_row_with_keys(), which allows
-|   sync::create_object_with_primary_key() to avoid updating the index twice when
-|   creating an object with a string primary key.
-| * Improved the performance of setting a link to its current value.
-|   
-| - ---------------------------------------------
-|  
-| # 5.6.3 Release notes
-| 
-| ### Enhancements
-| 
-| * Improved scalability for in-file freelist handling. This reduces
-|   commit overhead on large transactions.
-| * Improved scalability for in-file allocation during commit.
-| * Minimized use of memory mappings and msync() on large commits
-|   on devices which can support large address spaces.
-| 
-| ----------------------------------------------
-| 
-| # 5.6.2 Release notes
-| 
-| ### Bugfixes
-| 
-| * Fix curruption of freelist with more than 2M entries.
-|    PR [#3059](https://github.com/realm/realm-core/pull/3059).
-|   
-|- ---------------------------------------------
-|  
-| # 5.6.1 Release notes
-| 
-| ### Bugfixes
-| 
-| * More readable error message in the query parser when requesting an a bad argument.
-| * Don't write history information in `SharedGroup::compact()` for
-|   non-syncronized Realms.
-| 
-| -----------
-| 
-| ### Internals
-| 
-| * Restore -fvisibility-inlines-hidden for the binaries for Apple platforms.
-| * Remove a few warnings at compile time.
-| * Improve error detection related to memory allocation/release
-|
-|----------------------------------------------
-|
-|   # 5.6.0 Release notes
-|   
-|   ### Bugfixes
-|   
-|   * In the parser, fix `@links.@count` when applied over lists to return
-|     the sum of backlinks for all connected rows in the list.
-|   * Fix null comparisons in queries not serialising properly in some cases.
-|     Also explicitly disable list IN list comparisons since its not supported.
-|     PR [#3037](https://github.com/realm/realm-core/pull/3037).
-|   
-|   ### Enhancements
-|   
-|   * `SharedGroup::compact()` now also compacts history information, which means
-|     that Sync'ed Realm files can now be compacted (under the usual restrictions;
-|     see `group_shared.hpp` for details).
-|   
-| ----------------------------------------------
-| 
-| # 5.5.0 Release notes
-| 
-| ### Enhancements
-| 
-| * Parser improvements:
-|     - Allow an arbitrary prefix on backlink class names of @links queries.
-|       This will allow users to query unnamed backlinks using the `@links.Class.property` syntax.
-|     - Case insensitive `nil` is now recognised as a synonym to `NULL`.
-|     - Add support for `@links.@count` which gives the count of all backlinks to an object.
-|       See Issue [#3003](https://github.com/realm/realm-core/issues/3003).
-| 
-| -----------
-| 
-| ### Internals
-| 
-| * Apple binaries are now built with Xcode 8.3.3.
 
 ----------------------------------------------
 
@@ -1199,6 +383,805 @@ up until v5.8.0
 * Speed improvement for Sort().
 
 ---------------------------------------------
+# 5.23.6 Release notes
+
+### Enhancements
+* Performance significantly improved when making a query on the property of a linked table, when the property is indexed.
+
+### Fixed
+* A race between extending the file and activity in the encryption layer could lead to crash and corruption.
+  This race has been fixed. The bug was introduced with version 5.3.0 and may hit on Android, if encryption is
+  in use. It could also affect Linux on file systems where posix prealloc() is unsupported.
+  ([PR #3427](https://github.com/realm/realm-core/issues/3427), since 5.3.0)
+* Null values were not printed correctly when using json serialisation. ([PR #3399](https://github.com/realm/realm-core/issues/3399)).
+* ListOfPrimitives were not printed correctly when using json serialisation. ([#3408](https://github.com/realm/realm-core/issues/3408)).
+
+-----------
+
+### Internals
+* Fixed several warnings found by newer clang compilers. ([#3393](https://github.com/realm/realm-core/issues/3393)).
+
+----------------------------------------------
+
+# 5.23.5 Release notes
+
+### Enhancements
+* None.
+
+### Fixed
+* Chained OR equals queries on an unindexed string column failed to match any results if any of the strings were 64 bytes or longer. ([PR #3386](https://github.com/realm/realm-core/pull/3386), since 5.17.0).
+* Fixed serialization of a query which looks for a null timestamp. This only affects query based sync. ([PR #3389](https://github.com/realm/realm-core/pull/3388), since v5.23.2).
+
+### Breaking changes
+* None.
+
+-----------
+
+### Internals
+
+* VersionID comparison operators are now const qualified ([PR #3391](https://github.com/realm/realm-core/pull/3391)).
+* Exception `util::File::AccessError`, and it's derivatives such as `util::File::NotFound`, will now include a stacktrace in the message returned by the `what()` method. ([PR #3394](https://github.com/realm/realm-core/pull/3394))
+
+
+----------------------------------------------
+
+# 5.23.4 Release notes
+
+### Internals
+* The release binaries for Apple platforms are now built with Xcode 10.0 (up from 9.4).
+* Add a Catalyst/UIKit for Mac library to the Cocoa release package.
+
+----------------------------------------------
+
+# 5.23.3 Release notes
+
+### Fixed
+* If a signal interrupted a msync() call, Core would throw an exception. This behavior has new been changed to retry the system call instead. (Issue [#3352](https://github.com/realm/realm-core/issues/3352))
+* Fixed a bug in sum() or average() of == and != queries on integer columns sometimes returning an incorrect result. ([#3356](https://github.com/realm/realm-core/pull/3356), since the beginning).
+
+-----------
+
+### Internals
+* Changed the metrics timers to more precisely report in nanoseconds, instead of seconds. ([#3359](https://github.com/realm/realm-core/issues/3359))
+* Better performance when cloud query metrics are turned on, by not acquiring a backtrace on query serialization errors (permissions queries). ([#3361](https://github.com/realm/realm-core/issues/3361)).
+* Performance improved for queries comparing a constant value to a property over unary link path (eg: "someLink.Id == 42"). ([#3670](https://github.com/realm/realm-core/issues/3370))
+
+----------------------------------------------
+
+# 5.23.2 Release notes
+
+### Fixed
+* Named pipes on Android are now created with 0666 permissions instead of 0600. This fixes a bug on Huawei devices which caused named pipes to change owners during app upgrades causing subsequent `ACCESS DENIED` errors. This should have not practical security implications. (Issue [#3328](https://github.com/realm/realm-core/pull/3328))
+ 
+-----------
+
+### Internals
+* The release binaries for Apple platforms are now built with Xcode 9.4 (up from 9.2).
+* Performance of queries on Timestamp is improved
+
+----------------------------------------------
+
+# 5.23.1 Release notes
+
+### Fixed
+* Fixed the metrics throwing an exception when a query cannot be serialised. Now it reports the exception message as the description.
+ ([#3031](https://github.com/realm/realm-sync/issues/3031), since v3.2.0)
+* Queries involving an indexed int column which were constrained by a LinkList with an order different from the table's order would
+  give incorrect results. ([#3307](https://github.com/realm/realm-core/issues/3307), since v5.19.0)
+* Queries involving an indexed int column had a memory leak if run multiple times. ([#6186](https://github.com/realm/realm-cocoa/issues/6186)), since v5.19.0)
+
+----------------------------------------------
+
+# 5.23.0 Release notes
+
+### Enhancements
+* Add a Swift Package Manager package ([#3308](https://github.com/realm/realm-core/pull/3308)).
+
+### Fixed
+* Constructing an `IncludeDescriptor` made unnecessary table comparisons. This resulted in poor performance for subscriptions
+  using the `includeLinkingObjects` functionality. ([#3311](https://github.com/realm/realm-core/issues/3311), since v5.18.0)
+ 
+### Breaking changes
+* None.
+
+-----------
+
+### Internals
+* None.
+
+----------------------------------------------
+
+# 5.22.0 Release notes
+
+### Enhancements
+
+* Expose the ability to follow links while printing a TableView in JSON format.
+  TableView::to_json() now supports the same arguments as Table::to_json().
+  ([#3301](https://github.com/realm/realm-core/pull/3301))
+
+### Fixed
+* None.
+ 
+### Breaking changes
+* None.
+
+-----------
+
+### Internals
+* Fixed an inconsistency in the use of the `REALM_METRICS` compile time option. Now core consumers are able
+  to use `SharedGroup::get_metrics()` regardless of whether or not metrics are compiled in. A null pointer
+  is returned if the feature has been disabled at compile time.
+
+----------------------------------------------
+
+# 5.21.0 Release notes
+
+### Enhancements
+* Added support for unicode characters in realm path and filenames for Windows. Contribution by @rajivshah3.
+  ([#3293](https://github.com/realm/realm-core/pull/3293))
+
+### Fixed
+* None.
+
+### Breaking changes
+* None.
+
+-----------
+
+### Internals
+* Introduced new feature test macros for address and thread sanitizers in
+  `<realm/util/features.h>`.
+* Added Realm file path to Allocator assertions ([3283](https://github.com/realm/realm-core/issues/3283)).
+
+----------------------------------------------
+
+# 5.20.0 Release notes
+
+### Enhancements
+* Added the ability to convert a std::chrono::time_point to a Timestamp and
+  vice versa. This allows us to make calculations using std::chrono::duration.
+
+### Fixed
+* Slab usage was reported wrong by SlabAlloc::get_total_slab_size() ([#3284](https://github.com/realm/realm-core/pull/3284)
+  This caused ROS to incorectly report "exabytes" of memory used for slab.
+* The control of the page reclaimer did not limit the page reclaimers workload correctly. This could lead
+  to the reclaimer not running as much as intended. This is not believed to have been visible to end users.
+  This bug also caused ROS to occasionally report odd metrics for the reclaimer.
+  ([#3285](https://github.com/realm/realm-core/pull/3285))
+* When opening an encrypted file via SharedGroup::open(), it could wrongly fail and indicate a file corruption
+  although the file was ok.
+  ([#3267](https://github.com/realm/realm-core/issues/3267), since core v5.12.2)
+ 
+----------------------------------------------
+
+# 5.19.1 Release notes
+
+### Fixed
+* Freelist would keep growing with a decreased commit performance as a result.
+  ([2927](https://github.com/realm/realm-sync/issues/2927))
+* Fixed an incorrect debug mode assertion which could be triggered when generating the description of an IncludeDescriptor.
+  ([PR #3276](https://github.com/realm/realm-core/pull/3276) since v5.18.0). 
+----------------------------------------------
+
+# 5.19.0 Release notes
+
+### Enhancements
+* Improved query performance for unindexed integer columns when the query has a chain of OR conditions.
+  This will improve performance of "IN" queries generated by SDKs.
+  ([PR #2888](https://github.com/realm/realm-sync/issues/2888).
+* Use search index in queries on integer columns (equality only). This will improve performance of
+  queries on integer primary key properties for example. ([PR #3272](https://github.com/realm/realm-core/pull/3272)).
+* Number of 8 byte blocks in freelist is minimized. This will result in a shorter freelist.
+
+### Fixed
+* Writing a snapshot to file via Group::write() could produce a file with some parts not
+  reachable from top array (a memory leak). ([#2911](https://github.com/realm/realm-sync/issues/2911))
+* Fixed a bug in queries on a string column with more than two "or" equality conditions when the last condition also had an
+  "and" clause. For example: `first == "a" || (first == "b" && second == 1)` would be incorrectly evaluated as
+  `(first == "a" || first == "b")`. ([#3271](https://github.com/realm/realm-core/pull/3271), since v5.17.0)
+ 
+### Breaking changes
+* None.
+
+-----------
+
+### Internals
+* None.
+
+----------------------------------------------
+
+# 5.18.0 Release notes
+
+### Enhancements
+* Adds support for a new IncludeDescriptor type which describes arbitrary link paths
+  on a TableView. Applying this to a TableView does not modify the results, but gives
+  users the ability to use the reporting method to find rows in a different table that
+  are connected by backlinks. This is intended for sync subscriptions.
+* Enhances LinksToNode so that it can check links to multiple targets. This can be utilized
+  in permissions check in sync.
+
+### Fixed
+* None.
+ 
+-----------
+
+### Internals
+* The release binaries for Apple platforms are now built with Xcode 9.2 (up from 8.3.3).
+
+----------------------------------------------
+
+# 5.17.0 Release notes
+
+### Enhancements
+* Improved query performance for unindexed string columns when the query has a chain of OR conditions.
+  This will improve performance of "IN" queries generated by SDKs.
+  ([PR #3250](https://github.com/realm/realm-core/pull/3250).
+
+### Fixed
+* Making a query that compares two integer properties could cause a segmentation fault on the server.
+  ([#3253](https://github.com/realm/realm-core/issues/3253))
+ 
+-----------
+
+### Internals
+* The protocol for updating Replication/History is changed. The Replication object will be initialized
+  in every transaction. A new parameter will tell if it is a write- or readtransaction. A new function -
+  History::ensure_updated can be called in places where the history object needs to be up-to-date. The 
+  function will use a flag to ensure that the object is only updated once per transaction.
+
+----------------------------------------------
+
+# 5.16.0 Release notes
+
+### Enhancements
+* Improved performance of encryption and decryption significantly by utilizing hardware optimized encryption functions.
+  ([#293](https://github.com/realm/realm-core-private/issues/293))
+* Added the ability to write a Group with the history stripped.
+  ([#3245](https://github.com/realm/realm-core/pull/3245))
+
+### Fixed
+* Nothing
+
+-----------
+
+### Internals
+* Size of decrypted memory and of currently reserved slab is now available outside of the
+  metrics system (to which they were added in 5.15.0). This allows us to get the current
+  values independently from transactions start or end (the metrics system is only updated
+  at transaction boundaries).
+  ([3240] https://github.com/realm/realm-core/pull/3240)
+* Current target and workload set for the page reclaimer is now also available from `get_decrypted_memory_stats()`
+  ([3246] https://github.com/realm/realm-core/pull/3246)
+* Default heuristic for reclaiming pages holding decrypted data has been changed, now
+  limiting amount to same as current use of the buffer cache. Previously the limit was
+  half of buffer cache usage. This heuristic may still not be good enough for some scenarios
+  and we recommend monitoring and explicitly setting a better target in cases where we reclaim
+  more memory than nescessary.
+  (also [3240] https://github.com/realm/realm-core/pull/3240)
+* Now publishing a TSAN compatible linux build.
+----------------------------------------------
+
+# 5.15.0 Release notes
+
+### Enhancements
+* Metrics history is now capped to a configurable buffer size with a default of 10000 entries.
+  If this is exceeded without being consumed, only the most recent entries are stored. This
+  prevents excessive memory growth if users turn on metrics but don't use it.
+* Metrics transaction objects now store the number of decrypted pages currently in memory.
+* SharedGroup::get_stats includes an optional parameter to get size of currently locked memory.
+* Metrics now exposes the table name of queries which have been run.
+
+### Fixed
+* When shutting down the server you could sometimes experience a crash with "realm::util::Mutex::lock_failed"
+  in the stacktrace.
+  ([#3237](https://github.com/realm/realm-core/pull/3237), since v5.12.5)
+
+### Internal
+* Fix a race between the encryption page reclaim governor running and setting a governor.
+  This only affects applications which actually set the governor to something custom which no one does yet.
+  ([#3239](https://github.com/realm/realm-core/issues/3239), since v5.12.2)
+
+----------------------------------------------
+
+# 5.14.0 Release notes
+
+### Enhancements
+* Add assertion to prevent translating a ref value that is not 8 byte aligned. This will allow
+  us to detect file corruptions at an earlier stage.
+* You can now get size of the commit being built and the size of currently allocated slab area.
+* The amount of memory held by SharedGroup is minimized as most of it will be freed after each commit.
+
+### Fixed
+* Compacting a realm into an encrypted file could take a really long time. The process is now optimized by adjusting the write
+  buffer size relative to the used space in the realm.
+  ([#2754](https://github.com/realm/realm-sync/issues/2754))
+* Creating an object after creating an object with the int primary key of "null" would hit an assertion failure.
+  ([#3227](https://github.com/realm/realm-core/pull/3227)).
+
+### Breaking changes
+* None.
+
+-----------
+
+### Internals
+* The buffer size used by util::File::Streambuf is now configurable in construction.
+
+----------------------------------------------
+
+# 5.13.0 Release notes
+
+### Enhancements
+* The parser now supports readable timestamps with a 'T' separator in addition to the originally supported "@" separator.
+  For example: "startDate > 1981-11-01T23:59:59:1". ([#3198](https://github.com/realm/realm-core/issues/3198)).
+
+### Fixed
+* If, in debug mode, you try to compute the used space on a newly compacted realm (with empty free list), the program will
+  abort. ([#1171](https://github.com/realm/realm-sync/issues/2724), since v5.12.0)
+ 
+### Breaking changes
+* None.
+
+-----------
+
+### Internals
+* For convenience, `parser::parse` now accepts a `StringData` type instead of just `std::string`.
+* Parsing a query which uses the 'between' operator now gives a better error message indicating
+  that support is not yet implemented. ([#3198](https://github.com/realm/realm-core/issues/3198)).
+
+----------------------------------------------
+
+# 5.12.7 Release notes
+
+### Enhancements
+* Instead of asserting, an `InvalidDatabase` exception is thrown when a realm file is opened 
+  with an invalid top ref. Name of problematic file is included in exception message.
+
+### Fixed
+* A bug was fixed in `realm::util::DirScanner` that could cause it to sometimes
+  skip directory entries due to faulty error handling around `readdir()`.
+  (Issue [realm-sync#2699](https://github.com/realm/realm-sync/issues/2699), since 5.12.5).
+ 
+### Breaking changes
+* None.
+
+-----------
+
+### Internals
+* Improved performance on `find_first` for small string arrays (ArrayString). This will improve the table name lookup
+  performance.
+* Upgrade pegtl to 2.6.1. Several issues fixed.
+* Introduced Durability::Unsafe, which disables sync'ing to disk. Using this option, 
+  a platform crash may corrupt the realm file. Use only, if you'r OK with this.
+
+----------------------------------------------
+
+# 5.12.6 Release notes
+
+### Enhancements
+* None.
+
+### Fixed
+* On AWS Lambda we may throw an "Operation not permitted" exception when calling posix_fallocate().
+  A slower workaround has been supplied.
+  ([#3193](https://github.com/realm/realm-core/issues/3293))
+ 
+### Breaking changes
+* None.
+
+-----------
+
+### Internals
+* None.
+
+----------------------------------------------
+
+# 5.12.5 Release notes
+
+### Enhancements
+* None.
+
+### Fixed
+* When loading the realm binary from within the realm-js SDK, core could hang on Windows as described in
+  https://github.com/realm/realm-js/issues/2169.
+  ([#3188](https://github.com/realm/realm-core/pull/3188, since 5.12.2)
+
+### Breaking changes
+* None.
+
+-----------
+
+### Internals
+* Fixed warnings reported by GCC 8.
+* Replaced call to the deprecated `readdir_r()` with `readdir()`.
+* Compilation without encryption now possible
+
+----------------------------------------------
+
+# 5.12.4 Release notes
+
+### Enhancements
+* None.
+
+### Fixed
+* A segmentation fault would occur when calling Group:get_used_space() for a realm file
+  with no commits. This method would usually only be called from sync/ROS to calculate
+  and report state size.
+  ([#3182](https://github.com/realm/realm-core/issues/3182), since v5.12.0)
+
+### Breaking changes
+* None.
+
+----------------------------------------------
+
+# 5.12.3 Release notes
+
+### Enhancements
+* None.
+
+### Fixed
+* Added assertions around use of invalid refs and sizes. Helps in narrowing down the causes for
+  asserts like `ref != 0` and `(chunk_pos % 8) == 0`
+
+### Breaking changes
+* None.
+
+-----------
+
+### Internals
+* None.
+
+----------------------------------------------
+
+# 5.12.2 Release notes
+
+### Enhancements
+* None
+
+### Fixed
+* If encryption was enabled, decrypted pages were not released until the file was closed, causing
+  excessive usage of memory.
+  A page reclaim daemon thread has been added, which will work to release decrypted pages back to
+  the operating system. To control it, a governing function can be installed. The governing function
+  sets the target for the page reclaimer. If no governing function is installed, the system will attempt
+  to keep the memory usage below any of the following:
+
+        - 1/4 of physical memory available on the platform as reported by "/proc/meminfo"
+        - 1/4 of allowed memory available as indicated by "/sys/fs/cgroup/memory/memory_limit_in_bytes"
+        - 1/2 of what is used by the buffer cache as indicated by "/sys/fs/cgroup/memory/memory.stat"
+        - A target directly specified as "target <number of bytes>" in a configuration file specified
+          by the environment variable REALM_PAGE_GOVERNOR_CFG.
+  if none of the above is available, or if a target of -1 is given, the feature is disabled.
+  ([#3123](https://github.com/realm/realm-core/issues/3123))
+
+-----------
+
+### Internals
+* None.
+
+----------------------------------------------
+
+# 5.12.1 Release notes
+
+### Enhancements
+* Illegal freeing of in-file-memory is now detected when freeing is
+  actually done. This will make it easier to find the root cause of
+  some file corruption issues.
+
+### Fixed
+* None.
+
+### Breaking changes
+* None.
+
+-----------
+
+### Internals
+* None.
+
+----------------------------------------------
+
+# 5.12.0 Release notes
+
+### Enhancements
+* Added Group::get_used_space() which will return the size of the data taken up by the current
+  commit. This is in contrast to the number returned by SharedGroup::get_stats() which will
+  return the size of the last commit done in that SharedGroup. If the commits are the same,
+  the number will of course be the same.
+  Issue [#259](https://github.com/realm/realm-core-private/issues/259)
+
+### Fixed
+* None.
+
+### Breaking changes
+* The way the Linux binaries are delivered is changed. They are now distributed
+  like the rest of the binaries with two packages (devel/runtime) per build type.
+  The file names follow this scheme:
+  realm-core-<buildType>-<release>-Linux-{devel|runtime}.tar.gz
+  For Linux the following build types are published: Debug, Release, RelAssert
+  and RelASAN.
+
+-----------
+
+### Internals
+* Replication::get_database_path() is made const.
+* TrivialReplication::get_database_path() is made public.
+* Added better compatibility for custom allocators with standard library
+  containers on GCC 4.9.
+
+----------------------------------------------
+
+# 5.11.3 Release notes
+
+### Compatibility
+* File format: ver. 9
+  Upgrades automatically from previous formats.
+  Can open realms down to file format version 7 in ReadOnly mode (without upgrade).
+
+-----------
+
+### Internals
+* Improved assertion checking in release mode in order to detect any corruption
+  of our freelist earlier and prevent bogus allocations from a corrupted freelist
+  from leading to subsequent corruption of other parts of the file.
+
+----------------------------------------------
+
+# 5.11.2 Release notes
+
+### Compatibility
+* File format: ver. 9
+  Upgrades automatically from previous formats.
+  Can open realms down to file format version 7 in ReadOnly mode (without upgrade).
+
+-----------
+
+### Internals
+* Releases no longer include RPM and DEB packages.
+* Releases now include RelWithDebInfo+ASAN and RelWithDebInfo+Assertions tarballs for linux.
+  [#3112](https://github.com/realm/realm-core/pull/3112).
+
+----------------------------------------------
+
+# 5.11.1 Release notes
+
+### Compatibility
+* File format: ver. 9
+  Upgrades automatically from previous formats.
+  Can open realms down to file format version 7 in ReadOnly mode (without upgrade).
+
+-----------
+
+### Internals
+* Fixed a bug in the use of placement new on MSVC, where the implementation is
+  buggy. This bug only affected version 5.11.0.
+  PR [#3109](https://github.com/realm/realm-core/pull/3109)
+* Made improvements to the custom allocation interfaces introduced in 5.11.0,
+  which should make them more convenient and use slightly less memory.
+  PR [#3108](https://github.com/realm/realm-core/pull/3108)
+
+----------------------------------------------
+
+# 5.11.0 Release notes
+
+### Compatibility
+* File format: ver. 9
+  Upgrades automatically from previous formats.
+  Can open realms down to file format version 7 in ReadOnly mode (without upgrade).
+
+-----------
+
+### Internals
+* Added support for custom heap allocators
+  PR [#3106](https://github.com/realm/realm-core/pull/3106).
+
+----------------------------------------------
+
+# 5.10.3 Release notes
+
+### Fixed
+* When a sort or distinct over links was done on an already-sorted TableView,
+  the link translation map was done using the unsorted rows, resulting in the
+  second sort/distinct being done with the incorrect values.
+  PR [#3102](https://github.com/realm/realm-core/pull/3102).
+
+### Compatibility
+* File format: ver. 9 (upgrades automatically from previous formats)
+
+-----------
+
+### Internals
+
+* Will assert if someone tries to free a null ref.
+  Issue [#254](https://github.com/realm/realm-core-private/issues/254) and the like.
+
+----------------------------------------------
+
+# 5.10.2 Release notes
+
+### Enhancements
+
+* Add an arm64_32 slice to the watchOS build.
+
+----------------------------------------------
+
+# 5.10.1 Release notes
+
+### Internals
+
+* Stack trace also available when throwing std:: exceptions.
+
+----------------------------------------------
+
+# 5.10.0 Release notes
+
+### Enhancements
+
+* Allow compact to take an optional output encryption key.
+  PR [#3090](https://github.com/realm/realm-core/pull/3090).
+
+----------------------------------------------
+
+# 5.9.0 Release notes
+
+### Enhancements
+
+* Allow a version number in Group::write which will cause a file with (sync)
+  history to be written.
+
+-----------
+
+### Internals
+
+* Most exception types now report the stack trace of the point where they were
+  thrown in their `what()` message. This is intended to aid debugging.
+  Additionally, assertion failures on Linux now report their stack traces as
+  well, similar to Apple platforms. Recording stack traces is only supported on
+  Linux (non-Android) and Apple platforms for now.
+
+----------------------------------------------
+
+# 5.8.0 Release notes
+
+### Bugfixes
+
+* Fix a crash on some platforms when using the query parser to look for a string
+  or binary object which has a certain combination of non-printable characters.
+
+### Enhancements
+
+* Support limiting queries via `DescriptorOrdering::set_limit` and by supporting
+  "LIMIT(x)" in string queries.
+  Issue [realm_sync:#2223](https://github.com/realm/realm-sync/issues/2223)
+
+----------------------------------------------
+
+# 5.7.2 Release notes
+
+### Bugfixes
+
+* Fix a use-after-free when an observer is passed to rollback_and_continue_as_read().
+
+### Enhancements
+
+* More informative InvalidDatabase exception messages
+  Issue [#3075](https://github.com/realm/realm-core/issues/3075).
+
+----------------------------------------------
+
+# 5.7.1 Release notes
+
+### Bugfixes
+
+* Fix crash in Group::compute_aggregated_byte_size() when applied on an empty
+  realm file. (Issue #3072)
+
+----------------------------------------------
+
+# 5.7.0 Release notes
+
+### Enhancements
+
+* Improved Group::compute_aggregated_byte_size() allowing us to differentiate
+  between state, history and freelists.
+  (Issue #3063)
+
+----------------------------------------------
+
+# 5.6.5 Release notes
+
+### Enhancements
+
+* Improved scalability for the slab allocator. This allows for larger
+  transactions. (PR #3067)
+
+----------------------------------------------
+
+# 5.6.4 Release notes
+
+### Enhancements
+
+* Add Table::add_row_with_keys(), which allows
+  sync::create_object_with_primary_key() to avoid updating the index twice when
+  creating an object with a string primary key.
+* Improved the performance of setting a link to its current value.
+
+----------------------------------------------
+
+# 5.6.3 Release notes
+
+### Enhancements
+
+* Improved scalability for in-file freelist handling. This reduces
+  commit overhead on large transactions.
+* Improved scalability for in-file allocation during commit.
+* Minimized use of memory mappings and msync() on large commits
+  on devices which can support large address spaces.
+
+----------------------------------------------
+
+# 5.6.2 Release notes
+
+### Bugfixes
+
+* Fix curruption of freelist with more than 2M entries.
+  PR [#3059](https://github.com/realm/realm-core/pull/3059).
+
+----------------------------------------------
+
+# 5.6.1 Release notes
+
+### Bugfixes
+
+* More readable error message in the query parser when requesting an a bad argument.
+* Don't write history information in `SharedGroup::compact()` for
+  non-syncronized Realms.
+
+-----------
+
+### Internals
+
+* Restore -fvisibility-inlines-hidden for the binaries for Apple platforms.
+* Remove a few warnings at compile time.
+* Improve error detection related to memory allocation/release
+
+----------------------------------------------
+
+# 5.6.0 Release notes
+
+### Bugfixes
+
+* In the parser, fix `@links.@count` when applied over lists to return
+  the sum of backlinks for all connected rows in the list.
+* Fix null comparisons in queries not serialising properly in some cases.
+  Also explicitly disable list IN list comparisons since its not supported.
+  PR [#3037](https://github.com/realm/realm-core/pull/3037).
+
+### Enhancements
+
+* `SharedGroup::compact()` now also compacts history information, which means
+  that Sync'ed Realm files can now be compacted (under the usual restrictions;
+  see `group_shared.hpp` for details).
+
+----------------------------------------------
+
+# 5.5.0 Release notes
+
+### Enhancements
+
+* Parser improvements:
+    - Allow an arbitrary prefix on backlink class names of @links queries.
+      This will allow users to query unnamed backlinks using the `@links.Class.property` syntax.
+    - Case insensitive `nil` is now recognised as a synonym to `NULL`.
+    - Add support for `@links.@count` which gives the count of all backlinks to an object.
+      See Issue [#3003](https://github.com/realm/realm-core/issues/3003).
+
+-----------
+
+### Internals
+
+* Apple binaries are now built with Xcode 8.3.3.
+
+----------------------------------------------
 
 # 5.4.2 Release notes
 
@@ -1252,8 +1235,6 @@ up until v5.8.0
   PR [#3002](https://github.com/realm/realm-core/pull/3002).
 * Assertions will print more information in relase mode.
   PR [#2982](https://github.com/realm/realm-core/pull/2982).
-:
-(xed:22928): Gtk-WARNING **: Calling Inhibit failed: GDBus.Error:org.freedesktop.DBus.Error.ServiceUnknown: The name org.gnome.SessionManager was not provided by any .service files
 
 ----------------------------------------------
 
@@ -1773,7 +1754,7 @@ up until v5.8.0
 * Fix missing symbols for some overloads of Table::find_first
   in some configurations.
   PR [#2624](https://github.com/realm/realm-core/pull/2624).
-  
+
 ----------------------------------------------
 
 # 2.8.0 Release notes
@@ -2089,7 +2070,7 @@ up until v5.8.0
 
 ### Enhancements
 * Windows 10 UWP support. Use the new "UWP" configurations in Visual Studio to
-  compile core as a static .lib library for that platform. Also see sample App 
+  compile core as a static .lib library for that platform. Also see sample App
   in the uwp_demo directory that uses the static library (compile the .lib first).
   Note that it is currently just an internal preview with lots of limitations; see
   https://github.com/realm/realm-core/issues/2059
@@ -2267,7 +2248,7 @@ up until v5.8.0
 * Fixed a crash related to queries that was introduced in rc7. (#2186)
 * Fixed a bug triggered through set unique of primary keys through
   the ROS. (#2180)
-  
+
 -----------
 
 ### Internals
@@ -2357,12 +2338,12 @@ up until v5.8.0
 
 * Refactored the `SharedGroup` constructors and open methods to use a new
   `SharedGroupOptions` parameter which stores all options together.
-* BREAKING! Until now, a Query would return indexes into a restricting view if such was 
+* BREAKING! Until now, a Query would return indexes into a restricting view if such was
   present (a view given in the `.where(&view) method`, or it would return indexes into the
-  Table if no restricting view was present. This would make query results useless if you did 
-  not know whether or not a restricting view was present. This fix make it *always* return 
-  indexes into the Table in all cases. Also, any `begin` and `end` arguments could point into 
-  eitherthe View or the Table. These now always point into the Table. Also see 
+  Table if no restricting view was present. This would make query results useless if you did
+  not know whether or not a restricting view was present. This fix make it *always* return
+  indexes into the Table in all cases. Also, any `begin` and `end` arguments could point into
+  eitherthe View or the Table. These now always point into the Table. Also see
   https://github.com/realm/realm-core/issues/1565
 
 ### Enhancements
@@ -2373,7 +2354,7 @@ up until v5.8.0
 
 ### Internals
 
-* When creating a `SharedGroup`, optionally allow setting the temporary 
+* When creating a `SharedGroup`, optionally allow setting the temporary
   directory to when making named pipes fails. This is to fix a bug
   involving mkfifo on recent android devices (#1959).
 * Bug fixed in test harness: In some cases some tests and checks would be
@@ -2946,7 +2927,7 @@ about the size of the list in question prior to carrying out the instruction.
 * S: Misbehavior of empty asynchronous write in POSIX networking API.
 * S: Access dangling pointer while handling canceled asynchronous accept
   in POSIX networking API.
-* Changed group operator== to take table names into account.  
+* Changed group operator== to take table names into account.
 
 ### Enhancements:
 
