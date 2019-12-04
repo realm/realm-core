@@ -101,7 +101,7 @@ void AdminRealmListener::start()
         download_complete();
 
         auto realm = Realm::get_shared_realm(m_config);
-        m_results = Results(realm, *ObjectStore::table_for_object_type(realm->read_group(), "RealmFile")).sort({{"path", true}});
+        m_results = Results(realm, ObjectStore::table_for_object_type(realm->read_group(), "RealmFile")).sort({{"path", true}});
 
         struct Handler {
             bool initial_sent = false;
@@ -116,11 +116,11 @@ void AdminRealmListener::start()
                 if (!self)
                     return;
 
-                auto& table = self->m_results.get_tableview().get_parent();
-                auto path_col_key = table.get_column_key("path");
+                auto table = self->m_results.get_tableview().get_parent();
+                auto path_col_key = table->get_column_key("path");
                 for (auto i : c.deletions.as_indexes()) {
                     auto obj = self->m_results.get(i);
-                    self->unregister_realm(table.get_object_id(obj.get_key()), obj.get<StringData>(path_col_key));
+                    self->unregister_realm(table->get_object_id(obj.get_key()), obj.get<StringData>(path_col_key));
                 }
             }
 
@@ -135,20 +135,20 @@ void AdminRealmListener::start()
                 if (self->m_results.size() == 0)
                     return;
 
-                auto& table = self->m_results.get_tableview().get_parent();
-                auto path_col_key = table.get_column_key("path");
+                auto table = self->m_results.get_tableview().get_parent();
+                auto path_col_key = table->get_column_key("path");
 
                 if (!initial_sent) {
                     for (size_t i = 0, size = self->m_results.size(); i < size; ++i) {
                         auto obj = self->m_results.get(i);
-                        self->register_realm(table.get_object_id(obj.get_key()), obj.get<StringData>(path_col_key));
+                        self->register_realm(table->get_object_id(obj.get_key()), obj.get<StringData>(path_col_key));
                     }
                     initial_sent = true;
                 }
                 else {
                     for (auto i : c.insertions.as_indexes()) {
                         auto obj = self->m_results.get(i);
-                        self->register_realm(table.get_object_id(obj.get_key()), obj.get<StringData>(path_col_key));
+                        self->register_realm(table->get_object_id(obj.get_key()), obj.get<StringData>(path_col_key));
                     }
                 }
             }

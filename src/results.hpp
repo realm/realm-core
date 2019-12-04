@@ -44,7 +44,7 @@ public:
     // or a wrapper around a query and a sort order which creates and updates
     // the tableview as needed
     Results();
-    Results(std::shared_ptr<Realm> r, Table& table);
+    Results(std::shared_ptr<Realm> r, ConstTableRef table);
     Results(std::shared_ptr<Realm> r, std::shared_ptr<LstBase> list);
     Results(std::shared_ptr<Realm> r, std::shared_ptr<LstBase> list, DescriptorOrdering o);
     Results(std::shared_ptr<Realm> r, Query q, DescriptorOrdering o = {});

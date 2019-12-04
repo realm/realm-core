@@ -167,7 +167,7 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
     }
     realm->commit_transaction();
 
-    Results results(realm, *table);
+    Results results(realm, table);
     auto frozen_realm = Realm::get_frozen_realm(config, realm->current_transaction_version().value());
     Results frozen_results = results.freeze(frozen_realm);
 
@@ -196,7 +196,7 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
     }
 
     SECTION("Result constructor - Table") {
-        Results res = Results(frozen_realm, *frozen_realm->read_group().get_table("class_object"));
+        Results res = Results(frozen_realm, frozen_realm->read_group().get_table("class_object"));
         Results frozen_res = results.freeze(frozen_realm);
         JoiningThread thread([&] {
             auto obj = frozen_res.get(0);
@@ -316,7 +316,7 @@ TEST_CASE("Freeze List", "[freeze_list]") {
     }
     realm->commit_transaction();
 
-    Results results(realm, *table);
+    Results results(realm, table);
     auto frozen_realm = Realm::get_frozen_realm(config, realm->current_transaction_version().value());
 
     std::shared_ptr<LnkLst> link_list = results.get(0).get_linklist_ptr(object_link_col);
@@ -393,7 +393,7 @@ TEST_CASE("Freeze Object", "[freeze_object]") {
     }
     realm->commit_transaction();
 
-    Results results(realm, *table);
+    Results results(realm, table);
     auto frozen_realm = Realm::get_frozen_realm(config, realm->current_transaction_version().value());
     Object frozen_obj = Object(realm, table->get_object(0)).freeze(frozen_realm);
     CppContext ctx(frozen_realm);

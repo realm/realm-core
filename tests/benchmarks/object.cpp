@@ -114,9 +114,9 @@ TEST_CASE("Benchmark object", "[benchmark]") {
     auto r = Realm::get_shared_realm(config);
     TestContext d(r);
 
-    auto create_person = [&](util::Any&& value, bool update, bool update_only_diff = false) {
+    auto create_person = [&](util::Any&& value, CreatePolicy policy) {
         r->begin_transaction();
-        auto obj = Object::create(d, r, *r->schema().find("person"), value, update, update_only_diff);
+        auto obj = Object::create(d, r, *r->schema().find("person"), value, policy);
         r->commit_transaction();
         return obj;
     };
@@ -124,8 +124,7 @@ TEST_CASE("Benchmark object", "[benchmark]") {
     SECTION("create object") {
         r->begin_transaction();
         ObjectSchema all_types = *r->schema().find("all types");
-        constexpr bool update = false;
-        constexpr bool update_only_diff = false;
+        constexpr CreatePolicy policy = CreatePolicy::ForceCreate;
 
         int64_t benchmark_pk = 0;
         BENCHMARK("create object") {
@@ -148,7 +147,7 @@ TEST_CASE("Benchmark object", "[benchmark]") {
                 {"data array", AnyVec{"d"s, "e"s, "f"s}},
                 {"date array", AnyVec{}},
                 {"object array", AnyVec{AnyDict{{"value", INT64_C(20)}}}},
-            }), update, update_only_diff);
+            }), policy);
         };
         r->commit_transaction();
     }
@@ -157,8 +156,7 @@ TEST_CASE("Benchmark object", "[benchmark]") {
         auto table = r->read_group().get_table("class_all types");
         r->begin_transaction();
         ObjectSchema all_types = *r->schema().find("all types");
-        constexpr bool update = false;
-        constexpr bool update_only_diff = false;
+        constexpr CreatePolicy policy = CreatePolicy::ForceCreate;
         auto obj = Object::create(d, r, all_types, util::Any(AnyDict{
             {"pk", INT64_C(0)},
             {"bool", true},
@@ -178,10 +176,10 @@ TEST_CASE("Benchmark object", "[benchmark]") {
             {"data array", AnyVec{"d"s, "e"s, "f"s}},
             {"date array", AnyVec{}},
             {"object array", AnyVec{AnyDict{{"value", INT64_C(20)}}}},
-        }), update, update_only_diff);
+        }), policy);
         r->commit_transaction();
 
-        Results result(r, *table);
+        Results result(r, table);
         size_t num_modifications = 0;
         auto token = result.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
             num_modifications += c.modifications.count();
@@ -197,7 +195,7 @@ TEST_CASE("Benchmark object", "[benchmark]") {
                 auto shadow = Object::create(d, r, all_types, util::Any(AnyDict{
                     {"pk", INT64_C(0)},
                     {"int", update_int},
-                }), true, true);
+                }), CreatePolicy::UpdateModified);
             });
             r->commit_transaction();
             advance_and_notify(*r);
@@ -209,7 +207,7 @@ TEST_CASE("Benchmark object", "[benchmark]") {
 
     SECTION("change notifications reporting") {
         auto table = r->read_group().get_table("class_person");
-        Results result(r, *table);
+        Results result(r, table);
         size_t num_calls = 0;
         size_t num_insertions = 0;
         auto token = result.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
@@ -226,7 +224,7 @@ TEST_CASE("Benchmark object", "[benchmark]") {
                 {"name", name.str()},
                 {"age", pk},
             };
-            create_person(person, true, false);
+            create_person(person, CreatePolicy::UpdateAll);
             meter.measure([&r] {
                 advance_and_notify(*r);
             });
