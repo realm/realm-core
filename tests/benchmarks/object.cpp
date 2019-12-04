@@ -233,7 +233,7 @@ TEST_CASE("Benchmark object", "[benchmark]") {
         }), CreatePolicy::ForceCreate);
         r->commit_transaction();
 
-        Results result(r, *table);
+        Results result(r, table);
         size_t num_modifications = 0;
         auto token = result.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
             num_modifications += c.modifications.count();
@@ -261,7 +261,7 @@ TEST_CASE("Benchmark object", "[benchmark]") {
 
     SECTION("change notifications reporting") {
         auto table = r->read_group().get_table("class_person");
-        Results result(r, *table);
+        Results result(r, table);
         size_t num_calls = 0;
         size_t num_insertions = 0;
         size_t num_deletions = 0;
@@ -274,7 +274,6 @@ TEST_CASE("Benchmark object", "[benchmark]") {
         });
 
         advance_and_notify(*r);
-        int64_t pk = 0;
         ObjectSchema person_schema = *r->schema().find("person");
         constexpr size_t num_objects = 1000;
 
@@ -312,7 +311,6 @@ TEST_CASE("Benchmark object", "[benchmark]") {
         result.clear();
         r->commit_transaction();
         advance_and_notify(*r);
-        pk = 0;
         num_calls = 0;
 
         BENCHMARK_ADVANCED("delete notifications")(Catch::Benchmark::Chronometer meter) {
@@ -508,7 +506,7 @@ TEST_CASE("Benchmark object", "[benchmark]") {
     SECTION("change notifications sorted") {
         auto table = r->read_group().get_table("class_person");
         auto age_col = table->get_column_key("age");
-        Results result = Results(r, *table).sort({{"age", true}});
+        Results result = Results(r, table).sort({{"age", true}});
         size_t num_insertions = 0;
         size_t num_deletions = 0;
         size_t num_modifications = 0;

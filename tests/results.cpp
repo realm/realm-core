@@ -1314,8 +1314,8 @@ TEST_CASE("notifications: sync") {
         auto r = Realm::get_shared_realm(config);
         auto wait_realm = Realm::get_shared_realm(config);
 
-        Results results(r, *r->read_group().get_table("class_object"));
-        Results wait_results(wait_realm, *wait_realm->read_group().get_table("class_object"));
+        Results results(r, r->read_group().get_table("class_object"));
+        Results wait_results(wait_realm, wait_realm->read_group().get_table("class_object"));
         auto token1 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) { });
         auto token2 = wait_results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) { });
 
@@ -1951,7 +1951,7 @@ TEST_CASE("results: notifications after move") {
     });
 
     auto table = r->read_group().get_table("class_object");
-    auto results = std::make_unique<Results>(r, *table);
+    auto results = std::make_unique<Results>(r, table);
 
     int notification_calls = 0;
     auto token = results->add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
@@ -2076,7 +2076,7 @@ TEST_CASE("results: error messages") {
 
     auto r = Realm::get_shared_realm(config);
     auto table = r->read_group().get_table("class_object");
-    Results results(r, *table);
+    Results results(r, table);
 
     r->begin_transaction();
     table->create_object();
@@ -2121,7 +2121,7 @@ TEST_CASE("results: snapshots") {
 
     SECTION("snapshot of Results based on Table") {
         auto table = r->read_group().get_table("class_object");
-        Results results(r, *table);
+        Results results(r, table);
 
         {
             // A newly-added row should not appear in the snapshot.
@@ -2405,7 +2405,7 @@ TEST_CASE("results: snapshots") {
         write([=] {
             table->create_object();
         });
-        Results results(r, *table);
+        Results results(r, table);
         auto snapshot = results.snapshot();
         write([=] {;
             table->clear();
@@ -2648,7 +2648,7 @@ TEST_CASE("results: sort") {
     auto realm = Realm::get_shared_realm(config);
     auto table = realm->read_group().get_table("class_object");
     auto table2 = realm->read_group().get_table("class_object 2");
-    Results r(realm, *table);
+    Results r(realm, table);
 
     SECTION("invalid keypaths") {
         SECTION("empty property name") {
@@ -2747,22 +2747,22 @@ TEST_CASE("results: sort") {
 }
 
 struct ResultsFromTable {
-    static Results call(std::shared_ptr<Realm> r, Table* table) {
-        return Results(std::move(r), *table);
+    static Results call(std::shared_ptr<Realm> r, ConstTableRef table) {
+        return Results(std::move(r), table);
     }
 };
 struct ResultsFromQuery {
-    static Results call(std::shared_ptr<Realm> r, Table* table) {
+    static Results call(std::shared_ptr<Realm> r, ConstTableRef table) {
         return Results(std::move(r), table->where());
     }
 };
 struct ResultsFromTableView {
-    static Results call(std::shared_ptr<Realm> r, Table* table) {
+    static Results call(std::shared_ptr<Realm> r, ConstTableRef table) {
         return Results(std::move(r), table->where().find_all());
     }
 };
 struct ResultsFromLinkView {
-    static Results call(std::shared_ptr<Realm> r, Table* table) {
+    static Results call(std::shared_ptr<Realm> r, ConstTableRef table) {
         r->begin_transaction();
         auto link_table = r->read_group().get_table("class_linking_object");
         std::shared_ptr<LnkLst> link_view = link_table->create_object().get_linklist_ptr(link_table->get_column_key("link"));
@@ -2998,7 +2998,7 @@ TEST_CASE("results: set property value on all objects", "[batch_updates]") {
     table->create_object();
     table->create_object();
     realm->commit_transaction();
-    Results r(realm, *table);
+    Results r(realm, table);
 
     TestContext ctx(realm);
 
@@ -3144,7 +3144,7 @@ TEST_CASE("results: limit", "[limit]") {
         table->create_object().set(col, (i + 2) % 4);
     }
     realm->commit_transaction();
-    Results r(realm, *table);
+    Results r(realm, table);
 
     SECTION("unsorted") {
         REQUIRE(r.limit(0).size() == 0);

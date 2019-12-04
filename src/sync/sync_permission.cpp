@@ -141,7 +141,7 @@ void Permissions::get_permissions(std::shared_ptr<SyncUser> user,
 {
     auto realm = Permissions::permission_realm(user, make_config);
     auto table = ObjectStore::table_for_object_type(realm->read_group(), "Permission");
-    auto results = std::make_shared<_impl::NotificationWrapper<Results>>(std::move(realm), *table);
+    auto results = std::make_shared<_impl::NotificationWrapper<Results>>(std::move(realm), table);
 
     // `get_permissions` works by temporarily adding an async notifier to the permission Realm.
     // This notifier will run the `async` callback until the Realm contains permissions or

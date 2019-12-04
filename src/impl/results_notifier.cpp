@@ -63,7 +63,7 @@ ResultsNotifier::ResultsNotifier(Results& target)
 {
     auto table = m_query->get_table();
     if (table) {
-        set_table(*table);
+        set_table(table);
     }
 }
 
@@ -127,7 +127,7 @@ void ResultsNotifier::calculate_changes()
             next_rows.push_back(m_run_tv.get_key(i).value);
 
         m_change = CollectionChangeBuilder::calculate(m_previous_rows, next_rows,
-                                                      get_modification_checker(*m_info, *m_query->get_table()),
+                                                      get_modification_checker(*m_info, m_query->get_table()),
                                                       m_target_is_in_table_order);
 
         m_previous_rows = std::move(next_rows);

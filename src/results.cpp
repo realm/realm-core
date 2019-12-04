@@ -41,9 +41,9 @@ Results::Results(SharedRealm r, Query q, DescriptorOrdering o)
 {
 }
 
-Results::Results(SharedRealm r, Table& table)
+Results::Results(SharedRealm r, ConstTableRef table)
 : m_realm(std::move(r))
-, m_table(&table)
+, m_table(table)
 , m_mode(Mode::Table)
 {
 }
@@ -69,7 +69,7 @@ Results::Results(std::shared_ptr<Realm> r, TableView tv, DescriptorOrdering o)
 , m_descriptor_ordering(std::move(o))
 , m_mode(Mode::TableView)
 {
-    m_table = TableRef(&m_table_view.get_parent());
+    m_table = m_table_view.get_parent();
 }
 
 Results::Results(std::shared_ptr<Realm> r, std::shared_ptr<LnkLst> lv, util::Optional<Query> q, SortDescriptor s)
@@ -77,7 +77,7 @@ Results::Results(std::shared_ptr<Realm> r, std::shared_ptr<LnkLst> lv, util::Opt
 , m_link_list(std::move(lv))
 , m_mode(Mode::LinkList)
 {
-    m_table = TableRef(&m_link_list->get_target_table());
+    m_table = m_link_list->get_target_table();
     if (q) {
         m_query = std::move(*q);
         m_mode = Mode::Query;
@@ -99,7 +99,7 @@ bool Results::is_valid() const
     // Here we cannot just use if (m_table) as it combines a check if the
     // reference contains a value and if that value is valid.
     // First we check if a table is referenced ...
-    if (((const Table*)m_table) != nullptr)
+    if (m_table.unchecked_ptr() != nullptr)
         return !!m_table; // ... and then we check if it is valid
 
     if (m_list)
@@ -674,7 +674,7 @@ Query Results::get_query() const
             if (m_update_policy == UpdatePolicy::Auto) {
                 m_table_view.sync_if_needed();
             }
-            return Query(*m_table, std::unique_ptr<ConstTableView>(new TableView(m_table_view)));
+            return Query(m_table, std::unique_ptr<ConstTableView>(new TableView(m_table_view)));
         }
         case Mode::LinkList:
             return m_table->where(*m_link_list);
@@ -975,7 +975,7 @@ Results Results::freeze(SharedRealm frozen_realm)
         case Mode::Empty:
             return Results();
         case Mode::Table:
-            return Results(frozen_realm, *frozen_realm->transaction().import_copy_of(m_table));
+            return Results(frozen_realm, frozen_realm->transaction().import_copy_of(m_table));
         case Mode::List: {
             return Results(frozen_realm, frozen_realm->transaction().import_copy_of(*m_list), m_descriptor_ordering);
         }

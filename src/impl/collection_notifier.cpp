@@ -48,7 +48,7 @@ bool CollectionNotifier::all_related_tables_covered(const TableVersions& version
 
 std::function<bool (size_t)>
 CollectionNotifier::get_modification_checker(TransactionChangeInfo const& info,
-                                             Table const& root_table)
+                                             ConstTableRef root_table)
 {
     if (info.schema_changed)
         set_table(root_table);
@@ -68,7 +68,7 @@ CollectionNotifier::get_modification_checker(TransactionChangeInfo const& info,
         return [&](size_t row) { return object_set.modifications_contains(row); };
     }
 
-    return DeepChangeChecker(info, root_table, m_related_tables);
+    return DeepChangeChecker(info, *root_table, m_related_tables);
 }
 
 void DeepChangeChecker::find_related_tables(std::vector<RelatedTable>& out, Table const& table)
@@ -288,10 +288,10 @@ std::unique_lock<std::mutex> CollectionNotifier::lock_target()
     return std::unique_lock<std::mutex>{m_realm_mutex};
 }
 
-void CollectionNotifier::set_table(Table const& table)
+void CollectionNotifier::set_table(ConstTableRef table)
 {
     m_related_tables.clear();
-    DeepChangeChecker::find_related_tables(m_related_tables, table);
+    DeepChangeChecker::find_related_tables(m_related_tables, *table);
 }
 
 void CollectionNotifier::add_required_change_info(TransactionChangeInfo& info)

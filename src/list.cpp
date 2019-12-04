@@ -77,7 +77,7 @@ ObjectSchema const& List::get_object_schema() const
 
     REALM_ASSERT(get_type() == PropertyType::Object);
     if (!m_object_schema) {
-        auto object_type = object_name(static_cast<LnkLst&>(*m_list_base).get_target_table());
+        auto object_type = object_name(*static_cast<LnkLst&>(*m_list_base).get_target_table());
         auto it = m_realm->schema().find(object_type);
         REALM_ASSERT(it != m_realm->schema().end());
         m_object_schema = &*it;
@@ -89,7 +89,7 @@ Query List::get_query() const
 {
     verify_attached();
     if (m_type == PropertyType::Object)
-        return static_cast<LnkLst&>(*m_list_base).get_target_table().where(as<Obj>());
+        return static_cast<LnkLst&>(*m_list_base).get_target_table()->where(as<Obj>());
     throw std::runtime_error("not implemented");
 }
 
@@ -123,11 +123,11 @@ void List::validate(const Obj& obj) const
 {
     if (!obj.is_valid())
         throw std::invalid_argument("Object has been deleted or invalidated");
-    auto& target = static_cast<LnkLst&>(*m_list_base).get_target_table();
-    if (obj.get_table() != &target)
+    auto target = static_cast<LnkLst&>(*m_list_base).get_target_table();
+    if (obj.get_table() != target)
         throw std::invalid_argument(util::format("Object of type (%1) does not match List type (%2)",
                                                  object_name(*obj.get_table()),
-                                                 object_name(target)));
+                                                 object_name(*target)));
 }
 
 bool List::is_valid() const
@@ -171,7 +171,7 @@ Obj List::get(size_t row_ndx) const
 {
     verify_valid_row(row_ndx);
     auto& list = as<Obj>();
-    return list.get_target_table().get_object(list.get(row_ndx));
+    return list.get_target_table()->get_object(list.get(row_ndx));
 }
 
 template<typename T>

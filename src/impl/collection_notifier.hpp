@@ -24,6 +24,7 @@
 #include <realm/util/assert.hpp>
 #include <realm/version_id.hpp>
 #include <realm/keys.hpp>
+#include <realm/table_ref.hpp>
 
 #include <array>
 #include <atomic>
@@ -36,7 +37,6 @@
 namespace realm {
 class Realm;
 class Transaction;
-class Table;
 
 namespace _impl {
 class RealmCoordinator;
@@ -180,12 +180,12 @@ public:
     bool have_callbacks() const noexcept { return m_have_callbacks; }
 protected:
     void add_changes(CollectionChangeBuilder change);
-    void set_table(Table const& table);
+    void set_table(ConstTableRef table);
     std::unique_lock<std::mutex> lock_target();
     Transaction& source_shared_group();
 
     bool all_related_tables_covered(const TableVersions& versions);
-    std::function<bool (size_t)> get_modification_checker(TransactionChangeInfo const&, Table const&);
+    std::function<bool (size_t)> get_modification_checker(TransactionChangeInfo const&, ConstTableRef);
 
     // The actual change, calculated in run() and delivered in prepare_handover()
     CollectionChangeBuilder m_change;
