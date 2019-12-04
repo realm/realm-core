@@ -2864,6 +2864,11 @@ void Table::create_objects(const std::vector<ObjKey>& keys)
     }
 }
 
+void Table::dump_objects()
+{
+    return m_clusters.dump_objects();
+}
+
 void Table::remove_object(ObjKey key)
 {
     Group* g = get_parent_group();
@@ -3035,6 +3040,7 @@ void Table::set_primary_key_column(ColKey col_key)
                 // Rebuild table according to new primary key
 
                 ObjKeys old_keys;
+                ObjKeys tmp_keys;
                 old_keys.reserve(size());
                 for (auto& o : *this) {
                     old_keys.push_back(o.get_key());
@@ -3042,11 +3048,43 @@ void Table::set_primary_key_column(ColKey col_key)
 
                 // m_primary_key_col must be set here in order to make
                 // create_object_with_primary_key work correctly
+                auto old_primary_key_col = m_primary_key_col;
+                bool old_primary_is_string = old_primary_key_col.get_type() == col_type_String;
                 m_primary_key_col = col_key;
 
                 for (auto key : old_keys) {
                     auto old_obj = get_object(key);
-                    Mixed pk(old_obj.get<String>(col_key));
+                    StringData pk(old_obj.get<String>(col_key));
+                    if (old_primary_is_string && old_obj.get<String>(old_primary_key_col) == pk) {
+                        // The pk value is the same
+                        continue;
+                    }
+
+                    GlobalKey object_id{pk};
+                    ObjKey object_key = global_to_local_object_id_hashed(object_id);
+
+                    // Check if an object with this key already exists
+                    if (is_valid(object_key) && old_primary_is_string &&
+                        get_object(object_key).get<String>(old_primary_key_col) == pk) {
+                        // We here have a case where there already exists an object with a primary key
+                        // from the old column equal to the primary key value of the current object.
+                        // Create temporary object to hold the values of the current object. The conflicting
+                        // object will be moved during this first pass.
+                        uint64_t sequence_number_for_local_id = allocate_sequence_number();
+                        ObjKey temp_key = make_tagged_local_id_after_hash_collision(sequence_number_for_local_id);
+                        auto tmp_obj = create_object(temp_key);
+                        tmp_obj.assign(old_obj);
+                        tmp_keys.push_back(temp_key);
+                    }
+                    else {
+                        auto new_obj = create_object(object_key);
+                        new_obj.assign(old_obj);
+                    }
+                    remove_object(key);
+                }
+                for (auto key : tmp_keys) {
+                    auto old_obj = get_object(key);
+                    StringData pk(old_obj.get<String>(col_key));
                     auto new_obj = create_object_with_primary_key(pk);
                     new_obj.assign(old_obj);
                     remove_object(key);

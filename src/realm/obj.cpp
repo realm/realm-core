@@ -1094,33 +1094,38 @@ void Obj::assign(const ConstObj& other, bool only_diff)
 {
     REALM_ASSERT(get_table() == other.get_table());
     auto cols = m_table->get_column_keys();
-    auto pk_col = m_table->get_primary_key_column();
     for (auto col : cols) {
-        if (col != pk_col) {
-            if (col.get_attrs().test(col_attr_List)) {
-                // TODO: implement
+        if (col.get_attrs().test(col_attr_List)) {
+            // TODO: implement
+            auto src_list = other.get_listbase_ptr(col);
+            auto dst_list = get_listbase_ptr(col);
+            auto sz = src_list->size();
+            dst_list->clear();
+            for (size_t i = 0; i < sz; i++) {
+                Mixed val = src_list->get_any(i);
+                dst_list->insert_any(i, val);
             }
-            else {
-                auto type = col.get_type();
-                Mixed val = other.get_any(col);
-                if (!only_diff || val != get_any(col)) {
-                    switch (type) {
-                        case col_type_String: {
-                            // Need to take copy. Values might be in same cluster
-                            std::string str{val.get_string()};
-                            this->set(col, str);
-                            break;
-                        }
-                        case col_type_Binary: {
-                            // Need to take copy. Values might be in same cluster
-                            std::string str{val.get_binary()};
-                            this->set(col, BinaryData(str));
-                            break;
-                        }
-                        default:
-                            this->set(col, val);
-                            break;
+        }
+        else {
+            auto type = col.get_type();
+            Mixed val = other.get_any(col);
+            if (!only_diff || val != get_any(col)) {
+                switch (type) {
+                    case col_type_String: {
+                        // Need to take copy. Values might be in same cluster
+                        std::string str{val.get_string()};
+                        this->set(col, str);
+                        break;
                     }
+                    case col_type_Binary: {
+                        // Need to take copy. Values might be in same cluster
+                        std::string str{val.get_binary()};
+                        this->set(col, BinaryData(str));
+                        break;
+                    }
+                    default:
+                        this->set(col, val);
+                        break;
                 }
             }
         }
