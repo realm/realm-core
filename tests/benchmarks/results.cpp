@@ -52,7 +52,7 @@ TEST_CASE("Benchmark results", "[benchmark]") {
     auto realm = Realm::get_shared_realm(config);
     auto table = realm->read_group().get_table("class_object");
     auto table2 = realm->read_group().get_table("class_object 2");
-    Results r(realm, *table);
+    Results r(realm, table);
 
     realm->begin_transaction();
     ObjKeys table_keys;
