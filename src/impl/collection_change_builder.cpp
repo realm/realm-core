@@ -563,7 +563,7 @@ void verify_changeset(std::vector<int64_t> const& prev_rows,
 
 CollectionChangeBuilder CollectionChangeBuilder::calculate(std::vector<int64_t> const& prev_rows,
                                                            std::vector<int64_t> const& next_rows,
-                                                           std::function<bool (size_t)> row_did_change,
+                                                           std::function<bool (decltype(ObjKey::value))> row_did_change,
                                                            bool in_table_order)
 {
     CollectionChangeBuilder ret;

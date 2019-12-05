@@ -103,7 +103,7 @@ public:
     // it into new_rows, and check all matching rows for modifications
     static CollectionChangeBuilder calculate(std::vector<int64_t> const& old_rows,
                                              std::vector<int64_t> const& new_rows,
-                                             std::function<bool (size_t)> row_did_change,
+                                             std::function<bool (decltype(ObjKey::value))> row_did_change,
                                              bool in_table_order=false);
 
     // generic operations {
