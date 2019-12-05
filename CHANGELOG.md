@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 5.23.7 Release notes
 
 ### Enhancements
 * Reduce the encrypted page reclaimer's impact on battery life on Apple platforms. ([PR #3461](https://github.com/realm/realm-core/pull/3461)).
@@ -10,14 +10,6 @@
   could also result in other kinds of crashes. ([Cocoa #6333](https://github.com/realm/realm-cocoa/issues/6333)).
 * Sorting float or double columns containing NaN values had inconsistent results and would sometimes
   crash due to out-of-bounds memory accesses. ([Cocoa #6357](https://github.com/realm/realm-cocoa/issues/6357)).
-
-### Breaking changes
-* None.
-
------------
-
-### Internals
-* None.
 
 ----------------------------------------------
 
