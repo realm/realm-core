@@ -661,12 +661,9 @@ void ObjectChangeSet::insertions_add(ObjectKeyType obj)
 
 void ObjectChangeSet::modifications_add(ObjectKeyType obj, ColKeyType col)
 {
-    auto it = m_modifications.find(obj);
-    if (it != m_modifications.end()) {
-        it->second.insert(col);
-    }
-    else {
-        m_modifications.insert({obj, {col}});
+    auto it_and_success = m_modifications.insert({obj, {col}});
+    if (!it_and_success.second) {
+        it_and_success.first->second.insert(col);
     }
 }
 
@@ -723,13 +720,13 @@ bool ObjectChangeSet::modifications_contains(ObjectKeyType obj) const
     return m_modifications.count(obj) > 0;
 }
 
-util::Optional<std::pair<ObjectChangeSet::ColKeyIterator, ObjectChangeSet::ColKeyIterator>> ObjectChangeSet::get_columns_modified(ObjectKeyType obj) const
+const ObjectChangeSet::ObjectSet* ObjectChangeSet::get_columns_modified(ObjectKeyType obj) const
 {
     auto it = m_modifications.find(obj);
     if (it == m_modifications.end()) {
-        return {};
+        return nullptr;
     }
-    return {{it->second.begin(), it->second.end()}};
+    return &it->second;
 }
 
 void ObjectChangeSet::merge(ObjectChangeSet&& other)

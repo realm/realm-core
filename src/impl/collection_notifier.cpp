@@ -46,7 +46,7 @@ bool CollectionNotifier::all_related_tables_covered(const TableVersions& version
     return true;
 }
 
-std::function<bool (size_t)>
+std::function<bool (ObjectChangeSet::ObjectKeyType)>
 CollectionNotifier::get_modification_checker(TransactionChangeInfo const& info,
                                              ConstTableRef root_table)
 {
@@ -61,11 +61,11 @@ CollectionNotifier::get_modification_checker(TransactionChangeInfo const& info,
         return it != info.tables.end() && !it->second.modifications_empty();
     };
     if (!any_of(begin(m_related_tables), end(m_related_tables), table_modified)) {
-        return [](size_t) { return false; };
+        return [](ObjectChangeSet::ObjectKeyType) { return false; };
     }
     if (m_related_tables.size() == 1) {
         auto& object_set = info.tables.find(m_related_tables[0].table_key)->second;
-        return [&](size_t row) { return object_set.modifications_contains(row); };
+        return [&](ObjectChangeSet::ObjectKeyType object_key) { return object_set.modifications_contains(object_key); };
     }
 
     return DeepChangeChecker(info, *root_table, m_related_tables);

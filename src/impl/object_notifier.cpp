@@ -58,7 +58,7 @@ void ObjectNotifier::run()
     if (!column_modifications)
         return;
     m_change.modifications.add(0);
-    for (auto col_it = column_modifications->first; col_it != column_modifications->second; ++col_it) {
+    for (auto col_it = column_modifications->begin(); col_it != column_modifications->end(); ++col_it) {
         m_change.columns[*col_it].add(0);
     }
 }

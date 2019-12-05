@@ -21,6 +21,7 @@
 
 #include "collection_notifications.hpp"
 
+#include <realm/keys.hpp>
 #include <realm/util/optional.hpp>
 
 #include <unordered_map>
@@ -32,8 +33,8 @@ namespace _impl {
 
 class ObjectChangeSet {
 public:
-    using ColKeyType = int64_t;
-    using ObjectKeyType = int64_t;
+    using ColKeyType = decltype(realm::ColKey::value);
+    using ObjectKeyType = decltype(realm::ObjKey::value);
     using ObjectSet = std::unordered_set<ObjectKeyType>;
     using ObjectMapToColumnSet = std::unordered_map<ObjectKeyType, std::unordered_set<ColKeyType>>;
 
@@ -44,7 +45,7 @@ public:
     ObjectChangeSet& operator=(ObjectChangeSet&&) = default;
 
     void insertions_add(ObjectKeyType obj);
-    void modifications_add(ObjectKeyType obj, ColKeyType col = -1);
+    void modifications_add(ObjectKeyType obj, ColKeyType col);
     void deletions_add(ObjectKeyType obj);
     void clear(size_t old_size);
 
@@ -55,10 +56,9 @@ public:
     bool insertions_contains(ObjectKeyType obj) const;
     bool modifications_contains(ObjectKeyType obj) const;
     bool deletions_contains(ObjectKeyType obj) const;
-    // if the specified object has not been modified, returns util::Optional::None
-    // if the object has been modified, returns the begin and end const_iterator into a vector of columns
-    using ColKeyIterator = std::unordered_set<ColKeyType>::const_iterator;
-    util::Optional<std::pair<ColKeyIterator, ColKeyIterator>> get_columns_modified(ObjectKeyType obj) const;
+    // if the specified object has not been modified, returns nullptr
+    // if the object has been modified, returns a pointer to the ObjectSet
+    const ObjectSet* get_columns_modified(ObjectKeyType obj) const;
 
     bool insertions_empty() const noexcept { return m_insertions.empty(); }
     bool modifications_empty() const noexcept { return m_modifications.empty(); }

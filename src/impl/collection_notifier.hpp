@@ -185,7 +185,7 @@ protected:
     Transaction& source_shared_group();
 
     bool all_related_tables_covered(const TableVersions& versions);
-    std::function<bool (size_t)> get_modification_checker(TransactionChangeInfo const&, ConstTableRef);
+    std::function<bool (ObjectChangeSet::ObjectKeyType)> get_modification_checker(TransactionChangeInfo const&, ConstTableRef);
 
     // The actual change, calculated in run() and delivered in prepare_handover()
     CollectionChangeBuilder m_change;
