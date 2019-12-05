@@ -20,6 +20,7 @@
 #ifdef TEST_TABLE
 
 #include <algorithm>
+#include <cmath>
 #include <limits>
 #include <string>
 #include <fstream>
@@ -1849,7 +1850,7 @@ TEST_TYPES(Table_SortFloat, float, double)
     for (size_t i = 0; i < table.size(); i += 3) {
         table.set(col, i, static_cast<TEST_TYPE>(-500.0 + i));
         table.set_null(col, i + 1);
-        char nan_tag[] = {char('0' + i % 10), 0};
+        const char nan_tag[] = {char('0' + i % 10), 0};
         table.set(col, i + 2, static_cast<TEST_TYPE>(nan(nan_tag)));
     }
 
