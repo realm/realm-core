@@ -1842,6 +1842,18 @@ TEST(Table_Sorted_Query_where)
 #endif
 }
 
+namespace realm {
+template <class T>
+T nan(const char* tag)
+{
+    typename std::conditional<std::is_same<T, float>::value, uint32_t, uint64_t>::type i;
+    uint64_t double_nan = 0x7ff8000000000000;
+    i = std::is_same<T, float>::value ? 0x7fc00000 : static_cast<decltype(i)>(double_nan);
+    i += *tag;
+    return type_punning<T>(i);
+}
+} // namespace realm
+
 TEST_TYPES(Table_SortFloat, float, double)
 {
     Table table;
@@ -1851,7 +1863,7 @@ TEST_TYPES(Table_SortFloat, float, double)
         table.set(col, i, static_cast<TEST_TYPE>(-500.0 + i));
         table.set_null(col, i + 1);
         const char nan_tag[] = {char('0' + i % 10), 0};
-        table.set(col, i + 2, static_cast<TEST_TYPE>(nan(nan_tag)));
+        table.set(col, i + 2, realm::nan<TEST_TYPE>(nan_tag));
     }
 
     TableView sorted = table.get_sorted_view(SortDescriptor{table, {{col}}, {true}});
