@@ -56,7 +56,7 @@ public:
         _impl::CollectionChangeBuilder c;
         _impl::TransactionChangeInfo info{};
         info.tables[m_table_key.value];
-        info.lists.push_back({m_table_key.value, m_list.ConstLstBase::get_key().value, m_list.get_col_key().value, &c});
+        info.lists.push_back({m_table_key, m_list.ConstLstBase::get_key().value, m_list.get_col_key().value, &c});
         _impl::transaction::advance(*m_group, info);
 
         if (info.lists.empty()) {
@@ -168,7 +168,7 @@ public:
     {
         m_result.reserve(objects.size());
         for (auto& obj : objects) {
-            m_result.push_back(ObserverState{obj.get_table()->get_key().value,
+            m_result.push_back(ObserverState{obj.get_table()->get_key(),
                 obj.get_key().value, (void *)(uintptr_t)m_result.size()});
         }
     }
@@ -280,7 +280,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
         });
 
         auto& table = *r->read_group().get_table("class_table");
-        int64_t table_key = table.get_key().value;
+        auto table_key = table.get_key().value;
         auto cols = table.get_column_keys();
 
         r->begin_transaction();
@@ -291,7 +291,8 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
         r->commit_transaction();
 
         auto coordinator = _impl::RealmCoordinator::get_coordinator(config.path);
-        auto track_changes = [&](std::vector<int64_t> tables_needed, auto&& f) {
+        using TableKeyType = decltype(TableKey::value);
+        auto track_changes = [&](std::vector<TableKeyType> tables_needed, auto&& f) {
             auto sg = coordinator->begin_read();
 
             r->begin_transaction();

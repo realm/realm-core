@@ -61,7 +61,7 @@ bool ListNotifier::do_add_required_change_info(TransactionChangeInfo& info)
     if (!m_list->is_attached())
         return false; // origin row was deleted after the notification was added
 
-    info.lists.push_back({m_table.value, m_obj.value, m_col.value, &m_change});
+    info.lists.push_back({m_table, m_obj.value, m_col.value, &m_change});
 
     m_info = &info;
     return true;

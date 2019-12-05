@@ -21,6 +21,8 @@
 
 #include "index_set.hpp"
 
+#include <realm/keys.hpp>
+
 #include <memory>
 #include <tuple>
 #include <unordered_map>
@@ -156,7 +158,7 @@ public:
     // in each ObserverState with information about what changes were made.
     struct ObserverState {
         // Table and row which is observed
-        uint32_t table_key;
+        realm::TableKey table_key;
         int64_t obj_key;
 
         // Opaque userdata for the delegate's use
