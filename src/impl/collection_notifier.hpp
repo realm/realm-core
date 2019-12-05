@@ -19,6 +19,7 @@
 #ifndef REALM_BACKGROUND_COLLECTION_HPP
 #define REALM_BACKGROUND_COLLECTION_HPP
 
+#include "object_changeset.hpp"
 #include "impl/collection_change_builder.hpp"
 
 #include <realm/util/assert.hpp>

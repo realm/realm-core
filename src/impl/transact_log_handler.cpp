@@ -257,7 +257,7 @@ struct TransactLogValidator : public TransactLogValidationMixin {
 class TransactLogObserver : public TransactLogValidationMixin {
     _impl::TransactionChangeInfo& m_info;
     _impl::CollectionChangeBuilder* m_active_list = nullptr;
-    _impl::ObjectChangeSet* m_active_table = nullptr;
+    ObjectChangeSet* m_active_table = nullptr;
 
     _impl::CollectionChangeBuilder* find_list(ObjKey obj, ColKey col)
     {
