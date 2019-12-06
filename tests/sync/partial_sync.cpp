@@ -953,7 +953,7 @@ TEST_CASE("Query-based Sync link behaviour", "[sync]") {
         partial_sync::SubscriptionOptions options;
         std::vector<StringData> keypaths = { "parents" };
         parser::KeyPathMapping mapping;
-        alias_backlinks(mapping, *realm);
+        populate_keypath_mapping(mapping, *realm);
         options.inclusions = generate_include_from_keypaths(keypaths, *realm, os_c, mapping);
         auto subscription = subscribe_and_wait("TRUEPREDICATE", partial_config, "link_target", options, [&c_objects](Results results, std::exception_ptr) {
             // all a objects that have a valid link, no b objects, all c objects
@@ -970,7 +970,7 @@ TEST_CASE("Query-based Sync link behaviour", "[sync]") {
         partial_sync::SubscriptionOptions options;
         std::vector<StringData> keypaths = { "parents" };
         parser::KeyPathMapping mapping;
-        // mapping is not populated by partial_sync::alias_backlinks(mapping, realm);
+        // mapping is not populated by partial_sync::populate_keypath_mapping(mapping, realm);
         REQUIRE_THROWS_WITH(generate_include_from_keypaths(keypaths, *realm, os_c, mapping),
                             "No property 'parents' on object of type 'link_target'");
     }
@@ -983,7 +983,7 @@ TEST_CASE("Query-based Sync link behaviour", "[sync]") {
         partial_sync::SubscriptionOptions options;
         std::vector<StringData> keypaths = { "id" };
         parser::KeyPathMapping mapping;
-        alias_backlinks(mapping, *realm);
+        populate_keypath_mapping(mapping, *realm);
         REQUIRE_THROWS_WITH(generate_include_from_keypaths(keypaths, *realm, os_c, mapping),
                             "Property 'id' is not a link in object of type 'link_target' in 'INCLUDE' clause");
     }
@@ -996,7 +996,7 @@ TEST_CASE("Query-based Sync link behaviour", "[sync]") {
         partial_sync::SubscriptionOptions options;
         std::vector<StringData> keypaths = { "a_property_which_does_not_exist" };
         parser::KeyPathMapping mapping;
-        alias_backlinks(mapping, *realm);
+        populate_keypath_mapping(mapping, *realm);
         REQUIRE_THROWS_WITH(generate_include_from_keypaths(keypaths, *realm, os_c, mapping),
                             "No property 'a_property_which_does_not_exist' on object of type 'link_target'");
     }
