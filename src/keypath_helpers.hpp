@@ -23,19 +23,30 @@
 #include <realm/parser/keypath_mapping.hpp>
 
 namespace realm {
-/// Create the mappings from user defined names of linkingObjects into the verbose
-/// syntax that the parser supports: @links.Class.property.
-inline void alias_backlinks(parser::KeyPathMapping& mapping, Realm& realm)
+/// Populate the mapping from public name to internal name for queries.
+static void populate_keypath_mapping(parser::KeyPathMapping& mapping, Realm& realm)
 {
+    mapping.set_backlink_class_prefix("class_");
+
     for (auto& object_schema : realm.schema()) {
-        for (Property const& property : object_schema.computed_properties) {
-            if (property.type == PropertyType::LinkingObjects) {
-                auto table = ObjectStore::table_for_object_type(realm.read_group(), object_schema.name);
-                auto native_name = util::format("@links.%1.%2",
-                                                ObjectStore::table_name_for_object_type(property.object_type),
-                                                property.link_origin_property_name);
-                mapping.add_mapping(table, property.name, std::move(native_name));
-            }
+        TableRef table;
+        auto get_table = [&] {
+            if (!table)
+                table = ObjectStore::table_for_object_type(realm.read_group(), object_schema.name);
+            return table;
+        };
+
+        for (auto& property : object_schema.persisted_properties) {
+            if (!property.public_name.empty() && property.public_name != property.name)
+                mapping.add_mapping(get_table(), property.public_name, property.name);
+        }
+
+        for (auto& property : object_schema.computed_properties) {
+            if (property.type != PropertyType::LinkingObjects)
+                continue;
+            auto native_name = util::format("@links.%1.%2", property.object_type,
+                                            property.link_origin_property_name);
+            mapping.add_mapping(get_table(), property.name, std::move(native_name));
         }
     }
 }
