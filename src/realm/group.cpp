@@ -423,7 +423,7 @@ void Group::open(ref_type top_ref, const std::string& file_path)
             break;
     }
     if (REALM_UNLIKELY(!file_format_ok))
-        throw InvalidDatabase("Unsupported Realm file format version", file_path);
+        throw FileFormatUpgradeRequired("Realm file needs upgrade before opening in RO mode", file_path);
 
     Replication::HistoryType history_type = Replication::hist_None;
     int target_file_format_version = get_target_file_format_version_for_session(m_file_format_version, history_type);
