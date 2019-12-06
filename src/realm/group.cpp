@@ -172,7 +172,7 @@ void TableKeyIterator::load_key()
         if (rot.is_ref()) {
             Table* t;
             if (m_index_in_group < g.m_table_accessors.size() &&
-                (t = load_atomic(g.m_table_accessors[m_index_in_group], std::memory_order_relaxed))) {
+                (t = load_atomic(g.m_table_accessors[m_index_in_group], std::memory_order_acquire))) {
                 m_table_key = t->get_key();
             }
             else {
@@ -239,7 +239,7 @@ void Group::remove_pk_table()
 TableKey Group::ndx2key(size_t ndx) const
 {
     REALM_ASSERT(is_attached());
-    Table* accessor = load_atomic(m_table_accessors[ndx], std::memory_order_relaxed);
+    Table* accessor = load_atomic(m_table_accessors[ndx], std::memory_order_acquire);
     if (accessor)
         return accessor->get_key(); // fast path
 
@@ -262,7 +262,7 @@ size_t Group::key2ndx_checked(TableKey key) const
     // concurrently. (We aim to be safe in face of concurrent access to a frozen transaction, where tables
     // cannot be added or removed. All other races are undefined behaviour)
     if (idx < m_table_accessors.size()) {
-        Table* tbl = load_atomic(m_table_accessors[idx], std::memory_order_relaxed);
+        Table* tbl = load_atomic(m_table_accessors[idx], std::memory_order_acquire);
         if (tbl && tbl->get_key() == key)
             return idx;
     }
@@ -690,7 +690,7 @@ Table* Group::do_get_table(size_t table_ndx)
 {
     REALM_ASSERT(m_table_accessors.size() == m_tables.size());
     // Get table accessor from cache if it exists, else create
-    Table* table = load_atomic(m_table_accessors[table_ndx], std::memory_order_relaxed);
+    Table* table = load_atomic(m_table_accessors[table_ndx], std::memory_order_acquire);
     if (!table) {
         // double-checked locking idiom
         std::lock_guard<std::mutex> lock(m_accessor_mutex);
@@ -864,7 +864,7 @@ Table* Group::create_table_accessor(size_t table_ndx)
         table = new_table.release();
     }
     // must be atomic to allow concurrent probing of the m_table_accessors vector.
-    store_atomic(m_table_accessors[table_ndx], table, std::memory_order_relaxed);
+    store_atomic(m_table_accessors[table_ndx], table, std::memory_order_release);
     table->refresh_index_accessors();
     return table;
 }
