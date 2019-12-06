@@ -132,6 +132,73 @@ TEST(Transactions_Frozen)
         frozen_workers[j].join();
 }
 
+
+
+TEST(Transactions_ConcurrentFrozenTableGetByName)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
+    DBRef db = DB::create(*hist_w);
+    TransactionRef frozen;
+    std::string table_names[3000];
+    {
+        auto wt = db->start_write();
+        for (int j = 0; j < 3000; ++j) {
+            std::string name = "Table" + to_string(j);
+            table_names[j] = name;
+            auto table = wt->add_table(name);
+        }
+        wt->commit_and_continue_as_read();
+        frozen = wt->freeze();
+    }
+    auto runner = [&](int first, int last) {
+        millisleep(1);
+        for (int j = first; j < last; ++j) {
+            auto table = frozen->get_table(table_names[j]);
+        }
+    };
+    std::thread threads[1000];
+    for (int j = 0; j < 1000; ++j) {
+        threads[j] = std::thread(runner, j * 2, j * 2 + 1000);
+    }
+    for (int j = 0; j < 1000; ++j)
+        threads[j].join();
+}
+
+
+TEST(Transactions_ConcurrentFrozenTableGetByKey)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
+    DBRef db = DB::create(*hist_w);
+    TransactionRef frozen;
+    TableKey table_keys[3000];
+    {
+        auto wt = db->start_write();
+        for (int j = 0; j < 3000; ++j) {
+            std::string name = "Table" + to_string(j);
+            auto table = wt->add_table(name);
+            table_keys[j] = table->get_key();
+        }
+        wt->commit_and_continue_as_read();
+        frozen = wt->freeze();
+    }
+    auto runner = [&](int first, int last) {
+        millisleep(1);
+        for (int j = first; j < last; ++j) {
+            auto table = frozen->get_table(table_keys[j]);
+            CHECK(table->get_key() == table_keys[j]);
+        }
+    };
+    std::thread threads[1000];
+    for (int j = 0; j < 1000; ++j) {
+        threads[j] = std::thread(runner, j * 2, j * 2 + 1000);
+    }
+    for (int j = 0; j < 1000; ++j)
+        threads[j].join();
+}
+
+
 class MyHistory : public _impl::History {
 public:
     MyHistory(const MyHistory&) = delete;
