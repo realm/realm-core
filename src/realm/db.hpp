@@ -68,6 +68,22 @@ struct IncompatibleHistories : util::File::AccessError {
     }
 };
 
+/// The FileFormatUpgradeRequired exception can be thrown by the DB
+/// constructor when opening a database that uses a deprecated file format
+/// and/or a deprecated history schema, and the user has indicated he does not
+/// want automatic upgrades to be performed. This exception indicates that until
+/// an upgrade of the file format is performed, the database will be unavailable
+/// for read or write operations.
+/// It will also be thrown if a realm which requires upgrade is opened in read-only
+/// mode (Group::open).
+struct FileFormatUpgradeRequired : util::File::AccessError {
+    FileFormatUpgradeRequired(const std::string& msg, const std::string& path)
+        : util::File::AccessError(msg, path)
+    {
+    }
+};
+
+
 /// A DB facilitates transactions.
 ///
 /// Access to a database is done through transactions. Transactions
