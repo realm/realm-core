@@ -27,6 +27,7 @@ set(NORMAL_TESTS
     test_column_float.cpp
     test_column_string.cpp
     test_column_timestamp.cpp
+    test_decimal128.cpp
     test_destroy_guard.cpp
     test_file.cpp
     test_file_locks.cpp

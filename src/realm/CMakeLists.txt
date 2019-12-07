@@ -16,6 +16,7 @@ set(REALM_SOURCES
     bplustree.cpp
     cluster.cpp
     column_binary.cpp
+    decimal128.cpp
     disable_sync_to_disk.cpp
     exceptions.cpp
     group.cpp

@@ -1,5 +1,4 @@
 set(BID_SOURCES
-LIBRARY/src/bid128_2_str_tables.c
 LIBRARY/src/bid128.c
 LIBRARY/src/bid128_compare.c
 LIBRARY/src/bid64_to_bid128.c
