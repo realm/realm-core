@@ -228,6 +228,7 @@ target_compile_definitions(CoreObjects PRIVATE
 target_compile_options(CoreObjects PRIVATE ${REALM_SANITIZER_FLAGS})
 
 set(REALM_OBJECT_FILES $<TARGET_OBJECTS:CoreObjects>)
+list(APPEND REALM_OBJECT_FILES $<TARGET_OBJECTS:Bid>)
 
 if(COMMAND set_target_xcode_attributes)
     set_target_xcode_attributes(CoreObjects)

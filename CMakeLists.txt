@@ -67,10 +67,13 @@ if(MSVC)
         /D_DISABLE_EXTENDED_ALIGNED_STORAGE #https://developercommunity.visualstudio.com/comments/279328/view.html
     )
     if(NOT WINDOWS_STORE)
+        # TODO: replace with CMAKE_MSVC_RUNTIME_LIBRARY once we switch to CMake 3.15 as the minimum
         # Statically link the run-time library
         # https://docs.microsoft.com/bg-bg/cpp/build/reference/md-mt-ld-use-run-time-library
         # https://cmake.org/Wiki/CMake_FAQ#How_can_I_build_my_MSVC_application_with_a_static_runtime.3F
         foreach(flag_var
+            CMAKE_C_FLAGS CMAKE_C_FLAGS_DEBUG CMAKE_C_FLAGS_RELEASE
+            CMAKE_C_FLAGS_MINSIZEREL CMAKE_C_FLAGS_RELWITHDEBINFO
             CMAKE_CXX_FLAGS CMAKE_CXX_FLAGS_DEBUG CMAKE_CXX_FLAGS_RELEASE
             CMAKE_CXX_FLAGS_MINSIZEREL CMAKE_CXX_FLAGS_RELWITHDEBINFO)
             if(${flag_var} MATCHES "/MD")
