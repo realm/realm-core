@@ -16,8 +16,8 @@
  *
  **************************************************************************/
 
-#ifndef REALM_OBJECT_ID_HPP
-#define REALM_OBJECT_ID_HPP
+#ifndef REALM_GLOBAL_KEY_HPP
+#define REALM_GLOBAL_KEY_HPP
 
 #include <realm/keys.hpp>
 #include <realm/util/optional.hpp>
@@ -29,52 +29,52 @@ namespace realm {
 class StringData;
 class Mixed;
 
-/// ObjectIDs are globally unique for a given class (table), and up to 128 bits
+/// GlobalKeys are globally unique for a given class (table), and up to 128 bits
 /// wide. They are represented as two 64-bit integers, each of which may
 /// frequently be small, for best on-wire compressibility.
 ///
-/// We define a way to map from 128-bit on-write ObjectIDs to local 64-bit object IDs.
+/// We define a way to map from 128-bit on-write GlobalKeys to local 64-bit ObjKeys.
 ///
 /// The three object ID types are:
-/// a. Object IDs for objects in tables without primary keys.
-/// b. Object IDs for objects in tables with integer primary keys.
-/// c. Object IDs for objects in tables with other primary key types.
+/// a. Global Keyss for objects in tables without primary keys.
+/// b. Global Keys for objects in tables with integer primary keys.
+/// c. Global Keys for objects in tables with other primary key types.
 ///
 /// For objects without primary keys (a), a "squeezed" tuple of the
 /// client_file_ident and a peer-local sequence number is used as the local
 /// ObjKey. The on-write Object ID is the "unsqueezed" format.
 ///
-/// For integer primary keys (b), the ObjectID just the integer value as the low
+/// For integer primary keys (b), the GlobalKey just the integer value as the low
 /// part.
 ///
-/// For objects with other types of primary keys (c), the ObjectID is a 128-bit
+/// For objects with other types of primary keys (c), the GlobalKey is a 128-bit
 /// hash of the primary key value. However, the local object ID must be a 63-bit
 /// integer, because that is the maximum size integer that can be used in an ObjKey.
-/// The solution is to optimistically use the lower 62 bits of the on-wire ObjectID.
+/// The solution is to optimistically use the lower 62 bits of the on-wire GlobalKey.
 /// If this results in a ObjKey which is already in use, a new local ObjKey is
 /// generated with the 63th bit set and using a locally generated sequence number for
-/// the lower bits. The mapping between ObjectID and ObjKey is stored in the Table
+/// the lower bits. The mapping between GlobalKey and ObjKey is stored in the Table
 /// structure.
 
-struct ObjectID {
-    constexpr ObjectID(uint64_t h, uint64_t l)
+struct GlobalKey {
+    constexpr GlobalKey(uint64_t h, uint64_t l)
         : m_lo(l)
         , m_hi(h)
     {
     }
-    static ObjectID from_string(StringData);
+    static GlobalKey from_string(StringData);
 
-    constexpr ObjectID(realm::util::None = realm::util::none)
+    constexpr GlobalKey(realm::util::None = realm::util::none)
         : m_lo(-1)
         , m_hi(-1)
     {
     }
 
     // Construct an ObjectId from either a string or an integer
-    ObjectID(Mixed pk);
+    GlobalKey(Mixed pk);
 
     // Construct an object id from the local squeezed ObjKey
-    ObjectID(ObjKey squeezed, uint64_t sync_file_id)
+    GlobalKey(ObjKey squeezed, uint64_t sync_file_id)
     {
         uint64_t u = uint64_t(squeezed.value);
 
@@ -84,8 +84,8 @@ struct ObjectID {
             m_hi = sync_file_id;
     }
 
-    constexpr ObjectID(const ObjectID&) noexcept = default;
-    ObjectID& operator=(const ObjectID&) noexcept = default;
+    constexpr GlobalKey(const GlobalKey&) noexcept = default;
+    GlobalKey& operator=(const GlobalKey&) noexcept = default;
 
     constexpr uint64_t lo() const
     {
@@ -98,25 +98,25 @@ struct ObjectID {
 
     std::string to_string() const;
 
-    constexpr bool operator<(const ObjectID& other) const
+    constexpr bool operator<(const GlobalKey& other) const
     {
         return (m_hi == other.m_hi) ? (m_lo < other.m_lo) : (m_hi < other.m_hi);
     }
-    constexpr bool operator==(const ObjectID& other) const
+    constexpr bool operator==(const GlobalKey& other) const
     {
         return m_hi == other.m_hi && m_lo == other.m_lo;
     }
-    constexpr bool operator!=(const ObjectID& other) const
+    constexpr bool operator!=(const GlobalKey& other) const
     {
         return !(*this == other);
     }
 
     explicit constexpr operator bool() const noexcept
     {
-        return (*this != ObjectID{});
+        return (*this != GlobalKey{});
     }
 
-    // Generate a local key from the ObjectID. If the object is created
+    // Generate a local ObjKey from the GlobalKey. If the object is created
     // in this realm (sync_file_id == hi) then 0 is used for hi. In this
     // way we achieves that objects created before first contact with the
     // server does not need to change key.
@@ -141,16 +141,16 @@ private:
     uint64_t m_hi;
 };
 
-std::ostream& operator<<(std::ostream&, const ObjectID&);
-std::istream& operator>>(std::istream&, ObjectID&);
+std::ostream& operator<<(std::ostream&, const GlobalKey&);
+std::istream& operator>>(std::istream&, GlobalKey&);
 
 } // namespace realm
 
 namespace std {
 
 template <>
-struct hash<realm::ObjectID> {
-    size_t operator()(realm::ObjectID oid) const
+struct hash<realm::GlobalKey> {
+    size_t operator()(realm::GlobalKey oid) const
     {
         return std::hash<uint64_t>{}(oid.lo()) ^ std::hash<uint64_t>{}(oid.hi());
     }

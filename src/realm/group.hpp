@@ -234,9 +234,9 @@ public:
     }
 
     /// The sync file id is set when a client synchronizes with the server for the
-    /// first time. It is used when generating ObjecIDs for tables without a primary
+    /// first time. It is used when generating GlobalKeys for tables without a primary
     /// key, where it is used as the "hi" part. This ensures global uniqueness of
-    /// ObjectIDs.
+    /// GlobalKeys.
     uint64_t get_sync_file_id() const noexcept;
     void set_sync_file_id(uint64_t id);
 
