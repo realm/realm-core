@@ -132,6 +132,113 @@ TEST(Transactions_Frozen)
         frozen_workers[j].join();
 }
 
+
+
+TEST(Transactions_ConcurrentFrozenTableGetByName)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
+    DBRef db = DB::create(*hist_w);
+    TransactionRef frozen;
+    std::string table_names[3000];
+    {
+        auto wt = db->start_write();
+        for (int j = 0; j < 3000; ++j) {
+            std::string name = "Table" + to_string(j);
+            table_names[j] = name;
+            auto table = wt->add_table(name);
+        }
+        wt->commit_and_continue_as_read();
+        frozen = wt->freeze();
+    }
+    auto runner = [&](int first, int last) {
+        millisleep(1);
+        for (int j = first; j < last; ++j) {
+            auto table = frozen->get_table(table_names[j]);
+        }
+    };
+    std::thread threads[1000];
+    for (int j = 0; j < 1000; ++j) {
+        threads[j] = std::thread(runner, j * 2, j * 2 + 1000);
+    }
+    for (int j = 0; j < 1000; ++j)
+        threads[j].join();
+}
+
+
+TEST(Transactions_ConcurrentFrozenTableGetByKey)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
+    DBRef db = DB::create(*hist_w);
+    TransactionRef frozen;
+    TableKey table_keys[3000];
+    {
+        auto wt = db->start_write();
+        for (int j = 0; j < 3000; ++j) {
+            std::string name = "Table" + to_string(j);
+            auto table = wt->add_table(name);
+            table_keys[j] = table->get_key();
+        }
+        wt->commit_and_continue_as_read();
+        frozen = wt->freeze();
+    }
+    auto runner = [&](int first, int last) {
+        millisleep(1);
+        for (int j = first; j < last; ++j) {
+            auto table = frozen->get_table(table_keys[j]);
+            CHECK(table->get_key() == table_keys[j]);
+        }
+    };
+    std::thread threads[1000];
+    for (int j = 0; j < 1000; ++j) {
+        threads[j] = std::thread(runner, j * 2, j * 2 + 1000);
+    }
+    for (int j = 0; j < 1000; ++j)
+        threads[j].join();
+}
+
+
+TEST(Transactions_ConcurrentFrozenQueryAndObj)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
+    DBRef db = DB::create(*hist_w);
+    TransactionRef frozen;
+    ObjKey obj_keys[1000];
+    {
+        auto wt = db->start_write();
+        auto table = wt->add_table("MyTable");
+        table->add_column(type_Int, "MyCol");
+        for (int i = 0; i < 1000; ++i) {
+            obj_keys[i] = table->create_object().set_all(i).get_key();
+        }
+        wt->commit_and_continue_as_read();
+        frozen = wt; // ->freeze();
+    }
+    auto runner = [&](int first, int last) {
+        millisleep(1);
+        auto table = frozen->get_table("MyTable");
+        auto col = table->get_column_key("MyCol");
+        for (int j = first; j < last; ++j) {
+            // loads of concurrent queries created and executed:
+            TableView tb = table->where().equal(col, j).find_all();
+            CHECK(tb.size() == 1);
+            CHECK(tb.get_key(0) == obj_keys[j]);
+            // concurrent reads from results are just fine:
+            auto obj = tb[0];
+            CHECK(obj.get<Int>(col) == j);
+        }
+    };
+    std::thread threads[500];
+    for (int j = 0; j < 500; ++j) {
+        threads[j] = std::thread(runner, j, j + 500);
+    }
+    for (int j = 0; j < 500; ++j)
+        threads[j].join();
+}
+
+
 class MyHistory : public _impl::History {
 public:
     MyHistory(const MyHistory&) = delete;
