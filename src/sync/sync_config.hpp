@@ -143,6 +143,9 @@ struct SyncConfig {
     bool is_partial = false;
     util::Optional<std::string> custom_partial_sync_identifier;
 
+    // If true, upload/download waits are canceled on any sync error and not just fatal ones
+    bool cancel_waits_on_nonfatal_error = false;
+
     bool validate_sync_history = true;
 
     util::Optional<std::string> authorization_header_name;

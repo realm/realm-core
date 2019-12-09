@@ -630,6 +630,10 @@ void SyncSession::handle_error(SyncError error)
     }
     switch (next_state) {
         case NextStateAfterError::none:
+            if (m_config.cancel_waits_on_nonfatal_error) {
+                std::unique_lock<std::mutex> lock(m_state_mutex);
+                cancel_pending_waits(lock, error.error_code);
+            }
             break;
         case NextStateAfterError::inactive: {
             std::unique_lock<std::mutex> lock(m_state_mutex);
