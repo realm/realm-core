@@ -48,7 +48,7 @@ ConstObj::ConstObj(ConstTableRef table, MemRef mem, ObjKey key, size_t row_ndx)
     m_storage_version = get_alloc().get_storage_version();
 }
 
-ObjectID ConstObj::get_object_id() const
+GlobalKey ConstObj::get_object_id() const
 {
     return m_table->get_object_id(m_key);
 }

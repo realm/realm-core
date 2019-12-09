@@ -16,7 +16,7 @@
  *
  **************************************************************************/
 
-#include <realm/object_id.hpp>
+#include <realm/global_key.hpp>
 #include <realm/string_data.hpp>
 #include <realm/mixed.hpp>
 #include <realm/util/sha_crypto.hpp>
@@ -28,14 +28,14 @@
 
 namespace realm {
 
-std::ostream& operator<<(std::ostream& os, const ObjectID& object_id)
+std::ostream& operator<<(std::ostream& os, const GlobalKey& object_id)
 {
     return os << '{' << std::setw(4) << std::right << std::setfill('0') << std::hex << object_id.hi() << '-'
               << std::setw(4) << std::right << std::setfill('0') << std::hex << object_id.lo() << '}'
               << std::setfill(' ') << std::setw(0);
 }
 
-std::istream& operator>>(std::istream& in, ObjectID& object_id)
+std::istream& operator>>(std::istream& in, GlobalKey& object_id)
 {
     try {
         std::istream::sentry sentry{in};
@@ -49,16 +49,16 @@ std::istream& operator>>(std::istream& in, ObjectID& object_id)
                     break;
                 in.get(ch);
             }
-            object_id = ObjectID::from_string(string);
+            object_id = GlobalKey::from_string(string);
         }
     }
     catch (const util::invalid_argument&) {
-        object_id = ObjectID();
+        object_id = GlobalKey();
         in.setstate(std::ios_base::failbit);
     }
     return in;
 }
-std::string ObjectID::to_string() const
+std::string GlobalKey::to_string() const
 {
     std::ostringstream ss;
     ss << *this;
@@ -66,7 +66,7 @@ std::string ObjectID::to_string() const
 }
 
 
-ObjectID ObjectID::from_string(StringData string)
+GlobalKey GlobalKey::from_string(StringData string)
 {
     if (string.size() < 5) // Must be at least "{0-0}"
         throw util::invalid_argument("Invalid object ID.");
@@ -101,10 +101,10 @@ ObjectID ObjectID::from_string(StringData string)
     // buffer because we have checked above that they are immediately followed
     // by '-' or '}' respectively, and std::strtoull guarantees that it will
     // stop processing when it reaches either of those characters.
-    return ObjectID(strtoull(hi_begin, nullptr, 16), strtoull(lo_begin, nullptr, 16));
+    return GlobalKey(strtoull(hi_begin, nullptr, 16), strtoull(lo_begin, nullptr, 16));
 }
 
-ObjectID::ObjectID(Mixed pk)
+GlobalKey::GlobalKey(Mixed pk)
 {
     if (pk.is_null()) {
         // Choose {1, 0} as the object ID for NULL. This could just as well have been {0, 0},

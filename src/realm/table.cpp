@@ -1904,7 +1904,7 @@ ObjKey Table::find_first(ColKey col_key, StringData value) const
     }
 
     if (col_key.get_type() == col_type_String && col_key == m_primary_key_col) {
-        ObjectID object_id{value};
+        GlobalKey object_id{value};
         ObjKey k = global_to_local_object_id_hashed(object_id);
         return is_valid(k) ? k : ObjKey();
     }
@@ -2567,7 +2567,7 @@ void Table::dump_node_structure(std::ostream& out, int level) const
 Obj Table::create_object(ObjKey key, const FieldValues& values)
 {
     if (key == null_key) {
-        ObjectID object_id = allocate_object_id_squeezed();
+        GlobalKey object_id = allocate_object_id_squeezed();
         key = object_id.get_local_key(get_sync_file_id());
         if (auto repl = get_repl())
             repl->create_object(this, object_id);
@@ -2582,7 +2582,7 @@ Obj Table::create_object(ObjKey key, const FieldValues& values)
     return obj;
 }
 
-Obj Table::create_object(ObjectID object_id, const FieldValues& values)
+Obj Table::create_object(GlobalKey object_id, const FieldValues& values)
 {
     ObjKey key = object_id.get_local_key(get_sync_file_id());
 
@@ -2605,7 +2605,7 @@ Obj Table::create_object_with_primary_key(const Mixed& primary_key)
                  primary_key.get_type() == type);
 
     ObjKey object_key;
-    ObjectID object_id{primary_key};
+    GlobalKey object_id{primary_key};
 
     if (type == type_Int) {
         if (primary_key.is_null())
@@ -2631,7 +2631,7 @@ Obj Table::create_object_with_primary_key(const Mixed& primary_key)
                 return existing_obj;
             }
 
-            ObjectID existing_id{existing_pk_value};
+            GlobalKey existing_id{existing_pk_value};
             object_key = allocate_local_id_after_hash_collision(object_id, existing_id, object_key);
         }
     }
@@ -2643,7 +2643,7 @@ Obj Table::create_object_with_primary_key(const Mixed& primary_key)
     return create_object(object_key, {{primary_key_col, primary_key}});
 }
 
-ObjKey Table::get_obj_key(ObjectID id) const
+ObjKey Table::get_obj_key(GlobalKey id) const
 {
     ObjKey key;
     auto col = get_primary_key_column();
@@ -2673,7 +2673,7 @@ ObjKey Table::get_obj_key(ObjectID id) const
     return key;
 }
 
-ObjectID Table::get_object_id(ObjKey key) const
+GlobalKey Table::get_object_id(ObjKey key) const
 {
     auto col = get_primary_key_column();
     if (col) {
@@ -2687,13 +2687,13 @@ ObjectID Table::get_object_id(ObjKey key) const
     return {};
 }
 
-ObjectID Table::allocate_object_id_squeezed()
+GlobalKey Table::allocate_object_id_squeezed()
 {
     // m_client_file_ident will be zero if we haven't been in contact with
     // the server yet.
     auto peer_id = get_sync_file_id();
     auto sequence = allocate_sequence_number();
-    return ObjectID{peer_id, sequence};
+    return GlobalKey{peer_id, sequence};
 }
 
 namespace {
@@ -2702,7 +2702,7 @@ namespace {
 /// the caller to ensure that collisions are detected and that
 /// allocate_local_id_after_collision() is called to obtain a non-colliding
 /// ID.
-inline ObjKey get_optimistic_local_id_hashed(ObjectID global_id)
+inline ObjKey get_optimistic_local_id_hashed(GlobalKey global_id)
 {
 #if REALM_EXERCISE_OBJECT_ID_COLLISION
     const uint64_t optimistic_mask = 0xff;
@@ -2722,7 +2722,7 @@ inline ObjKey make_tagged_local_id_after_hash_collision(uint64_t sequence_number
 
 } // namespace
 
-ObjKey Table::global_to_local_object_id_hashed(ObjectID object_id) const
+ObjKey Table::global_to_local_object_id_hashed(GlobalKey object_id) const
 {
     ObjKey optimistic = get_optimistic_local_id_hashed(object_id);
 
@@ -2751,7 +2751,7 @@ ObjKey Table::global_to_local_object_id_hashed(ObjectID object_id) const
     return optimistic;
 }
 
-ObjKey Table::allocate_local_id_after_hash_collision(ObjectID incoming_id, ObjectID colliding_id,
+ObjKey Table::allocate_local_id_after_hash_collision(GlobalKey incoming_id, GlobalKey colliding_id,
                                                      ObjKey colliding_local_id)
 {
     // FIXME: Cache these accessors
@@ -2791,17 +2791,17 @@ ObjKey Table::allocate_local_id_after_hash_collision(ObjectID incoming_id, Objec
     REALM_ASSERT(lo.size() == num_entries);
     REALM_ASSERT(local_id.size() == num_entries);
 
-    auto lower_bound_object_id = [&](ObjectID object_id) -> size_t {
+    auto lower_bound_object_id = [&](GlobalKey object_id) -> size_t {
         size_t i = hi.lower_bound_int(int64_t(object_id.hi()));
         while (i < num_entries && uint64_t(hi.get(i)) == object_id.hi() && uint64_t(lo.get(i)) < object_id.lo())
             ++i;
         return i;
     };
 
-    auto insert_collision = [&](ObjectID object_id, ObjKey new_local_id) {
+    auto insert_collision = [&](GlobalKey object_id, ObjKey new_local_id) {
         size_t i = lower_bound_object_id(object_id);
         if (i != num_entries) {
-            ObjectID existing{uint64_t(hi.get(i)), uint64_t(lo.get(i))};
+            GlobalKey existing{uint64_t(hi.get(i)), uint64_t(lo.get(i))};
             if (existing == object_id) {
                 REALM_ASSERT(new_local_id.value == local_id.get(i));
                 return;
@@ -3058,7 +3058,7 @@ void Table::validate_primary_column_uniqueness() const
         else {
             for (auto o : *this) {
                 auto pk_val = o.get_any(col);
-                ObjectID object_id{pk_val};
+                GlobalKey object_id{pk_val};
                 if (global_to_local_object_id_hashed(object_id) != o.get_key()) {
                     throw std::runtime_error("Invalid primary key column");
                 }
