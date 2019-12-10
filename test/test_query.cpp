@@ -12294,5 +12294,26 @@ TEST(Query_LinksWithIndex)
     CHECK_EQUAL(q.find(), 4);
 }
 
+TEST(Query_NotImmediatelyBeforeKnownRange)
+{
+    Group g;
+    TableRef parent = g.add_table("parent");
+    TableRef child = g.add_table("child");
+    parent->add_column_link(type_LinkList, "list", *child);
+    child->add_column(type_String, "value");
+    child->add_search_index(0);
+
+    parent->add_empty_row();
+    child->add_empty_row(2);
+    child->set_string_unique(0, 0, "a");
+    child->set_string_unique(0, 1, "b");
+    auto list = parent->get_linklist(0, 0);
+    list->insert(0, 0);
+    list->insert(0, 1);
+
+    Query q = child->where(list).Not().equal(0, "a");
+    CHECK_EQUAL(q.count(), 1);
+}
+
 
 #endif // TEST_QUERY
