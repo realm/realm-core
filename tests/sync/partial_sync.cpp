@@ -384,7 +384,7 @@ TEST_CASE("Query-based Sync", "[sync]") {
     if (!EventLoop::has_implementation())
         return;
 
-    SyncManager::shared().configure(tmp_dir(), SyncManager::MetadataMode::NoEncryption);
+    TestSyncManager init_sync_manager;
 
     SyncServer server;
     SyncTestFile config(server, "test");
@@ -883,7 +883,7 @@ TEST_CASE("Query-based Sync link behaviour", "[sync]") {
     if (!EventLoop::has_implementation())
         return;
 
-    SyncManager::shared().configure(tmp_dir(), SyncManager::MetadataMode::NoEncryption);
+    TestSyncManager init_sync_manager;
 
     SyncServer server;
     SyncTestFile config(server, "test");
@@ -1003,7 +1003,7 @@ TEST_CASE("Query-based Sync link behaviour", "[sync]") {
 }
 
 TEST_CASE("Query-based Sync error checking", "[sync]") {
-    SyncManager::shared().configure(tmp_dir(), SyncManager::MetadataMode::NoEncryption);
+    TestSyncManager init_sync_manager;
 
     SECTION("API misuse throws an exception from `subscribe`") {
         SECTION("non-synced Realm") {
@@ -1093,7 +1093,7 @@ TEST_CASE("Creating/Updating subscriptions synchronously", "[sync]") {
 
     using namespace std::string_literals;
 
-    SyncManager::shared().configure(tmp_dir(), SyncManager::MetadataMode::NoEncryption);
+    TestSyncManager init_sync_manager;
 
     SyncServer server;
     SyncTestFile config(server, "test");
