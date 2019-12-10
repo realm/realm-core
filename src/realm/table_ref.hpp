@@ -62,9 +62,9 @@ public:
     }
     TableRef cast_away_const() const;
     static ConstTableRef unsafe_create(const Table* t_ptr);
+    void check() const;
 
 protected:
-    void check() const;
     explicit ConstTableRef(const Table* t_ptr, uint64_t instance_version)
         : m_table(const_cast<Table*>(t_ptr))
         , m_instance_version(instance_version)

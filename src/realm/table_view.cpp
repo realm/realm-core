@@ -94,7 +94,6 @@ R ConstTableView::aggregate(ColKey column_key, size_t* result_count, ObjKey* ret
         *result_count = 0;
 
     REALM_ASSERT(action == act_Sum || action == act_Max || action == act_Min || action == act_Average);
-    REALM_ASSERT(m_table);
     REALM_ASSERT(m_table->valid_column(column_key));
 
     if ((m_key_values->size()) == 0) {
@@ -194,7 +193,6 @@ template <typename T>
 size_t ConstTableView::aggregate_count(ColKey column_key, T count_target) const
 {
     check_cookie();
-    REALM_ASSERT(m_table);
     REALM_ASSERT(m_table->valid_column(column_key));
 
     if ((m_key_values->size()) == 0) {
@@ -451,7 +449,7 @@ void ConstTableView::sync_if_needed() const
 
 void TableView::remove(size_t row_ndx)
 {
-    REALM_ASSERT(m_table);
+    m_table.check();
     REALM_ASSERT(row_ndx < m_key_values->size());
 
     bool sync_to_keep = m_last_seen_versions == get_dependency_versions();
@@ -477,7 +475,7 @@ void TableView::remove(size_t row_ndx)
 
 void TableView::clear()
 {
-    REALM_ASSERT(m_table);
+    m_table.check();
 
     bool sync_to_keep = m_last_seen_versions == get_dependency_versions();
 
