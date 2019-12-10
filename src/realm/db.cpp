@@ -2184,6 +2184,28 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction)
 
         // Cleanup any stale mappings
         m_alloc.purge_old_mappings(oldest_version, new_version);
+
+        // Allocation of more ringbuffer space must be done before 'acquire'
+        // on the ringbuffer entry we want to use for the commit.
+        info->commit_in_critical_phase = 1;
+        if (r_info->readers.is_full()) {
+            // buffer expansion
+            uint_fast32_t entries = r_info->readers.get_num_entries();
+            entries = entries + 32;
+            size_t new_info_size = sizeof(SharedInfo) + r_info->readers.compute_required_space(entries);
+            // std::cout << "resizing: " << entries << " = " << new_info_size << std::endl;
+            m_file.prealloc(new_info_size);                                          // Throws
+            m_reader_map.remap(m_file, util::File::access_ReadWrite, new_info_size); // Throws
+            r_info = m_reader_map.get_addr();
+            m_local_max_entry = entries;
+            r_info->readers.expand_to(entries);
+        }
+        // Acquire on the ringbuffer entry must be done before any writes
+        // into the file free space.
+        Ringbuffer::ReadCount& r = r_info->readers.get_next();
+        auto count = r.count.load(std::memory_order_acquire);
+        REALM_ASSERT(count == 1); // entry is free
+        info->commit_in_critical_phase = 0;
     }
 
     // Do the actual commit
@@ -2235,18 +2257,6 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction)
         info->commit_in_critical_phase = 1;
         {
             SharedInfo* r_info = m_reader_map.get_addr();
-            if (r_info->readers.is_full()) {
-                // buffer expansion
-                uint_fast32_t entries = r_info->readers.get_num_entries();
-                entries = entries + 32;
-                size_t new_info_size = sizeof(SharedInfo) + r_info->readers.compute_required_space(entries);
-                // std::cout << "resizing: " << entries << " = " << new_info_size << std::endl;
-                m_file.prealloc(new_info_size);                                          // Throws
-                m_reader_map.remap(m_file, util::File::access_ReadWrite, new_info_size); // Throws
-                r_info = m_reader_map.get_addr();
-                m_local_max_entry = entries;
-                r_info->readers.expand_to(entries);
-            }
             Ringbuffer::ReadCount& r = r_info->readers.get_next();
             r.current_top = new_top_ref;
             r.filesize = new_file_size;
