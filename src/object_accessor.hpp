@@ -161,7 +161,6 @@ ValueType Object::get_property_value_impl(ContextType& ctx, const Property &prop
 //        case PropertyType::Any:    return ctx.box(m_obj.get<Mixed>(column));
         case PropertyType::Object: {
             auto linkObjectSchema = m_realm->schema().find(property.object_type);
-            TableRef table = ObjectStore::table_for_object_type(m_realm->read_group(), property.object_type);
             return ctx.box(Object(m_realm, *linkObjectSchema, m_obj.get_linked_object(column)));
         }
         case PropertyType::LinkingObjects: {
