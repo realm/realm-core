@@ -39,6 +39,7 @@ set(REALM_SOURCES
     table.cpp
     table_ref.cpp
     obj_list.cpp
+    object_id.cpp
     table_view.cpp
     sort_descriptor.cpp
     unicode.cpp
@@ -124,6 +125,7 @@ set(REALM_INSTALL_GENERAL_HEADERS
     table_ref.hpp
     sort_descriptor.hpp
     obj_list.hpp
+    object_id.hpp
     table_view.hpp
     timestamp.hpp
     unicode.hpp
