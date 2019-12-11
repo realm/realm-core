@@ -79,6 +79,28 @@ public:
     void merge(ObjectChangeSet&& other);
     void verify();
 
+    class ObjectSetIteratable {
+    public:
+        auto begin() const noexcept { return m_object_set.cbegin(); }
+        auto end() const noexcept { return m_object_set.cend(); }
+        ObjectSetIteratable(ObjectSet const& is) : m_object_set(is) { }
+    private:
+        ObjectSet const& m_object_set;
+    };
+
+    class ObjectMapIteratable {
+    public:
+        auto begin() const noexcept { return m_object_map.cbegin(); }
+        auto end() const noexcept { return m_object_map.cend(); }
+        ObjectMapIteratable(ObjectMapToColumnSet const& is) : m_object_map(is) { }
+    private:
+        ObjectMapToColumnSet const& m_object_map;
+    };
+
+    ObjectSetIteratable get_deletions() const noexcept { return m_deletions; }
+    ObjectMapIteratable get_modifications() const noexcept { return m_modifications; }
+    ObjectSetIteratable get_insertions() const noexcept { return m_insertions; }
+
 private:
     ObjectSet m_deletions;
     ObjectSet m_insertions;

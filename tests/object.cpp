@@ -580,7 +580,6 @@ TEST_CASE("object") {
             change = c;
             callback_called = true;
         });
-
         advance_and_notify(*r);
 
         // First update unconditionally
@@ -588,7 +587,6 @@ TEST_CASE("object") {
 
         callback_called = false;
         advance_and_notify(*r);
-        coordinator.advance_to_latest(*r); // wait for async callbacks to complete
         REQUIRE(callback_called);
         REQUIRE_INDICES(change.modifications, 0, 1, 2, 3, 4);
 

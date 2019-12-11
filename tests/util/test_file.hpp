@@ -91,7 +91,7 @@ using StartImmediately = realm::util::TaggedBool<class StartImmediatelyTag>;
 
 class SyncServer : private realm::sync::Clock {
 public:
-    SyncServer(StartImmediately start_immediately=true);
+    SyncServer(StartImmediately start_immediately=true, std::string local_dir = "");
     ~SyncServer();
 
     void start();
@@ -99,6 +99,7 @@ public:
 
     std::string url_for_realm(realm::StringData realm_name) const;
     std::string base_url() const { return m_url; }
+    std::string local_root_dir() const { return m_local_root_dir; }
 
     template <class R, class P>
     void advance_clock(std::chrono::duration<R, P> duration = std::chrono::seconds(1)) noexcept
@@ -107,6 +108,7 @@ public:
     }
 
 private:
+    std::string m_local_root_dir;
     realm::sync::Server m_server;
     std::thread m_thread;
     std::string m_url;

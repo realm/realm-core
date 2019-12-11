@@ -132,8 +132,9 @@ SyncTestFile::SyncTestFile(SyncServer& server, std::string name, bool is_partial
     schema_mode = SchemaMode::Additive;
 }
 
-SyncServer::SyncServer(StartImmediately start_immediately)
-: m_server(util::make_temp_dir(), util::none, ([&] {
+SyncServer::SyncServer(StartImmediately start_immediately, std::string local_dir)
+: m_local_root_dir(local_dir.empty() ? util::make_temp_dir() : local_dir)
+, m_server(m_local_root_dir, util::none, ([&] {
     using namespace std::literals::chrono_literals;
 
     sync::Server::Config config;
