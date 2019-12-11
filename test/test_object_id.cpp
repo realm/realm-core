@@ -17,7 +17,7 @@
  **************************************************************************/
 
 #include <realm.hpp>
-#include <realm/object_id.hpp>
+#include <realm/array_object_id.hpp>
 
 #include "test.hpp"
 
@@ -39,4 +39,38 @@ TEST(ObjectId_Basics)
 
     ObjectId id_null;
     CHECK(id_null.is_null());
+}
+
+TEST(ObjectId_Array)
+{
+    const char str0[] = "0000012300000000009218a4";
+    const char str1[] = "000004560000000000170232";
+    const char str2[] = "0000078900000000002999f3";
+
+    ArrayObjectId arr(Allocator::get_default());
+    arr.create();
+
+    arr.add({str0});
+    arr.add({str1});
+    arr.insert(1, {str2});
+
+    ObjectId id2(str2);
+    CHECK_EQUAL(arr.get(0), ObjectId(str0));
+    CHECK_EQUAL(arr.get(1), id2);
+    CHECK_EQUAL(arr.get(2), ObjectId(str1));
+    CHECK_EQUAL(arr.find_first(id2), 1);
+
+    arr.erase(1);
+    CHECK_EQUAL(arr.get(1), ObjectId(str1));
+
+    ArrayObjectId arr1(Allocator::get_default());
+    arr1.create();
+    arr.move(arr1, 1);
+
+    CHECK_EQUAL(arr.size(), 1);
+    CHECK_EQUAL(arr1.size(), 1);
+    CHECK_EQUAL(arr1.get(0), ObjectId(str1));
+
+    arr.destroy();
+    arr1.destroy();
 }
