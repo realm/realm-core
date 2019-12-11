@@ -1975,44 +1975,6 @@ void Group::print_free() const
     }
     std::cout << "\n";
 }
-
-
-void Group::to_dot(std::ostream& out) const
-{
-    out << "digraph G {" << std::endl;
-
-    out << "subgraph cluster_group {" << std::endl;
-    out << " label = \"Group\";" << std::endl;
-
-    m_top.to_dot(out, "group_top");
-    m_table_names.to_dot(out, "table_names");
-    m_tables.to_dot(out, "tables");
-
-    // Tables
-    auto keys = get_table_keys();
-    for (auto key : keys) {
-        ConstTableRef table = get_table(key);
-        StringData name = get_table_name(key);
-        table->to_dot(out, name);
-    }
-
-    out << "}" << std::endl;
-    out << "}" << std::endl;
-}
-
-
-void Group::to_dot() const
-{
-    to_dot(std::cerr);
-}
-
-
-void Group::to_dot(const char* file_path) const
-{
-    std::ofstream out(file_path);
-    to_dot(out);
-}
-
 #endif
 
 std::pair<ref_type, size_t> Group::get_to_dot_parent(size_t ndx_in_parent) const

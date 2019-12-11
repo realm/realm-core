@@ -658,11 +658,7 @@ public:
     void verify() const;
 
 #ifdef REALM_DEBUG
-    void to_dot(std::ostream&, StringData title = StringData()) const;
-    void print() const;
     MemStats stats() const;
-    void dump_node_structure() const; // To std::cerr (for GDB)
-    void dump_node_structure(std::ostream&, int level) const;
 #endif
     TableRef get_opposite_table(ColKey col_key) const;
     TableKey get_opposite_table_key(ColKey col_key) const;
@@ -913,9 +909,6 @@ private:
     void flush_for_commit();
 
     bool is_cross_table_link_target() const noexcept;
-#ifdef REALM_DEBUG
-    void to_dot_internal(std::ostream&) const;
-#endif
     template <Action action, typename T, typename R>
     R aggregate(ColKey col_key, T value = {}, size_t* resultcount = nullptr, ObjKey* return_ndx = nullptr) const;
     template <typename T>
