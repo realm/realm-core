@@ -24,6 +24,7 @@
 #include "realm/array_string.hpp"
 #include "realm/array_binary.hpp"
 #include "realm/array_timestamp.hpp"
+#include "realm/array_object_id.hpp"
 #include "realm/array_key.hpp"
 #include "realm/array_backlink.hpp"
 #include "realm/index_string.hpp"
@@ -781,6 +782,9 @@ void Cluster::create(size_t nb_leaf_columns)
             case col_type_Timestamp:
                 do_create<ArrayTimestamp>(col_key);
                 break;
+            case col_type_ObjectId:
+                do_create<ArrayObjectId>(col_key);
+                break;
             case col_type_Link:
                 do_create<ArrayKey>(col_key);
                 break;
@@ -948,6 +952,9 @@ void Cluster::insert_row(size_t ndx, ObjKey k, const FieldValues& init_values)
             case col_type_Timestamp:
                 do_insert_row<ArrayTimestamp>(ndx, col_key, init_value, nullable);
                 break;
+            case col_type_ObjectId:
+                do_insert_row<ArrayObjectId>(ndx, col_key, init_value, nullable);
+                break;
             case col_type_Link:
                 do_insert_key(ndx, col_key, init_value, ObjKey(k.value + get_offset()));
                 break;
@@ -1027,6 +1034,9 @@ void Cluster::move(size_t ndx, ClusterNode* new_node, int64_t offset)
                 break;
             case col_type_Timestamp:
                 do_move<ArrayTimestamp>(ndx, col_key, new_leaf);
+                break;
+            case col_type_ObjectId:
+                do_move<ArrayObjectId>(ndx, col_key, new_leaf);
                 break;
             case col_type_Link:
                 do_move<ArrayKey>(ndx, col_key, new_leaf);
@@ -1139,6 +1149,9 @@ void Cluster::insert_column(ColKey col_key)
             break;
         case col_type_Timestamp:
             do_insert_column<ArrayTimestamp>(col_key, nullable);
+            break;
+        case col_type_ObjectId:
+            do_insert_column<ArrayObjectId>(col_key, nullable);
             break;
         case col_type_Link:
             do_insert_column<ArrayKey>(col_key, nullable);
@@ -1359,6 +1372,9 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
             case col_type_Timestamp:
                 do_erase<ArrayTimestamp>(ndx, col_key);
                 break;
+            case col_type_ObjectId:
+                do_erase<ArrayObjectId>(ndx, col_key);
+                break;
             case col_type_Link:
                 do_erase_key(ndx, col_key, state);
                 break;
@@ -1543,6 +1559,9 @@ void Cluster::verify() const
             case col_type_Timestamp:
                 verify<ArrayTimestamp>(ref, col, sz);
                 break;
+            case col_type_ObjectId:
+                verify<ArrayObjectId>(ref, col, sz);
+                break;
             case col_type_Link:
                 verify<ArrayKey>(ref, col, sz);
                 break;
@@ -1651,6 +1670,19 @@ void Cluster::dump_objects(int64_t key_offset, std::string lead) const
                         std::cout << ", " << "null";
                     }
                     else  {
+                        std::cout << ", " << arr.get(i);
+                    }
+                    break;
+                }
+                case col_type_ObjectId: {
+                    ArrayObjectId arr(m_alloc);
+                    ref_type ref = Array::get_as_ref(j);
+                    arr.init_from_ref(ref);
+                    if (arr.is_null(i)) {
+                        std::cout << ", "
+                                  << "null";
+                    }
+                    else {
                         std::cout << ", " << arr.get(i);
                     }
                     break;

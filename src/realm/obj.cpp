@@ -25,6 +25,7 @@
 #include "realm/array_binary.hpp"
 #include "realm/array_timestamp.hpp"
 #include "realm/array_key.hpp"
+#include "realm/array_object_id.hpp"
 #include "realm/array_backlink.hpp"
 #include "realm/column_type_traits.hpp"
 #include "realm/index_string.hpp"
@@ -123,6 +124,8 @@ int ConstObj::cmp(const ConstObj& other, ColKey col_key) const
             return cmp<Binary>(other, col_ndx);
         case type_Timestamp:
             return cmp<Timestamp>(other, col_ndx);
+        case type_ObjectId:
+            return cmp<ObjectId>(other, col_ndx);
         case type_Link:
             return cmp<ObjKey>(other, col_ndx);
         case type_OldDateTime:
@@ -560,6 +563,11 @@ void out_mixed(std::ostream& out, const Mixed& val)
         case type_Timestamp:
             out << "\"";
             out << val.get<Timestamp>();
+            out << "\"";
+            break;
+        case type_ObjectId:
+            out << "\"";
+            out << val.get<ObjectId>();
             out << "\"";
             break;
         case type_Link:
@@ -1102,6 +1110,7 @@ template util::Optional<double> ConstObj::get<util::Optional<double>>(ColKey col
 template StringData ConstObj::get<StringData>(ColKey col_key) const;
 template BinaryData ConstObj::get<BinaryData>(ColKey col_key) const;
 template Timestamp ConstObj::get<Timestamp>(ColKey col_key) const;
+template ObjectId ConstObj::get<ObjectId>(ColKey col_key) const;
 template ObjKey ConstObj::get<ObjKey>(ColKey col_key) const;
 
 template Obj& Obj::set<bool>(ColKey, bool, bool);
@@ -1110,6 +1119,7 @@ template Obj& Obj::set<double>(ColKey, double, bool);
 template Obj& Obj::set<StringData>(ColKey, StringData, bool);
 template Obj& Obj::set<BinaryData>(ColKey, BinaryData, bool);
 template Obj& Obj::set<Timestamp>(ColKey, Timestamp, bool);
+template Obj& Obj::set<ObjectId>(ColKey, ObjectId, bool);
 
 template <class T>
 inline void Obj::do_set_null(ColKey col_key)

@@ -28,6 +28,7 @@
 namespace realm {
 
 struct ObjKey;
+class ObjectId;
 class Timestamp;
 class ArraySmallBlobs;
 class ArrayString;
@@ -41,6 +42,7 @@ class ArrayBool;
 class ArrayBoolNull;
 class ArrayKey;
 class ArrayKeyNonNullable;
+class ArrayObjectId;
 template <class>
 class BasicArray;
 template <class>
@@ -168,6 +170,13 @@ struct ColumnTypeTraits<Timestamp> {
     using minmax_type = Timestamp;
     static const DataType id = type_Timestamp;
     static const ColumnType column_id = col_type_Timestamp;
+};
+
+template <>
+struct ColumnTypeTraits<ObjectId> {
+    using cluster_leaf_type = ArrayObjectId;
+    static const DataType id = type_ObjectId;
+    static const ColumnType column_id = col_type_ObjectId;
 };
 
 template <>

@@ -91,6 +91,8 @@ const char* data_type_to_str(DataType type)
             return "DateTime";
         case type_Timestamp:
             return "Timestamp";
+        case type_ObjectId:
+            return "ObjectId";
         case type_OldTable:
             return "Table";
         case type_OldMixed:

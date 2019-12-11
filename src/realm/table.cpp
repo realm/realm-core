@@ -38,6 +38,7 @@
 #include <realm/array_binary.hpp>
 #include <realm/array_string.hpp>
 #include <realm/array_timestamp.hpp>
+#include <realm/array_object_id.hpp>
 #include <realm/table_tpl.hpp>
 
 /// \page AccessorConsistencyLevels
@@ -293,6 +294,8 @@ const char* get_data_type_name(DataType type) noexcept
             return "binary";
         case type_Timestamp:
             return "timestamp";
+        case type_ObjectId:
+            return "ObjectId";
         case type_Link:
             return "link";
         case type_LinkList:
@@ -557,6 +560,10 @@ void Table::populate_search_index(ColKey col_key)
         }
         else if (type == type_Timestamp) {
             Timestamp value = o.get<Timestamp>(col_key);
+            index->insert(key, value); // Throws
+        }
+        else if (type == type_ObjectId) {
+            ObjectId value = o.get<ObjectId>(col_key);
             index->insert(key, value); // Throws
         }
         else {
@@ -1978,8 +1985,7 @@ template ObjKey Table::find_first(ColKey col_key, double) const;
 template ObjKey Table::find_first(ColKey col_key, util::Optional<bool>) const;
 template ObjKey Table::find_first(ColKey col_key, util::Optional<int64_t>) const;
 template ObjKey Table::find_first(ColKey col_key, BinaryData) const;
-
-
+template ObjKey Table::find_first(ColKey col_key, ObjectId) const;
 
 ObjKey Table::find_first_int(ColKey col_key, int64_t value) const
 {
@@ -1998,6 +2004,11 @@ ObjKey Table::find_first_bool(ColKey col_key, bool value) const
 }
 
 ObjKey Table::find_first_timestamp(ColKey col_key, Timestamp value) const
+{
+    return find_first(col_key, value);
+}
+
+ObjKey Table::find_first_object_id(ColKey col_key, ObjectId value) const
 {
     return find_first(col_key, value);
 }

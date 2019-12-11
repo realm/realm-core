@@ -74,3 +74,21 @@ TEST(ObjectId_Array)
     arr.destroy();
     arr1.destroy();
 }
+
+TEST(ObjectId_Table)
+{
+    const char str0[] = "0000012300000000009218a4";
+    const char str1[] = "000004560000000000170232";
+
+    Table t;
+    auto col_id = t.add_column(type_ObjectId, "id");
+    auto obj0 = t.create_object().set(col_id, ObjectId(str0));
+    auto obj1 = t.create_object().set(col_id, ObjectId(str1));
+    CHECK_EQUAL(obj0.get<ObjectId>(col_id), ObjectId(str0));
+    CHECK_EQUAL(obj1.get<ObjectId>(col_id), ObjectId(str1));
+    auto key = t.find_first(col_id, ObjectId(str1));
+    CHECK_EQUAL(key, obj1.get_key());
+    t.add_search_index(col_id);
+    key = t.find_first(col_id, ObjectId(str1));
+    CHECK_EQUAL(key, obj1.get_key());
+}

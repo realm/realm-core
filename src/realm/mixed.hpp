@@ -30,6 +30,7 @@
 #include <realm/data_type.hpp>
 #include <realm/string_data.hpp>
 #include <realm/timestamp.hpp>
+#include <realm/object_id.hpp>
 #include <realm/util/assert.hpp>
 #include <realm/utilities.hpp>
 
@@ -126,6 +127,7 @@ public:
     Mixed(StringData) noexcept;
     Mixed(BinaryData) noexcept;
     Mixed(Timestamp) noexcept;
+    Mixed(ObjectId) noexcept;
     Mixed(ObjKey) noexcept;
 
     // These are shortcuts for Mixed(StringData(c_str)), and are
@@ -301,6 +303,17 @@ inline Mixed::Mixed(Timestamp v) noexcept
     }
 }
 
+inline Mixed::Mixed(ObjectId v) noexcept
+{
+    if (!v.is_null()) {
+        m_type = type_ObjectId + 1;
+        memcpy(&short_val, &v, sizeof(ObjectId));
+    }
+    else {
+        m_type = 0;
+    }
+}
+
 inline Mixed::Mixed(ObjKey v) noexcept
 {
     if (v) {
@@ -394,6 +407,15 @@ inline Timestamp Mixed::get<Timestamp>() const noexcept
 inline Timestamp Mixed::get_timestamp() const
 {
     return get<Timestamp>();
+}
+
+template <>
+inline ObjectId Mixed::get<ObjectId>() const noexcept
+{
+    REALM_ASSERT(get_type() == type_ObjectId);
+    ObjectId id;
+    memcpy(&id, &short_val, sizeof(ObjectId));
+    return id;
 }
 
 template <>
@@ -504,6 +526,10 @@ inline std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, c
             case type_Timestamp:
                 out << Timestamp(m.int_val, m.short_val);
                 break;
+            case type_ObjectId: {
+                out << m.get<ObjectId>();
+                break;
+            }
             case type_Link:
                 out << ObjKey(m.int_val);
                 break;

@@ -411,6 +411,7 @@ public:
     ObjKey find_first_int(ColKey col_key, int64_t value) const;
     ObjKey find_first_bool(ColKey col_key, bool value) const;
     ObjKey find_first_timestamp(ColKey col_key, Timestamp value) const;
+    ObjKey find_first_object_id(ColKey col_key, ObjectId value) const;
     ObjKey find_first_float(ColKey col_key, float value) const;
     ObjKey find_first_double(ColKey col_key, double value) const;
     ObjKey find_first_string(ColKey col_key, StringData value) const;
