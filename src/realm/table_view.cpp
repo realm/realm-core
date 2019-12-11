@@ -587,7 +587,7 @@ void ConstTableView::do_sync()
     }
     // FIXME: Unimplemented for link to a column
     else {
-        REALM_ASSERT(m_query.m_table);
+        m_query.m_table.check();
 
         // valid query, so clear earlier results and reexecute it.
         if (m_key_values->is_attached())
@@ -620,7 +620,7 @@ bool ConstTableView::is_in_table_order() const
         return false;
     }
     else {
-        REALM_ASSERT(m_query.m_table);
+        m_query.m_table.check();
         return m_query.produces_results_in_table_order() && !m_descriptor_ordering.will_apply_sort();
     }
 }

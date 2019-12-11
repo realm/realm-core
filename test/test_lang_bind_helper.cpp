@@ -238,6 +238,10 @@ TEST(Transactions_ConcurrentFrozenQueryAndObj)
         threads[j].join();
 }
 
+// this tests resilience against some violations of the Core API.
+// It creates a lot of races between accessor use and transaction close.
+// This is undefined behaviour
+// but the goal is none the less to "harden" Core against just crashing
 TEST(Transactions_ConcurrentFrozenQueryAndObjAndTransactionClose)
 {
     SHARED_GROUP_TEST_PATH(path);
