@@ -543,7 +543,7 @@ TEST(Thread_MutexTryLock)
     // basic same thread try_lock
     CHECK(m.try_lock());
     CHECK(m.owns_lock());
-    CHECK_THROW(m.try_lock(), std::system_error); // already locked: Resource deadlock avoided
+    CHECK_THROW(static_cast<void>(m.try_lock()), std::system_error); // already locked: Resource deadlock avoided
     m.unlock();
 
     bool init_done = false;
