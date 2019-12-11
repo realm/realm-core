@@ -2117,4 +2117,20 @@ TEST(Group_StringPrimaryKeyCol)
     CHECK_NOT(table->has_search_index(col2));
 }
 
+TEST(Group_SetColumnWithDuplicateValuesToPrimaryKey)
+{
+    Group g;
+    TableRef table = g.add_table("table");
+    ColKey string_col = table->add_column(type_String, "string");
+    ColKey int_col = table->add_column(type_Int, "int");
+
+    std::vector<ObjKey> keys;
+    table->create_objects(2, keys);
+
+    CHECK_THROW(table->set_primary_key_column(string_col), DuplicatePrimaryKeyValueException);
+    CHECK_EQUAL(table->get_primary_key_column(), ColKey());
+    CHECK_THROW(table->set_primary_key_column(int_col), DuplicatePrimaryKeyValueException);
+    CHECK_EQUAL(table->get_primary_key_column(), ColKey());
+}
+
 #endif // TEST_GROUP
