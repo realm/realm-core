@@ -543,7 +543,7 @@ public:
     size_t get_used_space() const noexcept;
 
     void verify() const;
-    void validate_primary_column_uniqueness() const;
+    void validate_primary_columns();
 #ifdef REALM_DEBUG
     void print() const;
     void print_free() const;

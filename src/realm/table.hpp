@@ -133,7 +133,7 @@ public:
     // Primary key columns
     ColKey get_primary_key_column() const;
     void set_primary_key_column(ColKey col);
-    void validate_primary_column_uniqueness() const;
+    void validate_primary_column();
 
     //@{
     /// Convenience functions for manipulating the dynamic table type.
@@ -756,6 +756,7 @@ private:
     void set_opposite_column(ColKey col_key, TableKey opposite_table, ColKey opposite_column);
     void do_set_primary_key_column(ColKey col_key);
     void validate_column_is_unique(ColKey col_key) const;
+    void rebuild_table_with_pk_column();
 
     ObjKey get_next_key();
     /// Some Object IDs are generated as a tuple of the client_file_ident and a

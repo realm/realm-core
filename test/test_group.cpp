@@ -2081,11 +2081,11 @@ TEST(Group_StringPrimaryKeyCol)
     for (int f = 0; f < 10; f++) {
         list.add(float(f) / 2.f);
     }
-    g.validate_primary_column_uniqueness();
+    g.validate_primary_columns();
 
     // Changing PK should not add an index to the new PK
     table->set_primary_key_column(col2);
-    g.validate_primary_column_uniqueness();
+    g.validate_primary_columns();
     CHECK(table->get_primary_key_column() == col2);
     CHECK_NOT(table->has_search_index(col2));
 
@@ -2111,7 +2111,7 @@ TEST(Group_StringPrimaryKeyCol)
     CHECK_NOT(table->has_search_index(col2));
 
     table->set_primary_key_column(primary_key_column);
-    g.validate_primary_column_uniqueness();
+    g.validate_primary_columns();
     CHECK(table->get_primary_key_column() == primary_key_column);
     CHECK_NOT(table->has_search_index(primary_key_column));
     CHECK_NOT(table->has_search_index(col2));
@@ -2131,6 +2131,61 @@ TEST(Group_SetColumnWithDuplicateValuesToPrimaryKey)
     CHECK_EQUAL(table->get_primary_key_column(), ColKey());
     CHECK_THROW(table->set_primary_key_column(int_col), DuplicatePrimaryKeyValueException);
     CHECK_EQUAL(table->get_primary_key_column(), ColKey());
+}
+
+TEST(Group_ChangeIntPrimaryKeyValuesInMigration)
+{
+    Group g;
+    TableRef table = g.add_table_with_primary_key("table", type_Int, "pk");
+    ColKey value_col = table->add_column(type_Int, "value");
+    ColKey pk_col = table->get_primary_key_column();
+
+    for (int i = 0; i < 10; ++i) {
+        table->create_object_with_primary_key(i).set<int64_t>(value_col, i + 10);
+    }
+
+    TableView tv = table->where().find_all();
+    for (size_t i = 0; i < tv.size(); ++i) {
+        Obj obj = tv.get(i);
+        obj.set(pk_col, obj.get<int64_t>(value_col));
+    }
+    table->validate_primary_column();
+
+    for (int64_t i = 0; i < 10; ++i) {
+        ObjKey key = table->find_first(pk_col, i + 10);
+        CHECK(key);
+        Obj obj = table->get_object(key);
+        CHECK_EQUAL(obj.get<int64_t>(pk_col), i + 10);
+        CHECK_EQUAL(obj.get<int64_t>(value_col), i + 10);
+    }
+}
+
+TEST(Group_ChangeStringPrimaryKeyValuesInMigration)
+{
+    Group g;
+    TableRef table = g.add_table_with_primary_key("table", type_String, "pk");
+    ColKey value_col = table->add_column(type_String, "value");
+    ColKey pk_col = table->get_primary_key_column();
+
+    for (int i = 0; i < 10; ++i) {
+        table->create_object_with_primary_key(util::to_string(i)).set(value_col, util::to_string(i + 10));
+    }
+
+    TableView tv = table->where().find_all();
+    for (size_t i = 0; i < tv.size(); ++i) {
+        Obj obj = tv.get(i);
+        obj.set(pk_col, obj.get<StringData>(value_col));
+    }
+    table->validate_primary_column();
+
+    for (int64_t i = 0; i < 10; ++i) {
+        auto str = util::to_string(i + 10);
+        ObjKey key = table->find_first<StringData>(pk_col, str);
+        CHECK(key);
+        Obj obj = table->get_object(key);
+        CHECK_EQUAL(obj.get<StringData>(pk_col), str);
+        CHECK_EQUAL(obj.get<StringData>(value_col), str);
+    }
 }
 
 #endif // TEST_GROUP
