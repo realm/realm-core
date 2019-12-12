@@ -2474,8 +2474,8 @@ void Table::print() const
             }
             switch (type) {
                 case col_type_Int: {
-                    // FIXME size_t value = to_size_t(get_int(n, i));
-                    // std::cout << std::setw(10) << value << " ";
+                    size_t value = to_size_t(obj.get<int64_t>(n));
+                    std::cout << std::setw(10) << value << " ";
                     break;
                 }
                 case col_type_Float: {
@@ -3037,68 +3037,68 @@ void Table::set_primary_key_column(ColKey col_key)
     if (col_key) {
         check_column(col_key);
         validate_column_is_unique(col_key);
+        do_set_primary_key_column(col_key);
 
         if (col_key.get_type() == col_type_String) {
             remove_search_index(col_key);
-
-            // Rebuild table according to new primary key
-
-            ObjKeys old_keys;
-            ObjKeys tmp_keys;
-            old_keys.reserve(size());
-            for (auto& o : *this) {
-                old_keys.push_back(o.get_key());
-            }
-
-            // m_primary_key_col must be set here in order to make
-            // create_object_with_primary_key work correctly
-            auto old_primary_key_col = m_primary_key_col;
-            bool old_primary_is_string = old_primary_key_col.get_type() == col_type_String;
-            m_primary_key_col = col_key;
-
-            for (auto key : old_keys) {
-                auto old_obj = get_object(key);
-                StringData pk(old_obj.get<String>(col_key));
-                if (old_primary_is_string && old_obj.get<String>(old_primary_key_col) == pk) {
-                    // The pk value is the same
-                    continue;
-                }
-
-                GlobalKey object_id{pk};
-                ObjKey object_key = global_to_local_object_id_hashed(object_id);
-
-                // Check if an object with this key already exists
-                if (is_valid(object_key) && old_primary_is_string &&
-                    get_object(object_key).get<String>(old_primary_key_col) == pk) {
-                    // We here have a case where there already exists an object with a primary key
-                    // from the old column equal to the primary key value of the current object.
-                    // Create temporary object to hold the values of the current object. The conflicting
-                    // object will be moved during this first pass.
-                    uint64_t sequence_number_for_local_id = allocate_sequence_number();
-                    ObjKey temp_key = make_tagged_local_id_after_hash_collision(sequence_number_for_local_id);
-                    auto tmp_obj = create_object(temp_key);
-                    tmp_obj.assign(old_obj);
-                    tmp_keys.push_back(temp_key);
-                }
-                else {
-                    auto new_obj = create_object(object_key);
-                    new_obj.assign(old_obj);
-                }
-                remove_object(key);
-            }
-            for (auto key : tmp_keys) {
-                auto old_obj = get_object(key);
-                StringData pk(old_obj.get<String>(col_key));
-                auto new_obj = create_object_with_primary_key(pk);
-                new_obj.assign(old_obj);
-                remove_object(key);
-            }
+            rebuild_table_with_pk_column();
         }
         else {
             add_search_index(col_key);
         }
     }
-    do_set_primary_key_column(col_key);
+    else {
+        do_set_primary_key_column(col_key);
+    }
+}
+
+void Table::rebuild_table_with_pk_column()
+{
+    std::vector<std::pair<ObjKey, ObjKey>> changed_keys;
+    for (auto& obj : *this) {
+        StringData pk(obj.get<String>(m_primary_key_col));
+        GlobalKey object_id{pk};
+        ObjKey new_key = global_to_local_object_id_hashed(object_id);
+        if (new_key != obj.get_key())
+            changed_keys.emplace_back(obj.get_key(), new_key);
+    }
+    if (changed_keys.empty()) {
+        return;
+    }
+
+    ObjKeys tmp_keys;
+    for (auto& keypair : changed_keys) {
+        auto old_key = keypair.first;
+        auto new_key = keypair.second;
+        auto old_obj = get_object(old_key);
+
+        // Check if an object with the key already exists
+        if (is_valid(new_key)) {
+            // We can't just change the object's key to the new key because one
+            // already exists with that key and we don't want to overwrite that
+            // one. We know that that object will also be changing its key
+            // because we already verified that there are no duplicates in the
+            // new PK column.
+            // Create temporary object to hold the values of the current object,
+            // and then we'll move the object to its final key in a second pass.
+            uint64_t sequence_number_for_local_id = allocate_sequence_number();
+            ObjKey temp_key = make_tagged_local_id_after_hash_collision(sequence_number_for_local_id);
+            auto tmp_obj = create_object(temp_key);
+            tmp_obj.assign(old_obj);
+            tmp_keys.push_back(temp_key);
+        }
+        else {
+            create_object(new_key).assign(old_obj);
+        }
+        remove_object(old_key);
+    }
+    for (auto key : tmp_keys) {
+        auto old_obj = get_object(key);
+        StringData pk(old_obj.get<String>(m_primary_key_col));
+        auto new_obj = create_object_with_primary_key(pk);
+        new_obj.assign(old_obj);
+        remove_object(key);
+    }
 }
 
 void Table::do_set_primary_key_column(ColKey col_key)
@@ -3129,10 +3129,13 @@ void Table::validate_column_is_unique(ColKey col) const
     }
 }
 
-void Table::validate_primary_column_uniqueness() const
+void Table::validate_primary_column()
 {
     if (ColKey col = get_primary_key_column()) {
         validate_column_is_unique(col);
+        if (col.get_type() == col_type_String) {
+            rebuild_table_with_pk_column();
+        }
     }
 }
 

@@ -1909,12 +1909,12 @@ void Group::verify() const
 #endif
 }
 
-void Group::validate_primary_column_uniqueness() const
+void Group::validate_primary_columns()
 {
     auto table_keys = this->get_table_keys();
     for (auto tk : table_keys) {
         auto table = get_table(tk);
-        table->validate_primary_column_uniqueness();
+        table->validate_primary_column();
     }
 }
 
