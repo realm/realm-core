@@ -504,7 +504,7 @@ size_t NotNode::find_first_overlap_lower(size_t start, size_t end)
         result = m_first_in_known_range;
     }
     update_known(start, m_known_range_end, result);
-    return result;
+    return result < end ? result : not_found;
 }
 
 size_t NotNode::find_first_overlap_upper(size_t start, size_t end)

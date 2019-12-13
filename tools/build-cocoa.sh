@@ -7,22 +7,24 @@ SCRIPT=$(basename "${BASH_SOURCE[0]}")
 VERSION=$(git describe)
 
 function usage {
-    echo "Usage: ${SCRIPT} [-b] [-m] [-c <realm-cocoa-folder>]"
+    echo "Usage: ${SCRIPT} [-b] [-m] [-c <realm-cocoa-folder>] [-f <cmake-flags>]"
     echo ""
     echo "Arguments:"
     echo "   -b : build from source. If absent it will expect prebuilt packages"
     echo "   -m : build for macOS only"
     echo "   -c : copy core to the specified folder instead of packaging it"
+    echo "   -f : additional configuration flags to pass to cmake"
     exit 1;
 }
 
 # Parse the options
-while getopts ":bmc:" opt; do
+while getopts ":bmc:f:" opt; do
     case "${opt}" in
         b) BUILD=1;;
         m) MACOS_ONLY=1;;
         c) COPY=1
            DESTINATION=${OPTARG};;
+        f) CMAKE_FLAGS=${OPTARG};;
         *) usage;;
     esac
 done
@@ -45,6 +47,7 @@ function build_macos {
               -D REALM_VERSION="${VERSION}" \
               -D REALM_SKIP_SHARED_LIB=ON \
               -D REALM_BUILD_LIB_ONLY=ON \
+              ${CMAKE_FLAGS} \
               -G Ninja ..
         cmake --build . --config "${bt}" --target package
     )
@@ -60,7 +63,7 @@ if [[ ! -z $BUILD ]]; then
         done
         for os in ios watchos tvos; do
             for bt in "${BUILD_TYPES[@]}"; do
-                tools/cross_compile.sh -o $os -t $bt -v $(git describe)
+                tools/cross_compile.sh -o $os -t $bt -v $(git describe) -f "${CMAKE_FLAGS}"
             done
         done
     fi

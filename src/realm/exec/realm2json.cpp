@@ -8,6 +8,7 @@ int main(int argc, char const* argv[])
         std::string path = argv[1];
         std::map<std::string, std::string> renames;
         size_t link_depth = 0;
+        std::map<std::string, std::string> renames;
         if (argc > 2) {
             link_depth = strtol(argv[2], nullptr, 0);
         }
