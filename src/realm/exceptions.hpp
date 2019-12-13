@@ -60,17 +60,6 @@ public:
 };
 
 
-/// The FileFormatUpgradeRequired exception can be thrown by the SharedGroup
-/// constructor when opening a database that uses a deprecated file format
-/// and/or a deprecated history schema, and the user has indicated he does not
-/// want automatic upgrades to be performed. This exception indicates that until
-/// an upgrade of the file format is performed, the database will be unavailable
-/// for read or write operations.
-class FileFormatUpgradeRequired : public ExceptionWithBacktrace<std::exception> {
-public:
-    const char* message() const noexcept override;
-};
-
 /// The UnsupportedFileFormatVersion exception is thrown by DB::open()
 /// constructor when opening a database that uses a deprecated file format
 /// and/or a deprecated history schema which this version of Realm cannot
@@ -327,11 +316,6 @@ inline const char* CrossTableLinkTarget::message() const noexcept
 inline const char* DescriptorMismatch::message() const noexcept
 {
     return "Table descriptor mismatch";
-}
-
-inline const char* FileFormatUpgradeRequired::message() const noexcept
-{
-    return "Database upgrade required but prohibited";
 }
 
 inline UnsupportedFileFormatVersion::UnsupportedFileFormatVersion(int version)

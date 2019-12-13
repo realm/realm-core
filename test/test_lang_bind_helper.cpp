@@ -146,7 +146,7 @@ TEST(Transactions_ConcurrentFrozenTableGetByName)
         for (int j = 0; j < 3000; ++j) {
             std::string name = "Table" + to_string(j);
             table_names[j] = name;
-            auto table = wt->add_table(name);
+            wt->add_table(name);
         }
         wt->commit_and_continue_as_read();
         frozen = wt->freeze();
@@ -154,7 +154,7 @@ TEST(Transactions_ConcurrentFrozenTableGetByName)
     auto runner = [&](int first, int last) {
         millisleep(1);
         for (int j = first; j < last; ++j) {
-            auto table = frozen->get_table(table_names[j]);
+            frozen->get_table(table_names[j]);
         }
     };
     std::thread threads[1000];
@@ -462,7 +462,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
     // Try to advance after a propper rollback
     {
         WriteTransaction wt(sg_w);
-        TableRef foo_w = wt.add_table("bad");
+        wt.add_table("bad");
         // Implicit rollback
     }
     rt->advance_read();
@@ -876,7 +876,7 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkColumnInNewTable)
     DBRef sg_w = DB::create(hist, DBOptions(crypt_key()));
     {
         WriteTransaction wt(sg_w);
-        TableRef a = wt.get_or_add_table("a");
+        wt.get_or_add_table("a");
         wt.commit();
     }
 
@@ -890,7 +890,9 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkColumnInNewTable)
         b_w->add_column_link(type_Link, "foo", *a_w);
         wt.commit();
     }
+
     rt->advance_read();
+    CHECK(a_r);
     rt->verify();
 }
 
@@ -1235,7 +1237,6 @@ TEST(LangBindHelper_ConcurrentLinkViewDeletes)
     deleter.start([&] { deleter_thread(queue); });
     for (int i = 0; i < max_refs; ++i) {
         TableRef origin = rt->get_table("origin");
-        TableRef target = rt->get_table("target");
         int ndx = random.draw_int_mod(table_size);
         Obj o = origin->get_object(o_keys[ndx]);
         LnkLstPtr lw = o.get_linklist_ptr(ck);
@@ -1286,6 +1287,8 @@ TEST(LangBindHelper_AdvanceReadTransact_InsertLink)
         wt.commit();
     }
     rt->advance_read();
+    CHECK(origin);
+    CHECK(target);
     rt->verify();
 }
 
@@ -2328,7 +2331,7 @@ TEST(LangBindHelper_RollbackAndContinueAsRead)
         {
             // rollback of group level table insertion
             group->promote_to_write();
-            TableRef o = group->get_or_add_table("nullermand");
+            group->get_or_add_table("nullermand");
             TableRef o2 = group->get_table("nullermand");
             REALM_ASSERT(o2);
             group->rollback_and_continue_as_read();
@@ -2375,7 +2378,7 @@ TEST(LangBindHelper_RollbackAndContinueAsReadGroupLevelTableRemoval)
     auto reader = sg->start_read();
     {
         reader->promote_to_write();
-        TableRef origin = reader->get_or_add_table("a_table");
+        reader->get_or_add_table("a_table");
         reader->commit_and_continue_as_read();
     }
     reader->verify();
@@ -2520,6 +2523,8 @@ TEST(LangBindHelper_RollbackTableRemove)
         CHECK_EQUAL(2, group->size());
         TableRef alpha = group->get_table("alpha");
         TableRef beta = group->get_table("beta");
+        CHECK(alpha);
+        CHECK(beta);
         group->remove_table("beta");
         CHECK_NOT(group->has_table("beta"));
         group->rollback_and_continue_as_read();
@@ -2575,7 +2580,7 @@ TEST(LangBindHelper_ContinuousTransactions_RollbackTableRemoval)
     DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
     auto group = sg->start_read();
     group->promote_to_write();
-    TableRef filler = group->get_or_add_table("filler");
+    group->get_or_add_table("filler");
     TableRef table = group->get_or_add_table("table");
     auto col = table->add_column(type_Int, "i");
     Obj o = table->create_object();
@@ -3069,7 +3074,7 @@ TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
         auto table_b = wt.add_table("B");
         table_b->add_column(type_Int, "bussemand");
         table_b->create_object().set_all(99);
-        auto table_c = wt.add_table("C");
+        wt.add_table("C");
         wt.commit();
     }
     // FIXME: Use separate arrays for reader and writer threads for safety and readability.
@@ -3285,7 +3290,6 @@ TEST(LangBindHelper_ImplicitTransactions_ContinuedUseOfLinkList)
     group_w->verify();
 
     group->advance_read();
-    ConstTableRef table = group->get_table("table");
     auto link_list = obj.get_linklist(col);
     CHECK_EQUAL(1, link_list.size());
     group->verify();
@@ -3506,7 +3510,7 @@ TEST(LangBindHelper_SubqueryHandoverDependentViews)
             }
             writer->commit_and_continue_as_read();
             tv1 = table->where().less_equal(col0, 50).find_all();
-            Query qq = tv1.get_parent().where(&tv1);
+            Query qq = tv1.get_parent()->where(&tv1);
             reader = writer->duplicate();
             qq2 = reader->import_copy_of(qq, PayloadPolicy::Copy);
             CHECK(tv1.is_attached());
@@ -3545,7 +3549,7 @@ TEST(LangBindHelper_HandoverPartialQuery)
             }
             writer->commit_and_continue_as_read();
             tv1 = table->where().less_equal(col0, 50).find_all();
-            Query qq = tv1.get_parent().where(&tv1);
+            Query qq = tv1.get_parent()->where(&tv1);
             reader = writer->duplicate();
             qq2 = reader->import_copy_of(qq, PayloadPolicy::Copy);
             CHECK(tv1.is_attached());
@@ -3584,7 +3588,7 @@ TEST(LangBindHelper_HandoverNestedTableViews)
             writer->commit_and_continue_as_read();
             // Create a TableView tv2 that is backed by a Query that is restricted to rows from TableView tv1.
             TableView tv1 = table->where().less_equal(col, 50).find_all();
-            TableView tv2 = tv1.get_parent().where(&tv1).find_all();
+            TableView tv2 = tv1.get_parent()->where(&tv1).find_all();
             CHECK(tv2.is_in_sync());
             reader = writer->duplicate();
             tv = reader->import_copy_of(tv2, PayloadPolicy::Move);
@@ -5114,7 +5118,6 @@ TEST_IF(LangBindHelper_HandoverFuzzyTest, TEST_DURATION > 0)
 
     auto rt = sg->start_read();
     // Create and export query
-    TableRef owner = rt->get_table("Owner");
     TableRef dog = rt->get_table("Dog");
 
     realm::Query query = dog->link(c3).column<String>(c0) == "owner" + to_string(rand() % numberOfOwner);
@@ -5214,7 +5217,6 @@ TEST(LangBindHelper_TableViewClear)
     {
         tr->promote_to_write();
 
-        TableRef history = tr->get_table("history");
         TableRef line = tr->get_table("line");
 
         //    number_of_line = 2;
@@ -5498,7 +5500,7 @@ TEST(LangbindHelper_GroupWriter_EdgeCaseAssert)
     t2->add_column_link(type_LinkList, "dtkiipajqdsfglbptieibknaoeeohqdlhftqmlriphobspjr", *t1);
     std::vector<ObjKey> keys;
     t1->create_objects(375, keys);
-    auto t3 = g_w->add_table("pnsidlijqeddnsgaesiijrrqedkdktmfekftogjccerhpeil");
+    g_w->add_table("pnsidlijqeddnsgaesiijrrqedkdktmfekftogjccerhpeil");
     g_r->close();
     g_w->commit();
     REALM_ASSERT_RELEASE(sg->compact());

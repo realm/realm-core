@@ -29,7 +29,7 @@ set(REALM_SOURCES
     list.cpp
     node.cpp
     obj.cpp
-    object_id.cpp
+    global_key.cpp
     query.cpp
     query_engine.cpp
     query_expression.cpp
@@ -110,7 +110,7 @@ set(REALM_INSTALL_GENERAL_HEADERS
     node.hpp
     node_header.hpp
     obj.hpp
-    object_id.hpp
+    global_key.hpp
     owned_data.hpp
     query.hpp
     query_conditions.hpp

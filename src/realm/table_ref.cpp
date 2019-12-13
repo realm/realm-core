@@ -31,7 +31,7 @@ TableRef TableRef::unsafe_create(Table* t_ptr)
     return TableRef(t_ptr, t_ptr ? t_ptr->get_instance_version() : 0);
 }
 
-ConstTableRef::operator bool() const
+ConstTableRef::operator bool() const noexcept
 {
     return m_table != nullptr && m_table->get_instance_version() == m_instance_version;
 }

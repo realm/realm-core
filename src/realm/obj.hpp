@@ -33,7 +33,7 @@ class Replication;
 class TableView;
 class ConstLstBase;
 class LstBase;
-struct ObjectID;
+struct GlobalKey;
 
 template <class>
 class ConstLstIf;
@@ -76,7 +76,7 @@ public:
         return m_key;
     }
 
-    ObjectID get_object_id() const;
+    GlobalKey get_object_id() const;
 
     ConstTableRef get_table() const
     {
@@ -251,6 +251,8 @@ public:
 
     template <class Head, class... Tail>
     Obj& set_all(Head v, Tail... tail);
+
+    void assign(const ConstObj& other, bool only_diff = true);
 
     Obj get_linked_object(ColKey link_col_key);
 

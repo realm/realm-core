@@ -389,6 +389,7 @@ private:
     ObjKey find_first_integer(ColKey column_key, int64_t value) const;
     template <class oper>
     Timestamp minmax_timestamp(ColKey column_key, ObjKey* return_key) const;
+    RaceDetector m_race_detector;
 
     friend class Table;
     friend class ConstObj;
@@ -411,9 +412,9 @@ public:
 
     TableView() = default;
 
-    Table& get_parent()
+    TableRef get_parent() noexcept
     {
-        return const_cast<Table&>(*m_table);
+        return m_table.cast_away_const();
     }
 
     // Rows
@@ -692,7 +693,7 @@ inline Obj TableView::get(size_t row_ndx)
     REALM_ASSERT_ROW(row_ndx);
     ObjKey key(m_key_values->get(row_ndx));
     REALM_ASSERT(key != realm::null_key);
-    return get_parent().get_object(key);
+    return get_parent()->get_object(key);
 }
 
 inline Obj TableView::front()

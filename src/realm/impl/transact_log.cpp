@@ -16,8 +16,8 @@
  *
  **************************************************************************/
 
+#include <realm/global_key.hpp>
 #include <realm/impl/transact_log.hpp>
-#include <realm/object_id.hpp>
 
 namespace realm {
 namespace _impl {
@@ -31,8 +31,8 @@ TransactLogConvenientEncoder::~TransactLogConvenientEncoder() {}
 
 void TransactLogConvenientEncoder::add_class(StringData) {}
 void TransactLogConvenientEncoder::add_class_with_primary_key(StringData, DataType, StringData, bool) {}
-void TransactLogConvenientEncoder::create_object(const Table*, ObjectID) {}
-void TransactLogConvenientEncoder::create_object_with_primary_key(const Table*, ObjectID, Mixed) {}
+void TransactLogConvenientEncoder::create_object(const Table*, GlobalKey) {}
+void TransactLogConvenientEncoder::create_object_with_primary_key(const Table*, GlobalKey, Mixed) {}
 
 bool TransactLogEncoder::select_table(TableKey key)
 {
