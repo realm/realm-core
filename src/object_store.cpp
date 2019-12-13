@@ -572,7 +572,7 @@ static void apply_post_migration_changes(Group& group,
                 auto col = t.get_column_key(op.property->name);
                 REALM_ASSERT(col);
                 t.set_primary_key_column(col);
-                t.validate_primary_column_uniqueness();
+                t.validate_primary_column();
             }
             else {
                 t.set_primary_key_column(ColKey());
@@ -715,7 +715,7 @@ void ObjectStore::apply_schema_changes(Transaction& group, uint64_t schema_versi
         }
 
         verify_no_changes_required(schema_from_group(group).compare(target_schema));
-        group.validate_primary_column_uniqueness();
+        group.validate_primary_columns();
         set_schema_columns(group, target_schema);
         set_schema_version(group, target_schema_version);
         return;
@@ -736,7 +736,7 @@ void ObjectStore::apply_schema_changes(Transaction& group, uint64_t schema_versi
         // Migration function may have changed the schema, so we need to re-read it
         auto schema = schema_from_group(group);
         apply_post_migration_changes(group, schema.compare(target_schema), old_schema, DidRereadSchema::Yes);
-        group.validate_primary_column_uniqueness();
+        group.validate_primary_columns();
     }
     else {
         apply_post_migration_changes(group, changes, {}, DidRereadSchema::No);

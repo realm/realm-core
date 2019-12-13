@@ -27,6 +27,8 @@
 #include <functional>
 #include <string>
 #include <vector>
+#include <limits>
+
 namespace realm {
 class Group;
 class Transaction;

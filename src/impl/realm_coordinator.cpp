@@ -361,6 +361,12 @@ REALM_NOINLINE void translate_file_exception(StringData path, bool immutable)
         throw RealmFileException(RealmFileException::Kind::NotFound, ex.get_path(),
                                  util::format("Directory at path '%1' does not exist.", ex.get_path()), ex.what());
     }
+    catch (FileFormatUpgradeRequired const& ex) {
+        throw RealmFileException(RealmFileException::Kind::FormatUpgradeRequired, path,
+                                 "The Realm file format must be allowed to be upgraded "
+                                 "in order to proceed.",
+                                 ex.what());
+    }
     catch (util::File::AccessError const& ex) {
         // Errors for `open()` include the path, but other errors don't. We
         // don't want two copies of the path in the error, so strip it out if it
@@ -383,12 +389,6 @@ REALM_NOINLINE void translate_file_exception(StringData path, bool immutable)
                                  "Realm file is currently open in another process "
                                  "which cannot share access with this process. "
                                  "All processes sharing a single file must be the same architecture.",
-                                 ex.what());
-    }
-    catch (FileFormatUpgradeRequired const& ex) {
-        throw RealmFileException(RealmFileException::Kind::FormatUpgradeRequired, path,
-                                 "The Realm file format must be allowed to be upgraded "
-                                 "in order to proceed.",
                                  ex.what());
     }
     catch (UnsupportedFileFormatVersion const& ex) {

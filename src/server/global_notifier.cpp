@@ -34,7 +34,7 @@
 
 #include <realm/util/file.hpp>
 #include <realm/util/scope_exit.hpp>
-#include <realm/object_id.hpp>
+#include <realm/global_key.hpp>
 
 #include <json.hpp>
 
@@ -60,14 +60,14 @@ static void from_json(nlohmann::json const& j, VersionID& v)
     v.index = j["index"];
 }
 
-static void to_json(nlohmann::json& j, ObjectID id)
+static void to_json(nlohmann::json& j, GlobalKey id)
 {
     j = id.to_string();
 }
-static void from_json(nlohmann::json const& j, ObjectID& v)
+static void from_json(nlohmann::json const& j, GlobalKey& v)
 {
     std::string str = j;
-    v = ObjectID::from_string(str);
+    v = GlobalKey::from_string(str);
 }
 }
 
@@ -77,11 +77,11 @@ public:
          std::string local_root_dir, SyncConfig sync_config_template);
 
     util::Optional<ChangeNotification> next_changed_realm();
-    void release_version(ObjectID id, VersionID old_version, VersionID new_version);
+    void release_version(GlobalKey id, VersionID old_version, VersionID new_version);
 
 public:
-    void register_realm(ObjectID, StringData virtual_path) override;
-    void unregister_realm(ObjectID, StringData) override;
+    void register_realm(GlobalKey, StringData virtual_path) override;
+    void unregister_realm(GlobalKey, StringData) override;
     void error(std::exception_ptr err) override { m_target->error(err); }
     void download_complete() override { m_target->download_complete(); }
 
@@ -90,7 +90,7 @@ public:
 
     std::mutex m_work_queue_mutex;
     struct RealmToCalculate {
-        ObjectID realm_id;
+        GlobalKey realm_id;
         std::string virtual_path;
         std::shared_ptr<_impl::RealmCoordinator> coordinator;
         TransactionRef transaction;
@@ -98,14 +98,14 @@ public:
         bool pending_deletion = false;
 
         // constructor to make GCC 4.9 happy
-        RealmToCalculate(ObjectID realm_id, std::string virtual_path)
+        RealmToCalculate(GlobalKey realm_id, std::string virtual_path)
         : realm_id(realm_id)
         , virtual_path(std::move(virtual_path))
         {
         }
     };
     std::queue<RealmToCalculate*> m_work_queue;
-    std::unordered_map<ObjectID, RealmToCalculate> m_realms;
+    std::unordered_map<GlobalKey, RealmToCalculate> m_realms;
 
     struct SignalCallback {
         std::weak_ptr<Impl> notifier;
@@ -129,7 +129,7 @@ GlobalNotifier::Impl::Impl(std::unique_ptr<Callback> async_target,
 {
 }
 
-void GlobalNotifier::Impl::register_realm(ObjectID id, StringData path) {
+void GlobalNotifier::Impl::register_realm(GlobalKey id, StringData path) {
     auto info = &m_realms.emplace(id, RealmToCalculate{id, path}).first->second;
     m_realms.emplace(id, RealmToCalculate{id, path});
 
@@ -177,7 +177,7 @@ void GlobalNotifier::Impl::register_realm(ObjectID id, StringData path) {
     });
 }
 
-void GlobalNotifier::Impl::unregister_realm(ObjectID id, StringData path) {
+void GlobalNotifier::Impl::unregister_realm(GlobalKey id, StringData path) {
     auto realm = m_realms.find(id);
     if (realm == m_realms.end()) {
         m_logger->trace("Global notifier: unwatched Realm at (%1) was deleted", path);
@@ -197,7 +197,7 @@ void GlobalNotifier::Impl::unregister_realm(ObjectID id, StringData path) {
     }
 }
 
-void GlobalNotifier::Impl::release_version(ObjectID id, VersionID old_version, VersionID new_version)
+void GlobalNotifier::Impl::release_version(GlobalKey id, VersionID old_version, VersionID new_version)
 {
     std::lock_guard<std::mutex> l(m_work_queue_mutex);
 
@@ -292,7 +292,7 @@ GlobalNotifier::Callback& GlobalNotifier::target()
 
 GlobalNotifier::ChangeNotification::ChangeNotification(std::shared_ptr<GlobalNotifier::Impl> notifier,
                                                        std::string virtual_path,
-                                                       ObjectID realm_id,
+                                                       GlobalKey realm_id,
                                                        Realm::Config config,
                                                        VersionID old_version,
                                                        VersionID new_version)
@@ -308,7 +308,7 @@ GlobalNotifier::ChangeNotification::ChangeNotification(std::shared_ptr<GlobalNot
 
 GlobalNotifier::ChangeNotification::ChangeNotification(std::shared_ptr<GlobalNotifier::Impl> notifier,
                                                        std::string virtual_path,
-                                                       ObjectID realm_id)
+                                                       GlobalKey realm_id)
 : realm_path(std::move(virtual_path))
 , type(Type::Delete)
 , m_realm_id(realm_id)
