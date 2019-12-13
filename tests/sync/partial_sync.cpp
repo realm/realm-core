@@ -948,10 +948,7 @@ TEST_CASE("Query-based Sync link behaviour", "[sync]") {
     }
     SECTION("link targets bring in backlinked parents if requested via verbose string property names") {
         auto realm = Realm::get_shared_realm(config);
-        const ObjectSchema os_a = *realm->schema().find("object_a");
         const ObjectSchema os_c = *realm->schema().find("link_target");
-        ObjectStore::table_for_object_type(realm->read_group(), "object_a");
-        ObjectStore::table_for_object_type(realm->read_group(), "link_target");
         partial_sync::SubscriptionOptions options;
         std::vector<StringData> keypaths = { "@links.class_object_a.link" };
         parser::KeyPathMapping mapping;
@@ -964,10 +961,7 @@ TEST_CASE("Query-based Sync link behaviour", "[sync]") {
     }
     SECTION("link targets bring in backlinked parents if requested via user defined string property names") {
         auto realm = Realm::get_shared_realm(config);
-        const ObjectSchema os_a = *realm->schema().find("object_a");
         const ObjectSchema os_c = *realm->schema().find("link_target");
-        ObjectStore::table_for_object_type(realm->read_group(), "object_a");
-        ObjectStore::table_for_object_type(realm->read_group(), "link_target");
         partial_sync::SubscriptionOptions options;
         std::vector<StringData> keypaths = { "parents" };
         parser::KeyPathMapping mapping;
@@ -981,10 +975,7 @@ TEST_CASE("Query-based Sync link behaviour", "[sync]") {
     }
     SECTION("inclusion generation for unaliased link targets are not found and will throw") {
         auto realm = Realm::get_shared_realm(config);
-        const ObjectSchema os_a = *realm->schema().find("object_a");
         const ObjectSchema os_c = *realm->schema().find("link_target");
-        ObjectStore::table_for_object_type(realm->read_group(), "object_a");
-        ObjectStore::table_for_object_type(realm->read_group(), "link_target");
         partial_sync::SubscriptionOptions options;
         std::vector<StringData> keypaths = { "parents" };
         parser::KeyPathMapping mapping;
@@ -994,10 +985,7 @@ TEST_CASE("Query-based Sync link behaviour", "[sync]") {
     }
     SECTION("inclusion generation for link targets which are not a link will throw") {
         auto realm = Realm::get_shared_realm(config);
-        const ObjectSchema os_a = *realm->schema().find("object_a");
         const ObjectSchema os_c = *realm->schema().find("link_target");
-        ObjectStore::table_for_object_type(realm->read_group(), "object_a");
-        ObjectStore::table_for_object_type(realm->read_group(), "link_target");
         partial_sync::SubscriptionOptions options;
         std::vector<StringData> keypaths = { "id" };
         parser::KeyPathMapping mapping;
@@ -1007,10 +995,7 @@ TEST_CASE("Query-based Sync link behaviour", "[sync]") {
     }
     SECTION("inclusion generation for link targets which do not exist will throw") {
         auto realm = Realm::get_shared_realm(config);
-        const ObjectSchema os_a = *realm->schema().find("object_a");
         const ObjectSchema os_c = *realm->schema().find("link_target");
-        ObjectStore::table_for_object_type(realm->read_group(), "object_a");
-        ObjectStore::table_for_object_type(realm->read_group(), "link_target");
         partial_sync::SubscriptionOptions options;
         std::vector<StringData> keypaths = { "a_property_which_does_not_exist" };
         parser::KeyPathMapping mapping;
