@@ -399,7 +399,7 @@ void Table::remove_column(ColKey col_key)
         repl->erase_column(this, col_key); // Throws
 
     if (col_key == m_primary_key_col) {
-        set_primary_key_column(ColKey());
+        do_set_primary_key_column(ColKey());
     }
     bump_content_version();
     bump_storage_version();
