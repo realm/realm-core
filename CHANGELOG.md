@@ -1,19 +1,18 @@
-# NEXT RELEASE
+# 6.0.0-beta.1 Release notes
 
-### Enhancements
-* None.
+Includes changes introduced by v5.23.7
+
+### Outstanding issues.
+* Links lost during Table rebuild.([RCORE-229](https://jira.mongodb.org/browse/RCORE-229))
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * None.
  
-### Breaking changes
-* None.
-
 -----------
 
 ### Internals
-* None.
+* ObjectID renamed to GlobalKey
+* Table is now rebuilt when a string property is selected as new primary key.
 
 ----------------------------------------------
 
