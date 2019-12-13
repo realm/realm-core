@@ -252,7 +252,7 @@ public:
     template <class Head, class... Tail>
     Obj& set_all(Head v, Tail... tail);
 
-    void assign(const ConstObj& other, bool only_diff = true);
+    void assign(const ConstObj& other);
 
     Obj get_linked_object(ColKey link_col_key);
 

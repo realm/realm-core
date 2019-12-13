@@ -1090,7 +1090,7 @@ bool Obj::remove_backlink(ColKey col_key, ObjKey old_key, CascadeState& state)
     return false;
 }
 
-void Obj::assign(const ConstObj& other, bool only_diff)
+void Obj::assign(const ConstObj& other)
 {
     REALM_ASSERT(get_table() == other.get_table());
     auto cols = m_table->get_column_keys();
@@ -1107,26 +1107,23 @@ void Obj::assign(const ConstObj& other, bool only_diff)
             }
         }
         else {
-            auto type = col.get_type();
             Mixed val = other.get_any(col);
-            if (!only_diff || val != get_any(col)) {
-                switch (type) {
-                    case col_type_String: {
-                        // Need to take copy. Values might be in same cluster
-                        std::string str{val.get_string()};
-                        this->set(col, str);
-                        break;
-                    }
-                    case col_type_Binary: {
-                        // Need to take copy. Values might be in same cluster
-                        std::string str{val.get_binary()};
-                        this->set(col, BinaryData(str));
-                        break;
-                    }
-                    default:
-                        this->set(col, val);
-                        break;
+            switch (val.get_type()) {
+                case type_String: {
+                    // Need to take copy. Values might be in same cluster
+                    std::string str{val.get_string()};
+                    this->set(col, str);
+                    break;
                 }
+                case type_Binary: {
+                    // Need to take copy. Values might be in same cluster
+                    std::string str{val.get_binary()};
+                    this->set(col, BinaryData(str));
+                    break;
+                }
+                default:
+                    this->set(col, val);
+                    break;
             }
         }
     }
