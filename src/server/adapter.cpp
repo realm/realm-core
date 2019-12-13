@@ -28,7 +28,7 @@
 #include <realm/impl/transact_log.hpp>
 #include <realm/impl/input_stream.hpp>
 #include <realm/util/base64.hpp>
-#include <realm/object_id.hpp>
+#include <realm/global_key.hpp>
 
 #include <json.hpp>
 #include <unordered_map>
@@ -86,9 +86,9 @@ public:
     util::AppendBuffer<char>& m_out_buffer;
     std::unordered_map<std::string, ObjectSchema> m_schema;
 
-    std::unordered_map<std::string, std::unordered_map<ObjectID, int64_t>> m_int_primaries;
-    std::unordered_map<std::string, std::unordered_map<ObjectID, std::string>> m_string_primaries;
-    std::unordered_map<std::string, std::unordered_set<ObjectID>> m_null_primaries;
+    std::unordered_map<std::string, std::unordered_map<GlobalKey, int64_t>> m_int_primaries;
+    std::unordered_map<std::string, std::unordered_map<GlobalKey, std::string>> m_string_primaries;
+    std::unordered_map<std::string, std::unordered_set<GlobalKey>> m_null_primaries;
 
     nlohmann::json m_pending_instruction = nullptr;
 
@@ -139,7 +139,7 @@ public:
             flush();
     }
 
-    void add_set_instruction(ObjectID row, StringData column, nlohmann::json &&value) {
+    void add_set_instruction(GlobalKey row, StringData column, nlohmann::json &&value) {
         nlohmann::json identity = get_identity(row, *m_selected_table, m_selected_primary);
 
         // collapse values if inserting/setting values for the last object
@@ -175,7 +175,7 @@ public:
         }}, true, object_type);
     }
 
-    nlohmann::json get_identity(ObjectID object_id, const Table& table, Property *primary_key) {
+    nlohmann::json get_identity(GlobalKey object_id, const Table& table, Property *primary_key) {
         if (primary_key) {
             std::string object_type = ObjectStore::object_type_for_table_name(table.get_name());
 
@@ -590,8 +590,8 @@ public:
     using AdminRealmListener::start;
 
 private:
-    void register_realm(ObjectID, StringData virtual_path) override;
-    void unregister_realm(ObjectID, StringData) override {}
+    void register_realm(GlobalKey, StringData virtual_path) override;
+    void unregister_realm(GlobalKey, StringData) override {}
     void error(std::exception_ptr) override {} // FIXME
     void download_complete() override {}
 
@@ -629,7 +629,7 @@ Realm::Config Adapter::Impl::get_config(StringData virtual_path, util::Optional<
     return config;
 }
 
-void Adapter::Impl::register_realm(ObjectID, StringData virtual_path) {
+void Adapter::Impl::register_realm(GlobalKey, StringData virtual_path) {
     std::string path = virtual_path;
     if (!m_should_watch_realm_predicate(path))
         return;

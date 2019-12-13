@@ -403,7 +403,6 @@ void SyncUserMetadata::remove()
 {
     m_invalid = true;
     m_realm->begin_transaction();
-    TableRef table = ObjectStore::table_for_object_type(m_realm->read_group(), c_sync_userMetadata);
     m_obj.remove();
     m_realm->commit_transaction();
     m_realm = nullptr;
@@ -463,7 +462,6 @@ void SyncFileActionMetadata::remove()
     REALM_ASSERT(m_realm);
     m_realm->verify_thread();
     m_realm->begin_transaction();
-    TableRef table = ObjectStore::table_for_object_type(m_realm->read_group(), c_sync_fileActionMetadata);
     m_obj.remove();
     m_realm->commit_transaction();
     m_realm = nullptr;

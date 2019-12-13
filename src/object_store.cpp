@@ -110,8 +110,6 @@ ColKey add_column(Group& group, Table& table, Property const& property)
         auto key = table.add_column(to_core_type(property.type), property.name, is_nullable(property.type));
         if (property.requires_index())
             table.add_search_index(key);
-        if (property.is_primary)
-            table.set_primary_key_column(key);
         return key;
     }
 }
@@ -529,7 +527,7 @@ static void apply_pre_migration_changes(Group& group, std::vector<SchemaChange> 
         void operator()(ChangePropertyType op) { replace_column(group, table(op.object), *op.old_property, *op.new_property); }
         void operator()(MakePropertyNullable op) { make_property_optional(table(op.object), *op.property); }
         void operator()(MakePropertyRequired op) { make_property_required(group, table(op.object), *op.property); }
-        void operator()(ChangePrimaryKey op) { ObjectStore::set_primary_key_for_object(group, op.object->name.c_str(), op.property ? op.property->name.c_str() : ""); }
+        void operator()(ChangePrimaryKey op) { table(op.object).set_primary_key_column(ColKey{}); }
         void operator()(AddIndex op) { table(op.object).add_search_index(op.property->column_key); }
         void operator()(RemoveIndex op) { table(op.object).remove_search_index(op.property->column_key); }
     } applier{group};
@@ -572,7 +570,6 @@ static void apply_post_migration_changes(Group& group,
                 auto col = t.get_column_key(op.property->name);
                 REALM_ASSERT(col);
                 t.set_primary_key_column(col);
-                t.validate_primary_column_uniqueness();
             }
             else {
                 t.set_primary_key_column(ColKey());
@@ -715,7 +712,7 @@ void ObjectStore::apply_schema_changes(Transaction& group, uint64_t schema_versi
         }
 
         verify_no_changes_required(schema_from_group(group).compare(target_schema));
-        group.validate_primary_column_uniqueness();
+        group.validate_primary_columns();
         set_schema_columns(group, target_schema);
         set_schema_version(group, target_schema_version);
         return;
@@ -736,7 +733,7 @@ void ObjectStore::apply_schema_changes(Transaction& group, uint64_t schema_versi
         // Migration function may have changed the schema, so we need to re-read it
         auto schema = schema_from_group(group);
         apply_post_migration_changes(group, schema.compare(target_schema), old_schema, DidRereadSchema::Yes);
-        group.validate_primary_column_uniqueness();
+        group.validate_primary_columns();
     }
     else {
         apply_post_migration_changes(group, changes, {}, DidRereadSchema::No);
