@@ -10362,19 +10362,18 @@ TEST(Query_NotImmediatelyBeforeKnownRange)
     Group g;
     TableRef parent = g.add_table("parent");
     TableRef child = g.add_table("child");
-    parent->add_column_link(type_LinkList, "list", *child);
-    child->add_column(type_String, "value");
-    child->add_search_index(0);
+    auto col_link = parent->add_column_link(type_LinkList, "list", *child);
+    auto col_str = child->add_column(type_String, "value");
+    child->add_search_index(col_str);
 
-    parent->add_empty_row();
-    child->add_empty_row(2);
-    child->set_string_unique(0, 0, "a");
-    child->set_string_unique(0, 1, "b");
-    auto list = parent->get_linklist(0, 0);
-    list->insert(0, 0);
-    list->insert(0, 1);
+    Obj obj = parent->create_object();
+    auto k0 = child->create_object().set(col_str, "a").get_key();
+    auto k1 = child->create_object().set(col_str, "b").get_key();
+    auto list = obj.get_linklist(col_link);
+    list.insert(0, k0);
+    list.insert(0, k1);
 
-    Query q = child->where(list).Not().equal(0, "a");
+    Query q = child->where(list).Not().equal(col_str, "a");
     CHECK_EQUAL(q.count(), 1);
 }
 

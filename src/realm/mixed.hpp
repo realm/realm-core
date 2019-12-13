@@ -408,17 +408,59 @@ inline bool Mixed::is_null() const
     return (m_type == 0);
 }
 
-namespace {
-inline int comp(StringData a, StringData b)
+namespace _impl {
+inline int compare_string(StringData a, StringData b)
 {
     if (a == b)
         return 0;
     return utf8_compare(a, b) ? -1 : 1;
 }
+
+template <int>
+struct IntTypeForSize;
+template <>
+struct IntTypeForSize<1> {
+    using type = uint8_t;
+};
+template <>
+struct IntTypeForSize<2> {
+    using type = uint16_t;
+};
+template <>
+struct IntTypeForSize<4> {
+    using type = uint32_t;
+};
+template <>
+struct IntTypeForSize<8> {
+    using type = uint64_t;
+};
+
+template <typename Float>
+inline int compare_float(Float a_raw, Float b_raw)
+{
+    bool a_nan = std::isnan(a_raw);
+    bool b_nan = std::isnan(b_raw);
+    if (!a_nan && !b_nan) {
+        // Just compare as IEEE floats
+        return a_raw == b_raw ? 0 : a_raw < b_raw ? -1 : 1;
+    }
+    if (a_nan && b_nan) {
+        // Compare the nan values as unsigned
+        using IntType = typename _impl::IntTypeForSize<sizeof(Float)>::type;
+        IntType a = 0, b = 0;
+        memcpy(&a, &a_raw, sizeof(Float));
+        memcpy(&b, &b_raw, sizeof(Float));
+        return a == b ? 0 : a < b ? -1 : 1;
+    }
+    // One is nan, the other is not
+    // nans are treated as being less than all non-nan values
+    return a_nan ? -1 : 1;
 }
+} // namespace _impl
 
 inline int Mixed::compare(const Mixed& b) const
 {
+    // nulls are treated as being less than all other values
     if (is_null()) {
         return b.is_null() ? 0 : -1;
     }
@@ -433,20 +475,12 @@ inline int Mixed::compare(const Mixed& b) const
                 return -1;
             break;
         case type_String:
-            return comp(get<StringData>(), b.get<StringData>());
+            return _impl::compare_string(get<StringData>(), b.get<StringData>());
             break;
         case type_Float:
-            if (get<float>() > b.get<float>())
-                return 1;
-            else if (get<float>() < b.get<float>())
-                return -1;
-            break;
+            return _impl::compare_float(get<float>(), b.get<float>());
         case type_Double:
-            if (get<double>() > b.get<double>())
-                return 1;
-            else if (get<double>() < b.get<double>())
-                return -1;
-            break;
+            return _impl::compare_float(get<double>(), b.get<double>());
         case type_Bool:
             if (get<bool>() > b.get<bool>())
                 return 1;
