@@ -27,9 +27,12 @@ void ObjectChangeSet::insertions_add(ObjectKeyType obj)
 
 void ObjectChangeSet::modifications_add(ObjectKeyType obj, ColKeyType col)
 {
-    auto it_and_success = m_modifications.insert({obj, {col}});
-    if (!it_and_success.second) {
-        it_and_success.first->second.insert(col);
+    // don't report modifications on new objects
+    if (m_insertions.find(obj) == m_insertions.end()) {
+        auto it_and_success = m_modifications.insert({obj, {col}});
+        if (!it_and_success.second) {
+            it_and_success.first->second.insert(col);
+        }
     }
 }
 

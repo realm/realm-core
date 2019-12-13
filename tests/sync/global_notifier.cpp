@@ -226,7 +226,7 @@ TEST_CASE("global_notifier: basics", "[sync][global_notifier]") {
                 REQUIRE(changes.size() == 1);
                 REQUIRE(changes.find(object_name) != changes.end());
                 REQUIRE(changes[object_name].insertions_size() == 2);
-                REQUIRE(changes[object_name].modifications_size() == 2);
+                REQUIRE(changes[object_name].modifications_size() == 0);
                 REQUIRE(changes[object_name].deletions_size() == 0);
 
                 {
@@ -250,6 +250,8 @@ TEST_CASE("global_notifier: basics", "[sync][global_notifier]") {
                         int64_t value = object_table->get_object(key).get<int64_t>(value_col_name);
                         REQUIRE((value == initial_value || value == second_value));
                     }
+                    // no modifications on inserted objects, but the below loop at least checks for compile errors
+                    REQUIRE(changes[object_name].get_modifications().count() == 0);
                     for (auto modification : changes[object_name].get_modifications()) {
                         ObjKey key(modification.first);
                         REQUIRE(bool(key));
@@ -257,7 +259,16 @@ TEST_CASE("global_notifier: basics", "[sync][global_notifier]") {
                         int64_t value = object_table->get_object(key).get<int64_t>(value_col_name);
                         REQUIRE((value == initial_value || value == second_value));
                     }
+                    REQUIRE(changes[object_name].get_modification_keys().count() == 0);
+                    for (auto modification : changes[object_name].get_modification_keys()) {
+                        ObjKey key(modification);
+                        REQUIRE(bool(key));
+                        REQUIRE(object_table->get_object(key));
+                        int64_t value = object_table->get_object(key).get<int64_t>(value_col_name);
+                        REQUIRE((value == initial_value || value == second_value));
+                    }
                     auto deletions = changes[object_name].get_deletions();
+                    REQUIRE(deletions.count() == 0);
                     REQUIRE(deletions.begin() == deletions.end());
                 }
                 next_change = global_notifier.next_changed_realm();

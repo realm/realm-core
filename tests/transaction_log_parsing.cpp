@@ -344,15 +344,15 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             REQUIRE(info.tables[table_key].deletions_empty());
         }
 
-        SECTION("modifying newly added rows is reported as a modification") {
+        SECTION("modifying newly added rows does not report it as a modification") {
             auto info = track_changes({table_key}, [&] {
                 table.create_object().set_all(10, 0);
             });
             REQUIRE(info.tables.size() == 1);
             REQUIRE(info.tables[table_key].insertions_size() == 1);
             REQUIRE(info.tables[table_key].insertions_contains(10));
-            REQUIRE(info.tables[table_key].modifications_size() == 1);
-            REQUIRE(info.tables[table_key].modifications_contains(10));
+            REQUIRE(info.tables[table_key].modifications_size() == 0);
+            REQUIRE(!info.tables[table_key].modifications_contains(10));
             REQUIRE(info.tables[table_key].deletions_empty());
         }
 

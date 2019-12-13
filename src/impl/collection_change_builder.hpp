@@ -23,7 +23,9 @@
 
 #include <realm/keys.hpp>
 
+#include <functional>
 #include <unordered_set>
+#include <vector>
 
 namespace realm {
 namespace _impl {
