@@ -279,13 +279,13 @@ TEST(Transactions_ConcurrentFrozenQueryAndObjAndTransactionClose)
         catch(NoSuchTable& e) {
         }
     };
-    std::thread threads[500];
-    for (int j = 0; j < 500; ++j) {
-        threads[j] = std::thread(runner, j, j + 500);
+    std::thread threads[100];
+    for (int j = 0; j < 100; ++j) {
+        threads[j] = std::thread(runner, j, j + 100);
     }
     millisleep(10);
     frozen->close(); // this should cause all threads to throw
-    for (int j = 0; j < 500; ++j)
+    for (int j = 0; j < 100; ++j)
         threads[j].join();
 }
 
