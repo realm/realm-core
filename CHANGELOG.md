@@ -1,4 +1,4 @@
-# 6.0.0-beta.1 Release notes
+# 6.0.0-beta.2 Release notes
 
 Includes changes introduced by v5.23.7
 
@@ -14,6 +14,12 @@ Includes changes introduced by v5.23.7
 * ObjectID renamed to GlobalKey
 * Table is now rebuilt when a string property is selected as new primary key.
 
+----------------------------------------------
+
+# 6.0.0-beta.1 Release notes
+
+This release was never published
+ 
 ----------------------------------------------
 
 # 6.0.0-beta.0 Release notes
