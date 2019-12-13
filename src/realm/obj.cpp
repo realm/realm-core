@@ -609,7 +609,7 @@ void ConstObj::to_json(std::ostream& out, size_t link_depth, std::map<std::strin
                     out << "[";
                     for (size_t i = 0; i < sz; i++) {
                         if (i > 0)
-                            out << ", ";
+                            out << ",";
                         followed.push_back(ck);
                         size_t new_depth = link_depth == not_found ? not_found : link_depth - 1;
                         ll.get_object(i).to_json(out, new_depth, renames, followed);

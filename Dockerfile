@@ -27,10 +27,10 @@ RUN apt-get update && apt-get install -y \
 RUN pip install diff_cover
 
 RUN cd /opt \
-    && wget https://cmake.org/files/v3.7/cmake-3.7.2-Linux-x86_64.tar.gz \
-    && tar zxvf cmake-3.7.2-Linux-x86_64.tar.gz
+    && wget https://cmake.org/files/v3.15/cmake-3.15.2-Linux-x86_64.tar.gz \
+    && tar zxvf cmake-3.15.2-Linux-x86_64.tar.gz
 
-ENV PATH "$PATH:/opt/cmake-3.7.2-Linux-x86_64/bin"
+ENV PATH "/opt/cmake-3.15.2-Linux-x86_64/bin:$PATH"
 
 VOLUME /source
 VOLUME /out
