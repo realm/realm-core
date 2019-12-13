@@ -29,10 +29,7 @@ void ObjectChangeSet::modifications_add(ObjectKeyType obj, ColKeyType col)
 {
     // don't report modifications on new objects
     if (m_insertions.find(obj) == m_insertions.end()) {
-        auto it_and_success = m_modifications.insert({obj, {col}});
-        if (!it_and_success.second) {
-            it_and_success.first->second.insert(col);
-        }
+        m_modifications[obj].insert(col);
     }
 }
 
@@ -133,11 +130,7 @@ void ObjectChangeSet::merge(ObjectChangeSet&& other)
         m_deletions.insert(other.m_deletions.begin(), other.m_deletions.end());
     }
     for (auto it = other.m_modifications.begin(); it != other.m_modifications.end(); ++it) {
-        auto insert_result = m_modifications.insert(*it);
-        if (!insert_result.second) {
-            // the insertion failed because the key already exists, merge in the other column values
-            insert_result.first->second.insert(it->second.begin(), it->second.end());
-        }
+        m_modifications[it->first].insert(it->second.begin(), it->second.end());
     }
 
     verify();

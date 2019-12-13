@@ -79,49 +79,9 @@ public:
     void merge(ObjectChangeSet&& other);
     void verify();
 
-    // provides iterator access to keys in the set (unordered)
-    struct ObjectSetIterable {
-        size_t count() const noexcept { return m_object_set.size(); }
-        auto begin() const noexcept { return m_object_set.cbegin(); }
-        auto end() const noexcept { return m_object_set.cend(); }
-        ObjectSetIterable(ObjectSet const& is) : m_object_set(is) { }
-    private:
-        ObjectSet const& m_object_set;
-    };
-
-    // adapter to provide implicit key only iteration on top of a std::map<ObjKey, value>
-    using ObjMapToColSetIterator = ObjectMapToColumnSet::const_iterator;
-    struct ObjKeyIterator : public ObjMapToColSetIterator {
-        ObjKeyIterator() : ObjMapToColSetIterator() {};
-        ObjKeyIterator(ObjMapToColSetIterator s) : ObjMapToColSetIterator(s) {};
-        ObjectKeyType* operator->() const { return (ObjectKeyType*)&(ObjMapToColSetIterator::operator->()->first); }
-        ObjectKeyType operator*() const { return ObjMapToColSetIterator::operator*().first; }
-    };
-
-    // provides iterator access direct to keys
-    struct ObjectMapKeyIterable {
-        size_t count() const noexcept { return m_object_map.size(); }
-        ObjKeyIterator begin() const noexcept { return m_object_map.cbegin(); }
-        ObjKeyIterator end() const noexcept { return m_object_map.cend(); }
-        ObjectMapKeyIterable(ObjectMapToColumnSet const& is) : m_object_map(is) { }
-    private:
-        ObjectMapToColumnSet const& m_object_map;
-    };
-
-    // provides access to keys (using .first) and their set of columns (using .second)
-    struct ObjectMapIterable {
-        size_t count() const noexcept { return m_object_map.size(); }
-        auto begin() const noexcept { return m_object_map.cbegin(); }
-        auto end() const noexcept { return m_object_map.cend(); }
-        ObjectMapIterable(ObjectMapToColumnSet const& is) : m_object_map(is) { }
-    private:
-        ObjectMapToColumnSet const& m_object_map;
-    };
-
-    ObjectSetIterable get_deletions() const noexcept { return m_deletions; }
-    ObjectMapIterable get_modifications() const noexcept { return m_modifications; }
-    ObjectMapKeyIterable get_modification_keys() const noexcept { return m_modifications; }
-    ObjectSetIterable get_insertions() const noexcept { return m_insertions; }
+    const ObjectSet& get_deletions() const noexcept { return m_deletions; }
+    const ObjectMapToColumnSet& get_modifications() const noexcept { return m_modifications; }
+    const ObjectSet& get_insertions() const noexcept { return m_insertions; }
 
 private:
     ObjectSet m_deletions;
