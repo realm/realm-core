@@ -242,7 +242,9 @@ TEST(Transactions_ConcurrentFrozenQueryAndObj)
 // It creates a lot of races between accessor use and transaction close.
 // This is undefined behaviour
 // but the goal is none the less to "harden" Core against just crashing
-TEST(Transactions_ConcurrentFrozenQueryAndObjAndTransactionClose)
+// **           THIS TEST MAY CRASH OCCASIONALLY          **
+// ** if so, disable it and run it in a different setting **
+TEST_IF(Transactions_ConcurrentFrozenQueryAndObjAndTransactionClose, !REALM_TSAN)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
