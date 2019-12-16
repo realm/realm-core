@@ -212,9 +212,9 @@ void ArrayBacklink::verify() const
         }
         REALM_ASSERT(target_table->is_valid(target_key));
         Obj target = target_table->get_object(target_key);
-        size_t count = target.get_backlink_count(*src_table, src_col_key);
-        REALM_ASSERT(count > 0);
-        for (size_t i = 0; i < count; ++i) {
+        size_t cnt = target.get_backlink_count(*src_table, src_col_key);
+        REALM_ASSERT(cnt > 0);
+        for (size_t i = 0; i < cnt; ++i) {
             if (target.get_backlink(target_col_key, i)  == src) {
                 return;
             }

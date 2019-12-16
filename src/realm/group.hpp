@@ -552,9 +552,6 @@ public:
     {
         m_alloc.enable_debug(enable);
     }
-    void to_dot(std::ostream&) const;
-    void to_dot() const; // To std::cerr (for GDB)
-    void to_dot(const char* file_path) const;
 #endif
 
 protected:
