@@ -1877,7 +1877,7 @@ TEST_TYPES(Table_SortFloat, float, double)
     for (size_t i = 300; i < 600; ++i) {
         CHECK(sorted.get(i).is_null(col));
     }
-    for (size_t i = 600; i + i < 900; ++i) {
+    for (size_t i = 600; i + 1 < 900; ++i) {
         CHECK_GREATER(sorted.get(i + 1).get<TEST_TYPE>(col), sorted.get(i).get<TEST_TYPE>(col));
     }
 }

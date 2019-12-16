@@ -895,20 +895,23 @@ template <> struct IntTypeForSize<8> { using type = uint64_t; };
 template <typename Float>
 int compare_float(Float a_raw, Float b_raw)
 {
-    // nans (and by extension nulls) are treated as being less than all non-nan values
     bool a_nan = std::isnan(a_raw);
     bool b_nan = std::isnan(b_raw);
-    if (a_nan != b_nan) {
-        return a_nan ? 1 : -1;
+    if (!a_nan && !b_nan) {
+        // Just compare as IEEE floats
+        return a_raw == b_raw ? 0 : a_raw < b_raw ? 1 : -1;
     }
-
-    // Compare the values as ints, which gives correct results for IEEE floats
-    // and bypasses the usual behavior of nans not being comparable to each other
-    using IntType = typename _impl::IntTypeForSize<sizeof(Float)>::type;
-    IntType a = 0, b = 0;
-    memcpy(&a, &a_raw, sizeof(Float));
-    memcpy(&b, &b_raw, sizeof(Float));
-    return a == b ? 0 : a < b ? 1 : -1;
+    if (a_nan && b_nan) {
+        // Compare the nan values (including nulls) as unsigned
+        using IntType = typename _impl::IntTypeForSize<sizeof(Float)>::type;
+        IntType a = 0, b = 0;
+        memcpy(&a, &a_raw, sizeof(Float));
+        memcpy(&b, &b_raw, sizeof(Float));
+        return a == b ? 0 : a < b ? 1 : -1;
+    }
+    // One is nan, the other is not
+    // nans are treated as being less than all non-nan values
+    return a_nan ? 1 : -1;
 }
 } // namespace _impl
 
