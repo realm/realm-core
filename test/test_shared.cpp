@@ -986,17 +986,6 @@ TEST(Shared_Writes)
     }
 }
 
-namespace {
-
-void add_int(Table& table, ColKey col, int64_t diff)
-{
-    for (auto& o : table) {
-        o.add_int(col, diff);
-    }
-}
-
-} // anonymous namespace
-
 #if !REALM_ANDROID // FIXME
 TEST_IF(Shared_ManyReaders, TEST_DURATION > 0)
 {
@@ -1027,6 +1016,12 @@ TEST_IF(Shared_ManyReaders, TEST_DURATION > 0)
     TransactionRef read_transactions[8 * max_N];
     ColKey col_int;
     ColKey col_bin;
+
+    auto add_int = [](Table& table, ColKey col, int64_t diff) {
+        for (auto& o : table) {
+            o.add_int(col, diff);
+        }
+    };
 
     for (int round = 0; round < num_rounds; ++round) {
         int N = rounds[round];
@@ -1472,6 +1467,13 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
     // processes which can then be terminated individually.
     const int process_count = 100;
     SHARED_GROUP_TEST_PATH(path);
+    ColKey col_int;
+
+    auto add_int = [](Table& table, ColKey col, int64_t diff) {
+        for (auto& o : table) {
+            o.add_int(col, diff);
+        }
+    };
 
     for (int i = 0; i < process_count; ++i) {
         pid_t pid = fork();
@@ -1505,11 +1507,10 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
             wt.get_group().verify();
             TableRef table = wt.get_or_add_table("beta");
             if (table->is_empty()) {
-                table->add_column(type_Int, "i");
-                table->insert_empty_row(0);
-                table->set_int(0, 0, 0);
+                col_int = table->add_column(type_Int, "i");
+                table->create_object().set(col_int, 0);
             }
-            add_int(*table, 0, 1);
+            add_int(*table, col_int, 1);
             wt.commit();
         }
     }
@@ -1521,7 +1522,7 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
         CHECK(!rt.has_table("alpha"));
         CHECK(rt.has_table("beta"));
         ConstTableRef table = rt.get_table("beta");
-        CHECK_EQUAL(process_count, table->get_int(0, 0));
+        CHECK_EQUAL(process_count, table->begin()->get<Int>(col_int));
     }
 }
 
