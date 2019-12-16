@@ -261,9 +261,9 @@ TEST(Transactions_ConcurrentFrozenQueryAndObjAndTransactionClose)
     }
     auto runner = [&](int first, int last) {
         millisleep(1);
-        auto table = frozen->get_table("MyTable");
-        auto col = table->get_column_key("MyCol");
         try {
+            auto table = frozen->get_table("MyTable");
+            auto col = table->get_column_key("MyCol");
             while (1) {
                 for (int j = first; j < last; ++j) {
                     // loads of concurrent queries created and executed:
@@ -277,6 +277,8 @@ TEST(Transactions_ConcurrentFrozenQueryAndObjAndTransactionClose)
             }
         }
         catch(NoSuchTable& e) {
+        }
+        catch (LogicError& e) {
         }
     };
     std::thread threads[100];
