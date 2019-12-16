@@ -421,7 +421,7 @@ if ((sig_n_prime192.w[2] == 0) && sig_n_prime192.w[1] == sig_x.w[1]
   BID_RETURN_VAL (res);
 }
 }
-
+#if 0 // Not needed in Realm
 BID128_FUNCTION_ARG2_NORND_CUSTOMRESTYPE (int,
 					  bid128_quiet_greater_equal, x,
 					  y)
@@ -923,7 +923,7 @@ if ((sig_n_prime192.w[2] == 0) && sig_n_prime192.w[1] == sig_x.w[1]
   BID_RETURN_VAL (res);
 }
 }
-
+#endif
 BID128_FUNCTION_ARG2_NORND_CUSTOMRESTYPE (int, bid128_quiet_less, x, y)
 
      int res;
@@ -1173,7 +1173,7 @@ if ((sig_n_prime192.w[2] == 0) && sig_n_prime192.w[1] == sig_x.w[1]
   BID_RETURN_VAL (res);
 }
 }
-
+#if 0 // Not needed in Realm
 BID128_FUNCTION_ARG2_NORND_CUSTOMRESTYPE (int, bid128_quiet_less_equal,
 					  x, y)
 
@@ -4351,3 +4351,4 @@ if ((sig_n_prime192.w[2] == 0) && sig_n_prime192.w[1] == sig_x.w[1]
   BID_RETURN_VAL (res);
 }
 }
+#endif
