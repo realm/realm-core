@@ -1,3 +1,22 @@
+# NEXT RELEASE
+
+### Enhancements
+* None.
+
+### Fixed
+* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* None.
+ 
+### Breaking changes
+* None.
+
+-----------
+
+### Internals
+* None.
+
+----------------------------------------------
+
 # 6.0.0-beta.2 Release notes
 
 Includes changes introduced by v5.23.7
