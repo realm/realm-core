@@ -16,7 +16,7 @@
  *
  **************************************************************************/
 
-#include <realm/decimal128.hpp>
+#include <realm/array_decimal128.hpp>
 
 #include "test.hpp"
 
@@ -53,4 +53,38 @@ TEST(Decimal_Basics)
     Decimal128 d10(10);
     CHECK(d10 < d2);
     CHECK(d10 >= d);
+}
+
+TEST(Decimal_Array)
+{
+    const char str0[] = "12345.67";
+    const char str1[] = "1000.00";
+    const char str2[] = "-45";
+
+    ArrayDecimal128 arr(Allocator::get_default());
+    arr.create();
+
+    arr.add({str0});
+    arr.add({str1});
+    arr.insert(1, {str2});
+
+    Decimal128 id2(str2);
+    CHECK_EQUAL(arr.get(0), Decimal128(str0));
+    CHECK_EQUAL(arr.get(1), id2);
+    CHECK_EQUAL(arr.get(2), Decimal128(str1));
+    CHECK_EQUAL(arr.find_first(id2), 1);
+
+    arr.erase(1);
+    CHECK_EQUAL(arr.get(1), Decimal128(str1));
+
+    ArrayDecimal128 arr1(Allocator::get_default());
+    arr1.create();
+    arr.move(arr1, 1);
+
+    CHECK_EQUAL(arr.size(), 1);
+    CHECK_EQUAL(arr1.size(), 1);
+    CHECK_EQUAL(arr1.get(0), Decimal128(str1));
+
+    arr.destroy();
+    arr1.destroy();
 }

@@ -7,6 +7,7 @@ set(REALM_SOURCES
     array_blob.cpp
     array_blobs_small.cpp
     array_blobs_big.cpp
+    array_decimal128.cpp
     array_integer.cpp
     array_mixed.cpp
     array_unsigned.cpp
