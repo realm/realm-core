@@ -613,11 +613,11 @@ inline ConstTableView& ConstTableView::operator=(const ConstTableView& tv)
 }
 
 #define REALM_ASSERT_COLUMN(column_key)                                                                              \
-    REALM_ASSERT(m_table);                                                                                           \
+    m_table.check();                                                                                                 \
     REALM_ASSERT(m_table->colkey2ndx(column_key))
 
 #define REALM_ASSERT_ROW(row_ndx)                                                                                    \
-    REALM_ASSERT(m_table);                                                                                           \
+    m_table.check();                                                                                                 \
     REALM_ASSERT(row_ndx < m_key_values->size())
 
 #define REALM_ASSERT_COLUMN_AND_TYPE(column_key, column_type)                                                        \
