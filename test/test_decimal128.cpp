@@ -16,6 +16,7 @@
  *
  **************************************************************************/
 
+#include <realm.hpp>
 #include <realm/array_decimal128.hpp>
 
 #include "test.hpp"
@@ -87,4 +88,21 @@ TEST(Decimal_Array)
 
     arr.destroy();
     arr1.destroy();
+}
+
+TEST(Decimal128_Table)
+{
+    const char str0[] = "12345.67";
+    const char str1[] = "1000.00";
+
+    Table t;
+    auto col_price = t.add_column(type_Decimal, "id");
+    auto obj0 = t.create_object().set(col_price, Decimal128(str0));
+    auto obj1 = t.create_object().set(col_price, Decimal128(str1));
+    CHECK_EQUAL(obj0.get<Decimal128>(col_price), Decimal128(str0));
+    CHECK_EQUAL(obj1.get<Decimal128>(col_price), Decimal128(str1));
+    auto key = t.find_first(col_price, Decimal128(str1));
+    CHECK_EQUAL(key, obj1.get_key());
+    auto d = obj1.get_any(col_price);
+    CHECK_EQUAL(d.get<Decimal128>().to_string(), "1000.00");
 }

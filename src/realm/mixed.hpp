@@ -30,6 +30,7 @@
 #include <realm/data_type.hpp>
 #include <realm/string_data.hpp>
 #include <realm/timestamp.hpp>
+#include <realm/decimal128.hpp>
 #include <realm/util/assert.hpp>
 #include <realm/utilities.hpp>
 
@@ -126,6 +127,7 @@ public:
     Mixed(StringData) noexcept;
     Mixed(BinaryData) noexcept;
     Mixed(Timestamp) noexcept;
+    Mixed(Decimal128) noexcept;
     Mixed(ObjKey) noexcept;
 
     // These are shortcuts for Mixed(StringData(c_str)), and are
@@ -188,6 +190,7 @@ private:
 
     union {
         int64_t int_val;
+        uint64_t uint_val;
         bool bool_val;
         float float_val;
         double double_val;
@@ -301,6 +304,18 @@ inline Mixed::Mixed(Timestamp v) noexcept
     }
 }
 
+inline Mixed::Mixed(Decimal128 v) noexcept
+{
+    if (!v.is_null()) {
+        m_type = type_Decimal + 1;
+        auto x = v.to_bid64();
+        uint_val = x.w;
+    }
+    else {
+        m_type = 0;
+    }
+}
+
 inline Mixed::Mixed(ObjKey v) noexcept
 {
     if (v) {
@@ -394,6 +409,13 @@ inline Timestamp Mixed::get<Timestamp>() const noexcept
 inline Timestamp Mixed::get_timestamp() const
 {
     return get<Timestamp>();
+}
+
+template <>
+inline Decimal128 Mixed::get<Decimal128>() const noexcept
+{
+    REALM_ASSERT(get_type() == type_Decimal);
+    return Decimal128(Decimal128::Bid64(uint_val));
 }
 
 template <>
@@ -537,6 +559,9 @@ inline std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, c
                 break;
             case type_Timestamp:
                 out << Timestamp(m.int_val, m.short_val);
+                break;
+            case type_Decimal:
+                out << Decimal128(Decimal128::Bid64(m.uint_val));
                 break;
             case type_Link:
                 out << ObjKey(m.int_val);

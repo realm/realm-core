@@ -418,6 +418,15 @@ struct GetIndexData<double> {
 };
 
 template <>
+struct GetIndexData<Decimal128> {
+    static StringData get_index_data(Decimal128&, StringConversionBuffer&)
+    {
+        REALM_ASSERT_RELEASE(false); // LCOV_EXCL_LINE; Decimal not supported
+        return {};
+    }
+};
+
+template <>
 struct GetIndexData<BinaryData> {
     static StringData get_index_data(BinaryData, StringConversionBuffer&)
     {

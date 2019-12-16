@@ -25,6 +25,7 @@
 #include "realm/array_string.hpp"
 #include "realm/array_binary.hpp"
 #include "realm/array_timestamp.hpp"
+#include "realm/array_decimal128.hpp"
 #include "realm/column_type_traits.hpp"
 #include "realm/table.hpp"
 #include "realm/table_view.hpp"
@@ -72,6 +73,9 @@ ConstLstBasePtr ConstObj::get_listbase_ptr(ColKey col_key) const
         }
         case type_Timestamp: {
             return std::make_unique<ConstLst<Timestamp>>(*this, col_key);
+        }
+        case type_Decimal: {
+            return std::make_unique<ConstLst<Decimal128>>(*this, col_key);
         }
         case type_LinkList: {
             const ConstLstBase* clb = get_linklist_ptr(col_key).release();
@@ -126,6 +130,9 @@ LstBasePtr Obj::get_listbase_ptr(ColKey col_key) const
         }
         case type_Timestamp: {
             return std::make_unique<Lst<Timestamp>>(*this, col_key);
+        }
+        case type_Decimal: {
+            return std::make_unique<Lst<Decimal128>>(*this, col_key);
         }
         case type_LinkList:
             return get_linklist_ptr(col_key);
@@ -670,6 +677,17 @@ void Lst<ObjKey>::set_repl(Replication* repl, size_t ndx, ObjKey key)
     }
 }
 
+template <>
+void Lst<Decimal128>::set_repl(Replication* repl, size_t ndx, Decimal128 value)
+{
+    if (value.is_null()) {
+        repl->list_set_null(*this, ndx);
+    }
+    else {
+        // FIXME: Implement
+    }
+}
+
 /*************************** Lst<T>::insert_repl ****************************/
 template <>
 void Lst<Int>::insert_repl(Replication* repl, size_t ndx, int64_t value)
@@ -780,6 +798,17 @@ void Lst<ObjKey>::insert_repl(Replication* repl, size_t ndx, ObjKey key)
     }
     else {
         repl->list_insert_null(*this, ndx);
+    }
+}
+
+template <>
+void Lst<Decimal128>::insert_repl(Replication* repl, size_t ndx, Decimal128 value)
+{
+    if (value.is_null()) {
+        repl->list_insert_null(*this, ndx);
+    }
+    else {
+        // FIXME: Implement
     }
 }
 }

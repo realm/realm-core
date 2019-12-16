@@ -52,6 +52,7 @@ enum DataType {
     type_Timestamp = 8,
     type_OldTable = 5,
     type_OldMixed = 6,
+    type_Decimal = 11,
     type_Link = 12,
     type_LinkList = 13
 };

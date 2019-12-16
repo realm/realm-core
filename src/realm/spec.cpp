@@ -487,7 +487,7 @@ bool Spec::operator==(const Spec& spec) const noexcept
             case col_type_Timestamp:
             case col_type_Float:
             case col_type_Double:
-            case col_type_Reserved4:
+            case col_type_Decimal:
             case col_type_BackLink:
                 // All other column types are compared as before
                 if (m_types.get(col_ndx) != spec.m_types.get(col_ndx))

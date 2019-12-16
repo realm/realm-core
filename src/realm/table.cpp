@@ -38,6 +38,7 @@
 #include <realm/array_binary.hpp>
 #include <realm/array_string.hpp>
 #include <realm/array_timestamp.hpp>
+#include <realm/array_decimal128.hpp>
 #include <realm/table_tpl.hpp>
 
 /// \page AccessorConsistencyLevels
@@ -1975,6 +1976,7 @@ template ObjKey Table::find_first(ColKey col_key, bool) const;
 template ObjKey Table::find_first(ColKey col_key, int64_t) const;
 template ObjKey Table::find_first(ColKey col_key, float) const;
 template ObjKey Table::find_first(ColKey col_key, double) const;
+template ObjKey Table::find_first(ColKey col_key, Decimal128) const;
 template ObjKey Table::find_first(ColKey col_key, util::Optional<bool>) const;
 template ObjKey Table::find_first(ColKey col_key, util::Optional<int64_t>) const;
 template ObjKey Table::find_first(ColKey col_key, BinaryData) const;
@@ -2010,6 +2012,11 @@ ObjKey Table::find_first_float(ColKey col_key, float value) const
 ObjKey Table::find_first_double(ColKey col_key, double value) const
 {
     return find_first<Double>(col_key, value);
+}
+
+ObjKey Table::find_first_decimal(ColKey col_key, Decimal128 value) const
+{
+    return find_first<Decimal128>(col_key, value);
 }
 
 ObjKey Table::find_first_string(ColKey col_key, StringData value) const
