@@ -278,9 +278,9 @@ TEST_IF(Transactions_ConcurrentFrozenQueryAndObjAndTransactionClose, !REALM_TSAN
                 }
             }
         }
-        catch(NoSuchTable& e) {
+        catch (NoSuchTable&) {
         }
-        catch (LogicError& e) {
+        catch (LogicError&) {
         }
     };
     std::thread threads[100];
