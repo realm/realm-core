@@ -2926,19 +2926,22 @@ void Table::do_set_primary_key_column(ColKey col_key)
     m_primary_key_col = col_key;
 }
 
-void Table::validate_column_is_unique(ColKey col) const
+bool Table::contains_unique_values(ColKey col) const
 {
     if (has_search_index(col)) {
-        if (get_distinct_view(col).size() != size()) {
-            throw DuplicatePrimaryKeyValueException(get_name(), get_column_name(col));
-        }
+        return get_distinct_view(col).size() == size();
     }
     else {
         TableView tv = where().find_all();
         tv.distinct(col);
-        if (tv.size() != size()) {
-            throw DuplicatePrimaryKeyValueException(get_name(), get_column_name(col));
-        }
+        return tv.size() == size();
+    }
+}
+
+void Table::validate_column_is_unique(ColKey col) const
+{
+    if (!contains_unique_values(col)) {
+        throw DuplicatePrimaryKeyValueException(get_name(), get_column_name(col));
     }
 }
 

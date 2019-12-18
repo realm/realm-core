@@ -240,6 +240,7 @@ public:
 
     void enumerate_string_column(ColKey col_key);
     bool is_enumerated(ColKey col_key) const noexcept;
+    bool contains_unique_values(ColKey col_key) const;
 
     //@}
 
