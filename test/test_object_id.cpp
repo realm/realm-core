@@ -18,6 +18,7 @@
 
 #include <realm.hpp>
 #include <realm/array_object_id.hpp>
+#include <chrono>
 
 #include "test.hpp"
 
@@ -91,4 +92,26 @@ TEST(ObjectId_Table)
     t.add_search_index(col_id);
     key = t.find_first(col_id, ObjectId(str1));
     CHECK_EQUAL(key, obj1.get_key());
+}
+
+TEST(ObjectId_PrimaryKey)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    DBRef db = DB::create(path);
+    Timestamp now{std::chrono::steady_clock::now()};
+    ObjectId id{now};
+    ObjKey key;
+    {
+        auto wt = db->start_write();
+        auto table = wt->add_table_with_primary_key("Foo", type_ObjectId, "id");
+        table->create_object_with_primary_key(ObjectId(now));
+        key = table->create_object_with_primary_key(id).get_key();
+        wt->commit();
+    }
+    {
+        auto rt = db->start_read();
+        auto table = rt->get_table("Foo");
+        CHECK_EQUAL(table->size(), 2);
+        CHECK_EQUAL(table->find_first_object_id(table->get_primary_key_column(), id), key);
+    }
 }

@@ -310,10 +310,7 @@ public:
         return m_clusters.get_ndx(key);
     }
 
-    void dump_objects()
-    {
-        return m_clusters.dump_objects();
-    }
+    void dump_objects();
 
     bool traverse_clusters(ClusterTree::TraverseFunction func) const
     {

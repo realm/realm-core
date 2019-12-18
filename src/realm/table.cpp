@@ -1935,6 +1935,40 @@ ObjKey Table::find_first(ColKey col_key, StringData value) const
 }
 
 template <>
+ObjKey Table::find_first(ColKey col_key, ObjectId value) const
+{
+    if (REALM_UNLIKELY(!valid_column(col_key)))
+        throw InvalidKey("Non-existing column");
+
+    if (StringIndex* index = get_search_index(col_key)) {
+        return index->find_first(value);
+    }
+
+    if (col_key.get_type() == col_type_ObjectId && col_key == m_primary_key_col) {
+        GlobalKey object_id{value};
+        ObjKey k = global_to_local_object_id_hashed(object_id);
+        return is_valid(k) ? k : ObjKey();
+    }
+
+    ObjKey key;
+    ArrayObjectId leaf(get_alloc());
+
+    auto f = [&key, &col_key, &value, &leaf](const Cluster* cluster) {
+        cluster->init_leaf(col_key, &leaf);
+        size_t row = leaf.find_first(value, 0, cluster->node_size());
+        if (row != realm::npos) {
+            key = cluster->get_real_key(row);
+            return true;
+        }
+        return false;
+    };
+
+    traverse_clusters(f);
+
+    return key;
+}
+
+template <>
 ObjKey Table::find_first(ColKey col_key, ObjKey value) const
 {
     check_column(col_key);
@@ -1985,7 +2019,6 @@ template ObjKey Table::find_first(ColKey col_key, double) const;
 template ObjKey Table::find_first(ColKey col_key, util::Optional<bool>) const;
 template ObjKey Table::find_first(ColKey col_key, util::Optional<int64_t>) const;
 template ObjKey Table::find_first(ColKey col_key, BinaryData) const;
-template ObjKey Table::find_first(ColKey col_key, ObjectId) const;
 
 ObjKey Table::find_first_int(ColKey col_key, int64_t value) const
 {
@@ -2441,17 +2474,17 @@ Obj Table::create_object_with_primary_key(const Mixed& primary_key)
             return get_object(object_key); // Already exists
         object_key = get_next_key();
     }
-
-    if (type == type_String) {
+    else {
+        REALM_ASSERT(type == type_String || type == type_ObjectId);
         // Generate local ObjKey
         object_key = global_to_local_object_id_hashed(object_id);
         // Check for collision
         if (is_valid(object_key)) {
             Obj existing_obj = get_object(object_key);
-            StringData existing_pk_value = existing_obj.get<String>(primary_key_col);
+            auto existing_pk_value = existing_obj.get_any(primary_key_col);
 
             // It may just be the same object
-            if (existing_pk_value == primary_key.get_string()) {
+            if (existing_pk_value == primary_key) {
                 return existing_obj;
             }
 
@@ -2686,6 +2719,11 @@ void Table::create_objects(const std::vector<ObjKey>& keys)
     for (auto k : keys) {
         create_object(k);
     }
+}
+
+void Table::dump_objects()
+{
+    return m_clusters.dump_objects();
 }
 
 void Table::remove_object(ObjKey key)
