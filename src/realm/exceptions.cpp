@@ -106,6 +106,8 @@ const char* LogicError::message() const noexcept
             return "Search index on a subtable of a subtable is not yet supported";
         case list_type_mismatch:
             return "Instantiating a list object not matching column type";
+        case table_not_empty:
+            return "Changing whether a non-empty table is embedded or not";
     }
     return "Unknown error";
 }

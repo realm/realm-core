@@ -502,6 +502,9 @@ void Table::init(ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent, bo
 
     auto rot_pk_key = m_top.get_as_ref_or_tagged(top_position_for_pk_col);
     m_primary_key_col = rot_pk_key.is_tagged() ? ColKey(rot_pk_key.get_as_int()) : ColKey();
+
+    uint64_t flags = m_top.get_as_ref_or_tagged(top_position_for_flags).get_as_int();
+    m_is_embedded = flags & 0x1;
 }
 
 
@@ -781,6 +784,19 @@ ColKey Table::insert_backlink_column(TableKey origin_table_key, ColKey origin_co
     ColKey retval = do_insert_root_column(backlink_col_key, col_type_BackLink, ""); // Throws
     set_opposite_column(retval, origin_table_key, origin_col_key);
     return retval;
+}
+
+void Table::set_embedded(bool embedded)
+{
+    if (size()) {
+        throw realm::LogicError(realm::LogicError::table_not_empty);
+    }
+    REALM_ASSERT(m_top.size() > top_position_for_flags);
+    uint64_t flags = m_top.get_as_ref_or_tagged(top_position_for_flags).get_as_int();
+    flags |= embedded ? 1 : 0;
+    m_top.set(top_position_for_flags, RefOrTagged::make_tagged(flags));
+    m_is_embedded = embedded;
+    // Fixme: propagate to db
 }
 
 
@@ -1627,6 +1643,7 @@ ref_type Table::create_empty_table(Allocator& alloc, TableKey key)
     top.add(0); // Sequence number
     top.add(0); // Collision_map
     top.add(0); // pk col key
+    top.add(0); // flags
 
     REALM_ASSERT(top.size() == top_array_size);
 
@@ -2187,6 +2204,10 @@ void Table::update_from_parent(size_t old_baseline) noexcept
             m_opposite_table.update_from_parent(old_baseline);
         if (m_top.size() > top_position_for_opposite_column)
             m_opposite_column.update_from_parent(old_baseline);
+        if (m_top.size() > top_position_for_flags) {
+            uint64_t flags = m_top.get_as_ref_or_tagged(top_position_for_flags).get_as_int();
+            m_is_embedded = flags & 0x1;
+        }
         refresh_content_version();
     }
     m_alloc.bump_storage_version();
@@ -2301,6 +2322,8 @@ void Table::refresh_accessor_tree()
     m_opposite_column.init_from_parent();
     auto rot_pk_key = m_top.get_as_ref_or_tagged(top_position_for_pk_col);
     m_primary_key_col = rot_pk_key.is_tagged() ? ColKey(rot_pk_key.get_as_int()) : ColKey();
+    auto rot_flags = m_top.get_as_ref_or_tagged(top_position_for_flags);
+    m_is_embedded = rot_flags.get_as_int() & 0x1;
     refresh_content_version();
     bump_storage_version();
     build_column_mapping();

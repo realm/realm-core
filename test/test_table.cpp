@@ -5034,4 +5034,37 @@ TEST(Table_IteratorRandomAccess)
     CHECK_EQUAL(keys[1], iter->get_key());
 }
 
+TEST(Table_EmbeddedObjects)
+{
+    SHARED_GROUP_TEST_PATH(path);
+
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
+
+    auto tr = sg->start_write();
+    auto table = tr->add_table("mytable");
+    tr->commit_and_continue_as_read();
+    tr->promote_to_write();
+    CHECK(!table->is_embedded());
+    table->set_embedded(true);
+    CHECK(table->is_embedded());
+    table->set_embedded(false);
+    CHECK(!table->is_embedded());
+    auto o = table->create_object();
+    CHECK_THROW(table->set_embedded(true), LogicError);
+    o.remove();
+    table->set_embedded(true);
+    CHECK(table->is_embedded());
+    tr->rollback_and_continue_as_read();
+    CHECK(!table->is_embedded());
+    tr->promote_to_write();
+    table->set_embedded(true);
+    tr->commit();
+
+    tr = sg->start_read();
+    table = tr->get_table("mytable");
+    CHECK(table->is_embedded());
+}
+
+
 #endif // TEST_TABLE

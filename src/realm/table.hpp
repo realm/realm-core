@@ -119,6 +119,7 @@ public:
     //@{
     /// Conventience functions for inspecting the dynamic table type.
     ///
+    bool is_embedded() const noexcept; // true if table holds embedded objects
     size_t get_column_count() const noexcept;
     DataType get_column_type(ColKey column_key) const;
     StringData get_column_name(ColKey column_key) const;
@@ -143,6 +144,7 @@ public:
     ColKey add_column(DataType type, StringData name, bool nullable = false);
     ColKey add_column_list(DataType type, StringData name, bool nullable = false);
     ColKey add_column_link(DataType type, StringData name, Table& target, LinkType link_type = link_Weak);
+    void set_embedded(bool is_embedded); // throws if table is non-empty.
 
     // Pass a ColKey() as first argument to have a new colkey generated
     // Requesting a specific ColKey may fail with invalidkey exception, if the key is already in use
@@ -916,7 +918,7 @@ private:
     std::vector<ColKey> m_leaf_ndx2colkey;
     std::vector<ColKey::Idx> m_spec_ndx2leaf_ndx;
     std::vector<size_t> m_leaf_ndx2spec_ndx;
-
+    bool m_is_embedded = false;
     uint64_t m_in_file_version_at_transaction_boundary = 0;
 
     static constexpr int top_position_for_spec = 0;
@@ -931,7 +933,9 @@ private:
     static constexpr int top_position_for_sequence_number = 9;
     static constexpr int top_position_for_collision_map = 10;
     static constexpr int top_position_for_pk_col = 11;
-    static constexpr int top_array_size = 12;
+    static constexpr int top_position_for_flags = 12;
+    // flags contents: bit 0 - is table embedded?
+    static constexpr int top_array_size = 13;
 
     enum { s_collision_map_lo = 0, s_collision_map_hi = 1, s_collision_map_local_id = 2, s_collision_map_num_slots };
 
@@ -1184,6 +1188,11 @@ inline void Table::bump_content_version() const noexcept
 inline size_t Table::get_column_count() const noexcept
 {
     return m_spec.get_public_column_count();
+}
+
+inline bool Table::is_embedded() const noexcept
+{
+    return m_is_embedded;
 }
 
 inline StringData Table::get_column_name(ColKey column_key) const
