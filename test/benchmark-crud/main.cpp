@@ -134,13 +134,14 @@ int main()
     TableRef tables_1[num_tables], tables_2[num_tables];
 
     group.reset(new Group);
-    bool require_unique_name = false;
     for (int i = 0; i < num_tables; ++i) {
-        tables_1[i] = group->add_table("IntTable", require_unique_name);
+        std::string name = "IntTable1_" + to_string(i);
+        tables_1[i] = group->add_table(name);
         tables_1[i]->add_column(type_Int, "i");
     }
     for (int i = 0; i < num_tables; ++i) {
-        tables_2[i] = group->add_table("IntTable", require_unique_name);
+        std::string name = "IntTable2_" + to_string(i);
+        tables_2[i] = group->add_table(name);
         tables_2[i]->add_column(type_Int, "i");
     }
 
