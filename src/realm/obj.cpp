@@ -1096,7 +1096,6 @@ void Obj::assign(const ConstObj& other)
     auto cols = m_table->get_column_keys();
     for (auto col : cols) {
         if (col.get_attrs().test(col_attr_List)) {
-            // TODO: implement
             auto src_list = other.get_listbase_ptr(col);
             auto dst_list = get_listbase_ptr(col);
             auto sz = src_list->size();
@@ -1108,6 +1107,10 @@ void Obj::assign(const ConstObj& other)
         }
         else {
             Mixed val = other.get_any(col);
+            if (val.is_null()) {
+                this->set_null(col);
+                continue;
+            }
             switch (val.get_type()) {
                 case type_String: {
                     // Need to take copy. Values might be in same cluster
