@@ -2402,6 +2402,8 @@ MemStats Table::stats() const
 
 Obj Table::create_object(ObjKey key, const FieldValues& values)
 {
+    if (m_is_embedded)
+        throw LogicError(LogicError::wrong_kind_of_table);
     if (key == null_key) {
         GlobalKey object_id = allocate_object_id_squeezed();
         key = object_id.get_local_key(get_sync_file_id());
@@ -2418,8 +2420,28 @@ Obj Table::create_object(ObjKey key, const FieldValues& values)
     return obj;
 }
 
+Obj Table::create_embedded_object()
+{
+    if (!m_is_embedded)
+        throw LogicError(LogicError::wrong_kind_of_table);
+    ObjKey key = get_next_key();
+    /*
+    if (auto repl = get_repl())
+        repl->create_object(this, object_id); // FIXME: How is this to work when the object is unlinked atm?
+    */
+    REALM_ASSERT(key.value >= 0);
+
+    bump_content_version();
+    bump_storage_version();
+    Obj obj = m_clusters.insert(key, {});
+
+    return obj;
+}
+
 Obj Table::create_object(GlobalKey object_id, const FieldValues& values)
 {
+    if (m_is_embedded)
+        throw LogicError(LogicError::wrong_kind_of_table);
     ObjKey key = object_id.get_local_key(get_sync_file_id());
 
     if (auto repl = get_repl())
@@ -2434,6 +2456,8 @@ Obj Table::create_object(GlobalKey object_id, const FieldValues& values)
 
 Obj Table::create_object_with_primary_key(const Mixed& primary_key)
 {
+    if (m_is_embedded)
+        throw LogicError(LogicError::wrong_kind_of_table);
     auto primary_key_col = get_primary_key_column();
     REALM_ASSERT(primary_key_col);
     DataType type = DataType(primary_key_col.get_type());

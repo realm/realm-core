@@ -5066,5 +5066,28 @@ TEST(Table_EmbeddedObjects)
     CHECK(table->is_embedded());
 }
 
+TEST(Table_EmbeddedObjectCreateAndDestroy)
+{
+    SHARED_GROUP_TEST_PATH(path);
+
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
+
+    auto tr = sg->start_write();
+    auto table = tr->add_table("myEmbeddedStuff");
+    table->set_embedded(true);
+    auto col_recurse = table->add_column_link(type_Link, "theRecursiveBit", *table, link_Strong);
+    CHECK_THROW(table->create_object(), LogicError);
+    auto parent = tr->add_table("myParentStuff");
+    auto ck = parent->add_column_link(type_Link, "theGreatColumn", *table, link_Strong);
+    Obj o = parent->create_object();
+    Obj o2 = o.create_embedded_and_set(ck);
+    o2.create_embedded_and_set(col_recurse);
+    CHECK(table->size() == 2);
+    o.set(ck, ObjKey());
+    CHECK(table->size() == 0);
+    tr->commit();
+}
+
 
 #endif // TEST_TABLE

@@ -222,7 +222,7 @@ public:
 
     template <typename U>
     Obj& set(ColKey col_key, U value, bool is_default = false);
-
+    Obj create_embedded_and_set(ColKey col_key);
     Obj& set(ColKey col_key, Mixed value);
 
     template <typename U>

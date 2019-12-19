@@ -850,7 +850,9 @@ Obj& Obj::set<ObjKey>(ColKey col_key, ObjKey target_key, bool is_default)
     if (target_key != null_key && !target_table->is_valid(target_key)) {
         throw LogicError(LogicError::target_row_index_out_of_range);
     }
-
+    if (target_table->is_embedded() && target_key != null_key) {
+        throw LogicError(LogicError::wrong_kind_of_table);
+    }
     ObjKey old_key = get<ObjKey>(col_key); // Will update if needed
 
     if (target_key != old_key) {
@@ -880,6 +882,56 @@ Obj& Obj::set<ObjKey>(ColKey col_key, ObjKey target_key, bool is_default)
     }
 
     return *this;
+}
+
+Obj Obj::create_embedded_and_set(ColKey col_key)
+{
+    ObjKey target_key;
+    Obj result;
+    update_if_needed();
+    get_table()->report_invalid_key(col_key);
+    ColKey::Idx col_ndx = col_key.get_index();
+    ColumnType type = col_key.get_type();
+    if (type != ColumnTypeTraits<ObjKey>::column_id)
+        throw LogicError(LogicError::illegal_type);
+    TableRef target_table = get_target_table(col_key);
+    if (target_key != null_key && !target_table->is_valid(target_key)) {
+        throw LogicError(LogicError::target_row_index_out_of_range);
+    }
+    if (target_table->is_embedded()) {
+        result = target_table->create_embedded_object();
+        target_key = result.get_key();
+    }
+    ObjKey old_key = get<ObjKey>(col_key); // Will update if needed
+
+    if (target_key != old_key) {
+        CascadeState state;
+
+        ensure_writeable();
+        bool recurse = replace_backlink(col_key, old_key, target_key, state);
+
+        Allocator& alloc = get_alloc();
+        alloc.bump_content_version();
+        Array fallback(alloc);
+        Array& fields = get_tree_top()->get_fields_accessor(fallback, m_mem);
+        REALM_ASSERT(col_ndx.val + 1 < fields.size());
+        ArrayKey values(alloc);
+        values.set_parent(&fields, col_ndx.val + 1);
+        values.init_from_parent();
+
+        values.set(m_row_ndx, target_key);
+
+        if (Replication* repl = get_replication()) {
+            bool is_default = true; // FIXME: Is this correct?
+            repl->set(m_table.unchecked_ptr(), col_key, m_key, target_key,
+                      is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
+        }
+
+        if (recurse)
+            target_table->remove_recursive(state);
+    }
+
+    return result;
 }
 
 namespace {

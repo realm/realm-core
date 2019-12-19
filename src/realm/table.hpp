@@ -120,6 +120,8 @@ public:
     /// Conventience functions for inspecting the dynamic table type.
     ///
     bool is_embedded() const noexcept; // true if table holds embedded objects
+    /// Note that you should choose link_type = link_Strong when adding columns with
+    /// links to a table which is embedded.
     size_t get_column_count() const noexcept;
     DataType get_column_type(ColKey column_key) const;
     StringData get_column_name(ColKey column_key) const;
@@ -143,6 +145,8 @@ public:
     static const uint64_t max_num_columns = 0xFFFFUL; // <-- must be power of two -1
     ColKey add_column(DataType type, StringData name, bool nullable = false);
     ColKey add_column_list(DataType type, StringData name, bool nullable = false);
+
+    /// iff the target table is embedded, use link_type = link_Strong.
     ColKey add_column_link(DataType type, StringData name, Table& target, LinkType link_type = link_Weak);
     void set_embedded(bool is_embedded); // throws if table is non-empty.
 
@@ -518,6 +522,7 @@ private:
     void change_nullability(ColKey from, ColKey to, bool throw_on_null);
     template <class F, class T>
     void change_nullability_list(ColKey from, ColKey to, bool throw_on_null);
+    Obj create_embedded_object();
 
 public:
     // mapping between index used in leaf nodes (leaf_ndx) and index used in spec (spec_ndx)
