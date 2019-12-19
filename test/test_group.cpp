@@ -2119,6 +2119,32 @@ TEST(Group_SetColumnWithDuplicateValuesToPrimaryKey)
     CHECK_EQUAL(table->get_primary_key_column(), ColKey());
 }
 
+TEST(Group_SetColumnWithNullPrimaryKeyy)
+{
+    Group g;
+    TableRef table = g.add_table("table");
+    ColKey string_col = table->add_column(type_String, "string", true);
+
+    std::vector<ObjKey> keys;
+    table->create_objects(2, keys);
+    table->get_object(keys[0]).set(string_col, {"first"});
+    table->get_object(keys[1]).set(string_col, {});
+    CHECK(!table->get_object(keys[0]).is_null(string_col));
+    CHECK_EQUAL(table->get_object(keys[0]).get<StringData>(string_col), "first");
+    CHECK(table->get_object(keys[1]).is_null(string_col));
+    CHECK(table->get_primary_key_column() != string_col);
+    CHECK_EQUAL(table->size(), 2);
+    table->set_primary_key_column(string_col);
+    CHECK_EQUAL(table->get_primary_key_column(), string_col);
+    ObjKey first = table->find_first_string(string_col, "first");
+    ObjKey second = table->find_first_null(string_col);
+    ObjKey third = table->find_first_string(string_col, "not found");
+    CHECK(bool(first));
+    CHECK(bool(second));
+    CHECK(!bool(third));
+    CHECK_EQUAL(table->size(), 2);
+}
+
 TEST(Group_ChangeIntPrimaryKeyValuesInMigration)
 {
     Group g;
