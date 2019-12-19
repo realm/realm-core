@@ -116,10 +116,10 @@ TEST(Group_UnattachedErrorHandling)
     CHECK_EQUAL(TableKey(), group.find_table("foo"));
     CHECK_LOGIC_ERROR(group.get_table(TableKey()), LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(group.get_table("foo"), LogicError::detached_accessor);
-    CHECK_LOGIC_ERROR(group.add_table("foo", false), LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(group.add_table("foo"), LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(group.get_table(TableKey()), LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(group.get_table("foo"), LogicError::detached_accessor);
-    CHECK_LOGIC_ERROR(group.add_table("foo", false), LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(group.add_table("foo"), LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(group.remove_table("foo"), LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(group.remove_table(TableKey()), LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(group.rename_table("foo", "bar", false), LogicError::detached_accessor);
@@ -384,20 +384,6 @@ TEST(Group_Size)
 
 
 TEST(Group_AddTable)
-{
-    Group group;
-    TableRef foo_1 = group.add_table("foo");
-    CHECK_EQUAL(1, group.size());
-    CHECK_THROW(group.add_table("foo"), TableNameInUse);
-    CHECK_EQUAL(1, group.size());
-    bool require_unique_name = false;
-    TableRef foo_2 = group.add_table("foo", require_unique_name);
-    CHECK_EQUAL(2, group.size());
-    CHECK_NOT_EQUAL(foo_1, foo_2);
-}
-
-
-TEST(Group_AddTable2)
 {
     Group group;
     group.add_table("a");

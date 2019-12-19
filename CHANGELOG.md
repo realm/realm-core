@@ -8,7 +8,7 @@
 * None.
  
 ### Breaking changes
-* None.
+* We now require uniqieness on table names.
 
 -----------
 
