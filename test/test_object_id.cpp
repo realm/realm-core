@@ -115,3 +115,36 @@ TEST(ObjectId_PrimaryKey)
         CHECK_EQUAL(table->find_first_object_id(table->get_primary_key_column(), id), key);
     }
 }
+
+TEST(ObjectId_Query)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    DBRef db = DB::create(path);
+    auto now = std::chrono::steady_clock::now();
+    ObjectId t0;
+    ObjectId t25;
+
+    ObjKey key;
+    {
+        auto wt = db->start_write();
+        auto table = wt->add_table_with_primary_key("Foo", type_ObjectId, "id");
+        for (int i = 0; i < 100; i++) {
+            ObjectId id{now + std::chrono::seconds(i)};
+            if (i == 0)
+                t0 = id;
+            if (i == 25)
+                t25 = id;
+            table->create_object_with_primary_key(id);
+        }
+        wt->commit();
+    }
+    {
+        auto rt = db->start_read();
+        auto table = rt->get_table("Foo");
+        auto col = table->get_primary_key_column();
+        Query q = table->column<ObjectId>(col) > t0;
+        CHECK_EQUAL(q.count(), 99);
+        Query q1 = table->column<ObjectId>(col) < t25;
+        CHECK_EQUAL(q1.count(), 25);
+    }
+}

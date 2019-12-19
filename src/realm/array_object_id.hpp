@@ -105,7 +105,7 @@ protected:
 
     size_t calc_byte_len(size_t num_items, size_t) const override
     {
-        return num_items;
+        return num_items + header_size;
     }
 };
 
