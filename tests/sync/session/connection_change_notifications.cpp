@@ -46,9 +46,8 @@ TEST_CASE("sync: Connection state changes", "[sync]") {
     if (!EventLoop::has_implementation())
         return;
 
-    auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
     SyncServer server;
-    SyncManager::shared().configure(tmp_dir(), SyncManager::MetadataMode::NoEncryption);
+    TestSyncManager init_sync_manager;
     const std::string realm_base_url = server.base_url();
     auto user = SyncManager::shared().get_user({ "user", dummy_auth_url }, "not_a_real_token");
 

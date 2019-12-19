@@ -332,7 +332,7 @@ private:
     SyncSession(_impl::SyncClient&, std::string realm_path, SyncConfig, bool force_client_resync);
 
     void handle_error(SyncError);
-    void cancel_pending_waits(std::unique_lock<std::mutex>&);
+    void cancel_pending_waits(std::unique_lock<std::mutex>&, std::error_code);
     enum class ShouldBackup { yes, no };
     void update_error_and_mark_file_for_deletion(SyncError&, ShouldBackup);
     std::string get_recovery_file_path();

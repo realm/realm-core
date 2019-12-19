@@ -20,7 +20,10 @@
 
 #include "sync/sync_manager.hpp"
 #include "sync/sync_user.hpp"
+
 #include "util/test_utils.hpp"
+#include "util/test_file.hpp"
+
 #include <realm/util/file.hpp>
 #include <realm/util/scope_exit.hpp>
 
@@ -31,9 +34,8 @@ using File = realm::util::File;
 static const std::string base_path = tmp_dir() + "/realm_objectstore_sync_user/";
 
 TEST_CASE("sync_user: SyncManager `get_user()` API", "[sync]") {
-    auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
     reset_test_directory(base_path);
-    SyncManager::shared().configure(base_path, SyncManager::MetadataMode::NoEncryption);
+    TestSyncManager init_sync_manager(base_path);
     const std::string identity = "sync_test_identity";
     const std::string token = "1234567890-fake-token";
     const std::string server_url = "https://realm.example.org";
@@ -86,9 +88,8 @@ TEST_CASE("sync_user: SyncManager `get_user()` API", "[sync]") {
 }
 
 TEST_CASE("sync_user: SyncManager `get_admin_token_user()` APIs", "[sync]") {
-    auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
     reset_test_directory(base_path);
-    SyncManager::shared().configure(base_path, SyncManager::MetadataMode::NoEncryption);
+    TestSyncManager init_sync_manager(base_path, SyncManager::MetadataMode::NoMetadata);
     const std::string token = "1234567890-fake-token";
     const std::string server_url = "https://realm.example.org";
 
@@ -146,9 +147,8 @@ TEST_CASE("sync_user: SyncManager `get_admin_token_user()` APIs", "[sync]") {
 }
 
 TEST_CASE("sync_user: SyncManager `get_existing_logged_in_user()` API", "[sync]") {
-    auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
     reset_test_directory(base_path);
-    SyncManager::shared().configure(base_path, SyncManager::MetadataMode::NoEncryption);
+    TestSyncManager init_sync_manager(base_path, SyncManager::MetadataMode::NoMetadata);
     const std::string identity = "sync_test_identity";
     const std::string token = "1234567890-fake-token";
     const std::string server_url = "https://realm.example.org";
@@ -181,7 +181,7 @@ TEST_CASE("sync_user: SyncManager `get_existing_logged_in_user()` API", "[sync]"
 
 TEST_CASE("sync_user: logout", "[sync]") {
     reset_test_directory(base_path);
-    SyncManager::shared().configure(base_path, SyncManager::MetadataMode::NoEncryption);
+    TestSyncManager init_sync_manager(base_path, SyncManager::MetadataMode::NoMetadata);
     const std::string identity = "sync_test_identity";
     const std::string token = "1234567890-fake-token";
     const std::string server_url = "https://realm.example.org";
@@ -195,9 +195,8 @@ TEST_CASE("sync_user: logout", "[sync]") {
 }
 
 TEST_CASE("sync_user: user persistence", "[sync]") {
-    auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
     reset_test_directory(base_path);
-    SyncManager::shared().configure(base_path, SyncManager::MetadataMode::NoEncryption);
+    TestSyncManager init_sync_manager(base_path, SyncManager::MetadataMode::NoEncryption);
     auto file_manager = SyncFileManager(base_path);
     // Open the metadata separately, so we can investigate it ourselves.
     SyncMetadataManager manager(file_manager.metadata_path(), false);
