@@ -498,6 +498,39 @@ ObjKey ConstObj::get_backlink(ColKey backlink_col, size_t backlink_ndx) const
     return backlinks.get_backlink(m_row_ndx, backlink_ndx);
 }
 
+ConstObj::Path ConstObj::get_embedded_path()
+{
+    Path result;
+    if (m_table->is_embedded()) {
+        ConstObj* o_ptr = this;
+        REALM_ASSERT(o_ptr->get_backlink_count(true) == 1);
+        PathElement pe;
+        do {
+            o_ptr->m_table->for_each_backlink_column([&](ColKey col_key) {
+                    if (o_ptr->get_backlink_count(col_key) == 1) {
+                        TableRef tr = o_ptr->m_table->get_opposite_table(col_key);
+                        pe.obj = tr->get_object(o_ptr->get_backlink(col_key, 0)); // always the first (and only)
+                        pe.col_key = o_ptr->m_table->get_opposite_column(col_key);
+                        pe.index = 0;
+                        if (pe.col_key.get_attrs().test(col_attr_List)) {
+                            ConstLnkLst ll = pe.obj.get_linklist(pe.col_key);
+                            while (ll.get(pe.index) != o_ptr->get_key()) {
+                                pe.index++;
+                                REALM_ASSERT(ll.size() > pe.index);
+                            }
+                        }
+                        result.push_back(pe);
+                        o_ptr = &result.back().obj;
+                        return true; // early out
+                    }
+                    return false;
+                });
+        } while (o_ptr->m_table->is_embedded());
+    }
+    return result;
+}
+
+
 namespace {
 const char to_be_escaped[] = "\"\n\r\t\f\\\b";
 const char encoding[] = "\"nrtf\\b";

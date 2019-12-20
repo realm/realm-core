@@ -55,6 +55,8 @@ class ConstLnkLst;
 using LnkLstPtr = std::unique_ptr<LnkLst>;
 using ConstLnkLstPtr = std::unique_ptr<const LnkLst>;
 
+
+
 // 'Object' would have been a better name, but it clashes with a class in ObjectStore
 class ConstObj {
 public:
@@ -164,6 +166,14 @@ public:
     }
 
     std::string to_string() const;
+
+    // For an embedded object, obtain the path leading to this object.
+    // For a top-level object, the returned vector will be empty.
+    // The vector is in opposite order, with the top level object at the end.
+    struct PathElement;
+    using Path = std::vector<PathElement>;
+    Path get_embedded_path();
+
 
 protected:
     friend class ColumnListBase;
@@ -313,6 +323,11 @@ private:
     inline void set_spec(T&, ColKey);
 };
 
+struct ConstObj::PathElement {
+    ConstObj obj;   // Object which embeds...
+    ColKey col_key; // Column holding link or link list which embeds...
+    size_t index;   // index into link list (or 0)
+};
 
 inline Obj Obj::get_linked_object(ColKey link_col_key)
 {
