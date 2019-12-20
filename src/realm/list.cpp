@@ -505,6 +505,38 @@ Obj LnkLst::get_object(size_t ndx)
     return get_target_table()->get_object(k);
 }
 
+void LnkLst::set(size_t ndx, ObjKey value)
+{
+    if (get_target_table()->is_embedded() && value != ObjKey())
+        throw LogicError(LogicError::wrong_kind_of_table);
+    Lst<ObjKey>::set(ndx, value);
+}
+
+void LnkLst::insert(size_t ndx, ObjKey value)
+{
+    if (get_target_table()->is_embedded() && value != ObjKey())
+        throw LogicError(LogicError::wrong_kind_of_table);
+    Lst<ObjKey>::insert(ndx, value);
+}
+
+Obj LnkLst::create_and_insert_embedded(size_t ndx)
+{
+    if (!get_target_table()->is_embedded())
+        throw LogicError(LogicError::wrong_kind_of_table);
+    auto o = get_target_table()->create_embedded_object();
+    Lst<ObjKey>::insert(ndx, o.get_key());
+    return o;
+}
+
+Obj LnkLst::create_and_set_embedded(size_t ndx)
+{
+    if (!get_target_table()->is_embedded())
+        throw LogicError(LogicError::wrong_kind_of_table);
+    auto o = get_target_table()->create_embedded_object();
+    Lst<ObjKey>::set(ndx, o.get_key());
+    return o;
+}
+
 TableView LnkLst::get_sorted_view(SortDescriptor order) const
 {
     TableView tv(get_target_table(), clone());

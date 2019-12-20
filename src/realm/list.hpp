@@ -858,6 +858,10 @@ public:
 
     using Lst<ObjKey>::find_first;
     using Lst<ObjKey>::find_all;
+    void set(size_t ndx, ObjKey value);
+    void insert(size_t ndx, ObjKey value);
+    Obj create_and_insert_embedded(size_t ndx);
+    Obj create_and_set_embedded(size_t ndx);
 
     TableView get_sorted_view(SortDescriptor order) const;
     TableView get_sorted_view(ColKey column_key, bool ascending = true) const;

@@ -5089,5 +5089,38 @@ TEST(Table_EmbeddedObjectCreateAndDestroy)
     tr->commit();
 }
 
+TEST(Table_EmbeddedObjectCreateAndDestroyList)
+{
+    SHARED_GROUP_TEST_PATH(path);
+
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
+
+    auto tr = sg->start_write();
+    auto table = tr->add_table("myEmbeddedStuff");
+    table->set_embedded(true);
+    auto col_recurse = table->add_column_link(type_LinkList, "theRecursiveBit", *table, link_Strong);
+    CHECK_THROW(table->create_object(), LogicError);
+    auto parent = tr->add_table("myParentStuff");
+    auto ck = parent->add_column_link(type_LinkList, "theGreatColumn", *table, link_Strong);
+    Obj o = parent->create_object();
+    auto parent_ll = o.get_linklist(ck);
+    Obj o2 = parent_ll.create_and_insert_embedded(0);
+    Obj o3 = parent_ll.create_and_insert_embedded(1);
+    Obj o4 = parent_ll.create_and_insert_embedded(0);
+    auto o2_ll = o2.get_linklist(col_recurse);
+    auto o3_ll = o3.get_linklist(col_recurse);
+    o2_ll.create_and_insert_embedded(0);
+    o2_ll.create_and_insert_embedded(0);
+    o3_ll.create_and_insert_embedded(0);
+    CHECK(table->size() == 6);
+    parent_ll.create_and_set_embedded(1); // implicitly remove entry for 02
+    CHECK(!o2.is_valid());
+    CHECK(table->size() == 4);
+    o.remove();
+    CHECK(table->size() == 0);
+    tr->commit();
+}
+
 
 #endif // TEST_TABLE
