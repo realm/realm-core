@@ -573,7 +573,8 @@ void SlabAlloc::do_free(ref_type ref, char* addr)
             if (next != m_free_read_only.end()) {
                 REALM_ASSERT_RELEASE_EX(ref + size <= next->first, ref, size, next->first, next->second, get_file_path_for_assertions());
                 // See if element can be combined with next element
-                if (ref + size == next->first) {
+                if (ref + size == next->first) { 
+                    // if so, combine to include next element and remove that from collection
                     size += next->second;
                     next = m_free_read_only.erase(next);
                 }
@@ -590,7 +591,7 @@ void SlabAlloc::do_free(ref_type ref, char* addr)
                     prev->second += size;
                     return; // Done!
                 }
-                m_free_read_only.emplace_hint(prev, ref, size); // Throws
+                m_free_read_only.emplace_hint(next, ref, size); // Throws
             }
             else {
                 m_free_read_only.emplace(ref, size); // Throws
