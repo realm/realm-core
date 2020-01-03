@@ -128,13 +128,14 @@ TEST(ObjectId_Query)
     {
         auto wt = db->start_write();
         auto table = wt->add_table_with_primary_key("Foo", type_ObjectId, "id");
+        auto col_int = table->add_column(type_Int, "int");
         for (int i = 0; i < 100; i++) {
-            ObjectId id{now + std::chrono::seconds(i)};
+            ObjectId id{now + std::chrono::seconds(i / 20)};
             if (i == 0)
                 t0 = id;
             if (i == 25)
                 t25 = id;
-            table->create_object_with_primary_key(id);
+            table->create_object_with_primary_key(id).set(col_int, i);
         }
         wt->commit();
     }
@@ -142,9 +143,18 @@ TEST(ObjectId_Query)
         auto rt = db->start_read();
         auto table = rt->get_table("Foo");
         auto col = table->get_primary_key_column();
+        auto col_int = table->get_column_key("int");
         Query q = table->column<ObjectId>(col) > t0;
         CHECK_EQUAL(q.count(), 99);
         Query q1 = table->column<ObjectId>(col) < t25;
         CHECK_EQUAL(q1.count(), 25);
+        auto tv = q1.find_all();
+        tv.sort(col, true);
+        for (int i = 0; i < 25; i++) {
+            CHECK_EQUAL(tv.get(i).get<int64_t>(col_int), i);
+        }
+
+        std::ostringstream ostr;
+        tv.to_json(ostr); // just check that it does not crash
     }
 }

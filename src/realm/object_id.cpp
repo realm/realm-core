@@ -55,18 +55,21 @@ ObjectId::ObjectId(const char* init)
 ObjectId::ObjectId(Timestamp d, int machine_id, int process_id)
 {
     auto sec = uint32_t(d.get_seconds());
-    auto as_bytes = type_punning<Byte4>(sec);
     // Store in big endian so that memcmp can be used for comparison
-    m_bytes[0] = as_bytes.b[3];
-    m_bytes[1] = as_bytes.b[2];
-    m_bytes[2] = as_bytes.b[1];
-    m_bytes[3] = as_bytes.b[0];
+    m_bytes[0] = sec >> 24;
+    m_bytes[1] = (sec >> 16) & 0xff;
+    m_bytes[2] = (sec >> 8) & 0xff;
+    m_bytes[3] = sec & 0xff;
 
     memcpy(m_bytes + 4, &machine_id, 3);
     memcpy(m_bytes + 7, &process_id, 2);
 
     auto r = seq++;
-    memcpy(m_bytes + 9, &r, 3);
+    // Also store random number as big endian. This ensures that objects created
+    // later within the same second will also be sorted correctly
+    m_bytes[9] = (r >> 16) & 0xff;
+    m_bytes[10] = (r >> 8) & 0xff;
+    m_bytes[11] = r & 0xff;
 }
 
 bool ObjectId::is_null() const
@@ -76,13 +79,9 @@ bool ObjectId::is_null() const
 
 Timestamp ObjectId::get_timestamp() const
 {
-    Byte4 as_bytes;
     // Convert back to little endian
-    as_bytes.b[0] = m_bytes[3];
-    as_bytes.b[1] = m_bytes[2];
-    as_bytes.b[2] = m_bytes[1];
-    as_bytes.b[3] = m_bytes[0];
-    auto sec = type_punning<uint32_t>(as_bytes);
+    uint32_t sec = (uint32_t(m_bytes[0]) << 24) + (uint32_t(m_bytes[1]) << 16) + (uint32_t(m_bytes[2]) << 8) +
+                   uint32_t(m_bytes[3]);
 
     return Timestamp(sec, 0);
 }

@@ -193,6 +193,8 @@ Mixed ConstObj::get_any(ColKey col_key) const
             return Mixed{get<Binary>(col_key)};
         case col_type_Timestamp:
             return Mixed{get<Timestamp>(col_key)};
+        case col_type_ObjectId:
+            return Mixed{get<ObjectId>(col_key)};
         case col_type_Link:
             return Mixed{get<ObjKey>(col_key)};
         default:

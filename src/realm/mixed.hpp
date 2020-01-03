@@ -481,6 +481,15 @@ inline int Mixed::compare(const Mixed& b) const
             else if (get<Timestamp>() < b.get<Timestamp>())
                 return -1;
             break;
+        case type_ObjectId: {
+            auto l = get<ObjectId>();
+            auto r = b.get<ObjectId>();
+            if (l > r)
+                return 1;
+            else if (l < r)
+                return -1;
+            break;
+        }
         case type_Link:
             if (get<ObjKey>() > b.get<ObjKey>())
                 return 1;
