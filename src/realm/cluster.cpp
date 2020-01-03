@@ -1594,6 +1594,7 @@ void Cluster::dump_objects(int64_t key_offset, std::string lead) const
         for (size_t j = 1; j < size(); j++) {
             if (m_tree_top.get_spec().get_column_attr(j - 1).test(col_attr_List)) {
                 std::cout << ", list";
+                continue;
             }
 
             switch (m_tree_top.get_spec().get_column_type(j - 1)) {

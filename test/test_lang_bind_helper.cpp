@@ -146,7 +146,7 @@ TEST(Transactions_ConcurrentFrozenTableGetByName)
         for (int j = 0; j < 3000; ++j) {
             std::string name = "Table" + to_string(j);
             table_names[j] = name;
-            auto table = wt->add_table(name);
+            wt->add_table(name);
         }
         wt->commit_and_continue_as_read();
         frozen = wt->freeze();
@@ -154,7 +154,7 @@ TEST(Transactions_ConcurrentFrozenTableGetByName)
     auto runner = [&](int first, int last) {
         millisleep(1);
         for (int j = first; j < last; ++j) {
-            auto table = frozen->get_table(table_names[j]);
+            frozen->get_table(table_names[j]);
         }
     };
     std::thread threads[1000];
@@ -214,7 +214,7 @@ TEST(Transactions_ConcurrentFrozenQueryAndObj)
             obj_keys[i] = table->create_object().set_all(i).get_key();
         }
         wt->commit_and_continue_as_read();
-        frozen = wt; // ->freeze();
+        frozen = wt->freeze();
     }
     auto runner = [&](int first, int last) {
         millisleep(1);
@@ -235,6 +235,61 @@ TEST(Transactions_ConcurrentFrozenQueryAndObj)
         threads[j] = std::thread(runner, j, j + 500);
     }
     for (int j = 0; j < 500; ++j)
+        threads[j].join();
+}
+
+// this tests resilience against some violations of the Core API.
+// It creates a lot of races between accessor use and transaction close.
+// This is undefined behaviour
+// but the goal is none the less to "harden" Core against just crashing
+// **           THIS TEST MAY CRASH OCCASIONALLY          **
+// ** if so, disable it and run it in a different setting **
+TEST_IF(Transactions_ConcurrentFrozenQueryAndObjAndTransactionClose, !REALM_TSAN)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
+    DBRef db = DB::create(*hist_w);
+    TransactionRef frozen;
+    ObjKey obj_keys[1000];
+    {
+        auto wt = db->start_write();
+        auto table = wt->add_table("MyTable");
+        table->add_column(type_Int, "MyCol");
+        for (int i = 0; i < 1000; ++i) {
+            obj_keys[i] = table->create_object().set_all(i).get_key();
+        }
+        wt->commit_and_continue_as_read();
+        frozen = wt->freeze();
+    }
+    auto runner = [&](int first, int last) {
+        millisleep(1);
+        try {
+            auto table = frozen->get_table("MyTable");
+            auto col = table->get_column_key("MyCol");
+            while (1) {
+                for (int j = first; j < last; ++j) {
+                    // loads of concurrent queries created and executed:
+                    TableView tb = table->where().equal(col, j).find_all();
+                    CHECK(tb.size() == 1);
+                    CHECK(tb.get_key(0) == obj_keys[j]);
+                    // concurrent reads from results are just fine:
+                    auto obj = tb[0];
+                    CHECK(obj.get<Int>(col) == j);
+                }
+            }
+        }
+        catch (NoSuchTable&) {
+        }
+        catch (LogicError&) {
+        }
+    };
+    std::thread threads[100];
+    for (int j = 0; j < 100; ++j) {
+        threads[j] = std::thread(runner, j, j + 100);
+    }
+    millisleep(10);
+    frozen->close(); // this should cause all threads to throw
+    for (int j = 0; j < 100; ++j)
         threads[j].join();
 }
 
@@ -411,7 +466,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
     // Try to advance after a propper rollback
     {
         WriteTransaction wt(sg_w);
-        TableRef foo_w = wt.add_table("bad");
+        wt.add_table("bad");
         // Implicit rollback
     }
     rt->advance_read();
@@ -825,7 +880,7 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkColumnInNewTable)
     DBRef sg_w = DB::create(hist, DBOptions(crypt_key()));
     {
         WriteTransaction wt(sg_w);
-        TableRef a = wt.get_or_add_table("a");
+        wt.get_or_add_table("a");
         wt.commit();
     }
 
@@ -839,7 +894,9 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkColumnInNewTable)
         b_w->add_column_link(type_Link, "foo", *a_w);
         wt.commit();
     }
+
     rt->advance_read();
+    CHECK(a_r);
     rt->verify();
 }
 
@@ -1184,7 +1241,6 @@ TEST(LangBindHelper_ConcurrentLinkViewDeletes)
     deleter.start([&] { deleter_thread(queue); });
     for (int i = 0; i < max_refs; ++i) {
         TableRef origin = rt->get_table("origin");
-        TableRef target = rt->get_table("target");
         int ndx = random.draw_int_mod(table_size);
         Obj o = origin->get_object(o_keys[ndx]);
         LnkLstPtr lw = o.get_linklist_ptr(ck);
@@ -1235,6 +1291,8 @@ TEST(LangBindHelper_AdvanceReadTransact_InsertLink)
         wt.commit();
     }
     rt->advance_read();
+    CHECK(origin);
+    CHECK(target);
     rt->verify();
 }
 
@@ -2277,7 +2335,7 @@ TEST(LangBindHelper_RollbackAndContinueAsRead)
         {
             // rollback of group level table insertion
             group->promote_to_write();
-            TableRef o = group->get_or_add_table("nullermand");
+            group->get_or_add_table("nullermand");
             TableRef o2 = group->get_table("nullermand");
             REALM_ASSERT(o2);
             group->rollback_and_continue_as_read();
@@ -2324,7 +2382,7 @@ TEST(LangBindHelper_RollbackAndContinueAsReadGroupLevelTableRemoval)
     auto reader = sg->start_read();
     {
         reader->promote_to_write();
-        TableRef origin = reader->get_or_add_table("a_table");
+        reader->get_or_add_table("a_table");
         reader->commit_and_continue_as_read();
     }
     reader->verify();
@@ -2469,6 +2527,8 @@ TEST(LangBindHelper_RollbackTableRemove)
         CHECK_EQUAL(2, group->size());
         TableRef alpha = group->get_table("alpha");
         TableRef beta = group->get_table("beta");
+        CHECK(alpha);
+        CHECK(beta);
         group->remove_table("beta");
         CHECK_NOT(group->has_table("beta"));
         group->rollback_and_continue_as_read();
@@ -2524,7 +2584,7 @@ TEST(LangBindHelper_ContinuousTransactions_RollbackTableRemoval)
     DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
     auto group = sg->start_read();
     group->promote_to_write();
-    TableRef filler = group->get_or_add_table("filler");
+    group->get_or_add_table("filler");
     TableRef table = group->get_or_add_table("table");
     auto col = table->add_column(type_Int, "i");
     Obj o = table->create_object();
@@ -3018,7 +3078,7 @@ TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
         auto table_b = wt.add_table("B");
         table_b->add_column(type_Int, "bussemand");
         table_b->create_object().set_all(99);
-        auto table_c = wt.add_table("C");
+        wt.add_table("C");
         wt.commit();
     }
     // FIXME: Use separate arrays for reader and writer threads for safety and readability.
@@ -3234,7 +3294,6 @@ TEST(LangBindHelper_ImplicitTransactions_ContinuedUseOfLinkList)
     group_w->verify();
 
     group->advance_read();
-    ConstTableRef table = group->get_table("table");
     auto link_list = obj.get_linklist(col);
     CHECK_EQUAL(1, link_list.size());
     group->verify();
@@ -5063,7 +5122,6 @@ TEST_IF(LangBindHelper_HandoverFuzzyTest, TEST_DURATION > 0)
 
     auto rt = sg->start_read();
     // Create and export query
-    TableRef owner = rt->get_table("Owner");
     TableRef dog = rt->get_table("Dog");
 
     realm::Query query = dog->link(c3).column<String>(c0) == "owner" + to_string(rand() % numberOfOwner);
@@ -5163,7 +5221,6 @@ TEST(LangBindHelper_TableViewClear)
     {
         tr->promote_to_write();
 
-        TableRef history = tr->get_table("history");
         TableRef line = tr->get_table("line");
 
         //    number_of_line = 2;
@@ -5447,7 +5504,7 @@ TEST(LangbindHelper_GroupWriter_EdgeCaseAssert)
     t2->add_column_link(type_LinkList, "dtkiipajqdsfglbptieibknaoeeohqdlhftqmlriphobspjr", *t1);
     std::vector<ObjKey> keys;
     t1->create_objects(375, keys);
-    auto t3 = g_w->add_table("pnsidlijqeddnsgaesiijrrqedkdktmfekftogjccerhpeil");
+    g_w->add_table("pnsidlijqeddnsgaesiijrrqedkdktmfekftogjccerhpeil");
     g_r->close();
     g_w->commit();
     REALM_ASSERT_RELEASE(sg->compact());

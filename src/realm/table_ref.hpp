@@ -20,7 +20,6 @@
 #define REALM_TABLE_REF_HPP
 
 #include <cstddef>
-#include <algorithm>
 #include <ostream>
 namespace realm {
 
@@ -30,17 +29,13 @@ class TableRef;
 
 class ConstTableRef {
 public:
-    ~ConstTableRef()
-    {
-    }
-    ConstTableRef(const TableRef& other);
-    ConstTableRef(std::nullptr_t) {}
+    ConstTableRef() noexcept {}
+    ConstTableRef(std::nullptr_t) noexcept {}
+    ConstTableRef(const TableRef& other) noexcept;
+
     const Table* operator->() const;
     const Table& operator*() const;
-    ConstTableRef()
-    {
-    }
-    operator bool() const;
+    operator bool() const noexcept;
     const Table* unchecked_ptr() const
     {
         return m_table;
@@ -62,9 +57,9 @@ public:
     }
     TableRef cast_away_const() const;
     static ConstTableRef unsafe_create(const Table* t_ptr);
+    void check() const;
 
 protected:
-    void check() const;
     explicit ConstTableRef(const Table* t_ptr, uint64_t instance_version)
         : m_table(const_cast<Table*>(t_ptr))
         , m_instance_version(instance_version)
@@ -80,16 +75,20 @@ protected:
 
 class TableRef : public ConstTableRef {
 public:
+    TableRef() noexcept
+        : ConstTableRef()
+    {
+    }
+    TableRef(std::nullptr_t) noexcept
+        : ConstTableRef()
+    {
+    }
+
     Table* operator->() const;
     Table& operator*() const;
     Table* unchecked_ptr() const
     {
         return m_table;
-    }
-    TableRef(std::nullptr_t) {}
-    TableRef()
-        : ConstTableRef()
-    {
     }
     static TableRef unsafe_create(Table* t_ptr);
 
@@ -105,7 +104,7 @@ private:
 };
 
 
-inline ConstTableRef::ConstTableRef(const TableRef& other)
+inline ConstTableRef::ConstTableRef(const TableRef& other) noexcept
     : m_table(other.m_table)
     , m_instance_version(other.m_instance_version)
 {

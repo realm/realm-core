@@ -758,9 +758,9 @@ public:
         return trans->get_table(name); // Throws
     }
 
-    TableRef add_table(StringData name, bool require_unique_name = true) const
+    TableRef add_table(StringData name) const
     {
-        return trans->add_table(name, require_unique_name); // Throws
+        return trans->add_table(name); // Throws
     }
 
     TableRef get_or_add_table(StringData name, bool* was_added = nullptr) const

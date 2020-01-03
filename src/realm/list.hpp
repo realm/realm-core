@@ -490,6 +490,7 @@ public:
     }
     virtual void set_null(size_t ndx) = 0;
     virtual void insert_null(size_t ndx) = 0;
+    virtual void insert_any(size_t ndx, Mixed val) = 0;
     virtual void resize(size_t new_size) = 0;
     virtual void remove(size_t from, size_t to) = 0;
     virtual void move(size_t from, size_t to) = 0;
@@ -533,6 +534,16 @@ public:
     void insert_null(size_t ndx) override
     {
         insert(ndx, BPlusTree<T>::default_value(m_nullable));
+    }
+
+    void insert_any(size_t ndx, Mixed val) override
+    {
+        if (val.is_null()) {
+            insert_null(ndx);
+        }
+        else {
+            insert(ndx, val.get<typename RemoveOptional<T>::type>());
+        }
     }
 
     void resize(size_t new_size) override

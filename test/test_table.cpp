@@ -20,6 +20,7 @@
 #ifdef TEST_TABLE
 
 #include <algorithm>
+#include <cmath>
 #include <limits>
 #include <string>
 #include <fstream>
@@ -1284,6 +1285,47 @@ TEST(Table_Sorted_Query_where)
 #ifdef REALM_DEBUG
     table.verify();
 #endif
+}
+
+namespace realm {
+template <class T>
+T nan(const char* tag)
+{
+    typename std::conditional<std::is_same<T, float>::value, uint32_t, uint64_t>::type i;
+    uint64_t double_nan = 0x7ff8000000000000;
+    i = std::is_same<T, float>::value ? 0x7fc00000 : static_cast<decltype(i)>(double_nan);
+    i += *tag;
+    return type_punning<T>(i);
+}
+} // namespace realm
+
+TEST_TYPES(Table_SortFloat, float, double)
+{
+    Table table;
+    auto col = table.add_column(std::is_same<TEST_TYPE, float>::value ? type_Float : type_Double, "value", true);
+    ObjKeys keys;
+    table.create_objects(900, keys);
+    for (size_t i = 0; i < keys.size(); i += 3) {
+        table.get_object(keys[i]).set(col, static_cast<TEST_TYPE>(-500.0 + i));
+        table.get_object(keys[i + 1]).set_null(col);
+        const char nan_tag[] = {char('0' + i % 10), 0};
+        table.get_object(keys[i + 2]).set(col, realm::nan<TEST_TYPE>(nan_tag));
+    }
+
+    TableView sorted = table.get_sorted_view(SortDescriptor{{{col}}, {true}});
+    CHECK_EQUAL(table.size(), sorted.size());
+
+    // nans should appear first (because the tag is less than the tag we use for nulls),
+    // followed by nulls, folllowed by the rest of the values in ascending order
+    for (size_t i = 0; i < 300; ++i) {
+        CHECK(sorted.get(i).is_null(col));
+    }
+    for (size_t i = 300; i < 600; ++i) {
+        CHECK(std::isnan(sorted.get(i).get<TEST_TYPE>(col)));
+    }
+    for (size_t i = 600; i + 1 < 900; ++i) {
+        CHECK_GREATER(sorted.get(i + 1).get<TEST_TYPE>(col), sorted.get(i).get<TEST_TYPE>(col));
+    }
 }
 
 TEST(Table_Multi_Sort)

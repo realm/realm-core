@@ -1,20 +1,43 @@
 # NEXT RELEASE
 
 ### Enhancements
-* None.
+* `Table::contains_unique_values(ColKey) -> bool` function added
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Fixed an assertion failure when rebuilding a table with a null primary key, since 6.0.0-beta.2 ([#3528](https://github.com/realm/realm-core/issues/3528)).
  
 ### Breaking changes
-* None.
+* We now require uniqieness on table names.
 
 -----------
 
 ### Internals
 * None.
 
+----------------------------------------------
+
+# 6.0.0-beta.2 Release notes
+
+Includes changes introduced by v5.23.7
+
+### Outstanding issues.
+* Links lost during Table rebuild.([RCORE-229](https://jira.mongodb.org/browse/RCORE-229))
+
+### Fixed
+* None.
+ 
+-----------
+
+### Internals
+* ObjectID renamed to GlobalKey
+* Table is now rebuilt when a string property is selected as new primary key.
+
+----------------------------------------------
+
+# 6.0.0-beta.1 Release notes
+
+This release was never published
+ 
 ----------------------------------------------
 
 # 6.0.0-beta.0 Release notes
@@ -402,6 +425,22 @@ This release was never published
 * Speed improvement for Sort().
 
 ---------------------------------------------
+
+# 5.23.7 Release notes
+
+### Enhancements
+* Reduce the encrypted page reclaimer's impact on battery life on Apple platforms. ([PR #3461](https://github.com/realm/realm-core/pull/3461)).
+
+### Fixed
+* macOS binaries were built with the incorrect deployment target (10.14 rather than 10.9). ([Cocoa #6299](https://github.com/realm/realm-cocoa/issues/6299), since 5.23.4).
+* Subtable accessors could be double-deleted if the last reference was released from a different
+  thread at the wrong time. This would typically manifest as "pthread_mutex_destroy() failed", but
+  could also result in other kinds of crashes. ([Cocoa #6333](https://github.com/realm/realm-cocoa/issues/6333)).
+* Sorting float or double columns containing NaN values had inconsistent results and would sometimes
+  crash due to out-of-bounds memory accesses. ([Cocoa #6357](https://github.com/realm/realm-cocoa/issues/6357)).
+
+----------------------------------------------
+
 # 5.23.6 Release notes
 
 ### Enhancements

@@ -402,7 +402,7 @@ void Table::remove_column(ColKey col_key)
         repl->erase_column(this, col_key); // Throws
 
     if (col_key == m_primary_key_col) {
-        set_primary_key_column(ColKey());
+        do_set_primary_key_column(ColKey());
     }
     bump_content_version();
     bump_storage_version();
@@ -2881,19 +2881,80 @@ ColKey Table::get_primary_key_column() const
 
 void Table::set_primary_key_column(ColKey col_key)
 {
-    if (col_key != m_primary_key_col) {
-        if (col_key) {
-            check_column(col_key);
+    if (col_key == m_primary_key_col) {
+        return;
+    }
 
-            if (Replication* repl = get_repl()) {
-                if (repl->get_history_type() == Replication::HistoryType::hist_SyncClient) {
-                    throw std::logic_error("Cannot change pk column in sync client");
-                }
-            }
+    if (Replication* repl = get_repl()) {
+        if (repl->get_history_type() == Replication::HistoryType::hist_SyncClient) {
+            throw std::logic_error("Cannot change pk column in sync client");
+        }
+    }
 
+    if (col_key) {
+        check_column(col_key);
+        validate_column_is_unique(col_key);
+        do_set_primary_key_column(col_key);
+
+        if (col_key.get_type() == col_type_String) {
+            remove_search_index(col_key);
+            rebuild_table_with_pk_column();
+        }
+        else {
             add_search_index(col_key);
         }
+    }
+    else {
         do_set_primary_key_column(col_key);
+    }
+}
+
+void Table::rebuild_table_with_pk_column()
+{
+    std::vector<std::pair<ObjKey, ObjKey>> changed_keys;
+    for (auto& obj : *this) {
+        StringData pk(obj.get<String>(m_primary_key_col));
+        GlobalKey object_id{pk};
+        ObjKey new_key = global_to_local_object_id_hashed(object_id);
+        if (new_key != obj.get_key())
+            changed_keys.emplace_back(obj.get_key(), new_key);
+    }
+    if (changed_keys.empty()) {
+        return;
+    }
+
+    ObjKeys tmp_keys;
+    for (auto& keypair : changed_keys) {
+        auto old_key = keypair.first;
+        auto new_key = keypair.second;
+        auto old_obj = get_object(old_key);
+
+        // Check if an object with the key already exists
+        if (is_valid(new_key)) {
+            // We can't just change the object's key to the new key because one
+            // already exists with that key and we don't want to overwrite that
+            // one. We know that that object will also be changing its key
+            // because we already verified that there are no duplicates in the
+            // new PK column.
+            // Create temporary object to hold the values of the current object,
+            // and then we'll move the object to its final key in a second pass.
+            uint64_t sequence_number_for_local_id = allocate_sequence_number();
+            ObjKey temp_key = make_tagged_local_id_after_hash_collision(sequence_number_for_local_id);
+            auto tmp_obj = create_object(temp_key);
+            tmp_obj.assign(old_obj);
+            tmp_keys.push_back(temp_key);
+        }
+        else {
+            create_object(new_key).assign(old_obj);
+        }
+        remove_object(old_key);
+    }
+    for (auto key : tmp_keys) {
+        auto old_obj = get_object(key);
+        StringData pk(old_obj.get<String>(m_primary_key_col));
+        auto new_obj = create_object_with_primary_key(pk);
+        new_obj.assign(old_obj);
+        remove_object(key);
     }
 }
 
@@ -2909,26 +2970,34 @@ void Table::do_set_primary_key_column(ColKey col_key)
     m_primary_key_col = col_key;
 }
 
-void Table::validate_primary_column_uniqueness() const
+bool Table::contains_unique_values(ColKey col) const
 {
-    if (ColKey col = get_primary_key_column()) {
-        if (this->has_search_index(col)) {
-            if (col && get_distinct_view(col).size() != size()) {
-                throw DuplicatePrimaryKeyValueException(get_name(), get_column_name(col));
-            }
-        }
-        else {
-            for (auto o : *this) {
-                auto pk_val = o.get_any(col);
-                GlobalKey object_id{pk_val};
-                if (global_to_local_object_id_hashed(object_id) != o.get_key()) {
-                    throw std::runtime_error("Invalid primary key column");
-                }
-            }
-        }
+    if (has_search_index(col)) {
+        return get_distinct_view(col).size() == size();
+    }
+    else {
+        TableView tv = where().find_all();
+        tv.distinct(col);
+        return tv.size() == size();
     }
 }
 
+void Table::validate_column_is_unique(ColKey col) const
+{
+    if (!contains_unique_values(col)) {
+        throw DuplicatePrimaryKeyValueException(get_name(), get_column_name(col));
+    }
+}
+
+void Table::validate_primary_column()
+{
+    if (ColKey col = get_primary_key_column()) {
+        validate_column_is_unique(col);
+        if (col.get_type() == col_type_String) {
+            rebuild_table_with_pk_column();
+        }
+    }
+}
 
 ObjKey Table::get_next_key()
 {

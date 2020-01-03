@@ -718,45 +718,28 @@ TableRef Group::add_table_with_primary_key(StringData name, DataType pk_type, St
 {
     if (!is_attached())
         throw LogicError(LogicError::detached_accessor);
-    auto table = do_get_table(name);
-    if (!table) {
-        if (Replication* repl = *get_repl())
-            repl->add_class_with_primary_key(name, pk_type, pk_name, nullable);
+    check_table_name_uniqueness(name);
 
-        table = do_add_table(name, true);
+    if (Replication* repl = *get_repl())
+        repl->add_class_with_primary_key(name, pk_type, pk_name, nullable);
 
-        ColKey pk_col = table->add_column(pk_type, pk_name, nullable);
-        table->do_set_primary_key_column(pk_col);
-        if (pk_type == type_Int) {
-            table->add_search_index(pk_col);
-        }
-    }
-    else {
-#ifdef REALM_DEBUG
-        ColKey pk_col = table->get_primary_key_column();
-        REALM_ASSERT(pk_col != ColKey{});
-        REALM_ASSERT(table->get_column_name(pk_col) == pk_name);
-        REALM_ASSERT(table->get_column_type(pk_col) == pk_type);
-        REALM_ASSERT(table->is_nullable(pk_col) == nullable);
-#endif // REALM_DEBUG
+    auto table = do_add_table(name);
+
+    ColKey pk_col = table->add_column(pk_type, pk_name, nullable);
+    table->do_set_primary_key_column(pk_col);
+    if (pk_type == type_Int) {
+        table->add_search_index(pk_col);
     }
 
     return TableRef(table, table ? table->m_alloc.get_instance_version() : 0);
 }
 
-Table* Group::do_add_table(StringData name, bool require_unique_name)
+Table* Group::do_add_table(StringData name)
 {
     if (!m_is_writable)
         throw LogicError(LogicError::wrong_transact_state);
-    // get new key and index
-    if (!m_table_names.is_attached())
-        return 0;
-    if (require_unique_name) {
-        size_t table_ndx = m_table_names.find_first(name);
-        if (table_ndx != not_found)
-            throw TableNameInUse();
-    }
 
+    // get new key and index
     // find first empty spot:
     // FIXME: Optimize with rowing ptr or free list of some sort
     uint32_t j;
@@ -790,7 +773,7 @@ Table* Group::do_get_or_add_table(StringData name, bool* was_added)
         if (repl && name.begins_with(g_class_name_prefix))
             repl->add_class(name);
 
-        table = do_add_table(name, false);
+        table = do_add_table(name);
         if (was_added)
             *was_added = true;
         return table;
@@ -1909,12 +1892,12 @@ void Group::verify() const
 #endif
 }
 
-void Group::validate_primary_column_uniqueness() const
+void Group::validate_primary_columns()
 {
     auto table_keys = this->get_table_keys();
     for (auto tk : table_keys) {
         auto table = get_table(tk);
-        table->validate_primary_column_uniqueness();
+        table->validate_primary_column();
     }
 }
 

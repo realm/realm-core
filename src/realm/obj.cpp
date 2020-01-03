@@ -619,7 +619,7 @@ void ConstObj::to_json(std::ostream& out, size_t link_depth, std::map<std::strin
                     out << "[";
                     for (size_t i = 0; i < sz; i++) {
                         if (i > 0)
-                            out << ", ";
+                            out << ",";
                         followed.push_back(ck);
                         size_t new_depth = link_depth == not_found ? not_found : link_depth - 1;
                         ll.get_object(i).to_json(out, new_depth, renames, followed);
@@ -1098,6 +1098,48 @@ bool Obj::remove_backlink(ColKey col_key, ObjKey old_key, CascadeState& state)
     }
 
     return false;
+}
+
+void Obj::assign(const ConstObj& other)
+{
+    REALM_ASSERT(get_table() == other.get_table());
+    auto cols = m_table->get_column_keys();
+    for (auto col : cols) {
+        if (col.get_attrs().test(col_attr_List)) {
+            auto src_list = other.get_listbase_ptr(col);
+            auto dst_list = get_listbase_ptr(col);
+            auto sz = src_list->size();
+            dst_list->clear();
+            for (size_t i = 0; i < sz; i++) {
+                Mixed val = src_list->get_any(i);
+                dst_list->insert_any(i, val);
+            }
+        }
+        else {
+            Mixed val = other.get_any(col);
+            if (val.is_null()) {
+                this->set_null(col);
+                continue;
+            }
+            switch (val.get_type()) {
+                case type_String: {
+                    // Need to take copy. Values might be in same cluster
+                    std::string str{val.get_string()};
+                    this->set(col, str);
+                    break;
+                }
+                case type_Binary: {
+                    // Need to take copy. Values might be in same cluster
+                    std::string str{val.get_binary()};
+                    this->set(col, BinaryData(str));
+                    break;
+                }
+                default:
+                    this->set(col, val);
+                    break;
+            }
+        }
+    }
 }
 
 

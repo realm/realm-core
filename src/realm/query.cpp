@@ -1634,7 +1634,7 @@ std::string Query::get_description() const
 
 void Query::init() const
 {
-    REALM_ASSERT(m_table);
+    m_table.check();
     if (ParentNode* root = root_node()) {
         root->init();
         std::vector<ParentNode*> vec;
@@ -1767,7 +1767,6 @@ void Query::get_outside_versions(TableVersions& versions) const
     if (m_table) {
         if (m_table_keys.empty()) {
             // Store primary table info
-            REALM_ASSERT_DEBUG(m_table);
             m_table_keys.push_back(m_table.unchecked_ptr()->get_key());
 
             if (ParentNode* root = root_node())
