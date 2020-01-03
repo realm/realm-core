@@ -30,13 +30,11 @@ constexpr int MAX_STRING_DIGITS = 19;
 
 namespace realm {
 
-// This is a cut down version of bid128_from_string() from the Intel library.
+// This is a cut down version of bid128_from_string() from the IntelRDFPMathLib20U2 library.
 // If we can live with only 19 significant digits, we can avoid a lot of complex code
+// as the significant can be stored in w[0] only.
 void Decimal128::from_string(const char* ps)
 {
-    char c, buffer[MAX_STRING_DIGITS];
-    bool rdx_pt_enc = false;
-
     // if null string, return NaN
     if (!ps) {
         m_value.w[1] = 0x7c00000000000000ull;
@@ -48,7 +46,7 @@ void Decimal128::from_string(const char* ps)
         ps++;
 
     // c gets first character
-    c = *ps;
+    char c = *ps;
 
     // set up sign_x to be OR'ed with the upper word later
     uint64_t sign_x = (c == '-') ? 0x8000000000000000ull : 0;
@@ -60,11 +58,13 @@ void Decimal128::from_string(const char* ps)
     c = *ps;
 
     // if c isn't a decimal point or a decimal digit, return NaN
-    if (c != '.' && (unsigned(c - '0') > 9)) {
+    if (!(c == '.' || (c >= '0' && c <= '9'))) {
         m_value.w[1] = 0x7c00000000000000ull | sign_x;
         m_value.w[0] = 0;
         return;
     }
+
+    bool rdx_pt_enc = false;
     if (c == '.') {
         rdx_pt_enc = true;
         ps++;
@@ -121,6 +121,7 @@ void Decimal128::from_string(const char* ps)
     c = *ps;
 
     // initialize local variables
+    char buffer[MAX_STRING_DIGITS];
     int ndigits_before = 0;
     int ndigits_total = 0;
     int sgn_exp = 0;
@@ -128,7 +129,7 @@ void Decimal128::from_string(const char* ps)
 
     if (!rdx_pt_enc) {
         // investigate string (before radix point)
-        while (unsigned(c - '0') <= 9) {
+        while (c >= '0' && c <= '9') {
             if (ndigits_before == MAX_STRING_DIGITS) {
                 throw std::overflow_error("Too many digits before radix point");
             }
@@ -146,7 +147,7 @@ void Decimal128::from_string(const char* ps)
 
     if ((c = *ps)) {
         // investigate string (after radix point)
-        while (unsigned(c - '0') <= 9) {
+        while (c >= '0' && c <= '9') {
             if (ndigits_total == MAX_STRING_DIGITS) {
                 throw std::overflow_error("Too many digits");
             }
@@ -169,8 +170,11 @@ void Decimal128::from_string(const char* ps)
         }
         ps++;
         c = *ps;
+        auto c1 = ps[1];
 
-        if ((unsigned(c - '0') > 9) && ((c != '+' && c != '-') || unsigned(ps[1] - '0') > 9)) {
+        // Either the next character must be a digit OR it must be either '-' or '+' AND the following
+        // character must be a digit.
+        if (!((c >= '0' && c <= '9') || ((c == '+' || c == '-') && c1 >= '0' && c1 <= '9'))) {
             // return NaN
             m_value.w[1] = 0x7c00000000000000ull;
             m_value.w[0] = 0;
@@ -195,38 +199,28 @@ void Decimal128::from_string(const char* ps)
             while ((*ps) == '0')
                 ps++;
         }
-        c = (*ps) - '0';
+        c = *ps;
 
-        while (unsigned(c) <= 9 && i < 7) {
-            dec_expon = 10 * dec_expon + c;
+        while ((c >= '0' && c <= '9') && i < 7) {
+            dec_expon = 10 * dec_expon + (c - '0');
             ps++;
-            c = *ps - '0';
+            c = *ps;
             i++;
         }
     }
 
     dec_expon = (dec_expon + sgn_exp) ^ sgn_exp;
     dec_expon += DECIMAL_EXPONENT_BIAS_128 - ndigits_after - right_radix_leading_zeros;
-    if (dec_expon < 0) {
-        m_value.w[1] = 0 | sign_x;
-        m_value.w[0] = 0;
-    }
-    Bid128 CX;
-    if (ndigits_total == 0) {
-        CX.w[0] = 0;
-        CX.w[1] = 0;
-    }
-    else {
-        uint64_t coeff_high = buffer[0] - '0';
+    uint64_t coeff = 0;
+    if (ndigits_total > 0) {
+        coeff = buffer[0] - '0';
         for (int i = 1; i < ndigits_total; i++) {
-            coeff_high = 10 * coeff_high + (buffer[i] - '0');
+            coeff = 10 * coeff + (buffer[i] - '0');
         }
-        CX.w[0] = coeff_high;
-        CX.w[1] = 0;
     }
-    m_value.w[0] = CX.w[0];
+    m_value.w[0] = coeff;
     uint64_t tmp = dec_expon;
-    m_value.w[1] = sign_x | (tmp << 49) | CX.w[1];
+    m_value.w[1] = sign_x | (tmp << 49);
 }
 
 
@@ -316,7 +310,8 @@ bool Decimal128::operator>=(const Decimal128& rhs) const
 
 std::string Decimal128::to_string() const
 {
-    // Primitive implementation
+    // Primitive implementation.
+    // Assumes that the significant is stored in w[0] only.
     std::ostringstream ostr;
     ostr << m_value.w[0];
     auto digits = ostr.str();

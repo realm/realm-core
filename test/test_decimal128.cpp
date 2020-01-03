@@ -33,10 +33,15 @@ TEST(Decimal_Basics)
         Decimal128 d1(x);
         CHECK_EQUAL(d, d1);
     };
+    test_str("0", "0");
+    test_str("0.000", "0E-3");
+    test_str("0E-3", "0E-3");
     test_str("3.1416", "3.1416");
     test_str("3.1416e-4", "3.1416E-4");
     test_str("-3.1416e-4", "-3.1416E-4");
     test_str("10e2", "10E2");
+    test_str("10e+2", "10E2");
+    test_str("1e-00021", "1E-21");
     test_str("10.100e2", "1010.0");
     test_str(".00000001", "1E-8");
     test_str(".00000001000000000", "1.000000000E-8");
