@@ -49,9 +49,9 @@ void ArrayDecimal128::insert(size_t ndx, Decimal128 value)
 void ArrayDecimal128::erase(size_t ndx)
 {
     REALM_ASSERT(ndx < m_size);
+
     copy_on_write();
-    // This can throw, but only if array is currently in read-only
-    // memory.
+
     Decimal128* dst = reinterpret_cast<Decimal128*>(m_data) + ndx;
     Decimal128* src = dst + 1;
 

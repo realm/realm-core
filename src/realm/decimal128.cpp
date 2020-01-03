@@ -30,6 +30,8 @@ constexpr int MAX_STRING_DIGITS = 19;
 
 namespace realm {
 
+// This is a cut down version of bid128_from_string() from the Intel library.
+// If we can live with only 19 significant digits, we can avoid a lot of complex code
 void Decimal128::from_string(const char* ps)
 {
     char c, buffer[MAX_STRING_DIGITS];
