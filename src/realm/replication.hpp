@@ -515,7 +515,7 @@ inline void Replication::set(const Table* table, ColKey col_key, ObjKey key, Obj
         set_null(table, col_key, key, variant);
     }
     else {
-        // FIXME: implement
+        set_object_id(table, col_key, key, value, variant);
     }
 }
 

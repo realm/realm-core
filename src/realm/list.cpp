@@ -680,7 +680,7 @@ void Lst<ObjectId>::set_repl(Replication* repl, size_t ndx, ObjectId value)
         repl->list_set_null(*this, ndx);
     }
     else {
-        // FIXME: implement
+        repl->list_set_object_id(*this, ndx, value);
     }
 }
 
@@ -815,7 +815,7 @@ void Lst<ObjectId>::insert_repl(Replication* repl, size_t ndx, ObjectId value)
         repl->list_insert_null(*this, ndx);
     }
     else {
-        // FIXME: implement
+        repl->list_insert_object_id(*this, ndx, value);
     }
 }
 
