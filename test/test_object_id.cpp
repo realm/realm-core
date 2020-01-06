@@ -124,7 +124,6 @@ TEST(ObjectId_Query)
     ObjectId t0;
     ObjectId t25;
 
-    ObjKey key;
     {
         auto wt = db->start_write();
         auto table = wt->add_table_with_primary_key("Foo", type_ObjectId, "id");

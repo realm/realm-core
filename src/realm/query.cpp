@@ -777,6 +777,44 @@ Query& Query::less(ColKey column_key, Timestamp value)
     return add_condition<Less>(column_key, value);
 }
 
+// ------------- ObjectId
+Query& Query::greater(ColKey, ObjectId)
+{
+    REALM_ASSERT(false);
+    return *this;
+    // return add_condition<Greater>(column_key, value);
+}
+Query& Query::equal(ColKey, ObjectId)
+{
+    REALM_ASSERT(false);
+    return *this;
+    // return add_condition<Equal>(column_key, value);
+}
+Query& Query::not_equal(ColKey, ObjectId)
+{
+    REALM_ASSERT(false);
+    return *this;
+    // return add_condition<NotEqual>(column_key, value);
+}
+Query& Query::greater_equal(ColKey, ObjectId)
+{
+    REALM_ASSERT(false);
+    return *this;
+    // return add_condition<GreaterEqual>(column_key, value);
+}
+Query& Query::less_equal(ColKey, ObjectId)
+{
+    REALM_ASSERT(false);
+    return *this;
+    // return add_condition<LessEqual>(column_key, value);
+}
+Query& Query::less(ColKey, ObjectId)
+{
+    REALM_ASSERT(false);
+    return *this;
+    // return add_condition<Less>(column_key, value);
+}
+
 // ------------- size
 Query& Query::size_equal(ColKey column_key, int64_t value)
 {
