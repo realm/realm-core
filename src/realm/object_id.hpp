@@ -61,9 +61,6 @@ public:
     std::string to_string() const;
 
 private:
-    struct Byte4 {
-        uint8_t b[4];
-    };
     uint8_t m_bytes[12];
 };
 
