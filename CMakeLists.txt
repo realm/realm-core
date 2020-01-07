@@ -17,6 +17,7 @@ include(Utilities)
 include(SpecialtyBuilds)
 include(GetVersion)
 include(CheckCXXCompilerFlag)
+include(CheckCXXSourceRuns)
 
 # Get accurate git-describe version
 git_describe(REALM_VERSION)
@@ -46,6 +47,25 @@ function(add_cxx_flag_if_supported flag)
     endif()
 endfunction()
 
+function(use_faster_linker)
+    # If a linker has already been set, don't override.
+    if ("${CMAKE_EXE_LINKER_FLAGS}" MATCHES "-fuse-ld=")
+        return()
+    endif()
+
+    foreach(LINKER lld gold) # lld > gold > default
+        # there is no link equivalent to check_cxx_compiler_flag()
+        set(CMAKE_REQUIRED_LINK_OPTIONS "-fuse-ld=${LINKER}")
+        check_cxx_source_compiles("int main() {}" HAVE_LINKER_${LINKER})
+        if(HAVE_LINKER_${LINKER})
+            foreach(KIND EXE SHARED MODULE)
+                set(CMAKE_${KIND}_LINKER_FLAGS "${CMAKE_${KIND}_LINKER_FLAGS} -fuse-ld=${LINKER}" PARENT_SCOPE)
+            endforeach()
+            return()
+        endif()
+    endforeach()
+endfunction()
+
 # Set global warnings settings
 if(MSVC)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /W3 /D_CRT_SECURE_NO_WARNINGS /D_SCL_SECURE_NO_WARNINGS")
@@ -66,6 +86,8 @@ else()
     if("${CMAKE_GENERATOR}" STREQUAL "Ninja")
         add_cxx_flag_if_supported(-fdiagnostics-color)
     endif()
+
+    use_faster_linker()
 endif()
 
 # Add REALM_DEBUG=1 to compile definitions for Debug / MinSizeDebug targets
