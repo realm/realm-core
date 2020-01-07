@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 6.0.0-beta.3 Release notes
 
 ### Enhancements
 * `Table::contains_unique_values(ColKey) -> bool` function added
@@ -8,11 +8,6 @@
  
 ### Breaking changes
 * We now require uniqieness on table names.
-
------------
-
-### Internals
-* None.
 
 ----------------------------------------------
 
