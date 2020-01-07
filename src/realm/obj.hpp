@@ -203,7 +203,6 @@ protected:
     template <class T>
     int cmp(const ConstObj& other, ColKey::Idx col_ndx) const;
     int cmp(const ConstObj& other, ColKey::Idx col_ndx) const;
-    size_t _get_backlink_count(ColKey backlink_col) const;
     ObjKey get_backlink(ColKey backlink_col, size_t backlink_ndx) const;
     std::vector<ObjKey> get_all_backlinks(ColKey backlink_col) const;
 };
