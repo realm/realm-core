@@ -166,6 +166,7 @@ public:
     std::string to_string() const;
 
 protected:
+    friend class Obj;
     friend class ColumnListBase;
     friend class ConstLstBase;
     friend class ConstLnkLst;
@@ -202,8 +203,8 @@ protected:
     template <class T>
     int cmp(const ConstObj& other, ColKey::Idx col_ndx) const;
     int cmp(const ConstObj& other, ColKey::Idx col_ndx) const;
-    size_t get_backlink_count(ColKey backlink_col) const;
     ObjKey get_backlink(ColKey backlink_col, size_t backlink_ndx) const;
+    std::vector<ObjKey> get_all_backlinks(ColKey backlink_col) const;
 };
 
 

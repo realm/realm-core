@@ -100,9 +100,8 @@ void LinkMap::map_links(size_t column, ObjKey key, LinkMapFunction& lm) const
     }
     else if (type == col_type_BackLink) {
         auto backlink_column = m_link_column_keys[column];
-        size_t sz = obj.get_backlink_count(backlink_column);
-        for (size_t t = 0; t < sz; t++) {
-            ObjKey k = obj.get_backlink(backlink_column, t);
+        auto backlinks = obj.get_all_backlinks(backlink_column);
+        for (auto k : backlinks) {
             if (last) {
                 bool continue2 = lm.consume(k);
                 if (!continue2)

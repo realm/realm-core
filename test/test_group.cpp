@@ -2069,9 +2069,19 @@ TEST(Group_StringPrimaryKeyCol)
     }
     g.validate_primary_columns();
 
+    auto table1 = g.add_table("class_bar");
+    auto col_link = table1->add_column_link(type_Link, "link", *table);
+    auto col_linklist = table1->add_column_link(type_LinkList, "linklist", *table);
+    Obj origin_obj = table1->create_object();
+    origin_obj.set(col_link, k);
+    auto ll = origin_obj.get_linklist(col_linklist);
+    for (auto o : *table) {
+        ll.add(o.get_key());
+    }
     // Changing PK should not add an index to the new PK
     table->set_primary_key_column(col2);
     g.validate_primary_columns();
+    g.verify();
     CHECK(table->get_primary_key_column() == col2);
     CHECK_NOT(table->has_search_index(col2));
 
@@ -2082,6 +2092,9 @@ TEST(Group_StringPrimaryKeyCol)
     CHECK_NOT(obj1.is_valid());
     obj1 = table->get_object(k);
     CHECK_EQUAL(obj1.get<String>(col1), "Exactly!");
+    CHECK_EQUAL(origin_obj.get<ObjKey>(col_link), k);
+    CHECK_EQUAL(ll.size(), 4);
+    CHECK(table->is_valid(ll.get(0)));
     list = obj1.get_list<Float>(list_col);
     CHECK_EQUAL(list.size(), 10);
     CHECK_EQUAL(list.get(5), 2.5f);
