@@ -1,14 +1,13 @@
 # NEXT RELEASE
 
 ### Enhancements
-* None.
+* `Table::contains_unique_values(ColKey) -> bool` function added
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Fixed an assertion failure when rebuilding a table with a null primary key, since 6.0.0-beta.2 ([#3528](https://github.com/realm/realm-core/issues/3528)).
  
 ### Breaking changes
-* None.
+* We now require uniqieness on table names.
 
 -----------
 

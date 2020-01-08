@@ -44,17 +44,18 @@ typedef realm::Timestamp Timestamp;
 enum DataType {
     type_Int = 0,
     type_Bool = 1,
-    type_Float = 9,
-    type_Double = 10,
     type_String = 2,
     type_Binary = 4,
-    type_OldDateTime = 7,
-    type_Timestamp = 8,
     type_OldTable = 5,
     type_OldMixed = 6,
+    type_OldDateTime = 7,
+    type_Timestamp = 8,
+    type_Float = 9,
+    type_Double = 10,
     type_Decimal = 11,
     type_Link = 12,
-    type_LinkList = 13
+    type_LinkList = 13,
+    type_ObjectId = 15
 };
 
 /// See Descriptor::set_link_type().

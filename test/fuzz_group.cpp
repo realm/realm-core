@@ -201,6 +201,9 @@ std::string create_column_name(DataType t)
         case type_Decimal:
             str = "decimal_";
             break;
+        case type_ObjectId:
+            str = "id_";
+            break;
         case type_Link:
             str = "link_";
             break;

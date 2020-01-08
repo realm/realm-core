@@ -16,31 +16,29 @@
  *
  **************************************************************************/
 
-#ifndef REALM_ARRAY_DECIMAL128_HPP
-#define REALM_ARRAY_DECIMAL128_HPP
+#ifndef REALM_ARRAY_OBJECT_ID_HPP
+#define REALM_ARRAY_OBJECT_ID_HPP
 
 #include <realm/array.hpp>
-#include <realm/decimal128.hpp>
+#include <realm/object_id.hpp>
 
 namespace realm {
 
-class ArrayDecimal128 : public ArrayPayload, private Array {
+class ArrayObjectId : public ArrayPayload, private Array {
 public:
-    using value_type = Decimal128;
+    using value_type = ObjectId;
 
     using Array::Array;
     using Array::destroy;
     using Array::get_ref;
     using Array::init_from_mem;
     using Array::init_from_parent;
-    using Array::size;
-    using Array::truncate;
     using Array::update_parent;
     using Array::verify;
 
-    static Decimal128 default_value(bool nullable)
+    static ObjectId default_value(bool)
     {
-        return nullable ? Decimal128() : Decimal128(0);
+        return ObjectId();
     }
 
     void create()
@@ -59,47 +57,58 @@ public:
         Array::set_parent(parent, ndx_in_parent);
     }
 
+    size_t size() const
+    {
+        REALM_ASSERT(m_size < s_width * 10000);
+        // return m_size / 12
+        // Multiply by 0x10000 / 3. Divide by 0x10000 * 4
+        // Error is shifted away.
+        // Ensured to work for number of elements < 10000. Also on 32 bit
+        return (m_size * 0x5556) >> 18;
+    }
+
     bool is_null(size_t ndx) const
     {
         return this->get_width() == 0 || get(ndx).is_null();
     }
 
-    Decimal128 get(size_t ndx) const
+    ObjectId get(size_t ndx) const
     {
-        REALM_ASSERT(ndx < m_size);
-        auto values = reinterpret_cast<Decimal128*>(this->m_data);
+        REALM_ASSERT(s_width * ndx < m_size);
+        auto values = reinterpret_cast<ObjectId*>(this->m_data);
         return values[ndx];
     }
 
-    void add(Decimal128 value)
+    void add(ObjectId value)
     {
         insert(size(), value);
     }
 
-    void set(size_t ndx, Decimal128 value);
-    void set_null(size_t ndx)
-    {
-        Decimal128 null_value;
-        set(ndx, null_value);
-    }
-
-    void insert(size_t ndx, Decimal128 value);
+    void set(size_t ndx, ObjectId value);
+    void insert(size_t ndx, ObjectId value);
     void erase(size_t ndx);
-    void move(ArrayDecimal128& dst, size_t ndx);
+    void move(ArrayObjectId& dst, size_t ndx);
     void clear()
     {
         truncate(0);
     }
+    void truncate(size_t ndx)
+    {
+        Array::truncate(s_width * ndx);
+    }
 
-    size_t find_first(Decimal128 value, size_t begin = 0, size_t end = npos) const noexcept;
+    size_t find_first(ObjectId value, size_t begin = 0, size_t end = npos) const noexcept;
 
 protected:
+    static constexpr size_t s_width = sizeof(ObjectId); // Size of each element
+    static_assert(s_width == 12, "Size of ObjectId must be 12");
+
     size_t calc_byte_len(size_t num_items, size_t) const override
     {
-        return num_items * sizeof(Decimal128);
+        return num_items + header_size;
     }
 };
 
 } // namespace realm
 
-#endif /* REALM_ARRAY_DECIMAL128_HPP */
+#endif /* REALM_ARRAY_OBJECT_ID_HPP */

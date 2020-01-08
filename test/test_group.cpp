@@ -116,10 +116,10 @@ TEST(Group_UnattachedErrorHandling)
     CHECK_EQUAL(TableKey(), group.find_table("foo"));
     CHECK_LOGIC_ERROR(group.get_table(TableKey()), LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(group.get_table("foo"), LogicError::detached_accessor);
-    CHECK_LOGIC_ERROR(group.add_table("foo", false), LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(group.add_table("foo"), LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(group.get_table(TableKey()), LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(group.get_table("foo"), LogicError::detached_accessor);
-    CHECK_LOGIC_ERROR(group.add_table("foo", false), LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(group.add_table("foo"), LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(group.remove_table("foo"), LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(group.remove_table(TableKey()), LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(group.rename_table("foo", "bar", false), LogicError::detached_accessor);
@@ -384,20 +384,6 @@ TEST(Group_Size)
 
 
 TEST(Group_AddTable)
-{
-    Group group;
-    TableRef foo_1 = group.add_table("foo");
-    CHECK_EQUAL(1, group.size());
-    CHECK_THROW(group.add_table("foo"), TableNameInUse);
-    CHECK_EQUAL(1, group.size());
-    bool require_unique_name = false;
-    TableRef foo_2 = group.add_table("foo", require_unique_name);
-    CHECK_EQUAL(2, group.size());
-    CHECK_NOT_EQUAL(foo_1, foo_2);
-}
-
-
-TEST(Group_AddTable2)
 {
     Group group;
     group.add_table("a");
@@ -2131,6 +2117,32 @@ TEST(Group_SetColumnWithDuplicateValuesToPrimaryKey)
     CHECK_EQUAL(table->get_primary_key_column(), ColKey());
     CHECK_THROW(table->set_primary_key_column(int_col), DuplicatePrimaryKeyValueException);
     CHECK_EQUAL(table->get_primary_key_column(), ColKey());
+}
+
+TEST(Group_SetColumnWithNullPrimaryKeyy)
+{
+    Group g;
+    TableRef table = g.add_table("table");
+    ColKey string_col = table->add_column(type_String, "string", true);
+
+    std::vector<ObjKey> keys;
+    table->create_objects(2, keys);
+    table->get_object(keys[0]).set(string_col, {"first"});
+    table->get_object(keys[1]).set(string_col, {});
+    CHECK(!table->get_object(keys[0]).is_null(string_col));
+    CHECK_EQUAL(table->get_object(keys[0]).get<StringData>(string_col), "first");
+    CHECK(table->get_object(keys[1]).is_null(string_col));
+    CHECK(table->get_primary_key_column() != string_col);
+    CHECK_EQUAL(table->size(), 2);
+    table->set_primary_key_column(string_col);
+    CHECK_EQUAL(table->get_primary_key_column(), string_col);
+    ObjKey first = table->find_first_string(string_col, "first");
+    ObjKey second = table->find_first_null(string_col);
+    ObjKey third = table->find_first_string(string_col, "not found");
+    CHECK(bool(first));
+    CHECK(bool(second));
+    CHECK(!bool(third));
+    CHECK_EQUAL(table->size(), 2);
 }
 
 TEST(Group_ChangeIntPrimaryKeyValuesInMigration)

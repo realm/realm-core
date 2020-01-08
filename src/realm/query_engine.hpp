@@ -455,7 +455,7 @@ protected:
     size_t aggregate_local_impl(QueryStateBase* st, size_t start, size_t end, size_t local_limit,
                                 ArrayPayload* source_column, int c)
     {
-        REALM_ASSERT(m_table);
+        m_table.check();
         REALM_ASSERT(m_cluster);
         REALM_ASSERT(m_children.size() > 0);
         m_local_matches = 0;

@@ -337,7 +337,7 @@ public:
     TableRef get_table(StringData name);
     ConstTableRef get_table(StringData name) const;
 
-    TableRef add_table(StringData name, bool require_unique_name = true);
+    TableRef add_table(StringData name);
     TableRef add_table_with_primary_key(StringData name, DataType pk_type, StringData pk_name, bool nullable = false);
     TableRef get_or_add_table(StringData name, bool* was_added = nullptr);
 
@@ -728,7 +728,7 @@ private:
     const Table* do_get_table(size_t ndx) const;
     Table* do_get_table(StringData name);
     const Table* do_get_table(StringData name) const;
-    Table* do_add_table(StringData name, bool require_unique_name);
+    Table* do_add_table(StringData name);
 
     Table* do_get_or_add_table(StringData name, bool* was_added);
 
@@ -849,6 +849,11 @@ private:
     size_t key2ndx_checked(TableKey key) const;
     void set_size() const noexcept;
     void remove_pk_table();
+    void check_table_name_uniqueness(StringData name)
+    {
+        if (m_table_names.find_first(name) != not_found)
+            throw TableNameInUse();
+    }
 
     friend class Table;
     friend class GroupWriter;
@@ -1002,11 +1007,12 @@ inline ConstTableRef Group::get_table(StringData name) const
     return ConstTableRef(table, table ? table->m_alloc.get_instance_version() : 0);
 }
 
-inline TableRef Group::add_table(StringData name, bool require_unique_name)
+inline TableRef Group::add_table(StringData name)
 {
     if (!is_attached())
         throw LogicError(LogicError::detached_accessor);
-    Table* table = do_add_table(name, require_unique_name); // Throws
+    check_table_name_uniqueness(name);
+    Table* table = do_add_table(name); // Throws
     return TableRef(table, table ? table->m_alloc.get_instance_version() : 0);
 }
 

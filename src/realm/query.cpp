@@ -777,6 +777,44 @@ Query& Query::less(ColKey column_key, Timestamp value)
     return add_condition<Less>(column_key, value);
 }
 
+// ------------- ObjectId
+Query& Query::greater(ColKey, ObjectId)
+{
+    REALM_ASSERT(false);
+    return *this;
+    // return add_condition<Greater>(column_key, value);
+}
+Query& Query::equal(ColKey, ObjectId)
+{
+    REALM_ASSERT(false);
+    return *this;
+    // return add_condition<Equal>(column_key, value);
+}
+Query& Query::not_equal(ColKey, ObjectId)
+{
+    REALM_ASSERT(false);
+    return *this;
+    // return add_condition<NotEqual>(column_key, value);
+}
+Query& Query::greater_equal(ColKey, ObjectId)
+{
+    REALM_ASSERT(false);
+    return *this;
+    // return add_condition<GreaterEqual>(column_key, value);
+}
+Query& Query::less_equal(ColKey, ObjectId)
+{
+    REALM_ASSERT(false);
+    return *this;
+    // return add_condition<LessEqual>(column_key, value);
+}
+Query& Query::less(ColKey, ObjectId)
+{
+    REALM_ASSERT(false);
+    return *this;
+    // return add_condition<Less>(column_key, value);
+}
+
 // ------------- size
 Query& Query::size_equal(ColKey column_key, int64_t value)
 {
@@ -1634,7 +1672,7 @@ std::string Query::get_description() const
 
 void Query::init() const
 {
-    REALM_ASSERT(m_table);
+    m_table.check();
     if (ParentNode* root = root_node()) {
         root->init();
         std::vector<ParentNode*> vec;
@@ -1767,7 +1805,6 @@ void Query::get_outside_versions(TableVersions& versions) const
     if (m_table) {
         if (m_table_keys.empty()) {
             // Store primary table info
-            REALM_ASSERT_DEBUG(m_table);
             m_table_keys.push_back(m_table.unchecked_ptr()->get_key());
 
             if (ParentNode* root = root_node())

@@ -40,6 +40,7 @@ set(NORMAL_TESTS
     test_links.cpp
     test_metrics.cpp
     test_global_key.cpp
+    test_object_id.cpp
     test_optional.cpp
     test_parser.cpp
     test_priority_queue.cpp
