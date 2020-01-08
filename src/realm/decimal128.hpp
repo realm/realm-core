@@ -55,6 +55,8 @@ public:
     bool operator<=(const Decimal128& rhs) const;
     bool operator>=(const Decimal128& rhs) const;
 
+    Decimal128 operator/(int64_t div) const;
+
     std::string to_string() const;
     Bid64 to_bid64() const;
     const Bid128* raw() const

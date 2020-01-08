@@ -232,10 +232,15 @@ Decimal128::Decimal128()
 
 Decimal128::Decimal128(int64_t val)
 {
-    BID_SINT64 x(val);
-    BID_UINT128 tmp;
-    bid128_from_int64(&tmp, &x);
-    memcpy(this, &tmp, sizeof(*this));
+    constexpr uint64_t expon = uint64_t(DECIMAL_EXPONENT_BIAS_128) << 49;
+    if (val < 0) {
+        m_value.w[1] = expon | 0x8000000000000000ull;
+        m_value.w[0] = ~val + 1;
+    }
+    else {
+        m_value.w[1] = expon;
+        m_value.w[0] = val;
+    }
 }
 
 Decimal128::Decimal128(Bid64 val)
@@ -316,8 +321,40 @@ bool Decimal128::operator>=(const Decimal128& rhs) const
     return !(*this < rhs);
 }
 
+Decimal128 Decimal128::operator/(int64_t div) const
+{
+    unsigned flags = 0;
+    BID_UINT128 x;
+    BID_UINT128 y;
+
+    memcpy(&x, this, sizeof(Decimal128));
+
+    BID_UINT64 tmp(div);
+    bid128_from_uint64(&y, &tmp);
+
+    BID_UINT128 res;
+    bid128_div(&res, &x, &y, &flags);
+
+    // Reduce precision. Ensures that the result can be stored in a Mixed.
+    // FIXME: Should be seen as a temporary solution
+    BID_UINT64 res1;
+    bid128_to_bid64(&res1, &res, &flags);
+    bid64_to_bid128(&res, &res1, &flags);
+
+    Bid128* p = reinterpret_cast<Bid128*>(&res);
+    return Decimal128(*p);
+}
+
 std::string Decimal128::to_string() const
 {
+    /*
+    char buffer[64];
+    unsigned flags = 0;
+    BID_UINT128 x;
+    memcpy(&x, this, sizeof(Decimal128));
+    bid128_to_string(buffer, &x, &flags);
+    return std::string(buffer);
+    */
     // Primitive implementation.
     // Assumes that the significant is stored in w[0] only.
     std::ostringstream ostr;

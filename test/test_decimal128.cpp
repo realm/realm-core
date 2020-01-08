@@ -64,6 +64,13 @@ TEST(Decimal_Basics)
     CHECK(d10 >= d);
 }
 
+TEST(Decimal_Aritmethics)
+{
+    Decimal128 d(10);
+    auto q = d / 3;
+    CHECK_EQUAL(q.to_string(), "3.333333333333333");
+}
+
 TEST(Decimal_Array)
 {
     const char str0[] = "12345.67";
