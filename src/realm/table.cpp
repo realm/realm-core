@@ -38,6 +38,7 @@
 #include <realm/array_binary.hpp>
 #include <realm/array_string.hpp>
 #include <realm/array_timestamp.hpp>
+#include <realm/array_object_id.hpp>
 #include <realm/table_tpl.hpp>
 
 /// \page AccessorConsistencyLevels
@@ -293,6 +294,8 @@ const char* get_data_type_name(DataType type) noexcept
             return "binary";
         case type_Timestamp:
             return "timestamp";
+        case type_ObjectId:
+            return "ObjectId";
         case type_Link:
             return "link";
         case type_LinkList:
@@ -557,6 +560,10 @@ void Table::populate_search_index(ColKey col_key)
         }
         else if (type == type_Timestamp) {
             Timestamp value = o.get<Timestamp>(col_key);
+            index->insert(key, value); // Throws
+        }
+        else if (type == type_ObjectId) {
+            ObjectId value = o.get<ObjectId>(col_key);
             index->insert(key, value); // Throws
         }
         else {
@@ -1928,6 +1935,40 @@ ObjKey Table::find_first(ColKey col_key, StringData value) const
 }
 
 template <>
+ObjKey Table::find_first(ColKey col_key, ObjectId value) const
+{
+    if (REALM_UNLIKELY(!valid_column(col_key)))
+        throw InvalidKey("Non-existing column");
+
+    if (StringIndex* index = get_search_index(col_key)) {
+        return index->find_first(value);
+    }
+
+    if (col_key.get_type() == col_type_ObjectId && col_key == m_primary_key_col) {
+        GlobalKey object_id{value};
+        ObjKey k = global_to_local_object_id_hashed(object_id);
+        return is_valid(k) ? k : ObjKey();
+    }
+
+    ObjKey key;
+    ArrayObjectId leaf(get_alloc());
+
+    auto f = [&key, &col_key, &value, &leaf](const Cluster* cluster) {
+        cluster->init_leaf(col_key, &leaf);
+        size_t row = leaf.find_first(value, 0, cluster->node_size());
+        if (row != realm::npos) {
+            key = cluster->get_real_key(row);
+            return true;
+        }
+        return false;
+    };
+
+    traverse_clusters(f);
+
+    return key;
+}
+
+template <>
 ObjKey Table::find_first(ColKey col_key, ObjKey value) const
 {
     check_column(col_key);
@@ -1979,8 +2020,6 @@ template ObjKey Table::find_first(ColKey col_key, util::Optional<bool>) const;
 template ObjKey Table::find_first(ColKey col_key, util::Optional<int64_t>) const;
 template ObjKey Table::find_first(ColKey col_key, BinaryData) const;
 
-
-
 ObjKey Table::find_first_int(ColKey col_key, int64_t value) const
 {
     if (is_nullable(col_key))
@@ -1998,6 +2037,11 @@ ObjKey Table::find_first_bool(ColKey col_key, bool value) const
 }
 
 ObjKey Table::find_first_timestamp(ColKey col_key, Timestamp value) const
+{
+    return find_first(col_key, value);
+}
+
+ObjKey Table::find_first_object_id(ColKey col_key, ObjectId value) const
 {
     return find_first(col_key, value);
 }
@@ -2430,17 +2474,17 @@ Obj Table::create_object_with_primary_key(const Mixed& primary_key)
             return get_object(object_key); // Already exists
         object_key = get_next_key();
     }
-
-    if (type == type_String) {
+    else {
+        REALM_ASSERT(type == type_String || type == type_ObjectId);
         // Generate local ObjKey
         object_key = global_to_local_object_id_hashed(object_id);
         // Check for collision
         if (is_valid(object_key)) {
             Obj existing_obj = get_object(object_key);
-            StringData existing_pk_value = existing_obj.get<String>(primary_key_col);
+            auto existing_pk_value = existing_obj.get_any(primary_key_col);
 
             // It may just be the same object
-            if (existing_pk_value == primary_key.get_string()) {
+            if (existing_pk_value == primary_key) {
                 return existing_obj;
             }
 

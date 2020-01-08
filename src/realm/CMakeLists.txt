@@ -9,6 +9,7 @@ set(REALM_SOURCES
     array_blobs_big.cpp
     array_integer.cpp
     array_mixed.cpp
+    array_object_id.cpp
     array_unsigned.cpp
     array_string.cpp
     array_string_short.cpp
@@ -39,6 +40,7 @@ set(REALM_SOURCES
     table.cpp
     table_ref.cpp
     obj_list.cpp
+    object_id.cpp
     table_view.cpp
     sort_descriptor.cpp
     unicode.cpp
@@ -80,6 +82,7 @@ set(REALM_INSTALL_GENERAL_HEADERS
     array_mixed.hpp
     array_key.hpp
     array_list.hpp
+    array_object_id.hpp
     array_string.hpp
     array_string_short.hpp
     array_timestamp.hpp
@@ -124,6 +127,7 @@ set(REALM_INSTALL_GENERAL_HEADERS
     table_ref.hpp
     sort_descriptor.hpp
     obj_list.hpp
+    object_id.hpp
     table_view.hpp
     timestamp.hpp
     unicode.hpp

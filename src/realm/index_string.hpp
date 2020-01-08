@@ -167,14 +167,10 @@ public:
         return m_target_column.get_column_key();
     }
 
-    template <class T>
-    static bool type_supported()
-    {
-        return realm::is_any<T, int64_t, int, StringData, bool, Timestamp>::value;
-    }
     static bool type_supported(realm::DataType type)
     {
-        return (type == type_Int || type == type_String || type == type_Bool || type == type_Timestamp);
+        return (type == type_Int || type == type_String || type == type_Bool || type == type_Timestamp ||
+                type == type_ObjectId);
     }
 
     static ref_type create_empty(Allocator& alloc);
@@ -423,6 +419,15 @@ struct GetIndexData<BinaryData> {
     {
         REALM_ASSERT_RELEASE(false); // LCOV_EXCL_LINE; Index on float not supported
         return {};
+    }
+};
+
+template <>
+struct GetIndexData<ObjectId> {
+    static StringData get_index_data(ObjectId value, StringConversionBuffer& buffer)
+    {
+        memcpy(&buffer, &value, sizeof(ObjectId));
+        return StringData{buffer.data(), sizeof(ObjectId)};
     }
 };
 
