@@ -1937,13 +1937,8 @@ Obj ClusterTree::insert(ObjKey k, const FieldValues& values)
                         index->insert(k, init_value.get<Timestamp>());
                     }
                     break;
-                case col_type_Decimal:
-                    if (init_value.is_null()) {
-                        index->insert(k, ArrayDecimal128::default_value(nullable));
-                    }
-                    else {
-                        index->insert(k, init_value.get<Timestamp>());
-                    }
+                case col_type_ObjectId:
+                    index->insert(k, init_value.get<ObjectId>());
                     break;
                 default:
                     break;
