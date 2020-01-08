@@ -1,19 +1,9 @@
-# NEXT RELEASE
-
-### Enhancements
-* None.
+# 5.23.8 Release notes
 
 ### Fixed
 * A NOT query on a LinkList would incorrectly match rows which have a row index one less than a correctly matching row which appeared earlier in the LinkList. ([Cocoa #6289](https://github.com/realm/realm-cocoa/issues/6289), since 0.87.6).
+* Columns with float and double values would not be sorted correctly (since 5.23.7)
  
-### Breaking changes
-* None.
-
------------
-
-### Internals
-* None.
-
 ----------------------------------------------
 
 # 5.23.7 Release notes
