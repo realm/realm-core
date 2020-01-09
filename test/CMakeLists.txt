@@ -12,6 +12,7 @@ add_subdirectory(benchmark-crud)
 set(NORMAL_TESTS
     # slowest to compile first
     test_query.cpp
+    test_query2.cpp
     test_query_big.cpp
     test_table.cpp
     test_lang_bind_helper.cpp
