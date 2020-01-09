@@ -1,7 +1,10 @@
 set(REALM_SOURCES
+    # slowest to compile first
+    query.cpp
+    array.cpp
+
     alloc.cpp
     alloc_slab.cpp
-    array.cpp
     array_backlink.cpp
     array_binary.cpp
     array_blob.cpp
@@ -30,7 +33,6 @@ set(REALM_SOURCES
     node.cpp
     obj.cpp
     global_key.cpp
-    query.cpp
     query_engine.cpp
     query_expression.cpp
     replication.cpp
