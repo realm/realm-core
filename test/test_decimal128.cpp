@@ -46,6 +46,9 @@ TEST(Decimal_Basics)
     test_str(".00000001", "1E-8");
     test_str(".00000001000000000", "1.000000000E-8");
 
+    Decimal128 pi("3.141592653589793238"); // 19 significant digits
+    CHECK_EQUAL(pi.to_string(), "3.141592653589793238");
+
     Decimal128 d("-10.5");
     Decimal128 d1("20.25");
     CHECK(d < d1);

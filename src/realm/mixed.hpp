@@ -128,7 +128,7 @@ public:
     Mixed(StringData) noexcept;
     Mixed(BinaryData) noexcept;
     Mixed(Timestamp) noexcept;
-    Mixed(Decimal128) noexcept;
+    Mixed(Decimal128);
     Mixed(ObjectId) noexcept;
     Mixed(ObjKey) noexcept;
 
@@ -306,10 +306,12 @@ inline Mixed::Mixed(Timestamp v) noexcept
     }
 }
 
-inline Mixed::Mixed(Decimal128 v) noexcept
+inline Mixed::Mixed(Decimal128 v)
 {
     if (!v.is_null()) {
         m_type = type_Decimal + 1;
+        // FIXME: This somewhat reduced the precision of the value.
+        // If only used in sorting scenarios this may not be a problem.
         auto x = v.to_bid64();
         uint_val = x.w;
     }
