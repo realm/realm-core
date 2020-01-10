@@ -28,6 +28,7 @@
 namespace realm {
 
 struct ObjKey;
+class Decimal128;
 class ObjectId;
 class Timestamp;
 class ArraySmallBlobs;
@@ -42,6 +43,7 @@ class ArrayBool;
 class ArrayBoolNull;
 class ArrayKey;
 class ArrayKeyNonNullable;
+class ArrayDecimal128;
 class ArrayObjectId;
 template <class>
 class BasicArray;
@@ -193,6 +195,13 @@ struct ColumnTypeTraits<BinaryData> {
     static const DataType id = type_Binary;
     static const ColumnType column_id = col_type_Binary;
     static const ColumnType real_column_type = col_type_Binary;
+};
+
+template <>
+struct ColumnTypeTraits<Decimal128> {
+    using cluster_leaf_type = ArrayDecimal128;
+    static const DataType id = type_Decimal;
+    static const ColumnType column_id = col_type_Decimal;
 };
 
 template <class T>

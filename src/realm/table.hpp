@@ -412,6 +412,7 @@ public:
     ObjKey find_first_object_id(ColKey col_key, ObjectId value) const;
     ObjKey find_first_float(ColKey col_key, float value) const;
     ObjKey find_first_double(ColKey col_key, double value) const;
+    ObjKey find_first_decimal(ColKey col_key, Decimal128 value) const;
     ObjKey find_first_string(ColKey col_key, StringData value) const;
     ObjKey find_first_binary(ColKey col_key, BinaryData value) const;
     ObjKey find_first_null(ColKey col_key) const;

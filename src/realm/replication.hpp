@@ -538,6 +538,18 @@ inline void Replication::set(const Table* table, ColKey col_key, ObjKey key, dou
 }
 
 template <>
+inline void Replication::set(const Table* table, ColKey col_key, ObjKey key, Decimal128 value,
+                             _impl::Instruction variant)
+{
+    if (value.is_null()) {
+        set_null(table, col_key, key, variant);
+    }
+    else {
+        // FIXME: implement
+    }
+}
+
+template <>
 inline void Replication::set(const Table* table, ColKey col_key, ObjKey key, ObjKey target_key,
                              _impl::Instruction variant)
 {

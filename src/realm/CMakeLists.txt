@@ -7,6 +7,7 @@ set(REALM_SOURCES
     array_blob.cpp
     array_blobs_small.cpp
     array_blobs_big.cpp
+    array_decimal128.cpp
     array_integer.cpp
     array_mixed.cpp
     array_object_id.cpp
@@ -17,6 +18,7 @@ set(REALM_SOURCES
     bplustree.cpp
     cluster.cpp
     column_binary.cpp
+    decimal128.cpp
     disable_sync_to_disk.cpp
     exceptions.cpp
     group.cpp
@@ -232,6 +234,7 @@ target_compile_definitions(CoreObjects PRIVATE
 target_compile_options(CoreObjects PRIVATE ${REALM_SANITIZER_FLAGS})
 
 set(REALM_OBJECT_FILES $<TARGET_OBJECTS:CoreObjects>)
+list(APPEND REALM_OBJECT_FILES $<TARGET_OBJECTS:Bid>)
 
 if(COMMAND set_target_xcode_attributes)
     set_target_xcode_attributes(CoreObjects)

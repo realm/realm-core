@@ -37,7 +37,7 @@ enum ColumnType {
     col_type_Timestamp = 8,
     col_type_Float = 9,
     col_type_Double = 10,
-    col_type_Reserved4 = 11, // Decimal
+    col_type_Decimal = 11,
     col_type_Link = 12,
     col_type_LinkList = 13,
     col_type_BackLink = 14,

@@ -52,6 +52,7 @@ enum DataType {
     type_Timestamp = 8,
     type_Float = 9,
     type_Double = 10,
+    type_Decimal = 11,
     type_Link = 12,
     type_LinkList = 13,
     type_ObjectId = 15

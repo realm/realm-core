@@ -24,6 +24,7 @@
 #include "realm/array_string.hpp"
 #include "realm/array_binary.hpp"
 #include "realm/array_timestamp.hpp"
+#include "realm/array_decimal128.hpp"
 #include "realm/array_key.hpp"
 #include "realm/array_object_id.hpp"
 #include "realm/array_backlink.hpp"
@@ -124,6 +125,8 @@ int ConstObj::cmp(const ConstObj& other, ColKey col_key) const
             return cmp<Binary>(other, col_ndx);
         case type_Timestamp:
             return cmp<Timestamp>(other, col_ndx);
+        case type_Decimal:
+            return cmp<Decimal128>(other, col_ndx);
         case type_ObjectId:
             return cmp<ObjectId>(other, col_ndx);
         case type_Link:
@@ -193,6 +196,8 @@ Mixed ConstObj::get_any(ColKey col_key) const
             return Mixed{get<Binary>(col_key)};
         case col_type_Timestamp:
             return Mixed{get<Timestamp>(col_key)};
+        case col_type_Decimal:
+            return Mixed{get<Decimal128>(col_key)};
         case col_type_ObjectId:
             return Mixed{get<ObjectId>(col_key)};
         case col_type_Link:
@@ -565,6 +570,11 @@ void out_mixed(std::ostream& out, const Mixed& val)
         case type_Timestamp:
             out << "\"";
             out << val.get<Timestamp>();
+            out << "\"";
+            break;
+        case type_Decimal:
+            out << "\"";
+            out << val.get<Decimal128>();
             out << "\"";
             break;
         case type_ObjectId:
@@ -1156,6 +1166,7 @@ template BinaryData ConstObj::get<BinaryData>(ColKey col_key) const;
 template Timestamp ConstObj::get<Timestamp>(ColKey col_key) const;
 template ObjectId ConstObj::get<ObjectId>(ColKey col_key) const;
 template ObjKey ConstObj::get<ObjKey>(ColKey col_key) const;
+template Decimal128 ConstObj::get<Decimal128>(ColKey col_key) const;
 
 template Obj& Obj::set<bool>(ColKey, bool, bool);
 template Obj& Obj::set<float>(ColKey, float, bool);
@@ -1163,6 +1174,7 @@ template Obj& Obj::set<double>(ColKey, double, bool);
 template Obj& Obj::set<StringData>(ColKey, StringData, bool);
 template Obj& Obj::set<BinaryData>(ColKey, BinaryData, bool);
 template Obj& Obj::set<Timestamp>(ColKey, Timestamp, bool);
+template Obj& Obj::set<Decimal128>(ColKey, Decimal128, bool);
 template Obj& Obj::set<ObjectId>(ColKey, ObjectId, bool);
 
 template <class T>
@@ -1238,6 +1250,9 @@ Obj& Obj::set_null(ColKey col_key, bool is_default)
                 break;
             case col_type_Timestamp:
                 do_set_null<ArrayTimestamp>(col_key);
+                break;
+            case col_type_Decimal:
+                do_set_null<ArrayDecimal128>(col_key);
                 break;
             default:
                 break;

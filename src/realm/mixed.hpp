@@ -30,6 +30,7 @@
 #include <realm/data_type.hpp>
 #include <realm/string_data.hpp>
 #include <realm/timestamp.hpp>
+#include <realm/decimal128.hpp>
 #include <realm/object_id.hpp>
 #include <realm/util/assert.hpp>
 #include <realm/utilities.hpp>
@@ -127,6 +128,7 @@ public:
     Mixed(StringData) noexcept;
     Mixed(BinaryData) noexcept;
     Mixed(Timestamp) noexcept;
+    Mixed(Decimal128);
     Mixed(ObjectId) noexcept;
     Mixed(ObjKey) noexcept;
 
@@ -190,6 +192,7 @@ private:
 
     union {
         int64_t int_val;
+        uint64_t uint_val;
         bool bool_val;
         float float_val;
         double double_val;
@@ -303,6 +306,20 @@ inline Mixed::Mixed(Timestamp v) noexcept
     }
 }
 
+inline Mixed::Mixed(Decimal128 v)
+{
+    if (!v.is_null()) {
+        m_type = type_Decimal + 1;
+        // FIXME: This somewhat reduced the precision of the value.
+        // If only used in sorting scenarios this may not be a problem.
+        auto x = v.to_bid64();
+        uint_val = x.w;
+    }
+    else {
+        m_type = 0;
+    }
+}
+
 inline Mixed::Mixed(ObjectId v) noexcept
 {
     if (!v.is_null()) {
@@ -407,6 +424,13 @@ inline Timestamp Mixed::get<Timestamp>() const noexcept
 inline Timestamp Mixed::get_timestamp() const
 {
     return get<Timestamp>();
+}
+
+template <>
+inline Decimal128 Mixed::get<Decimal128>() const noexcept
+{
+    REALM_ASSERT(get_type() == type_Decimal);
+    return Decimal128(Decimal128::Bid64(uint_val));
 }
 
 template <>
@@ -568,6 +592,9 @@ inline std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, c
                 break;
             case type_Timestamp:
                 out << Timestamp(m.int_val, m.short_val);
+                break;
+            case type_Decimal:
+                out << Decimal128(Decimal128::Bid64(m.uint_val));
                 break;
             case type_ObjectId: {
                 out << m.get<ObjectId>();
