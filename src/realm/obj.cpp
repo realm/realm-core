@@ -752,6 +752,9 @@ Obj& Obj::set(ColKey col_key, Mixed value)
             case col_type_ObjectId:
                 set(col_key, value.get<ObjectId>());
                 break;
+            case col_type_Decimal:
+                set(col_key, value.get<Decimal128>());
+                break;
             case col_type_Link:
                 set(col_key, value.get<ObjKey>());
                 break;

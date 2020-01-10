@@ -247,6 +247,14 @@ Decimal128::Decimal128(Bid64 val)
     memcpy(this, &tmp, sizeof(*this));
 }
 
+Decimal128::Decimal128(Bid128 coefficient, int exponent, bool sign)
+{
+    uint64_t sign_x = sign ? 0x8000000000000000ull : 0;
+    m_value = coefficient;
+    uint64_t tmp = exponent + DECIMAL_EXPONENT_BIAS_128;
+    m_value.w[1] |= (sign_x | (tmp << 49));
+}
+
 Decimal128::Decimal128(const std::string& init)
 {
     from_string(const_cast<char*>(init.c_str()));
@@ -354,6 +362,16 @@ auto Decimal128::to_bid64() const -> Bid64
     if (flags & ~BID_INEXACT_EXCEPTION)
         throw std::overflow_error("Decimal128::to_bid64 failed");
     return Bid64(buffer);
+}
+
+void Decimal128::unpack(Bid128& coefficient, int& exponent, bool& sign) const noexcept
+{
+    sign = (m_value.w[1] & 0x8000000000000000ull) != 0;
+    int64_t exp = m_value.w[1] & 0x7fffffffffffffffull;
+    exp >>= 49;
+    exponent = int(exp) - DECIMAL_EXPONENT_BIAS_128;
+    coefficient.w[0] = m_value.w[0];
+    coefficient.w[1] = m_value.w[1] & 0x00003fffffffffffull;
 }
 
 

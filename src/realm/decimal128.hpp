@@ -38,6 +38,7 @@ public:
     };
     Decimal128();
     Decimal128(int64_t);
+    Decimal128(Bid128 coefficient, int exponent, bool sign);
     explicit Decimal128(Bid64);
     Decimal128(const std::string&);
 
@@ -56,6 +57,7 @@ public:
     {
         return &m_value;
     }
+    void unpack(Bid128& coefficient, int& exponent, bool& sign) const noexcept;
 
 private:
     Bid128 m_value;

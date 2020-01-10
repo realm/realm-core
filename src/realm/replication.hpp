@@ -545,7 +545,7 @@ inline void Replication::set(const Table* table, ColKey col_key, ObjKey key, Dec
         set_null(table, col_key, key, variant);
     }
     else {
-        // FIXME: implement
+        set_decimal(table, col_key, key, value, variant);
     }
 }
 

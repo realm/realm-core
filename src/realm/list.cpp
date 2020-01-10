@@ -702,7 +702,7 @@ void Lst<Decimal128>::set_repl(Replication* repl, size_t ndx, Decimal128 value)
         repl->list_set_null(*this, ndx);
     }
     else {
-        // FIXME: Implement
+        repl->list_set_decimal(*this, ndx, value);
     }
 }
 
@@ -837,7 +837,7 @@ void Lst<Decimal128>::insert_repl(Replication* repl, size_t ndx, Decimal128 valu
         repl->list_insert_null(*this, ndx);
     }
     else {
-        // FIXME: Implement
+        repl->list_insert_decimal(*this, ndx, value);
     }
 }
 }

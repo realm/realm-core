@@ -2521,7 +2521,7 @@ ObjKey Table::get_obj_key(GlobalKey id) const
                 key = find_first_int(col, int64_t(id.lo()));
             }
         }
-        if (col.get_type() == col_type_String) {
+        else {
             key = global_to_local_object_id_hashed(id);
         }
     }
