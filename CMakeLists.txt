@@ -1,4 +1,8 @@
-cmake_minimum_required(VERSION 3.4)
+if(WIN32)
+    cmake_minimum_required(VERSION 3.12)
+else()
+    cmake_minimum_required(VERSION 3.15)
+endif()
 
 set(CMAKE_BUILD_TYPE Debug CACHE STRING "")
 project(RealmCore)
