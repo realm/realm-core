@@ -27,7 +27,7 @@ using namespace realm;
 TEST(Decimal_Basics)
 {
     auto test_str = [&](const std::string& str, const std::string& ref) {
-        Decimal128 d(str);
+        Decimal128 d = Decimal128(str);
         CHECK_EQUAL(d.to_string(), ref);
         auto x = d.to_bid64();
         Decimal128 d1(x);
@@ -46,13 +46,13 @@ TEST(Decimal_Basics)
     test_str(".00000001", "1E-8");
     test_str(".00000001000000000", "1.000000000E-8");
 
-    Decimal128 pi("3.141592653589793238"); // 19 significant digits
+    Decimal128 pi = Decimal128("3.141592653589793238"); // 19 significant digits
     CHECK_EQUAL(pi.to_string(), "3.141592653589793238");
 
-    Decimal128 d("-10.5");
-    Decimal128 d1("20.25");
+    Decimal128 d = Decimal128("-10.5");
+    Decimal128 d1 = Decimal128("20.25");
     CHECK(d < d1);
-    Decimal128 d2("100");
+    Decimal128 d2 = Decimal128("100");
     CHECK(d1 < d2);
 
     Decimal128 y;
@@ -73,9 +73,9 @@ TEST(Decimal_Array)
     ArrayDecimal128 arr(Allocator::get_default());
     arr.create();
 
-    arr.add({str0});
-    arr.add({str1});
-    arr.insert(1, {str2});
+    arr.add(Decimal128(str0));
+    arr.add(Decimal128(str1));
+    arr.insert(1, Decimal128(str2));
 
     Decimal128 id2(str2);
     CHECK_EQUAL(arr.get(0), Decimal128(str0));
@@ -113,4 +113,30 @@ TEST(Decimal128_Table)
     CHECK_EQUAL(key, obj1.get_key());
     auto d = obj1.get_any(col_price);
     CHECK_EQUAL(d.get<Decimal128>().to_string(), "1000.00");
+}
+
+
+TEST(Decimal128_Query)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    DBRef db = DB::create(path);
+
+    {
+        auto wt = db->start_write();
+        auto table = wt->add_table("Foo");
+        auto col_dec = table->add_column(type_Decimal, "price");
+        for (int i = 0; i < 100; i++) {
+            table->create_object().set(col_dec, Decimal128(i));
+        }
+        wt->commit();
+    }
+    {
+        auto rt = db->start_read();
+        auto table = rt->get_table("Foo");
+        auto col = table->get_column_key("price");
+        Query q = table->column<Decimal>(col) > Decimal128(0);
+        CHECK_EQUAL(q.count(), 99);
+        Query q1 = table->column<Decimal>(col) < Decimal128(25);
+        CHECK_EQUAL(q1.count(), 25);
+    }
 }
