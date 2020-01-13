@@ -41,6 +41,10 @@ public:
     Decimal128(Bid128 coefficient, int exponent, bool sign);
     explicit Decimal128(Bid64);
     explicit Decimal128(const std::string&);
+    explicit Decimal128(Bid128 val)
+    {
+        m_value = val;
+    }
 
     bool is_null() const;
 
