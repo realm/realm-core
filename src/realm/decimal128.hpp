@@ -37,10 +37,10 @@ public:
         uint64_t w[2];
     };
     Decimal128();
-    Decimal128(int64_t);
+    explicit Decimal128(int64_t);
     Decimal128(Bid128 coefficient, int exponent, bool sign);
     explicit Decimal128(Bid64);
-    Decimal128(const std::string&);
+    explicit Decimal128(const std::string&);
 
     bool is_null() const;
 

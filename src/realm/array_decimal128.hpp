@@ -96,7 +96,7 @@ public:
 protected:
     size_t calc_byte_len(size_t num_items, size_t) const override
     {
-        return num_items * sizeof(Decimal128);
+        return num_items * sizeof(Decimal128) + header_size;
     }
 };
 

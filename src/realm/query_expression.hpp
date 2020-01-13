@@ -318,6 +318,7 @@ struct ValueBase {
     virtual void export_bool(ValueBase& destination) const = 0;
     virtual void export_Timestamp(ValueBase& destination) const = 0;
     virtual void export_ObjectId(ValueBase& destination) const = 0;
+    virtual void export_Decimal(ValueBase& destination) const = 0;
     virtual void export_int(ValueBase& destination) const = 0;
     virtual void export_float(ValueBase& destination) const = 0;
     virtual void export_int64_t(ValueBase& destination) const = 0;
@@ -734,6 +735,7 @@ class Subexpr2 : public Subexpr,
                  public Overloads<T, bool>,
                  public Overloads<T, Timestamp>,
                  public Overloads<T, ObjectId>,
+                 public Overloads<T, Decimal128>,
                  public Overloads<T, null> {
 public:
     virtual ~Subexpr2()
@@ -746,7 +748,12 @@ public:
     RLM_U2(float, o)                                                                                                 \
     RLM_U2(double, o)                                                                                                \
     RLM_U2(int64_t, o)                                                                                               \
-    RLM_U2(StringData, o) RLM_U2(bool, o) RLM_U2(Timestamp, o) RLM_U2(ObjectId, o) RLM_U2(null, o)
+    RLM_U2(StringData, o)                                                                                            \
+    RLM_U2(bool, o)                                                                                                  \
+    RLM_U2(Timestamp, o)                                                                                             \
+    RLM_U2(ObjectId, o)                                                                                              \
+    RLM_U2(Decimal128, o)                                                                                            \
+    RLM_U2(null, o)
     RLM_U(+) RLM_U(-) RLM_U(*) RLM_U(/) RLM_U(>) RLM_U(<) RLM_U(==) RLM_U(!=) RLM_U(>=) RLM_U(<=)
 };
 
@@ -888,7 +895,7 @@ struct NullableVector {
 
     template <typename Type = T>
     typename std::enable_if<realm::is_any<Type, float, double, BinaryData, StringData, ObjKey, Timestamp, ObjectId,
-                                          ref_type, SizeOfList, null>::value,
+                                          Decimal128, ref_type, SizeOfList, null>::value,
                             void>::type
     set(size_t index, t_storage value)
     {
@@ -1064,6 +1071,20 @@ template <>
 inline void NullableVector<ObjectId>::set_null(size_t index)
 {
     m_first[index] = ObjectId{};
+}
+
+// Decimal128
+
+template <>
+inline bool NullableVector<Decimal128>::is_null(size_t index) const
+{
+    return m_first[index].is_null();
+}
+
+template <>
+inline void NullableVector<Decimal128>::set_null(size_t index)
+{
+    m_first[index] = Decimal128{};
 }
 
 // ref_type
@@ -1330,6 +1351,11 @@ public:
         export2<ObjectId>(destination);
     }
 
+    REALM_FORCEINLINE void export_Decimal(ValueBase& destination) const override
+    {
+        export2<Decimal128>(destination);
+    }
+
     REALM_FORCEINLINE void export_bool(ValueBase& destination) const override
     {
         export2<bool>(destination);
@@ -1376,6 +1402,8 @@ public:
             source.export_Timestamp(*this);
         else if (std::is_same<T, ObjectId>::value)
             source.export_ObjectId(*this);
+        else if (std::is_same<T, Decimal128>::value)
+            source.export_Decimal(*this);
         else if (std::is_same<T, bool>::value)
             source.export_bool(*this);
         else if (std::is_same<T, float>::value)
@@ -2189,6 +2217,11 @@ class Columns<BinaryData> : public SimpleQuerySupport<BinaryData> {
 
 template <>
 class Columns<ObjectId> : public SimpleQuerySupport<ObjectId> {
+    using SimpleQuerySupport::SimpleQuerySupport;
+};
+
+template <>
+class Columns<Decimal128> : public SimpleQuerySupport<Decimal128> {
     using SimpleQuerySupport::SimpleQuerySupport;
 };
 
