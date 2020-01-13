@@ -12,19 +12,12 @@ RUN apt-get update && apt-get install -y \
     libprocps4-dev \
     libssl-dev \
     ninja-build \
-    pandoc \
-    # cheetah is required to build core < v1.0.0 benchmarks
-    python-cheetah \
-    python-matplotlib \
-    python-pip \
     pkg-config \
     s3cmd \
     tar \
     unzip \
     wget \
     && rm -rf /var/lib/apt/lists/*
-
-RUN pip install diff_cover
 
 RUN cd /opt \
     && wget https://cmake.org/files/v3.15/cmake-3.15.2-Linux-x86_64.tar.gz \
