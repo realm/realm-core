@@ -148,6 +148,7 @@ public:
     {
         Cluster cluster(0, get_alloc(), *get_tree_top());
         cluster.init(m_mem);
+        cluster.set_offset(m_key.value - cluster.get_key_value(m_row_ndx));
         return func(&cluster, m_row_ndx);
     }
 
