@@ -108,7 +108,8 @@ struct SyncError {
         return (error_code == ProtocolError::bad_server_file_ident
                 || error_code == ProtocolError::bad_client_file_ident
                 || error_code == ProtocolError::bad_server_version
-                || error_code == ProtocolError::diverging_histories);
+                || error_code == ProtocolError::diverging_histories
+                || error_code == ProtocolError::client_file_expired);
     }
 };
 
@@ -141,6 +142,9 @@ struct SyncConfig {
     util::Optional<ProxyConfig> proxy_config;
     bool is_partial = false;
     util::Optional<std::string> custom_partial_sync_identifier;
+
+    // If true, upload/download waits are canceled on any sync error and not just fatal ones
+    bool cancel_waits_on_nonfatal_error = false;
 
     bool validate_sync_history = true;
 

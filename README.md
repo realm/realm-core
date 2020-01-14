@@ -132,6 +132,18 @@ docker run --rm -it -v $(pwd):/tmp -w /tmp objectstore bash
 Refer to the rest of this document for instructions to build/test in other
 configurations.
 
+## Visual Studio Code
+
+The `.vscode` folder contains workspace configuration files for Visual Studio Code, which will be picked up by VSCode when it opens this folder. `.vscode/extensions.json` contains a list of recommended IDE extensions - namely C++, CMake, and Catch2 support. Make sure to accept installing the recommended extensions the first time you open this repo in VSCode.
+
+### Building
+
+From the command palette execute `CMake: Select Variant` and choose one of the predefined build variants, such as `Debug + Enable Sync + Download Core`. Then, execute `CMake: Configure` and `CMake: Build`. Refer to the [CMake Tools for Visual Studio Code guide](https://vector-of-bool.github.io/docs/vscode-cmake-tools/getting_started.html) for more details.
+
+### Testing
+
+The [Catch2 and Google Test Explorer extension](https://marketplace.visualstudio.com/items?itemName=matepek.vscode-catch2-test-adapter) enables exploring, running, and debugging individual test cases. Simply build the `tests` target and execute the `Test: Focus on Test Explorer View` VSCode command or manually switch to the Test Explorer view in the sidebar to get started.
+
 ## License
 
 Realm Object Store is published under the Apache 2.0 license. The [underlying core](https://github.com/realm/realm-core) is also published under the Apache 2.0 license.

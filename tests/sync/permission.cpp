@@ -116,7 +116,7 @@ static void subscribe_to_all(std::shared_ptr<Realm> const& r)
 }
 
 TEST_CASE("Object-level Permissions") {
-    SyncManager::shared().configure(tmp_dir(), SyncManager::MetadataMode::NoEncryption);
+    TestSyncManager init_sync_manager;
 
     SyncServer server{StartImmediately{false}};
 

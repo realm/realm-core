@@ -32,10 +32,9 @@ TEST_CASE("SyncSession: wait_for_download_completion() API", "[sync]") {
 
     const std::string dummy_auth_url = "https://realm.example.org";
 
-    auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
     SyncServer server;
     // Disable file-related functionality and metadata functionality for testing purposes.
-    SyncManager::shared().configure(tmp_dir(), SyncManager::MetadataMode::NoMetadata);
+    TestSyncManager init_sync_manager("", SyncManager::MetadataMode::NoMetadata);
 
     std::atomic<bool> handler_called(false);
 
@@ -112,15 +111,15 @@ TEST_CASE("SyncSession: wait_for_download_completion() API", "[sync]") {
                                                                                   login_handler_called = true;
                                                                               },
                                                                               [&](auto, auto) { ++error_count; });
+        std::error_code code = std::error_code{static_cast<int>(ProtocolError::bad_syntax), realm::sync::protocol_error_category()};
         // Register the download-completion notification
         session->wait_for_download_completion([&](std::error_code error) {
-            REQUIRE(error == util::error::operation_aborted);
+            REQUIRE(error == code);
             handler_called = true;
         });
         EventLoop::main().run_until([&] { return login_handler_called == true; });
         REQUIRE(handler_called == false);
         // Now trigger an error
-        std::error_code code = std::error_code{static_cast<int>(ProtocolError::bad_syntax), realm::sync::protocol_error_category()};
         SyncSession::OnlyForTesting::handle_error(*session, {code, "Not a real error message", true});
         EventLoop::main().run_until([&] { return error_count > 0; });
         REQUIRE(handler_called == true);
@@ -133,10 +132,9 @@ TEST_CASE("SyncSession: wait_for_upload_completion() API", "[sync]") {
 
     const std::string dummy_auth_url = "https://realm.example.org";
 
-    auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
     SyncServer server;
     // Disable file-related functionality and metadata functionality for testing purposes.
-    SyncManager::shared().configure(tmp_dir(), SyncManager::MetadataMode::NoMetadata);
+    TestSyncManager init_sync_manager("", SyncManager::MetadataMode::NoMetadata);
 
     std::atomic<bool> handler_called(false);
 
@@ -213,15 +211,15 @@ TEST_CASE("SyncSession: wait_for_upload_completion() API", "[sync]") {
                                                                                   login_handler_called = true;
                                                                               },
                                                                               [&](auto, auto) { ++error_count; });
+        std::error_code code = std::error_code{static_cast<int>(ProtocolError::bad_syntax), realm::sync::protocol_error_category()};
         // Register the upload-completion notification
         session->wait_for_upload_completion([&](std::error_code error) {
-            REQUIRE(error == util::error::operation_aborted);
+            REQUIRE(error == code);
             handler_called = true;
         });
         EventLoop::main().run_until([&] { return login_handler_called == true; });
         REQUIRE(handler_called == false);
         // Now trigger an error
-        std::error_code code = std::error_code{static_cast<int>(ProtocolError::bad_syntax), realm::sync::protocol_error_category()};
         SyncSession::OnlyForTesting::handle_error(*session, {code, "Not a real error message", true});
         EventLoop::main().run_until([&] { return error_count > 0; });
         REQUIRE(handler_called == true);

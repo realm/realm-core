@@ -374,9 +374,9 @@ struct sync_session_states::Inactive : public SyncSession::State {
 
         // Inform any queued-up completion handlers that they were cancelled.
         for (auto& callback : download_waits)
-            callback(util::error::operation_aborted);
+            callback(make_error_code(util::error::operation_aborted));
         for (auto& callback : upload_waits)
-            callback(util::error::operation_aborted);
+            callback(make_error_code(util::error::operation_aborted));
     }
 
     bool revive_if_needed(std::unique_lock<std::mutex>& lock, SyncSession& session) const override
@@ -561,7 +561,7 @@ void SyncSession::handle_error(SyncError error)
                 {
                     std::unique_lock<std::mutex> lock(m_state_mutex);
                     user_to_invalidate = user();
-                    cancel_pending_waits(lock);
+                    cancel_pending_waits(lock, error.error_code);
                 }
                 if (user_to_invalidate)
                     user_to_invalidate->invalidate();
@@ -581,6 +581,7 @@ void SyncSession::handle_error(SyncError error)
             case ProtocolError::diverging_histories:
             case ProtocolError::server_file_deleted:
             case ProtocolError::user_blacklisted:
+            case ProtocolError::client_file_expired:
                 next_state = NextStateAfterError::inactive;
                 update_error_and_mark_file_for_deletion(error, ShouldBackup::yes);
                 break;
@@ -633,6 +634,10 @@ void SyncSession::handle_error(SyncError error)
     }
     switch (next_state) {
         case NextStateAfterError::none:
+            if (m_config.cancel_waits_on_nonfatal_error) {
+                std::unique_lock<std::mutex> lock(m_state_mutex);
+                cancel_pending_waits(lock, error.error_code);
+            }
             break;
         case NextStateAfterError::inactive: {
             std::unique_lock<std::mutex> lock(m_state_mutex);
@@ -641,7 +646,7 @@ void SyncSession::handle_error(SyncError error)
         }
         case NextStateAfterError::error: {
             std::unique_lock<std::mutex> lock(m_state_mutex);
-            cancel_pending_waits(lock);
+            cancel_pending_waits(lock, error.error_code);
             break;
         }
     }
@@ -650,7 +655,7 @@ void SyncSession::handle_error(SyncError error)
     }
 }
 
-void SyncSession::cancel_pending_waits(std::unique_lock<std::mutex>& lock)
+void SyncSession::cancel_pending_waits(std::unique_lock<std::mutex>& lock, std::error_code error)
 {
     auto download = std::move(m_download_completion_callbacks);
     auto upload = std::move(m_upload_completion_callbacks);
@@ -658,9 +663,9 @@ void SyncSession::cancel_pending_waits(std::unique_lock<std::mutex>& lock)
 
     // Inform any queued-up completion handlers that they were cancelled.
     for (auto& callback : download)
-        callback(util::error::operation_aborted);
+        callback(error);
     for (auto& callback : upload)
-        callback(util::error::operation_aborted);
+        callback(error);
 }
 
 void SyncSession::handle_progress_update(uint64_t downloaded, uint64_t downloadable,
