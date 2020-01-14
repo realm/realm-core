@@ -322,13 +322,8 @@ inline Mixed::Mixed(Decimal128 v)
 
 inline Mixed::Mixed(ObjectId v) noexcept
 {
-    if (!v.is_null()) {
-        m_type = type_ObjectId + 1;
-        memcpy(&short_val, &v, sizeof(ObjectId));
-    }
-    else {
-        m_type = 0;
-    }
+    m_type = type_ObjectId + 1;
+    memcpy(&short_val, &v, sizeof(ObjectId));
 }
 
 inline Mixed::Mixed(ObjKey v) noexcept

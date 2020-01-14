@@ -279,7 +279,6 @@ void add_binary_constraint_to_query(Query& query, const Predicate::Comparison& c
     }
 }
 
-
 template <typename LHS, typename RHS>
 void add_link_constraint_to_query(realm::Query &,
                                   Predicate::Operator,
@@ -364,6 +363,11 @@ void do_add_comparison_to_query(Query& query, const Predicate::Comparison& cmp, 
         case type_Link:
             add_link_constraint_to_query(query, cmp.op, lhs, rhs);
             break;
+        case type_ObjectId:
+            add_numeric_constraint_to_query(query, cmp.op,
+                                             lhs. template value_of_type_for_query<ObjectId>(),
+                                             rhs. template value_of_type_for_query<ObjectId>());
+            break;
         default:
             throw std::logic_error(util::format("Object type '%1' not supported", data_type_to_str(type)));
     }
@@ -421,6 +425,9 @@ void do_add_null_comparison_to_query(Query& query, const Predicate::Comparison& 
             }
             break;
         }
+        case realm::type_ObjectId:
+            do_add_null_comparison_to_query<ObjectId>(query, cmp.op, expr);
+            break;
         case realm::type_Link:
             do_add_null_comparison_to_query<Link>(query, cmp.op, expr);
             break;

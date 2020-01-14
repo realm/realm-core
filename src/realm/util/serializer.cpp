@@ -115,6 +115,15 @@ std::string print_value<>(realm::Timestamp t)
 }
 
 template <>
+std::string print_value<>(realm::ObjectId oid)
+{
+    // ObjectId will not support NULL
+    std::stringstream ss;
+    ss << "oid(" << oid.to_string() << ")" ;
+    return ss.str();
+}
+
+template <>
 std::string print_value<>(realm::ObjKey k)
 {
     std::stringstream ss;

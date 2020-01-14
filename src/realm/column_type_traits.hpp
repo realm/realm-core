@@ -270,6 +270,11 @@ inline bool value_is_null(const ObjKey& val)
 {
     return !val;
 }
+template <>
+inline bool value_is_null(const ObjectId&)
+{
+    return false;
+}
 
 } // namespace realm
 

@@ -32,7 +32,7 @@ struct Predicate;
 
 struct Expression
 {
-    enum class Type { None, Number, String, KeyPath, Argument, True, False, Null, Timestamp, Base64, SubQuery } type;
+    enum class Type { None, Number, String, KeyPath, Argument, True, False, Null, Timestamp, Base64, SubQuery, ObjectId } type;
     enum class KeyPathOp { None, Min, Max, Avg, Sum, Count, SizeString, SizeBinary, BacklinkCount } collection_op;
     std::string s;
     std::vector<std::string> time_inputs;
