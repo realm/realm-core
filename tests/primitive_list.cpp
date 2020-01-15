@@ -115,6 +115,15 @@ struct Date : Base<PropertyType::Date, Timestamp> {
     static Timestamp max() { return Timestamp(1, 1); }
 };
 
+struct OID : Base<PropertyType::ObjectId, ObjectId> {
+    static std::vector<ObjectId> values() { return {ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa"), ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb")}; }
+};
+
+struct Decimal : Base<PropertyType::Decimal, Decimal128> {
+    static std::vector<Decimal128> values() { return {Decimal128("123.45e6"), Decimal128("876.54e32")}; }
+    // FIXME: turn on aggregates once core implements them
+};
+
 template<typename BaseT>
 struct BoxedOptional : BaseT {
     using Type = util::Optional<typename BaseT::Type>;
@@ -273,7 +282,7 @@ auto greater::operator()<Timestamp&, Timestamp&>(Timestamp& a, Timestamp& b) con
     return a > b;
 }
 
-TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::Double, ::String, ::Binary, ::Date,
+TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::Double, ::String, ::Binary, ::Date, ::OID, ::Decimal,
                    BoxedOptional<::Int>, BoxedOptional<::Bool>, BoxedOptional<::Float>, BoxedOptional<::Double>,
                    UnboxedOptional<::String>, UnboxedOptional<::Binary>, UnboxedOptional<::Date>)
 {

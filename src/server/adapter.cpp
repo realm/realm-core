@@ -61,6 +61,8 @@ static PropertyType from_core_type(DataType type)
         case type_Binary:    return PropertyType::Data;
         case type_Timestamp: return PropertyType::Date;
         case type_OldMixed:  return PropertyType::Any;
+        case type_ObjectId:  return PropertyType::ObjectId;
+        case type_Decimal:   return PropertyType::Decimal;
         case type_Link:      return PropertyType::Object | PropertyType::Nullable;
         case type_LinkList:  return PropertyType::Object | PropertyType::Array;
         case type_OldTable:  REALM_ASSERT(false && "Use ObjectSchema::from_core_type if subtables are a possibility");
@@ -412,6 +414,10 @@ public:
                 int64_t value = ts.get_seconds() * 1000 + ts.get_nanoseconds() / 1000000;
                 return add_set_instruction(instr.object, field, {"date", value});
             }
+            case type_ObjectId:
+                return add_set_instruction(instr.object, field, instr.payload.data.object_id.to_string());
+            case type_Decimal:
+                return add_set_instruction(instr.object, field, instr.payload.data.decimal.to_string());
             case type_Link: {
                 ObjectSchema *target_object_schema;
                 ConstTableRef target_table;

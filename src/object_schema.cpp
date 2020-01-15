@@ -68,6 +68,8 @@ PropertyType ObjectSchema::from_core_type(Table const& table, ColKey col)
         case type_Binary:    return PropertyType::Data | flags;
         case type_Timestamp: return PropertyType::Date | flags;
         case type_OldMixed:  return PropertyType::Any | flags;
+        case type_ObjectId:  return PropertyType::ObjectId | flags;
+        case type_Decimal:   return PropertyType::Decimal | flags;
         case type_Link:      return PropertyType::Object | PropertyType::Nullable;
         case type_LinkList:  return PropertyType::Object | PropertyType::Array;
         default: REALM_UNREACHABLE();
@@ -197,7 +199,7 @@ static void validate_property(Schema const& schema,
 
     // check primary keys
     if (prop.is_primary) {
-        if (prop.type != PropertyType::Int && prop.type != PropertyType::String) {
+        if (prop.type != PropertyType::Int && prop.type != PropertyType::String && prop.type != PropertyType::ObjectId) {
             exceptions.emplace_back("Property '%1.%2' of type '%3' cannot be made the primary key.",
                                     object_name, prop.name, string_for_property_type(prop.type));
         }

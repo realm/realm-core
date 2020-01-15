@@ -2976,6 +2976,8 @@ TEST_CASE("results: set property value on all objects", "[batch_updates]") {
             {"string", PropertyType::String},
             {"data", PropertyType::Data},
             {"date", PropertyType::Date},
+            {"object id", PropertyType::ObjectId},
+            {"decimal", PropertyType::Decimal},
             {"object", PropertyType::Object|PropertyType::Nullable, "AllTypes"},
             {"list", PropertyType::Array|PropertyType::Object, "AllTypes"},
 
@@ -2986,6 +2988,8 @@ TEST_CASE("results: set property value on all objects", "[batch_updates]") {
             {"string array", PropertyType::Array|PropertyType::String},
             {"data array", PropertyType::Array|PropertyType::Data},
             {"date array", PropertyType::Array|PropertyType::Date},
+            {"object id array", PropertyType::Array|PropertyType::ObjectId},
+            {"decimal array", PropertyType::Array|PropertyType::Decimal},
             {"object array", PropertyType::Array|PropertyType::Object, "AllTypes"},
         }, {
            {"parents", PropertyType::LinkingObjects|PropertyType::Array, "AllTypes", "object"},
@@ -3022,7 +3026,7 @@ TEST_CASE("results: set property value on all objects", "[batch_updates]") {
 
     SECTION("set property values removes object from Results") {
         realm->begin_transaction();
-        Results results(realm, table->where().equal(table->get_column_key("int"),0));
+        Results results(realm, table->where().equal(table->get_column_key("int"), 0));
         CHECK(results.size() == 2);
         r.set_property_value(ctx, "int", util::Any(INT64_C(42)));
         CHECK(results.size() == 0);
@@ -3066,6 +3070,18 @@ TEST_CASE("results: set property value on all objects", "[batch_updates]") {
         r.set_property_value(ctx, "date", timestamp);
         for (size_t i = 0; i < r.size(); i++) {
             CHECK(r.get(i).get<Timestamp>("date") == any_cast<Timestamp>(timestamp));
+        }
+
+        util::Any object_id = ObjectId("ffffffffffffffffffffffff");
+        r.set_property_value(ctx, "object id", object_id);
+        for (size_t i = 0; i < r.size(); i++) {
+            CHECK(r.get(i).get<ObjectId>("object id") == any_cast<ObjectId>(object_id));
+        }
+
+        util::Any decimal = Decimal128("876.54e32");
+        r.set_property_value(ctx, "decimal", decimal);
+        for (size_t i = 0; i < r.size(); i++) {
+            CHECK(r.get(i).get<Decimal128>("decimal") == any_cast<Decimal128>(decimal));
         }
 
         ObjKey object_key = table->create_object().get_key();
@@ -3122,6 +3138,12 @@ TEST_CASE("results: set property value on all objects", "[batch_updates]") {
 
         r.set_property_value(ctx, "date array", util::Any(AnyVec{Timestamp(10,20), Timestamp(20,30), Timestamp(30,40)}));
         check_array(table->get_column_key("date array"), Timestamp(10,20), Timestamp(20,30), Timestamp(30,40));
+
+        r.set_property_value(ctx, "object id array", util::Any(AnyVec{ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa"), ObjectId("888888888888888888888888")}));
+        check_array(table->get_column_key("object id array"), ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa"), ObjectId("888888888888888888888888"));
+
+        r.set_property_value(ctx, "decimal array", util::Any(AnyVec{Decimal128("123.45e67"), Decimal128("876.54e32")}));
+        check_array(table->get_column_key("decimal array"), Decimal128("123.45e67"), Decimal128("876.54e32"));
     }
 }
 

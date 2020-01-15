@@ -124,6 +124,8 @@ TEST_CASE("ObjectSchema") {
         table->add_column(type_String, "string");
         table->add_column(type_Binary, "data");
         table->add_column(type_Timestamp, "date");
+        table->add_column(type_ObjectId, "object id");
+        table->add_column(type_Decimal, "decimal");
 
         table->add_column_link(type_Link, "object", *target);
         table->add_column_link(type_LinkList, "array", *target);
@@ -135,6 +137,8 @@ TEST_CASE("ObjectSchema") {
         table->add_column(type_String, "string?", true);
         table->add_column(type_Binary, "data?", true);
         table->add_column(type_Timestamp, "date?", true);
+        table->add_column(type_ObjectId, "object id?", true);
+        table->add_column(type_Decimal, "decimal?", true);
 
         auto add_list = [](TableRef table, DataType type, StringData name, bool nullable) {
             table->add_column_list(type, name, nullable);
@@ -147,6 +151,8 @@ TEST_CASE("ObjectSchema") {
         add_list(table, type_String, "string array", false);
         add_list(table, type_Binary, "data array", false);
         add_list(table, type_Timestamp, "date array", false);
+        add_list(table, type_ObjectId, "object id array", false);
+        add_list(table, type_Decimal, "decimal array", false);
         add_list(table, type_Int, "int? array", true);
         add_list(table, type_Bool, "bool? array", true);
         add_list(table, type_Float, "float? array", true);
@@ -154,17 +160,21 @@ TEST_CASE("ObjectSchema") {
         add_list(table, type_String, "string? array", true);
         add_list(table, type_Binary, "data? array", true);
         add_list(table, type_Timestamp, "date? array", true);
+        add_list(table, type_ObjectId, "object id? array", true);
+        add_list(table, type_Decimal, "decimal? array", true);
 
         std::vector<ColKey> indexed_cols;
         indexed_cols.push_back(table->add_column(type_Int, "indexed int"));
         indexed_cols.push_back(table->add_column(type_Bool, "indexed bool"));
         indexed_cols.push_back(table->add_column(type_String, "indexed string"));
         indexed_cols.push_back(table->add_column(type_Timestamp, "indexed date"));
+        indexed_cols.push_back(table->add_column(type_ObjectId, "indexed object id"));
 
         indexed_cols.push_back(table->add_column(type_Int, "indexed int?", true));
         indexed_cols.push_back(table->add_column(type_Bool, "indexed bool?", true));
         indexed_cols.push_back(table->add_column(type_String, "indexed string?", true));
         indexed_cols.push_back(table->add_column(type_Timestamp, "indexed date?", true));
+        indexed_cols.push_back(table->add_column(type_ObjectId, "indexed object id?", true));
 
         for (auto col : indexed_cols)
             table->add_search_index(col);
@@ -193,6 +203,8 @@ TEST_CASE("ObjectSchema") {
         REQUIRE_PROPERTY("string", String);
         REQUIRE_PROPERTY("data", Data);
         REQUIRE_PROPERTY("date", Date);
+        REQUIRE_PROPERTY("object id", ObjectId);
+        REQUIRE_PROPERTY("decimal", Decimal);
 
         REQUIRE_PROPERTY("object", Object|PropertyType::Nullable, "target");
         REQUIRE_PROPERTY("array", Array|PropertyType::Object, "target");
@@ -204,6 +216,8 @@ TEST_CASE("ObjectSchema") {
         REQUIRE_PROPERTY("string?", String|PropertyType::Nullable);
         REQUIRE_PROPERTY("data?", Data|PropertyType::Nullable);
         REQUIRE_PROPERTY("date?", Date|PropertyType::Nullable);
+        REQUIRE_PROPERTY("object id?", ObjectId|PropertyType::Nullable);
+        REQUIRE_PROPERTY("decimal?", Decimal|PropertyType::Nullable);
 
         REQUIRE_PROPERTY("int array", Int|PropertyType::Array);
         REQUIRE_PROPERTY("bool array", Bool|PropertyType::Array);
@@ -212,6 +226,8 @@ TEST_CASE("ObjectSchema") {
         REQUIRE_PROPERTY("string array", String|PropertyType::Array);
         REQUIRE_PROPERTY("data array", Data|PropertyType::Array);
         REQUIRE_PROPERTY("date array", Date|PropertyType::Array);
+        REQUIRE_PROPERTY("object id array", ObjectId|PropertyType::Array);
+        REQUIRE_PROPERTY("decimal array", Decimal|PropertyType::Array);
         REQUIRE_PROPERTY("int? array", Int|PropertyType::Array|PropertyType::Nullable);
         REQUIRE_PROPERTY("bool? array", Bool|PropertyType::Array|PropertyType::Nullable);
         REQUIRE_PROPERTY("float? array", Float|PropertyType::Array|PropertyType::Nullable);
@@ -219,16 +235,19 @@ TEST_CASE("ObjectSchema") {
         REQUIRE_PROPERTY("string? array", String|PropertyType::Array|PropertyType::Nullable);
         REQUIRE_PROPERTY("data? array", Data|PropertyType::Array|PropertyType::Nullable);
         REQUIRE_PROPERTY("date? array", Date|PropertyType::Array|PropertyType::Nullable);
+        REQUIRE_PROPERTY("object id? array", ObjectId|PropertyType::Array|PropertyType::Nullable);
+        REQUIRE_PROPERTY("decimal? array", Decimal|PropertyType::Array|PropertyType::Nullable);
 
         REQUIRE_PROPERTY("indexed int", Int, Property::IsPrimary{false}, Property::IsIndexed{true});
         REQUIRE_PROPERTY("indexed bool", Bool, Property::IsPrimary{false}, Property::IsIndexed{true});
         REQUIRE_PROPERTY("indexed string", String, Property::IsPrimary{false}, Property::IsIndexed{true});
         REQUIRE_PROPERTY("indexed date", Date, Property::IsPrimary{false}, Property::IsIndexed{true});
-
+        REQUIRE_PROPERTY("indexed object id", ObjectId, Property::IsPrimary{false}, Property::IsIndexed{true});
         REQUIRE_PROPERTY("indexed int?", Int|PropertyType::Nullable, Property::IsPrimary{false}, Property::IsIndexed{true});
         REQUIRE_PROPERTY("indexed bool?", Bool|PropertyType::Nullable, Property::IsPrimary{false}, Property::IsIndexed{true});
         REQUIRE_PROPERTY("indexed string?", String|PropertyType::Nullable, Property::IsPrimary{false}, Property::IsIndexed{true});
         REQUIRE_PROPERTY("indexed date?", Date|PropertyType::Nullable, Property::IsPrimary{false}, Property::IsIndexed{true});
+        REQUIRE_PROPERTY("indexed object id?", ObjectId|PropertyType::Nullable, Property::IsPrimary{false}, Property::IsIndexed{true});
     }
 }
 
@@ -348,6 +367,9 @@ TEST_CASE("Schema") {
                     {"double", PropertyType::Double},
                     {"string", PropertyType::String},
                     {"date", PropertyType::Date},
+                    {"data", PropertyType::Data},
+                    {"object id", PropertyType::ObjectId},
+                    {"decimal", PropertyType::Decimal},
                 }}
             };
             for (auto& prop : schema.begin()->persisted_properties) {
@@ -368,6 +390,8 @@ TEST_CASE("Schema") {
                     {"string", PropertyType::String},
                     {"data", PropertyType::Data},
                     {"date", PropertyType::Date},
+                    {"object id", PropertyType::ObjectId},
+                    {"decimal", PropertyType::Decimal},
                     {"object", PropertyType::Object|PropertyType::Nullable, "object"},
                     {"array", PropertyType::Object|PropertyType::Array, "object"},
                 }}
@@ -456,6 +480,9 @@ TEST_CASE("Schema") {
 
             schema.begin()->primary_key_property()->type = PropertyType::Date;
             REQUIRE_THROWS_CONTAINING(schema.validate(), "Property 'object.pk' of type 'date' cannot be made the primary key.");
+
+            schema.begin()->primary_key_property()->type = PropertyType::Decimal;
+            REQUIRE_THROWS_CONTAINING(schema.validate(), "Property 'object.pk' of type 'decimal' cannot be made the primary key.");
         }
 
         SECTION("allows valid primary key types") {
@@ -472,6 +499,10 @@ TEST_CASE("Schema") {
             schema.begin()->primary_key_property()->type = PropertyType::String;
             REQUIRE_NOTHROW(schema.validate());
             schema.begin()->primary_key_property()->type = PropertyType::String|PropertyType::Nullable;
+            REQUIRE_NOTHROW(schema.validate());
+            schema.begin()->primary_key_property()->type = PropertyType::ObjectId;
+            REQUIRE_NOTHROW(schema.validate());
+            schema.begin()->primary_key_property()->type = PropertyType::ObjectId|PropertyType::Nullable;
             REQUIRE_NOTHROW(schema.validate());
         }
 
@@ -493,6 +524,7 @@ TEST_CASE("Schema") {
                     {"data", PropertyType::Data},
                     {"object", PropertyType::Object|PropertyType::Nullable, "object"},
                     {"array", PropertyType::Array|PropertyType::Object, "object"},
+                    {"decimal", PropertyType::Decimal},
                 }}
             };
             for (auto& prop : schema.begin()->persisted_properties) {
@@ -511,6 +543,7 @@ TEST_CASE("Schema") {
                     {"bool", PropertyType::Bool, Property::IsPrimary{false}, Property::IsIndexed{true}},
                     {"string", PropertyType::String, Property::IsPrimary{false}, Property::IsIndexed{true}},
                     {"date", PropertyType::Date, Property::IsPrimary{false}, Property::IsIndexed{true}},
+                    {"object id", PropertyType::Date, Property::IsPrimary{false}, Property::IsIndexed{true}},
                 }}
             };
             REQUIRE_NOTHROW(schema.validate());

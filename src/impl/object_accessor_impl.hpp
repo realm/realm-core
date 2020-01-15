@@ -101,6 +101,8 @@ public:
     util::Any box(double v) const { return v; }
     util::Any box(float v) const { return v; }
     util::Any box(int64_t v) const { return v; }
+    util::Any box(ObjectId v) const { return v; }
+    util::Any box(Decimal v) const { return v; }
     util::Any box(util::Optional<bool> v) const { return v; }
     util::Any box(util::Optional<double> v) const { return v; }
     util::Any box(util::Optional<float> v) const { return v; }

@@ -24,8 +24,10 @@
 #include "object.hpp"
 #include "property.hpp"
 
-#include <realm/mixed.hpp>
+#include <realm/decimal128.hpp>
 #include <realm/list.hpp>
+#include <realm/mixed.hpp>
+#include <realm/object_id.hpp>
 
 #include <functional>
 #include <memory>
