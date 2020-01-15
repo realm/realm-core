@@ -38,8 +38,8 @@ TEST(ObjectId_Basics)
     CHECK_GREATER(id2, id1);
     CHECK_LESS(id1, id2);
 
-//    ObjectId id_null;
-//    CHECK(id_null.is_null());
+    ObjectId id_null;
+    CHECK(id_null.is_null());
 }
 
 TEST(ObjectId_Array)

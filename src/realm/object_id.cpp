@@ -28,6 +28,7 @@ static std::mt19937 generator(std::mt19937::result_type(system_clock::now().time
 
 static std::atomic<std::mt19937::result_type> seq(generator());
 static const char hex_digits[] = "0123456789abcdef";
+static const char null_id[12] = {0};
 
 namespace realm {
 
@@ -38,7 +39,6 @@ ObjectId::ObjectId()
 
 ObjectId::ObjectId(const null&) noexcept
 {
-    // FIXME: this should generate something sensible that isn't 0
     memset(m_bytes, 0, sizeof(m_bytes));
 }
 
@@ -75,6 +75,11 @@ ObjectId::ObjectId(Timestamp d, int machine_id, int process_id)
     m_bytes[9] = (r >> 16) & 0xff;
     m_bytes[10] = (r >> 8) & 0xff;
     m_bytes[11] = r & 0xff;
+}
+
+bool ObjectId::is_null() const
+{
+    return memcmp(m_bytes, null_id, sizeof(m_bytes)) == 0;
 }
 
 Timestamp ObjectId::get_timestamp() const

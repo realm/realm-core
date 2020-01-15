@@ -676,7 +676,12 @@ void Lst<Timestamp>::set_repl(Replication* repl, size_t ndx, Timestamp value)
 template <>
 void Lst<ObjectId>::set_repl(Replication* repl, size_t ndx, ObjectId value)
 {
-    repl->list_set_object_id(*this, ndx, value);
+    if (value.is_null()) {
+        repl->list_set_null(*this, ndx);
+    }
+    else {
+        repl->list_set_object_id(*this, ndx, value);
+    }
 }
 
 template <>
@@ -806,7 +811,12 @@ void Lst<Timestamp>::insert_repl(Replication* repl, size_t ndx, Timestamp value)
 template <>
 void Lst<ObjectId>::insert_repl(Replication* repl, size_t ndx, ObjectId value)
 {
-    repl->list_insert_object_id(*this, ndx, value);
+    if (value.is_null()) {
+        repl->list_insert_null(*this, ndx);
+    }
+    else {
+        repl->list_insert_object_id(*this, ndx, value);
+    }
 }
 
 template <>

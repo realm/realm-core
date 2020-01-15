@@ -1062,9 +1062,9 @@ inline void NullableVector<Timestamp>::set_null(size_t index)
 // ObjectId
 
 template <>
-inline bool NullableVector<ObjectId>::is_null(size_t /*index*/) const
+inline bool NullableVector<ObjectId>::is_null(size_t index) const
 {
-    return false;   // FIXME: implement
+    return m_first[index].is_null();
 }
 
 template <>

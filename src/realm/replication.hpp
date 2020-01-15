@@ -511,7 +511,12 @@ template <>
 inline void Replication::set(const Table* table, ColKey col_key, ObjKey key, ObjectId value,
                              _impl::Instruction variant)
 {
-    set_object_id(table, col_key, key, value, variant);
+    if (value.is_null()) {
+        set_null(table, col_key, key, variant);
+    }
+    else {
+        set_object_id(table, col_key, key, value, variant);
+    }
 }
 
 template <>

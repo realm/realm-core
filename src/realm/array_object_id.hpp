@@ -67,10 +67,9 @@ public:
         return (m_size * 0x5556) >> 18;
     }
 
-    bool is_null(size_t /*ndx*/) const
+    bool is_null(size_t ndx) const
     {
-        // FIXME: we need proper Optional<ObjectId> support
-        return false;
+        return this->get_width() == 0 || get(ndx).is_null();
     }
 
     ObjectId get(size_t ndx) const
