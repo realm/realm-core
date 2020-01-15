@@ -186,17 +186,14 @@ private:
 
     uint32_t m_type;
     union {
-        int32_t short_val;
-        uint32_t ushort_val;
-    };
-
-    union {
         int64_t int_val;
-        uint64_t uint_val;
         bool bool_val;
         float float_val;
         double double_val;
-        const char* str_val;
+        StringData string_val;
+        Timestamp date_val;
+        ObjectId id_val;
+        Decimal128 decimal_val;
     };
 };
 
@@ -274,8 +271,7 @@ inline Mixed::Mixed(StringData v) noexcept
 {
     if (!v.is_null()) {
         m_type = type_String + 1;
-        str_val = v.data();
-        ushort_val = uint32_t(v.size());
+        string_val = v;
     }
     else {
         m_type = 0;
@@ -286,8 +282,7 @@ inline Mixed::Mixed(BinaryData v) noexcept
 {
     if (!v.is_null()) {
         m_type = type_Binary + 1;
-        str_val = v.data();
-        ushort_val = uint32_t(v.size());
+        string_val = StringData(v.data(), v.size());
     }
     else {
         m_type = 0;
@@ -298,8 +293,7 @@ inline Mixed::Mixed(Timestamp v) noexcept
 {
     if (!v.is_null()) {
         m_type = type_Timestamp + 1;
-        int_val = v.get_seconds();
-        short_val = v.get_nanoseconds();
+        date_val = v;
     }
     else {
         m_type = 0;
@@ -310,10 +304,7 @@ inline Mixed::Mixed(Decimal128 v)
 {
     if (!v.is_null()) {
         m_type = type_Decimal + 1;
-        // FIXME: This somewhat reduced the precision of the value.
-        // If only used in sorting scenarios this may not be a problem.
-        auto x = v.to_bid64();
-        uint_val = x.w;
+        decimal_val = v;
     }
     else {
         m_type = 0;
@@ -324,7 +315,7 @@ inline Mixed::Mixed(ObjectId v) noexcept
 {
     if (!v.is_null()) {
         m_type = type_ObjectId + 1;
-        memcpy(&short_val, &v, sizeof(ObjectId));
+        id_val = v;
     }
     else {
         m_type = 0;
@@ -394,7 +385,7 @@ template <>
 inline StringData Mixed::get<StringData>() const noexcept
 {
     REALM_ASSERT(get_type() == type_String);
-    return StringData(str_val, ushort_val);
+    return string_val;
 }
 
 inline StringData Mixed::get_string() const
@@ -406,7 +397,8 @@ template <>
 inline BinaryData Mixed::get<BinaryData>() const noexcept
 {
     REALM_ASSERT(get_type() == type_Binary);
-    return BinaryData(str_val, ushort_val);
+    return BinaryData(string_val.data(), string_val.size());
+    ;
 }
 
 inline BinaryData Mixed::get_binary() const
@@ -418,7 +410,7 @@ template <>
 inline Timestamp Mixed::get<Timestamp>() const noexcept
 {
     REALM_ASSERT(get_type() == type_Timestamp);
-    return Timestamp(int_val, short_val);
+    return date_val;
 }
 
 inline Timestamp Mixed::get_timestamp() const
@@ -430,16 +422,14 @@ template <>
 inline Decimal128 Mixed::get<Decimal128>() const noexcept
 {
     REALM_ASSERT(get_type() == type_Decimal);
-    return Decimal128(Decimal128::Bid64(uint_val));
+    return decimal_val;
 }
 
 template <>
 inline ObjectId Mixed::get<ObjectId>() const noexcept
 {
     REALM_ASSERT(get_type() == type_ObjectId);
-    ObjectId id;
-    memcpy(&id, &short_val, sizeof(ObjectId));
-    return id;
+    return id_val;
 }
 
 template <>
@@ -585,16 +575,16 @@ inline std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, c
                 out << m.double_val;
                 break;
             case type_String:
-                out << StringData(m.str_val, m.short_val);
+                out << m.string_val;
                 break;
             case type_Binary:
-                out << BinaryData(m.str_val, m.short_val);
+                out << BinaryData(m.string_val.data(), m.string_val.size());
                 break;
             case type_Timestamp:
-                out << Timestamp(m.int_val, m.short_val);
+                out << m.date_val;
                 break;
             case type_Decimal:
-                out << Decimal128(Decimal128::Bid64(m.uint_val));
+                out << m.decimal_val;
                 break;
             case type_ObjectId: {
                 out << m.get<ObjectId>();
