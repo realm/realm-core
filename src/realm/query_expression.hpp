@@ -3540,6 +3540,7 @@ public:
     {
         std::vector<ObjKey> links = m_link_map.get_links(index);
         // std::sort(links.begin(), links.end());
+        m_query.init();
 
         size_t count = std::accumulate(links.begin(), links.end(), size_t(0), [this](size_t running_count, ObjKey k) {
             ConstObj obj = m_link_map.get_target_table()->get_object(k);

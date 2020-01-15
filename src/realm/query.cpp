@@ -947,7 +947,6 @@ bool Query::eval_object(ConstObj& obj) const
     if (m_view)
         m_view->check_cookie();
 #endif
-    init();
 
     if (has_conditions())
         return root_node()->match(obj);

@@ -1,6 +1,25 @@
 # NEXT RELEASE
 
 ### Enhancements
+* None.
+
+### Fixed
+* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* None.
+ 
+### Breaking changes
+* None.
+
+-----------
+
+### Internals
+* None.
+
+----------------------------------------------
+
+# 6.0.0-beta.3 Release notes
+
+### Enhancements
 * `Table::contains_unique_values(ColKey) -> bool` function added
 
 ### Fixed
@@ -8,11 +27,6 @@
  
 ### Breaking changes
 * We now require uniqieness on table names.
-
------------
-
-### Internals
-* None.
 
 ----------------------------------------------
 

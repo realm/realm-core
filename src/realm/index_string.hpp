@@ -121,11 +121,6 @@ public:
         , m_column_key(column_key)
     {
     }
-    ClusterColumn(const ClusterColumn& other)
-        : m_cluster_tree(other.m_cluster_tree)
-        , m_column_key(other.m_column_key)
-    {
-    }
     size_t size() const
     {
         return m_cluster_tree->size();

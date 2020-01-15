@@ -4477,10 +4477,6 @@ struct managed {
         : value(v)
     {
     }
-    managed(const managed<T>& v)
-        : value(v.value)
-    {
-    }
 };
 
 template <>

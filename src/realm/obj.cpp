@@ -462,8 +462,16 @@ size_t ConstObj::get_backlink_count(const Table& origin, ColKey origin_col_key) 
     size_t cnt = 0;
     TableKey origin_table_key = origin.get_key();
     if (origin_table_key != TableKey()) {
-        ColKey backlink_col_key = origin.get_opposite_column(origin_col_key);
-        cnt = get_backlink_count(backlink_col_key);
+        ColKey backlink_col = origin.get_opposite_column(origin_col_key);
+
+        Allocator& alloc = get_alloc();
+        Array fields(alloc);
+        fields.init_from_mem(m_mem);
+
+        ArrayBacklink backlinks(alloc);
+        backlinks.set_parent(&fields, backlink_col.get_index().val + 1);
+        backlinks.init_from_parent();
+        cnt = backlinks.get_backlink_count(m_row_ndx);
     }
     return cnt;
 }
@@ -481,20 +489,6 @@ TableView ConstObj::get_backlink_view(TableRef src_table, ColKey src_col_key)
     return tv;
 }
 
-size_t ConstObj::get_backlink_count(ColKey backlink_col) const
-{
-    get_table()->report_invalid_key(backlink_col);
-    Allocator& alloc = get_alloc();
-    Array fields(alloc);
-    fields.init_from_mem(m_mem);
-
-    ArrayBacklink backlinks(alloc);
-    backlinks.set_parent(&fields, backlink_col.get_index().val + 1);
-    backlinks.init_from_parent();
-
-    return backlinks.get_backlink_count(m_row_ndx);
-}
-
 ObjKey ConstObj::get_backlink(ColKey backlink_col, size_t backlink_ndx) const
 {
     get_table()->report_invalid_key(backlink_col);
@@ -506,6 +500,26 @@ ObjKey ConstObj::get_backlink(ColKey backlink_col, size_t backlink_ndx) const
     backlinks.set_parent(&fields, backlink_col.get_index().val + 1);
     backlinks.init_from_parent();
     return backlinks.get_backlink(m_row_ndx, backlink_ndx);
+}
+
+std::vector<ObjKey> ConstObj::get_all_backlinks(ColKey backlink_col) const
+{
+    get_table()->report_invalid_key(backlink_col);
+    Allocator& alloc = get_alloc();
+    Array fields(alloc);
+    fields.init_from_mem(m_mem);
+
+    ArrayBacklink backlinks(alloc);
+    backlinks.set_parent(&fields, backlink_col.get_index().val + 1);
+    backlinks.init_from_parent();
+
+    auto cnt = backlinks.get_backlink_count(m_row_ndx);
+    std::vector<ObjKey> vec;
+    vec.reserve(cnt);
+    for (size_t i = 0; i < cnt; i++) {
+        vec.push_back(backlinks.get_backlink(m_row_ndx, i));
+    }
+    return vec;
 }
 
 namespace {
@@ -1156,6 +1170,28 @@ void Obj::assign(const ConstObj& other)
             }
         }
     }
+
+    auto copy_links = [this, &other](ColKey col) {
+        auto t = m_table->get_opposite_table(col);
+        auto c = m_table->get_opposite_column(col);
+        auto backlinks = other.get_all_backlinks(col);
+        for (auto bl : backlinks) {
+            auto linking_obj = t->get_object(bl);
+            if (c.get_type() == col_type_Link) {
+                // Single link
+                REALM_ASSERT(linking_obj.get<ObjKey>(c) == other.get_key());
+                linking_obj.set(c, get_key());
+            }
+            else {
+                auto l = linking_obj.get_linklist(c);
+                auto n = l.find_first(other.get_key());
+                REALM_ASSERT(n != realm::npos);
+                l.set(n, get_key());
+            }
+        }
+        return false;
+    };
+    m_table->for_each_backlink_column(copy_links);
 }
 
 

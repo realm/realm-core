@@ -372,6 +372,7 @@ private:
 
     friend class Table;
     friend class ConstTableView;
+    friend class SubQueryCount;
     friend class metrics::QueryInfo;
 
     std::string error_code;

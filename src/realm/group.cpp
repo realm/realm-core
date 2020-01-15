@@ -230,7 +230,7 @@ void Group::remove_pk_table()
             auto table = get_table(name);
             auto pk_col_name = pk_obj.get<String>(col_prop);
             auto pk_col = table->get_column_key(pk_col_name);
-            table->set_primary_key_column(pk_col);
+            table->do_set_primary_key_column(pk_col);
         }
         this->remove_table("pk");
     }
