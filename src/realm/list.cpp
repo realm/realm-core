@@ -519,20 +519,18 @@ void LnkLst::insert(size_t ndx, ObjKey value)
     Lst<ObjKey>::insert(ndx, value);
 }
 
-Obj LnkLst::create_and_insert_embedded(size_t ndx)
+Obj LnkLst::create_and_insert_linked_object(size_t ndx)
 {
-    if (!get_target_table()->is_embedded())
-        throw LogicError(LogicError::wrong_kind_of_table);
-    auto o = get_target_table()->create_embedded_object();
+    Table& t = *get_target_table();
+    auto o = t.is_embedded() ? t.create_linked_object() : t.create_object();
     Lst<ObjKey>::insert(ndx, o.get_key());
     return o;
 }
 
-Obj LnkLst::create_and_set_embedded(size_t ndx)
+Obj LnkLst::create_and_set_linked_object(size_t ndx)
 {
-    if (!get_target_table()->is_embedded())
-        throw LogicError(LogicError::wrong_kind_of_table);
-    auto o = get_target_table()->create_embedded_object();
+    Table& t = *get_target_table();
+    auto o = t.is_embedded() ? t.create_linked_object() : t.create_object();
     Lst<ObjKey>::set(ndx, o.get_key());
     return o;
 }

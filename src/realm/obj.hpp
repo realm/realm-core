@@ -232,7 +232,16 @@ public:
 
     template <typename U>
     Obj& set(ColKey col_key, U value, bool is_default = false);
-    Obj create_embedded_and_set(ColKey col_key);
+    // Create a new object and link it. If an embedded object
+    // is already set, it will be removed. If a non-embedded
+    // object is already set, we throw LogicError (to prevent
+    // dangling objects, since they do not delete automatically
+    // if they are not embedded...)
+    Obj create_and_set_linked_object(ColKey col_key);
+    // Clear all fields of a linked object returning it to its
+    // default state. If the object does not exist, create a
+    // new object and link it. (To Be Implemented)
+    Obj clear_linked_object(ColKey col_key);
     Obj& set(ColKey col_key, Mixed value);
 
     template <typename U>

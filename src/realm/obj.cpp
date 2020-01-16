@@ -917,10 +917,8 @@ Obj& Obj::set<ObjKey>(ColKey col_key, ObjKey target_key, bool is_default)
     return *this;
 }
 
-Obj Obj::create_embedded_and_set(ColKey col_key)
+Obj Obj::create_and_set_linked_object(ColKey col_key)
 {
-    ObjKey target_key;
-    Obj result;
     update_if_needed();
     get_table()->report_invalid_key(col_key);
     ColKey::Idx col_ndx = col_key.get_index();
@@ -928,15 +926,13 @@ Obj Obj::create_embedded_and_set(ColKey col_key)
     if (type != ColumnTypeTraits<ObjKey>::column_id)
         throw LogicError(LogicError::illegal_type);
     TableRef target_table = get_target_table(col_key);
-    if (target_key != null_key && !target_table->is_valid(target_key)) {
-        throw LogicError(LogicError::target_row_index_out_of_range);
-    }
-    if (target_table->is_embedded()) {
-        result = target_table->create_embedded_object();
-        target_key = result.get_key();
-    }
+    Table& t = *target_table;
+    auto result = t.is_embedded() ? t.create_linked_object() : t.create_object();
+    auto target_key = result.get_key();
     ObjKey old_key = get<ObjKey>(col_key); // Will update if needed
-
+    if (t.is_embedded() && old_key != ObjKey()) {
+        throw LogicError(LogicError::wrong_kind_of_table);
+    }
     if (target_key != old_key) {
         CascadeState state;
 
