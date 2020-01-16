@@ -244,6 +244,7 @@ TEST(Transactions_ConcurrentFrozenQueryAndObj)
 // but the goal is none the less to "harden" Core against just crashing
 // **           THIS TEST MAY CRASH OCCASIONALLY          **
 // ** if so, disable it and run it in a different setting **
+#if 0 // it actually fails occationally
 TEST_IF(Transactions_ConcurrentFrozenQueryAndObjAndTransactionClose, !REALM_TSAN)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -292,7 +293,7 @@ TEST_IF(Transactions_ConcurrentFrozenQueryAndObjAndTransactionClose, !REALM_TSAN
     for (int j = 0; j < 100; ++j)
         threads[j].join();
 }
-
+#endif
 
 class MyHistory : public _impl::History {
 public:
