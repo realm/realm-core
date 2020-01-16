@@ -503,8 +503,13 @@ void Table::init(ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent, bo
     auto rot_pk_key = m_top.get_as_ref_or_tagged(top_position_for_pk_col);
     m_primary_key_col = rot_pk_key.is_tagged() ? ColKey(rot_pk_key.get_as_int()) : ColKey();
 
-    uint64_t flags = m_top.get_as_ref_or_tagged(top_position_for_flags).get_as_int();
-    m_is_embedded = flags & 0x1;
+    if (m_top.size() <= top_position_for_flags) {
+        m_is_embedded = false;
+    }
+    else {
+        uint64_t flags = m_top.get_as_ref_or_tagged(top_position_for_flags).get_as_int();
+        m_is_embedded = flags & 0x1;
+    }
 }
 
 
@@ -791,12 +796,14 @@ void Table::set_embedded(bool embedded)
     if (size()) {
         throw realm::LogicError(realm::LogicError::table_not_empty);
     }
-    REALM_ASSERT(m_top.size() > top_position_for_flags);
+    REALM_ASSERT(m_top.size() >= top_position_for_flags);
+    if (m_top.size() == top_position_for_flags) {
+        m_top.add(0);
+    }
     uint64_t flags = m_top.get_as_ref_or_tagged(top_position_for_flags).get_as_int();
     flags |= embedded ? 1 : 0;
     m_top.set(top_position_for_flags, RefOrTagged::make_tagged(flags));
     m_is_embedded = embedded;
-    // Fixme: propagate to db
 }
 
 
@@ -2207,6 +2214,8 @@ void Table::update_from_parent(size_t old_baseline) noexcept
         if (m_top.size() > top_position_for_flags) {
             uint64_t flags = m_top.get_as_ref_or_tagged(top_position_for_flags).get_as_int();
             m_is_embedded = flags & 0x1;
+        } else {
+            m_is_embedded = false;
         }
         refresh_content_version();
     }
@@ -2322,8 +2331,13 @@ void Table::refresh_accessor_tree()
     m_opposite_column.init_from_parent();
     auto rot_pk_key = m_top.get_as_ref_or_tagged(top_position_for_pk_col);
     m_primary_key_col = rot_pk_key.is_tagged() ? ColKey(rot_pk_key.get_as_int()) : ColKey();
-    auto rot_flags = m_top.get_as_ref_or_tagged(top_position_for_flags);
-    m_is_embedded = rot_flags.get_as_int() & 0x1;
+    if (m_top.size() == top_position_for_flags) {
+        auto rot_flags = m_top.get_as_ref_or_tagged(top_position_for_flags);
+        m_is_embedded = rot_flags.get_as_int() & 0x1;
+    }
+    else {
+        m_is_embedded = false;
+    }
     refresh_content_version();
     bump_storage_version();
     build_column_mapping();
