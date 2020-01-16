@@ -191,6 +191,7 @@ private:
         float float_val;
         double double_val;
         StringData string_val;
+        BinaryData binary_val;
         Timestamp date_val;
         ObjectId id_val;
         Decimal128 decimal_val;
@@ -282,7 +283,7 @@ inline Mixed::Mixed(BinaryData v) noexcept
 {
     if (!v.is_null()) {
         m_type = type_Binary + 1;
-        string_val = StringData(v.data(), v.size());
+        binary_val = v;
     }
     else {
         m_type = 0;
@@ -397,8 +398,7 @@ template <>
 inline BinaryData Mixed::get<BinaryData>() const noexcept
 {
     REALM_ASSERT(get_type() == type_Binary);
-    return BinaryData(string_val.data(), string_val.size());
-    ;
+    return binary_val;
 }
 
 inline BinaryData Mixed::get_binary() const
@@ -578,7 +578,7 @@ inline std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, c
                 out << m.string_val;
                 break;
             case type_Binary:
-                out << BinaryData(m.string_val.data(), m.string_val.size());
+                out << m.binary_val;
                 break;
             case type_Timestamp:
                 out << m.date_val;
