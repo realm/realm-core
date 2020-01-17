@@ -531,9 +531,10 @@ ConstObj::Path ConstObj::get_embedded_path()
         PathElement pe;
         do {
             o_ptr->m_table->for_each_backlink_column([&](ColKey col_key) {
-                    if (o_ptr->get_backlink_count(col_key) == 1) {
+                    std::vector<ObjKey> backlinks = o_ptr->get_all_backlinks(col_key);
+                    if (backlinks.size() == 1) {
                         TableRef tr = o_ptr->m_table->get_opposite_table(col_key);
-                        pe.obj = tr->get_object(o_ptr->get_backlink(col_key, 0)); // always the first (and only)
+                        pe.obj = tr->get_object(backlinks[0]); // always the first (and only)
                         pe.col_key = o_ptr->m_table->get_opposite_column(col_key);
                         pe.index = 0;
                         if (pe.col_key.get_attrs().test(col_attr_List)) {
