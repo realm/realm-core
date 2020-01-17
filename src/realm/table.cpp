@@ -5236,11 +5236,9 @@ void Table::to_json_row(size_t row_ndx, std::ostream& out, size_t link_depth,
                     out << "{\"table\": \"" << table.get_name() << "\", \"key\": " << lnk << "}";
                 }
                 else {
-                    out << "[";
                     followed.push_back(clb_ref);
                     size_t new_depth = link_depth == not_found ? not_found : link_depth - 1;
                     table.to_json_row(cl.get_link(row_ndx), out, new_depth, renames, followed);
-                    out << "]";
                 }
             }
             else {
