@@ -592,13 +592,13 @@ def doLinuxCrossCompile(String target, String configuration, String testAgent = 
                               ..
                         cmake --build .
                     """
-                    stash('test/**/*', "realm-tests-${target}")
+                    stash includes: 'test/**/*', name: "realm-tests-${target}"
                 }
             }
         }
         if (testAgent != null) {
             node(testAgent) {
-                unstash("realm-tests-${target}")
+                unstash "realm-tests-${target}"
                 try {
                     sh 'UNITTEST_PROGRESS=1 test/realm-test'
                 } finally {
