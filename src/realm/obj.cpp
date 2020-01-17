@@ -418,7 +418,7 @@ bool ConstObj::has_backlinks(bool only_strong_links) const
         // Find origin table and column for this backlink column
         TableRef origin_table = target_table.get_opposite_table(backlink_col_key);
         ColKey origin_col = target_table.get_opposite_column(backlink_col_key);
-        if (!only_strong_links || origin_col.get_attrs().test(col_attr_StrongLinks)) {
+        if (!only_strong_links || target_table.is_embedded()) {
             auto cnt = get_backlink_count(*origin_table, origin_col);
             if (cnt)
                 return true;
@@ -436,7 +436,7 @@ size_t ConstObj::get_backlink_count(bool only_strong_links) const
         // Find origin table and column for this backlink column
         TableRef origin_table = target_table.get_opposite_table(backlink_col_key);
         ColKey origin_col = target_table.get_opposite_column(backlink_col_key);
-        if (!only_strong_links || origin_col.get_attrs().test(col_attr_StrongLinks)) {
+        if (!only_strong_links || target_table.is_embedded()) {
             cnt += get_backlink_count(*origin_table, origin_col);
         }
         return false;
@@ -1160,7 +1160,7 @@ bool Obj::remove_backlink(ColKey col_key, ObjKey old_key, CascadeState& state)
     ColKey backlink_col_key = m_table->get_opposite_column(col_key);
     REALM_ASSERT(target_table->valid_column(backlink_col_key));
 
-    bool strong_links = (origin_table.get_link_type(col_key) == link_Strong);
+    bool strong_links = target_table->is_embedded();
 
     if (old_key != realm::null_key) {
         Obj target_obj = target_table->get_object(old_key);

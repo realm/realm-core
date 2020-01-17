@@ -120,8 +120,6 @@ public:
     /// Conventience functions for inspecting the dynamic table type.
     ///
     bool is_embedded() const noexcept; // true if table holds embedded objects
-    /// Note that you should choose link_type = link_Strong when adding columns with
-    /// links to a table which is embedded.
     size_t get_column_count() const noexcept;
     DataType get_column_type(ColKey column_key) const;
     StringData get_column_name(ColKey column_key) const;
@@ -146,79 +144,21 @@ public:
     ColKey add_column(DataType type, StringData name, bool nullable = false);
     ColKey add_column_list(DataType type, StringData name, bool nullable = false);
 
-    /// iff the target table is embedded, use link_type = link_Strong.
-    ColKey add_column_link(DataType type, StringData name, Table& target, LinkType link_type = link_Weak);
-    void set_embedded(bool is_embedded); // throws if table is non-empty.
+    ColKey add_column_link(DataType type, StringData name, Table& target);
+    /// Indicate whether a table holds embedded objects or not.
+    /// This method may be called ONLY on an empty table on which no backlink columns are present.
+    void set_embedded(bool is_embedded); // throws if table is non-empty or backlink columns are present
 
     // Pass a ColKey() as first argument to have a new colkey generated
     // Requesting a specific ColKey may fail with invalidkey exception, if the key is already in use
     // We recommend allowing Core to choose the ColKey.
     ColKey insert_column(ColKey col_key, DataType type, StringData name, bool nullable = false);
-    ColKey insert_column_link(ColKey col_key, DataType type, StringData name, Table& target,
-                              LinkType link_type = link_Weak);
+    ColKey insert_column_link(ColKey col_key, DataType type, StringData name, Table& target);
     void remove_column(ColKey col_key);
     void rename_column(ColKey col_key, StringData new_name);
     bool valid_column(ColKey col_key) const noexcept;
     void check_column(ColKey col_key) const;
     //@}
-
-    /// There are two kinds of links, 'weak' and 'strong'. A strong link is one
-    /// that implies ownership, i.e., that the origin object (parent) owns the
-    /// target parent (child). Simply stated, this means that when the origin object
-    /// (parent) is removed, so is the target object (child). If there are multiple
-    /// strong links to an object, the origin objects share ownership, and the
-    /// target object is removed when the last owner disappears. Weak links do not
-    /// imply ownership, and will be nullified or removed when the target object
-    /// disappears.
-    ///
-    /// To put this in precise terms; when a strong link is broken, and the
-    /// target object has no other strong links to it, the target object is removed. A
-    /// object that is implicitly removed in this way, is said to be
-    /// *cascade-removed*. When a weak link is broken, nothing is
-    /// cascade-removed.
-    ///
-    /// A link is considered broken if
-    ///
-    ///  - the link is nullified, removed, or replaced by a different link
-    ///
-    ///  - the origin object is explicitly removed
-    ///
-    ///  - the origin object is cascade-removed, or if
-    ///
-    ///  - the origin field is removed from the table (Table::remove_column()),
-    ///    or if
-    ///
-    ///  - the origin table is removed from the group.
-    ///
-    /// Note that a link is *not* considered broken when it is replaced by a
-    /// link to the same target object. I.e., no objects will be cascade-removed
-    /// due to such an operation.
-    ///
-    /// When a object is explicitly removed (such as by Table::move_last_over()),
-    /// all links to it are automatically removed or nullified. For single link
-    /// columns (type_Link), links to the removed object are nullified. For link
-    /// list columns (type_LinkList), links to the removed object are removed from
-    /// the list.
-    ///
-    /// When a object is cascade-removed there can no longer be any strong links to
-    /// it, but if there are any weak links, they will be removed or nullified.
-    ///
-    /// It is important to understand that this cascade-removal scheme is too
-    /// simplistic to enable detection and removal of orphaned link-cycles. In
-    /// this respect, it suffers from the same limitations as a reference
-    /// counting scheme generally does.
-    ///
-    /// It is also important to understand, that the possible presence of a link
-    /// cycle can cause a object to be cascade-removed as a consequence of being
-    /// modified. This happens, for example, if two objects, A and B, have strong
-    /// links to each other, and there are no other strong links to either of
-    /// them. In this case, if A->B is changed to A->C, then both A and B will
-    /// be cascade-removed. This can lead to obscure bugs in some applications.
-    ///
-    /// The link type must be specified at column creation and cannot be changed
-    // Returns the link type for the given column.
-    // Throws an LogicError if target column is not a link column.
-    LinkType get_link_type(ColKey col_key) const;
 
     /// True for `col_type_Link` and `col_type_LinkList`.
     static bool is_link_type(ColumnType) noexcept;
@@ -324,10 +264,8 @@ public:
     }
 
     /// remove_object() removes the specified object from the table.
-    /// The removal of an object a table may cause other linked objects to be
-    /// cascade-removed. The clearing of a table may also cause linked objects
-    /// to be cascade-removed, but in this respect, the effect is exactly as if
-    /// each object had been removed individually. See set_link_type() for details.
+    /// Any links from the specified object into objects residing in an embedded
+    /// table will cause those objects to be deleted as well, and so on recursively.
     void remove_object(ObjKey key);
     /// remove_object_recursive() will delete linked rows if the removed link was the
     /// last one holding on to the row in question. This will be done recursively.
@@ -522,7 +460,7 @@ private:
     void change_nullability(ColKey from, ColKey to, bool throw_on_null);
     template <class F, class T>
     void change_nullability_list(ColKey from, ColKey to, bool throw_on_null);
-    Obj create_embedded_object();
+    Obj create_linked_object();
 
 public:
     // mapping between index used in leaf nodes (leaf_ndx) and index used in spec (spec_ndx)
@@ -696,6 +634,7 @@ private:
     Replication* const* m_repl;
     static Replication* g_dummy_replication;
     bool m_is_frozen = false;
+    bool m_has_any_embedded_objects = false;
     TableRef m_own_ref;
 
     void batch_erase_rows(const KeyColumn& keys);
@@ -741,17 +680,17 @@ private:
     void set_key(TableKey key);
 
     ColKey do_insert_column(ColKey col_key, DataType type, StringData name, LinkTargetInfo& link_target_info,
-                            bool nullable = false, bool listtype = false, LinkType link_type = link_Weak);
+                            bool nullable = false, bool listtype = false);
 
     struct InsertSubtableColumns;
     struct EraseSubtableColumns;
     struct RenameSubtableColumns;
 
     ColKey insert_root_column(ColKey col_key, DataType type, StringData name, LinkTargetInfo& link_target,
-                              bool nullable = false, bool linktype = false, LinkType link_type = link_Weak);
+                              bool nullable = false, bool linktype = false);
     void erase_root_column(ColKey col_key);
     ColKey do_insert_root_column(ColKey col_key, ColumnType, StringData name, bool nullable = false,
-                                 bool listtype = false, LinkType link_type = link_Weak);
+                                 bool listtype = false);
     void do_erase_root_column(ColKey col_key);
     ColKey insert_backlink_column(TableKey origin_table_key, ColKey origin_col_key, ColKey backlink_col_key);
     void erase_backlink_column(ColKey backlink_col_key);

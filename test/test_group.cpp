@@ -1457,6 +1457,7 @@ TEST(Group_CascadeNotify_SimpleWeak)
     CHECK(called);
 }
 
+#if 0
 TEST(Group_CascadeNotify_SimpleStrong)
 {
     GROUP_TEST_PATH(path);
@@ -1568,7 +1569,7 @@ TEST(Group_CascadeNotify_SimpleStrong)
     origin->remove_object(o_keys[20]);
     CHECK_EQUAL(calls, 2);
 }
-
+#endif
 
 TEST(Group_CascadeNotify_TableClearWeak)
 {
@@ -1628,6 +1629,7 @@ TEST(Group_CascadeNotify_TableClearWeak)
     g.verify();
 }
 
+#if 0
 TEST(Group_CascadeNotify_TableClearStrong)
 {
     GROUP_TEST_PATH(path);
@@ -1763,7 +1765,6 @@ TEST(Group_CascadeNotify_TableViewClearStrong)
     CHECK_EQUAL(calls, 2);
 }
 
-
 static ObjKey make_tree(Table& table, ObjKey parent, int depth)
 {
     if (depth >= 5)
@@ -1801,6 +1802,7 @@ TEST(Group_CascadeNotify_TreeCascade)
     CHECK_EQUAL(calls, 5);
     CHECK_EQUAL(t->size(), 0);
 }
+#endif
 
 TEST(Group_WriteEmpty)
 {

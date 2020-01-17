@@ -1430,6 +1430,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RemoveTableWithColumns)
     CHECK(epsilon);
 }
 
+#if 0
 TEST(LangBindHelper_AdvanceReadTransact_CascadeRemove_ColumnLink)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -1519,70 +1520,8 @@ TEST(LangBindHelper_AdvanceReadTransact_CascadeRemove_ColumnLink)
     CHECK_EQUAL(target->size(), 2);
 }
 
-// to be ported
 TEST(LangBindHelper_AdvanceReadTransact_CascadeRemove_ColumnLinkList)
 {
-    /*
-    SHARED_GROUP_TEST_PATH(path);
-    ShortCircuitHistory hist(path);
-    DBRef sg = DB::create(hist, DBOptions(crypt_key()));
-    DBRef sg_w = DB::create(hist, DBOptions(crypt_key()));
-
-    {
-        WriteTransaction wt(sg_w);
-        Table& origin = *wt.add_table("origin");
-        Table& target = *wt.add_table("target");
-        origin.add_column_link(type_LinkList, "o_1", target, link_Strong);
-        target.add_column(type_Int, "t_1");
-        wt.commit();
-    }
-
-    // Start a read transaction (to be repeatedly advanced)
-    TransactionRef rt = sg->start_read() const Group& group = rt;
-    const Table& target = *rt->get_table("target");
-
-    ConstRow target_row_0, target_row_1;
-
-    auto perform_change = [&](util::FunctionRef<void(Table&)> func) {
-        // Ensure there are two rows in each table, with the first row in `origin`
-        // linking to the first row in `target`, and the second row in `origin`
-        // linking to both rows in `target`
-        {
-            WriteTransaction wt(sg_w);
-            Table& origin_w = *wt.get_table("origin");
-            Table& target_w = *wt.get_table("target");
-
-            origin_w.clear();
-            target_w.clear();
-            origin_w.add_empty_row(2);
-            target_w.add_empty_row(2);
-            origin_w[0].get_linklist(0)->add(0);
-            origin_w[1].get_linklist(0)->add(0);
-            origin_w[1].get_linklist(0)->add(1);
-
-
-            wt.commit();
-        }
-
-        // Grab the row accessors before applying the modification being tested
-        rt->advance_read();
-        rt->verify();
-        target_row_0 = target.get(0);
-        target_row_1 = target.get(1);
-
-        // Perform the modification
-        {
-            WriteTransaction wt(sg_w);
-            func(*wt.get_table("origin"));
-            wt.commit();
-        }
-
-        rt->advance_read();
-        rt->verify();
-        // Leave `group` and the target accessors in a state which can be tested
-        // with the changes applied
-    };
-*/
     SHARED_GROUP_TEST_PATH(path);
     ShortCircuitHistory hist(path);
     DBRef sg = DB::create(hist, DBOptions(crypt_key()));
@@ -1672,6 +1611,7 @@ TEST(LangBindHelper_AdvanceReadTransact_CascadeRemove_ColumnLinkList)
     CHECK(!target_obj0.is_valid() && !target_obj1.is_valid());
     CHECK_EQUAL(target->size(), 0);
 }
+#endif
 
 
 TEST(LangBindHelper_AdvanceReadTransact_IntIndex)

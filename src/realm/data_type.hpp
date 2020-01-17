@@ -52,14 +52,8 @@ enum DataType {
     type_Timestamp = 8,
     type_OldTable = 5,
     type_OldMixed = 6,
-    type_Link = 12,
+    type_Link = 12, // reserved, not used from format 10 onwards.
     type_LinkList = 13
-};
-
-/// See Descriptor::set_link_type().
-enum LinkType {
-    link_Strong,
-    link_Weak,
 };
 
 const char* get_data_type_name(DataType type) noexcept;

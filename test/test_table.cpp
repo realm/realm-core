@@ -4422,29 +4422,6 @@ TEST(Table_KeysRow)
     CHECK_EQUAL(i, ObjKey(9));
 }
 
-TEST(Table_getLinkType)
-{
-    Group g;
-    TableRef table = g.add_table("table");
-
-    auto col_int = table->add_column(type_Int, "int");
-    auto col_weak_link = table->add_column_link(type_Link, "weak_link", *table);
-    auto col_strong_link = table->add_column_link(type_Link, "strong_link", *table, link_Strong);
-    auto col_weak_linklist = table->add_column_link(type_LinkList, "weak_list", *table);
-    auto col_strong_linklist = table->add_column_link(type_LinkList, "strong_list", *table, link_Strong);
-
-    CHECK(link_Weak == table->get_link_type(col_weak_link));
-    CHECK(link_Strong == table->get_link_type(col_strong_link));
-    CHECK(link_Weak == table->get_link_type(col_weak_linklist));
-    CHECK(link_Strong == table->get_link_type(col_strong_linklist));
-
-    CHECK_THROW(table->get_link_type(col_int), LogicError);
-
-    g.remove_table("table");
-    CHECK_THROW(table->get_link_type(col_weak_link), NoSuchTable);
-}
-
-
 template<typename T> T generate_value() { return test_util::random_int<T>(); }
 
 template<> StringData generate_value()
@@ -5076,10 +5053,10 @@ TEST(Table_EmbeddedObjectCreateAndDestroy)
     auto tr = sg->start_write();
     auto table = tr->add_table("myEmbeddedStuff");
     table->set_embedded(true);
-    auto col_recurse = table->add_column_link(type_Link, "theRecursiveBit", *table, link_Strong);
+    auto col_recurse = table->add_column_link(type_Link, "theRecursiveBit", *table);
     CHECK_THROW(table->create_object(), LogicError);
     auto parent = tr->add_table("myParentStuff");
-    auto ck = parent->add_column_link(type_Link, "theGreatColumn", *table, link_Strong);
+    auto ck = parent->add_column_link(type_Link, "theGreatColumn", *table);
     Obj o = parent->create_object();
     Obj o2 = o.create_and_set_linked_object(ck);
     o2.create_and_set_linked_object(col_recurse);
@@ -5099,10 +5076,10 @@ TEST(Table_EmbeddedObjectCreateAndDestroyList)
     auto tr = sg->start_write();
     auto table = tr->add_table("myEmbeddedStuff");
     table->set_embedded(true);
-    auto col_recurse = table->add_column_link(type_LinkList, "theRecursiveBit", *table, link_Strong);
+    auto col_recurse = table->add_column_link(type_LinkList, "theRecursiveBit", *table);
     CHECK_THROW(table->create_object(), LogicError);
     auto parent = tr->add_table("myParentStuff");
-    auto ck = parent->add_column_link(type_LinkList, "theGreatColumn", *table, link_Strong);
+    auto ck = parent->add_column_link(type_LinkList, "theGreatColumn", *table);
     Obj o = parent->create_object();
     auto parent_ll = o.get_linklist(ck);
     Obj o2 = parent_ll.create_and_insert_linked_object(0);
@@ -5132,15 +5109,21 @@ TEST(Table_EmbeddedObjectPath)
     auto tr = sg->start_write();
     auto table = tr->add_table("myEmbeddedStuff");
     table->set_embedded(true);
-    auto col_recurse = table->add_column_link(type_LinkList, "theRecursiveBit", *table, link_Strong);
+    auto col_recurse = table->add_column_link(type_LinkList, "theRecursiveBit", *table);
     CHECK_THROW(table->create_object(), LogicError);
     auto parent = tr->add_table("myParentStuff");
-    auto ck = parent->add_column_link(type_LinkList, "theGreatColumn", *table, link_Strong);
+    auto ck = parent->add_column_link(type_LinkList, "theGreatColumn", *table);
     Obj o = parent->create_object();
+    auto gch = o.get_embedded_path();
+    CHECK(gch.size() == 0);
     auto parent_ll = o.get_linklist(ck);
     Obj o2 = parent_ll.create_and_insert_linked_object(0);
+    auto gbh = o2.get_embedded_path();
+    CHECK(gbh.size() == 1);
     Obj o3 = parent_ll.create_and_insert_linked_object(1);
     Obj o4 = parent_ll.create_and_insert_linked_object(0);
+    auto gah = o4.get_embedded_path();
+    CHECK(gah.size() == 1);
     auto o2_ll = o2.get_linklist(col_recurse);
     auto o3_ll = o3.get_linklist(col_recurse);
     o2_ll.create_and_insert_linked_object(0);

@@ -1156,7 +1156,7 @@ TEST(Links_FormerMemLeakCase)
     }
 }
 
-
+#if 0
 TEST(Links_CascadeRemove_ColumnLink)
 {
     struct Fixture {
@@ -1466,7 +1466,7 @@ TEST(Links_CascadeRemove_ColumnLinkList)
         f.group.verify();
     }
 }
-
+#endif
 
 TEST(Links_LinkList_Swap)
 {
