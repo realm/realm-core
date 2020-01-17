@@ -70,6 +70,7 @@ jobWrapper {
             checkWin64Release       : doBuildWindows('Release', false, 'x64', true),
             iosDebug                : doBuildAppleDevice('ios', 'MinSizeDebug'),
             androidArm64Debug       : doAndroidBuildInDocker('arm64-v8a', 'Debug', false),
+            checkRaspberryPi        : doLinuxCrossCompile('arm-linux-gnueabihf', 'Debug', 'raspberry-pi'),
             threadSanitizer         : doCheckSanity('Debug', '1000', 'thread'),
             addressSanitizer        : doCheckSanity('Debug', '1000', 'address')
         ]
@@ -572,6 +573,37 @@ def doBuildAppleDevice(String sdk, String buildType) {
             cocoaStashes << stashName
             if(gitTag) {
                 publishingStashes << stashName
+            }
+        }
+    }
+}
+
+def doLinuxCrossCompile(String target, String configuration, String testAgent = null) {
+    return {
+        node('docker') {
+            getArchive()
+            docker.build("realm-core-crosscompiling:${target}", "-f ${target}.Dockerfile .").inside {
+                dir('build') {
+                    sh """
+                        cmake -GNinja \
+                              -DREALM_SKIP_SHARED_LIB=ON \
+                              -DCMAKE_TOOLCHAIN_FILE=$WORKSPACE/tools/cmake/${target}.toolchain.cmake \
+                              -DCMAKE_BUILD_TYPE=${configuration} \
+                              ..
+                        cmake --build .
+                    """
+                    stash('test/**/*', "realm-tests-${target}")
+                }
+            }
+        }
+        if (testAgent != null) {
+            node(testAgent) {
+                unstash("realm-tests-${target}")
+                try {
+                    sh 'UNITTEST_PROGRESS=1 test/realm-test'
+                } finally {
+                    deleteDir()
+                }
             }
         }
     }
