@@ -1773,6 +1773,27 @@ size_t Table::count_double(ColKey col_key, double value) const
     aggregate<act_Count, double, double>(col_key, value, &count);
     return count;
 }
+size_t Table::count_decimal(ColKey col_key, Decimal128 value) const
+{
+    ArrayDecimal128 leaf(get_alloc());
+    size_t cnt = 0;
+    bool null_value = value.is_null();
+    auto f = [value, &leaf, col_key, null_value, &cnt](const Cluster* cluster) {
+        // direct aggregate on the leaf
+        cluster->init_leaf(col_key, &leaf);
+        auto sz = leaf.size();
+        for (size_t i = 0; i < sz; i++) {
+            if ((null_value && leaf.is_null(i)) || (leaf.get(i) == value)) {
+                cnt++;
+            }
+        }
+        return false;
+    };
+
+    traverse_clusters(f);
+
+    return cnt;
+}
 size_t Table::count_string(ColKey col_key, StringData value) const
 {
     if (auto index = this->get_search_index(col_key)) {
@@ -1784,6 +1805,34 @@ size_t Table::count_string(ColKey col_key, StringData value) const
 }
 
 // sum ----------------------------------------------
+
+template <>
+Decimal128 Table::aggregate<act_Sum, Decimal128, Decimal128>(ColKey column_key, Decimal128, size_t* resultcount,
+                                                             ObjKey*) const
+{
+    ArrayDecimal128 leaf(get_alloc());
+    Decimal128 sum = Decimal128(0);
+    size_t count = 0;
+    auto f = [&leaf, column_key, &sum, &count](const Cluster* cluster) {
+        // direct aggregate on the leaf
+        cluster->init_leaf(column_key, &leaf);
+        auto sz = leaf.size();
+        for (size_t i = 0; i < sz; i++) {
+            if (!leaf.is_null(i)) {
+                sum = sum + leaf.get(i);
+                count++;
+            }
+        }
+        return false;
+    };
+
+    traverse_clusters(f);
+    if (resultcount) {
+        *resultcount = count;
+    }
+
+    return sum;
+}
 
 int64_t Table::sum_int(ColKey col_key) const
 {
@@ -1799,6 +1848,10 @@ double Table::sum_float(ColKey col_key) const
 double Table::sum_double(ColKey col_key) const
 {
     return aggregate<act_Sum, double, double>(col_key);
+}
+Decimal128 Table::sum_decimal(ColKey col_key) const
+{
+    return aggregate<act_Sum, Decimal128, Decimal128>(col_key);
 }
 
 // average ----------------------------------------------
@@ -1817,6 +1870,17 @@ double Table::average_float(ColKey col_key, size_t* value_count) const
 double Table::average_double(ColKey col_key, size_t* value_count) const
 {
     return average<double>(col_key, value_count);
+}
+Decimal128 Table::average_decimal(ColKey col_key, size_t* value_count) const
+{
+    size_t count;
+    auto sum = aggregate<act_Sum, Decimal128, Decimal128>(col_key, {}, &count);
+    Decimal128 avg(0);
+    if (count != 0)
+        avg = sum / count;
+    if (value_count)
+        *value_count = count;
+    return avg;
 }
 
 // minimum ----------------------------------------------
@@ -1839,6 +1903,33 @@ float Table::minimum_float(ColKey col_key, ObjKey* return_ndx) const
 double Table::minimum_double(ColKey col_key, ObjKey* return_ndx) const
 {
     return aggregate<act_Min, double, double>(col_key, 0., nullptr, return_ndx);
+}
+
+Decimal128 Table::minimum_decimal(ColKey col_key, ObjKey* return_ndx) const
+{
+    ArrayDecimal128 leaf(get_alloc());
+    Decimal128 min("+Inf");
+    ObjKey ret_key;
+    auto f = [&min, &ret_key, &leaf, col_key](const Cluster* cluster) {
+        // direct aggregate on the leaf
+        cluster->init_leaf(col_key, &leaf);
+        auto sz = leaf.size();
+        for (size_t i = 0; i < sz; i++) {
+            auto val = leaf.get(i);
+            if (!val.is_null() && val < min) {
+                min = val;
+                ret_key = cluster->get_real_key(i);
+            }
+        }
+        return false;
+    };
+
+    if (return_ndx) {
+        *return_ndx = ret_key;
+    }
+    traverse_clusters(f);
+
+    return min;
 }
 
 Timestamp Table::minimum_timestamp(ColKey col_key, ObjKey* return_ndx) const
@@ -1864,6 +1955,33 @@ float Table::maximum_float(ColKey col_key, ObjKey* return_ndx) const
 double Table::maximum_double(ColKey col_key, ObjKey* return_ndx) const
 {
     return aggregate<act_Max, double, double>(col_key, 0., nullptr, return_ndx);
+}
+
+Decimal128 Table::maximum_decimal(ColKey col_key, ObjKey* return_ndx) const
+{
+    ArrayDecimal128 leaf(get_alloc());
+    Decimal128 max("-Inf");
+    ObjKey ret_key;
+    auto f = [&max, &ret_key, &leaf, col_key](const Cluster* cluster) {
+        // direct aggregate on the leaf
+        cluster->init_leaf(col_key, &leaf);
+        auto sz = leaf.size();
+        for (size_t i = 0; i < sz; i++) {
+            auto val = leaf.get(i);
+            if (!val.is_null() && val > max) {
+                max = val;
+                ret_key = cluster->get_real_key(i);
+            }
+        }
+        return false;
+    };
+
+    if (return_ndx) {
+        *return_ndx = ret_key;
+    }
+    traverse_clusters(f);
+
+    return max;
 }
 
 Timestamp Table::maximum_timestamp(ColKey col_key, ObjKey* return_ndx) const

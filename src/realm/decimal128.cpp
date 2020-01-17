@@ -35,10 +35,10 @@ namespace realm {
 // as the significant can be stored in w[0] only.
 void Decimal128::from_string(const char* ps)
 {
+    m_value.w[0] = 0;
     // if null string, return NaN
     if (!ps) {
         m_value.w[1] = 0x7c00000000000000ull;
-        m_value.w[0] = 0;
         return;
     }
     // eliminate leading white space
@@ -57,10 +57,20 @@ void Decimal128::from_string(const char* ps)
 
     c = *ps;
 
+    if (tolower(c) == 'i') {
+        // Check for infinity
+        std::string inf = ps;
+        for (auto& chr : inf)
+            chr = tolower(chr);
+        if (inf == "inf" || inf == "infinity") {
+            m_value.w[1] = 0x7800000000000000ull | sign_x;
+            return;
+        }
+    }
+
     // if c isn't a decimal point or a decimal digit, return NaN
     if (!(c == '.' || (c >= '0' && c <= '9'))) {
         m_value.w[1] = 0x7c00000000000000ull | sign_x;
-        m_value.w[0] = 0;
         return;
     }
 
@@ -95,7 +105,6 @@ void Decimal128::from_string(const char* ps)
                     if (!*(ps + 1)) {
                         uint64_t tmp = right_radix_leading_zeros;
                         m_value.w[1] = (0x3040000000000000ull - (tmp << 49)) | sign_x;
-                        m_value.w[0] = 0;
                         return;
                     }
                     ps = ps + 1;
@@ -103,7 +112,6 @@ void Decimal128::from_string(const char* ps)
                 else {
                     // if 2 radix points, return NaN
                     m_value.w[1] = 0x7c00000000000000ull | sign_x;
-                    m_value.w[0] = 0;
                     return;
                 }
             }
@@ -112,7 +120,6 @@ void Decimal128::from_string(const char* ps)
                     right_radix_leading_zeros = 6176;
                 uint64_t tmp = right_radix_leading_zeros;
                 m_value.w[1] = (0x3040000000000000ull - (tmp << 49)) | sign_x;
-                m_value.w[0] = 0;
                 return;
             }
         }
@@ -165,7 +172,6 @@ void Decimal128::from_string(const char* ps)
         if (c != 'e' && c != 'E') {
             // return NaN
             m_value.w[1] = 0x7c00000000000000ull;
-            m_value.w[0] = 0;
             return;
         }
         ps++;
@@ -177,7 +183,6 @@ void Decimal128::from_string(const char* ps)
         if (!((c >= '0' && c <= '9') || ((c == '+' || c == '-') && c1 >= '0' && c1 <= '9'))) {
             // return NaN
             m_value.w[1] = 0x7c00000000000000ull;
-            m_value.w[0] = 0;
             return;
         }
 
@@ -335,14 +340,23 @@ Decimal128 Decimal128::operator/(int64_t div) const
     BID_UINT128 res;
     bid128_div(&res, &x, &y, &flags);
 
-    // Reduce precision. Ensures that the result can be stored in a Mixed.
-    // FIXME: Should be seen as a temporary solution
-    BID_UINT64 res1;
-    bid128_to_bid64(&res1, &res, &flags);
-    bid64_to_bid128(&res, &res1, &flags);
-
     Bid128* p = reinterpret_cast<Bid128*>(&res);
     return Decimal128(*p);
+}
+
+Decimal128& Decimal128::operator+=(Decimal128 rhs)
+{
+    unsigned flags = 0;
+    BID_UINT128 x;
+    BID_UINT128 y;
+    memcpy(&x, this, sizeof(Decimal128));
+    memcpy(&y, &rhs, sizeof(Decimal128));
+
+    BID_UINT128 res;
+    bid128_add(&res, &x, &y, &flags);
+    memcpy(this, &res, sizeof(Decimal128));
+
+    return *this;
 }
 
 std::string Decimal128::to_string() const
@@ -354,14 +368,35 @@ std::string Decimal128::to_string() const
     memcpy(&x, this, sizeof(Decimal128));
     bid128_to_string(buffer, &x, &flags);
     return std::string(buffer);
+    // Reduce precision. Ensures that the result can be stored in a Mixed.
+    // FIXME: Should be seen as a temporary solution
+    BID_UINT64 res1;
+    bid128_to_bid64(&res1, &res, &flags);
+    bid64_to_bid128(&res, &res1, &flags);
     */
     // Primitive implementation.
     // Assumes that the significant is stored in w[0] only.
+
+    bool sign = (m_value.w[1] & 0x8000000000000000ull) != 0;
+    std::string ret;
+    if (sign)
+        ret = "-";
+
+    // check for NaN or Infinity
+    if ((m_value.w[1] & 0x7800000000000000ull) == 0x7800000000000000ull) {
+        if ((m_value.w[1] & 0x7c00000000000000ull) == 0x7c00000000000000ull) { // x is NAN
+            ret += "NaN";
+        }
+        else {
+            ret += "Inf";
+        }
+        return ret;
+    }
+
     std::ostringstream ostr;
     ostr << m_value.w[0];
     auto digits = ostr.str();
     ostr.clear();
-    bool sign = (m_value.w[1] & 0x8000000000000000ull) != 0;
     int64_t exponen = m_value.w[1] & 0x7fffffffffffffffull;
     exponen >>= 49;
     exponen -= DECIMAL_EXPONENT_BIAS_128;
@@ -370,9 +405,6 @@ std::string Decimal128::to_string() const
         digits_before--;
         exponen++;
     }
-    std::string ret;
-    if (sign)
-        ret = "-";
     ret += digits.substr(0, digits_before);
     if (digits_before < digits.length()) {
         // There are also digits after the decimal sign

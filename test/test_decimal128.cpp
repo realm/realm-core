@@ -45,6 +45,8 @@ TEST(Decimal_Basics)
     test_str("10.100e2", "1010.0");
     test_str(".00000001", "1E-8");
     test_str(".00000001000000000", "1.000000000E-8");
+    test_str("+Infinity", "Inf");
+    test_str("-INF", "-Inf");
 
     Decimal128 pi = Decimal128("3.141592653589793238"); // 19 significant digits
     CHECK_EQUAL(pi.to_string(), "3.141592653589793238");
@@ -67,8 +69,10 @@ TEST(Decimal_Basics)
 TEST(Decimal_Aritmethics)
 {
     Decimal128 d(10);
-    auto q = d / 3;
-    CHECK_EQUAL(q.to_string(), "3.333333333333333");
+    auto q = d / 4;
+    CHECK_EQUAL(q.to_string(), "2.5");
+    q = d + Decimal128(20);
+    CHECK_EQUAL(q.to_string(), "30");
 }
 
 TEST(Decimal_Array)
@@ -145,5 +149,40 @@ TEST(Decimal128_Query)
         CHECK_EQUAL(q.count(), 99);
         Query q1 = table->column<Decimal>(col) < Decimal128(25);
         CHECK_EQUAL(q1.count(), 25);
+    }
+}
+
+TEST(Decimal128_Aggregates)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    DBRef db = DB::create(path);
+    int sum = 0;
+    size_t count = 0;
+    {
+        auto wt = db->start_write();
+        auto table = wt->add_table("Foo");
+        auto col_dec = table->add_column(type_Decimal, "price", true);
+        for (int i = 0; i < 100; i++) {
+            Obj obj = table->create_object();
+            if (i % 10) {
+                int val = i % 60;
+                obj.set(col_dec, Decimal128(val));
+                sum += val;
+                count++;
+            }
+        }
+        wt->commit();
+    }
+    {
+        auto rt = db->start_read();
+        // rt->to_json(std::cout);
+        auto table = rt->get_table("Foo");
+        auto col = table->get_column_key("price");
+        CHECK_EQUAL(table->count_decimal(col, Decimal128(51)), 1);
+        CHECK_EQUAL(table->count_decimal(col, Decimal128(31)), 2);
+        CHECK_EQUAL(table->sum_decimal(col), Decimal128(sum));
+        CHECK_EQUAL(table->average_decimal(col), Decimal128(sum) / count);
+        CHECK_EQUAL(table->maximum_decimal(col), Decimal128(59));
+        CHECK_EQUAL(table->minimum_decimal(col), Decimal128(1));
     }
 }

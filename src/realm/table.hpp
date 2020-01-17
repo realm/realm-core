@@ -379,21 +379,26 @@ public:
     size_t count_string(ColKey col_key, StringData value) const;
     size_t count_float(ColKey col_key, float value) const;
     size_t count_double(ColKey col_key, double value) const;
+    size_t count_decimal(ColKey col_key, Decimal128 value) const;
 
     int64_t sum_int(ColKey col_key) const;
     double sum_float(ColKey col_key) const;
     double sum_double(ColKey col_key) const;
+    Decimal128 sum_decimal(ColKey col_key) const;
     int64_t maximum_int(ColKey col_key, ObjKey* return_ndx = nullptr) const;
     float maximum_float(ColKey col_key, ObjKey* return_ndx = nullptr) const;
     double maximum_double(ColKey col_key, ObjKey* return_ndx = nullptr) const;
+    Decimal128 maximum_decimal(ColKey col_key, ObjKey* return_ndx = nullptr) const;
     Timestamp maximum_timestamp(ColKey col_key, ObjKey* return_ndx = nullptr) const;
     int64_t minimum_int(ColKey col_key, ObjKey* return_ndx = nullptr) const;
     float minimum_float(ColKey col_key, ObjKey* return_ndx = nullptr) const;
     double minimum_double(ColKey col_key, ObjKey* return_ndx = nullptr) const;
+    Decimal128 minimum_decimal(ColKey col_key, ObjKey* return_ndx = nullptr) const;
     Timestamp minimum_timestamp(ColKey col_key, ObjKey* return_ndx = nullptr) const;
     double average_int(ColKey col_key, size_t* value_count = nullptr) const;
     double average_float(ColKey col_key, size_t* value_count = nullptr) const;
     double average_double(ColKey col_key, size_t* value_count = nullptr) const;
+    Decimal128 average_decimal(ColKey col_key, size_t* value_count = nullptr) const;
 
     // Will return pointer to search index accessor. Will return nullptr if no index
     StringIndex* get_search_index(ColKey col) const noexcept
