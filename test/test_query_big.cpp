@@ -173,56 +173,67 @@ struct QueryInitHelper {
     {
         return *rt->get_table(TableKey(0));
     }
-    template <typename Func>
-    REALM_NOINLINE void operator()(Func&& fn);
 
-    template <typename Func, typename... Mutations>
-    REALM_NOINLINE size_t run(Func& fn);
+    // This is to allow type-erasing a function that can be passed either an lvalue- or rvalue-reference,
+    // but needs to use it as a mutable reference.
+    struct QueryAnyRef {
+        QueryAnyRef(Query& q) : ptr(&q) {}
+        QueryAnyRef(Query&& q) : ptr(&q) {}
+        operator Query&() { return *ptr; }
+
+        Query* ptr;
+    };
+
+    // Using type erasure here is a massive speedup (up to 10x) to compile times.
+    using TestFunc = util::FunctionRef<void(Query&, util::FunctionRef<void(QueryAnyRef)>)>;
+    REALM_NOINLINE void operator()(const TestFunc& fn);
+
+    template <typename... Mutations>
+    REALM_NOINLINE size_t run(const TestFunc& fn);
 };
 
-template <typename Func>
-void QueryInitHelper::operator()(Func&& fn)
+void QueryInitHelper::operator()(const TestFunc& fn)
 {
     // get baseline result with no copies
     size_t count = run(fn);
-    CHECK_EQUAL(count, (run<Func, InsertColumn>(fn)));
-    CHECK_EQUAL(count, (run<Func, PreRun, InsertColumn>(fn)));
+    CHECK_EQUAL(count, (run<InsertColumn>(fn)));
+    CHECK_EQUAL(count, (run<PreRun, InsertColumn>(fn)));
 
     // copy the query, then run
-    CHECK_EQUAL(count, (run<Func, CopyQuery>(fn)));
-    CHECK_EQUAL(count, (run<Func, AndQuery>(fn)));
-    CHECK_EQUAL(count, (run<Func, HandoverQuery>(fn)));
-    CHECK_EQUAL(count, (run<Func, SelfHandoverQuery>(fn)));
+    CHECK_EQUAL(count, (run<CopyQuery>(fn)));
+    CHECK_EQUAL(count, (run<AndQuery>(fn)));
+    CHECK_EQUAL(count, (run<HandoverQuery>(fn)));
+    CHECK_EQUAL(count, (run<SelfHandoverQuery>(fn)));
 
     // run, copy the query, rerun
-    CHECK_EQUAL(count, (run<Func, PreRun, CopyQuery>(fn)));
-    CHECK_EQUAL(count, (run<Func, PreRun, AndQuery>(fn)));
-    CHECK_EQUAL(count, (run<Func, PreRun, HandoverQuery>(fn)));
-    CHECK_EQUAL(count, (run<Func, PreRun, SelfHandoverQuery>(fn)));
+    CHECK_EQUAL(count, (run<PreRun, CopyQuery>(fn)));
+    CHECK_EQUAL(count, (run<PreRun, AndQuery>(fn)));
+    CHECK_EQUAL(count, (run<PreRun, HandoverQuery>(fn)));
+    CHECK_EQUAL(count, (run<PreRun, SelfHandoverQuery>(fn)));
 
     // copy the query, insert column, then run
-    CHECK_EQUAL(count, (run<Func, CopyQuery, InsertColumn>(fn)));
-    CHECK_EQUAL(count, (run<Func, AndQuery, InsertColumn>(fn)));
-    CHECK_EQUAL(count, (run<Func, HandoverQuery, InsertColumn>(fn)));
+    CHECK_EQUAL(count, (run<CopyQuery, InsertColumn>(fn)));
+    CHECK_EQUAL(count, (run<AndQuery, InsertColumn>(fn)));
+    CHECK_EQUAL(count, (run<HandoverQuery, InsertColumn>(fn)));
 
     // run, copy the query, insert column, rerun
-    CHECK_EQUAL(count, (run<Func, PreRun, CopyQuery, InsertColumn>(fn)));
-    CHECK_EQUAL(count, (run<Func, PreRun, AndQuery, InsertColumn>(fn)));
-    CHECK_EQUAL(count, (run<Func, PreRun, HandoverQuery, InsertColumn>(fn)));
+    CHECK_EQUAL(count, (run<PreRun, CopyQuery, InsertColumn>(fn)));
+    CHECK_EQUAL(count, (run<PreRun, AndQuery, InsertColumn>(fn)));
+    CHECK_EQUAL(count, (run<PreRun, HandoverQuery, InsertColumn>(fn)));
 
     // insert column, copy the query, then run
-    CHECK_EQUAL(count, (run<Func, InsertColumn, CopyQuery>(fn)));
-    CHECK_EQUAL(count, (run<Func, InsertColumn, AndQuery>(fn)));
-    CHECK_EQUAL(count, (run<Func, InsertColumn, HandoverQuery>(fn)));
+    CHECK_EQUAL(count, (run<InsertColumn, CopyQuery>(fn)));
+    CHECK_EQUAL(count, (run<InsertColumn, AndQuery>(fn)));
+    CHECK_EQUAL(count, (run<InsertColumn, HandoverQuery>(fn)));
 
     // run, insert column, copy the query, rerun
-    CHECK_EQUAL(count, (run<Func, PreRun, InsertColumn, CopyQuery>(fn)));
-    CHECK_EQUAL(count, (run<Func, PreRun, InsertColumn, AndQuery>(fn)));
-    CHECK_EQUAL(count, (run<Func, PreRun, InsertColumn, HandoverQuery>(fn)));
+    CHECK_EQUAL(count, (run<PreRun, InsertColumn, CopyQuery>(fn)));
+    CHECK_EQUAL(count, (run<PreRun, InsertColumn, AndQuery>(fn)));
+    CHECK_EQUAL(count, (run<PreRun, InsertColumn, HandoverQuery>(fn)));
 }
 
-template <typename Func, typename... Mutations>
-size_t QueryInitHelper::run(Func& fn)
+template <typename... Mutations>
+size_t QueryInitHelper::run(const TestFunc& fn)
 {
     rt = sg->start_read(initial_version);
     auto table = rt->get_table(TableKey(0));

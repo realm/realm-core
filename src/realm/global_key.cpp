@@ -117,43 +117,46 @@ GlobalKey::GlobalKey(Mixed pk)
         return;
     }
 
-    if (pk.get_type() == type_String) {
-        // FIXME: Type-punning will only work on little-endian architectures
-        // (which is everyone we care about).
-        union {
-            unsigned char buffer[20];
-            struct {
-                uint64_t lo;
-                uint64_t hi;
-            } oid;
-        } data;
-        // FIXME: Use a better hash function than SHA1
-        auto val = pk.get_string();
-        util::sha1(val.data(), val.size(), data.buffer);
+    union {
+        unsigned char buffer[20];
+        struct {
+            uint64_t lo;
+            uint64_t hi;
+        } oid;
+    } outp;
 
-        // On big-endian architectures, this is necessary instead:
-        // uint64_t lo = uint64_t(buffer[0]) | (uint64_t(buffer[1]) << 8)
-        //             | (uint64_t(buffer[2])  << 16) | (uint64_t(buffer[3])  << 24)
-        //             | (uint64_t(buffer[4])  << 32) | (uint64_t(buffer[5])  << 40)
-        //             | (uint64_t(buffer[6])  << 48) | (uint64_t(buffer[7])  << 56);
-        // uint64_t hi = uint64_t(buffer[8]) | (uint64_t(buffer[9]) << 8)
-        //             | (uint64_t(buffer[10]) << 16) | (uint64_t(buffer[11]) << 24)
-        //             | (uint64_t(buffer[12]) << 32) | (uint64_t(buffer[13]) << 40)
-        //             | (uint64_t(buffer[14]) << 48) | (uint64_t(buffer[15]) << 56);
+    switch (pk.get_type()) {
+        case type_String: {
+            auto val = pk.get_string();
+            util::sha1(val.data(), val.size(), outp.buffer);
+            m_hi = outp.oid.hi;
+            m_lo = outp.oid.lo;
+            break;
+        }
 
-        m_hi = data.oid.hi;
-        m_lo = data.oid.lo;
-        return;
+        case type_ObjectId: {
+            union ObjectIdBuffer {
+                ObjectIdBuffer() {}
+                char buffer[sizeof(ObjectId)];
+                ObjectId id;
+            } inp;
+            inp.id = pk.get<ObjectId>();
+            util::sha1(inp.buffer, sizeof(ObjectId), outp.buffer);
+            m_hi = outp.oid.hi;
+            m_lo = outp.oid.lo;
+            break;
+        }
+
+        case type_Int:
+            m_hi = 0;
+            m_lo = uint64_t(pk.get_int());
+            break;
+
+        default:
+            m_hi = -1;
+            m_lo = -1;
+            break;
     }
-
-    if (pk.get_type() == type_Int) {
-        m_hi = 0;
-        m_lo = uint64_t(pk.get_int());
-        return;
-    }
-
-    m_hi = -1;
-    m_lo = -1;
 }
 
 } // namespace realm

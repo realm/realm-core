@@ -777,6 +777,82 @@ Query& Query::less(ColKey column_key, Timestamp value)
     return add_condition<Less>(column_key, value);
 }
 
+// ------------- ObjectId
+Query& Query::greater(ColKey, ObjectId)
+{
+    REALM_ASSERT(false);
+    return *this;
+    // return add_condition<Greater>(column_key, value);
+}
+Query& Query::equal(ColKey, ObjectId)
+{
+    REALM_ASSERT(false);
+    return *this;
+    // return add_condition<Equal>(column_key, value);
+}
+Query& Query::not_equal(ColKey, ObjectId)
+{
+    REALM_ASSERT(false);
+    return *this;
+    // return add_condition<NotEqual>(column_key, value);
+}
+Query& Query::greater_equal(ColKey, ObjectId)
+{
+    REALM_ASSERT(false);
+    return *this;
+    // return add_condition<GreaterEqual>(column_key, value);
+}
+Query& Query::less_equal(ColKey, ObjectId)
+{
+    REALM_ASSERT(false);
+    return *this;
+    // return add_condition<LessEqual>(column_key, value);
+}
+Query& Query::less(ColKey, ObjectId)
+{
+    REALM_ASSERT(false);
+    return *this;
+    // return add_condition<Less>(column_key, value);
+}
+
+// ------------- Decimal128
+Query& Query::greater(ColKey, Decimal128)
+{
+    REALM_ASSERT(false);
+    return *this;
+    // return add_condition<Greater>(column_key, value);
+}
+Query& Query::equal(ColKey, Decimal128)
+{
+    REALM_ASSERT(false);
+    return *this;
+    // return add_condition<Equal>(column_key, value);
+}
+Query& Query::not_equal(ColKey, Decimal128)
+{
+    REALM_ASSERT(false);
+    return *this;
+    // return add_condition<NotEqual>(column_key, value);
+}
+Query& Query::greater_equal(ColKey, Decimal128)
+{
+    REALM_ASSERT(false);
+    return *this;
+    // return add_condition<GreaterEqual>(column_key, value);
+}
+Query& Query::less_equal(ColKey, Decimal128)
+{
+    REALM_ASSERT(false);
+    return *this;
+    // return add_condition<LessEqual>(column_key, value);
+}
+Query& Query::less(ColKey, Decimal128)
+{
+    REALM_ASSERT(false);
+    return *this;
+    // return add_condition<Less>(column_key, value);
+}
+
 // ------------- size
 Query& Query::size_equal(ColKey column_key, int64_t value)
 {
@@ -871,7 +947,6 @@ bool Query::eval_object(ConstObj& obj) const
     if (m_view)
         m_view->check_cookie();
 #endif
-    init();
 
     if (has_conditions())
         return root_node()->match(obj);

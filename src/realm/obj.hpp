@@ -150,6 +150,7 @@ public:
     {
         Cluster cluster(0, get_alloc(), *get_tree_top());
         cluster.init(m_mem);
+        cluster.set_offset(m_key.value - cluster.get_key_value(m_row_ndx));
         return func(&cluster, m_row_ndx);
     }
 
@@ -176,6 +177,7 @@ public:
 
 
 protected:
+    friend class Obj;
     friend class ColumnListBase;
     friend class ConstLstBase;
     friend class ConstLnkLst;
@@ -212,8 +214,8 @@ protected:
     template <class T>
     int cmp(const ConstObj& other, ColKey::Idx col_ndx) const;
     int cmp(const ConstObj& other, ColKey::Idx col_ndx) const;
-    size_t get_backlink_count(ColKey backlink_col) const;
     ObjKey get_backlink(ColKey backlink_col, size_t backlink_ndx) const;
+    std::vector<ObjKey> get_all_backlinks(ColKey backlink_col) const;
 };
 
 

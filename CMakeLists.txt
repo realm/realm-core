@@ -1,4 +1,8 @@
-cmake_minimum_required(VERSION 3.4)
+if(WIN32)
+    cmake_minimum_required(VERSION 3.12)
+else()
+    cmake_minimum_required(VERSION 3.15)
+endif()
 
 set(CMAKE_BUILD_TYPE Debug CACHE STRING "")
 project(RealmCore)
@@ -12,6 +16,8 @@ include(GetGitRevisionDescription)
 include(Utilities)
 include(SpecialtyBuilds)
 include(GetVersion)
+include(CheckCXXCompilerFlag)
+include(CheckCXXSourceRuns)
 
 # Get accurate git-describe version
 git_describe(REALM_VERSION)
@@ -27,6 +33,39 @@ elseif(APPLE)
     set(CMAKE_VISIBILITY_INLINES_HIDDEN 1)
 endif()
 
+function(add_cxx_flag_if_supported flag)
+    if(flag MATCHES "^-Wno-")
+        # Compilers ignore unknown -Wno-foo flags, so look for -Wfoo instead.
+        string(REPLACE "-Wno-" "-W" check_flag ${flag})
+    else()
+        set(check_flag ${flag})
+    endif()
+
+    check_cxx_compiler_flag(${check_flag} HAVE${check_flag})
+    if(HAVE${check_flag})
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${flag}" PARENT_SCOPE)
+    endif()
+endfunction()
+
+function(use_faster_linker)
+    # If a linker has already been set, don't override.
+    if ("${CMAKE_EXE_LINKER_FLAGS}" MATCHES "-fuse-ld=")
+        return()
+    endif()
+
+    foreach(LINKER lld gold) # lld > gold > default
+        # there is no link equivalent to check_cxx_compiler_flag()
+        set(CMAKE_REQUIRED_LINK_OPTIONS "-fuse-ld=${LINKER}")
+        check_cxx_source_compiles("int main() {}" HAVE_LINKER_${LINKER})
+        if(HAVE_LINKER_${LINKER})
+            foreach(KIND EXE SHARED MODULE)
+                set(CMAKE_${KIND}_LINKER_FLAGS "${CMAKE_${KIND}_LINKER_FLAGS} -fuse-ld=${LINKER}" PARENT_SCOPE)
+            endforeach()
+            return()
+        endif()
+    endforeach()
+endfunction()
+
 # Set global warnings settings
 if(MSVC)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /W3 /D_CRT_SECURE_NO_WARNINGS /D_SCL_SECURE_NO_WARNINGS")
@@ -38,6 +77,17 @@ else()
     elseif(${CMAKE_CXX_COMPILER_ID} MATCHES ".*[Cc]lang")
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wunreachable-code -Wshorten-64-to-32 -Wold-style-cast -Wconditional-uninitialized -Wextra-semi -Wno-nested-anon-types")
     endif()
+
+    # This warning is too agressive. It warns about moves that are not redundant on older
+    # compilers that we still support. It is also harmless, unlike pessimizing moves.
+    add_cxx_flag_if_supported(-Wno-redundant-move)
+
+    # Ninja buffers output so we need to tell the compiler to use colors even though stdout isn't a tty.
+    if("${CMAKE_GENERATOR}" STREQUAL "Ninja")
+        add_cxx_flag_if_supported(-fdiagnostics-color)
+    endif()
+
+    use_faster_linker()
 endif()
 
 # Add REALM_DEBUG=1 to compile definitions for Debug / MinSizeDebug targets
@@ -67,10 +117,13 @@ if(MSVC)
         /D_DISABLE_EXTENDED_ALIGNED_STORAGE #https://developercommunity.visualstudio.com/comments/279328/view.html
     )
     if(NOT WINDOWS_STORE)
+        # TODO: replace with CMAKE_MSVC_RUNTIME_LIBRARY once we switch to CMake 3.15 as the minimum
         # Statically link the run-time library
         # https://docs.microsoft.com/bg-bg/cpp/build/reference/md-mt-ld-use-run-time-library
         # https://cmake.org/Wiki/CMake_FAQ#How_can_I_build_my_MSVC_application_with_a_static_runtime.3F
         foreach(flag_var
+            CMAKE_C_FLAGS CMAKE_C_FLAGS_DEBUG CMAKE_C_FLAGS_RELEASE
+            CMAKE_C_FLAGS_MINSIZEREL CMAKE_C_FLAGS_RELWITHDEBINFO
             CMAKE_CXX_FLAGS CMAKE_CXX_FLAGS_DEBUG CMAKE_CXX_FLAGS_RELEASE
             CMAKE_CXX_FLAGS_MINSIZEREL CMAKE_CXX_FLAGS_RELWITHDEBINFO)
             if(${flag_var} MATCHES "/MD")

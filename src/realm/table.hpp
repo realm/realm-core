@@ -186,6 +186,7 @@ public:
 
     void enumerate_string_column(ColKey col_key);
     bool is_enumerated(ColKey col_key) const noexcept;
+    bool contains_unique_values(ColKey col_key) const;
 
     //@}
 
@@ -352,8 +353,10 @@ public:
     ObjKey find_first_int(ColKey col_key, int64_t value) const;
     ObjKey find_first_bool(ColKey col_key, bool value) const;
     ObjKey find_first_timestamp(ColKey col_key, Timestamp value) const;
+    ObjKey find_first_object_id(ColKey col_key, ObjectId value) const;
     ObjKey find_first_float(ColKey col_key, float value) const;
     ObjKey find_first_double(ColKey col_key, double value) const;
+    ObjKey find_first_decimal(ColKey col_key, Decimal128 value) const;
     ObjKey find_first_string(ColKey col_key, StringData value) const;
     ObjKey find_first_binary(ColKey col_key, BinaryData value) const;
     ObjKey find_first_null(ColKey col_key) const;

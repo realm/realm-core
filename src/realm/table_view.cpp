@@ -580,9 +580,10 @@ void ConstTableView::do_sync()
                 ColKey backlink_col = m_table->get_opposite_column(m_source_column_key);
                 REALM_ASSERT(backlink_col);
                 m_linked_table->report_invalid_key(backlink_col);
-                size_t backlink_count = m_linked_obj.get_backlink_count(backlink_col);
-                for (size_t i = 0; i < backlink_count; i++)
-                    m_key_values->add(m_linked_obj.get_backlink(backlink_col, i));
+                auto backlinks = m_linked_obj.get_all_backlinks(backlink_col);
+                for (auto k : backlinks) {
+                    m_key_values->add(k);
+                }
             }
         }
     }

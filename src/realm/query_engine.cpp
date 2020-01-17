@@ -230,26 +230,35 @@ size_t StringNodeEqualBase::find_first_local(size_t start, size_t end)
     REALM_ASSERT(m_table);
 
     if (m_has_search_index) {
-        // Check if m_actual_key is in the current leaf
-
-        // Check if we can expect to find more keys
-        if (m_results_start < m_results_end && start < end) {
-            // Check if we should advance to next key to search for
+        if (start < end) {
             ObjKey first_key = m_cluster->get_real_key(start);
-            while (first_key > m_actual_key) {
-                m_results_start++;
-                if (m_results_start == m_results_end)
-                    return not_found;
-                m_actual_key = get_key(m_results_start);
+            if (first_key < m_last_start_key) {
+                // We are not advancing through the clusters. We basically don't know where we are,
+                // so just start over from the beginning.
+                m_results_ndx = m_results_start;
+                m_actual_key = get_key(m_results_ndx);
             }
+            m_last_start_key = first_key;
 
-            // If actual_key is bigger than last key, it is not in this leaf
-            ObjKey last_key = m_cluster->get_real_key(end - 1);
-            if (m_actual_key > last_key)
-                return not_found;
+            // Check if we can expect to find more keys
+            if (m_results_ndx < m_results_end) {
+                // Check if we should advance to next key to search for
+                while (first_key > m_actual_key) {
+                    m_results_ndx++;
+                    if (m_results_ndx == m_results_end) {
+                        return not_found;
+                    }
+                    m_actual_key = get_key(m_results_ndx);
+                }
 
-            // Now actual_key must be found in leaf keys
-            return m_cluster->lower_bound_key(ObjKey(m_actual_key.value - m_cluster->get_offset()));
+                // If actual_key is bigger than last key, it is not in this leaf
+                ObjKey last_key = m_cluster->get_real_key(end - 1);
+                if (m_actual_key > last_key)
+                    return not_found;
+
+                // Now actual_key must be found in leaf keys
+                return m_cluster->lower_bound_key(ObjKey(m_actual_key.value - m_cluster->get_offset()));
+            }
         }
         return not_found;
     }
@@ -265,10 +274,11 @@ void StringNode<Equal>::_search_index_init()
     FindRes fr;
     InternalFindResult res;
 
+    m_last_start_key = ObjKey();
+    m_results_start = 0;
     if (ParentNode::m_table->get_primary_key_column() == ParentNode::m_condition_column_key) {
         m_actual_key = ParentNode::m_table.unchecked_ptr()->find_first(ParentNode::m_condition_column_key,
                                                                        StringData(StringNodeBase::m_value));
-        m_results_start = 0;
         m_results_end = m_actual_key ? 1 : 0;
     }
     else {
@@ -278,13 +288,9 @@ void StringNode<Equal>::_search_index_init()
         switch (fr) {
             case FindRes_single:
                 m_actual_key = ObjKey(res.payload);
-                m_results_start = 0;
                 m_results_end = 1;
                 break;
             case FindRes_column:
-                // todo: Apparently we can't use m_index.get_alloc() because it uses default allocator which
-                // simply makes
-                // translate(x) = x. Shouldn't it inherit owner column's allocator?!
                 m_index_matches.reset(
                     new IntegerColumn(m_table.unchecked_ptr()->get_alloc(), ref_type(res.payload))); // Throws
                 m_results_start = res.start_ndx;
@@ -293,11 +299,11 @@ void StringNode<Equal>::_search_index_init()
                 break;
             case FindRes_not_found:
                 m_index_matches.reset();
-                m_results_start = 0;
                 m_results_end = 0;
                 break;
         }
     }
+    m_results_ndx = m_results_start;
 }
 
 void StringNode<Equal>::consume_condition(StringNode<Equal>* other)
@@ -390,6 +396,7 @@ void StringNode<EqualIns>::_search_index_init()
     auto index = ParentNode::m_table->get_search_index(ParentNode::m_condition_column_key);
     index->find_all(m_index_matches, StringData(StringNodeBase::m_value), true);
     m_results_start = 0;
+    m_results_ndx = 0;
     m_results_end = m_index_matches.size();
     if (m_results_start != m_results_end) {
         m_actual_key = m_index_matches[0];

@@ -21,6 +21,7 @@
 
 #include <realm/column_type_traits.hpp>
 #include <realm/timestamp.hpp>
+#include <realm/object_id.hpp>
 #include <realm/util/function_ref.hpp>
 
 namespace realm {

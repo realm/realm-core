@@ -121,11 +121,6 @@ public:
         , m_column_key(column_key)
     {
     }
-    ClusterColumn(const ClusterColumn& other)
-        : m_cluster_tree(other.m_cluster_tree)
-        , m_column_key(other.m_column_key)
-    {
-    }
     size_t size() const
     {
         return m_cluster_tree->size();
@@ -167,14 +162,10 @@ public:
         return m_target_column.get_column_key();
     }
 
-    template <class T>
-    static bool type_supported()
-    {
-        return realm::is_any<T, int64_t, int, StringData, bool, Timestamp>::value;
-    }
     static bool type_supported(realm::DataType type)
     {
-        return (type == type_Int || type == type_String || type == type_Bool || type == type_Timestamp);
+        return (type == type_Int || type == type_String || type == type_Bool || type == type_Timestamp ||
+                type == type_ObjectId);
     }
 
     static ref_type create_empty(Allocator& alloc);
@@ -418,11 +409,29 @@ struct GetIndexData<double> {
 };
 
 template <>
+struct GetIndexData<Decimal128> {
+    static StringData get_index_data(Decimal128&, StringConversionBuffer&)
+    {
+        REALM_ASSERT_RELEASE(false); // LCOV_EXCL_LINE; Decimal not supported
+        return {};
+    }
+};
+
+template <>
 struct GetIndexData<BinaryData> {
     static StringData get_index_data(BinaryData, StringConversionBuffer&)
     {
         REALM_ASSERT_RELEASE(false); // LCOV_EXCL_LINE; Index on float not supported
         return {};
+    }
+};
+
+template <>
+struct GetIndexData<ObjectId> {
+    static StringData get_index_data(ObjectId value, StringConversionBuffer& buffer)
+    {
+        memcpy(&buffer, &value, sizeof(ObjectId));
+        return StringData{buffer.data(), sizeof(ObjectId)};
     }
 };
 

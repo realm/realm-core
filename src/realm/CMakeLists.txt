@@ -1,14 +1,19 @@
 set(REALM_SOURCES
+    # slowest to compile first
+    query.cpp
+    array.cpp
+
     alloc.cpp
     alloc_slab.cpp
-    array.cpp
     array_backlink.cpp
     array_binary.cpp
     array_blob.cpp
     array_blobs_small.cpp
     array_blobs_big.cpp
+    array_decimal128.cpp
     array_integer.cpp
     array_mixed.cpp
+    array_object_id.cpp
     array_unsigned.cpp
     array_string.cpp
     array_string_short.cpp
@@ -16,6 +21,7 @@ set(REALM_SOURCES
     bplustree.cpp
     cluster.cpp
     column_binary.cpp
+    decimal128.cpp
     disable_sync_to_disk.cpp
     exceptions.cpp
     group.cpp
@@ -30,7 +36,6 @@ set(REALM_SOURCES
     node.cpp
     obj.cpp
     global_key.cpp
-    query.cpp
     query_engine.cpp
     query_expression.cpp
     replication.cpp
@@ -39,6 +44,7 @@ set(REALM_SOURCES
     table.cpp
     table_ref.cpp
     obj_list.cpp
+    object_id.cpp
     table_view.cpp
     sort_descriptor.cpp
     unicode.cpp
@@ -80,6 +86,7 @@ set(REALM_INSTALL_GENERAL_HEADERS
     array_mixed.hpp
     array_key.hpp
     array_list.hpp
+    array_object_id.hpp
     array_string.hpp
     array_string_short.hpp
     array_timestamp.hpp
@@ -124,6 +131,7 @@ set(REALM_INSTALL_GENERAL_HEADERS
     table_ref.hpp
     sort_descriptor.hpp
     obj_list.hpp
+    object_id.hpp
     table_view.hpp
     timestamp.hpp
     unicode.hpp
@@ -228,6 +236,7 @@ target_compile_definitions(CoreObjects PRIVATE
 target_compile_options(CoreObjects PRIVATE ${REALM_SANITIZER_FLAGS})
 
 set(REALM_OBJECT_FILES $<TARGET_OBJECTS:CoreObjects>)
+list(APPEND REALM_OBJECT_FILES $<TARGET_OBJECTS:Bid>)
 
 if(COMMAND set_target_xcode_attributes)
     set_target_xcode_attributes(CoreObjects)

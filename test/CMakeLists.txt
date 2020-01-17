@@ -10,6 +10,14 @@ add_subdirectory(benchmark-crud)
 # FIXME: Add other benchmarks
 
 set(NORMAL_TESTS
+    # slowest to compile first
+    test_query.cpp
+    test_query2.cpp
+    test_query_big.cpp
+    test_table.cpp
+    test_lang_bind_helper.cpp
+    test_parser.cpp
+
     test_all.cpp
     test_alloc.cpp
     test_array.cpp
@@ -27,6 +35,7 @@ set(NORMAL_TESTS
     test_column_float.cpp
     test_column_string.cpp
     test_column_timestamp.cpp
+    test_decimal128.cpp
     test_destroy_guard.cpp
     test_file.cpp
     test_file_locks.cpp
@@ -34,22 +43,18 @@ set(NORMAL_TESTS
     test_impl_simulated_failure.cpp
     test_index_string.cpp
     test_json.cpp
-    test_lang_bind_helper.cpp
     test_link_query_view.cpp
     test_links.cpp
     test_metrics.cpp
     test_global_key.cpp
+    test_object_id.cpp
     test_optional.cpp
-    test_parser.cpp
     test_priority_queue.cpp
-    test_query.cpp
-    test_query_big.cpp
     test_replication.cpp
     test_safe_int_ops.cpp
     test_self.cpp
     test_shared.cpp
     test_string_data.cpp
-    test_table.cpp
     test_table_view.cpp
     test_thread.cpp
     test_transactions.cpp

@@ -701,6 +701,7 @@ public:
             auto index = ParentNode::m_table->get_search_index(ParentNode::m_condition_column_key);
             index->find_all(m_result, BaseType::m_value);
             m_result_get = 0;
+            m_last_start_key = ObjKey();
             IntegerNodeBase<LeafType>::m_dT = 0;
         }
     }
@@ -740,31 +741,39 @@ public:
         REALM_ASSERT(this->m_table);
         size_t s = realm::npos;
 
-        if (has_search_index()) {
-
-            if (m_result_get < m_result.size() && start < end) {
-                ObjKey first_key = BaseType::m_cluster->get_real_key(start);
-                auto actual_key = m_result[m_result_get];
-                // skip through keys which are in "earlier" leafs than the one selected by start..end:
-                while (first_key > actual_key) {
-                    m_result_get++;
-                    if (m_result_get == m_result.size())
-                        return not_found;
-                    actual_key = m_result[m_result_get];
-                }
-
-                // if actual key is bigger than last key, it is not in this leaf
-                ObjKey last_key = BaseType::m_cluster->get_real_key(end - 1);
-                if (actual_key > last_key)
-                    return not_found;
-
-                // key is known to be in this leaf, so find key whithin leaf keys
-                return BaseType::m_cluster->lower_bound_key(ObjKey(actual_key.value - BaseType::m_cluster->get_offset()));
-            }
-            return not_found;
-        }
-
         if (start < end) {
+            if (has_search_index()) {
+                ObjKey first_key = BaseType::m_cluster->get_real_key(start);
+                if (first_key < m_last_start_key) {
+                    // We are not advancing through the clusters. We basically don't know where we are,
+                    // so just start over from the beginning.
+                    auto it = std::lower_bound(m_result.begin(), m_result.end(), first_key);
+                    m_result_get = (it == m_result.end()) ? realm::npos : (it - m_result.begin());
+                }
+                m_last_start_key = first_key;
+
+                if (m_result_get < m_result.size()) {
+                    auto actual_key = m_result[m_result_get];
+                    // skip through keys which are in "earlier" leafs than the one selected by start..end:
+                    while (first_key > actual_key) {
+                        m_result_get++;
+                        if (m_result_get == m_result.size())
+                            return not_found;
+                        actual_key = m_result[m_result_get];
+                    }
+
+                    // if actual key is bigger than last key, it is not in this leaf
+                    ObjKey last_key = BaseType::m_cluster->get_real_key(end - 1);
+                    if (actual_key > last_key)
+                        return not_found;
+
+                    // key is known to be in this leaf, so find key whithin leaf keys
+                    return BaseType::m_cluster->lower_bound_key(
+                        ObjKey(actual_key.value - BaseType::m_cluster->get_offset()));
+                }
+                return not_found;
+            }
+
             if (m_nb_needles) {
                 s = find_first_haystack(start, end);
             }
@@ -777,6 +786,7 @@ public:
                 s = this->m_leaf_ptr->template find_first<Equal>(this->m_value, start, end);
             }
         }
+
         return s;
     }
 
@@ -814,6 +824,7 @@ private:
     std::vector<ObjKey> m_result;
     size_t m_nb_needles = 0;
     size_t m_result_get = 0;
+    ObjKey m_last_start_key;
 
     IntegerNode(const IntegerNode<LeafType, Equal>& from, Transaction* patches)
         : BaseType(from, patches)
@@ -1616,7 +1627,9 @@ public:
 
 protected:
     ObjKey m_actual_key;
+    ObjKey m_last_start_key;
     size_t m_results_start;
+    size_t m_results_ndx;
     size_t m_results_end;
 
     inline BinaryData str_to_bin(const StringData& s) noexcept
@@ -1669,7 +1682,13 @@ private:
 
     ObjKey get_key(size_t ndx) override
     {
-        return ObjKey(m_index_matches->get(ndx));
+        if (IntegerColumn* vec = m_index_matches.get()) {
+            return ObjKey(vec->get(ndx));
+        }
+        else if (m_results_end == 1) {
+            return m_actual_key;
+        }
+        return ObjKey();
     }
 
     size_t _find_first_local(size_t start, size_t end) override;
@@ -1732,6 +1751,7 @@ private:
     {
         return m_index_matches[ndx];
     }
+
     size_t _find_first_local(size_t start, size_t end) override;
 };
 

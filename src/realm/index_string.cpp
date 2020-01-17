@@ -87,6 +87,10 @@ StringData ClusterColumn::get_index_data(ObjKey key, StringConversionBuffer& buf
         GetIndexData<Timestamp> stringifier;
         return stringifier.get_index_data(obj.get<Timestamp>(m_column_key), buffer);
     }
+    else if (type == type_ObjectId) {
+        GetIndexData<ObjectId> stringifier;
+        return stringifier.get_index_data(obj.get<ObjectId>(m_column_key), buffer);
+    }
     // It should not be possible to reach this line through public Core API
     REALM_ASSERT_RELEASE(false);
     return {};

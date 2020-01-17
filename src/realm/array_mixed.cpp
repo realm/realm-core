@@ -123,6 +123,23 @@ Mixed ArrayMixed::get(size_t ndx) const
                 REALM_ASSERT(payload_ndx + 1 < m_int_pairs.size());
                 return Mixed(Timestamp(m_int_pairs.get(payload_ndx), int32_t(m_int_pairs.get(payload_ndx + 1))));
             }
+            case type_ObjectId: {
+                ensure_string_array();
+                REALM_ASSERT(size_t(int_val) < m_strings.size());
+                auto s = m_strings.get(payload_ndx);
+                ObjectId id;
+                memcpy(&id, s.data(), sizeof(ObjectId));
+                return Mixed(id);
+            }
+            case type_Decimal: {
+                ensure_int_pair_array();
+                Decimal128::Bid128 raw;
+                payload_ndx <<= 1;
+                REALM_ASSERT(payload_ndx + 1 < m_int_pairs.size());
+                raw.w[0] = m_int_pairs.get(payload_ndx);
+                raw.w[1] = m_int_pairs.get(payload_ndx + 1);
+                return Mixed(Decimal128(raw));
+            }
             default:
                 break;
         }
@@ -237,14 +254,12 @@ void ArrayMixed::erase_linked_payload(size_t ndx)
     auto payload_arr_index = size_t((val & s_payload_idx_mask) >> s_payload_idx_shift);
 
     if (payload_arr_index) {
-        // A value is store in one of the payload arrays
+        // A value is stored in one of the payload arrays
         size_t last_ndx = 0;
         size_t erase_ndx = size_t(val >> s_data_shift);
         // Clean up current value by moving last over
-        switch (DataType((val & s_data_type_mask) - 1)) {
-            case type_Int:
-            case type_Float:
-            case type_Double: {
+        switch (payload_arr_index) {
+            case payload_idx_int: {
                 ensure_int_array();
                 last_ndx = m_ints.size() - 1;
                 if (erase_ndx != last_ndx) {
@@ -254,8 +269,7 @@ void ArrayMixed::erase_linked_payload(size_t ndx)
                 m_ints.erase(last_ndx);
                 break;
             }
-            case type_String:
-            case type_Binary: {
+            case payload_idx_str: {
                 ensure_string_array();
                 last_ndx = m_strings.size() - 1;
                 if (erase_ndx != last_ndx) {
@@ -267,7 +281,7 @@ void ArrayMixed::erase_linked_payload(size_t ndx)
                 m_strings.erase(last_ndx);
                 break;
             }
-            case type_Timestamp: {
+            case payload_idx_pair: {
                 ensure_int_pair_array();
                 last_ndx = m_int_pairs.size() - 2;
                 erase_ndx <<= 1;
@@ -341,6 +355,25 @@ int64_t ArrayMixed::store(const Mixed& value)
             auto t = value.get_timestamp();
             m_int_pairs.add(t.get_seconds());
             m_int_pairs.add(t.get_nanoseconds());
+            val = int64_t(ndx << s_data_shift) | (payload_idx_pair << s_payload_idx_shift);
+            break;
+        }
+        case type_ObjectId: {
+            ensure_string_array();
+            size_t ndx = m_strings.size();
+            auto id = value.get<ObjectId>();
+            char buffer[sizeof(ObjectId)];
+            memcpy(buffer, &id, sizeof(ObjectId));
+            m_strings.add(StringData(buffer, sizeof(ObjectId)));
+            val = int64_t(ndx << s_data_shift) | (payload_idx_str << s_payload_idx_shift);
+            break;
+        }
+        case type_Decimal: {
+            ensure_int_pair_array();
+            size_t ndx = m_int_pairs.size() / 2;
+            auto t = value.get<Decimal128>();
+            m_int_pairs.add(t.raw()->w[0]);
+            m_int_pairs.add(t.raw()->w[1]);
             val = int64_t(ndx << s_data_shift) | (payload_idx_pair << s_payload_idx_shift);
             break;
         }

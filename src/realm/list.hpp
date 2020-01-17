@@ -28,6 +28,8 @@
 #include <realm/array_string.hpp>
 #include <realm/array_binary.hpp>
 #include <realm/array_timestamp.hpp>
+#include <realm/array_object_id.hpp>
+#include <realm/array_decimal128.hpp>
 
 #ifdef _MSC_VER
 #pragma warning(disable : 4250) // Suppress 'inherits ... via dominance' on MSVC

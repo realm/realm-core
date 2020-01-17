@@ -134,6 +134,7 @@ The Columns class encapsulates all this into a simple class that, for any type T
 #include <realm/array_list.hpp>
 #include <realm/array_key.hpp>
 #include <realm/array_bool.hpp>
+#include <realm/array_object_id.hpp>
 #include <realm/column_integer.hpp>
 #include <realm/column_type_traits.hpp>
 #include <realm/table.hpp>
@@ -316,6 +317,8 @@ struct ValueBase {
     static const size_t chunk_size = 8;
     virtual void export_bool(ValueBase& destination) const = 0;
     virtual void export_Timestamp(ValueBase& destination) const = 0;
+    virtual void export_ObjectId(ValueBase& destination) const = 0;
+    virtual void export_Decimal(ValueBase& destination) const = 0;
     virtual void export_int(ValueBase& destination) const = 0;
     virtual void export_float(ValueBase& destination) const = 0;
     virtual void export_int64_t(ValueBase& destination) const = 0;
@@ -731,6 +734,8 @@ class Subexpr2 : public Subexpr,
                  public Overloads<T, StringData>,
                  public Overloads<T, bool>,
                  public Overloads<T, Timestamp>,
+                 public Overloads<T, ObjectId>,
+                 public Overloads<T, Decimal128>,
                  public Overloads<T, null> {
 public:
     virtual ~Subexpr2()
@@ -743,7 +748,12 @@ public:
     RLM_U2(float, o)                                                                                                 \
     RLM_U2(double, o)                                                                                                \
     RLM_U2(int64_t, o)                                                                                               \
-    RLM_U2(StringData, o) RLM_U2(bool, o) RLM_U2(Timestamp, o) RLM_U2(null, o)
+    RLM_U2(StringData, o)                                                                                            \
+    RLM_U2(bool, o)                                                                                                  \
+    RLM_U2(Timestamp, o)                                                                                             \
+    RLM_U2(ObjectId, o)                                                                                              \
+    RLM_U2(Decimal128, o)                                                                                            \
+    RLM_U2(null, o)
     RLM_U(+) RLM_U(-) RLM_U(*) RLM_U(/) RLM_U(>) RLM_U(<) RLM_U(==) RLM_U(!=) RLM_U(>=) RLM_U(<=)
 };
 
@@ -884,8 +894,8 @@ struct NullableVector {
     }
 
     template <typename Type = T>
-    typename std::enable_if<realm::is_any<Type, float, double, BinaryData, StringData, ObjKey, Timestamp, ref_type,
-                                          SizeOfList, null>::value,
+    typename std::enable_if<realm::is_any<Type, float, double, BinaryData, StringData, ObjKey, Timestamp, ObjectId,
+                                          Decimal128, ref_type, SizeOfList, null>::value,
                             void>::type
     set(size_t index, t_storage value)
     {
@@ -1047,6 +1057,34 @@ template <>
 inline void NullableVector<Timestamp>::set_null(size_t index)
 {
     m_first[index] = Timestamp{};
+}
+
+// ObjectId
+
+template <>
+inline bool NullableVector<ObjectId>::is_null(size_t index) const
+{
+    return m_first[index].is_null();
+}
+
+template <>
+inline void NullableVector<ObjectId>::set_null(size_t index)
+{
+    m_first[index] = ObjectId{};
+}
+
+// Decimal128
+
+template <>
+inline bool NullableVector<Decimal128>::is_null(size_t index) const
+{
+    return m_first[index].is_null();
+}
+
+template <>
+inline void NullableVector<Decimal128>::set_null(size_t index)
+{
+    m_first[index] = Decimal128{};
 }
 
 // ref_type
@@ -1308,6 +1346,16 @@ public:
         export2<Timestamp>(destination);
     }
 
+    REALM_FORCEINLINE void export_ObjectId(ValueBase& destination) const override
+    {
+        export2<ObjectId>(destination);
+    }
+
+    REALM_FORCEINLINE void export_Decimal(ValueBase& destination) const override
+    {
+        export2<Decimal128>(destination);
+    }
+
     REALM_FORCEINLINE void export_bool(ValueBase& destination) const override
     {
         export2<bool>(destination);
@@ -1352,6 +1400,10 @@ public:
             source.export_int(*this);
         else if (std::is_same<T, Timestamp>::value)
             source.export_Timestamp(*this);
+        else if (std::is_same<T, ObjectId>::value)
+            source.export_ObjectId(*this);
+        else if (std::is_same<T, Decimal128>::value)
+            source.export_Decimal(*this);
         else if (std::is_same<T, bool>::value)
             source.export_bool(*this);
         else if (std::is_same<T, float>::value)
@@ -2160,6 +2212,16 @@ class Columns<Timestamp> : public SimpleQuerySupport<Timestamp> {
 
 template <>
 class Columns<BinaryData> : public SimpleQuerySupport<BinaryData> {
+    using SimpleQuerySupport::SimpleQuerySupport;
+};
+
+template <>
+class Columns<ObjectId> : public SimpleQuerySupport<ObjectId> {
+    using SimpleQuerySupport::SimpleQuerySupport;
+};
+
+template <>
+class Columns<Decimal128> : public SimpleQuerySupport<Decimal128> {
     using SimpleQuerySupport::SimpleQuerySupport;
 };
 
@@ -3478,6 +3540,7 @@ public:
     {
         std::vector<ObjKey> links = m_link_map.get_links(index);
         // std::sort(links.begin(), links.end());
+        m_query.init();
 
         size_t count = std::accumulate(links.begin(), links.end(), size_t(0), [this](size_t running_count, ObjKey k) {
             ConstObj obj = m_link_map.get_target_table()->get_object(k);
