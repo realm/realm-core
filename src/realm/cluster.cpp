@@ -23,6 +23,7 @@
 #include "realm/array_bool.hpp"
 #include "realm/array_string.hpp"
 #include "realm/array_binary.hpp"
+#include "realm/array_mixed.hpp"
 #include "realm/array_timestamp.hpp"
 #include "realm/array_decimal128.hpp"
 #include "realm/array_object_id.hpp"
@@ -823,6 +824,9 @@ void Cluster::create(size_t nb_leaf_columns)
             case col_type_Binary:
                 do_create<ArrayBinary>(col_key);
                 break;
+            case col_type_OldMixed:
+                do_create<ArrayMixed>(col_key);
+                break;
             case col_type_Timestamp:
                 do_create<ArrayTimestamp>(col_key);
                 break;
@@ -995,6 +999,13 @@ void Cluster::insert_row(size_t ndx, ObjKey k, const FieldValues& init_values)
             case col_type_Binary:
                 do_insert_row<ArrayBinary>(ndx, col_key, init_value, nullable);
                 break;
+            case col_type_OldMixed: {
+                ArrayMixed arr(m_alloc);
+                arr.set_parent(this, col_key.get_index().val + s_first_col_index);
+                arr.init_from_parent();
+                arr.insert(ndx, init_value);
+                break;
+            }
             case col_type_Timestamp:
                 do_insert_row<ArrayTimestamp>(ndx, col_key, init_value, nullable);
                 break;
@@ -1080,6 +1091,9 @@ void Cluster::move(size_t ndx, ClusterNode* new_node, int64_t offset)
             }
             case col_type_Binary:
                 do_move<ArrayBinary>(ndx, col_key, new_leaf);
+                break;
+            case col_type_OldMixed:
+                do_move<ArrayMixed>(ndx, col_key, new_leaf);
                 break;
             case col_type_Timestamp:
                 do_move<ArrayTimestamp>(ndx, col_key, new_leaf);
@@ -1203,6 +1217,9 @@ void Cluster::insert_column(ColKey col_key)
             break;
         case col_type_Binary:
             do_insert_column<ArrayBinary>(col_key, nullable);
+            break;
+        case col_type_OldMixed:
+            do_insert_column<ArrayMixed>(col_key, nullable);
             break;
         case col_type_Timestamp:
             do_insert_column<ArrayTimestamp>(col_key, nullable);
@@ -1430,6 +1447,9 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
                 break;
             case col_type_Binary:
                 do_erase<ArrayBinary>(ndx, col_key);
+                break;
+            case col_type_OldMixed:
+                do_erase<ArrayMixed>(ndx, col_key);
                 break;
             case col_type_Timestamp:
                 do_erase<ArrayTimestamp>(ndx, col_key);
@@ -1687,6 +1707,9 @@ void Cluster::verify() const
             case col_type_Binary:
                 verify<ArrayBinary>(ref, col, sz);
                 break;
+            case col_type_OldMixed:
+                verify<ArrayMixed>(ref, col, sz);
+                break;
             case col_type_Timestamp:
                 verify<ArrayTimestamp>(ref, col, sz);
                 break;
@@ -1798,6 +1821,13 @@ void Cluster::dump_objects(int64_t key_offset, std::string lead) const
                 }
                 case col_type_Binary: {
                     ArrayBinary arr(m_alloc);
+                    ref_type ref = Array::get_as_ref(j);
+                    arr.init_from_ref(ref);
+                    std::cout << ", " << arr.get(i);
+                    break;
+                }
+                case col_type_OldMixed: {
+                    ArrayMixed arr(m_alloc);
                     ref_type ref = Array::get_as_ref(j);
                     arr.init_from_ref(ref);
                     std::cout << ", " << arr.get(i);
