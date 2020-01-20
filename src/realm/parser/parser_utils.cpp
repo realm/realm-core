@@ -71,6 +71,12 @@ const char* type_to_str<Link>()
 {
     return "Link";
 }
+template <>
+const char* type_to_str<ObjectId>()
+{
+    return "ObjectId";
+}
+
 
 const char* data_type_to_str(DataType type)
 {

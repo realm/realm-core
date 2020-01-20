@@ -30,6 +30,7 @@ public:
     ObjectId();
     ObjectId(const char* init);
     ObjectId(Timestamp d, int machine_id = 0, int process_id = 0);
+    ObjectId(const null&) noexcept;
 
     bool operator==(const ObjectId& other) const
     {

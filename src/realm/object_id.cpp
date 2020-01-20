@@ -37,6 +37,11 @@ ObjectId::ObjectId()
     memset(m_bytes, 0, sizeof(m_bytes));
 }
 
+ObjectId::ObjectId(const null&) noexcept
+{
+    memset(m_bytes, 0, sizeof(m_bytes));
+}
+
 ObjectId::ObjectId(const char* init)
 {
     char buf[3];
