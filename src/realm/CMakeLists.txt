@@ -101,6 +101,7 @@ set(REALM_INSTALL_GENERAL_HEADERS
     column_type.hpp
     column_type_traits.hpp
     data_type.hpp
+    decimal128.hpp
     disable_sync_to_disk.hpp
     exceptions.hpp
     group.hpp
