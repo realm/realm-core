@@ -5095,6 +5095,119 @@ TEST(Table_EmbeddedObjectCreateAndDestroyList)
     tr->commit();
 }
 
+TEST(Table_EmbeddedObjectNotifications)
+{
+    SHARED_GROUP_TEST_PATH(path);
+
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
+
+    auto tr = sg->start_write();
+    auto table = tr->add_table("myEmbeddedStuff");
+    table->set_embedded(true);
+    auto col_recurse = table->add_column_link(type_LinkList, "theRecursiveBit", *table);
+    CHECK_THROW(table->create_object(), LogicError);
+    auto parent = tr->add_table("myParentStuff");
+    auto ck = parent->add_column_link(type_LinkList, "theGreatColumn", *table);
+    Obj o = parent->create_object();
+    auto parent_ll = o.get_linklist(ck);
+    Obj o2 = parent_ll.create_and_insert_linked_object(0);
+    Obj o3 = parent_ll.create_and_insert_linked_object(1);
+    Obj o4 = parent_ll.create_and_insert_linked_object(0);
+    auto o2_ll = o2.get_linklist(col_recurse);
+    auto o3_ll = o3.get_linklist(col_recurse);
+    o2_ll.create_and_insert_linked_object(0);
+    o2_ll.create_and_insert_linked_object(0);
+    o3_ll.create_and_insert_linked_object(0);
+    CHECK(table->size() == 6);
+    Obj o5 = parent_ll.create_and_set_linked_object(1); // implicitly remove entry for 02
+    CHECK(!o2.is_valid());
+    CHECK(table->size() == 4);
+    // now the notifications...
+    int calls = 0;
+    tr->set_cascade_notification_handler([&](const Group::CascadeNotification& notification) {
+            CHECK_EQUAL(0, notification.links.size());
+            if (calls == 0) {
+                CHECK_EQUAL(1, notification.rows.size());
+                CHECK_EQUAL(parent->get_key(), notification.rows[0].table_key);
+                CHECK_EQUAL(o.get_key(), notification.rows[0].key);
+            }
+            else if (calls == 1) {
+                CHECK_EQUAL(3, notification.rows.size());
+                for (auto& row : notification.rows)
+                    CHECK_EQUAL(table->get_key(), row.table_key);
+                CHECK_EQUAL(o4.get_key(), notification.rows[0].key);
+                CHECK_EQUAL(o5.get_key(), notification.rows[1].key);
+                CHECK_EQUAL(o3.get_key(), notification.rows[2].key);
+            }
+            else if (calls == 2) {
+                CHECK_EQUAL(1, notification.rows.size()); // from o3
+                for (auto& row : notification.rows)
+                    CHECK_EQUAL(table->get_key(), row.table_key);
+                // don't bother checking the keys...
+            }
+            ++calls;
+        });
+
+    o.remove();
+    CHECK(calls == 3);
+    tr->commit();
+
+}
+TEST(Table_EmbeddedObjectTableClearNotifications)
+{
+    SHARED_GROUP_TEST_PATH(path);
+
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
+
+    auto tr = sg->start_write();
+    auto table = tr->add_table("myEmbeddedStuff");
+    table->set_embedded(true);
+    auto col_recurse = table->add_column_link(type_LinkList, "theRecursiveBit", *table);
+    CHECK_THROW(table->create_object(), LogicError);
+    auto parent = tr->add_table("myParentStuff");
+    auto ck = parent->add_column_link(type_LinkList, "theGreatColumn", *table);
+    Obj o = parent->create_object();
+    auto parent_ll = o.get_linklist(ck);
+    Obj o2 = parent_ll.create_and_insert_linked_object(0);
+    Obj o3 = parent_ll.create_and_insert_linked_object(1);
+    Obj o4 = parent_ll.create_and_insert_linked_object(0);
+    auto o2_ll = o2.get_linklist(col_recurse);
+    auto o3_ll = o3.get_linklist(col_recurse);
+    o2_ll.create_and_insert_linked_object(0);
+    o2_ll.create_and_insert_linked_object(0);
+    o3_ll.create_and_insert_linked_object(0);
+    CHECK(table->size() == 6);
+    Obj o5 = parent_ll.create_and_set_linked_object(1); // implicitly remove entry for 02
+    CHECK(!o2.is_valid());
+    CHECK(table->size() == 4);
+    // now the notifications...
+    int calls = 0;
+    tr->set_cascade_notification_handler([&](const Group::CascadeNotification& notification) {
+            if (calls == 0) {
+                CHECK_EQUAL(3, notification.rows.size());
+                for (auto& row : notification.rows)
+                    CHECK_EQUAL(table->get_key(), row.table_key);
+                CHECK_EQUAL(o4.get_key(), notification.rows[0].key);
+                CHECK_EQUAL(o5.get_key(), notification.rows[1].key);
+                CHECK_EQUAL(o3.get_key(), notification.rows[2].key);
+            }
+            else if (calls == 1) {
+                CHECK_EQUAL(1, notification.rows.size()); // from o3
+                for (auto& row : notification.rows)
+                    CHECK_EQUAL(table->get_key(), row.table_key);
+                // don't bother checking the keys...
+            }
+            ++calls;
+        });
+
+    parent->clear();
+    CHECK(calls == 2);
+    tr->commit();
+
+}
+
 TEST(Table_EmbeddedObjectPath)
 {
     SHARED_GROUP_TEST_PATH(path);

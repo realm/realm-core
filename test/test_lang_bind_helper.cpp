@@ -1431,7 +1431,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RemoveTableWithColumns)
     CHECK(epsilon);
 }
 
-#if 0
+
 TEST(LangBindHelper_AdvanceReadTransact_CascadeRemove_ColumnLink)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -1443,7 +1443,8 @@ TEST(LangBindHelper_AdvanceReadTransact_CascadeRemove_ColumnLink)
         WriteTransaction wt(sg);
         auto origin = wt.add_table("origin");
         auto target = wt.add_table("target");
-        col = origin->add_column_link(type_Link, "o_1", *target, link_Strong);
+        target->set_embedded(true);
+        col = origin->add_column_link(type_Link, "o_1", *target);
         target->add_column(type_Int, "t_1");
         wt.commit();
     }
@@ -1467,12 +1468,8 @@ TEST(LangBindHelper_AdvanceReadTransact_CascadeRemove_ColumnLink)
             target_w->clear();
             auto o0 = origin_w->create_object();
             auto o1 = origin_w->create_object();
-            auto t0 = target_w->create_object();
-            auto t1 = target_w->create_object();
-            target_key0 = t0.get_key();
-            target_key1 = t1.get_key();
-            o0.set(col, target_key0);
-            o1.set(col, target_key1);
+            target_key0 = o0.create_and_set_linked_object(col).get_key();
+            target_key1 = o1.create_and_set_linked_object(col).get_key();
             wt.commit();
         }
 
@@ -1508,18 +1505,12 @@ TEST(LangBindHelper_AdvanceReadTransact_CascadeRemove_ColumnLink)
     CHECK_EQUAL(target->size(), 1);
 
     // Break link by reassign
-    perform_change([&](Table& origin) { origin.get_object(1).set(col, target_key0); });
+    perform_change([&](Table& origin) { origin.get_object(1).create_and_set_linked_object(col); });
     CHECK(target_obj0.is_valid());
     CHECK(!target_obj1.is_valid());
-    CHECK_EQUAL(target->size(), 1);
-
-    // Avoid breaking link by reassigning self
-    perform_change([&](Table& origin) { origin.get_object(1).set(col, target_key1); });
-    // Should not delete anything
-    CHECK(target_obj0.is_valid());
-    CHECK(target_obj1.is_valid());
     CHECK_EQUAL(target->size(), 2);
 }
+
 
 TEST(LangBindHelper_AdvanceReadTransact_CascadeRemove_ColumnLinkList)
 {
@@ -1532,7 +1523,8 @@ TEST(LangBindHelper_AdvanceReadTransact_CascadeRemove_ColumnLinkList)
         WriteTransaction wt(sg);
         auto origin = wt.add_table("origin");
         auto target = wt.add_table("target");
-        col = origin->add_column_link(type_LinkList, "o_1", *target, link_Strong);
+        target->set_embedded(true);
+        col = origin->add_column_link(type_LinkList, "o_1", *target);
         target->add_column(type_Int, "t_1");
         wt.commit();
     }
@@ -1556,13 +1548,8 @@ TEST(LangBindHelper_AdvanceReadTransact_CascadeRemove_ColumnLinkList)
             target_w->clear();
             auto o0 = origin_w->create_object();
             auto o1 = origin_w->create_object();
-            auto t0 = target_w->create_object();
-            auto t1 = target_w->create_object();
-            target_key0 = t0.get_key();
-            target_key1 = t1.get_key();
-            o0.get_linklist(col).add(target_key0);
-            o1.get_linklist(col).add(target_key0);
-            o1.get_linklist(col).add(target_key1);
+            target_key0 = o0.get_linklist(col).create_and_insert_linked_object(0).get_key();
+            target_key1 = o1.get_linklist(col).create_and_insert_linked_object(0).get_key();
             wt.commit();
         }
 
@@ -1592,19 +1579,13 @@ TEST(LangBindHelper_AdvanceReadTransact_CascadeRemove_ColumnLinkList)
     CHECK_EQUAL(target->size(), 1);
 
     // Break link by removal from list
-    perform_change([&](Table& origin) { origin.get_object(1).get_linklist(col).remove(1); });
+    perform_change([&](Table& origin) { origin.get_object(1).get_linklist(col).remove(0); });
     CHECK(target_obj0.is_valid() && !target_obj1.is_valid());
     CHECK_EQUAL(target->size(), 1);
 
     // Break link by reassign
-    perform_change([&](Table& origin) { origin.get_object(1).get_linklist(col).set(1, target_key0); });
+    perform_change([&](Table& origin) { origin.get_object(1).get_linklist(col).create_and_set_linked_object(0); });
     CHECK(target_obj0.is_valid() && !target_obj1.is_valid());
-    CHECK_EQUAL(target->size(), 1);
-
-    // Avoid breaking link by reassigning self
-    perform_change([&](Table& origin) { origin.get_object(1).get_linklist(col).set(1, target_key1); });
-    // Should not delete anything
-    CHECK(target_obj0.is_valid() && target_obj1.is_valid());
     CHECK_EQUAL(target->size(), 2);
 
     // Break link by clearing table
@@ -1612,7 +1593,7 @@ TEST(LangBindHelper_AdvanceReadTransact_CascadeRemove_ColumnLinkList)
     CHECK(!target_obj0.is_valid() && !target_obj1.is_valid());
     CHECK_EQUAL(target->size(), 0);
 }
-#endif
+
 
 
 TEST(LangBindHelper_AdvanceReadTransact_IntIndex)

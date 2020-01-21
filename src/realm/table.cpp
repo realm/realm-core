@@ -793,6 +793,10 @@ void Table::set_embedded(bool embedded)
     if (size()) {
         throw realm::LogicError(realm::LogicError::table_not_empty);
     }
+    for_each_backlink_column([](ColKey) {
+            throw realm::LogicError(realm::LogicError::table_not_empty);
+            return true;
+        });
     REALM_ASSERT(m_top.size() >= top_position_for_flags);
     if (m_top.size() == top_position_for_flags) {
         m_top.add(0);
