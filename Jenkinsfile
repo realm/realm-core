@@ -13,6 +13,8 @@ branch = tokens[tokens.size()-1]
 
 jobWrapper {
     stage('gather-info') {
+        isPullRequest = !!env.CHANGE_TARGET
+        targetBranch = isPullRequest ? env.CHANGE_TARGET : "none"
         node('docker') {
             getSourceArchive()
             stash includes: '**', name: 'core-source', useDefaultExcludes: false
@@ -36,10 +38,13 @@ jobWrapper {
                     setBuildName("Tag ${gitTag}")
                 }
             }
+            targetSHA1 = 'NONE'
+            if (isPullRequest) {
+                targetSHA1 = sh(returnStdout: true, script: "git merge-base origin/${targetBranch} HEAD").trim()
+            }
+ 
         }
 
-        isPullRequest = !!env.CHANGE_TARGET
-        targetBranch = isPullRequest ? env.CHANGE_TARGET : "none"
         currentBranch = env.BRANCH_NAME
         println "Building branch: ${currentBranch}"
         println "Target branch: ${targetBranch}"
@@ -64,6 +69,31 @@ jobWrapper {
         }
     }
 
+    if (isPullRequest) {
+        stage('FormatCheck') {
+            node('docker') {
+                getArchive()
+                docker.build('realm-core-clang:snapshot', '-f clang.Dockerfile .').inside() {
+                    echo "Checking code formatting"
+                    modifications = sh(returnStdout: true, script: "git clang-format --diff ${targetSHA1}").trim()
+                    try {
+                        if (!modifications.equals('no modified files to format')) {
+                            if (!modifications.equals('clang-format did not modify any files')) {
+                                echo "Commit violates formatting rules"
+                                sh "git clang-format --diff ${targetSHA1} > format_error.txt"
+                                archiveArtifacts('format_error.txt')
+                                sh 'exit 1'
+                            }
+                        }
+                        currentBuild.result = 'SUCCESS'
+                    } catch (Exception err) {
+                        currentBuild.result = 'FAILURE'
+                        throw err
+                    }
+                }
+            }
+        }
+    }
     stage('Checking') {
         parallelExecutors = [
             checkLinuxDebug         : doCheckInDocker('Debug'),

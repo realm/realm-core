@@ -100,9 +100,7 @@ public:
         return reinterpret_cast<char*>(ref);
     }
 
-    void verify() const override
-    {
-    }
+    void verify() const override {}
 };
 
 // This variable is declared such that get_default() can return it. It could be a static local variable, but
