@@ -78,6 +78,7 @@ struct ColumnTypeTraits<int64_t> {
     using cluster_leaf_type = ArrayInteger;
     using sum_type = int64_t;
     using minmax_type = int64_t;
+    using average_type = double;
     static const DataType id = type_Int;
     static const ColumnType column_id = col_type_Int;
     static const ColumnType real_column_type = col_type_Int;
@@ -96,6 +97,7 @@ struct ColumnTypeTraits<util::Optional<int64_t>> {
     using cluster_leaf_type = ArrayIntNull;
     using sum_type = int64_t;
     using minmax_type = int64_t;
+    using average_type = double;
     static const DataType id = type_Int;
     static const ColumnType column_id = col_type_Int;
     static const ColumnType real_column_type = col_type_Int;
@@ -132,6 +134,7 @@ struct ColumnTypeTraits<float> {
     using cluster_leaf_type = BasicArray<float>;
     using sum_type = double;
     using minmax_type = float;
+    using average_type = double;
     static const DataType id = type_Float;
     static const ColumnType column_id = col_type_Float;
     static const ColumnType real_column_type = col_type_Float;
@@ -142,6 +145,7 @@ struct ColumnTypeTraits<util::Optional<float>> {
     using cluster_leaf_type = BasicArrayNull<float>;
     using sum_type = double;
     using minmax_type = float;
+    using average_type = double;
     static const DataType id = type_Float;
     static const ColumnType column_id = col_type_Float;
     static const ColumnType real_column_type = col_type_Float;
@@ -152,6 +156,7 @@ struct ColumnTypeTraits<double> {
     using cluster_leaf_type = BasicArray<double>;
     using sum_type = double;
     using minmax_type = double;
+    using average_type = double;
     static const DataType id = type_Double;
     static const ColumnType column_id = col_type_Double;
     static const ColumnType real_column_type = col_type_Double;
@@ -162,6 +167,7 @@ struct ColumnTypeTraits<util::Optional<double>> {
     using cluster_leaf_type = BasicArrayNull<double>;
     using sum_type = double;
     using minmax_type = double;
+    using average_type = double;
     static const DataType id = type_Double;
     static const ColumnType column_id = col_type_Double;
     static const ColumnType real_column_type = col_type_Double;
@@ -208,6 +214,9 @@ struct ColumnTypeTraits<BinaryData> {
 template <>
 struct ColumnTypeTraits<Decimal128> {
     using cluster_leaf_type = ArrayDecimal128;
+    using sum_type = Decimal128;
+    using minmax_type = Decimal128;
+    using average_type = Decimal128;
     static const DataType id = type_Decimal;
     static const ColumnType column_id = col_type_Decimal;
 };

@@ -463,6 +463,7 @@ TEST(Parser_basic_serialisation)
     auto int_col_key = t->add_column(type_Int, "age");
     t->add_column(type_String, "name");
     t->add_column(type_Double, "fees", true);
+    t->add_column(type_Float, "float_fees", true);
     t->add_column(type_Bool, "licensed", true);
     auto link_col = t->add_column_link(type_Link, "buddy", *t);
     auto time_col = t->add_column(type_Timestamp, "time", true);
@@ -473,7 +474,7 @@ TEST(Parser_basic_serialisation)
 
     t->create_objects(5, keys);
     for (size_t i = 0; i < t->size(); ++i) {
-        t->get_object(keys[i]).set_all(int(i), StringData(names[i]), fees[i], (i % 2 == 0));
+        t->get_object(keys[i]).set_all(int(i), StringData(names[i]), fees[i], float(fees[i]), (i % 2 == 0));
     }
     t->get_object(keys[0]).set(time_col, Timestamp(realm::null()));
     t->get_object(keys[1]).set(time_col, Timestamp(1512130073, 0));   // 2017/12/02 @ 12:47am (UTC)
@@ -508,6 +509,18 @@ TEST(Parser_basic_serialisation)
     verify_query(test_context, t, "fees = 0 || fees = 1", 0);
 
     verify_query(test_context, t, "fees != 2.22 && fees > 2.2", 3);
+    verify_query(test_context, t, "fees > 2.0E0", 4);
+    verify_query(test_context, t, "fees > 200e-2", 4);
+    verify_query(test_context, t, "fees > 0.002e3", 4);
+    verify_query(test_context, t, "fees < inf", 5);
+    verify_query(test_context, t, "fees > -inf", 5);
+    verify_query(test_context, t, "float_fees > 2.0E0", 4);
+    verify_query(test_context, t, "float_fees > 200e-2", 4);
+    verify_query(test_context, t, "float_fees > 0.002E3", 4);
+    verify_query(test_context, t, "float_fees < inf", 5);
+    verify_query(test_context, t, "float_fees > -inf", 5);
+    verify_query(test_context, t, "float_fees == NaN", 0);
+    verify_query(test_context, t, "float_fees != NaN", 5);
     verify_query(test_context, t, "(age > 1 || fees >= 2.25) && age == 4", 1);
     verify_query(test_context, t, "licensed == true", 3);
     verify_query(test_context, t, "licensed == false", 2);
@@ -1036,7 +1049,6 @@ TEST(Parser_TwoColumnExpressionBasics)
     CHECK_THROW_ANY(verify_query(test_context, table, "strings == doubles", 0));
 }
 
-
 TEST(Parser_TwoColumnAggregates)
 {
     Group g;
@@ -1062,6 +1074,8 @@ TEST(Parser_TwoColumnAggregates)
     TableRef items = g.add_table("class_Items");
     ColKey item_name_col = items->add_column(type_String, "name");
     ColKey item_price_col = items->add_column(type_Double, "price");
+    ColKey item_price_float_col = items->add_column(type_Float, "price_float");
+    ColKey item_price_decimal_col = items->add_column(type_Decimal, "price_decimal");
     ColKey item_discount_col = items->add_column_link(type_Link, "discount", *discounts);
     using item_t = std::pair<std::string, double>;
     std::vector<item_t> item_info = {{"milk", 5.5}, {"oranges", 4.0}, {"pizza", 9.5}, {"cereal", 6.5}};
@@ -1071,6 +1085,8 @@ TEST(Parser_TwoColumnAggregates)
         Obj obj = items->get_object(item_keys[i]);
         obj.set(item_name_col, StringData(item_info[i].first));
         obj.set(item_price_col, item_info[i].second);
+        obj.set(item_price_float_col, float(item_info[i].second));
+        obj.set(item_price_decimal_col, Decimal128(item_info[i].second));
     }
     items->get_object(item_keys[0]).set(item_discount_col, discount_keys[2]); // milk -0.50
     items->get_object(item_keys[2]).set(item_discount_col, discount_keys[1]); // pizza -2.5
@@ -1080,6 +1096,8 @@ TEST(Parser_TwoColumnAggregates)
     ColKey id_col = t->add_column(type_Int, "customer_id");
     ColKey account_col = t->add_column(type_Double, "account_balance");
     ColKey items_col = t->add_column_link(type_LinkList, "items", *items);
+    ColKey account_float_col = t->add_column(type_Float, "account_balance_float");
+    ColKey account_decimal_col = t->add_column(type_Decimal, "account_balance_decimal");
 
     Obj person0 = t->create_object();
     Obj person1 = t->create_object();
@@ -1087,10 +1105,16 @@ TEST(Parser_TwoColumnAggregates)
 
     person0.set(id_col, int64_t(0));
     person0.set(account_col, double(10.0));
+    person0.set(account_float_col, float(10.0));
+    person0.set(account_decimal_col, Decimal128(10.0));
     person1.set(id_col, int64_t(1));
     person1.set(account_col, double(20.0));
+    person1.set(account_float_col, float(20.0));
+    person1.set(account_decimal_col, Decimal128(20.0));
     person2.set(id_col, int64_t(2));
     person2.set(account_col, double(30.0));
+    person2.set(account_float_col, float(30.0));
+    person2.set(account_decimal_col, Decimal128(30.0));
 
     LnkLst list_0 = person0.get_linklist(items_col);
     list_0.add(item_keys[0]);
@@ -1121,10 +1145,32 @@ TEST(Parser_TwoColumnAggregates)
     CHECK_THROW_ANY(verify_query(test_context, items, "price < name.@size", 3));
 
     // double vs double
+    verify_query(test_context, t, "items.@sum.price == 25.5", 2);  // person0, person2
+    verify_query(test_context, t, "items.@min.price == 4.0", 1);   // person0
+    verify_query(test_context, t, "items.@max.price == 9.5", 2);   // person0, person2
+    verify_query(test_context, t, "items.@avg.price == 6.375", 1); // person0
     verify_query(test_context, t, "items.@sum.price > account_balance", 2);
     verify_query(test_context, t, "items.@min.price > account_balance", 0);
     verify_query(test_context, t, "items.@max.price > account_balance", 0);
     verify_query(test_context, t, "items.@avg.price > account_balance", 0);
+    // float vs float
+    verify_query(test_context, t, "items.@sum.price_float == 25.5", 2);  // person0, person2
+    verify_query(test_context, t, "items.@min.price_float == 4.0", 1);   // person0
+    verify_query(test_context, t, "items.@max.price_float == 9.5", 2);   // person0, person2
+    verify_query(test_context, t, "items.@avg.price_float == 6.375", 1); // person0
+    verify_query(test_context, t, "items.@sum.price_float > account_balance_float", 2);
+    verify_query(test_context, t, "items.@min.price_float > account_balance_float", 0);
+    verify_query(test_context, t, "items.@max.price_float > account_balance_float", 0);
+    verify_query(test_context, t, "items.@avg.price_float > account_balance_float", 0);
+    // Decimal128 vs Decimal128
+    verify_query(test_context, t, "items.@sum.price_decimal == 25.5", 2);  // person0, person2
+    verify_query(test_context, t, "items.@min.price_decimal == 4.0", 1);   // person0
+    verify_query(test_context, t, "items.@max.price_decimal == 9.5", 2);   // person0, person2
+    verify_query(test_context, t, "items.@avg.price_decimal == 6.375", 1); // person0
+    verify_query(test_context, t, "items.@sum.price_decimal > account_balance_decimal", 2);
+    verify_query(test_context, t, "items.@min.price_decimal > account_balance_decimal", 0);
+    verify_query(test_context, t, "items.@max.price_decimal > account_balance_decimal", 0);
+    verify_query(test_context, t, "items.@avg.price_decimal > account_balance_decimal", 0);
 
     // cannot aggregate string
     CHECK_THROW_ANY(verify_query(test_context, t, "items.@min.name > account_balance", 0));
@@ -3397,5 +3443,100 @@ TEST(Parser_ObjectId)
     verify_query_sub(test_context, table, "id == $1", args, num_args, 1);
     verify_query_sub(test_context, table, "id == $2", args, num_args, 1);
 }
+
+TEST(Parser_Decimal128)
+{
+    Group g;
+    auto table = g.add_table("table");
+    auto col_key = table->add_column(type_Decimal, "dec");
+    auto nullable_col_key = table->add_column(type_Decimal, "nullable_dec", true);
+
+    // the test assumes that these are all unique
+    std::vector<std::string> values = {
+        "123",
+        "0.1",
+        "3.141592653589793238", // currently limited to 19 digits
+        // sign variations
+        "1E1",
+        "+2E2",
+        "+3E+3",
+        "4E+4",
+        "-5E5",
+        "-6E-6",
+        "7E-7",
+        "+8E-8",
+        "-9E+9",
+        // decimal sign variations
+        "1.1E1",
+        "+2.1E2",
+        "+3.1E+3",
+        "4.1E+4",
+        "-5.1E5",
+        "-6.1E-6",
+        "7.1E-7",
+        "+8.1E-8",
+        "-9.1E+9",
+        // + and - infinity are treated differently
+        "inf",
+        "-infinity",
+    };
+
+    std::vector<std::string> invalids = {
+        ".", "e10", "E-12", "infin", "-+2", "+-2", "2e+-12", "2e-+12", "2e1.3", "/2.0", "*2.0",
+    };
+
+    for (auto value : values) {
+        auto obj = table->create_object();
+        obj.set(col_key, Decimal128(value));
+        obj.set(nullable_col_key, Decimal128(value));
+    }
+    // add one object with default values, 0 and null
+    auto obj_generated = table->create_object();
+    Decimal128 generated = obj_generated.get<Decimal128>(col_key);
+    Decimal128 generated_nullable = obj_generated.get<Decimal128>(nullable_col_key);
+    CHECK_EQUAL(generated, Decimal128(0));
+    CHECK(generated_nullable.is_null());
+    verify_query(test_context, table, "dec == " + generated.to_string(), 1);
+    verify_query(test_context, table, "nullable_dec == " + generated_nullable.to_string(), 1);
+    verify_query(test_context, table, "dec == 0.", 1);
+
+    for (auto value : values) {
+        verify_query(test_context, table, "dec == " + value, 1);
+        verify_query(test_context, table, "nullable_dec == " + value, 1);
+    }
+
+    for (auto value : invalids) {
+        CHECK_THROW_ANY(verify_query(test_context, table, "dec == " + value, 0));
+        CHECK_THROW_ANY(verify_query(test_context, table, "nullable_dec == " + value, 0));
+    }
+
+    // none of the non-nullable values are null
+    verify_query(test_context, table, "dec == NULL", 0);
+    // the default generated nullable value is null
+    verify_query(test_context, table, "nullable_dec == NULL", 1);
+    constexpr size_t num_nans = 0;
+    // everything should be less than positive infinity (except NaNs)
+    verify_query(test_context, table, "dec <= infinity", table->size() - num_nans);
+    // everything should be greater than or equal to negative infinity (except NaNs)
+    verify_query(test_context, table, "dec >= -infinity", table->size() - num_nans);
+
+    // argument substitution checks
+    util::Any args[] = {Decimal128("0"), Decimal128("123"), realm::null{}};
+    size_t num_args = 3;
+    verify_query_sub(test_context, table, "dec == $0", args, num_args, 1);
+    verify_query_sub(test_context, table, "dec == $1", args, num_args, 1);
+    verify_query_sub(test_context, table, "dec == $2", args, num_args, 0);
+    verify_query_sub(test_context, table, "nullable_dec == $2", args, num_args, 1);
+
+    // column vs column
+    constexpr size_t num_different_rows = 1; // default generated row is (0, null)
+    verify_query(test_context, table, "dec == nullable_dec", table->size() - num_different_rows);
+    verify_query(test_context, table, "dec >= nullable_dec", table->size() - num_different_rows);
+    verify_query(test_context, table, "dec <= nullable_dec", table->size() - num_different_rows);
+    verify_query(test_context, table, "dec > nullable_dec", 0);
+    verify_query(test_context, table, "dec < nullable_dec", 0);
+    verify_query(test_context, table, "dec != nullable_dec", num_different_rows);
+}
+
 
 #endif // TEST_PARSER

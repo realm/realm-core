@@ -30,6 +30,8 @@ namespace realm {
 
 class Table;
 class Timestamp;
+class ObjectId;
+class Decimal128;
 struct Link;
 
 namespace util {
@@ -60,6 +62,10 @@ template <>
 const char* type_to_str<Binary>();
 template <>
 const char* type_to_str<Timestamp>();
+template <>
+const char* type_to_str<ObjectId>();
+template <>
+const char* type_to_str<Decimal128>();
 template <>
 const char* type_to_str<Link>();
 

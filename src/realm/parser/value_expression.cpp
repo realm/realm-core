@@ -185,6 +185,18 @@ Int ValueExpression::value_of_type_for_query<Int>()
 }
 
 template <>
+Decimal128 ValueExpression::value_of_type_for_query<Decimal128>()
+{
+    if (value->type == parser::Expression::Type::Argument) {
+        return arguments->decimal128_for_argument(stot<int>(value->s));
+    }
+    if (value->type != parser::Expression::Type::Number) {
+        throw std::logic_error("Attempting to compare a decimal128 property to a non-numeric value");
+    }
+    return Decimal128(value->s);
+}
+
+template <>
 StringData ValueExpression::value_of_type_for_query<StringData>()
 {
     if (value->type == parser::Expression::Type::Argument) {

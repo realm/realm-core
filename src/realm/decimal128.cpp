@@ -235,7 +235,14 @@ Decimal128::Decimal128()
     m_value.w[1] = 0x7c00000000000000;
 }
 
-Decimal128::Decimal128(int64_t val)
+Decimal128::Decimal128(double val)
+{
+    std::stringstream ss;
+    ss << val;
+    from_string(ss.str().c_str());
+}
+
+void Decimal128::from_int64_t(int64_t val)
 {
     constexpr uint64_t expon = uint64_t(DECIMAL_EXPONENT_BIAS_128) << 49;
     if (val < 0) {
@@ -246,6 +253,16 @@ Decimal128::Decimal128(int64_t val)
         m_value.w[1] = expon;
         m_value.w[0] = val;
     }
+}
+
+Decimal128::Decimal128(int val)
+{
+    from_int64_t(static_cast<int64_t>(val));
+}
+
+Decimal128::Decimal128(int64_t val)
+{
+    from_int64_t(val);
 }
 
 Decimal128::Decimal128(Bid64 val)
@@ -268,6 +285,12 @@ Decimal128::Decimal128(Bid128 coefficient, int exponent, bool sign)
 Decimal128::Decimal128(const std::string& init)
 {
     from_string(const_cast<char*>(init.c_str()));
+}
+
+Decimal128::Decimal128(const null&) noexcept
+{
+    m_value.w[0] = 0xaa;
+    m_value.w[1] = 0x7c00000000000000;
 }
 
 bool Decimal128::is_null() const
@@ -326,22 +349,43 @@ bool Decimal128::operator>=(const Decimal128& rhs) const
     return !(*this < rhs);
 }
 
-Decimal128 Decimal128::operator/(int64_t div) const
+Decimal128 do_divide(BID_UINT128 x, BID_UINT128 div)
 {
     unsigned flags = 0;
-    BID_UINT128 x;
-    BID_UINT128 y;
-
-    memcpy(&x, this, sizeof(Decimal128));
-
-    BID_UINT64 tmp(div);
-    bid128_from_uint64(&y, &tmp);
-
     BID_UINT128 res;
-    bid128_div(&res, &x, &y, &flags);
-
-    Bid128* p = reinterpret_cast<Bid128*>(&res);
+    bid128_div(&res, &x, &div, &flags);
+    Decimal128::Bid128* p = reinterpret_cast<Decimal128::Bid128*>(&res);
     return Decimal128(*p);
+}
+
+Decimal128 Decimal128::operator/(int64_t div) const
+{
+    BID_UINT128 x;
+    memcpy(&x, this, sizeof(Decimal128));
+    BID_UINT128 y;
+    Decimal128 dx(div);
+    memcpy(&y, &dx, sizeof(Decimal128));
+    return do_divide(x, y);
+}
+
+Decimal128 Decimal128::operator/(size_t div) const
+{
+    BID_UINT128 x;
+    memcpy(&x, this, sizeof(Decimal128));
+    BID_UINT64 tmp(div);
+    BID_UINT128 y;
+    bid128_from_uint64(&y, &tmp);
+    return do_divide(x, y);
+}
+
+Decimal128 Decimal128::operator/(int div) const
+{
+    BID_UINT128 x;
+    memcpy(&x, this, sizeof(Decimal128));
+    BID_UINT128 y;
+    Decimal128 dx(static_cast<int64_t>(div));
+    memcpy(&y, &dx, sizeof(Decimal128));
+    return do_divide(x, y);
 }
 
 Decimal128& Decimal128::operator+=(Decimal128 rhs)
@@ -376,6 +420,10 @@ std::string Decimal128::to_string() const
     */
     // Primitive implementation.
     // Assumes that the significant is stored in w[0] only.
+
+    if (is_null()) {
+        return "NULL";
+    }
 
     bool sign = (m_value.w[1] & 0x8000000000000000ull) != 0;
     std::string ret;
@@ -442,6 +490,5 @@ void Decimal128::unpack(Bid128& coefficient, int& exponent, bool& sign) const no
     coefficient.w[0] = m_value.w[0];
     coefficient.w[1] = m_value.w[1] & 0x00003fffffffffffull;
 }
-
 
 } // namespace realm

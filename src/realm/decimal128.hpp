@@ -22,6 +22,8 @@
 #include <string>
 #include <cstring>
 
+#include "null.hpp"
+
 namespace realm {
 
 class Decimal128 {
@@ -38,6 +40,8 @@ public:
     };
     Decimal128();
     explicit Decimal128(int64_t);
+    explicit Decimal128(int);
+    explicit Decimal128(double);
     Decimal128(Bid128 coefficient, int exponent, bool sign);
     explicit Decimal128(Bid64);
     explicit Decimal128(const std::string&);
@@ -45,6 +49,7 @@ public:
     {
         m_value = val;
     }
+    Decimal128(const null&) noexcept;
 
     bool is_null() const;
 
@@ -56,6 +61,8 @@ public:
     bool operator>=(const Decimal128& rhs) const;
 
     Decimal128 operator/(int64_t div) const;
+    Decimal128 operator/(size_t div) const;
+    Decimal128 operator/(int div) const;
     Decimal128& operator+=(Decimal128);
     Decimal128 operator+(Decimal128 rhs) const
     {
@@ -76,6 +83,7 @@ private:
     Bid128 m_value;
 
     void from_string(const char* ps);
+    void from_int64_t(int64_t val);
 };
 
 inline std::ostream& operator<<(std::ostream& ostr, const Decimal128& id)

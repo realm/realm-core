@@ -712,17 +712,18 @@ typename ColumnTypeTraits<T>::minmax_type bptree_minimum(const BPlusTree<T>& tre
 }
 
 template <class T>
-double bptree_average(const BPlusTree<T>& tree, size_t* return_cnt = nullptr)
+typename ColumnTypeTraits<T>::average_type bptree_average(const BPlusTree<T>& tree, size_t* return_cnt = nullptr)
 {
     size_t cnt;
     auto sum = bptree_sum(tree, &cnt);
-    double avg{};
+    typename ColumnTypeTraits<T>::average_type avg{};
     if (cnt != 0)
-        avg = double(sum) / cnt;
+        avg = typename ColumnTypeTraits<T>::average_type(sum) / cnt;
     if (return_cnt)
         *return_cnt = cnt;
     return avg;
 }
+
 }
 
 #endif /* REALM_BPLUSTREE_HPP */

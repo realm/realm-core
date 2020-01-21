@@ -28,6 +28,8 @@
 
 #include <realm/parser/parser_utils.hpp>
 
+// clang-format off
+
 // String tokens can't be followed by [A-z0-9_].
 #define string_token_t(s) seq< TAOCPP_PEGTL_ISTRING(s), not_at< identifier_other > >
 
@@ -60,17 +62,20 @@ struct b64_content : until< at< one< '"' > >, must< b64_allowed > > {};
 struct base64 : seq< TAOCPP_PEGTL_ISTRING("B64\""), must< b64_content >, any > {};
 
 // numbers
-struct minus : opt< one< '-' > > {};
+struct optional_sign : opt< sor< one< '-' >, one< '+' > > > {};
 struct dot : one< '.' > {};
+struct optional_exponent : opt< seq< sor< one< 'E' >, one< 'e' > >, optional_sign, plus< digit > > > {};
+struct infinity : seq< optional_sign, sor< TAOCPP_PEGTL_ISTRING("infinity"), TAOCPP_PEGTL_ISTRING("inf") > > {};
+struct nan : seq< optional_sign, TAOCPP_PEGTL_ISTRING("nan") > {};
 
 struct float_num : sor<
-    seq< plus< digit >, dot, star< digit > >,
-    seq< star< digit >, dot, plus< digit > >
+    seq< plus< digit >, dot, star< digit >, optional_exponent >,
+    seq< star< digit >, dot, plus< digit >, optional_exponent >
 > {};
 struct hex_num : seq< one< '0' >, one< 'x', 'X' >, plus< xdigit > > {};
-struct int_num : plus< digit > {};
+struct int_num : seq< plus< digit >, optional_exponent > {};
 
-struct number : seq< minus, sor< float_num, hex_num, int_num > > {};
+struct number : seq< optional_sign, sor< float_num, hex_num, int_num, infinity, nan > > {};
 
 struct timestamp_number : disable< number > {};
 struct first_timestamp_number : disable< timestamp_number > {};
@@ -90,8 +95,7 @@ struct oid : seq< TAOCPP_PEGTL_ISTRING("oid("), must< oid_content >, any > {};
 
 struct true_value : string_token_t("true") {};
 struct false_value : string_token_t("false") {};
-struct null_value : seq<sor<string_token_t("null"), string_token_t("nil")>> {
-};
+struct null_value : seq<sor<string_token_t("null"), string_token_t("nil")>> {};
 
 // following operators must allow proceeding string characters
 struct min : TAOCPP_PEGTL_ISTRING(".@min.") {};
@@ -232,6 +236,8 @@ struct and_ext : if_must< and_op, pred > {};
 struct and_pred : seq< atom_pred, star< and_ext > > {};
 
 struct pred : seq< and_pred, star< or_ext > > {};
+
+// clang-format on
 
 // state
 struct ParserState
