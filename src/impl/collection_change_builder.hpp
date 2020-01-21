@@ -21,12 +21,15 @@
 
 #include "collection_notifications.hpp"
 
-#include <realm/util/optional.hpp>
+#include <realm/keys.hpp>
 
-#include <unordered_map>
+#include <functional>
+#include <unordered_set>
+#include <vector>
 
 namespace realm {
 namespace _impl {
+
 class CollectionChangeBuilder : public CollectionChangeSet {
 public:
     CollectionChangeBuilder(CollectionChangeBuilder const&) = default;
@@ -43,7 +46,7 @@ public:
     // it into new_rows, and check all matching rows for modifications
     static CollectionChangeBuilder calculate(std::vector<int64_t> const& old_rows,
                                              std::vector<int64_t> const& new_rows,
-                                             std::function<bool (size_t)> row_did_change,
+                                             std::function<bool (decltype(ObjKey::value))> row_did_change,
                                              bool in_table_order=false);
 
     // generic operations {

@@ -19,6 +19,7 @@
 #ifndef REALM_OBJECT_STORE_GLOBAL_NOTIFIER_HPP
 #define REALM_OBJECT_STORE_GLOBAL_NOTIFIER_HPP
 
+#include "object_changeset.hpp"
 #include "impl/collection_notifier.hpp"
 #include "shared_realm.hpp"
 #include "sync/sync_config.hpp"
@@ -77,7 +78,7 @@ public:
     // The actual changes made, keyed on object name.
     // This will be empty if the Realm already existed before the
     // GlobalNotifier was started.
-    std::unordered_map<std::string, CollectionChangeSet> const& get_changes() const;
+    std::unordered_map<std::string, ObjectChangeSet> const& get_changes() const;
 
     ~ChangeNotification();
 
@@ -105,7 +106,7 @@ private:
     std::shared_ptr<GlobalNotifier::Impl> m_notifier;
     mutable std::shared_ptr<Realm> m_old_realm;
     mutable std::shared_ptr<Realm> m_new_realm;
-    mutable std::unordered_map<std::string, CollectionChangeSet> m_changes;
+    mutable std::unordered_map<std::string, ObjectChangeSet> m_changes;
     mutable bool m_have_calculated_changes = false;
 
     ChangeNotification() = default;

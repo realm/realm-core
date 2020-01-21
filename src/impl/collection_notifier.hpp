@@ -19,6 +19,7 @@
 #ifndef REALM_BACKGROUND_COLLECTION_HPP
 #define REALM_BACKGROUND_COLLECTION_HPP
 
+#include "object_changeset.hpp"
 #include "impl/collection_change_builder.hpp"
 
 #include <realm/util/assert.hpp>
@@ -42,15 +43,18 @@ namespace _impl {
 class RealmCoordinator;
 
 struct ListChangeInfo {
-    int64_t table_key;
+    TableKey table_key;
     int64_t row_key;
     int64_t col_key;
     CollectionChangeBuilder* changes;
 };
 
+// FIXME: this should be in core
+using TableKeyType = decltype(TableKey::value);
+
 struct TransactionChangeInfo {
     std::vector<ListChangeInfo> lists;
-    std::unordered_map<int64_t, CollectionChangeBuilder> tables;
+    std::unordered_map<TableKeyType, ObjectChangeSet> tables;
     bool track_all;
     bool schema_changed;
 };
@@ -62,7 +66,7 @@ public:
         bool is_list;
     };
     struct RelatedTable {
-        decltype(TableKey::value) table_key;
+        TableKey table_key;
         std::vector<OutgoingLink> links;
     };
 
@@ -78,9 +82,9 @@ public:
 private:
     TransactionChangeInfo const& m_info;
     Table const& m_root_table;
-    const int64_t m_root_table_key;
-    IndexSet const* const m_root_modifications;
-    std::unordered_map<int64_t, IndexSet> m_not_modified;
+    const TableKey m_root_table_key;
+    ObjectChangeSet const* const m_root_object_changes;
+    std::unordered_map<TableKeyType, IndexSet> m_not_modified;
     std::vector<RelatedTable> const& m_related_tables;
 
     struct Path {
@@ -91,7 +95,7 @@ private:
     std::array<Path, 4> m_current_path;
 
     bool check_row(Table const& table, int64_t obj_key, size_t depth = 0);
-    bool check_outgoing_links(int64_t table_key, Table const& table,
+    bool check_outgoing_links(TableKey table_key, Table const& table,
                               int64_t obj_key, size_t depth = 0);
 };
 
@@ -185,7 +189,7 @@ protected:
     Transaction& source_shared_group();
 
     bool all_related_tables_covered(const TableVersions& versions);
-    std::function<bool (size_t)> get_modification_checker(TransactionChangeInfo const&, ConstTableRef);
+    std::function<bool (ObjectChangeSet::ObjectKeyType)> get_modification_checker(TransactionChangeInfo const&, ConstTableRef);
 
     // The actual change, calculated in run() and delivered in prepare_handover()
     CollectionChangeBuilder m_change;

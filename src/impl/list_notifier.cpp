@@ -61,7 +61,7 @@ bool ListNotifier::do_add_required_change_info(TransactionChangeInfo& info)
     if (!m_list->is_attached())
         return false; // origin row was deleted after the notification was added
 
-    info.lists.push_back({m_table.value, m_obj.value, m_col.value, &m_change});
+    info.lists.push_back({m_table, m_obj.value, m_col.value, &m_change});
 
     m_info = &info;
     return true;
@@ -86,18 +86,18 @@ void ListNotifier::run()
 
     if (m_type == PropertyType::Object) {
         auto& list = static_cast<LnkLst&>(*m_list);
-        auto row_did_change = get_modification_checker(*m_info, list.get_target_table());
+        auto object_did_change = get_modification_checker(*m_info, list.get_target_table());
         for (size_t i = 0; i < list.size(); ++i) {
             if (m_change.modifications.contains(i))
                 continue;
-            if (row_did_change(list.get(i).value))
+            if (object_did_change(list.get(i).value))
                 m_change.modifications.add(i);
         }
 
         for (auto const& move : m_change.moves) {
             if (m_change.modifications.contains(move.to))
                 continue;
-            if (row_did_change(list.get(move.to).value))
+            if (object_did_change(list.get(move.to).value))
                 m_change.modifications.add(move.to);
         }
     }

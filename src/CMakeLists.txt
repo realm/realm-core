@@ -4,6 +4,7 @@ set(SOURCES
     index_set.cpp
     list.cpp
     object.cpp
+    object_changeset.cpp
     object_schema.cpp
     object_store.cpp
     results.cpp
@@ -31,6 +32,7 @@ set(HEADERS
     list.hpp
     object.hpp
     object_accessor.hpp
+    object_changeset.hpp
     object_schema.hpp
     object_store.hpp
     property.hpp

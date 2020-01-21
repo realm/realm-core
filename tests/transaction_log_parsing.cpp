@@ -56,7 +56,7 @@ public:
         _impl::CollectionChangeBuilder c;
         _impl::TransactionChangeInfo info{};
         info.tables[m_table_key.value];
-        info.lists.push_back({m_table_key.value, m_list.ConstLstBase::get_key().value, m_list.get_col_key().value, &c});
+        info.lists.push_back({m_table_key, m_list.ConstLstBase::get_key().value, m_list.get_col_key().value, &c});
         _impl::transaction::advance(*m_group, info);
 
         if (info.lists.empty()) {
@@ -168,7 +168,7 @@ public:
     {
         m_result.reserve(objects.size());
         for (auto& obj : objects) {
-            m_result.push_back(ObserverState{obj.get_table()->get_key().value,
+            m_result.push_back(ObserverState{obj.get_table()->get_key(),
                 obj.get_key().value, (void *)(uintptr_t)m_result.size()});
         }
     }
@@ -280,7 +280,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
         });
 
         auto& table = *r->read_group().get_table("class_table");
-        int64_t table_key = table.get_key().value;
+        auto table_key = table.get_key().value;
         auto cols = table.get_column_keys();
 
         r->begin_transaction();
@@ -291,7 +291,8 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
         r->commit_transaction();
 
         auto coordinator = _impl::RealmCoordinator::get_coordinator(config.path);
-        auto track_changes = [&](std::vector<int64_t> tables_needed, auto&& f) {
+        using TableKeyType = decltype(TableKey::value);
+        auto track_changes = [&](std::vector<TableKeyType> tables_needed, auto&& f) {
             auto sg = coordinator->begin_read();
 
             r->begin_transaction();
@@ -310,7 +311,8 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
                 table.get_object(objects[1]).set(cols[1], 2);
             });
             REQUIRE(info.tables.size() == 1);
-            REQUIRE_INDICES(info.tables[table_key].modifications, 1);
+            REQUIRE(info.tables[table_key].modifications_size() == 1);
+            REQUIRE(info.tables[table_key].modifications_contains(1));
         }
 
         SECTION("modifications to untracked tables are ignored") {
@@ -326,7 +328,9 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
                 table.create_object();
             });
             REQUIRE(info.tables.size() == 1);
-            REQUIRE_INDICES(info.tables[table_key].insertions, 10, 11);
+            REQUIRE(info.tables[table_key].insertions_size() == 2);
+            REQUIRE(info.tables[table_key].insertions_contains(10));
+            REQUIRE(info.tables[table_key].insertions_contains(11));
         }
 
         SECTION("deleting newly added rows makes them not be reported") {
@@ -335,17 +339,21 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
                 table.remove_object(table.create_object().get_key());
             });
             REQUIRE(info.tables.size() == 1);
-            REQUIRE_INDICES(info.tables[table_key].insertions, 10);
-            REQUIRE(info.tables[table_key].deletions.empty());
+            REQUIRE(info.tables[table_key].insertions_size() == 1);
+            REQUIRE(info.tables[table_key].insertions_contains(10));
+            REQUIRE(info.tables[table_key].deletions_empty());
         }
 
-        SECTION("modifying newly added rows is reported as a modification") {
+        SECTION("modifying newly added rows does not report it as a modification") {
             auto info = track_changes({table_key}, [&] {
                 table.create_object().set_all(10, 0);
             });
             REQUIRE(info.tables.size() == 1);
-            REQUIRE_INDICES(info.tables[table_key].insertions, 10);
-            REQUIRE_INDICES(info.tables[table_key].modifications, 10);
+            REQUIRE(info.tables[table_key].insertions_size() == 1);
+            REQUIRE(info.tables[table_key].insertions_contains(10));
+            REQUIRE(info.tables[table_key].modifications_size() == 0);
+            REQUIRE(!info.tables[table_key].modifications_contains(10));
+            REQUIRE(info.tables[table_key].deletions_empty());
         }
 
         SECTION("remove_object() does not shift rows") {
@@ -354,9 +362,11 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
                 table.remove_object(objects[3]);
             });
             REQUIRE(info.tables.size() == 1);
-            REQUIRE_INDICES(info.tables[table_key].deletions, 2, 3);
-            REQUIRE(info.tables[table_key].insertions.empty());
-            REQUIRE(info.tables[table_key].moves.empty());
+            REQUIRE(info.tables[table_key].deletions_size() == 2);
+            REQUIRE(info.tables[table_key].deletions_contains(2));
+            REQUIRE(info.tables[table_key].deletions_contains(3));
+            REQUIRE(info.tables[table_key].insertions_empty());
+            REQUIRE(info.tables[table_key].modifications_empty());
         }
 
         SECTION("SetDefault does not mark a row as modified") {

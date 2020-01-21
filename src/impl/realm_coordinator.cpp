@@ -841,7 +841,7 @@ public:
                 if (pt.empty())
                     pt = ct.second;
                 else
-                    pt.merge(CollectionChangeBuilder{ct.second});
+                    pt.merge(ObjectChangeSet{ct.second});
             }
         }
 

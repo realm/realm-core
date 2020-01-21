@@ -47,18 +47,18 @@ void ObjectNotifier::run()
         return;
     auto& change = it->second;
 
-    if (change.deletions.contains(m_obj.value)) {
+    if (change.deletions_contains(m_obj.value)) {
         m_change.deletions.add(0);
         m_table = {};
         m_obj = {};
         return;
     }
 
-    if (!change.modifications.contains(m_obj.value))
+    auto column_modifications = change.get_columns_modified(m_obj.value);
+    if (!column_modifications)
         return;
     m_change.modifications.add(0);
-    for (auto& col : change.columns) {
-        if (col.second.contains(m_obj.value))
-            m_change.columns[col.first].add(0);
+    for (auto col : *column_modifications) {
+        m_change.columns[col].add(0);
     }
 }
