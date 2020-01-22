@@ -199,12 +199,11 @@ Mixed ConstObj::get_any(ColKey col_key) const
         case col_type_Decimal:
             return Mixed{get<Decimal128>(col_key)};
         case col_type_ObjectId:
-            return Mixed{get<ObjectId>(col_key)};
+            return Mixed{get<util::Optional<ObjectId>>(col_key)};
         case col_type_Link:
             return Mixed{get<ObjKey>(col_key)};
         default:
             REALM_UNREACHABLE();
-            break;
     }
     return {};
 }
@@ -412,8 +411,10 @@ bool ConstObj::is_null(ColKey col_key) const
                 return do_is_null<ArrayTimestamp>(col_ndx);
             case col_type_Link:
                 return do_is_null<ArrayKey>(col_ndx);
+            case col_type_ObjectId:
+                return do_is_null<ArrayObjectIdNull>(col_ndx);
             default:
-                break;
+                REALM_UNREACHABLE();
         }
     }
     return false;
@@ -650,7 +651,6 @@ void ConstObj::to_json(std::ostream& out, size_t link_depth, std::map<std::strin
                     }
                     out << "]";
                 }
-
             }
             else {
                 auto list = get_listbase_ptr(ck);
@@ -671,9 +671,10 @@ void ConstObj::to_json(std::ostream& out, size_t link_depth, std::map<std::strin
                 auto k = get<ObjKey>(ck);
                 if (k) {
                     auto obj = get_linked_object(ck);
-                    if ((link_depth == 0) ||
-                        (link_depth == not_found && std::find(followed.begin(), followed.end(), ck) != followed.end())) {
-                        out << "{\"table\": \"" << get_target_table(ck)->get_name() << "\", \"key\": " << obj.get_key().value << "}";
+                    if ((link_depth == 0) || (link_depth == not_found &&
+                                              std::find(followed.begin(), followed.end(), ck) != followed.end())) {
+                        out << "{\"table\": \"" << get_target_table(ck)->get_name()
+                            << "\", \"key\": " << obj.get_key().value << "}";
                     }
                     else {
                         out << "[";
@@ -1284,6 +1285,9 @@ Obj& Obj::set_null(ColKey col_key, bool is_default)
             case col_type_Double:
                 do_set_null<ArrayDoubleNull>(col_key);
                 break;
+            case col_type_ObjectId:
+                do_set_null<ArrayObjectIdNull>(col_key);
+                break;
             case col_type_String:
                 do_set_null<ArrayString>(col_key);
                 break;
@@ -1297,7 +1301,7 @@ Obj& Obj::set_null(ColKey col_key, bool is_default)
                 do_set_null<ArrayDecimal128>(col_key);
                 break;
             default:
-                break;
+                REALM_UNREACHABLE();
         }
     }
 

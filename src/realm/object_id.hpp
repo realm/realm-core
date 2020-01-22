@@ -56,7 +56,6 @@ public:
         return memcmp(m_bytes, other.m_bytes, sizeof(m_bytes)) <= 0;
     }
 
-    bool is_null() const;
     Timestamp get_timestamp() const;
     std::string to_string() const;
 

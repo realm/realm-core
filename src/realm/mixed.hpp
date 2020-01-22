@@ -103,18 +103,15 @@ namespace realm {
 /// \sa StringData
 class Mixed {
 public:
-    Mixed() noexcept
-        : m_type(0)
+    Mixed() noexcept : m_type(0)
     {
     }
 
-    Mixed(util::None) noexcept
-        : Mixed()
+    Mixed(util::None) noexcept : Mixed()
     {
     }
 
-    Mixed(int i) noexcept
-        : Mixed(int64_t(i))
+    Mixed(int i) noexcept : Mixed(int64_t(i))
     {
     }
     Mixed(int64_t) noexcept;
@@ -130,20 +127,18 @@ public:
     Mixed(Timestamp) noexcept;
     Mixed(Decimal128);
     Mixed(ObjectId) noexcept;
+    Mixed(util::Optional<ObjectId>) noexcept;
     Mixed(ObjKey) noexcept;
 
     // These are shortcuts for Mixed(StringData(c_str)), and are
     // needed to avoid unwanted implicit conversion of char* to bool.
-    Mixed(char* c_str) noexcept
-        : Mixed(StringData(c_str))
+    Mixed(char* c_str) noexcept : Mixed(StringData(c_str))
     {
     }
-    Mixed(const char* c_str) noexcept
-        : Mixed(StringData(c_str))
+    Mixed(const char* c_str) noexcept : Mixed(StringData(c_str))
     {
     }
-    Mixed(const std::string& s) noexcept
-        : Mixed(StringData(s))
+    Mixed(const std::string& s) noexcept : Mixed(StringData(s))
     {
     }
 
@@ -268,6 +263,17 @@ inline Mixed::Mixed(util::Optional<double> v) noexcept
     }
 }
 
+inline Mixed::Mixed(util::Optional<ObjectId> v) noexcept
+{
+    if (v) {
+        m_type = type_ObjectId + 1;
+        id_val = *v;
+    }
+    else {
+        m_type = 0;
+    }
+}
+
 inline Mixed::Mixed(StringData v) noexcept
 {
     if (!v.is_null()) {
@@ -314,13 +320,8 @@ inline Mixed::Mixed(Decimal128 v)
 
 inline Mixed::Mixed(ObjectId v) noexcept
 {
-    if (!v.is_null()) {
-        m_type = type_ObjectId + 1;
-        id_val = v;
-    }
-    else {
-        m_type = 0;
-    }
+    m_type = type_ObjectId + 1;
+    id_val = v;
 }
 
 inline Mixed::Mixed(ObjKey v) noexcept

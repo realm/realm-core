@@ -1100,42 +1100,30 @@ Mixed get_val_from_column(size_t ndx, ColumnType col_type, bool nullable, BPlusT
         case col_type_Int:
             if (nullable) {
                 auto val = static_cast<BPlusTree<util::Optional<Int>>*>(accessor)->get(ndx);
-                if (val) {
-                    return Mixed{*val};
-                }
+                return Mixed{val};
             }
             else {
                 return Mixed{static_cast<BPlusTree<Int>*>(accessor)->get(ndx)};
             }
-            break;
         case col_type_Bool:
             if (nullable) {
                 auto val = static_cast<BPlusTree<util::Optional<Int>>*>(accessor)->get(ndx);
-                if (val) {
-                    return Mixed{bool(*val)};
-                }
+                return val ? Mixed{bool(*val)} : Mixed{};
             }
             else {
                 return Mixed{bool(static_cast<BPlusTree<Int>*>(accessor)->get(ndx))};
             }
-            break;
         case col_type_Float:
             return Mixed{static_cast<BPlusTree<float>*>(accessor)->get(ndx)};
-            break;
         case col_type_Double:
             return Mixed{static_cast<BPlusTree<double>*>(accessor)->get(ndx)};
-            break;
         case col_type_String:
             return Mixed{static_cast<LegacyStringColumn*>(accessor)->get_legacy(ndx)};
-            break;
         case col_type_Binary:
             return Mixed{static_cast<BPlusTree<Binary>*>(accessor)->get(ndx)};
-            break;
         default:
-            break;
+            REALM_UNREACHABLE();
     }
-
-    return Mixed{};
 }
 
 template <class T>
@@ -1695,8 +1683,8 @@ void Table::clear()
 Group* Table::get_parent_group() const noexcept
 {
     if (!m_top.is_attached())
-        return 0;                                              // Subtable with shared descriptor
-    ArrayParent* parent = m_top.get_parent();                  // ArrayParent guaranteed to be Table::Parent
+        return 0;                             // Subtable with shared descriptor
+    ArrayParent* parent = m_top.get_parent(); // ArrayParent guaranteed to be Table::Parent
     if (!parent)
         return 0; // Free-standing table
 
@@ -1712,8 +1700,8 @@ inline uint64_t Table::get_sync_file_id() const noexcept
 size_t Table::get_index_in_group() const noexcept
 {
     if (!m_top.is_attached())
-        return realm::npos;                                    // Subtable with shared descriptor
-    ArrayParent* parent = m_top.get_parent();                  // ArrayParent guaranteed to be Table::Parent
+        return realm::npos;                   // Subtable with shared descriptor
+    ArrayParent* parent = m_top.get_parent(); // ArrayParent guaranteed to be Table::Parent
     if (!parent)
         return realm::npos; // Free-standing table
     return m_top.get_ndx_in_parent();
@@ -1952,7 +1940,7 @@ ObjKey Table::find_first(ColKey col_key, ObjectId value) const
     }
 
     ObjKey key;
-    ArrayObjectId leaf(get_alloc());
+    ArrayObjectIdNull leaf(get_alloc());
 
     auto f = [&key, &col_key, &value, &leaf](const Cluster* cluster) {
         cluster->init_leaf(col_key, &leaf);
@@ -2020,6 +2008,7 @@ template ObjKey Table::find_first(ColKey col_key, double) const;
 template ObjKey Table::find_first(ColKey col_key, Decimal128) const;
 template ObjKey Table::find_first(ColKey col_key, util::Optional<bool>) const;
 template ObjKey Table::find_first(ColKey col_key, util::Optional<int64_t>) const;
+template ObjKey Table::find_first(ColKey col_key, util::Optional<ObjectId>) const;
 template ObjKey Table::find_first(ColKey col_key, BinaryData) const;
 
 ObjKey Table::find_first_int(ColKey col_key, int64_t value) const
