@@ -119,6 +119,8 @@ public:
     template <class... Args>
     void emplace(Args&&...);
     // FIXME: std::optional specifies an std::initializer_list overload for `emplace` as well.
+
+    void reset();
 private:
     using Storage = _impl::OptionalStorage<T>;
     using Storage::m_engaged;
@@ -132,7 +134,6 @@ private:
     {
         m_engaged = b;
     }
-    void clear();
 };
 
 
@@ -327,7 +328,7 @@ constexpr Optional<T>::Optional(InPlace, Args&&... args)
 }
 
 template <class T>
-void Optional<T>::clear()
+void Optional<T>::reset()
 {
     if (m_engaged) {
         m_value.~T();
@@ -338,7 +339,7 @@ void Optional<T>::clear()
 template <class T>
 Optional<T>& Optional<T>::operator=(None)
 {
-    clear();
+    reset();
     return *this;
 }
 
@@ -350,7 +351,7 @@ Optional<T>& Optional<T>::operator=(Optional<T>&& other)
             m_value = std::move(other.m_value);
         }
         else {
-            clear();
+            reset();
         }
     }
     else {
@@ -370,7 +371,7 @@ Optional<T>& Optional<T>::operator=(const Optional<T>& other)
             m_value = other.m_value;
         }
         else {
-            clear();
+            reset();
         }
     }
     else {
@@ -484,7 +485,7 @@ template <class T>
 template <class... Args>
 void Optional<T>::emplace(Args&&... args)
 {
-    clear();
+    reset();
     new (&m_value) T(std::forward<Args>(args)...);
     m_engaged = true;
 }

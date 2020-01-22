@@ -24,7 +24,7 @@
 
 namespace realm {
 
-class ArrayObjectId : public ArrayPayload, private Array {
+class ArrayObjectId : public ArrayPayload, protected Array {
 public:
     using value_type = ObjectId;
 
@@ -36,8 +36,9 @@ public:
     using Array::update_parent;
     using Array::verify;
 
-    static ObjectId default_value(bool)
+    static ObjectId default_value(bool nullable)
     {
+        REALM_ASSERT(!nullable);
         return ObjectId();
     }
 
@@ -59,33 +60,29 @@ public:
 
     size_t size() const
     {
-        REALM_ASSERT(m_size < s_width * 10000);
-        // return m_size / 12
-        // Multiply by 0x10000 / 3. Divide by 0x10000 * 4
-        // Error is shifted away.
-        // Ensured to work for number of elements < 10000. Also on 32 bit
-        return (m_size * 0x5556) >> 18;
+        auto data_bytes = m_size - div_round_up<s_block_size>(m_size); // remove one byte per block.
+        return data_bytes / s_width;
     }
 
     bool is_null(size_t ndx) const
     {
-        return this->get_width() == 0 || get(ndx).is_null();
+        return this->get_width() == 0 || get_pos(ndx).is_null(this);
     }
 
     ObjectId get(size_t ndx) const
     {
-        REALM_ASSERT(s_width * ndx < m_size);
-        auto values = reinterpret_cast<ObjectId*>(this->m_data);
-        return values[ndx];
+        REALM_ASSERT(is_valid_ndx(ndx));
+        REALM_ASSERT(!is_null(ndx));
+        return get_pos(ndx).get_value(this);
     }
 
-    void add(ObjectId value)
+    void add(const ObjectId& value)
     {
         insert(size(), value);
     }
 
-    void set(size_t ndx, ObjectId value);
-    void insert(size_t ndx, ObjectId value);
+    void set(size_t ndx, const ObjectId& value);
+    void insert(size_t ndx, const ObjectId& value);
     void erase(size_t ndx);
     void move(ArrayObjectId& dst, size_t ndx);
     void clear()
@@ -94,20 +91,136 @@ public:
     }
     void truncate(size_t ndx)
     {
-        Array::truncate(s_width * ndx);
+        Array::truncate(calc_byte_len(ndx));
     }
 
-    size_t find_first(ObjectId value, size_t begin = 0, size_t end = npos) const noexcept;
+    size_t find_first(const ObjectId& value, size_t begin = 0, size_t end = npos) const noexcept;
 
 protected:
     static constexpr size_t s_width = sizeof(ObjectId); // Size of each element
     static_assert(s_width == 12, "Size of ObjectId must be 12");
 
-    size_t calc_byte_len(size_t num_items, size_t) const override
+    // A block is a byte bitvector indicating null entries and 8 ObjectIds.
+    static constexpr size_t s_block_size = s_width * 8 + 1; // 97
+
+    template <size_t div>
+    static size_t div_round_up(size_t num)
     {
-        return num_items + header_size;
+        return (num + div - 1) / div;
+    }
+
+    // An accessor for the data at a given index. All casting and offset calculation should be kept here.
+    struct Pos {
+        size_t base_byte;
+        size_t offset;
+
+        void set_value(ArrayObjectId* arr, const ObjectId& val) const
+        {
+            reinterpret_cast<ObjectId*>(arr->m_data + base_byte + 1 /*null bit byte*/)[offset] = val;
+        }
+        const ObjectId& get_value(const ArrayObjectId* arr) const
+        {
+            return reinterpret_cast<const ObjectId*>(arr->m_data + base_byte + 1 /*null bit byte*/)[offset];
+        }
+
+        void set_null(ArrayObjectId* arr, bool new_is_null) const
+        {
+            auto& bitvec = arr->m_data[base_byte];
+            if (new_is_null) {
+                bitvec |= 1 << offset;
+            }
+            else {
+                bitvec &= ~(1 << offset);
+            }
+        }
+        bool is_null(const ArrayObjectId* arr) const
+        {
+            return arr->m_data[base_byte] & (1 << offset);
+        }
+    };
+
+    static Pos get_pos(size_t ndx)
+    {
+
+        return Pos{(ndx / 8) * s_block_size, ndx % 8};
+    }
+
+    size_t calc_byte_len(size_t num_items, size_t /*unused width*/ = 0) const override
+    {
+        return (num_items * s_width) +       // ObjectId data
+               (div_round_up<8>(num_items)); // null bitvectors (1 byte per 8 oids, rounded up)
+    }
+
+    bool is_valid_ndx(size_t ndx) const
+    {
+        return calc_byte_len(ndx) <= m_size;
     }
 };
+
+// The nullable ObjectId array uses the same layout and is compatible with the non-nullable one. It adds support for
+// operations on null. Because the base class maintains null markers, we are able to defer to it for many operations.
+class ArrayObjectIdNull final : public ArrayObjectId {
+public:
+    using ArrayObjectId::ArrayObjectId;
+    static util::Optional<ObjectId> default_value(bool nullable)
+    {
+        if (nullable)
+            return util::none;
+        return ObjectId();
+    }
+
+    void set(size_t ndx, const util::Optional<ObjectId>& value)
+    {
+        if (value) {
+            ArrayObjectId::set(ndx, *value);
+        }
+        else {
+            set_null(ndx);
+        }
+    }
+    void add(const util::Optional<ObjectId>& value)
+    {
+        insert(size(), value);
+    }
+    void insert(size_t ndx, const util::Optional<ObjectId>& value)
+    {
+        if (value) {
+            ArrayObjectId::insert(ndx, *value);
+        }
+        else {
+            ArrayObjectId::insert(ndx, null_oid);
+            set_null(ndx);
+        }
+    }
+    void set_null(size_t ndx)
+    {
+        auto pos = get_pos(ndx);
+        pos.set_value(this, null_oid);
+        pos.set_null(this, true);
+    }
+    util::Optional<ObjectId> get(size_t ndx) const noexcept
+    {
+        auto pos = get_pos(ndx);
+        if (pos.is_null(this)) {
+            return util::none;
+        }
+        return pos.get_value(this);
+    }
+    size_t find_first(const util::Optional<ObjectId>& value, size_t begin = 0, size_t end = npos) const
+    {
+        if (value) {
+            return ArrayObjectId::find_first(*value, begin, end);
+        }
+        else {
+            return find_first_null(begin, end);
+        }
+    }
+    size_t find_first_null(size_t begin = 0, size_t end = npos) const;
+
+private:
+    static const ObjectId null_oid;
+};
+
 
 } // namespace realm
 

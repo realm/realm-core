@@ -38,8 +38,8 @@ TEST(ObjectId_Basics)
     CHECK_GREATER(id2, id1);
     CHECK_LESS(id1, id2);
 
-    ObjectId id_null;
-    CHECK(id_null.is_null());
+    ObjectId id_zeros;
+    CHECK(id_zeros == ObjectId("000000000000000000000000"));
 }
 
 TEST(ObjectId_Array)
@@ -74,6 +74,93 @@ TEST(ObjectId_Array)
 
     arr.destroy();
     arr1.destroy();
+}
+
+TEST(ObjectId_ArrayNull)
+{
+    const char str0[] = "0000012300000000009218a4";
+    const char str1[] = "DEADDEADDEADDEADDEADDEAD";
+    const char str2[] = "0000078900000000002999f3";
+
+    ArrayObjectIdNull arr(Allocator::get_default());
+    arr.create();
+
+    arr.add({str0});
+    arr.add({str1});
+    arr.insert(1, {str2});
+
+    ObjectId id2(str2);
+    CHECK(!arr.is_null(0));
+    CHECK_EQUAL(arr.get(0), ObjectId(str0));
+    CHECK(!arr.is_null(1));
+    CHECK_EQUAL(arr.get(1), id2);
+    CHECK(!arr.is_null(2));
+    CHECK_EQUAL(arr.get(2), ObjectId(str1));
+    CHECK_EQUAL(arr.find_first(id2), 1);
+    CHECK_EQUAL(arr.find_first_null(), npos);
+
+    arr.add(util::none);
+    CHECK_EQUAL(arr.find_first_null(0), 3);
+    CHECK_EQUAL(arr.find_first_null(1), 3);
+    CHECK_EQUAL(arr.find_first_null(2), 3);
+    CHECK_EQUAL(arr.find_first_null(3), 3);
+    CHECK_EQUAL(arr.find_first_null(0, 3), npos);
+    CHECK_EQUAL(arr.find_first_null(3, 3), npos);
+    CHECK_EQUAL(arr.find_first_null(4), npos);
+
+    arr.erase(1);
+    CHECK_EQUAL(arr.get(1), ObjectId(str1));
+
+    ArrayObjectIdNull arr1(Allocator::get_default());
+    arr1.create();
+    arr.move(arr1, 1);
+
+    CHECK_EQUAL(arr.size(), 1);
+    CHECK_EQUAL(arr1.size(), 2);
+    CHECK_EQUAL(arr1.get(0), ObjectId(str1));
+    CHECK(!arr1.is_null(0));
+    CHECK(arr1.is_null(1));
+
+    arr.destroy();
+    arr1.destroy();
+}
+
+// This should exhaustively test all cases of ArrayObjectIdNull::find_first_null.
+TEST(ObjectId_ArrayNull_FindFirstNull_StressTest)
+{
+    // Test is O(2^N * N^2) in terms of this, so don't go too high...
+    // 17 should be enough to cover all cases, including a middle block that is neither first nor last.
+    const auto MaxSize = 17;
+
+    for (int size = 0; size <= MaxSize; size++) {
+        ArrayObjectIdNull arr(Allocator::get_default());
+        arr.create();
+        for (int i = 0; i < size; i++) {
+            arr.add(util::none);
+        }
+
+        for (unsigned mask = 0; mask < (1u << size); mask++) {
+            // Set nulls to match mask.
+            for (int i = 0; i < size; i++) {
+                if (mask & (1 << i)) {
+                    arr.set(i, util::none);
+                }
+                else {
+                    arr.set(i, ObjectId());
+                }
+            }
+
+            for (int begin = 0; begin <= size; begin++) {
+                for (int end = begin; end <= size; end++) {
+                    auto adjusted_mask = (mask & ~(unsigned(-1) << end)) >> begin;
+                    const size_t expected = adjusted_mask ? begin + ctz(adjusted_mask) : npos;
+                    CHECK_EQUAL(arr.find_first_null(begin, end), expected);
+                }
+            }
+        }
+
+        arr.destroy();
+    }
 }
 
 TEST(ObjectId_Table)

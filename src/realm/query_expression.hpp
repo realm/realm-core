@@ -383,7 +383,9 @@ public:
     //
     // During thread-handover of a Query, set_base_table() is also called to make objects point at the new table
     // instead of the old one from the old thread.
-    virtual void set_base_table(ConstTableRef) {}
+    virtual void set_base_table(ConstTableRef)
+    {
+    }
 
     virtual std::string description(util::serializer::SerialisationState& state) const = 0;
 
@@ -828,10 +830,31 @@ time optimizations for these cases.
 
 template <class T, size_t prealloc = 8>
 struct NullableVector {
-    using Underlying = typename util::RemoveOptional<T>::type;
-    using t_storage =
-        typename std::conditional<std::is_same<Underlying, bool>::value || std::is_same<Underlying, int>::value,
-                                  int64_t, Underlying>::type;
+
+    // Searches the PairsToMatch for the first that has the Query type as the first type and returns the second type.
+    // If no pair matches, returns the Query type unmodified.
+    template <typename Query, typename... PairsToMatch>
+    struct TypeMapperImpl;
+    template <typename Query, typename... PairsToMatch>
+    using TypeMapper = typename TypeMapperImpl<Query, PairsToMatch...>::type;
+
+    template <typename Query>
+    struct TypeMapperImpl<Query /*no more options*/> {
+        using type = Query; // Base case
+    };
+    template <typename Match, typename V, typename... Rest>
+    struct TypeMapperImpl<Match, std::pair<Match, V>, Rest...> {
+        using type = V; // Found a match
+    };
+    template <typename Query, typename K, typename V, typename... Rest>
+    struct TypeMapperImpl<Query, std::pair<K, V>, Rest...> {
+        using type = TypeMapper<Query, Rest...>; // Keep looking
+    };
+
+    using t_storage = TypeMapper<T,                        //
+                                 std::pair<bool, int64_t>, //
+                                 std::pair<int, int64_t>,  //
+                                 std::pair<ObjectId, util::Optional<ObjectId>>>;
 
     NullableVector()
     {
@@ -897,7 +920,7 @@ struct NullableVector {
     typename std::enable_if<realm::is_any<Type, float, double, BinaryData, StringData, ObjKey, Timestamp, ObjectId,
                                           Decimal128, ref_type, SizeOfList, null>::value,
                             void>::type
-    set(size_t index, t_storage value)
+    set(size_t index, T value)
     {
         m_first[index] = value;
     }
@@ -910,11 +933,10 @@ struct NullableVector {
         return util::make_optional((*this)[index]);
     }
 
-    inline void set(size_t index, util::Optional<Underlying> value)
+    inline void set(size_t index, util::Optional<T> value)
     {
         if (value) {
-            Underlying v = *value;
-            set(index, v);
+            set(index, *value);
         }
         else {
             set_null(index);
@@ -976,6 +998,9 @@ struct NullableVector {
 
     int64_t m_null = reinterpret_cast<int64_t>(&m_null); // choose magic value to represent nulls
 };
+
+template <typename T, size_t prealloc>
+struct NullableVector<util::Optional<T>, prealloc>; // NullableVector<Optional<T>> is banned.
 
 // Double
 // NOTE: fails in gcc 4.8 without `inline`. Do not remove. Same applies for all methods below.
@@ -1064,13 +1089,21 @@ inline void NullableVector<Timestamp>::set_null(size_t index)
 template <>
 inline bool NullableVector<ObjectId>::is_null(size_t index) const
 {
-    return m_first[index].is_null();
+    return !m_first[index];
 }
 
 template <>
 inline void NullableVector<ObjectId>::set_null(size_t index)
 {
-    m_first[index] = ObjectId{};
+    m_first[index].reset();
+}
+
+template <>
+inline ObjectId NullableVector<ObjectId>::operator[](size_t index) const
+{
+    REALM_ASSERT_3(index, <, m_size);
+    const auto& opt = m_first[index];
+    return opt ? *opt : ObjectId();
 }
 
 // Decimal128
@@ -1152,7 +1185,9 @@ struct TrueExpression : Expression {
 
         return realm::not_found;
     }
-    void set_base_table(ConstTableRef) override {}
+    void set_base_table(ConstTableRef) override
+    {
+    }
     void set_cluster(const Cluster*) override
     {
     }
@@ -1176,7 +1211,9 @@ struct FalseExpression : Expression {
     {
         return realm::not_found;
     }
-    void set_base_table(ConstTableRef) override {}
+    void set_base_table(ConstTableRef) override
+    {
+    }
     void set_cluster(const Cluster*) override
     {
     }
@@ -2660,7 +2697,9 @@ public:
     {
     }
 
-    void set_base_table(ConstTableRef) override {}
+    void set_base_table(ConstTableRef) override
+    {
+    }
 
     ConstTableRef get_base_table() const override
     {
@@ -4017,7 +4056,6 @@ public:
 
                 // key is known to be in this leaf, so find key whithin leaf keys
                 return m_cluster->lower_bound_key(ObjKey(actual_key.value - m_cluster->get_offset()));
-
             }
             return not_found;
         }

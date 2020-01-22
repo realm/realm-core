@@ -45,6 +45,7 @@ class ArrayKey;
 class ArrayKeyNonNullable;
 class ArrayDecimal128;
 class ArrayObjectId;
+class ArrayObjectIdNull;
 template <class>
 class BasicArray;
 template <class>
@@ -182,6 +183,13 @@ struct ColumnTypeTraits<ObjectId> {
 };
 
 template <>
+struct ColumnTypeTraits<util::Optional<ObjectId>> {
+    using cluster_leaf_type = ArrayObjectIdNull;
+    static const DataType id = type_ObjectId;
+    static const ColumnType column_id = col_type_ObjectId;
+};
+
+template <>
 struct ColumnTypeTraits<StringData> {
     using cluster_leaf_type = ArrayString;
     static const DataType id = type_String;
@@ -245,27 +253,26 @@ inline bool value_is_null(const util::Optional<T>& val)
 {
     return !val;
 }
-template <>
 inline bool value_is_null(const int64_t&)
 {
     return false;
 }
-template <>
 inline bool value_is_null(const bool&)
 {
     return false;
 }
-template <>
+inline bool value_is_null(const ObjectId&)
+{
+    return false;
+}
 inline bool value_is_null(const float& val)
 {
     return null::is_null_float(val);
 }
-template <>
 inline bool value_is_null(const double& val)
 {
     return null::is_null_float(val);
 }
-template <>
 inline bool value_is_null(const ObjKey& val)
 {
     return !val;
