@@ -1208,6 +1208,7 @@ template StringData ConstObj::get<StringData>(ColKey col_key) const;
 template BinaryData ConstObj::get<BinaryData>(ColKey col_key) const;
 template Timestamp ConstObj::get<Timestamp>(ColKey col_key) const;
 template ObjectId ConstObj::get<ObjectId>(ColKey col_key) const;
+template util::Optional<ObjectId> ConstObj::get<util::Optional<ObjectId>>(ColKey col_key) const;
 template ObjKey ConstObj::get<ObjKey>(ColKey col_key) const;
 template Decimal128 ConstObj::get<Decimal128>(ColKey col_key) const;
 
