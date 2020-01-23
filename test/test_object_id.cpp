@@ -170,10 +170,18 @@ TEST(ObjectId_Table)
 
     Table t;
     auto col_id = t.add_column(type_ObjectId, "id");
+    auto col_id_null = t.add_column(type_ObjectId, "id_null", true);
     auto obj0 = t.create_object().set(col_id, ObjectId(str0));
-    auto obj1 = t.create_object().set(col_id, ObjectId(str1));
+    auto obj1 = t.create_object().set(col_id, ObjectId(str1)).set(col_id_null, ObjectId(str1));
+    auto obj2 = t.create_object();
     CHECK_EQUAL(obj0.get<ObjectId>(col_id), ObjectId(str0));
     CHECK_EQUAL(obj1.get<ObjectId>(col_id), ObjectId(str1));
+    CHECK_NOT(obj2.is_null(col_id));
+    CHECK(obj2.is_null(col_id_null));
+    auto id = obj1.get<util::Optional<ObjectId>>(col_id_null);
+    CHECK(id);
+    id = obj2.get<util::Optional<ObjectId>>(col_id_null);
+    CHECK_NOT(id);
     auto key = t.find_first(col_id, ObjectId(str1));
     CHECK_EQUAL(key, obj1.get_key());
     t.add_search_index(col_id);
@@ -210,18 +218,22 @@ TEST(ObjectId_Query)
     auto now = std::chrono::steady_clock::now();
     ObjectId t0;
     ObjectId t25;
+    ObjectId alternative_id("000004560000000000170232");
 
     {
         auto wt = db->start_write();
         auto table = wt->add_table_with_primary_key("Foo", type_ObjectId, "id");
+        auto col_id = table->add_column(type_ObjectId, "alternative_id", true);
         auto col_int = table->add_column(type_Int, "int");
-        for (int i = 0; i < 100; i++) {
+        for (int i = 0; i < 1000; i++) {
             ObjectId id{now + std::chrono::seconds(i / 20)};
             if (i == 0)
                 t0 = id;
             if (i == 25)
                 t25 = id;
-            table->create_object_with_primary_key(id).set(col_int, i);
+            auto obj = table->create_object_with_primary_key(id).set(col_int, i);
+            if (i % 30 == 0)
+                obj.set(col_id, alternative_id);
         }
         wt->commit();
     }
@@ -230,8 +242,9 @@ TEST(ObjectId_Query)
         auto table = rt->get_table("Foo");
         auto col = table->get_primary_key_column();
         auto col_int = table->get_column_key("int");
+        auto col_id = table->get_column_key("alternative_id");
         Query q = table->column<ObjectId>(col) > t0;
-        CHECK_EQUAL(q.count(), 99);
+        CHECK_EQUAL(q.count(), 999);
         Query q1 = table->column<ObjectId>(col) < t25;
         CHECK_EQUAL(q1.count(), 25);
         auto tv = q1.find_all();
@@ -239,6 +252,8 @@ TEST(ObjectId_Query)
         for (int i = 0; i < 25; i++) {
             CHECK_EQUAL(tv.get(i).get<int64_t>(col_int), i);
         }
+        Query q2 = table->column<ObjectId>(col_id) == alternative_id;
+        CHECK_EQUAL(q2.count(), 34);
 
         std::ostringstream ostr;
         tv.to_json(ostr); // just check that it does not crash

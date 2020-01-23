@@ -2008,7 +2008,6 @@ template ObjKey Table::find_first(ColKey col_key, double) const;
 template ObjKey Table::find_first(ColKey col_key, Decimal128) const;
 template ObjKey Table::find_first(ColKey col_key, util::Optional<bool>) const;
 template ObjKey Table::find_first(ColKey col_key, util::Optional<int64_t>) const;
-template ObjKey Table::find_first(ColKey col_key, util::Optional<ObjectId>) const;
 template ObjKey Table::find_first(ColKey col_key, BinaryData) const;
 
 ObjKey Table::find_first_int(ColKey col_key, int64_t value) const
