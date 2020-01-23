@@ -2494,10 +2494,10 @@ Obj Table::create_linked_object()
     if (!m_is_embedded)
         throw LogicError(LogicError::wrong_kind_of_table);
     ObjKey key = get_next_key();
-    /*
-    if (auto repl = get_repl())
-        repl->create_object(this, object_id); // FIXME: How is this to work when the object is unlinked atm?
-    */
+    if (auto repl = get_repl()) {
+        // NOTE the replication logic CANNOT use the key to create an object accessor at this point.
+        repl->create_object(this, key);
+    }
     REALM_ASSERT(key.value >= 0);
 
     bump_content_version();
