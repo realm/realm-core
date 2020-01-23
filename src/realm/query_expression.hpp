@@ -2203,7 +2203,12 @@ public:
             REALM_ASSERT(m_leaf_ptr != nullptr);
             // Not a link column
             for (size_t t = 0; t < destination.m_values && index + t < m_leaf_ptr->size(); t++) {
-                d.m_storage.set(t, m_leaf_ptr->get(index + t));
+                if (m_leaf_ptr->is_null(index + t)) {
+                    d.m_storage.set_null(t);
+                }
+                else {
+                    d.m_storage.set(t, m_leaf_ptr->get(index + t));
+                }
             }
         }
     }
