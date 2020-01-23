@@ -28,6 +28,7 @@
 #include "realm/array_decimal128.hpp"
 #include "realm/array_object_id.hpp"
 #include "realm/column_type_traits.hpp"
+#include "realm/object_id.hpp"
 #include "realm/table.hpp"
 #include "realm/table_view.hpp"
 #include "realm/group.hpp"
@@ -79,7 +80,12 @@ ConstLstBasePtr ConstObj::get_listbase_ptr(ColKey col_key) const
             return std::make_unique<ConstLst<Decimal128>>(*this, col_key);
         }
         case type_ObjectId: {
-            return std::make_unique<ConstLst<ObjectId>>(*this, col_key);
+            if (nullable) {
+                return std::make_unique<ConstLst<util::Optional<ObjectId>>>(*this, col_key);
+            }
+            else {
+                return std::make_unique<ConstLst<ObjectId>>(*this, col_key);
+            }
         }
         case type_LinkList: {
             const ConstLstBase* clb = get_linklist_ptr(col_key).release();
@@ -139,7 +145,10 @@ LstBasePtr Obj::get_listbase_ptr(ColKey col_key) const
             return std::make_unique<Lst<Decimal128>>(*this, col_key);
         }
         case type_ObjectId: {
-            return std::make_unique<Lst<ObjectId>>(*this, col_key);
+            if (nullable)
+                return std::make_unique<Lst<util::Optional<ObjectId>>>(*this, col_key);
+            else
+                return std::make_unique<Lst<ObjectId>>(*this, col_key);
         }
         case type_LinkList:
             return get_linklist_ptr(col_key);
@@ -397,6 +406,8 @@ template ConstLst<StringData>::ConstLst(const ConstObj& obj, ColKey col_key);
 template ConstLst<BinaryData>::ConstLst(const ConstObj& obj, ColKey col_key);
 template ConstLst<Timestamp>::ConstLst(const ConstObj& obj, ColKey col_key);
 template ConstLst<ObjKey>::ConstLst(const ConstObj& obj, ColKey col_key);
+template ConstLst<ObjectId>::ConstLst(const ConstObj& obj, ColKey col_key);
+template ConstLst<util::Optional<ObjectId>>::ConstLst(const ConstObj& obj, ColKey col_key);
 
 template Lst<int64_t>::Lst(const Obj& obj, ColKey col_key);
 template Lst<util::Optional<Int>>::Lst(const Obj& obj, ColKey col_key);
@@ -410,6 +421,8 @@ template Lst<StringData>::Lst(const Obj& obj, ColKey col_key);
 template Lst<BinaryData>::Lst(const Obj& obj, ColKey col_key);
 template Lst<Timestamp>::Lst(const Obj& obj, ColKey col_key);
 template Lst<ObjKey>::Lst(const Obj& obj, ColKey col_key);
+template Lst<ObjectId>::Lst(const Obj& obj, ColKey col_key);
+template Lst<util::Optional<ObjectId>>::Lst(const Obj& obj, ColKey col_key);
 }
 
 ConstObj ConstLnkLst::get_object(size_t link_ndx) const
@@ -473,7 +486,7 @@ void Lst<ObjKey>::clear()
                 m_tree->erase(ndx);
                 ConstLstBase::adj_remove(ndx);
             }
-            //m_obj.bump_both_versions();
+            // m_obj.bump_both_versions();
             m_obj.bump_content_version();
             return;
         }
@@ -680,6 +693,18 @@ void Lst<ObjectId>::set_repl(Replication* repl, size_t ndx, ObjectId value)
 }
 
 template <>
+void Lst<util::Optional<ObjectId>>::set_repl(Replication* repl, size_t ndx, util::Optional<ObjectId> value)
+{
+    if (value) {
+        repl->list_set_object_id(*this, ndx, *value);
+    }
+    else {
+        repl->list_set_null(*this, ndx);
+    }
+}
+
+
+template <>
 void Lst<ObjKey>::set_repl(Replication* repl, size_t ndx, ObjKey key)
 {
     if (key) {
@@ -808,6 +833,18 @@ void Lst<ObjectId>::insert_repl(Replication* repl, size_t ndx, ObjectId value)
 {
     repl->list_insert_object_id(*this, ndx, value);
 }
+
+template <>
+void Lst<util::Optional<ObjectId>>::insert_repl(Replication* repl, size_t ndx, util::Optional<ObjectId> value)
+{
+    if (value) {
+        repl->list_insert_object_id(*this, ndx, *value);
+    }
+    else {
+        repl->list_insert_null(*this, ndx);
+    }
+}
+
 
 template <>
 void Lst<ObjKey>::insert_repl(Replication* repl, size_t ndx, ObjKey key)
