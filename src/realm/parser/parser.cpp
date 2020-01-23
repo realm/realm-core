@@ -84,6 +84,10 @@ struct readable_timestamp : seq< first_timestamp_number, one< '-' >, timestamp_n
     timestamp_number, opt< seq< one< ':' >, timestamp_number > > > {};
 struct timestamp : sor< internal_timestamp, readable_timestamp > {};
 
+struct oid_allowed : disable< xdigit > {};
+struct oid_content : until< at< one< ')' > >, must< oid_allowed > > {};
+struct oid : seq< TAOCPP_PEGTL_ISTRING("oid("), must< oid_content >, any > {};
+
 struct true_value : string_token_t("true") {};
 struct false_value : string_token_t("false") {};
 struct null_value : seq<sor<string_token_t("null"), string_token_t("nil")>> {
@@ -157,7 +161,7 @@ struct agg_shortcut_pred : sor<agg_any, agg_all, agg_none> {
 };
 
 // expressions and operators
-struct expr : sor<dq_string, sq_string, timestamp, number, argument, true_value, false_value, null_value, base64,
+struct expr : sor<dq_string, sq_string, timestamp, oid, number, argument, true_value, false_value, null_value, base64,
                   collection_operator_match, subquery, key_path> {
 };
 struct case_insensitive : TAOCPP_PEGTL_ISTRING("[c]") {};
@@ -401,6 +405,7 @@ EXPRESSION_ACTION(false_value, Expression::Type::False)
 EXPRESSION_ACTION(null_value, Expression::Type::Null)
 EXPRESSION_ACTION(argument_index, Expression::Type::Argument)
 EXPRESSION_ACTION(base64, Expression::Type::Base64)
+EXPRESSION_ACTION(oid, Expression::Type::ObjectId)
 
 template<> struct action< timestamp >
 {

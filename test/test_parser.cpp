@@ -3153,7 +3153,6 @@ TEST(Parser_OperatorIN)
         "The keypath preceeding 'IN' must not contain a list, list vs list comparisons are not currently supported");
 }
 
-
 // we won't support full object comparisons until we have stable keys in core, but as an exception
 // we allow comparison with null objects because we can serialise that and bindings use it to check agains nulls.
 TEST(Parser_Object)
@@ -3279,6 +3278,7 @@ TEST(Parser_ChainedIntEqualQueries)
     }
     auto default_obj = table->create_object(); // one null/default 0 object
 
+    verify_query(test_context, table, "a == NULL", 0);
     verify_query(test_context, table, "a == 0 or a == 1 or a == 2", 4);
     verify_query(test_context, table, "a == 1 or b == 2 or a == 3 or b == 4", 4);
     verify_query(test_context, table,
@@ -3329,5 +3329,52 @@ TEST(Parser_TimestampNullable)
     CHECK_EQUAL(description, "b == T200:0 and (a == T100:0 or a == NULL)");
 }
 
+TEST(Parser_ObjectId)
+{
+    Group g;
+    auto table = g.add_table_with_primary_key("table", type_ObjectId, "id");
+    auto pk_col_key = table->get_primary_key_column();
+    auto nullable_oid_col_key = table->add_column(type_ObjectId, "nid", true);
+
+    auto now = std::chrono::steady_clock::now();
+    ObjectId t1{Timestamp{0, 1}};
+    ObjectId tNow{now};
+    ObjectId t25{now + std::chrono::seconds(25)};
+    std::vector<ObjectId> ids = {t1, tNow, t25};
+
+    for (auto oid : ids) {
+        auto obj = table->create_object_with_primary_key({oid});
+        obj.set(nullable_oid_col_key, oid);
+    }
+    // add one object with default values, we assume time > now, and null
+    auto obj_generated = table->create_object();
+    ObjectId generated_pk = obj_generated.get<ObjectId>(pk_col_key);
+    ObjectId generated_nullable = obj_generated.get<ObjectId>(nullable_oid_col_key);
+    CHECK_GREATER_EQUAL(Timestamp{now}, generated_pk.get_timestamp());
+    CHECK(generated_nullable.is_null());
+    verify_query(test_context, table, "id == oid(" + generated_pk.to_string() + ")", 1);
+    verify_query(test_context, table, "nid == oid(" + generated_nullable.to_string() + ")", 1);
+
+    for (auto oid : ids) {
+        verify_query(test_context, table, "id == oid(" + oid.to_string() + ")", 1);
+    }
+
+    // FIXME: there is currently buggy behaviour here until we get proper null support
+    // in a non-nullable column, everything should match >= 0
+    // verify_query(test_context, table, "id >= oid(000000000000000000000000)", table->size());
+    // in a non-nullable column, everything should match <= max value
+    // verify_query(test_context, table, "id <= oid(ffffffffffffffffffffffff)", table->size());
+    // a non nullable column should never contain null values
+    // verify_query(test_context, table, "id == NULL", 0);
+    // a nullable column should find the null created by the default constructed row
+     verify_query(test_context, table, "nid == NULL", 1);
+
+    // argument substitution checks
+    util::Any args[] = {t1, tNow, t25};
+    size_t num_args = 3;
+    verify_query_sub(test_context, table, "id == $0", args, num_args, 1);
+    verify_query_sub(test_context, table, "id == $1", args, num_args, 1);
+    verify_query_sub(test_context, table, "id == $2", args, num_args, 1);
+}
 
 #endif // TEST_PARSER

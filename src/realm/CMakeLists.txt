@@ -81,6 +81,7 @@ set(REALM_INSTALL_GENERAL_HEADERS
     array_blobs_big.hpp
     array_blobs_small.hpp
     array_bool.hpp
+    array_decimal128.hpp
     array_direct.hpp
     array_integer.hpp
     array_mixed.hpp
@@ -101,6 +102,7 @@ set(REALM_INSTALL_GENERAL_HEADERS
     column_type.hpp
     column_type_traits.hpp
     data_type.hpp
+    decimal128.hpp
     disable_sync_to_disk.hpp
     exceptions.hpp
     group.hpp

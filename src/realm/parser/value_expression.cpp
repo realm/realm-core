@@ -224,5 +224,26 @@ BinaryData ValueExpression::value_of_type_for_query<BinaryData>()
     throw std::logic_error("Binary properties must be compared against a binary argument.");
 }
 
+template<>
+ObjectId ValueExpression::value_of_type_for_query<ObjectId>()
+{
+    if (value->type == parser::Expression::Type::Argument) {
+        return arguments->objectid_for_argument(stot<int>(value->s));
+    }
+    else if (value->type == parser::Expression::Type::Timestamp) {
+        return ObjectId(from_timestamp_values(value->time_inputs));
+    } else if (value->type == parser::Expression::Type::Null) {
+        return ObjectId();
+    } else if (value->type == parser::Expression::Type::ObjectId) {
+        // expect oid(...) from the parser, and pass in the contents
+        if (value->s.size() > 5 && value->s.substr(0, 4) == "oid(" && value->s[value->s.size() - 1] == ')') {
+            return ObjectId(value->s.substr(4, value->s.size() - 5).c_str());
+        }
+        // otherwise let the ObjectId constructor try to parse all the contents (may assert)
+        return ObjectId(value->s.c_str());
+    }
+    throw std::logic_error("ObjectId properties must be compared against an ObjectId or Timestamp argument.");
+}
+
 } // namespace parser
 } // namespace realm

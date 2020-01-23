@@ -26,6 +26,7 @@
 #include <realm/binary_data.hpp>
 #include <realm/parser/keypath_mapping.hpp>
 #include <realm/null.hpp>
+#include <realm/object_id.hpp>
 #include <realm/string_data.hpp>
 #include <realm/timestamp.hpp>
 #include <realm/table.hpp>
@@ -83,6 +84,7 @@ public:
     virtual BinaryData binary_for_argument(size_t argument_index) = 0;
     virtual Timestamp timestamp_for_argument(size_t argument_index) = 0;
     virtual ObjKey object_index_for_argument(size_t argument_index) = 0;
+    virtual ObjectId objectid_for_argument(size_t i) = 0;
     virtual bool is_argument_null(size_t argument_index) = 0;
     // dynamic conversion space with lifetime tied to this
     // it is used for storing literal binary/string data
@@ -105,6 +107,7 @@ public:
     StringData string_for_argument(size_t i) override { return get<StringData>(i); }
     BinaryData binary_for_argument(size_t i) override { return get<BinaryData>(i); }
     Timestamp timestamp_for_argument(size_t i) override { return get<Timestamp>(i); }
+    ObjectId objectid_for_argument(size_t i) override { return get<ObjectId>(i); }
     ObjKey object_index_for_argument(size_t i) override
     {
         return get<ObjKey>(i);
@@ -174,6 +177,10 @@ public:
         throw NoArgsError();
     }
     Timestamp timestamp_for_argument(size_t)
+    {
+        throw NoArgsError();
+    }
+    ObjectId objectid_for_argument(size_t)
     {
         throw NoArgsError();
     }

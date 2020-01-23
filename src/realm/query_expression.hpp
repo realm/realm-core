@@ -1518,7 +1518,7 @@ private:
 // left-hand-side       operator                              right-hand-side
 // L                    +, -, *, /, <, >, ==, !=, <=, >=      Subexpr2<R>
 //
-// For L = R = {int, int64_t, float, double, Timestamp}:
+// For L = R = {int, int64_t, float, double, Timestamp, ObjectId}:
 // Compare numeric values
 template <class R>
 Query operator>(double left, const Subexpr2<R>& right)
@@ -1542,6 +1542,11 @@ Query operator>(int64_t left, const Subexpr2<R>& right)
 }
 template <class R>
 Query operator>(Timestamp left, const Subexpr2<R>& right)
+{
+    return create<Greater>(left, right);
+}
+template <class R>
+Query operator>(ObjectId left, const Subexpr2<R>& right)
 {
     return create<Greater>(left, right);
 }
@@ -1572,6 +1577,11 @@ Query operator<(Timestamp left, const Subexpr2<R>& right)
     return create<Less>(left, right);
 }
 template <class R>
+Query operator<(ObjectId left, const Subexpr2<R>& right)
+{
+    return create<Less>(left, right);
+}
+template <class R>
 Query operator==(double left, const Subexpr2<R>& right)
 {
     return create<Equal>(left, right);
@@ -1593,6 +1603,11 @@ Query operator==(int64_t left, const Subexpr2<R>& right)
 }
 template <class R>
 Query operator==(Timestamp left, const Subexpr2<R>& right)
+{
+    return create<Equal>(left, right);
+}
+template <class R>
+Query operator==(ObjectId left, const Subexpr2<R>& right)
 {
     return create<Equal>(left, right);
 }
@@ -1627,6 +1642,11 @@ Query operator>=(Timestamp left, const Subexpr2<R>& right)
     return create<GreaterEqual>(left, right);
 }
 template <class R>
+Query operator>=(ObjectId left, const Subexpr2<R>& right)
+{
+    return create<GreaterEqual>(left, right);
+}
+template <class R>
 Query operator<=(double left, const Subexpr2<R>& right)
 {
     return create<LessEqual>(left, right);
@@ -1652,6 +1672,11 @@ Query operator<=(Timestamp left, const Subexpr2<R>& right)
     return create<LessEqual>(left, right);
 }
 template <class R>
+Query operator<=(ObjectId left, const Subexpr2<R>& right)
+{
+    return create<LessEqual>(left, right);
+}
+template <class R>
 Query operator!=(double left, const Subexpr2<R>& right)
 {
     return create<NotEqual>(left, right);
@@ -1673,6 +1698,11 @@ Query operator!=(int64_t left, const Subexpr2<R>& right)
 }
 template <class R>
 Query operator!=(Timestamp left, const Subexpr2<R>& right)
+{
+    return create<NotEqual>(left, right);
+}
+template <class R>
+Query operator!=(ObjectId left, const Subexpr2<R>& right)
 {
     return create<NotEqual>(left, right);
 }

@@ -263,7 +263,7 @@ if (!CA4.w[0] && !CA4.w[1])
       tdigit[0] = Q_high & 0x3ffffff;
       tdigit[1] = 0;
       QX = Q_high >> 26;
-      QX32 = QX;
+      QX32 = (BID_UINT32)QX;
       nzeros = 0;
 
       for (j = 0; QX32; j++, QX32 >>= 7) {
@@ -321,7 +321,7 @@ if (!CA4.w[0] && !CA4.w[1])
       tdigit[0] = Q_low & 0x3ffffff;
       tdigit[1] = 0;
       QX = Q_low >> 26;
-      QX32 = QX;
+      QX32 = (BID_UINT32)QX;
       nzeros = 0;
 
       for (j = 0; QX32; j++, QX32 >>= 7) {
@@ -716,7 +716,7 @@ bid___div_256_by_128 (&CQ, &CA4, CY);
 	tdigit[0] = Q_high & 0x3ffffff;
 	tdigit[1] = 0;
 	QX = Q_high >> 26;
-	QX32 = QX;
+	QX32 = (BID_UINT32)QX;
 	nzeros = 0;
 
 	for (j = 0; QX32; j++, QX32 >>= 7) {
@@ -775,7 +775,7 @@ bid___div_256_by_128 (&CQ, &CA4, CY);
 	tdigit[0] = Q_low & 0x3ffffff;
 	tdigit[1] = 0;
 	QX = Q_low >> 26;
-	QX32 = QX;
+	QX32 = (BID_UINT32)QX;
 	nzeros = 0;
 
 	for (j = 0; QX32; j++, QX32 >>= 7) {
@@ -1164,7 +1164,7 @@ bid___div_256_by_128 (&CQ, &CA4, CY);
 	tdigit[0] = Q_high & 0x3ffffff;
 	tdigit[1] = 0;
 	QX = Q_high >> 26;
-	QX32 = QX;
+	QX32 = (BID_UINT32)QX;
 	nzeros = 0;
 
 	for (j = 0; QX32; j++, QX32 >>= 7) {
@@ -1224,7 +1224,7 @@ bid___div_256_by_128 (&CQ, &CA4, CY);
 	tdigit[0] = Q_low & 0x3ffffff;
 	tdigit[1] = 0;
 	QX = Q_low >> 26;
-	QX32 = QX;
+	QX32 = (BID_UINT32)QX;
 	nzeros = 0;
 
 	for (j = 0; QX32; j++, QX32 >>= 7) {
@@ -1609,7 +1609,7 @@ bid___div_256_by_128 (&CQ, &CA4, CY);
 	tdigit[0] = Q_high & 0x3ffffff;
 	tdigit[1] = 0;
 	QX = Q_high >> 26;
-	QX32 = QX;
+	QX32 = (BID_UINT32)QX;
 	nzeros = 0;
 
 	for (j = 0; QX32; j++, QX32 >>= 7) {
@@ -1668,7 +1668,7 @@ bid___div_256_by_128 (&CQ, &CA4, CY);
 	tdigit[0] = Q_low & 0x3ffffff;
 	tdigit[1] = 0;
 	QX = Q_low >> 26;
-	QX32 = QX;
+	QX32 = (BID_UINT32)QX;
 	nzeros = 0;
 
 	for (j = 0; QX32; j++, QX32 >>= 7) {
