@@ -159,7 +159,7 @@ protected:
 
 // The nullable ObjectId array uses the same layout and is compatible with the non-nullable one. It adds support for
 // operations on null. Because the base class maintains null markers, we are able to defer to it for many operations.
-class ArrayObjectIdNull final : public ArrayObjectId {
+class ArrayObjectIdNull : public ArrayObjectId {
 public:
     using ArrayObjectId::ArrayObjectId;
     static util::Optional<ObjectId> default_value(bool nullable)
