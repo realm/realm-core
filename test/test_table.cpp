@@ -2475,7 +2475,7 @@ TEST(Table_Nulls)
         obj0.set(col_date, Timestamp(3, 0));
 
         CHECK_EQUAL(65, obj0.get<util::Optional<Int>>(col_int));
-        CHECK_EQUAL(false, obj0.get<Bool>(col_bool));
+        CHECK_EQUAL(false, obj0.get<util::Optional<Bool>>(col_bool));
         CHECK_EQUAL(Timestamp(3, 0), obj0.get<Timestamp>(col_date));
 
         CHECK_EQUAL(65, t.maximum_int(col_int));
@@ -2865,7 +2865,7 @@ TEST(Table_object_basic)
 
     // Check that accessing a removed object will throw
     table.remove_object(ObjKey(5));
-    CHECK_THROW(y.get<int64_t>(intnull_col), InvalidKey);
+    CHECK_THROW(y.get<util::Optional<int64_t>>(intnull_col), InvalidKey);
 
     CHECK(table.get_object(ObjKey(8)).is_null(intnull_col));
 }

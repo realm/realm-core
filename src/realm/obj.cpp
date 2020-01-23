@@ -269,11 +269,38 @@ bool ConstObj::update_if_needed() const
 }
 
 template <class T>
+struct is_optional : std::false_type {};
+template <class T>
+struct is_optional<util::Optional<T>> : std::true_type {};
+
+// FIXME: All these are pretty problematic.
+template <>
+struct is_optional<StringData> : std::true_type {};
+template <>
+struct is_optional<Timestamp> : std::true_type {};
+template <>
+struct is_optional<BinaryData> : std::true_type {};
+template <>
+struct is_optional<Decimal128> : std::true_type {};
+template <>
+struct is_optional<ObjectId> : std::true_type {};
+template <>
+struct is_optional<ObjKey> : std::true_type {};
+template <>
+struct is_optional<float> : std::true_type {};
+template <>
+struct is_optional<double> : std::true_type {};
+
+template <class T>
+constexpr bool is_optional_v = is_optional<T>::value;
+
+template <class T>
 T ConstObj::get(ColKey col_key) const
 {
     m_table->report_invalid_key(col_key);
     ColumnType type = col_key.get_type();
     REALM_ASSERT(type == ColumnTypeTraits<T>::column_id);
+    REALM_ASSERT(!m_table->is_nullable(col_key) || is_optional_v<T>);
 
     return _get<T>(col_key.get_index());
 }
