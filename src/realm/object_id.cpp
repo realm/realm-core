@@ -24,19 +24,30 @@
 
 using namespace std::chrono;
 
-static std::mt19937 generator(std::mt19937::result_type(system_clock::now().time_since_epoch().count()));
+namespace {
+struct GeneratorState {
+    // This just initializes all state randomly. The machine and process id fields are no longer supposed to use PIDs
+    // or any machine-specific data, because that increases the probability of collisions.
+    GeneratorState(std::random_device&& rnd = std::random_device{})
+        : machine_id(rnd())
+        , process_id(rnd())
+        , seq(rnd())
+    {
+        static_assert(sizeof(std::random_device{}()) == 4, "4 bytes of random");
+    }
 
-static std::atomic<std::mt19937::result_type> seq(generator());
+    const int32_t machine_id;
+    const int32_t process_id;
+    std::atomic<uint32_t> seq;
+} g_gen_state;
+}
+
+
 static const char hex_digits[] = "0123456789abcdef";
 
 namespace realm {
 
-ObjectId::ObjectId()
-{
-    memset(m_bytes, 0, sizeof(m_bytes));
-}
-
-ObjectId::ObjectId(const null&) noexcept
+ObjectId::ObjectId() noexcept
 {
     memset(m_bytes, 0, sizeof(m_bytes));
 }
@@ -68,12 +79,18 @@ ObjectId::ObjectId(Timestamp d, int machine_id, int process_id)
     memcpy(m_bytes + 4, &machine_id, 3);
     memcpy(m_bytes + 7, &process_id, 2);
 
-    auto r = seq++;
+    auto r = g_gen_state.seq.fetch_add(1, std::memory_order_relaxed);
+
     // Also store random number as big endian. This ensures that objects created
     // later within the same second will also be sorted correctly
     m_bytes[9] = (r >> 16) & 0xff;
     m_bytes[10] = (r >> 8) & 0xff;
     m_bytes[11] = r & 0xff;
+}
+
+ObjectId ObjectId::gen()
+{
+    return ObjectId(Timestamp(::time(nullptr), 0), g_gen_state.machine_id, g_gen_state.process_id);
 }
 
 Timestamp ObjectId::get_timestamp() const

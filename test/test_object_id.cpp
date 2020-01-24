@@ -259,3 +259,19 @@ TEST(ObjectId_Query)
         tv.to_json(ostr); // just check that it does not crash
     }
 }
+
+TEST(ObjectId_Gen)
+{
+    auto a = ObjectId::gen();
+    auto b = ObjectId::gen();
+
+    if (b < a) {
+        // This can only happen if the seq counter rolled over. Since it is 24 bits, this is expected once every 16
+        // million runs. Generate new ones which should not involve another rollover.
+        // This could also happen if the clock goes backwards, and while it could happen again, hopefully it won't.
+        a = ObjectId::gen();
+        b = ObjectId::gen();
+    }
+
+    CHECK_LESS(a, b);
+}

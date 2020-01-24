@@ -27,10 +27,25 @@ namespace realm {
 
 class ObjectId {
 public:
-    ObjectId();
+    /**
+     * Constructs an ObjectId with all bytes 0x00.
+     */
+    ObjectId() noexcept;
+    ObjectId(null) noexcept : ObjectId()
+    {
+    }
+
+    /**
+     * Constructs an ObjectId from 24 hex characters.
+     */
     ObjectId(const char* init);
+
     ObjectId(Timestamp d, int machine_id = 0, int process_id = 0);
-    ObjectId(const null&) noexcept;
+
+    /**
+     * Generates a new ObjectId using the algorithm to attempt to avoid collisions.
+     */
+    static ObjectId gen();
 
     bool operator==(const ObjectId& other) const
     {
