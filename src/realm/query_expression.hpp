@@ -3786,7 +3786,7 @@ class Maximum : public BaseAggregateOperation<T, Maximum<T>> {
 public:
     static T initial_value()
     {
-        return std::numeric_limits<T>::min();
+        return std::numeric_limits<T>::lowest();
     }
     static T apply(T a, T b)
     {
