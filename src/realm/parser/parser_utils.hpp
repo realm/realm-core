@@ -25,6 +25,7 @@
 
 #include <sstream>
 #include <stdexcept>
+#include <string>
 
 namespace realm {
 
@@ -79,13 +80,40 @@ std::string key_path_to_string(const KeyPath& keypath);
 StringData get_printable_table_name(StringData name);
 StringData get_printable_table_name(const Table& table);
 
-template<typename T>
-T stot(std::string const& s) {
+template <typename T>
+inline T stot(std::string const& s)
+{
     std::istringstream iss(s);
     T value;
     iss >> value;
     if (iss.fail()) {
         throw std::invalid_argument(util::format("Cannot convert string '%1'", s));
+    }
+    return value;
+}
+
+template <>
+inline double stot(std::string const& s)
+{
+    double value;
+    try {
+        value = stold(s); // parsing NaN and +-Infinity are well defined in this conversion to long double
+    }
+    catch (const std::exception& e) {
+        throw std::invalid_argument(util::format("Cannot convert string '%1' to double: '%2'", s, e.what()));
+    }
+    return value;
+}
+
+template <>
+inline float stot(std::string const& s)
+{
+    float value;
+    try {
+        value = stof(s); // parsing NaN and +-Infinity are well defined in this conversion to long double
+    }
+    catch (const std::exception& e) {
+        throw std::invalid_argument(util::format("Cannot convert string '%1' to float: '%2'", s, e.what()));
     }
     return value;
 }
