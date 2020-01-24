@@ -5,6 +5,7 @@
 
 ### Fixed
 * Fixed float and double maximum queries when all values were less or equal to zero.
+* Fixes parsing float and double constants which had been serialised to scientific notation (eg. 1.23E-24). ([#3076](https://github.com/realm/realm-core/issues/3076)).
  
 ### Breaking changes
 * None.
