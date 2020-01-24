@@ -119,12 +119,7 @@ std::string print_value<>(realm::Timestamp t)
 template <>
 std::string print_value<>(realm::ObjectId oid)
 {
-    if (oid.is_null()) {
-        return "NULL";
-    }
-    std::stringstream ss;
-    ss << "oid(" << oid.to_string() << ")";
-    return ss.str();
+    return "oid(" + oid.to_string() + ")";
 }
 
 template <>

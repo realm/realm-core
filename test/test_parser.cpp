@@ -3370,11 +3370,11 @@ TEST(Parser_ObjectId)
     // add one object with default values, we assume time > now, and null
     auto obj_generated = table->create_object();
     ObjectId generated_pk = obj_generated.get<ObjectId>(pk_col_key);
-    ObjectId generated_nullable = obj_generated.get<ObjectId>(nullable_oid_col_key);
+    auto generated_nullable = obj_generated.get<util::Optional<ObjectId>>(nullable_oid_col_key);
     CHECK_GREATER_EQUAL(Timestamp{now}, generated_pk.get_timestamp());
-    CHECK(generated_nullable.is_null());
+    CHECK(!generated_nullable);
     verify_query(test_context, table, "id == oid(" + generated_pk.to_string() + ")", 1);
-    verify_query(test_context, table, "nid == oid(" + generated_nullable.to_string() + ")", 1);
+    verify_query(test_context, table, "nid == NULL", 1);
 
     for (auto oid : ids) {
         verify_query(test_context, table, "id == oid(" + oid.to_string() + ")", 1);
