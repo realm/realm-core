@@ -54,7 +54,7 @@ enum Instruction {
     instr_InsertColumn = 20, // Insert new column into to selected descriptor
     instr_EraseColumn = 21,  // Remove column from selected descriptor
     instr_RenameColumn = 22, // Rename column in selected descriptor
-    instr_SetLinkType = 23,  // Strong/weak (unused from file format 10)
+    instr_SetLinkType = 23,  // Strong/weak (unused from file format 11)
 
     instr_SelectList = 30,
     instr_ListInsert = 31, // Insert list entry

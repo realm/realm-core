@@ -5015,24 +5015,12 @@ TEST(Table_EmbeddedObjects)
     DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
 
     auto tr = sg->start_write();
-    auto table = tr->add_table("mytable");
+    auto table = tr->add_embedded_table("mytable");
     tr->commit_and_continue_as_read();
     tr->promote_to_write();
-    CHECK(!table->is_embedded());
-    table->set_embedded(true);
     CHECK(table->is_embedded());
-    table->set_embedded(false);
-    CHECK(!table->is_embedded());
-    auto o = table->create_object();
-    CHECK_THROW(table->set_embedded(true), LogicError);
-    o.remove();
-    table->set_embedded(true);
-    CHECK(table->is_embedded());
-    tr->rollback_and_continue_as_read();
-    CHECK(!table->is_embedded());
-    tr->promote_to_write();
-    table->set_embedded(true);
-    tr->commit();
+    CHECK_THROW(table->create_object(), LogicError);
+    tr->rollback();
 
     tr = sg->start_read();
     table = tr->get_table("mytable");
@@ -5047,8 +5035,7 @@ TEST(Table_EmbeddedObjectCreateAndDestroy)
     DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
 
     auto tr = sg->start_write();
-    auto table = tr->add_table("myEmbeddedStuff");
-    table->set_embedded(true);
+    auto table = tr->add_embedded_table("myEmbeddedStuff");
     auto col_recurse = table->add_column_link(type_Link, "theRecursiveBit", *table);
     CHECK_THROW(table->create_object(), LogicError);
     auto parent = tr->add_table("myParentStuff");
@@ -5070,8 +5057,7 @@ TEST(Table_EmbeddedObjectCreateAndDestroyList)
     DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
 
     auto tr = sg->start_write();
-    auto table = tr->add_table("myEmbeddedStuff");
-    table->set_embedded(true);
+    auto table = tr->add_embedded_table("myEmbeddedStuff");
     auto col_recurse = table->add_column_link(type_LinkList, "theRecursiveBit", *table);
     CHECK_THROW(table->create_object(), LogicError);
     auto parent = tr->add_table("myParentStuff");
@@ -5103,8 +5089,7 @@ TEST(Table_EmbeddedObjectNotifications)
     DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
 
     auto tr = sg->start_write();
-    auto table = tr->add_table("myEmbeddedStuff");
-    table->set_embedded(true);
+    auto table = tr->add_embedded_table("myEmbeddedStuff");
     auto col_recurse = table->add_column_link(type_LinkList, "theRecursiveBit", *table);
     CHECK_THROW(table->create_object(), LogicError);
     auto parent = tr->add_table("myParentStuff");
@@ -5162,8 +5147,7 @@ TEST(Table_EmbeddedObjectTableClearNotifications)
     DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
 
     auto tr = sg->start_write();
-    auto table = tr->add_table("myEmbeddedStuff");
-    table->set_embedded(true);
+    auto table = tr->add_embedded_table("myEmbeddedStuff");
     auto col_recurse = table->add_column_link(type_LinkList, "theRecursiveBit", *table);
     CHECK_THROW(table->create_object(), LogicError);
     auto parent = tr->add_table("myParentStuff");
@@ -5216,8 +5200,7 @@ TEST(Table_EmbeddedObjectPath)
     DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
 
     auto tr = sg->start_write();
-    auto table = tr->add_table("myEmbeddedStuff");
-    table->set_embedded(true);
+    auto table = tr->add_embedded_table("myEmbeddedStuff");
     auto col_recurse = table->add_column_link(type_LinkList, "theRecursiveBit", *table);
     CHECK_THROW(table->create_object(), LogicError);
     auto parent = tr->add_table("myParentStuff");

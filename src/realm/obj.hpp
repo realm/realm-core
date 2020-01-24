@@ -55,8 +55,6 @@ class ConstLnkLst;
 using LnkLstPtr = std::unique_ptr<LnkLst>;
 using ConstLnkLstPtr = std::unique_ptr<const LnkLst>;
 
-
-
 // 'Object' would have been a better name, but it clashes with a class in ObjectStore
 class ConstObj {
 public:

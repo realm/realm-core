@@ -1161,13 +1161,12 @@ TEST(Links_CascadeRemove_ColumnLink)
     struct Fixture {
         Group group;
         TableRef origin = group.add_table("origin");
-        TableRef target = group.add_table("target");
+        TableRef target = group.add_embedded_table("target");
         std::vector<ObjKey> origin_keys;
         std::vector<ObjKey> target_keys;
         ColKey col_link;
         Fixture()
         {
-            target->set_embedded(true);
             target->add_column(type_Int, "t_1");
             col_link = origin->add_column_link(type_Link, "o_1", *target);
             for (int i = 0; i < 3; ++i) {
@@ -1285,7 +1284,7 @@ TEST(Links_CascadeRemove_ColumnLinkList)
     struct Fixture {
         Group group;
         TableRef origin = group.add_table("origin");
-        TableRef target = group.add_table("target");
+        TableRef target = group.add_embedded_table("target");
         std::vector<ObjKey> origin_keys;
         std::vector<ObjKey> target_keys;
         std::vector<LnkLstPtr> linklists;
@@ -1293,7 +1292,6 @@ TEST(Links_CascadeRemove_ColumnLinkList)
         Fixture()
         {
             target->add_column(type_Int, "t_1");
-            target->set_embedded(true);
             col_link = origin->add_column_link(type_LinkList, "o_1", *target);
             origin->create_objects(3, origin_keys);
             linklists.emplace_back(origin->get_object(origin_keys[0]).get_linklist_ptr(col_link));

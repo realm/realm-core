@@ -338,6 +338,7 @@ public:
     ConstTableRef get_table(StringData name) const;
 
     TableRef add_table(StringData name);
+    TableRef add_embedded_table(StringData name);
     TableRef add_table_with_primary_key(StringData name, DataType pk_type, StringData pk_name, bool nullable = false);
     TableRef get_or_add_table(StringData name, bool* was_added = nullptr);
 
@@ -1013,6 +1014,16 @@ inline TableRef Group::add_table(StringData name)
         throw LogicError(LogicError::detached_accessor);
     check_table_name_uniqueness(name);
     Table* table = do_add_table(name); // Throws
+    return TableRef(table, table ? table->m_alloc.get_instance_version() : 0);
+}
+
+inline TableRef Group::add_embedded_table(StringData name)
+{
+    if (!is_attached())
+        throw LogicError(LogicError::detached_accessor);
+    check_table_name_uniqueness(name);
+    Table* table = do_add_table(name); // Throws
+    table->set_embedded(true);
     return TableRef(table, table ? table->m_alloc.get_instance_version() : 0);
 }
 

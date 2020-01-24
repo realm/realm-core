@@ -790,13 +790,7 @@ ColKey Table::insert_backlink_column(TableKey origin_table_key, ColKey origin_co
 
 void Table::set_embedded(bool embedded)
 {
-    if (size()) {
-        throw realm::LogicError(realm::LogicError::table_not_empty);
-    }
-    for_each_backlink_column([](ColKey) {
-            throw realm::LogicError(realm::LogicError::table_not_empty);
-            return true;
-        });
+    REALM_ASSERT(size() == 0);
     REALM_ASSERT(m_top.size() >= top_position_for_flags);
     if (m_top.size() == top_position_for_flags) {
         m_top.add(0);
@@ -2504,7 +2498,7 @@ void Table::refresh_accessor_tree()
     m_opposite_column.init_from_parent();
     auto rot_pk_key = m_top.get_as_ref_or_tagged(top_position_for_pk_col);
     m_primary_key_col = rot_pk_key.is_tagged() ? ColKey(rot_pk_key.get_as_int()) : ColKey();
-    if (m_top.size() == top_position_for_flags) {
+    if (m_top.size() > top_position_for_flags) {
         auto rot_flags = m_top.get_as_ref_or_tagged(top_position_for_flags);
         m_is_embedded = rot_flags.get_as_int() & 0x1;
     }

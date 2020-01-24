@@ -1572,8 +1572,7 @@ TEST(Group_CascadeNotify_TreeCascade)
     GROUP_TEST_PATH(path);
 
     Group g(path, 0, Group::mode_ReadWrite);
-    TableRef t = g.add_table("table");
-    t->set_embedded(true);
+    TableRef t = g.add_embedded_table("table");
     TableRef parent = g.add_table("parent");
     auto left = t->add_column_link(type_Link, "left", *t);
     auto right = t->add_column_link(type_Link, "right", *t);

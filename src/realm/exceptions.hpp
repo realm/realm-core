@@ -281,10 +281,7 @@ public:
         subtable_of_subtable_index,
 
         /// You try to instantiate a list object not matching column type
-        list_type_mismatch,
-
-        /// You try to change embedding status on a Table which is not empty
-        table_not_empty
+        list_type_mismatch
     };
 
     LogicError(ErrorKind message);

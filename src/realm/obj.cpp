@@ -964,7 +964,7 @@ Obj Obj::create_and_set_linked_object(ColKey col_key)
     get_table()->report_invalid_key(col_key);
     ColKey::Idx col_ndx = col_key.get_index();
     ColumnType type = col_key.get_type();
-    if (type != ColumnTypeTraits<ObjKey>::column_id)
+    if (type != col_type_Link)
         throw LogicError(LogicError::illegal_type);
     TableRef target_table = get_target_table(col_key);
     Table& t = *target_table;

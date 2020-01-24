@@ -1442,8 +1442,7 @@ TEST(LangBindHelper_AdvanceReadTransact_CascadeRemove_ColumnLink)
     {
         WriteTransaction wt(sg);
         auto origin = wt.add_table("origin");
-        auto target = wt.add_table("target");
-        target->set_embedded(true);
+        auto target = wt.add_embedded_table("target");
         col = origin->add_column_link(type_Link, "o_1", *target);
         target->add_column(type_Int, "t_1");
         wt.commit();
@@ -1522,8 +1521,7 @@ TEST(LangBindHelper_AdvanceReadTransact_CascadeRemove_ColumnLinkList)
     {
         WriteTransaction wt(sg);
         auto origin = wt.add_table("origin");
-        auto target = wt.add_table("target");
-        target->set_embedded(true);
+        auto target = wt.add_embedded_table("target");
         col = origin->add_column_link(type_LinkList, "o_1", *target);
         target->add_column(type_Int, "t_1");
         wt.commit();

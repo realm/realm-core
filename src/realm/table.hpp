@@ -145,9 +145,6 @@ public:
     ColKey add_column_list(DataType type, StringData name, bool nullable = false);
 
     ColKey add_column_link(DataType type, StringData name, Table& target);
-    /// Indicate whether a table holds embedded objects or not.
-    /// This method may be called ONLY on an empty table on which no backlink columns are present.
-    void set_embedded(bool is_embedded); // throws if table is non-empty or backlink columns are present
 
     // Pass a ColKey() as first argument to have a new colkey generated
     // Requesting a specific ColKey may fail with invalidkey exception, if the key is already in use
@@ -469,6 +466,8 @@ private:
     template <class F, class T>
     void change_nullability_list(ColKey from, ColKey to, bool throw_on_null);
     Obj create_linked_object();
+    /// Indicate whether a table holds embedded objects or not. Called only from Group::add_embedded_table()
+    void set_embedded(bool is_embedded); // throws if table is non-empty or backlink columns are present
 
 public:
     // mapping between index used in leaf nodes (leaf_ndx) and index used in spec (spec_ndx)
