@@ -58,7 +58,8 @@ std::string print_value<>(realm::null)
     return "NULL";
 }
 
-bool contains_invalids(StringData data) {
+bool contains_invalids(StringData data)
+{
     // the custom whitelist is different from std::isprint because it doesn't include quotations
     const static std::string whitelist = " {|}~:;<=>?@!#$%&()*+,-./[]^_`";
     for (size_t i = 0; i < data.size(); ++i) {
@@ -87,7 +88,8 @@ std::string print_value<>(StringData data)
         encode_buffer.resize(util::base64_encoded_size(len));
         util::base64_encode(start, len, encode_buffer.data(), encode_buffer.size());
         out = "B64\"" + encode_buffer.str() + "\"";
-    } else {
+    }
+    else {
         out.reserve(len + 2);
         out += '"';
         for (const char* i = start; i != start + len; ++i) {
@@ -121,7 +123,7 @@ std::string print_value<>(realm::ObjectId oid)
         return "NULL";
     }
     std::stringstream ss;
-    ss << "oid(" << oid.to_string() << ")" ;
+    ss << "oid(" << oid.to_string() << ")";
     return ss.str();
 }
 

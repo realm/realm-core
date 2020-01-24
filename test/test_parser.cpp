@@ -353,16 +353,18 @@ static std::vector<std::string> invalid_queries = {
 };
 // clang-format on
 
-TEST(Parser_valid_queries) {
+TEST(Parser_valid_queries)
+{
     for (auto& query : valid_queries) {
-        //std::cout << "query: " << query << std::endl;
+        // std::cout << "query: " << query << std::endl;
         realm::parser::parse(query);
     }
 }
 
-TEST(Parser_invalid_queries) {
+TEST(Parser_invalid_queries)
+{
     for (auto& query : invalid_queries) {
-        //std::cout << "query: " << query << std::endl;
+        // std::cout << "query: " << query << std::endl;
         CHECK_THROW_ANY(realm::parser::parse(query));
     }
 }
@@ -372,7 +374,9 @@ TEST(Parser_grammar_analysis)
     CHECK(realm::parser::analyze_grammar() == 0);
 }
 
-Query verify_query(test_util::unit_test::TestContext& test_context, TableRef t, std::string query_string, size_t num_results) {
+Query verify_query(test_util::unit_test::TestContext& test_context, TableRef t, std::string query_string,
+                   size_t num_results)
+{
     Query q = t->where();
     realm::query_builder::NoArguments args;
 
@@ -381,7 +385,7 @@ Query verify_query(test_util::unit_test::TestContext& test_context, TableRef t, 
 
     CHECK_EQUAL(q.count(), num_results);
     std::string description = q.get_description();
-    //std::cerr << "original: " << query_string << "\tdescribed: " << description << "\n";
+    // std::cerr << "original: " << query_string << "\tdescribed: " << description << "\n";
     Query q2 = t->where();
 
     parser::ParserResult res2 = realm::parser::parse(description);
@@ -464,7 +468,7 @@ TEST(Parser_basic_serialisation)
     auto time_col = t->add_column(type_Timestamp, "time", true);
     t->add_search_index(int_col_key);
     std::vector<std::string> names = {"Billy", "Bob", "Joe", "Jane", "Joel"};
-    std::vector<double> fees = { 2.0, 2.23, 2.22, 2.25, 3.73 };
+    std::vector<double> fees = {2.0, 2.23, 2.22, 2.25, 3.73};
     std::vector<ObjKey> keys;
 
     t->create_objects(5, keys);
@@ -636,13 +640,17 @@ TEST(Parser_LinksToDifferentTable)
     list_2.add(item_keys[2]);
     list_2.add(item_keys[3]);
 
-    verify_query(test_context, t, "items.@count > 2", 3); // how many people bought more than two items?
-    verify_query(test_context, t, "items.price > 3.0", 3); // how many people buy items over $3.0?
+    verify_query(test_context, t, "items.@count > 2", 3);        // how many people bought more than two items?
+    verify_query(test_context, t, "items.price > 3.0", 3);       // how many people buy items over $3.0?
     verify_query(test_context, t, "items.name ==[c] 'milk'", 2); // how many people buy milk?
-    verify_query(test_context, t, "items.discount.active == true", 3); // how many people bought items with an active sale?
-    verify_query(test_context, t, "items.discount.reduced_by > 2.0", 2); // how many people bought an item marked down by more than $2.0?
-    verify_query(test_context, t, "items.@sum.price > 50", 1); // how many people would spend more than $50 without sales applied?
-    verify_query(test_context, t, "items.@avg.price > 7", 1); // how manay people like to buy items more expensive on average than $7?
+    verify_query(test_context, t, "items.discount.active == true",
+                 3); // how many people bought items with an active sale?
+    verify_query(test_context, t, "items.discount.reduced_by > 2.0",
+                 2); // how many people bought an item marked down by more than $2.0?
+    verify_query(test_context, t, "items.@sum.price > 50",
+                 1); // how many people would spend more than $50 without sales applied?
+    verify_query(test_context, t, "items.@avg.price > 7",
+                 1); // how manay people like to buy items more expensive on average than $7?
 
     std::string message;
     // missing property
@@ -657,7 +665,7 @@ TEST(Parser_LinksToDifferentTable)
     CHECK(message.find("nonexistent_property") != std::string::npos);
     // property is not a link
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "customer_id.property > 2", 0), message);
-    CHECK(message.find("Person") != std::string::npos); // without the "class_" prefix
+    CHECK(message.find("Person") != std::string::npos);      // without the "class_" prefix
     CHECK(message.find("customer_id") != std::string::npos); // is not a link
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "items.price.property > 2", 0), message);
     CHECK(message.find("Items") != std::string::npos); // without the "class_" prefix
@@ -801,10 +809,12 @@ TEST(Parser_Timestamps)
         verify_query(test_context, t, "birthday != NULL", 5);
         verify_query(test_context, t, "birthday != NIL", 5);
         verify_query(test_context, t, "birthday == T0:0", 3);
-        verify_query(test_context, t, std::string("birthday == 1970-1-1") + separator + "0:0:0:0", 3); // epoch is default non-null Timestamp
+        verify_query(test_context, t, std::string("birthday == 1970-1-1") + separator + "0:0:0:0",
+                     3); // epoch is default non-null Timestamp
 
 #ifndef _WIN32 // windows native functions do not support pre epoch conversions, other platforms stop at ~1901
-        verify_query(test_context, t, std::string("birthday == 1969-12-31") + separator + "23:59:59:1", 1); // just before epoch
+        verify_query(test_context, t, std::string("birthday == 1969-12-31") + separator + "23:59:59:1",
+                     1); // just before epoch
         verify_query(test_context, t, std::string("birthday > 1905-12-31") + separator + "23:59:59", 5);
         verify_query(test_context, t, std::string("birthday > 1905-12-31") + separator + "23:59:59:2020", 5);
 #endif
@@ -813,15 +823,20 @@ TEST(Parser_Timestamps)
         verify_query(test_context, t, "birthday == T399", 1); // a null entry matches
 
         // dates pre 1900 are not supported by functions like timegm
-        CHECK_THROW_ANY(verify_query(test_context, t, std::string("birthday > 1800-12-31") + separator + "23:59:59", 0));
-        CHECK_THROW_ANY(verify_query(test_context, t, std::string("birthday > 1800-12-31") + separator + "23:59:59:2020", 4));
+        CHECK_THROW_ANY(
+            verify_query(test_context, t, std::string("birthday > 1800-12-31") + separator + "23:59:59", 0));
+        CHECK_THROW_ANY(
+            verify_query(test_context, t, std::string("birthday > 1800-12-31") + separator + "23:59:59:2020", 4));
 
         // negative nanoseconds are not allowed
         CHECK_THROW_ANY(verify_query(test_context, t, "birthday == T-1:1", 0));
         CHECK_THROW_ANY(verify_query(test_context, t, "birthday == T1:-1", 0));
-        CHECK_THROW_ANY(verify_query(test_context, t, std::string("birthday == 1970-1-1") + separator + "0:0:1:-1", 0));
-        CHECK_THROW_ANY(verify_query(test_context, t, std::string("birthday == 1969-12-31") + separator + "23:59:59:-1", 1));
-        CHECK_THROW_ANY(verify_query(test_context, t, std::string("birthday == 1970-1-1") + separator + "0:0:0:-1", 1));
+        CHECK_THROW_ANY(
+            verify_query(test_context, t, std::string("birthday == 1970-1-1") + separator + "0:0:1:-1", 0));
+        CHECK_THROW_ANY(
+            verify_query(test_context, t, std::string("birthday == 1969-12-31") + separator + "23:59:59:-1", 1));
+        CHECK_THROW_ANY(
+            verify_query(test_context, t, std::string("birthday == 1970-1-1") + separator + "0:0:0:-1", 1));
 
         // Invalid predicate
         CHECK_THROW_ANY(verify_query(test_context, t, "birthday == T1:", 0));
@@ -833,8 +848,10 @@ TEST(Parser_Timestamps)
         CHECK_THROW_ANY(verify_query(test_context, t, std::string("birthday == 1970-1-1") + separator + "0:0", 0));
         CHECK_THROW_ANY(verify_query(test_context, t, std::string("birthday == 1970-1-1") + separator + "0:0:", 0));
         CHECK_THROW_ANY(verify_query(test_context, t, std::string("birthday == 1970-1-1") + separator + "0:0:0:", 0));
-        CHECK_THROW_ANY(verify_query(test_context, t, std::string("birthday == 1970-1-1") + separator + "0:0:0:0:", 0));
-        CHECK_THROW_ANY(verify_query(test_context, t, std::string("birthday == 1970-1-1") + separator + "0:0:0:0:0", 0));
+        CHECK_THROW_ANY(
+            verify_query(test_context, t, std::string("birthday == 1970-1-1") + separator + "0:0:0:0:", 0));
+        CHECK_THROW_ANY(
+            verify_query(test_context, t, std::string("birthday == 1970-1-1") + separator + "0:0:0:0:0", 0));
     };
 
     // both versions are allowed
@@ -1017,7 +1034,6 @@ TEST(Parser_TwoColumnExpressionBasics)
     CHECK_THROW_ANY(verify_query(test_context, table, "doubles == strings", 0));
     CHECK_THROW_ANY(verify_query(test_context, table, "ints == doubles", 0));
     CHECK_THROW_ANY(verify_query(test_context, table, "strings == doubles", 0));
-
 }
 
 
@@ -1122,7 +1138,7 @@ TEST(Parser_TwoColumnAggregates)
     CHECK_THROW_ANY(verify_query(test_context, t, "items.@avg.discount > account_balance", 0));
 
     verify_query(test_context, t, "items.@count < account_balance", 3); // linklist count vs double
-    verify_query(test_context, t, "items.@count > 3", 2);   // linklist count vs literal int
+    verify_query(test_context, t, "items.@count > 3", 2);               // linklist count vs literal int
     // linklist count vs literal double, integer promotion done here so this is true!
     verify_query(test_context, t, "items.@count == 3.1", 1);
 
@@ -1146,7 +1162,9 @@ TEST(Parser_TwoColumnAggregates)
     verify_query(test_context, items, "discount.promotion LIKE[c] name", 0);
 }
 
-void verify_query_sub(test_util::unit_test::TestContext& test_context, TableRef t, std::string query_string, const util::Any* arg_list, size_t num_args, size_t num_results) {
+void verify_query_sub(test_util::unit_test::TestContext& test_context, TableRef t, std::string query_string,
+                      const util::Any* arg_list, size_t num_args, size_t num_results)
+{
 
     query_builder::AnyContext ctx;
     std::string empty_string;
@@ -1159,7 +1177,7 @@ void verify_query_sub(test_util::unit_test::TestContext& test_context, TableRef 
 
     CHECK_EQUAL(q.count(), num_results);
     std::string description = q.get_description();
-    //std::cerr << "original: " << query_string << "\tdescribed: " << description << "\n";
+    // std::cerr << "original: " << query_string << "\tdescribed: " << description << "\n";
     Query q2 = t->where();
 
     realm::parser::Predicate p2 = realm::parser::parse(description).predicate;
@@ -1183,7 +1201,7 @@ TEST(Parser_substitution)
     ColKey link_col = t->add_column_link(type_Link, "links", *t);
     ColKey list_col = t->add_column_link(type_LinkList, "list", *t);
     std::vector<std::string> names = {"Billy", "Bob", "Joe", "Jane", "Joel"};
-    std::vector<double> fees = { 2.0, 2.23, 2.22, 2.25, 3.73 };
+    std::vector<double> fees = {2.0, 2.23, 2.22, 2.25, 3.73};
     std::vector<ObjKey> obj_keys;
     t->create_objects(names.size(), obj_keys);
 
@@ -1298,7 +1316,7 @@ TEST(Parser_substitution)
     // string
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "name == $0", args, num_args, 0));
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "name == $1", args, num_args, 0));
-                    verify_query_sub(test_context, t, "name == $3", args, num_args, 0);
+    verify_query_sub(test_context, t, "name == $3", args, num_args, 0);
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "name == $4", args, num_args, 0));
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "name == $5", args, num_args, 0));
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "name == $6", args, num_args, 0));
@@ -1307,7 +1325,7 @@ TEST(Parser_substitution)
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "paid == $0", args, num_args, 0));
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "paid == $1", args, num_args, 0));
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "paid == $2", args, num_args, 0));
-                    verify_query_sub(test_context, t, "paid == $3", args, num_args, 3);
+    verify_query_sub(test_context, t, "paid == $3", args, num_args, 3);
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "paid == $5", args, num_args, 0));
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "paid == $6", args, num_args, 0));
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "paid == $7", args, num_args, 0));
@@ -1315,7 +1333,7 @@ TEST(Parser_substitution)
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "time == $0", args, num_args, 0));
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "time == $1", args, num_args, 0));
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "time == $2", args, num_args, 0));
-                    verify_query_sub(test_context, t, "time == $3", args, num_args, 4);
+    verify_query_sub(test_context, t, "time == $3", args, num_args, 4);
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "time == $4", args, num_args, 0));
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "time == $6", args, num_args, 0));
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "time == $7", args, num_args, 0));
@@ -1323,7 +1341,7 @@ TEST(Parser_substitution)
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "binary == $0", args, num_args, 0));
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "binary == $1", args, num_args, 0));
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "binary == $2", args, num_args, 0));
-                    verify_query_sub(test_context, t, "binary == $3", args, num_args, 3);
+    verify_query_sub(test_context, t, "binary == $3", args, num_args, 3);
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "binary == $4", args, num_args, 0));
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "binary == $5", args, num_args, 0));
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "binary == $7", args, num_args, 0));
@@ -1429,8 +1447,7 @@ TEST(Parser_string_binary_encoding)
         "\"''''\"'\"",
         "\"'\"'\"''''\"",
         "<foo val=“bar” />",
-        "<foo val=`bar' />"
-    };
+        "<foo val=`bar' />"};
 
     t->create_object(); // nulls
     // add a single char of each value
@@ -1532,7 +1549,7 @@ TEST(Parser_string_binary_encoding)
             }
         }
 
-        //std::cerr << "original: " << buff << "\tdescribed: " << string_description << "\n";
+        // std::cerr << "original: " << buff << "\tdescribed: " << string_description << "\n";
 
         query_builder::NoArguments args;
         Query qstr2 = t->where();
@@ -1569,8 +1586,7 @@ TEST(Parser_collection_aggregates)
     auto courses_col = people->add_column_link(type_LinkList, "courses_taken", *courses);
     auto binary_col = people->add_column(type_Binary, "hash");
     using info_t = std::pair<std::string, int64_t>;
-    std::vector<info_t> person_info
-        = {{"Billy", 18}, {"Bob", 17}, {"Joe", 19}, {"Jane", 20}, {"Joel", 18}};
+    std::vector<info_t> person_info = {{"Billy", 18}, {"Bob", 17}, {"Joe", 19}, {"Jane", 20}, {"Joel", 18}};
     size_t j = 0;
     for (info_t i : person_info) {
         Obj obj = people->create_object();
@@ -1581,9 +1597,9 @@ TEST(Parser_collection_aggregates)
         obj.set(binary_col, payload);
     }
     using cinfo = std::tuple<std::string, double, int64_t, float>;
-    std::vector<cinfo> course_info
-            = { cinfo{"Math", 5.0, 42, 0.36f}, cinfo{"Comp Sci", 4.5, 45, 0.25f}, cinfo{"Chemistry", 4.0, 41, 0.40f},
-            cinfo{"English", 3.5, 40, 0.07f}, cinfo{"Physics", 4.5, 42, 0.42f} };
+    std::vector<cinfo> course_info = {cinfo{"Math", 5.0, 42, 0.36f}, cinfo{"Comp Sci", 4.5, 45, 0.25f},
+                                      cinfo{"Chemistry", 4.0, 41, 0.40f}, cinfo{"English", 3.5, 40, 0.07f},
+                                      cinfo{"Physics", 4.5, 42, 0.42f}};
     std::vector<ObjKey> course_keys;
     for (cinfo course : course_info) {
         Obj obj = courses->create_object();
@@ -1728,7 +1744,8 @@ TEST(Parser_SortAndDistinctSerialisation)
     tv.sort(age_col, true);
     tv.sort(SortDescriptor({{account_col, balance_col}, {account_col, transaction_col}}, {true, false}));
     std::string description = tv.get_descriptor_ordering_description();
-    CHECK(description.find("SORT(account.balance ASC, account.num_transactions DESC, age ASC, name DESC)") != std::string::npos);
+    CHECK(description.find("SORT(account.balance ASC, account.num_transactions DESC, age ASC, name DESC)") !=
+          std::string::npos);
 
     // distinct serialisation
     tv = people->where().find_all();
@@ -1736,7 +1753,8 @@ TEST(Parser_SortAndDistinctSerialisation)
     tv.distinct(age_col);
     tv.distinct(DistinctDescriptor({{account_col, balance_col}, {account_col, transaction_col}}));
     description = tv.get_descriptor_ordering_description();
-    CHECK(description.find("DISTINCT(name) DISTINCT(age) DISTINCT(account.balance, account.num_transactions)") != std::string::npos);
+    CHECK(description.find("DISTINCT(name) DISTINCT(age) DISTINCT(account.balance, account.num_transactions)") !=
+          std::string::npos);
 
     // combined sort and distinct serialisation
     tv = people->where().find_all();
@@ -1760,7 +1778,7 @@ TableView get_sorted_view(TableRef t, std::string query_string)
     std::string ordering_description = ordering.get_description(t);
     std::string combined = query_description + " " + ordering_description;
 
-    //std::cerr << "original: " << query_string << "\tdescribed: " << combined << "\n";
+    // std::cerr << "original: " << query_string << "\tdescribed: " << combined << "\n";
     Query q2 = t->where();
 
     parser::ParserResult result2 = realm::parser::parse(combined);
@@ -2363,7 +2381,9 @@ TEST(Parser_IncludeDescriptorDeepLinks)
     auto eli = people->create_object().set(name_col, "Eli").set(link_col, jonathan.get_key());
 
     // include serialisation
-    TableView tv = get_sorted_view(people, "name contains[c] 'bone' SORT(name DESC) INCLUDE(@links.person.father.@links.person.father.@links.person.father.@links.person.father)");
+    TableView tv = get_sorted_view(people, "name contains[c] 'bone' SORT(name DESC) "
+                                           "INCLUDE(@links.person.father.@links.person.father.@links.person.father.@"
+                                           "links.person.father)");
     IncludeDescriptor includes = tv.get_include_descriptors();
     CHECK(includes.is_valid());
     CHECK_EQUAL(tv.size(), 1);
@@ -3200,7 +3220,8 @@ TEST(Parser_Between)
     // operator between is not supported yet, but we at least use a friendly error message.
     std::string message;
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, table, "age between {20, 25}", 1), message);
-    CHECK(message.find("Invalid Predicate. The 'between' operator is not supported yet, please rewrite the expression using '>' and '<'.") != std::string::npos);
+    CHECK(message.find("Invalid Predicate. The 'between' operator is not supported yet, please rewrite the "
+                       "expression using '>' and '<'.") != std::string::npos);
 }
 
 TEST(Parser_ChainedStringEqualQueries)
@@ -3318,12 +3339,12 @@ TEST(Parser_TimestampNullable)
     table->create_object().set(a_col, Timestamp(7, 0)).set(b_col, Timestamp(17, 0));
 
     Query q = table->where()
-      .equal(b_col, Timestamp(200, 0))
-      .group()
-      .equal(a_col, Timestamp(100, 0))
-      .Or()
-      .equal(a_col, Timestamp(realm::null()))
-      .end_group();
+                  .equal(b_col, Timestamp(200, 0))
+                  .group()
+                  .equal(a_col, Timestamp(100, 0))
+                  .Or()
+                  .equal(a_col, Timestamp(realm::null()))
+                  .end_group();
     std::string description = q.get_description();
     CHECK(description.find("NULL") != std::string::npos);
     CHECK_EQUAL(description, "b == T200:0 and (a == T100:0 or a == NULL)");
@@ -3367,7 +3388,7 @@ TEST(Parser_ObjectId)
     // a non nullable column should never contain null values
     // verify_query(test_context, table, "id == NULL", 0);
     // a nullable column should find the null created by the default constructed row
-     verify_query(test_context, table, "nid == NULL", 1);
+    verify_query(test_context, table, "nid == NULL", 1);
 
     // argument substitution checks
     util::Any args[] = {t1, tNow, t25};
