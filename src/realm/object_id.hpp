@@ -43,7 +43,7 @@ public:
     ObjectId(Timestamp d, int machine_id = 0, int process_id = 0);
 
     /**
-     * Generates a new ObjectId using the algorithm to attempt to avoid (not prevent) collisions.
+     * Generates a new ObjectId using the algorithm to attempt to avoid collisions.
      */
     static ObjectId gen();
 
