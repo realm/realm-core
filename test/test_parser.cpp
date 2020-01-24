@@ -1555,6 +1555,7 @@ TEST(Parser_string_binary_encoding)
     }
 }
 
+
 TEST(Parser_collection_aggregates)
 {
     Group g;
@@ -1681,6 +1682,83 @@ TEST(Parser_collection_aggregates)
     CHECK_THROW_ANY(verify_query(test_context, people, "age.@size <= 2", 0));
     CHECK_THROW_ANY(verify_query(test_context, courses, "credits.@size == 2", 0));
     CHECK_THROW_ANY(verify_query(test_context, courses, "failure_percentage.@size <= 2", 0));
+}
+
+TEST(Parser_NegativeAgg)
+{
+    Group g;
+
+    TableRef items = g.add_table("class_Items");
+    ColKey item_name_col = items->add_column(type_String, "name");
+    ColKey item_price_col = items->add_column(type_Double, "price");
+    ColKey item_price_float_col = items->add_column(type_Float, "price_float");
+    ColKey item_price_decimal_col = items->add_column(type_Decimal, "price_decimal");
+    using item_t = std::pair<std::string, double>;
+    std::vector<item_t> item_info = {{"milk", -5.5}, {"oranges", -4.0}, {"pizza", -9.5}, {"cereal", -6.5}};
+    std::vector<ObjKey> item_keys;
+    items->create_objects(item_info.size(), item_keys);
+    for (size_t i = 0; i < item_keys.size(); ++i) {
+        Obj obj = items->get_object(item_keys[i]);
+        obj.set(item_name_col, StringData(item_info[i].first));
+        obj.set(item_price_col, item_info[i].second);
+        obj.set(item_price_float_col, float(item_info[i].second));
+        obj.set(item_price_decimal_col, Decimal128(item_info[i].second));
+    }
+
+    TableRef t = g.add_table("class_Person");
+    ColKey id_col = t->add_column(type_Int, "customer_id");
+    ColKey account_col = t->add_column(type_Double, "account_balance");
+    ColKey items_col = t->add_column_link(type_LinkList, "items", *items);
+    ColKey account_float_col = t->add_column(type_Float, "account_balance_float");
+    ColKey account_decimal_col = t->add_column(type_Decimal, "account_balance_decimal");
+
+    Obj person0 = t->create_object();
+    Obj person1 = t->create_object();
+    Obj person2 = t->create_object();
+
+    person0.set(id_col, int64_t(0));
+    person0.set(account_col, double(10.0));
+    person0.set(account_float_col, float(10.0));
+    person0.set(account_decimal_col, Decimal128(10.0));
+    person1.set(id_col, int64_t(1));
+    person1.set(account_col, double(20.0));
+    person1.set(account_float_col, float(20.0));
+    person1.set(account_decimal_col, Decimal128(20.0));
+    person2.set(id_col, int64_t(2));
+    person2.set(account_col, double(30.0));
+    person2.set(account_float_col, float(30.0));
+    person2.set(account_decimal_col, Decimal128(30.0));
+
+    LnkLst list_0 = person0.get_linklist(items_col);
+    list_0.add(item_keys[0]);
+    list_0.add(item_keys[1]);
+    list_0.add(item_keys[2]);
+    list_0.add(item_keys[3]);
+
+    LnkLst list_1 = person1.get_linklist(items_col);
+    for (size_t i = 0; i < 10; ++i) {
+        list_1.add(item_keys[0]);
+    }
+
+    LnkLst list_2 = person2.get_linklist(items_col);
+    list_2.add(item_keys[2]);
+    list_2.add(item_keys[2]);
+    list_2.add(item_keys[3]);
+
+    verify_query(test_context, t, "items.@min.price == -9.5", 2);   // person0, person2
+    verify_query(test_context, t, "items.@max.price == -4.0", 1);   // person0
+    verify_query(test_context, t, "items.@sum.price == -25.5", 2);  // person0, person2
+    verify_query(test_context, t, "items.@avg.price == -6.375", 1); // person0
+
+    verify_query(test_context, t, "items.@min.price_float == -9.5", 2);   // person0, person2
+    verify_query(test_context, t, "items.@max.price_float == -4.0", 1);   // person0
+    verify_query(test_context, t, "items.@sum.price_float == -25.5", 2);  // person0, person2
+    verify_query(test_context, t, "items.@avg.price_float == -6.375", 1); // person0
+
+    verify_query(test_context, t, "items.@min.price_decimal == -9.5", 2);   // person0, person2
+    verify_query(test_context, t, "items.@max.price_decimal == -4.0", 1);   // person0
+    verify_query(test_context, t, "items.@sum.price_decimal == -25.5", 2);  // person0, person2
+    verify_query(test_context, t, "items.@avg.price_decimal == -6.375", 1); // person0
 }
 
 TEST(Parser_SortAndDistinctSerialisation)
