@@ -28,7 +28,7 @@ namespace {
 struct GeneratorState {
     // This just initializes all state randomly. The machine and process id fields are no longer supposed to use PIDs
     // or any machine-specific data, because that increases the probability of collisions.
-    GeneratorState(std::random_device&& rnd = {})
+    GeneratorState(std::random_device&& rnd = std::random_device{})
         : machine_id(rnd())
         , process_id(rnd())
         , seq(rnd())
