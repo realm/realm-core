@@ -321,6 +321,11 @@ TEST(Table_Null)
 
         Obj obj = table->create_object();
         CHECK(obj.is_null(col));
+
+        // Check that you can obtain a non null value through get<Int>
+        obj.set(col, 7);
+        CHECK_NOT(obj.is_null(col));
+        CHECK_EQUAL(obj.get<Int>(col), 7);
     }
 
     {
@@ -2474,7 +2479,7 @@ TEST(Table_Nulls)
         obj0.set(col_bool, false);
         obj0.set(col_date, Timestamp(3, 0));
 
-        CHECK_EQUAL(65, obj0.get<util::Optional<Int>>(col_int));
+        CHECK_EQUAL(65, obj0.get<Int>(col_int));
         CHECK_EQUAL(false, obj0.get<Bool>(col_bool));
         CHECK_EQUAL(Timestamp(3, 0), obj0.get<Timestamp>(col_date));
 
@@ -2487,6 +2492,7 @@ TEST(Table_Nulls)
         CHECK_NOT(obj0.is_null(col_bool));
         CHECK_NOT(obj0.is_null(col_date));
 
+        CHECK_THROW_ANY(obj1.get<Int>(col_int));
         CHECK(obj1.is_null(col_int));
         CHECK(obj1.is_null(col_bool));
         CHECK(obj1.is_null(col_date));
