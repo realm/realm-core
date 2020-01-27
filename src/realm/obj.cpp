@@ -168,37 +168,6 @@ void ConstObj::remove()
     m_table.cast_away_const()->remove_object(m_key);
 }
 
-Mixed ConstObj::get_any(ColKey col_key) const
-{
-    switch (col_key.get_type()) {
-        case col_type_Int:
-            if (col_key.get_attrs().test(col_attr_Nullable)) {
-                return Mixed{get<util::Optional<int64_t>>(col_key)};
-            }
-            else {
-                return Mixed{get<int64_t>(col_key)};
-            }
-        case col_type_Bool:
-            return Mixed{get<util::Optional<bool>>(col_key)};
-        case col_type_Float:
-            return Mixed{get<util::Optional<float>>(col_key)};
-        case col_type_Double:
-            return Mixed{get<util::Optional<double>>(col_key)};
-        case col_type_String:
-            return Mixed{get<String>(col_key)};
-        case col_type_Binary:
-            return Mixed{get<Binary>(col_key)};
-        case col_type_Timestamp:
-            return Mixed{get<Timestamp>(col_key)};
-        case col_type_Link:
-            return Mixed{get<ObjKey>(col_key)};
-        default:
-            REALM_UNREACHABLE();
-            break;
-    }
-    return {};
-}
-
 ColKey ConstObj::get_column_key(StringData col_name) const
 {
     return get_table()->get_column_key(col_name);
@@ -298,6 +267,44 @@ int64_t ConstObj::_get<int64_t>(ColKey::Idx col_ndx) const
 }
 
 template <>
+int64_t ConstObj::get<int64_t>(ColKey col_key) const
+{
+    m_table->report_invalid_key(col_key);
+    ColumnType type = col_key.get_type();
+    REALM_ASSERT(type == col_type_Int);
+
+    if (col_key.get_attrs().test(col_attr_Nullable)) {
+        auto val = _get<util::Optional<int64_t>>(col_key.get_index());
+        if (!val) {
+            throw std::runtime_error("Cannot return null value");
+        }
+        return *val;
+    }
+    else {
+        return _get<int64_t>(col_key.get_index());
+    }
+}
+
+template <>
+bool ConstObj::get<bool>(ColKey col_key) const
+{
+    m_table->report_invalid_key(col_key);
+    ColumnType type = col_key.get_type();
+    REALM_ASSERT(type == col_type_Bool);
+
+    if (col_key.get_attrs().test(col_attr_Nullable)) {
+        auto val = _get<util::Optional<bool>>(col_key.get_index());
+        if (!val) {
+            throw std::runtime_error("Cannot return null value");
+        }
+        return *val;
+    }
+    else {
+        return _get<bool>(col_key.get_index());
+    }
+}
+
+template <>
 StringData ConstObj::_get<StringData>(ColKey::Idx col_ndx) const
 {
     // manual inline of is_in_sync():
@@ -334,6 +341,39 @@ BinaryData ConstObj::_get<BinaryData>(ColKey::Idx col_ndx) const
 
     ref_type ref = to_ref(Array::get(m_mem.get_addr(), col_ndx.val + 1));
     return ArrayBinary::get(alloc.translate(ref), m_row_ndx, alloc);
+}
+
+Mixed ConstObj::get_any(ColKey col_key) const
+{
+    m_table->report_invalid_key(col_key);
+    auto col_ndx = col_key.get_index();
+    switch (col_key.get_type()) {
+        case col_type_Int:
+            if (col_key.get_attrs().test(col_attr_Nullable)) {
+                return Mixed{_get<util::Optional<int64_t>>(col_ndx)};
+            }
+            else {
+                return Mixed{_get<int64_t>(col_ndx)};
+            }
+        case col_type_Bool:
+            return Mixed{_get<util::Optional<bool>>(col_ndx)};
+        case col_type_Float:
+            return Mixed{_get<util::Optional<float>>(col_ndx)};
+        case col_type_Double:
+            return Mixed{_get<util::Optional<double>>(col_ndx)};
+        case col_type_String:
+            return Mixed{_get<String>(col_ndx)};
+        case col_type_Binary:
+            return Mixed{_get<Binary>(col_ndx)};
+        case col_type_Timestamp:
+            return Mixed{_get<Timestamp>(col_ndx)};
+        case col_type_Link:
+            return Mixed{_get<ObjKey>(col_ndx)};
+        default:
+            REALM_UNREACHABLE();
+            break;
+    }
+    return {};
 }
 
 /* FIXME: Make this one fast too!
@@ -1167,9 +1207,7 @@ void Obj::assign(const ConstObj& other)
 }
 
 
-template int64_t ConstObj::get<int64_t>(ColKey col_key) const;
 template util::Optional<int64_t> ConstObj::get<util::Optional<int64_t>>(ColKey col_key) const;
-template bool ConstObj::get<Bool>(ColKey col_key) const;
 template util::Optional<Bool> ConstObj::get<util::Optional<Bool>>(ColKey col_key) const;
 template float ConstObj::get<float>(ColKey col_key) const;
 template util::Optional<float> ConstObj::get<util::Optional<float>>(ColKey col_key) const;
