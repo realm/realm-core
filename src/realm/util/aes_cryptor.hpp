@@ -33,11 +33,8 @@
 #include <bcrypt.h>
 #pragma comment(lib, "bcrypt.lib")
 #else
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wold-style-cast"
 #include <openssl/sha.h>
 #include <openssl/evp.h>
-#pragma GCC diagnostic pop
 #endif
 
 namespace realm {
