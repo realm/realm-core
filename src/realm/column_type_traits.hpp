@@ -221,6 +221,15 @@ struct ColumnTypeTraits<Decimal128> {
     static const ColumnType column_id = col_type_Decimal;
 };
 
+template <typename T>
+using ColumnClusterLeafType = typename ColumnTypeTraits<T>::cluster_leaf_type;
+template <typename T>
+using ColumnSumType = typename ColumnTypeTraits<T>::sum_type;
+template <typename T>
+using ColumnMinMaxType = typename ColumnTypeTraits<T>::minmax_type;
+template <typename T>
+using ColumnAverageType = typename ColumnTypeTraits<T>::average_type;
+
 template <class T>
 struct ColumnTypeTraits<Lst<T>> {
     static const ColumnType column_id = ColumnTypeTraits<T>::column_id;

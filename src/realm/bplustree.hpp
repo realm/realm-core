@@ -626,7 +626,7 @@ inline T bptree_aggregate_value(util::Optional<T> val)
 }
 
 template <class T>
-typename ColumnTypeTraits<T>::sum_type bptree_sum(const BPlusTree<T>& tree, size_t* return_cnt = nullptr)
+ColumnSumType<T> bptree_sum(const BPlusTree<T>& tree, size_t* return_cnt = nullptr)
 {
     using ResultType = typename AggregateResultType<T, act_Sum>::result_type;
     ResultType result{};
@@ -654,7 +654,7 @@ typename ColumnTypeTraits<T>::sum_type bptree_sum(const BPlusTree<T>& tree, size
 }
 
 template <class T>
-typename ColumnTypeTraits<T>::minmax_type bptree_maximum(const BPlusTree<T>& tree, size_t* return_ndx = nullptr)
+ColumnMinMaxType<T> bptree_maximum(const BPlusTree<T>& tree, size_t* return_ndx = nullptr)
 {
     using ResultType = typename AggregateResultType<T, act_Max>::result_type;
     ResultType max = std::numeric_limits<ResultType>::lowest();
@@ -683,7 +683,7 @@ typename ColumnTypeTraits<T>::minmax_type bptree_maximum(const BPlusTree<T>& tre
 }
 
 template <class T>
-typename ColumnTypeTraits<T>::minmax_type bptree_minimum(const BPlusTree<T>& tree, size_t* return_ndx = nullptr)
+ColumnMinMaxType<T> bptree_minimum(const BPlusTree<T>& tree, size_t* return_ndx = nullptr)
 {
     using ResultType = typename AggregateResultType<T, act_Max>::result_type;
     ResultType min = std::numeric_limits<ResultType>::max();
@@ -712,13 +712,13 @@ typename ColumnTypeTraits<T>::minmax_type bptree_minimum(const BPlusTree<T>& tre
 }
 
 template <class T>
-typename ColumnTypeTraits<T>::average_type bptree_average(const BPlusTree<T>& tree, size_t* return_cnt = nullptr)
+ColumnAverageType<T> bptree_average(const BPlusTree<T>& tree, size_t* return_cnt = nullptr)
 {
     size_t cnt;
     auto sum = bptree_sum(tree, &cnt);
-    typename ColumnTypeTraits<T>::average_type avg{};
+    ColumnAverageType<T> avg{};
     if (cnt != 0)
-        avg = typename ColumnTypeTraits<T>::average_type(sum) / cnt;
+        avg = ColumnAverageType<T>(sum) / cnt;
     if (return_cnt)
         *return_cnt = cnt;
     return avg;

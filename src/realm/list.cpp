@@ -256,7 +256,7 @@ struct MinHelper {
 };
 
 template <class T>
-struct MinHelper<T, void_t<typename ColumnTypeTraits<T>::minmax_type>> {
+struct MinHelper<T, void_t<ColumnMinMaxType<T>>> {
     template <class U>
     static Mixed eval(U& tree, size_t* return_ndx)
     {
@@ -280,7 +280,7 @@ struct MaxHelper {
 };
 
 template <class T>
-struct MaxHelper<T, void_t<typename ColumnTypeTraits<T>::minmax_type>> {
+struct MaxHelper<T, void_t<ColumnMinMaxType<T>>> {
     template <class U>
     static Mixed eval(U& tree, size_t* return_ndx)
     {
@@ -307,7 +307,7 @@ public:
 };
 
 template <class T>
-class SumHelper<T, void_t<typename ColumnTypeTraits<T>::sum_type>> {
+class SumHelper<T, void_t<ColumnSumType<T>>> {
 public:
     template <class U>
     static Mixed eval(U& tree, size_t* return_cnt)
@@ -334,7 +334,7 @@ struct AverageHelper {
 };
 
 template <class T>
-struct AverageHelper<T, void_t<typename ColumnTypeTraits<T>::sum_type>> {
+struct AverageHelper<T, void_t<ColumnSumType<T>>> {
     template <class U>
     static Mixed eval(U& tree, size_t* return_cnt)
     {

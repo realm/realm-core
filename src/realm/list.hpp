@@ -937,25 +937,25 @@ inline LnkLst Obj::get_linklist(StringData col_name) const
 }
 
 template <class T>
-inline typename ColumnTypeTraits<T>::sum_type list_sum(const ConstLstIf<T>& list, size_t* return_cnt = nullptr)
+inline ColumnSumType<T> list_sum(const ConstLstIf<T>& list, size_t* return_cnt = nullptr)
 {
     return bptree_sum(list.get_tree(), return_cnt);
 }
 
 template <class T>
-inline typename ColumnTypeTraits<T>::minmax_type list_maximum(const ConstLstIf<T>& list, size_t* return_ndx = nullptr)
+inline ColumnMinMaxType<T> list_maximum(const ConstLstIf<T>& list, size_t* return_ndx = nullptr)
 {
     return bptree_maximum(list.get_tree(), return_ndx);
 }
 
 template <class T>
-inline typename ColumnTypeTraits<T>::minmax_type list_minimum(const ConstLstIf<T>& list, size_t* return_ndx = nullptr)
+inline ColumnMinMaxType<T> list_minimum(const ConstLstIf<T>& list, size_t* return_ndx = nullptr)
 {
     return bptree_minimum(list.get_tree(), return_ndx);
 }
 
 template <class T>
-inline double list_average(const ConstLstIf<T>& list, size_t* return_cnt = nullptr)
+inline ColumnAverageType<T> list_average(const ConstLstIf<T>& list, size_t* return_cnt = nullptr)
 {
     return bptree_average(list.get_tree(), return_cnt);
 }
