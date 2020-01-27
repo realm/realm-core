@@ -522,36 +522,60 @@ std::vector<ObjKey> ConstObj::get_all_backlinks(ColKey backlink_col) const
     return vec;
 }
 
+void ConstObj::traverse_path(Visitor v, PathSizer ps, size_t path_length) const {
+    if (m_table->is_embedded()) {
+        REALM_ASSERT(get_backlink_count(true) == 1);
+        m_table->for_each_backlink_column([&](ColKey col_key) {
+                std::vector<ObjKey> backlinks = get_all_backlinks(col_key);
+                if (backlinks.size() == 1) {
+                    TableRef tr = m_table->get_opposite_table(col_key);
+                    ConstObj obj = tr->get_object(backlinks[0]); // always the first (and only)
+                    auto next_col_key = m_table->get_opposite_column(col_key);
+                    size_t index = 0;
+                    if (next_col_key.get_attrs().test(col_attr_List)) {
+                        ConstLnkLst ll = obj.get_linklist(next_col_key);
+                        while (ll.get(index) != get_key()) {
+                            index++;
+                            REALM_ASSERT(ll.size() > index);
+                        }
+                    }
+                    obj.traverse_path(v, ps, path_length + 1);
+                    v(obj, next_col_key, index);
+                    return true; // early out
+                }
+                return false; // try next column
+            });
+    }
+    else {
+        ps(path_length);
+    }
+}
+
 ConstObj::Path ConstObj::get_embedded_path()
 {
     Path result;
-    if (m_table->is_embedded()) {
-        ConstObj* o_ptr = this;
-        REALM_ASSERT(o_ptr->get_backlink_count(true) == 1);
-        PathElement pe;
-        do {
-            o_ptr->m_table->for_each_backlink_column([&](ColKey col_key) {
-                    std::vector<ObjKey> backlinks = o_ptr->get_all_backlinks(col_key);
-                    if (backlinks.size() == 1) {
-                        TableRef tr = o_ptr->m_table->get_opposite_table(col_key);
-                        pe.obj = tr->get_object(backlinks[0]); // always the first (and only)
-                        pe.col_key = o_ptr->m_table->get_opposite_column(col_key);
-                        pe.index = 0;
-                        if (pe.col_key.get_attrs().test(col_attr_List)) {
-                            ConstLnkLst ll = pe.obj.get_linklist(pe.col_key);
-                            while (ll.get(pe.index) != o_ptr->get_key()) {
-                                pe.index++;
-                                REALM_ASSERT(ll.size() > pe.index);
-                            }
-                        }
-                        result.push_back(pe);
-                        o_ptr = &result.back().obj;
-                        return true; // early out
-                    }
-                    return false;
-                });
-        } while (o_ptr->m_table->is_embedded());
-    }
+    auto sizer = [&](size_t size) { result.reserve(size); };
+    auto step = [&](const ConstObj& o2, ColKey col, size_t idx) -> void {
+        result.push_back({o2, col, idx});
+    };
+    traverse_path(step, sizer);
+    return result;
+}
+
+ConstObj::JurgenPath ConstObj::get_jurgen_path()
+{
+    JurgenPath result;
+    bool top_done = false;
+    auto sizer = [&](size_t size) { result.path_from_top.reserve(size); };
+    auto step = [&](const ConstObj& o2, ColKey col, size_t idx) -> void {
+        if (!top_done) {
+            top_done = true;
+            result.top_table = o2.get_table()->get_key();
+            result.top_objkey = o2.get_key();
+        }
+        result.path_from_top.push_back({col, idx});
+    };
+    traverse_path(step, sizer);
     return result;
 }
 

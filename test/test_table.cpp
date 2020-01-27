@@ -5194,6 +5194,16 @@ TEST(Table_EmbeddedObjectTableClearNotifications)
 
 TEST(Table_EmbeddedObjectPath)
 {
+    auto collect_path = [](const ConstObj& o) {
+        ConstObj::Path path_;
+        auto sizer = [&](size_t size) { path_.reserve(size); };
+        auto step = [&](const ConstObj& o2, ColKey col, size_t idx) -> void {
+            path_.push_back({o2, col, idx});
+        };
+        o.traverse_path(step, sizer);
+        return path_;
+    };
+
     SHARED_GROUP_TEST_PATH(path);
 
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
@@ -5206,30 +5216,41 @@ TEST(Table_EmbeddedObjectPath)
     auto parent = tr->add_table("myParentStuff");
     auto ck = parent->add_column_link(type_LinkList, "theGreatColumn", *table);
     Obj o = parent->create_object();
-    auto gch = o.get_embedded_path();
+    auto gch = collect_path(o);
     CHECK(gch.size() == 0);
     auto parent_ll = o.get_linklist(ck);
     Obj o2 = parent_ll.create_and_insert_linked_object(0);
-    auto gbh = o2.get_embedded_path();
+    auto gbh = collect_path(o2);
     CHECK(gbh.size() == 1);
+    CHECK(gbh[0].obj.get_key() == o.get_key());
+    CHECK(gbh[0].col_key == ck);
+    CHECK(gbh[0].index == 0);
     Obj o3 = parent_ll.create_and_insert_linked_object(1);
     Obj o4 = parent_ll.create_and_insert_linked_object(0);
-    auto gah = o4.get_embedded_path();
+    auto gah = collect_path(o4);
     CHECK(gah.size() == 1);
+    CHECK(gah[0].obj.get_key() == o.get_key());
+    CHECK(gah[0].col_key == ck);
+    CHECK(gah[0].index == 0);
+    auto gzh = collect_path(o3);
+    CHECK(gzh.size() == 1);
+    CHECK(gzh[0].obj.get_key() == o.get_key());
+    CHECK(gzh[0].col_key == ck);
+    CHECK(gzh[0].index == 2);
     auto o2_ll = o2.get_linklist(col_recurse);
     auto o3_ll = o3.get_linklist(col_recurse);
     o2_ll.create_and_insert_linked_object(0);
     o2_ll.create_and_insert_linked_object(0);
     o3_ll.create_and_insert_linked_object(0);
     CHECK(table->size() == 6);
-    auto gyh = o3_ll.get_object(0).get_embedded_path();
+    auto gyh = collect_path(o3_ll.get_object(0));
     CHECK(gyh.size() == 2);
-    CHECK(gyh[0].obj.get_key() == o3.get_key());
-    CHECK(gyh[0].col_key = col_recurse);
-    CHECK(gyh[0].index == 0);
-    CHECK(gyh[1].obj.get_key() == o.get_key());
-    CHECK(gyh[1].col_key == ck);
-    CHECK(gyh[1].index == 2);
+    CHECK(gyh[0].obj.get_key() == o.get_key());
+    CHECK(gyh[0].col_key == ck);
+    CHECK(gyh[0].index == 2);
+    CHECK(gyh[1].obj.get_key() == o3.get_key());
+    CHECK(gyh[1].col_key = col_recurse);
+    CHECK(gyh[1].index == 0);
 }
 
 

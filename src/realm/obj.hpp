@@ -166,13 +166,29 @@ public:
 
     std::string to_string() const;
 
-    // For an embedded object, obtain the path leading to this object.
+    // Get the path to this object expressed as a vector of path elements
     // For a top-level object, the returned vector will be empty.
     // The vector is in opposite order, with the top level object at the end.
     struct PathElement;
     using Path = std::vector<PathElement>;
     Path get_embedded_path();
 
+    // For an embedded object, traverse the path leading to this object.
+    // The PathSizer is called first to set the size of the path
+    // Then there is one call for each object on that path, starting with the top level object
+    // The embedded object itself is not considered part of the path.
+    using Visitor = std::function<void(const ConstObj&, ColKey, size_t)>;
+    using PathSizer = std::function<void(size_t)>;
+    void traverse_path(Visitor v, PathSizer ps, size_t path_index = 0) const;
+
+    // Get the path in the canonical Jurgen-format.
+    struct JurgenPathElement;
+    struct JurgenPath {
+        TableKey top_table;
+        ObjKey top_objkey;
+        std::vector<JurgenPathElement> path_from_top;
+    };
+    JurgenPath get_jurgen_path();
 
 protected:
     friend class Obj;
@@ -334,6 +350,11 @@ private:
 
 struct ConstObj::PathElement {
     ConstObj obj;   // Object which embeds...
+    ColKey col_key; // Column holding link or link list which embeds...
+    size_t index;   // index into link list (or 0)
+};
+
+struct ConstObj::JurgenPathElement {
     ColKey col_key; // Column holding link or link list which embeds...
     size_t index;   // index into link list (or 0)
 };
