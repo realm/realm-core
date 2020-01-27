@@ -11,11 +11,10 @@ RUN touch /var/lib/rpm/* \
 
 RUN yum -y install \
       chrpath \
-      devtoolset-6-binutils \
-      devtoolset-6-gcc \
-      devtoolset-6-gcc-c++ \
+      devtoolset-8-binutils \
+      devtoolset-8-gcc \
+      devtoolset-8-gcc-c++ \
       git \
-      openssl-devel \
       unzip \
       wget \
       which \
@@ -23,13 +22,14 @@ RUN yum -y install \
  
 # Install CMake
 RUN cd /opt \
-    && wget https://cmake.org/files/v3.15/cmake-3.15.2-Linux-x86_64.tar.gz \
-    && tar zxvf cmake-3.15.2-Linux-x86_64.tar.gz
+    && wget -nv https://cmake.org/files/v3.15/cmake-3.15.2-Linux-x86_64.tar.gz \
+    && tar zxf cmake-3.15.2-Linux-x86_64.tar.gz
 
 ENV PATH "/opt/cmake-3.15.2-Linux-x86_64/bin:$PATH"
 
 # Install ninja
-RUN wget https://github.com/ninja-build/ninja/releases/download/v1.9.0/ninja-linux.zip \
-    && unzip ninja-linux.zip \
-    && chmod a+x ninja \
-    && mv ninja /usr/bin
+RUN git clone https://github.com/ninja-build/ninja.git \
+    && cd ninja \
+    && scl enable devtoolset-8 -- cmake -B build-cmake \
+    && cmake --build build-cmake \
+    && mv build-cmake/ninja /usr/bin
