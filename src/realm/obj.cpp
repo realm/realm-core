@@ -677,11 +677,9 @@ void ConstObj::to_json(std::ostream& out, size_t link_depth, std::map<std::strin
                             << "\", \"key\": " << obj.get_key().value << "}";
                     }
                     else {
-                        out << "[";
                         followed.push_back(ck);
                         size_t new_depth = link_depth == not_found ? not_found : link_depth - 1;
                         obj.to_json(out, new_depth, renames, followed);
-                        out << "]";
                     }
                 }
                 else {

@@ -117,7 +117,7 @@ jobWrapper {
                 buildLinuxTSAN      : doBuildLinuxClang("RelTSAN")
             ]
 
-            androidAbis = ['armeabi-v7a', 'x86', 'mips', 'x86_64', 'arm64-v8a']
+            androidAbis = ['armeabi-v7a', 'x86', 'x86_64', 'arm64-v8a']
             androidBuildTypes = ['Debug', 'Release']
 
             for (abi in androidAbis) {
@@ -336,7 +336,7 @@ def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmula
             withEnv(environment) {
                 if(!runTestsInEmulator) {
                     buildEnv.inside {
-                        runAndCollectWarnings(script: "tools/cross_compile.sh -o android -a ${abi} -t ${buildType} -v ${gitDescribeVersion}")
+                        sh "tools/cross_compile.sh -o android -a ${abi} -t ${buildType} -v ${gitDescribeVersion}"
                         dir(buildDir) {
                             archiveArtifacts('realm-*.tar.gz')
                         }
@@ -564,10 +564,10 @@ def doBuildAppleDevice(String sdk, String buildType) {
             withEnv(['DEVELOPER_DIR=/Applications/Xcode-10.app/Contents/Developer/']) {
                 retry(3) {
                     timeout(time: 15, unit: 'MINUTES') {
-                        runAndCollectWarnings(parser:'clang', script: """
-                                rm -rf build-*
-                                tools/cross_compile.sh -o ${sdk} -t ${buildType} -v ${gitDescribeVersion}
-                            """)
+                        sh """
+                            rm -rf build-*
+                            tools/cross_compile.sh -o ${sdk} -t ${buildType} -v ${gitDescribeVersion}
+                        """
                     }
                 }
             }
