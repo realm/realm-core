@@ -352,7 +352,7 @@ TEST(Transactions_Threaded)
         tk = table->get_key();
         wt->commit();
     }
-#if defined(_WIN32) || REALM_ANDROID
+#if defined(_WIN32) || REALM_ANDROID || REALM_PLATFORM_APPLE
     const int num_threads = 2;
 #else
     const int num_threads = 20;
@@ -385,7 +385,7 @@ TEST(Transactions_ThreadedAdvanceRead)
         tk = table->get_key();
         wt->commit();
     }
-#if defined(_WIN32) || REALM_ANDROID
+#if defined(_WIN32) || REALM_ANDROID || REALM_PLATFORM_APPLE
     const int num_threads = 2;
 #else
     const int num_threads = 20;
