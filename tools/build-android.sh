@@ -26,7 +26,7 @@ done
 shift $((OPTIND-1))
 
 BUILD_TYPES=( Release Debug )
-[[ -z $ARM_ONLY ]] && PLATFORMS=( armeabi-v7a x86 mips x86_64 arm64-v8a ) || PLATFORMS=( armeabi-v7a )
+[[ -z $ARM_ONLY ]] && PLATFORMS=( armeabi-v7a x86 x86_64 arm64-v8a ) || PLATFORMS=( armeabi-v7a )
 
 if [[ ! -z $BUILD ]]; then
     for bt in "${BUILD_TYPES[@]}"; do
