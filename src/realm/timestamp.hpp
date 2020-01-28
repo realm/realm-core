@@ -219,10 +219,6 @@ struct numeric_limits<realm::Timestamp> {
     {
         return realm::Timestamp(numeric_limits<int64_t>::min(), 0);
     }
-    static realm::Timestamp lowest()
-    {
-        return realm::Timestamp(numeric_limits<int64_t>::lowest(), 0);
-    }
     static realm::Timestamp max()
     {
         return realm::Timestamp(numeric_limits<int64_t>::max(), 0);
