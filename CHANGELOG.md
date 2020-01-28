@@ -5,7 +5,11 @@
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+<<<<<<< HEAD
 * Fixed float and double maximum queries when all values were less or equal to zero..
+=======
+* Using case insensitive search on a primary key string column would crash. ([#3564](https://github.com/realm/realm-core/issues/3564), since v6.0.0-alpha.25)
+>>>>>>> Fix case insensitive search on string primary key column
  
 ### Breaking changes
 * None.
