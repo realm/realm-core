@@ -860,6 +860,18 @@ public:
 
     using Lst<ObjKey>::find_first;
     using Lst<ObjKey>::find_all;
+    void set(size_t ndx, ObjKey value);
+    void insert(size_t ndx, ObjKey value);
+    // Create a new object in insert a link to it
+    Obj create_and_insert_linked_object(size_t ndx);
+    // Create a new object and link it. If an embedded object
+    // is already set, it will be removed. TBD: If a non-embedded
+    // object is already set, we throw LogicError (to prevent
+    // dangling objects, since they do not delete automatically
+    // if they are not embedded...)
+    Obj create_and_set_linked_object(size_t ndx);
+    // to be implemented:
+    Obj clear_linked_object(size_t ndx);
 
     TableView get_sorted_view(SortDescriptor order) const;
     TableView get_sorted_view(ColKey column_key, bool ascending = true) const;

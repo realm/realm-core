@@ -166,6 +166,37 @@ public:
 
     std::string to_string() const;
 
+    // Get the path in a minimal format without including object accessors.
+    // If you need to obtain additional information for each object in the path,
+    // you should use get_fat_path() or traverse_path() instead (see below).
+    struct PathElement;
+    struct Path {
+        TableKey top_table;
+        ObjKey top_objkey;
+        std::vector<PathElement> path_from_top;
+    };
+    Path get_path() const;
+
+    // Get the fat path to this object expressed as a vector of fat path elements.
+    // each Fat path elements include a ConstObj allowing for low cost access to the
+    // objects data.
+    // For a top-level object, the returned vector will be empty.
+    // For an embedded object, the vector has the top object as first element,
+    // and the embedded object itself is not included in the path.
+    struct FatPathElement;
+    using FatPath = std::vector<FatPathElement>;
+    FatPath get_fat_path() const;
+
+    // For an embedded object, traverse the path leading to this object.
+    // The PathSizer is called first to set the size of the path
+    // Then there is one call for each object on that path, starting with the top level object
+    // The embedded object itself is not considered part of the path.
+    // Note: You should never provide the path_index for calls to traverse_path.
+    using Visitor = std::function<void(const ConstObj&, ColKey, size_t)>;
+    using PathSizer = std::function<void(size_t)>;
+    void traverse_path(Visitor v, PathSizer ps, size_t path_index = 0) const;
+
+
 protected:
     friend class Obj;
     friend class ColumnListBase;
@@ -224,7 +255,16 @@ public:
 
     template <typename U>
     Obj& set(ColKey col_key, U value, bool is_default = false);
-
+    // Create a new object and link it. If an embedded object
+    // is already set, it will be removed. If a non-embedded
+    // object is already set, we throw LogicError (to prevent
+    // dangling objects, since they do not delete automatically
+    // if they are not embedded...)
+    Obj create_and_set_linked_object(ColKey col_key);
+    // Clear all fields of a linked object returning it to its
+    // default state. If the object does not exist, create a
+    // new object and link it. (To Be Implemented)
+    Obj clear_linked_object(ColKey col_key);
     Obj& set(ColKey col_key, Mixed value);
 
     template <typename U>
@@ -315,6 +355,16 @@ private:
     inline void set_spec(T&, ColKey);
 };
 
+struct ConstObj::FatPathElement {
+    ConstObj obj;   // Object which embeds...
+    ColKey col_key; // Column holding link or link list which embeds...
+    size_t index;   // index into link list (or 0)
+};
+
+struct ConstObj::PathElement {
+    ColKey col_key; // Column holding link or link list which embeds...
+    size_t index;   // index into link list (or 0)
+};
 
 inline Obj Obj::get_linked_object(ColKey link_col_key)
 {

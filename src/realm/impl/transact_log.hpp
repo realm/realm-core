@@ -54,7 +54,7 @@ enum Instruction {
     instr_InsertColumn = 20, // Insert new column into to selected descriptor
     instr_EraseColumn = 21,  // Remove column from selected descriptor
     instr_RenameColumn = 22, // Rename column in selected descriptor
-    instr_SetLinkType = 23,  // Strong/weak
+    instr_SetLinkType = 23,  // Strong/weak (unused from file format 11)
 
     instr_SelectList = 30,
     instr_ListInsert = 31, // Insert list entry
@@ -324,7 +324,7 @@ public:
     virtual void erase_group_level_table(TableKey table_key, size_t num_tables);
     virtual void rename_group_level_table(TableKey table_key, StringData new_name);
     virtual void insert_column(const Table*, ColKey col_key, DataType type, StringData name, LinkTargetInfo& link,
-                               bool nullable = false, bool listtype = false, LinkType link_type = link_Weak);
+                               bool nullable = false, bool listtype = false);
     virtual void erase_column(const Table*, ColKey col_key);
     virtual void rename_column(const Table*, ColKey col_key, StringData name);
 
@@ -375,7 +375,7 @@ public:
     virtual void remove_object(const Table*, ObjKey);
     /// \param prior_num_rows The number of rows in the table prior to the
     /// modification.
-    virtual void set_link_type(const Table*, ColKey col_key, LinkType);
+    virtual void set_link_type(const Table*, ColKey col_key);
     virtual void clear_table(const Table*, size_t prior_num_rows);
 
     virtual void list_set_null(const ConstLstBase&, size_t ndx);
@@ -773,7 +773,7 @@ inline bool TransactLogEncoder::insert_column(ColKey col_key)
 }
 
 inline void TransactLogConvenientEncoder::insert_column(const Table* t, ColKey col_key, DataType, StringData,
-                                                        LinkTargetInfo&, bool, bool, LinkType)
+                                                        LinkTargetInfo&, bool, bool)
 {
     select_table(t);                  // Throws
     m_encoder.insert_column(col_key); // Throws
@@ -1066,7 +1066,7 @@ inline bool TransactLogEncoder::set_link_type(ColKey col_key)
     return true;
 }
 
-inline void TransactLogConvenientEncoder::set_link_type(const Table* t, ColKey col_key, LinkType)
+inline void TransactLogConvenientEncoder::set_link_type(const Table* t, ColKey col_key)
 {
     select_table(t);                  // Throws
     m_encoder.set_link_type(col_key); // Throws

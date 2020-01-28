@@ -4422,29 +4422,6 @@ TEST(Table_KeysRow)
     CHECK_EQUAL(i, ObjKey(9));
 }
 
-TEST(Table_getLinkType)
-{
-    Group g;
-    TableRef table = g.add_table("table");
-
-    auto col_int = table->add_column(type_Int, "int");
-    auto col_weak_link = table->add_column_link(type_Link, "weak_link", *table);
-    auto col_strong_link = table->add_column_link(type_Link, "strong_link", *table, link_Strong);
-    auto col_weak_linklist = table->add_column_link(type_LinkList, "weak_list", *table);
-    auto col_strong_linklist = table->add_column_link(type_LinkList, "strong_list", *table, link_Strong);
-
-    CHECK(link_Weak == table->get_link_type(col_weak_link));
-    CHECK(link_Strong == table->get_link_type(col_strong_link));
-    CHECK(link_Weak == table->get_link_type(col_weak_linklist));
-    CHECK(link_Strong == table->get_link_type(col_strong_linklist));
-
-    CHECK_THROW(table->get_link_type(col_int), LogicError);
-
-    g.remove_table("table");
-    CHECK_THROW(table->get_link_type(col_weak_link), NoSuchTable);
-}
-
-
 template<typename T> T generate_value() { return test_util::random_int<T>(); }
 
 template<> StringData generate_value()
@@ -5029,5 +5006,246 @@ TEST(Table_IteratorRandomAccess)
     CHECK_EQUAL(keys[201], iter200[1].get_key());
     CHECK_EQUAL(keys[1], iter->get_key());
 }
+
+TEST(Table_EmbeddedObjects)
+{
+    SHARED_GROUP_TEST_PATH(path);
+
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
+
+    auto tr = sg->start_write();
+    auto table = tr->add_embedded_table("mytable");
+    tr->commit_and_continue_as_read();
+    tr->promote_to_write();
+    CHECK(table->is_embedded());
+    CHECK_THROW(table->create_object(), LogicError);
+    tr->rollback();
+
+    tr = sg->start_read();
+    table = tr->get_table("mytable");
+    CHECK(table->is_embedded());
+}
+
+TEST(Table_EmbeddedObjectCreateAndDestroy)
+{
+    SHARED_GROUP_TEST_PATH(path);
+
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
+
+    auto tr = sg->start_write();
+    auto table = tr->add_embedded_table("myEmbeddedStuff");
+    auto col_recurse = table->add_column_link(type_Link, "theRecursiveBit", *table);
+    CHECK_THROW(table->create_object(), LogicError);
+    auto parent = tr->add_table("myParentStuff");
+    auto ck = parent->add_column_link(type_Link, "theGreatColumn", *table);
+    Obj o = parent->create_object();
+    Obj o2 = o.create_and_set_linked_object(ck);
+    o2.create_and_set_linked_object(col_recurse);
+    CHECK(table->size() == 2);
+    o.set(ck, ObjKey());
+    CHECK(table->size() == 0);
+    tr->commit();
+}
+
+TEST(Table_EmbeddedObjectCreateAndDestroyList)
+{
+    SHARED_GROUP_TEST_PATH(path);
+
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
+
+    auto tr = sg->start_write();
+    auto table = tr->add_embedded_table("myEmbeddedStuff");
+    auto col_recurse = table->add_column_link(type_LinkList, "theRecursiveBit", *table);
+    CHECK_THROW(table->create_object(), LogicError);
+    auto parent = tr->add_table("myParentStuff");
+    auto ck = parent->add_column_link(type_LinkList, "theGreatColumn", *table);
+    Obj o = parent->create_object();
+    auto parent_ll = o.get_linklist(ck);
+    Obj o2 = parent_ll.create_and_insert_linked_object(0);
+    Obj o3 = parent_ll.create_and_insert_linked_object(1);
+    Obj o4 = parent_ll.create_and_insert_linked_object(0);
+    auto o2_ll = o2.get_linklist(col_recurse);
+    auto o3_ll = o3.get_linklist(col_recurse);
+    o2_ll.create_and_insert_linked_object(0);
+    o2_ll.create_and_insert_linked_object(0);
+    o3_ll.create_and_insert_linked_object(0);
+    CHECK(table->size() == 6);
+    parent_ll.create_and_set_linked_object(1); // implicitly remove entry for 02
+    CHECK(!o2.is_valid());
+    CHECK(table->size() == 4);
+    o.remove();
+    CHECK(table->size() == 0);
+    tr->commit();
+}
+
+TEST(Table_EmbeddedObjectNotifications)
+{
+    SHARED_GROUP_TEST_PATH(path);
+
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
+
+    auto tr = sg->start_write();
+    auto table = tr->add_embedded_table("myEmbeddedStuff");
+    auto col_recurse = table->add_column_link(type_LinkList, "theRecursiveBit", *table);
+    CHECK_THROW(table->create_object(), LogicError);
+    auto parent = tr->add_table("myParentStuff");
+    auto ck = parent->add_column_link(type_LinkList, "theGreatColumn", *table);
+    Obj o = parent->create_object();
+    auto parent_ll = o.get_linklist(ck);
+    Obj o2 = parent_ll.create_and_insert_linked_object(0);
+    Obj o3 = parent_ll.create_and_insert_linked_object(1);
+    Obj o4 = parent_ll.create_and_insert_linked_object(0);
+    auto o2_ll = o2.get_linklist(col_recurse);
+    auto o3_ll = o3.get_linklist(col_recurse);
+    o2_ll.create_and_insert_linked_object(0);
+    o2_ll.create_and_insert_linked_object(0);
+    o3_ll.create_and_insert_linked_object(0);
+    CHECK(table->size() == 6);
+    Obj o5 = parent_ll.create_and_set_linked_object(1); // implicitly remove entry for 02
+    CHECK(!o2.is_valid());
+    CHECK(table->size() == 4);
+    // now the notifications...
+    int calls = 0;
+    tr->set_cascade_notification_handler([&](const Group::CascadeNotification& notification) {
+            CHECK_EQUAL(0, notification.links.size());
+            if (calls == 0) {
+                CHECK_EQUAL(1, notification.rows.size());
+                CHECK_EQUAL(parent->get_key(), notification.rows[0].table_key);
+                CHECK_EQUAL(o.get_key(), notification.rows[0].key);
+            }
+            else if (calls == 1) {
+                CHECK_EQUAL(3, notification.rows.size());
+                for (auto& row : notification.rows)
+                    CHECK_EQUAL(table->get_key(), row.table_key);
+                CHECK_EQUAL(o4.get_key(), notification.rows[0].key);
+                CHECK_EQUAL(o5.get_key(), notification.rows[1].key);
+                CHECK_EQUAL(o3.get_key(), notification.rows[2].key);
+            }
+            else if (calls == 2) {
+                CHECK_EQUAL(1, notification.rows.size()); // from o3
+                for (auto& row : notification.rows)
+                    CHECK_EQUAL(table->get_key(), row.table_key);
+                // don't bother checking the keys...
+            }
+            ++calls;
+        });
+
+    o.remove();
+    CHECK(calls == 3);
+    tr->commit();
+
+}
+TEST(Table_EmbeddedObjectTableClearNotifications)
+{
+    SHARED_GROUP_TEST_PATH(path);
+
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
+
+    auto tr = sg->start_write();
+    auto table = tr->add_embedded_table("myEmbeddedStuff");
+    auto col_recurse = table->add_column_link(type_LinkList, "theRecursiveBit", *table);
+    CHECK_THROW(table->create_object(), LogicError);
+    auto parent = tr->add_table("myParentStuff");
+    auto ck = parent->add_column_link(type_LinkList, "theGreatColumn", *table);
+    Obj o = parent->create_object();
+    auto parent_ll = o.get_linklist(ck);
+    Obj o2 = parent_ll.create_and_insert_linked_object(0);
+    Obj o3 = parent_ll.create_and_insert_linked_object(1);
+    Obj o4 = parent_ll.create_and_insert_linked_object(0);
+    auto o2_ll = o2.get_linklist(col_recurse);
+    auto o3_ll = o3.get_linklist(col_recurse);
+    o2_ll.create_and_insert_linked_object(0);
+    o2_ll.create_and_insert_linked_object(0);
+    o3_ll.create_and_insert_linked_object(0);
+    CHECK(table->size() == 6);
+    Obj o5 = parent_ll.create_and_set_linked_object(1); // implicitly remove entry for 02
+    CHECK(!o2.is_valid());
+    CHECK(table->size() == 4);
+    // now the notifications...
+    int calls = 0;
+    tr->set_cascade_notification_handler([&](const Group::CascadeNotification& notification) {
+            if (calls == 0) {
+                CHECK_EQUAL(3, notification.rows.size());
+                for (auto& row : notification.rows)
+                    CHECK_EQUAL(table->get_key(), row.table_key);
+                CHECK_EQUAL(o4.get_key(), notification.rows[0].key);
+                CHECK_EQUAL(o5.get_key(), notification.rows[1].key);
+                CHECK_EQUAL(o3.get_key(), notification.rows[2].key);
+            }
+            else if (calls == 1) {
+                CHECK_EQUAL(1, notification.rows.size()); // from o3
+                for (auto& row : notification.rows)
+                    CHECK_EQUAL(table->get_key(), row.table_key);
+                // don't bother checking the keys...
+            }
+            ++calls;
+        });
+
+    parent->clear();
+    CHECK(calls == 2);
+    tr->commit();
+
+}
+
+TEST(Table_EmbeddedObjectPath)
+{
+    auto collect_path = [](const ConstObj& o) {
+        return o.get_fat_path();
+    };
+
+    SHARED_GROUP_TEST_PATH(path);
+
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
+
+    auto tr = sg->start_write();
+    auto table = tr->add_embedded_table("myEmbeddedStuff");
+    auto col_recurse = table->add_column_link(type_LinkList, "theRecursiveBit", *table);
+    CHECK_THROW(table->create_object(), LogicError);
+    auto parent = tr->add_table("myParentStuff");
+    auto ck = parent->add_column_link(type_LinkList, "theGreatColumn", *table);
+    Obj o = parent->create_object();
+    auto gch = collect_path(o);
+    CHECK(gch.size() == 0);
+    auto parent_ll = o.get_linklist(ck);
+    Obj o2 = parent_ll.create_and_insert_linked_object(0);
+    auto gbh = collect_path(o2);
+    CHECK(gbh.size() == 1);
+    CHECK(gbh[0].obj.get_key() == o.get_key());
+    CHECK(gbh[0].col_key == ck);
+    CHECK(gbh[0].index == 0);
+    Obj o3 = parent_ll.create_and_insert_linked_object(1);
+    Obj o4 = parent_ll.create_and_insert_linked_object(0);
+    auto gah = collect_path(o4);
+    CHECK(gah.size() == 1);
+    CHECK(gah[0].obj.get_key() == o.get_key());
+    CHECK(gah[0].col_key == ck);
+    CHECK(gah[0].index == 0);
+    auto gzh = collect_path(o3);
+    CHECK(gzh.size() == 1);
+    CHECK(gzh[0].obj.get_key() == o.get_key());
+    CHECK(gzh[0].col_key == ck);
+    CHECK(gzh[0].index == 2);
+    auto o2_ll = o2.get_linklist(col_recurse);
+    auto o3_ll = o3.get_linklist(col_recurse);
+    o2_ll.create_and_insert_linked_object(0);
+    o2_ll.create_and_insert_linked_object(0);
+    o3_ll.create_and_insert_linked_object(0);
+    CHECK(table->size() == 6);
+    auto gyh = collect_path(o3_ll.get_object(0));
+    CHECK(gyh.size() == 2);
+    CHECK(gyh[0].obj.get_key() == o.get_key());
+    CHECK(gyh[0].col_key == ck);
+    CHECK(gyh[0].index == 2);
+    CHECK(gyh[1].obj.get_key() == o3.get_key());
+    CHECK(gyh[1].col_key = col_recurse);
+    CHECK(gyh[1].index == 0);
+}
+
 
 #endif // TEST_TABLE

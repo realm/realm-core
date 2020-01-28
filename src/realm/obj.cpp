@@ -429,7 +429,7 @@ bool ConstObj::has_backlinks(bool only_strong_links) const
         // Find origin table and column for this backlink column
         TableRef origin_table = target_table.get_opposite_table(backlink_col_key);
         ColKey origin_col = target_table.get_opposite_column(backlink_col_key);
-        if (!only_strong_links || origin_col.get_attrs().test(col_attr_StrongLinks)) {
+        if (!only_strong_links || target_table.is_embedded()) {
             auto cnt = get_backlink_count(*origin_table, origin_col);
             if (cnt)
                 return true;
@@ -447,7 +447,7 @@ size_t ConstObj::get_backlink_count(bool only_strong_links) const
         // Find origin table and column for this backlink column
         TableRef origin_table = target_table.get_opposite_table(backlink_col_key);
         ColKey origin_col = target_table.get_opposite_column(backlink_col_key);
-        if (!only_strong_links || origin_col.get_attrs().test(col_attr_StrongLinks)) {
+        if (!only_strong_links || target_table.is_embedded()) {
             cnt += get_backlink_count(*origin_table, origin_col);
         }
         return false;
@@ -522,6 +522,64 @@ std::vector<ObjKey> ConstObj::get_all_backlinks(ColKey backlink_col) const
     }
     return vec;
 }
+
+void ConstObj::traverse_path(Visitor v, PathSizer ps, size_t path_length) const {
+    if (m_table->is_embedded()) {
+        REALM_ASSERT(get_backlink_count(true) == 1);
+        m_table->for_each_backlink_column([&](ColKey col_key) {
+                std::vector<ObjKey> backlinks = get_all_backlinks(col_key);
+                if (backlinks.size() == 1) {
+                    TableRef tr = m_table->get_opposite_table(col_key);
+                    ConstObj obj = tr->get_object(backlinks[0]); // always the first (and only)
+                    auto next_col_key = m_table->get_opposite_column(col_key);
+                    size_t index = 0;
+                    if (next_col_key.get_attrs().test(col_attr_List)) {
+                        ConstLnkLst ll = obj.get_linklist(next_col_key);
+                        while (ll.get(index) != get_key()) {
+                            index++;
+                            REALM_ASSERT(ll.size() > index);
+                        }
+                    }
+                    obj.traverse_path(v, ps, path_length + 1);
+                    v(obj, next_col_key, index);
+                    return true; // early out
+                }
+                return false; // try next column
+            });
+    }
+    else {
+        ps(path_length);
+    }
+}
+
+ConstObj::FatPath ConstObj::get_fat_path() const
+{
+    FatPath result;
+    auto sizer = [&](size_t size) { result.reserve(size); };
+    auto step = [&](const ConstObj& o2, ColKey col, size_t idx) -> void {
+        result.push_back({o2, col, idx});
+    };
+    traverse_path(step, sizer);
+    return result;
+}
+
+ConstObj::Path ConstObj::get_path() const
+{
+    Path result;
+    bool top_done = false;
+    auto sizer = [&](size_t size) { result.path_from_top.reserve(size); };
+    auto step = [&](const ConstObj& o2, ColKey col, size_t idx) -> void {
+        if (!top_done) {
+            top_done = true;
+            result.top_table = o2.get_table()->get_key();
+            result.top_objkey = o2.get_key();
+        }
+        result.path_from_top.push_back({col, idx});
+    };
+    traverse_path(step, sizer);
+    return result;
+}
+
 
 namespace {
 const char to_be_escaped[] = "\"\n\r\t\f\\\b";
@@ -891,7 +949,9 @@ Obj& Obj::set<ObjKey>(ColKey col_key, ObjKey target_key, bool is_default)
     if (target_key != null_key && !target_table->is_valid(target_key)) {
         throw LogicError(LogicError::target_row_index_out_of_range);
     }
-
+    if (target_table->is_embedded() && target_key != null_key) {
+        throw LogicError(LogicError::wrong_kind_of_table);
+    }
     ObjKey old_key = get<ObjKey>(col_key); // Will update if needed
 
     if (target_key != old_key) {
@@ -921,6 +981,52 @@ Obj& Obj::set<ObjKey>(ColKey col_key, ObjKey target_key, bool is_default)
     }
 
     return *this;
+}
+
+Obj Obj::create_and_set_linked_object(ColKey col_key)
+{
+    update_if_needed();
+    get_table()->report_invalid_key(col_key);
+    ColKey::Idx col_ndx = col_key.get_index();
+    ColumnType type = col_key.get_type();
+    if (type != col_type_Link)
+        throw LogicError(LogicError::illegal_type);
+    TableRef target_table = get_target_table(col_key);
+    Table& t = *target_table;
+    auto result = t.is_embedded() ? t.create_linked_object() : t.create_object();
+    auto target_key = result.get_key();
+    ObjKey old_key = get<ObjKey>(col_key); // Will update if needed
+    if (!t.is_embedded() && old_key != ObjKey()) {
+        throw LogicError(LogicError::wrong_kind_of_table);
+    }
+    if (target_key != old_key) {
+        CascadeState state;
+
+        ensure_writeable();
+        bool recurse = replace_backlink(col_key, old_key, target_key, state);
+
+        Allocator& alloc = get_alloc();
+        alloc.bump_content_version();
+        Array fallback(alloc);
+        Array& fields = get_tree_top()->get_fields_accessor(fallback, m_mem);
+        REALM_ASSERT(col_ndx.val + 1 < fields.size());
+        ArrayKey values(alloc);
+        values.set_parent(&fields, col_ndx.val + 1);
+        values.init_from_parent();
+
+        values.set(m_row_ndx, target_key);
+
+        if (Replication* repl = get_replication()) {
+            bool is_default = true; // FIXME: Is this correct?
+            repl->set(m_table.unchecked_ptr(), col_key, m_key, target_key,
+                      is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
+        }
+
+        if (recurse)
+            target_table->remove_recursive(state);
+    }
+
+    return result;
 }
 
 namespace {
@@ -1120,7 +1226,7 @@ bool Obj::remove_backlink(ColKey col_key, ObjKey old_key, CascadeState& state)
     ColKey backlink_col_key = m_table->get_opposite_column(col_key);
     REALM_ASSERT(target_table->valid_column(backlink_col_key));
 
-    bool strong_links = (origin_table.get_link_type(col_key) == link_Strong);
+    bool strong_links = target_table->is_embedded();
 
     if (old_key != realm::null_key) {
         Obj target_obj = target_table->get_object(old_key);
