@@ -551,9 +551,9 @@ void ConstObj::traverse_path(Visitor v, PathSizer ps, size_t path_length) const 
     }
 }
 
-ConstObj::Path ConstObj::get_embedded_path()
+ConstObj::FatPath ConstObj::get_fat_path() const
 {
-    Path result;
+    FatPath result;
     auto sizer = [&](size_t size) { result.reserve(size); };
     auto step = [&](const ConstObj& o2, ColKey col, size_t idx) -> void {
         result.push_back({o2, col, idx});
@@ -562,9 +562,9 @@ ConstObj::Path ConstObj::get_embedded_path()
     return result;
 }
 
-ConstObj::JurgenPath ConstObj::get_jurgen_path()
+ConstObj::Path ConstObj::get_path() const
 {
-    JurgenPath result;
+    Path result;
     bool top_done = false;
     auto sizer = [&](size_t size) { result.path_from_top.reserve(size); };
     auto step = [&](const ConstObj& o2, ColKey col, size_t idx) -> void {

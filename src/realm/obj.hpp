@@ -166,29 +166,36 @@ public:
 
     std::string to_string() const;
 
-    // Get the path to this object expressed as a vector of path elements
-    // For a top-level object, the returned vector will be empty.
-    // The vector is in opposite order, with the top level object at the end.
+    // Get the path in a minimal format without including object accessors.
+    // If you need to obtain additional information for each object in the path,
+    // you should use get_fat_path() or traverse_path() instead (see below).
     struct PathElement;
-    using Path = std::vector<PathElement>;
-    Path get_embedded_path();
+    struct Path {
+        TableKey top_table;
+        ObjKey top_objkey;
+        std::vector<PathElement> path_from_top;
+    };
+    Path get_path() const;
+
+    // Get the fat path to this object expressed as a vector of fat path elements.
+    // each Fat path elements include a ConstObj allowing for low cost access to the
+    // objects data.
+    // For a top-level object, the returned vector will be empty.
+    // For an embedded object, the vector has the top object as first element,
+    // and the embedded object itself is not included in the path.
+    struct FatPathElement;
+    using FatPath = std::vector<FatPathElement>;
+    FatPath get_fat_path() const;
 
     // For an embedded object, traverse the path leading to this object.
     // The PathSizer is called first to set the size of the path
     // Then there is one call for each object on that path, starting with the top level object
     // The embedded object itself is not considered part of the path.
+    // Note: You should never provide the path_index for calls to traverse_path.
     using Visitor = std::function<void(const ConstObj&, ColKey, size_t)>;
     using PathSizer = std::function<void(size_t)>;
     void traverse_path(Visitor v, PathSizer ps, size_t path_index = 0) const;
 
-    // Get the path in the canonical Jurgen-format.
-    struct JurgenPathElement;
-    struct JurgenPath {
-        TableKey top_table;
-        ObjKey top_objkey;
-        std::vector<JurgenPathElement> path_from_top;
-    };
-    JurgenPath get_jurgen_path();
 
 protected:
     friend class Obj;
@@ -348,13 +355,13 @@ private:
     inline void set_spec(T&, ColKey);
 };
 
-struct ConstObj::PathElement {
+struct ConstObj::FatPathElement {
     ConstObj obj;   // Object which embeds...
     ColKey col_key; // Column holding link or link list which embeds...
     size_t index;   // index into link list (or 0)
 };
 
-struct ConstObj::JurgenPathElement {
+struct ConstObj::PathElement {
     ColKey col_key; // Column holding link or link list which embeds...
     size_t index;   // index into link list (or 0)
 };

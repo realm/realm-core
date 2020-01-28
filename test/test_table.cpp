@@ -5195,13 +5195,7 @@ TEST(Table_EmbeddedObjectTableClearNotifications)
 TEST(Table_EmbeddedObjectPath)
 {
     auto collect_path = [](const ConstObj& o) {
-        ConstObj::Path path_;
-        auto sizer = [&](size_t size) { path_.reserve(size); };
-        auto step = [&](const ConstObj& o2, ColKey col, size_t idx) -> void {
-            path_.push_back({o2, col, idx});
-        };
-        o.traverse_path(step, sizer);
-        return path_;
+        return o.get_fat_path();
     };
 
     SHARED_GROUP_TEST_PATH(path);
