@@ -318,9 +318,9 @@ endif()
 
 if(UNIX AND NOT APPLE)
     if(ANDROID)
-        set(OPENSSL_URL "http://static.realm.io/downloads/openssl/${OPENSSL_VERSION}/Android/${CMAKE_ANDROID_ARCH_ABI}/openssl.tgz")
+        set(OPENSSL_URL "https://static.realm.io/downloads/openssl/${OPENSSL_VERSION}/Android/${CMAKE_ANDROID_ARCH_ABI}/openssl.tgz")
     else()
-        set(OPENSSL_URL "http://static.realm.io/downloads/openssl/${OPENSSL_VERSION}/Linux/x86_64/openssl.tgz")
+        set(OPENSSL_URL "https://static.realm.io/downloads/openssl/${OPENSSL_VERSION}/Linux/x86_64/openssl.tgz")
     endif()
 
     message(STATUS "Getting ${OPENSSL_URL}...")
