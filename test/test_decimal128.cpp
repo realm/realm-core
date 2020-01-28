@@ -64,7 +64,7 @@ TEST(Decimal_Basics)
     CHECK(d3 + d3 < d3);
 
     Decimal128 y;
-    CHECK(y.is_null());
+    CHECK(!y.is_null());
     y = d1;
 
     Decimal128 d10(10);
@@ -181,6 +181,9 @@ TEST(Decimal128_Aggregates)
                 obj.set(col_dec, Decimal128(val));
                 sum += val;
                 count++;
+            }
+            else {
+                obj.set_null(col_dec);
             }
         }
         wt->commit();

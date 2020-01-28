@@ -1124,7 +1124,7 @@ inline bool NullableVector<Decimal128>::is_null(size_t index) const
 template <>
 inline void NullableVector<Decimal128>::set_null(size_t index)
 {
-    m_first[index] = Decimal128{};
+    m_first[index] = Decimal128{realm::null()};
 }
 
 // ref_type
@@ -3820,7 +3820,7 @@ class Sum : public BaseAggregateOperation<T, Sum<T>> {
 public:
     static T initial_value()
     {
-        return T(0);
+        return T();
     }
     static T apply(T a, T b)
     {

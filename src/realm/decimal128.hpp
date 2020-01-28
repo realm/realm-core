@@ -40,6 +40,7 @@ public:
     };
     Decimal128();
     explicit Decimal128(int64_t);
+    explicit Decimal128(uint64_t);
     explicit Decimal128(int);
     explicit Decimal128(double);
     Decimal128(Bid128 coefficient, int exponent, bool sign);
@@ -49,7 +50,7 @@ public:
     {
         m_value = val;
     }
-    Decimal128(const null&) noexcept;
+    Decimal128(null) noexcept;
 
     bool is_null() const;
 
@@ -63,6 +64,7 @@ public:
     Decimal128 operator/(int64_t div) const;
     Decimal128 operator/(size_t div) const;
     Decimal128 operator/(int div) const;
+    Decimal128 operator/(Decimal128 div) const;
     Decimal128& operator+=(Decimal128);
     Decimal128 operator+(Decimal128 rhs) const
     {
