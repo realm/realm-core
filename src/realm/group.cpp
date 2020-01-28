@@ -759,7 +759,7 @@ Table* Group::do_add_table(StringData name)
 }
 
 
-Table* Group::do_get_or_add_table(StringData name, bool* was_added)
+Table* Group::do_get_or_add_table(StringData name, bool is_embedded, bool* was_added)
 {
     REALM_ASSERT(m_table_names.is_attached());
     auto table = do_get_table(name);
@@ -771,9 +771,10 @@ Table* Group::do_get_or_add_table(StringData name, bool* was_added)
     else {
         Replication* repl = *get_repl();
         if (repl && name.begins_with(g_class_name_prefix))
-            repl->add_class(name);
+            repl->add_class(name, is_embedded);
 
         table = do_add_table(name);
+        table->set_embedded(is_embedded);
         if (was_added)
             *was_added = true;
         return table;
