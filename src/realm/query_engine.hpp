@@ -1301,8 +1301,6 @@ public:
     void table_changed() override
     {
         m_is_string_enum = m_table.unchecked_ptr()->is_enumerated(m_condition_column_key);
-        m_has_search_index = m_table.unchecked_ptr()->has_search_index(m_condition_column_key) ||
-                             m_table.unchecked_ptr()->get_primary_key_column() == m_condition_column_key;
     }
 
     void cluster_changed() override
@@ -1316,11 +1314,6 @@ public:
         m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) ArrayString(m_table.unchecked_ptr()->get_alloc()));
         m_cluster->init_leaf(this->m_condition_column_key, m_array_ptr.get());
         m_leaf_ptr = m_array_ptr.get();
-    }
-
-    bool has_search_index() const
-    {
-        return m_has_search_index;
     }
 
     void init() override
@@ -1344,7 +1337,6 @@ public:
         : ParentNode(from, tr)
         , m_value(from.m_value)
         , m_is_string_enum(from.m_is_string_enum)
-        , m_has_search_index(from.m_has_search_index)
     {
     }
 
@@ -1369,7 +1361,6 @@ protected:
     const ArrayString* m_leaf_ptr = nullptr;
 
     bool m_is_string_enum = false;
-    bool m_has_search_index = false;
 
     size_t m_end_s = 0;
     size_t m_leaf_start = 0;
@@ -1604,10 +1595,16 @@ public:
     }
     StringNodeEqualBase(const StringNodeEqualBase& from, Transaction* tr)
         : StringNodeBase(from, tr)
+        , m_has_search_index(from.m_has_search_index)
     {
     }
 
     void init() override;
+
+    bool has_search_index() const
+    {
+        return m_has_search_index;
+    }
 
     void cluster_changed() override
     {
@@ -1631,6 +1628,7 @@ protected:
     size_t m_results_start;
     size_t m_results_ndx;
     size_t m_results_end;
+    bool m_has_search_index = false;
 
     inline BinaryData str_to_bin(const StringData& s) noexcept
     {
@@ -1650,6 +1648,13 @@ template <>
 class StringNode<Equal> : public StringNodeEqualBase {
 public:
     using StringNodeEqualBase::StringNodeEqualBase;
+
+    void table_changed() override
+    {
+        StringNodeBase::table_changed();
+        m_has_search_index = m_table.unchecked_ptr()->has_search_index(m_condition_column_key) ||
+                             m_table.unchecked_ptr()->get_primary_key_column() == m_condition_column_key;
+    }
 
     void _search_index_init() override;
 
@@ -1720,6 +1725,12 @@ public:
     {
         StringNodeEqualBase::clear_leaf_state();
         m_index_matches.clear();
+    }
+
+    void table_changed() override
+    {
+        StringNodeBase::table_changed();
+        m_has_search_index = m_table.unchecked_ptr()->has_search_index(m_condition_column_key);
     }
 
     void _search_index_init() override;
