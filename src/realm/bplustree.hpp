@@ -656,7 +656,7 @@ template <class T>
 typename ColumnTypeTraits<T>::minmax_type bptree_maximum(const BPlusTree<T>& tree, size_t* return_ndx = nullptr)
 {
     using ResultType = typename AggregateResultType<T, act_Max>::result_type;
-    ResultType max = std::numeric_limits<ResultType>::lowest();
+    ResultType max = std::numeric_limits<ResultType>::min();
 
     auto func = [&max, return_ndx](BPlusTreeNode* node, size_t offset) {
         auto leaf = static_cast<typename BPlusTree<T>::LeafNode*>(node);
