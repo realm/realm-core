@@ -3720,8 +3720,7 @@ private:
 namespace aggregate_operations {
 template <typename T, typename Derived, typename R = T>
 class BaseAggregateOperation {
-    static_assert(std::is_same<T, Int>::value || std::is_same<T, Float>::value || std::is_same<T, Double>::value ||
-                      std::is_same<T, Decimal128>::value,
+    static_assert(realm::is_any<T, Int, Float, Double, Decimal128>::value,
                   "Numeric aggregates can only be used with subcolumns of numeric types");
 
 public:

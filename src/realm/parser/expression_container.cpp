@@ -165,14 +165,6 @@ SubqueryExpression& ExpressionContainer::get_subexpression()
     return util::any_cast<SubqueryExpression&>(storage);
 }
 
-bool types_are_numerically_comparible(DataType lhs, DataType rhs)
-{
-    auto is_numeric = [&](DataType t) {
-        return t == type_Float || t == type_Double || t == type_Int || t == type_Decimal;
-    };
-    return is_numeric(lhs) && is_numeric(rhs);
-}
-
 DataType ExpressionContainer::check_type_compatibility(DataType other_type)
 {
     util::Optional<DataType> self_type;
@@ -217,9 +209,6 @@ DataType ExpressionContainer::check_type_compatibility(DataType other_type)
                         data_type_to_str(other_type)));
     }
     else if (self_type.value() != other_type) {
-        if (types_are_numerically_comparible(self_type.value(), other_type)) {
-            return other_type; // FIXME: type cast to most precise
-        }
         throw std::runtime_error(
                                  util::format("Comparison between properties of different types is not supported ('%1' and '%2').",
                                               data_type_to_str(other_type), data_type_to_str(self_type.value())));
