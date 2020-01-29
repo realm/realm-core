@@ -107,12 +107,25 @@ public:
     StringData string_for_argument(size_t i) override { return get<StringData>(i); }
     BinaryData binary_for_argument(size_t i) override { return get<BinaryData>(i); }
     Timestamp timestamp_for_argument(size_t i) override { return get<Timestamp>(i); }
-    ObjectId objectid_for_argument(size_t i) override { return get<ObjectId>(i); }
+    ObjectId objectid_for_argument(size_t i) override
+    {
+        // allow construction of an ObjectId from a Timestamp arg
+        if (at(i).type() == typeid(Timestamp)) {
+            return ObjectId(get<Timestamp>(i));
+        }
+        return get<ObjectId>(i);
+    }
     ObjKey object_index_for_argument(size_t i) override
     {
         return get<ObjKey>(i);
     }
-    bool is_argument_null(size_t i) override { return m_ctx.is_null(at(i)); }
+    bool is_argument_null(size_t i) override
+    {
+        if (at(i).type() == typeid(Timestamp)) {
+            return get<Timestamp>(i).is_null();
+        }
+        return m_ctx.is_null(at(i));
+    }
 
 private:
     ContextType& m_ctx;

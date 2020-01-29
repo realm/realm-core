@@ -1370,8 +1370,23 @@ public:
         }
     }
 
+    template <class X, class Y>
+    static constexpr bool IsNullToObjectId = std::is_same<X, realm::null>::value&& std::is_same<Y, ObjectId>::value;
+
+    // we specialize here to convert between null and ObjectId without having a constructor from null
     template <class D>
-    typename std::enable_if<!std::is_convertible<T, D>::value>::type REALM_FORCEINLINE export2(ValueBase&) const
+    typename std::enable_if<IsNullToObjectId<T, D>>::type REALM_FORCEINLINE export2(ValueBase& destination) const
+    {
+        Value<D>& d = static_cast<Value<D>&>(destination);
+        d.init(ValueBase::m_from_link_list, ValueBase::m_values, D());
+        for (size_t t = 0; t < ValueBase::m_values; t++) {
+            d.m_storage.set_null(t);
+        }
+    }
+
+    template <class D>
+    typename std::enable_if<!std::is_convertible<T, D>::value && !IsNullToObjectId<T, D>>::type REALM_FORCEINLINE
+    export2(ValueBase&) const
     {
         // export2 is instantiated for impossible conversions like T=StringData, D=int64_t. These are never
         // performed at runtime but would result in a compiler error if we did not provide this implementation.

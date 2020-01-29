@@ -31,16 +31,22 @@ public:
      * Constructs an ObjectId with all bytes 0x00.
      */
     ObjectId() noexcept;
-    ObjectId(null) noexcept : ObjectId()
-    {
-    }
 
     /**
      * Constructs an ObjectId from 24 hex characters.
      */
     ObjectId(const char* init);
 
-    ObjectId(Timestamp d, int machine_id = 0, int process_id = 0);
+    /**
+     * Constructs an ObjectId with the specified inputs, and a random number
+     */
+    ObjectId(Timestamp d, int machine_id, int process_id);
+
+    /**
+     * Constructs an ObjectId with only the seconds part of the Timestamp
+     * and the remainder filled with zeros.
+     */
+    ObjectId(Timestamp d);
 
     /**
      * Generates a new ObjectId using the algorithm to attempt to avoid collisions.

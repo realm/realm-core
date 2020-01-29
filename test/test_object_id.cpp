@@ -194,7 +194,7 @@ TEST(ObjectId_PrimaryKey)
     SHARED_GROUP_TEST_PATH(path);
     DBRef db = DB::create(path);
     Timestamp now{std::chrono::steady_clock::now()};
-    ObjectId id{now};
+    ObjectId id{now, 0, 0};
     ObjKey key;
     {
         auto wt = db->start_write();
@@ -226,7 +226,7 @@ TEST(ObjectId_Query)
         auto col_id = table->add_column(type_ObjectId, "alternative_id", true);
         auto col_int = table->add_column(type_Int, "int");
         for (int i = 0; i < 1000; i++) {
-            ObjectId id{now + std::chrono::seconds(i / 20)};
+            ObjectId id{now + std::chrono::seconds(i / 20), 0, 0};
             if (i == 0)
                 t0 = id;
             if (i == 25)
