@@ -110,20 +110,20 @@ public:
     Results snapshot() const;
 
     // Returns a frozen copy of this result
-    List freeze(std::shared_ptr<Realm> realm);
+    List freeze(std::shared_ptr<Realm> realm) const;
 
     // Returns whether or not this List is frozen.
-    bool is_frozen();
+    bool is_frozen() const noexcept;
 
     // Get the min/max/average/sum of the given column
     // All but sum() returns none when there are zero matching rows
     // sum() returns 0,
     // Throws UnsupportedColumnTypeException for sum/average on timestamp or non-numeric column
     // Throws OutOfBoundsIndexException for an out-of-bounds column
-    util::Optional<Mixed> max(ColKey column={});
-    util::Optional<Mixed> min(ColKey column={});
-    util::Optional<double> average(ColKey column={});
-    Mixed sum(ColKey column={});
+    util::Optional<Mixed> max(ColKey column={}) const;
+    util::Optional<Mixed> min(ColKey column={}) const;
+    util::Optional<double> average(ColKey column={}) const;
+    Mixed sum(ColKey column={}) const;
 
     bool operator==(List const& rgt) const noexcept;
 
@@ -176,8 +176,6 @@ private:
 
     template<typename T, typename Context>
     void set_if_different(Context&, size_t row_ndx, T&& value, CreatePolicy);
-
-    size_t to_table_ndx(size_t row) const noexcept;
 
     friend struct std::hash<List>;
 };

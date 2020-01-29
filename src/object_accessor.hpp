@@ -57,13 +57,13 @@ void Object::set_property_value(ContextType& ctx, StringData prop_name,
 }
 
 template <typename ValueType, typename ContextType>
-ValueType Object::get_property_value(ContextType& ctx, const Property& property)
+ValueType Object::get_property_value(ContextType& ctx, const Property& property) const
 {
     return get_property_value_impl<ValueType>(ctx, property);
 }
 
 template <typename ValueType, typename ContextType>
-ValueType Object::get_property_value(ContextType& ctx, StringData prop_name)
+ValueType Object::get_property_value(ContextType& ctx, StringData prop_name) const
 {
     return get_property_value_impl<ValueType>(ctx, property_for_name(prop_name));
 }
@@ -140,7 +140,7 @@ void Object::set_property_value_impl(ContextType& ctx, const Property &property,
 }
 
 template <typename ValueType, typename ContextType>
-ValueType Object::get_property_value_impl(ContextType& ctx, const Property &property)
+ValueType Object::get_property_value_impl(ContextType& ctx, const Property &property) const
 {
     verify_attached();
 
@@ -161,13 +161,14 @@ ValueType Object::get_property_value_impl(ContextType& ctx, const Property &prop
 //        case PropertyType::Any:    return ctx.box(m_obj.get<Mixed>(column));
         case PropertyType::Object: {
             auto linkObjectSchema = m_realm->schema().find(property.object_type);
-            return ctx.box(Object(m_realm, *linkObjectSchema, m_obj.get_linked_object(column)));
+            return ctx.box(Object(m_realm, *linkObjectSchema,
+                                  const_cast<Obj&>(m_obj).get_linked_object(column)));
         }
         case PropertyType::LinkingObjects: {
             auto target_object_schema = m_realm->schema().find(property.object_type);
             auto link_property = target_object_schema->property_for_name(property.link_origin_property_name);
             auto table = m_realm->read_group().get_table(target_object_schema->table_key);
-            auto tv = m_obj.get_backlink_view(table, ColKey(link_property->column_key));
+            auto tv = const_cast<Obj&>(m_obj).get_backlink_view(table, ColKey(link_property->column_key));
             return ctx.box(Results(m_realm, std::move(tv)));
         }
         default: REALM_UNREACHABLE();

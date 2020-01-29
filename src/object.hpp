@@ -66,10 +66,10 @@ public:
     bool is_valid() const { return m_obj.is_valid(); }
 
     // Returns a frozen copy of this object.
-    Object freeze(std::shared_ptr<Realm> frozen_realm);
+    Object freeze(std::shared_ptr<Realm> frozen_realm) const;
 
     // Returns whether or not this Object is frozen.
-    bool is_frozen();
+    bool is_frozen() const noexcept;
 
     NotificationToken add_notification_callback(CollectionChangeCallback callback) &;
 
@@ -80,7 +80,7 @@ public:
     void set_column_value(StringData prop_name, ValueType&& value) { m_obj.set(prop_name, value); }
 
     template<typename ValueType>
-    ValueType get_column_value(StringData prop_name) { return m_obj.get<ValueType>(prop_name); }
+    ValueType get_column_value(StringData prop_name) const { return m_obj.get<ValueType>(prop_name); }
 
     // The following functions require an accessor context which converts from
     // the binding's native data types to the core data types. See CppContext
@@ -94,10 +94,10 @@ public:
                             ValueType value, CreatePolicy policy = CreatePolicy::ForceCreate);
 
     template<typename ValueType, typename ContextType>
-    ValueType get_property_value(ContextType& ctx, StringData prop_name);
+    ValueType get_property_value(ContextType& ctx, StringData prop_name) const;
 
     template<typename ValueType, typename ContextType>
-    ValueType get_property_value(ContextType& ctx, const Property& property);
+    ValueType get_property_value(ContextType& ctx, const Property& property) const;
 
     // create an Object from a native representation
     template<typename ValueType, typename ContextType>
@@ -137,7 +137,7 @@ private:
     void set_property_value_impl(ContextType& ctx, const Property &property,
                                  ValueType value, CreatePolicy policy, bool is_default);
     template<typename ValueType, typename ContextType>
-    ValueType get_property_value_impl(ContextType& ctx, const Property &property);
+    ValueType get_property_value_impl(ContextType& ctx, const Property &property) const;
 
     template<typename ValueType, typename ContextType>
     static ObjKey get_for_primary_key_impl(ContextType& ctx, Table const& table,
