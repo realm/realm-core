@@ -1,10 +1,33 @@
+# NEXT RELEASE
+
+### Enhancements
+* None.
+
+### Fixed
+* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* None.
+ 
+### Breaking changes
+* None.
+
+-----------
+
+### Internals
+* None.
+
+----------------------------------------------
+
 # 6.0.0 Release notes
 
 ### Fixed since 6.0.0-beta.3
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Fixed float and double maximum queries when all values were less or equal to zero..
 * Using case insensitive search on a primary key string column would crash. ([#3564](https://github.com/realm/realm-core/issues/3564), since v6.0.0-alpha.25)
- 
+
+### Internals since 6.0.0-beta.3
+* Upgrade OpenSSL for Android to version 1.1.1b.
+* Upgrade the NDK to version 21.
+* Removed support for ARMv5 and MIPS from Android. This is a consequence of the new NDK being used. 
+
 Wrap up of the changes done from v6.0.0.alpha0 to v6.0.0-beta.3 compared to v5.23.7:
 
 ### Enhancements
