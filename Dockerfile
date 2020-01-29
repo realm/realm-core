@@ -1,4 +1,4 @@
-FROM ubuntu:19.04
+FROM ubuntu:18.04
 
 # One dependency per line in alphabetical order.
 # This should help avoiding duplicates and make the file easier to update.
@@ -7,11 +7,12 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
     curl \
     gcovr \
     git \
-    gcc-8 \
-    g++-8 \
+    gcc-7 \
+    g++-7 \
     lcov \
     libprocps-dev \
     ninja-build \
+    python-matplotlib \
     pkg-config \
     s3cmd \
     tar \
