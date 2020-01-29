@@ -1,19 +1,91 @@
-# NEXT RELEASE
+# 6.0.0 Release notes
+
+### Fixed since 6.0.0-beta.3
+* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* Fixed float and double maximum queries when all values were less or equal to zero..
+* Using case insensitive search on a primary key string column would crash. ([#3564](https://github.com/realm/realm-core/issues/3564), since v6.0.0-alpha.25)
+ 
+Wrap up of the changes done from v6.0.0.alpha0 to v6.0.0-beta.3 compared to v5.23.7:
 
 ### Enhancements
-* None.
+* `Table::contains_unique_values(ColKey) -> bool` function added
+* Ability to stream into an GlobalKey added.
+* Table iterator to support random access. If the object that iterator points to is deleted, the iterator must be advanced or renewed before used for table access.
+* Allow DB::close to release tethered versions.
+* Further reduction of the use of virtual address space. ([#3392](https://github.com/realm/realm-core/pull/3392))
+* min, max, sum and avg functions added as virtual members of ConstLstBase. Makes it possible to
+  get the values without knowing the exact type of list.
+* pk handling enhanched so that it can be used by OS
+* Ability to get a general pointer to list object added to ConstObj
+* All ObjectID handling functionality has been moved from Sync to Core.
+* The primary key column concept is now handled in Core in a way consistent with Sync and ObjectStore. This means that the corresponding code can be removed in those subsystems.
+* Creating tables and objects can now be done entirely using the Core interface. All sync::create_table...() and sync::create_object...() functions now map directly to a core function.
+* Ability to get/set Mixed on ConstObj/Obj.
+* Providing option to supply initial values when creating an object. This can be used as an optimization when some columns have a search index. Then you don't have to first insert the default value in the index and subsequently the real value.
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Fixed assert in SlabAlloc::allocate_block() which could falsely trigger when requesting an allocation that
+  would be slightly smaller than the underlying free block. ([3490](https://github.com/realm/realm-core/issues/3490))
+* Queries can be built without mutating the Table object.([#237](https://github.com/realm/realm-core-private/issues/237), since v1.0.0)
  
 ### Breaking changes
-* None.
+* We now require uniqieness on table names.
+* Implicit conversion between Table* and TableRef is removed. It you want to get a raw Table* from a TableRef, you will
+  have to call TableRef::unchecked_ptr(). Several API functions now take a ConstTableRef instead of a 'const Table*'.
+* DB objects are now heap allocated and accessed through a DBRef. You must create a DB using static DB::create() function.
+* SharedGroup class removed. New DB class added allowing you to specify the Realm file
+  only once regardless of the number of threads.
+* New Transaction class added, inheriting from Group. Transactions are produced by DB.
+* TransactionRef added to provide reference to a Transaction. This is a std::shared_ptr.
+* Old export_for_handover/import_from_handover has been removed. Handover is now direct
+  from one transaction to another, using a new method Transaction::import_copy_of().
+* 'begin' argument removed from Query::count();
+* Table::optimize replaced with explicit Table::enumerate_string_column. It will enumerate
+  column unconditionally.
+* TableView::num_attached_rows() no longer available. get(), front, back()... and similar
+  functions will throw `InvalidKey` if the referenced object has been deleted.
+* Removed the ability to sort a linklist according to some property of the target table. This
+  operation is not supported by the sync protocol and allegedly not used in the bindings.
+* Moved `get_uncommitted_changes()` from `History` class to `Replication` class. This removes the
+  need to call TrivialReplication::get_uncommitted_changes from a decendant of History.
+* Column identifier changed from size_t to ColKey. This identifier is subsequently
+  used when accessing/mutating the data and when making queries.
+* Table identifiers changed from size_t to TableKey.
+* Row interface on Table removed. All access to data goes through the new Obj
+  interface. Obj objects are created with an ObjKey identifier, which subsequently
+  is used to get access to and optionally delete the object.
+* Support for sub-tables removed. The feature was only used to implement support for
+  array-of-primitives. This is now implemented by a more specific List class.
+* Descriptor class removed. No longer needed as we don't have sub-tables.
+* Mixed column no longer supported. Will be revived at a later point in time.
+* LinkView is replaced by the more general list interface
+* Limiting parameters removed from Query aggregate functions (start, end, limit)
+* Table::get_range_view() has been removed.
+* Table::merge_rows() not supported. Not needed anymore.
+* Ref-counted freestanding tables can no longer be created (by Table::create)
+* OldDateTime is no longer supported
+* An old database cannot be opened without being updated to the new file version.
+  This implies that an old database cannot be opened in read-only, as read-only
+  prevents updating.
+* Only file format versions from 6 and onwards can be opened (realm core v2.0.0)
 
 -----------
 
 ### Internals
-* None.
+* ObjectID renamed to GlobalKey
+* Table is now rebuilt when a string property is selected as new primary key.
+* pk table removed. Primary key column is stored in Table structure.
+* Search index is not added to primary key string columns. Will compute key directly from primary key value.
+* ConstTableView::get_dependency_versions() is now public. Needed by realm-object-store.
+* ConstObj::to_string() added. Mostly to be used during debugging.
+* SortDescriptor::is_ascending() added. Potentially to be used by OS.
+* Class ObjectId is moved over from Sync.
+* Column keys cannot be used across tables. If a key is obtained from one table, it can only be used in relation to that table.
+* realm-browser now able to read Core-6 files and print values for even more columns
+* All read transactions will have a separate history object. Read transactions
+  use the object stored in the Replication object.
+* Major simplifications and optimizations to management of memory mappings.
+* Speed improvement for Sort().
 
 ----------------------------------------------
 
