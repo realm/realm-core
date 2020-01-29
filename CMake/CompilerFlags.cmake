@@ -72,11 +72,13 @@ if(${CMAKE_CXX_COMPILER_ID} MATCHES "Clang")
         -Wconditional-uninitialized
         -Wconstant-conversion
         -Wenum-conversion
+        -Wimplicit-fallthrough
         -Wint-conversion
         -Wmissing-prototypes
         -Wnewline-eof
         -Wshorten-64-to-32
-        -Wimplicit-fallthrough
+        -Wthread-safety
+        -Wthread-safety-negative
     )
 endif()
 
