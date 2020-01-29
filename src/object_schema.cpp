@@ -84,6 +84,7 @@ ObjectSchema::ObjectSchema(Group const& group, StringData name, TableKey key)
     else {
         table = ObjectStore::table_for_object_type(group, name);
     }
+    table_key = table->get_key();
 
     size_t count = table->get_column_count();
     persisted_properties.reserve(count);
@@ -112,7 +113,7 @@ ObjectSchema::ObjectSchema(Group const& group, StringData name, TableKey key)
         persisted_properties.push_back(std::move(property));
     }
 
-    primary_key = realm::ObjectStore::get_primary_key_for_object(group, name);
+    primary_key = ObjectStore::get_primary_key_for_object(group, name);
     set_primary_key_property();
 }
 

@@ -166,7 +166,7 @@ ValueType Object::get_property_value_impl(ContextType& ctx, const Property &prop
         case PropertyType::LinkingObjects: {
             auto target_object_schema = m_realm->schema().find(property.object_type);
             auto link_property = target_object_schema->property_for_name(property.link_origin_property_name);
-            TableRef table = ObjectStore::table_for_object_type(m_realm->read_group(), target_object_schema->name);
+            auto table = m_realm->read_group().get_table(target_object_schema->table_key);
             auto tv = m_obj.get_backlink_view(table, ColKey(link_property->column_key));
             return ctx.box(Results(m_realm, std::move(tv)));
         }
@@ -196,7 +196,7 @@ Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
 
     // try to get existing row if updating
     Obj obj;
-    TableRef table = ObjectStore::table_for_object_type(realm->read_group(), object_schema.name);
+    auto table = realm->read_group().get_table(object_schema.table_key);
 
     bool skip_primary = true;
     if (auto primary_prop = object_schema.primary_key_property()) {
@@ -305,7 +305,9 @@ Object Object::get_for_primary_key(ContextType& ctx, std::shared_ptr<Realm> cons
         throw MissingPrimaryKeyException(object_schema.name);
     }
 
-    auto table = ObjectStore::table_for_object_type(realm->read_group(), object_schema.name);
+    TableRef table;
+    if (object_schema.table_key)
+        table = realm->read_group().get_table(object_schema.table_key);
     if (!table)
         return Object(realm, object_schema, Obj());
     auto key = get_for_primary_key_impl(ctx, *table, *primary_prop, primary_value);

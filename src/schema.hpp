@@ -60,7 +60,7 @@ public:
     // Get the changes which must be applied to this schema to produce the passed-in schema
     std::vector<SchemaChange> compare(Schema const&, bool include_removals=false) const;
 
-    void copy_table_columns_from(Schema const&);
+    void copy_keys_from(Schema const&);
 
     friend bool operator==(Schema const&, Schema const&);
     friend bool operator!=(Schema const& a, Schema const& b) { return !(a == b); }

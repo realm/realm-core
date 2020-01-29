@@ -168,7 +168,7 @@ std::shared_ptr<AsyncOpenTask> Realm::get_synchronized_realm(Config config)
 void Realm::set_schema(Schema const& reference, Schema schema)
 {
     m_dynamic_schema = false;
-    schema.copy_table_columns_from(reference);
+    schema.copy_keys_from(reference);
     m_schema = std::move(schema);
     notify_schema_changed();
 }
@@ -199,7 +199,7 @@ void Realm::read_schema_from_group_if_needed()
     if (m_dynamic_schema) {
         if (m_schema == schema) {
             // The structure of the schema hasn't changed. Bring the table column indices up to date.
-            m_schema.copy_table_columns_from(schema);
+            m_schema.copy_keys_from(schema);
         }
         else {
             // The structure of the schema has changed, so replace our copy of the schema.
@@ -208,7 +208,7 @@ void Realm::read_schema_from_group_if_needed()
     }
     else {
         ObjectStore::verify_valid_external_changes(m_schema.compare(schema));
-        m_schema.copy_table_columns_from(schema);
+        m_schema.copy_keys_from(schema);
     }
     notify_schema_changed();
 }
@@ -441,7 +441,7 @@ void Realm::add_schema_change_handler()
             m_schema = *m_new_schema;
         }
         else
-            m_schema.copy_table_columns_from(*m_new_schema);
+            m_schema.copy_keys_from(*m_new_schema);
 
         notify_schema_changed();
     });

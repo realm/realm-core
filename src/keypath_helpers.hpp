@@ -32,7 +32,7 @@ static void populate_keypath_mapping(parser::KeyPathMapping& mapping, Realm& rea
         TableRef table;
         auto get_table = [&] {
             if (!table)
-                table = ObjectStore::table_for_object_type(realm.read_group(), object_schema.name);
+                table = realm.read_group().get_table(object_schema.table_key);
             return table;
         };
 
@@ -59,7 +59,7 @@ inline IncludeDescriptor generate_include_from_keypaths(std::vector<StringData> 
                                                         Realm& realm, ObjectSchema const& object_schema,
                                                         parser::KeyPathMapping& mapping)
 {
-    auto base_table = ObjectStore::table_for_object_type(realm.read_group(), object_schema.name);
+    auto base_table = realm.read_group().get_table(object_schema.table_key);
     REALM_ASSERT(base_table);
     // FIXME: the following is mostly copied from core's query_builder::apply_ordering
     std::vector<std::vector<LinkPathPart>> properties;

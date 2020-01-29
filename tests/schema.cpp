@@ -170,6 +170,7 @@ TEST_CASE("ObjectSchema") {
             table->add_search_index(col);
 
         ObjectSchema os(g, "table", table->get_key());
+        REQUIRE(os.table_key == table->get_key());
 
 #define REQUIRE_PROPERTY(name, type, ...) do { \
     Property* prop; \
