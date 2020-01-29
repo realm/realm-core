@@ -979,7 +979,7 @@ class NoPageReclaimGovernor : public realm::util::PageReclaimGovernor {
 public:
     NoPageReclaimGovernor()
     {
-        has_run_twice = will_run.get_future();
+        has_run_once = will_run.get_future();
     }
 
     std::function<int64_t()> current_target_getter(size_t) override
@@ -989,15 +989,15 @@ public:
 
     void report_target_result(int64_t) override
     {
-        if (run_count > 1) { // need to run twice before we're done
+        if (!has_run) {
             will_run.set_value();
+            has_run = true;
         }
-        ++run_count;
     }
 
-    std::future<void> has_run_twice;
+    std::future<void> has_run_once;
     std::promise<void> will_run;
-    int run_count = 0;
+    bool has_run = false;
 };
 
 // this test relies on the global state of the number of decrypted pages and therefore must be run in isolation
@@ -1018,8 +1018,8 @@ NONCONCURRENT_TEST(Metrics_NumDecryptedPagesWithoutEncryption)
         // that the global pages are from this shared group only.
         NoPageReclaimGovernor gov;
         realm::util::set_page_reclaim_governor(&gov);
-        CHECK(gov.has_run_twice.valid());
-        gov.has_run_twice.wait_for(std::chrono::seconds(2));
+        CHECK(gov.has_run_once.valid());
+        gov.has_run_once.wait_for(std::chrono::seconds(2));
 
         tr->commit();
     }
@@ -1061,8 +1061,8 @@ NONCONCURRENT_TEST_IF(Metrics_NumDecryptedPagesWithEncryption, REALM_ENABLE_ENCR
 
         NoPageReclaimGovernor gov;
         realm::util::set_page_reclaim_governor(&gov);
-        CHECK(gov.has_run_twice.valid());
-        gov.has_run_twice.wait_for(std::chrono::seconds(2));
+        CHECK(gov.has_run_once.valid());
+        gov.has_run_once.wait_for(std::chrono::seconds(2));
 
         tr->commit();
     }
