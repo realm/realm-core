@@ -80,40 +80,49 @@ std::string key_path_to_string(const KeyPath& keypath);
 StringData get_printable_table_name(StringData name);
 StringData get_printable_table_name(const Table& table);
 
+// Converts ascii c-locale uppercase characters to lower case,
+// leaves other char values unchanged.
+inline char toLowerAscii(char c)
+{
+    if (isascii(c) && isupper(c))
+        return _tolower(c);
+    return c;
+}
+
+// Looks for +-infinity, NaN
+// There is spotty support for these edge cases on some platforms
+// so we implement manual checks here
 template <typename T>
-inline T stot(std::string const& s)
+bool try_parse_specials(std::string str, T& ret)
+{
+    std::transform(str.begin(), str.end(), str.begin(), toLowerAscii);
+    if (std::numeric_limits<T>::has_quiet_NaN && (str == "nan" || str == "-nan")) {
+        ret = std::numeric_limits<T>::quiet_NaN();
+        return true;
+    }
+    else if (std::numeric_limits<T>::has_infinity &&
+             (str == "+infinity" || str == "infinity" || str == "+inf" || str == "inf")) {
+        ret = std::numeric_limits<T>::infinity();
+        return true;
+    }
+    else if (std::numeric_limits<T>::has_infinity && (str == "-infinity" || str == "-inf")) {
+        ret = -std::numeric_limits<T>::infinity();
+        return true;
+    }
+    return false;
+}
+
+template <typename T>
+inline T string_to(std::string const& s)
 {
     std::istringstream iss(s);
+    iss.imbue(std::locale::classic());
     T value;
     iss >> value;
     if (iss.fail()) {
-        throw std::invalid_argument(util::format("Cannot convert string '%1'", s));
-    }
-    return value;
-}
-
-template <>
-inline double stot(std::string const& s)
-{
-    double value;
-    try {
-        value = stold(s); // parsing NaN and +-Infinity are well defined in this conversion to long double
-    }
-    catch (const std::exception& e) {
-        throw std::invalid_argument(util::format("Cannot convert string '%1' to double: '%2'", s, e.what()));
-    }
-    return value;
-}
-
-template <>
-inline float stot(std::string const& s)
-{
-    float value;
-    try {
-        value = stof(s); // parsing NaN and +-Infinity are well defined in this conversion to long double
-    }
-    catch (const std::exception& e) {
-        throw std::invalid_argument(util::format("Cannot convert string '%1' to float: '%2'", s, e.what()));
+        if (!try_parse_specials(s, value)) {
+            throw std::invalid_argument(util::format("Cannot convert string '%1'", s));
+        }
     }
     return value;
 }

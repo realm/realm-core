@@ -183,7 +183,7 @@ TEST(Decimal128_Aggregates)
                 count++;
             }
             else {
-                obj.set_null(col_dec);
+                CHECK(obj.get<Decimal128>(col_dec).is_null());
             }
         }
         wt->commit();

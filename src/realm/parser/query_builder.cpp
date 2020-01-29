@@ -292,7 +292,7 @@ void add_link_constraint_to_query(realm::Query &query,
                                   Predicate::Operator op,
                                   const PropertyExpression &prop_expr,
                                   const ValueExpression &value_expr) {
-    ObjKey obj_key = value_expr.arguments->object_index_for_argument(stot<int>(value_expr.value->s));
+    ObjKey obj_key = value_expr.arguments->object_index_for_argument(string_to<int>(value_expr.value->s));
     realm_precondition(prop_expr.link_chain.size() == 1, "KeyPath queries not supported for object comparisons.");
     switch (op) {
         case Predicate::Operator::NotEqual:

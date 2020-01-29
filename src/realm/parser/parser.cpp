@@ -551,7 +551,7 @@ struct action<limit_param> {
         try {
             DescriptorOrderingState::SingleOrderingState limit_state;
             limit_state.type = DescriptorOrderingState::SingleOrderingState::DescriptorType::Limit;
-            limit_state.limit = realm::util::stot<size_t>(in.string());
+            limit_state.limit = realm::util::string_to<size_t>(in.string());
             state.ordering_state.orderings.push_back(limit_state);
         }
         catch (...) {
