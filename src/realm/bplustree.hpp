@@ -723,7 +723,6 @@ ColumnAverageType<T> bptree_average(const BPlusTree<T>& tree, size_t* return_cnt
         *return_cnt = cnt;
     return avg;
 }
-
 }
 
 #endif /* REALM_BPLUSTREE_HPP */

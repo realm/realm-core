@@ -13,6 +13,8 @@ branch = tokens[tokens.size()-1]
 
 jobWrapper {
     stage('gather-info') {
+        isPullRequest = !!env.CHANGE_TARGET
+        targetBranch = isPullRequest ? env.CHANGE_TARGET : "none"
         node('docker') {
             getSourceArchive()
             stash includes: '**', name: 'core-source', useDefaultExcludes: false
@@ -36,10 +38,13 @@ jobWrapper {
                     setBuildName("Tag ${gitTag}")
                 }
             }
+            targetSHA1 = 'NONE'
+            if (isPullRequest) {
+                targetSHA1 = sh(returnStdout: true, script: "git merge-base origin/${targetBranch} HEAD").trim()
+            }
+ 
         }
 
-        isPullRequest = !!env.CHANGE_TARGET
-        targetBranch = isPullRequest ? env.CHANGE_TARGET : "none"
         currentBranch = env.BRANCH_NAME
         println "Building branch: ${currentBranch}"
         println "Target branch: ${targetBranch}"
@@ -64,6 +69,31 @@ jobWrapper {
         }
     }
 
+    if (isPullRequest) {
+        stage('FormatCheck') {
+            node('docker') {
+                getArchive()
+                docker.build('realm-core-clang:snapshot', '-f clang.Dockerfile .').inside() {
+                    echo "Checking code formatting"
+                    modifications = sh(returnStdout: true, script: "git clang-format --diff ${targetSHA1}").trim()
+                    try {
+                        if (!modifications.equals('no modified files to format')) {
+                            if (!modifications.equals('clang-format did not modify any files')) {
+                                echo "Commit violates formatting rules"
+                                sh "git clang-format --diff ${targetSHA1} > format_error.txt"
+                                archiveArtifacts('format_error.txt')
+                                sh 'exit 1'
+                            }
+                        }
+                        currentBuild.result = 'SUCCESS'
+                    } catch (Exception err) {
+                        currentBuild.result = 'FAILURE'
+                        throw err
+                    }
+                }
+            }
+        }
+    }
     stage('Checking') {
         parallelExecutors = [
             checkLinuxDebug         : doCheckInDocker('Debug'),
@@ -117,7 +147,7 @@ jobWrapper {
                 buildLinuxTSAN      : doBuildLinuxClang("RelTSAN")
             ]
 
-            androidAbis = ['armeabi-v7a', 'x86', 'mips', 'x86_64', 'arm64-v8a']
+            androidAbis = ['armeabi-v7a', 'x86', 'x86_64', 'arm64-v8a']
             androidBuildTypes = ['Debug', 'Release']
 
             for (abi in androidAbis) {
@@ -179,7 +209,7 @@ def doCheckInDocker(String buildType, String maxBpNodeSize = '1000', String enab
     return {
         node('docker') {
             getArchive()
-            def buildEnv = docker.build 'realm-core:snapshot'
+            def buildEnv = docker.build 'realm-core-linux:18.04'
             def environment = environment()
             def cxx_flags = longRunningTests ? ' -D CMAKE_CXX_FLAGS="-DTEST_DURATION=1"' : ''
             environment << 'UNITTEST_PROGRESS=1'
@@ -209,7 +239,7 @@ def doCheckSanity(String buildType, String maxBpNodeSize = '1000', String saniti
     return {
         node('docker') {
             getArchive()
-            def buildEnv = docker.build('realm-core-clang:snapshot', '-f clang.Dockerfile .')
+            def buildEnv = docker.build('realm-core-linux:clang', '-f clang.Dockerfile .')
             def environment = environment()
             def sanitizeFlags = ''
             def privileged = '';
@@ -247,14 +277,14 @@ def doBuildLinux(String buildType) {
         node('docker') {
             getSourceArchive()
 
-            docker.build('realm-core-generic:snapshot', '-f generic.Dockerfile .').inside {
+            docker.build('realm-core-generic:gcc-8', '-f generic.Dockerfile .').inside {
                 sh """
                    cmake --help
                    rm -rf build-dir
                    mkdir build-dir
                    cd build-dir
-                   scl enable devtoolset-6 -- cmake -DCMAKE_BUILD_TYPE=${buildType} -DREALM_NO_TESTS=1 ..
-                   make -j4
+                   scl enable devtoolset-8 -- cmake -DCMAKE_BUILD_TYPE=${buildType} -DREALM_NO_TESTS=1 -G Ninja ..
+                   ninja
                    cpack -G TGZ
                 """
             }
@@ -273,7 +303,7 @@ def doBuildLinuxClang(String buildType) {
     return {
         node('docker') {
             getArchive()
-            docker.build('realm-core-clang:snapshot', '-f clang.Dockerfile .').inside() {
+            docker.build('realm-core-linux:clang', '-f clang.Dockerfile .').inside() {
                 sh """
                    mkdir build-dir
                    cd build-dir
@@ -296,7 +326,7 @@ def doCheckValgrind() {
     return {
         node('docker') {
             getArchive()
-            def buildEnv = docker.build('realm-core-valgrind:snapshot', '-f valgrind.Dockerfile .')
+            def buildEnv = docker.build 'realm-core-linux:18.04'
             def environment = environment()
             environment << 'UNITTEST_PROGRESS=1'
             withEnv(environment) {
@@ -330,13 +360,13 @@ def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmula
             getArchive()
             def stashName = "android___${abi}___${buildType}"
             def buildDir = "build-${stashName}".replaceAll('___', '-')
-            def buildEnv = docker.build('realm-core-android:snapshot', '-f android.Dockerfile .')
+            def buildEnv = docker.build('realm-core-android:ndk21', '-f android.Dockerfile .')
             def environment = environment()
             environment << 'UNITTEST_PROGRESS=1'
             withEnv(environment) {
                 if(!runTestsInEmulator) {
                     buildEnv.inside {
-                        runAndCollectWarnings(script: "tools/cross_compile.sh -o android -a ${abi} -t ${buildType} -v ${gitDescribeVersion}")
+                        sh "tools/cross_compile.sh -o android -a ${abi} -t ${buildType} -v ${gitDescribeVersion}"
                         dir(buildDir) {
                             archiveArtifacts('realm-*.tar.gz')
                         }
@@ -443,7 +473,7 @@ def buildPerformance() {
       // REALM_BENCH_DIR tells the gen_bench_hist.sh script where to place results
       // REALM_BENCH_MACHID gives the results an id - results are organized by hardware to prevent mixing cached results with runs on different machines
       // MPLCONFIGDIR gives the python matplotlib library a config directory, otherwise it will try to make one on the user home dir which fails in docker
-      docker.build('realm-core:snapshot').inside {
+      docker.build('realm-core-linux:18.04').inside {
         withEnv(["REALM_BENCH_DIR=${env.WORKSPACE}/test/bench/core-benchmarks", "REALM_BENCH_MACHID=docker-brix","MPLCONFIGDIR=${env.WORKSPACE}/test/bench/config"]) {
           rlmS3Get file: 'core-benchmarks.zip', path: 'downloads/core/core-benchmarks.zip'
           sh 'unzip core-benchmarks.zip -d test/bench/'
@@ -564,10 +594,10 @@ def doBuildAppleDevice(String sdk, String buildType) {
             withEnv(['DEVELOPER_DIR=/Applications/Xcode-10.app/Contents/Developer/']) {
                 retry(3) {
                     timeout(time: 15, unit: 'MINUTES') {
-                        runAndCollectWarnings(parser:'clang', script: """
-                                rm -rf build-*
-                                tools/cross_compile.sh -o ${sdk} -t ${buildType} -v ${gitDescribeVersion}
-                            """)
+                        sh """
+                            rm -rf build-*
+                            tools/cross_compile.sh -o ${sdk} -t ${buildType} -v ${gitDescribeVersion}
+                        """
                     }
                 }
             }
@@ -586,7 +616,7 @@ def doBuildCoverage() {
   return {
     node('docker') {
       getArchive()
-      docker.build('realm-core:snapshot').inside {
+      docker.build('realm-core-linux:18.04').inside {
         def workspace = pwd()
         sh """
           mkdir build

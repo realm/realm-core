@@ -1746,7 +1746,7 @@ void Cluster::remove_backlinks(ObjKey origin_key, ColKey origin_col_key, const s
     const Table* origin_table = m_tree_top.get_owner();
     TableRef target_table = origin_table->get_opposite_table(origin_col_key);
     ColKey backlink_col_key = origin_table->get_opposite_column(origin_col_key);
-    bool strong_links = (origin_table->get_link_type(origin_col_key) == link_Strong);
+    bool strong_links = target_table->is_embedded();
 
     for (auto key : keys) {
         if (key != null_key) {

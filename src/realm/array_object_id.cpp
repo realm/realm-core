@@ -44,12 +44,17 @@ void ArrayObjectId::insert(size_t ndx, const ObjectId& value)
     REALM_ASSERT(ndx <= old_size);
 
     // Allocate room for the new value
-    const auto new_byte_size = calc_byte_len(old_size + 1);
+    const auto new_byte_size = calc_required_bytes(old_size + 1);
     alloc(new_byte_size, 1); // Throws
     m_size = new_byte_size;
     m_width = 1;
 
     auto dest = get_pos(old_size);
+
+    // Initialize null byte when a new section is taken into use
+    if (old_size % 8 == 0) {
+        m_data[dest.base_byte] = 0;
+    }
 
     // Make gap for new value
     // Possible optimization: Use memmove + shifting the bitvector to operate in chunks.
@@ -74,7 +79,7 @@ void ArrayObjectId::erase(size_t ndx)
     copy_on_write();
 
     const auto new_size = size() - 1;
-    m_size = calc_byte_len(new_size);
+    m_size = calc_required_bytes(new_size);
     set_header_size(m_size);
 
     // Possible optimization: Use memmove + shifting the bitvector to operate in chunks.
@@ -97,10 +102,14 @@ void ArrayObjectId::move(ArrayObjectId& dst_arr, size_t ndx)
     const auto n_to_move = old_src_size - ndx;
 
     // Allocate room for the new value
-    const auto new_dest_byte_size = calc_byte_len(old_dst_size + n_to_move);
+    const auto new_dest_byte_size = calc_required_bytes(old_dst_size + n_to_move);
     dst_arr.alloc(new_dest_byte_size, 1); // Throws
     dst_arr.m_width = 1;
     dst_arr.m_size = new_dest_byte_size;
+
+    // Initialize last null byte.
+    const auto last_in_dst = get_pos(old_dst_size + n_to_move - 1);
+    dst_arr.m_data[last_in_dst.base_byte] = 0;
 
     for (size_t i = 0; i < n_to_move; i++) {
         // Possible optimization: Use memmove + shifting the bitvector to operate in chunks. This can be especially

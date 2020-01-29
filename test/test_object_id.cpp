@@ -120,6 +120,7 @@ TEST(ObjectId_ArrayNull)
     CHECK_EQUAL(arr1.get(0), ObjectId(str1));
     CHECK(!arr1.is_null(0));
     CHECK(arr1.is_null(1));
+    CHECK_EQUAL(arr1.find_first_null(0), 1);
 
     arr.destroy();
     arr1.destroy();
@@ -208,6 +209,34 @@ TEST(ObjectId_PrimaryKey)
         auto table = rt->get_table("Foo");
         CHECK_EQUAL(table->size(), 2);
         CHECK_EQUAL(table->find_first_object_id(table->get_primary_key_column(), id), key);
+    }
+}
+
+TEST(ObjectId_Commit)
+{
+    // Tend to discover errors in the size calculation logic
+    SHARED_GROUP_TEST_PATH(path);
+    DBRef db = DB::create(path);
+    ObjectId id("0000002a9a7969d24bea4cf2");
+    ColKey col;
+    {
+        auto wt = db->start_write();
+        auto table = wt->add_table("Foo");
+        col = table->add_column(type_ObjectId, "id");
+        wt->commit();
+    }
+    {
+        auto wt = db->start_write();
+        auto table = wt->get_table("Foo");
+        col = table->get_column_key("id");
+        table->create_object().set(col, id);
+        wt->commit();
+    }
+    {
+        auto rt = db->start_read();
+        auto table = rt->get_table("Foo");
+        CHECK_EQUAL(table->size(), 1);
+        CHECK_EQUAL(table->begin()->get<ObjectId>(col), id);
     }
 }
 

@@ -60,12 +60,6 @@ enum DataType {
     type_ObjectId = 15
 };
 
-/// See Descriptor::set_link_type().
-enum LinkType {
-    link_Strong,
-    link_Weak,
-};
-
 const char* get_data_type_name(DataType type) noexcept;
 
 } // namespace realm

@@ -40,7 +40,7 @@ struct GeneratorState {
     const int32_t process_id;
     std::atomic<uint32_t> seq;
 } g_gen_state;
-}
+} // namespace
 
 
 static const char hex_digits[] = "0123456789abcdef";

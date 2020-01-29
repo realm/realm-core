@@ -321,13 +321,13 @@ ColKey Table::add_column_list(DataType type, StringData name, bool nullable)
     return do_insert_column(ColKey(), type, name, invalid_link, nullable, true); // Throws
 }
 
-ColKey Table::add_column_link(DataType type, StringData name, Table& target, LinkType link_type)
+ColKey Table::add_column_link(DataType type, StringData name, Table& target)
 {
-    return insert_column_link(ColKey(), type, name, target, link_type); // Throws
+    return insert_column_link(ColKey(), type, name, target); // Throws
 }
 
 
-ColKey Table::insert_column_link(ColKey col_key, DataType type, StringData name, Table& target, LinkType link_type)
+ColKey Table::insert_column_link(ColKey col_key, DataType type, StringData name, Table& target)
 {
     if (REALM_UNLIKELY(col_key && !valid_column(col_key)))
         throw InvalidKey("Requested key in use");
@@ -342,8 +342,8 @@ ColKey Table::insert_column_link(ColKey col_key, DataType type, StringData name,
         throw LogicError(LogicError::group_mismatch);
 
     LinkTargetInfo link_target_info(&target);
-    auto retval =
-        do_insert_column(col_key, type, name, link_target_info, false, type == type_LinkList, link_type); // Throws
+    m_has_any_embedded_objects |= target.is_embedded();
+    auto retval = do_insert_column(col_key, type, name, link_target_info, false, type == type_LinkList); // Throws
     return retval;
 }
 
@@ -506,20 +506,28 @@ void Table::init(ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent, bo
 
     auto rot_pk_key = m_top.get_as_ref_or_tagged(top_position_for_pk_col);
     m_primary_key_col = rot_pk_key.is_tagged() ? ColKey(rot_pk_key.get_as_int()) : ColKey();
+
+    if (m_top.size() <= top_position_for_flags) {
+        m_is_embedded = false;
+    }
+    else {
+        uint64_t flags = m_top.get_as_ref_or_tagged(top_position_for_flags).get_as_int();
+        m_is_embedded = flags & 0x1;
+    }
 }
 
 
 ColKey Table::do_insert_column(ColKey col_key, DataType type, StringData name, LinkTargetInfo& link_target_info,
-                               bool nullable, bool listtype, LinkType link_type)
+                               bool nullable, bool listtype)
 {
     if (type == type_Link)
         nullable = true;
 
     bump_storage_version();
-    col_key = insert_root_column(col_key, type, name, link_target_info, nullable, listtype, link_type); // Throws
+    col_key = insert_root_column(col_key, type, name, link_target_info, nullable, listtype); // Throws
 
     if (Replication* repl = get_repl())
-        repl->insert_column(this, col_key, type, name, link_target_info, nullable, listtype, link_type); // Throws
+        repl->insert_column(this, col_key, type, name, link_target_info, nullable, listtype); // Throws
 
     return col_key;
 }
@@ -665,9 +673,9 @@ size_t Table::get_num_unique_values(ColKey col_key) const
 }
 
 ColKey Table::insert_root_column(ColKey col_key, DataType type, StringData name, LinkTargetInfo& link_target,
-                                 bool nullable, bool listtype, LinkType link_type)
+                                 bool nullable, bool listtype)
 {
-    col_key = do_insert_root_column(col_key, ColumnType(type), name, nullable, listtype, link_type); // Throws
+    col_key = do_insert_root_column(col_key, ColumnType(type), name, nullable, listtype); // Throws
 
     // When the inserted column is a link-type column, we must also add a
     // backlink column to the target table.
@@ -698,8 +706,7 @@ void Table::erase_root_column(ColKey col_key)
 }
 
 
-ColKey Table::do_insert_root_column(ColKey col_key, ColumnType type, StringData name, bool nullable, bool listtype,
-                                    LinkType link_type)
+ColKey Table::do_insert_root_column(ColKey col_key, ColumnType type, StringData name, bool nullable, bool listtype)
 {
     // if col_key specifies a key, it must be unused
     REALM_ASSERT(!col_key || !valid_column(col_key));
@@ -712,8 +719,6 @@ ColKey Table::do_insert_root_column(ColKey col_key, ColumnType type, StringData 
         attr |= col_attr_Nullable;
     if (listtype)
         attr |= col_attr_List;
-    if (link_type == link_Strong)
-        attr |= col_attr_StrongLinks;
     // if col_key does not specify a key, one must be generated
     if (!col_key) {
         col_key = generate_col_key(type, attr);
@@ -775,20 +780,24 @@ void Table::do_erase_root_column(ColKey col_key)
     }
 }
 
-LinkType Table::get_link_type(ColKey col_key) const
-{
-    auto type = col_key.get_type();
-    if (!(type == col_type_Link) && !(type == col_type_LinkList)) {
-        throw LogicError{LogicError::illegal_type};
-    }
-    return col_key.get_attrs().test(col_attr_StrongLinks) ? link_Strong : link_Weak;
-}
-
 ColKey Table::insert_backlink_column(TableKey origin_table_key, ColKey origin_col_key, ColKey backlink_col_key)
 {
     ColKey retval = do_insert_root_column(backlink_col_key, col_type_BackLink, ""); // Throws
     set_opposite_column(retval, origin_table_key, origin_col_key);
     return retval;
+}
+
+void Table::set_embedded(bool embedded)
+{
+    REALM_ASSERT(size() == 0);
+    REALM_ASSERT(m_top.size() >= top_position_for_flags);
+    if (m_top.size() == top_position_for_flags) {
+        m_top.add(0);
+    }
+    uint64_t flags = m_top.get_as_ref_or_tagged(top_position_for_flags).get_as_int();
+    flags |= embedded ? 1 : 0;
+    m_top.set(top_position_for_flags, RefOrTagged::make_tagged(flags));
+    m_is_embedded = embedded;
 }
 
 
@@ -1623,6 +1632,7 @@ ref_type Table::create_empty_table(Allocator& alloc, TableKey key)
     top.add(0); // Sequence number
     top.add(0); // Collision_map
     top.add(0); // pk col key
+    top.add(0); // flags
 
     REALM_ASSERT(top.size() == top_array_size);
 
@@ -1646,7 +1656,7 @@ void Table::batch_erase_rows(const KeyColumn& keys)
     sort(vec.begin(), vec.end());
     vec.erase(unique(vec.begin(), vec.end()), vec.end());
 
-    if (m_spec.has_strong_link_columns() || (g && g->has_cascade_notification_handler())) {
+    if (m_has_any_embedded_objects || (g && g->has_cascade_notification_handler())) {
         CascadeState state(CascadeState::Mode::Strong, g);
         std::for_each(vec.begin(), vec.end(),
                       [this, &state](ObjKey k) { state.m_to_be_deleted.emplace_back(m_key, k); });
@@ -2344,7 +2354,24 @@ void Table::update_from_parent(size_t old_baseline) noexcept
             m_opposite_table.update_from_parent(old_baseline);
         if (m_top.size() > top_position_for_opposite_column)
             m_opposite_column.update_from_parent(old_baseline);
+        if (m_top.size() > top_position_for_flags) {
+            uint64_t flags = m_top.get_as_ref_or_tagged(top_position_for_flags).get_as_int();
+            m_is_embedded = flags & 0x1;
+        }
+        else {
+            m_is_embedded = false;
+        }
         refresh_content_version();
+        m_has_any_embedded_objects = false;
+        for_each_public_column([&](ColKey col_key) {
+            auto target_table_key = get_opposite_table_key(col_key);
+            if (target_table_key) {
+                auto target_table = get_parent_group()->get_table(target_table_key);
+                m_has_any_embedded_objects |= target_table->is_embedded();
+                return true; // early out
+            }
+            return false;
+        });
     }
     m_alloc.bump_storage_version();
 }
@@ -2458,6 +2485,13 @@ void Table::refresh_accessor_tree()
     m_opposite_column.init_from_parent();
     auto rot_pk_key = m_top.get_as_ref_or_tagged(top_position_for_pk_col);
     m_primary_key_col = rot_pk_key.is_tagged() ? ColKey(rot_pk_key.get_as_int()) : ColKey();
+    if (m_top.size() > top_position_for_flags) {
+        auto rot_flags = m_top.get_as_ref_or_tagged(top_position_for_flags);
+        m_is_embedded = rot_flags.get_as_int() & 0x1;
+    }
+    else {
+        m_is_embedded = false;
+    }
     refresh_content_version();
     bump_storage_version();
     build_column_mapping();
@@ -2536,6 +2570,8 @@ MemStats Table::stats() const
 
 Obj Table::create_object(ObjKey key, const FieldValues& values)
 {
+    if (m_is_embedded)
+        throw LogicError(LogicError::wrong_kind_of_table);
     if (key == null_key) {
         GlobalKey object_id = allocate_object_id_squeezed();
         key = object_id.get_local_key(get_sync_file_id());
@@ -2552,8 +2588,29 @@ Obj Table::create_object(ObjKey key, const FieldValues& values)
     return obj;
 }
 
+Obj Table::create_linked_object()
+{
+    if (!m_is_embedded)
+        throw LogicError(LogicError::wrong_kind_of_table);
+    GlobalKey object_id = allocate_object_id_squeezed();
+    ObjKey key = object_id.get_local_key(get_sync_file_id());
+    if (auto repl = get_repl()) {
+        // NOTE the replication logic CANNOT use the key to create an object accessor at this point.
+        repl->create_object(this, object_id);
+    }
+    REALM_ASSERT(key.value >= 0);
+
+    bump_content_version();
+    bump_storage_version();
+    Obj obj = m_clusters.insert(key, {});
+
+    return obj;
+}
+
 Obj Table::create_object(GlobalKey object_id, const FieldValues& values)
 {
+    if (m_is_embedded)
+        throw LogicError(LogicError::wrong_kind_of_table);
     ObjKey key = object_id.get_local_key(get_sync_file_id());
 
     if (auto repl = get_repl())
@@ -2568,6 +2625,8 @@ Obj Table::create_object(GlobalKey object_id, const FieldValues& values)
 
 Obj Table::create_object_with_primary_key(const Mixed& primary_key)
 {
+    if (m_is_embedded)
+        throw LogicError(LogicError::wrong_kind_of_table);
     auto primary_key_col = get_primary_key_column();
     REALM_ASSERT(primary_key_col);
     DataType type = DataType(primary_key_col.get_type());
@@ -2843,7 +2902,7 @@ void Table::remove_object(ObjKey key)
 {
     Group* g = get_parent_group();
 
-    if (m_spec.has_strong_link_columns() || (g && g->has_cascade_notification_handler())) {
+    if (m_has_any_embedded_objects || (g && g->has_cascade_notification_handler())) {
         CascadeState state(CascadeState::Mode::Strong, g);
         state.m_to_be_deleted.emplace_back(m_key, key);
         nullify_links(state);

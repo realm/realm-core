@@ -38,8 +38,6 @@ public:
 
     Allocator& get_alloc() const noexcept;
 
-    bool has_strong_link_columns() noexcept;
-
     // insert column at index
     void insert_column(size_t column_ndx, ColKey column_key, ColumnType type, StringData name,
                        int attr = col_attr_None);
@@ -109,7 +107,6 @@ private:
     Array m_enumkeys;     // 5th slot in m_top
     ArrayInteger m_keys;  // 6th slot in m_top
     size_t m_num_public_columns;
-    bool m_has_strong_link_columns;
 
     Spec(Allocator&) noexcept; // Unattached
 
@@ -167,11 +164,6 @@ private:
 inline Allocator& Spec::get_alloc() const noexcept
 {
     return m_top.get_alloc();
-}
-
-inline bool Spec::has_strong_link_columns() noexcept
-{
-    return m_has_strong_link_columns;
 }
 
 // Uninitialized Spec (call init() to init)

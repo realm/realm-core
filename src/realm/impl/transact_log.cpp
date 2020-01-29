@@ -29,7 +29,7 @@ TransactLogConvenientEncoder::TransactLogConvenientEncoder(TransactLogStream& st
 
 TransactLogConvenientEncoder::~TransactLogConvenientEncoder() {}
 
-void TransactLogConvenientEncoder::add_class(StringData) {}
+void TransactLogConvenientEncoder::add_class(StringData, bool) {}
 void TransactLogConvenientEncoder::add_class_with_primary_key(StringData, DataType, StringData, bool) {}
 void TransactLogConvenientEncoder::create_object(const Table*, GlobalKey) {}
 void TransactLogConvenientEncoder::create_object_with_primary_key(const Table*, GlobalKey, Mixed) {}

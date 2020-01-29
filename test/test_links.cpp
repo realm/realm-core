@@ -1156,25 +1156,25 @@ TEST(Links_FormerMemLeakCase)
     }
 }
 
-
 TEST(Links_CascadeRemove_ColumnLink)
 {
     struct Fixture {
         Group group;
         TableRef origin = group.add_table("origin");
-        TableRef target = group.add_table("target");
+        TableRef target = group.add_embedded_table("target");
         std::vector<ObjKey> origin_keys;
         std::vector<ObjKey> target_keys;
         ColKey col_link;
         Fixture()
         {
             target->add_column(type_Int, "t_1");
-            col_link = origin->add_column_link(type_Link, "o_1", *target, link_Strong);
-            origin->create_objects(3, origin_keys);
-            target->create_objects(3, target_keys);
-            origin->get_object(origin_keys[0]).set(col_link, target_keys[0]); // origin[0].o_1 -> target[0]
-            origin->get_object(origin_keys[1]).set(col_link, target_keys[1]); // origin[1].o_1 -> target[1]
-            origin->get_object(origin_keys[2]).set(col_link, target_keys[2]); // origin[2].o_1 -> target[2]
+            col_link = origin->add_column_link(type_Link, "o_1", *target);
+            for (int i = 0; i < 3; ++i) {
+                auto oo = origin->create_object();
+                auto to = oo.create_and_set_linked_object(col_link);
+                origin_keys.push_back(oo.get_key());
+                target_keys.push_back(to.get_key());
+            }
         }
         Obj get_origin_obj(int i)
         {
@@ -1214,71 +1214,34 @@ TEST(Links_CascadeRemove_ColumnLink)
         CHECK_EQUAL(f.target_keys[0], f.get_origin_obj(0).get<ObjKey>(f.col_link));
         CHECK_EQUAL(f.target_keys[1], f.get_origin_obj(1).get<ObjKey>(f.col_link));
     }
-
     // Break link by reassign
     {
         Fixture f;
-        f.get_origin_obj(0).set(f.col_link, f.target_keys[2]); // origin[0].o_1 -> target[2]
+        f.get_origin_obj(0).create_and_set_linked_object(f.col_link);
         // Cascade: target->remove_object(key[0])
         CHECK(!f.target->is_valid(f.target_keys[0]));
         CHECK(f.target->is_valid(f.target_keys[1]) && f.target->is_valid(f.target_keys[2]));
-        CHECK_EQUAL(f.target_keys[2], f.get_origin_obj(0).get<ObjKey>(f.col_link));
         CHECK_EQUAL(f.target_keys[1], f.get_origin_obj(1).get<ObjKey>(f.col_link));
         CHECK_EQUAL(f.target_keys[2], f.get_origin_obj(2).get<ObjKey>(f.col_link));
     }
     {
         Fixture f;
-        f.get_origin_obj(1).set(f.col_link, f.target_keys[0]); // origin[0].o_1 -> target[0]
+        f.get_origin_obj(1).create_and_set_linked_object(f.col_link);
         // Cascade: target->remove_object(key[1])
         CHECK(!f.target->is_valid(f.target_keys[1]));
         CHECK(f.target->is_valid(f.target_keys[0]) && f.target->is_valid(f.target_keys[2]));
         CHECK_EQUAL(f.target_keys[0], f.get_origin_obj(0).get<ObjKey>(f.col_link));
-        CHECK_EQUAL(f.target_keys[0], f.get_origin_obj(1).get<ObjKey>(f.col_link));
         CHECK_EQUAL(f.target_keys[2], f.get_origin_obj(2).get<ObjKey>(f.col_link));
     }
     {
         Fixture f;
-        f.get_origin_obj(2).set(f.col_link, f.target_keys[1]); // origin[2].o_1 -> target[1]
+        f.get_origin_obj(2).create_and_set_linked_object(f.col_link);
         // Cascade: target->remove_object(key[2])
         CHECK(!f.target->is_valid(f.target_keys[2]));
         CHECK(f.target->is_valid(f.target_keys[0]) && f.target->is_valid(f.target_keys[1]));
         CHECK_EQUAL(f.target_keys[0], f.get_origin_obj(0).get<ObjKey>(f.col_link));
         CHECK_EQUAL(f.target_keys[1], f.get_origin_obj(1).get<ObjKey>(f.col_link));
-        CHECK_EQUAL(f.target_keys[1], f.get_origin_obj(2).get<ObjKey>(f.col_link));
     }
-
-    // Avoid breaking link by reassigning self
-    {
-        Fixture f;
-        f.get_origin_obj(0).set(f.col_link, f.target_keys[0]); // No effective change!
-        // Cascade: target->remove_object(key[2])
-        CHECK(f.target->is_valid(f.target_keys[0]) && f.target->is_valid(f.target_keys[1]) &&
-              f.target->is_valid(f.target_keys[2]));
-        CHECK_EQUAL(f.target_keys[0], f.get_origin_obj(0).get<ObjKey>(f.col_link));
-        CHECK_EQUAL(f.target_keys[1], f.get_origin_obj(1).get<ObjKey>(f.col_link));
-        CHECK_EQUAL(f.target_keys[2], f.get_origin_obj(2).get<ObjKey>(f.col_link));
-    }
-    {
-        Fixture f;
-        f.get_origin_obj(1).set(f.col_link, f.target_keys[1]); // No effective change!
-        // Cascade: target->remove_object(key[2])
-        CHECK(f.target->is_valid(f.target_keys[0]) && f.target->is_valid(f.target_keys[1]) &&
-              f.target->is_valid(f.target_keys[2]));
-        CHECK_EQUAL(f.target_keys[0], f.get_origin_obj(0).get<ObjKey>(f.col_link));
-        CHECK_EQUAL(f.target_keys[1], f.get_origin_obj(1).get<ObjKey>(f.col_link));
-        CHECK_EQUAL(f.target_keys[2], f.get_origin_obj(2).get<ObjKey>(f.col_link));
-    }
-    {
-        Fixture f;
-        f.get_origin_obj(2).set(f.col_link, f.target_keys[2]); // No effective change!
-        // Cascade: target->remove_object(key[2])
-        CHECK(f.target->is_valid(f.target_keys[0]) && f.target->is_valid(f.target_keys[1]) &&
-              f.target->is_valid(f.target_keys[2]));
-        CHECK_EQUAL(f.target_keys[0], f.get_origin_obj(0).get<ObjKey>(f.col_link));
-        CHECK_EQUAL(f.target_keys[1], f.get_origin_obj(1).get<ObjKey>(f.col_link));
-        CHECK_EQUAL(f.target_keys[2], f.get_origin_obj(2).get<ObjKey>(f.col_link));
-    }
-
     // Break link by explicit object removal
     {
         Fixture f;
@@ -1321,26 +1284,25 @@ TEST(Links_CascadeRemove_ColumnLinkList)
     struct Fixture {
         Group group;
         TableRef origin = group.add_table("origin");
-        TableRef target = group.add_table("target");
+        TableRef target = group.add_embedded_table("target");
         std::vector<ObjKey> origin_keys;
         std::vector<ObjKey> target_keys;
         std::vector<LnkLstPtr> linklists;
         ColKey col_link;
         Fixture()
         {
-            col_link = origin->add_column_link(type_LinkList, "o_1", *target, link_Strong);
             target->add_column(type_Int, "t_1");
+            col_link = origin->add_column_link(type_LinkList, "o_1", *target);
             origin->create_objects(3, origin_keys);
-            target->create_objects(3, target_keys);
             linklists.emplace_back(origin->get_object(origin_keys[0]).get_linklist_ptr(col_link));
             linklists.emplace_back(origin->get_object(origin_keys[1]).get_linklist_ptr(col_link));
             linklists.emplace_back(origin->get_object(origin_keys[2]).get_linklist_ptr(col_link));
-            linklists[0]->add(target_keys[1]); // origin[0].o_1 -> [ target[1] ]
-            linklists[1]->add(target_keys[0]);
-            linklists[1]->add(target_keys[1]); // origin[1].o_1 -> [ target[0], target[1] ]
-            linklists[2]->add(target_keys[2]);
-            linklists[2]->add(target_keys[1]);
-            linklists[2]->add(target_keys[2]); // origin[1].o_1 -> [ target[2], target[1], target[2] ]
+            target_keys.emplace_back(linklists[0]->create_and_insert_linked_object(0).get_key());
+            target_keys.emplace_back(linklists[1]->create_and_insert_linked_object(0).get_key());
+            target_keys.emplace_back(linklists[1]->create_and_insert_linked_object(1).get_key());
+            target_keys.emplace_back(linklists[2]->create_and_insert_linked_object(0).get_key());
+            target_keys.emplace_back(linklists[2]->create_and_insert_linked_object(1).get_key());
+            target_keys.emplace_back(linklists[2]->create_and_insert_linked_object(2).get_key());
         }
         Obj get_origin_obj(int i)
         {
@@ -1348,113 +1310,192 @@ TEST(Links_CascadeRemove_ColumnLinkList)
         }
         Obj get_target_obj(int i)
         {
-            return target->get_object(origin_keys[i]);
+            return target->get_object(target_keys[i]);
         }
     };
-
     // Break links by clearing list
     {
         Fixture f;
-        f.linklists[0]->clear(); // Cascade: Nothing
-        CHECK(f.target->is_valid(f.target_keys[0]) && f.target->is_valid(f.target_keys[1]) &&
-              f.target->is_valid(f.target_keys[2]));
-        CHECK_EQUAL(f.target_keys[0], f.linklists[1]->get(0));
-        CHECK_EQUAL(f.target_keys[1], f.linklists[1]->get(1));
-        CHECK_EQUAL(f.target_keys[2], f.linklists[2]->get(0));
-        CHECK_EQUAL(f.target_keys[1], f.linklists[2]->get(1));
-        CHECK_EQUAL(f.target_keys[2], f.linklists[2]->get(2));
+        f.linklists[0]->clear();
+        CHECK(!f.target->is_valid(f.target_keys[0]));
+        CHECK(f.target->is_valid(f.target_keys[1]));
+        CHECK(f.target->is_valid(f.target_keys[2]));
+        CHECK(f.target->is_valid(f.target_keys[3]));
+        CHECK(f.target->is_valid(f.target_keys[4]));
+        CHECK(f.target->is_valid(f.target_keys[5]));
+        CHECK_EQUAL(f.target_keys[1], f.linklists[1]->get(0));
+        CHECK_EQUAL(f.target_keys[2], f.linklists[1]->get(1));
+        CHECK_EQUAL(f.target_keys[3], f.linklists[2]->get(0));
+        CHECK_EQUAL(f.target_keys[4], f.linklists[2]->get(1));
+        CHECK_EQUAL(f.target_keys[5], f.linklists[2]->get(2));
+        CHECK_EQUAL(5, f.target->size());
+        f.group.verify();
+    }
+    {
+        Fixture f;
+        f.linklists[1]->clear();
+        CHECK(f.target->is_valid(f.target_keys[0]));
+        CHECK(!f.target->is_valid(f.target_keys[1]));
+        CHECK(!f.target->is_valid(f.target_keys[2]));
+        CHECK(f.target->is_valid(f.target_keys[3]));
+        CHECK(f.target->is_valid(f.target_keys[4]));
+        CHECK(f.target->is_valid(f.target_keys[5]));
+        CHECK_EQUAL(f.target_keys[0], f.linklists[0]->get(0));
+        CHECK_EQUAL(f.target_keys[3], f.linklists[2]->get(0));
+        CHECK_EQUAL(f.target_keys[4], f.linklists[2]->get(1));
+        CHECK_EQUAL(f.target_keys[5], f.linklists[2]->get(2));
+        CHECK_EQUAL(4, f.target->size());
+        f.group.verify();
+    }
+    {
+        Fixture f;
+        f.linklists[2]->clear(); // Cascade: Nothing
+        CHECK(f.target->is_valid(f.target_keys[0]));
+        CHECK(f.target->is_valid(f.target_keys[1]));
+        CHECK(f.target->is_valid(f.target_keys[2]));
+        CHECK(!f.target->is_valid(f.target_keys[3]));
+        CHECK(!f.target->is_valid(f.target_keys[4]));
+        CHECK(!f.target->is_valid(f.target_keys[5]));
+        CHECK_EQUAL(f.target_keys[0], f.linklists[0]->get(0));
+        CHECK_EQUAL(f.target_keys[1], f.linklists[1]->get(0));
+        CHECK_EQUAL(f.target_keys[2], f.linklists[1]->get(1));
         CHECK_EQUAL(3, f.target->size());
         f.group.verify();
     }
-    {
-        Fixture f;
-        f.linklists[1]->clear(); // Cascade: target->remove_object(0)
-        CHECK(!f.target->is_valid(f.target_keys[0]));
-        CHECK(f.target->is_valid(f.target_keys[1]) && f.target->is_valid(f.target_keys[2]));
-        CHECK_EQUAL(2, f.target->size());
-        f.group.verify();
-    }
-    {
-        Fixture f;
-        f.linklists[2]->clear(); // Cascade: target->remove_object(2)
-        CHECK(!f.target->is_valid(f.target_keys[2]));
-        CHECK(f.target->is_valid(f.target_keys[0]) && f.target->is_valid(f.target_keys[1]));
-        CHECK_EQUAL(2, f.target->size());
-        f.group.verify();
-    }
-
     // Break links by removal from list
     {
         Fixture f;
         f.linklists[0]->remove(0); // Cascade: Nothing
-        CHECK(f.target->is_valid(f.target_keys[0]) && f.target->is_valid(f.target_keys[1]) &&
-              f.target->is_valid(f.target_keys[2]));
-        CHECK_EQUAL(3, f.target->size());
+        CHECK(!f.target->is_valid(f.target_keys[0]));
+        CHECK(f.target->is_valid(f.target_keys[1]));
+        CHECK(f.target->is_valid(f.target_keys[2]));
+        CHECK(f.target->is_valid(f.target_keys[3]));
+        CHECK(f.target->is_valid(f.target_keys[4]));
+        CHECK(f.target->is_valid(f.target_keys[5]));
+        CHECK_EQUAL(f.target_keys[1], f.linklists[1]->get(0));
+        CHECK_EQUAL(f.target_keys[2], f.linklists[1]->get(1));
+        CHECK_EQUAL(f.target_keys[3], f.linklists[2]->get(0));
+        CHECK_EQUAL(f.target_keys[4], f.linklists[2]->get(1));
+        CHECK_EQUAL(f.target_keys[5], f.linklists[2]->get(2));
+        CHECK_EQUAL(5, f.target->size());
         f.group.verify();
     }
     {
         Fixture f;
-        f.linklists[1]->remove(0); // Cascade: target->remove_object(0)
-        CHECK(!f.target->is_valid(f.target_keys[0]));
-        CHECK(f.target->is_valid(f.target_keys[1]) && f.target->is_valid(f.target_keys[2]));
-        CHECK_EQUAL(2, f.target->size());
+        f.linklists[1]->remove(0);
+        CHECK(f.target->is_valid(f.target_keys[0]));
+        CHECK(!f.target->is_valid(f.target_keys[1]));
+        CHECK(f.target->is_valid(f.target_keys[2]));
+        CHECK(f.target->is_valid(f.target_keys[3]));
+        CHECK(f.target->is_valid(f.target_keys[4]));
+        CHECK(f.target->is_valid(f.target_keys[5]));
+        CHECK_EQUAL(f.target_keys[0], f.linklists[0]->get(0));
+        CHECK_EQUAL(f.target_keys[2], f.linklists[1]->get(0));
+        CHECK_EQUAL(f.target_keys[3], f.linklists[2]->get(0));
+        CHECK_EQUAL(f.target_keys[4], f.linklists[2]->get(1));
+        CHECK_EQUAL(f.target_keys[5], f.linklists[2]->get(2));
+        CHECK_EQUAL(5, f.target->size());
         f.group.verify();
     }
 
     // Break links by reassign
     {
         Fixture f;
-        f.linklists[0]->set(0, f.target_keys[0]); // Cascade: Nothing
-        CHECK(f.target->is_valid(f.target_keys[0]) && f.target->is_valid(f.target_keys[1]) &&
-              f.target->is_valid(f.target_keys[2]));
-        CHECK_EQUAL(3, f.target->size());
-        f.group.verify();
-    }
-    {
-        Fixture f;
-        f.linklists[1]->set(0, f.target_keys[1]); // Cascade: target->remove_object(0)
+        f.target_keys.emplace_back(f.linklists[0]->create_and_set_linked_object(0).get_key());
         CHECK(!f.target->is_valid(f.target_keys[0]));
-        CHECK(f.target->is_valid(f.target_keys[1]) && f.target->is_valid(f.target_keys[2]));
-        CHECK_EQUAL(2, f.target->size());
+        CHECK(f.target->is_valid(f.target_keys[6]));
+        CHECK(f.target->is_valid(f.target_keys[1]));
+        CHECK(f.target->is_valid(f.target_keys[2]));
+        CHECK(f.target->is_valid(f.target_keys[3]));
+        CHECK(f.target->is_valid(f.target_keys[4]));
+        CHECK(f.target->is_valid(f.target_keys[5]));
+        CHECK_EQUAL(f.target_keys[6], f.linklists[0]->get(0));
+        CHECK_EQUAL(f.target_keys[1], f.linklists[1]->get(0));
+        CHECK_EQUAL(f.target_keys[2], f.linklists[1]->get(1));
+        CHECK_EQUAL(f.target_keys[3], f.linklists[2]->get(0));
+        CHECK_EQUAL(f.target_keys[4], f.linklists[2]->get(1));
+        CHECK_EQUAL(f.target_keys[5], f.linklists[2]->get(2));
+        CHECK_EQUAL(6, f.target->size());
         f.group.verify();
     }
-
-    // Avoid breaking links by reassigning self
     {
         Fixture f;
-        f.linklists[1]->set(0, f.target_keys[0]); // Cascade: Nothing
-        CHECK(f.target->is_valid(f.target_keys[0]) && f.target->is_valid(f.target_keys[1]) &&
-              f.target->is_valid(f.target_keys[2]));
-        CHECK_EQUAL(3, f.target->size());
+        f.target_keys.emplace_back(f.linklists[1]->create_and_set_linked_object(0).get_key());
+        CHECK(!f.target->is_valid(f.target_keys[1]));
+        CHECK(f.target->is_valid(f.target_keys[0]));
+        CHECK(f.target->is_valid(f.target_keys[6]));
+        CHECK(f.target->is_valid(f.target_keys[2]));
+        CHECK(f.target->is_valid(f.target_keys[3]));
+        CHECK(f.target->is_valid(f.target_keys[4]));
+        CHECK(f.target->is_valid(f.target_keys[5]));
+        CHECK_EQUAL(f.target_keys[0], f.linklists[0]->get(0));
+        CHECK_EQUAL(f.target_keys[6], f.linklists[1]->get(0));
+        CHECK_EQUAL(f.target_keys[2], f.linklists[1]->get(1));
+        CHECK_EQUAL(f.target_keys[3], f.linklists[2]->get(0));
+        CHECK_EQUAL(f.target_keys[4], f.linklists[2]->get(1));
+        CHECK_EQUAL(f.target_keys[5], f.linklists[2]->get(2));
+        CHECK_EQUAL(6, f.target->size());
         f.group.verify();
     }
 
     // Break links by explicit ordered row removal
     {
         Fixture f;
-        f.get_origin_obj(0).remove(); // Cascade: Nothing
-        CHECK(f.target->is_valid(f.target_keys[0]) && f.target->is_valid(f.target_keys[1]) &&
-              f.target->is_valid(f.target_keys[2]));
-        CHECK_EQUAL(3, f.target->size());
-        f.group.verify();
-    }
-    {
-        Fixture f;
-        f.get_origin_obj(1).remove(); // Cascade: target->remove_object(0)
+        f.get_origin_obj(0).remove();
+        CHECK_EQUAL(2, f.origin->size());
+        CHECK_EQUAL(5, f.target->size());
         CHECK(!f.target->is_valid(f.target_keys[0]));
-        CHECK(f.target->is_valid(f.target_keys[1]) && f.target->is_valid(f.target_keys[2]));
-        CHECK_EQUAL(2, f.target->size());
+        CHECK(f.target->is_valid(f.target_keys[1]));
+        CHECK(f.target->is_valid(f.target_keys[2]));
+        CHECK(f.target->is_valid(f.target_keys[3]));
+        CHECK(f.target->is_valid(f.target_keys[4]));
+        CHECK(f.target->is_valid(f.target_keys[5]));
+        // CHECK_EQUAL(f.target_keys[0], f.linklists[0]->get(0));
+        CHECK_EQUAL(f.target_keys[1], f.linklists[1]->get(0));
+        CHECK_EQUAL(f.target_keys[2], f.linklists[1]->get(1));
+        CHECK_EQUAL(f.target_keys[3], f.linklists[2]->get(0));
+        CHECK_EQUAL(f.target_keys[4], f.linklists[2]->get(1));
+        CHECK_EQUAL(f.target_keys[5], f.linklists[2]->get(2));
         f.group.verify();
     }
     {
         Fixture f;
-        f.get_origin_obj(2).remove(); // Cascade: target->remove_object(2)
+        f.get_origin_obj(1).remove();
+        CHECK_EQUAL(2, f.origin->size());
+        CHECK_EQUAL(4, f.target->size());
+        CHECK(f.target->is_valid(f.target_keys[0]));
+        CHECK(!f.target->is_valid(f.target_keys[1]));
         CHECK(!f.target->is_valid(f.target_keys[2]));
-        CHECK(f.target->is_valid(f.target_keys[0]) && f.target->is_valid(f.target_keys[1]));
-        CHECK_EQUAL(2, f.target->size());
+        CHECK(f.target->is_valid(f.target_keys[3]));
+        CHECK(f.target->is_valid(f.target_keys[4]));
+        CHECK(f.target->is_valid(f.target_keys[5]));
+        CHECK_EQUAL(f.target_keys[0], f.linklists[0]->get(0));
+        // CHECK_EQUAL(f.target_keys[1], f.linklists[1]->get(0));
+        // CHECK_EQUAL(f.target_keys[2], f.linklists[1]->get(1));
+        CHECK_EQUAL(f.target_keys[3], f.linklists[2]->get(0));
+        CHECK_EQUAL(f.target_keys[4], f.linklists[2]->get(1));
+        CHECK_EQUAL(f.target_keys[5], f.linklists[2]->get(2));
         f.group.verify();
     }
-
+    {
+        Fixture f;
+        f.get_origin_obj(2).remove();
+        CHECK_EQUAL(2, f.origin->size());
+        CHECK_EQUAL(3, f.target->size());
+        CHECK(f.target->is_valid(f.target_keys[0]));
+        CHECK(f.target->is_valid(f.target_keys[1]));
+        CHECK(f.target->is_valid(f.target_keys[2]));
+        CHECK(!f.target->is_valid(f.target_keys[3]));
+        CHECK(!f.target->is_valid(f.target_keys[4]));
+        CHECK(!f.target->is_valid(f.target_keys[5]));
+        CHECK_EQUAL(f.target_keys[0], f.linklists[0]->get(0));
+        CHECK_EQUAL(f.target_keys[1], f.linklists[1]->get(0));
+        CHECK_EQUAL(f.target_keys[2], f.linklists[1]->get(1));
+        // CHECK_EQUAL(f.target_keys[3], f.linklists[2]->get(0));
+        // CHECK_EQUAL(f.target_keys[4], f.linklists[2]->get(1));
+        // CHECK_EQUAL(f.target_keys[5], f.linklists[2]->get(2));
+        f.group.verify();
+    }
     // Break link by clearing table
     {
         Fixture f;
@@ -1462,11 +1503,13 @@ TEST(Links_CascadeRemove_ColumnLinkList)
         CHECK(!f.target->is_valid(f.target_keys[0]));
         CHECK(!f.target->is_valid(f.target_keys[1]));
         CHECK(!f.target->is_valid(f.target_keys[2]));
+        CHECK(!f.target->is_valid(f.target_keys[3]));
+        CHECK(!f.target->is_valid(f.target_keys[4]));
+        CHECK(!f.target->is_valid(f.target_keys[5]));
         CHECK_EQUAL(0, f.target->size());
         f.group.verify();
     }
 }
-
 
 TEST(Links_LinkList_Swap)
 {

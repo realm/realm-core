@@ -91,7 +91,7 @@ public:
     }
     void truncate(size_t ndx)
     {
-        Array::truncate(calc_byte_len(ndx));
+        Array::truncate(calc_required_bytes(ndx));
     }
 
     size_t find_first(const ObjectId& value, size_t begin = 0, size_t end = npos) const noexcept;
@@ -145,10 +145,15 @@ protected:
         return Pos{(ndx / 8) * s_block_size, ndx % 8};
     }
 
-    size_t calc_byte_len(size_t num_items, size_t /*unused width*/ = 0) const override
+    static size_t calc_required_bytes(size_t num_items)
     {
         return (num_items * s_width) +       // ObjectId data
                (div_round_up<8>(num_items)); // null bitvectors (1 byte per 8 oids, rounded up)
+    }
+
+    size_t calc_byte_len(size_t num_items, size_t /*unused width*/ = 0) const override
+    {
+        return num_items + Node::header_size;
     }
 
     bool is_valid_ndx(size_t ndx) const

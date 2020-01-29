@@ -54,7 +54,7 @@ enum Instruction {
     instr_InsertColumn = 20, // Insert new column into to selected descriptor
     instr_EraseColumn = 21,  // Remove column from selected descriptor
     instr_RenameColumn = 22, // Rename column in selected descriptor
-    instr_SetLinkType = 23,  // Strong/weak
+    // instr_SetLinkType = 23,  Strong/weak (unused from file format 11)
 
     instr_SelectList = 30,
     instr_ListInsert = 31, // Insert list entry
@@ -317,14 +317,14 @@ private:
 class TransactLogConvenientEncoder {
 public:
     virtual ~TransactLogConvenientEncoder();
-    virtual void add_class(StringData table_name);
+    virtual void add_class(StringData table_name, bool is_embedded);
     virtual void add_class_with_primary_key(StringData table_name, DataType pk_type, StringData pk_field,
                                             bool nullable);
     virtual void insert_group_level_table(TableKey table_key, size_t num_tables, StringData name);
     virtual void erase_group_level_table(TableKey table_key, size_t num_tables);
     virtual void rename_group_level_table(TableKey table_key, StringData new_name);
     virtual void insert_column(const Table*, ColKey col_key, DataType type, StringData name, LinkTargetInfo& link,
-                               bool nullable = false, bool listtype = false, LinkType link_type = link_Weak);
+                               bool nullable = false, bool listtype = false);
     virtual void erase_column(const Table*, ColKey col_key);
     virtual void rename_column(const Table*, ColKey col_key, StringData name);
 
@@ -373,9 +373,6 @@ public:
     virtual void create_object(const Table*, ObjKey);
     virtual void create_object_with_primary_key(const Table*, GlobalKey, Mixed);
     virtual void remove_object(const Table*, ObjKey);
-    /// \param prior_num_rows The number of rows in the table prior to the
-    /// modification.
-    virtual void set_link_type(const Table*, ColKey col_key, LinkType);
     virtual void clear_table(const Table*, size_t prior_num_rows);
 
     virtual void list_set_null(const ConstLstBase&, size_t ndx);
@@ -773,7 +770,7 @@ inline bool TransactLogEncoder::insert_column(ColKey col_key)
 }
 
 inline void TransactLogConvenientEncoder::insert_column(const Table* t, ColKey col_key, DataType, StringData,
-                                                        LinkTargetInfo&, bool, bool, LinkType)
+                                                        LinkTargetInfo&, bool, bool)
 {
     select_table(t);                  // Throws
     m_encoder.insert_column(col_key); // Throws
@@ -1060,19 +1057,6 @@ inline void TransactLogConvenientEncoder::remove_object(const Table* t, ObjKey k
     m_encoder.remove_object(key); // Throws
 }
 
-inline bool TransactLogEncoder::set_link_type(ColKey col_key)
-{
-    append_simple_instr(instr_SetLinkType, col_key); // Throws
-    return true;
-}
-
-inline void TransactLogConvenientEncoder::set_link_type(const Table* t, ColKey col_key, LinkType)
-{
-    select_table(t);                  // Throws
-    m_encoder.set_link_type(col_key); // Throws
-}
-
-
 inline bool TransactLogEncoder::clear_table(size_t old_size)
 {
     append_simple_instr(instr_ClearTable, old_size); // Throws
@@ -1280,12 +1264,6 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
             ColKey col_key = ColKey(read_int<int64_t>()); // Throws
             ObjKey key = ObjKey(read_int<int64_t>());     // Throws
             if (!handler.select_list(col_key, key))       // Throws
-                parser_error();
-            return;
-        }
-        case instr_SetLinkType: {
-            ColKey col_key = ColKey(read_int<int64_t>()); // Throws
-            if (!handler.set_link_type(col_key))          // Throws
                 parser_error();
             return;
         }
