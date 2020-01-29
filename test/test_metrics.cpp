@@ -989,7 +989,7 @@ public:
 
     void report_target_result(int64_t) override
     {
-        if (run_count > 1) { // need to run twice before we're done
+        if (run_count == 2) { // need to run twice before we're done
             will_run.set_value();
         }
         ++run_count;
