@@ -250,6 +250,7 @@ Decimal128::Decimal128()
 Decimal128::Decimal128(double val)
 {
     std::stringstream ss;
+    ss.imbue(std::locale::classic());
     ss << val;
     from_string(ss.str().c_str());
 }
@@ -279,9 +280,10 @@ Decimal128::Decimal128(int64_t val)
 
 Decimal128::Decimal128(uint64_t val)
 {
-    constexpr uint64_t expon = uint64_t(DECIMAL_EXPONENT_BIAS_128) << 49;
-    m_value.w[1] = expon;
-    m_value.w[0] = val;
+    BID_UINT64 tmp(val);
+    BID_UINT128 expanded;
+    bid128_from_uint64(&expanded, &tmp);
+    memcpy(this, &expanded, sizeof(*this));
 }
 
 Decimal128::Decimal128(Bid64 val)
@@ -379,11 +381,8 @@ Decimal128 Decimal128::operator/(int64_t div) const
 
 Decimal128 Decimal128::operator/(size_t div) const
 {
-    BID_UINT128 x = to_BID_UINT128(*this);
-    BID_UINT64 tmp(div);
-    BID_UINT128 y;
-    bid128_from_uint64(&y, &tmp);
-    return do_divide(x, y);
+    Decimal128 tmp_div(static_cast<uint64_t>(div));
+    return do_divide(to_BID_UINT128(*this), to_BID_UINT128(tmp_div));
 }
 
 Decimal128 Decimal128::operator/(int div) const
