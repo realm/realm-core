@@ -70,7 +70,7 @@ jobWrapper {
             checkWin64Release       : doBuildWindows('Release', false, 'x64', true),
             iosDebug                : doBuildAppleDevice('ios', 'MinSizeDebug'),
             androidArm64Debug       : doAndroidBuildInDocker('arm64-v8a', 'Debug', false),
-            checkRaspberryPi        : doLinuxCrossCompile('arm-linux-gnueabihf', 'Debug', 'raspberry-pi'),
+            checkRaspberryPi        : doLinuxCrossCompile('armhf', 'Debug', 'raspberry-pi'),
             threadSanitizer         : doCheckSanity('Debug', '1000', 'thread'),
             addressSanitizer        : doCheckSanity('Debug', '1000', 'address')
         ]
@@ -97,20 +97,6 @@ jobWrapper {
                 buildCatalystDebug  : doBuildMacOsCatalyst('MinSizeDebug'),
                 buildCatalystRelease: doBuildMacOsCatalyst('Release'),
 
-                buildWin32Debug     : doBuildWindows('Debug', false, 'Win32', false),
-                buildWin32Release   : doBuildWindows('Release', false, 'Win32', false),
-                buildWin64Debug     : doBuildWindows('Debug', false, 'x64', false),
-                buildWin64Release   : doBuildWindows('Release', false, 'x64', false),
-                buildUwpWin32Debug  : doBuildWindows('Debug', true, 'Win32', false),
-                buildUwpWin32Release: doBuildWindows('Release', true, 'Win32', false),
-                buildUwpx64Debug    : doBuildWindows('Debug', true, 'x64', false),
-                buildUwpx64Release  : doBuildWindows('Release', true, 'x64', false),
-                buildUwpArmDebug    : doBuildWindows('Debug', true, 'ARM', false),
-                buildUwpArmRelease  : doBuildWindows('Release', true, 'ARM', false),
-
-                buildLinuxDebug     : doBuildLinux('Debug'),
-                buildLinuxRelease   : doBuildLinux('Release'),
-                buildLinuxRelAssert : doBuildLinux('RelAssert'),
                 buildLinuxASAN      : doBuildLinuxClang("RelASAN"),
                 buildLinuxTSAN      : doBuildLinuxClang("RelTSAN")
             ]
@@ -131,6 +117,27 @@ jobWrapper {
                 for (buildType in appleBuildTypes) {
                     parallelExecutors["${sdk}${buildType}"] = doBuildAppleDevice(sdk, buildType)
                 }
+            }
+
+            linuxBuildTypes = ['Debug', 'Release', 'RelAssert']
+            linuxCrossCompileTargets = ['armhf']
+
+            for (buildType in linuxBuildTypes) {
+                parallelExecutors["buildLinux${buildType}"] = doBuildLinux(buildType)
+                for (target in linuxCrossCompileTargets) {
+                    parallelExecutors["crossCompileLinux-${target}-${buildType}"] = doLinuxCrossCompile(target, buildType)
+                }
+            }
+
+            windowsBuildTypes = ['Debug', 'Release']
+            windowsPlatforms = ['Win32', 'x64']
+
+            for (buildType in windowsBuildTypes) {
+                for (platform in windowsPlatforms) {
+                    parallelExecutors["buildWindows-${platform}-${buildType}"] = doBuildWindows(buildType, false, platform, false)
+                    parallelExecutors["buildWindowsUniversal-${platform}-${buildType}"] = doBuildWindows(buildType, true, platform, false)
+                }
+                parallelExecutors["buildWindowsUniversal-ARM-${buildType}"] = doBuildWindows(buildType, true, 'ARM', false)
             }
 
             parallel parallelExecutors
@@ -578,7 +585,7 @@ def doBuildAppleDevice(String sdk, String buildType) {
     }
 }
 
-def doLinuxCrossCompile(String target, String configuration, String testAgent = null) {
+def doLinuxCrossCompile(String target, String buildType, String testAgent = null) {
     return {
         node('docker') {
             getArchive()
@@ -588,20 +595,35 @@ def doLinuxCrossCompile(String target, String configuration, String testAgent = 
                         cmake -GNinja \
                               -DREALM_SKIP_SHARED_LIB=ON \
                               -DCMAKE_TOOLCHAIN_FILE=$WORKSPACE/tools/cmake/${target}.toolchain.cmake \
-                              -DCMAKE_BUILD_TYPE=${configuration} \
+                              -DCMAKE_BUILD_TYPE=${buildType} \
+                              -DREALM_NO_TESTS=${testAgent ? 'OFF' : 'ON'} \
+                              -DCPACK_SYSTEM_NAME=Linux-${target} \
                               ..
                         cmake --build .
                     """
-                    stash includes: 'test/**/*', name: "realm-tests-${target}"
+                    if (testAgent != null) {
+                        stash includes: 'test/**/*', name: "realm-tests-Linux-${target}"
+                    } else {
+                        sh 'cpack'
+                        archiveArtifacts '*.tar.gz'
+                        def stashName = "linux-${target}___${buildType}"
+                        stash includes:"*.tar.gz", name:stashName
+                        publishingStashes << stashName
+                    }
                 }
             }
         }
         if (testAgent != null) {
             node(testAgent) {
-                unstash "realm-tests-${target}"
+                unstash "realm-tests-Linux-${target}"
                 try {
-                    sh 'UNITTEST_PROGRESS=1 test/realm-test'
+                    def environment = environment()
+                    environment << 'UNITTEST_PROGRESS=1'
+                    withEnv(environment) {
+                        sh 'test/realm-tests'
+                    }
                 } finally {
+                    recordTests("Linux-${target}-${buildType}")
                     deleteDir()
                 }
             }
