@@ -13,7 +13,8 @@
 -----------
 
 ### Internals
-* None.
+* Build targets are now RealmCore::Storage and RealmCore::QueryParser
+* OpenSSL library will be downloaded automatically on Linux and Android
 
 ----------------------------------------------
 

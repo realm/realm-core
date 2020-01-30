@@ -103,11 +103,6 @@ if(ANDROID)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fdata-sections -ffunction-sections -fomit-frame-pointer -fsigned-char -fstrict-aliasing -funwind-tables -no-canonical-prefixes")
 endif()
 
-# Add REALM_DEBUG=1 to compile definitions for Debug / MinSizeDebug targets
-set_property(DIRECTORY APPEND PROPERTY COMPILE_DEFINITIONS
-    $<$<CONFIG:Debug>:REALM_DEBUG=1>
-    $<$<CONFIG:MinSizeDebug>:REALM_DEBUG=1>
-)
 set_property(DIRECTORY APPEND PROPERTY COMPILE_OPTIONS
     $<$<CONFIG:MinSizeDebug>:-g>
 )
@@ -209,14 +204,21 @@ endif()
 install(FILES LICENSE CHANGELOG.md DESTINATION "doc/realm" COMPONENT devel)
 
 # Make the project importable from the build directory
-export(TARGETS Core QueryParser NAMESPACE Realm:: FILE realm-config.cmake)
+export(TARGETS Storage QueryParser NAMESPACE RealmCore:: FILE RealmCoreTargets.cmake)
+configure_file(${CMAKE_CURRENT_LIST_DIR}/tools/cmake/RealmCoreConfig.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/RealmCoreConfig.cmake @ONLY)
 
 # Make the project importable from the install directory
 install(EXPORT realm
-        NAMESPACE Realm::
-        FILE realm-config.cmake
-        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/realm
-        COMPONENT devel)
+        NAMESPACE RealmCore::
+        FILE RealmCoreTargets.cmake
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/RealmCore
+        COMPONENT devel
+)
+
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/RealmCoreConfig.cmake 
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/RealmCore 
+        COMPONENT devel
+)
 
 # CPack
 set(CPACK_GENERATOR "TGZ")
