@@ -3427,7 +3427,7 @@ TEST(Parser_ObjectId)
 
     auto now = std::chrono::system_clock::now();
 
-    Timestamp ts_t1{0, 1};
+    Timestamp ts_t1{1, 1};
     Timestamp ts_now{now};
     Timestamp ts_t25{now + std::chrono::seconds(25)};
     std::vector<Timestamp> times = {ts_t1, ts_now, ts_t25};
@@ -3443,8 +3443,9 @@ TEST(Parser_ObjectId)
     // add one object with default values, we assume time >= now, and null
     auto obj_generated = table->create_object();
     ObjectId generated_pk = obj_generated.get<ObjectId>(pk_col_key);
+    CHECK_EQUAL(generated_pk.get_timestamp().get_seconds(), 0);
     auto generated_nullable = obj_generated.get<util::Optional<ObjectId>>(nullable_oid_col_key);
-    CHECK_LESS_EQUAL(Timestamp{now}.get_seconds(), generated_pk.get_timestamp().get_seconds());
+    CHECK_GREATER(Timestamp{now}.get_seconds(), 0);
     CHECK(!generated_nullable);
     verify_query(test_context, table, "id == oid(" + generated_pk.to_string() + ")", 1);
     verify_query(test_context, table, "nid == NULL", 1);
@@ -3513,56 +3514,56 @@ TEST(Parser_ObjectId)
     verify_query(test_context, table, util::format("nid != %1", print_value(times[2])), table->size() - 1);
 
     // greater
-    verify_query_sub(test_context, table, "id > $0", ts_args, num_args, 3);
-    verify_query_sub(test_context, table, "id > $1", ts_args, num_args, 2);
+    verify_query_sub(test_context, table, "id > $0", ts_args, num_args, 2);
+    verify_query_sub(test_context, table, "id > $1", ts_args, num_args, 1);
     verify_query_sub(test_context, table, "id > $2", ts_args, num_args, 0);
     verify_query_sub(test_context, table, "nid > $0", ts_args, num_args, 2);
     verify_query_sub(test_context, table, "nid > $1", ts_args, num_args, 1);
     verify_query_sub(test_context, table, "nid > $2", ts_args, num_args, 0);
-    verify_query(test_context, table, util::format("id > %1", print_value(times[0])), 3);
-    verify_query(test_context, table, util::format("id > %1", print_value(times[1])), 2);
+    verify_query(test_context, table, util::format("id > %1", print_value(times[0])), 2);
+    verify_query(test_context, table, util::format("id > %1", print_value(times[1])), 1);
     verify_query(test_context, table, util::format("id > %1", print_value(times[2])), 0);
     verify_query(test_context, table, util::format("nid > %1", print_value(times[0])), 2);
     verify_query(test_context, table, util::format("nid > %1", print_value(times[1])), 1);
     verify_query(test_context, table, util::format("nid > %1", print_value(times[2])), 0);
 
     // greater equal
-    verify_query_sub(test_context, table, "id >= $0", ts_args, num_args, 4);
-    verify_query_sub(test_context, table, "id >= $1", ts_args, num_args, 3);
+    verify_query_sub(test_context, table, "id >= $0", ts_args, num_args, 3);
+    verify_query_sub(test_context, table, "id >= $1", ts_args, num_args, 2);
     verify_query_sub(test_context, table, "id >= $2", ts_args, num_args, 1);
     verify_query_sub(test_context, table, "nid >= $0", ts_args, num_args, 3);
     verify_query_sub(test_context, table, "nid >= $1", ts_args, num_args, 2);
     verify_query_sub(test_context, table, "nid >= $2", ts_args, num_args, 1);
-    verify_query(test_context, table, util::format("id >= %1", print_value(times[0])), 4);
-    verify_query(test_context, table, util::format("id >= %1", print_value(times[1])), 3);
+    verify_query(test_context, table, util::format("id >= %1", print_value(times[0])), 3);
+    verify_query(test_context, table, util::format("id >= %1", print_value(times[1])), 2);
     verify_query(test_context, table, util::format("id >= %1", print_value(times[2])), 1);
     verify_query(test_context, table, util::format("nid >= %1", print_value(times[0])), 3);
     verify_query(test_context, table, util::format("nid >= %1", print_value(times[1])), 2);
     verify_query(test_context, table, util::format("nid >= %1", print_value(times[2])), 1);
 
     // less
-    verify_query_sub(test_context, table, "id < $0", ts_args, num_args, 0);
-    verify_query_sub(test_context, table, "id < $1", ts_args, num_args, 1);
+    verify_query_sub(test_context, table, "id < $0", ts_args, num_args, 1);
+    verify_query_sub(test_context, table, "id < $1", ts_args, num_args, 2);
     verify_query_sub(test_context, table, "id < $2", ts_args, num_args, 3);
     verify_query_sub(test_context, table, "nid < $0", ts_args, num_args, 0);
     verify_query_sub(test_context, table, "nid < $1", ts_args, num_args, 1);
     verify_query_sub(test_context, table, "nid < $2", ts_args, num_args, 2);
-    verify_query(test_context, table, util::format("id < %1", print_value(times[0])), 0);
-    verify_query(test_context, table, util::format("id < %1", print_value(times[1])), 1);
+    verify_query(test_context, table, util::format("id < %1", print_value(times[0])), 1);
+    verify_query(test_context, table, util::format("id < %1", print_value(times[1])), 2);
     verify_query(test_context, table, util::format("id < %1", print_value(times[2])), 3);
     verify_query(test_context, table, util::format("nid < %1", print_value(times[0])), 0);
     verify_query(test_context, table, util::format("nid < %1", print_value(times[1])), 1);
     verify_query(test_context, table, util::format("nid < %1", print_value(times[2])), 2);
 
     // less equal
-    verify_query_sub(test_context, table, "id <= $0", ts_args, num_args, 1);
-    verify_query_sub(test_context, table, "id <= $1", ts_args, num_args, 2);
+    verify_query_sub(test_context, table, "id <= $0", ts_args, num_args, 2);
+    verify_query_sub(test_context, table, "id <= $1", ts_args, num_args, 3);
     verify_query_sub(test_context, table, "id <= $2", ts_args, num_args, 4);
     verify_query_sub(test_context, table, "nid <= $0", ts_args, num_args, 1);
     verify_query_sub(test_context, table, "nid <= $1", ts_args, num_args, 2);
     verify_query_sub(test_context, table, "nid <= $2", ts_args, num_args, 3);
-    verify_query(test_context, table, util::format("id <= %1", print_value(times[0])), 1);
-    verify_query(test_context, table, util::format("id <= %1", print_value(times[1])), 2);
+    verify_query(test_context, table, util::format("id <= %1", print_value(times[0])), 2);
+    verify_query(test_context, table, util::format("id <= %1", print_value(times[1])), 3);
     verify_query(test_context, table, util::format("id <= %1", print_value(times[2])), 4);
     verify_query(test_context, table, util::format("nid <= %1", print_value(times[0])), 1);
     verify_query(test_context, table, util::format("nid <= %1", print_value(times[1])), 2);

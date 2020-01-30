@@ -39,7 +39,7 @@ public:
     static ObjectId default_value(bool nullable)
     {
         REALM_ASSERT(!nullable);
-        return ObjectId::gen();
+        return ObjectId();
     }
 
     void create()
@@ -171,7 +171,7 @@ public:
     {
         if (nullable)
             return util::none;
-        return ObjectId::gen();
+        return ObjectId();
     }
 
     void set(size_t ndx, const util::Optional<ObjectId>& value)
