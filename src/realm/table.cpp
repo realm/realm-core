@@ -343,8 +343,7 @@ ColKey Table::insert_column_link(ColKey col_key, DataType type, StringData name,
 
     LinkTargetInfo link_target_info(&target);
     m_has_any_embedded_objects |= target.is_embedded();
-    auto retval =
-        do_insert_column(col_key, type, name, link_target_info, false, type == type_LinkList); // Throws
+    auto retval = do_insert_column(col_key, type, name, link_target_info, false, type == type_LinkList); // Throws
     return retval;
 }
 
@@ -2358,21 +2357,21 @@ void Table::update_from_parent(size_t old_baseline) noexcept
         if (m_top.size() > top_position_for_flags) {
             uint64_t flags = m_top.get_as_ref_or_tagged(top_position_for_flags).get_as_int();
             m_is_embedded = flags & 0x1;
-        } else {
+        }
+        else {
             m_is_embedded = false;
         }
         refresh_content_version();
         m_has_any_embedded_objects = false;
-        for_each_public_column([&](ColKey col_key)
-                               {
-                                   auto target_table_key = get_opposite_table_key(col_key);
-                                   if (target_table_key) {
-                                       auto target_table = get_parent_group()->get_table(target_table_key);
-                                       m_has_any_embedded_objects |= target_table->is_embedded();
-                                       return true; // early out
-                                   }
-                                   return false;
-                               });
+        for_each_public_column([&](ColKey col_key) {
+            auto target_table_key = get_opposite_table_key(col_key);
+            if (target_table_key) {
+                auto target_table = get_parent_group()->get_table(target_table_key);
+                m_has_any_embedded_objects |= target_table->is_embedded();
+                return true; // early out
+            }
+            return false;
+        });
     }
     m_alloc.bump_storage_version();
 }

@@ -31,7 +31,8 @@ public:
      * Constructs an ObjectId with all bytes 0x00.
      */
     ObjectId() noexcept;
-    ObjectId(null) noexcept : ObjectId()
+    ObjectId(null) noexcept
+        : ObjectId()
     {
     }
 
