@@ -96,7 +96,7 @@ template <typename T>
 bool try_parse_specials(std::string str, T& ret)
 {
     std::transform(str.begin(), str.end(), str.begin(), toLowerAscii);
-    if (std::numeric_limits<T>::has_quiet_NaN && (str == "nan" || str == "-nan")) {
+    if (std::numeric_limits<T>::has_quiet_NaN && (str == "nan" || str == "+nan" || str == "-nan")) {
         ret = std::numeric_limits<T>::quiet_NaN();
         return true;
     }

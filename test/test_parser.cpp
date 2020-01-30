@@ -513,14 +513,28 @@ TEST(Parser_basic_serialisation)
     verify_query(test_context, t, "fees > 200e-2", 4);
     verify_query(test_context, t, "fees > 0.002e3", 4);
     verify_query(test_context, t, "fees < inf", 5);
+    verify_query(test_context, t, "fees < +inf", 5);
     verify_query(test_context, t, "fees > -inf", 5);
+    verify_query(test_context, t, "fees < infinity", 5);
+    verify_query(test_context, t, "fees < +infinity", 5);
+    verify_query(test_context, t, "fees > -infinity", 5);
+    verify_query(test_context, t, "fees == NaN", 0);
+    verify_query(test_context, t, "fees != NaN", 5);
+    verify_query(test_context, t, "fees == -NaN", 0);
+    verify_query(test_context, t, "fees != -NaN", 5);
     verify_query(test_context, t, "float_fees > 2.0E0", 4);
     verify_query(test_context, t, "float_fees > 200e-2", 4);
     verify_query(test_context, t, "float_fees > 0.002E3", 4);
     verify_query(test_context, t, "float_fees < inf", 5);
+    verify_query(test_context, t, "float_fees < +inf", 5);
     verify_query(test_context, t, "float_fees > -inf", 5);
+    verify_query(test_context, t, "float_fees < infinity", 5);
+    verify_query(test_context, t, "float_fees < +infinity", 5);
+    verify_query(test_context, t, "float_fees > -infinity", 5);
     verify_query(test_context, t, "float_fees == NaN", 0);
     verify_query(test_context, t, "float_fees != NaN", 5);
+    verify_query(test_context, t, "float_fees == -NaN", 0);
+    verify_query(test_context, t, "float_fees != -NaN", 5);
     verify_query(test_context, t, "(age > 1 || fees >= 2.25) && age == 4", 1);
     verify_query(test_context, t, "licensed == true", 3);
     verify_query(test_context, t, "licensed == false", 2);
@@ -552,6 +566,8 @@ TEST(Parser_basic_serialisation)
     verify_query(test_context, t, "age > 2 AND !TRUEPREDICATE", 0);
 
     CHECK_THROW_ANY(verify_query(test_context, t, "buddy.age > $0", 0)); // no external parameters provided
+    CHECK_THROW_ANY(verify_query(test_context, t, "age == infinity", 0));  // integer vs infinity is not supported
+    CHECK_THROW_ANY(verify_query(test_context, t, "name == infinity", 0)); // string vs infinity is an invalid query
 
     std::string message;
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "missing_property > 2", 0), message);
