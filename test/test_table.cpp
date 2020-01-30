@@ -321,6 +321,11 @@ TEST(Table_Null)
 
         Obj obj = table->create_object();
         CHECK(obj.is_null(col));
+
+        // Check that you can obtain a non null value through get<Int>
+        obj.set(col, 7);
+        CHECK_NOT(obj.is_null(col));
+        CHECK_EQUAL(obj.get<Int>(col), 7);
     }
 
     {
@@ -2474,7 +2479,7 @@ TEST(Table_Nulls)
         obj0.set(col_bool, false);
         obj0.set(col_date, Timestamp(3, 0));
 
-        CHECK_EQUAL(65, obj0.get<util::Optional<Int>>(col_int));
+        CHECK_EQUAL(65, obj0.get<Int>(col_int));
         CHECK_EQUAL(false, obj0.get<Bool>(col_bool));
         CHECK_EQUAL(Timestamp(3, 0), obj0.get<Timestamp>(col_date));
 
@@ -2487,6 +2492,7 @@ TEST(Table_Nulls)
         CHECK_NOT(obj0.is_null(col_bool));
         CHECK_NOT(obj0.is_null(col_date));
 
+        CHECK_THROW_ANY(obj1.get<Int>(col_int));
         CHECK(obj1.is_null(col_int));
         CHECK(obj1.is_null(col_bool));
         CHECK(obj1.is_null(col_date));
@@ -5111,33 +5117,32 @@ TEST(Table_EmbeddedObjectNotifications)
     // now the notifications...
     int calls = 0;
     tr->set_cascade_notification_handler([&](const Group::CascadeNotification& notification) {
-            CHECK_EQUAL(0, notification.links.size());
-            if (calls == 0) {
-                CHECK_EQUAL(1, notification.rows.size());
-                CHECK_EQUAL(parent->get_key(), notification.rows[0].table_key);
-                CHECK_EQUAL(o.get_key(), notification.rows[0].key);
-            }
-            else if (calls == 1) {
-                CHECK_EQUAL(3, notification.rows.size());
-                for (auto& row : notification.rows)
-                    CHECK_EQUAL(table->get_key(), row.table_key);
-                CHECK_EQUAL(o4.get_key(), notification.rows[0].key);
-                CHECK_EQUAL(o5.get_key(), notification.rows[1].key);
-                CHECK_EQUAL(o3.get_key(), notification.rows[2].key);
-            }
-            else if (calls == 2) {
-                CHECK_EQUAL(1, notification.rows.size()); // from o3
-                for (auto& row : notification.rows)
-                    CHECK_EQUAL(table->get_key(), row.table_key);
-                // don't bother checking the keys...
-            }
-            ++calls;
-        });
+        CHECK_EQUAL(0, notification.links.size());
+        if (calls == 0) {
+            CHECK_EQUAL(1, notification.rows.size());
+            CHECK_EQUAL(parent->get_key(), notification.rows[0].table_key);
+            CHECK_EQUAL(o.get_key(), notification.rows[0].key);
+        }
+        else if (calls == 1) {
+            CHECK_EQUAL(3, notification.rows.size());
+            for (auto& row : notification.rows)
+                CHECK_EQUAL(table->get_key(), row.table_key);
+            CHECK_EQUAL(o4.get_key(), notification.rows[0].key);
+            CHECK_EQUAL(o5.get_key(), notification.rows[1].key);
+            CHECK_EQUAL(o3.get_key(), notification.rows[2].key);
+        }
+        else if (calls == 2) {
+            CHECK_EQUAL(1, notification.rows.size()); // from o3
+            for (auto& row : notification.rows)
+                CHECK_EQUAL(table->get_key(), row.table_key);
+            // don't bother checking the keys...
+        }
+        ++calls;
+    });
 
     o.remove();
     CHECK(calls == 3);
     tr->commit();
-
 }
 TEST(Table_EmbeddedObjectTableClearNotifications)
 {
@@ -5169,34 +5174,31 @@ TEST(Table_EmbeddedObjectTableClearNotifications)
     // now the notifications...
     int calls = 0;
     tr->set_cascade_notification_handler([&](const Group::CascadeNotification& notification) {
-            if (calls == 0) {
-                CHECK_EQUAL(3, notification.rows.size());
-                for (auto& row : notification.rows)
-                    CHECK_EQUAL(table->get_key(), row.table_key);
-                CHECK_EQUAL(o4.get_key(), notification.rows[0].key);
-                CHECK_EQUAL(o5.get_key(), notification.rows[1].key);
-                CHECK_EQUAL(o3.get_key(), notification.rows[2].key);
-            }
-            else if (calls == 1) {
-                CHECK_EQUAL(1, notification.rows.size()); // from o3
-                for (auto& row : notification.rows)
-                    CHECK_EQUAL(table->get_key(), row.table_key);
-                // don't bother checking the keys...
-            }
-            ++calls;
-        });
+        if (calls == 0) {
+            CHECK_EQUAL(3, notification.rows.size());
+            for (auto& row : notification.rows)
+                CHECK_EQUAL(table->get_key(), row.table_key);
+            CHECK_EQUAL(o4.get_key(), notification.rows[0].key);
+            CHECK_EQUAL(o5.get_key(), notification.rows[1].key);
+            CHECK_EQUAL(o3.get_key(), notification.rows[2].key);
+        }
+        else if (calls == 1) {
+            CHECK_EQUAL(1, notification.rows.size()); // from o3
+            for (auto& row : notification.rows)
+                CHECK_EQUAL(table->get_key(), row.table_key);
+            // don't bother checking the keys...
+        }
+        ++calls;
+    });
 
     parent->clear();
     CHECK(calls == 2);
     tr->commit();
-
 }
 
 TEST(Table_EmbeddedObjectPath)
 {
-    auto collect_path = [](const ConstObj& o) {
-        return o.get_fat_path();
-    };
+    auto collect_path = [](const ConstObj& o) { return o.get_fat_path(); };
 
     SHARED_GROUP_TEST_PATH(path);
 

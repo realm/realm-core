@@ -1450,7 +1450,7 @@ TEST(Links_CascadeRemove_ColumnLinkList)
         CHECK(f.target->is_valid(f.target_keys[3]));
         CHECK(f.target->is_valid(f.target_keys[4]));
         CHECK(f.target->is_valid(f.target_keys[5]));
-        //CHECK_EQUAL(f.target_keys[0], f.linklists[0]->get(0));
+        // CHECK_EQUAL(f.target_keys[0], f.linklists[0]->get(0));
         CHECK_EQUAL(f.target_keys[1], f.linklists[1]->get(0));
         CHECK_EQUAL(f.target_keys[2], f.linklists[1]->get(1));
         CHECK_EQUAL(f.target_keys[3], f.linklists[2]->get(0));
@@ -1470,8 +1470,8 @@ TEST(Links_CascadeRemove_ColumnLinkList)
         CHECK(f.target->is_valid(f.target_keys[4]));
         CHECK(f.target->is_valid(f.target_keys[5]));
         CHECK_EQUAL(f.target_keys[0], f.linklists[0]->get(0));
-        //CHECK_EQUAL(f.target_keys[1], f.linklists[1]->get(0));
-        //CHECK_EQUAL(f.target_keys[2], f.linklists[1]->get(1));
+        // CHECK_EQUAL(f.target_keys[1], f.linklists[1]->get(0));
+        // CHECK_EQUAL(f.target_keys[2], f.linklists[1]->get(1));
         CHECK_EQUAL(f.target_keys[3], f.linklists[2]->get(0));
         CHECK_EQUAL(f.target_keys[4], f.linklists[2]->get(1));
         CHECK_EQUAL(f.target_keys[5], f.linklists[2]->get(2));
@@ -1491,9 +1491,9 @@ TEST(Links_CascadeRemove_ColumnLinkList)
         CHECK_EQUAL(f.target_keys[0], f.linklists[0]->get(0));
         CHECK_EQUAL(f.target_keys[1], f.linklists[1]->get(0));
         CHECK_EQUAL(f.target_keys[2], f.linklists[1]->get(1));
-        //CHECK_EQUAL(f.target_keys[3], f.linklists[2]->get(0));
-        //CHECK_EQUAL(f.target_keys[4], f.linklists[2]->get(1));
-        //CHECK_EQUAL(f.target_keys[5], f.linklists[2]->get(2));
+        // CHECK_EQUAL(f.target_keys[3], f.linklists[2]->get(0));
+        // CHECK_EQUAL(f.target_keys[4], f.linklists[2]->get(1));
+        // CHECK_EQUAL(f.target_keys[5], f.linklists[2]->get(2));
         f.group.verify();
     }
     // Break link by clearing table

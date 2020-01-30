@@ -1593,7 +1593,6 @@ TEST(LangBindHelper_AdvanceReadTransact_CascadeRemove_ColumnLinkList)
 }
 
 
-
 TEST(LangBindHelper_AdvanceReadTransact_IntIndex)
 {
     SHARED_GROUP_TEST_PATH(path);
