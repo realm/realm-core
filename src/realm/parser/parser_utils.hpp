@@ -105,7 +105,8 @@ bool try_parse_specials(std::string str, T& ret)
         ret = std::numeric_limits<T>::infinity();
         return true;
     }
-    else if (std::numeric_limits<T>::has_infinity && (str == "-infinity" || str == "-inf")) {
+    else if (std::numeric_limits<T>::has_infinity && std::numeric_limits<T>::is_signed &&
+             (str == "-infinity" || str == "-inf")) {
         ret = -std::numeric_limits<T>::infinity();
         return true;
     }
