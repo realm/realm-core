@@ -205,12 +205,13 @@ std::vector<SchemaChange> Schema::compare(Schema const& target_schema, bool incl
     return changes;
 }
 
-void Schema::copy_table_columns_from(realm::Schema const& other)
+void Schema::copy_keys_from(realm::Schema const& other)
 {
     zip_matching(*this, other, [&](ObjectSchema* existing, const ObjectSchema* other) {
         if (!existing || !other)
             return;
 
+        existing->table_key = other->table_key;
         for (auto& current_prop : other->persisted_properties) {
             auto target_prop = existing->property_for_name(current_prop.name);
             if (target_prop) {

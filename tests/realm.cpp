@@ -259,6 +259,7 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         auto it = realm->schema().find("object");
         auto table = realm->read_group().get_table("class_object");
         REQUIRE(it != realm->schema().end());
+        REQUIRE(it->table_key == table->get_key());
         REQUIRE(it->persisted_properties.size() == 1);
         REQUIRE(it->persisted_properties[0].name == "value");
         REQUIRE(it->persisted_properties[0].column_key == table->get_column_key("value"));
@@ -326,6 +327,7 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         auto it = realm->schema().find("object");
         auto table = realm->read_group().get_table("class_object");
         REQUIRE(it != realm->schema().end());
+        REQUIRE(it->table_key == table->get_key());
         REQUIRE(it->persisted_properties.size() == 1);
         REQUIRE(it->persisted_properties[0].name == "value");
         REQUIRE(it->persisted_properties[0].column_key == table->get_column_key("value"));
@@ -837,6 +839,7 @@ TEST_CASE("ShareRealm: in-memory mode from buffer") {
         auto it = realm->schema().find("object");
         auto table = realm->read_group().get_table("class_object");
         REQUIRE(it != realm->schema().end());
+        REQUIRE(it->table_key == table->get_key());
         REQUIRE(it->persisted_properties.size() == 1);
         REQUIRE(it->persisted_properties[0].name == "value");
         REQUIRE(it->persisted_properties[0].column_key == table->get_column_key("value"));

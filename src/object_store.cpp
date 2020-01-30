@@ -697,40 +697,40 @@ void ObjectStore::apply_schema_changes(Transaction& group, uint64_t schema_versi
         if (sync_user_id)
             create_default_permissions(group, changes, *sync_user_id);
 
-        set_schema_columns(group, target_schema);
+        set_schema_keys(group, target_schema);
         return;
     }
 
     if (schema_version == ObjectStore::NotVersioned) {
         create_initial_tables(group, changes);
         set_schema_version(group, target_schema_version);
-        set_schema_columns(group, target_schema);
+        set_schema_keys(group, target_schema);
         return;
     }
 
     if (mode == SchemaMode::Manual) {
-        set_schema_columns(group, target_schema);
+        set_schema_keys(group, target_schema);
         if (migration_function) {
             migration_function();
         }
 
         verify_no_changes_required(schema_from_group(group).compare(target_schema));
         group.validate_primary_columns();
-        set_schema_columns(group, target_schema);
+        set_schema_keys(group, target_schema);
         set_schema_version(group, target_schema_version);
         return;
     }
 
     if (schema_version == target_schema_version) {
         apply_non_migration_changes(group, changes);
-        set_schema_columns(group, target_schema);
+        set_schema_keys(group, target_schema);
         return;
     }
 
     auto old_schema = schema_from_group(group);
     apply_pre_migration_changes(group, changes);
     if (migration_function) {
-        set_schema_columns(group, target_schema);
+        set_schema_keys(group, target_schema);
         migration_function();
 
         // Migration function may have changed the schema, so we need to re-read it
@@ -743,7 +743,7 @@ void ObjectStore::apply_schema_changes(Transaction& group, uint64_t schema_versi
     }
 
     set_schema_version(group, target_schema_version);
-    set_schema_columns(group, target_schema);
+    set_schema_keys(group, target_schema);
 }
 
 Schema ObjectStore::schema_from_group(Group const& group) {
@@ -777,13 +777,14 @@ util::Optional<Property> ObjectStore::property_for_column_index(ConstTableRef& t
     return property;
 }
 
-void ObjectStore::set_schema_columns(Group const& group, Schema& schema)
+void ObjectStore::set_schema_keys(Group const& group, Schema& schema)
 {
     for (auto& object_schema : schema) {
         auto table = table_for_object_schema(group, object_schema);
         if (!table) {
             continue;
         }
+        object_schema.table_key = table->get_key();
         for (auto& property : object_schema.persisted_properties) {
             property.column_key = table->get_column_key(property.name);
         }

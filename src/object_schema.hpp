@@ -19,6 +19,7 @@
 #ifndef REALM_OBJECT_SCHEMA_HPP
 #define REALM_OBJECT_SCHEMA_HPP
 
+#include <realm/keys.hpp>
 #include <realm/string_data.hpp>
 
 #include <string>
@@ -27,12 +28,10 @@
 namespace realm {
 class Group;
 class Schema;
+class Table;
 enum class PropertyType: unsigned char;
 struct ObjectSchemaValidationException;
 struct Property;
-struct TableKey;
-struct ColKey;
-class Table;
 
 class ObjectSchema {
 public:
@@ -43,13 +42,14 @@ public:
     ~ObjectSchema();
 
     // create object schema from existing table
-    // if no table is provided it is looked up in the group
+    // if no table key is provided it is looked up in the group
     ObjectSchema(Group const& group, StringData name, TableKey key);
 
     std::string name;
     std::vector<Property> persisted_properties;
     std::vector<Property> computed_properties;
     std::string primary_key;
+    TableKey table_key;
 
     Property *property_for_public_name(StringData public_name);
     const Property *property_for_public_name(StringData public_name) const;

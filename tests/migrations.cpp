@@ -62,8 +62,9 @@ void verify_schema(Realm& r, int line, bool in_migration)
 {
     CAPTURE(line);
     for (auto&& object_schema : r.schema()) {
-        auto table = ObjectStore::table_for_object_type(r.read_group(), object_schema.name);
+        auto table = r.read_group().get_table(object_schema.table_key);
         REQUIRE(table);
+        REQUIRE(std::string(table->get_name()) == ObjectStore::table_name_for_object_type(object_schema.name));
         CAPTURE(object_schema.name);
         std::string primary_key;
         if (!in_migration) {

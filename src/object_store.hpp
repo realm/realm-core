@@ -104,7 +104,7 @@ public:
     // NOTE: is_primary won't be set for the returned property.
     static util::Optional<Property> property_for_column_index(ConstTableRef& table, ColKey column_key);
 
-    static void set_schema_columns(Group const& group, Schema& schema);
+    static void set_schema_keys(Group const& group, Schema& schema);
 
     // deletes the table for the given type
     static void delete_data_for_object(Group& group, StringData object_type);
