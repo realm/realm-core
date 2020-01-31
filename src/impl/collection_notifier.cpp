@@ -441,7 +441,8 @@ NotifierPackage::NotifierPackage(std::exception_ptr error,
 {
 }
 
-void NotifierPackage::package_and_wait(util::Optional<VersionID::version_type> target_version)
+// Clang TSE seems to not like returning a unique_lock from a function
+void NotifierPackage::package_and_wait(util::Optional<VersionID::version_type> target_version) NO_THREAD_SAFETY_ANALYSIS
 {
     if (!m_coordinator || m_error || !*this)
         return;
