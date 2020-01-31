@@ -76,7 +76,11 @@ const char* type_to_str<ObjectId>()
 {
     return "ObjectId";
 }
-
+template <>
+const char* type_to_str<Decimal128>()
+{
+    return "Decimal128";
+}
 
 const char* data_type_to_str(DataType type)
 {

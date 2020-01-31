@@ -2983,7 +2983,7 @@ TEST_TYPES(Table_list_nullable, int64_t, float, double)
 {
     Table table;
     auto list_col = table.add_column_list(ColumnTypeTraits<TEST_TYPE>::id, "int_list", true);
-    typename ColumnTypeTraits<TEST_TYPE>::sum_type sum = 0;
+    ColumnSumType<TEST_TYPE> sum = 0;
 
     {
         Obj obj = table.create_object(ObjKey(5));

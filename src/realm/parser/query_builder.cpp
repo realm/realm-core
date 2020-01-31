@@ -292,7 +292,7 @@ void add_link_constraint_to_query(realm::Query &query,
                                   Predicate::Operator op,
                                   const PropertyExpression &prop_expr,
                                   const ValueExpression &value_expr) {
-    ObjKey obj_key = value_expr.arguments->object_index_for_argument(stot<int>(value_expr.value->s));
+    ObjKey obj_key = value_expr.arguments->object_index_for_argument(string_to<int>(value_expr.value->s));
     realm_precondition(prop_expr.link_chain.size() == 1, "KeyPath queries not supported for object comparisons.");
     switch (op) {
         case Predicate::Operator::NotEqual:
@@ -368,6 +368,10 @@ void do_add_comparison_to_query(Query& query, const Predicate::Comparison& cmp, 
                                              lhs. template value_of_type_for_query<ObjectId>(),
                                              rhs. template value_of_type_for_query<ObjectId>());
             break;
+        case type_Decimal:
+            add_numeric_constraint_to_query(query, cmp.op, lhs.template value_of_type_for_query<Decimal128>(),
+                                            rhs.template value_of_type_for_query<Decimal128>());
+            break;
         default:
             throw std::logic_error(util::format("Object type '%1' not supported", data_type_to_str(type)));
     }
@@ -427,6 +431,9 @@ void do_add_null_comparison_to_query(Query& query, const Predicate::Comparison& 
         }
         case realm::type_ObjectId:
             do_add_null_comparison_to_query<ObjectId>(query, cmp.op, expr);
+            break;
+        case realm::type_Decimal:
+            do_add_null_comparison_to_query<Decimal128>(query, cmp.op, expr);
             break;
         case realm::type_Link:
             do_add_null_comparison_to_query<Link>(query, cmp.op, expr);
