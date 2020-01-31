@@ -40,7 +40,7 @@ public:
 
     static Decimal128 default_value(bool nullable)
     {
-        return nullable ? Decimal128() : Decimal128(0);
+        return nullable ? Decimal128(realm::null()) : Decimal128(0);
     }
 
     void create()
@@ -79,8 +79,7 @@ public:
     void set(size_t ndx, Decimal128 value);
     void set_null(size_t ndx)
     {
-        Decimal128 null_value;
-        set(ndx, null_value);
+        set(ndx, Decimal128(realm::null()));
     }
 
     void insert(size_t ndx, Decimal128 value);

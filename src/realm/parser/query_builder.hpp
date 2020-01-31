@@ -24,6 +24,7 @@
 #include <vector>
 
 #include <realm/binary_data.hpp>
+#include <realm/decimal128.hpp>
 #include <realm/parser/keypath_mapping.hpp>
 #include <realm/null.hpp>
 #include <realm/object_id.hpp>
@@ -85,6 +86,7 @@ public:
     virtual Timestamp timestamp_for_argument(size_t argument_index) = 0;
     virtual ObjKey object_index_for_argument(size_t argument_index) = 0;
     virtual ObjectId objectid_for_argument(size_t i) = 0;
+    virtual Decimal128 decimal128_for_argument(size_t i) = 0;
     virtual bool is_argument_null(size_t argument_index) = 0;
     // dynamic conversion space with lifetime tied to this
     // it is used for storing literal binary/string data
@@ -114,6 +116,10 @@ public:
             return ObjectId(get<Timestamp>(i));
         }
         return get<ObjectId>(i);
+    }
+    Decimal128 decimal128_for_argument(size_t i) override
+    {
+        return get<Decimal128>(i);
     }
     ObjKey object_index_for_argument(size_t i) override
     {
@@ -194,6 +200,10 @@ public:
         throw NoArgsError();
     }
     ObjectId objectid_for_argument(size_t)
+    {
+        throw NoArgsError();
+    }
+    Decimal128 decimal128_for_argument(size_t)
     {
         throw NoArgsError();
     }

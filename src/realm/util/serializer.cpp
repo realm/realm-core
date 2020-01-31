@@ -29,6 +29,7 @@
 #include <realm/util/string_buffer.hpp>
 
 #include <cctype>
+#include <cmath>
 
 namespace realm {
 namespace util {
@@ -50,6 +51,35 @@ std::string print_value<>(bool b)
         return "true";
     }
     return "false";
+}
+
+template <typename T>
+inline std::string print_with_nan_check(T val)
+{
+    // we standardize NaN because some implementations (windows) will
+    // print the different types of NaN such as "nan(ind)" to indicate "indefinite"
+    if (std::isnan(val)) {
+        // preserving the sign of nan is not strictly required but is good etiquette
+        if (std::signbit(val)) {
+            return "-nan";
+        }
+        return "nan";
+    }
+    std::stringstream ss;
+    ss << val;
+    return ss.str();
+}
+
+template <>
+std::string print_value<>(float val)
+{
+    return print_with_nan_check(val);
+}
+
+template <>
+std::string print_value<>(double val)
+{
+    return print_with_nan_check(val);
 }
 
 template <>

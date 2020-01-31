@@ -56,9 +56,15 @@ TEST(Decimal_Basics)
     CHECK(d < d1);
     Decimal128 d2 = Decimal128("100");
     CHECK(d1 < d2);
+    Decimal128 d3 = Decimal128("-1000.5");
+    CHECK(d3 < d1);
+    CHECK(d3 < d2);
+    CHECK(d1 > d3);
+    CHECK(d2 > d3);
+    CHECK(d3 + d3 < d3);
 
     Decimal128 y;
-    CHECK(y.is_null());
+    CHECK(!y.is_null());
     y = d1;
 
     Decimal128 d10(10);
@@ -73,6 +79,12 @@ TEST(Decimal_Aritmethics)
     CHECK_EQUAL(q.to_string(), "2.5");
     q = d + Decimal128(20);
     CHECK_EQUAL(q.to_string(), "30");
+    q = d + Decimal128(-20);
+    CHECK_EQUAL(q.to_string(), "-10");
+    q = d / -4;
+    CHECK_EQUAL(q.to_string(), "-2.5");
+    q = d / size_t(4);
+    CHECK_EQUAL(q.to_string(), "2.5");
 }
 
 TEST(Decimal_Array)
@@ -169,6 +181,9 @@ TEST(Decimal128_Aggregates)
                 obj.set(col_dec, Decimal128(val));
                 sum += val;
                 count++;
+            }
+            else {
+                CHECK(obj.get<Decimal128>(col_dec).is_null());
             }
         }
         wt->commit();

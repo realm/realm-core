@@ -175,6 +175,12 @@ inline T only_numeric(U in)
 }
 
 template <class T>
+inline Decimal128 only_numeric(const Decimal128& d)
+{
+    return d;
+}
+
+template <class T>
 inline int only_numeric(const StringData&)
 {
     REALM_ASSERT(false);
@@ -469,12 +475,13 @@ Query create(L left, const Subexpr2<R>& right)
     // TODO: recognize size operator expressions
     // auto size_operator = dynamic_cast<const SizeOperator<Size<StringData>, Subexpr>*>(&right);
 
-    if (column && ((std::numeric_limits<L>::is_integer && std::numeric_limits<R>::is_integer) ||
-                   (std::is_same<L, double>::value && std::is_same<R, double>::value) ||
-                   (std::is_same<L, float>::value && std::is_same<R, float>::value) ||
-                   (std::is_same<L, Timestamp>::value && std::is_same<R, Timestamp>::value) ||
-                   (std::is_same<L, StringData>::value && std::is_same<R, StringData>::value) ||
-                   (std::is_same<L, BinaryData>::value && std::is_same<R, BinaryData>::value)) &&
+    if (column &&
+        ((std::numeric_limits<L>::is_integer && std::numeric_limits<R>::is_integer) ||
+         (std::is_same<L, double>::value && std::is_same<R, double>::value) ||
+         (std::is_same<L, float>::value && std::is_same<R, float>::value) ||
+         (std::is_same<L, Timestamp>::value && std::is_same<R, Timestamp>::value) ||
+         (std::is_same<L, StringData>::value && std::is_same<R, StringData>::value) ||
+         (std::is_same<L, BinaryData>::value && std::is_same<R, BinaryData>::value)) &&
         !column->links_exist()) {
         ConstTableRef t = column->get_base_table();
         Query q = Query(t);
@@ -1117,7 +1124,7 @@ inline bool NullableVector<Decimal128>::is_null(size_t index) const
 template <>
 inline void NullableVector<Decimal128>::set_null(size_t index)
 {
-    m_first[index] = Decimal128{};
+    m_first[index] = Decimal128{realm::null()};
 }
 
 // ref_type
@@ -1570,7 +1577,7 @@ private:
 // left-hand-side       operator                              right-hand-side
 // L                    +, -, *, /, <, >, ==, !=, <=, >=      Subexpr2<R>
 //
-// For L = R = {int, int64_t, float, double, Timestamp, ObjectId}:
+// For L = R = {int, int64_t, float, double, Timestamp, ObjectId, Decimal128}:
 // Compare numeric values
 template <class R>
 Query operator>(double left, const Subexpr2<R>& right)
@@ -1599,6 +1606,11 @@ Query operator>(Timestamp left, const Subexpr2<R>& right)
 }
 template <class R>
 Query operator>(ObjectId left, const Subexpr2<R>& right)
+{
+    return create<Greater>(left, right);
+}
+template <class R>
+Query operator>(Decimal128 left, const Subexpr2<R>& right)
 {
     return create<Greater>(left, right);
 }
@@ -1634,6 +1646,12 @@ Query operator<(ObjectId left, const Subexpr2<R>& right)
     return create<Less>(left, right);
 }
 template <class R>
+Query operator<(Decimal128 left, const Subexpr2<R>& right)
+{
+    return create<Less>(left, right);
+}
+
+template <class R>
 Query operator==(double left, const Subexpr2<R>& right)
 {
     return create<Equal>(left, right);
@@ -1664,10 +1682,16 @@ Query operator==(ObjectId left, const Subexpr2<R>& right)
     return create<Equal>(left, right);
 }
 template <class R>
+Query operator==(Decimal128 left, const Subexpr2<R>& right)
+{
+    return create<Equal>(left, right);
+}
+template <class R>
 Query operator==(bool left, const Subexpr2<R>& right)
 {
     return create<Equal>(left, right);
 }
+
 template <class R>
 Query operator>=(double left, const Subexpr2<R>& right)
 {
@@ -1699,6 +1723,12 @@ Query operator>=(ObjectId left, const Subexpr2<R>& right)
     return create<GreaterEqual>(left, right);
 }
 template <class R>
+Query operator>=(Decimal128 left, const Subexpr2<R>& right)
+{
+    return create<GreaterEqual>(left, right);
+}
+
+template <class R>
 Query operator<=(double left, const Subexpr2<R>& right)
 {
     return create<LessEqual>(left, right);
@@ -1729,6 +1759,12 @@ Query operator<=(ObjectId left, const Subexpr2<R>& right)
     return create<LessEqual>(left, right);
 }
 template <class R>
+Query operator<=(Decimal128 left, const Subexpr2<R>& right)
+{
+    return create<LessEqual>(left, right);
+}
+
+template <class R>
 Query operator!=(double left, const Subexpr2<R>& right)
 {
     return create<NotEqual>(left, right);
@@ -1755,6 +1791,11 @@ Query operator!=(Timestamp left, const Subexpr2<R>& right)
 }
 template <class R>
 Query operator!=(ObjectId left, const Subexpr2<R>& right)
+{
+    return create<NotEqual>(left, right);
+}
+template <class R>
+Query operator!=(Decimal128 left, const Subexpr2<R>& right)
 {
     return create<NotEqual>(left, right);
 }
@@ -3694,7 +3735,7 @@ private:
 namespace aggregate_operations {
 template <typename T, typename Derived, typename R = T>
 class BaseAggregateOperation {
-    static_assert(std::is_same<T, Int>::value || std::is_same<T, Float>::value || std::is_same<T, Double>::value,
+    static_assert(realm::is_any<T, Int, Float, Double, Decimal128>::value,
                   "Numeric aggregates can only be used with subcolumns of numeric types");
 
 public:
@@ -3737,6 +3778,23 @@ public:
     }
 };
 
+template <>
+class Minimum<Decimal128> : public BaseAggregateOperation<Decimal128, Minimum<Decimal128>> {
+public:
+    static Decimal128 initial_value()
+    {
+        return Decimal128("+inf");
+    }
+    static Decimal128 apply(Decimal128 a, Decimal128 b)
+    {
+        return std::min(a, b);
+    }
+    static std::string description()
+    {
+        return "@min";
+    }
+};
+
 template <typename T>
 class Maximum : public BaseAggregateOperation<T, Maximum<T>> {
 public:
@@ -3745,6 +3803,23 @@ public:
         return std::numeric_limits<T>::lowest();
     }
     static T apply(T a, T b)
+    {
+        return std::max(a, b);
+    }
+    static std::string description()
+    {
+        return "@max";
+    }
+};
+
+template <>
+class Maximum<Decimal128> : public BaseAggregateOperation<Decimal128, Maximum<Decimal128>> {
+public:
+    static Decimal128 initial_value()
+    {
+        return Decimal128("-inf");
+    }
+    static Decimal128 apply(Decimal128 a, Decimal128 b)
     {
         return std::max(a, b);
     }
@@ -3791,6 +3866,29 @@ public:
     double result() const
     {
         return Base::m_result / Base::m_count;
+    }
+    static std::string description()
+    {
+        return "@avg";
+    }
+};
+
+template <>
+class Average<Decimal128> : public BaseAggregateOperation<Decimal128, Average<Decimal128>, Decimal128> {
+    using Base = BaseAggregateOperation<Decimal128, Average<Decimal128>, Decimal128>;
+
+public:
+    static Decimal128 initial_value()
+    {
+        return Decimal128(0);
+    }
+    static Decimal128 apply(Decimal128 a, Decimal128 b)
+    {
+        return a + b;
+    }
+    Decimal128 result() const
+    {
+        return Decimal128(Base::m_result) / Base::m_count;
     }
     static std::string description()
     {
