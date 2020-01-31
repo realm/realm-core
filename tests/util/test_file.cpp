@@ -147,12 +147,9 @@ SyncServer::SyncServer(StartImmediately start_immediately, std::string local_dir
 #else
     config.logger = new TestLogger;
 #endif
+    m_logger.reset(config.logger);
     config.history_compaction_clock = this;
-#if REALM_SYNC_VER_MAJOR > 4 || (REALM_SYNC_VER_MAJOR == 4 && REALM_SYNC_VER_MINOR >= 7)
     config.disable_history_compaction = false;
-#else
-    config.enable_log_compaction = true;
-#endif
     config.history_ttl = 1s;
     config.history_compaction_interval = 1s;
     config.state_realm_dir = util::make_temp_dir();
