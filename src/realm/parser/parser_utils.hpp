@@ -89,15 +89,22 @@ inline char toLowerAscii(char c)
     return c;
 }
 
+template <typename T>
+static constexpr bool TypeMaySupportSpecials = (realm::is_any<T, float, double>::value ||
+                                                std::numeric_limits<T>::is_iec559);
 // Looks for +-infinity, NaN
 // There is spotty support for these edge cases on some platforms
 // so we implement manual checks here
 template <typename T>
-bool try_parse_specials(std::string str, T& ret)
+inline std::enable_if_t<TypeMaySupportSpecials<T>, bool> try_parse_specials(std::string str, T& ret)
 {
     std::transform(str.begin(), str.end(), str.begin(), toLowerAscii);
-    if (std::numeric_limits<T>::has_quiet_NaN && (str == "nan" || str == "+nan" || str == "-nan")) {
+    if (std::numeric_limits<T>::has_quiet_NaN && (str == "nan" || str == "+nan")) {
         ret = std::numeric_limits<T>::quiet_NaN();
+        return true;
+    }
+    else if (std::numeric_limits<T>::has_quiet_NaN && (str == "-nan")) {
+        ret = -std::numeric_limits<T>::quiet_NaN();
         return true;
     }
     else if (std::numeric_limits<T>::has_infinity &&
@@ -105,11 +112,16 @@ bool try_parse_specials(std::string str, T& ret)
         ret = std::numeric_limits<T>::infinity();
         return true;
     }
-    else if (std::numeric_limits<T>::has_infinity && std::numeric_limits<T>::is_signed &&
-             (str == "-infinity" || str == "-inf")) {
+    else if (std::numeric_limits<T>::has_infinity && (str == "-infinity" || str == "-inf")) {
         ret = -std::numeric_limits<T>::infinity();
         return true;
     }
+    return false;
+}
+
+template <typename T>
+inline std::enable_if_t<!TypeMaySupportSpecials<T>, bool> try_parse_specials(std::string, T&)
+{
     return false;
 }
 
