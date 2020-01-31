@@ -316,7 +316,7 @@ int Group::get_target_file_format_version_for_session(int /* current_file_format
     // Please see Group::get_file_format_version() for information about the
     // individual file format versions.
 
-    return 10;
+    return 11;
 }
 
 uint64_t Group::get_sync_file_id() const noexcept
@@ -338,15 +338,15 @@ void Transaction::upgrade_file_format(int target_file_format_version)
     // Be sure to revisit the following upgrade logic when a new file format
     // version is introduced. The following assert attempt to help you not
     // forget it.
-    REALM_ASSERT_EX(target_file_format_version == 10, target_file_format_version);
+    REALM_ASSERT_EX(target_file_format_version == 11, target_file_format_version);
 
     int current_file_format_version = get_file_format_version();
     REALM_ASSERT(current_file_format_version < target_file_format_version);
 
     // SharedGroup::do_open() must ensure this. Be sure to revisit the
-    // following upgrade logic when SharedGroup::do_open() is changed (or
+    // following upgrade logic when DB::do_open() is changed (or
     // vice versa).
-    REALM_ASSERT_EX(current_file_format_version >= 5 && current_file_format_version <= 9,
+    REALM_ASSERT_EX(current_file_format_version >= 5 && current_file_format_version <= 10,
                     current_file_format_version);
 
 
@@ -364,7 +364,7 @@ void Transaction::upgrade_file_format(int target_file_format_version)
         commit_and_continue_writing();
     }
 
-    // NOTE: Additional future upgrade steps go here.
+    // Upgrade from version prior to 10 (Cluster based db)
     if (current_file_format_version <= 9 && target_file_format_version >= 10) {
         DisableReplication disable_replication(*this);
 
@@ -399,6 +399,10 @@ void Transaction::upgrade_file_format(int target_file_format_version)
         }
         remove_pk_table();
     }
+    if (current_file_format_version <= 10 && target_file_format_version >= 11) {
+        // No upgrade needed
+    }
+    // NOTE: Additional future upgrade steps go here.
 }
 
 void Group::open(ref_type top_ref, const std::string& file_path)
@@ -419,6 +423,7 @@ void Group::open(ref_type top_ref, const std::string& file_path)
             file_format_ok = (top_ref == 0);
             break;
         case 10:
+        case 11:
             file_format_ok = true;
             break;
     }
@@ -774,7 +779,8 @@ Table* Group::do_get_or_add_table(StringData name, bool is_embedded, bool* was_a
             repl->add_class(name, is_embedded);
 
         table = do_add_table(name);
-        table->set_embedded(is_embedded);
+        if (is_embedded)
+            table->set_embedded();
         if (was_added)
             *was_added = true;
         return table;

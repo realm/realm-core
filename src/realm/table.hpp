@@ -466,8 +466,8 @@ private:
     template <class F, class T>
     void change_nullability_list(ColKey from, ColKey to, bool throw_on_null);
     Obj create_linked_object();
-    /// Indicate whether a table holds embedded objects or not. Called only from Group::add_embedded_table()
-    void set_embedded(bool is_embedded); // throws if table is non-empty or backlink columns are present
+    /// Indicate that a table holds embedded objects. Called only from Group::do_get_or_add_table()
+    void set_embedded();
 
 public:
     // mapping between index used in leaf nodes (leaf_ndx) and index used in spec (spec_ndx)

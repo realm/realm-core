@@ -1068,6 +1068,7 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
                 case 8:
                 case 9:
                 case 10:
+                case 11:
                     file_format_ok = true;
                     break;
             }
