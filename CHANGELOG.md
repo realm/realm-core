@@ -1,19 +1,6 @@
-# NEXT RELEASE
+# 6.1.0-prealpha.1 Release notes
 
-### Enhancements
-* None.
-
-### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
- 
-### Breaking changes
-* None.
-
------------
-
-### Internals
-* None.
+Internal release used only to kickstart realm-sync CI.
 
 ----------------------------------------------
 
