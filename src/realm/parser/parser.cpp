@@ -65,8 +65,8 @@ struct base64 : seq< TAOCPP_PEGTL_ISTRING("B64\""), must< b64_content >, any > {
 struct optional_sign : opt< sor< one< '-' >, one< '+' > > > {};
 struct dot : one< '.' > {};
 struct optional_exponent : opt< seq< sor< one< 'E' >, one< 'e' > >, optional_sign, plus< digit > > > {};
-struct infinity : seq< optional_sign, sor< TAOCPP_PEGTL_ISTRING("infinity"), TAOCPP_PEGTL_ISTRING("inf") > > {};
-struct nan : seq< optional_sign, TAOCPP_PEGTL_ISTRING("nan") > {};
+struct infinity : seq< optional_sign, sor< string_token_t("infinity"), string_token_t("inf") > > {};
+struct nan : seq< optional_sign, string_token_t("nan") > {};
 
 struct float_num : sor<
     seq< plus< digit >, dot, star< digit >, optional_exponent >,
@@ -365,7 +365,10 @@ template< typename Rule >
 struct action : nothing< Rule > {};
 
 #ifdef REALM_PARSER_PRINT_TOKENS
-    #define DEBUG_PRINT_TOKEN(string) do { std::cout << string << std::endl; } while (0)
+#define DEBUG_PRINT_TOKEN(string)                                                                                    \
+    do {                                                                                                             \
+        std::cout << string << std::endl;                                                                            \
+    } while (0)
 #else
     #define DEBUG_PRINT_TOKEN(string) do { static_cast<void>(string); } while (0)
 #endif
