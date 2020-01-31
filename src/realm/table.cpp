@@ -452,7 +452,7 @@ void Table::init(ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent, bo
 
     m_spec.init_from_parent();
 
-    while (m_top.size() < top_array_size) {
+    while (m_top.size() <= top_position_for_pk_col) {
         m_top.add(0);
     }
 
@@ -787,17 +787,15 @@ ColKey Table::insert_backlink_column(TableKey origin_table_key, ColKey origin_co
     return retval;
 }
 
-void Table::set_embedded(bool embedded)
+void Table::set_embedded()
 {
     REALM_ASSERT(size() == 0);
-    REALM_ASSERT(m_top.size() >= top_position_for_flags);
-    if (m_top.size() == top_position_for_flags) {
-        m_top.add(0);
-    }
+    REALM_ASSERT(m_top.size() > top_position_for_flags);
+
     uint64_t flags = m_top.get_as_ref_or_tagged(top_position_for_flags).get_as_int();
-    flags |= embedded ? 1 : 0;
+    flags |= 1;
     m_top.set(top_position_for_flags, RefOrTagged::make_tagged(flags));
-    m_is_embedded = embedded;
+    m_is_embedded = true;
 }
 
 

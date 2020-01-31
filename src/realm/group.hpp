@@ -814,6 +814,8 @@ private:
     ///  10 Memory mapping changes which require special treatment of large files
     ///     of preceeding versions.
     ///
+    ///  11 New data types: Decimal128 and ObjectId. Embedded tables.
+    ///
     /// IMPORTANT: When introducing a new file format version, be sure to review
     /// the file validity checks in Group::open() and SharedGroup::do_open, the file
     /// format selection logic in
