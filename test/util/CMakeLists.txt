@@ -19,7 +19,7 @@ set(TEST_UTIL_SOURCES
 
 add_library(TestUtil ${TEST_UTIL_SOURCES})
 
-target_link_libraries(TestUtil Core)
+target_link_libraries(TestUtil Storage)
 
 if(UNIX AND NOT APPLE)
     find_library(LIBRT rt)

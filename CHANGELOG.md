@@ -1,19 +1,13 @@
-# NEXT RELEASE
-
-### Enhancements
-* None.
+# 6.0.1 Release notes
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
- 
-### Breaking changes
 * None.
 
 -----------
 
 ### Internals
-* None.
+* Build targets are now RealmCore::Storage and RealmCore::QueryParser
+* OpenSSL library will be downloaded automatically on Linux and Android
 
 ----------------------------------------------
 
