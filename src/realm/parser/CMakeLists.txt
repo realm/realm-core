@@ -24,7 +24,7 @@ set(REALM_PARSER_HEADERS
 
 add_library(QueryParser STATIC ${REALM_PARSER_SOURCES} ${REALM_PARSER_HEADERS})
 add_library(realm-parser ALIAS QueryParser)
-target_link_libraries(QueryParser PUBLIC Core)
+target_link_libraries(QueryParser PUBLIC Storage)
 target_include_directories(QueryParser PRIVATE ${PEGTL_INCLUDE_DIR})
 set_target_properties(QueryParser PROPERTIES OUTPUT_NAME "realm-parser")
 install(FILES ${REALM_PARSER_HEADERS}
@@ -34,8 +34,8 @@ install(TARGETS QueryParser EXPORT realm
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT devel)
 if(NOT REALM_SKIP_SHARED_LIB)
     add_library(QueryParserShared SHARED ${REALM_PARSER_SOURCES} ${REALM_PARSER_HEADERS})
-    add_dependencies(QueryParserShared CoreShared)
-    target_link_libraries(QueryParserShared PRIVATE CoreShared)
+    add_dependencies(QueryParserShared StorageShared)
+    target_link_libraries(QueryParserShared PRIVATE StorageShared)
     target_include_directories(QueryParserShared PRIVATE ${PEGTL_INCLUDE_DIR})
     target_include_directories(QueryParserShared
         INTERFACE

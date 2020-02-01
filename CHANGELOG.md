@@ -1,7 +1,7 @@
 # NEXT RELEASE
 
 ### Enhancements
-* Added query parser support for Decimal128 and ObjectId types.
+* Added new data types - Decimal128 and ObjectId types.
 
 ### Fixed
 * Fixed float and double maximum queries when all values were less or equal to zero.
@@ -14,6 +14,19 @@
 
 ### Internals
 * None.
+
+----------------------------------------------
+
+# 6.0.1 Release notes
+
+### Fixed
+* None.
+
+-----------
+
+### Internals
+* Build targets are now RealmCore::Storage and RealmCore::QueryParser
+* OpenSSL library will be downloaded automatically on Linux and Android
 
 ----------------------------------------------
 
