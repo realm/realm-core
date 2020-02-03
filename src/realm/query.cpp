@@ -937,6 +937,14 @@ R Query::aggregate(ColKey column_key, size_t* resultcount, ObjKey* return_ndx) c
     }
 }
 
+size_t Query::find_best_node(ParentNode* pn) const
+{
+    auto score_compare = [](const ParentNode* a, const ParentNode* b) { return a->cost() < b->cost(); };
+    size_t best = std::distance(pn->m_children.begin(),
+                                std::min_element(pn->m_children.begin(), pn->m_children.end(), score_compare));
+    return best;
+}
+
 /**************************************************************************************************************
 *                                                                                                             *
 * Main entry point of a query. Schedules calls to aggregate_local                                             *
@@ -948,14 +956,11 @@ void Query::aggregate_internal(ParentNode* pn, QueryStateBase* st, size_t start,
                                ArrayPayload* source_column) const
 {
     while (start < end) {
-        auto score_compare = [](const ParentNode* a, const ParentNode* b) { return a->cost() < b->cost(); };
-        size_t best = std::distance(pn->m_children.begin(),
-                                    std::min_element(pn->m_children.begin(), pn->m_children.end(), score_compare));
-
         // Executes start...end range of a query and will stay inside the condition loop of the node it was called
         // on. Can be called on any node; yields same result, but different performance. Returns prematurely if
         // condition of called node has evaluated to true local_matches number of times.
         // Return value is the next row for resuming aggregating (next row that caller must call aggregate_local on)
+        size_t best = find_best_node(pn);
         start = pn->m_children[best]->aggregate_local(st, start, end, findlocals, source_column);
 
         // Make remaining conditions compute their m_dD (statistics)
@@ -1367,33 +1372,23 @@ size_t Query::do_count(size_t limit) const
     }
     else {
         size_t counter = 0;
-        Evaluator evaluator = [&](ConstObj& obj) -> void {
-            if (eval_object(obj))
+        Evaluator evaluator = [&](ConstObj& obj) -> bool {
+            if (eval_object(obj)) {
                 ++counter;
+                return true;
+            }
+            else {
+                return false;
+            }
         };
-        // FIXME: Unify index based aggregation across node types...
-        // FIXME: Propagating 'limit' not done yet..
-        // FIXME: Is root node even the right node to check for and drive process from?
-        auto node = root_node();
-#if 1
+        auto pn = root_node();
+        auto node = pn->m_children[find_best_node(pn)];
         if (node->has_search_index()) {
-            node->index_based_aggregate(evaluator);
+            node->index_based_aggregate(evaluator, limit);
             return counter;
         }
-#else
-        auto string_node = dynamic_cast<StringNode<Equal>*>(node);
-        if (string_node && string_node->has_search_index()) {
-            string_node->index_based_aggregate(evaluator);
-            return counter;
-        }
-
-        auto base_node = dynamic_cast<ColumnNodeBase*>(node);
-        if (base_node && base_node->has_search_index()) {
-            base_node->index_based_aggregate(evaluator);
-            return counter;
-        }
-#endif
-        // no index
+        // no index, descend down the B+-tree instead
+        node = pn;
         QueryState<int64_t> st(act_Count, limit);
 
         for (size_t c = 0; c < node->m_children.size(); c++)
@@ -1406,7 +1401,6 @@ size_t Query::do_count(size_t limit) const
             st.m_key_values = cluster->get_key_array();
             aggregate_internal(node, &st, 0, e, nullptr);
             // Stop if limit or end is reached
-            // FIXME? Doesn't this allow for collecting more entries than limit specifies?
             return st.m_match_count == st.m_limit;
         };
 

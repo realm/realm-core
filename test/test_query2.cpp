@@ -4684,6 +4684,20 @@ TEST_TYPES(Query_Rover, std::true_type, std::false_type)
     CHECK_EQUAL(tv.size(), 2);
 }
 
+TEST(Query_StringPrimaryKey)
+{
+    Table table;
+    auto col = table.add_column(type_String, "name");
+    table.set_primary_key_column(col);
+
+    table.create_object().set(col, "RASMUS");
+    table.create_object().set(col, "Rasmus");
+
+    Query q = table.where().equal(col, "rasmus", false);
+    CHECK_EQUAL(q.count(), 2);
+    TableView tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+}
 
 TEST(Query_IntOnly)
 {

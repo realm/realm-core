@@ -227,6 +227,10 @@ target_compile_definitions(CoreObjects PRIVATE
   "$<$<CXX_COMPILER_ID:MSVC>:_CRT_SECURE_NO_WARNINGS>"
   "$<$<CXX_COMPILER_ID:MSVC>:_SCL_SECURE_NO_WARNINGS>"
 )
+target_compile_definitions(CoreObjects PRIVATE
+  $<$<CONFIG:Debug>:REALM_DEBUG=1>
+  $<$<CONFIG:MinSizeDebug>:REALM_DEBUG=1>
+)
 target_compile_options(CoreObjects PRIVATE ${REALM_SANITIZER_FLAGS})
 
 set(REALM_OBJECT_FILES $<TARGET_OBJECTS:CoreObjects>)
@@ -259,18 +263,23 @@ if(CMAKE_GENERATOR STREQUAL Xcode)
 endif()
 
 
-add_library(Core STATIC ${REALM_OBJECT_FILES} ${REALM_XCODE_DEPENDENCY})
-set_target_properties(Core PROPERTIES OUTPUT_NAME "realm")
-add_library(realm ALIAS Core)
+add_library(Storage STATIC ${REALM_OBJECT_FILES} ${REALM_XCODE_DEPENDENCY})
+set_target_properties(Storage PROPERTIES OUTPUT_NAME "realm")
+add_library(realm ALIAS Storage)
 
-target_compile_definitions(Core PUBLIC
-  "$<$<CXX_COMPILER_ID:MSVC>:_CRT_SECURE_NO_WARNINGS>"
-  "$<$<CXX_COMPILER_ID:MSVC>:_SCL_SECURE_NO_WARNINGS>"
+target_compile_definitions(Storage PUBLIC
+  $<$<CXX_COMPILER_ID:MSVC>:_CRT_SECURE_NO_WARNINGS>
+  $<$<CXX_COMPILER_ID:MSVC>:_SCL_SECURE_NO_WARNINGS>
+)
+
+target_compile_definitions(Storage PUBLIC
+  $<$<CONFIG:Debug>:REALM_DEBUG=1>
+  $<$<CONFIG:MinSizeDebug>:REALM_DEBUG=1>
 )
 
 if(NOT MSVC)
-    target_compile_options(Core PUBLIC ${REALM_SANITIZER_FLAGS})
-    target_link_options(Core PUBLIC ${REALM_SANITIZER_FLAGS})
+    target_compile_options(Storage PUBLIC ${REALM_SANITIZER_FLAGS})
+    target_link_options(Storage PUBLIC ${REALM_SANITIZER_FLAGS})
 endif()
 
 # GCC<5.1 does not adhere to the C++11 ABI for std::string but some systems
@@ -280,78 +289,84 @@ endif()
 if(UNIX AND NOT APPLE AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     try_compile(USES_OLD_ABI ${RealmCore_BINARY_DIR}/abitest ${RealmCore_SOURCE_DIR}/tools/cmake/abitest abitest)
     if(USES_OLD_ABI)
-        message(WARNING "You are compiling on a system that uses a non-compliant C++11 ABI. Downstream components depending on Realm::Core will be built with _GLIBCXX_USE_CXX11_ABI=0.")
-        target_compile_definitions(Core INTERFACE "_GLIBCXX_USE_CXX11_ABI=0")
+        message(WARNING "You are compiling on a system that uses a non-compliant C++11 ABI. Downstream components depending on RealmCore::Storage will be built with _GLIBCXX_USE_CXX11_ABI=0.")
+        target_compile_definitions(Storage INTERFACE "_GLIBCXX_USE_CXX11_ABI=0")
     endif()
 endif()
 
-target_include_directories(Core
+target_include_directories(Storage
     INTERFACE
         $<BUILD_INTERFACE:${RealmCore_SOURCE_DIR}/src>
         $<BUILD_INTERFACE:${RealmCore_BINARY_DIR}/src>
         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 
-target_link_libraries(Core INTERFACE ${REALM_EXTRA_LIBS} ${CMAKE_THREAD_LIBS_INIT})
+target_link_libraries(Storage INTERFACE ${REALM_EXTRA_LIBS} ${CMAKE_THREAD_LIBS_INIT})
 
 if(ANDROID OR CMAKE_SYSTEM_NAME MATCHES "^Windows")
     set(REALM_SKIP_SHARED_LIB ON)
 endif()
 
 if(NOT REALM_SKIP_SHARED_LIB)
-    add_library(CoreShared SHARED ${REALM_OBJECT_FILES} ${REALM_XCODE_DEPENDENCY})
-    add_library(realm-shared ALIAS CoreShared)
+    add_library(StorageShared SHARED ${REALM_OBJECT_FILES} ${REALM_XCODE_DEPENDENCY})
+    add_library(realm-shared ALIAS StorageShared)
 
-    target_include_directories(CoreShared
+    target_include_directories(StorageShared
         INTERFACE
             $<BUILD_INTERFACE:${RealmCore_SOURCE_DIR}/src>
             $<BUILD_INTERFACE:${RealmCore_BINARY_DIR}/src>
             $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 
     set_target_properties(
-            CoreShared PROPERTIES
+        StorageShared PROPERTIES
             OUTPUT_NAME "realm"
     )
 
-    target_link_libraries(CoreShared PRIVATE ${REALM_EXTRA_LIBS} ${CMAKE_THREAD_LIBS_INIT}
+    target_link_libraries(StorageShared PRIVATE ${REALM_EXTRA_LIBS} ${CMAKE_THREAD_LIBS_INIT}
     )
 endif()
 
 if(UNIX AND NOT APPLE)
-    if(ANDROID)
-        string(TOLOWER "${CMAKE_BUILD_TYPE}" BUILD_TYPE)
-        set(OPENSSL_FILENAME "openssl-${BUILD_TYPE}-${ANDROID_OPENSSL_VERSION}-${ANDROID_OPENSSL_BUILD_NUMBER}-Android-${ANDROID_ABI}")
-        set(OPENSSL_URL "http://static.realm.io/downloads/openssl/${ANDROID_OPENSSL_VERSION}/Android/${ANDROID_ABI}/${OPENSSL_FILENAME}.tar.gz")
-
-        message(STATUS "Downloading OpenSSL...")
-        file(DOWNLOAD "${OPENSSL_URL}" "${CMAKE_BINARY_DIR}/${OPENSSL_FILENAME}.tar.gz")
-
+    if(NOT EXISTS ${CMAKE_CURRENT_BINARY_DIR}/openssl/lib/cmake/OpenSSL/OpenSSLConfig.cmake)
+        if(ANDROID)
+            set(OPENSSL_URL "https://static.realm.io/downloads/openssl/${OPENSSL_VERSION}/Android/${CMAKE_ANDROID_ARCH_ABI}/openssl.tgz")
+        else()
+            set(OPENSSL_URL "https://static.realm.io/downloads/openssl/${OPENSSL_VERSION}/Linux/x86_64/openssl.tgz")
+        endif()
+    
+        message(STATUS "Getting ${OPENSSL_URL}...")
+        file(DOWNLOAD "${OPENSSL_URL}" "${CMAKE_CURRENT_BINARY_DIR}/openssl/openssl.tgz" STATUS download_status)
+    
+        list(GET download_status 0 status_code)
+        if (NOT "${status_code}" STREQUAL "0")
+            message(FATAL_ERROR "Downloading ${url}... Failed. Status: ${download_status}")
+        endif()
+    
         message(STATUS "Uncompressing OpenSSL...")
-        execute_process(COMMAND ${CMAKE_COMMAND} -E tar xfz "${OPENSSL_FILENAME}.tar.gz")
-
-        set(OPENSSL_ROOT_DIR "${CMAKE_BINARY_DIR}/${OPENSSL_FILENAME}")
-        set(OPENSSL_INCLUDE_DIR "${OPENSSL_ROOT_DIR}/include")
-        set(OPENSSL_CRYPTO_LIBRARY "${OPENSSL_ROOT_DIR}/lib/libcrypto.a")
-        install(
-            DIRECTORY ${OPENSSL_ROOT_DIR}
-            DESTINATION .
-            COMPONENT devel)
+        execute_process(
+            COMMAND ${CMAKE_COMMAND} -E tar xfz "openssl.tgz"
+            WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/openssl"
+        )
     endif()
-    find_package(OpenSSL REQUIRED)
-    target_include_directories(CoreObjects PUBLIC ${OPENSSL_INCLUDE_DIR})
-    target_link_libraries(Core INTERFACE OpenSSL::Crypto)
+
+    set(OpenSSL_DIR "${CMAKE_CURRENT_BINARY_DIR}/openssl/lib/cmake/OpenSSL")
+    find_package(OpenSSL REQUIRED CONFIG)
+    get_target_property(OPENSSL_INCLUDE_DIR OpenSSL::Crypto INTERFACE_INCLUDE_DIRECTORIES)
+
+    target_include_directories(CoreObjects SYSTEM PUBLIC ${OPENSSL_INCLUDE_DIR})
+    target_link_libraries(Storage PUBLIC OpenSSL::Crypto)
     if(NOT REALM_SKIP_SHARED_LIB)
-        target_link_libraries(CoreShared PRIVATE OpenSSL::Crypto)
+        target_link_libraries(StorageShared PUBLIC OpenSSL::Crypto)
     endif()
 endif()
 
 if(APPLE)
-    target_link_libraries(Core INTERFACE "-framework Foundation")
+    target_link_libraries(Storage INTERFACE "-framework Foundation")
     if(NOT REALM_SKIP_SHARED_LIB)
-        target_link_libraries(CoreShared PRIVATE ${Foundation})
+        target_link_libraries(StorageShared PRIVATE ${Foundation})
     endif()
 endif(APPLE)
 
-install(TARGETS Core EXPORT realm
+install(TARGETS Storage EXPORT realm
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT devel)
 
 # include .pdb files with debug symbols on Windows
@@ -385,7 +400,7 @@ install(FILES ${PROJECT_BINARY_DIR}/src/realm/util/config.h
         COMPONENT devel)
 
 if(NOT REALM_SKIP_SHARED_LIB)
-    install(TARGETS CoreShared
+    install(TARGETS StorageShared
             LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT runtime
             RUNTIME DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT runtime)
 endif()

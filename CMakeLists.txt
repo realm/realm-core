@@ -73,7 +73,7 @@ else()
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wpedantic -Wundef -Wshadow")
     # TODO: Remove this when fixed
     if(ANDROID)
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-maybe-uninitialized -Wno-uninitialized")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-uninitialized")
     elseif(${CMAKE_CXX_COMPILER_ID} MATCHES ".*[Cc]lang")
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wunreachable-code -Wshorten-64-to-32 -Wold-style-cast -Wconditional-uninitialized -Wextra-semi -Wno-nested-anon-types")
     endif()
@@ -90,15 +90,24 @@ else()
     use_faster_linker()
 endif()
 
-# Add REALM_DEBUG=1 to compile definitions for Debug / MinSizeDebug targets
-set_property(DIRECTORY APPEND PROPERTY COMPILE_DEFINITIONS
-    $<$<CONFIG:Debug>:REALM_DEBUG=1>
-    $<$<CONFIG:MinSizeDebug>:REALM_DEBUG=1>
-)
+if(ANDROID)
+    # Optimize for size vs. performance for Android. The has the following implications:
+    # - Replace `-O3` with `-Oz`.
+    # - Add `-ffunction-sections` and `-fdata-sections`. This requires that `-Wl,-gc-sections` are used when creating
+    #   the final .so file.
+    # - `-fstrict-aliasing` is inherited from NDK r10e.
+    # - `-fomit-frame-pointer` is inherited from NDK r10e.
+    #
+    # On some architectures char is unsigned by default. Make it signed
+    set(CMAKE_CXX_FLAGS_RELEASE "-Oz -DNDEBUG")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fdata-sections -ffunction-sections -fomit-frame-pointer -fsigned-char -fstrict-aliasing -funwind-tables -no-canonical-prefixes")
+endif()
+
 set_property(DIRECTORY APPEND PROPERTY COMPILE_OPTIONS
     $<$<CONFIG:MinSizeDebug>:-g>
 )
 
+set(OPENSSL_VERSION "1.1.1b")
 
 set(CMAKE_DEBUG_POSTFIX "-dbg")
 set(CMAKE_MINSIZEDEBUG_POSTFIX "-dbg")
@@ -146,8 +155,6 @@ endif()
 if(APPLE)
     find_library(Foundation Foundation)
 elseif(ANDROID)
-    set(ANDROID_OPENSSL_VERSION "1.0.2k")
-    set(ANDROID_OPENSSL_BUILD_NUMBER "1")
     list(APPEND PLATFORM_LIBRARIES log android)
 endif()
 
@@ -197,14 +204,21 @@ endif()
 install(FILES LICENSE CHANGELOG.md DESTINATION "doc/realm" COMPONENT devel)
 
 # Make the project importable from the build directory
-export(TARGETS Core QueryParser NAMESPACE Realm:: FILE realm-config.cmake)
+export(TARGETS Storage QueryParser NAMESPACE RealmCore:: FILE RealmCoreTargets.cmake)
+configure_file(${CMAKE_CURRENT_LIST_DIR}/tools/cmake/RealmCoreConfig.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/RealmCoreConfig.cmake @ONLY)
 
 # Make the project importable from the install directory
 install(EXPORT realm
-        NAMESPACE Realm::
-        FILE realm-config.cmake
-        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/realm
-        COMPONENT devel)
+        NAMESPACE RealmCore::
+        FILE RealmCoreTargets.cmake
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/RealmCore
+        COMPONENT devel
+)
+
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/RealmCoreConfig.cmake 
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/RealmCore 
+        COMPONENT devel
+)
 
 # CPack
 set(CPACK_GENERATOR "TGZ")
