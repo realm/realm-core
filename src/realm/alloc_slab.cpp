@@ -1321,7 +1321,8 @@ void SlabAlloc::extend_fast_mapping_with_slab(char* address)
 #else
     new_fast_mapping[m_translation_table_size - 1] = {address};
 #endif
-    m_ref_translation_ptr = new_fast_mapping;
+    m_ref_translation_ptr.store(new_fast_mapping, std::memory_order_release);
+    REALM_TSAN_ANNOTATE_HAPPENS_BEFORE(new_fast_mapping);
 }
 
 void SlabAlloc::rebuild_translations(bool requires_new_translation, size_t old_num_sections)

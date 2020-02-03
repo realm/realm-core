@@ -1,4 +1,4 @@
-﻿/*************************************************************************
+/*************************************************************************
  *
  * Copyright 2016 Realm Inc.
  *
@@ -497,15 +497,16 @@ inline Allocator::~Allocator() noexcept
 
 inline char* Allocator::translate(ref_type ref) const noexcept
 {
-    if (m_ref_translation_ptr) {
+    if (auto ref_translation_ptr = m_ref_translation_ptr.load(std::memory_order_acquire)) {
         char* base_addr;
         size_t idx = get_section_index(ref);
-        base_addr = m_ref_translation_ptr[idx].mapping_addr;
+        REALM_TSAN_ANNOTATE_HAPPENS_AFTER(ref_translation_ptr);
+        base_addr = ref_translation_ptr[idx].mapping_addr;
         size_t offset = ref - get_section_base(idx);
         auto addr = base_addr + offset;
 #if REALM_ENABLE_ENCRYPTION
         realm::util::encryption_read_barrier(addr, NodeHeader::header_size,
-                                             m_ref_translation_ptr[idx].encrypted_mapping,
+                                             ref_translation_ptr[idx].encrypted_mapping,
                                              NodeHeader::get_byte_size_from_header);
 #endif
         return addr;

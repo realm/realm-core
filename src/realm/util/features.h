@@ -341,4 +341,16 @@
 #  define REALM_SANITIZE_THREAD 0
 #endif
 
+#if REALM_SANITIZE_THREAD
+#define REALM_TSAN_ANNOTATE_HAPPENS_BEFORE(addr)                                                                     \
+    AnnotateHappensBefore(__FILE__, __LINE__, reinterpret_cast<void*>(addr))
+#define REALM_TSAN_ANNOTATE_HAPPENS_AFTER(addr)                                                                      \
+    AnnotateHappensAfter(__FILE__, __LINE__, reinterpret_cast<void*>(addr))
+extern "C" void AnnotateHappensBefore(const char* f, int l, void* addr);
+extern "C" void AnnotateHappensAfter(const char* f, int l, void* addr);
+#else
+#define REALM_TSAN_ANNOTATE_HAPPENS_BEFORE(addr)
+#define REALM_TSAN_ANNOTATE_HAPPENS_AFTER(addr)
+#endif
+
 #endif /* REALM_UTIL_FEATURES_H */
