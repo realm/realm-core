@@ -135,6 +135,8 @@ const size_t probe_matches = 4;
 const size_t bitwidth_time_unit = 64;
 
 typedef bool (*CallbackDummy)(int64_t);
+using Evaluator = std::function<void(ConstObj& obj)>;
+
 
 class ParentNode {
     typedef ParentNode ThisType;
@@ -142,6 +144,12 @@ class ParentNode {
 public:
     ParentNode() = default;
     virtual ~ParentNode() = default;
+
+    virtual bool has_search_index() const
+    {
+        return false;
+    }
+    virtual void index_based_aggregate(Evaluator) {}
 
     void gather_children(std::vector<ParentNode*>& v)
     {
@@ -716,9 +724,17 @@ public:
         m_needles.insert(other->m_value);
     }
 
-    bool has_search_index() const
+    bool has_search_index() const override
     {
         return this->m_table->has_search_index(IntegerNodeBase<LeafType>::m_condition_column_key);
+    }
+
+    void index_based_aggregate(Evaluator evaluator) override
+    {
+        for (size_t t = 0; t < m_result.size(); ++t) {
+            auto obj = this->m_table->get_object(m_result[t]);
+            evaluator(obj);
+        }
     }
 
     void aggregate_local_prepare(Action action, DataType col_id, bool is_nullable) override
@@ -1318,7 +1334,7 @@ public:
         m_leaf_ptr = m_array_ptr.get();
     }
 
-    bool has_search_index() const
+    bool has_search_index() const override
     {
         return m_has_search_index;
     }
@@ -1673,6 +1689,21 @@ public:
                 m_needle_storage.emplace_back(StringBuffer());
                 m_needle_storage.back().append(it->data(), it->size());
                 m_needles.insert(StringData(m_needle_storage.back().data(), m_needle_storage.back().size()));
+            }
+        }
+    }
+    void index_based_aggregate(Evaluator evaluator) override
+    {
+        if (m_index_matches == nullptr) {
+            if (m_results_end) { // 1 result
+                auto obj = m_table->get_object(m_actual_key);
+                evaluator(obj);
+            }
+        }
+        else { // multiple results
+            for (size_t t = m_results_start; t < m_results_end; ++t) {
+                auto obj = m_table->get_object(m_index_matches->get(t));
+                evaluator(obj);
             }
         }
     }

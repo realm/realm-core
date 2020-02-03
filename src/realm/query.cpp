@@ -1366,7 +1366,34 @@ size_t Query::do_count(size_t limit) const
         }
     }
     else {
+        size_t counter = 0;
+        Evaluator evaluator = [&](ConstObj& obj) -> void {
+            if (eval_object(obj))
+                ++counter;
+        };
+        // FIXME: Unify index based aggregation across node types...
+        // FIXME: Propagating 'limit' not done yet..
+        // FIXME: Is root node even the right node to check for and drive process from?
         auto node = root_node();
+#if 1
+        if (node->has_search_index()) {
+            node->index_based_aggregate(evaluator);
+            return counter;
+        }
+#else
+        auto string_node = dynamic_cast<StringNode<Equal>*>(node);
+        if (string_node && string_node->has_search_index()) {
+            string_node->index_based_aggregate(evaluator);
+            return counter;
+        }
+
+        auto base_node = dynamic_cast<ColumnNodeBase*>(node);
+        if (base_node && base_node->has_search_index()) {
+            base_node->index_based_aggregate(evaluator);
+            return counter;
+        }
+#endif
+        // no index
         QueryState<int64_t> st(act_Count, limit);
 
         for (size_t c = 0; c < node->m_children.size(); c++)
@@ -1379,6 +1406,7 @@ size_t Query::do_count(size_t limit) const
             st.m_key_values = cluster->get_key_array();
             aggregate_internal(node, &st, 0, e, nullptr);
             // Stop if limit or end is reached
+            // FIXME? Doesn't this allow for collecting more entries than limit specifies?
             return st.m_match_count == st.m_limit;
         };
 
