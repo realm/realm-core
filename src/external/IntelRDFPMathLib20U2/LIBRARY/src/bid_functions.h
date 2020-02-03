@@ -74,7 +74,7 @@ typedef signed bid__int64 BID_SINT64;
 #endif
 
 #if defined _MSC_VER
-#if defined _M_IX86 && !defined __INTEL_COMPILER        // Win IA-32, MS compiler
+#if (defined(_M_IX86) || defined(_M_ARM)) && !defined __INTEL_COMPILER // Win IA-32, ARM, MS compiler
 #define BID_ALIGN(n)
 #else
 #define BID_ALIGN(n) __declspec(align(n))
