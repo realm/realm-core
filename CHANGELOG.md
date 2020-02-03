@@ -1,20 +1,8 @@
 # 6.1.0-alpha.2 Release notes
 
-### Enhancements
-* None.
-
-### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+### Fixes
+* Fixed issue regarding opening a file format version 10 realm file in RO mode.
  
-### Breaking changes
-* None.
-
------------
-
-### Internals
-* None.
-
 ----------------------------------------------
 
 # 6.1.0-alpha.1 Release notes

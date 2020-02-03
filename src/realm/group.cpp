@@ -301,8 +301,8 @@ int Group::get_committed_file_format_version() const noexcept
 }
 
 
-int Group::get_target_file_format_version_for_session(int /* current_file_format_version */,
-                                                      int /* requested_history_type */) noexcept
+int Group::get_target_file_format_version_for_session(int current_file_format_version,
+                                                      int requested_history_type) noexcept
 {
     // Note: This function is responsible for choosing the target file format
     // for a sessions. If it selects a file format that is different from
@@ -315,6 +315,9 @@ int Group::get_target_file_format_version_for_session(int /* current_file_format
 
     // Please see Group::get_file_format_version() for information about the
     // individual file format versions.
+
+    if (requested_history_type == Replication::hist_None && current_file_format_version == 10)
+        return 10;
 
     return 11;
 }
