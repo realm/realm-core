@@ -10,7 +10,7 @@
   IgnorableNamespaces="mp uap uap5 desktop4 rescap">
   <Identity
     Name="D1CE79C3-3CEF-47F4-AFAB-24F16B8BBD8E"
-    Publisher="CN=Realm"
+    Publisher="CN=CMake Test Cert"
     Version="1.0.0.0" />
 
   <mp:PhoneIdentity PhoneProductId="D1CE79C3-3CEF-47F4-AFAB-24F16B8BBD8E" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
@@ -33,9 +33,9 @@
       <uap:VisualElements DisplayName="Realm Core Tests" 
                           Description="Realm Core Tests" 
                           BackgroundColor="transparent"
-                          Square150x150Logo="Assets\Square150x150Logo.png"
-                          Square44x44Logo="Assets\Square44x44Logo.png">
-        <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png"/>
+                          Square150x150Logo="Assets\Logo.png"
+                          Square44x44Logo="Assets\SmallLogo44x44.png">
+        <uap:DefaultTile />
         <uap:SplashScreen Image="Assets\SplashScreen.png" />
       </uap:VisualElements >
       <Extensions>
@@ -51,7 +51,7 @@
     </Application>
   </Applications>
   <Capabilities>
-    <!--<rescap:Capability Name="broadFileSystemAccess" />-->
+    <rescap:Capability Name="broadFileSystemAccess" />
   </Capabilities>
   <Resources>
     <Resource Language="x-generate" />

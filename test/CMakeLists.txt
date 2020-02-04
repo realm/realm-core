@@ -137,13 +137,24 @@ target_link_libraries(CoreTests
 )
 
 if(WINDOWS_STORE)
-    target_sources(CoreTests PRIVATE Package.appxmanifest)
-    set_property(SOURCE Package.appxmanifest PROPERTY VS_DEPLOYMENT_CONTENT 1)
+    set_target_properties(CoreTests PROPERTIES
+        VS_WINDOWS_TARGET_PLATFORM_MIN_VERSION 10.0.17134.0
+        CXX_STANDARD 17 # the test runner needs to call Windows APIs with C++/WinRT which needs C++ 17
+    )
 
-    file(GLOB APPX_ASSETS "../Visual Studio/uwp_demo/Assets/*")
-    target_sources(CoreTests PRIVATE ${APPX_ASSETS})
-    set_property(SOURCE ${APPX_ASSETS} PROPERTY VS_DEPLOYMENT_CONTENT 1)
-    set_property(SOURCE ${APPX_ASSETS} PROPERTY VS_DEPLOYMENT_LOCATION "Assets")
+    file(GLOB UWP_ASSETS "${CMAKE_ROOT}/Templates/Windows/*")
+    
+    set(UWP_SOURCES
+        Package.appxmanifest
+        ${UWP_ASSETS}
+        ${REQUIRED_TEST_FILES}
+    )
+
+    target_sources(CoreTests PRIVATE ${UWP_SOURCES})
+    set_property(SOURCE ${UWP_SOURCES} PROPERTY VS_DEPLOYMENT_CONTENT 1)
+
+    set_property(SOURCE ${UWP_ASSETS} PROPERTY VS_DEPLOYMENT_LOCATION "Assets")
+    set_property(SOURCE ${REQUIRED_TEST_FILES} PROPERTY VS_DEPLOYMENT_LOCATION "TestAssets")
 endif()
 
 if(UNIX AND NOT APPLE)
