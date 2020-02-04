@@ -99,7 +99,7 @@ jobWrapper {
             checkLinuxDebug         : doCheckInDocker('Debug'),
             checkLinuxDebugNoEncryp : doCheckInDocker('Release', '4', 'OFF'),
             checkMacOsRelease       : doBuildMacOs('Release', true),
-            checkWin32Debug         : doBuildWindows('Debug', false, 'Win32', true),
+            checkWin32Release       : doBuildWindows('Release', false, 'Win32', true),
             checkWin32DebugUWP      : doBuildWindows('Debug', true, 'Win32', true),
             iosDebug                : doBuildAppleDevice('ios', 'MinSizeDebug'),
             androidArm64Debug       : doAndroidBuildInDocker('arm64-v8a', 'Debug', false),
