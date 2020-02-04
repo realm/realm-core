@@ -553,7 +553,8 @@ int test_all(int argc, char* argv[], util::Logger* logger)
 
 #ifdef WIN32
 #if REALM_UWP
-    std::string path = winrt::to_string(winrt::Windows::ApplicationModel::Package::Current().InstalledLocation().Path());
+    std::string path =
+        winrt::to_string(winrt::Windows::ApplicationModel::Package::Current().InstalledLocation().Path());
     set_test_resource_path(path);
     set_test_path_prefix(path);
 #else
