@@ -100,7 +100,7 @@ jobWrapper {
             checkLinuxDebugNoEncryp : doCheckInDocker('Release', '4', 'OFF'),
             checkMacOsRelease       : doBuildMacOs('Release', true),
             checkWin32Debug         : doBuildWindows('Debug', false, 'Win32', true),
-            checkWin64Release       : doBuildWindows('Release', false, 'x64', true),
+            checkWin32DebugUWP      : doBuildWindows('Debug', true, 'Win32', true),
             iosDebug                : doBuildAppleDevice('ios', 'MinSizeDebug'),
             androidArm64Debug       : doAndroidBuildInDocker('arm64-v8a', 'Debug', false),
             threadSanitizer         : doCheckSanity('Debug', '1000', 'thread'),
@@ -419,7 +419,7 @@ def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmula
 def doBuildWindows(String buildType, boolean isUWP, String platform, boolean runTests) {
     def cmakeDefinitions;
     if (isUWP) {
-      cmakeDefinitions = '-DCMAKE_SYSTEM_NAME=WindowsStore -DCMAKE_SYSTEM_VERSION=10.0 -DREALM_BUILD_LIB_ONLY=1'
+      cmakeDefinitions = '-DCMAKE_SYSTEM_NAME=WindowsStore -DCMAKE_SYSTEM_VERSION=10.0'
     } else {
       cmakeDefinitions = '-DCMAKE_SYSTEM_VERSION=8.1'
     }
@@ -444,7 +444,7 @@ def doBuildWindows(String buildType, boolean isUWP, String platform, boolean run
                     publishingStashes << stashName
                 }
             }
-            if (runTests) {
+            if (runTests && !isUWP) {
                 def environment = environment() << "TMP=${env.WORKSPACE}\\temp"
                 environment << 'UNITTEST_PROGRESS=1'
                 withEnv(environment) {

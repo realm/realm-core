@@ -136,6 +136,16 @@ target_link_libraries(CoreTests
                       TestUtil QueryParser ${EXTRA_TEST_LIBS} ${PLATFORM_LIBRARIES}
 )
 
+if(WINDOWS_STORE)
+    target_sources(CoreTests PRIVATE Package.appxmanifest)
+    set_property(SOURCE Package.appxmanifest PROPERTY VS_DEPLOYMENT_CONTENT 1)
+
+    file(GLOB APPX_ASSETS "../Visual Studio/uwp_demo/Assets/*")
+    target_sources(CoreTests PRIVATE ${APPX_ASSETS})
+    set_property(SOURCE ${APPX_ASSETS} PROPERTY VS_DEPLOYMENT_CONTENT 1)
+    set_property(SOURCE ${APPX_ASSETS} PROPERTY VS_DEPLOYMENT_LOCATION "Assets")
+endif()
+
 if(UNIX AND NOT APPLE)
     # This enables symbols in backtraces
     target_link_libraries(CoreTests "-rdynamic")
