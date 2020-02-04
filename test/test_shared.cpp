@@ -133,14 +133,14 @@ DWORD winfork(std::string unit_test_name)
     if (getenv("REALM_FORKED"))
         return GetCurrentProcessId();
 
-    char filename[MAX_PATH];
-    DWORD success = GetModuleFileNameA(nullptr, filename, MAX_PATH);
+    wchar_t filename[MAX_PATH];
+    DWORD success = GetModuleFileName(nullptr, filename, MAX_PATH);
     if (success == 0 || success == MAX_PATH) {
         DWORD err = GetLastError();
         REALM_ASSERT_EX(false, err, MAX_PATH, filename);
     }
 
-    GetModuleFileNameA(nullptr, filename, MAX_PATH);
+    GetModuleFileName(nullptr, filename, MAX_PATH);
 
     StringBuffer environment;
     environment.append("REALM_FORKED=1");
@@ -154,7 +154,7 @@ DWORD winfork(std::string unit_test_name)
     ZeroMemory(&info, sizeof(info));
     info.cb = sizeof(info);
 
-    BOOL b = CreateProcessA(filename, nullptr, 0, 0, false, 0, environment.data(), nullptr, &info, &process);
+    BOOL b = CreateProcess(filename, nullptr, 0, 0, false, 0, environment.data(), nullptr, &info, &process);
     REALM_ASSERT_RELEASE(b);
 
     CloseHandle(process.hProcess);
