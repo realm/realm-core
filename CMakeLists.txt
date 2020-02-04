@@ -147,13 +147,28 @@ if(MSVC)
                 string(REGEX REPLACE "/RTC(su|[1su])" "" ${flag_var} "${${flag_var}}")
             endif()
         endforeach()
+    else()
+        # Removing LNK4075 warnings for debug UWP builds
+        # "LNK4075: ignoring '/INCREMENTAL' due to '/OPT:ICF' specification"
+        # "LNK4075: ignoring '/INCREMENTAL' due to '/OPT:REF' specification"
 
-        # Let the compiler optimize debug builds ever so slightly.
-        # /Ob1: This allows the compiler to inline functions marked __inline.
-        # /Oi:  This enables (faster) intrinsic functions.
-        string(REPLACE "/Ob0" "/Ob1" CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}")
-        string(CONCAT CMAKE_CXX_FLAGS_DEBUG "/Oi " "${CMAKE_CXX_FLAGS_DEBUG}")
+        # Optional verification checks since we don't know existing contents of variables below
+        string(REPLACE "/OPT:ICF " "/OPT:NOICF " CMAKE_EXE_LINKER_FLAGS_DEBUG "${CMAKE_EXE_LINKER_FLAGS_DEBUG}")
+        string(REPLACE "/OPT:REF " "/OPT:NOREF " CMAKE_EXE_LINKER_FLAGS_DEBUG "${CMAKE_EXE_LINKER_FLAGS_DEBUG}")
+        string(REPLACE "/INCREMENTAL:YES " "/INCREMENTAL:NO " CMAKE_EXE_LINKER_FLAGS_DEBUG "${CMAKE_EXE_LINKER_FLAGS_DEBUG}")
+        string(REPLACE "/INCREMENTAL " "/INCREMENTAL:NO " CMAKE_EXE_LINKER_FLAGS_DEBUG "${CMAKE_EXE_LINKER_FLAGS_DEBUG}")
+
+        # Mandatory
+        set(CMAKE_MODULE_LINKER_FLAGS_DEBUG  "${CMAKE_MODULE_LINKER_FLAGS_DEBUG} /INCREMENTAL:NO /OPT:NOREF /OPT:NOICF")
+        set(CMAKE_EXE_LINKER_FLAGS_DEBUG     "${CMAKE_EXE_LINKER_FLAGS_DEBUG} /INCREMENTAL:NO /OPT:NOREF /OPT:NOICF")
+        set(CMAKE_SHARED_LINKER_FLAGS_DEBUG  "${CMAKE_SHARED_LINKER_FLAGS_DEBUG} /INCREMENTAL:NO /OPT:NOREF /OPT:NOICF")
     endif()
+
+    # Let the compiler optimize debug builds ever so slightly.
+    # /Ob1: This allows the compiler to inline functions marked __inline.
+    # /Oi:  This enables (faster) intrinsic functions.
+    string(REPLACE "/Ob0" "/Ob1" CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}")
+    string(CONCAT CMAKE_CXX_FLAGS_DEBUG "/Oi " "${CMAKE_CXX_FLAGS_DEBUG}")
 endif()
 
 # Platform-specific build configuration
