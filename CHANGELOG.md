@@ -1,20 +1,8 @@
-# NEXT RELEASE
+# 6.1.0-alpha.3 Release notes
 
-### Enhancements
-* None.
-
-### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+### Fixes
+* Ability to create Decimal128 lists was missing
  
-### Breaking changes
-* None.
-
------------
-
-### Internals
-* None.
-
 ----------------------------------------------
 
 # 6.1.0-alpha.2 Release notes
