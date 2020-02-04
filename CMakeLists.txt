@@ -115,7 +115,12 @@ set(CMAKE_MINSIZEDEBUG_POSTFIX "-dbg")
 set(CMAKE_POSITION_INDEPENDENT_CODE true)
 
 if(CMAKE_SYSTEM_NAME MATCHES "^Windows")
-    add_definitions(-D_SCL_SECURE_NO_WARNINGS -DWIN32_LEAN_AND_MEAN)
+    add_definitions(
+        /D_SCL_SECURE_NO_WARNINGS
+        /DWIN32_LEAN_AND_MEAN
+        /DUNICODE
+        /D_UNICODE
+    )
 endif()
 
 if(MSVC)
