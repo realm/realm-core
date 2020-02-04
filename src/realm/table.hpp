@@ -465,7 +465,7 @@ private:
     void change_nullability(ColKey from, ColKey to, bool throw_on_null);
     template <class F, class T>
     void change_nullability_list(ColKey from, ColKey to, bool throw_on_null);
-    Obj create_linked_object();
+    Obj create_linked_object(GlobalKey = {});
     /// Indicate that a table holds embedded objects. Called only from Group::do_get_or_add_table()
     void set_embedded();
 
@@ -1456,6 +1456,11 @@ public:
     static void batch_erase_rows(Table& table, const KeyColumn& keys)
     {
         table.batch_erase_rows(keys); // Throws
+    }
+    // Temporary hack
+    static Obj create_linked_object(Table& table, GlobalKey id)
+    {
+        return table.create_linked_object(id);
     }
 };
 

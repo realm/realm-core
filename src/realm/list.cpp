@@ -401,6 +401,7 @@ template ConstLst<util::Optional<bool>>::ConstLst(const ConstObj& obj, ColKey co
 template ConstLst<float>::ConstLst(const ConstObj& obj, ColKey col_key);
 template ConstLst<util::Optional<float>>::ConstLst(const ConstObj& obj, ColKey col_key);
 template ConstLst<double>::ConstLst(const ConstObj& obj, ColKey col_key);
+template ConstLst<Decimal128>::ConstLst(const ConstObj& obj, ColKey col_key);
 template ConstLst<util::Optional<double>>::ConstLst(const ConstObj& obj, ColKey col_key);
 template ConstLst<StringData>::ConstLst(const ConstObj& obj, ColKey col_key);
 template ConstLst<BinaryData>::ConstLst(const ConstObj& obj, ColKey col_key);
@@ -416,6 +417,7 @@ template Lst<util::Optional<bool>>::Lst(const Obj& obj, ColKey col_key);
 template Lst<float>::Lst(const Obj& obj, ColKey col_key);
 template Lst<util::Optional<float>>::Lst(const Obj& obj, ColKey col_key);
 template Lst<double>::Lst(const Obj& obj, ColKey col_key);
+template Lst<Decimal128>::Lst(const Obj& obj, ColKey col_key);
 template Lst<util::Optional<double>>::Lst(const Obj& obj, ColKey col_key);
 template Lst<StringData>::Lst(const Obj& obj, ColKey col_key);
 template Lst<BinaryData>::Lst(const Obj& obj, ColKey col_key);
