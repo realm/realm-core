@@ -84,8 +84,13 @@ StringData get_printable_table_name(const Table& table);
 // leaves other char values unchanged.
 inline char toLowerAscii(char c)
 {
-    if (isascii(c) && isupper(c))
+    if (isascii(c) && isupper(c)) {
+#if REALM_ANDROID
+        return tolower(c); // _tolower is not supported on all ABI levels
+#else
         return _tolower(c);
+#endif
+    }
     return c;
 }
 
