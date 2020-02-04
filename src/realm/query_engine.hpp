@@ -1711,7 +1711,7 @@ public:
         }
         else { // multiple results
             for (size_t t = m_results_start; t < m_results_end && limit > 0; ++t) {
-                auto obj = m_table->get_object(m_index_matches->get(t));
+                auto obj = m_table->get_object(ObjKey(m_index_matches->get(t)));
                 if (evaluator(obj)) {
                     --limit;
                 }
