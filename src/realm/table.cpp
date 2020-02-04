@@ -2586,16 +2586,15 @@ Obj Table::create_object(ObjKey key, const FieldValues& values)
     return obj;
 }
 
-Obj Table::create_linked_object()
+Obj Table::create_linked_object(GlobalKey object_id)
 {
     if (!m_is_embedded)
         throw LogicError(LogicError::wrong_kind_of_table);
-    GlobalKey object_id = allocate_object_id_squeezed();
-    ObjKey key = object_id.get_local_key(get_sync_file_id());
-    if (auto repl = get_repl()) {
-        // NOTE the replication logic CANNOT use the key to create an object accessor at this point.
-        repl->create_object(this, object_id);
+    if (!object_id) {
+        object_id = allocate_object_id_squeezed();
     }
+    ObjKey key = object_id.get_local_key(get_sync_file_id());
+
     REALM_ASSERT(key.value >= 0);
 
     bump_content_version();

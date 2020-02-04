@@ -2,6 +2,7 @@
 
 ### Fixes
 * Ability to create Decimal128 lists was missing
+* No replication of create/delete operations on embedded tables.
  
 ----------------------------------------------
 
