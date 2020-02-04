@@ -289,6 +289,56 @@ TEST(ObjectId_Query)
     }
 }
 
+ONLY(ObjectId_QueryTimestamp)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    DBRef db = DB::create(path);
+    auto now = std::chrono::steady_clock::now();
+    std::vector<Timestamp> times = {{0, 0}, {1, 1}, {2, 2}};
+    //    Timestamp t0(0, 0);
+    //    Timestamp t1(1, 1);
+    //    Timestamp t2(2, 2);
+    //    ObjectId o0(t0);
+    //    ObjectId o01(t0, 1, 1);
+    //    ObjectId o1(t1);
+    //    ObjectId o11(t1, 1, 1);
+    //    ObjectId o2(t2);
+    //    ObjectId o21(t2, 2, 2);
+
+    {
+        auto wt = db->start_write();
+        auto table = wt->add_table_with_primary_key("Foo", type_ObjectId, "oid");
+        auto col_id_nullable = table->add_column(type_ObjectId, "oid_nullable", true);
+        auto col_int = table->add_column(type_Int, "int");
+        auto col_ts = table->add_column(type_Timestamp, "ts");
+        auto col_ts_nullable = table->add_column(type_Timestamp, "ts_nullable", true);
+
+        for (size_t i = 0; i < times.size(); ++i) {
+            auto obj = table->create_object_with_primary_key(ObjectId(times[i]));
+            obj.set(col_int, int64_t(i));
+            obj.set(col_id_nullable, ObjectId(times[i]));
+            obj.set(col_ts, times[i]);
+            obj.set(col_ts_nullable, times[i]);
+        }
+        wt->commit();
+    }
+    {
+        auto rt = db->start_read();
+        auto table = rt->get_table("Foo");
+        auto col = table->get_primary_key_column();
+        auto col_int = table->get_column_key("int");
+        auto col_oid_nullable = table->get_column_key("oid_nullable");
+
+        for (size_t i = 0; i < times.size(); ++i) {
+            //            Query q = table->column<ObjectId>(col) == ObjectId(times[i]);
+            //            CHECK_EQUAL(q.count(), 1);
+            Query q_timestamp_equal = table->column<ObjectId>(col) == times[i];
+            CHECK_EQUAL(q_timestamp_equal.count(), 1);
+        }
+    }
+}
+
+
 TEST(ObjectId_Gen)
 {
     auto a = ObjectId::gen();

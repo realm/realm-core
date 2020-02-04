@@ -1105,6 +1105,17 @@ inline void NullableVector<ObjectId>::set_null(size_t index)
     m_first[index].reset();
 }
 
+//    template <typename Type = T>
+//    typename std::enable_if<realm::is_any<Type, float, double, BinaryData, StringData, ObjKey, Timestamp, ObjectId,
+//    Decimal128, ref_type, SizeOfList, null>::value,
+//    void>::type
+//    template <>
+//    inline void NullableVector<ObjectId>::set(size_t index, Timestamp value)
+//    {
+//        m_first[index] = value;
+//    }
+
+
 template <>
 inline ObjectId NullableVector<ObjectId>::operator[](size_t index) const
 {
@@ -2263,7 +2274,7 @@ public:
                     d.m_storage.set_null(t);
                 }
                 else {
-                    d.m_storage.set(t, m_leaf_ptr->get(index + t));
+                    d.m_storage.set(t, T(m_leaf_ptr->get(index + t)));
                 }
             }
         }
