@@ -896,8 +896,24 @@ R Query::aggregate(ColKey column_key, size_t* resultcount, ObjKey* return_ndx) c
         QueryState<ResultType> st(action);
 
         if (!m_view) {
+            auto pn = root_node();
+            auto node = pn->m_children[find_best_node(pn)];
+            if (node->has_search_index()) {
+                Evaluator evaluator = [&](ConstObj& obj) -> bool {
+                    if (eval_object(obj)) {
+                        st.template match<action, false>(size_t(obj.get_key().value), 0, obj.get<T>(column_key));
+                        return true;
+                    }
+                    else {
+                        return false;
+                    }
+                };
+                node->index_based_aggregate(evaluator, size_t(-1));
+                return st.m_state;
+            }
+            // no index, traverse cluster tree
+            node = pn;
             LeafType leaf(m_table.unchecked_ptr()->get_alloc());
-            auto node = root_node();
             bool nullable = m_table->is_nullable(column_key);
 
             for (size_t c = 0; c < node->m_children.size(); c++)
