@@ -2027,22 +2027,26 @@ TEST(Table_Aggregates)
     auto float_col = table.add_column(type_Float, "c_float");
     auto double_col = table.add_column(type_Double, "c_double");
     auto str_col = table.add_column(type_String, "c_string");
+    auto decimal_col = table.add_column(type_Decimal, "c_decimal");
     int64_t i_sum = 0;
     double f_sum = 0;
     double d_sum = 0;
+    Decimal128 decimal_sum(0);
 
     for (int i = 0; i < TBL_SIZE; i++) {
-        table.create_object().set_all(5987654, 4.0f, 3.0, "Hello");
+        table.create_object().set_all(5987654, 4.0f, 3.0, "Hello", Decimal128(7.7));
         i_sum += 5987654;
         f_sum += 4.0f;
         d_sum += 3.0;
+        decimal_sum += Decimal128(7.7);
     }
-    table.create_object().set_all(1, 1.1f, 1.2, "Hi");
-    table.create_object().set_all(987654321, 11.0f, 12.0, "Goodbye");
-    table.create_object().set_all(5, 4.0f, 3.0, "Hey");
+    table.create_object().set_all(1, 1.1f, 1.2, "Hi", Decimal128(8.9));
+    table.create_object().set_all(987654321, 11.0f, 12.0, "Goodbye", Decimal128(10.1));
+    table.create_object().set_all(5, 4.0f, 3.0, "Hey", Decimal128("1.12e23"));
     i_sum += 1 + 987654321 + 5;
     f_sum += double(1.1f) + double(11.0f) + double(4.0f);
     d_sum += 1.2 + 12.0 + 3.0;
+    decimal_sum += Decimal128(8.9) + Decimal128(10.1) + Decimal128("1.12e23");
     double size = TBL_SIZE + 3;
 
     double epsilon = std::numeric_limits<double>::epsilon();
@@ -2052,22 +2056,59 @@ TEST(Table_Aggregates)
     CHECK_EQUAL(1, table.count_float(float_col, 11.0f));
     CHECK_EQUAL(1, table.count_double(double_col, 12.0));
     CHECK_EQUAL(1, table.count_string(str_col, "Goodbye"));
+    CHECK_EQUAL(1, table.count_decimal(decimal_col, Decimal128("1.12e23")));
+    ObjKey ret;
     // minimum
-    CHECK_EQUAL(1, table.minimum_int(int_col));
-    CHECK_EQUAL(1.1f, table.minimum_float(float_col));
-    CHECK_EQUAL(1.2, table.minimum_double(double_col));
+    CHECK_EQUAL(1, table.minimum_int(int_col, &ret));
+    CHECK(ret && table.get_object(ret).get<Int>(int_col) == 1);
+    ret = ObjKey();
+    CHECK_EQUAL(1.1f, table.minimum_float(float_col, &ret));
+    CHECK(ret);
+    CHECK_EQUAL(table.get_object(ret).get<Float>(float_col), 1.1f);
+    ret = ObjKey();
+    CHECK_EQUAL(1.2, table.minimum_double(double_col, &ret));
+    CHECK(ret);
+    CHECK_EQUAL(table.get_object(ret).get<Double>(double_col), 1.2);
+    ret = ObjKey();
+    CHECK_EQUAL(Decimal128(7.7), table.minimum_decimal(decimal_col, &ret));
+    CHECK(ret);
+    CHECK_EQUAL(table.get_object(ret).get<Decimal128>(decimal_col), Decimal128(7.7));
+
     // maximum
-    CHECK_EQUAL(987654321, table.maximum_int(int_col));
-    CHECK_EQUAL(11.0f, table.maximum_float(float_col));
-    CHECK_EQUAL(12.0, table.maximum_double(double_col));
+    ret = ObjKey();
+    CHECK_EQUAL(987654321, table.maximum_int(int_col, &ret));
+    CHECK(ret);
+    CHECK_EQUAL(table.get_object(ret).get<Int>(int_col), 987654321);
+    ret = ObjKey();
+    CHECK_EQUAL(11.0f, table.maximum_float(float_col, &ret));
+    CHECK(ret);
+    CHECK_EQUAL(11.0f, table.get_object(ret).get<Float>(float_col));
+    ret = ObjKey();
+    CHECK_EQUAL(12.0, table.maximum_double(double_col, &ret));
+    CHECK(ret);
+    CHECK_EQUAL(12.0, table.get_object(ret).get<Double>(double_col));
+    ret = ObjKey();
+    CHECK_EQUAL(Decimal128("1.12e23"), table.maximum_decimal(decimal_col, &ret));
+    CHECK(ret);
+    CHECK_EQUAL(Decimal128("1.12e23"), table.get_object(ret).get<Decimal128>(decimal_col));
     // sum
     CHECK_APPROXIMATELY_EQUAL(double(i_sum), double(table.sum_int(int_col)), 10 * epsilon);
     CHECK_APPROXIMATELY_EQUAL(f_sum, table.sum_float(float_col), 10 * epsilon);
     CHECK_APPROXIMATELY_EQUAL(d_sum, table.sum_double(double_col), 10 * epsilon);
+    CHECK_EQUAL(decimal_sum, table.sum_decimal(decimal_col));
     // average
-    CHECK_APPROXIMATELY_EQUAL(i_sum / size, table.average_int(int_col), 10 * epsilon);
-    CHECK_APPROXIMATELY_EQUAL(f_sum / size, table.average_float(float_col), 10 * epsilon);
-    CHECK_APPROXIMATELY_EQUAL(d_sum / size, table.average_double(double_col), 10 * epsilon);
+    size_t count = realm::npos;
+    CHECK_APPROXIMATELY_EQUAL(i_sum / size, table.average_int(int_col, &count), 10 * epsilon);
+    CHECK_EQUAL(count, size);
+    count = realm::npos;
+    CHECK_APPROXIMATELY_EQUAL(f_sum / size, table.average_float(float_col, &count), 10 * epsilon);
+    CHECK_EQUAL(count, size);
+    count = realm::npos;
+    CHECK_APPROXIMATELY_EQUAL(d_sum / size, table.average_double(double_col, &count), 10 * epsilon);
+    CHECK_EQUAL(count, size);
+    count = realm::npos;
+    CHECK_EQUAL(decimal_sum / Decimal128(size), table.average_decimal(decimal_col, &count));
+    CHECK_EQUAL(count, size);
 }
 
 TEST(Table_Aggregates2)
@@ -2979,16 +3020,36 @@ TEST(Table_list_basic)
     table.remove_object(ObjKey(5));
 }
 
-TEST_TYPES(Table_list_nullable, int64_t, float, double)
+template <typename T>
+struct NullableTypeConverter
+{
+    using NullableType = util::Optional<T>;
+    static bool is_null(NullableType t)
+    {
+        return !bool(t);
+    }
+};
+
+template <>
+struct NullableTypeConverter<Decimal128>
+{
+    using NullableType = Decimal128;
+    static bool is_null(Decimal128 val)
+    {
+        return val.is_null();
+    }
+};
+
+TEST_TYPES(Table_list_nullable, int64_t, float, double, Decimal128)
 {
     Table table;
     auto list_col = table.add_column_list(ColumnTypeTraits<TEST_TYPE>::id, "int_list", true);
-    ColumnSumType<TEST_TYPE> sum = 0;
+    ColumnSumType<TEST_TYPE> sum = TEST_TYPE(0);
 
     {
         Obj obj = table.create_object(ObjKey(5));
         CHECK_NOT(obj.is_null(list_col));
-        auto list = obj.get_list<util::Optional<TEST_TYPE>>(list_col);
+        auto list = obj.get_list<typename NullableTypeConverter<TEST_TYPE>::NullableType>(list_col);
         CHECK_NOT(obj.is_null(list_col));
         CHECK(list.is_empty());
         for (int i = 0; i < 100; i++) {
@@ -2999,36 +3060,36 @@ TEST_TYPES(Table_list_nullable, int64_t, float, double)
     }
     {
         Obj obj = table.get_object(ObjKey(5));
-        auto list1 = obj.get_list<util::Optional<TEST_TYPE>>(list_col);
+        auto list1 = obj.get_list<typename NullableTypeConverter<TEST_TYPE>::NullableType>(list_col);
         CHECK_EQUAL(list1.size(), 100);
-        CHECK_EQUAL(list1.get(0), 1000);
-        CHECK_EQUAL(list1.get(99), 1099);
+        CHECK_EQUAL(list1.get(0), TEST_TYPE(1000));
+        CHECK_EQUAL(list1.get(99), TEST_TYPE(1099));
         CHECK_NOT(list1.is_null(0));
         auto list_base = obj.get_listbase_ptr(list_col);
         CHECK_EQUAL(list_base->size(), 100);
         CHECK_NOT(list_base->is_null(0));
-        CHECK(dynamic_cast<Lst<util::Optional<TEST_TYPE>>*>(list_base.get()));
+        CHECK(dynamic_cast<Lst<typename NullableTypeConverter<TEST_TYPE>::NullableType>*>(list_base.get()));
 
         CHECK_EQUAL(list1.sum(), sum);
         CHECK_EQUAL(list1.max(), TEST_TYPE(1099));
         CHECK_EQUAL(list1.min(), TEST_TYPE(1000));
-        CHECK_EQUAL(list1.avg(), double(sum) / 100);
+        CHECK_EQUAL(list1.avg(), typename ColumnTypeTraits<TEST_TYPE>::average_type(sum) / 100);
 
-        auto list2 = obj.get_list<util::Optional<TEST_TYPE>>(list_col);
+        auto list2 = obj.get_list<typename NullableTypeConverter<TEST_TYPE>::NullableType>(list_col);
         list2.set(50, TEST_TYPE(747));
-        CHECK_EQUAL(list1.get(50), 747);
+        CHECK_EQUAL(list1.get(50), TEST_TYPE(747));
         list1.set_null(50);
-        CHECK_NOT(list1.get(50));
+        CHECK(NullableTypeConverter<TEST_TYPE>::is_null(list1.get(50)));
         list1.resize(101);
-        CHECK_NOT(list1.get(100));
+        CHECK(NullableTypeConverter<TEST_TYPE>::is_null(list1.get(100)));
     }
     {
         Obj obj = table.create_object(ObjKey(7));
-        auto list = obj.get_list<util::Optional<TEST_TYPE>>(list_col);
+        auto list = obj.get_list<typename NullableTypeConverter<TEST_TYPE>::NullableType>(list_col);
         list.resize(10);
         CHECK_EQUAL(list.size(), 10);
         for (int i = 0; i < 10; i++) {
-            CHECK_NOT(list.get(i));
+            CHECK(NullableTypeConverter<TEST_TYPE>::is_null(list.get(i)));
         }
     }
     table.remove_object(ObjKey(5));
@@ -4450,6 +4511,7 @@ template<> bool generate_value() { return test_util::random_int<int>() & 0x1; }
 template<> float generate_value() { return float(1.0 * test_util::random_int<int>() / (test_util::random_int<int>(1, 1000))); }
 template<> double generate_value() { return 1.0 * test_util::random_int<int>() / (test_util::random_int<int>(1, 1000)); }
 template<> Timestamp generate_value() { return Timestamp(test_util::random_int<int>(0, 1000000), test_util::random_int<int>(0, 1000000000)); }
+template<> Decimal128 generate_value() { return Decimal128(test_util::random_int<int>(-100000, 100000)); }
 
 // helper object taking care of destroying memory underlying StringData and BinaryData
 // just a passthrough for other types
@@ -4609,6 +4671,19 @@ struct generator<BinaryData> {
     }
 };
 
+template <>
+struct generator<Decimal128> {
+    static managed<Decimal128> get(bool optional)
+    {
+        if (optional && (test_util::random_int<int>() % 10) == 0) {
+            return managed<Decimal128>(realm::null());
+        }
+        else {
+            return managed<Decimal128>(generate_value<Decimal128>());
+        }
+    }
+};
+
 template<typename T> struct generator<Optional<T>> {
     static managed<Optional<T>> get(bool)
     {
@@ -4678,7 +4753,7 @@ template<typename T> void test_lists(TestContext& test_context, DBRef sg, const 
     t->rollback();
 }
 
-TEST(List_Ops) {
+ONLY(List_Ops) {
     SHARED_GROUP_TEST_PATH(path);
 
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
@@ -4691,6 +4766,7 @@ TEST(List_Ops) {
 	test_lists<float>(test_context, sg, type_Float);
 	test_lists<double>(test_context, sg, type_Double);
 	test_lists<Timestamp>(test_context, sg, type_Timestamp);
+    test_lists<Decimal128>(test_context, sg, type_Decimal);
 
 	test_lists<Optional<int64_t>>(test_context, sg, type_Int, true);
 	test_lists<StringData>(test_context, sg, type_String, true); // always Optional?
@@ -4699,6 +4775,7 @@ TEST(List_Ops) {
 	test_lists<Optional<float>>(test_context, sg, type_Float, true);
 	test_lists<Optional<double>>(test_context, sg, type_Double, true);
 	test_lists<Timestamp>(test_context, sg, type_Timestamp, true); // always Optional?
+    test_lists<Decimal128>(test_context, sg, type_Decimal, true);
 }
 
 template <typename T>

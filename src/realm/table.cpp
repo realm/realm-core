@@ -1920,10 +1920,10 @@ Decimal128 Table::minimum_decimal(ColKey col_key, ObjKey* return_ndx) const
         return false;
     };
 
+    traverse_clusters(f);
     if (return_ndx) {
         *return_ndx = ret_key;
     }
-    traverse_clusters(f);
 
     return min;
 }
@@ -1972,11 +1972,10 @@ Decimal128 Table::maximum_decimal(ColKey col_key, ObjKey* return_ndx) const
         return false;
     };
 
+    traverse_clusters(f);
     if (return_ndx) {
         *return_ndx = ret_key;
     }
-    traverse_clusters(f);
-
     return max;
 }
 
