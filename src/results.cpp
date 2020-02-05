@@ -450,7 +450,7 @@ DataType Results::prepare_for_aggregate(ColKey column, const char* name)
             REALM_COMPILER_HINT_UNREACHABLE();
     }
     switch (type) {
-        case type_Timestamp: case type_Double: case type_Float: case type_Int: break;
+        case type_Timestamp: case type_Double: case type_Float: case type_Int: case type_Decimal: break;
         default: throw UnsupportedColumnTypeException{column, *m_table, name};
     }
     return type;
@@ -496,6 +496,15 @@ struct AggregateHelper<Timestamp, Table> {
     Mixed avg(ColKey col, size_t*) { throw Results::UnsupportedColumnTypeException{col, table, "avg"}; }
 };
 
+template<typename Table>
+struct AggregateHelper<Decimal128, Table> {
+    Table& table;
+    Mixed min(ColKey col, ObjKey* obj)   { return table.minimum_decimal(col, obj);   }
+    Mixed max(ColKey col, ObjKey* obj)   { return table.maximum_decimal(col, obj);   }
+    Mixed sum(ColKey col)                { return table.sum_decimal(col);            }
+    Mixed avg(ColKey col, size_t* count) { return table.average_decimal(col, count); }
+};
+
 struct ListAggregateHelper {
     LstBase& list;
     Mixed min(ColKey, size_t* ndx)   { return list.min(ndx);   }
@@ -509,6 +518,8 @@ template<> struct AggregateHelper<int64_t, LstBase&> : ListAggregateHelper
 template<> struct AggregateHelper<double,  LstBase&> : ListAggregateHelper
 { AggregateHelper(LstBase& l) : ListAggregateHelper{l} {} };
 template<> struct AggregateHelper<float,   LstBase&> : ListAggregateHelper
+{ AggregateHelper(LstBase& l) : ListAggregateHelper{l} {} };
+template<> struct AggregateHelper<Decimal128,   LstBase&> : ListAggregateHelper
 { AggregateHelper(LstBase& l) : ListAggregateHelper{l} {} };
 
 template<>
@@ -526,6 +537,7 @@ Mixed call_with_helper(Func&& func, Table&& table, DataType type)
         case type_Double:    return func(AggregateHelper<double, Table>{table});
         case type_Float:     return func(AggregateHelper<Float, Table>{table});
         case type_Int:       return func(AggregateHelper<Int, Table>{table});
+        case type_Decimal:   return func(AggregateHelper<Decimal128, Table>{table});
         default: REALM_COMPILER_HINT_UNREACHABLE();
     }
 }
@@ -581,13 +593,13 @@ util::Optional<Mixed> Results::sum(ColKey column)
     return aggregate(column, "sum", [&](auto&& helper) { return helper.sum(column); });
 }
 
-util::Optional<double> Results::average(ColKey column)
+util::Optional<Mixed> Results::average(ColKey column)
 {
     size_t value_count = 0;
     auto results = aggregate(column, "avg", [&](auto&& helper) {
         return helper.avg(column, &value_count);
     });
-    return value_count == 0 ? none : util::make_optional(results->get_double());
+    return value_count == 0 ? none : results;
 }
 
 void Results::clear()

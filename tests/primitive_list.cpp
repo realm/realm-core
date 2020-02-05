@@ -48,6 +48,7 @@ struct Base {
     using Type = T;
     using Wrapped = T;
     using Boxed = T;
+    using AvgType = double;
 
     static PropertyType property_type() { return prop_type; }
     static util::Any to_any(T value) { return value; }
@@ -58,7 +59,7 @@ struct Base {
     static T min() { abort(); }
     static T max() { abort(); }
     static T sum() { abort(); }
-    static double average() { abort(); }
+    static AvgType average() { abort(); }
 
     static bool can_sum() { return std::is_arithmetic<T>::value; }
     static bool can_average() { return std::is_arithmetic<T>::value; }
@@ -120,8 +121,15 @@ struct OID : Base<PropertyType::ObjectId, ObjectId> {
 };
 
 struct Decimal : Base<PropertyType::Decimal, Decimal128> {
+    using AvgType = Decimal128;
     static std::vector<Decimal128> values() { return {Decimal128("123.45e6"), Decimal128("876.54e32")}; }
-    // FIXME: turn on aggregates once core implements them
+    static Decimal128 min() { return Decimal128("123.45e6"); }
+    static Decimal128 max() { return Decimal128("876.54e32"); }
+    static Decimal128 sum() { return Decimal128("123.45e6") + Decimal128("876.54e32"); }
+    static Decimal128 average() { return ((Decimal128("123.45e6") + Decimal128("876.54e32")) / Decimal128(2)); }
+    static bool can_sum() { return true; }
+    static bool can_average() { return true; }
+    static bool can_minmax() { return true; }
 };
 
 template<typename BaseT>
@@ -162,6 +170,7 @@ template<> int64_t get(Mixed m) { return m.get_int(); }
 template<> float get(Mixed m) { return m.get_type() == type_Float ? m.get_float() : static_cast<float>(m.get_double()); }
 template<> double get(Mixed m) { return m.get_double(); }
 template<> Timestamp get(Mixed m) { return m.get_timestamp(); }
+template<> Decimal128 get(Mixed m) { return m.get<Decimal128>(); }
 
 namespace realm {
 template<typename T>
@@ -689,7 +698,7 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
             return;
         }
 
-        REQUIRE(*list.average() == TestType::average());
+        REQUIRE(get<typename TestType::AvgType>(*list.average()) == TestType::average());
         // REQUIRE(*results.average() == TestType::average());
         list.remove_all();
         REQUIRE(list.average() == util::none);

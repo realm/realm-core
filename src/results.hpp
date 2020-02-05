@@ -149,12 +149,12 @@ public:
     // Throws OutOfBoundsIndexException for an out-of-bounds column
     util::Optional<Mixed> max(ColKey column={});
     util::Optional<Mixed> min(ColKey column={});
-    util::Optional<double> average(ColKey column={});
+    util::Optional<Mixed> average(ColKey column={});
     util::Optional<Mixed> sum(ColKey column={});
 
     util::Optional<Mixed> max(StringData column_name) { return max(key(column_name)); }
     util::Optional<Mixed> min(StringData column_name) { return min(key(column_name)); }
-    util::Optional<double> average(StringData column_name) { return average(key(column_name)); }
+    util::Optional<Mixed> average(StringData column_name) { return average(key(column_name)); }
     util::Optional<Mixed> sum(StringData column_name) { return sum(key(column_name)); }
 
     enum class Mode {

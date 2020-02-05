@@ -124,7 +124,7 @@ public:
     // Throws OutOfBoundsIndexException for an out-of-bounds column
     util::Optional<Mixed> max(ColKey column={});
     util::Optional<Mixed> min(ColKey column={});
-    util::Optional<double> average(ColKey column={});
+    util::Optional<Mixed> average(ColKey column={});
     Mixed sum(ColKey column={});
 
     bool operator==(List const& rgt) const noexcept;

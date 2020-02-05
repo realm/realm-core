@@ -408,7 +408,7 @@ Mixed List::sum(ColKey col)
     return result;
 }
 
-util::Optional<double> List::average(ColKey col)
+util::Optional<Mixed> List::average(ColKey col)
 {
     if (get_type() == PropertyType::Object)
         return as_results().average(col);
@@ -417,7 +417,7 @@ util::Optional<double> List::average(ColKey col)
     if (result.is_null()) {
         throw realm::Results::UnsupportedColumnTypeException(m_list_base->get_col_key(), m_list_base->get_table(), "average");
     }
-    return count == 0 ? none : make_optional(result.get_double());
+    return count == 0 ? none : util::make_optional(result);
 }
 
 bool List::operator==(List const& rgt) const noexcept
