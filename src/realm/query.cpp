@@ -1300,7 +1300,31 @@ void Query::find_all(ConstTableView& ret, size_t begin, size_t end, size_t limit
             m_table->traverse_clusters(f);
         }
         else {
-            auto node = root_node();
+            auto pn = root_node();
+            auto node = pn->m_children[find_best_node(pn)];
+            // even with index, we can only drive the search from the index if
+            // there are no begin/end requirements on it.
+            auto begin_key = (begin >= m_table->size()) ? ObjKey() : m_table->get_object(begin).get_key();
+            auto end_key = (end >= m_table->size()) ? ObjKey() : m_table->get_object(end).get_key();
+            if (node->has_search_index()) {
+                KeyColumn* refs = ret.m_key_values;
+                Evaluator evaluator = [&](ConstObj& obj) ->bool {
+                    auto key = obj.get_key();
+                    if (begin_key && key < begin_key) return false;
+                    if (end_key && !(key < end_key)) return false;
+                    if (eval_object(obj)) {
+                        refs->add(key);
+                        return true;
+                    }
+                    else {
+                        return false;
+                    }
+                };
+                node->index_based_aggregate(evaluator, limit);
+                return;
+            }
+            // no index on best node (and likely no index at all), descend B+-tree
+            node = pn;
             QueryState<int64_t> st(act_FindAll, ret.m_key_values, limit);
 
             for (size_t c = 0; c < node->m_children.size(); c++)
