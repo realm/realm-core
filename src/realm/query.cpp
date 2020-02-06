@@ -899,7 +899,7 @@ R Query::aggregate(ColKey column_key, size_t* resultcount, ObjKey* return_ndx) c
             auto pn = root_node();
             auto node = pn->m_children[find_best_node(pn)];
             if (node->has_search_index()) {
-                Evaluator evaluator = [&](ConstObj& obj) -> bool {
+                node->index_based_aggregate(size_t(-1), [&](ConstObj& obj) -> bool {
                     if (eval_object(obj)) {
                         st.template match<action, false>(size_t(obj.get_key().value), 0, obj.get<T>(column_key));
                         return true;
@@ -907,8 +907,7 @@ R Query::aggregate(ColKey column_key, size_t* resultcount, ObjKey* return_ndx) c
                     else {
                         return false;
                     }
-                };
-                node->index_based_aggregate(evaluator, size_t(-1));
+                });
                 return st.m_state;
             }
             // no index, traverse cluster tree
@@ -1324,7 +1323,7 @@ void Query::find_all(ConstTableView& ret, size_t begin, size_t end, size_t limit
             auto end_key = (end >= m_table->size()) ? ObjKey() : m_table->get_object(end).get_key();
             if (node->has_search_index()) {
                 KeyColumn* refs = ret.m_key_values;
-                Evaluator evaluator = [&](ConstObj& obj) -> bool {
+                node->index_based_aggregate(limit, [&](ConstObj& obj) -> bool {
                     auto key = obj.get_key();
                     if (begin_key && key < begin_key)
                         return false;
@@ -1337,8 +1336,7 @@ void Query::find_all(ConstTableView& ret, size_t begin, size_t end, size_t limit
                     else {
                         return false;
                     }
-                };
-                node->index_based_aggregate(evaluator, limit);
+                });
                 return;
             }
             // no index on best node (and likely no index at all), descend B+-tree
@@ -1414,19 +1412,18 @@ size_t Query::do_count(size_t limit) const
     }
     else {
         size_t counter = 0;
-        Evaluator evaluator = [&](ConstObj& obj) -> bool {
-            if (eval_object(obj)) {
-                ++counter;
-                return true;
-            }
-            else {
-                return false;
-            }
-        };
         auto pn = root_node();
         auto node = pn->m_children[find_best_node(pn)];
         if (node->has_search_index()) {
-            node->index_based_aggregate(evaluator, limit);
+            node->index_based_aggregate(limit, [&](ConstObj& obj) -> bool {
+                if (eval_object(obj)) {
+                    ++counter;
+                    return true;
+                }
+                else {
+                    return false;
+                }
+            });
             return counter;
         }
         // no index, descend down the B+-tree instead

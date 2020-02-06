@@ -136,7 +136,7 @@ const size_t bitwidth_time_unit = 64;
 
 typedef bool (*CallbackDummy)(int64_t);
 using Evaluator = util::FunctionRef<bool(ConstObj& obj)>;
-
+// using Evaluator = std::function<bool(ConstObj& obj)>;
 
 class ParentNode {
     typedef ParentNode ThisType;
@@ -149,7 +149,7 @@ public:
     {
         return false;
     }
-    virtual void index_based_aggregate(Evaluator, size_t) {}
+    virtual void index_based_aggregate(size_t, Evaluator) {}
 
     void gather_children(std::vector<ParentNode*>& v)
     {
@@ -729,7 +729,7 @@ public:
         return this->m_table->has_search_index(IntegerNodeBase<LeafType>::m_condition_column_key);
     }
 
-    void index_based_aggregate(Evaluator evaluator, size_t limit) override
+    void index_based_aggregate(size_t limit, Evaluator evaluator) override
     {
         for (size_t t = 0; t < m_result.size() && limit > 0; ++t) {
             auto obj = this->m_table->get_object(m_result[t]);
@@ -1699,7 +1699,7 @@ public:
             }
         }
     }
-    void index_based_aggregate(Evaluator evaluator, size_t limit) override
+    void index_based_aggregate(size_t limit, Evaluator evaluator) override
     {
         if (limit == 0)
             return;
@@ -1788,7 +1788,7 @@ public:
     {
     }
 
-    void index_based_aggregate(Evaluator evaluator, size_t limit) override
+    void index_based_aggregate(size_t limit, Evaluator evaluator) override
     {
         for (size_t t = 0; t < m_index_matches.size() && limit > 0; ++t) {
             auto obj = m_table->get_object(m_index_matches[t]);
