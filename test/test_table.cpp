@@ -3021,8 +3021,7 @@ TEST(Table_list_basic)
 }
 
 template <typename T>
-struct NullableTypeConverter
-{
+struct NullableTypeConverter {
     using NullableType = util::Optional<T>;
     static bool is_null(NullableType t)
     {
@@ -3031,8 +3030,7 @@ struct NullableTypeConverter
 };
 
 template <>
-struct NullableTypeConverter<Decimal128>
-{
+struct NullableTypeConverter<Decimal128> {
     using NullableType = Decimal128;
     static bool is_null(Decimal128 val)
     {
@@ -4511,7 +4509,11 @@ template<> bool generate_value() { return test_util::random_int<int>() & 0x1; }
 template<> float generate_value() { return float(1.0 * test_util::random_int<int>() / (test_util::random_int<int>(1, 1000))); }
 template<> double generate_value() { return 1.0 * test_util::random_int<int>() / (test_util::random_int<int>(1, 1000)); }
 template<> Timestamp generate_value() { return Timestamp(test_util::random_int<int>(0, 1000000), test_util::random_int<int>(0, 1000000000)); }
-template<> Decimal128 generate_value() { return Decimal128(test_util::random_int<int>(-100000, 100000)); }
+template <>
+Decimal128 generate_value()
+{
+    return Decimal128(test_util::random_int<int>(-100000, 100000));
+}
 
 // helper object taking care of destroying memory underlying StringData and BinaryData
 // just a passthrough for other types
@@ -4753,28 +4755,29 @@ template<typename T> void test_lists(TestContext& test_context, DBRef sg, const 
     t->rollback();
 }
 
-ONLY(List_Ops) {
+TEST(List_Ops)
+{
     SHARED_GROUP_TEST_PATH(path);
 
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
     DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
 
-	test_lists<int64_t>(test_context, sg, type_Int);
-	test_lists<StringData>(test_context, sg, type_String);
-	test_lists<BinaryData>(test_context, sg, type_Binary);
-	test_lists<bool>(test_context, sg, type_Bool);
-	test_lists<float>(test_context, sg, type_Float);
-	test_lists<double>(test_context, sg, type_Double);
-	test_lists<Timestamp>(test_context, sg, type_Timestamp);
+    test_lists<int64_t>(test_context, sg, type_Int);
+    test_lists<StringData>(test_context, sg, type_String);
+    test_lists<BinaryData>(test_context, sg, type_Binary);
+    test_lists<bool>(test_context, sg, type_Bool);
+    test_lists<float>(test_context, sg, type_Float);
+    test_lists<double>(test_context, sg, type_Double);
+    test_lists<Timestamp>(test_context, sg, type_Timestamp);
     test_lists<Decimal128>(test_context, sg, type_Decimal);
 
-	test_lists<Optional<int64_t>>(test_context, sg, type_Int, true);
-	test_lists<StringData>(test_context, sg, type_String, true); // always Optional?
-	test_lists<BinaryData>(test_context, sg, type_Binary, true); // always Optional?
-	test_lists<Optional<bool>>(test_context, sg, type_Bool, true);
-	test_lists<Optional<float>>(test_context, sg, type_Float, true);
-	test_lists<Optional<double>>(test_context, sg, type_Double, true);
-	test_lists<Timestamp>(test_context, sg, type_Timestamp, true); // always Optional?
+    test_lists<Optional<int64_t>>(test_context, sg, type_Int, true);
+    test_lists<StringData>(test_context, sg, type_String, true); // always Optional?
+    test_lists<BinaryData>(test_context, sg, type_Binary, true); // always Optional?
+    test_lists<Optional<bool>>(test_context, sg, type_Bool, true);
+    test_lists<Optional<float>>(test_context, sg, type_Float, true);
+    test_lists<Optional<double>>(test_context, sg, type_Double, true);
+    test_lists<Timestamp>(test_context, sg, type_Timestamp, true); // always Optional?
     test_lists<Decimal128>(test_context, sg, type_Decimal, true);
 }
 

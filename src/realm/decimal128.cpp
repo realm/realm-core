@@ -321,6 +321,9 @@ bool Decimal128::is_null() const
 
 bool Decimal128::operator==(const Decimal128& rhs) const
 {
+    if (is_null() && rhs.is_null()) {
+        return true;
+    }
     unsigned flags = 0;
     int ret;
     BID_UINT128 l = to_BID_UINT128(*this);
