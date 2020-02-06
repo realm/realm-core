@@ -135,7 +135,7 @@ const size_t probe_matches = 4;
 const size_t bitwidth_time_unit = 64;
 
 typedef bool (*CallbackDummy)(int64_t);
-using Evaluator = std::function<bool(ConstObj& obj)>;
+using Evaluator = util::FunctionRef<bool(ConstObj& obj)>;
 
 
 class ParentNode {
