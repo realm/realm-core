@@ -27,6 +27,7 @@
 #include "property.hpp"
 #include "shared_realm.hpp"
 #include "util/checked_mutex.hpp"
+#include "util/copyable_atomic.hpp"
 
 #include <realm/table_view.hpp>
 #include <realm/util/optional.hpp>
@@ -263,7 +264,7 @@ public:
 
 private:
     std::shared_ptr<Realm> m_realm;
-    mutable const ObjectSchema *m_object_schema GUARDED_BY(m_mutex) = nullptr;
+    mutable util::CopyableAtomic<const ObjectSchema*> m_object_schema = nullptr;
     Query m_query GUARDED_BY(m_mutex);
     TableView m_table_view GUARDED_BY(m_mutex);
     ConstTableRef m_table;
@@ -380,7 +381,7 @@ void Results::set_property_value(ContextType& ctx, StringData prop_name, ValueTy
         throw InvalidPropertyException(object_schema.name, prop_name);
     }
     if (prop->is_primary && !m_realm->is_in_migration()) {
-        throw ModifyPrimaryKeyException(m_object_schema->name, prop->name);
+        throw ModifyPrimaryKeyException(object_schema.name, prop->name);
     }
 
     // Update all objects in this ResultSets. Use snapshot to avoid correctness problems if the

@@ -164,17 +164,17 @@ size_t Results::do_size()
 
 const ObjectSchema& Results::get_object_schema() const
 {
-    util::CheckedUniqueLock lock(m_mutex);
     validate_read();
 
-    if (!m_object_schema) {
+    auto object_schema = m_object_schema.load();
+    if (!object_schema) {
         REALM_ASSERT(m_realm);
         auto it = m_realm->schema().find(get_object_type());
         REALM_ASSERT(it != m_realm->schema().end());
-        m_object_schema = &*it;
+        m_object_schema = object_schema = &*it;
     }
 
-    return *m_object_schema;
+    return *object_schema;
 }
 
 StringData Results::get_object_type() const noexcept

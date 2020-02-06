@@ -23,6 +23,7 @@
 #include "impl/collection_notifier.hpp"
 #include "object.hpp"
 #include "property.hpp"
+#include "util/copyable_atomic.hpp"
 
 #include <realm/mixed.hpp>
 #include <realm/list.hpp>
@@ -162,7 +163,7 @@ public:
 private:
     std::shared_ptr<Realm> m_realm;
     PropertyType m_type;
-    mutable const ObjectSchema* m_object_schema = nullptr;
+    mutable util::CopyableAtomic<const ObjectSchema*> m_object_schema = nullptr;
     _impl::CollectionNotifier::Handle<_impl::ListNotifier> m_notifier;
     std::shared_ptr<LstBase> m_list_base;
 

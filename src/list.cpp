@@ -76,13 +76,14 @@ ObjectSchema const& List::get_object_schema() const
     verify_attached();
 
     REALM_ASSERT(get_type() == PropertyType::Object);
-    if (!m_object_schema) {
+    auto object_schema = m_object_schema.load();
+    if (!object_schema) {
         auto object_type = object_name(*static_cast<LnkLst&>(*m_list_base).get_target_table());
         auto it = m_realm->schema().find(object_type);
         REALM_ASSERT(it != m_realm->schema().end());
-        m_object_schema = &*it;
+        m_object_schema = object_schema = &*it;
     }
-    return *m_object_schema;
+    return *object_schema;
 }
 
 Query List::get_query() const
