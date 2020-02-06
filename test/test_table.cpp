@@ -4514,6 +4514,11 @@ Decimal128 generate_value()
 {
     return Decimal128(test_util::random_int<int>(-100000, 100000));
 }
+template <>
+ObjectId generate_value()
+{
+    return ObjectId::gen();
+}
 
 // helper object taking care of destroying memory underlying StringData and BinaryData
 // just a passthrough for other types
@@ -4686,6 +4691,14 @@ struct generator<Decimal128> {
     }
 };
 
+template <>
+struct generator<ObjectId> {
+    static managed<ObjectId> get(bool)
+    {
+        return managed<ObjectId>(generate_value<ObjectId>());
+    }
+};
+
 template<typename T> struct generator<Optional<T>> {
     static managed<Optional<T>> get(bool)
     {
@@ -4770,6 +4783,7 @@ TEST(List_Ops)
     test_lists<double>(test_context, sg, type_Double);
     test_lists<Timestamp>(test_context, sg, type_Timestamp);
     test_lists<Decimal128>(test_context, sg, type_Decimal);
+    test_lists<ObjectId>(test_context, sg, type_ObjectId);
 
     test_lists<Optional<int64_t>>(test_context, sg, type_Int, true);
     test_lists<StringData>(test_context, sg, type_String, true); // always Optional?
@@ -4779,6 +4793,7 @@ TEST(List_Ops)
     test_lists<Optional<double>>(test_context, sg, type_Double, true);
     test_lists<Timestamp>(test_context, sg, type_Timestamp, true); // always Optional?
     test_lists<Decimal128>(test_context, sg, type_Decimal, true);
+    test_lists<ObjectId>(test_context, sg, type_ObjectId, true);
 }
 
 template <typename T>

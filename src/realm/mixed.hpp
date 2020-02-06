@@ -507,7 +507,7 @@ inline int Mixed::compare(const Mixed& b) const
     // Now we are sure the two types are the same
     if (is_null()) {
         // Both are null
-        return true;
+        return 0;
     }
 
     switch (get_type()) {
