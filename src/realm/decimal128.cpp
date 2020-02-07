@@ -231,14 +231,14 @@ void Decimal128::from_string(const char* ps)
 Decimal128 to_decimal128(const BID_UINT128& val)
 {
     Decimal128 tmp;
-    memcpy(&tmp, &val, sizeof(Decimal128));
+    memcpy(tmp.raw(), &val, sizeof(BID_UINT128));
     return tmp;
 }
 
 BID_UINT128 to_BID_UINT128(const Decimal128& val)
 {
     BID_UINT128 ret;
-    memcpy(&ret, &val, sizeof(Decimal128));
+    memcpy(&ret, val.raw(), sizeof(BID_UINT128));
     return ret;
 }
 
