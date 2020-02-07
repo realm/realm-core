@@ -410,30 +410,6 @@ SyncSession::SyncSession(SyncClient& client, std::string realm_path, SyncConfig 
 , m_realm_path(std::move(realm_path))
 , m_client(client)
 {
-    // Sync history validation ensures that the history within the Realm file is in a format that can be used
-    // by the version of realm-sync that we're using. Validation is enabled by default when the binding manually
-    // opens a sync session (via `SyncManager::get_session`), but is disabled when the sync session is opened
-    // as a side effect of opening a `Realm`. In that case, the sync history has already been validated by the
-    // act of opening the `Realm` so it's not necessary to repeat it here.
-    if (m_config.validate_sync_history) {
-        DBOptions options;
-
-        if (m_config.realm_encryption_key) {
-            options.encryption_key = m_config.realm_encryption_key->data();
-        }
-#if REALM_ENABLE_SYNC
-        auto history = sync::make_client_replication(m_realm_path);
-#else
-        REALM_TERMINATE("Realm was not built with sync enabled");
-#endif
-
-        // FIXME: Opening a Realm only to discard it is relatively expensive. It may be preferable to have
-        // realm-sync open the Realm when the `sync::Session` is created since it can continue to use it.
-
-        // We use the core method directly as we don't want to modify the coordinator that might exist at this
-        // point (especially overwriting the config)
-        DB::create(*history, options);
-   }
 }
 
 std::string SyncSession::get_recovery_file_path()

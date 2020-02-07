@@ -68,7 +68,7 @@ public:
     // If the Realm is already on disk, it will be fully synchronized before being returned.
     // Timeouts and interruptions are not handled by this method and must be handled by upper layers.
     std::shared_ptr<AsyncOpenTask> get_synchronized_realm(Realm::Config config);
-    // Used from SyncSession constructor if config.validate_sync_history is set
+    // Used by GlobalNotifier to bypass the normal initialization path
     void open_with_config(Realm::Config config);
 
     // Creates the underlying sync session if it doesn't already exists.
@@ -235,7 +235,7 @@ private:
     void pin_version(VersionID version);
 
     void set_config(const Realm::Config&);
-    void create_sync_session(bool force_client_resync, bool validate_sync_history);
+    void create_sync_session(bool force_client_resync);
     void do_get_realm(Realm::Config config, std::shared_ptr<Realm>& realm,
                       util::Optional<VersionID> version,
                       std::unique_lock<std::mutex>& realm_lock, bool bind_to_context=true);
