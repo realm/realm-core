@@ -335,6 +335,7 @@ private:
     template <Action action, typename T, typename R>
     R aggregate(ColKey column_key, size_t* resultcount = nullptr, ObjKey* return_ndx = nullptr) const;
 
+    size_t find_best_node(ParentNode* pn) const;
     void aggregate_internal(ParentNode* pn, QueryStateBase* st, size_t start, size_t end,
                             ArrayPayload* source_column) const;
 

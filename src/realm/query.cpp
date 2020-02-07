@@ -896,8 +896,23 @@ R Query::aggregate(ColKey column_key, size_t* resultcount, ObjKey* return_ndx) c
         QueryState<ResultType> st(action);
 
         if (!m_view) {
+            auto pn = root_node();
+            auto node = pn->m_children[find_best_node(pn)];
+            if (node->has_search_index()) {
+                node->index_based_aggregate(size_t(-1), [&](ConstObj& obj) -> bool {
+                    if (eval_object(obj)) {
+                        st.template match<action, false>(size_t(obj.get_key().value), 0, obj.get<T>(column_key));
+                        return true;
+                    }
+                    else {
+                        return false;
+                    }
+                });
+                return st.m_state;
+            }
+            // no index, traverse cluster tree
+            node = pn;
             LeafType leaf(m_table.unchecked_ptr()->get_alloc());
-            auto node = root_node();
             bool nullable = m_table->is_nullable(column_key);
 
             for (size_t c = 0; c < node->m_children.size(); c++)
@@ -937,6 +952,14 @@ R Query::aggregate(ColKey column_key, size_t* resultcount, ObjKey* return_ndx) c
     }
 }
 
+size_t Query::find_best_node(ParentNode* pn) const
+{
+    auto score_compare = [](const ParentNode* a, const ParentNode* b) { return a->cost() < b->cost(); };
+    size_t best = std::distance(pn->m_children.begin(),
+                                std::min_element(pn->m_children.begin(), pn->m_children.end(), score_compare));
+    return best;
+}
+
 /**************************************************************************************************************
 *                                                                                                             *
 * Main entry point of a query. Schedules calls to aggregate_local                                             *
@@ -948,14 +971,11 @@ void Query::aggregate_internal(ParentNode* pn, QueryStateBase* st, size_t start,
                                ArrayPayload* source_column) const
 {
     while (start < end) {
-        auto score_compare = [](const ParentNode* a, const ParentNode* b) { return a->cost() < b->cost(); };
-        size_t best = std::distance(pn->m_children.begin(),
-                                    std::min_element(pn->m_children.begin(), pn->m_children.end(), score_compare));
-
         // Executes start...end range of a query and will stay inside the condition loop of the node it was called
         // on. Can be called on any node; yields same result, but different performance. Returns prematurely if
         // condition of called node has evaluated to true local_matches number of times.
         // Return value is the next row for resuming aggregating (next row that caller must call aggregate_local on)
+        size_t best = find_best_node(pn);
         start = pn->m_children[best]->aggregate_local(st, start, end, findlocals, source_column);
 
         // Make remaining conditions compute their m_dD (statistics)
@@ -1295,7 +1315,31 @@ void Query::find_all(ConstTableView& ret, size_t begin, size_t end, size_t limit
             m_table->traverse_clusters(f);
         }
         else {
-            auto node = root_node();
+            auto pn = root_node();
+            auto node = pn->m_children[find_best_node(pn)];
+            if (node->has_search_index()) {
+                // translate begin/end limiters into corresponding keys
+                auto begin_key = (begin >= m_table->size()) ? ObjKey() : m_table->get_object(begin).get_key();
+                auto end_key = (end >= m_table->size()) ? ObjKey() : m_table->get_object(end).get_key();
+                KeyColumn* refs = ret.m_key_values;
+                node->index_based_aggregate(limit, [&](ConstObj& obj) -> bool {
+                    auto key = obj.get_key();
+                    if (begin_key && key < begin_key)
+                        return false;
+                    if (end_key && !(key < end_key))
+                        return false;
+                    if (eval_object(obj)) {
+                        refs->add(key);
+                        return true;
+                    }
+                    else {
+                        return false;
+                    }
+                });
+                return;
+            }
+            // no index on best node (and likely no index at all), descend B+-tree
+            node = pn;
             QueryState<int64_t> st(act_FindAll, ret.m_key_values, limit);
 
             for (size_t c = 0; c < node->m_children.size(); c++)
@@ -1366,7 +1410,23 @@ size_t Query::do_count(size_t limit) const
         }
     }
     else {
-        auto node = root_node();
+        size_t counter = 0;
+        auto pn = root_node();
+        auto node = pn->m_children[find_best_node(pn)];
+        if (node->has_search_index()) {
+            node->index_based_aggregate(limit, [&](ConstObj& obj) -> bool {
+                if (eval_object(obj)) {
+                    ++counter;
+                    return true;
+                }
+                else {
+                    return false;
+                }
+            });
+            return counter;
+        }
+        // no index, descend down the B+-tree instead
+        node = pn;
         QueryState<int64_t> st(act_Count, limit);
 
         for (size_t c = 0; c < node->m_children.size(); c++)
