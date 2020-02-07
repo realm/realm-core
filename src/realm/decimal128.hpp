@@ -79,6 +79,10 @@ public:
     {
         return &m_value;
     }
+    Bid128* raw()
+    {
+        return &m_value;
+    }
     void unpack(Bid128& coefficient, int& exponent, bool& sign) const noexcept;
 
 private:
