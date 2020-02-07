@@ -2669,6 +2669,34 @@ Obj Table::create_object_with_primary_key(const Mixed& primary_key)
     return create_object(object_key, {{primary_key_col, primary_key}});
 }
 
+ObjKey Table::get_object_with_primary_key(const Mixed& primary_key)
+{
+    if (m_is_embedded)
+        throw LogicError(LogicError::wrong_kind_of_table);
+    auto primary_key_col = get_primary_key_column();
+    REALM_ASSERT(primary_key_col);
+    DataType type = DataType(primary_key_col.get_type());
+    REALM_ASSERT((primary_key.is_null() && primary_key_col.get_attrs().test(col_attr_Nullable)) ||
+                 primary_key.get_type() == type);
+
+    ObjKey object_key;
+    GlobalKey object_id{primary_key};
+
+    // Generate local ObjKey
+    object_key = global_to_local_object_id_hashed(object_id);
+
+    // Check if existing
+    if (is_valid(object_key)) {
+        return object_key;
+    }
+    auto unres_key = object_key.get_unresolved();
+    if (is_valid(unres_key)) {
+        return unres_key;
+    }
+
+    return allocate_unresolved_key(object_key);
+}
+
 ObjKey Table::get_obj_key(GlobalKey id) const
 {
     ObjKey key;
@@ -2845,6 +2873,17 @@ ObjKey Table::allocate_local_id_after_hash_collision(GlobalKey incoming_id, Glob
     insert_collision(colliding_id, colliding_local_id);
 
     return new_local_id;
+}
+
+ObjKey Table::allocate_unresolved_key(ObjKey key)
+{
+    auto unres_key = key.get_unresolved();
+
+    bump_content_version();
+    bump_storage_version();
+    Obj tombstone = m_clusters.insert(unres_key, {});
+
+    return tombstone.get_key();
 }
 
 void Table::free_local_id_after_hash_collision(ObjKey key)

@@ -1209,12 +1209,12 @@ ref_type Cluster::insert(ObjKey k, const FieldValues& init_values, ClusterNode::
     }
     else {
         sz = size_t(Array::get(s_key_ref_or_size_index)) >> 1; // Size is stored as tagged integer
-        if (k.value < int(sz)) {
+        if (uint64_t(k.value) < sz) {
             throw InvalidKey("Key already used");
         }
         // Key value is bigger than all other values, should be put last
         ndx = sz;
-        if (k.value > int(sz) && sz < cluster_node_size) {
+        if (uint64_t(k.value) > sz && sz < cluster_node_size) {
             ensure_general_form();
         }
     }
