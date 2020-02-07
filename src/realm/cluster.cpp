@@ -1261,7 +1261,7 @@ bool Cluster::try_get(ObjKey k, ClusterNode::State& state) const
         return state.index != m_keys.size() && m_keys.get(state.index) == uint64_t(k.value);
     }
     else {
-        if (k.value < (Array::get(s_key_ref_or_size_index) >> 1)) {
+        if (uint64_t(k.value) < uint64_t(Array::get(s_key_ref_or_size_index) >> 1)) {
             state.index = size_t(k.value);
             return true;
         }
@@ -1877,7 +1877,8 @@ void ClusterTree::insert_fast(ObjKey k, const FieldValues& init_values, ClusterN
 
         replace_root(std::move(new_root));
     }
-    m_size++;
+    if (!k.is_unresolved())
+        m_size++;
 }
 
 Obj ClusterTree::insert(ObjKey k, const FieldValues& values)
@@ -2031,7 +2032,8 @@ void ClusterTree::erase(ObjKey k, CascadeState& state)
 
     bump_content_version();
     bump_storage_version();
-    m_size--;
+    if (!k.is_unresolved())
+        m_size--;
     while (!m_root->is_leaf() && root_size == 1) {
         ClusterNodeInner* node = static_cast<ClusterNodeInner*>(m_root.get());
 

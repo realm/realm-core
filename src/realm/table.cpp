@@ -2666,7 +2666,16 @@ Obj Table::create_object_with_primary_key(const Mixed& primary_key)
         repl->create_object_with_primary_key(this, object_id, primary_key);
     }
 
-    return create_object(object_key, {{primary_key_col, primary_key}});
+    Obj ret = create_object(object_key, {{primary_key_col, primary_key}});
+    // Check if unresolved exists
+    ObjKey unres_key = object_key.get_unresolved();
+    if (is_valid(unres_key)) {
+        auto tombstone = m_clusters.get(unres_key);
+        ret.assign(tombstone);
+        CascadeState state(CascadeState::Mode::None);
+        m_clusters.erase(unres_key, state);
+    }
+    return ret;
 }
 
 ObjKey Table::get_object_with_primary_key(const Mixed& primary_key)

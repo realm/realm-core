@@ -256,6 +256,19 @@ T ConstObj::_get(ColKey::Idx col_ndx) const
 }
 
 template <>
+ObjKey ConstObj::_get<ObjKey>(ColKey::Idx col_ndx) const
+{
+    _update_if_needed();
+
+    ArrayKey values(get_alloc());
+    ref_type ref = to_ref(Array::get(m_mem.get_addr(), col_ndx.val + 1));
+    values.init_from_ref(ref);
+
+    ObjKey k = values.get(m_row_ndx);
+    return k.is_unresolved() ? ObjKey{} : k;
+}
+
+template <>
 int64_t ConstObj::_get<int64_t>(ColKey::Idx col_ndx) const
 {
     // manual inline of is_in_sync():
@@ -1324,7 +1337,7 @@ void Obj::assign(const ConstObj& other)
             auto linking_obj = t->get_object(bl);
             if (c.get_type() == col_type_Link) {
                 // Single link
-                REALM_ASSERT(linking_obj.get<ObjKey>(c) == other.get_key());
+                REALM_ASSERT(!linking_obj.get<ObjKey>(c) || linking_obj.get<ObjKey>(c) == other.get_key());
                 linking_obj.set(c, get_key());
             }
             else {
