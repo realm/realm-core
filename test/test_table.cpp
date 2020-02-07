@@ -4796,6 +4796,140 @@ TEST(List_Ops)
     test_lists<ObjectId>(test_context, sg, type_ObjectId, true);
 }
 
+template <typename T, typename U = T>
+void test_lists_numeric_agg(TestContext& test_context, DBRef sg, const realm::DataType type_id, U null_value = U{},
+                            bool optional = false)
+{
+    auto t = sg->start_write();
+    auto table = t->add_table("the_table");
+    auto col = table->add_column_list(type_id, "the column", optional);
+    Obj o = table->create_object();
+    Lst<T> lst = o.get_list<T>(col);
+    for (int j = -1000; j < 1000; ++j) {
+        T value = T(j);
+        lst.add(value);
+    }
+    if (optional) {
+        // given that sum/avg do not count nulls and min/max ignore nulls,
+        // adding any number of null values should not affect the results of any aggregates
+        for (size_t i = 0; i < 1000; ++i) {
+            lst.add(null_value);
+        }
+    }
+    for (int j = -1000; j < 1000; ++j) {
+        CHECK_EQUAL(lst.get(j + 1000), T(j));
+    }
+    {
+        size_t ret_ndx = realm::npos;
+        Mixed min = lst.min(&ret_ndx);
+        CHECK(!min.is_null());
+        CHECK_EQUAL(ret_ndx, 0);
+        CHECK_EQUAL(min.get<ColumnMinMaxType<T>>(), ColumnMinMaxType<T>(-1000));
+        Mixed max = lst.max(&ret_ndx);
+        CHECK(!max.is_null());
+        CHECK_EQUAL(ret_ndx, 1999);
+        CHECK_EQUAL(max.get<ColumnMinMaxType<T>>(), ColumnMinMaxType<T>(999));
+        size_t ret_count = 0;
+        Mixed sum = lst.sum(&ret_count);
+        CHECK(!sum.is_null());
+        CHECK_EQUAL(ret_count, 2000);
+        CHECK_EQUAL(sum.get<ColumnSumType<T>>(), ColumnSumType<T>(-1000));
+        Mixed avg = lst.avg(&ret_count);
+        CHECK(!avg.is_null());
+        CHECK_EQUAL(ret_count, 2000);
+        CHECK_EQUAL(avg.get<ColumnAverageType<T>>(), (ColumnAverageType<T>(-1000) / ColumnAverageType<T>(2000)));
+    }
+
+    lst.clear();
+    CHECK_EQUAL(lst.size(), 0);
+    {
+        size_t ret_ndx = realm::npos;
+        Mixed min = lst.min(&ret_ndx);
+        CHECK_EQUAL(ret_ndx, realm::npos);
+        ret_ndx = realm::npos;
+        Mixed max = lst.max(&ret_ndx);
+        CHECK_EQUAL(ret_ndx, realm::npos);
+        size_t ret_count = realm::npos;
+        Mixed sum = lst.sum(&ret_count);
+        CHECK_EQUAL(ret_count, 0);
+        ret_count = realm::npos;
+        Mixed avg = lst.avg(&ret_count);
+        CHECK_EQUAL(ret_count, 0);
+    }
+
+    lst.add(T(1));
+    {
+        size_t ret_ndx = realm::npos;
+        Mixed min = lst.min(&ret_ndx);
+        CHECK(!min.is_null());
+        CHECK_EQUAL(ret_ndx, 0);
+        CHECK_EQUAL(min.get<ColumnMinMaxType<T>>(), ColumnMinMaxType<T>(1));
+        Mixed max = lst.max(&ret_ndx);
+        CHECK(!max.is_null());
+        CHECK_EQUAL(ret_ndx, 0);
+        CHECK_EQUAL(max.get<ColumnMinMaxType<T>>(), ColumnMinMaxType<T>(1));
+        size_t ret_count = 0;
+        Mixed sum = lst.sum(&ret_count);
+        CHECK(!sum.is_null());
+        CHECK_EQUAL(ret_count, 1);
+        CHECK_EQUAL(sum.get<ColumnSumType<T>>(), ColumnSumType<T>(1));
+        Mixed avg = lst.avg(&ret_count);
+        CHECK(!avg.is_null());
+        CHECK_EQUAL(ret_count, 1);
+        CHECK_EQUAL(avg.get<ColumnAverageType<T>>(), ColumnAverageType<T>(1));
+    }
+
+    t->rollback();
+}
+
+TEST(List_AggOps)
+{
+    SHARED_GROUP_TEST_PATH(path);
+
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
+
+    test_lists_numeric_agg<int64_t>(test_context, sg, type_Int);
+    test_lists_numeric_agg<float>(test_context, sg, type_Float);
+    test_lists_numeric_agg<double>(test_context, sg, type_Double);
+    test_lists_numeric_agg<Decimal128>(test_context, sg, type_Decimal);
+
+    test_lists_numeric_agg<Optional<int64_t>>(test_context, sg, type_Int, Optional<int64_t>{}, true);
+    test_lists_numeric_agg<float>(test_context, sg, type_Float, realm::null::get_null_float<float>(), true);
+    test_lists_numeric_agg<double>(test_context, sg, type_Double, realm::null::get_null_float<double>(), true);
+    test_lists_numeric_agg<Decimal128>(test_context, sg, type_Decimal, Decimal128(realm::null()), true);
+}
+
+TEST(List_DecimalMinMax)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
+    auto t = sg->start_write();
+    auto table = t->add_table("the_table");
+    auto col = table->add_column_list(type_Decimal, "the column");
+    Obj o = table->create_object();
+    Lst<Decimal128> lst = o.get_list<Decimal128>(col);
+    std::string larger_than_max_int64_t = "123.45e99";
+    lst.add(Decimal128(larger_than_max_int64_t));
+    CHECK_EQUAL(lst.size(), 1);
+    CHECK_EQUAL(lst.get(0), Decimal128(larger_than_max_int64_t));
+    size_t min_ndx = realm::npos;
+    Mixed min = lst.min(&min_ndx);
+    CHECK_EQUAL(min_ndx, 0);
+    CHECK_EQUAL(min.get<Decimal128>(), Decimal128(larger_than_max_int64_t));
+    lst.clear();
+    CHECK_EQUAL(lst.size(), 0);
+    std::string smaller_than_min_int64_t = "-123.45e99";
+    lst.add(Decimal128(smaller_than_min_int64_t));
+    CHECK_EQUAL(lst.size(), 1);
+    CHECK_EQUAL(lst.get(0), Decimal128(smaller_than_min_int64_t));
+    size_t max_ndx = realm::npos;
+    Mixed max = lst.max(&max_ndx);
+    CHECK_EQUAL(max_ndx, 0);
+    CHECK_EQUAL(max.get<Decimal128>(), Decimal128(smaller_than_min_int64_t));
+}
+
 template <typename T>
 void check_table_values(TestContext& test_context, TableRef t, ColKey col, std::map<int, managed<T>>& reference)
 {

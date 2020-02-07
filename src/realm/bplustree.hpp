@@ -20,6 +20,7 @@
 #define REALM_BPLUSTREE_HPP
 
 #include <realm/column_type_traits.hpp>
+#include <realm/decimal128.hpp>
 #include <realm/timestamp.hpp>
 #include <realm/object_id.hpp>
 #include <realm/util/function_ref.hpp>
@@ -619,6 +620,11 @@ inline bool bptree_aggregate_not_null(double val)
 {
     return !null::is_null_float(val);
 }
+template <>
+inline bool bptree_aggregate_not_null(Decimal128 val)
+{
+    return !val.is_null();
+}
 template <class T>
 inline T bptree_aggregate_value(util::Optional<T> val)
 {
@@ -657,16 +663,21 @@ template <class T>
 ColumnMinMaxType<T> bptree_maximum(const BPlusTree<T>& tree, size_t* return_ndx = nullptr)
 {
     using ResultType = typename AggregateResultType<T, act_Max>::result_type;
-    ResultType max = std::numeric_limits<ResultType>::lowest();
+    ResultType max{}; // placeholder, callers should check return_ndx for integrity
+    if (tree.size() == 0) {
+        return max;
+    }
 
-    auto func = [&max, return_ndx](BPlusTreeNode* node, size_t offset) {
+    bool do_set_to_first_value = true;
+    auto func = [&max, return_ndx, &do_set_to_first_value](BPlusTreeNode* node, size_t offset) {
         auto leaf = static_cast<typename BPlusTree<T>::LeafNode*>(node);
         size_t sz = leaf->size();
         for (size_t i = 0; i < sz; i++) {
             auto val_or_null = leaf->get(i);
             if (bptree_aggregate_not_null(val_or_null)) {
                 auto val = bptree_aggregate_value<ResultType>(val_or_null);
-                if (val > max) {
+                if (val > max || do_set_to_first_value) {
+                    do_set_to_first_value = false;
                     max = val;
                     if (return_ndx) {
                         *return_ndx = i + offset;
@@ -686,16 +697,21 @@ template <class T>
 ColumnMinMaxType<T> bptree_minimum(const BPlusTree<T>& tree, size_t* return_ndx = nullptr)
 {
     using ResultType = typename AggregateResultType<T, act_Max>::result_type;
-    ResultType min = std::numeric_limits<ResultType>::max();
+    ResultType min{}; // placeholder, callers should check return_ndx for integrity
+    if (tree.size() == 0) {
+        return min;
+    }
 
-    auto func = [&min, return_ndx](BPlusTreeNode* node, size_t offset) {
+    bool do_set_to_first_value = true;
+    auto func = [&min, return_ndx, &do_set_to_first_value](BPlusTreeNode* node, size_t offset) {
         auto leaf = static_cast<typename BPlusTree<T>::LeafNode*>(node);
         size_t sz = leaf->size();
         for (size_t i = 0; i < sz; i++) {
             auto val_or_null = leaf->get(i);
             if (bptree_aggregate_not_null(val_or_null)) {
                 auto val = bptree_aggregate_value<ResultType>(val_or_null);
-                if (val < min) {
+                if (val < min || do_set_to_first_value) {
+                    do_set_to_first_value = false;
                     min = val;
                     if (return_ndx) {
                         *return_ndx = i + offset;
