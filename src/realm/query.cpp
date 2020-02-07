@@ -1317,11 +1317,10 @@ void Query::find_all(ConstTableView& ret, size_t begin, size_t end, size_t limit
         else {
             auto pn = root_node();
             auto node = pn->m_children[find_best_node(pn)];
-            // even with index, we can only drive the search from the index if
-            // there are no begin/end requirements on it.
-            auto begin_key = (begin >= m_table->size()) ? ObjKey() : m_table->get_object(begin).get_key();
-            auto end_key = (end >= m_table->size()) ? ObjKey() : m_table->get_object(end).get_key();
             if (node->has_search_index()) {
+                // translate begin/end limiters into corresponding keys
+                auto begin_key = (begin >= m_table->size()) ? ObjKey() : m_table->get_object(begin).get_key();
+                auto end_key = (end >= m_table->size()) ? ObjKey() : m_table->get_object(end).get_key();
                 KeyColumn* refs = ret.m_key_values;
                 node->index_based_aggregate(limit, [&](ConstObj& obj) -> bool {
                     auto key = obj.get_key();

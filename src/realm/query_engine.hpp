@@ -136,7 +136,6 @@ const size_t bitwidth_time_unit = 64;
 
 typedef bool (*CallbackDummy)(int64_t);
 using Evaluator = util::FunctionRef<bool(ConstObj& obj)>;
-// using Evaluator = std::function<bool(ConstObj& obj)>;
 
 class ParentNode {
     typedef ParentNode ThisType;
