@@ -631,11 +631,23 @@ inline T bptree_aggregate_value(util::Optional<T> val)
     return *val;
 }
 
+template <typename T>
+inline T get_non_null_placeholder()
+{
+    return T{};
+}
+
+template <>
+inline Timestamp get_non_null_placeholder()
+{
+    return Timestamp{0, 0};
+}
+
 template <class T>
 ColumnSumType<T> bptree_sum(const BPlusTree<T>& tree, size_t* return_cnt = nullptr)
 {
     using ResultType = typename AggregateResultType<T, act_Sum>::result_type;
-    ResultType result{};
+    ResultType result = get_non_null_placeholder<ResultType>();
     size_t cnt = 0;
 
     auto func = [&result, &cnt](BPlusTreeNode* node, size_t) {
@@ -663,7 +675,7 @@ template <class T>
 ColumnMinMaxType<T> bptree_maximum(const BPlusTree<T>& tree, size_t* return_ndx = nullptr)
 {
     using ResultType = typename AggregateResultType<T, act_Max>::result_type;
-    ResultType max{}; // placeholder, callers should check return_ndx for integrity
+    ResultType max = get_non_null_placeholder<ResultType>();
     if (tree.size() == 0) {
         return max;
     }
@@ -697,7 +709,7 @@ template <class T>
 ColumnMinMaxType<T> bptree_minimum(const BPlusTree<T>& tree, size_t* return_ndx = nullptr)
 {
     using ResultType = typename AggregateResultType<T, act_Max>::result_type;
-    ResultType min{}; // placeholder, callers should check return_ndx for integrity
+    ResultType min = get_non_null_placeholder<ResultType>();
     if (tree.size() == 0) {
         return min;
     }
@@ -732,7 +744,7 @@ ColumnAverageType<T> bptree_average(const BPlusTree<T>& tree, size_t* return_cnt
 {
     size_t cnt;
     auto sum = bptree_sum(tree, &cnt);
-    ColumnAverageType<T> avg{};
+    ColumnAverageType<T> avg = get_non_null_placeholder<ColumnAverageType<T>>();
     if (cnt != 0)
         avg = ColumnAverageType<T>(sum) / cnt;
     if (return_cnt)
