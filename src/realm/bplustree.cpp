@@ -664,7 +664,7 @@ BPlusTreeBase& BPlusTreeBase::operator=(const BPlusTreeBase& rhs)
     return *this;
 }
 
-BPlusTreeBase& BPlusTreeBase::operator=(BPlusTreeBase&& rhs)
+BPlusTreeBase& BPlusTreeBase::operator=(BPlusTreeBase&& rhs) noexcept
 {
     // Destroy current tree
     destroy();

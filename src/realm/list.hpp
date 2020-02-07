@@ -419,7 +419,7 @@ protected:
         }
     }
 
-    ConstLstIf(ConstLstIf&& other)
+    ConstLstIf(ConstLstIf&& other) noexcept
         : ConstLstBase(ColKey{}, nullptr)
         , m_tree(std::move(other.m_tree))
         , m_valid(other.m_valid)
@@ -458,7 +458,7 @@ template <class T>
 class ConstLst : public ConstLstIf<T> {
 public:
     ConstLst(const ConstObj& owner, ColKey col_key);
-    ConstLst(ConstLst&& other)
+    ConstLst(ConstLst&& other) noexcept
         : ConstLstBase(other.m_col_key, &m_obj)
         , ConstLstIf<T>(std::move(other))
         , m_obj(std::move(other.m_obj))
@@ -510,7 +510,7 @@ public:
     }
     Lst(const Obj& owner, ColKey col_key);
     Lst(const Lst& other);
-    Lst(Lst&& other);
+    Lst(Lst&& other) noexcept;
 
     Lst& operator=(const Lst& other);
     Lst& operator=(const BPlusTree<T>& other);
@@ -727,7 +727,7 @@ Lst<T>::Lst(const Lst<T>& other)
 }
 
 template <class T>
-Lst<T>::Lst(Lst<T>&& other)
+Lst<T>::Lst(Lst<T>&& other) noexcept
     : ConstLstBase(other.m_col_key, &m_obj)
     , ConstLstIf<T>(std::move(other))
     , m_obj(std::move(other.m_obj))
@@ -778,7 +778,7 @@ public:
     {
         this->init_from_parent();
     }
-    ConstLnkLst(ConstLnkLst&& other)
+    ConstLnkLst(ConstLnkLst&& other) noexcept
         : ConstLstBase(other.m_col_key, &m_obj)
         , ConstLstIf<ObjKey>(std::move(other))
         , m_obj(std::move(other.m_obj))
@@ -814,7 +814,7 @@ public:
         , ObjList(this->m_tree.get(), m_obj.get_target_table(m_col_key))
     {
     }
-    LnkLst(LnkLst&& other)
+    LnkLst(LnkLst&& other) noexcept
         : ConstLstBase(other.m_col_key, &m_obj)
         , Lst<ObjKey>(std::move(other))
         , ObjList(this->m_tree.get(), m_obj.get_target_table(m_col_key))

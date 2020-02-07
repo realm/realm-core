@@ -95,8 +95,8 @@ public:
     Query(const Query& copy);
     Query& operator=(const Query& source);
 
-    Query(Query&&);
-    Query& operator=(Query&&);
+    Query(Query&&) noexcept;
+    Query& operator=(Query&&) noexcept;
 
     // Find links that point to a specific target row
     Query& links_to(ColKey column_key, ObjKey target_key);

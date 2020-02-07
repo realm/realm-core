@@ -2176,7 +2176,7 @@ public:
     {
     }
 
-    Columns(Columns&& other)
+    Columns(Columns&& other) noexcept
         : SimpleQuerySupport(other)
     {
     }
@@ -3669,8 +3669,8 @@ public:
         return *this;
     }
 
-    UnaryOperator(UnaryOperator&&) = default;
-    UnaryOperator& operator=(UnaryOperator&&) = default;
+    UnaryOperator(UnaryOperator&&) noexcept = default;
+    UnaryOperator& operator=(UnaryOperator&&) noexcept = default;
 
     // See comment in base class
     void set_base_table(ConstTableRef table) override
@@ -3748,8 +3748,8 @@ public:
         return *this;
     }
 
-    Operator(Operator&&) = default;
-    Operator& operator=(Operator&&) = default;
+    Operator(Operator&&) noexcept = default;
+    Operator& operator=(Operator&&) noexcept = default;
 
     // See comment in base class
     void set_base_table(ConstTableRef table) override
