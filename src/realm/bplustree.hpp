@@ -131,7 +131,7 @@ public:
     virtual ~BPlusTreeBase();
 
     BPlusTreeBase& operator=(const BPlusTreeBase& rhs);
-    BPlusTreeBase& operator=(BPlusTreeBase&& rhs);
+    BPlusTreeBase& operator=(BPlusTreeBase&& rhs) noexcept;
 
     Allocator& get_alloc() const
     {
@@ -365,7 +365,7 @@ public:
         *this = other;
     }
 
-    BPlusTree(BPlusTree&& other)
+    BPlusTree(BPlusTree&& other) noexcept
         : BPlusTree(other.get_alloc())
     {
         *this = std::move(other);
@@ -379,7 +379,7 @@ public:
         return *this;
     }
 
-    BPlusTree& operator=(BPlusTree&& rhs)
+    BPlusTree& operator=(BPlusTree&& rhs) noexcept
     {
         this->BPlusTreeBase::operator=(std::move(rhs));
         return *this;

@@ -543,19 +543,18 @@ private:
 
     // Description of to-be-deleted memory mapping
     struct OldMapping {
-        OldMapping(uint64_t version, util::File::Map<char>& map)
+        OldMapping(uint64_t version, util::File::Map<char>&& map) noexcept
             : replaced_at_version(version)
-            , mapping()
+            , mapping(std::move(map))
         {
-            mapping = std::move(map);
         }
-        OldMapping(OldMapping&& other)
+        OldMapping(OldMapping&& other) noexcept
             : replaced_at_version(other.replaced_at_version)
             , mapping()
         {
             mapping = std::move(other.mapping);
         }
-        void operator=(OldMapping&& other)
+        void operator=(OldMapping&& other) noexcept
         {
             replaced_at_version = other.replaced_at_version;
             mapping = std::move(other.mapping);
@@ -564,7 +563,7 @@ private:
         util::File::Map<char> mapping;
     };
     struct OldRefTranslation {
-        OldRefTranslation(uint64_t v, RefTranslation* m)
+        OldRefTranslation(uint64_t v, RefTranslation* m) noexcept
         {
             replaced_at_version = v;
             translations = m;

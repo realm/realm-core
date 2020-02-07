@@ -721,7 +721,7 @@ public:
     Map& operator=(const Map&) = delete;
 
     /// Move the mapping from another Map object to this Map object
-    File::Map<T>& operator=(File::Map<T>&& other)
+    File::Map<T>& operator=(File::Map<T>&& other) noexcept
     {
         if (m_addr)
             unmap();
@@ -737,6 +737,10 @@ public:
         other.m_encrypted_mapping = nullptr;
 #endif
         return *this;
+    }
+    Map(Map&& other) noexcept
+    {
+        *this = std::move(other);
     }
 
     /// See File::map().

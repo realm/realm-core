@@ -65,7 +65,7 @@ public:
     Thread(const Thread&) = delete;
     Thread& operator=(const Thread&) = delete;
 
-    Thread(Thread&&);
+    Thread(Thread&&) noexcept;
 
     /// This method is an extension of the API provided by
     /// std::thread. This method exists because proper move semantics
@@ -427,7 +427,7 @@ inline Thread::Thread(F func)
     func2.release();
 }
 
-inline Thread::Thread(Thread&& thread)
+inline Thread::Thread(Thread&& thread) noexcept
 {
 #ifndef _WIN32
     m_id = thread.m_id;
