@@ -2703,7 +2703,7 @@ ObjKey Table::get_object_with_primary_key(const Mixed& primary_key)
         return unres_key;
     }
 
-    return allocate_unresolved_key(object_key);
+    return allocate_unresolved_key(object_key, {{primary_key_col, primary_key}});
 }
 
 ObjKey Table::get_obj_key(GlobalKey id) const
@@ -2884,13 +2884,13 @@ ObjKey Table::allocate_local_id_after_hash_collision(GlobalKey incoming_id, Glob
     return new_local_id;
 }
 
-ObjKey Table::allocate_unresolved_key(ObjKey key)
+ObjKey Table::allocate_unresolved_key(ObjKey key, const FieldValues& values)
 {
     auto unres_key = key.get_unresolved();
 
     bump_content_version();
     bump_storage_version();
-    Obj tombstone = m_clusters.insert(unres_key, {});
+    Obj tombstone = m_clusters.insert(unres_key, values);
 
     return tombstone.get_key();
 }

@@ -40,6 +40,7 @@ TEST(Links_UnresolvedBasic)
     Group g;
 
     auto cars = g.add_table_with_primary_key("Car", type_String, "model");
+    auto col_price = cars->add_column(type_Decimal, "price");
     auto persons = g.add_table_with_primary_key("Person", type_String, "e-mail");
     auto col_owns = persons->add_column_link(type_Link, "car", *cars);
     auto dealers = g.add_table_with_primary_key("Dealer", type_Int, "cvr");
@@ -49,6 +50,8 @@ TEST(Links_UnresolvedBasic)
     auto mathias = persons->create_object_with_primary_key("mathias@10gen.com");
     auto joergen = dealers->create_object_with_primary_key(18454033);
     auto stock = joergen.get_linklist(col_has);
+
+    cars->create_object_with_primary_key("Skoda Fabia").set(col_price, Decimal128("149999.5"));
 
     auto new_tesla = cars->get_object_with_primary_key("Tesla 10");
     CHECK(new_tesla.is_unresolved());
@@ -60,12 +63,17 @@ TEST(Links_UnresolvedBasic)
 
     CHECK_NOT(finn.get<ObjKey>(col_owns));
     CHECK_EQUAL(stock.size(), 0);
-    CHECK_EQUAL(cars->size(), 0);
-
-    cars->create_object_with_primary_key("Tesla 10");
-    CHECK_EQUAL(stock.size(), 1);
     CHECK_EQUAL(cars->size(), 1);
+    auto q = cars->column<Decimal128>(col_price) < Decimal128("300000");
+    CHECK_EQUAL(q.count(), 1);
+
+    // cars->dump_objects();
+
+    cars->create_object_with_primary_key("Tesla 10").set(col_price, Decimal128("499999.5"));
+    CHECK_EQUAL(stock.size(), 1);
+    CHECK_EQUAL(cars->size(), 2);
     CHECK(finn.get<ObjKey>(col_owns));
+    // cars->dump_objects();
 }
 
 #endif
