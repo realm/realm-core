@@ -156,6 +156,7 @@ SyncServer::SyncServer(StartImmediately start_immediately, std::string local_dir
     config.history_ttl = 1s;
     config.history_compaction_interval = 1s;
     config.state_realm_dir = util::make_temp_dir();
+    config.listen_address = "127.0.0.1";
 
     return config;
 })())
@@ -166,20 +167,8 @@ SyncServer::SyncServer(StartImmediately start_immediately, std::string local_dir
     SyncManager::shared().set_log_level(util::Logger::Level::off);
 #endif
 
-    uint64_t port;
-    while (true) {
-        // Try to pick a random available port, or loop forever if other
-        // problems occur because there's no specific error for "port in use"
-        try {
-            port = fastrand(65536 - 1000) + 1000;
-            m_server.start("127.0.0.1", util::to_string(port));
-            break;
-        }
-        catch (std::runtime_error const&) {
-            continue;
-        }
-    }
-    m_url = util::format("realm://127.0.0.1:%1", port);
+    m_server.start();
+    m_url = util::format("realm://127.0.0.1:%1", m_server.listen_endpoint().port());
     if (start_immediately)
         start();
 }
