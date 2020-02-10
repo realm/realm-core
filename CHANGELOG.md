@@ -1,19 +1,15 @@
-# NEXT RELEASE
+# 6.0.2 Release notes
 
 ### Enhancements
-* None.
+* Use search index to speed up Query::count, Query::find_all and generic aggregate function.
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * None.
  
-### Breaking changes
-* None.
-
 -----------
 
 ### Internals
-* None.
+* Don't force downstream components to look for OpenSSL on Windows.
 
 ----------------------------------------------
 
