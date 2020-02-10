@@ -20,6 +20,7 @@
 #define REALM_BPLUSTREE_HPP
 
 #include <realm/column_type_traits.hpp>
+#include <realm/decimal128.hpp>
 #include <realm/timestamp.hpp>
 #include <realm/object_id.hpp>
 #include <realm/util/function_ref.hpp>
@@ -619,6 +620,11 @@ inline bool bptree_aggregate_not_null(double val)
 {
     return !null::is_null_float(val);
 }
+template <>
+inline bool bptree_aggregate_not_null(Decimal128 val)
+{
+    return !val.is_null();
+}
 template <class T>
 inline T bptree_aggregate_value(util::Optional<T> val)
 {
@@ -658,6 +664,9 @@ ColumnMinMaxType<T> bptree_maximum(const BPlusTree<T>& tree, size_t* return_ndx 
 {
     using ResultType = typename AggregateResultType<T, act_Max>::result_type;
     ResultType max = std::numeric_limits<ResultType>::lowest();
+    if (tree.size() == 0) {
+        return max;
+    }
 
     auto func = [&max, return_ndx](BPlusTreeNode* node, size_t offset) {
         auto leaf = static_cast<typename BPlusTree<T>::LeafNode*>(node);
@@ -687,6 +696,9 @@ ColumnMinMaxType<T> bptree_minimum(const BPlusTree<T>& tree, size_t* return_ndx 
 {
     using ResultType = typename AggregateResultType<T, act_Max>::result_type;
     ResultType min = std::numeric_limits<ResultType>::max();
+    if (tree.size() == 0) {
+        return min;
+    }
 
     auto func = [&min, return_ndx](BPlusTreeNode* node, size_t offset) {
         auto leaf = static_cast<typename BPlusTree<T>::LeafNode*>(node);

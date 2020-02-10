@@ -4,9 +4,12 @@
 * None.
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
- 
+* Fixed a segfault when a list of Decimal128 expanded over 1000 elements.
+* Fixed min/max of a list of Decimal128 when the list contained numbers larger than a min/max int64 type.
+* Fixed sum/avg of a list of Decimal128 when the list contained nulls.
+* Added missing TableView aggregate functions for Decimal128.
+* Fixed min/max Decimal128 via Table not returning the result index.
+
 ### Breaking changes
 * None.
 

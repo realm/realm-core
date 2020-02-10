@@ -497,12 +497,18 @@ inline int compare_float(Float a_raw, Float b_raw)
 
 inline int Mixed::compare(const Mixed& b) const
 {
-    // nulls are treated as being less than all other values
-    if (is_null()) {
-        return b.is_null() ? 0 : -1;
-    }
-    if (b.is_null())
+    // Comparing types first makes it possible to make a sort of a list of Mixed
+    // This will also handle the case where null values are considered lower than all other values
+    if (m_type > b.m_type)
         return 1;
+    else if (m_type < b.m_type)
+        return -1;
+
+    // Now we are sure the two types are the same
+    if (is_null()) {
+        // Both are null
+        return 0;
+    }
 
     switch (get_type()) {
         case type_Int:
@@ -533,6 +539,15 @@ inline int Mixed::compare(const Mixed& b) const
         case type_ObjectId: {
             auto l = get<ObjectId>();
             auto r = b.get<ObjectId>();
+            if (l > r)
+                return 1;
+            else if (l < r)
+                return -1;
+            break;
+        }
+        case type_Decimal: {
+            auto l = get<Decimal128>();
+            auto r = get<Decimal128>();
             if (l > r)
                 return 1;
             else if (l < r)
