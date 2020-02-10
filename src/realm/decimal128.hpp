@@ -98,7 +98,8 @@ inline std::ostream& operator<<(std::ostream& ostr, const Decimal128& id)
 
 namespace std {
 template <>
-struct numeric_limits<realm::Decimal128> : public __numeric_limits_base {
+struct numeric_limits<realm::Decimal128> {
+    static constexpr bool is_integer = false;
     static realm::Decimal128 lowest() noexcept
     {
         return realm::Decimal128("-Inf");
