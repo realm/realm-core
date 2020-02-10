@@ -135,6 +135,7 @@ const size_t probe_matches = 4;
 const size_t bitwidth_time_unit = 64;
 
 typedef bool (*CallbackDummy)(int64_t);
+using Evaluator = util::FunctionRef<bool(ConstObj& obj)>;
 
 class ParentNode {
     typedef ParentNode ThisType;
@@ -142,6 +143,12 @@ class ParentNode {
 public:
     ParentNode() = default;
     virtual ~ParentNode() = default;
+
+    virtual bool has_search_index() const
+    {
+        return false;
+    }
+    virtual void index_based_aggregate(size_t, Evaluator) {}
 
     void gather_children(std::vector<ParentNode*>& v)
     {
@@ -716,9 +723,19 @@ public:
         m_needles.insert(other->m_value);
     }
 
-    bool has_search_index() const
+    bool has_search_index() const override
     {
         return this->m_table->has_search_index(IntegerNodeBase<LeafType>::m_condition_column_key);
+    }
+
+    void index_based_aggregate(size_t limit, Evaluator evaluator) override
+    {
+        for (size_t t = 0; t < m_result.size() && limit > 0; ++t) {
+            auto obj = this->m_table->get_object(m_result[t]);
+            if (evaluator(obj)) {
+                --limit;
+            }
+        }
     }
 
     void aggregate_local_prepare(Action action, DataType col_id, bool is_nullable) override
@@ -1601,7 +1618,7 @@ public:
 
     void init() override;
 
-    bool has_search_index() const
+    bool has_search_index() const override
     {
         return m_has_search_index;
     }
@@ -1681,6 +1698,25 @@ public:
             }
         }
     }
+    void index_based_aggregate(size_t limit, Evaluator evaluator) override
+    {
+        if (limit == 0)
+            return;
+        if (m_index_matches == nullptr) {
+            if (m_results_end) { // 1 result
+                auto obj = m_table->get_object(m_actual_key);
+                evaluator(obj);
+            }
+        }
+        else { // multiple results
+            for (size_t t = m_results_start; t < m_results_end && limit > 0; ++t) {
+                auto obj = m_table->get_object(ObjKey(m_index_matches->get(t)));
+                if (evaluator(obj)) {
+                    --limit;
+                }
+            }
+        }
+    }
 
 private:
     std::unique_ptr<IntegerColumn> m_index_matches;
@@ -1732,7 +1768,6 @@ public:
         StringNodeBase::table_changed();
         m_has_search_index = m_table.unchecked_ptr()->has_search_index(m_condition_column_key);
     }
-
     void _search_index_init() override;
 
     virtual std::string describe_condition() const override
@@ -1750,6 +1785,16 @@ public:
         , m_ucase(from.m_ucase)
         , m_lcase(from.m_lcase)
     {
+    }
+
+    void index_based_aggregate(size_t limit, Evaluator evaluator) override
+    {
+        for (size_t t = 0; t < m_index_matches.size() && limit > 0; ++t) {
+            auto obj = m_table->get_object(m_index_matches[t]);
+            if (evaluator(obj)) {
+                --limit;
+            }
+        }
     }
 
 private:
