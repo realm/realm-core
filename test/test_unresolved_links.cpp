@@ -51,7 +51,7 @@ TEST(Links_UnresolvedBasic)
     auto joergen = dealers->create_object_with_primary_key(18454033);
     auto stock = joergen.get_linklist(col_has);
 
-    cars->create_object_with_primary_key("Skoda Fabia").set(col_price, Decimal128("149999.5"));
+    auto skoda = cars->create_object_with_primary_key("Skoda Fabia").set(col_price, Decimal128("149999.5"));
 
     auto new_tesla = cars->get_object_with_primary_key("Tesla 10");
     CHECK(new_tesla.is_unresolved());
@@ -60,9 +60,11 @@ TEST(Links_UnresolvedBasic)
 
     auto another_tesla = cars->get_object_with_primary_key("Tesla 10");
     stock.add(another_tesla);
+    stock.add(skoda.get_key());
 
     CHECK_NOT(finn.get<ObjKey>(col_owns));
-    CHECK_EQUAL(stock.size(), 0);
+    CHECK_EQUAL(stock.size(), 1);
+    CHECK_EQUAL(stock.get(0), skoda.get_key());
     CHECK_EQUAL(cars->size(), 1);
     auto q = cars->column<Decimal128>(col_price) < Decimal128("300000");
     CHECK_EQUAL(q.count(), 1);
@@ -70,7 +72,7 @@ TEST(Links_UnresolvedBasic)
     // cars->dump_objects();
 
     cars->create_object_with_primary_key("Tesla 10").set(col_price, Decimal128("499999.5"));
-    CHECK_EQUAL(stock.size(), 1);
+    CHECK_EQUAL(stock.size(), 2);
     CHECK_EQUAL(cars->size(), 2);
     CHECK(finn.get<ObjKey>(col_owns));
     // cars->dump_objects();
