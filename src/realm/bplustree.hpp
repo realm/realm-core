@@ -631,23 +631,11 @@ inline T bptree_aggregate_value(util::Optional<T> val)
     return *val;
 }
 
-template <typename T>
-inline T get_non_null_placeholder()
-{
-    return T{};
-}
-
-template <>
-inline Timestamp get_non_null_placeholder()
-{
-    return Timestamp{0, 0};
-}
-
 template <class T>
 ColumnSumType<T> bptree_sum(const BPlusTree<T>& tree, size_t* return_cnt = nullptr)
 {
     using ResultType = typename AggregateResultType<T, act_Sum>::result_type;
-    ResultType result = get_non_null_placeholder<ResultType>();
+    ResultType result{};
     size_t cnt = 0;
 
     auto func = [&result, &cnt](BPlusTreeNode* node, size_t) {
@@ -675,21 +663,19 @@ template <class T>
 ColumnMinMaxType<T> bptree_maximum(const BPlusTree<T>& tree, size_t* return_ndx = nullptr)
 {
     using ResultType = typename AggregateResultType<T, act_Max>::result_type;
-    ResultType max = get_non_null_placeholder<ResultType>();
+    ResultType max = std::numeric_limits<ResultType>::lowest();
     if (tree.size() == 0) {
         return max;
     }
 
-    bool do_set_to_first_value = true;
-    auto func = [&max, return_ndx, &do_set_to_first_value](BPlusTreeNode* node, size_t offset) {
+    auto func = [&max, return_ndx](BPlusTreeNode* node, size_t offset) {
         auto leaf = static_cast<typename BPlusTree<T>::LeafNode*>(node);
         size_t sz = leaf->size();
         for (size_t i = 0; i < sz; i++) {
             auto val_or_null = leaf->get(i);
             if (bptree_aggregate_not_null(val_or_null)) {
                 auto val = bptree_aggregate_value<ResultType>(val_or_null);
-                if (val > max || do_set_to_first_value) {
-                    do_set_to_first_value = false;
+                if (val > max) {
                     max = val;
                     if (return_ndx) {
                         *return_ndx = i + offset;
@@ -709,21 +695,19 @@ template <class T>
 ColumnMinMaxType<T> bptree_minimum(const BPlusTree<T>& tree, size_t* return_ndx = nullptr)
 {
     using ResultType = typename AggregateResultType<T, act_Max>::result_type;
-    ResultType min = get_non_null_placeholder<ResultType>();
+    ResultType min = std::numeric_limits<ResultType>::max();
     if (tree.size() == 0) {
         return min;
     }
 
-    bool do_set_to_first_value = true;
-    auto func = [&min, return_ndx, &do_set_to_first_value](BPlusTreeNode* node, size_t offset) {
+    auto func = [&min, return_ndx](BPlusTreeNode* node, size_t offset) {
         auto leaf = static_cast<typename BPlusTree<T>::LeafNode*>(node);
         size_t sz = leaf->size();
         for (size_t i = 0; i < sz; i++) {
             auto val_or_null = leaf->get(i);
             if (bptree_aggregate_not_null(val_or_null)) {
                 auto val = bptree_aggregate_value<ResultType>(val_or_null);
-                if (val < min || do_set_to_first_value) {
-                    do_set_to_first_value = false;
+                if (val < min) {
                     min = val;
                     if (return_ndx) {
                         *return_ndx = i + offset;
@@ -744,7 +728,7 @@ ColumnAverageType<T> bptree_average(const BPlusTree<T>& tree, size_t* return_cnt
 {
     size_t cnt;
     auto sum = bptree_sum(tree, &cnt);
-    ColumnAverageType<T> avg = get_non_null_placeholder<ColumnAverageType<T>>();
+    ColumnAverageType<T> avg{};
     if (cnt != 0)
         avg = ColumnAverageType<T>(sum) / cnt;
     if (return_cnt)

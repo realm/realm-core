@@ -96,4 +96,18 @@ inline std::ostream& operator<<(std::ostream& ostr, const Decimal128& id)
 
 } // namespace realm
 
+namespace std {
+template <>
+struct numeric_limits<realm::Decimal128> : public __numeric_limits_base {
+    static realm::Decimal128 lowest() noexcept
+    {
+        return realm::Decimal128("-Inf");
+    }
+    static realm::Decimal128 max() noexcept
+    {
+        return realm::Decimal128("+Inf");
+    }
+};
+} // namespace std
+
 #endif /* REALM_DECIMAL_HPP */
