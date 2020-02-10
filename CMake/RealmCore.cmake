@@ -38,15 +38,34 @@ if(APPLE)
 
     set(CRYPTO_LIBRARIES "")
     set(SSL_LIBRARIES ${FOUNDATION_FRAMEWORK} ${SECURITY_FRAMEWORK})
-elseif(REALM_PLATFORM STREQUAL "Android")
-    set(CRYPTO_LIBRARIES crypto)
-    set(SSL_LIBRARIES ssl)
 elseif(CMAKE_SYSTEM_NAME MATCHES "^Windows")
     # Windows doesn't do crypto right now, but that is subject to change
     set(CRYPTO_LIBRARIES "")
     set(SSL_LIBRARIES "")
 else()
-    find_package(OpenSSL REQUIRED)
+    if(NOT EXISTS ${CMAKE_BINARY_DIR}/openssl/lib/cmake/OpenSSL/OpenSSLConfig.cmake)
+        set(OPENSSL_URL "http://static.realm.io/downloads/openssl/${OPENSSL_VERSION}/Linux/x86_64/openssl.tgz")
+        if(REALM_PLATFORM STREQUAL "Android")
+            set(OPENSSL_URL "http://static.realm.io/downloads/openssl/${OPENSSL_VERSION}/Android/${ANDROID_ABI}/openssl.tgz")
+        endif()
+    
+        message(STATUS "Downloading OpenSSL...")
+        file(DOWNLOAD "${OPENSSL_URL}" "${CMAKE_BINARY_DIR}/openssl/openssl.tgz" STATUS download_status)
+    
+        list(GET download_status 0 status_code)
+        if (NOT "${status_code}" STREQUAL "0")
+            message(FATAL_ERROR "Downloading ${OPENSSL_URL}... Failed. Status: ${download_status}")
+        endif()
+    
+        message(STATUS "Uncompressing OpenSSL...")
+        execute_process(
+            COMMAND ${CMAKE_COMMAND} -E tar xfz "openssl.tgz"
+            WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/openssl"
+        )
+        message(STATUS "Importing OpenSSL...")
+    endif()
+    set(OpenSSL_DIR "${CMAKE_BINARY_DIR}/openssl/lib/cmake/OpenSSL")
+    find_package(OpenSSL REQUIRED CONFIG)
 
     set(CRYPTO_LIBRARIES OpenSSL::Crypto)
     set(SSL_LIBRARIES OpenSSL::SSL)
@@ -106,26 +125,6 @@ function(download_realm_tarball url target libraries)
             COMMAND "${CMAKE_COMMAND}" -E make_directory "${target}"
             COMMAND "${CMAKE_COMMAND}" -E chdir "${target}" "${CMAKE_COMMAND}" -E tar xf "${tarball_path}"
             COMMAND "${CMAKE_COMMAND}" -E touch_nocreate ${libraries})
-    endif()
-endfunction()
-
-function(download_android_openssl)
-    if(ANDROID)
-        string(TOLOWER "${CMAKE_BUILD_TYPE}" BUILD_TYPE)
-        set(OPENSSL_FILENAME "openssl-${BUILD_TYPE}-${ANDROID_OPENSSL_VERSION}-Android-${ANDROID_ABI}")
-        set(OPENSSL_URL "http://static.realm.io/downloads/openssl/${ANDROID_OPENSSL_VERSION}/Android/${ANDROID_ABI}/${OPENSSL_FILENAME}.tar.gz")
-
-        message(STATUS "Downloading OpenSSL...")
-        file(DOWNLOAD "${OPENSSL_URL}" "${CMAKE_BINARY_DIR}/${OPENSSL_FILENAME}.tar.gz")
-
-        message(STATUS "Uncompressing OpenSSL...")
-        execute_process(COMMAND ${CMAKE_COMMAND} -E tar xfz "${OPENSSL_FILENAME}.tar.gz")
-
-        message(STATUS "Importing OpenSSL...")
-        include(${CMAKE_BINARY_DIR}/${OPENSSL_FILENAME}/openssl.cmake)
-        get_target_property(OPENSSL_INCLUDE_DIR crypto INTERFACE_INCLUDE_DIRECTORIES)
-        get_target_property(CRYPTO_LIB crypto IMPORTED_LOCATION)
-        get_target_property(SSL_LIB ssl IMPORTED_LOCATION)
     endif()
 endfunction()
 
@@ -190,7 +189,6 @@ function(download_realm_core core_version)
         set(core_libraries ${core_library_debug} ${core_library_release} ${core_parser_library_debug} ${core_parser_library_release})
 
         download_realm_tarball(${url} ${core_directory} "${core_libraries}")
-        download_android_openssl()
     endif()
 
     add_custom_target(realm-core DEPENDS ${core_libraries})
@@ -225,19 +223,12 @@ macro(build_realm_core)
         BUILD_IN_SOURCE 1
         UPDATE_DISCONNECTED 1
         INSTALL_COMMAND ""
-        CONFIGURE_COMMAND ${CMAKE_COMMAND} -E make_directory build.debug
-                        && cd build.debug
-                        && cmake -D CMAKE_BUILD_TYPE=Debug ${CORE_SANITIZER_FLAGS} -G Ninja ..
-                        && cd ..
-                        && ${CMAKE_COMMAND} -E make_directory build.release
-                        && cd build.release
-                        && cmake -D CMAKE_BUILD_TYPE=RelWithDebInfo ${CORE_SANITIZER_FLAGS} -G Ninja ..
+        CONFIGURE_COMMAND cmake -B build.debug -DOpenSSL_DIR="${CMAKE_BINARY_DIR}/openssl/lib/cmake/OpenSSL" -D CMAKE_BUILD_TYPE=Debug ${CORE_SANITIZER_FLAGS} -G Ninja
+                       && cmake -B build.release -DOpenSSL_DIR="${CMAKE_BINARY_DIR}/openssl/lib/cmake/OpenSSL" -D CMAKE_BUILD_TYPE=RelWithDebInfo ${CORE_SANITIZER_FLAGS} -G Ninja
+                       
+        BUILD_COMMAND cmake --build build.debug --target Storage --target QueryParser
+                   && cmake --build build.release --target Storage --target QueryParser
 
-        BUILD_COMMAND cd build.debug
-                   && ninja Core QueryParser
-                   && cd ..
-                   && cd build.release
-                   && ninja Core QueryParser
         ${USES_TERMINAL_BUILD}
         ${ARGN}
         )
@@ -266,7 +257,7 @@ macro(build_realm_core)
     set_property(TARGET realm PROPERTY IMPORTED_LOCATION_RELEASE ${core_library_release})
     set_property(TARGET realm PROPERTY IMPORTED_LOCATION ${core_library_release})
 
-    set_property(TARGET realm PROPERTY INTERFACE_LINK_LIBRARIES Threads::Threads ${CRYPTO_LIBRARIES})
+    set_property(TARGET realm PROPERTY INTERFACE_LINK_LIBRARIES ${CRYPTO_LIBRARIES} Threads::Threads)
 
     # Create directories that are included in INTERFACE_INCLUDE_DIRECTORIES, as CMake requires they exist at
     # configure time, when they'd otherwise not be created until we download and build core.
@@ -307,25 +298,17 @@ macro(build_realm_sync)
     ExternalProject_Get_Property(realm-core SOURCE_DIR)
     set(core_directory ${SOURCE_DIR})
 
-    separate_arguments(sync_cfg_args UNIX_COMMAND "-DOPENSSL_ROOT_DIR=${OPENSSL_ROOT_DIR} -DREALM_BUILD_DOGLESS=OFF ${CORE_SANITIZER_FLAGS} -G Ninja")
+    separate_arguments(sync_cfg_args UNIX_COMMAND "-DREALM_BUILD_DOGLESS=OFF ${CORE_SANITIZER_FLAGS} -G Ninja")
     ExternalProject_Add(realm-sync-lib
         DEPENDS realm-core
         PREFIX ${sync_prefix_directory}
         BUILD_IN_SOURCE 1
         UPDATE_DISCONNECTED 1
         INSTALL_COMMAND ""
-        CONFIGURE_COMMAND ${CMAKE_COMMAND} -E make_directory build.debug
-                        && cd build.debug
-                        && cmake -DCMAKE_BUILD_TYPE=Debug -DREALM_CORE_BUILDTREE=${core_directory}/build.debug ${sync_cfg_args} ..
-                        && cd ..
-                        && ${CMAKE_COMMAND} -E make_directory build.release
-                        && cd build.release
-                        && cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo -DREALM_CORE_BUILDTREE=${core_directory}/build.release ${sync_cfg_args}  ..
-        BUILD_COMMAND cd build.debug
-                        && ninja Sync SyncServer
-                        && cd ..
-                        && cd build.release
-                        && ninja Sync SyncServer
+        CONFIGURE_COMMAND cmake -B build.debug -DCMAKE_BUILD_TYPE=Debug -DRealmCore_DIR=${core_directory}/build.debug ${sync_cfg_args}
+                       && cmake -B build.release -DCMAKE_BUILD_TYPE=RelWithDebInfo -DRealmCore_DIR=${core_directory}/build.release ${sync_cfg_args}
+        BUILD_COMMAND cmake --build build.debug --target Sync --target SyncServer
+                   && cmake --build build.release --target Sync --target SyncServer
              ${USES_TERMINAL_BUILD}
         ${ARGN}
         )
