@@ -136,7 +136,12 @@ TableRef create_table(Group& group, ObjectSchema const& object_schema)
         }
     }
     else {
-        table = group.get_or_add_table(name);
+        if (object_schema.is_embedded) {
+            table = group.add_embedded_table(name);
+        }
+        else {
+            table = group.get_or_add_table(name);
+        }
     }
 
     return table;

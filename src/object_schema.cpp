@@ -33,15 +33,27 @@ ObjectSchema::ObjectSchema() = default;
 ObjectSchema::~ObjectSchema() = default;
 
 ObjectSchema::ObjectSchema(std::string name, std::initializer_list<Property> persisted_properties)
-: ObjectSchema(std::move(name), persisted_properties, {})
+: ObjectSchema(std::move(name), IsEmbedded{false}, persisted_properties, {})
+{
+}
+
+ObjectSchema::ObjectSchema(std::string name, IsEmbedded is_embedded, std::initializer_list<Property> persisted_properties)
+: ObjectSchema(std::move(name), is_embedded, persisted_properties, {})
 {
 }
 
 ObjectSchema::ObjectSchema(std::string name, std::initializer_list<Property> persisted_properties,
                            std::initializer_list<Property> computed_properties)
+: ObjectSchema(std::move(name), IsEmbedded{false}, persisted_properties, computed_properties)
+{
+}
+
+ObjectSchema::ObjectSchema(std::string name, IsEmbedded is_embedded, std::initializer_list<Property> persisted_properties,
+                           std::initializer_list<Property> computed_properties)
 : name(std::move(name))
 , persisted_properties(persisted_properties)
 , computed_properties(computed_properties)
+, is_embedded(is_embedded)
 {
     for (auto const& prop : persisted_properties) {
         if (prop.is_primary) {
@@ -87,6 +99,7 @@ ObjectSchema::ObjectSchema(Group const& group, StringData name, TableKey key)
         table = ObjectStore::table_for_object_type(group, name);
     }
     table_key = table->get_key();
+    is_embedded = table->is_embedded();
 
     size_t count = table->get_column_count();
     persisted_properties.reserve(count);
@@ -330,6 +343,9 @@ void ObjectSchema::validate(Schema const& schema, std::vector<ObjectSchemaValida
         validate_property(schema, name, prop, &primary, exceptions);
     }
 
+    if (!primary_key.empty() && is_embedded) {
+        exceptions.emplace_back("Embedded table '%1' cannot have primary key '%2'.", name, primary_key);
+    }
     if (!primary_key.empty() && !primary && !primary_key_property()) {
         exceptions.emplace_back("Specified primary key '%1.%2' does not exist.", name, primary_key);
     }
