@@ -146,8 +146,8 @@ Query& Query::operator=(const Query& source)
     return *this;
 }
 
-Query::Query(Query&&) noexcept = default;
-Query& Query::operator=(Query&&) noexcept = default;
+Query::Query(Query&&) = default;
+Query& Query::operator=(Query&&) = default;
 
 Query::~Query() noexcept = default;
 
