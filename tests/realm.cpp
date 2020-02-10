@@ -1284,6 +1284,25 @@ TEST_CASE("SharedRealm: dynamic schema mode doesn't invalidate object schema poi
     REQUIRE(object_schema == &*r2->schema().find("object"));
 }
 
+TEST_CASE("SharedRealm: declaring an object as embedded results in creating an embedded table") {
+    TestFile config;
+
+    // Prepopulate the Realm with the schema.
+    config.schema = Schema{
+        {"object1", ObjectSchema::IsEmbedded{true}, {
+            {"value", PropertyType::Int},
+        }},
+        {"object2", {
+            {"value", PropertyType::Object | PropertyType::Nullable, "object1"},
+        }}
+    };
+    auto r1 = Realm::get_shared_realm(config);
+
+    Group& g = r1->read_group();
+    auto t = g.get_table("class_object1");
+    REQUIRE(t->is_embedded());
+}
+
 TEST_CASE("SharedRealm: SchemaChangedFunction") {
     struct Context : BindingContext {
         size_t* change_count;
