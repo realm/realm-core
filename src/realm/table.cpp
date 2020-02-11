@@ -2734,14 +2734,13 @@ inline ObjKey get_optimistic_local_id_hashed(GlobalKey global_id)
 #else
     const uint64_t optimistic_mask = 0x3fffffffffffffff;
 #endif
-    static_assert(optimistic_mask < 0xc000000000000000,
-                  "optimistic Object ID mask must leave the 63rd and 64th bit zero");
+    static_assert(!(optimistic_mask >> 62), "optimistic Object ID mask must leave the 63rd and 64th bit zero");
     return ObjKey{int64_t(global_id.lo() & optimistic_mask)};
 }
 
 inline ObjKey make_tagged_local_id_after_hash_collision(uint64_t sequence_number)
 {
-    REALM_ASSERT(sequence_number < 0xc000000000000000);
+    REALM_ASSERT(!(sequence_number >> 62));
     return ObjKey{int64_t(0x4000000000000000 | sequence_number)};
 }
 

@@ -33,11 +33,15 @@
 #endif
 
 #if defined(_MSC_VER) && _MSC_VER >= 1900 // compiling with at least Visual Studio 2015
+#if _MSVC_LANG >= 201703L
+#include <filesystem>
+#else
 #define _SILENCE_EXPERIMENTAL_FILESYSTEM_DEPRECATION_WARNING // switch to <filesystem> once we switch to C++17
 #include <experimental/filesystem>
 namespace std {
     namespace filesystem = std::experimental::filesystem::v1;
 }
+#endif
 #define REALM_HAVE_STD_FILESYSTEM 1
 #else
 #define REALM_HAVE_STD_FILESYSTEM 0
@@ -717,7 +721,7 @@ public:
     Map& operator=(const Map&) = delete;
 
     /// Move the mapping from another Map object to this Map object
-    File::Map<T>& operator=(File::Map<T>&& other)
+    File::Map<T>& operator=(File::Map<T>&& other) noexcept
     {
         if (m_addr)
             unmap();
@@ -733,6 +737,10 @@ public:
         other.m_encrypted_mapping = nullptr;
 #endif
         return *this;
+    }
+    Map(Map&& other) noexcept
+    {
+        *this = std::move(other);
     }
 
     /// See File::map().

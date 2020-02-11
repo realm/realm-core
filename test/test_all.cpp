@@ -21,12 +21,6 @@
 #include "C:\\Program Files (x86)\\Visual Leak Detector\\include\\vld.h"
 #endif
 
-#ifdef _WIN32
-// Using GetModuleFileName() and PathRemoveFileSpec()
-#include <Shlwapi.h>
-#pragma comment(lib, "shlwapi.lib")
-#endif
-
 #include <ctime>
 #include <cstring>
 #include <cstdlib>
@@ -53,6 +47,18 @@
 
 #include "test.hpp"
 #include "test_all.hpp"
+
+#ifdef _WIN32
+#include <Windows.h>
+#if REALM_UWP
+#include <winrt/Windows.ApplicationModel.h>
+#include <winrt/Windows.Storage.h>
+#else
+// PathCchRemoveFileSpec()
+#include <pathcch.h>
+#pragma comment(lib, "Pathcch.lib")
+#endif
+#endif
 
 // Need to disable file descriptor leak checks on Apple platforms, as it seems
 // like an unknown number of file descriptors can be left behind, presumably due
@@ -545,16 +551,24 @@ int test_all(int argc, char* argv[], util::Logger* logger)
 
     bool no_error_exit_staus = 2 <= argc && strcmp(argv[1], "--no-error-exitcode") == 0;
 
-#ifdef _MSC_VER
+#ifdef WIN32
+#if REALM_UWP
+    std::string path =
+        winrt::to_string(winrt::Windows::ApplicationModel::Package::Current().InstalledLocation().Path());
+    path += "\\TestAssets\\";
+    set_test_resource_path(path);
+    set_test_path_prefix(path);
+#else
     // Set CurrentDirectory to the same directory as the binary, so that we can run the unit test suite with no
     // problems regardless if we use the Visual Studio IDE or command line
-    char dest[MAX_PATH];
-    DWORD length = GetModuleFileNameA(NULL, dest, MAX_PATH);
-    PathRemoveFileSpec(dest);
+    wchar_t dest[MAX_PATH];
+    DWORD length = GetModuleFileName(NULL, dest, MAX_PATH);
+    PathCchRemoveFileSpec(dest, MAX_PATH);
     SetCurrentDirectory(dest);
 
     set_test_resource_path("../");
     set_test_path_prefix("../");
+#endif
 #endif
 
     set_random_seed();

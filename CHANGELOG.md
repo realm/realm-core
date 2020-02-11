@@ -54,6 +54,21 @@
 
 ----------------------------------------------
 
+# 6.0.2 Release notes
+
+### Enhancements
+* Use search index to speed up Query::count, Query::find_all and generic aggregate function.
+
+### Fixed
+* None.
+ 
+-----------
+
+### Internals
+* Don't force downstream components to look for OpenSSL on Windows.
+
+----------------------------------------------
+
 # 6.0.1 Release notes
 
 ### Fixed
