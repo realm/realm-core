@@ -314,6 +314,14 @@ Decimal128::Decimal128(null) noexcept
     m_value.w[1] = 0x7c00000000000000;
 }
 
+Decimal128 Decimal128::nan(const char* init)
+{
+    Bid128 val;
+    val.w[0] = strtol(init, nullptr, 10);
+    val.w[1] = 0x7c00000000000000ull;
+    return Decimal128(val);
+}
+
 bool Decimal128::is_null() const
 {
     return m_value.w[0] == 0xaa && m_value.w[1] == 0x7c00000000000000;
@@ -321,8 +329,7 @@ bool Decimal128::is_null() const
 
 bool Decimal128::is_nan() const
 {
-    // NaN == NaN is false
-    return !(*this == *this);
+    return (m_value.w[1] & 0x7c00000000000000ull) == 0x7c00000000000000ull;
 }
 
 bool Decimal128::operator==(const Decimal128& rhs) const
@@ -345,18 +352,24 @@ bool Decimal128::operator!=(const Decimal128& rhs) const
 
 bool Decimal128::operator<(const Decimal128& rhs) const
 {
+    unsigned flags = 0;
+    int ret;
+    BID_UINT128 l = to_BID_UINT128(*this);
+    BID_UINT128 r = to_BID_UINT128(rhs);
+    bid128_quiet_less(&ret, &l, &r, &flags);
+    if (ret)
+        return true;
+
+    // Check for the case that one or more is NaN
     bool lhs_is_nan = is_nan();
     bool rhs_is_nan = rhs.is_nan();
     if (!lhs_is_nan && !rhs_is_nan) {
-        unsigned flags = 0;
-        int ret;
-        BID_UINT128 l = to_BID_UINT128(*this);
-        BID_UINT128 r = to_BID_UINT128(rhs);
-        bid128_quiet_less(&ret, &l, &r, &flags);
-        return ret != 0;
+        // None is Nan
+        return false;
     }
     if (lhs_is_nan && rhs_is_nan) {
-        return false;
+        // We should have stable sorting of NaN
+        return (m_value.w[0] < rhs.m_value.w[0]) || (m_value.w[1] < rhs.m_value.w[1]);
     }
     // nan vs non-nan should always order nan first
     return lhs_is_nan ? true : false;
@@ -364,18 +377,23 @@ bool Decimal128::operator<(const Decimal128& rhs) const
 
 bool Decimal128::operator>(const Decimal128& rhs) const
 {
+    unsigned flags = 0;
+    int ret;
+    BID_UINT128 l = to_BID_UINT128(*this);
+    BID_UINT128 r = to_BID_UINT128(rhs);
+    bid128_quiet_greater(&ret, &l, &r, &flags);
+    if (ret)
+        return true;
+
     bool lhs_is_nan = is_nan();
     bool rhs_is_nan = rhs.is_nan();
     if (!lhs_is_nan && !rhs_is_nan) {
-        unsigned flags = 0;
-        int ret;
-        BID_UINT128 l = to_BID_UINT128(*this);
-        BID_UINT128 r = to_BID_UINT128(rhs);
-        bid128_quiet_greater(&ret, &l, &r, &flags);
-        return ret != 0;
+        // None is Nan
+        return false;
     }
     if (lhs_is_nan && rhs_is_nan) {
-        return false;
+        // We should have stable sorting of NaN
+        return (m_value.w[0] > rhs.m_value.w[0]) || (m_value.w[1] > rhs.m_value.w[1]);
     }
     // nan vs non-nan should always order nan first
     return lhs_is_nan ? false : true;

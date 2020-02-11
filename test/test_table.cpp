@@ -1303,9 +1303,9 @@ T nan(const char* tag)
     return type_punning<T>(i);
 }
 template <>
-Decimal128 nan(const char*)
+Decimal128 nan(const char* init)
 {
-    return Decimal128("NaN");
+    return Decimal128::nan(init);
 }
 
 template <typename T>

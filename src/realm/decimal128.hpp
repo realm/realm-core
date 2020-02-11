@@ -51,6 +51,7 @@ public:
         m_value = val;
     }
     Decimal128(null) noexcept;
+    static Decimal128 nan(const char*);
 
     bool is_null() const;
     bool is_nan() const;
