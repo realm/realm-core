@@ -2678,7 +2678,7 @@ Obj Table::create_object_with_primary_key(const Mixed& primary_key)
     return ret;
 }
 
-ObjKey Table::get_object_with_primary_key(const Mixed& primary_key)
+ObjKey Table::get_objkey_from_primary_key(const Mixed& primary_key)
 {
     if (m_is_embedded)
         throw LogicError(LogicError::wrong_kind_of_table);
@@ -2702,7 +2702,6 @@ ObjKey Table::get_object_with_primary_key(const Mixed& primary_key)
     if (is_valid(unres_key)) {
         return unres_key;
     }
-
     return allocate_unresolved_key(object_key, {{primary_key_col, primary_key}});
 }
 
@@ -2960,6 +2959,12 @@ void Table::remove_object(ObjKey key)
         }
         m_clusters.erase(key, state);
     }
+}
+
+void Table::invalidate_object(ObjKey key)
+{
+    // TODO: handle tombstoning
+    remove_object(key);
 }
 
 void Table::remove_object_recursive(ObjKey key)

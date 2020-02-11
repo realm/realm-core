@@ -166,7 +166,7 @@ struct ObjKey {
     }
     bool is_unresolved() const
     {
-        return value < -2;
+        return value <= -2;
     }
     ObjKey get_unresolved() const
     {
