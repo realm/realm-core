@@ -319,6 +319,12 @@ bool Decimal128::is_null() const
     return m_value.w[0] == 0xaa && m_value.w[1] == 0x7c00000000000000;
 }
 
+bool Decimal128::is_nan() const
+{
+    // NaN == NaN is false
+    return !(*this == *this);
+}
+
 bool Decimal128::operator==(const Decimal128& rhs) const
 {
     if (is_null() && rhs.is_null()) {
@@ -339,22 +345,40 @@ bool Decimal128::operator!=(const Decimal128& rhs) const
 
 bool Decimal128::operator<(const Decimal128& rhs) const
 {
-    unsigned flags = 0;
-    int ret;
-    BID_UINT128 l = to_BID_UINT128(*this);
-    BID_UINT128 r = to_BID_UINT128(rhs);
-    bid128_quiet_less(&ret, &l, &r, &flags);
-    return ret != 0;
+    bool lhs_is_nan = is_nan();
+    bool rhs_is_nan = rhs.is_nan();
+    if (!lhs_is_nan && !rhs_is_nan) {
+        unsigned flags = 0;
+        int ret;
+        BID_UINT128 l = to_BID_UINT128(*this);
+        BID_UINT128 r = to_BID_UINT128(rhs);
+        bid128_quiet_less(&ret, &l, &r, &flags);
+        return ret != 0;
+    }
+    if (lhs_is_nan && rhs_is_nan) {
+        return false;
+    }
+    // nan vs non-nan should always order nan first
+    return lhs_is_nan ? true : false;
 }
 
 bool Decimal128::operator>(const Decimal128& rhs) const
 {
-    unsigned flags = 0;
-    int ret;
-    BID_UINT128 l = to_BID_UINT128(*this);
-    BID_UINT128 r = to_BID_UINT128(rhs);
-    bid128_quiet_greater(&ret, &l, &r, &flags);
-    return ret != 0;
+    bool lhs_is_nan = is_nan();
+    bool rhs_is_nan = rhs.is_nan();
+    if (!lhs_is_nan && !rhs_is_nan) {
+        unsigned flags = 0;
+        int ret;
+        BID_UINT128 l = to_BID_UINT128(*this);
+        BID_UINT128 r = to_BID_UINT128(rhs);
+        bid128_quiet_greater(&ret, &l, &r, &flags);
+        return ret != 0;
+    }
+    if (lhs_is_nan && rhs_is_nan) {
+        return false;
+    }
+    // nan vs non-nan should always order nan first
+    return lhs_is_nan ? false : true;
 }
 
 bool Decimal128::operator<=(const Decimal128& rhs) const

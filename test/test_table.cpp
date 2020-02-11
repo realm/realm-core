@@ -1302,16 +1302,33 @@ T nan(const char* tag)
     i += *tag;
     return type_punning<T>(i);
 }
+template <>
+Decimal128 nan(const char*)
+{
+    return Decimal128("NaN");
+}
+
+template <typename T>
+inline bool isnan(T val)
+{
+    return std::isnan(val);
+}
+inline bool isnan(Decimal128 val)
+{
+    return val.is_nan();
+}
+
 } // namespace realm
 
-TEST_TYPES(Table_SortFloat, float, double)
+TEST_TYPES(Table_SortFloat, float, double, Decimal128)
 {
     Table table;
-    auto col = table.add_column(std::is_same<TEST_TYPE, float>::value ? type_Float : type_Double, "value", true);
+    DataType type = ColumnTypeTraits<TEST_TYPE>::id;
+    auto col = table.add_column(type, "value", true);
     ObjKeys keys;
     table.create_objects(900, keys);
     for (size_t i = 0; i < keys.size(); i += 3) {
-        table.get_object(keys[i]).set(col, static_cast<TEST_TYPE>(-500.0 + i));
+        table.get_object(keys[i]).set(col, TEST_TYPE(-500.0 + i));
         table.get_object(keys[i + 1]).set_null(col);
         const char nan_tag[] = {char('0' + i % 10), 0};
         table.get_object(keys[i + 2]).set(col, realm::nan<TEST_TYPE>(nan_tag));
@@ -1320,32 +1337,32 @@ TEST_TYPES(Table_SortFloat, float, double)
     TableView sorted = table.get_sorted_view(SortDescriptor{{{col}}, {true}});
     CHECK_EQUAL(table.size(), sorted.size());
 
-    // nans should appear first (because the tag is less than the tag we use for nulls),
-    // followed by nulls, folllowed by the rest of the values in ascending order
+    // nulls should appear first,
+    // followed by nans, folllowed by the rest of the values in ascending order
     for (size_t i = 0; i < 300; ++i) {
         CHECK(sorted.get(i).is_null(col));
     }
     for (size_t i = 300; i < 600; ++i) {
-        CHECK(std::isnan(sorted.get(i).get<TEST_TYPE>(col)));
+        CHECK(realm::isnan(sorted.get(i).get<TEST_TYPE>(col)));
     }
     for (size_t i = 600; i + 1 < 900; ++i) {
         CHECK_GREATER(sorted.get(i + 1).get<TEST_TYPE>(col), sorted.get(i).get<TEST_TYPE>(col));
     }
 }
 
-TEST(Table_Multi_Sort)
+TEST_TYPES(Table_Multi_Sort, int64_t, float, double, Decimal128)
 {
     Table table;
-    auto col_int0 = table.add_column(type_Int, "first");
-    auto col_int1 = table.add_column(type_Int, "second");
+    auto col_0 = table.add_column(ColumnTypeTraits<TEST_TYPE>::id, "first");
+    auto col_1 = table.add_column(ColumnTypeTraits<TEST_TYPE>::id, "second");
 
-    table.create_object(ObjKey(0)).set_all(1, 10);
-    table.create_object(ObjKey(1)).set_all(2, 10);
-    table.create_object(ObjKey(2)).set_all(0, 10);
-    table.create_object(ObjKey(3)).set_all(2, 14);
-    table.create_object(ObjKey(4)).set_all(1, 14);
+    table.create_object(ObjKey(0)).set_all(TEST_TYPE(1), TEST_TYPE(10));
+    table.create_object(ObjKey(1)).set_all(TEST_TYPE(2), TEST_TYPE(10));
+    table.create_object(ObjKey(2)).set_all(TEST_TYPE(0), TEST_TYPE(10));
+    table.create_object(ObjKey(3)).set_all(TEST_TYPE(2), TEST_TYPE(14));
+    table.create_object(ObjKey(4)).set_all(TEST_TYPE(1), TEST_TYPE(14));
 
-    std::vector<std::vector<ColKey>> col_ndx1 = {{col_int0}, {col_int1}};
+    std::vector<std::vector<ColKey>> col_ndx1 = {{col_0}, {col_1}};
     std::vector<bool> asc = {true, true};
 
     // (0, 10); (1, 10); (1, 14); (2, 10); (2; 14)
@@ -1357,7 +1374,7 @@ TEST(Table_Multi_Sort)
     CHECK_EQUAL(ObjKey(1), v_sorted1.get_key(3));
     CHECK_EQUAL(ObjKey(3), v_sorted1.get_key(4));
 
-    std::vector<std::vector<ColKey>> col_ndx2 = {{col_int1}, {col_int0}};
+    std::vector<std::vector<ColKey>> col_ndx2 = {{col_1}, {col_0}};
 
     // (0, 10); (1, 10); (2, 10); (1, 14); (2, 14)
     TableView v_sorted2 = table.get_sorted_view(SortDescriptor{col_ndx2, asc});

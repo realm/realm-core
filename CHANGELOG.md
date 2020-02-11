@@ -9,6 +9,8 @@
 * Fixed sum/avg of a list of Decimal128 when the list contained nulls.
 * Added missing TableView aggregate functions for Decimal128.
 * Fixed min/max Decimal128 via Table not returning the result index.
+* Fixed sorting Decimal128 behaviour including position of NaN.
+* Fixed crash sorting a nullable ObjectID column.
 
 ### Breaking changes
 * None.

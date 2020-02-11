@@ -53,6 +53,7 @@ public:
     Decimal128(null) noexcept;
 
     bool is_null() const;
+    bool is_nan() const;
 
     bool operator==(const Decimal128& rhs) const;
     bool operator!=(const Decimal128& rhs) const;
