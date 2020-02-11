@@ -547,7 +547,7 @@ inline int Mixed::compare(const Mixed& b) const
         }
         case type_Decimal: {
             auto l = get<Decimal128>();
-            auto r = get<Decimal128>();
+            auto r = b.get<Decimal128>();
             if (l > r)
                 return 1;
             else if (l < r)
