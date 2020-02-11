@@ -369,7 +369,12 @@ bool Decimal128::operator<(const Decimal128& rhs) const
     }
     if (lhs_is_nan && rhs_is_nan) {
         // We should have stable sorting of NaN
-        return (m_value.w[0] < rhs.m_value.w[0]) || (m_value.w[1] < rhs.m_value.w[1]);
+        if (m_value.w[1] == rhs.m_value.w[1]) {
+            return m_value.w[0] < rhs.m_value.w[0];
+        }
+        else {
+            return m_value.w[1] < rhs.m_value.w[1];
+        }
     }
     // nan vs non-nan should always order nan first
     return lhs_is_nan ? true : false;
@@ -393,7 +398,12 @@ bool Decimal128::operator>(const Decimal128& rhs) const
     }
     if (lhs_is_nan && rhs_is_nan) {
         // We should have stable sorting of NaN
-        return (m_value.w[0] > rhs.m_value.w[0]) || (m_value.w[1] > rhs.m_value.w[1]);
+        if (m_value.w[1] == rhs.m_value.w[1]) {
+            return m_value.w[0] > rhs.m_value.w[0];
+        }
+        else {
+            return m_value.w[1] > rhs.m_value.w[1];
+        }
     }
     // nan vs non-nan should always order nan first
     return lhs_is_nan ? false : true;
