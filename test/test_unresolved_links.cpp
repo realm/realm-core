@@ -70,16 +70,80 @@ TEST(Links_UnresolvedBasic)
     CHECK_EQUAL(q.count(), 1);
 
     // cars->dump_objects();
-    cars->create_object_with_primary_key("Tesla 10").set(col_price, Decimal128("499999.5"));
+    auto tesla = cars->create_object_with_primary_key("Tesla 10").set(col_price, Decimal128("499999.5"));
     CHECK_EQUAL(stock.size(), 2);
     CHECK_EQUAL(cars->size(), 2);
     CHECK(finn.get<ObjKey>(col_owns));
 
     // cars->dump_objects();
-    cars->invalidate_object(new_tesla);
+    tesla.invalidate();
     CHECK_EQUAL(stock.size(), 1);
     CHECK_EQUAL(stock.get(0), skoda.get_key());
     CHECK_EQUAL(cars->size(), 1);
+
+    cars->create_object_with_primary_key("Tesla 10").set(col_price, Decimal128("499999.5"));
+    CHECK_EQUAL(stock.size(), 2);
+    CHECK_EQUAL(cars->size(), 2);
+    CHECK(finn.get<ObjKey>(col_owns));
+}
+
+
+TEST(Links_LinkRedirection)
+{
+    ObjKey k;
+
+    CHECK_NOT(k);
+    CHECK_NOT(k.get_unresolved());
+
+    Group g;
+
+    auto cars = g.add_table_with_primary_key("Car", type_String, "model");
+    auto col_price = cars->add_column(type_Decimal, "price");
+    auto persons = g.add_table_with_primary_key("Person", type_String, "e-mail");
+    auto col_owns = persons->add_column_link(type_Link, "car", *cars);
+    auto dealers = g.add_table_with_primary_key("Dealer", type_Int, "cvr");
+    auto col_has = dealers->add_column_link(type_LinkList, "stock", *cars);
+
+    auto finn = persons->create_object_with_primary_key("finn.schiermer-andersen@mongodb.com");
+    auto mathias = persons->create_object_with_primary_key("mathias@10gen.com");
+    auto joergen = dealers->create_object_with_primary_key(18454033);
+    auto stock = joergen.get_linklist(col_has);
+
+    auto skoda = cars->create_object_with_primary_key("Skoda Fabia").set(col_price, Decimal128("149999.5"));
+
+    cars->create_object_with_primary_key("Tesla 10").set(col_price, Decimal128("499999.5"));
+
+    auto new_tesla = cars->get_objkey_from_primary_key("Tesla 10");
+    finn.set(col_owns, new_tesla);
+    mathias.set(col_owns, new_tesla);
+
+    auto another_tesla = cars->get_objkey_from_primary_key("Tesla 10");
+    stock.add(another_tesla);
+    stock.add(skoda.get_key());
+
+    CHECK_EQUAL(stock.size(), 2);
+    CHECK_EQUAL(cars->size(), 2);
+    CHECK(finn.get<ObjKey>(col_owns));
+
+    // Tesla goes to the grave...
+    cars->invalidate_object(new_tesla);
+
+    new_tesla = cars->get_objkey_from_primary_key("Tesla 10");
+    CHECK(new_tesla.is_unresolved());
+
+    CHECK_NOT(finn.get<ObjKey>(col_owns));
+    CHECK_EQUAL(stock.size(), 1);
+    CHECK_EQUAL(stock.get(0), skoda.get_key());
+    CHECK_EQUAL(cars->size(), 1);
+    auto q = cars->column<Decimal128>(col_price) < Decimal128("300000");
+    CHECK_EQUAL(q.count(), 1);
+
+    // cars->dump_objects();
+    // resurrect the tesla
+    cars->create_object_with_primary_key("Tesla 10").set(col_price, Decimal128("499999.5"));
+    CHECK_EQUAL(stock.size(), 2);
+    CHECK_EQUAL(cars->size(), 2);
+    CHECK(finn.get<ObjKey>(col_owns));
 }
 
 #endif

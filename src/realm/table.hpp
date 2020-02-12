@@ -222,6 +222,8 @@ public:
     // Create an object with primary key - or return already existing object
     Obj create_object_with_primary_key(const Mixed& primary_key);
     // Return existing object or return unresolved key.
+    // Important: This is to be used ONLY by the Sync client. SDKs should NEVER
+    // observe an unresolved key. Ever.
     ObjKey get_objkey_from_primary_key(const Mixed& primary_key);
     /// Create a number of objects and add corresponding keys to a vector
     void create_objects(size_t number, std::vector<ObjKey>& keys);
