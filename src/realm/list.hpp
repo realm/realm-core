@@ -892,15 +892,20 @@ private:
     friend class ConstTableView;
     friend class Query;
 
+    // Sorted vector of indices containing unresolved links.
     mutable std::vector<size_t> m_unresolved;
 
     void get_dependencies(TableVersions&) const override;
     void sync_if_needed() const override;
     bool init_from_parent() const override;
 
+    // Translate from userfacing index to internal index.
     size_t virtual2real(size_t ndx) const;
+    // Add ndx to m_unresolved - if not already there
     void add_unres(size_t ndx);
+    // Remove ndx from m_unresolved - if there
     void remove_unres(size_t ndx);
+    // Scan through the list to find unresolved links
     void update_unresolved() const;
 };
 

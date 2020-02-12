@@ -546,14 +546,16 @@ size_t LnkLst::virtual2real(size_t ndx) const
 
 void LnkLst::add_unres(size_t ndx)
 {
+    bool empty_before = m_unresolved.empty();
     auto end = m_unresolved.end();
     auto it = std::lower_bound(m_unresolved.begin(), end, ndx);
+    // if *it == ndx, the index is already there
     if (it == end || *it > ndx) {
         m_unresolved.insert(it, ndx);
 
-        auto ref = m_tree->get_ref();
-        MemRef mem(ref, m_tree->get_alloc());
-        if (!Array::get_context_flag_from_header(mem.get_addr())) {
+        if (empty_before) {
+            auto ref = m_tree->get_ref();
+            MemRef mem(ref, m_tree->get_alloc());
             Array::set_context_flag_in_header(true, mem.get_addr());
         }
     }
@@ -563,12 +565,14 @@ void LnkLst::remove_unres(size_t ndx)
 {
     auto end = m_unresolved.end();
     auto it = std::lower_bound(m_unresolved.begin(), end, ndx);
+    // if *it != ndx, the index is not there
     if (it != end && *it == ndx) {
         m_unresolved.erase(it);
 
-        auto ref = m_tree->get_ref();
-        MemRef mem(ref, m_tree->get_alloc());
-        if (Array::get_context_flag_from_header(mem.get_addr())) {
+        if (m_unresolved.empty()) {
+            // Clear context flag
+            auto ref = m_tree->get_ref();
+            MemRef mem(ref, m_tree->get_alloc());
             Array::set_context_flag_in_header(false, mem.get_addr());
         }
     }
@@ -586,6 +590,7 @@ void LnkLst::update_unresolved() const
 {
     m_unresolved.clear();
     if (m_valid) {
+        // Only do the scan if context flag is set.
         auto ref = m_tree->get_ref();
         MemRef mem(ref, m_tree->get_alloc());
         if (Array::get_context_flag_from_header(mem.get_addr())) {
@@ -612,10 +617,16 @@ void LnkLst::set(size_t ndx, ObjKey value)
         throw LogicError(LogicError::wrong_kind_of_table);
     ndx = virtual2real(ndx);
     if (value.is_unresolved()) {
+        // Might be that the index is already there
+        // In that case it will not be added again
         add_unres(ndx);
     }
     else {
-        remove_unres(ndx);
+        if (!m_unresolved.empty()) {
+            // Might be that the index is not in m_unresolved
+            // In that case nothing will happen
+            remove_unres(ndx);
+        }
     }
     Lst<ObjKey>::set(ndx, value);
 }
@@ -627,6 +638,7 @@ void LnkLst::insert(size_t ndx, ObjKey value)
     ndx = virtual2real(ndx);
     Lst<ObjKey>::insert(ndx, value);
     if (value.is_unresolved()) {
+        // We definitely got a new entry
         add_unres(ndx);
     }
 }
