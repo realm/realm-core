@@ -866,6 +866,8 @@ public:
         insert(size(), value);
     }
     void set(size_t ndx, ObjKey value);
+    // As set, but without translating ndx
+    void set_direct(size_t ndx, ObjKey value);
     void insert(size_t ndx, ObjKey value);
     ObjKey get(size_t ndx)
     {

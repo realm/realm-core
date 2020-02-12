@@ -1346,10 +1346,10 @@ void Obj::assign(const ConstObj& other)
                 linking_obj.set(c, get_key());
             }
             else {
-                auto l = linking_obj.get_list<ObjKey>(c);
+                auto l = linking_obj.get_linklist(c);
                 auto n = l.find_first(other.get_key());
                 REALM_ASSERT(n != realm::npos);
-                l.set(n, get_key());
+                l.set_direct(n, get_key());
             }
         }
         return false;

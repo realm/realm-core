@@ -631,6 +631,23 @@ void LnkLst::set(size_t ndx, ObjKey value)
     Lst<ObjKey>::set(ndx, value);
 }
 
+void LnkLst::set_direct(size_t ndx, ObjKey value)
+{
+    if (value.is_unresolved()) {
+        // Might be that the index is already there
+        // In that case it will not be added again
+        add_unres(ndx);
+    }
+    else {
+        if (!m_unresolved.empty()) {
+            // Might be that the index is not in m_unresolved
+            // In that case nothing will happen
+            remove_unres(ndx);
+        }
+    }
+    Lst<ObjKey>::set(ndx, value);
+}
+
 void LnkLst::insert(size_t ndx, ObjKey value)
 {
     if (get_target_table()->is_embedded() && value != ObjKey())

@@ -2963,8 +2963,19 @@ void Table::remove_object(ObjKey key)
 
 void Table::invalidate_object(ObjKey key)
 {
-    // TODO: handle tombstoning
-    remove_object(key);
+    if (m_is_embedded)
+        throw LogicError(LogicError::wrong_kind_of_table);
+    auto primary_key_col = get_primary_key_column();
+    if (!primary_key_col)
+        throw LogicError(LogicError::wrong_kind_of_table);
+    if (!is_valid(key)) // idempotence
+        return;
+    auto obj = get_object(key);
+    auto tombstone_key = allocate_unresolved_key(key, {});
+    auto tombstone = m_clusters.get(tombstone_key);
+    tombstone.assign(obj);
+    CascadeState state(CascadeState::Mode::None);
+    m_clusters.erase(key, state);
 }
 
 void Table::remove_object_recursive(ObjKey key)
