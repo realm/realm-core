@@ -119,6 +119,8 @@ TEST_CASE("object") {
             {"string", PropertyType::String|PropertyType::Nullable},
             {"data", PropertyType::Data|PropertyType::Nullable},
             {"date", PropertyType::Date|PropertyType::Nullable},
+            {"object id", PropertyType::ObjectId|PropertyType::Nullable},
+            {"decimal", PropertyType::Decimal|PropertyType::Nullable},
 
             {"bool array", PropertyType::Array|PropertyType::Bool|PropertyType::Nullable},
             {"int array", PropertyType::Array|PropertyType::Int|PropertyType::Nullable},
@@ -127,6 +129,8 @@ TEST_CASE("object") {
             {"string array", PropertyType::Array|PropertyType::String|PropertyType::Nullable},
             {"data array", PropertyType::Array|PropertyType::Data|PropertyType::Nullable},
             {"date array", PropertyType::Array|PropertyType::Date|PropertyType::Nullable},
+            {"object id array", PropertyType::Array|PropertyType::ObjectId|PropertyType::Nullable},
+            {"decimal array", PropertyType::Array|PropertyType::Decimal|PropertyType::Nullable},
         }},
         {"link target", {
             {"value", PropertyType::Int},

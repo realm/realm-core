@@ -163,6 +163,20 @@ struct UnboxedOptional : BaseT {
     }
 };
 
+// Override default value added to an Optional<Decimal> list given that the default constructor
+// creates '0' instead of 'null' for this type
+template<>
+struct UnboxedOptional<::Decimal> : ::Decimal {
+    static PropertyType property_type() { return Decimal::property_type()|PropertyType::Nullable; }
+    static auto values() -> decltype(::Decimal::values())
+    {
+        auto ret = ::Decimal::values();
+        ret.push_back(typename ::Decimal::Type(realm::null()));
+        return ret;
+    }
+};
+
+
 template<typename T>
 T get(Mixed) { abort(); }
 
@@ -171,6 +185,7 @@ template<> float get(Mixed m) { return m.get_type() == type_Float ? m.get_float(
 template<> double get(Mixed m) { return m.get_double(); }
 template<> Timestamp get(Mixed m) { return m.get_timestamp(); }
 template<> Decimal128 get(Mixed m) { return m.get<Decimal128>(); }
+template<> ObjectId get(Mixed m) { return m.get<ObjectId>(); }
 
 namespace realm {
 template<typename T>
@@ -292,8 +307,8 @@ auto greater::operator()<Timestamp&, Timestamp&>(Timestamp& a, Timestamp& b) con
 }
 
 TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::Double, ::String, ::Binary, ::Date, ::OID, ::Decimal,
-                   BoxedOptional<::Int>, BoxedOptional<::Bool>, BoxedOptional<::Float>, BoxedOptional<::Double>,
-                   UnboxedOptional<::String>, UnboxedOptional<::Binary>, UnboxedOptional<::Date>)
+                   BoxedOptional<::Int>, BoxedOptional<::Bool>, BoxedOptional<::Float>, BoxedOptional<::Double>, BoxedOptional<::OID>,
+                   UnboxedOptional<::String>, UnboxedOptional<::Binary>, UnboxedOptional<::Date>, UnboxedOptional<::Decimal>)
 {
     auto values = TestType::values();
     using T = typename TestType::Type;
@@ -623,6 +638,7 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
         REQUIRE(undistinct == values2);
 
         auto distinct = results.distinct(DistinctDescriptor({{col}}));
+
         auto distinct2 = results.distinct({"self"});
         REQUIRE(distinct == values);
         REQUIRE(distinct2 == values);
