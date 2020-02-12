@@ -242,20 +242,20 @@ bool try_remove_dir_recursive(const std::string& path)
 std::string make_temp_dir()
 {
 #ifdef _WIN32 // Windows version
-    std::filesystem::path temp = std::filesystem::temp_directory_path();
+    std::experimental::filesystem::v1::path temp = std::experimental::filesystem::v1::temp_directory_path();
 
     wchar_t buffer[MAX_PATH];
-    std::filesystem::path path;
+    std::experimental::filesystem::v1::path path;
     for (;;) {
         if (GetTempFileNameW(temp.c_str(), L"rlm", 0, buffer) == 0)
             throw std::system_error(GetLastError(), std::system_category(), "GetTempFileName() failed");
         path = buffer;
-        std::filesystem::remove(path);
+        std::experimental::filesystem::v1::remove(path);
         try {
-            std::filesystem::create_directory(path);
+            std::experimental::filesystem::v1::create_directory(path);
             break;
         }
-        catch (const std::filesystem::filesystem_error& ex) {
+        catch (const std::experimental::filesystem::v1::filesystem_error& ex) {
             if (ex.code() != std::errc::file_exists)
                 throw;
         }
@@ -1180,7 +1180,7 @@ bool File::is_dir(const std::string& path)
     throw std::system_error(err, std::system_category(), "stat() failed");
 #elif REALM_HAVE_STD_FILESYSTEM
     std::wstring w_path = string_to_wstring(path);
-    return std::filesystem::is_directory(w_path);
+    return std::experimental::filesystem::v1::is_directory(w_path);
 #else
     static_cast<void>(path);
     throw util::runtime_error("Not yet supported");
@@ -1422,11 +1422,11 @@ std::string File::resolve(const std::string& path, const std::string& base_dir)
     */
     return base_dir_2 + path_2;
 #elif REALM_HAVE_STD_FILESYSTEM
-    std::filesystem::path path_(path.empty() ? "." : path);
+    std::experimental::filesystem::v1::path path_(path.empty() ? "." : path);
     if (path_.is_absolute())
         return path;
 
-    return (std::filesystem::path(base_dir) / path_).u8string();
+    return (std::experimental::filesystem::v1::path(base_dir) / path_).u8string();
 #else
     static_cast<void>(path);
     static_cast<void>(base_dir);
@@ -1581,9 +1581,9 @@ bool DirScanner::next(std::string& name)
 DirScanner::DirScanner(const std::string& path, bool allow_missing)
 {
     try {
-        m_iterator = std::filesystem::directory_iterator(path);
+        m_iterator = std::experimental::filesystem::v1::directory_iterator(path);
     }
-    catch (const std::filesystem::filesystem_error& e) {
+    catch (const std::experimental::filesystem::v1::filesystem_error& e) {
         if (e.code() != std::errc::no_such_file_or_directory || !allow_missing)
             throw;
     }
@@ -1593,7 +1593,7 @@ DirScanner::~DirScanner() = default;
 
 bool DirScanner::next(std::string& name)
 {
-    const std::filesystem::directory_iterator end;
+    const std::experimental::filesystem::v1::directory_iterator end;
     if (m_iterator != end) {
         name = m_iterator->path().filename().u8string();
         m_iterator++;

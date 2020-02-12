@@ -1302,6 +1302,12 @@ public:
     {
         return std::unique_ptr<ParentNode>(new TimestampNode(*this, tr));
     }
+
+protected:
+    TimestampNode(const TimestampNode& from, Transaction* tr)
+        : TimestampNodeBase(from, tr)
+    {
+    }
 };
 
 class StringNodeBase : public ParentNode {

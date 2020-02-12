@@ -38,9 +38,6 @@
 #else
 #define _SILENCE_EXPERIMENTAL_FILESYSTEM_DEPRECATION_WARNING // switch to <filesystem> once we switch to C++17
 #include <experimental/filesystem>
-namespace std {
-    namespace filesystem = std::experimental::filesystem::v1;
-}
 #endif
 #define REALM_HAVE_STD_FILESYSTEM 1
 #else
@@ -965,7 +962,7 @@ private:
 #ifndef _WIN32
     DIR* m_dirp;
 #elif REALM_HAVE_STD_FILESYSTEM
-    std::filesystem::directory_iterator m_iterator;
+    std::experimental::filesystem::v1::directory_iterator m_iterator;
 #endif
 };
 
