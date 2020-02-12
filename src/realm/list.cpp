@@ -554,9 +554,7 @@ void LnkLst::add_unres(size_t ndx)
         m_unresolved.insert(it, ndx);
 
         if (empty_before) {
-            auto ref = m_tree->get_ref();
-            MemRef mem(ref, m_tree->get_alloc());
-            Array::set_context_flag_in_header(true, mem.get_addr());
+            m_tree->set_context_flag(true);
         }
     }
 }
@@ -571,9 +569,7 @@ void LnkLst::remove_unres(size_t ndx)
 
         if (m_unresolved.empty()) {
             // Clear context flag
-            auto ref = m_tree->get_ref();
-            MemRef mem(ref, m_tree->get_alloc());
-            Array::set_context_flag_in_header(false, mem.get_addr());
+            m_tree->set_context_flag(false);
         }
     }
 }
@@ -591,9 +587,7 @@ void LnkLst::update_unresolved() const
     m_unresolved.clear();
     if (m_valid) {
         // Only do the scan if context flag is set.
-        auto ref = m_tree->get_ref();
-        MemRef mem(ref, m_tree->get_alloc());
-        if (Array::get_context_flag_from_header(mem.get_addr())) {
+        if (m_tree->get_context_flag()) {
             auto func = [this](BPlusTreeNode* node, size_t offset) {
                 auto leaf = static_cast<typename BPlusTree<ObjKey>::LeafNode*>(node);
                 size_t sz = leaf->size();

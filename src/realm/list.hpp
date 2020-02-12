@@ -814,12 +814,14 @@ public:
         : ConstLstBase(other.m_col_key, &m_obj)
         , Lst<ObjKey>(other)
         , ObjList(this->m_tree.get(), m_obj.get_target_table(m_col_key))
+        , m_unresolved(other.m_unresolved)
     {
     }
     LnkLst(LnkLst&& other) noexcept
         : ConstLstBase(other.m_col_key, &m_obj)
         , Lst<ObjKey>(std::move(other))
         , ObjList(this->m_tree.get(), m_obj.get_target_table(m_col_key))
+        , m_unresolved(std::move(other.m_unresolved))
     {
     }
     LnkLst& operator=(const LnkLst& other)

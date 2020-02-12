@@ -91,12 +91,6 @@ TEST(Links_UnresolvedBasic)
 
 TEST(Links_UnresolvedInvalidateObject)
 {
-    // Checks that a live object can be invalidated and then resurrected
-    ObjKey k;
-
-    CHECK_NOT(k);
-    CHECK_NOT(k.get_unresolved());
-
     Group g;
 
     auto cars = g.add_table_with_primary_key("Car", type_String, "model");
@@ -129,6 +123,44 @@ TEST(Links_UnresolvedInvalidateObject)
     cars->create_object_with_primary_key("Tesla 10").set(col_price, Decimal128("399999.5"));
     CHECK_EQUAL(stock.size(), 2);
     CHECK_EQUAL(cars->size(), 2);
+}
+
+TEST(LinkList_Unresolved)
+{
+    Group g;
+
+    auto cars = g.add_table_with_primary_key("Car", type_String, "model");
+    auto dealers = g.add_table_with_primary_key("Dealer", type_Int, "cvr");
+    auto col_has = dealers->add_column_link(type_LinkList, "stock", *cars);
+
+    auto dealer = dealers->create_object_with_primary_key(18454033);
+    auto stock1 = dealer.get_linklist(col_has);
+    auto stock2 = dealer.get_linklist(col_has);
+
+    auto skoda = cars->create_object_with_primary_key("Skoda Fabia");
+    auto tesla = cars->create_object_with_primary_key("Tesla 10");
+    auto volvo = cars->create_object_with_primary_key("Volvo XC90");
+    auto bmw = cars->create_object_with_primary_key("BMW 750");
+    auto mercedes = cars->create_object_with_primary_key("Mercedes SLC500");
+
+    stock1.add(skoda.get_key());
+    stock1.add(tesla.get_key());
+    stock1.add(volvo.get_key());
+    stock1.add(bmw.get_key());
+
+    CHECK_EQUAL(stock1.size(), 4);
+    CHECK_EQUAL(stock2.size(), 4);
+    tesla.invalidate();
+    CHECK_EQUAL(stock1.size(), 3);
+    CHECK_EQUAL(stock2.size(), 3);
+
+    stock1.add(mercedes.get_key());
+    // If REALM_MAX_BPNODE_SIZE is 4, we test that context flag is copied over when replacing root
+    CHECK_EQUAL(stock1.size(), 4);
+    CHECK_EQUAL(stock2.size(), 4);
+
+    LnkLst stock_copy{stock1};
+    CHECK_EQUAL(stock_copy.get(3), mercedes.get_key());
 }
 
 #endif
