@@ -211,7 +211,7 @@ void GlobalNotifier::Impl::release_version(sync::ObjectID id, VersionID old_vers
         if (info.coordinator) {
             std::string path = info.coordinator->get_config().path;
             m_realms.erase(it);
-            File::remove(path);
+            File::try_remove(path);
         }
         else {
             m_realms.erase(it);
