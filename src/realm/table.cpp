@@ -514,6 +514,16 @@ void Table::init(ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent, bo
         uint64_t flags = m_top.get_as_ref_or_tagged(top_position_for_flags).get_as_int();
         m_is_embedded = flags & 0x1;
     }
+    if (m_top.size() <= top_position_for_tombstones) {
+        m_tombstones.reset();
+    }
+    else {
+        if (!m_tombstones) {
+            m_tombstones.reset(new ClusterTree(this, m_alloc, top_position_for_tombstones));
+            std::cout << "Tombstones already there, setting up cluster" << std::endl;
+        }
+        m_tombstones->init_from_parent();
+    }
 }
 
 
@@ -1631,7 +1641,15 @@ ref_type Table::create_empty_table(Allocator& alloc, TableKey key)
     top.add(0); // Collision_map
     top.add(0); // pk col key
     top.add(0); // flags
-
+    {
+        // tombstones
+        MemRef mem = ClusterTree::create_empty_cluster(alloc); // Throws
+        dg_2.reset(mem.get_ref());
+        int_fast64_t v(from_ref(mem.get_ref()));
+        top.add(v); // Throws
+        dg_2.release();
+        std::cout << "Creating tombstone cluster as part of table creation" << std::endl;
+    }
     REALM_ASSERT(top.size() == top_array_size);
 
     return top.get_ref();
@@ -1679,6 +1697,8 @@ void Table::clear()
 
     CascadeState state(CascadeState::Mode::Strong, get_parent_group());
     m_clusters.clear(state);
+    // FIXME: what should happen to tombstones when a table is cleared?
+    // m_tombstones->clear(state); <-- does not work.
 
     bump_content_version();
     bump_storage_version();
@@ -2887,9 +2907,26 @@ ObjKey Table::allocate_unresolved_key(ObjKey key, const FieldValues& values)
 {
     auto unres_key = key.get_unresolved();
 
+    if (m_tombstones.get() == nullptr) {
+        std::cout << "Creating tombstone cluster" << std::endl;
+        // must expand top array to include tombstone first
+        while (m_top.size() < top_position_for_tombstones)
+            m_top.add(0);
+        if (m_top.size() == top_position_for_tombstones) {
+            std::cout << "REALLY Creating tombstone cluster" << std::endl;
+            MemRef mem = ClusterTree::create_empty_cluster(m_top.get_alloc());
+            m_top.add(from_ref(mem.get_ref()));
+            REALM_ASSERT(m_top.size() == top_array_size);
+        }
+        m_tombstones.reset(new ClusterTree(this, m_alloc, top_position_for_tombstones));
+        m_tombstones->init_from_parent();
+    }
+    else
+        std::cout << "Not creating tombstone cluster" << std::endl;
+
+    Obj tombstone = m_tombstones->insert(unres_key, values);
     bump_content_version();
     bump_storage_version();
-    Obj tombstone = m_clusters.insert(unres_key, values);
 
     return tombstone.get_key();
 }
@@ -2968,11 +3005,12 @@ void Table::invalidate_object(ObjKey key)
     auto primary_key_col = get_primary_key_column();
     if (!primary_key_col)
         throw LogicError(LogicError::wrong_kind_of_table);
-    if (!is_valid(key)) // idempotence
+    if (m_tombstones && m_tombstones->is_valid(key)) // idempotence
         return;
     auto obj = get_object(key);
-    auto tombstone_key = allocate_unresolved_key(key, {});
-    auto tombstone = m_clusters.get(tombstone_key);
+    auto pk = obj.get<realm::Mixed>(primary_key_col);
+    auto tombstone_key = allocate_unresolved_key(key, {{primary_key_col, pk}});
+    auto tombstone = m_tombstones->get(tombstone_key);
     tombstone.assign(obj);
     CascadeState state(CascadeState::Mode::None);
     m_clusters.erase(key, state);
