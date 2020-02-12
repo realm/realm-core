@@ -534,10 +534,100 @@ Obj LnkLst::get_object(size_t ndx)
     return get_target_table()->get_object(k);
 }
 
+size_t LnkLst::virtual2real(size_t ndx) const
+{
+    for (auto i : m_unresolved) {
+        if (i > ndx)
+            break;
+        ndx++;
+    }
+    return ndx;
+}
+
+void LnkLst::add_unres(size_t ndx)
+{
+    bool empty_before = m_unresolved.empty();
+    auto end = m_unresolved.end();
+    auto it = std::lower_bound(m_unresolved.begin(), end, ndx);
+    // if *it == ndx, the index is already there
+    if (it == end || *it > ndx) {
+        m_unresolved.insert(it, ndx);
+
+        if (empty_before) {
+            auto ref = m_tree->get_ref();
+            MemRef mem(ref, m_tree->get_alloc());
+            Array::set_context_flag_in_header(true, mem.get_addr());
+        }
+    }
+}
+
+void LnkLst::remove_unres(size_t ndx)
+{
+    auto end = m_unresolved.end();
+    auto it = std::lower_bound(m_unresolved.begin(), end, ndx);
+    // if *it != ndx, the index is not there
+    if (it != end && *it == ndx) {
+        m_unresolved.erase(it);
+
+        if (m_unresolved.empty()) {
+            // Clear context flag
+            auto ref = m_tree->get_ref();
+            MemRef mem(ref, m_tree->get_alloc());
+            Array::set_context_flag_in_header(false, mem.get_addr());
+        }
+    }
+}
+
+bool LnkLst::init_from_parent() const
+{
+    ConstLstIf<ObjKey>::init_from_parent();
+    update_unresolved();
+
+    return m_valid;
+}
+
+void LnkLst::update_unresolved() const
+{
+    m_unresolved.clear();
+    if (m_valid) {
+        // Only do the scan if context flag is set.
+        auto ref = m_tree->get_ref();
+        MemRef mem(ref, m_tree->get_alloc());
+        if (Array::get_context_flag_from_header(mem.get_addr())) {
+            auto func = [this](BPlusTreeNode* node, size_t offset) {
+                auto leaf = static_cast<typename BPlusTree<ObjKey>::LeafNode*>(node);
+                size_t sz = leaf->size();
+                for (size_t i = 0; i < sz; i++) {
+                    auto k = leaf->get(i);
+                    if (k.is_unresolved()) {
+                        m_unresolved.push_back(i + offset);
+                    }
+                }
+                return false;
+            };
+
+            m_tree->traverse(func);
+        }
+    }
+}
+
 void LnkLst::set(size_t ndx, ObjKey value)
 {
     if (get_target_table()->is_embedded() && value != ObjKey())
         throw LogicError(LogicError::wrong_kind_of_table);
+    ndx = virtual2real(ndx);
+    if (value.is_unresolved()) {
+        // Might be that the index is already there
+        // In that case it will not be added again
+        add_unres(ndx);
+    }
+    else {
+        if (!m_unresolved.empty()) {
+            // Might be that the index is not in m_unresolved
+            // In that case nothing will happen
+            remove_unres(ndx);
+        }
+    }
     Lst<ObjKey>::set(ndx, value);
 }
 
@@ -545,7 +635,12 @@ void LnkLst::insert(size_t ndx, ObjKey value)
 {
     if (get_target_table()->is_embedded() && value != ObjKey())
         throw LogicError(LogicError::wrong_kind_of_table);
+    ndx = virtual2real(ndx);
     Lst<ObjKey>::insert(ndx, value);
+    if (value.is_unresolved()) {
+        // We definitely got a new entry
+        add_unres(ndx);
+    }
 }
 
 Obj LnkLst::create_and_insert_linked_object(size_t ndx)
@@ -598,6 +693,7 @@ LnkLst::LnkLst(const Obj& owner, ColKey col_key)
     , Lst<ObjKey>(owner, col_key)
     , ObjList(this->m_tree.get(), m_obj.get_target_table(m_col_key))
 {
+    update_unresolved();
 }
 
 void LnkLst::get_dependencies(TableVersions& versions) const
