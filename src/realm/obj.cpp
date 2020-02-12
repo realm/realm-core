@@ -174,6 +174,11 @@ void ConstObj::remove()
     m_table.cast_away_const()->remove_object(m_key);
 }
 
+void ConstObj::invalidate()
+{
+    m_table.cast_away_const()->invalidate_object(m_key);
+}
+
 ColKey ConstObj::get_column_key(StringData col_name) const
 {
     return get_table()->get_column_key(col_name);

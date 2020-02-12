@@ -221,8 +221,8 @@ public:
     Obj create_object(GlobalKey object_id, const FieldValues& = {});
     // Create an object with primary key - or return already existing object
     Obj create_object_with_primary_key(const Mixed& primary_key);
-    // Return existing object or return unresolved key
-    ObjKey get_object_with_primary_key(const Mixed& primary_key);
+    // Return existing object or return unresolved key.
+    ObjKey get_objkey_from_primary_key(const Mixed& primary_key);
     /// Create a number of objects and add corresponding keys to a vector
     void create_objects(size_t number, std::vector<ObjKey>& keys);
     /// Create a number of objects with keys supplied
@@ -270,6 +270,11 @@ public:
     /// remove_object_recursive() will delete linked rows if the removed link was the
     /// last one holding on to the row in question. This will be done recursively.
     void remove_object_recursive(ObjKey key);
+    // Invalidate object. To be used by the Sync client.
+    // - turns the object into a tombstone if links exist
+    // - otherwise works just as remove_object()
+    void invalidate_object(ObjKey key);
+
     void clear();
     using Iterator = ClusterTree::Iterator;
     using ConstIterator = ClusterTree::ConstIterator;
