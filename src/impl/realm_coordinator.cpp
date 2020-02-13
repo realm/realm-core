@@ -963,10 +963,9 @@ void RealmCoordinator::run_async_notifiers()
         for (auto& notifier : notifiers)
             notifier->run();
 
-        lock.lock();
+        util::CheckedLockGuard lock(m_notifier_mutex);
         for (auto& notifier : notifiers)
             notifier->prepare_handover();
-        lock.unlock();
     }
 
     // Advance the non-new notifiers to the same version as we advanced the new
@@ -991,7 +990,7 @@ void RealmCoordinator::run_async_notifiers()
 
     // Reacquire the lock while updating the fields that are actually read on
     // other threads
-    lock.lock();
+    util::CheckedLockGuard lock2(m_notifier_mutex);
     for (auto& notifier : new_notifiers) {
         notifier->prepare_handover();
     }
