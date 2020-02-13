@@ -759,7 +759,16 @@ ColKey Table::do_insert_root_column(ColKey col_key, ColumnType type, StringData 
     }
     refresh_index_accessors();
     m_clusters.insert_column(col_key);
-
+    if (m_tombstones) {
+        m_tombstones->insert_column(col_key);
+        /*
+          FIXME: fails
+        if (col_key == get_primary_key_column())
+            m_tombstones->insert_column(col_key);
+        else if (col_key.get_type() == col_type_BackLink)
+            m_tombstones->insert_column(col_key);
+        */
+    }
     return col_key;
 }
 
@@ -2689,11 +2698,11 @@ Obj Table::create_object_with_primary_key(const Mixed& primary_key)
     Obj ret = create_object(object_key, {{primary_key_col, primary_key}});
     // Check if unresolved exists
     ObjKey unres_key = object_key.get_unresolved();
-    if (is_valid(unres_key)) {
-        auto tombstone = m_clusters.get(unres_key);
+    if (m_tombstones && m_tombstones->is_valid(unres_key)) {
+        auto tombstone = m_tombstones->get(unres_key);
         ret.assign(tombstone);
         CascadeState state(CascadeState::Mode::None);
-        m_clusters.erase(unres_key, state);
+        m_tombstones->erase(unres_key, state);
     }
     return ret;
 }
@@ -2715,11 +2724,11 @@ ObjKey Table::get_objkey_from_primary_key(const Mixed& primary_key)
     object_key = global_to_local_object_id_hashed(object_id);
 
     // Check if existing
-    if (is_valid(object_key)) {
+    if (m_clusters.is_valid(object_key)) {
         return object_key;
     }
     auto unres_key = object_key.get_unresolved();
-    if (is_valid(unres_key)) {
+    if (m_tombstones && m_tombstones->is_valid(unres_key)) {
         return unres_key;
     }
     return allocate_unresolved_key(object_key, {{primary_key_col, primary_key}});
@@ -2908,21 +2917,22 @@ ObjKey Table::allocate_unresolved_key(ObjKey key, const FieldValues& values)
     auto unres_key = key.get_unresolved();
 
     if (m_tombstones.get() == nullptr) {
-        std::cout << "Creating tombstone cluster" << std::endl;
+        std::cout << "Creating tombstone cluster on key allocation" << std::endl;
         // must expand top array to include tombstone first
         while (m_top.size() < top_position_for_tombstones)
             m_top.add(0);
         if (m_top.size() == top_position_for_tombstones) {
-            std::cout << "REALLY Creating tombstone cluster" << std::endl;
+            std::cout << "Creating tombstone cluster step II" << std::endl;
             MemRef mem = ClusterTree::create_empty_cluster(m_top.get_alloc());
             m_top.add(from_ref(mem.get_ref()));
             REALM_ASSERT(m_top.size() == top_array_size);
         }
         m_tombstones.reset(new ClusterTree(this, m_alloc, top_position_for_tombstones));
         m_tombstones->init_from_parent();
+        // FIXME: Missing addition of columns....
     }
     else
-        std::cout << "Not creating tombstone cluster" << std::endl;
+        std::cout << "Using existing tombstone cluster" << std::endl;
 
     Obj tombstone = m_tombstones->insert(unres_key, values);
     bump_content_version();
@@ -3008,7 +3018,7 @@ void Table::invalidate_object(ObjKey key)
     if (m_tombstones && m_tombstones->is_valid(key)) // idempotence
         return;
     auto obj = get_object(key);
-    auto pk = obj.get<realm::Mixed>(primary_key_col);
+    auto pk = obj.get_any(primary_key_col);
     auto tombstone_key = allocate_unresolved_key(key, {{primary_key_col, pk}});
     auto tombstone = m_tombstones->get(tombstone_key);
     tombstone.assign(obj);

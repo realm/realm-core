@@ -328,37 +328,6 @@ bool ConstObj::get<bool>(ColKey col_key) const
     }
 }
 
-template<>
-Mixed ConstObj::get<Mixed>(ColKey col_key) const
-{
-    if (col_key.get_attrs().test(col_attr_Nullable) && is_null(col_key))
-        return Mixed();
-    switch (col_key.get_type()) {
-        case col_type_Int:
-            return Mixed(get<Int>(col_key));
-        case col_type_Bool:
-            return Mixed(get<bool>(col_key));
-        case col_type_Float:
-            return Mixed(get<float>(col_key));
-        case col_type_Double:
-            return Mixed(get<double>(col_key));
-        case col_type_String:
-            return Mixed(get<StringData>(col_key));
-        case col_type_Binary:
-            return Mixed(get<Binary>(col_key));
-        case col_type_Timestamp:
-            return Mixed(get<Timestamp>(col_key));
-        case col_type_ObjectId:
-            return Mixed(get<ObjectId>(col_key));
-        case col_type_Decimal:
-            return Mixed(get<Decimal128>(col_key));
-        case col_type_Link:
-            return Mixed(get<ObjKey>(col_key));
-        default:
-            REALM_ASSERT(false);
-    }
-}
-
 template <>
 StringData ConstObj::_get<StringData>(ColKey::Idx col_ndx) const
 {
