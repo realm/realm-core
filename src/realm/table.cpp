@@ -2670,33 +2670,21 @@ Obj Table::create_object_with_primary_key(const Mixed& primary_key)
     ObjKey object_key;
     GlobalKey object_id{primary_key};
 
-    if (type == type_Int) {
-        if (primary_key.is_null())
-            object_key = find_first_null(primary_key_col);
-        else
-            object_key = find_first_int(primary_key_col, primary_key.get_int());
+    REALM_ASSERT(type == type_String || type == type_ObjectId || type == type_Int);
+    // Generate local ObjKey
+    object_key = global_to_local_object_id_hashed(object_id);
+    // Check for collision
+    if (is_valid(object_key)) {
+        Obj existing_obj = get_object(object_key);
+        auto existing_pk_value = existing_obj.get_any(primary_key_col);
 
-        if (object_key)
-            return get_object(object_key); // Already exists
-        object_key = get_next_key();
-    }
-    else {
-        REALM_ASSERT(type == type_String || type == type_ObjectId);
-        // Generate local ObjKey
-        object_key = global_to_local_object_id_hashed(object_id);
-        // Check for collision
-        if (is_valid(object_key)) {
-            Obj existing_obj = get_object(object_key);
-            auto existing_pk_value = existing_obj.get_any(primary_key_col);
-
-            // It may just be the same object
-            if (existing_pk_value == primary_key) {
-                return existing_obj;
-            }
-
-            GlobalKey existing_id{existing_pk_value};
-            object_key = allocate_local_id_after_hash_collision(object_id, existing_id, object_key);
+        // It may just be the same object
+        if (existing_pk_value == primary_key) {
+            return existing_obj;
         }
+
+        GlobalKey existing_id{existing_pk_value};
+        object_key = allocate_local_id_after_hash_collision(object_id, existing_id, object_key);
     }
 
     if (auto repl = get_repl()) {
@@ -3168,13 +3156,8 @@ void Table::set_primary_key_column(ColKey col_key)
         validate_column_is_unique(col_key);
         do_set_primary_key_column(col_key);
 
-        if (col_key.get_type() == col_type_String) {
-            remove_search_index(col_key);
-            rebuild_table_with_pk_column();
-        }
-        else {
-            add_search_index(col_key);
-        }
+        remove_search_index(col_key);
+        rebuild_table_with_pk_column();
     }
     else {
         do_set_primary_key_column(col_key);
@@ -3185,7 +3168,7 @@ void Table::rebuild_table_with_pk_column()
 {
     std::vector<std::pair<ObjKey, ObjKey>> changed_keys;
     for (auto& obj : *this) {
-        StringData pk(obj.get<String>(m_primary_key_col));
+        Mixed pk = obj.get_any(m_primary_key_col);
         GlobalKey object_id{pk};
         ObjKey new_key = global_to_local_object_id_hashed(object_id);
         if (new_key != obj.get_key())

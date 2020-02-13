@@ -30,7 +30,7 @@ using namespace realm;
 using namespace realm::util;
 using namespace realm::test_util;
 
-TEST(Links_UnresolvedBasic)
+TEST(Unresolved_Basic)
 {
     ObjKey k;
 
@@ -91,7 +91,7 @@ TEST(Links_UnresolvedBasic)
 }
 
 
-TEST(Links_UnresolvedInvalidateObject)
+TEST(Unresolved_InvalidateObject)
 {
     Group g;
 
@@ -127,7 +127,7 @@ TEST(Links_UnresolvedInvalidateObject)
     CHECK_EQUAL(cars->size(), 2);
 }
 
-TEST(LinkList_Unresolved)
+TEST(Unresolved_LinkList)
 {
     Group g;
 
@@ -165,7 +165,7 @@ TEST(LinkList_Unresolved)
     CHECK_EQUAL(stock_copy.get(3), mercedes.get_key());
 }
 
-TEST(Links_QueryOverUnresolvedLinks)
+TEST(Unresolved_QueryOverLinks)
 {
     Group g;
 
@@ -213,6 +213,22 @@ TEST(Links_QueryOverUnresolvedLinks)
     CHECK_EQUAL(q.count(), 1);
     mathias.set(col_owns, new_tesla);
     CHECK_EQUAL(q.count(), 1);
+}
+
+TEST(Unresolved_PrimaryKeyInt)
+{
+    Group g;
+
+    auto foo = g.add_table_with_primary_key("foo", type_Int, "id");
+    auto bar = g.add_table("bar");
+    auto col = bar->add_column_link(type_Link, "link", *foo);
+
+    auto obj = bar->create_object();
+    auto unres = foo->get_objkey_from_primary_key(5);
+    obj.set(col, unres);
+    CHECK_NOT(obj.get<ObjKey>(col));
+    auto lazarus = foo->create_object_with_primary_key(5);
+    CHECK_EQUAL(obj.get<ObjKey>(col), lazarus.get_key());
 }
 
 #endif
