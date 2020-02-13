@@ -1,7 +1,4 @@
-# NEXT RELEASE
-
-### Enhancements
-* None.
+# 6.1.0-alpha.4 Release notes
 
 ### Fixed
 * Fixed a segfault when a list of Decimal128 expanded over 1000 elements.
@@ -11,14 +8,6 @@
 * Fixed min/max Decimal128 via Table not returning the result index.
 * Fixed sorting Decimal128 behaviour including position of NaN.
 * Fixed crash sorting a nullable ObjectID column.
-
-### Breaking changes
-* None.
-
------------
-
-### Internals
-* None.
 
 ----------------------------------------------
 
