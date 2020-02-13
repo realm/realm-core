@@ -33,9 +33,13 @@
 #   include <Windows.h>
 #   define unlink _unlink
     static inline int link(const char* oldpath, const char* newpath) {
+#if WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP)
         if (::CreateHardLinkA(oldpath, newpath, 0) == 0)
             return ::GetLastError();
         return 0;
+#else
+        throw std::runtime_error("Creating hard links is not supported.");
+#endif
     }
 #endif
 

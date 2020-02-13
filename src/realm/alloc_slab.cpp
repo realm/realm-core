@@ -1210,8 +1210,7 @@ void SlabAlloc::update_reader_view(size_t file_size)
             size_t section_size = file_size - section_start_offset;
             requires_new_translation = true;
             // save the old mapping/keep it open
-            OldMapping oldie(m_youngest_live_version, m_mappings[mapping_index]);
-            m_old_mappings.emplace_back(std::move(oldie));
+            m_old_mappings.emplace_back(m_youngest_live_version, std::move(m_mappings[mapping_index]));
             m_mappings[mapping_index] =
                 util::File::Map<char>(m_file, section_start_offset, File::access_ReadOnly, section_size);
             m_mapping_version++;
@@ -1228,8 +1227,7 @@ void SlabAlloc::update_reader_view(size_t file_size)
                 size_t section_reservation = get_section_base(old_num_sections) - section_start_offset;
                 REALM_ASSERT(section_size == section_reservation);
                 // save the old mapping/keep it open
-                OldMapping oldie(m_youngest_live_version, m_mappings[mapping_index]);
-                m_old_mappings.emplace_back(std::move(oldie));
+                m_old_mappings.emplace_back(m_youngest_live_version, std::move(m_mappings[mapping_index]));
                 m_mappings[mapping_index] =
                     util::File::Map<char>(m_file, section_start_offset, File::access_ReadOnly, section_size);
                 m_mapping_version++;

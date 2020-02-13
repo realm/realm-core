@@ -128,7 +128,10 @@ int ConstObj::cmp(const ConstObj& other, ColKey col_key) const
         case type_Decimal:
             return cmp<Decimal128>(other, col_ndx);
         case type_ObjectId:
-            return cmp<ObjectId>(other, col_ndx);
+            if (attr.test(col_attr_Nullable))
+                return cmp<Optional<ObjectId>>(other, col_ndx);
+            else
+                return cmp<ObjectId>(other, col_ndx);
         case type_Link:
             return cmp<ObjKey>(other, col_ndx);
         case type_OldDateTime:
@@ -472,6 +475,8 @@ bool ConstObj::is_null(ColKey col_key) const
                 return do_is_null<ArrayKey>(col_ndx);
             case col_type_ObjectId:
                 return do_is_null<ArrayObjectIdNull>(col_ndx);
+            case col_type_Decimal:
+                return do_is_null<ArrayDecimal128>(col_ndx);
             default:
                 REALM_UNREACHABLE();
         }

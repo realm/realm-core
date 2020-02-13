@@ -17,6 +17,19 @@
 
 ----------------------------------------------
 
+# 6.1.0-alpha.4 Release notes
+
+### Fixed
+* Fixed a segfault when a list of Decimal128 expanded over 1000 elements.
+* Fixed min/max of a list of Decimal128 when the list contained numbers larger than a min/max int64 type.
+* Fixed sum/avg of a list of Decimal128 when the list contained nulls.
+* Added missing TableView aggregate functions for Decimal128.
+* Fixed min/max Decimal128 via Table not returning the result index.
+* Fixed sorting Decimal128 behaviour including position of NaN.
+* Fixed crash sorting a nullable ObjectID column.
+
+----------------------------------------------
+
 # 6.1.0-alpha.3 Release notes
 
 ### Fixes
@@ -48,6 +61,21 @@
 
 ### Internals
 * File format bumped to 11.
+
+----------------------------------------------
+
+# 6.0.2 Release notes
+
+### Enhancements
+* Use search index to speed up Query::count, Query::find_all and generic aggregate function.
+
+### Fixed
+* None.
+ 
+-----------
+
+### Internals
+* Don't force downstream components to look for OpenSSL on Windows.
 
 ----------------------------------------------
 

@@ -66,9 +66,10 @@ void ArrayDecimal128::move(ArrayDecimal128& dst_arr, size_t ndx)
 {
     size_t elements_to_move = m_size - ndx;
     if (elements_to_move) {
+        dst_arr.alloc(dst_arr.m_size + elements_to_move, sizeof(Decimal128));
+        dst_arr.m_width = sizeof(Decimal128);
         Decimal128* dst = reinterpret_cast<Decimal128*>(dst_arr.m_data) + dst_arr.m_size;
         Decimal128* src = reinterpret_cast<Decimal128*>(m_data) + ndx;
-        dst_arr.alloc(dst_arr.m_size + elements_to_move, sizeof(Decimal128));
         memmove(dst, src, elements_to_move * sizeof(Decimal128));
         dst_arr.m_size += elements_to_move;
     }

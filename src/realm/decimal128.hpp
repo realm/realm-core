@@ -51,8 +51,10 @@ public:
         m_value = val;
     }
     Decimal128(null) noexcept;
+    static Decimal128 nan(const char*);
 
     bool is_null() const;
+    bool is_nan() const;
 
     bool operator==(const Decimal128& rhs) const;
     bool operator!=(const Decimal128& rhs) const;
@@ -79,6 +81,10 @@ public:
     {
         return &m_value;
     }
+    Bid128* raw()
+    {
+        return &m_value;
+    }
     void unpack(Bid128& coefficient, int& exponent, bool& sign) const noexcept;
 
 private:
@@ -95,5 +101,20 @@ inline std::ostream& operator<<(std::ostream& ostr, const Decimal128& id)
 }
 
 } // namespace realm
+
+namespace std {
+template <>
+struct numeric_limits<realm::Decimal128> {
+    static constexpr bool is_integer = false;
+    static realm::Decimal128 lowest() noexcept
+    {
+        return realm::Decimal128("-Inf");
+    }
+    static realm::Decimal128 max() noexcept
+    {
+        return realm::Decimal128("+Inf");
+    }
+};
+} // namespace std
 
 #endif /* REALM_DECIMAL_HPP */

@@ -265,6 +265,11 @@ double ConstTableView::sum_double(ColKey column_key) const
     return aggregate<act_Sum, double, double>(column_key);
 }
 
+Decimal128 ConstTableView::sum_decimal(ColKey column_key) const
+{
+    return aggregate<act_Sum, Decimal128, Decimal128>(column_key);
+}
+
 // Maximum
 int64_t ConstTableView::maximum_int(ColKey column_key, ObjKey* return_key) const
 {
@@ -285,7 +290,10 @@ Timestamp ConstTableView::maximum_timestamp(ColKey column_key, ObjKey* return_ke
 {
     return minmax_timestamp<realm::Greater>(column_key, return_key);
 }
-
+Decimal128 ConstTableView::maximum_decimal(ColKey column_key, ObjKey* return_key) const
+{
+    return aggregate<act_Max, Decimal128, Decimal128>(column_key, nullptr, return_key);
+}
 
 // Minimum
 int64_t ConstTableView::minimum_int(ColKey column_key, ObjKey* return_key) const
@@ -307,6 +315,10 @@ Timestamp ConstTableView::minimum_timestamp(ColKey column_key, ObjKey* return_ke
 {
     return minmax_timestamp<realm::Less>(column_key, return_key);
 }
+Decimal128 ConstTableView::minimum_decimal(ColKey column_key, ObjKey* return_key) const
+{
+    return aggregate<act_Min, Decimal128, Decimal128>(column_key, nullptr, return_key);
+}
 
 // Average. The number of values used to compute the result is written to `value_count` by callee
 double ConstTableView::average_int(ColKey column_key, size_t* value_count) const
@@ -323,6 +335,10 @@ double ConstTableView::average_float(ColKey column_key, size_t* value_count) con
 double ConstTableView::average_double(ColKey column_key, size_t* value_count) const
 {
     return aggregate<act_Average, double, double>(column_key, value_count);
+}
+Decimal128 ConstTableView::average_decimal(ColKey column_key, size_t* value_count) const
+{
+    return aggregate<act_Average, Decimal128, Decimal128>(column_key, value_count);
 }
 
 // Count
@@ -360,6 +376,11 @@ size_t ConstTableView::count_timestamp(ColKey column_key, Timestamp target) cons
         }
     }
     return count;
+}
+
+size_t ConstTableView::count_decimal(ColKey column_key, Decimal128 target) const
+{
+    return aggregate_count<Decimal128>(column_key, target);
 }
 
 void ConstTableView::to_json(std::ostream& out, size_t link_depth, std::map<std::string, std::string>* renames) const
