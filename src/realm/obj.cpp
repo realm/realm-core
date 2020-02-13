@@ -281,6 +281,21 @@ ObjKey ConstObj::_get<ObjKey>(ColKey::Idx col_ndx) const
     return k.is_unresolved() ? ObjKey{} : k;
 }
 
+bool ConstObj::is_unresolved(ColKey col_key) const
+{
+    m_table->report_invalid_key(col_key);
+    ColumnType type = col_key.get_type();
+    REALM_ASSERT(type == col_type_Link);
+
+    _update_if_needed();
+
+    ArrayKey values(get_alloc());
+    ref_type ref = to_ref(Array::get(m_mem.get_addr(), col_key.get_index().val + 1));
+    values.init_from_ref(ref);
+
+    return values.get(m_row_ndx).is_unresolved();
+}
+
 template <>
 int64_t ConstObj::_get<int64_t>(ColKey::Idx col_ndx) const
 {

@@ -113,6 +113,7 @@ public:
     {
         return get<U>(get_column_key(col_name));
     }
+    bool is_unresolved(ColKey col_key) const;
     ConstObj get_linked_object(ColKey link_col_key) const;
     int cmp(const ConstObj& other, ColKey col_key) const;
 

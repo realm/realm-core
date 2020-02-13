@@ -854,6 +854,11 @@ public:
         return full_sz - m_unresolved.size();
     }
 
+    bool has_unresolved() const noexcept
+    {
+        return !m_unresolved.empty();
+    }
+
     Obj get_object(size_t ndx);
 
     Obj operator[](size_t ndx)
@@ -896,7 +901,7 @@ private:
     friend class ConstTableView;
     friend class Query;
 
-    // Sorted vector of indices containing unresolved links.
+    // Sorted set of indices containing unresolved links.
     mutable std::vector<size_t> m_unresolved;
 
     void get_dependencies(TableVersions&) const override;

@@ -63,6 +63,8 @@ TEST(Links_UnresolvedBasic)
     stock.add(skoda.get_key());
 
     CHECK_NOT(finn.get<ObjKey>(col_owns));
+    CHECK(finn.is_unresolved(col_owns));
+    CHECK(stock.has_unresolved());
     CHECK_EQUAL(stock.size(), 1);
     CHECK_EQUAL(stock.get(0), skoda.get_key());
     CHECK_EQUAL(cars->size(), 1);
