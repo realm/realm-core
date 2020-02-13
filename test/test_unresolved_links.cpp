@@ -165,4 +165,54 @@ TEST(LinkList_Unresolved)
     CHECK_EQUAL(stock_copy.get(3), mercedes.get_key());
 }
 
+TEST(Links_QueryOverUnresolvedLinks)
+{
+    Group g;
+
+    auto cars = g.add_table_with_primary_key("Car", type_String, "model");
+    auto col_price = cars->add_column(type_Decimal, "price");
+    auto persons = g.add_table_with_primary_key("Person", type_String, "e-mail");
+    auto col_owns = persons->add_column_link(type_Link, "car", *cars);
+    auto dealers = g.add_table_with_primary_key("Dealer", type_Int, "cvr");
+    auto col_has = dealers->add_column_link(type_LinkList, "stock", *cars);
+
+    auto finn = persons->create_object_with_primary_key("finn.schiermer-andersen@mongodb.com");
+    auto mathias = persons->create_object_with_primary_key("mathias@10gen.com");
+    auto bilcentrum = dealers->create_object_with_primary_key(18454033);
+    auto bilmekka = dealers->create_object_with_primary_key(26293995);
+    auto skoda = cars->create_object_with_primary_key("Skoda Fabia").set(col_price, Decimal128("149999.5"));
+    auto tesla = cars->create_object_with_primary_key("Tesla 3").set(col_price, Decimal128("449999.5"));
+    auto volvo = cars->create_object_with_primary_key("Volvo XC90").set(col_price, Decimal128("1056000"));
+    auto bmw = cars->create_object_with_primary_key("BMW 750").set(col_price, Decimal128("2088188"));
+    auto mercedes = cars->create_object_with_primary_key("Mercedes SLC500").set(col_price, Decimal128("2355103"));
+
+    finn.set(col_owns, skoda.get_key());
+    mathias.set(col_owns, bmw.get_key());
+
+    {
+        auto stock = bilcentrum.get_linklist(col_has);
+        stock.add(skoda.get_key());
+        stock.add(tesla.get_key());
+        stock.add(volvo.get_key());
+    }
+    {
+        auto stock = bilmekka.get_linklist(col_has);
+        stock.add(volvo.get_key());
+        stock.add(bmw.get_key());
+        stock.add(mercedes.get_key());
+    }
+
+    auto q = dealers->link(col_has).column<Decimal128>(col_price) < Decimal128("1000000");
+    CHECK_EQUAL(q.count(), 1);
+
+    auto new_tesla = cars->get_objkey_from_primary_key("Tesla 10");
+    bilmekka.get_linklist(col_has).add(new_tesla);
+    CHECK_EQUAL(q.count(), 1);
+
+    q = persons->link(col_owns).column<Decimal128>(col_price) < Decimal128("1000000");
+    CHECK_EQUAL(q.count(), 1);
+    mathias.set(col_owns, new_tesla);
+    CHECK_EQUAL(q.count(), 1);
+}
+
 #endif
