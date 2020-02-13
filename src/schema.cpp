@@ -28,29 +28,30 @@
 using namespace realm;
 
 namespace realm {
-bool operator==(Schema const& a, Schema const& b)
+bool operator==(Schema const& a, Schema const& b) noexcept
 {
     return static_cast<Schema::base const&>(a) == static_cast<Schema::base const&>(b);
 }
 }
 
-Schema::Schema() = default;
+Schema::Schema() noexcept = default;
 Schema::~Schema() = default;
 Schema::Schema(Schema const&) = default;
-Schema::Schema(Schema &&) = default;
+Schema::Schema(Schema &&) noexcept = default;
 Schema& Schema::operator=(Schema const&) = default;
-Schema& Schema::operator=(Schema&&) = default;
+Schema& Schema::operator=(Schema&&) noexcept = default;
 
 Schema::Schema(std::initializer_list<ObjectSchema> types) : Schema(base(types)) { }
 
-Schema::Schema(base types) : base(std::move(types))
+Schema::Schema(base types) noexcept
+: base(std::move(types))
 {
     std::sort(begin(), end(), [](ObjectSchema const& lft, ObjectSchema const& rgt) {
         return lft.name < rgt.name;
     });
 }
 
-Schema::iterator Schema::find(StringData name)
+Schema::iterator Schema::find(StringData name) noexcept
 {
     auto it = std::lower_bound(begin(), end(), name, [](ObjectSchema const& lft, StringData rgt) {
         return lft.name < rgt;
@@ -61,7 +62,7 @@ Schema::iterator Schema::find(StringData name)
     return it;
 }
 
-Schema::const_iterator Schema::find(StringData name) const
+Schema::const_iterator Schema::find(StringData name) const noexcept
 {
     return const_cast<Schema *>(this)->find(name);
 }
@@ -150,7 +151,7 @@ static void compare(ObjectSchema const& existing_schema,
 }
 
 template<typename T, typename U, typename Func>
-void Schema::zip_matching(T&& a, U&& b, Func&& func)
+void Schema::zip_matching(T&& a, U&& b, Func&& func) noexcept
 {
     size_t i = 0, j = 0;
     while (i < a.size() && j < b.size()) {
@@ -205,7 +206,7 @@ std::vector<SchemaChange> Schema::compare(Schema const& target_schema, bool incl
     return changes;
 }
 
-void Schema::copy_keys_from(realm::Schema const& other)
+void Schema::copy_keys_from(realm::Schema const& other) noexcept
 {
     zip_matching(*this, other, [&](ObjectSchema* existing, const ObjectSchema* other) {
         if (!existing || !other)
@@ -222,7 +223,7 @@ void Schema::copy_keys_from(realm::Schema const& other)
 }
 
 namespace realm {
-bool operator==(SchemaChange const& lft, SchemaChange const& rgt)
+bool operator==(SchemaChange const& lft, SchemaChange const& rgt) noexcept
 {
     if (lft.m_kind != rgt.m_kind)
         return false;

@@ -208,7 +208,7 @@ uint64_t CollectionNotifier::add_callback(CollectionChangeCallback callback)
 {
     m_realm->verify_thread();
 
-    std::lock_guard<std::mutex> lock(m_callback_mutex);
+    util::CheckedLockGuard lock(m_callback_mutex);
     auto token = m_next_token++;
     m_callbacks.push_back({std::move(callback), {}, {}, token, false, false});
     if (m_callback_index == npos) { // Don't need to wake up if we're already sending notifications
@@ -224,7 +224,7 @@ void CollectionNotifier::remove_callback(uint64_t token)
     // it could cause user code to be called
     Callback old;
     {
-        std::lock_guard<std::mutex> lock(m_callback_mutex);
+        util::CheckedLockGuard lock(m_callback_mutex);
         auto it = find_callback(token);
         if (it == end(m_callbacks)) {
             return;
@@ -253,7 +253,7 @@ void CollectionNotifier::suppress_next_notification(uint64_t token)
         m_realm->verify_in_write();
     }
 
-    std::lock_guard<std::mutex> lock(m_callback_mutex);
+    util::CheckedLockGuard lock(m_callback_mutex);
     auto it = find_callback(token);
     if (it != end(m_callbacks)) {
         it->skip_next = true;
@@ -315,7 +315,7 @@ void CollectionNotifier::prepare_handover()
     m_has_run = true;
 
 #ifdef REALM_DEBUG
-    std::lock_guard<std::mutex> lock(m_callback_mutex);
+    util::CheckedLockGuard lock(m_callback_mutex);
     for (auto& callback : m_callbacks)
         REALM_ASSERT(!callback.skip_next);
 #endif
@@ -332,7 +332,7 @@ void CollectionNotifier::before_advance()
         // acquire a local reference to the callback so that removing the
         // callback from within it can't result in a dangling pointer
         auto cb = callback.fn;
-        lock.unlock();
+        lock.unlock_unchecked();
         cb.before(changes);
     });
 }
@@ -349,7 +349,7 @@ void CollectionNotifier::after_advance()
         // acquire a local reference to the callback so that removing the
         // callback from within it can't result in a dangling pointer
         auto cb = callback.fn;
-        lock.unlock();
+        lock.unlock_unchecked();
         cb.after(changes);
     });
 }
@@ -365,7 +365,7 @@ void CollectionNotifier::deliver_error(std::exception_ptr error)
         // callback from within it can't result in a dangling pointer
         auto cb = std::move(callback.fn);
         auto token = callback.token;
-        lock.unlock();
+        lock.unlock_unchecked();
         cb.error(error);
 
         // We never want to call the callback again after this, so just remove it
@@ -383,7 +383,7 @@ bool CollectionNotifier::package_for_delivery()
 {
     if (!prepare_to_deliver())
         return false;
-    std::lock_guard<std::mutex> l(m_callback_mutex);
+    util::CheckedLockGuard lock(m_callback_mutex);
     for (auto& callback : m_callbacks)
         callback.changes_to_deliver = std::move(callback.accumulated_changes).finalize();
     m_callback_count = m_callbacks.size();
@@ -393,12 +393,12 @@ bool CollectionNotifier::package_for_delivery()
 template<typename Fn>
 void CollectionNotifier::for_each_callback(Fn&& fn)
 {
-    std::unique_lock<std::mutex> callback_lock(m_callback_mutex);
+    util::CheckedUniqueLock callback_lock(m_callback_mutex);
     REALM_ASSERT_DEBUG(m_callback_count <= m_callbacks.size());
     for (++m_callback_index; m_callback_index < m_callback_count; ++m_callback_index) {
         fn(callback_lock, m_callbacks[m_callback_index]);
         if (!callback_lock.owns_lock())
-            callback_lock.lock();
+            callback_lock.lock_unchecked();
     }
 
     m_callback_index = npos;
@@ -417,7 +417,7 @@ Transaction& CollectionNotifier::source_shared_group()
 
 void CollectionNotifier::add_changes(CollectionChangeBuilder change)
 {
-    std::lock_guard<std::mutex> lock(m_callback_mutex);
+    util::CheckedLockGuard lock(m_callback_mutex);
     for (auto& callback : m_callbacks) {
         if (callback.skip_next) {
             REALM_ASSERT_DEBUG(callback.accumulated_changes.empty());
@@ -441,7 +441,8 @@ NotifierPackage::NotifierPackage(std::exception_ptr error,
 {
 }
 
-void NotifierPackage::package_and_wait(util::Optional<VersionID::version_type> target_version)
+// Clang TSE seems to not like returning a unique_lock from a function
+void NotifierPackage::package_and_wait(util::Optional<VersionID::version_type> target_version) NO_THREAD_SAFETY_ANALYSIS
 {
     if (!m_coordinator || m_error || !*this)
         return;
