@@ -230,32 +230,21 @@ public:
     /// Create a number of objects with keys supplied
     void create_objects(const std::vector<ObjKey>& keys);
     /// Does the key refer to an object within the table?
-    /// - also returns true for an unresolved object.
     bool is_valid(ObjKey key) const
     {
-        if (m_clusters.is_valid(key))
-            return true;
-        if (m_tombstones && m_tombstones->is_valid(key))
-            return true;
-        return false;
+        return m_clusters.is_valid(key);
     }
     ObjKey get_obj_key(GlobalKey id) const;
     GlobalKey get_object_id(ObjKey key) const;
     Obj get_object(ObjKey key)
     {
-        if (!key.is_unresolved())
-            return m_clusters.get(key);
-        if (m_tombstones)
-            return m_tombstones->get(key);
-        throw InvalidKey("ObjKey not found");
+        REALM_ASSERT(!key.is_unresolved());
+        return m_clusters.get(key);
     }
     ConstObj get_object(ObjKey key) const
     {
-        if (!key.is_unresolved())
-            return m_clusters.get(key);
-        if (m_tombstones)
-            return m_tombstones->get(key);
-        throw InvalidKey("ObjKey not found");
+        REALM_ASSERT(!key.is_unresolved());
+        return m_clusters.get(key);
     }
     Obj get_object(size_t ndx)
     {

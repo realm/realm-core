@@ -1604,7 +1604,7 @@ ref_type Table::create_empty_table(Allocator& alloc, TableKey key)
         top.add(v); // Throws
         dg_2.release();
     }
-    top.add(0); // Old position for columns - now tombstones
+    top.add(0); // Old position for columns
     {
         MemRef mem = ClusterTree::create_empty_cluster(alloc); // Throws
         dg_2.reset(mem.get_ref());

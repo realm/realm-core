@@ -1007,11 +1007,14 @@ Obj& Obj::set<ObjKey>(ColKey col_key, ObjKey target_key, bool is_default)
     if (type != ColumnTypeTraits<ObjKey>::column_id)
         throw LogicError(LogicError::illegal_type);
     TableRef target_table = get_target_table(col_key);
-    if (target_key != null_key && !target_table->is_valid(target_key)) {
-        throw LogicError(LogicError::target_row_index_out_of_range);
-    }
-    if (target_table->is_embedded() && target_key != null_key) {
-        throw LogicError(LogicError::wrong_kind_of_table);
+    if (target_key) {
+        ClusterTree* ct = target_key.is_unresolved() ? target_table->m_tombstones.get() : &target_table->m_clusters;
+        if (!ct->is_valid(target_key)) {
+            throw LogicError(LogicError::target_row_index_out_of_range);
+        }
+        if (target_table->is_embedded()) {
+            throw LogicError(LogicError::wrong_kind_of_table);
+        }
     }
     ObjKey old_key = get<ObjKey>(col_key); // Will update if needed
 
@@ -1265,8 +1268,8 @@ void Obj::set_backlink(ColKey col_key, ObjKey new_key)
         ColKey backlink_col_key = m_table->get_opposite_column(col_key);
         REALM_ASSERT(target_table->valid_column(backlink_col_key));
 
-        Obj target_obj = target_table->get_object(new_key);
-        target_obj.add_backlink(backlink_col_key, m_key); // Throws
+        ClusterTree* ct = new_key.is_unresolved() ? target_table->m_tombstones.get() : &target_table->m_clusters;
+        ct->get(new_key).add_backlink(backlink_col_key, m_key);
     }
 }
 
@@ -1290,7 +1293,8 @@ bool Obj::remove_backlink(ColKey col_key, ObjKey old_key, CascadeState& state)
     bool strong_links = target_table->is_embedded();
 
     if (old_key != realm::null_key) {
-        Obj target_obj = target_table->get_object(old_key);
+        ClusterTree* ct = old_key.is_unresolved() ? target_table->m_tombstones.get() : &target_table->m_clusters;
+        Obj target_obj = ct->get(old_key);
         bool last_removed = target_obj.remove_one_backlink(backlink_col_key, m_key); // Throws
         return state.enqueue_for_cascade(target_obj, strong_links, last_removed);
     }
