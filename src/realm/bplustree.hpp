@@ -594,7 +594,7 @@ protected:
     {
         // Only copy context flag over in a linklist.
         // The flag is in use in other list types
-        if constexpr (std::is_same<T, ObjKey>::value) {
+        if constexpr (std::is_same_v<T, ObjKey>) {
             auto cf = m_root ? m_root->get_context_flag() : false;
             BPlusTreeBase::replace_root(std::move(new_root));
             m_root->set_context_flag(cf);
