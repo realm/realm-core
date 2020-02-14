@@ -27,11 +27,12 @@
 
 using namespace realm;
 
-Object Object::freeze(std::shared_ptr<Realm> frozen_realm) {
+Object Object::freeze(std::shared_ptr<Realm> frozen_realm) const
+{
     return Object(frozen_realm, frozen_realm->transaction().import_copy_of(m_obj));
 }
 
-bool Object::is_frozen()
+bool Object::is_frozen() const noexcept
 {
     return m_realm->is_frozen();
 }
@@ -61,8 +62,8 @@ ReadOnlyPropertyException::ReadOnlyPropertyException(const std::string& object_t
 , object_type(object_type), property_name(property_name) {}
 
 ModifyPrimaryKeyException::ModifyPrimaryKeyException(const std::string& object_type, const std::string& property_name)
-        : std::logic_error(util::format("Cannot modify primary key after creation: '%1.%2'", object_type, property_name))
-        , object_type(object_type), property_name(property_name) {}
+: std::logic_error(util::format("Cannot modify primary key after creation: '%1.%2'", object_type, property_name))
+, object_type(object_type), property_name(property_name) {}
 
 Object::Object(SharedRealm r, ObjectSchema const& s, Obj const& o)
 : m_realm(std::move(r)), m_object_schema(&s), m_obj(o) { }

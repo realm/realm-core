@@ -65,6 +65,8 @@ set(HEADERS
 
     util/aligned_union.hpp
     util/atomic_shared_ptr.hpp
+    util/checked_mutex.hpp
+    util/copyable_atomic.hpp
     util/event_loop_dispatcher.hpp
     util/event_loop_signal.hpp
     util/tagged_bool.hpp

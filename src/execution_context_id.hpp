@@ -54,7 +54,7 @@ public:
     // Convert from the representation used by Realm::Config, where the absence of an
     // explicit abstract execution context indicates that the current thread's identifier
     // should be used.
-    AnyExecutionContextID(util::Optional<AbstractExecutionContextID> maybe_abstract_id)
+    AnyExecutionContextID(util::Optional<AbstractExecutionContextID> maybe_abstract_id) noexcept
     {
         if (maybe_abstract_id)
             *this = AnyExecutionContextID(*maybe_abstract_id);
@@ -62,35 +62,37 @@ public:
             *this = AnyExecutionContextID(std::this_thread::get_id());
     }
 
-    AnyExecutionContextID(std::thread::id thread_id) : AnyExecutionContextID(Type::Thread, std::move(thread_id)) { }
-    AnyExecutionContextID(AbstractExecutionContextID abstract_id) : AnyExecutionContextID(Type::Abstract, abstract_id) { }
+    AnyExecutionContextID(std::thread::id thread_id) noexcept
+    : AnyExecutionContextID(Type::Thread, std::move(thread_id)) { }
+    AnyExecutionContextID(AbstractExecutionContextID abstract_id) noexcept
+    : AnyExecutionContextID(Type::Abstract, abstract_id) { }
 
     template <typename StorageType>
-    bool contains() const
+    bool contains() const noexcept
     {
         return TypeForStorageType<StorageType>::value == m_type;
     }
 
     template <typename StorageType>
-    StorageType get() const
+    StorageType get() const noexcept
     {
         REALM_ASSERT_DEBUG(contains<StorageType>());
         return *reinterpret_cast<const StorageType*>(&m_storage);
     }
 
-    bool operator==(const AnyExecutionContextID& other) const
+    bool operator==(const AnyExecutionContextID& other) const noexcept
     {
         return m_type == other.m_type && std::memcmp(&m_storage, &other.m_storage, sizeof(m_storage)) == 0;
     }
 
-    bool operator!=(const AnyExecutionContextID& other) const
+    bool operator!=(const AnyExecutionContextID& other) const noexcept
     {
         return !(*this == other);
     }
 
 private:
     template <typename T>
-    AnyExecutionContextID(Type type, T value) : m_type(type)
+    AnyExecutionContextID(Type type, T value) noexcept : m_type(type)
     {
         // operator== relies on being able to compare the raw bytes of m_storage,
         // so zero everything before intializing the portion in use.
