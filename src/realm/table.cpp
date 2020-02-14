@@ -514,15 +514,15 @@ void Table::init(ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent, bo
         uint64_t flags = m_top.get_as_ref_or_tagged(top_position_for_flags).get_as_int();
         m_is_embedded = flags & 0x1;
     }
-    if (m_top.size() <= top_position_for_tombstones) {
-        m_tombstones.reset();
-    }
-    else {
+    if (m_top.size() > top_position_for_tombstones && m_top.get_as_ref(top_position_for_tombstones)) {
+        // Tombstones exists
         if (!m_tombstones) {
-            m_tombstones.reset(new ClusterTree(this, m_alloc, top_position_for_tombstones));
-            std::cout << "Tombstones already there, setting up cluster" << std::endl;
+            m_tombstones = std::make_unique<ClusterTree>(this, m_alloc, size_t(top_position_for_tombstones));
         }
         m_tombstones->init_from_parent();
+    }
+    else {
+        m_tombstones = nullptr;
     }
 }
 
@@ -788,6 +788,8 @@ void Table::do_erase_root_column(ColKey col_key)
     m_opposite_column.set(col_ndx, 0);
     m_index_accessors[col_ndx] = nullptr;
     m_clusters.remove_column(col_key);
+    if (m_tombstones)
+        m_tombstones->remove_column(col_key);
     size_t spec_ndx = colkey2spec_ndx(col_key);
     m_spec.erase_column(spec_ndx);
     m_top.adjust(top_position_for_column_key, 2);
@@ -1602,7 +1604,7 @@ ref_type Table::create_empty_table(Allocator& alloc, TableKey key)
         top.add(v); // Throws
         dg_2.release();
     }
-    top.add(0); // Old position for columns
+    top.add(0); // Old position for columns - now tombstones
     {
         MemRef mem = ClusterTree::create_empty_cluster(alloc); // Throws
         dg_2.reset(mem.get_ref());
@@ -1650,20 +1652,29 @@ ref_type Table::create_empty_table(Allocator& alloc, TableKey key)
     top.add(0); // Collision_map
     top.add(0); // pk col key
     top.add(0); // flags
-    {
-        // tombstones
-        MemRef mem = ClusterTree::create_empty_cluster(alloc); // Throws
-        dg_2.reset(mem.get_ref());
-        int_fast64_t v(from_ref(mem.get_ref()));
-        top.add(v); // Throws
-        dg_2.release();
-        std::cout << "Creating tombstone cluster as part of table creation" << std::endl;
-    }
+    top.add(0); // tombstones
+
     REALM_ASSERT(top.size() == top_array_size);
 
     return top.get_ref();
 }
 
+void Table::ensure_graveyard()
+{
+    if (!m_tombstones) {
+        while (m_top.size() < top_position_for_tombstones)
+            m_top.add(0);
+        REALM_ASSERT(!m_top.get(top_position_for_tombstones));
+        MemRef mem = ClusterTree::create_empty_cluster(m_alloc);
+        m_top.set_as_ref(top_position_for_tombstones, mem.get_ref());
+        m_tombstones = std::make_unique<ClusterTree>(this, m_alloc, size_t(top_position_for_tombstones));
+        m_tombstones->init_from_parent();
+        for_each_and_every_column([ts = m_tombstones.get()](ColKey col) {
+            ts->insert_column(col);
+            return false;
+        });
+    }
+}
 
 void Table::batch_erase_rows(const KeyColumn& keys)
 {
@@ -2916,23 +2927,7 @@ ObjKey Table::allocate_unresolved_key(ObjKey key, const FieldValues& values)
 {
     auto unres_key = key.get_unresolved();
 
-    if (m_tombstones.get() == nullptr) {
-        std::cout << "Creating tombstone cluster on key allocation" << std::endl;
-        // must expand top array to include tombstone first
-        while (m_top.size() < top_position_for_tombstones)
-            m_top.add(0);
-        if (m_top.size() == top_position_for_tombstones) {
-            std::cout << "Creating tombstone cluster step II" << std::endl;
-            MemRef mem = ClusterTree::create_empty_cluster(m_top.get_alloc());
-            m_top.add(from_ref(mem.get_ref()));
-            REALM_ASSERT(m_top.size() == top_array_size);
-        }
-        m_tombstones.reset(new ClusterTree(this, m_alloc, top_position_for_tombstones));
-        m_tombstones->init_from_parent();
-        // FIXME: Missing addition of columns....
-    }
-    else
-        std::cout << "Using existing tombstone cluster" << std::endl;
+    ensure_graveyard();
 
     Obj tombstone = m_tombstones->insert(unres_key, values);
     bump_content_version();

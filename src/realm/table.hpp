@@ -706,6 +706,7 @@ private:
     void revive(Replication* const* repl, Allocator& new_allocator, bool writable);
 
     void init(ref_type top_ref, ArrayParent*, size_t ndx_in_parent, bool is_writable, bool is_frozen);
+    void ensure_graveyard();
 
     void set_key(TableKey key);
 

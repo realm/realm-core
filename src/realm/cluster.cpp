@@ -1108,6 +1108,11 @@ inline void Cluster::do_insert_column(ColKey col_key, bool nullable)
     }
     auto col_ndx = col_key.get_index();
     unsigned ndx = col_ndx.val + s_first_col_index;
+
+    // Fill up if indexes are not consecutive
+    while (size() < ndx)
+        Array::add(0);
+
     if (ndx == size())
         Array::insert(ndx, from_ref(arr.get_ref()));
     else
