@@ -705,6 +705,8 @@ TEST_CASE("migration: Automatic") {
                 {"string", PropertyType::String},
                 {"data", PropertyType::Data},
                 {"date", PropertyType::Date},
+                {"object id", PropertyType::ObjectId},
+                {"decimal", PropertyType::Decimal},
                 {"object", PropertyType::Object|PropertyType::Nullable, "link target"},
                 {"array", PropertyType::Object|PropertyType::Array, "array target"},
             }},
@@ -733,6 +735,8 @@ TEST_CASE("migration: Automatic") {
             {"string", "hello"s},
             {"data", "olleh"s},
             {"date", Timestamp(10, 20)},
+            {"object id", ObjectId("000000000000000000000001")},
+            {"decimal", Decimal128("123.45e6")},
             {"object", AnyDict{{"value", INT64_C(10)}}},
             {"array", AnyVector{AnyDict{{"value", INT64_C(20)}}}},
         };
@@ -759,6 +763,8 @@ TEST_CASE("migration: Automatic") {
                 REQUIRE(any_cast<std::string>(obj.get_property_value<util::Any>(ctx, "string")) == "hello");
                 REQUIRE(any_cast<std::string>(obj.get_property_value<util::Any>(ctx, "data")) == "olleh");
                 REQUIRE(any_cast<Timestamp>(obj.get_property_value<util::Any>(ctx, "date")) == Timestamp(10, 20));
+                REQUIRE(any_cast<ObjectId>(obj.get_property_value<util::Any>(ctx, "object id")) == ObjectId("000000000000000000000001"));
+                REQUIRE(any_cast<Decimal128>(obj.get_property_value<util::Any>(ctx, "decimal")) == Decimal128("123.45e6"));
 
                 auto link = any_cast<Object>(obj.get_property_value<util::Any>(ctx, "object"));
                 REQUIRE(link.is_valid());
@@ -864,6 +870,15 @@ TEST_CASE("migration: Automatic") {
                 REQUIRE(any_cast<Timestamp>(obj.get_property_value<util::Any>(ctx, "date")) == Timestamp(10, 20));
                 obj.set_property_value(ctx, "date", util::Any(Timestamp(1, 2)));
                 REQUIRE(any_cast<Timestamp>(obj.get_property_value<util::Any>(ctx, "date")) == Timestamp(1, 2));
+
+                REQUIRE(any_cast<ObjectId>(obj.get_property_value<util::Any>(ctx, "object id")) == ObjectId("000000000000000000000001"));
+                ObjectId generated = ObjectId::gen();
+                obj.set_property_value(ctx, "object id", util::Any(generated));
+                REQUIRE(any_cast<ObjectId>(obj.get_property_value<util::Any>(ctx, "object id")) == generated);
+
+                REQUIRE(any_cast<Decimal128>(obj.get_property_value<util::Any>(ctx, "decimal")) == Decimal128("123.45e6"));
+                obj.set_property_value(ctx, "decimal", util::Any(Decimal128("77.88E-99")));
+                REQUIRE(any_cast<Decimal128>(obj.get_property_value<util::Any>(ctx, "decimal")) == Decimal128("77.88E-99"));
 
                 Object linked_obj(new_realm, "link target", 0);
                 Object new_obj(new_realm, get_table(new_realm, "link target")->create_object());
