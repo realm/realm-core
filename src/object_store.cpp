@@ -760,7 +760,7 @@ Schema ObjectStore::schema_from_group(Group const& group) {
     return schema;
 }
 
-util::Optional<Property> ObjectStore::property_for_column_index(ConstTableRef& table, ColKey column_key)
+util::Optional<Property> ObjectStore::property_for_column_key(ConstTableRef& table, ColKey column_key)
 {
     StringData column_name = table->get_column_name(column_key);
 

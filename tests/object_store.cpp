@@ -38,7 +38,7 @@ TEST_CASE("ObjectStore: table_name_for_object_type()") {
     }
 }
 
-TEST_CASE("ObjectStore:: property_for_column_index()") {
+TEST_CASE("ObjectStore:: property_for_column_key()") {
     SECTION("Property should match the schema") {
         Schema schema = {
             {"object", {
@@ -65,7 +65,7 @@ TEST_CASE("ObjectStore:: property_for_column_index()") {
 
         auto all_columns = table->get_column_keys();
         for (auto col : all_columns) {
-            auto property = ObjectStore::property_for_column_index(table, col);
+            auto property = ObjectStore::property_for_column_key(table, col);
             if (!property) {
                 FAIL();
                 continue;
