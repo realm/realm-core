@@ -57,7 +57,12 @@ GlobalKey ConstObj::get_object_id() const
 
 const ClusterTree* ConstObj::get_tree_top() const
 {
-    return &m_table.unchecked_ptr()->m_clusters;
+    if (m_key.is_unresolved()) {
+        return m_table.unchecked_ptr()->m_tombstones.get();
+    }
+    else {
+        return &m_table.unchecked_ptr()->m_clusters;
+    }
 }
 
 Allocator& ConstObj::get_alloc() const
