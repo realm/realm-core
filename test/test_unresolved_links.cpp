@@ -67,10 +67,11 @@ TEST(Links_UnresolvedBasic)
     CHECK_EQUAL(stock.get(0), skoda.get_key());
     CHECK_EQUAL(cars->size(), 1);
     auto q = cars->column<Decimal128>(col_price) < Decimal128("300000");
-    // FIXME: CHECK_EQUAL(q.count(), 1);
+    CHECK_EQUAL(q.count(), 1);
 
     // cars->dump_objects();
     auto tesla = cars->create_object_with_primary_key("Tesla 10").set(col_price, Decimal128("499999.5"));
+    CHECK_EQUAL(tesla.get_backlink_count(), 3);
     CHECK_EQUAL(stock.size(), 2);
     CHECK_EQUAL(cars->size(), 2);
     CHECK(finn.get<ObjKey>(col_owns));

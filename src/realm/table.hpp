@@ -238,10 +238,12 @@ public:
     GlobalKey get_object_id(ObjKey key) const;
     Obj get_object(ObjKey key)
     {
+        REALM_ASSERT(!key.is_unresolved());
         return m_clusters.get(key);
     }
     ConstObj get_object(ObjKey key) const
     {
+        REALM_ASSERT(!key.is_unresolved());
         return m_clusters.get(key);
     }
     Obj get_object(size_t ndx)
@@ -641,6 +643,7 @@ private:
     }
     Spec m_spec;            // 1st slot in m_top
     ClusterTree m_clusters; // 3rd slot in m_top
+    std::unique_ptr<ClusterTree> m_tombstones; // 13th slot in m_top
     TableKey m_key;     // 4th slot in m_top
     Array m_index_refs; // 5th slot in m_top
     Array m_opposite_table;  // 7th slot in m_top
@@ -692,6 +695,7 @@ private:
     void revive(Replication* const* repl, Allocator& new_allocator, bool writable);
 
     void init(ref_type top_ref, ArrayParent*, size_t ndx_in_parent, bool is_writable, bool is_frozen);
+    void ensure_graveyard();
 
     void set_key(TableKey key);
 
@@ -897,7 +901,8 @@ private:
     static constexpr int top_position_for_pk_col = 11;
     static constexpr int top_position_for_flags = 12;
     // flags contents: bit 0 - is table embedded?
-    static constexpr int top_array_size = 13;
+    static constexpr int top_position_for_tombstones = 13;
+    static constexpr int top_array_size = 14;
 
     enum { s_collision_map_lo = 0, s_collision_map_hi = 1, s_collision_map_local_id = 2, s_collision_map_num_slots };
 
@@ -1193,7 +1198,7 @@ inline Table::Table(Allocator& alloc)
     : m_alloc(alloc)
     , m_top(m_alloc)
     , m_spec(m_alloc)
-    , m_clusters(this, m_alloc)
+    , m_clusters(this, m_alloc, top_position_for_cluster_tree)
     , m_index_refs(m_alloc)
     , m_opposite_table(m_alloc)
     , m_opposite_column(m_alloc)
@@ -1215,7 +1220,7 @@ inline Table::Table(Replication* const* repl, Allocator& alloc)
     : m_alloc(alloc)
     , m_top(m_alloc)
     , m_spec(m_alloc)
-    , m_clusters(this, m_alloc)
+    , m_clusters(this, m_alloc, top_position_for_cluster_tree)
     , m_index_refs(m_alloc)
     , m_opposite_table(m_alloc)
     , m_opposite_column(m_alloc)

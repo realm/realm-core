@@ -1108,6 +1108,11 @@ inline void Cluster::do_insert_column(ColKey col_key, bool nullable)
     }
     auto col_ndx = col_key.get_index();
     unsigned ndx = col_ndx.val + s_first_col_index;
+
+    // Fill up if indexes are not consecutive
+    while (size() < ndx)
+        Array::add(0);
+
     if (ndx == size())
         Array::insert(ndx, from_ref(arr.get_ref()));
     else
@@ -1761,9 +1766,10 @@ void Cluster::remove_backlinks(ObjKey origin_key, ColKey origin_col_key, const s
 
 /******************************** ClusterTree ********************************/
 
-ClusterTree::ClusterTree(Table* owner, Allocator& alloc)
+ClusterTree::ClusterTree(Table* owner, Allocator& alloc, size_t top_position_for_cluster_tree)
     : m_owner(owner)
     , m_alloc(alloc)
+    , m_top_position_for_cluster_tree(top_position_for_cluster_tree)
 {
 }
 
@@ -1813,7 +1819,7 @@ void ClusterTree::replace_root(std::unique_ptr<ClusterNode> new_root)
 {
     if (new_root != m_root) {
         // Maintain parent.
-        new_root->set_parent(&m_owner->m_top, Table::top_position_for_cluster_tree);
+        new_root->set_parent(&m_owner->m_top, m_top_position_for_cluster_tree);
         new_root->update_parent(); // Throws
         m_root = std::move(new_root);
     }
@@ -1822,14 +1828,14 @@ void ClusterTree::replace_root(std::unique_ptr<ClusterNode> new_root)
 void ClusterTree::init_from_ref(ref_type ref)
 {
     auto new_root = create_root_from_ref(m_alloc, ref);
-    new_root->set_parent(&m_owner->m_top, Table::top_position_for_cluster_tree);
+    new_root->set_parent(&m_owner->m_top, m_top_position_for_cluster_tree);
     m_root = std::move(new_root);
     m_size = m_root->get_tree_size();
 }
 
 void ClusterTree::init_from_parent()
 {
-    ref_type ref = m_owner->m_top.get_as_ref(Table::top_position_for_cluster_tree);
+    ref_type ref = m_owner->m_top.get_as_ref(m_top_position_for_cluster_tree);
     init_from_ref(ref);
 }
 

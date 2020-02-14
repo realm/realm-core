@@ -512,6 +512,16 @@ void Table::init(ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent, bo
         uint64_t flags = m_top.get_as_ref_or_tagged(top_position_for_flags).get_as_int();
         m_is_embedded = flags & 0x1;
     }
+    if (m_top.size() > top_position_for_tombstones && m_top.get_as_ref(top_position_for_tombstones)) {
+        // Tombstones exists
+        if (!m_tombstones) {
+            m_tombstones = std::make_unique<ClusterTree>(this, m_alloc, size_t(top_position_for_tombstones));
+        }
+        m_tombstones->init_from_parent();
+    }
+    else {
+        m_tombstones = nullptr;
+    }
 }
 
 
@@ -747,7 +757,16 @@ ColKey Table::do_insert_root_column(ColKey col_key, ColumnType type, StringData 
     }
     refresh_index_accessors();
     m_clusters.insert_column(col_key);
-
+    if (m_tombstones) {
+        m_tombstones->insert_column(col_key);
+        /*
+          FIXME: fails
+        if (col_key == get_primary_key_column())
+            m_tombstones->insert_column(col_key);
+        else if (col_key.get_type() == col_type_BackLink)
+            m_tombstones->insert_column(col_key);
+        */
+    }
     return col_key;
 }
 
@@ -767,6 +786,8 @@ void Table::do_erase_root_column(ColKey col_key)
     m_opposite_column.set(col_ndx, 0);
     m_index_accessors[col_ndx] = nullptr;
     m_clusters.remove_column(col_key);
+    if (m_tombstones)
+        m_tombstones->remove_column(col_key);
     size_t spec_ndx = colkey2spec_ndx(col_key);
     m_spec.erase_column(spec_ndx);
     m_top.adjust(top_position_for_column_key, 2);
@@ -1629,12 +1650,29 @@ ref_type Table::create_empty_table(Allocator& alloc, TableKey key)
     top.add(0); // Collision_map
     top.add(0); // pk col key
     top.add(0); // flags
+    top.add(0); // tombstones
 
     REALM_ASSERT(top.size() == top_array_size);
 
     return top.get_ref();
 }
 
+void Table::ensure_graveyard()
+{
+    if (!m_tombstones) {
+        while (m_top.size() < top_position_for_tombstones)
+            m_top.add(0);
+        REALM_ASSERT(!m_top.get(top_position_for_tombstones));
+        MemRef mem = ClusterTree::create_empty_cluster(m_alloc);
+        m_top.set_as_ref(top_position_for_tombstones, mem.get_ref());
+        m_tombstones = std::make_unique<ClusterTree>(this, m_alloc, size_t(top_position_for_tombstones));
+        m_tombstones->init_from_parent();
+        for_each_and_every_column([ts = m_tombstones.get()](ColKey col) {
+            ts->insert_column(col);
+            return false;
+        });
+    }
+}
 
 void Table::batch_erase_rows(const KeyColumn& keys)
 {
@@ -1677,6 +1715,8 @@ void Table::clear()
 
     CascadeState state(CascadeState::Mode::Strong, get_parent_group());
     m_clusters.clear(state);
+    // FIXME: what should happen to tombstones when a table is cleared?
+    // m_tombstones->clear(state); <-- does not work.
 
     bump_content_version();
     bump_storage_version();
@@ -2666,11 +2706,11 @@ Obj Table::create_object_with_primary_key(const Mixed& primary_key)
     Obj ret = create_object(object_key, {{primary_key_col, primary_key}});
     // Check if unresolved exists
     ObjKey unres_key = object_key.get_unresolved();
-    if (is_valid(unres_key)) {
-        auto tombstone = m_clusters.get(unres_key);
+    if (m_tombstones && m_tombstones->is_valid(unres_key)) {
+        auto tombstone = m_tombstones->get(unres_key);
         ret.assign(tombstone);
         CascadeState state(CascadeState::Mode::None);
-        m_clusters.erase(unres_key, state);
+        m_tombstones->erase(unres_key, state);
     }
     return ret;
 }
@@ -2692,11 +2732,11 @@ ObjKey Table::get_objkey_from_primary_key(const Mixed& primary_key)
     object_key = global_to_local_object_id_hashed(object_id);
 
     // Check if existing
-    if (is_valid(object_key)) {
+    if (m_clusters.is_valid(object_key)) {
         return object_key;
     }
     auto unres_key = object_key.get_unresolved();
-    if (is_valid(unres_key)) {
+    if (m_tombstones && m_tombstones->is_valid(unres_key)) {
         return unres_key;
     }
     return allocate_unresolved_key(object_key, {{primary_key_col, primary_key}});
@@ -2883,9 +2923,11 @@ ObjKey Table::allocate_unresolved_key(ObjKey key, const FieldValues& values)
 {
     auto unres_key = key.get_unresolved();
 
+    ensure_graveyard();
+
+    Obj tombstone = m_tombstones->insert(unres_key, values);
     bump_content_version();
     bump_storage_version();
-    Obj tombstone = m_clusters.insert(unres_key, values);
 
     return tombstone.get_key();
 }
@@ -2964,11 +3006,12 @@ void Table::invalidate_object(ObjKey key)
     auto primary_key_col = get_primary_key_column();
     if (!primary_key_col)
         throw LogicError(LogicError::wrong_kind_of_table);
-    if (!is_valid(key)) // idempotence
+    if (m_tombstones && m_tombstones->is_valid(key)) // idempotence
         return;
     auto obj = get_object(key);
-    auto tombstone_key = allocate_unresolved_key(key, {});
-    auto tombstone = m_clusters.get(tombstone_key);
+    auto pk = obj.get_any(primary_key_col);
+    auto tombstone_key = allocate_unresolved_key(key, {{primary_key_col, pk}});
+    auto tombstone = m_tombstones->get(tombstone_key);
     tombstone.assign(obj);
     CascadeState state(CascadeState::Mode::None);
     m_clusters.erase(key, state);
