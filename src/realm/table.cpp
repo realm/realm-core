@@ -315,7 +315,7 @@ ColKey Table::add_column(DataType type, StringData name, bool nullable)
 
 ColKey Table::add_column_list(DataType type, StringData name, bool nullable)
 {
-    LinkTargetInfo invalid_link;
+    Table* invalid_link = nullptr;
     return do_insert_column(ColKey(), type, name, invalid_link, nullable, true); // Throws
 }
 
@@ -339,9 +339,8 @@ ColKey Table::insert_column_link(ColKey col_key, DataType type, StringData name,
     if (origin_group != target_group)
         throw LogicError(LogicError::group_mismatch);
 
-    LinkTargetInfo link_target_info(&target);
     m_has_any_embedded_objects |= target.is_embedded();
-    auto retval = do_insert_column(col_key, type, name, link_target_info, false, type == type_LinkList); // Throws
+    auto retval = do_insert_column(col_key, type, name, &target, false, type == type_LinkList); // Throws
     return retval;
 }
 
@@ -393,7 +392,7 @@ ColKey Table::insert_column(ColKey col_key, DataType type, StringData name, bool
     if (REALM_UNLIKELY(is_link_type(ColumnType(type))))
         throw LogicError(LogicError::illegal_type);
 
-    LinkTargetInfo invalid_link;
+    Table* invalid_link = nullptr;
     return do_insert_column(col_key, type, name, invalid_link, nullable); // Throws
 }
 
@@ -408,8 +407,6 @@ void Table::remove_column(ColKey col_key)
     if (col_key == m_primary_key_col) {
         do_set_primary_key_column(ColKey());
     }
-    bump_content_version();
-    bump_storage_version();
     erase_root_column(col_key); // Throws
 }
 
@@ -530,17 +527,27 @@ void Table::init(ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent, bo
 }
 
 
-ColKey Table::do_insert_column(ColKey col_key, DataType type, StringData name, LinkTargetInfo& link_target_info,
-                               bool nullable, bool listtype)
+ColKey Table::do_insert_column(ColKey col_key, DataType type, StringData name, Table* target_table, bool nullable,
+                               bool listtype)
 {
     if (type == type_Link)
         nullable = true;
 
-    bump_storage_version();
-    col_key = insert_root_column(col_key, type, name, link_target_info, nullable, listtype); // Throws
+    col_key = do_insert_root_column(col_key, ColumnType(type), name, nullable, listtype); // Throws
+
+    // When the inserted column is a link-type column, we must also add a
+    // backlink column to the target table.
+
+    if (target_table) {
+        auto backlink_col_key = target_table->do_insert_root_column(ColKey{}, col_type_BackLink, ""); // Throws
+        target_table->report_invalid_key(backlink_col_key);
+
+        set_opposite_column(col_key, target_table->get_key(), backlink_col_key);
+        target_table->set_opposite_column(backlink_col_key, get_key(), col_key);
+    }
 
     if (Replication* repl = get_repl())
-        repl->insert_column(this, col_key, type, name, link_target_info, nullable, listtype); // Throws
+        repl->insert_column(this, col_key, type, name, target_table, nullable, listtype); // Throws
 
     return col_key;
 }
@@ -685,26 +692,6 @@ size_t Table::get_num_unique_values(ColKey col_key) const
     return col.size();
 }
 
-ColKey Table::insert_root_column(ColKey col_key, DataType type, StringData name, LinkTargetInfo& link_target,
-                                 bool nullable, bool listtype)
-{
-    col_key = do_insert_root_column(col_key, ColumnType(type), name, nullable, listtype); // Throws
-
-    // When the inserted column is a link-type column, we must also add a
-    // backlink column to the target table.
-
-    if (link_target.is_valid()) {
-        auto target_table_key = link_target.m_target_table->get_key();
-        auto origin_table_key = get_key();
-        link_target.m_backlink_col_key = link_target.m_target_table->insert_backlink_column(
-            origin_table_key, col_key, link_target.m_backlink_col_key); // Throws
-        link_target.m_target_table->report_invalid_key(link_target.m_backlink_col_key);
-        set_opposite_column(col_key, target_table_key, link_target.m_backlink_col_key);
-        // backlink metadata in opposite table is set by insert_backlink_column...
-    }
-    return col_key;
-}
-
 
 void Table::erase_root_column(ColKey col_key)
 {
@@ -713,7 +700,7 @@ void Table::erase_root_column(ColKey col_key)
     if (is_link_type(col_type)) {
         auto target_table = get_opposite_table(col_key);
         auto target_column = get_opposite_column(col_key);
-        target_table->erase_backlink_column(target_column);
+        target_table->do_erase_root_column(target_column);
     }
     do_erase_root_column(col_key); // Throws
 }
@@ -772,6 +759,9 @@ ColKey Table::do_insert_root_column(ColKey col_key, ColumnType type, StringData 
             m_tombstones->insert_column(col_key);
         */
     }
+
+    bump_storage_version();
+
     return col_key;
 }
 
@@ -802,13 +792,8 @@ void Table::do_erase_root_column(ColKey col_key)
         REALM_ASSERT(m_index_accessors.back() == nullptr);
         m_index_accessors.erase(m_index_accessors.end() - 1);
     }
-}
-
-ColKey Table::insert_backlink_column(TableKey origin_table_key, ColKey origin_col_key, ColKey backlink_col_key)
-{
-    ColKey retval = do_insert_root_column(backlink_col_key, col_type_BackLink, ""); // Throws
-    set_opposite_column(retval, origin_table_key, origin_col_key);
-    return retval;
+    bump_content_version();
+    bump_storage_version();
 }
 
 bool Table::set_embedded(bool embedded)
@@ -862,14 +847,6 @@ void Table::do_set_embedded(bool embedded)
     }
     m_top.set(top_position_for_flags, RefOrTagged::make_tagged(flags));
     m_is_embedded = embedded;
-}
-
-
-void Table::erase_backlink_column(ColKey backlink_col_key)
-{
-    bump_content_version();
-    bump_storage_version();
-    do_erase_root_column(backlink_col_key); // Throws
 }
 
 
@@ -3536,9 +3513,6 @@ ColKey Table::set_nullability(ColKey col_key, bool nullable, bool throw_on_null)
         remove_column(new_col);
         throw;
     }
-
-    bump_content_version();
-    bump_storage_version();
 
     erase_root_column(col_key);
     m_spec.rename_column(colkey2spec_ndx(new_col), column_name);
