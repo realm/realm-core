@@ -230,7 +230,7 @@ public:
     // Create an object with specific GlobalKey.
     Obj create_object(GlobalKey object_id, const FieldValues& = {});
     // Create an object with primary key - or return already existing object
-    Obj create_object_with_primary_key(const Mixed& primary_key);
+    Obj create_object_with_primary_key(const Mixed& primary_key, FieldValues&& = {});
     // Return existing object or return unresolved key.
     // Important: This is to be used ONLY by the Sync client. SDKs should NEVER
     // observe an unresolved key. Ever.

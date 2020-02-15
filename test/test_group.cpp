@@ -1886,10 +1886,10 @@ TEST(Group_StringPrimaryKeyCol)
     CHECK_NOT(table->find_first(primary_key_column, StringData("Exactly!")));
     CHECK_NOT(table->has_search_index(primary_key_column));
 
-    auto obj1 = table->create_object_with_primary_key({"Exactly!"}).set(col2, "first");
-    table->create_object_with_primary_key({"Paul"}).set(col2, "John");
-    table->create_object_with_primary_key({"John"}).set(col2, "Paul");
-    table->create_object_with_primary_key({"George"}).set(col2, "George");
+    auto obj1 = table->create_object_with_primary_key("Exactly!", {{col2, "first"}});
+    table->create_object_with_primary_key("Paul", {{col2, "John"}});
+    table->create_object_with_primary_key("John", {{col2, "Paul"}});
+    table->create_object_with_primary_key("George", {{col2, "George"}});
     CHECK_EQUAL(obj1.get<String>(primary_key_column), "Exactly!");
     auto k = table->find_first(primary_key_column, StringData("Exactly!"));
     CHECK_EQUAL(k, obj1.get_key());

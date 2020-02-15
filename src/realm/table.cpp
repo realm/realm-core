@@ -2681,7 +2681,7 @@ Obj Table::create_object(GlobalKey object_id, const FieldValues& values)
     return obj;
 }
 
-Obj Table::create_object_with_primary_key(const Mixed& primary_key)
+Obj Table::create_object_with_primary_key(const Mixed& primary_key, FieldValues&& field_values)
 {
     if (m_is_embedded)
         throw LogicError(LogicError::wrong_kind_of_table);
@@ -2715,7 +2715,8 @@ Obj Table::create_object_with_primary_key(const Mixed& primary_key)
         repl->create_object_with_primary_key(this, object_id, primary_key);
     }
 
-    Obj ret = create_object(object_key, {{primary_key_col, primary_key}});
+    field_values.emplace_back(primary_key_col, primary_key);
+    Obj ret = create_object(object_key, field_values);
     // Check if unresolved exists
     ObjKey unres_key = object_key.get_unresolved();
     if (m_tombstones && m_tombstones->is_valid(unres_key)) {
