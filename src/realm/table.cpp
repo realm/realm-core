@@ -364,7 +364,12 @@ void Table::remove_recursive(CascadeState& cascade_state)
         for (auto obj : to_delete) {
             auto table = group->get_table(obj.first);
             // This might add to the list of objects that should be deleted
-            table->m_clusters.erase(obj.second, cascade_state);
+            if (obj.second.is_unresolved()) {
+                table->m_tombstones->erase(obj.second, cascade_state);
+            }
+            else {
+                table->m_clusters.erase(obj.second, cascade_state);
+            }
         }
         nullify_links(cascade_state);
     } while (!cascade_state.m_to_be_deleted.empty() || !cascade_state.m_to_be_nullified.empty());
@@ -2696,9 +2701,9 @@ Obj Table::create_object_with_primary_key(const Mixed& primary_key)
     ObjKey unres_key = object_key.get_unresolved();
     if (m_tombstones && m_tombstones->is_valid(unres_key)) {
         auto tombstone = m_tombstones->get(unres_key);
+        // When last link to tombstone is removed, the object will be deleted
         ret.assign(tombstone);
-        CascadeState state(CascadeState::Mode::None);
-        m_tombstones->erase(unres_key, state);
+        REALM_ASSERT(!m_tombstones->is_valid(unres_key));
     }
     return ret;
 }

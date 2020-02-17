@@ -209,7 +209,14 @@ public:
 
     // Table size and deletion
     bool is_empty() const noexcept;
-    size_t size() const noexcept;
+    size_t size() const noexcept
+    {
+        return m_clusters.size();
+    }
+    size_t nb_unresolved() const noexcept
+    {
+        return m_tombstones ? m_tombstones->size() : 0;
+    }
 
     //@{
 
@@ -1307,12 +1314,6 @@ inline bool Table::is_empty() const noexcept
 {
     return size() == 0;
 }
-
-inline size_t Table::size() const noexcept
-{
-    return m_clusters.size();
-}
-
 
 inline ConstTableRef Table::get_link_target(ColKey col_key) const noexcept
 {

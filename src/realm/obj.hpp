@@ -243,6 +243,7 @@ protected:
     int cmp(const ConstObj& other, ColKey::Idx col_ndx) const;
     ObjKey get_backlink(ColKey backlink_col, size_t backlink_ndx) const;
     std::vector<ObjKey> get_all_backlinks(ColKey backlink_col) const;
+    ObjKey get_unfiltered_link(ColKey col_key) const;
 };
 
 

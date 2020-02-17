@@ -880,6 +880,23 @@ public:
     {
         return Lst<ObjKey>::get(virtual2real(ndx));
     }
+    void remove(size_t ndx)
+    {
+        clean_unres();
+        Lst<ObjKey>::remove(ndx);
+    }
+    void remove(size_t from, size_t to) override
+    {
+        clean_unres();
+        while (from < to) {
+            Lst<ObjKey>::remove(--to);
+        }
+    }
+    void clear() override
+    {
+        clean_unres();
+        Lst<ObjKey>::clear();
+    }
     // Create a new object in insert a link to it
     Obj create_and_insert_linked_object(size_t ndx);
     // Create a new object and link it. If an embedded object
@@ -914,6 +931,8 @@ private:
     void add_unres(size_t ndx);
     // Remove ndx from m_unresolved - if there
     void remove_unres(size_t ndx);
+    // Remove all unresolved entries
+    void clean_unres();
     // Scan through the list to find unresolved links
     void update_unresolved() const;
 };

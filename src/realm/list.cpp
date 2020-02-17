@@ -437,8 +437,8 @@ ConstObj ConstLnkLst::get_object(size_t link_ndx) const
 template <>
 void Lst<ObjKey>::do_set(size_t ndx, ObjKey target_key)
 {
-    CascadeState state;
     ObjKey old_key = get(ndx);
+    CascadeState state(old_key.is_unresolved() ? CascadeState::Mode::All : CascadeState::Mode::Strong);
     bool recurse = m_obj.replace_backlink(m_col_key, old_key, target_key, state);
 
     m_tree->set(ndx, target_key);
@@ -459,8 +459,9 @@ void Lst<ObjKey>::do_insert(size_t ndx, ObjKey target_key)
 template <>
 void Lst<ObjKey>::do_remove(size_t ndx)
 {
-    CascadeState state;
     ObjKey old_key = get(ndx);
+    CascadeState state(old_key.is_unresolved() ? CascadeState::Mode::All : CascadeState::Mode::Strong);
+
     bool recurse = m_obj.remove_backlink(m_col_key, old_key, state);
 
     m_tree->erase(ndx);
@@ -574,6 +575,18 @@ void LnkLst::remove_unres(size_t ndx)
     }
 }
 
+void LnkLst::clean_unres()
+{
+    if (!m_unresolved.empty()) {
+        // Delete all unresolved links
+        for (auto i : m_unresolved) {
+            Lst<ObjKey>::remove(i);
+        }
+        m_unresolved.clear();
+        m_tree->set_context_flag(false);
+    }
+}
+
 bool LnkLst::init_from_parent() const
 {
     ConstLstIf<ObjKey>::init_from_parent();
@@ -609,18 +622,14 @@ void LnkLst::set(size_t ndx, ObjKey value)
 {
     if (get_target_table()->is_embedded() && value != ObjKey())
         throw LogicError(LogicError::wrong_kind_of_table);
-    ndx = virtual2real(ndx);
+
     if (value.is_unresolved()) {
         // Might be that the index is already there
         // In that case it will not be added again
         add_unres(ndx);
     }
     else {
-        if (!m_unresolved.empty()) {
-            // Might be that the index is not in m_unresolved
-            // In that case nothing will happen
-            remove_unres(ndx);
-        }
+        clean_unres();
     }
     Lst<ObjKey>::set(ndx, value);
 }
@@ -646,8 +655,13 @@ void LnkLst::insert(size_t ndx, ObjKey value)
 {
     if (get_target_table()->is_embedded() && value != ObjKey())
         throw LogicError(LogicError::wrong_kind_of_table);
-    ndx = virtual2real(ndx);
+
+    if (!value.is_unresolved()) {
+        clean_unres();
+    }
+
     Lst<ObjKey>::insert(ndx, value);
+
     if (value.is_unresolved()) {
         // We definitely got a new entry
         add_unres(ndx);

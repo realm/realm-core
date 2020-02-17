@@ -59,8 +59,8 @@ TEST(Unresolved_Basic)
     mathias.set(col_owns, new_tesla);
 
     auto another_tesla = cars->get_objkey_from_primary_key("Tesla 10");
-    stock.add(another_tesla);
     stock.add(skoda.get_key());
+    stock.add(another_tesla);
 
     CHECK_NOT(finn.get<ObjKey>(col_owns));
     CHECK(finn.is_unresolved(col_owns));
@@ -227,8 +227,52 @@ TEST(Unresolved_PrimaryKeyInt)
     auto unres = foo->get_objkey_from_primary_key(5);
     obj.set(col, unres);
     CHECK_NOT(obj.get<ObjKey>(col));
+    CHECK_EQUAL(foo->nb_unresolved(), 1);
     auto lazarus = foo->create_object_with_primary_key(5);
     CHECK_EQUAL(obj.get<ObjKey>(col), lazarus.get_key());
+}
+
+TEST(Unresolved_GarbageCollect)
+{
+    Group g;
+
+    auto cars = g.add_table_with_primary_key("Car", type_String, "model");
+    auto persons = g.add_table_with_primary_key("Person", type_String, "e-mail");
+    auto col_owns = persons->add_column_link(type_Link, "car", *cars);
+
+    auto finn = persons->create_object_with_primary_key("finn.schiermer-andersen@mongodb.com");
+    auto mathias = persons->create_object_with_primary_key("mathias@10gen.com");
+
+    auto new_tesla = cars->get_objkey_from_primary_key("Tesla 10");
+
+    finn.set(col_owns, new_tesla);
+    mathias.set(col_owns, new_tesla);
+    CHECK_EQUAL(cars->nb_unresolved(), 1);
+    finn.set_null(col_owns);
+    CHECK_EQUAL(cars->nb_unresolved(), 1);
+    mathias.set_null(col_owns);
+    CHECK_EQUAL(cars->nb_unresolved(), 0);
+
+    // Try the same with linklists. Here you have to modify the lists in order to
+    // remove the unresolved links
+    auto dealers = g.add_table_with_primary_key("Dealer", type_Int, "cvr");
+    auto col_has = dealers->add_column_link(type_LinkList, "stock", *cars);
+    auto bilcentrum = dealers->create_object_with_primary_key(18454033);
+    auto bilmekka = dealers->create_object_with_primary_key(26293995);
+
+    new_tesla = cars->get_objkey_from_primary_key("Tesla 10");
+
+    bilcentrum.get_linklist(col_has).add(new_tesla);
+    bilmekka.get_linklist(col_has).add(new_tesla);
+    CHECK_EQUAL(cars->nb_unresolved(), 1);
+
+    // create a real car
+    auto skoda = cars->create_object_with_primary_key("Skoda Fabia");
+
+    bilcentrum.get_linklist(col_has).add(skoda.get_key());
+    CHECK_EQUAL(cars->nb_unresolved(), 1);
+    bilmekka.get_linklist(col_has).add(skoda.get_key());
+    CHECK_EQUAL(cars->nb_unresolved(), 0);
 }
 
 #endif
