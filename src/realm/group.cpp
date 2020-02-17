@@ -783,7 +783,7 @@ Table* Group::do_get_or_add_table(StringData name, bool is_embedded, bool* was_a
 
         table = do_add_table(name);
         if (is_embedded)
-            table->set_embedded();
+            table->do_set_embedded(true);
         if (was_added)
             *was_added = true;
         return table;

@@ -471,21 +471,26 @@ bool ConstObj::is_null(ColKey col_key) const
 bool ConstObj::has_backlinks(bool only_strong_links) const
 {
     const Table& target_table = *m_table;
+
+    // If we only look for strong links and the table is not embedded,
+    // then there is no relevant backlinks to find.
+    if (only_strong_links && !target_table.is_embedded()) {
+        return false;
+    }
+
     auto look_for_backlinks = [&](ColKey backlink_col_key) {
         // Find origin table and column for this backlink column
         TableRef origin_table = target_table.get_opposite_table(backlink_col_key);
         ColKey origin_col = target_table.get_opposite_column(backlink_col_key);
-        if (!only_strong_links || target_table.is_embedded()) {
-            auto cnt = get_backlink_count(*origin_table, origin_col);
-            if (cnt)
-                return true;
-        }
+        auto cnt = get_backlink_count(*origin_table, origin_col);
+        if (cnt)
+            return true;
         return false;
     };
     return m_table->for_each_backlink_column(look_for_backlinks);
 }
 
-size_t ConstObj::get_backlink_count(bool only_strong_links) const
+size_t ConstObj::get_backlink_count() const
 {
     const Table& target_table = *m_table;
     size_t cnt = 0;
@@ -493,9 +498,7 @@ size_t ConstObj::get_backlink_count(bool only_strong_links) const
         // Find origin table and column for this backlink column
         TableRef origin_table = target_table.get_opposite_table(backlink_col_key);
         ColKey origin_col = target_table.get_opposite_column(backlink_col_key);
-        if (!only_strong_links || target_table.is_embedded()) {
-            cnt += get_backlink_count(*origin_table, origin_col);
-        }
+        cnt += get_backlink_count(*origin_table, origin_col);
         return false;
     };
     m_table->for_each_backlink_column(look_for_backlinks);
@@ -572,7 +575,7 @@ std::vector<ObjKey> ConstObj::get_all_backlinks(ColKey backlink_col) const
 void ConstObj::traverse_path(Visitor v, PathSizer ps, size_t path_length) const
 {
     if (m_table->is_embedded()) {
-        REALM_ASSERT(get_backlink_count(true) == 1);
+        REALM_ASSERT(get_backlink_count() == 1);
         m_table->for_each_backlink_column([&](ColKey col_key) {
             std::vector<ObjKey> backlinks = get_all_backlinks(col_key);
             if (backlinks.size() == 1) {

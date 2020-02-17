@@ -785,15 +785,57 @@ ColKey Table::insert_backlink_column(TableKey origin_table_key, ColKey origin_co
     return retval;
 }
 
-void Table::set_embedded()
+bool Table::set_embedded(bool embedded)
 {
-    REALM_ASSERT(size() == 0);
-    REALM_ASSERT(m_top.size() > top_position_for_flags);
+    if (embedded == m_is_embedded)
+        return true;
+
+    if (Replication* repl = get_repl()) {
+        if (repl->get_history_type() == Replication::HistoryType::hist_SyncClient) {
+            throw std::logic_error("Cannot change embedded property in sync client");
+        }
+    }
+
+    if (get_primary_key_column()) {
+        return false;
+    }
+    if (size() > 0) {
+        // Check if the table has any backlink columns. If not, it is not required
+        // to check all objects for backlinks.
+        bool has_backlink_columns = false;
+        for_each_backlink_column([&has_backlink_columns](ColKey) {
+            has_backlink_columns = true;
+            return true; // Done
+        });
+
+        if (has_backlink_columns) {
+            for (auto o : *this) {
+                if (o.get_backlink_count() > 1) {
+                    return false;
+                }
+            }
+        }
+    }
+
+    do_set_embedded(embedded);
+
+    return true;
+}
+
+void Table::do_set_embedded(bool embedded)
+{
+    while (m_top.size() <= top_position_for_flags)
+        m_top.add(0);
 
     uint64_t flags = m_top.get_as_ref_or_tagged(top_position_for_flags).get_as_int();
-    flags |= 1;
+    if (embedded) {
+        flags |= 1;
+    }
+    else {
+        flags &= ~1;
+    }
     m_top.set(top_position_for_flags, RefOrTagged::make_tagged(flags));
-    m_is_embedded = true;
+    m_is_embedded = embedded;
 }
 
 

@@ -155,6 +155,10 @@ public:
     void rename_column(ColKey col_key, StringData new_name);
     bool valid_column(ColKey col_key) const noexcept;
     void check_column(ColKey col_key) const;
+    // Change the embedded property of a table. If switching to being embedded, the table must
+    // not have a primary key and all objects must have at most 1 backlink. Return value
+    // indicates if the conversion was done
+    bool set_embedded(bool embedded);
     //@}
 
     /// True for `col_type_Link` and `col_type_LinkList`.
@@ -466,8 +470,8 @@ private:
     template <class F, class T>
     void change_nullability_list(ColKey from, ColKey to, bool throw_on_null);
     Obj create_linked_object(GlobalKey = {});
-    /// Indicate that a table holds embedded objects. Called only from Group::do_get_or_add_table()
-    void set_embedded();
+    /// Changes embeddedness unconditionally. Called only from Group::do_get_or_add_table()
+    void do_set_embedded(bool embedded);
 
 public:
     // mapping between index used in leaf nodes (leaf_ndx) and index used in spec (spec_ndx)

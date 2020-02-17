@@ -1597,6 +1597,30 @@ TEST(Group_CascadeNotify_TreeCascade)
 }
 
 
+TEST(Group_ChangeEmbeddedness)
+{
+    Group g;
+    TableRef t = g.add_table("table");
+    TableRef parent = g.add_table("parent");
+    auto col = parent->add_column_link(type_Link, "child", *t);
+    auto p1 = parent->create_object();
+    auto p2 = parent->create_object();
+    auto p3 = parent->create_object();
+    auto obj1 = t->create_object();
+    auto obj2 = t->create_object();
+    auto obj3 = t->create_object();
+    p1.set(col, obj1.get_key());
+    p2.set(col, obj2.get_key());
+
+    CHECK(t->set_embedded(true));
+    CHECK(t->is_embedded());
+    CHECK(t->set_embedded(false));
+    p3.set(col, obj2.get_key());
+    CHECK_NOT(t->set_embedded(true));
+    CHECK_NOT(t->is_embedded());
+}
+
+
 TEST(Group_WriteEmpty)
 {
     GROUP_TEST_PATH(path_1);

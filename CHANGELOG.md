@@ -1,7 +1,7 @@
 # NEXT RELEASE
 
 ### Enhancements
-* None.
+* It is now possible to switch embeddedness of a table.
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
