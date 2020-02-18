@@ -115,6 +115,14 @@ struct numeric_limits<realm::Decimal128> {
         return realm::Decimal128("+Inf");
     }
 };
+
+template <>
+struct hash<realm::Decimal128> {
+    size_t operator()(const realm::Decimal128& d) const noexcept
+    {
+        return static_cast<size_t>(d.raw()->w[0] ^ d.raw()->w[1]);
+    }
+};
 } // namespace std
 
 #endif /* REALM_DECIMAL_HPP */

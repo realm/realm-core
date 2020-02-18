@@ -18,9 +18,10 @@
 
 #include <realm/object_id.hpp>
 #include <realm/util/assert.hpp>
-#include <chrono>
 #include <atomic>
+#include <chrono>
 #include <random>
+#include <string_view>
 
 using namespace std::chrono;
 
@@ -110,6 +111,12 @@ std::string ObjectId::to_string() const
         ret += hex_digits[m_bytes[i] & 0xf];
     }
     return ret;
+}
+
+size_t ObjectId::hash() const noexcept
+{
+    using string_view = std::basic_string_view<uint8_t>;
+    return std::hash<string_view>()(string_view(&m_bytes[12], sizeof m_bytes));
 }
 
 
