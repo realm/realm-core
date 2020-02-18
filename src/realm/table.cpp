@@ -3323,6 +3323,11 @@ bool remove_optional<Optional<bool>>(Optional<bool> val)
 {
     return val.value();
 }
+template <>
+ObjectId remove_optional<Optional<ObjectId>>(Optional<ObjectId> val)
+{
+    return val.value();
+}
 }
 
 template <class F, class T>
@@ -3435,6 +3440,17 @@ void Table::convert_column(ColKey from, ColKey to, bool throw_on_null)
             case type_Timestamp:
                 change_nullability_list<Timestamp, Timestamp>(from, to, throw_on_null);
                 break;
+            case type_ObjectId:
+                if (is_nullable(from)) {
+                    change_nullability_list<Optional<ObjectId>, ObjectId>(from, to, throw_on_null);
+                }
+                else {
+                    change_nullability_list<ObjectId, Optional<ObjectId>>(from, to, throw_on_null);
+                }
+                break;
+            case type_Decimal:
+                change_nullability_list<Decimal128, Decimal128>(from, to, throw_on_null);
+                break;
             default:
                 REALM_UNREACHABLE();
                 break;
@@ -3467,6 +3483,17 @@ void Table::convert_column(ColKey from, ColKey to, bool throw_on_null)
                 break;
             case type_Timestamp:
                 change_nullability<Timestamp, Timestamp>(from, to, throw_on_null);
+                break;
+            case type_ObjectId:
+                if (is_nullable(from)) {
+                    change_nullability<Optional<ObjectId>, ObjectId>(from, to, throw_on_null);
+                }
+                else {
+                    change_nullability<ObjectId, Optional<ObjectId>>(from, to, throw_on_null);
+                }
+                break;
+            case type_Decimal:
+                change_nullability<Decimal128, Decimal128>(from, to, throw_on_null);
                 break;
             default:
                 REALM_UNREACHABLE();
