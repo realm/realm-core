@@ -1048,6 +1048,7 @@ void Group::to_json(S& out, size_t link_depth, std::map<std::string, std::string
     out << "{" << std::endl;
 
     auto keys = get_table_keys();
+    bool first = true;
     for (size_t i = 0; i < keys.size(); ++i) {
         auto key = keys[i];
         StringData name = get_table_name(key);
@@ -1057,12 +1058,15 @@ void Group::to_json(S& out, size_t link_depth, std::map<std::string, std::string
 
         ConstTableRef table = get_table(key);
 
-        if (i)
-            out << ",";
-        out << "\"" << name << "\"";
-        out << ":";
-        table->to_json(out, link_depth, renames);
-        out << std::endl;
+        if (!table->is_embedded()) {
+            if (!first)
+                out << ",";
+            out << "\"" << name << "\"";
+            out << ":";
+            table->to_json(out, link_depth, renames);
+            out << std::endl;
+            first = false;
+        }
     }
 
     out << "}" << std::endl;

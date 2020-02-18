@@ -733,12 +733,14 @@ void ConstObj::to_json(std::ostream& out, size_t link_depth, std::map<std::strin
 
         if (ck.get_attrs().test(col_attr_List)) {
             if (type == type_LinkList) {
+                TableRef target_table = get_target_table(ck);
                 auto ll = get_linklist(ck);
                 auto sz = ll.size();
 
-                if ((link_depth == 0) ||
-                    (link_depth == not_found && std::find(followed.begin(), followed.end(), ck) != followed.end())) {
-                    out << "{\"table\": \"" << get_target_table(ck)->get_name() << "\", \"keys\": [";
+                if (!target_table->is_embedded() &&
+                    ((link_depth == 0) || (link_depth == not_found &&
+                                           std::find(followed.begin(), followed.end(), ck) != followed.end()))) {
+                    out << "{\"table\": \"" << target_table->get_name() << "\", \"keys\": [";
                     for (size_t i = 0; i < sz; i++) {
                         if (i > 0)
                             out << ",";
@@ -774,11 +776,13 @@ void ConstObj::to_json(std::ostream& out, size_t link_depth, std::map<std::strin
         }
         else {
             if (type == type_Link) {
+                TableRef target_table = get_target_table(ck);
                 auto k = get<ObjKey>(ck);
                 if (k) {
                     auto obj = get_linked_object(ck);
-                    if ((link_depth == 0) || (link_depth == not_found &&
-                                              std::find(followed.begin(), followed.end(), ck) != followed.end())) {
+                    if (!target_table->is_embedded() &&
+                        ((link_depth == 0) || (link_depth == not_found &&
+                                               std::find(followed.begin(), followed.end(), ck) != followed.end()))) {
                         out << "{\"table\": \"" << get_target_table(ck)->get_name()
                             << "\", \"key\": " << obj.get_key().value << "}";
                     }
