@@ -50,12 +50,6 @@ if(REALM_ENABLE_SYNC)
     )
 endif()
 
-if(REALM_ENABLE_SERVER)
-    list(APPEND SOURCES
-        sync/global_notifier.cpp
-    )
-endif()
-
 add_executable(tests ${SOURCES} ${HEADERS})
 target_compile_definitions(tests PRIVATE ${PLATFORM_DEFINES})
 
