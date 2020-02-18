@@ -289,11 +289,16 @@ bool ConstObj::is_unresolved(ColKey col_key) const
 
     _update_if_needed();
 
+    return get_unfiltered_link(col_key).is_unresolved();
+}
+
+ObjKey ConstObj::get_unfiltered_link(ColKey col_key) const
+{
     ArrayKey values(get_alloc());
     ref_type ref = to_ref(Array::get(m_mem.get_addr(), col_key.get_index().val + 1));
     values.init_from_ref(ref);
 
-    return values.get(m_row_ndx).is_unresolved();
+    return values.get(m_row_ndx);
 }
 
 template <>
@@ -1036,10 +1041,10 @@ Obj& Obj::set<ObjKey>(ColKey col_key, ObjKey target_key, bool is_default)
             throw LogicError(LogicError::wrong_kind_of_table);
         }
     }
-    ObjKey old_key = get<ObjKey>(col_key); // Will update if needed
+    ObjKey old_key = get_unfiltered_link(col_key); // Will update if needed
 
     if (target_key != old_key) {
-        CascadeState state;
+        CascadeState state(old_key.is_unresolved() ? CascadeState::Mode::All : CascadeState::Mode::Strong);
 
         ensure_writeable();
         bool recurse = replace_backlink(col_key, old_key, target_key, state);

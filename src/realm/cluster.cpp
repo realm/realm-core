@@ -1883,8 +1883,7 @@ void ClusterTree::insert_fast(ObjKey k, const FieldValues& init_values, ClusterN
 
         replace_root(std::move(new_root));
     }
-    if (!k.is_unresolved())
-        m_size++;
+    m_size++;
 }
 
 Obj ClusterTree::insert(ObjKey k, const FieldValues& values)
@@ -2038,8 +2037,7 @@ void ClusterTree::erase(ObjKey k, CascadeState& state)
 
     bump_content_version();
     bump_storage_version();
-    if (!k.is_unresolved())
-        m_size--;
+    m_size--;
     while (!m_root->is_leaf() && root_size == 1) {
         ClusterNodeInner* node = static_cast<ClusterNodeInner*>(m_root.get());
 
