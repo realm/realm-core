@@ -3299,18 +3299,82 @@ TEST(Table_ListOfPrimitives)
     CHECK_NOT(timestamp_list.is_attached());
 }
 
-TEST(Table_ListOfPrimitivesSort)
+template <typename T>
+inline T convert_for_test(int64_t v)
 {
+    return static_cast<T>(v);
+}
+
+template <>
+inline Timestamp convert_for_test<Timestamp>(int64_t v)
+{
+    return Timestamp{v, 0};
+}
+
+template <>
+inline ObjectId convert_for_test<ObjectId>(int64_t v)
+{
+    static const char hex_digits[] = "0123456789abcdef";
+    std::string value;
+    uint64_t cur = static_cast<uint64_t>(v);
+    for (size_t i = 0; i < 24; ++i) {
+        value += char(hex_digits[cur % 16]);
+        cur -= (cur % 16);
+        if (cur == 0) {
+            cur += static_cast<uint64_t>(v);
+        }
+    }
+    return ObjectId(value.c_str());
+}
+
+template <>
+inline Optional<ObjectId> convert_for_test(int64_t v)
+{
+    return Optional<ObjectId>(convert_for_test<ObjectId>(v));
+}
+
+template <typename T, typename U>
+std::vector<T> values_from_int(const std::vector<int64_t>& values)
+{
+    std::vector<T> ret;
+    for (size_t i = 0; i < values.size(); ++i) {
+        ret.push_back(convert_for_test<U>(values[i]));
+    }
+    return ret;
+}
+
+struct less {
+    template <typename T>
+    auto operator()(T&& a, T&& b) const noexcept
+    {
+        return Mixed(a).compare(Mixed(b)) < 0;
+    }
+};
+struct greater {
+    template <typename T>
+    auto operator()(T&& a, T&& b) const noexcept
+    {
+        return Mixed(a).compare(Mixed(b)) > 0;
+    }
+};
+
+TEST_TYPES(Table_ListOfPrimitivesSort, int64_t, float, double, Decimal128, ObjectId, Timestamp, Optional<int64_t>,
+           Optional<float>, Optional<double>, Optional<ObjectId>)
+{
+    using underlying_type = typename util::RemoveOptional<TEST_TYPE>::type;
+    constexpr bool is_optional = !std::is_same<underlying_type, TEST_TYPE>::value;
+
     Group g;
     TableRef t = g.add_table("table");
-    ColKey int_col = t->add_column_list(type_Int, "integers");
+    ColKey col = t->add_column_list(ColumnTypeTraits<TEST_TYPE>::id, "values", is_optional);
 
     auto obj = t->create_object();
-    auto list = obj.get_list<Int>(int_col);
+    auto list = obj.get_list<TEST_TYPE>(col);
 
-    std::vector<int64_t> values = {9, 4, 2, 7, 4, 1, 8, 11, 3, 4, 5, 22};
+    std::vector<TEST_TYPE> values =
+        values_from_int<TEST_TYPE, underlying_type>({9, 4, 2, 7, 4, 1, 8, 11, 3, 4, 5, 22});
     std::vector<size_t> indices;
-    obj.set_list_values(int_col, values);
+    obj.set_list_values(col, values);
 
     CHECK(list.has_changed());
     CHECK_NOT(list.has_changed());
@@ -3321,41 +3385,45 @@ TEST(Table_ListOfPrimitivesSort)
             CHECK_EQUAL(values[i], list.get(indices[i]));
         }
     };
-    std::sort(values.begin(), values.end(), std::less<int64_t>());
+    std::sort(values.begin(), values.end(), ::less());
     list.sort(indices);
     cmp();
-    std::sort(values.begin(), values.end(), std::greater<int64_t>());
+    std::sort(values.begin(), values.end(), ::greater());
     list.sort(indices, false);
     cmp();
     CHECK_NOT(list.has_changed());
 
-    values.push_back(6);
-    list.add(6);
+    TEST_TYPE new_value = convert_for_test<underlying_type>(6);
+    values.push_back(new_value);
+    list.add(new_value);
     CHECK(list.has_changed());
-    std::sort(values.begin(), values.end(), std::less<int64_t>());
+    std::sort(values.begin(), values.end(), ::less());
     list.sort(indices);
     cmp();
 
     values.resize(7);
-    obj.set_list_values(int_col, values);
-    std::sort(values.begin(), values.end(), std::greater<int64_t>());
+    obj.set_list_values(col, values);
+    std::sort(values.begin(), values.end(), ::greater());
     list.sort(indices, false);
     cmp();
 }
 
-TEST(Table_ListOfPrimitivesDistinct)
+TEST_TYPES(Table_ListOfPrimitivesDistinct, int64_t, float, double, Decimal128, ObjectId, Timestamp, Optional<int64_t>,
+           Optional<float>, Optional<double>, Optional<ObjectId>)
 {
+    using underlying_type = typename util::RemoveOptional<TEST_TYPE>::type;
+    constexpr bool is_optional = !std::is_same<underlying_type, TEST_TYPE>::value;
     Group g;
     TableRef t = g.add_table("table");
-    ColKey int_col = t->add_column_list(type_Int, "integers");
+    ColKey col = t->add_column_list(ColumnTypeTraits<underlying_type>::id, "values", is_optional);
 
     auto obj = t->create_object();
-    auto list = obj.get_list<Int>(int_col);
+    auto list = obj.get_list<TEST_TYPE>(col);
 
-    std::vector<int64_t> values = {9, 4, 2, 7, 4, 9, 8, 11, 2, 4, 5};
-    std::vector<int64_t> distinct_values = {9, 4, 2, 7, 8, 11, 5};
+    std::vector<TEST_TYPE> values = values_from_int<TEST_TYPE, underlying_type>({9, 4, 2, 7, 4, 9, 8, 11, 2, 4, 5});
+    std::vector<TEST_TYPE> distinct_values = values_from_int<TEST_TYPE, underlying_type>({9, 4, 2, 7, 8, 11, 5});
     std::vector<size_t> indices;
-    obj.set_list_values(int_col, values);
+    obj.set_list_values(col, values);
 
     auto cmp = [&]() {
         CHECK_EQUAL(distinct_values.size(), indices.size());
@@ -3367,10 +3435,10 @@ TEST(Table_ListOfPrimitivesDistinct)
     list.distinct(indices);
     cmp();
     list.distinct(indices, true);
-    std::sort(distinct_values.begin(), distinct_values.end(), std::less<int64_t>());
+    std::sort(distinct_values.begin(), distinct_values.end(), std::less<TEST_TYPE>());
     cmp();
     list.distinct(indices, false);
-    std::sort(distinct_values.begin(), distinct_values.end(), std::greater<int64_t>());
+    std::sort(distinct_values.begin(), distinct_values.end(), std::greater<TEST_TYPE>());
     cmp();
 }
 
