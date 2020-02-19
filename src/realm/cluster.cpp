@@ -102,6 +102,7 @@ public:
         Array::set(s_sub_tree_size, sub_tree_size << 1 | 1);
     }
     size_t update_sub_tree_size();
+
     int64_t get_last_key_value() const override;
 
     void ensure_general_form() override;
@@ -194,6 +195,12 @@ private:
 
     template <class T, class F>
     T recurse(ChildInfo& child_info, F func);
+    // Adjust key offset values by adding offset
+    void adjust_keys(int64_t offset);
+    // Make sure the first key offset value is 0
+    // This is done by adjusting the child node by current first offset
+    // and setting it to 0 thereafter
+    void adjust_keys_first_child(int64_t adj);
 };
 }
 
@@ -434,11 +441,41 @@ size_t ClusterNodeInner::get_ndx(ObjKey key, size_t ndx) const
     }
 }
 
+void ClusterNodeInner::adjust_keys(int64_t adj)
+{
+    ensure_general_form();
+    REALM_ASSERT(m_keys.get(0) == 0);
+    m_keys.adjust(0, m_keys.size(), adj);
+
+    // Now the first key offset value is 'adj' - it must be 0
+    adjust_keys_first_child(adj);
+}
+
+void ClusterNodeInner::adjust_keys_first_child(int64_t adj)
+{
+    ref_type child_ref = _get_child_ref(0);
+    char* child_header = m_alloc.translate(child_ref);
+    auto mem = MemRef(child_header, child_ref, m_alloc);
+    if (Array::get_is_inner_bptree_node_from_header(child_header)) {
+        ClusterNodeInner node(m_alloc, m_tree_top);
+        node.set_parent(this, s_first_node_index);
+        node.init(mem);
+        node.adjust_keys(adj);
+    }
+    else {
+        Cluster node(0, m_alloc, m_tree_top);
+        node.set_parent(this, s_first_node_index);
+        node.init(mem);
+        node.adjust_keys(adj);
+    }
+    m_keys.set(0, 0);
+}
+
 size_t ClusterNodeInner::erase(ObjKey key, CascadeState& state)
 {
     return recurse<size_t>(key, [this, &state](ClusterNode* erase_node, ChildInfo& child_info) {
         size_t erase_node_size = erase_node->erase(child_info.key, state);
-
+        bool is_leaf = erase_node->is_leaf();
         set_tree_size(get_tree_size() - 1);
 
         if (erase_node_size == 0) {
@@ -447,6 +484,13 @@ size_t ClusterNodeInner::erase(ObjKey key, CascadeState& state)
             ensure_general_form();
             _erase_child_ref(child_info.ndx);
             m_keys.erase(child_info.ndx);
+            if (child_info.ndx == 0 && m_keys.size() > 0) {
+                auto first_offset = m_keys.get(0);
+                // Adjust all key values in new first node
+                // We have to make sure that the first key offset value
+                // in all inner nodes is 0
+                adjust_keys_first_child(first_offset);
+            }
         }
         else if (erase_node_size < cluster_node_size / 2 && child_info.ndx < (node_size() - 1)) {
             // Candidate for merge. First calculate if the combined size of current and
@@ -454,8 +498,7 @@ size_t ClusterNodeInner::erase(ObjKey key, CascadeState& state)
             size_t sibling_ndx = child_info.ndx + 1;
             Cluster l2(child_info.offset, m_alloc, m_tree_top);
             ClusterNodeInner n2(m_alloc, m_tree_top);
-            ClusterNode* sibling_node =
-                erase_node->is_leaf() ? static_cast<ClusterNode*>(&l2) : static_cast<ClusterNode*>(&n2);
+            ClusterNode* sibling_node = is_leaf ? static_cast<ClusterNode*>(&l2) : static_cast<ClusterNode*>(&n2);
             sibling_node->set_parent(this, sibling_ndx + s_first_node_index);
             sibling_node->init_from_parent();
 
@@ -1607,6 +1650,8 @@ void Cluster::dump_objects(int64_t key_offset, std::string lead) const
     if (!m_keys.is_attached()) {
         std::cout << lead << "compact form" << std::endl;
     }
+    auto col_keys = get_owning_table()->get_column_keys();
+
     for (unsigned i = 0; i < node_size(); i++) {
         int64_t key_value;
         if (m_keys.is_attached()) {
@@ -1616,15 +1661,16 @@ void Cluster::dump_objects(int64_t key_offset, std::string lead) const
             key_value = int64_t(i);
         }
         std::cout << lead << "key: " << std::hex << key_value + key_offset << std::dec;
-        for (size_t j = 1; j < size(); j++) {
-            if (m_tree_top.get_spec().get_column_attr(j - 1).test(col_attr_List)) {
+        for (auto col : col_keys) {
+            size_t j = col.get_index().val + 1;
+            if (col.get_attrs().test(col_attr_List)) {
                 std::cout << ", list";
                 continue;
             }
 
-            switch (m_tree_top.get_spec().get_column_type(j - 1)) {
+            switch (col.get_type()) {
                 case col_type_Int: {
-                    bool nullable = m_tree_top.get_spec().get_column_attr(j - 1).test(col_attr_Nullable);
+                    bool nullable = col.get_attrs().test(col_attr_Nullable);
                     ref_type ref = Array::get_as_ref(j);
                     if (nullable) {
                         ArrayIntNull arr_int_null(m_alloc);
@@ -2041,12 +2087,11 @@ void ClusterTree::erase(ObjKey k, CascadeState& state)
     while (!m_root->is_leaf() && root_size == 1) {
         ClusterNodeInner* node = static_cast<ClusterNodeInner*>(m_root.get());
 
-        uint64_t offset = node->get_first_key_value();
+        REALM_ASSERT(node->get_first_key_value() == 0);
         ref_type new_root_ref = node->clear_first_child_ref();
         node->destroy_deep();
 
         auto new_root = get_node(new_root_ref);
-        new_root->adjust_keys(offset);
 
         replace_root(std::move(new_root));
         root_size = m_root->node_size();
