@@ -17,9 +17,10 @@
  **************************************************************************/
 
 #include <realm/object_id.hpp>
+#include <realm/string_data.hpp>
 #include <realm/util/assert.hpp>
-#include <chrono>
 #include <atomic>
+#include <chrono>
 #include <random>
 
 using namespace std::chrono;
@@ -110,6 +111,11 @@ std::string ObjectId::to_string() const
         ret += hex_digits[m_bytes[i] & 0xf];
     }
     return ret;
+}
+
+size_t ObjectId::hash() const noexcept
+{
+    return murmur2_or_cityhash(m_bytes, sizeof(m_bytes));
 }
 
 

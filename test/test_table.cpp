@@ -4438,7 +4438,7 @@ struct Tester {
 
     static void run(DBRef db, realm::DataType type)
     {
-    	auto trans = db->start_write();
+        auto trans = db->start_write();
         auto table = trans->add_table("my_table");
         col = table->add_column(type, "name", nullable);
         table->add_search_index(col);
@@ -4540,10 +4540,9 @@ TEST(Table_search_index_fuzzer)
     // nullable:  If the columns must be is nullable or not
     // Obj::set() will be automatically be called with set<RemoveOptional<T>>()
 
-	SHARED_GROUP_TEST_PATH(path);
-	std::unique_ptr<Replication> hist(make_in_realm_history(path));
-	auto db = DB::create(*hist);
-	//auto db = DB::create(path);
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    auto db = DB::create(*hist);
     Tester<bool, false>::run(db, type_Bool);
     Tester<Optional<bool>, true>::run(db, type_Bool);
 
@@ -4596,22 +4595,19 @@ TEST(Table_KeysRow)
     CHECK_EQUAL(i, ObjKey(9));
 }
 
-template<typename T> T generate_value() { return test_util::random_int<T>(); }
-
-template<> StringData generate_value()
+template <typename T>
+T generate_value()
 {
-	char* str = new char[32];
-	for (int j = 0; j < 31; ++j) str[j] = test_util::random_int<char>();
-	str[31] = 0;
-	return StringData(str, 32);
+    return test_util::random_int<T>();
 }
 
-template<> BinaryData generate_value()
+template <>
+std::string generate_value()
 {
-	char* str = new char[32];
-	for (int j = 0; j < 31; ++j) str[j] = test_util::random_int<char>();
-	str[31] = 0;
-	return BinaryData(str, 32);
+    std::string str;
+    str.resize(31);
+    std::generate<std::string::iterator, char (*)()>(str.begin(), str.end(), &test_util::random_int<char>);
+    return str;
 }
 
 template<> bool generate_value() { return test_util::random_int<int>() & 0x1; }
@@ -4634,104 +4630,59 @@ ObjectId generate_value()
 template <typename T>
 struct managed {
     T value;
-    managed(const T& v)
-        : value(v)
-    {
-    }
 };
 
-template <>
-struct managed<StringData> {
-    StringData value;
-    char* memory;
-    ~managed()
+template <typename T>
+struct ManagedStorage {
+    std::string storage;
+    T value;
+
+    ManagedStorage() {}
+    ManagedStorage(null) {}
+    ManagedStorage(std::string&& v)
+        : storage(std::move(v))
+        , value(storage)
     {
-        delete[] memory;
     }
-    void copy(const StringData& v)
+    ManagedStorage(const ManagedStorage& other)
     {
-        if (v.size()) {
-            auto sz = v.size();
-            const char* data = v.data();
-            memory = new char[sz];
-            for (size_t i = 0; i < sz; ++i)
-                memory[i] = data[i];
-            value = StringData(memory, sz);
+        *this = other;
+    }
+    ManagedStorage(ManagedStorage&& other)
+    {
+        *this = std::move(other);
+    }
+
+    ManagedStorage(T v)
+    {
+        if (v) {
+            if (v.size()) {
+                storage.assign(v.data(), v.data() + v.size());
+            }
+            value = T(storage);
         }
-        else if (v.data()) {
-            memory = nullptr;
-            value = StringData("", 0);
-        }
-        else {
-            memory = nullptr;
-            value = StringData();
-        }
     }
-    managed(const StringData& v)
+    ManagedStorage& operator=(const ManagedStorage& other)
     {
-        copy(v);
+        storage = other.storage;
+        value = other.value ? T(storage) : T();
+        return *this;
     }
-    managed(const managed<StringData>& v)
+    ManagedStorage& operator=(ManagedStorage&& other)
     {
-        copy(v.value);
-    }
-    managed(managed<StringData>&& v)
-    {
-        copy(v.value);
-    }
-    managed<StringData>& operator=(const managed<StringData>& v)
-    {
-        delete[] memory;
-        copy(v.value);
+        storage = std::move(other.storage);
+        value = other.value ? T(storage) : T();
         return *this;
     }
 };
 
 template <>
-struct managed<BinaryData> {
-    BinaryData value;
-    char* memory;
-    ~managed()
-    {
-        delete[] memory;
-    }
-    void copy(const BinaryData& v)
-    {
-        if (v.size()) {
-            auto sz = v.size();
-            const char* data = v.data();
-            memory = new char[sz];
-            for (size_t i = 0; i < sz; ++i)
-                memory[i] = data[i];
-            value = BinaryData(memory, sz);
-        }
-        else if (v.data()) {
-            memory = nullptr;
-            value = BinaryData("", 0);
-        }
-        else {
-            memory = nullptr;
-            value = BinaryData();
-        }
-    }
-    managed(const BinaryData& v)
-    {
-        copy(v);
-    }
-    managed(const managed<BinaryData>& v)
-    {
-        copy(v.value);
-    }
-    managed(managed<BinaryData>&& v)
-    {
-        copy(v.value);
-    }
-    managed<Binary>& operator=(const managed<BinaryData>& v)
-    {
-        delete[] memory;
-        copy(v.value);
-        return *this;
-    }
+struct managed<StringData> : ManagedStorage<StringData> {
+    using ManagedStorage::ManagedStorage;
+};
+template <>
+struct managed<BinaryData> : ManagedStorage<BinaryData> {
+    using ManagedStorage::ManagedStorage;
 };
 
 
@@ -4743,14 +4694,15 @@ void check_values(TestContext& test_context, Lst<T>& lst, std::vector<managed<T>
         CHECK_EQUAL(lst.get(j), reference[j].value);
 }
 
-template<typename T> struct generator {
+template <typename T>
+struct generator {
     static managed<T> get(bool optional)
     {
         if (optional && (test_util::random_int<int>() % 10) == 0) {
-            return managed<T>(T());
+            return managed<T>{T()};
         }
         else {
-            return managed<T>(generate_value<T>());
+            return managed<T>{generate_value<T>()};
         }
     }
 };
@@ -4760,13 +4712,10 @@ struct generator<StringData> {
     static managed<StringData> get(bool optional)
     {
         if (optional && (test_util::random_int<int>() % 10) == 0) {
-            return managed<StringData>(StringData());
+            return managed<StringData>(null());
         }
         else {
-            StringData v = generate_value<StringData>();
-            managed<StringData> rv(v);
-            delete[] v.data();
-            return rv;
+            return generate_value<std::string>();
         }
     }
 };
@@ -4776,26 +4725,10 @@ struct generator<BinaryData> {
     static managed<BinaryData> get(bool optional)
     {
         if (optional && (test_util::random_int<int>() % 10) == 0) {
-            return managed<BinaryData>(BinaryData());
+            return managed<BinaryData>(null());
         }
         else {
-            BinaryData v = generate_value<BinaryData>();
-            managed<BinaryData> rv(v);
-            delete[] v.data();
-            return rv;
-        }
-    }
-};
-
-template <>
-struct generator<Decimal128> {
-    static managed<Decimal128> get(bool optional)
-    {
-        if (optional && (test_util::random_int<int>() % 10) == 0) {
-            return managed<Decimal128>(realm::null());
-        }
-        else {
-            return managed<Decimal128>(generate_value<Decimal128>());
+            return generate_value<std::string>();
         }
     }
 };
@@ -4804,17 +4737,18 @@ template <>
 struct generator<ObjectId> {
     static managed<ObjectId> get(bool)
     {
-        return managed<ObjectId>(generate_value<ObjectId>());
+        return managed<ObjectId>{generate_value<ObjectId>()};
     }
 };
 
-template<typename T> struct generator<Optional<T>> {
+template <typename T>
+struct generator<Optional<T>> {
     static managed<Optional<T>> get(bool)
     {
         if ((test_util::random_int<int>() % 10) == 0)
-            return managed<Optional<T>>(Optional<T>());
+            return managed<Optional<T>>{Optional<T>()};
         else
-            return managed<Optional<T>>(Optional<T>(generate_value<T>()));
+            return managed<Optional<T>>{generate_value<T>()};
     }
 };
 
@@ -4826,7 +4760,9 @@ template <>
 struct generator<Optional<BinaryData>> {
 };
 
-template<typename T> void test_lists(TestContext& test_context, DBRef sg, const realm::DataType type_id, bool optional = false) {
+template <typename T>
+void test_lists(TestContext& test_context, DBRef sg, const realm::DataType type_id, bool optional = false)
+{
     auto t = sg->start_write();
     auto table = t->add_table("the_table");
     auto col = table->add_column_list(type_id, "the column", optional);
@@ -5053,7 +4989,9 @@ void check_table_values(TestContext& test_context, TableRef t, ColKey col, std::
     }
 }
 
-template<typename T> void test_tables(TestContext& test_context, DBRef sg, const realm::DataType type_id, bool optional = false) {
+template <typename T>
+void test_tables(TestContext& test_context, DBRef sg, const realm::DataType type_id, bool optional = false)
+{
     auto t = sg->start_write();
     auto table = t->add_table("the_table");
     auto col = table->add_column(type_id, "the column", optional);
@@ -5063,19 +5001,19 @@ template<typename T> void test_tables(TestContext& test_context, DBRef sg, const
     for (int j = 0; j < 1000; ++j) {
         managed<T> value = generator<T>::get(optional);
         Obj o = table->create_object(ObjKey(j)).set_all(value.value);
-        reference.insert(std::pair<int, managed<T>>(j, value));
+        reference[j] = std::move(value);
     }
     // insert elements 10000 - 10999
     for (int j = 10000; j < 11000; ++j) {
         managed<T> value = generator<T>::get(optional);
         Obj o = table->create_object(ObjKey(j)).set_all(value.value);
-        reference.insert(std::pair<int, managed<T>>(j, value));
+        reference[j] = std::move(value);
     }
     // insert in between previous groups
     for (int j = 4000; j < 7000; ++j) {
         managed<T> value = generator<T>::get(optional);
         Obj o = table->create_object(ObjKey(j)).set_all(value.value);
-        reference.insert(std::pair<int, managed<T>>(j, value));
+        reference[j] = std::move(value);
     }
     check_table_values(test_context, table, col, reference);
 
@@ -5110,21 +5048,25 @@ TEST(Table_Ops)
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
     DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
 
-	test_tables<int64_t>(test_context, sg, type_Int);
-	test_tables<StringData>(test_context, sg, type_String);
-	test_tables<BinaryData>(test_context, sg, type_Binary);
-	test_tables<bool>(test_context, sg, type_Bool);
-	test_tables<float>(test_context, sg, type_Float);
-	test_tables<double>(test_context, sg, type_Double);
-	test_tables<Timestamp>(test_context, sg, type_Timestamp);
+    test_tables<int64_t>(test_context, sg, type_Int);
+    test_tables<StringData>(test_context, sg, type_String);
+    test_tables<BinaryData>(test_context, sg, type_Binary);
+    test_tables<bool>(test_context, sg, type_Bool);
+    test_tables<float>(test_context, sg, type_Float);
+    test_tables<double>(test_context, sg, type_Double);
+    test_tables<Timestamp>(test_context, sg, type_Timestamp);
+    test_tables<Decimal128>(test_context, sg, type_Decimal);
+    test_tables<ObjectId>(test_context, sg, type_ObjectId);
 
-	test_tables<Optional<int64_t>>(test_context, sg, type_Int, true);
-	test_tables<StringData>(test_context, sg, type_String, true); // always Optional?
-	test_tables<BinaryData>(test_context, sg, type_Binary, true); // always Optional?
-	test_tables<Optional<bool>>(test_context, sg, type_Bool, true);
-	test_tables<Optional<float>>(test_context, sg, type_Float, true);
-	test_tables<Optional<double>>(test_context, sg, type_Double, true);
-	test_tables<Timestamp>(test_context, sg, type_Timestamp, true); // always Optional?
+    test_tables<Optional<int64_t>>(test_context, sg, type_Int, true);
+    test_tables<StringData>(test_context, sg, type_String, true); // always Optional?
+    test_tables<BinaryData>(test_context, sg, type_Binary, true); // always Optional?
+    test_tables<Optional<bool>>(test_context, sg, type_Bool, true);
+    test_tables<Optional<float>>(test_context, sg, type_Float, true);
+    test_tables<Optional<double>>(test_context, sg, type_Double, true);
+    test_tables<Timestamp>(test_context, sg, type_Timestamp, true); // always Optional?
+    test_tables<Decimal128>(test_context, sg, type_Decimal, true);
+    test_tables<Optional<ObjectId>>(test_context, sg, type_ObjectId, true);
 }
 
 template <typename TFrom, typename TTo>
@@ -5146,7 +5088,7 @@ void test_dynamic_conversion(TestContext& test_context, DBRef sg, realm::DataTyp
             table->create_object(ObjKey(j)).set_all(value.value); // <-- so set_all works even if it doesn't set all?
         TTo conv_value = copier(
             value.value, to_nullable); // one may argue that using the same converter for ref and dut is.. mmmh...
-        reference.insert(std::pair<int, managed<TTo>>(j, managed<TTo>(conv_value)));
+        reference[j] = managed<TTo>{conv_value};
     }
     auto col_to = table->set_nullability(col_from, to_nullable, false);
     if (type_id == type_String) {
@@ -5173,7 +5115,7 @@ void test_dynamic_conversion_list(TestContext& test_context, DBRef sg, realm::Da
         managed<TFrom> value = generator<TFrom>::get(from_nullable);
         from_lst.add(value.value);
         TTo conv_value = copier(value.value, to_nullable);
-        reference.push_back(conv_value);
+        reference.push_back(managed<TTo>{conv_value});
     }
     auto col_to = table->set_nullability(col_from, to_nullable, false);
     Lst<TTo> to_lst = o.get_list<TTo>(col_to);
@@ -5228,19 +5170,23 @@ TEST(Table_Column_DynamicConversions)
     test_dynamic_conversion_combi<float>(test_context, sg, type_Float);
     test_dynamic_conversion_combi<double>(test_context, sg, type_Double);
     test_dynamic_conversion_combi<bool>(test_context, sg, type_Bool);
+    test_dynamic_conversion_combi<ObjectId>(test_context, sg, type_ObjectId);
 
     test_dynamic_conversion_combi_sametype<StringData>(test_context, sg, type_String);
     test_dynamic_conversion_combi_sametype<BinaryData>(test_context, sg, type_Binary);
     test_dynamic_conversion_combi_sametype<Timestamp>(test_context, sg, type_Timestamp);
+    test_dynamic_conversion_combi_sametype<Decimal128>(test_context, sg, type_Decimal);
     // lists...:
     test_dynamic_conversion_list_combi<int64_t>(test_context, sg, type_Int);
     test_dynamic_conversion_list_combi<float>(test_context, sg, type_Float);
     test_dynamic_conversion_list_combi<double>(test_context, sg, type_Double);
     test_dynamic_conversion_list_combi<bool>(test_context, sg, type_Bool);
+    test_dynamic_conversion_list_combi<ObjectId>(test_context, sg, type_ObjectId);
 
     test_dynamic_conversion_list_combi_sametype<StringData>(test_context, sg, type_String);
     test_dynamic_conversion_list_combi_sametype<BinaryData>(test_context, sg, type_Binary);
     test_dynamic_conversion_list_combi_sametype<Timestamp>(test_context, sg, type_Timestamp);
+    test_dynamic_conversion_list_combi_sametype<Decimal128>(test_context, sg, type_Decimal);
 }
 
 /*

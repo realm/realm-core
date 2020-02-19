@@ -75,6 +75,7 @@ public:
 
     Timestamp get_timestamp() const;
     std::string to_string() const;
+    size_t hash() const noexcept;
 
 private:
     uint8_t m_bytes[12];
@@ -87,5 +88,15 @@ inline std::ostream& operator<<(std::ostream& ostr, const ObjectId& id)
 }
 
 } // namespace realm
+
+namespace std {
+template <>
+struct hash<realm::ObjectId> {
+    size_t operator()(const realm::ObjectId& oid) const noexcept
+    {
+        return oid.hash();
+    }
+};
+} // namespace std
 
 #endif /* REALM_OBJECT_ID_HPP */
