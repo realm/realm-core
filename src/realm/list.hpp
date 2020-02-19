@@ -356,7 +356,7 @@ public:
 
     T get(size_t ndx) const
     {
-        if (ndx >= size()) {
+        if (ndx >= ConstLstIf::size()) {
             throw std::out_of_range("Index out of range");
         }
         return m_tree->get(ndx);
@@ -371,7 +371,7 @@ public:
     }
     LstIterator<T> end() const
     {
-        return LstIterator<T>(this, size() + m_deleted.size());
+        return LstIterator<T>(this, ConstLstIf::size() + m_deleted.size());
     }
     size_t find_first(T value) const
     {
@@ -448,7 +448,7 @@ protected:
         return *this;
     }
 
-    bool init_from_parent() const final
+    bool init_from_parent() const override
     {
         m_valid = m_tree->init_from_parent();
         update_content_version();
@@ -814,12 +814,14 @@ public:
         : ConstLstBase(other.m_col_key, &m_obj)
         , Lst<ObjKey>(other)
         , ObjList(this->m_tree.get(), m_obj.get_target_table(m_col_key))
+        , m_unresolved(other.m_unresolved)
     {
     }
     LnkLst(LnkLst&& other) noexcept
         : ConstLstBase(other.m_col_key, &m_obj)
         , Lst<ObjKey>(std::move(other))
         , ObjList(this->m_tree.get(), m_obj.get_target_table(m_col_key))
+        , m_unresolved(std::move(other.m_unresolved))
     {
     }
     LnkLst& operator=(const LnkLst& other)
@@ -848,7 +850,13 @@ public:
     }
     size_t size() const override
     {
-        return Lst<ObjKey>::size();
+        auto full_sz = Lst<ObjKey>::size();
+        return full_sz - m_unresolved.size();
+    }
+
+    bool has_unresolved() const noexcept
+    {
+        return !m_unresolved.empty();
     }
 
     Obj get_object(size_t ndx);
@@ -860,8 +868,35 @@ public:
 
     using Lst<ObjKey>::find_first;
     using Lst<ObjKey>::find_all;
+    void add(ObjKey value)
+    {
+        insert(size(), value);
+    }
     void set(size_t ndx, ObjKey value);
+    // As set, but without translating ndx
+    void set_direct(size_t ndx, ObjKey value);
     void insert(size_t ndx, ObjKey value);
+    ObjKey get(size_t ndx)
+    {
+        return Lst<ObjKey>::get(virtual2real(ndx));
+    }
+    void remove(size_t ndx)
+    {
+        clean_unres();
+        Lst<ObjKey>::remove(ndx);
+    }
+    void remove(size_t from, size_t to) override
+    {
+        clean_unres();
+        while (from < to) {
+            Lst<ObjKey>::remove(--to);
+        }
+    }
+    void clear() override
+    {
+        clean_unres();
+        Lst<ObjKey>::clear();
+    }
     // Create a new object in insert a link to it
     Obj create_and_insert_linked_object(size_t ndx);
     // Create a new object and link it. If an embedded object
@@ -882,8 +917,24 @@ private:
     friend class DB;
     friend class ConstTableView;
     friend class Query;
+
+    // Sorted set of indices containing unresolved links.
+    mutable std::vector<size_t> m_unresolved;
+
     void get_dependencies(TableVersions&) const override;
     void sync_if_needed() const override;
+    bool init_from_parent() const override;
+
+    // Translate from userfacing index to internal index.
+    size_t virtual2real(size_t ndx) const;
+    // Add ndx to m_unresolved - if not already there
+    void add_unres(size_t ndx);
+    // Remove ndx from m_unresolved - if there
+    void remove_unres(size_t ndx);
+    // Remove all unresolved entries
+    void clean_unres();
+    // Scan through the list to find unresolved links
+    void update_unresolved() const;
 };
 
 template <typename U>

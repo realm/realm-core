@@ -213,7 +213,14 @@ public:
 
     // Table size and deletion
     bool is_empty() const noexcept;
-    size_t size() const noexcept;
+    size_t size() const noexcept
+    {
+        return m_clusters.size();
+    }
+    size_t nb_unresolved() const noexcept
+    {
+        return m_tombstones ? m_tombstones->size() : 0;
+    }
 
     //@{
 
@@ -223,8 +230,12 @@ public:
     Obj create_object(ObjKey key = {}, const FieldValues& = {});
     // Create an object with specific GlobalKey.
     Obj create_object(GlobalKey object_id, const FieldValues& = {});
-    // Create an object with primary key
+    // Create an object with primary key - or return already existing object
     Obj create_object_with_primary_key(const Mixed& primary_key);
+    // Return existing object or return unresolved key.
+    // Important: This is to be used ONLY by the Sync client. SDKs should NEVER
+    // observe an unresolved key. Ever.
+    ObjKey get_objkey_from_primary_key(const Mixed& primary_key);
     /// Create a number of objects and add corresponding keys to a vector
     void create_objects(size_t number, std::vector<ObjKey>& keys);
     /// Create a number of objects with keys supplied
@@ -238,10 +249,12 @@ public:
     GlobalKey get_object_id(ObjKey key) const;
     Obj get_object(ObjKey key)
     {
+        REALM_ASSERT(!key.is_unresolved());
         return m_clusters.get(key);
     }
     ConstObj get_object(ObjKey key) const
     {
+        REALM_ASSERT(!key.is_unresolved());
         return m_clusters.get(key);
     }
     Obj get_object(size_t ndx)
@@ -272,6 +285,11 @@ public:
     /// remove_object_recursive() will delete linked rows if the removed link was the
     /// last one holding on to the row in question. This will be done recursively.
     void remove_object_recursive(ObjKey key);
+    // Invalidate object. To be used by the Sync client.
+    // - turns the object into a tombstone if links exist
+    // - otherwise works just as remove_object()
+    void invalidate_object(ObjKey key);
+
     void clear();
     using Iterator = ClusterTree::Iterator;
     using ConstIterator = ClusterTree::ConstIterator;
@@ -636,6 +654,7 @@ private:
     }
     Spec m_spec;            // 1st slot in m_top
     ClusterTree m_clusters; // 3rd slot in m_top
+    std::unique_ptr<ClusterTree> m_tombstones; // 13th slot in m_top
     TableKey m_key;     // 4th slot in m_top
     Array m_index_refs; // 5th slot in m_top
     Array m_opposite_table;  // 7th slot in m_top
@@ -687,6 +706,7 @@ private:
     void revive(Replication* const* repl, Allocator& new_allocator, bool writable);
 
     void init(ref_type top_ref, ArrayParent*, size_t ndx_in_parent, bool is_writable, bool is_frozen);
+    void ensure_graveyard();
 
     void set_key(TableKey key);
 
@@ -727,6 +747,8 @@ private:
     /// for both \a incoming_id and \a colliding_id.
     ObjKey allocate_local_id_after_hash_collision(GlobalKey incoming_id, GlobalKey colliding_id,
                                                   ObjKey colliding_local_id);
+    /// Create a placeholder for a not yet existing object and return key to it
+    ObjKey allocate_unresolved_key(ObjKey key, const FieldValues& values);
     /// Should be called when an object is deleted
     void free_local_id_after_hash_collision(ObjKey key);
 
@@ -890,7 +912,8 @@ private:
     static constexpr int top_position_for_pk_col = 11;
     static constexpr int top_position_for_flags = 12;
     // flags contents: bit 0 - is table embedded?
-    static constexpr int top_array_size = 13;
+    static constexpr int top_position_for_tombstones = 13;
+    static constexpr int top_array_size = 14;
 
     enum { s_collision_map_lo = 0, s_collision_map_hi = 1, s_collision_map_local_id = 2, s_collision_map_num_slots };
 
@@ -1186,7 +1209,7 @@ inline Table::Table(Allocator& alloc)
     : m_alloc(alloc)
     , m_top(m_alloc)
     , m_spec(m_alloc)
-    , m_clusters(this, m_alloc)
+    , m_clusters(this, m_alloc, top_position_for_cluster_tree)
     , m_index_refs(m_alloc)
     , m_opposite_table(m_alloc)
     , m_opposite_column(m_alloc)
@@ -1208,7 +1231,7 @@ inline Table::Table(Replication* const* repl, Allocator& alloc)
     : m_alloc(alloc)
     , m_top(m_alloc)
     , m_spec(m_alloc)
-    , m_clusters(this, m_alloc)
+    , m_clusters(this, m_alloc, top_position_for_cluster_tree)
     , m_index_refs(m_alloc)
     , m_opposite_table(m_alloc)
     , m_opposite_column(m_alloc)
@@ -1295,12 +1318,6 @@ inline bool Table::is_empty() const noexcept
 {
     return size() == 0;
 }
-
-inline size_t Table::size() const noexcept
-{
-    return m_clusters.size();
-}
-
 
 inline ConstTableRef Table::get_link_target(ColKey col_key) const noexcept
 {

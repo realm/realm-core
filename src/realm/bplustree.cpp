@@ -22,6 +22,22 @@
 using namespace realm;
 
 namespace realm {
+
+bool BPlusTreeNode::get_context_flag() const noexcept
+{
+    auto ref = get_ref();
+    MemRef mem(ref, m_tree->get_alloc());
+    return Array::get_context_flag_from_header(mem.get_addr());
+}
+
+void BPlusTreeNode::set_context_flag(bool cf) noexcept
+{
+    auto ref = get_ref();
+    MemRef mem(ref, m_tree->get_alloc());
+    Array::set_context_flag_in_header(cf, mem.get_addr());
+}
+
+
 /*****************************************************************************/
 /* BPlusTreeInner                                                            */
 /* All interior nodes is of this class                                       */

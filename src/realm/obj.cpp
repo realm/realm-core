@@ -57,7 +57,12 @@ GlobalKey ConstObj::get_object_id() const
 
 const ClusterTree* ConstObj::get_tree_top() const
 {
-    return &m_table.unchecked_ptr()->m_clusters;
+    if (m_key.is_unresolved()) {
+        return m_table.unchecked_ptr()->m_tombstones.get();
+    }
+    else {
+        return &m_table.unchecked_ptr()->m_clusters;
+    }
 }
 
 Allocator& ConstObj::get_alloc() const
@@ -177,6 +182,11 @@ void ConstObj::remove()
     m_table.cast_away_const()->remove_object(m_key);
 }
 
+void ConstObj::invalidate()
+{
+    m_table.cast_away_const()->invalidate_object(m_key);
+}
+
 ColKey ConstObj::get_column_key(StringData col_name) const
 {
     return get_table()->get_column_key(col_name);
@@ -253,6 +263,39 @@ T ConstObj::_get(ColKey::Idx col_ndx) const
 
     typename ColumnTypeTraits<T>::cluster_leaf_type values(get_alloc());
     ref_type ref = to_ref(Array::get(m_mem.get_addr(), col_ndx.val + 1));
+    values.init_from_ref(ref);
+
+    return values.get(m_row_ndx);
+}
+
+template <>
+ObjKey ConstObj::_get<ObjKey>(ColKey::Idx col_ndx) const
+{
+    _update_if_needed();
+
+    ArrayKey values(get_alloc());
+    ref_type ref = to_ref(Array::get(m_mem.get_addr(), col_ndx.val + 1));
+    values.init_from_ref(ref);
+
+    ObjKey k = values.get(m_row_ndx);
+    return k.is_unresolved() ? ObjKey{} : k;
+}
+
+bool ConstObj::is_unresolved(ColKey col_key) const
+{
+    m_table->report_invalid_key(col_key);
+    ColumnType type = col_key.get_type();
+    REALM_ASSERT(type == col_type_Link);
+
+    _update_if_needed();
+
+    return get_unfiltered_link(col_key).is_unresolved();
+}
+
+ObjKey ConstObj::get_unfiltered_link(ColKey col_key) const
+{
+    ArrayKey values(get_alloc());
+    ref_type ref = to_ref(Array::get(m_mem.get_addr(), col_key.get_index().val + 1));
     values.init_from_ref(ref);
 
     return values.get(m_row_ndx);
@@ -996,16 +1039,19 @@ Obj& Obj::set<ObjKey>(ColKey col_key, ObjKey target_key, bool is_default)
     if (type != ColumnTypeTraits<ObjKey>::column_id)
         throw LogicError(LogicError::illegal_type);
     TableRef target_table = get_target_table(col_key);
-    if (target_key != null_key && !target_table->is_valid(target_key)) {
-        throw LogicError(LogicError::target_row_index_out_of_range);
+    if (target_key) {
+        ClusterTree* ct = target_key.is_unresolved() ? target_table->m_tombstones.get() : &target_table->m_clusters;
+        if (!ct->is_valid(target_key)) {
+            throw LogicError(LogicError::target_row_index_out_of_range);
+        }
+        if (target_table->is_embedded()) {
+            throw LogicError(LogicError::wrong_kind_of_table);
+        }
     }
-    if (target_table->is_embedded() && target_key != null_key) {
-        throw LogicError(LogicError::wrong_kind_of_table);
-    }
-    ObjKey old_key = get<ObjKey>(col_key); // Will update if needed
+    ObjKey old_key = get_unfiltered_link(col_key); // Will update if needed
 
     if (target_key != old_key) {
-        CascadeState state;
+        CascadeState state(old_key.is_unresolved() ? CascadeState::Mode::All : CascadeState::Mode::Strong);
 
         ensure_writeable();
         bool recurse = replace_backlink(col_key, old_key, target_key, state);
@@ -1254,8 +1300,8 @@ void Obj::set_backlink(ColKey col_key, ObjKey new_key)
         ColKey backlink_col_key = m_table->get_opposite_column(col_key);
         REALM_ASSERT(target_table->valid_column(backlink_col_key));
 
-        Obj target_obj = target_table->get_object(new_key);
-        target_obj.add_backlink(backlink_col_key, m_key); // Throws
+        ClusterTree* ct = new_key.is_unresolved() ? target_table->m_tombstones.get() : &target_table->m_clusters;
+        ct->get(new_key).add_backlink(backlink_col_key, m_key);
     }
 }
 
@@ -1279,7 +1325,8 @@ bool Obj::remove_backlink(ColKey col_key, ObjKey old_key, CascadeState& state)
     bool strong_links = target_table->is_embedded();
 
     if (old_key != realm::null_key) {
-        Obj target_obj = target_table->get_object(old_key);
+        ClusterTree* ct = old_key.is_unresolved() ? target_table->m_tombstones.get() : &target_table->m_clusters;
+        Obj target_obj = ct->get(old_key);
         bool last_removed = target_obj.remove_one_backlink(backlink_col_key, m_key); // Throws
         return state.enqueue_for_cascade(target_obj, strong_links, last_removed);
     }
@@ -1336,14 +1383,14 @@ void Obj::assign(const ConstObj& other)
             auto linking_obj = t->get_object(bl);
             if (c.get_type() == col_type_Link) {
                 // Single link
-                REALM_ASSERT(linking_obj.get<ObjKey>(c) == other.get_key());
+                REALM_ASSERT(!linking_obj.get<ObjKey>(c) || linking_obj.get<ObjKey>(c) == other.get_key());
                 linking_obj.set(c, get_key());
             }
             else {
                 auto l = linking_obj.get_linklist(c);
                 auto n = l.find_first(other.get_key());
                 REALM_ASSERT(n != realm::npos);
-                l.set(n, get_key());
+                l.set_direct(n, get_key());
             }
         }
         return false;

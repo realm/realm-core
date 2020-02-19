@@ -62,6 +62,9 @@ public:
         m_tree = tree;
     }
 
+    bool get_context_flag() const noexcept;
+    void set_context_flag(bool) noexcept;
+
     virtual ~BPlusTreeNode();
 
     virtual bool is_leaf() const = 0;
@@ -143,6 +146,16 @@ public:
     bool is_attached() const
     {
         return bool(m_root);
+    }
+
+    bool get_context_flag() const noexcept
+    {
+        return m_root->get_context_flag();
+    }
+
+    void set_context_flag(bool cf) noexcept
+    {
+        m_root->set_context_flag(cf);
     }
 
     size_t size() const
@@ -245,7 +258,7 @@ protected:
 
     // Initialize the leaf cache with 'mem'
     virtual BPlusTreeLeaf* cache_leaf(MemRef mem) = 0;
-    void replace_root(std::unique_ptr<BPlusTreeNode> new_root);
+    virtual void replace_root(std::unique_ptr<BPlusTreeNode> new_root);
     std::unique_ptr<BPlusTreeNode> create_root_from_ref(ref_type ref);
 };
 
@@ -576,6 +589,19 @@ protected:
     {
         m_leaf_cache.init_from_mem(mem);
         return &m_leaf_cache;
+    }
+    void replace_root(std::unique_ptr<BPlusTreeNode> new_root) override
+    {
+        // Only copy context flag over in a linklist.
+        // The flag is in use in other list types
+        if constexpr (std::is_same_v<T, ObjKey>) {
+            auto cf = m_root ? m_root->get_context_flag() : false;
+            BPlusTreeBase::replace_root(std::move(new_root));
+            m_root->set_context_flag(cf);
+        }
+        else {
+            BPlusTreeBase::replace_root(std::move(new_root));
+        }
     }
 
     template <class R>

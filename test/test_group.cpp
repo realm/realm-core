@@ -1859,22 +1859,19 @@ TEST(Group_IntPrimaryKeyCol)
     TableRef table = g.add_table_with_primary_key("class_foo", type_Int, "primary");
     ColKey primary_key_column = table->get_primary_key_column();
     CHECK(primary_key_column);
-    CHECK(table->has_search_index(primary_key_column));
+    CHECK_NOT(table->has_search_index(primary_key_column));
 
     auto obj = table->create_object_with_primary_key({1});
     CHECK_EQUAL(obj.get<Int>(primary_key_column), 1);
 
     table->set_primary_key_column(ColKey{});
+    table->add_search_index(primary_key_column);
     CHECK(table->get_primary_key_column() == ColKey{});
     CHECK(table->has_search_index(primary_key_column));
-
-    table->remove_search_index(primary_key_column);
-    CHECK(table->get_primary_key_column() == ColKey{});
-    CHECK_NOT(table->has_search_index(primary_key_column));
 
     table->set_primary_key_column(primary_key_column);
     CHECK(table->get_primary_key_column() == primary_key_column);
-    CHECK(table->has_search_index(primary_key_column));
+    CHECK_NOT(table->has_search_index(primary_key_column));
 }
 
 TEST(Group_StringPrimaryKeyCol)

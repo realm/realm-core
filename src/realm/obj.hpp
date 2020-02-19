@@ -97,6 +97,11 @@ public:
     void check_valid() const;
     // Delete object from table. Object is invalid afterwards.
     void remove();
+    // Invalidate
+    //  - this turns the object into a tombstone if links to the object exist.
+    //  - deletes the object is no links to the object exist.
+    //  - To be used by the Sync client.
+    void invalidate();
 
     template <typename U>
     U get(ColKey col_key) const;
@@ -108,6 +113,7 @@ public:
     {
         return get<U>(get_column_key(col_name));
     }
+    bool is_unresolved(ColKey col_key) const;
     ConstObj get_linked_object(ColKey link_col_key) const;
     int cmp(const ConstObj& other, ColKey col_key) const;
 
@@ -237,6 +243,7 @@ protected:
     int cmp(const ConstObj& other, ColKey::Idx col_ndx) const;
     ObjKey get_backlink(ColKey backlink_col, size_t backlink_ndx) const;
     std::vector<ObjKey> get_all_backlinks(ColKey backlink_col) const;
+    ObjKey get_unfiltered_link(ColKey col_key) const;
 };
 
 

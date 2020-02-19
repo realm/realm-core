@@ -735,9 +735,6 @@ TableRef Group::add_table_with_primary_key(StringData name, DataType pk_type, St
 
     ColKey pk_col = table->add_column(pk_type, pk_name, nullable);
     table->do_set_primary_key_column(pk_col);
-    if (pk_type == type_Int) {
-        table->add_search_index(pk_col);
-    }
 
     return TableRef(table, table ? table->m_alloc.get_instance_version() : 0);
 }

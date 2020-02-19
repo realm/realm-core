@@ -40,7 +40,7 @@ jobWrapper {
             }
             targetSHA1 = 'NONE'
             if (isPullRequest) {
-                targetSHA1 = sh(returnStdout: true, script: "git merge-base origin/${targetBranch} HEAD").trim()
+                targetSHA1 = sh(returnStdout: true, script: "git fetch origin && git merge-base origin/${targetBranch} HEAD").trim()
             }
  
         }
