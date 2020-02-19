@@ -96,12 +96,6 @@ public:
         return m_keys.get(ndx);
     }
 
-    void adjust_keys(int64_t offset)
-    {
-        ensure_general_form();
-        m_keys.adjust(0, m_keys.size(), offset);
-    }
-
     virtual bool update_from_parent(size_t old_baseline) noexcept = 0;
     virtual bool is_leaf() const = 0;
     virtual int get_sub_tree_depth() const = 0;
@@ -231,6 +225,12 @@ public:
                 return sz;
         }
         return size_t(key.value);
+    }
+
+    void adjust_keys(int64_t offset)
+    {
+        ensure_general_form();
+        m_keys.adjust(0, m_keys.size(), offset);
     }
 
     const Table* get_owning_table() const;
