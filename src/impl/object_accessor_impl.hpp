@@ -63,6 +63,11 @@ public:
         return it == v.end() ? util::none : util::make_optional(it->second);
     }
 
+    bool is_embedded() const
+    {
+        return object_schema ? bool(object_schema->is_embedded) : false;
+    }
+
     // Get the default value for the given property in the given object schema,
     // or `util::none` if there is none (which is distinct from the default
     // being `null`).
@@ -131,6 +136,8 @@ public:
     template<typename T>
     T unbox(util::Any& v, CreatePolicy = CreatePolicy::Skip, ObjKey /*current_row*/ = ObjKey()) const { return any_cast<T>(v); }
 
+    Obj unbox_embedded(util::Any& v, CreatePolicy policy, Obj& parent, ColKey col, size_t ndx) const;
+
     bool is_null(util::Any const& v) const noexcept { return !v.has_value(); }
     util::Any null_value() const noexcept { return {}; }
     util::Optional<util::Any> no_value() const noexcept { return {}; }
@@ -190,6 +197,11 @@ inline Obj CppContext::unbox(util::Any& v, CreatePolicy policy, ObjKey current_o
 
     REALM_ASSERT(object_schema);
     return Object::create(const_cast<CppContext&>(*this), realm, *object_schema, v, policy, current_obj).obj();
+}
+
+inline Obj CppContext::unbox_embedded(util::Any& v, CreatePolicy policy, Obj& parent, ColKey col, size_t ndx) const
+{
+    return Object::create_embedded(const_cast<CppContext&>(*this), realm, *object_schema, v, policy, parent, col, ndx).obj();
 }
 
 template<>

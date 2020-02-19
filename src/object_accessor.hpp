@@ -82,10 +82,15 @@ struct ValueUpdater {
     void operator()(Obj*)
     {
         ContextType child_ctx(ctx, property);
-        auto curr_link = obj.get<ObjKey>(col);
-        auto link = child_ctx.template unbox<Obj>(value, policy, curr_link);
-        if (policy != CreatePolicy::UpdateModified || curr_link != link.get_key()) {
-            obj.set(col, link.get_key());
+        if (child_ctx.is_embedded()) {
+            child_ctx.unbox_embedded(value, policy, obj, col, 0);
+        }
+        else {
+            auto curr_link = obj.get<ObjKey>(col);
+            auto link = child_ctx.template unbox<Obj>(value, policy, curr_link);
+            if (policy != CreatePolicy::UpdateModified || curr_link != link.get_key()) {
+                obj.set(col, link.get_key());
+            }
         }
     }
 
@@ -127,8 +132,19 @@ void Object::set_property_value_impl(ContextType& ctx, const Property &property,
             throw ReadOnlyPropertyException(m_object_schema->name, property.name);
 
         ContextType child_ctx(ctx, property);
-        List list(m_realm, m_obj, col);
-        list.assign(child_ctx, value, policy);
+        if (child_ctx.is_embedded()) {
+            size_t index = 0;
+            ctx.enumerate_list(value, [&](auto&& element) {
+                child_ctx.unbox_embedded(element, policy, m_obj, col, index);
+                index++;
+            });
+            auto ll = m_obj.get_linklist(col);
+            ll.remove(index, ll.size());
+        }
+        else {
+            List list(m_realm, m_obj, col);
+            list.assign(child_ctx, value, policy);
+        }
         ctx.did_change();
         return;
     }
@@ -286,6 +302,58 @@ Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
         object.ensure_private_role_exists_for_user();
     }
 #endif
+    return object;
+}
+
+template<typename ValueType, typename ContextType>
+Object Object::create_embedded(ContextType& ctx, std::shared_ptr<Realm> const& realm,
+                      ObjectSchema const& object_schema, ValueType value,
+                      CreatePolicy policy, Obj& parent, ColKey col, size_t ndx)
+{
+    realm->verify_in_write();
+
+    Obj obj;
+    if (col.get_attrs().test(col_attr_List)) {
+        auto ll = parent.get_linklist(col);
+        auto sz = ll.size();
+        if (ndx < sz) {
+            if (policy == CreatePolicy::UpdateModified) {
+                obj = ll.get_object(ndx);
+            }
+            else {
+                obj = ll.create_and_set_linked_object(ndx);
+            }
+        }
+        else {
+            obj = ll.create_and_insert_linked_object(ndx);
+        }
+    }
+    else {
+        ObjKey current_obj = parent.get<ObjKey>(col);
+        if (policy == CreatePolicy::UpdateModified && current_obj) {
+            auto table = realm->read_group().get_table(object_schema.table_key);
+            obj = table->get_object(current_obj);
+        }
+        else {
+            obj = parent.create_and_set_linked_object(col);
+        }
+    }
+
+    // populate
+    Object object(realm, object_schema, obj);
+    for (size_t i = 0; i < object_schema.persisted_properties.size(); ++i) {
+        auto& prop = object_schema.persisted_properties[i];
+
+        auto v = ctx.value_for_property(value, prop, i);
+
+        bool is_default = false;
+        if (!v) {
+            v = ctx.default_value_for_property(object_schema, prop);
+            is_default = true;
+        }
+        if (v)
+            object.set_property_value_impl(ctx, prop, *v, policy, is_default);
+    }
     return object;
 }
 
