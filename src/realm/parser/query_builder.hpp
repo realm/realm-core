@@ -109,7 +109,10 @@ public:
     StringData string_for_argument(size_t i) override { return get<StringData>(i); }
     BinaryData binary_for_argument(size_t i) override { return get<BinaryData>(i); }
     Timestamp timestamp_for_argument(size_t i) override { return get<Timestamp>(i); }
-    ObjectId objectid_for_argument(size_t i) override { return get<ObjectId>(i); }
+    ObjectId objectid_for_argument(size_t i) override
+    {
+        return get<ObjectId>(i);
+    }
     Decimal128 decimal128_for_argument(size_t i) override
     {
         return get<Decimal128>(i);

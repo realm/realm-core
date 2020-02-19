@@ -364,9 +364,8 @@ void do_add_comparison_to_query(Query& query, const Predicate::Comparison& cmp, 
             add_link_constraint_to_query(query, cmp.op, lhs, rhs);
             break;
         case type_ObjectId:
-            add_numeric_constraint_to_query(query, cmp.op,
-                                             lhs. template value_of_type_for_query<ObjectId>(),
-                                             rhs. template value_of_type_for_query<ObjectId>());
+            add_numeric_constraint_to_query(query, cmp.op, lhs.template value_of_type_for_query<ObjectId>(),
+                                            rhs.template value_of_type_for_query<ObjectId>());
             break;
         case type_Decimal:
             add_numeric_constraint_to_query(query, cmp.op, lhs.template value_of_type_for_query<Decimal128>(),

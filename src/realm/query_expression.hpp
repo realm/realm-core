@@ -389,9 +389,7 @@ public:
     //
     // During thread-handover of a Query, set_base_table() is also called to make objects point at the new table
     // instead of the old one from the old thread.
-    virtual void set_base_table(ConstTableRef)
-    {
-    }
+    virtual void set_base_table(ConstTableRef) {}
 
     virtual std::string description(util::serializer::SerialisationState& state) const = 0;
 
@@ -1192,9 +1190,7 @@ struct TrueExpression : Expression {
 
         return realm::not_found;
     }
-    void set_base_table(ConstTableRef) override
-    {
-    }
+    void set_base_table(ConstTableRef) override {}
     void set_cluster(const Cluster*) override
     {
     }
@@ -1218,9 +1214,7 @@ struct FalseExpression : Expression {
     {
         return realm::not_found;
     }
-    void set_base_table(ConstTableRef) override
-    {
-    }
+    void set_base_table(ConstTableRef) override {}
     void set_cluster(const Cluster*) override
     {
     }
@@ -2743,9 +2737,7 @@ public:
     {
     }
 
-    void set_base_table(ConstTableRef) override
-    {
-    }
+    void set_base_table(ConstTableRef) override {}
 
     ConstTableRef get_base_table() const override
     {

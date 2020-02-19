@@ -60,8 +60,10 @@ std::string print_value<>(double);
 template <> std::string print_value<>(realm::null);
 template <> std::string print_value<>(StringData);
 template <> std::string print_value<>(realm::Timestamp);
-template <> std::string print_value<>(realm::ObjectId);
-template <> std::string print_value<>(realm::ObjKey);
+template <>
+std::string print_value<>(realm::ObjectId);
+template <>
+std::string print_value<>(realm::ObjKey);
 
 // General implementation for most types
 template <typename T>

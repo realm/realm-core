@@ -103,15 +103,18 @@ namespace realm {
 /// \sa StringData
 class Mixed {
 public:
-    Mixed() noexcept : m_type(0)
+    Mixed() noexcept
+        : m_type(0)
     {
     }
 
-    Mixed(util::None) noexcept : Mixed()
+    Mixed(util::None) noexcept
+        : Mixed()
     {
     }
 
-    Mixed(int i) noexcept : Mixed(int64_t(i))
+    Mixed(int i) noexcept
+        : Mixed(int64_t(i))
     {
     }
     Mixed(int64_t) noexcept;
@@ -132,13 +135,16 @@ public:
 
     // These are shortcuts for Mixed(StringData(c_str)), and are
     // needed to avoid unwanted implicit conversion of char* to bool.
-    Mixed(char* c_str) noexcept : Mixed(StringData(c_str))
+    Mixed(char* c_str) noexcept
+        : Mixed(StringData(c_str))
     {
     }
-    Mixed(const char* c_str) noexcept : Mixed(StringData(c_str))
+    Mixed(const char* c_str) noexcept
+        : Mixed(StringData(c_str))
     {
     }
-    Mixed(const std::string& s) noexcept : Mixed(StringData(s))
+    Mixed(const std::string& s) noexcept
+        : Mixed(StringData(s))
     {
     }
 

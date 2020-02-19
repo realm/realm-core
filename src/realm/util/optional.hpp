@@ -121,6 +121,7 @@ public:
     // FIXME: std::optional specifies an std::initializer_list overload for `emplace` as well.
 
     void reset();
+
 private:
     using Storage = _impl::OptionalStorage<T>;
     using Storage::m_engaged;
