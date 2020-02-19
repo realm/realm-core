@@ -1563,6 +1563,8 @@ void Cluster::dump_objects(int64_t key_offset, std::string lead) const
     if (!m_keys.is_attached()) {
         std::cout << lead << "compact form" << std::endl;
     }
+    auto col_keys = get_owning_table()->get_column_keys();
+
     for (unsigned i = 0; i < node_size(); i++) {
         int64_t key_value;
         if (m_keys.is_attached()) {
@@ -1572,15 +1574,16 @@ void Cluster::dump_objects(int64_t key_offset, std::string lead) const
             key_value = int64_t(i);
         }
         std::cout << lead << "key: " << std::hex << key_value + key_offset << std::dec;
-        for (size_t j = 1; j < size(); j++) {
-            if (m_tree_top.get_spec().get_column_attr(j - 1).test(col_attr_List)) {
+        for (auto col : col_keys) {
+            size_t j = col.get_index().val + 1;
+            if (col.get_attrs().test(col_attr_List)) {
                 std::cout << ", list";
                 continue;
             }
 
-            switch (m_tree_top.get_spec().get_column_type(j - 1)) {
+            switch (col.get_type()) {
                 case col_type_Int: {
-                    bool nullable = m_tree_top.get_spec().get_column_attr(j - 1).test(col_attr_Nullable);
+                    bool nullable = col.get_attrs().test(col_attr_Nullable);
                     ref_type ref = Array::get_as_ref(j);
                     if (nullable) {
                         ArrayIntNull arr_int_null(m_alloc);
