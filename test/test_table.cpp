@@ -4543,7 +4543,6 @@ TEST(Table_search_index_fuzzer)
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
     auto db = DB::create(*hist);
-    // auto db = DB::create(path);
     Tester<bool, false>::run(db, type_Bool);
     Tester<Optional<bool>, true>::run(db, type_Bool);
 

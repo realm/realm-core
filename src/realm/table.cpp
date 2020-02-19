@@ -3451,7 +3451,13 @@ void Table::convert_column(ColKey from, ColKey to, bool throw_on_null)
             case type_Decimal:
                 change_nullability_list<Decimal128, Decimal128>(from, to, throw_on_null);
                 break;
-            default:
+            case type_Link:
+            case type_LinkList:
+                // Can't have lists of these types
+            case type_OldTable:
+            case type_OldMixed:
+            case type_OldDateTime:
+                // These types are no longer supported at all
                 REALM_UNREACHABLE();
                 break;
         }
@@ -3495,7 +3501,14 @@ void Table::convert_column(ColKey from, ColKey to, bool throw_on_null)
             case type_Decimal:
                 change_nullability<Decimal128, Decimal128>(from, to, throw_on_null);
                 break;
-            default:
+            case type_Link:
+                // Always nullable, so can't convert
+            case type_LinkList:
+                // Never nullable, so can't convert
+            case type_OldTable:
+            case type_OldMixed:
+            case type_OldDateTime:
+                // These types are no longer supported at all
                 REALM_UNREACHABLE();
                 break;
         }
