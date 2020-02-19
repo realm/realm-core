@@ -190,7 +190,7 @@ TEST_CASE("global_notifier: basics", "[sync][global_notifier]") {
                                                      });
 
             SyncTestFile gn_config_template(server, "");
-            gn_config_template.sync_config->reference_realm_url = server.base_url();
+            // gn_config_template.sync_config->reference_realm_url = server.base_url();
             GlobalNotifier global_notifier(std::move(callback), server.local_root_dir(), *gn_config_template.sync_config);
             REQUIRE(triggered_download.load() == 0);
             global_notifier.start();

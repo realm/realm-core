@@ -54,7 +54,7 @@ AdminRealmListener::AdminRealmListener(std::string local_root_dir, SyncConfig sy
     };
     m_config.schema_version = 0;
     m_config.sync_config = std::make_shared<SyncConfig>(m_sync_config_template);
-    m_config.sync_config->reference_realm_url += "/__admin";
+    // m_config.sync_config->reference_realm_url += "/__admin";
 }
 
 void AdminRealmListener::start()
@@ -181,7 +181,7 @@ Realm::Config AdminRealmListener::get_config(StringData virtual_path, StringData
 
     config.path = std::move(file_path);
     config.sync_config = std::make_unique<SyncConfig>(m_sync_config_template);
-    config.sync_config->reference_realm_url += virtual_path.data();
+    // config.sync_config->reference_realm_url += virtual_path.data();
     config.schema_mode = SchemaMode::Additive;
     config.automatic_change_notifications = false;
     return config;

@@ -79,15 +79,6 @@ Realm::~Realm()
     }
 }
 
-bool Realm::is_partial() const noexcept
-{
-#if REALM_ENABLE_SYNC
-    return m_config.sync_config && m_config.sync_config->is_partial;
-#else
-    return false;
-#endif
-}
-
 Group& Realm::read_group()
 {
     verify_open();
@@ -398,10 +389,6 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
     }
     else {
         util::Optional<std::string> sync_user_id;
-#if REALM_ENABLE_SYNC
-        if (m_config.sync_config && m_config.sync_config->is_partial)
-            sync_user_id = m_config.sync_config->user->identity();
-#endif
         ObjectStore::apply_schema_changes(transaction(), m_schema_version, schema, version,
                                           m_config.schema_mode, required_changes, std::move(sync_user_id));
         REALM_ASSERT_DEBUG(additive || (required_changes = ObjectStore::schema_from_group(read_group()).compare(schema)).empty());
@@ -942,13 +929,6 @@ bool Realm::init_permission_cache()
         return true;
     }
 
-    // Admin users bypass permissions checks outside of the logic in PermissionsCache
-    if (m_config.sync_config && m_config.sync_config->is_partial && !m_config.sync_config->user->is_admin()) {
-        m_table_info_cache = std::make_unique<sync::TableInfoCache>(transaction());
-        m_permissions_cache = std::make_unique<sync::PermissionsCache>(transaction(), *m_table_info_cache,
-                                                                       m_config.sync_config->user->identity());
-        return true;
-    }
     return false;
 }
 

@@ -102,7 +102,7 @@ InMemoryTestFile::InMemoryTestFile()
 }
 
 #if REALM_ENABLE_SYNC
-SyncTestFile::SyncTestFile(SyncServer& server, std::string name, bool is_partial, std::string user_name)
+SyncTestFile::SyncTestFile(SyncServer& server, std::string name, std::string user_name)
 {
     if (name.empty())
         name = path.substr(path.rfind('/') + 1);
@@ -120,17 +120,14 @@ SyncTestFile::SyncTestFile(SyncServer& server, std::string name, bool is_partial
             token = util::format("{\"identity\": \"%1\", \"access\": [\"download\", \"upload\"]}", user_name);
         else {
             std::string suffix;
-            if (config.is_partial)
-                suffix = util::format("/__partial/%1/%2", config.user->identity(), SyncConfig::partial_sync_identifier(*config.user));
             token = util::format("{\"identity\": \"%1\", \"path\": \"/%2%3\", \"access\": [\"download\", \"upload\"]}",
                                  user_name, name, suffix);
         }
         encoded.resize(base64_encoded_size(token.size()));
         base64_encode(token.c_str(), token.size(), &encoded[0], encoded.size());
-        session->refresh_access_token(encoded, config.realm_url());
+        session->refresh_access_token(encoded, config.realm_url);
     };
     sync_config->error_handler = [](auto, auto) { abort(); };
-    sync_config->is_partial = is_partial;
     schema_mode = SchemaMode::Additive;
 }
 

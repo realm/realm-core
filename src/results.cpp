@@ -644,10 +644,7 @@ void Results::clear()
             return;
         case Mode::Table:
             validate_write();
-            if (m_realm->is_partial())
-                m_table->where().find_all().clear();
-            else
-                const_cast<Table&>(*m_table).clear();
+            const_cast<Table&>(*m_table).clear();
             break;
         case Mode::Query:
             // Not using Query:remove() because building the tableview and

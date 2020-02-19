@@ -126,11 +126,7 @@ struct SyncConfig {
     using ProxyConfig = sync::Session::Config::ProxyConfig;
 
     std::shared_ptr<SyncUser> user;
-    // The URL of the Realm, or of the reference Realm if partial sync is being used.
-    // The URL that will be used when connecting to the object server is that returned by `realm_url()`,
-    // and will differ from `reference_realm_url` if partial sync is being used.
-    // Set this field, but read from `realm_url()`.
-    std::string reference_realm_url;
+    std::string realm_url;
     SyncSessionStopPolicy stop_policy = SyncSessionStopPolicy::AfterChangesUploaded;
     std::function<SyncBindSessionHandler> bind_session_handler;
     std::function<SyncSessionErrorHandler> error_handler;
@@ -140,8 +136,6 @@ struct SyncConfig {
     util::Optional<std::string> ssl_trust_certificate_path;
     std::function<sync::Session::SSLVerifyCallback> ssl_verify_callback;
     util::Optional<ProxyConfig> proxy_config;
-    bool is_partial = false;
-    util::Optional<std::string> custom_partial_sync_identifier;
 
     // If true, upload/download waits are canceled on any sync error and not just fatal ones
     bool cancel_waits_on_nonfatal_error = false;
@@ -158,20 +152,10 @@ struct SyncConfig {
     util::Optional<std::string> recovery_directory;
     ClientResyncMode client_resync_mode = ClientResyncMode::Recover;
 
-    // The URL that will be used when connecting to the object server.
-    // This will differ from `reference_realm_url` when partial sync is being used.
-    std::string realm_url() const;
-
-    SyncConfig(std::shared_ptr<SyncUser> user, std::string reference_realm_url)
+    SyncConfig(std::shared_ptr<SyncUser> user, std::string realm_url)
     : user(std::move(user))
-    , reference_realm_url(std::move(reference_realm_url))
-    {
-        if (this->reference_realm_url.find("/__partial/") != npos)
-            throw std::invalid_argument("A Realm URL may not contain the reserved string \"/__partial/\".");
-    }
-
-    // Construct an identifier for this partially synced Realm by combining client and user identifiers.
-    static std::string partial_sync_identifier(const SyncUser& user);
+    , realm_url(std::move(realm_url))
+    { }
 };
 
 } // namespace realm

@@ -70,10 +70,10 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync]") {
         REQUIRE(user->all_sessions().size() == 2);
         auto s1 = user->session_for_on_disk_path(path_1);
         REQUIRE(s1);
-        CHECK(s1->config().realm_url() == realm_base_url + "/test1a-1");
+        CHECK(s1->config().realm_url == realm_base_url + "/test1a-1");
         auto s2 = user->session_for_on_disk_path(path_2);
         REQUIRE(s2);
-        CHECK(s2->config().realm_url() == realm_base_url + "/test1a-2");
+        CHECK(s2->config().realm_url == realm_base_url + "/test1a-2");
     }
 
     SECTION("a SyncUser properly unbinds its sessions upon logging out") {
