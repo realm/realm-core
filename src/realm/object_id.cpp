@@ -17,11 +17,11 @@
  **************************************************************************/
 
 #include <realm/object_id.hpp>
+#include <realm/string_data.hpp>
 #include <realm/util/assert.hpp>
 #include <atomic>
 #include <chrono>
 #include <random>
-#include <string_view>
 
 using namespace std::chrono;
 
@@ -115,8 +115,7 @@ std::string ObjectId::to_string() const
 
 size_t ObjectId::hash() const noexcept
 {
-    using string_view = std::basic_string_view<uint8_t>;
-    return std::hash<string_view>()(string_view(&m_bytes[12], sizeof m_bytes));
+    return murmur2_or_cityhash(m_bytes, sizeof(m_bytes));
 }
 
 
