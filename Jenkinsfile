@@ -428,7 +428,7 @@ def doBuildWindows(String buildType, boolean isUWP, String platform, boolean run
     }
 
     return {
-        node('windows') {
+        node('windows-vs2019') {
             getArchive()
 
             dir('build-dir') {

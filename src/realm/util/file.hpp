@@ -33,12 +33,13 @@
 #endif
 
 #if defined(_MSC_VER) && _MSC_VER >= 1900 // compiling with at least Visual Studio 2015
-#if _MSVC_LANG >= 201703L
-#include <filesystem>
-#else
-#define _SILENCE_EXPERIMENTAL_FILESYSTEM_DEPRECATION_WARNING // switch to <filesystem> once we switch to C++17
+#define _SILENCE_EXPERIMENTAL_FILESYSTEM_DEPRECATION_WARNING
 #include <experimental/filesystem>
-#endif
+namespace realm::stdx {
+// For now, std::filesystem is incompatable with UWP: https://github.com/microsoft/STL/issues/322
+// TODO: switch to using std::filesytem once that is fixed.
+namespace filesystem = std::experimental::filesystem;
+}
 #define REALM_HAVE_STD_FILESYSTEM 1
 #else
 #define REALM_HAVE_STD_FILESYSTEM 0
@@ -962,7 +963,7 @@ private:
 #ifndef _WIN32
     DIR* m_dirp;
 #elif REALM_HAVE_STD_FILESYSTEM
-    std::experimental::filesystem::v1::directory_iterator m_iterator;
+    stdx::filesystem::directory_iterator m_iterator;
 #endif
 };
 
