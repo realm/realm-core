@@ -2292,6 +2292,30 @@ TEST(Table_AddColumnWithThreeLevelBptree)
     table.verify();
 }
 
+TEST(Table_DeleteObjectsInFirstCluster)
+{
+    // Designed to exercise logic if cluster size is 4
+    Table table;
+    table.add_column(type_Int, "int0");
+
+    ObjKeys keys;
+    table.create_objects(32, keys);
+
+    // delete objects in first cluster
+    table.remove_object(keys[2]);
+    table.remove_object(keys[1]);
+    table.remove_object(keys[3]);
+    table.remove_object(keys[0]);
+
+    table.create_object(ObjKey(1)); // Must not throw
+
+    // Replace root node
+    while (table.size() > 16)
+        table.begin()->remove();
+
+    // table.dump_objects();
+    table.create_object(ObjKey(1)); // Must not throw
+}
 
 TEST(Table_ClearWithTwoLevelBptree)
 {

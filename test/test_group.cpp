@@ -1766,7 +1766,7 @@ TEST(Group_CascadeNotify_TreeCascade)
     GROUP_TEST_PATH(path);
 
     Group g(path, 0, Group::mode_ReadWrite);
-    TableRef t = g.add_table("table");
+    TableRef t = g.add_table("tree");
     t->add_column_link(type_Link, "left", *t, link_Strong);
     t->add_column_link(type_Link, "right", *t, link_Strong);
     t->add_column_link(type_Link, "parent", *t, link_Weak);
