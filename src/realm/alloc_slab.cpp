@@ -103,54 +103,6 @@ void SlabAlloc::init_streaming_header(Header* streaming_header, int file_format_
     };
 }
 
-
-class SlabAlloc::ChunkRefEq {
-public:
-    ChunkRefEq(ref_type ref) noexcept
-        : m_ref(ref)
-    {
-    }
-    bool operator()(const Chunk& chunk) const noexcept
-    {
-        return chunk.ref == m_ref;
-    }
-
-private:
-    ref_type m_ref;
-};
-
-
-class SlabAlloc::ChunkRefEndEq {
-public:
-    ChunkRefEndEq(ref_type ref) noexcept
-        : m_ref(ref)
-    {
-    }
-    bool operator()(const Chunk& chunk) const noexcept
-    {
-        return chunk.ref + chunk.size == m_ref;
-    }
-
-private:
-    ref_type m_ref;
-};
-
-
-class SlabAlloc::SlabRefEndEq {
-public:
-    SlabRefEndEq(ref_type ref) noexcept
-        : m_ref(ref)
-    {
-    }
-    bool operator()(const Slab& slab) const noexcept
-    {
-        return slab.ref_end == m_ref;
-    }
-
-private:
-    ref_type m_ref;
-};
-
 inline SlabAlloc::Slab::Slab(ref_type r, size_t s)
     : ref_end(r)
     , size(s)
@@ -1450,18 +1402,17 @@ void SlabAlloc::reserve_disk_space(size_t size)
 void SlabAlloc::verify() const
 {
 #ifdef REALM_DEBUG
-    // Make sure that all free blocks fit within a slab
-    /* FIXME
-    for (const auto& chunk : m_free_space) {
-        slabs::const_iterator slab =
-            upper_bound(m_slabs.begin(), m_slabs.end(), chunk.ref, &ref_less_than_slab_ref_end);
-        REALM_ASSERT(slab != m_slabs.end());
-
-        ref_type slab_ref_end = slab->ref_end;
-        ref_type chunk_ref_end = chunk.ref + chunk.size;
-        REALM_ASSERT_3(chunk_ref_end, <=, slab_ref_end);
+    if (!m_slabs.empty()) {
+        // Make sure that all free blocks are within a slab. This is done
+        // implicitly by using for_all_free_entries()
+        size_t first_possible_ref = m_baseline;
+        size_t first_impossible_ref = align_size_to_section_boundary(m_slabs.back().ref_end);
+        for_all_free_entries([&](size_t ref, size_t size) {
+            REALM_ASSERT(ref >= first_possible_ref);
+            REALM_ASSERT(ref + size <= first_impossible_ref);
+            first_possible_ref = ref;
+        });
     }
-    */
 #endif
 }
 
@@ -1469,23 +1420,21 @@ void SlabAlloc::verify() const
 
 bool SlabAlloc::is_all_free() const
 {
-    /*
-     * FIXME
-    if (m_free_space.size() != m_slabs.size())
-        return false;
-
-    // Verify that free space matches slabs
-    ref_type slab_ref = align_size_to_section_boundary(m_baseline.load(std::memory_order_relaxed));
-    for (const auto& slab : m_slabs) {
-        size_t slab_size = slab.ref_end - slab_ref;
-        chunks::const_iterator chunk = find_if(m_free_space.begin(), m_free_space.end(), ChunkRefEq(slab_ref));
-        if (chunk == m_free_space.end())
+    // verify that slabs contain only free space.
+    // this is equivalent to each slab holding BetweenBlocks only at the ends.
+    for (const auto& e : m_slabs) {
+        auto first = reinterpret_cast<BetweenBlocks*>(e.addr);
+        REALM_ASSERT(first->block_before_size == 0);
+        auto last = reinterpret_cast<BetweenBlocks*>(e.addr + e.size) - 1;
+        REALM_ASSERT(last->block_after_size == 0);
+        if (first->block_after_size != last->block_before_size)
             return false;
-        if (slab_size != chunk->size)
+        auto range = reinterpret_cast<char*>(last) - reinterpret_cast<char*>(first);
+        range -= sizeof(BetweenBlocks);
+        // the size of the free area must match the distance between the two BetweenBlocks:
+        if (range != first->block_after_size)
             return false;
-        slab_ref = slab.ref_end;
     }
-    */
     return true;
 }
 
