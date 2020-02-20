@@ -1,10 +1,11 @@
-# NEXT RELEASE
+# 6.1.0-alpha.5 Release notes
 
 ### Enhancements
+* Initial support for dangling links: Table::get_objkey_from_primary_key() and Table::invalidate_object() added.
+* Several minor enhancements for Decimal128 and ObjectId.
 * It is now possible to switch embeddedness of a table.
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * None.
  
 ### Breaking changes
@@ -13,7 +14,7 @@
 -----------
 
 ### Internals
-* None.
+* Now uses c++17!!!!
 
 ----------------------------------------------
 
