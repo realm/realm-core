@@ -58,7 +58,6 @@ template <class>
 class Columns;
 template <class>
 class SubQuery;
-struct LinkTargetInfo;
 class ColKeys;
 struct GlobalKey;
 class LinkChain;
@@ -231,7 +230,7 @@ public:
     // Create an object with specific GlobalKey.
     Obj create_object(GlobalKey object_id, const FieldValues& = {});
     // Create an object with primary key - or return already existing object
-    Obj create_object_with_primary_key(const Mixed& primary_key);
+    Obj create_object_with_primary_key(const Mixed& primary_key, FieldValues&& = {});
     // Return existing object or return unresolved key.
     // Important: This is to be used ONLY by the Sync client. SDKs should NEVER
     // observe an unresolved key. Ever.
@@ -710,21 +709,17 @@ private:
 
     void set_key(TableKey key);
 
-    ColKey do_insert_column(ColKey col_key, DataType type, StringData name, LinkTargetInfo& link_target_info,
+    ColKey do_insert_column(ColKey col_key, DataType type, StringData name, Table* target_table,
                             bool nullable = false, bool listtype = false);
 
     struct InsertSubtableColumns;
     struct EraseSubtableColumns;
     struct RenameSubtableColumns;
 
-    ColKey insert_root_column(ColKey col_key, DataType type, StringData name, LinkTargetInfo& link_target,
-                              bool nullable = false, bool linktype = false);
     void erase_root_column(ColKey col_key);
     ColKey do_insert_root_column(ColKey col_key, ColumnType, StringData name, bool nullable = false,
                                  bool listtype = false);
     void do_erase_root_column(ColKey col_key);
-    ColKey insert_backlink_column(TableKey origin_table_key, ColKey origin_col_key, ColKey backlink_col_key);
-    void erase_backlink_column(ColKey backlink_col_key);
 
     void set_opposite_column(ColKey col_key, TableKey opposite_table, ColKey opposite_column);
     void do_set_primary_key_column(ColKey col_key);
@@ -1429,24 +1424,6 @@ inline void Table::check_column(ColKey col_key) const
     if (REALM_UNLIKELY(!valid_column(col_key)))
         throw InvalidKey("No such column");
 }
-
-// This class groups together information about the target of a link column
-// This is not a valid link if the target table == nullptr
-struct LinkTargetInfo {
-    LinkTargetInfo(Table* target = nullptr, ColKey backlink_key = ColKey())
-        : m_target_table(target)
-        , m_backlink_col_key(backlink_key)
-    {
-        if (backlink_key)
-            m_target_table->report_invalid_key(backlink_key);
-    }
-    bool is_valid() const
-    {
-        return (m_target_table != nullptr);
-    }
-    Table* m_target_table;
-    ColKey m_backlink_col_key; // a value of ColKey() indicates the backlink should be appended
-};
 
 // The purpose of this class is to give internal access to some, but
 // not all of the non-public parts of the Table class.
