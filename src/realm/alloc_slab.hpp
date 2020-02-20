@@ -405,10 +405,6 @@ private:
             other.size = 0;
         }
     };
-    struct Chunk { // describes a freed in-file block
-        ref_type ref;
-        size_t size;
-    };
 
     // free blocks that are in the slab area are managed using the following structures:
     // - FreeBlock: Placed at the start of any free space. Holds the 'ref' corresponding to
@@ -670,9 +666,6 @@ private:
     // Gets the path of the attached file, or other relevant debugging info.
     std::string get_file_path_for_assertions() const;
 
-    class ChunkRefEq;
-    class ChunkRefEndEq;
-    class SlabRefEndEq;
     static bool ref_less_than_slab_ref_end(ref_type, const Slab&) noexcept;
 
     friend class Group;
