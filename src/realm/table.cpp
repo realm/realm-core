@@ -2051,8 +2051,17 @@ ObjKey Table::find_first(ColKey col_key, T value) const
 {
     check_column(col_key);
 
-    if (StringIndex* index = get_search_index(col_key)) {
-        return index->find_first(value);
+    // You cannot call GetIndexData on ObjKey
+    if constexpr (!std::is_same_v<T, ObjKey>) {
+        if (StringIndex* index = get_search_index(col_key)) {
+            return index->find_first(value);
+        }
+
+        if (col_key == m_primary_key_col) {
+            GlobalKey object_id{value};
+            ObjKey k = global_to_local_object_id_hashed(object_id);
+            return is_valid(k) ? k : ObjKey();
+        }
     }
 
     ObjKey key;
@@ -2077,98 +2086,6 @@ ObjKey Table::find_first(ColKey col_key, T value) const
 namespace realm {
 
 template <>
-ObjKey Table::find_first(ColKey col_key, StringData value) const
-{
-    if (REALM_UNLIKELY(!valid_column(col_key)))
-        throw InvalidKey("Non-existing column");
-
-    if (StringIndex* index = get_search_index(col_key)) {
-        return index->find_first(value);
-    }
-
-    if (col_key.get_type() == col_type_String && col_key == m_primary_key_col) {
-        GlobalKey object_id{value};
-        ObjKey k = global_to_local_object_id_hashed(object_id);
-        return is_valid(k) ? k : ObjKey();
-    }
-
-    ObjKey key;
-    ArrayString leaf(get_alloc());
-
-    auto f = [&key, &col_key, &value, &leaf](const Cluster* cluster) {
-        cluster->init_leaf(col_key, &leaf);
-        size_t row = leaf.find_first(value, 0, cluster->node_size());
-        if (row != realm::npos) {
-            key = cluster->get_real_key(row);
-            return true;
-        }
-        return false;
-    };
-
-    traverse_clusters(f);
-
-    return key;
-}
-
-template <>
-ObjKey Table::find_first(ColKey col_key, ObjectId value) const
-{
-    if (REALM_UNLIKELY(!valid_column(col_key)))
-        throw InvalidKey("Non-existing column");
-
-    if (StringIndex* index = get_search_index(col_key)) {
-        return index->find_first(value);
-    }
-
-    if (col_key.get_type() == col_type_ObjectId && col_key == m_primary_key_col) {
-        GlobalKey object_id{value};
-        ObjKey k = global_to_local_object_id_hashed(object_id);
-        return is_valid(k) ? k : ObjKey();
-    }
-
-    ObjKey key;
-    ArrayObjectIdNull leaf(get_alloc());
-
-    auto f = [&key, &col_key, &value, &leaf](const Cluster* cluster) {
-        cluster->init_leaf(col_key, &leaf);
-        size_t row = leaf.find_first(value, 0, cluster->node_size());
-        if (row != realm::npos) {
-            key = cluster->get_real_key(row);
-            return true;
-        }
-        return false;
-    };
-
-    traverse_clusters(f);
-
-    return key;
-}
-
-template <>
-ObjKey Table::find_first(ColKey col_key, ObjKey value) const
-{
-    check_column(col_key);
-
-    ObjKey key;
-    using LeafType = typename ColumnTypeTraits<ObjKey>::cluster_leaf_type;
-    LeafType leaf(get_alloc());
-
-    auto f = [&key, &col_key, &value, &leaf](const Cluster* cluster) {
-        cluster->init_leaf(col_key, &leaf);
-        size_t row = leaf.find_first(value, 0, cluster->node_size());
-        if (row != realm::npos) {
-            key = cluster->get_real_key(row);
-            return true;
-        }
-        return false;
-    };
-
-    traverse_clusters(f);
-
-    return key;
-}
-
-template <>
 ObjKey Table::find_first(ColKey col_key, util::Optional<float> value) const
 {
     return value ? find_first(col_key, *value) : find_first_null(col_key);
@@ -2185,7 +2102,7 @@ ObjKey Table::find_first(ColKey col_key, null) const
 {
     return find_first_null(col_key);
 }
-}
+} // namespace realm
 
 // Explicitly instantiate the generic case of the template for the types we care about.
 template ObjKey Table::find_first(ColKey col_key, bool) const;
@@ -2193,6 +2110,8 @@ template ObjKey Table::find_first(ColKey col_key, int64_t) const;
 template ObjKey Table::find_first(ColKey col_key, float) const;
 template ObjKey Table::find_first(ColKey col_key, double) const;
 template ObjKey Table::find_first(ColKey col_key, Decimal128) const;
+template ObjKey Table::find_first(ColKey col_key, ObjectId) const;
+template ObjKey Table::find_first(ColKey col_key, ObjKey) const;
 template ObjKey Table::find_first(ColKey col_key, util::Optional<bool>) const;
 template ObjKey Table::find_first(ColKey col_key, util::Optional<int64_t>) const;
 template ObjKey Table::find_first(ColKey col_key, BinaryData) const;
@@ -3273,9 +3192,7 @@ void Table::validate_primary_column()
 {
     if (ColKey col = get_primary_key_column()) {
         validate_column_is_unique(col);
-        if (col.get_type() == col_type_String) {
-            rebuild_table_with_pk_column();
-        }
+        rebuild_table_with_pk_column();
     }
 }
 
