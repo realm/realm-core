@@ -2311,7 +2311,7 @@ std::vector<std::pair<std::string, bool>> DB::get_core_files(const std::string& 
 // FIXME: Extend to provide recycling of transaction objects?
 void TransactionDeleter(Transaction* t)
 {
-    t->close();
+    t->internal_close();
     delete t;
 }
 
@@ -2332,13 +2332,27 @@ TransactionRef DB::start_frozen(VersionID version_id)
 {
     if (!is_attached())
         throw LogicError(LogicError::wrong_transact_state);
+    // prune stale frozen transactions
+    while (!m_frozen_transactions.empty() && m_frozen_transactions.begin()->second.expired()) {
+        m_frozen_transactions.erase(m_frozen_transactions.begin());
+    }
     ReadLockInfo read_lock;
-    grab_read_lock(read_lock, version_id);
     ReadLockGuard g(*this, read_lock);
+    grab_read_lock(read_lock, version_id);
+    version_id.version = read_lock.m_version;
+    // reuse existing frozen transaction if one exists:
+    std::weak_ptr<Transaction>& weak_tr = m_frozen_transactions[version_id.version];
+    TransactionRef res = weak_tr.lock();
+    if (res) {
+        return res; // <-- also releases read_lock - the now shared frozen transaction has its own
+    }
+    // none cached, create a new. In case we haven't grabbed the read_lock yet, we do that first.
     Transaction* tr = new Transaction(shared_from_this(), &m_alloc, read_lock, DB::transact_Frozen);
     tr->set_file_format_version(get_file_format_version());
+    res = TransactionRef(tr, TransactionDeleter);
+    weak_tr = res;
     g.release();
-    return TransactionRef(tr, TransactionDeleter);
+    return res;
 }
 
 Transaction::Transaction(DBRef _db, SlabAlloc* alloc, DB::ReadLockInfo& rli, DB::TransactStage stage)
@@ -2354,7 +2368,7 @@ Transaction::Transaction(DBRef _db, SlabAlloc* alloc, DB::ReadLockInfo& rli, DB:
     attach_shared(m_read_lock.m_top_ref, m_read_lock.m_file_size, writable);
 }
 
-void Transaction::close()
+void Transaction::internal_close()
 {
     if (m_transact_stage == DB::transact_Writing) {
         rollback();
@@ -2362,6 +2376,13 @@ void Transaction::close()
     if (m_transact_stage == DB::transact_Reading || m_transact_stage == DB::transact_Frozen) {
         do_end_read();
     }
+}
+
+void Transaction::close()
+{
+    // Disallow calling close() on a frozen transaction.
+    REALM_ASSERT(!is_frozen());
+    internal_close();
 }
 
 void Transaction::end_read()
@@ -2386,7 +2407,7 @@ void Transaction::do_end_read() noexcept
 
 TransactionRef Transaction::freeze()
 {
-    if (m_transact_stage != DB::transact_Reading)
+    if (m_transact_stage != DB::transact_Reading && m_transact_stage != DB::transact_Frozen)
         throw LogicError(LogicError::wrong_transact_state);
     auto version = VersionID(m_read_lock.m_version, m_read_lock.m_reader_idx);
     return db->start_frozen(version);

@@ -244,6 +244,10 @@ TEST(Transactions_StateChanges)
     // verify that we can freeze a read transaction
     TransactionRef frozen = writer->freeze();
     CHECK(frozen->is_frozen());
+    TransactionRef frozen2 = frozen->freeze();
+    CHECK(frozen.get() == frozen2.get());
+    TransactionRef frozen3 = writer->freeze();
+    CHECK(frozen.get() == frozen3.get());
     // verify that we can handover an accessor directly to the frozen transaction.
     auto frozen_obj = frozen->import_copy_of(obj);
     // verify that we can read the correct value(s)

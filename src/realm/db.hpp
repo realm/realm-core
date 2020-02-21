@@ -397,6 +397,7 @@ private:
     std::string m_coordination_dir;
     const char* m_key;
     int m_file_format_version = 0;
+    std::map<VersionID::version_type, std::weak_ptr<Transaction>> m_frozen_transactions;
     util::InterprocessMutex m_writemutex;
 #ifdef REALM_ASYNC_DAEMON
     util::InterprocessMutex m_balancemutex;
@@ -617,6 +618,7 @@ public:
     VersionID get_version_of_current_transaction();
 
     void upgrade_file_format(int target_file_format_version);
+    void internal_close();
 
 private:
     DBRef get_db() const
@@ -642,7 +644,8 @@ private:
 
     DB::ReadLockInfo m_read_lock;
     DB::TransactStage m_transact_stage = DB::transact_Ready;
-
+    // FIXME: this appears to be ignored, forcing internal_close() to be public
+    // friend void realm::TransactionDeleter(Transaction* t);
     friend class DB;
     friend class DisableReplication;
 };
