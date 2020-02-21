@@ -2722,7 +2722,7 @@ Obj Table::create_object_with_primary_key(const Mixed& primary_key, FieldValues&
     if (m_tombstones && m_tombstones->is_valid(unres_key)) {
         auto tombstone = m_tombstones->get(unres_key);
         // When last link to tombstone is removed, the object will be deleted
-        ret.assign(tombstone);
+        ret.assign_pk_and_backlinks(tombstone);
         REALM_ASSERT(!m_tombstones->is_valid(unres_key));
     }
     return ret;
@@ -2797,6 +2797,23 @@ GlobalKey Table::get_object_id(ObjKey key) const
         return {key, get_sync_file_id()};
     }
     return {};
+}
+
+Obj Table::get_object_with_primary_key(Mixed primary_key)
+{
+    auto primary_key_col = get_primary_key_column();
+    REALM_ASSERT(primary_key_col);
+    DataType type = DataType(primary_key_col.get_type());
+    REALM_ASSERT((primary_key.is_null() && primary_key_col.get_attrs().test(col_attr_Nullable)) ||
+                 primary_key.get_type() == type);
+
+    ObjKey object_key;
+    GlobalKey object_id{primary_key};
+
+    // Generate local ObjKey
+    object_key = global_to_local_object_id_hashed(object_id);
+
+    return m_clusters.get(object_key);
 }
 
 GlobalKey Table::allocate_object_id_squeezed()
@@ -3025,7 +3042,7 @@ void Table::invalidate_object(ObjKey key)
     auto pk = obj.get_any(primary_key_col);
     auto tombstone_key = allocate_unresolved_key(key, {{primary_key_col, pk}});
     auto tombstone = m_tombstones->get(tombstone_key);
-    tombstone.assign(obj);
+    tombstone.assign_pk_and_backlinks(obj);
     CascadeState state(CascadeState::Mode::None);
     m_clusters.erase(key, state);
 }

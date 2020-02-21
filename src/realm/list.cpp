@@ -576,18 +576,6 @@ void LnkLst::remove_unres(size_t ndx)
     }
 }
 
-void LnkLst::clean_unres()
-{
-    if (!m_unresolved.empty()) {
-        // Delete all unresolved links
-        for (auto i : m_unresolved) {
-            Lst<ObjKey>::remove(i);
-        }
-        m_unresolved.clear();
-        m_tree->set_context_flag(false);
-    }
-}
-
 bool LnkLst::init_from_parent() const
 {
     ConstLstIf<ObjKey>::init_from_parent();
@@ -624,32 +612,7 @@ void LnkLst::set(size_t ndx, ObjKey value)
     if (get_target_table()->is_embedded() && value != ObjKey())
         throw LogicError(LogicError::wrong_kind_of_table);
 
-    if (value.is_unresolved()) {
-        // Might be that the index is already there
-        // In that case it will not be added again
-        add_unres(ndx);
-    }
-    else {
-        clean_unres();
-    }
-    Lst<ObjKey>::set(ndx, value);
-}
-
-void LnkLst::set_direct(size_t ndx, ObjKey value)
-{
-    if (value.is_unresolved()) {
-        // Might be that the index is already there
-        // In that case it will not be added again
-        add_unres(ndx);
-    }
-    else {
-        if (!m_unresolved.empty()) {
-            // Might be that the index is not in m_unresolved
-            // In that case nothing will happen
-            remove_unres(ndx);
-        }
-    }
-    Lst<ObjKey>::set(ndx, value);
+    Lst<ObjKey>::set(virtual2real(ndx), value);
 }
 
 void LnkLst::insert(size_t ndx, ObjKey value)
@@ -657,14 +620,24 @@ void LnkLst::insert(size_t ndx, ObjKey value)
     if (get_target_table()->is_embedded() && value != ObjKey())
         throw LogicError(LogicError::wrong_kind_of_table);
 
-    if (!value.is_unresolved()) {
-        clean_unres();
-    }
+    Lst<ObjKey>::insert(virtual2real(ndx), value);
+}
 
-    Lst<ObjKey>::insert(ndx, value);
-
+void LnkLst::set_direct(size_t ndx, ObjKey value)
+{
+    Lst<ObjKey>::set(ndx, value);
     if (value.is_unresolved()) {
-        // We definitely got a new entry
+        add_unres(ndx);
+    }
+    else {
+        remove_unres(ndx);
+    }
+}
+
+void LnkLst::insert_direct(size_t ndx, ObjKey value)
+{
+    Lst<ObjKey>::insert(ndx, value);
+    if (value.is_unresolved()) {
         add_unres(ndx);
     }
 }
