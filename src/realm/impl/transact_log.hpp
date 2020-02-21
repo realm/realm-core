@@ -620,7 +620,7 @@ template <class T>
 char* TransactLogEncoder::encode_int(char* ptr, T value)
 {
     static_assert(std::numeric_limits<T>::is_integer, "Integer required");
-    bool negative = util::is_negative(value);
+    bool negative = value < 0;
     if (negative) {
         // The following conversion is guaranteed by C++11 to never
         // overflow (contrast this with "-value" which indeed could
@@ -632,7 +632,7 @@ char* TransactLogEncoder::encode_int(char* ptr, T value)
     }
     // At this point 'value' is always a positive number. Also, small
     // negative numbers have been converted to small positive numbers.
-    REALM_ASSERT(!util::is_negative(value));
+    REALM_ASSERT(value >= 0);
     // One sign bit plus number of value bits
     const int num_bits = 1 + std::numeric_limits<T>::digits;
     // Only the first 7 bits are available per byte. Had it not been
@@ -1182,8 +1182,6 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
     char instr_ch = 0; // silence a warning
     if (!read_char(instr_ch))
         parser_error(); // Throws
-    //    std::cerr << "parsing " << util::promote(instr) << " @ " << std::hex << long(m_input_begin) << std::dec <<
-    //    "\n";
     Instruction instr = Instruction(instr_ch);
     switch (instr) {
         case instr_Set: {

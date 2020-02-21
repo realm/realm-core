@@ -344,7 +344,7 @@ inline int_fast64_t from_ref(ref_type v) noexcept
                   "If ref_type changes, from_ref and to_ref should probably be updated");
 
     // Make sure that we preserve the bit pattern of the ref_type (without sign extension).
-    return util::from_twos_compl<int_fast64_t>(uint_fast64_t(v));
+    return int_fast64_t(uint_fast64_t(v));
 }
 
 inline ref_type to_ref(int_fast64_t v) noexcept
