@@ -1,5 +1,3 @@
-include_directories(../external/catch/single_include .)
-
 set(HEADERS
     util/event_loop.hpp
     util/index_helpers.hpp
@@ -58,6 +56,7 @@ endif()
 
 add_executable(tests ${SOURCES} ${HEADERS})
 target_compile_definitions(tests PRIVATE ${PLATFORM_DEFINES})
+target_include_directories(tests PRIVATE ${CATCH_INCLUDE_DIR} .)
 
 if(VSCODE_TEST_RUNNER)
     # Increase the Catch2 virtual console width so that the Visual Studio Code

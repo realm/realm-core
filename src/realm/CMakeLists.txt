@@ -427,3 +427,4 @@ endif()
 
 add_subdirectory(parser)
 add_subdirectory(exec)
+add_subdirectory(object-store)

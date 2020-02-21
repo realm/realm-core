@@ -1,4 +1,5 @@
 add_subdirectory(util)
+add_subdirectory(object-store)
 
 # AFL not yet supported by Windows
 if(NOT CMAKE_SYSTEM_NAME MATCHES "^Windows")
@@ -165,7 +166,7 @@ if(UNIX AND NOT APPLE)
     target_link_libraries(CoreTests "-rdynamic")
 endif()
 
-target_include_directories(CoreTests PUBLIC ${EXTRA_TEST_CFLAGS})
+target_include_directories(CoreTests PRIVATE ${EXTRA_TEST_CFLAGS} .)
 
 add_test(NAME RealmTests COMMAND realm-tests)
 

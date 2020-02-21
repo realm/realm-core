@@ -12,12 +12,15 @@ list(APPEND CMAKE_MODULE_PATH "${RealmCore_SOURCE_DIR}/tools/cmake")
 # Include general CMake modules
 include(GNUInstallDirs)
 include(CheckIncludeFiles)
+include(CheckSymbolExists)
 include(GetGitRevisionDescription)
 include(Utilities)
 include(SpecialtyBuilds)
 include(GetVersion)
 include(CheckCXXCompilerFlag)
 include(CheckCXXSourceRuns)
+
+include(CodeCoverage)
 
 # Get accurate git-describe version
 git_describe(REALM_VERSION)
@@ -26,6 +29,12 @@ git_describe(REALM_VERSION)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+
+option(REALM_ENABLE_SYNC "Enable sync." OFF)
+if(REALM_ENABLE_SYNC)
+  add_definitions(-DREALM_ENABLE_SYNC)
+endif()
+
 if(ANDROID)
     # TODO: Core APIs should always built for internal usage. But there seems to be issues with cocoa. Enable it only for Android for now.
     set(CMAKE_CXX_VISIBILITY_PRESET hidden)
@@ -70,7 +79,7 @@ endfunction()
 if(MSVC)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /W3 /D_CRT_SECURE_NO_WARNINGS /D_SCL_SECURE_NO_WARNINGS")
 else()
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wpedantic -Wundef -Wshadow")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wempty-body -Wparentheses -Wunknown-pragmas -Wunreachable-code -Wno-missing-field-initializers")
     # TODO: Remove this when fixed
     if(ANDROID)
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-uninitialized")
@@ -186,6 +195,28 @@ set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 list(APPEND PLATFORM_LIBRARIES Threads::Threads)
 
+if(NOT REALM_PLATFORM OR REALM_PLATFORM STREQUAL "Node")
+    find_library(UV_LIBRARY NAMES uv libuv)
+    if(UV_LIBRARY)
+        find_path(UV_INCLUDE_DIR uv.h)
+
+        list(APPEND PLATFORM_LIBRARIES ${UV_LIBRARY})
+        add_definitions(-DREALM_HAVE_UV)
+    endif()
+endif()
+
+if(REALM_PLATFORM STREQUAL "Node")
+    set(PLATFORM_DEFINES "REALM_PLATFORM_NODE=1")
+    if(NOT UV_LIBRARY)
+        message(FATAL_ERROR "Platform set to Node but libuv was not found!")
+    endif()
+endif()
+
+check_symbol_exists(epoll_create sys/epoll.h REALM_HAVE_EPOLL)
+if(REALM_HAVE_EPOLL)
+    add_definitions(-DREALM_HAVE_EPOLL)
+endif()
+
 # Options (passed to CMake)
 option(REALM_ENABLE_ASSERTIONS "Enable assertions in release mode." OFF)
 option(REALM_ENABLE_ALLOC_SET_ZERO "Zero all allocations." OFF)
@@ -209,6 +240,7 @@ if(EXISTS "${DEPRECATED_CONFIG_FILE}")
 endif()
 
 set(PEGTL_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src/external/pegtl/include/tao/)
+set(CATCH_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/catch/single_include)
 
 # Tell the build system where to find the sources (and generated sources)
 include_directories(src)
