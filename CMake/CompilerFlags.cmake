@@ -29,9 +29,11 @@ set_property(DIRECTORY APPEND PROPERTY COMPILE_DEFINITIONS
 
 if(${CMAKE_CXX_COMPILER_ID} MATCHES "Clang" OR ${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU")
     add_compile_options(
+        -Werror
         -Wall
         -Wextra
         -Wno-missing-field-initializers
+        -Wno-unevaluated-expression
         -Wempty-body
         -Wparentheses
         -Wunknown-pragmas
