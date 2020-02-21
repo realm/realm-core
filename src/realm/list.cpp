@@ -476,14 +476,16 @@ template <>
 void Lst<ObjKey>::clear()
 {
     update_if_needed();
-    if (size() > 0) {
+    auto sz = Lst<ObjKey>::size();
+    if (sz > 0) {
         auto origin_table = m_obj.get_table();
+        TableRef target_table = m_obj.get_target_table(m_col_key);
 
         if (Replication* repl = m_const_obj->get_replication())
             repl->list_clear(*this); // Throws
 
-        if (!origin_table->get_column_attr(m_col_key).test(col_attr_StrongLinks)) {
-            size_t ndx = size();
+        if (!target_table->is_embedded()) {
+            size_t ndx = sz;
             while (ndx--) {
                 do_set(ndx, null_key);
                 m_tree->erase(ndx);
@@ -494,7 +496,6 @@ void Lst<ObjKey>::clear()
             return;
         }
 
-        TableRef target_table = m_obj.get_target_table(m_col_key);
         TableKey target_table_key = target_table->get_key();
         ColKey backlink_col = origin_table->get_opposite_column(m_col_key);
 
