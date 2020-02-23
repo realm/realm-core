@@ -668,18 +668,15 @@ TEST_CASE("thread safe reference") {
             REQUIRE(results.is_valid());
             REQUIRE(results.size() == 0);
         }
-#if 0
+
         SECTION("int results") {
             r->begin_transaction();
             obj = create_object(r, "int array", {{"value", AnyVector{INT64_C(1)}}});
-            List list(r, *get_table(*r, "int array"), 0, 0);
+            List list(r, obj.obj(), get_table(*r, "int array")->get_column_key("value"));
             r->commit_transaction();
 
-            auto results = delete_and_resolve(list.sort({{"self", true}}));
-            REQUIRE(results.is_valid());
-            REQUIRE(results.size() == 0);
+            REQUIRE(!delete_and_resolve(list).is_valid());
         }
-#endif
     }
 
     SECTION("lifetime") {

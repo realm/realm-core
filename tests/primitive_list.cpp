@@ -48,6 +48,7 @@ struct Base {
     using Type = T;
     using Wrapped = T;
     using Boxed = T;
+    enum { is_optional = false };
 
     static PropertyType property_type() { return prop_type; }
     static util::Any to_any(T value) { return value; }
@@ -104,21 +105,29 @@ struct String : Base<PropertyType::String, StringData> {
 
 struct Binary : Base<PropertyType::Data, BinaryData> {
     using Boxed = std::string;
-    static std::vector<BinaryData> values() { return {BinaryData("a", 1)}; }
     static util::Any to_any(BinaryData value) { return value ? std::string(value) : util::Any(); }
+    static std::vector<BinaryData> values()
+    {
+        return {BinaryData("c", 1), BinaryData("a", 1), BinaryData("b", 1)};
+    }
 };
 
 struct Date : Base<PropertyType::Date, Timestamp> {
-    static std::vector<Timestamp> values() { return {Timestamp(1, 1)}; }
+    static std::vector<Timestamp> values()
+    {
+        return {Timestamp(3, 3), Timestamp(1, 1), Timestamp(2, 2)};
+    }
     static bool can_minmax() { return true; }
     static Timestamp min() { return Timestamp(1, 1); }
-    static Timestamp max() { return Timestamp(1, 1); }
+    static Timestamp max() { return Timestamp(3, 3); }
 };
 
 template<typename BaseT>
 struct BoxedOptional : BaseT {
     using Type = util::Optional<typename BaseT::Type>;
     using Boxed = Type;
+    enum { is_optional = true };
+
     static PropertyType property_type() { return BaseT::property_type()|PropertyType::Nullable; }
     static std::vector<Type> values()
     {
@@ -137,6 +146,7 @@ struct BoxedOptional : BaseT {
 
 template<typename BaseT>
 struct UnboxedOptional : BaseT {
+    enum { is_optional = true };
     static PropertyType property_type() { return BaseT::property_type()|PropertyType::Nullable; }
     static auto values() -> decltype(BaseT::values())
     {
@@ -636,29 +646,29 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
     SECTION("min()") {
         if (!TestType::can_minmax()) {
             REQUIRE_THROWS(list.min());
-            // REQUIRE_THROWS(results.min());
+            REQUIRE_THROWS(results.min());
             return;
         }
 
         REQUIRE(get<W>(*list.min()) == TestType::min());
-        // REQUIRE(get<W>(*results.min()) == TestType::min());
+        REQUIRE(get<W>(*results.min()) == TestType::min());
         list.remove_all();
         REQUIRE(list.min() == util::none);
-        // REQUIRE(results.min() == util::none);
+        REQUIRE(results.min() == util::none);
     }
 
     SECTION("max()") {
         if (!TestType::can_minmax()) {
             REQUIRE_THROWS(list.max());
-            // REQUIRE_THROWS(results.max());
+            REQUIRE_THROWS(results.max());
             return;
         }
 
         REQUIRE(get<W>(*list.max()) == TestType::max());
-        // REQUIRE(get<W>(*results.max()) == TestType::max());
+        REQUIRE(get<W>(*results.max()) == TestType::max());
         list.remove_all();
         REQUIRE(list.max() == util::none);
-        // REQUIRE(results.max() == util::none);
+        REQUIRE(results.max() == util::none);
     }
 
     SECTION("sum()") {
@@ -668,10 +678,10 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
         }
 
         REQUIRE(get<W>(list.sum()) == TestType::sum());
-        // REQUIRE(get<W>(*results.sum()) == TestType::sum());
+        REQUIRE(get<W>(*results.sum()) == TestType::sum());
         list.remove_all();
         REQUIRE(get<W>(list.sum()) == W{});
-        // REQUIRE(get<W>(*results.sum()) == W{});
+        REQUIRE(get<W>(*results.sum()) == W{});
     }
 
     SECTION("average()") {
@@ -681,10 +691,10 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
         }
 
         REQUIRE(*list.average() == TestType::average());
-        // REQUIRE(*results.average() == TestType::average());
+        REQUIRE(*results.average() == TestType::average());
         list.remove_all();
         REQUIRE(list.average() == util::none);
-        // REQUIRE(results.average() == util::none);
+        REQUIRE(results.average() == util::none);
     }
 
     SECTION("operator==()") {
@@ -705,42 +715,65 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
 
         auto list2 = ThreadSafeReference(list).resolve<List>(r);
         REQUIRE(list == list2);
-#if 0
         auto results2 = ThreadSafeReference(results).resolve<Results>(r);
         REQUIRE(results2 == values);
-#endif
     }
 
     SECTION("notifications") {
         r->commit_transaction();
 
-        CollectionChangeSet change, rchange;
-        SECTION("add value to list") {
-            auto token = list.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
-                change = c;
-            });
-            auto rtoken = results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
-                rchange = c;
-            });
-            advance_and_notify(*r);
+        auto sorted = results.sort({{"self", true}});
 
+        size_t calls = 0;
+        CollectionChangeSet change, rchange, srchange;
+        auto token = list.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+            change = c;
+            ++calls;
+        });
+        auto rtoken = results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+            rchange = c;
+            ++calls;
+        });
+        auto srtoken = sorted.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+            srchange = c;
+            ++calls;
+        });
+
+        SECTION("add value to list") {
+            // Remove the existing copy of this value so that the sorted list
+            // doesn't have dupes resulting in an unstable order
+            advance_and_notify(*r);
+            r->begin_transaction();
+            list.remove(0);
+            r->commit_transaction();
+
+            advance_and_notify(*r);
             r->begin_transaction();
             list.insert(0, static_cast<T>(values[0]));
             r->commit_transaction();
+
             advance_and_notify(*r);
             REQUIRE_INDICES(change.insertions, 0);
-#if 0
             REQUIRE_INDICES(rchange.insertions, 0);
-#endif
+            // values[0] is max(), so it ends up at the end of the sorted list
+            REQUIRE_INDICES(srchange.insertions, values.size() - 1);
+        }
+
+        SECTION("remove value from list") {
+            advance_and_notify(*r);
+            r->begin_transaction();
+            list.remove(1);
+            r->commit_transaction();
+
+            advance_and_notify(*r);
+            REQUIRE_INDICES(change.deletions, 1);
+            REQUIRE_INDICES(rchange.deletions, 1);
+            // values[1] is min(), so it's index 0 for non-optional and 1 for
+            // optional (as nulls sort to the front)
+            REQUIRE_INDICES(srchange.deletions, TestType::is_optional);
         }
 
         SECTION("clear list") {
-            auto token = list.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
-                change = c;
-            });
-            auto rtoken = results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
-                rchange = c;
-            });
             advance_and_notify(*r);
 
             r->begin_transaction();
@@ -748,46 +781,31 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
             r->commit_transaction();
             advance_and_notify(*r);
             REQUIRE(change.deletions.count() == values.size());
-#if 0
             REQUIRE(rchange.deletions.count() == values.size());
-#endif
+            REQUIRE(srchange.deletions.count() == values.size());
         }
 
         SECTION("delete containing row") {
-            size_t calls = 0;
-            auto token = list.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
-                change = c;
-                ++calls;
-            });
-            auto rtoken = results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
-                rchange = c;
-                ++calls;
-            });
             advance_and_notify(*r);
-            REQUIRE(calls == 2);
+            REQUIRE(calls == 3);
 
             r->begin_transaction();
             obj.remove();
             r->commit_transaction();
             advance_and_notify(*r);
-            calls++; // FIXME: remove when working
-            REQUIRE(calls == 4);
+            REQUIRE(calls == 6);
             REQUIRE(change.deletions.count() == values.size());
-#if 0
             REQUIRE(rchange.deletions.count() == values.size());
-#endif
+            REQUIRE(srchange.deletions.count() == values.size());
 
             r->begin_transaction();
             table->create_object();
             r->commit_transaction();
             advance_and_notify(*r);
-            REQUIRE(calls == 4);
+            REQUIRE(calls == 6);
         }
 
         SECTION("deleting containing row before first run of notifier") {
-            auto token = list.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
-                change = c;
-            });
             r2->begin_transaction();
             table2->begin()->remove();
             r2->commit_transaction();

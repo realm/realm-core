@@ -20,6 +20,8 @@
 
 #include "shared_realm.hpp"
 
+#include <numeric>
+
 using namespace realm;
 using namespace realm::_impl;
 
@@ -56,7 +58,7 @@ using namespace realm::_impl;
 //     - Reads m_results_were_used
 
 ResultsNotifier::ResultsNotifier(Results& target)
-: CollectionNotifier(target.get_realm())
+: ResultsNotifierBase(target.get_realm())
 , m_query(std::make_unique<Query>(target.get_query()))
 , m_descriptor_ordering(target.get_descriptor_ordering())
 , m_target_is_in_table_order(target.is_in_table_order())
@@ -203,4 +205,150 @@ void ResultsNotifier::do_attach_to(Transaction& sg)
 {
     if (m_query->get_table())
         m_query = sg.import_copy_of(*m_query, PayloadPolicy::Move);
+}
+
+ListResultsNotifier::ListResultsNotifier(Results& target)
+: ResultsNotifierBase(target.get_realm())
+, m_list(target.get_list())
+{
+    auto& ordering = target.get_descriptor_ordering();
+    for (size_t i = 0, sz = ordering.size(); i < sz; i++) {
+        auto descr = ordering[i];
+        if (descr->get_type() == DescriptorType::Sort)
+            m_sort_order = static_cast<const SortDescriptor*>(descr)->is_ascending(0);
+        if (descr->get_type() == DescriptorType::Distinct)
+            m_distinct = true;
+    }
+
+}
+
+void ListResultsNotifier::release_data() noexcept
+{
+    m_list = {};
+    CollectionNotifier::release_data();
+}
+
+bool ListResultsNotifier::get_list_indices(ListIndices& out)
+{
+    if (!m_delivered_indices)
+        return false;
+    auto& transaction = source_shared_group();
+    if (m_delivered_transaction_version != transaction.get_version_of_current_transaction())
+        return false;
+
+    out = std::move(m_delivered_indices);
+    m_delivered_indices = util::none;
+    return true;
+}
+
+bool ListResultsNotifier::do_add_required_change_info(TransactionChangeInfo& info)
+{
+    if (!m_list->is_attached())
+        return false; // origin row was deleted after the notification was added
+
+    info.lists.push_back({m_list->get_table()->get_key(), m_list->get_key().value,
+        m_list->get_col_key().value, &m_change});
+
+    m_info = &info;
+    return true;
+}
+
+bool ListResultsNotifier::need_to_run()
+{
+    REALM_ASSERT(m_info);
+
+    {
+        auto lock = lock_target();
+        // Don't run the query if the results aren't actually going to be used
+        if (!get_realm() || (!have_callbacks() && !m_results_were_used))
+            return false;
+    }
+
+    return !has_run() || m_list->has_changed();
+}
+
+void ListResultsNotifier::calculate_changes()
+{
+    // Unsorted lists can just forward the changeset directly from the
+    // transaction log parsing, but sorted lists need to perform diffing
+    if (has_run() && have_callbacks() && (m_sort_order || m_distinct)) {
+        // Update each of the row indices in m_previous_indices to the equivalent
+        // new index in the new list
+        if (!m_change.insertions.empty() || !m_change.deletions.empty()) {
+            for (auto& row : m_previous_indices) {
+                if (m_change.deletions.contains(row))
+                    row = npos;
+                else
+                    row = m_change.insertions.shift(m_change.deletions.unshift(row));
+            }
+        }
+
+        m_change = CollectionChangeBuilder::calculate(m_previous_indices, *m_run_indices,
+                                                      [=](int64_t key) {
+            return m_change.modifications_new.contains(static_cast<size_t>(key));
+        });
+    }
+
+    m_previous_indices = *m_run_indices;
+}
+
+void ListResultsNotifier::run()
+{
+    if (!m_list->is_attached()) {
+        // List was deleted, so report all of the rows being removed
+        m_change = {};
+        m_change.deletions.set(m_previous_indices.size());
+        m_previous_indices.clear();
+        return;
+    }
+
+    if (!need_to_run())
+        return;
+
+    m_run_indices = std::vector<size_t>();
+    if (m_distinct)
+        m_list->distinct(*m_run_indices, m_sort_order);
+    else if (m_sort_order)
+        m_list->sort(*m_run_indices, *m_sort_order);
+    else {
+        m_run_indices->resize(m_list->size());
+        std::iota(m_run_indices->begin(), m_run_indices->end(), 0);
+    }
+
+    calculate_changes();
+}
+
+void ListResultsNotifier::do_prepare_handover(Transaction& sg)
+{
+    if (m_run_indices) {
+        m_handover_indices = std::move(m_run_indices);
+        m_run_indices = {};
+    }
+    else {
+        m_handover_indices = {};
+    }
+    m_handover_transaction_version = sg.get_version_of_current_transaction();
+}
+
+bool ListResultsNotifier::prepare_to_deliver()
+{
+    auto lock = lock_target();
+    if (!get_realm()) {
+        return false;
+    }
+    if (!m_handover_indices)
+        return true;
+
+    m_results_were_used = !m_delivered_indices;
+    m_delivered_indices = std::move(m_handover_indices);
+    m_delivered_transaction_version = m_handover_transaction_version;
+    m_handover_indices = {};
+
+    return true;
+}
+
+void ListResultsNotifier::do_attach_to(Transaction& sg)
+{
+    if (m_list->is_attached())
+        m_list = sg.import_copy_of(*m_list);
 }
