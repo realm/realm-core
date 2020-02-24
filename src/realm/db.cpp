@@ -52,7 +52,8 @@
 //#define REALM_ENABLE_LOGFILE
 
 
-using namespace realm;
+namespace realm {
+
 using namespace realm::metrics;
 using namespace realm::util;
 using Durability = DBOptions::Durability;
@@ -2711,3 +2712,5 @@ Replication::~Replication()
         m_db->set_replication(nullptr);
     }
 }
+
+}; // namespace realm

@@ -618,7 +618,6 @@ public:
     VersionID get_version_of_current_transaction();
 
     void upgrade_file_format(int target_file_format_version);
-    void internal_close();
 
 private:
     DBRef get_db() const
@@ -637,6 +636,7 @@ private:
     void do_end_read() noexcept;
     void commit_and_continue_writing();
     void initialize_replication();
+    void internal_close();
 
     DBRef db;
     mutable std::unique_ptr<_impl::History> m_history_read;
@@ -645,7 +645,7 @@ private:
     DB::ReadLockInfo m_read_lock;
     DB::TransactStage m_transact_stage = DB::transact_Ready;
     // FIXME: this appears to be ignored, forcing internal_close() to be public
-    // friend void realm::TransactionDeleter(Transaction* t);
+    friend void TransactionDeleter(Transaction* t);
     friend class DB;
     friend class DisableReplication;
 };
