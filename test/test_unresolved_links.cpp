@@ -45,6 +45,7 @@ TEST(Unresolved_Basic)
     ColKey col_has;
 
     {
+        // Sync operations
         auto wt = db->start_write();
         auto cars = wt->add_table_with_primary_key("Car", type_String, "model");
         col_price = cars->add_column(type_Decimal, "price");
@@ -56,7 +57,10 @@ TEST(Unresolved_Basic)
         auto finn = persons->create_object_with_primary_key("finn.schiermer-andersen@mongodb.com");
         auto mathias = persons->create_object_with_primary_key("mathias@10gen.com");
         auto joergen = dealers->create_object_with_primary_key(18454033);
-        auto stock = joergen.get_linklist(col_has);
+
+        // Sync should use Lst<ObjKey> interface which gives access to all
+        // links directly
+        auto stock = joergen.get_list<ObjKey>(col_has);
 
         auto skoda = cars->create_object_with_primary_key("Skoda Fabia").set(col_price, Decimal128("149999.5"));
 
@@ -66,8 +70,8 @@ TEST(Unresolved_Basic)
         mathias.set(col_owns, new_tesla);
 
         auto another_tesla = cars->get_objkey_from_primary_key("Tesla 10");
-        stock.insert_direct(0, another_tesla);
-        stock.insert_direct(1, skoda.get_key());
+        stock.insert(0, another_tesla);
+        stock.insert(1, skoda.get_key());
 
         wt->commit();
     }
@@ -88,6 +92,7 @@ TEST(Unresolved_Basic)
     CHECK_EQUAL(q.count(), 1);
 
     {
+        // Sync operations
         auto wt = db->start_write();
         wt->get_table("Car")->create_object_with_primary_key("Tesla 10").set(col_price, Decimal128("499999.5"));
         wt->commit();
@@ -100,6 +105,7 @@ TEST(Unresolved_Basic)
     CHECK(finn.get<ObjKey>(col_owns));
 
     {
+        // Sync operations
         auto wt = db->start_write();
         auto t = wt->get_table("Car");
         auto car = cars->get_objkey_from_primary_key("Tesla 10");
@@ -114,6 +120,7 @@ TEST(Unresolved_Basic)
     CHECK_EQUAL(cars->size(), 1);
 
     {
+        // Sync operations
         auto wt = db->start_write();
         wt->get_table("Car")->create_object_with_primary_key("Tesla 10").set(col_price, Decimal128("499999.5"));
         wt->commit();
@@ -297,8 +304,8 @@ TEST(Unresolved_GarbageCollect)
 
     new_tesla = cars->get_objkey_from_primary_key("Tesla 10");
 
-    bilcentrum.get_linklist(col_has).insert_direct(0, new_tesla);
-    bilmekka.get_linklist(col_has).insert_direct(0, new_tesla);
+    bilcentrum.get_list<ObjKey>(col_has).insert(0, new_tesla);
+    bilmekka.get_list<ObjKey>(col_has).insert(0, new_tesla);
     CHECK_EQUAL(cars->nb_unresolved(), 1);
 
     bilcentrum.get_linklist(col_has).clear();

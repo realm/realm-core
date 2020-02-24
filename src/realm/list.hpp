@@ -874,10 +874,6 @@ public:
     }
     void set(size_t ndx, ObjKey value);
     void insert(size_t ndx, ObjKey value);
-    // As set, but without translating ndx - to be used from sync
-    void set_direct(size_t ndx, ObjKey value);
-    // As insert, but without translating ndx - to be used from sync
-    void insert_direct(size_t ndx, ObjKey value);
     ObjKey get(size_t ndx)
     {
         return Lst<ObjKey>::get(virtual2real(ndx));
@@ -927,10 +923,6 @@ private:
 
     // Translate from userfacing index to internal index.
     size_t virtual2real(size_t ndx) const;
-    // Add ndx to m_unresolved - if not already there
-    void add_unres(size_t ndx);
-    // Remove ndx from m_unresolved - if there
-    void remove_unres(size_t ndx);
     // Scan through the list to find unresolved links
     void update_unresolved() const;
 };
