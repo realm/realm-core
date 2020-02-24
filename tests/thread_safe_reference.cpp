@@ -649,7 +649,7 @@ TEST_CASE("thread safe reference") {
 
         SECTION("int list") {
             r->begin_transaction();
-            obj = create_object(r, "int array", {{"value", AnyVector{INT64_C(1)}}});
+            obj = create_object(r, "int array", {{"value", AnyVector{{INT64_C(1)}}}});
             auto col = get_table(*r, "int array")->get_column_key("value");
             List list(r, obj.obj(), col);
             r->commit_transaction();
@@ -671,11 +671,184 @@ TEST_CASE("thread safe reference") {
 
         SECTION("int results") {
             r->begin_transaction();
-            obj = create_object(r, "int array", {{"value", AnyVector{INT64_C(1)}}});
+            obj = create_object(r, "int array", {{"value", AnyVector{{INT64_C(1)}}}});
             List list(r, obj.obj(), get_table(*r, "int array")->get_column_key("value"));
             r->commit_transaction();
 
             REQUIRE(!delete_and_resolve(list).is_valid());
+        }
+    }
+
+    SECTION("resolve at version before where handed over thing was created") {
+        auto create_ref = [&](auto&& fn) -> ThreadSafeReference {
+            ThreadSafeReference ref;
+            {
+                SharedRealm r2 = Realm::get_shared_realm(config);
+                r2->begin_transaction();
+                auto obj = fn(r2);
+                r2->commit_transaction();
+                ref = obj;
+            };
+            return ref;
+        };
+
+        SECTION("object") {
+            auto obj = create_ref([](auto& r) {
+                return create_object(r, "int object", {{"value", INT64_C(7)}});
+            }).resolve<Object>(r);
+            REQUIRE(obj.is_valid());
+            REQUIRE(obj.get_column_value<int64_t>("value") == 7);
+        }
+
+        SECTION("object list") {
+            auto list = create_ref([](auto& r) {
+                auto obj = create_object(r, "int array object", {{"value", AnyVector{AnyDict{{"value", INT64_C(0)}}}}});
+                return List(r, obj.obj(), get_table(*r, "int array object")->get_column_key("value"));
+            }).resolve<List>(r);
+            REQUIRE(list.is_valid());
+            REQUIRE(list.size() == 1);
+        }
+
+        SECTION("int list") {
+            auto list = create_ref([](auto& r) {
+                auto obj = create_object(r, "int array", {{"value", AnyVector{{INT64_C(1)}}}});
+                return List(r, obj.obj(), get_table(*r, "int array")->get_column_key("value"));
+            }).resolve<List>(r);
+            REQUIRE(list.is_valid());
+            REQUIRE(list.size() == 1);
+        }
+
+        SECTION("object results") {
+            auto results = create_ref([](auto& r) {
+                auto obj = create_object(r, "int array object", {{"value", AnyVector{AnyDict{{"value", INT64_C(0)}}}}});
+                Results results = List(r, obj.obj(), get_table(*r, "int array object")->get_column_key("value"))
+                    .sort({{"value", true}});
+                REQUIRE(results.size() == 1);
+                return results;
+            }).resolve<Results>(r);
+            REQUIRE(results.is_valid());
+            REQUIRE(results.size() == 1);
+        }
+
+        SECTION("int results") {
+            auto results = create_ref([](auto& r) {
+                auto obj = create_object(r, "int array", {{"value", AnyVector{{INT64_C(1)}}}});
+                return List(r, obj.obj(), get_table(*r, "int array")->get_column_key("value")).sort({{"self", true}});
+            }).resolve<Results>(r);
+            REQUIRE(results.is_valid());
+            REQUIRE(results.size() == 1);
+        }
+    }
+
+    SECTION("create TSR inside the write transaction which created the object being handed over") {
+        auto create_ref = [&](auto&& fn) -> ThreadSafeReference {
+            ThreadSafeReference ref;
+            {
+                SharedRealm r2 = Realm::get_shared_realm(config);
+                r2->begin_transaction();
+                ref = fn(r2);
+                r2->commit_transaction();
+            };
+            return ref;
+        };
+
+        SECTION("object") {
+            auto obj = create_ref([](auto& r) {
+                return create_object(r, "int object", {{"value", INT64_C(7)}});
+            }).resolve<Object>(r);
+            REQUIRE(obj.is_valid());
+            REQUIRE(obj.get_column_value<int64_t>("value") == 7);
+        }
+
+        SECTION("object list") {
+            auto list = create_ref([](auto& r) {
+                auto obj = create_object(r, "int array object", {{"value", AnyVector{AnyDict{{"value", INT64_C(0)}}}}});
+                return List(r, obj.obj(), get_table(*r, "int array object")->get_column_key("value"));
+            }).resolve<List>(r);
+            REQUIRE(list.is_valid());
+            REQUIRE(list.size() == 1);
+        }
+
+        SECTION("int list") {
+            auto list = create_ref([](auto& r) {
+                auto obj = create_object(r, "int array", {{"value", AnyVector{{INT64_C(1)}}}});
+                return List(r, obj.obj(), get_table(*r, "int array")->get_column_key("value"));
+            }).resolve<List>(r);
+            REQUIRE(list.is_valid());
+            REQUIRE(list.size() == 1);
+        }
+
+        SECTION("object results") {
+            REQUIRE_THROWS(create_ref([](auto& r) {
+                auto obj = create_object(r, "int array object", {{"value", AnyVector{AnyDict{{"value", INT64_C(0)}}}}});
+                Results results = List(r, obj.obj(), get_table(*r, "int array object")->get_column_key("value"))
+                    .sort({{"value", true}});
+                REQUIRE(results.size() == 1);
+                return results;
+            }));
+        }
+
+        SECTION("int results") {
+            auto results = create_ref([](auto& r) {
+                auto obj = create_object(r, "int array", {{"value", AnyVector{{INT64_C(1)}}}});
+                return List(r, obj.obj(), get_table(*r, "int array")->get_column_key("value")).sort({{"self", true}});
+            }).resolve<Results>(r);
+            REQUIRE(results.is_valid());
+            REQUIRE(results.size() == 1);
+        }
+    }
+
+    SECTION("create TSR inside cancelled write transaction") {
+        auto create_ref = [&](auto&& fn) -> ThreadSafeReference {
+            ThreadSafeReference ref;
+            {
+                SharedRealm r2 = Realm::get_shared_realm(config);
+                r2->begin_transaction();
+                ref = fn(r2);
+                r2->cancel_transaction();
+            };
+            return ref;
+        };
+
+        SECTION("object") {
+            auto obj = create_ref([](auto& r) {
+                return create_object(r, "int object", {{"value", INT64_C(7)}});
+            }).resolve<Object>(r);
+            REQUIRE_FALSE(obj.is_valid());
+        }
+
+        SECTION("object list") {
+            auto list = create_ref([](auto& r) {
+                auto obj = create_object(r, "int array object", {{"value", AnyVector{AnyDict{{"value", INT64_C(0)}}}}});
+                return List(r, obj.obj(), get_table(*r, "int array object")->get_column_key("value"));
+            }).resolve<List>(r);
+            REQUIRE_FALSE(list.is_valid());
+        }
+
+        SECTION("int list") {
+            auto list = create_ref([](auto& r) {
+                auto obj = create_object(r, "int array", {{"value", AnyVector{{INT64_C(1)}}}});
+                return List(r, obj.obj(), get_table(*r, "int array")->get_column_key("value"));
+            }).resolve<List>(r);
+            REQUIRE_FALSE(list.is_valid());
+        }
+
+        SECTION("object results") {
+            REQUIRE_THROWS(create_ref([](auto& r) {
+                auto obj = create_object(r, "int array object", {{"value", AnyVector{AnyDict{{"value", INT64_C(0)}}}}});
+                Results results = List(r, obj.obj(), get_table(*r, "int array object")->get_column_key("value"))
+                    .sort({{"value", true}});
+                REQUIRE(results.size() == 1);
+                return results;
+            }));
+        }
+
+        SECTION("int results") {
+            auto results = create_ref([](auto& r) {
+                auto obj = create_object(r, "int array", {{"value", AnyVector{{INT64_C(1)}}}});
+                return List(r, obj.obj(), get_table(*r, "int array")->get_column_key("value")).sort({{"self", true}});
+            }).resolve<Results>(r);
+            REQUIRE_FALSE(results.is_valid());
         }
     }
 

@@ -385,7 +385,6 @@ public:
         friend class _impl::CollectionNotifier;
         friend class _impl::PartialSyncHelper;
         friend class _impl::RealmCoordinator;
-        friend class ThreadSafeReference;
         friend class GlobalNotifier;
         friend class TestHelper;
 
