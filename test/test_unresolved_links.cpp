@@ -37,54 +37,96 @@ TEST(Unresolved_Basic)
     CHECK_NOT(k);
     CHECK_NOT(k.get_unresolved());
 
-    Group g;
+    SHARED_GROUP_TEST_PATH(path);
+    auto hist = make_in_realm_history(path);
+    DBRef db = DB::create(*hist);
+    ColKey col_price;
+    ColKey col_owns;
+    ColKey col_has;
 
-    auto cars = g.add_table_with_primary_key("Car", type_String, "model");
-    auto col_price = cars->add_column(type_Decimal, "price");
-    auto persons = g.add_table_with_primary_key("Person", type_String, "e-mail");
-    auto col_owns = persons->add_column_link(type_Link, "car", *cars);
-    auto dealers = g.add_table_with_primary_key("Dealer", type_Int, "cvr");
-    auto col_has = dealers->add_column_link(type_LinkList, "stock", *cars);
+    {
+        // Sync operations
+        auto wt = db->start_write();
+        auto cars = wt->add_table_with_primary_key("Car", type_String, "model");
+        col_price = cars->add_column(type_Decimal, "price");
+        auto persons = wt->add_table_with_primary_key("Person", type_String, "e-mail");
+        col_owns = persons->add_column_link(type_Link, "car", *cars);
+        auto dealers = wt->add_table_with_primary_key("Dealer", type_Int, "cvr");
+        col_has = dealers->add_column_link(type_LinkList, "stock", *cars);
 
-    auto finn = persons->create_object_with_primary_key("finn.schiermer-andersen@mongodb.com");
-    auto mathias = persons->create_object_with_primary_key("mathias@10gen.com");
-    auto joergen = dealers->create_object_with_primary_key(18454033);
-    auto stock = joergen.get_linklist(col_has);
+        auto finn = persons->create_object_with_primary_key("finn.schiermer-andersen@mongodb.com");
+        auto mathias = persons->create_object_with_primary_key("mathias@10gen.com");
+        auto joergen = dealers->create_object_with_primary_key(18454033);
 
-    auto skoda = cars->create_object_with_primary_key("Skoda Fabia").set(col_price, Decimal128("149999.5"));
+        // Sync should use Lst<ObjKey> interface which gives access to all
+        // links directly
+        auto stock = joergen.get_list<ObjKey>(col_has);
 
-    auto new_tesla = cars->get_objkey_from_primary_key("Tesla 10");
-    CHECK(new_tesla.is_unresolved());
-    finn.set(col_owns, new_tesla);
-    mathias.set(col_owns, new_tesla);
+        auto skoda = cars->create_object_with_primary_key("Skoda Fabia").set(col_price, Decimal128("149999.5"));
 
-    auto another_tesla = cars->get_objkey_from_primary_key("Tesla 10");
-    stock.add(skoda.get_key());
-    stock.add(another_tesla);
+        auto new_tesla = cars->get_objkey_from_primary_key("Tesla 10");
+        CHECK(new_tesla.is_unresolved());
+        finn.set(col_owns, new_tesla);
+        mathias.set(col_owns, new_tesla);
 
+        auto another_tesla = cars->get_objkey_from_primary_key("Tesla 10");
+        stock.insert(0, another_tesla);
+        stock.insert(1, skoda.get_key());
+
+        wt->commit();
+    }
+
+    auto rt = db->start_read();
+    auto cars = rt->get_table("Car");
+    auto persons = rt->get_table("Person");
+    auto dealers = rt->get_table("Dealer");
+    auto finn = persons->get_object_with_primary_key("finn.schiermer-andersen@mongodb.com");
     CHECK_NOT(finn.get<ObjKey>(col_owns));
     CHECK(finn.is_unresolved(col_owns));
+    auto stock = dealers->get_object_with_primary_key(18454033).get_linklist(col_has);
     CHECK(stock.has_unresolved());
     CHECK_EQUAL(stock.size(), 1);
-    CHECK_EQUAL(stock.get(0), skoda.get_key());
+    CHECK_EQUAL(stock.get(0), cars->get_object_with_primary_key("Skoda Fabia").get_key());
     CHECK_EQUAL(cars->size(), 1);
     auto q = cars->column<Decimal128>(col_price) < Decimal128("300000");
     CHECK_EQUAL(q.count(), 1);
 
-    // cars->dump_objects();
-    auto tesla = cars->create_object_with_primary_key("Tesla 10").set(col_price, Decimal128("499999.5"));
-    CHECK_EQUAL(tesla.get_backlink_count(), 3);
+    {
+        // Sync operations
+        auto wt = db->start_write();
+        wt->get_table("Car")->create_object_with_primary_key("Tesla 10").set(col_price, Decimal128("499999.5"));
+        wt->commit();
+    }
+
+    rt->advance_read();
+    CHECK_EQUAL(cars->get_object_with_primary_key("Tesla 10").get_backlink_count(), 3);
     CHECK_EQUAL(stock.size(), 2);
     CHECK_EQUAL(cars->size(), 2);
     CHECK(finn.get<ObjKey>(col_owns));
 
-    // cars->dump_objects();
-    tesla.invalidate();
+    {
+        // Sync operations
+        auto wt = db->start_write();
+        auto t = wt->get_table("Car");
+        auto car = cars->get_objkey_from_primary_key("Tesla 10");
+        CHECK_NOT(car.is_unresolved());
+        t->invalidate_object(car);
+        wt->commit();
+    }
+
+    rt->advance_read();
     CHECK_EQUAL(stock.size(), 1);
-    CHECK_EQUAL(stock.get(0), skoda.get_key());
+    CHECK_EQUAL(stock.get(0), cars->get_object_with_primary_key("Skoda Fabia").get_key());
     CHECK_EQUAL(cars->size(), 1);
 
-    cars->create_object_with_primary_key("Tesla 10").set(col_price, Decimal128("499999.5"));
+    {
+        // Sync operations
+        auto wt = db->start_write();
+        wt->get_table("Car")->create_object_with_primary_key("Tesla 10").set(col_price, Decimal128("499999.5"));
+        wt->commit();
+    }
+
+    rt->advance_read();
     CHECK_EQUAL(stock.size(), 2);
     CHECK_EQUAL(cars->size(), 2);
     CHECK(finn.get<ObjKey>(col_owns));
@@ -253,7 +295,7 @@ TEST(Unresolved_GarbageCollect)
     mathias.set_null(col_owns);
     CHECK_EQUAL(cars->nb_unresolved(), 0);
 
-    // Try the same with linklists. Here you have to modify the lists in order to
+    // Try the same with linklists. Here you have to clear the lists in order to
     // remove the unresolved links
     auto dealers = g.add_table_with_primary_key("Dealer", type_Int, "cvr");
     auto col_has = dealers->add_column_link(type_LinkList, "stock", *cars);
@@ -262,16 +304,13 @@ TEST(Unresolved_GarbageCollect)
 
     new_tesla = cars->get_objkey_from_primary_key("Tesla 10");
 
-    bilcentrum.get_linklist(col_has).add(new_tesla);
-    bilmekka.get_linklist(col_has).add(new_tesla);
+    bilcentrum.get_list<ObjKey>(col_has).insert(0, new_tesla);
+    bilmekka.get_list<ObjKey>(col_has).insert(0, new_tesla);
     CHECK_EQUAL(cars->nb_unresolved(), 1);
 
-    // create a real car
-    auto skoda = cars->create_object_with_primary_key("Skoda Fabia");
-
-    bilcentrum.get_linklist(col_has).add(skoda.get_key());
+    bilcentrum.get_linklist(col_has).clear();
     CHECK_EQUAL(cars->nb_unresolved(), 1);
-    bilmekka.get_linklist(col_has).add(skoda.get_key());
+    bilmekka.get_linklist(col_has).clear();
     CHECK_EQUAL(cars->nb_unresolved(), 0);
 }
 

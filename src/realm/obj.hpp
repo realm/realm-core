@@ -321,6 +321,7 @@ public:
     LnkLst get_linklist(StringData col_name) const;
 
     LstBasePtr get_listbase_ptr(ColKey col_key) const;
+    void assign_pk_and_backlinks(const ConstObj& other);
 
 private:
     friend class ArrayBacklink;
