@@ -2260,6 +2260,9 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction)
         // At this point, the ringbuffer has been succesfully updated, and the next writer
         // can safely proceed once the writemutex has been lifted.
         info->commit_in_critical_phase = 0;
+
+        // Clear 'keep-alive' of latest frozen transaction, since it's not the latest anymore
+        m_recent_frozen_transaction.reset();
     }
     {
         // protect against concurrent updates to the .lock file.
@@ -2340,19 +2343,30 @@ TransactionRef DB::start_frozen(VersionID version_id)
     }
     ReadLockInfo read_lock;
     ReadLockGuard g(*this, read_lock);
+    // Need to get a real version_id in case the caller asks for the default/most recent version:
+    bool asked_for_most_recent = version_id == VersionID();
     grab_read_lock(read_lock, version_id);
     version_id.version = read_lock.m_version;
     // reuse existing frozen transaction if one exists:
     std::weak_ptr<Transaction>& weak_tr = m_frozen_transactions[version_id.version];
-    TransactionRef res = weak_tr.lock();
-    if (res) {
+    if (auto res = weak_tr.lock()) {
         return res; // <-- also releases read_lock - the now shared frozen transaction has its own
     }
-    // none cached, create a new. In case we haven't grabbed the read_lock yet, we do that first.
-    Transaction* tr = new Transaction(shared_from_this(), &m_alloc, read_lock, DB::transact_Frozen);
-    tr->set_file_format_version(get_file_format_version());
-    res = TransactionRef(tr, TransactionDeleter);
+    // reuse most recent (and add to cache) if asked for it
+    if (asked_for_most_recent && m_recent_frozen_transaction &&
+        m_version_of_recent_frozen_transaction == version_id.version) {
+        weak_tr = m_recent_frozen_transaction;
+        return m_recent_frozen_transaction;
+    }
+    // none cached, create a new.
+    auto res = TransactionRef(new Transaction(shared_from_this(), &m_alloc, read_lock, DB::transact_Frozen),
+                              TransactionDeleter);
+    res->set_file_format_version(get_file_format_version());
     weak_tr = res;
+    if (asked_for_most_recent) {
+        m_recent_frozen_transaction = res;
+        m_version_of_recent_frozen_transaction = version_id.version;
+    }
     g.release();
     return res;
 }
