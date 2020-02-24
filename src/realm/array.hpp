@@ -1182,7 +1182,7 @@ inline bool Array::get_context_flag() const noexcept
 inline void Array::set_context_flag(bool value) noexcept
 {
     if (m_context_flag != value) {
-        REALM_ASSERT(!is_read_only());
+        copy_on_write();
         m_context_flag = value;
         set_context_flag_in_header(value, get_header());
     }
