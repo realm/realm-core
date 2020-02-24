@@ -97,7 +97,8 @@ jobWrapper {
     stage('Checking') {
         parallelExecutors = [
             checkLinuxDebug         : doCheckInDocker('Debug'),
-            checkLinuxDebugNoEncryp : doCheckInDocker('Release', '4', 'OFF'),
+            checkLinuxRelease       : doCheckInDocker('Release'),
+            checkLinuxDebugNoEncryp : doCheckInDocker('Debug', '4', 'OFF'),
             checkMacOsRelease       : doBuildMacOs('Release', true),
             checkWin32Release       : doBuildWindows('Release', false, 'Win32', true),
             checkWin32DebugUWP      : doBuildWindows('Debug', true, 'Win32', true),
