@@ -2714,4 +2714,4 @@ Replication::~Replication()
     }
 }
 
-}; // namespace realm
+} // namespace realm
