@@ -18,9 +18,6 @@
 
 #define CATCH_CONFIG_ENABLE_BENCHMARKING
 
-// FIXME: the nextafter define below can be removed once we upgrade to an
-// Android ndk version which has support for std::nextafter (absent in ndk r10e)
-#define CATCH_CONFIG_GLOBAL_NEXTAFTER
 #define CATCH_CONFIG_RUNNER
 #include "catch2/catch.hpp"
 

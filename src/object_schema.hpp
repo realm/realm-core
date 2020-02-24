@@ -21,6 +21,7 @@
 
 #include <realm/keys.hpp>
 #include <realm/string_data.hpp>
+#include "util/tagged_bool.hpp"
 
 #include <string>
 #include <vector>
@@ -35,9 +36,14 @@ struct Property;
 
 class ObjectSchema {
 public:
+    using IsEmbedded = util::TaggedBool<class IsEmbeddedTag>;
+
     ObjectSchema();
     ObjectSchema(std::string name, std::initializer_list<Property> persisted_properties);
+    ObjectSchema(std::string name, IsEmbedded is_embedded, std::initializer_list<Property> persisted_properties);
     ObjectSchema(std::string name, std::initializer_list<Property> persisted_properties,
+                 std::initializer_list<Property> computed_properties);
+    ObjectSchema(std::string name, IsEmbedded is_embedded, std::initializer_list<Property> persisted_properties,
                  std::initializer_list<Property> computed_properties);
     ~ObjectSchema();
 
@@ -55,6 +61,7 @@ public:
     std::vector<Property> computed_properties;
     std::string primary_key;
     TableKey table_key;
+    IsEmbedded is_embedded = false;
 
     Property *property_for_public_name(StringData public_name) noexcept;
     const Property *property_for_public_name(StringData public_name) const noexcept;

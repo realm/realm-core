@@ -1060,3 +1060,80 @@ TEST_CASE("object") {
     }
 #endif
 }
+
+TEST_CASE("Embedded Object")
+{
+    SECTION("Object creation") {
+        Schema schema{
+            {"all types", {
+                {"pk", PropertyType::Int, Property::IsPrimary{true}},
+                {"object", PropertyType::Object|PropertyType::Nullable, "link target"},
+                {"array", PropertyType::Object|PropertyType::Array, "array target"},
+            }},
+            {"link target", ObjectSchema::IsEmbedded{true}, {
+                {"value", PropertyType::Int},
+            }},
+            {"array target", ObjectSchema::IsEmbedded{true}, {
+                {"value", PropertyType::Int},
+            }},
+        };
+
+        InMemoryTestFile config;
+        config.automatic_change_notifications = false;
+        config.schema_mode = SchemaMode::Automatic;
+        config.schema = schema;
+        auto realm = Realm::get_shared_realm(config);
+        CppContext ctx(realm);
+
+        auto create = [&](util::Any&& value, CreatePolicy policy = CreatePolicy::UpdateAll) {
+            realm->begin_transaction();
+            auto obj = Object::create(ctx, realm, *realm->schema().find("all types"), value, policy);
+            realm->commit_transaction();
+            return obj;
+        };
+
+        auto obj = create(AnyDict{
+            {"pk", INT64_C(1)},
+            {"object", AnyDict{{"value", INT64_C(10)}}},
+            {"array", AnyVector{AnyDict{{"value", INT64_C(20)}}, AnyDict{{"value", INT64_C(30)}}}},
+        });
+        // realm->read_group().to_json(std::cout);
+
+        bool obj_callback_called;
+        bool list_callback_called;
+        auto token = obj.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+            obj_callback_called = true;
+        });
+        auto array_table = realm->read_group().get_table("class_array target");
+        Results result(realm, array_table);
+        auto token1 = result.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+            list_callback_called = true;
+        });
+        advance_and_notify(*realm);
+
+        // Update with identical value
+        create(AnyDict{
+            {"pk", INT64_C(1)},
+            {"object", AnyDict{{"value", INT64_C(10)}}},
+        }, CreatePolicy::UpdateModified);
+
+        obj_callback_called = false;
+        list_callback_called = false;
+        advance_and_notify(*realm);
+        REQUIRE(!obj_callback_called);
+        REQUIRE(!list_callback_called);
+
+        create(AnyDict{
+            {"pk", INT64_C(1)},
+            {"array", AnyVector{AnyDict{{"value", INT64_C(40)}}, AnyDict{{"value", INT64_C(50)}}}},
+        }, CreatePolicy::UpdateModified);
+
+        obj_callback_called = false;
+        list_callback_called = false;
+        advance_and_notify(*realm);
+        REQUIRE(!obj_callback_called);
+        REQUIRE(list_callback_called);
+
+        // realm->read_group().to_json(std::cout);
+    }
+}
