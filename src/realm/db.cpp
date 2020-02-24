@@ -2334,6 +2334,7 @@ TransactionRef DB::start_frozen(VersionID version_id)
     if (!is_attached())
         throw LogicError(LogicError::wrong_transact_state);
     // prune stale frozen transactions
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     while (!m_frozen_transactions.empty() && m_frozen_transactions.begin()->second.expired()) {
         m_frozen_transactions.erase(m_frozen_transactions.begin());
     }
