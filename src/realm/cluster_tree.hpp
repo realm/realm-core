@@ -64,6 +64,10 @@ public:
         return m_size;
     }
     void clear(CascadeState&);
+    void destroy()
+    {
+        m_root->destroy_deep();
+    }
     void nullify_links(ObjKey, CascadeState&);
     bool is_empty() const noexcept
     {

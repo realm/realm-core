@@ -314,4 +314,52 @@ TEST(Unresolved_GarbageCollect)
     CHECK_EQUAL(cars->nb_unresolved(), 0);
 }
 
+TEST(Unresolved_PkCollission)
+{
+    Group g;
+
+    auto t = g.add_table_with_primary_key("Table", type_Int, "id");
+    auto col_str = t->add_column(type_String, "str");
+    t->add_search_index(col_str);
+
+    // This pk will collide with plain '7'
+    int64_t pk7 = int64_t(7 + (1ull << 63));
+    auto k1 = t->get_objkey_from_primary_key(pk7);
+    CHECK(k1.is_unresolved());
+    auto k2 = t->create_object_with_primary_key(7, {{col_str, "Foo"}}).get_key();
+    CHECK_EQUAL(t->nb_unresolved(), 1);
+    CHECK_EQUAL(t->size(), 1);
+    auto k3 = t->create_object_with_primary_key(pk7, {{col_str, "Bar"}}).get_key();
+    CHECK_NOT_EQUAL(k2, k3);
+    CHECK_EQUAL(t->nb_unresolved(), 0);
+    CHECK_EQUAL(t->size(), 2);
+
+    // This pk will collide with plain '9'
+    int64_t pk9 = int64_t(9 + (1ull << 63));
+    k2 = t->create_object_with_primary_key(pk9, {{col_str, "Foo"}}).get_key();
+    k1 = t->get_objkey_from_primary_key(9);
+    CHECK(k1.is_unresolved());
+    CHECK_EQUAL(t->nb_unresolved(), 1);
+    CHECK_EQUAL(t->size(), 3);
+    k3 = t->create_object_with_primary_key(9, {{col_str, "Bar"}}).get_key();
+    CHECK_NOT_EQUAL(k2, k3);
+    CHECK_EQUAL(t->nb_unresolved(), 0);
+    CHECK_EQUAL(t->size(), 4);
+
+    // This pk will collide with plain '9'
+    int64_t pk5 = int64_t(5 + (1ull << 63));
+    k1 = t->get_objkey_from_primary_key(pk5);
+    k2 = t->get_objkey_from_primary_key(5);
+    CHECK_NOT_EQUAL(k1, k2);
+    CHECK_EQUAL(t->nb_unresolved(), 2);
+    t->create_object_with_primary_key(pk5, {{col_str, "Foo"}}).get_key();
+    k2 = t->create_object_with_primary_key(5, {{col_str, "Bar"}}).get_key();
+    CHECK_EQUAL(t->nb_unresolved(), 0);
+    CHECK_EQUAL(t->size(), 6);
+    t->clear();
+    k3 = t->create_object_with_primary_key(5, {{col_str, "Bar"}}).get_key();
+    // Collision table should have be cleared
+    CHECK_NOT_EQUAL(k2, k3);
+}
+
 #endif
