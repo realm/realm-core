@@ -139,7 +139,7 @@ public:
     Results snapshot() && REQUIRES(!m_mutex);
 
     // Returns a frozen copy of this result
-    Results freeze(SharedRealm realm) REQUIRES(!m_mutex);
+    Results freeze(std::shared_ptr<Realm> const& realm) REQUIRES(!m_mutex);
 
     // Returns whether or not this Results is frozen.
     bool is_frozen() REQUIRES(!m_mutex);

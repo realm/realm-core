@@ -412,7 +412,7 @@ void enqueue_registration(Realm& realm, std::string object_type, std::string que
                           std::function<void(std::exception_ptr)> callback)
 {
     auto config = realm.config();
-    auto transact = realm.transaction().duplicate();
+    auto transact = realm.duplicate();
 
     auto& work_queue = _impl::PartialSyncHelper::get_coordinator(realm).partial_sync_work_queue();
     work_queue.enqueue([object_type, query, name, transact=std::move(transact),
@@ -434,7 +434,7 @@ void enqueue_unregistration(Object result_set, std::function<void()> callback)
 {
     auto realm = result_set.realm();
     auto config = realm->config();
-    auto transact = realm->transaction().duplicate();
+    auto transact = realm->duplicate();
     auto& work_queue = _impl::PartialSyncHelper::get_coordinator(*realm).partial_sync_work_queue();
 
     // Export a reference to the __ResultSets row so we can hand it to the worker thread.
@@ -467,7 +467,7 @@ void enqueue_unregistration(Results const& result_set, std::shared_ptr<Notifier>
 
     // Export a reference to the query which will match the __ResultSets row
     // once it's created so we can hand it to the worker thread
-    auto transact = realm->transaction().duplicate();
+    auto transact = realm->duplicate();
     auto tmp_query = result_set.get_query();
     std::shared_ptr<Query> query = transact->import_copy_of(tmp_query, PayloadPolicy::Move);
 

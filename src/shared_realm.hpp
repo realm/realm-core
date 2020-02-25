@@ -316,11 +316,12 @@ public:
 
     VersionID read_transaction_version() const;
     Group& read_group();
-    Transaction& transaction();
 
     // Get the version of the current read or frozen transaction, or `none` if the Realm
     // is not in a read transaction
     util::Optional<VersionID> current_transaction_version() const;
+
+    TransactionRef duplicate() const;
 
     void enable_wait_for_change();
     bool wait_for_change();
@@ -366,6 +367,12 @@ public:
     ComputedPrivileges get_privileges(ConstObj const& obj);
 
     AuditInterface* audit_context() const noexcept;
+
+    template<typename... Args>
+    auto import_copy_of(Args&&... args)
+    {
+        return transaction().import_copy_of(std::forward<Args>(args)...);
+    }
 
     static SharedRealm make_shared_realm(Config config, util::Optional<VersionID> version, std::shared_ptr<_impl::RealmCoordinator> coordinator)
     {
@@ -445,6 +452,7 @@ private:
     bool init_permission_cache();
     void invalidate_permission_cache();
 
+    Transaction& transaction();
     Transaction& transaction() const;
     std::shared_ptr<Transaction> transaction_ref();
 

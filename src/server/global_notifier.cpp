@@ -395,11 +395,11 @@ std::unordered_map<std::string, ObjectChangeSet> const& GlobalNotifier::ChangeNo
     auto realm = Realm::get_shared_realm(config);
 
     Realm::Internal::begin_read(*realm, m_old_version);
-    Group const& g = realm->read_group();
+    Group& g = realm->read_group();
 
     _impl::TransactionChangeInfo info;
     info.track_all = true;
-    _impl::transaction::advance(realm->transaction(), info, m_new_version);
+    _impl::transaction::advance(static_cast<Transaction&>(g), info, m_new_version);
 
     m_changes.reserve(info.tables.size());
     auto table_keys = g.get_table_keys();
