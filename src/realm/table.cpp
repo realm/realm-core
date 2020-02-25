@@ -2952,16 +2952,23 @@ void Table::invalidate_object(ObjKey key)
 {
     if (m_is_embedded)
         throw LogicError(LogicError::wrong_kind_of_table);
-    auto primary_key_col = get_primary_key_column();
-    if (!primary_key_col)
-        throw LogicError(LogicError::wrong_kind_of_table);
-    if (m_tombstones && m_tombstones->is_valid(key)) // idempotence
-        return;
+    REALM_ASSERT(!key.is_unresolved());
+
     auto obj = get_object(key);
-    auto pk = obj.get_any(primary_key_col);
-    auto tombstone_key = allocate_unresolved_key(key, {{primary_key_col, pk}});
-    auto tombstone = m_tombstones->get(tombstone_key);
-    tombstone.assign_pk_and_backlinks(obj);
+    if (obj.has_backlinks(false)) {
+        // If the object has backlinks, we should make a tombstone
+        // and make inward links point to it,
+        ObjKey tombstone_key;
+        if (auto primary_key_col = get_primary_key_column()) {
+            auto pk = obj.get_any(primary_key_col);
+            tombstone_key = allocate_unresolved_key(key, {{primary_key_col, pk}});
+        }
+        else {
+            tombstone_key = allocate_unresolved_key(key, {{}});
+        }
+        auto tombstone = m_tombstones->get(tombstone_key);
+        tombstone.assign_pk_and_backlinks(obj);
+    }
     CascadeState state(CascadeState::Mode::None);
     m_clusters.erase(key, state);
 }

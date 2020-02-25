@@ -1402,9 +1402,10 @@ void Obj::assign(const ConstObj& other)
 void Obj::assign_pk_and_backlinks(const ConstObj& other)
 {
     REALM_ASSERT(get_table() == other.get_table());
-    auto col_pk = m_table->get_primary_key_column();
-    Mixed val = other.get_any(col_pk);
-    this->set(col_pk, val);
+    if (auto col_pk = m_table->get_primary_key_column()) {
+        Mixed val = other.get_any(col_pk);
+        this->set(col_pk, val);
+    }
 
     auto copy_links = [this, &other](ColKey col) {
         auto t = m_table->get_opposite_table(col);
