@@ -74,18 +74,14 @@ namespace realm {
 // mode, it is not modified within the transaction, and it is not used to modify data in
 // other parts of the database.
 //
-// 2. Handover
-// The second use case is "handover." The implicit rerun of the query in our first use case
+// 2. Background execution
+// This is the second use case. The implicit rerun of the query in our first use case
 // may be too costly to be acceptable on the main thread. Instead you want to run the query
 // on a worker thread, but display it on the main thread. To achieve this, you need two
-// SharedGroups locked on to the same version of the database. If you have that, you can
-// *handover* a view from one thread/SharedGroup to the other.
-//
-// Handover is a two-step procedure. First, the accessors are *exported* from one SharedGroup,
-// called the sourcing group, then it is *imported* into another SharedGroup, called the
-// receiving group. The thread associated with the sourcing SharedGroup will be
-// responsible for the export operation, while the thread associated with the receiving
-// SharedGroup will do the import operation.
+// Transactions locked on to the same version of the database. If you have that, you can
+// import_copy_of() a view from one transaction to the other. See also db.hpp for more
+// information. Technically, you can also import_copy_of into a transaction locked to a
+// different version. The imported view will automatically match the importing version.
 //
 // 3. Iterating a view and changing data
 // The third use case (and a motivator behind the imperative view) is when you want
@@ -230,7 +226,7 @@ public:
         return std::unique_ptr<ConstTableView>(new ConstTableView(*this));
     }
 
-    // handover machinery entry points based on dynamic type. These methods:
+    // import_copy_of() machinery entry points based on dynamic type. These methods:
     // a) forward their calls to the static type entry points.
     // b) new/delete patch data structures.
     std::unique_ptr<ConstTableView> clone_for_handover(Transaction* tr, PayloadPolicy mode) const
@@ -301,12 +297,9 @@ public:
     // query used to generate the view. If derived from another view, that
     // view will be synchronized as well.
     //
-    // "live" or "reactive" views are implemented by calling sync_if_needed
+    // "live" or "reactive" views are implemented by calling sync_if_needed()
     // before any of the other access-methods whenever the view may have become
     // outdated.
-    //
-    // This will make the TableView empty and in sync with the highest possible table version
-    // if the TableView depends on an object (LinkView or row) that has been deleted.
     void sync_if_needed() const override;
     // Return the version of the source it was created from.
     TableVersions get_dependency_versions() const
@@ -370,7 +363,7 @@ protected:
     ObjKey m_linked_obj_key;
     ConstTableRef m_linked_table;
 
-    // If this TableView was created from a LinkList, then this reference points to it. Otherwise it's 0
+    // If this TableView was created from a LnkLst, then this reference points to it. Otherwise it's 0
     mutable ConstLnkLstPtr m_linklist_source;
 
     // m_distinct_column_source != ColKey() if this view was created from distinct values in a column of m_table.
