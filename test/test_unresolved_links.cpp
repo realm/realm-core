@@ -139,18 +139,28 @@ TEST(Unresolved_InvalidateObject)
 
     auto cars = g.add_table_with_primary_key("Car", type_String, "model");
     auto col_price = cars->add_column(type_Decimal, "price");
-    auto dealers = g.add_table_with_primary_key("Dealer", type_Int, "cvr");
+    auto dealers = g.add_table("Dealer");
     auto col_has = dealers->add_column_link(type_LinkList, "stock", *cars);
+    auto organization = g.add_table("Organization");
+    auto col_members = organization->add_column_link(type_LinkList, "members", *dealers);
 
-    auto stock = dealers->create_object_with_primary_key(18454033).get_linklist(col_has);
+    auto dealer1 = dealers->create_object();
+    auto dealer2 = dealers->create_object();
+    auto org = organization->create_object();
+
+    auto members = org.get_linklist(col_members);
+    members.add(dealer1.get_key());
+    members.add(dealer2.get_key());
 
     auto skoda = cars->create_object_with_primary_key("Skoda Fabia").set(col_price, Decimal128("149999.5"));
     auto tesla = cars->create_object_with_primary_key("Tesla 10").set(col_price, Decimal128("499999.5"));
 
+    auto stock = dealer1.get_linklist(col_has);
     stock.add(tesla.get_key());
     stock.add(skoda.get_key());
 
     CHECK_EQUAL(stock.size(), 2);
+    CHECK_EQUAL(members.size(), 2);
     CHECK_EQUAL(cars->size(), 2);
 
     // Tesla goes to the grave. Too expensive
@@ -162,6 +172,11 @@ TEST(Unresolved_InvalidateObject)
     CHECK_EQUAL(stock.size(), 1);
     CHECK_EQUAL(stock.get(0), skoda.get_key());
     CHECK_EQUAL(cars->size(), 1);
+
+    // One dealer goes bankrupt
+    dealer2.invalidate();
+    CHECK_EQUAL(members.size(), 1);
+    CHECK_EQUAL(dealers->nb_unresolved(), 1);
 
     // resurrect the tesla
     cars->create_object_with_primary_key("Tesla 10").set(col_price, Decimal128("399999.5"));
