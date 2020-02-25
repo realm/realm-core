@@ -1,3 +1,14 @@
+# 10.0.0-alpha.1 Release notes
+
+### Fixed
+* Table::find_first() now handles tables with int primary key correctly.
+* We will not delete dangling links when otherwise modifying a list.
+
+-----------
+
+### Internals
+* Sync should now use Lst<ObjKey> interface when setting possibly dangling links
+
 # 6.1.0-alpha.5 Release notes
 
 ### Enhancements
