@@ -113,7 +113,7 @@ int64_t next_null_candidate(int64_t previous_candidate)
     // Increment by a prime number. This guarantees that we will
     // eventually hit every possible integer in the 2^64 range.
     x += 0xfffffffbULL;
-    return util::from_twos_compl<int64_t>(x);
+    return int64_t(x);
 }
 }
 

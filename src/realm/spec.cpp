@@ -96,13 +96,9 @@ void Spec::init(MemRef mem) noexcept
 
 void Spec::update_internals() noexcept
 {
-    m_has_strong_link_columns = false;
     m_num_public_columns = 0;
     size_t n = m_types.size();
     for (size_t i = 0; i < n; ++i) {
-        if (ColumnAttr(m_attr.get(i)) & col_attr_StrongLinks) {
-            m_has_strong_link_columns = true;
-        }
         if (m_types.get(i) == col_type_BackLink) {
             // Now we have no more public columns
             return;
@@ -487,8 +483,9 @@ bool Spec::operator==(const Spec& spec) const noexcept
             case col_type_Timestamp:
             case col_type_Float:
             case col_type_Double:
-            case col_type_Reserved4:
+            case col_type_Decimal:
             case col_type_BackLink:
+            case col_type_ObjectId:
                 // All other column types are compared as before
                 if (m_types.get(col_ndx) != spec.m_types.get(col_ndx))
                     return false;

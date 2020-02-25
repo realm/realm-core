@@ -17,6 +17,81 @@
 
 ----------------------------------------------
 
+# 10.0.0-alpha.1 Release notes
+
+### Fixed
+* Table::find_first() now handles tables with int primary key correctly.
+* We will not delete dangling links when otherwise modifying a list.
+
+-----------
+
+### Internals
+* Sync should now use Lst<ObjKey> interface when setting possibly dangling links
+
+# 6.1.0-alpha.5 Release notes
+
+### Enhancements
+* Initial support for dangling links: Table::get_objkey_from_primary_key() and Table::invalidate_object() added.
+* Several minor enhancements for Decimal128 and ObjectId.
+* It is now possible to switch embeddedness of a table.
+
+### Fixed
+* None.
+ 
+-----------
+
+### Internals
+* Now uses c++17!!!!
+
+----------------------------------------------
+
+# 6.1.0-alpha.4 Release notes
+
+### Fixed
+* Fixed a segfault when a list of Decimal128 expanded over 1000 elements.
+* Fixed min/max of a list of Decimal128 when the list contained numbers larger than a min/max int64 type.
+* Fixed sum/avg of a list of Decimal128 when the list contained nulls.
+* Added missing TableView aggregate functions for Decimal128.
+* Fixed min/max Decimal128 via Table not returning the result index.
+* Fixed sorting Decimal128 behaviour including position of NaN.
+* Fixed crash sorting a nullable ObjectID column.
+
+----------------------------------------------
+
+# 6.1.0-alpha.3 Release notes
+
+### Fixes
+* Ability to create Decimal128 lists was missing
+* No replication of create/delete operations on embedded tables.
+ 
+----------------------------------------------
+
+# 6.1.0-alpha.2 Release notes
+
+### Fixes
+* Fixed issue regarding opening a file format version 10 realm file in RO mode.
+ 
+----------------------------------------------
+
+# 6.1.0-alpha.1 Release notes
+
+### Enhancements
+* Added new data types - Decimal128 and ObjectId types.
+* Added support for embedded objects.
+
+### Fixes
+* Fixes parsing float and double constants which had been serialised to scientific notation (eg. 1.23E-24). ([#3076](https://github.com/realm/realm-core/issues/3076)).
+ 
+### Breaking changes
+* None.
+
+-----------
+
+### Internals
+* File format bumped to 11.
+
+----------------------------------------------
+
 # 6.0.3 Release notes
 
 ### Fixed

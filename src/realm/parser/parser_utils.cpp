@@ -71,6 +71,16 @@ const char* type_to_str<Link>()
 {
     return "Link";
 }
+template <>
+const char* type_to_str<ObjectId>()
+{
+    return "ObjectId";
+}
+template <>
+const char* type_to_str<Decimal128>()
+{
+    return "Decimal128";
+}
 
 const char* data_type_to_str(DataType type)
 {
@@ -91,6 +101,10 @@ const char* data_type_to_str(DataType type)
             return "DateTime";
         case type_Timestamp:
             return "Timestamp";
+        case type_Decimal:
+            return "Decimal";
+        case type_ObjectId:
+            return "ObjectId";
         case type_OldTable:
             return "Table";
         case type_OldMixed:

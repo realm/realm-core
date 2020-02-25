@@ -175,6 +175,22 @@ public:
     Query& less_equal(ColKey column_key, Timestamp value);
     Query& less(ColKey column_key, Timestamp value);
 
+    // Conditions: ObjectId
+    Query& equal(ColKey column_key, ObjectId value);
+    Query& not_equal(ColKey column_key, ObjectId value);
+    Query& greater(ColKey column_key, ObjectId value);
+    Query& greater_equal(ColKey column_key, ObjectId value);
+    Query& less_equal(ColKey column_key, ObjectId value);
+    Query& less(ColKey column_key, ObjectId value);
+
+    // Conditions: Decimal128
+    Query& equal(ColKey column_key, Decimal128 value);
+    Query& not_equal(ColKey column_key, Decimal128 value);
+    Query& greater(ColKey column_key, Decimal128 value);
+    Query& greater_equal(ColKey column_key, Decimal128 value);
+    Query& less_equal(ColKey column_key, Decimal128 value);
+    Query& less(ColKey column_key, Decimal128 value);
+
     // Conditions: size
     Query& size_equal(ColKey column_key, int64_t value);
     Query& size_not_equal(ColKey column_key, int64_t value);

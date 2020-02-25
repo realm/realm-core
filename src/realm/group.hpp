@@ -338,6 +338,7 @@ public:
     ConstTableRef get_table(StringData name) const;
 
     TableRef add_table(StringData name);
+    TableRef add_embedded_table(StringData name);
     TableRef add_table_with_primary_key(StringData name, DataType pk_type, StringData pk_name, bool nullable = false);
     TableRef get_or_add_table(StringData name, bool* was_added = nullptr);
 
@@ -730,7 +731,7 @@ private:
     const Table* do_get_table(StringData name) const;
     Table* do_add_table(StringData name);
 
-    Table* do_get_or_add_table(StringData name, bool* was_added);
+    Table* do_get_or_add_table(StringData name, bool is_embedded, bool* was_added = nullptr);
 
     void create_and_insert_table(TableKey key, StringData name);
     Table* create_table_accessor(size_t table_ndx);
@@ -812,6 +813,8 @@ private:
     ///
     ///  10 Memory mapping changes which require special treatment of large files
     ///     of preceeding versions.
+    ///
+    ///  11 New data types: Decimal128 and ObjectId. Embedded tables.
     ///
     /// IMPORTANT: When introducing a new file format version, be sure to review
     /// the file validity checks in Group::open() and SharedGroup::do_open, the file
@@ -1016,11 +1019,20 @@ inline TableRef Group::add_table(StringData name)
     return TableRef(table, table ? table->m_alloc.get_instance_version() : 0);
 }
 
+inline TableRef Group::add_embedded_table(StringData name)
+{
+    if (!is_attached())
+        throw LogicError(LogicError::detached_accessor);
+    check_table_name_uniqueness(name);
+    Table* table = do_get_or_add_table(name, true); // Throws
+    return TableRef(table, table ? table->m_alloc.get_instance_version() : 0);
+}
+
 inline TableRef Group::get_or_add_table(StringData name, bool* was_added)
 {
     if (!is_attached())
         throw LogicError(LogicError::detached_accessor);
-    Table* table = do_get_or_add_table(name, was_added); // Throws
+    Table* table = do_get_or_add_table(name, false, was_added); // Throws
     return TableRef(table, table ? table->m_alloc.get_instance_version() : 0);
 }
 
@@ -1036,6 +1048,7 @@ void Group::to_json(S& out, size_t link_depth, std::map<std::string, std::string
     out << "{" << std::endl;
 
     auto keys = get_table_keys();
+    bool first = true;
     for (size_t i = 0; i < keys.size(); ++i) {
         auto key = keys[i];
         StringData name = get_table_name(key);
@@ -1045,12 +1058,15 @@ void Group::to_json(S& out, size_t link_depth, std::map<std::string, std::string
 
         ConstTableRef table = get_table(key);
 
-        if (i)
-            out << ",";
-        out << "\"" << name << "\"";
-        out << ":";
-        table->to_json(out, link_depth, renames);
-        out << std::endl;
+        if (!table->is_embedded()) {
+            if (!first)
+                out << ",";
+            out << "\"" << name << "\"";
+            out << ":";
+            table->to_json(out, link_depth, renames);
+            out << std::endl;
+            first = false;
+        }
     }
 
     out << "}" << std::endl;

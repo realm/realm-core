@@ -717,7 +717,7 @@ void spawn_daemon(const std::string& file)
 } // anonymous namespace
 
 #if REALM_HAVE_STD_FILESYSTEM
-std::string DBOptions::sys_tmp_dir = std::filesystem::temp_directory_path().u8string();
+std::string DBOptions::sys_tmp_dir = std::experimental::filesystem::v1::temp_directory_path().u8string();
 #else
 std::string DBOptions::sys_tmp_dir = getenv("TMPDIR") ? getenv("TMPDIR") : "";
 #endif
@@ -1069,6 +1069,7 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
                 case 8:
                 case 9:
                 case 10:
+                case 11:
                     file_format_ok = true;
                     break;
             }

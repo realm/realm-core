@@ -22,6 +22,26 @@
 using namespace realm;
 
 namespace realm {
+
+bool BPlusTreeNode::get_context_flag() const noexcept
+{
+    auto ref = get_ref();
+    MemRef mem(ref, m_tree->get_alloc());
+    return Array::get_context_flag_from_header(mem.get_addr());
+}
+
+void BPlusTreeNode::set_context_flag(bool cf) noexcept
+{
+    auto ref = get_ref();
+    MemRef mem(ref, m_tree->get_alloc());
+    if (Array::get_context_flag_from_header(mem.get_addr()) != cf) {
+        Array arr(m_tree->get_alloc());
+        arr.init_from_mem(mem);
+        arr.set_context_flag(cf);
+    }
+}
+
+
 /*****************************************************************************/
 /* BPlusTreeInner                                                            */
 /* All interior nodes is of this class                                       */

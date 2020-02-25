@@ -28,6 +28,8 @@
 
 #include <realm/parser/parser_utils.hpp>
 
+// clang-format off
+
 // String tokens can't be followed by [A-z0-9_].
 #define string_token_t(s) seq< TAOCPP_PEGTL_ISTRING(s), not_at< identifier_other > >
 
@@ -60,17 +62,20 @@ struct b64_content : until< at< one< '"' > >, must< b64_allowed > > {};
 struct base64 : seq< TAOCPP_PEGTL_ISTRING("B64\""), must< b64_content >, any > {};
 
 // numbers
-struct minus : opt< one< '-' > > {};
+struct optional_sign : opt< sor< one< '-' >, one< '+' > > > {};
 struct dot : one< '.' > {};
+struct optional_exponent : opt< seq< sor< one< 'E' >, one< 'e' > >, optional_sign, plus< digit > > > {};
+struct infinity : seq< optional_sign, sor< string_token_t("infinity"), string_token_t("inf") > > {};
+struct nan : seq< optional_sign, string_token_t("nan") > {};
 
 struct float_num : sor<
-    seq< plus< digit >, dot, star< digit > >,
-    seq< star< digit >, dot, plus< digit > >
+    seq< plus< digit >, dot, star< digit >, optional_exponent >,
+    seq< star< digit >, dot, plus< digit >, optional_exponent >
 > {};
 struct hex_num : seq< one< '0' >, one< 'x', 'X' >, plus< xdigit > > {};
-struct int_num : plus< digit > {};
+struct int_num : seq< plus< digit >, optional_exponent > {};
 
-struct number : seq< minus, sor< float_num, hex_num, int_num > > {};
+struct number : seq< optional_sign, sor< float_num, hex_num, int_num, infinity, nan > > {};
 
 struct timestamp_number : disable< number > {};
 struct first_timestamp_number : disable< timestamp_number > {};
@@ -84,10 +89,13 @@ struct readable_timestamp : seq< first_timestamp_number, one< '-' >, timestamp_n
     timestamp_number, opt< seq< one< ':' >, timestamp_number > > > {};
 struct timestamp : sor< internal_timestamp, readable_timestamp > {};
 
+struct oid_allowed : disable< xdigit > {};
+struct oid_content : until< at< one< ')' > >, must< oid_allowed > > {};
+struct oid : seq< TAOCPP_PEGTL_ISTRING("oid("), must< oid_content >, any > {};
+
 struct true_value : string_token_t("true") {};
 struct false_value : string_token_t("false") {};
-struct null_value : seq<sor<string_token_t("null"), string_token_t("nil")>> {
-};
+struct null_value : seq<sor<string_token_t("null"), string_token_t("nil")>> {};
 
 // following operators must allow proceeding string characters
 struct min : TAOCPP_PEGTL_ISTRING(".@min.") {};
@@ -157,7 +165,7 @@ struct agg_shortcut_pred : sor<agg_any, agg_all, agg_none> {
 };
 
 // expressions and operators
-struct expr : sor<dq_string, sq_string, timestamp, number, argument, true_value, false_value, null_value, base64,
+struct expr : sor<dq_string, sq_string, timestamp, oid, number, argument, true_value, false_value, null_value, base64,
                   collection_operator_match, subquery, key_path> {
 };
 struct case_insensitive : TAOCPP_PEGTL_ISTRING("[c]") {};
@@ -228,6 +236,8 @@ struct and_ext : if_must< and_op, pred > {};
 struct and_pred : seq< atom_pred, star< and_ext > > {};
 
 struct pred : seq< and_pred, star< or_ext > > {};
+
+// clang-format on
 
 // state
 struct ParserState
@@ -355,7 +365,10 @@ template< typename Rule >
 struct action : nothing< Rule > {};
 
 #ifdef REALM_PARSER_PRINT_TOKENS
-    #define DEBUG_PRINT_TOKEN(string) do { std::cout << string << std::endl; } while (0)
+#define DEBUG_PRINT_TOKEN(string)                                                                                    \
+    do {                                                                                                             \
+        std::cout << string << std::endl;                                                                            \
+    } while (0)
 #else
     #define DEBUG_PRINT_TOKEN(string) do { static_cast<void>(string); } while (0)
 #endif
@@ -401,6 +414,7 @@ EXPRESSION_ACTION(false_value, Expression::Type::False)
 EXPRESSION_ACTION(null_value, Expression::Type::Null)
 EXPRESSION_ACTION(argument_index, Expression::Type::Argument)
 EXPRESSION_ACTION(base64, Expression::Type::Base64)
+EXPRESSION_ACTION(oid, Expression::Type::ObjectId)
 
 template<> struct action< timestamp >
 {
@@ -540,7 +554,7 @@ struct action<limit_param> {
         try {
             DescriptorOrderingState::SingleOrderingState limit_state;
             limit_state.type = DescriptorOrderingState::SingleOrderingState::DescriptorType::Limit;
-            limit_state.limit = realm::util::stot<size_t>(in.string());
+            limit_state.limit = realm::util::string_to<size_t>(in.string());
             state.ordering_state.orderings.push_back(limit_state);
         }
         catch (...) {

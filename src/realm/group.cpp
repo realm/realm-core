@@ -301,8 +301,8 @@ int Group::get_committed_file_format_version() const noexcept
 }
 
 
-int Group::get_target_file_format_version_for_session(int /* current_file_format_version */,
-                                                      int /* requested_history_type */) noexcept
+int Group::get_target_file_format_version_for_session(int current_file_format_version,
+                                                      int requested_history_type) noexcept
 {
     // Note: This function is responsible for choosing the target file format
     // for a sessions. If it selects a file format that is different from
@@ -316,7 +316,10 @@ int Group::get_target_file_format_version_for_session(int /* current_file_format
     // Please see Group::get_file_format_version() for information about the
     // individual file format versions.
 
-    return 10;
+    if (requested_history_type == Replication::hist_None && current_file_format_version == 10)
+        return 10;
+
+    return 11;
 }
 
 uint64_t Group::get_sync_file_id() const noexcept
@@ -338,15 +341,15 @@ void Transaction::upgrade_file_format(int target_file_format_version)
     // Be sure to revisit the following upgrade logic when a new file format
     // version is introduced. The following assert attempt to help you not
     // forget it.
-    REALM_ASSERT_EX(target_file_format_version == 10, target_file_format_version);
+    REALM_ASSERT_EX(target_file_format_version == 11, target_file_format_version);
 
     int current_file_format_version = get_file_format_version();
     REALM_ASSERT(current_file_format_version < target_file_format_version);
 
     // SharedGroup::do_open() must ensure this. Be sure to revisit the
-    // following upgrade logic when SharedGroup::do_open() is changed (or
+    // following upgrade logic when DB::do_open() is changed (or
     // vice versa).
-    REALM_ASSERT_EX(current_file_format_version >= 5 && current_file_format_version <= 9,
+    REALM_ASSERT_EX(current_file_format_version >= 5 && current_file_format_version <= 10,
                     current_file_format_version);
 
 
@@ -364,7 +367,7 @@ void Transaction::upgrade_file_format(int target_file_format_version)
         commit_and_continue_writing();
     }
 
-    // NOTE: Additional future upgrade steps go here.
+    // Upgrade from version prior to 10 (Cluster based db)
     if (current_file_format_version <= 9 && target_file_format_version >= 10) {
         DisableReplication disable_replication(*this);
 
@@ -399,6 +402,10 @@ void Transaction::upgrade_file_format(int target_file_format_version)
         }
         remove_pk_table();
     }
+    if (current_file_format_version <= 10 && target_file_format_version >= 11) {
+        // No upgrade needed
+    }
+    // NOTE: Additional future upgrade steps go here.
 }
 
 void Group::open(ref_type top_ref, const std::string& file_path)
@@ -419,6 +426,7 @@ void Group::open(ref_type top_ref, const std::string& file_path)
             file_format_ok = (top_ref == 0);
             break;
         case 10:
+        case 11:
             file_format_ok = true;
             break;
     }
@@ -727,9 +735,6 @@ TableRef Group::add_table_with_primary_key(StringData name, DataType pk_type, St
 
     ColKey pk_col = table->add_column(pk_type, pk_name, nullable);
     table->do_set_primary_key_column(pk_col);
-    if (pk_type != type_String) {
-        table->add_search_index(pk_col);
-    }
 
     return TableRef(table, table ? table->m_alloc.get_instance_version() : 0);
 }
@@ -759,7 +764,7 @@ Table* Group::do_add_table(StringData name)
 }
 
 
-Table* Group::do_get_or_add_table(StringData name, bool* was_added)
+Table* Group::do_get_or_add_table(StringData name, bool is_embedded, bool* was_added)
 {
     REALM_ASSERT(m_table_names.is_attached());
     auto table = do_get_table(name);
@@ -771,9 +776,11 @@ Table* Group::do_get_or_add_table(StringData name, bool* was_added)
     else {
         Replication* repl = *get_repl();
         if (repl && name.begins_with(g_class_name_prefix))
-            repl->add_class(name);
+            repl->add_class(name, is_embedded);
 
         table = do_add_table(name);
+        if (is_embedded)
+            table->do_set_embedded(true);
         if (was_added)
             *was_added = true;
         return table;

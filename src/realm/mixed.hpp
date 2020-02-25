@@ -30,6 +30,8 @@
 #include <realm/data_type.hpp>
 #include <realm/string_data.hpp>
 #include <realm/timestamp.hpp>
+#include <realm/decimal128.hpp>
+#include <realm/object_id.hpp>
 #include <realm/util/assert.hpp>
 #include <realm/utilities.hpp>
 
@@ -126,6 +128,9 @@ public:
     Mixed(StringData) noexcept;
     Mixed(BinaryData) noexcept;
     Mixed(Timestamp) noexcept;
+    Mixed(Decimal128);
+    Mixed(ObjectId) noexcept;
+    Mixed(util::Optional<ObjectId>) noexcept;
     Mixed(ObjKey) noexcept;
 
     // These are shortcuts for Mixed(StringData(c_str)), and are
@@ -182,16 +187,15 @@ private:
 
     uint32_t m_type;
     union {
-        int32_t short_val;
-        uint32_t ushort_val;
-    };
-
-    union {
         int64_t int_val;
         bool bool_val;
         float float_val;
         double double_val;
-        const char* str_val;
+        StringData string_val;
+        BinaryData binary_val;
+        Timestamp date_val;
+        ObjectId id_val;
+        Decimal128 decimal_val;
     };
 };
 
@@ -265,12 +269,22 @@ inline Mixed::Mixed(util::Optional<double> v) noexcept
     }
 }
 
+inline Mixed::Mixed(util::Optional<ObjectId> v) noexcept
+{
+    if (v) {
+        m_type = type_ObjectId + 1;
+        id_val = *v;
+    }
+    else {
+        m_type = 0;
+    }
+}
+
 inline Mixed::Mixed(StringData v) noexcept
 {
     if (!v.is_null()) {
         m_type = type_String + 1;
-        str_val = v.data();
-        ushort_val = uint32_t(v.size());
+        string_val = v;
     }
     else {
         m_type = 0;
@@ -281,8 +295,7 @@ inline Mixed::Mixed(BinaryData v) noexcept
 {
     if (!v.is_null()) {
         m_type = type_Binary + 1;
-        str_val = v.data();
-        ushort_val = uint32_t(v.size());
+        binary_val = v;
     }
     else {
         m_type = 0;
@@ -293,12 +306,28 @@ inline Mixed::Mixed(Timestamp v) noexcept
 {
     if (!v.is_null()) {
         m_type = type_Timestamp + 1;
-        int_val = v.get_seconds();
-        short_val = v.get_nanoseconds();
+        date_val = v;
     }
     else {
         m_type = 0;
     }
+}
+
+inline Mixed::Mixed(Decimal128 v)
+{
+    if (!v.is_null()) {
+        m_type = type_Decimal + 1;
+        decimal_val = v;
+    }
+    else {
+        m_type = 0;
+    }
+}
+
+inline Mixed::Mixed(ObjectId v) noexcept
+{
+    m_type = type_ObjectId + 1;
+    id_val = v;
 }
 
 inline Mixed::Mixed(ObjKey v) noexcept
@@ -364,7 +393,7 @@ template <>
 inline StringData Mixed::get<StringData>() const noexcept
 {
     REALM_ASSERT(get_type() == type_String);
-    return StringData(str_val, ushort_val);
+    return string_val;
 }
 
 inline StringData Mixed::get_string() const
@@ -376,7 +405,7 @@ template <>
 inline BinaryData Mixed::get<BinaryData>() const noexcept
 {
     REALM_ASSERT(get_type() == type_Binary);
-    return BinaryData(str_val, ushort_val);
+    return binary_val;
 }
 
 inline BinaryData Mixed::get_binary() const
@@ -388,12 +417,26 @@ template <>
 inline Timestamp Mixed::get<Timestamp>() const noexcept
 {
     REALM_ASSERT(get_type() == type_Timestamp);
-    return Timestamp(int_val, short_val);
+    return date_val;
 }
 
 inline Timestamp Mixed::get_timestamp() const
 {
     return get<Timestamp>();
+}
+
+template <>
+inline Decimal128 Mixed::get<Decimal128>() const noexcept
+{
+    REALM_ASSERT(get_type() == type_Decimal);
+    return decimal_val;
+}
+
+template <>
+inline ObjectId Mixed::get<ObjectId>() const noexcept
+{
+    REALM_ASSERT(get_type() == type_ObjectId);
+    return id_val;
 }
 
 template <>
@@ -460,12 +503,18 @@ inline int compare_float(Float a_raw, Float b_raw)
 
 inline int Mixed::compare(const Mixed& b) const
 {
-    // nulls are treated as being less than all other values
-    if (is_null()) {
-        return b.is_null() ? 0 : -1;
-    }
-    if (b.is_null())
+    // Comparing types first makes it possible to make a sort of a list of Mixed
+    // This will also handle the case where null values are considered lower than all other values
+    if (m_type > b.m_type)
         return 1;
+    else if (m_type < b.m_type)
+        return -1;
+
+    // Now we are sure the two types are the same
+    if (is_null()) {
+        // Both are null
+        return 0;
+    }
 
     switch (get_type()) {
         case type_Int:
@@ -493,6 +542,24 @@ inline int Mixed::compare(const Mixed& b) const
             else if (get<Timestamp>() < b.get<Timestamp>())
                 return -1;
             break;
+        case type_ObjectId: {
+            auto l = get<ObjectId>();
+            auto r = b.get<ObjectId>();
+            if (l > r)
+                return 1;
+            else if (l < r)
+                return -1;
+            break;
+        }
+        case type_Decimal: {
+            auto l = get<Decimal128>();
+            auto r = b.get<Decimal128>();
+            if (l > r)
+                return 1;
+            else if (l < r)
+                return -1;
+            break;
+        }
         case type_Link:
             if (get<ObjKey>() > b.get<ObjKey>())
                 return 1;
@@ -530,14 +597,21 @@ inline std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, c
                 out << m.double_val;
                 break;
             case type_String:
-                out << StringData(m.str_val, m.short_val);
+                out << m.string_val;
                 break;
             case type_Binary:
-                out << BinaryData(m.str_val, m.short_val);
+                out << m.binary_val;
                 break;
             case type_Timestamp:
-                out << Timestamp(m.int_val, m.short_val);
+                out << m.date_val;
                 break;
+            case type_Decimal:
+                out << m.decimal_val;
+                break;
+            case type_ObjectId: {
+                out << m.get<ObjectId>();
+                break;
+            }
             case type_Link:
                 out << ObjKey(m.int_val);
                 break;

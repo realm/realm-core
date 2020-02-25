@@ -134,6 +134,7 @@ The Columns class encapsulates all this into a simple class that, for any type T
 #include <realm/array_list.hpp>
 #include <realm/array_key.hpp>
 #include <realm/array_bool.hpp>
+#include <realm/array_object_id.hpp>
 #include <realm/column_integer.hpp>
 #include <realm/column_type_traits.hpp>
 #include <realm/table.hpp>
@@ -171,6 +172,12 @@ template <class T, class U>
 inline T only_numeric(U in)
 {
     return static_cast<T>(util::unwrap(in));
+}
+
+template <class T>
+inline Decimal128 only_numeric(const Decimal128& d)
+{
+    return d;
 }
 
 template <class T>
@@ -316,6 +323,8 @@ struct ValueBase {
     static const size_t chunk_size = 8;
     virtual void export_bool(ValueBase& destination) const = 0;
     virtual void export_Timestamp(ValueBase& destination) const = 0;
+    virtual void export_ObjectId(ValueBase& destination) const = 0;
+    virtual void export_Decimal(ValueBase& destination) const = 0;
     virtual void export_int(ValueBase& destination) const = 0;
     virtual void export_float(ValueBase& destination) const = 0;
     virtual void export_int64_t(ValueBase& destination) const = 0;
@@ -464,12 +473,13 @@ Query create(L left, const Subexpr2<R>& right)
     // TODO: recognize size operator expressions
     // auto size_operator = dynamic_cast<const SizeOperator<Size<StringData>, Subexpr>*>(&right);
 
-    if (column && ((std::numeric_limits<L>::is_integer && std::numeric_limits<R>::is_integer) ||
-                   (std::is_same<L, double>::value && std::is_same<R, double>::value) ||
-                   (std::is_same<L, float>::value && std::is_same<R, float>::value) ||
-                   (std::is_same<L, Timestamp>::value && std::is_same<R, Timestamp>::value) ||
-                   (std::is_same<L, StringData>::value && std::is_same<R, StringData>::value) ||
-                   (std::is_same<L, BinaryData>::value && std::is_same<R, BinaryData>::value)) &&
+    if (column &&
+        ((std::numeric_limits<L>::is_integer && std::numeric_limits<R>::is_integer) ||
+         (std::is_same<L, double>::value && std::is_same<R, double>::value) ||
+         (std::is_same<L, float>::value && std::is_same<R, float>::value) ||
+         (std::is_same<L, Timestamp>::value && std::is_same<R, Timestamp>::value) ||
+         (std::is_same<L, StringData>::value && std::is_same<R, StringData>::value) ||
+         (std::is_same<L, BinaryData>::value && std::is_same<R, BinaryData>::value)) &&
         !column->links_exist()) {
         ConstTableRef t = column->get_base_table();
         Query q = Query(t);
@@ -731,6 +741,8 @@ class Subexpr2 : public Subexpr,
                  public Overloads<T, StringData>,
                  public Overloads<T, bool>,
                  public Overloads<T, Timestamp>,
+                 public Overloads<T, ObjectId>,
+                 public Overloads<T, Decimal128>,
                  public Overloads<T, null> {
 public:
     virtual ~Subexpr2()
@@ -743,7 +755,12 @@ public:
     RLM_U2(float, o)                                                                                                 \
     RLM_U2(double, o)                                                                                                \
     RLM_U2(int64_t, o)                                                                                               \
-    RLM_U2(StringData, o) RLM_U2(bool, o) RLM_U2(Timestamp, o) RLM_U2(null, o)
+    RLM_U2(StringData, o)                                                                                            \
+    RLM_U2(bool, o)                                                                                                  \
+    RLM_U2(Timestamp, o)                                                                                             \
+    RLM_U2(ObjectId, o)                                                                                              \
+    RLM_U2(Decimal128, o)                                                                                            \
+    RLM_U2(null, o)
     RLM_U(+) RLM_U(-) RLM_U(*) RLM_U(/) RLM_U(>) RLM_U(<) RLM_U(==) RLM_U(!=) RLM_U(>=) RLM_U(<=)
 };
 
@@ -818,10 +835,31 @@ time optimizations for these cases.
 
 template <class T, size_t prealloc = 8>
 struct NullableVector {
-    using Underlying = typename util::RemoveOptional<T>::type;
-    using t_storage =
-        typename std::conditional<std::is_same<Underlying, bool>::value || std::is_same<Underlying, int>::value,
-                                  int64_t, Underlying>::type;
+
+    // Searches the PairsToMatch for the first that has the Query type as the first type and returns the second type.
+    // If no pair matches, returns the Query type unmodified.
+    template <typename Query, typename... PairsToMatch>
+    struct TypeMapperImpl;
+    template <typename Query, typename... PairsToMatch>
+    using TypeMapper = typename TypeMapperImpl<Query, PairsToMatch...>::type;
+
+    template <typename Query>
+    struct TypeMapperImpl<Query /*no more options*/> {
+        using type = Query; // Base case
+    };
+    template <typename Match, typename V, typename... Rest>
+    struct TypeMapperImpl<Match, std::pair<Match, V>, Rest...> {
+        using type = V; // Found a match
+    };
+    template <typename Query, typename K, typename V, typename... Rest>
+    struct TypeMapperImpl<Query, std::pair<K, V>, Rest...> {
+        using type = TypeMapper<Query, Rest...>; // Keep looking
+    };
+
+    using t_storage = TypeMapper<T,                        //
+                                 std::pair<bool, int64_t>, //
+                                 std::pair<int, int64_t>,  //
+                                 std::pair<ObjectId, util::Optional<ObjectId>>>;
 
     NullableVector()
     {
@@ -884,10 +922,10 @@ struct NullableVector {
     }
 
     template <typename Type = T>
-    typename std::enable_if<realm::is_any<Type, float, double, BinaryData, StringData, ObjKey, Timestamp, ref_type,
-                                          SizeOfList, null>::value,
+    typename std::enable_if<realm::is_any<Type, float, double, BinaryData, StringData, ObjKey, Timestamp, ObjectId,
+                                          Decimal128, ref_type, SizeOfList, null>::value,
                             void>::type
-    set(size_t index, t_storage value)
+    set(size_t index, T value)
     {
         m_first[index] = value;
     }
@@ -900,11 +938,10 @@ struct NullableVector {
         return util::make_optional((*this)[index]);
     }
 
-    inline void set(size_t index, util::Optional<Underlying> value)
+    inline void set(size_t index, util::Optional<T> value)
     {
         if (value) {
-            Underlying v = *value;
-            set(index, v);
+            set(index, *value);
         }
         else {
             set_null(index);
@@ -966,6 +1003,9 @@ struct NullableVector {
 
     int64_t m_null = reinterpret_cast<int64_t>(&m_null); // choose magic value to represent nulls
 };
+
+template <typename T, size_t prealloc>
+struct NullableVector<util::Optional<T>, prealloc>; // NullableVector<Optional<T>> is banned.
 
 // Double
 // NOTE: fails in gcc 4.8 without `inline`. Do not remove. Same applies for all methods below.
@@ -1047,6 +1087,42 @@ template <>
 inline void NullableVector<Timestamp>::set_null(size_t index)
 {
     m_first[index] = Timestamp{};
+}
+
+// ObjectId
+
+template <>
+inline bool NullableVector<ObjectId>::is_null(size_t index) const
+{
+    return !m_first[index];
+}
+
+template <>
+inline void NullableVector<ObjectId>::set_null(size_t index)
+{
+    m_first[index].reset();
+}
+
+template <>
+inline ObjectId NullableVector<ObjectId>::operator[](size_t index) const
+{
+    REALM_ASSERT_3(index, <, m_size);
+    const auto& opt = m_first[index];
+    return opt ? *opt : ObjectId();
+}
+
+// Decimal128
+
+template <>
+inline bool NullableVector<Decimal128>::is_null(size_t index) const
+{
+    return m_first[index].is_null();
+}
+
+template <>
+inline void NullableVector<Decimal128>::set_null(size_t index)
+{
+    m_first[index] = Decimal128{realm::null()};
 }
 
 // ref_type
@@ -1308,6 +1384,16 @@ public:
         export2<Timestamp>(destination);
     }
 
+    REALM_FORCEINLINE void export_ObjectId(ValueBase& destination) const override
+    {
+        export2<ObjectId>(destination);
+    }
+
+    REALM_FORCEINLINE void export_Decimal(ValueBase& destination) const override
+    {
+        export2<Decimal128>(destination);
+    }
+
     REALM_FORCEINLINE void export_bool(ValueBase& destination) const override
     {
         export2<bool>(destination);
@@ -1352,6 +1438,10 @@ public:
             source.export_int(*this);
         else if (std::is_same<T, Timestamp>::value)
             source.export_Timestamp(*this);
+        else if (std::is_same<T, ObjectId>::value)
+            source.export_ObjectId(*this);
+        else if (std::is_same<T, Decimal128>::value)
+            source.export_Decimal(*this);
         else if (std::is_same<T, bool>::value)
             source.export_bool(*this);
         else if (std::is_same<T, float>::value)
@@ -1466,7 +1556,7 @@ private:
 // left-hand-side       operator                              right-hand-side
 // L                    +, -, *, /, <, >, ==, !=, <=, >=      Subexpr2<R>
 //
-// For L = R = {int, int64_t, float, double, Timestamp}:
+// For L = R = {int, int64_t, float, double, Timestamp, ObjectId, Decimal128}:
 // Compare numeric values
 template <class R>
 Query operator>(double left, const Subexpr2<R>& right)
@@ -1490,6 +1580,16 @@ Query operator>(int64_t left, const Subexpr2<R>& right)
 }
 template <class R>
 Query operator>(Timestamp left, const Subexpr2<R>& right)
+{
+    return create<Greater>(left, right);
+}
+template <class R>
+Query operator>(ObjectId left, const Subexpr2<R>& right)
+{
+    return create<Greater>(left, right);
+}
+template <class R>
+Query operator>(Decimal128 left, const Subexpr2<R>& right)
 {
     return create<Greater>(left, right);
 }
@@ -1520,6 +1620,17 @@ Query operator<(Timestamp left, const Subexpr2<R>& right)
     return create<Less>(left, right);
 }
 template <class R>
+Query operator<(ObjectId left, const Subexpr2<R>& right)
+{
+    return create<Less>(left, right);
+}
+template <class R>
+Query operator<(Decimal128 left, const Subexpr2<R>& right)
+{
+    return create<Less>(left, right);
+}
+
+template <class R>
 Query operator==(double left, const Subexpr2<R>& right)
 {
     return create<Equal>(left, right);
@@ -1545,10 +1656,21 @@ Query operator==(Timestamp left, const Subexpr2<R>& right)
     return create<Equal>(left, right);
 }
 template <class R>
+Query operator==(ObjectId left, const Subexpr2<R>& right)
+{
+    return create<Equal>(left, right);
+}
+template <class R>
+Query operator==(Decimal128 left, const Subexpr2<R>& right)
+{
+    return create<Equal>(left, right);
+}
+template <class R>
 Query operator==(bool left, const Subexpr2<R>& right)
 {
     return create<Equal>(left, right);
 }
+
 template <class R>
 Query operator>=(double left, const Subexpr2<R>& right)
 {
@@ -1575,6 +1697,17 @@ Query operator>=(Timestamp left, const Subexpr2<R>& right)
     return create<GreaterEqual>(left, right);
 }
 template <class R>
+Query operator>=(ObjectId left, const Subexpr2<R>& right)
+{
+    return create<GreaterEqual>(left, right);
+}
+template <class R>
+Query operator>=(Decimal128 left, const Subexpr2<R>& right)
+{
+    return create<GreaterEqual>(left, right);
+}
+
+template <class R>
 Query operator<=(double left, const Subexpr2<R>& right)
 {
     return create<LessEqual>(left, right);
@@ -1600,6 +1733,17 @@ Query operator<=(Timestamp left, const Subexpr2<R>& right)
     return create<LessEqual>(left, right);
 }
 template <class R>
+Query operator<=(ObjectId left, const Subexpr2<R>& right)
+{
+    return create<LessEqual>(left, right);
+}
+template <class R>
+Query operator<=(Decimal128 left, const Subexpr2<R>& right)
+{
+    return create<LessEqual>(left, right);
+}
+
+template <class R>
 Query operator!=(double left, const Subexpr2<R>& right)
 {
     return create<NotEqual>(left, right);
@@ -1621,6 +1765,16 @@ Query operator!=(int64_t left, const Subexpr2<R>& right)
 }
 template <class R>
 Query operator!=(Timestamp left, const Subexpr2<R>& right)
+{
+    return create<NotEqual>(left, right);
+}
+template <class R>
+Query operator!=(ObjectId left, const Subexpr2<R>& right)
+{
+    return create<NotEqual>(left, right);
+}
+template <class R>
+Query operator!=(Decimal128 left, const Subexpr2<R>& right)
 {
     return create<NotEqual>(left, right);
 }
@@ -2084,7 +2238,12 @@ public:
             REALM_ASSERT(m_leaf_ptr != nullptr);
             // Not a link column
             for (size_t t = 0; t < destination.m_values && index + t < m_leaf_ptr->size(); t++) {
-                d.m_storage.set(t, m_leaf_ptr->get(index + t));
+                if (m_leaf_ptr->is_null(index + t)) {
+                    d.m_storage.set_null(t);
+                }
+                else {
+                    d.m_storage.set(t, m_leaf_ptr->get(index + t));
+                }
             }
         }
     }
@@ -2160,6 +2319,16 @@ class Columns<Timestamp> : public SimpleQuerySupport<Timestamp> {
 
 template <>
 class Columns<BinaryData> : public SimpleQuerySupport<BinaryData> {
+    using SimpleQuerySupport::SimpleQuerySupport;
+};
+
+template <>
+class Columns<ObjectId> : public SimpleQuerySupport<ObjectId> {
+    using SimpleQuerySupport::SimpleQuerySupport;
+};
+
+template <>
+class Columns<Decimal128> : public SimpleQuerySupport<Decimal128> {
     using SimpleQuerySupport::SimpleQuerySupport;
 };
 
@@ -3543,7 +3712,7 @@ private:
 namespace aggregate_operations {
 template <typename T, typename Derived, typename R = T>
 class BaseAggregateOperation {
-    static_assert(std::is_same<T, Int>::value || std::is_same<T, Float>::value || std::is_same<T, Double>::value,
+    static_assert(realm::is_any<T, Int, Float, Double, Decimal128>::value,
                   "Numeric aggregates can only be used with subcolumns of numeric types");
 
 public:
@@ -3586,6 +3755,23 @@ public:
     }
 };
 
+template <>
+class Minimum<Decimal128> : public BaseAggregateOperation<Decimal128, Minimum<Decimal128>> {
+public:
+    static Decimal128 initial_value()
+    {
+        return Decimal128("+inf");
+    }
+    static Decimal128 apply(Decimal128 a, Decimal128 b)
+    {
+        return std::min(a, b);
+    }
+    static std::string description()
+    {
+        return "@min";
+    }
+};
+
 template <typename T>
 class Maximum : public BaseAggregateOperation<T, Maximum<T>> {
 public:
@@ -3594,6 +3780,23 @@ public:
         return std::numeric_limits<T>::lowest();
     }
     static T apply(T a, T b)
+    {
+        return std::max(a, b);
+    }
+    static std::string description()
+    {
+        return "@max";
+    }
+};
+
+template <>
+class Maximum<Decimal128> : public BaseAggregateOperation<Decimal128, Maximum<Decimal128>> {
+public:
+    static Decimal128 initial_value()
+    {
+        return Decimal128("-inf");
+    }
+    static Decimal128 apply(Decimal128 a, Decimal128 b)
     {
         return std::max(a, b);
     }
@@ -3640,6 +3843,29 @@ public:
     double result() const
     {
         return Base::m_result / Base::m_count;
+    }
+    static std::string description()
+    {
+        return "@avg";
+    }
+};
+
+template <>
+class Average<Decimal128> : public BaseAggregateOperation<Decimal128, Average<Decimal128>, Decimal128> {
+    using Base = BaseAggregateOperation<Decimal128, Average<Decimal128>, Decimal128>;
+
+public:
+    static Decimal128 initial_value()
+    {
+        return Decimal128(0);
+    }
+    static Decimal128 apply(Decimal128 a, Decimal128 b)
+    {
+        return a + b;
+    }
+    Decimal128 result() const
+    {
+        return Decimal128(Base::m_result) / Base::m_count;
     }
     static std::string description()
     {
@@ -3925,7 +4151,6 @@ public:
 
                 // key is known to be in this leaf, so find key whithin leaf keys
                 return m_cluster->lower_bound_key(ObjKey(actual_key.value - m_cluster->get_offset()));
-
             }
             return not_found;
         }

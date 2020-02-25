@@ -768,6 +768,11 @@ public:
         return trans->add_table(name); // Throws
     }
 
+    TableRef add_embedded_table(StringData name) const
+    {
+        return trans->add_embedded_table(name); // Throws
+    }
+
     TableRef get_or_add_table(StringData name, bool* was_added = nullptr) const
     {
         return trans->get_or_add_table(name, was_added); // Throws

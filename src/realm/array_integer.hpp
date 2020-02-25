@@ -271,14 +271,7 @@ inline void ArrayInteger::set(size_t ndx, int64_t value)
 
 inline void ArrayInteger::set_uint(size_t ndx, uint_fast64_t value) noexcept
 {
-    // When a value of a signed type is converted to an unsigned type, the C++
-    // standard guarantees that negative values are converted from the native
-    // representation to 2's complement, but the effect of conversions in the
-    // opposite direction is left unspecified by the
-    // standard. `realm::util::from_twos_compl()` is used here to perform the
-    // correct opposite unsigned-to-signed conversion, which reduces to a no-op
-    // when 2's complement is the native representation of negative values.
-    set(ndx, util::from_twos_compl<int_fast64_t>(value));
+    set(ndx, int_fast64_t(value));
 }
 
 inline bool ArrayInteger::compare(const ArrayInteger& a) const noexcept

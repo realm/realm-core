@@ -31,6 +31,7 @@ namespace realm {
 class BinaryData;
 struct ColKey;
 struct null;
+class ObjectId;
 struct ObjKey;
 class StringData;
 class Timestamp;
@@ -52,9 +53,15 @@ const static std::string value_separator = ".";
 // Specializations declared here to be defined in the cpp file
 template <> std::string print_value<>(BinaryData);
 template <> std::string print_value<>(bool);
+template <>
+std::string print_value<>(float);
+template <>
+std::string print_value<>(double);
 template <> std::string print_value<>(realm::null);
 template <> std::string print_value<>(StringData);
 template <> std::string print_value<>(realm::Timestamp);
+template <>
+std::string print_value<>(realm::ObjectId);
 template <>
 std::string print_value<>(realm::ObjKey);
 

@@ -64,6 +64,7 @@ using namespace realm::util;
 
 #include <realm/util/encrypted_file_mapping.hpp>
 #include <realm/util/to_string.hpp>
+#include <realm/util/scope_exit.hpp>
 
 #include <future>
 #include <chrono>
@@ -979,7 +980,7 @@ class NoPageReclaimGovernor : public realm::util::PageReclaimGovernor {
 public:
     NoPageReclaimGovernor()
     {
-        has_run_once = will_run.get_future();
+        has_run_twice = will_run.get_future();
     }
 
     std::function<int64_t()> current_target_getter(size_t) override
@@ -989,15 +990,15 @@ public:
 
     void report_target_result(int64_t) override
     {
-        if (!has_run) {
+        if (run_count == 2) { // need to run twice before we're done
             will_run.set_value();
-            has_run = true;
         }
+        ++run_count;
     }
 
-    std::future<void> has_run_once;
+    std::future<void> has_run_twice;
     std::promise<void> will_run;
-    bool has_run = false;
+    int run_count = 0;
 };
 
 // this test relies on the global state of the number of decrypted pages and therefore must be run in isolation
@@ -1014,12 +1015,16 @@ NONCONCURRENT_TEST(Metrics_NumDecryptedPagesWithoutEncryption)
         auto tr = sg->start_write();
         tr->add_table("table");
 
+#if REALM_ENABLE_ENCRYPTION
         // we need this here because other unit tests might be using encryption and we need a guarantee
         // that the global pages are from this shared group only.
         NoPageReclaimGovernor gov;
         realm::util::set_page_reclaim_governor(&gov);
-        CHECK(gov.has_run_once.valid());
-        gov.has_run_once.wait_for(std::chrono::seconds(2));
+        // the remainder of the test suite should use the default.
+        auto on_exit = make_scope_exit([]() noexcept { realm::util::set_page_reclaim_governor_to_default(); });
+        CHECK(gov.has_run_twice.valid());
+        REALM_ASSERT_RELEASE(gov.has_run_twice.wait_for(std::chrono::seconds(30)) == std::future_status::ready);
+#endif
 
         tr->commit();
     }
@@ -1041,8 +1046,6 @@ NONCONCURRENT_TEST(Metrics_NumDecryptedPagesWithoutEncryption)
     CHECK_EQUAL(transactions->at(1).get_transaction_type(),
                 realm::metrics::TransactionInfo::TransactionType::read_transaction);
     CHECK_EQUAL(transactions->at(1).get_num_decrypted_pages(), 0);
-
-    realm::util::set_page_reclaim_governor_to_default(); // the remainder of the test suite should use the default
 }
 
 // this test relies on the global state of the number of decrypted pages and therefore must be run in isolation
@@ -1059,10 +1062,14 @@ NONCONCURRENT_TEST_IF(Metrics_NumDecryptedPagesWithEncryption, REALM_ENABLE_ENCR
         auto tr = sg->start_write();
         tr->add_table("table");
 
+#if REALM_ENABLE_ENCRYPTION
         NoPageReclaimGovernor gov;
         realm::util::set_page_reclaim_governor(&gov);
-        CHECK(gov.has_run_once.valid());
-        gov.has_run_once.wait_for(std::chrono::seconds(2));
+        // the remainder of the test suite should use the default.
+        auto on_exit = make_scope_exit([]() noexcept { realm::util::set_page_reclaim_governor_to_default(); });
+        CHECK(gov.has_run_twice.valid());
+        REALM_ASSERT_RELEASE(gov.has_run_twice.wait_for(std::chrono::seconds(30)) == std::future_status::ready);
+#endif
 
         tr->commit();
     }
@@ -1084,8 +1091,6 @@ NONCONCURRENT_TEST_IF(Metrics_NumDecryptedPagesWithEncryption, REALM_ENABLE_ENCR
     CHECK_EQUAL(transactions->at(1).get_transaction_type(),
                 realm::metrics::TransactionInfo::TransactionType::read_transaction);
     CHECK_EQUAL(transactions->at(1).get_num_decrypted_pages(), 1);
-
-    realm::util::set_page_reclaim_governor_to_default(); // the remainder of the test suite should use the default
 }
 
 TEST(Metrics_MemoryChecks)

@@ -24,7 +24,9 @@
 #include "realm/array_string.hpp"
 #include "realm/array_binary.hpp"
 #include "realm/array_timestamp.hpp"
+#include "realm/array_decimal128.hpp"
 #include "realm/array_key.hpp"
+#include "realm/array_object_id.hpp"
 #include "realm/array_backlink.hpp"
 #include "realm/column_type_traits.hpp"
 #include "realm/index_string.hpp"
@@ -55,7 +57,12 @@ GlobalKey ConstObj::get_object_id() const
 
 const ClusterTree* ConstObj::get_tree_top() const
 {
-    return &m_table.unchecked_ptr()->m_clusters;
+    if (m_key.is_unresolved()) {
+        return m_table.unchecked_ptr()->m_tombstones.get();
+    }
+    else {
+        return &m_table.unchecked_ptr()->m_clusters;
+    }
 }
 
 Allocator& ConstObj::get_alloc() const
@@ -123,6 +130,13 @@ int ConstObj::cmp(const ConstObj& other, ColKey col_key) const
             return cmp<Binary>(other, col_ndx);
         case type_Timestamp:
             return cmp<Timestamp>(other, col_ndx);
+        case type_Decimal:
+            return cmp<Decimal128>(other, col_ndx);
+        case type_ObjectId:
+            if (attr.test(col_attr_Nullable))
+                return cmp<Optional<ObjectId>>(other, col_ndx);
+            else
+                return cmp<ObjectId>(other, col_ndx);
         case type_Link:
             return cmp<ObjKey>(other, col_ndx);
         case type_OldDateTime:
@@ -166,6 +180,11 @@ void ConstObj::check_valid() const
 void ConstObj::remove()
 {
     m_table.cast_away_const()->remove_object(m_key);
+}
+
+void ConstObj::invalidate()
+{
+    m_table.cast_away_const()->invalidate_object(m_key);
 }
 
 ColKey ConstObj::get_column_key(StringData col_name) const
@@ -244,6 +263,39 @@ T ConstObj::_get(ColKey::Idx col_ndx) const
 
     typename ColumnTypeTraits<T>::cluster_leaf_type values(get_alloc());
     ref_type ref = to_ref(Array::get(m_mem.get_addr(), col_ndx.val + 1));
+    values.init_from_ref(ref);
+
+    return values.get(m_row_ndx);
+}
+
+template <>
+ObjKey ConstObj::_get<ObjKey>(ColKey::Idx col_ndx) const
+{
+    _update_if_needed();
+
+    ArrayKey values(get_alloc());
+    ref_type ref = to_ref(Array::get(m_mem.get_addr(), col_ndx.val + 1));
+    values.init_from_ref(ref);
+
+    ObjKey k = values.get(m_row_ndx);
+    return k.is_unresolved() ? ObjKey{} : k;
+}
+
+bool ConstObj::is_unresolved(ColKey col_key) const
+{
+    m_table->report_invalid_key(col_key);
+    ColumnType type = col_key.get_type();
+    REALM_ASSERT(type == col_type_Link);
+
+    _update_if_needed();
+
+    return get_unfiltered_link(col_key).is_unresolved();
+}
+
+ObjKey ConstObj::get_unfiltered_link(ColKey col_key) const
+{
+    ArrayKey values(get_alloc());
+    ref_type ref = to_ref(Array::get(m_mem.get_addr(), col_key.get_index().val + 1));
     values.init_from_ref(ref);
 
     return values.get(m_row_ndx);
@@ -367,6 +419,10 @@ Mixed ConstObj::get_any(ColKey col_key) const
             return Mixed{_get<Binary>(col_ndx)};
         case col_type_Timestamp:
             return Mixed{_get<Timestamp>(col_ndx)};
+        case col_type_Decimal:
+            return Mixed{_get<Decimal128>(col_ndx)};
+        case col_type_ObjectId:
+            return Mixed{_get<util::Optional<ObjectId>>(col_ndx)};
         case col_type_Link:
             return Mixed{_get<ObjKey>(col_ndx)};
         default:
@@ -442,8 +498,12 @@ bool ConstObj::is_null(ColKey col_key) const
                 return do_is_null<ArrayTimestamp>(col_ndx);
             case col_type_Link:
                 return do_is_null<ArrayKey>(col_ndx);
+            case col_type_ObjectId:
+                return do_is_null<ArrayObjectIdNull>(col_ndx);
+            case col_type_Decimal:
+                return do_is_null<ArrayDecimal128>(col_ndx);
             default:
-                break;
+                REALM_UNREACHABLE();
         }
     }
     return false;
@@ -454,21 +514,26 @@ bool ConstObj::is_null(ColKey col_key) const
 bool ConstObj::has_backlinks(bool only_strong_links) const
 {
     const Table& target_table = *m_table;
+
+    // If we only look for strong links and the table is not embedded,
+    // then there is no relevant backlinks to find.
+    if (only_strong_links && !target_table.is_embedded()) {
+        return false;
+    }
+
     auto look_for_backlinks = [&](ColKey backlink_col_key) {
         // Find origin table and column for this backlink column
         TableRef origin_table = target_table.get_opposite_table(backlink_col_key);
         ColKey origin_col = target_table.get_opposite_column(backlink_col_key);
-        if (!only_strong_links || origin_col.get_attrs().test(col_attr_StrongLinks)) {
-            auto cnt = get_backlink_count(*origin_table, origin_col);
-            if (cnt)
-                return true;
-        }
+        auto cnt = get_backlink_count(*origin_table, origin_col);
+        if (cnt)
+            return true;
         return false;
     };
     return m_table->for_each_backlink_column(look_for_backlinks);
 }
 
-size_t ConstObj::get_backlink_count(bool only_strong_links) const
+size_t ConstObj::get_backlink_count() const
 {
     const Table& target_table = *m_table;
     size_t cnt = 0;
@@ -476,9 +541,7 @@ size_t ConstObj::get_backlink_count(bool only_strong_links) const
         // Find origin table and column for this backlink column
         TableRef origin_table = target_table.get_opposite_table(backlink_col_key);
         ColKey origin_col = target_table.get_opposite_column(backlink_col_key);
-        if (!only_strong_links || origin_col.get_attrs().test(col_attr_StrongLinks)) {
-            cnt += get_backlink_count(*origin_table, origin_col);
-        }
+        cnt += get_backlink_count(*origin_table, origin_col);
         return false;
     };
     m_table->for_each_backlink_column(look_for_backlinks);
@@ -552,6 +615,63 @@ std::vector<ObjKey> ConstObj::get_all_backlinks(ColKey backlink_col) const
     return vec;
 }
 
+void ConstObj::traverse_path(Visitor v, PathSizer ps, size_t path_length) const
+{
+    if (m_table->is_embedded()) {
+        REALM_ASSERT(get_backlink_count() == 1);
+        m_table->for_each_backlink_column([&](ColKey col_key) {
+            std::vector<ObjKey> backlinks = get_all_backlinks(col_key);
+            if (backlinks.size() == 1) {
+                TableRef tr = m_table->get_opposite_table(col_key);
+                ConstObj obj = tr->get_object(backlinks[0]); // always the first (and only)
+                auto next_col_key = m_table->get_opposite_column(col_key);
+                size_t index = 0;
+                if (next_col_key.get_attrs().test(col_attr_List)) {
+                    ConstLnkLst ll = obj.get_linklist(next_col_key);
+                    while (ll.get(index) != get_key()) {
+                        index++;
+                        REALM_ASSERT(ll.size() > index);
+                    }
+                }
+                obj.traverse_path(v, ps, path_length + 1);
+                v(obj, next_col_key, index);
+                return true; // early out
+            }
+            return false; // try next column
+        });
+    }
+    else {
+        ps(path_length);
+    }
+}
+
+ConstObj::FatPath ConstObj::get_fat_path() const
+{
+    FatPath result;
+    auto sizer = [&](size_t size) { result.reserve(size); };
+    auto step = [&](const ConstObj& o2, ColKey col, size_t idx) -> void { result.push_back({o2, col, idx}); };
+    traverse_path(step, sizer);
+    return result;
+}
+
+ConstObj::Path ConstObj::get_path() const
+{
+    Path result;
+    bool top_done = false;
+    auto sizer = [&](size_t size) { result.path_from_top.reserve(size); };
+    auto step = [&](const ConstObj& o2, ColKey col, size_t idx) -> void {
+        if (!top_done) {
+            top_done = true;
+            result.top_table = o2.get_table()->get_key();
+            result.top_objkey = o2.get_key();
+        }
+        result.path_from_top.push_back({col, idx});
+    };
+    traverse_path(step, sizer);
+    return result;
+}
+
+
 namespace {
 const char to_be_escaped[] = "\"\n\r\t\f\\\b";
 const char encoding[] = "\"nrtf\\b";
@@ -616,6 +736,16 @@ void out_mixed(std::ostream& out, const Mixed& val)
             out << val.get<Timestamp>();
             out << "\"";
             break;
+        case type_Decimal:
+            out << "\"";
+            out << val.get<Decimal128>();
+            out << "\"";
+            break;
+        case type_ObjectId:
+            out << "\"";
+            out << val.get<ObjectId>();
+            out << "\"";
+            break;
         case type_Link:
         case type_LinkList:
         case type_OldDateTime:
@@ -646,12 +776,14 @@ void ConstObj::to_json(std::ostream& out, size_t link_depth, std::map<std::strin
 
         if (ck.get_attrs().test(col_attr_List)) {
             if (type == type_LinkList) {
+                TableRef target_table = get_target_table(ck);
                 auto ll = get_linklist(ck);
                 auto sz = ll.size();
 
-                if ((link_depth == 0) ||
-                    (link_depth == not_found && std::find(followed.begin(), followed.end(), ck) != followed.end())) {
-                    out << "{\"table\": \"" << get_target_table(ck)->get_name() << "\", \"keys\": [";
+                if (!target_table->is_embedded() &&
+                    ((link_depth == 0) || (link_depth == not_found &&
+                                           std::find(followed.begin(), followed.end(), ck) != followed.end()))) {
+                    out << "{\"table\": \"" << target_table->get_name() << "\", \"keys\": [";
                     for (size_t i = 0; i < sz; i++) {
                         if (i > 0)
                             out << ",";
@@ -670,7 +802,6 @@ void ConstObj::to_json(std::ostream& out, size_t link_depth, std::map<std::strin
                     }
                     out << "]";
                 }
-
             }
             else {
                 auto list = get_listbase_ptr(ck);
@@ -688,12 +819,15 @@ void ConstObj::to_json(std::ostream& out, size_t link_depth, std::map<std::strin
         }
         else {
             if (type == type_Link) {
+                TableRef target_table = get_target_table(ck);
                 auto k = get<ObjKey>(ck);
                 if (k) {
                     auto obj = get_linked_object(ck);
-                    if ((link_depth == 0) ||
-                        (link_depth == not_found && std::find(followed.begin(), followed.end(), ck) != followed.end())) {
-                        out << "{\"table\": \"" << get_target_table(ck)->get_name() << "\", \"key\": " << obj.get_key().value << "}";
+                    if (!target_table->is_embedded() &&
+                        ((link_depth == 0) || (link_depth == not_found &&
+                                               std::find(followed.begin(), followed.end(), ck) != followed.end()))) {
+                        out << "{\"table\": \"" << get_target_table(ck)->get_name()
+                            << "\", \"key\": " << obj.get_key().value << "}";
                     }
                     else {
                         followed.push_back(ck);
@@ -780,6 +914,12 @@ Obj& Obj::set(ColKey col_key, Mixed value)
                 break;
             case col_type_Timestamp:
                 set(col_key, value.get<Timestamp>());
+                break;
+            case col_type_ObjectId:
+                set(col_key, value.get<ObjectId>());
+                break;
+            case col_type_Decimal:
+                set(col_key, value.get<Decimal128>());
                 break;
             case col_type_Link:
                 set(col_key, value.get<ObjKey>());
@@ -899,14 +1039,19 @@ Obj& Obj::set<ObjKey>(ColKey col_key, ObjKey target_key, bool is_default)
     if (type != ColumnTypeTraits<ObjKey>::column_id)
         throw LogicError(LogicError::illegal_type);
     TableRef target_table = get_target_table(col_key);
-    if (target_key != null_key && !target_table->is_valid(target_key)) {
-        throw LogicError(LogicError::target_row_index_out_of_range);
+    if (target_key) {
+        ClusterTree* ct = target_key.is_unresolved() ? target_table->m_tombstones.get() : &target_table->m_clusters;
+        if (!ct->is_valid(target_key)) {
+            throw LogicError(LogicError::target_row_index_out_of_range);
+        }
+        if (target_table->is_embedded()) {
+            throw LogicError(LogicError::wrong_kind_of_table);
+        }
     }
-
-    ObjKey old_key = get<ObjKey>(col_key); // Will update if needed
+    ObjKey old_key = get_unfiltered_link(col_key); // Will update if needed
 
     if (target_key != old_key) {
-        CascadeState state;
+        CascadeState state(old_key.is_unresolved() ? CascadeState::Mode::All : CascadeState::Mode::Strong);
 
         ensure_writeable();
         bool recurse = replace_backlink(col_key, old_key, target_key, state);
@@ -932,6 +1077,52 @@ Obj& Obj::set<ObjKey>(ColKey col_key, ObjKey target_key, bool is_default)
     }
 
     return *this;
+}
+
+Obj Obj::create_and_set_linked_object(ColKey col_key)
+{
+    update_if_needed();
+    get_table()->report_invalid_key(col_key);
+    ColKey::Idx col_ndx = col_key.get_index();
+    ColumnType type = col_key.get_type();
+    if (type != col_type_Link)
+        throw LogicError(LogicError::illegal_type);
+    TableRef target_table = get_target_table(col_key);
+    Table& t = *target_table;
+    auto result = t.is_embedded() ? t.create_linked_object() : t.create_object();
+    auto target_key = result.get_key();
+    ObjKey old_key = get<ObjKey>(col_key); // Will update if needed
+    if (!t.is_embedded() && old_key != ObjKey()) {
+        throw LogicError(LogicError::wrong_kind_of_table);
+    }
+    if (target_key != old_key) {
+        CascadeState state;
+
+        ensure_writeable();
+        bool recurse = replace_backlink(col_key, old_key, target_key, state);
+
+        Allocator& alloc = get_alloc();
+        alloc.bump_content_version();
+        Array fallback(alloc);
+        Array& fields = get_tree_top()->get_fields_accessor(fallback, m_mem);
+        REALM_ASSERT(col_ndx.val + 1 < fields.size());
+        ArrayKey values(alloc);
+        values.set_parent(&fields, col_ndx.val + 1);
+        values.init_from_parent();
+
+        values.set(m_row_ndx, target_key);
+
+        if (Replication* repl = get_replication()) {
+            bool is_default = true; // FIXME: Is this correct?
+            repl->set(m_table.unchecked_ptr(), col_key, m_key, target_key,
+                      is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
+        }
+
+        if (recurse)
+            target_table->remove_recursive(state);
+    }
+
+    return result;
 }
 
 namespace {
@@ -1109,8 +1300,8 @@ void Obj::set_backlink(ColKey col_key, ObjKey new_key)
         ColKey backlink_col_key = m_table->get_opposite_column(col_key);
         REALM_ASSERT(target_table->valid_column(backlink_col_key));
 
-        Obj target_obj = target_table->get_object(new_key);
-        target_obj.add_backlink(backlink_col_key, m_key); // Throws
+        ClusterTree* ct = new_key.is_unresolved() ? target_table->m_tombstones.get() : &target_table->m_clusters;
+        ct->get(new_key).add_backlink(backlink_col_key, m_key);
     }
 }
 
@@ -1131,10 +1322,11 @@ bool Obj::remove_backlink(ColKey col_key, ObjKey old_key, CascadeState& state)
     ColKey backlink_col_key = m_table->get_opposite_column(col_key);
     REALM_ASSERT(target_table->valid_column(backlink_col_key));
 
-    bool strong_links = (origin_table.get_link_type(col_key) == link_Strong);
+    bool strong_links = target_table->is_embedded();
 
     if (old_key != realm::null_key) {
-        Obj target_obj = target_table->get_object(old_key);
+        ClusterTree* ct = old_key.is_unresolved() ? target_table->m_tombstones.get() : &target_table->m_clusters;
+        Obj target_obj = ct->get(old_key);
         bool last_removed = target_obj.remove_one_backlink(backlink_col_key, m_key); // Throws
         return state.enqueue_for_cascade(target_obj, strong_links, last_removed);
     }
@@ -1191,7 +1383,7 @@ void Obj::assign(const ConstObj& other)
             auto linking_obj = t->get_object(bl);
             if (c.get_type() == col_type_Link) {
                 // Single link
-                REALM_ASSERT(linking_obj.get<ObjKey>(c) == other.get_key());
+                REALM_ASSERT(!linking_obj.get<ObjKey>(c) || linking_obj.get<ObjKey>(c) == other.get_key());
                 linking_obj.set(c, get_key());
             }
             else {
@@ -1207,6 +1399,37 @@ void Obj::assign(const ConstObj& other)
 }
 
 
+void Obj::assign_pk_and_backlinks(const ConstObj& other)
+{
+    REALM_ASSERT(get_table() == other.get_table());
+    if (auto col_pk = m_table->get_primary_key_column()) {
+        Mixed val = other.get_any(col_pk);
+        this->set(col_pk, val);
+    }
+
+    auto copy_links = [this, &other](ColKey col) {
+        auto t = m_table->get_opposite_table(col);
+        auto c = m_table->get_opposite_column(col);
+        auto backlinks = other.get_all_backlinks(col);
+        for (auto bl : backlinks) {
+            auto linking_obj = t->get_object(bl);
+            if (c.get_type() == col_type_Link) {
+                // Single link
+                REALM_ASSERT(!linking_obj.get<ObjKey>(c) || linking_obj.get<ObjKey>(c) == other.get_key());
+                linking_obj.set(c, get_key());
+            }
+            else {
+                auto l = linking_obj.get_list<ObjKey>(c);
+                auto n = l.find_first(other.get_key());
+                REALM_ASSERT(n != realm::npos);
+                l.set(n, get_key());
+            }
+        }
+        return false;
+    };
+    m_table->for_each_backlink_column(copy_links);
+}
+
 template util::Optional<int64_t> ConstObj::get<util::Optional<int64_t>>(ColKey col_key) const;
 template util::Optional<Bool> ConstObj::get<util::Optional<Bool>>(ColKey col_key) const;
 template float ConstObj::get<float>(ColKey col_key) const;
@@ -1216,7 +1439,10 @@ template util::Optional<double> ConstObj::get<util::Optional<double>>(ColKey col
 template StringData ConstObj::get<StringData>(ColKey col_key) const;
 template BinaryData ConstObj::get<BinaryData>(ColKey col_key) const;
 template Timestamp ConstObj::get<Timestamp>(ColKey col_key) const;
+template ObjectId ConstObj::get<ObjectId>(ColKey col_key) const;
+template util::Optional<ObjectId> ConstObj::get<util::Optional<ObjectId>>(ColKey col_key) const;
 template ObjKey ConstObj::get<ObjKey>(ColKey col_key) const;
+template Decimal128 ConstObj::get<Decimal128>(ColKey col_key) const;
 
 template Obj& Obj::set<bool>(ColKey, bool, bool);
 template Obj& Obj::set<float>(ColKey, float, bool);
@@ -1224,6 +1450,8 @@ template Obj& Obj::set<double>(ColKey, double, bool);
 template Obj& Obj::set<StringData>(ColKey, StringData, bool);
 template Obj& Obj::set<BinaryData>(ColKey, BinaryData, bool);
 template Obj& Obj::set<Timestamp>(ColKey, Timestamp, bool);
+template Obj& Obj::set<Decimal128>(ColKey, Decimal128, bool);
+template Obj& Obj::set<ObjectId>(ColKey, ObjectId, bool);
 
 template <class T>
 inline void Obj::do_set_null(ColKey col_key)
@@ -1290,6 +1518,9 @@ Obj& Obj::set_null(ColKey col_key, bool is_default)
             case col_type_Double:
                 do_set_null<ArrayDoubleNull>(col_key);
                 break;
+            case col_type_ObjectId:
+                do_set_null<ArrayObjectIdNull>(col_key);
+                break;
             case col_type_String:
                 do_set_null<ArrayString>(col_key);
                 break;
@@ -1299,8 +1530,11 @@ Obj& Obj::set_null(ColKey col_key, bool is_default)
             case col_type_Timestamp:
                 do_set_null<ArrayTimestamp>(col_key);
                 break;
-            default:
+            case col_type_Decimal:
+                do_set_null<ArrayDecimal128>(col_key);
                 break;
+            default:
+                REALM_UNREACHABLE();
         }
     }
 
