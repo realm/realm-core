@@ -398,8 +398,9 @@ private:
     const char* m_key;
     int m_file_format_version = 0;
     std::map<VersionID::version_type, std::weak_ptr<Transaction>> m_frozen_transactions;
+    // specifically keep the most recent frozen transaction alive to support a use case
+    // where the most recent transaction is frozen, then deleted, then frozen again, etc.
     std::shared_ptr<Transaction> m_recent_frozen_transaction;
-    VersionID::version_type m_version_of_recent_frozen_transaction;
     util::InterprocessMutex m_writemutex;
 #ifdef REALM_ASYNC_DAEMON
     util::InterprocessMutex m_balancemutex;

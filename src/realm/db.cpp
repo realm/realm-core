@@ -2355,18 +2355,17 @@ TransactionRef DB::start_frozen(VersionID version_id)
     }
     // reuse most recent (and add to cache) if asked for it
     if (asked_for_most_recent && m_recent_frozen_transaction &&
-        m_version_of_recent_frozen_transaction == version_id.version) {
+        m_recent_frozen_transaction->get_version() == version_id.version) {
         weak_tr = m_recent_frozen_transaction;
         return m_recent_frozen_transaction;
     }
-    // none cached, create a new.
+    // none cached, create a new one.
     auto res = TransactionRef(new Transaction(shared_from_this(), &m_alloc, read_lock, DB::transact_Frozen),
                               TransactionDeleter);
     res->set_file_format_version(get_file_format_version());
     weak_tr = res;
     if (asked_for_most_recent) {
         m_recent_frozen_transaction = res;
-        m_version_of_recent_frozen_transaction = version_id.version;
     }
     g.release();
     return res;
