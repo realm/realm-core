@@ -1,20 +1,8 @@
-# NEXT RELEASE
-
-### Enhancements
-* None.
+# 6.0.4 Release notes
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* It was not possible to make client resync if a table contained binary data. ([#3619](https://github.com/realm/realm-core/issues/3619), v6.0.0-alpha.0)
  
-### Breaking changes
-* None.
-
------------
-
-### Internals
-* None.
-
 ----------------------------------------------
 
 # 6.0.3 Release notes
