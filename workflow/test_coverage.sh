@@ -25,7 +25,7 @@ rm -rf coverage.build
 mkdir -p coverage.build
 cd coverage.build
 
-cmake_flags=""
+cmake_flags="-DCMAKE_CXX_FLAGS=-Werror"
 if [ "${sync}" = "sync" ]; then
     cmake_flags="${cmake_flags} -DREALM_ENABLE_SYNC=1 -DREALM_ENABLE_SERVER=1 -DOPENSSL_ROOT_DIR=${OPENSSL_ROOT_DIR}"
 fi
