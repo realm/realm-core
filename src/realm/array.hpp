@@ -696,7 +696,7 @@ public:
 #endif
 
     Array& operator=(const Array&) = delete; // not allowed
-    Array(const Array&) = delete; // not allowed
+    Array(const Array&) = delete;            // not allowed
 protected:
     typedef bool (*CallbackDummy)(int64_t);
 
@@ -1055,8 +1055,7 @@ inline RefOrTagged RefOrTagged::make_ref(ref_type ref) noexcept
 inline RefOrTagged RefOrTagged::make_tagged(uint_fast64_t i) noexcept
 {
     REALM_ASSERT(i < (1ULL << 63));
-    int_fast64_t value = util::from_twos_compl<int_fast64_t>((i << 1) | 1);
-    return RefOrTagged(value);
+    return RefOrTagged((i << 1) | 1);
 }
 
 inline RefOrTagged::RefOrTagged(int_fast64_t value) noexcept
@@ -1605,7 +1604,8 @@ bool Array::find_optimized(int64_t value, size_t start, size_t end, size_t basei
             baseindex--;
         }
         else {
-            // We were called by find() of a nullable array. So skip first entry, take nulls in count, etc, etc. Fixme:
+            // We were called by find() of a nullable array. So skip first entry, take nulls in count, etc, etc.
+            // Fixme:
             // Huge speed optimizations are possible here! This is a very simple generic method.
             auto null_value = get(0);
             for (; start2 < end; start2++) {

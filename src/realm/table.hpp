@@ -266,6 +266,8 @@ public:
     }
     // Get object based on primary key
     Obj get_object_with_primary_key(Mixed pk);
+    // Get primary key based on ObjKey
+    Mixed get_primary_key(ObjKey key);
     // Get logical index for object. This function is not very efficient
     size_t get_object_ndx(ObjKey key) const
     {
@@ -748,6 +750,8 @@ private:
     ObjKey allocate_unresolved_key(ObjKey key, const FieldValues& values);
     /// Should be called when an object is deleted
     void free_local_id_after_hash_collision(ObjKey key);
+    /// Should be called when last entry is removed - or when table is cleared
+    void free_collision_table();
 
     /// Called in the context of Group::commit() to ensure that
     /// attached table accessors stay valid across a commit. Please
