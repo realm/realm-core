@@ -346,7 +346,7 @@ TEST(Unresolved_PkCollission)
     CHECK_EQUAL(t->nb_unresolved(), 0);
     CHECK_EQUAL(t->size(), 4);
 
-    // This pk will collide with plain '9'
+    // This pk will collide with plain '5'
     int64_t pk5 = int64_t(5 + (1ull << 63));
     k1 = t->get_objkey_from_primary_key(pk5);
     k2 = t->get_objkey_from_primary_key(5);

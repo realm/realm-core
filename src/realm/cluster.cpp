@@ -1944,6 +1944,7 @@ Obj ClusterTree::insert(ObjKey k, const FieldValues& values)
 
     insert_fast(k, init_values, state);
 
+    // Tombstones do not use index - will crash if we try to insert values
     if (!k.is_unresolved()) {
         // Update index
         auto value = init_values.begin();
@@ -2073,6 +2074,7 @@ size_t ClusterTree::get_ndx(ObjKey k) const
 
 void ClusterTree::erase(ObjKey k, CascadeState& state)
 {
+    // Tombstones do not use index - will crash if we try to erase values
     if (!k.is_unresolved()) {
         size_t num_cols = get_spec().get_public_column_count();
         for (size_t col_ndx = 0; col_ndx < num_cols; col_ndx++) {

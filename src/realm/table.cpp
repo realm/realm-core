@@ -1740,7 +1740,6 @@ void Table::clear()
     CascadeState state(CascadeState::Mode::Strong, get_parent_group());
     m_clusters.clear(state);
     // FIXME: what should happen to tombstones when a table is cleared?
-    // m_tombstones->clear(state); <-- does not work.
     if (m_tombstones) {
         m_tombstones->destroy();
         m_tombstones = nullptr;
