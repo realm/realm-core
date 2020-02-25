@@ -90,6 +90,11 @@
 ### Internals
 * File format bumped to 11.
 
+# 6.0.4 Release notes
+
+### Fixed
+* It was not possible to make client resync if a table contained binary data. ([#3619](https://github.com/realm/realm-core/issues/3619), v6.0.0-alpha.0)
+ 
 ----------------------------------------------
 
 # 6.0.3 Release notes

@@ -726,6 +726,33 @@ NONCONCURRENT_TEST(TableView_StringSort)
     set_string_compare_method(STRING_COMPARE_CORE, nullptr);
 }
 
+TEST(TableView_BinarySort)
+{
+    Table t;
+    auto col_bin = t.add_column(type_Binary, "bin", true);
+    auto col_rank = t.add_column(type_Int, "rank");
+
+    const char b1[] = {1, 2, 3, 4, 5};
+    const char b2[] = {1, 2, 0, 4, 5};
+    const char b3[] = {1, 2, 3, 4};
+    const char b4[] = {1, 2, 3, 4, 5, 6};
+
+    t.create_object(ObjKey{}, {{col_bin, BinaryData(b1, sizeof(b1))}, {col_rank, 4}});
+    t.create_object(ObjKey{}, {{col_bin, BinaryData(b2, sizeof(b2))}, {col_rank, 2}});
+    t.create_object(ObjKey{}, {{col_rank, 1}});
+    t.create_object(ObjKey{}, {{col_bin, BinaryData(b3, sizeof(b3))}, {col_rank, 3}});
+    t.create_object(ObjKey{}, {{col_bin, BinaryData(b4, sizeof(b4))}, {col_rank, 5}});
+
+    TableView tv = t.where().find_all();
+    tv.sort(col_bin);
+    int64_t rank = 0;
+    for (size_t n = 0; n < tv.size(); n++) {
+        auto this_rank = tv.get_object(n).get<Int>(col_rank);
+        CHECK_GREATER(this_rank, rank);
+        rank = this_rank;
+    }
+}
+
 
 TEST(TableView_FloatDoubleSort)
 {
