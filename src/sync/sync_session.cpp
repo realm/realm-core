@@ -515,6 +515,7 @@ void SyncSession::handle_error(SyncError error)
             case ProtocolError::bad_decompression:
             case ProtocolError::unsupported_session_feature:
             case ProtocolError::transact_before_upload:
+            case ProtocolError::partial_sync_disabled:
                 break;
             // Session errors
             case ProtocolError::session_closed:
@@ -595,8 +596,6 @@ void SyncSession::handle_error(SyncError error)
             case ClientError::ssl_server_cert_rejected:
             case ClientError::missing_protocol_feature:
             case ClientError::unknown_message:
-            case ClientError::bad_serial_transact_status:
-            case ClientError::bad_object_id_substitutions:
             case ClientError::http_tunnel_failed:
                 // Don't do anything special for these errors.
                 // Future functionality may require special-case handling for existing

@@ -394,7 +394,6 @@ private:
 
     std::shared_ptr<_impl::RealmCoordinator> m_coordinator;
     std::unique_ptr<sync::TableInfoCache> m_table_info_cache;
-    std::unique_ptr<sync::PermissionsCache> m_permissions_cache;
 
     Config m_config;
     util::Optional<VersionID> m_frozen_version;
@@ -436,9 +435,6 @@ private:
     void cache_new_schema();
     void translate_schema_error();
     void notify_schema_changed();
-
-    bool init_permission_cache();
-    void invalidate_permission_cache();
 
     Transaction& transaction() const;
     std::shared_ptr<Transaction> transaction_ref();

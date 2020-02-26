@@ -645,7 +645,6 @@ void Realm::commit_transaction()
         m_coordinator->commit_write(*this);
     }
     cache_new_schema();
-    invalidate_permission_cache();
 }
 
 void Realm::cancel_transaction()
@@ -658,7 +657,6 @@ void Realm::cancel_transaction()
     }
 
     transaction::cancel(transaction(), m_binding_context.get());
-    invalidate_permission_cache();
 }
 
 void Realm::invalidate()
@@ -675,7 +673,6 @@ void Realm::invalidate()
         cancel_transaction();
     }
 
-    m_permissions_cache = nullptr;
     m_table_info_cache = nullptr;
     m_group = nullptr;
 }
@@ -728,7 +725,6 @@ void Realm::notify()
     }
 
     verify_thread();
-    invalidate_permission_cache();
 
     // Any of the callbacks to user code below could drop the last remaining
     // strong reference to `this`
@@ -799,7 +795,6 @@ bool Realm::refresh()
     if (m_is_sending_notifications) {
         return false;
     }
-    invalidate_permission_cache();
 
     // Any of the callbacks to user code below could drop the last remaining
     // strong reference to `this`
@@ -882,7 +877,6 @@ void Realm::close()
         transaction().close();
     }
 
-    m_permissions_cache = nullptr;
     m_table_info_cache = nullptr;
     m_group = nullptr;
     m_binding_context = nullptr;
@@ -917,68 +911,20 @@ static constexpr const uint8_t s_allObjectPrivileges = sync::Privilege::Read
                                                      | sync::Privilege::Delete
                                                      | sync::Privilege::SetPermissions;
 
-bool Realm::init_permission_cache()
-{
-    verify_thread();
-
-    if (m_permissions_cache) {
-        // Rather than trying to track changes to permissions tables, just skip the caching
-        // entirely within write transactions for now
-        if (is_in_transaction())
-            m_permissions_cache->clear();
-        return true;
-    }
-
-    return false;
-}
-
-void Realm::invalidate_permission_cache()
-{
-    if (m_permissions_cache)
-        m_permissions_cache->clear();
-}
-
 ComputedPrivileges Realm::get_privileges()
 {
-    if (!init_permission_cache())
-        return static_cast<ComputedPrivileges>(s_allRealmPrivileges);
-    return static_cast<ComputedPrivileges>(m_permissions_cache->get_realm_privileges() & s_allRealmPrivileges);
+    return static_cast<ComputedPrivileges>(s_allRealmPrivileges);
 }
 
-static uint8_t inherited_mask(uint32_t privileges)
+ComputedPrivileges Realm::get_privileges(StringData)
 {
-    uint8_t mask = ~0;
-    if (!(privileges & sync::Privilege::Read))
-        mask = 0;
-    else if (!(privileges & sync::Privilege::Update))
-        mask = static_cast<uint8_t>(sync::Privilege::Read | sync::Privilege::Query);
-    return mask;
+    return static_cast<ComputedPrivileges>(s_allClassPrivileges);
 }
 
-ComputedPrivileges Realm::get_privileges(StringData object_type)
+ComputedPrivileges Realm::get_privileges(ConstObj const&)
 {
-    if (!init_permission_cache())
-        return static_cast<ComputedPrivileges>(s_allClassPrivileges);
-    auto privileges = inherited_mask(m_permissions_cache->get_realm_privileges())
-                    & m_permissions_cache->get_class_privileges(object_type);
-    return static_cast<ComputedPrivileges>(privileges & s_allClassPrivileges);
+    return static_cast<ComputedPrivileges>(s_allObjectPrivileges);
 }
-
-ComputedPrivileges Realm::get_privileges(ConstObj const& obj)
-{
-    if (!init_permission_cache())
-        return static_cast<ComputedPrivileges>(s_allObjectPrivileges);
-
-    auto table = obj.get_table();
-    auto object_type = ObjectStore::object_type_for_table_name(table->get_name());
-    sync::GlobalID global_id{object_type, table->get_object_id(obj.get_key())};
-    auto privileges = inherited_mask(m_permissions_cache->get_realm_privileges())
-                    & inherited_mask(m_permissions_cache->get_class_privileges(object_type))
-                    & m_permissions_cache->get_object_privileges(global_id);
-    return static_cast<ComputedPrivileges>(privileges & s_allObjectPrivileges);
-}
-#else
-void Realm::invalidate_permission_cache() { }
 #endif
 
 MismatchedConfigException::MismatchedConfigException(StringData message, StringData path)
