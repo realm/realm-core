@@ -18,12 +18,12 @@
 
 #include "sync/sync_user.hpp"
 
+#include "sync/generic_network_transport.hpp"
 #include "sync/impl/sync_metadata.hpp"
 #include "sync/sync_manager.hpp"
 #include "sync/sync_session.hpp"
-#include "sync/generic_network_transport.hpp"
-#include "../../external/json/json.hpp"
 
+#include <json.hpp>
 #include <realm/util/base64.hpp>
 
 namespace realm {

@@ -16,12 +16,14 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "app.hpp"
+#include "sync/app.hpp"
+
+#include "sync/app_credentials.hpp"
+#include "sync/generic_network_transport.hpp"
+#include "sync/sync_manager.hpp"
+
+#include <json.hpp>
 #include <sstream>
-#include "sync_manager.hpp"
-#include "generic_network_transport.hpp"
-#include "app_credentials.hpp"
-#include "../external/json/json.hpp"
 
 // wrap an optional json key into the Optional type
 #define WRAP_JSON_OPT(JSON, KEY, RET_TYPE) \

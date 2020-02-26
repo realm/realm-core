@@ -16,8 +16,9 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "app_credentials.hpp"
-#include "../external/json/json.hpp"
+#include "sync/app_credentials.hpp"
+
+#include <json.hpp>
 
 namespace realm {
 namespace app {

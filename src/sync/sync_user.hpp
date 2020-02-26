@@ -19,19 +19,19 @@
 #ifndef REALM_OS_SYNC_USER_HPP
 #define REALM_OS_SYNC_USER_HPP
 
-#include <string>
-#include <memory>
-#include <unordered_map>
-#include <vector>
-#include <mutex>
-#include <map>
-
 #include "util/atomic_shared_ptr.hpp"
 #include <realm/util/any.hpp>
 #include <realm/util/optional.hpp>
 #include <realm/table.hpp>
 
-#include "../object_schema.hpp"
+#include "object_schema.hpp"
+
+#include <map>
+#include <memory>
+#include <mutex>
+#include <string>
+#include <unordered_map>
+#include <vector>
 
 namespace realm {
 

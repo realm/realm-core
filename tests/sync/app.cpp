@@ -16,15 +16,15 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <curl/curl.h>
-#include <sstream>
-#include "../../external/json/json.hpp"
-#include "util/test_utils.hpp"
-#include "util/test_file.hpp"
 #include "catch2/catch.hpp"
-
 #include "sync/app.hpp"
 #include "sync/app_credentials.hpp"
+#include "util/test_utils.hpp"
+#include "util/test_file.hpp"
+
+#include <curl/curl.h>
+#include <json.hpp>
+#include <sstream>
 
 #pragma mark - Integration Tests
 

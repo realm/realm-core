@@ -19,15 +19,14 @@
 #ifndef REALM_OS_SYNC_METADATA_HPP
 #define REALM_OS_SYNC_METADATA_HPP
 
-#include <string>
+#include "results.hpp"
+#include "shared_realm.hpp"
+#include "sync/sync_user.hpp"
 
 #include <realm/obj.hpp>
 #include <realm/table.hpp>
 #include <realm/util/optional.hpp>
-
-#include "results.hpp"
-#include "shared_realm.hpp"
-#include "../sync_user.hpp"
+#include <string>
 
 namespace realm {
 template<typename T> class BasicRowExpr;
