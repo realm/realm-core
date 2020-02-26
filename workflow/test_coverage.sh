@@ -20,7 +20,7 @@ if [ "${TMPDIR}" = "" ]; then
 fi
 
 echo "TMPDIR: ${TMPDIR}"
-ls "${TMPDIR}/realm*" | while read filename; do rm -rf "$filename"; done
+find $TMPDIR -name 'realm*' -exec rm -rf "{}" \+ || true
 rm -rf coverage.build
 mkdir -p coverage.build
 cd coverage.build
@@ -32,3 +32,5 @@ fi
 
 cmake ${cmake_flags} -DCMAKE_BUILD_TYPE=Coverage -DDEPENDENCIES_FILE="dependencies${deps_suffix}.list" ..
 make VERBOSE=1 -j${nprocs} generate-coverage-cobertura
+
+find $TMPDIR -name 'realm*' -exec rm -rf "{}" \+ || true

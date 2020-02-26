@@ -277,7 +277,8 @@ public:
         return *this;
     }
 
-    Handle& operator=(std::shared_ptr<T>&& other)
+    template<typename U>
+    Handle& operator=(std::shared_ptr<U>&& other)
     {
         reset();
         std::shared_ptr<T>::operator=(std::move(other));

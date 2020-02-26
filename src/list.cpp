@@ -331,7 +331,9 @@ Results List::filter(Query q) const
 Results List::as_results() const
 {
     verify_attached();
-    return (m_type == PropertyType::Object) ? Results(m_realm, std::static_pointer_cast<LnkLst>(m_list_base)) : Results(m_realm, m_list_base);
+    return m_type == PropertyType::Object
+        ? Results(m_realm, std::static_pointer_cast<LnkLst>(m_list_base))
+        : Results(m_realm, m_list_base);
 }
 
 Results List::snapshot() const

@@ -197,6 +197,11 @@ void Results::evaluate_sort_and_distinct_on_list()
     if (m_descriptor_ordering.is_empty())
         return;
 
+    // We can't use the sorted list from the notifier if we're in a write
+    // transaction as we only check the transaction version to see if the data matches
+    if (m_notifier && m_notifier->get_list_indices(m_list_indices) && !m_realm->is_in_transaction())
+        return;
+
     bool needs_update = m_list->has_changed();
     if (!m_list_indices) {
         m_list_indices = std::vector<size_t>{};
@@ -214,12 +219,10 @@ void Results::evaluate_sort_and_distinct_on_list()
     auto sz = m_descriptor_ordering.size();
     for (size_t i = 0; i < sz; i++) {
         auto descr = m_descriptor_ordering[i];
-        if (descr->get_type() == DescriptorType::Sort) {
+        if (descr->get_type() == DescriptorType::Sort)
             sort_order = static_cast<const SortDescriptor*>(descr)->is_ascending(0);
-        }
-        if (descr->get_type() == DescriptorType::Distinct) {
+        if (descr->get_type() == DescriptorType::Distinct)
             do_distinct = true;
-        }
     }
 
     if (do_distinct)
@@ -971,7 +974,10 @@ void Results::prepare_async(ForCallback force) NO_THREAD_SAFETY_ANALYSIS
             return;
     }
 
-    m_notifier = std::make_shared<_impl::ResultsNotifier>(*this);
+    if (m_list)
+        m_notifier = std::make_shared<_impl::ListResultsNotifier>(*this);
+    else
+        m_notifier = std::make_shared<_impl::ResultsNotifier>(*this);
     _impl::RealmCoordinator::register_notifier(m_notifier);
 }
 
