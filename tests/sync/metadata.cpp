@@ -49,7 +49,8 @@ TEST_CASE("sync_metadata: migration", "[sync]") {
             {"identity", PropertyType::String, Property::IsPrimary{true}},
             {"marked_for_removal", PropertyType::Bool},
             {"auth_server_url", PropertyType::String|PropertyType::Nullable},
-            {"user_token", PropertyType::String|PropertyType::Nullable},
+            {"refresh_token", PropertyType::String|PropertyType::Nullable},
+            {"access_token", PropertyType::String|PropertyType::Nullable},
         }},
         {"FileActionMetadata", {
             {"original_name", PropertyType::String, Property::IsPrimary{true}},
@@ -65,7 +66,8 @@ TEST_CASE("sync_metadata: migration", "[sync]") {
             {"identity", PropertyType::String, Property::IsPrimary{true}},
             {"marked_for_removal", PropertyType::Bool},
             {"auth_server_url", PropertyType::String|PropertyType::Nullable},
-            {"user_token", PropertyType::String|PropertyType::Nullable},
+            {"refresh_token", PropertyType::String|PropertyType::Nullable},
+            {"access_token", PropertyType::String|PropertyType::Nullable},
             {"user_is_admin", PropertyType::Bool},
         }},
         {"FileActionMetadata", {
@@ -95,7 +97,8 @@ TEST_CASE("sync_metadata: migration", "[sync]") {
             Object::create<util::Any>(context, realm, user_metadata_schema, AnyDict{
                 { "identity", identity_1 },
                 { "marked_for_removal", false },
-                { "user_token", token }
+                {"refresh_token", token},
+                {"access_token", token},
             });
             Object::create<util::Any>(context, realm, user_metadata_schema, AnyDict{
                 { "identity", identity_2 },
@@ -113,14 +116,14 @@ TEST_CASE("sync_metadata: migration", "[sync]") {
                 CHECK(md_1->identity() == identity_1);
                 CHECK(md_1->local_uuid() == identity_1);
                 CHECK(md_1->auth_server_url() == "");
-                CHECK(md_1->user_token() == token);
+                CHECK(md_1->access_token() == token);
                 CHECK(md_1->is_valid());
                 auto md_2 = manager.get_or_make_user_metadata(identity_2, auth_server_url, false);
                 REQUIRE(bool(md_2));
                 CHECK(md_2->identity() == identity_2);
                 CHECK(md_2->local_uuid() == identity_2);
                 CHECK(md_2->auth_server_url() == auth_server_url);
-                CHECK(!md_2->user_token());
+                CHECK(!md_2->access_token());
                 CHECK(md_2->is_valid());
             }
 
@@ -130,9 +133,6 @@ TEST_CASE("sync_metadata: migration", "[sync]") {
                 CHECK(user_metadata->identity() == identity_3);
                 CHECK(user_metadata->local_uuid() != "");
                 CHECK(user_metadata->local_uuid() != identity_3);
-                CHECK(!user_metadata->is_admin());
-                user_metadata->set_is_admin(true);
-                CHECK(user_metadata->is_admin());
                 CHECK(user_metadata->auth_server_url() == auth_server_url);
             }
         }
@@ -155,7 +155,8 @@ TEST_CASE("sync_metadata: migration", "[sync]") {
             Object::create<util::Any>(context, realm, user_metadata_schema, AnyDict{
                 { "identity", identity_1 },
                 { "marked_for_removal", false },
-                { "user_token", token },
+                {"refresh_token", token},
+                {"access_token", token},
                 { "user_is_admin", false }
             });
             Object::create<util::Any>(context, realm, user_metadata_schema, AnyDict{
@@ -175,16 +176,14 @@ TEST_CASE("sync_metadata: migration", "[sync]") {
                 CHECK(md_1->identity() == identity_1);
                 CHECK(md_1->local_uuid() == identity_1);
                 CHECK(md_1->auth_server_url() == "");
-                CHECK(md_1->user_token() == token);
-                CHECK(!md_1->is_admin());
+                CHECK(md_1->access_token() == token);
                 CHECK(md_1->is_valid());
                 auto md_2 = manager.get_or_make_user_metadata(identity_2, auth_server_url, false);
                 REQUIRE(bool(md_2));
                 CHECK(md_2->identity() == identity_2);
                 CHECK(md_2->local_uuid() == identity_2);
                 CHECK(md_2->auth_server_url() == auth_server_url);
-                CHECK(!md_2->user_token());
-                CHECK(md_2->is_admin());
+                CHECK(!md_2->access_token());
                 CHECK(md_2->is_valid());
             }
 
@@ -212,32 +211,29 @@ TEST_CASE("sync_metadata: user metadata", "[sync]") {
         auto user_metadata = manager.get_or_make_user_metadata(identity, auth_server_url);
         REQUIRE(user_metadata->identity() == identity);
         REQUIRE(user_metadata->auth_server_url() == auth_server_url);
-        REQUIRE(user_metadata->user_token() == none);
-        REQUIRE(!user_metadata->is_admin());
+        REQUIRE(user_metadata->access_token() == none);
     }
 
     SECTION("properly reflects updating state") {
         const auto identity = "testcase1b";
         const std::string sample_token = "this_is_a_user_token";
         auto user_metadata = manager.get_or_make_user_metadata(identity, auth_server_url);
-        user_metadata->set_user_token(sample_token);
+        user_metadata->set_access_token(sample_token);
         REQUIRE(user_metadata->identity() == identity);
         REQUIRE(user_metadata->auth_server_url() == auth_server_url);
-        REQUIRE(user_metadata->user_token() == sample_token);
-        user_metadata->set_is_admin(true);
-        REQUIRE(user_metadata->is_admin());
+        REQUIRE(user_metadata->access_token() == sample_token);
     }
 
     SECTION("can be properly re-retrieved from the same manager") {
         const auto identity = "testcase1c";
         const std::string sample_token = "this_is_a_user_token";
         auto first = manager.get_or_make_user_metadata(identity, auth_server_url);
-        first->set_user_token(sample_token);
+        first->set_access_token(sample_token);
         // Get a second instance of the user metadata for the same identity.
         auto second = manager.get_or_make_user_metadata(identity, auth_server_url, false);
         REQUIRE(second->identity() == identity);
         REQUIRE(second->auth_server_url() == auth_server_url);
-        REQUIRE(second->user_token() == sample_token);
+        REQUIRE(second->access_token() == sample_token);
     }
 
     SECTION("properly reflects changes across different instances") {
@@ -245,25 +241,22 @@ TEST_CASE("sync_metadata: user metadata", "[sync]") {
         const std::string sample_token_1 = "this_is_a_user_token";
         auto first = manager.get_or_make_user_metadata(identity, auth_server_url);
         auto second = manager.get_or_make_user_metadata(identity, auth_server_url);
-        CHECK(!first->is_admin());
-        first->set_user_token(sample_token_1);
+        first->set_access_token(sample_token_1);
         REQUIRE(first->identity() == identity);
         REQUIRE(first->auth_server_url() == auth_server_url);
-        REQUIRE(first->user_token() == sample_token_1);
-        CHECK(!first->is_admin());
+        REQUIRE(first->access_token() == sample_token_1);
         REQUIRE(second->identity() == identity);
         REQUIRE(second->auth_server_url() == auth_server_url);
-        REQUIRE(second->user_token() == sample_token_1);
-        CHECK(!second->is_admin());
+        REQUIRE(second->access_token() == sample_token_1);
         // Set the state again.
         const std::string sample_token_2 = "this_is_another_user_token";
-        second->set_user_token(sample_token_2);
+        second->set_access_token(sample_token_2);
         REQUIRE(first->identity() == identity);
         REQUIRE(first->auth_server_url() == auth_server_url);
-        REQUIRE(first->user_token() == sample_token_2);
+        REQUIRE(first->access_token() == sample_token_2);
         REQUIRE(second->identity() == identity);
         REQUIRE(second->auth_server_url() == auth_server_url);
-        REQUIRE(second->user_token() == sample_token_2);
+        REQUIRE(second->access_token() == sample_token_2);
     }
 
     SECTION("can be removed") {
@@ -285,18 +278,17 @@ TEST_CASE("sync_metadata: user metadata", "[sync]") {
         SECTION("with valid prior metadata for the identifier") {
             const auto identity = "testcase1g2";
             auto first = manager.get_or_make_user_metadata(identity, auth_server_url);
-            first->set_user_token(sample_token);
+            first->set_access_token(sample_token);
             auto second = manager.get_or_make_user_metadata(identity, auth_server_url, false);
             REQUIRE(second->is_valid());
             REQUIRE(second->identity() == identity);
             REQUIRE(second->auth_server_url() == auth_server_url);
-            REQUIRE(second->user_token() == sample_token);
-            REQUIRE(!second->is_admin());
+            REQUIRE(second->access_token() == sample_token);
         }
         SECTION("with invalid prior metadata for the identifier") {
             const auto identity = "testcase1g3";
             auto first = manager.get_or_make_user_metadata(identity, auth_server_url);
-            first->set_user_token(sample_token);
+            first->set_access_token(sample_token);
             first->mark_for_removal();
             auto second = manager.get_or_make_user_metadata(identity, auth_server_url, false);
             REQUIRE(!second);
@@ -463,20 +455,17 @@ TEST_CASE("sync_metadata: persistence across metadata manager instances", "[sync
         const std::string sample_token = "this_is_a_user_token";
         SyncMetadataManager first_manager(metadata_path, false);
         auto first = first_manager.get_or_make_user_metadata(identity, auth_server_url);
-        first->set_user_token(sample_token);
-        first->set_is_admin(true);
+        first->set_access_token(sample_token);
         REQUIRE(first->identity() == identity);
         REQUIRE(first->auth_server_url() == auth_server_url);
-        REQUIRE(first->user_token() == sample_token);
-        REQUIRE(first->is_admin());
+        REQUIRE(first->access_token() == sample_token);
         auto first_client_uuid = first_manager.client_uuid();
 
         SyncMetadataManager second_manager(metadata_path, false);
         auto second = second_manager.get_or_make_user_metadata(identity, auth_server_url, false);
         REQUIRE(second->identity() == identity);
         REQUIRE(second->auth_server_url() == auth_server_url);
-        REQUIRE(second->user_token() == sample_token);
-        REQUIRE(second->is_admin());
+        REQUIRE(second->access_token() == sample_token);
 
         REQUIRE(second_manager.client_uuid() == first_client_uuid);
     }
@@ -505,7 +494,7 @@ TEST_CASE("sync_metadata: encryption", "[sync]") {
         REQUIRE(bool(user_metadata));
         CHECK(user_metadata->identity() == identity);
         CHECK(user_metadata->auth_server_url() == auth_url);
-        CHECK(user_metadata->user_token() == none);
+        CHECK(user_metadata->access_token() == none);
         CHECK(user_metadata->is_valid());
         // Reopen the metadata file with the same key.
         SyncMetadataManager manager_2(metadata_path, true, key);

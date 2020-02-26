@@ -178,33 +178,6 @@ TEST_CASE("sync_file: SyncFileManager APIs", "[sync]") {
                 REQUIRE_DIR_DOES_NOT_EXIST(expected);
             }
         }
-
-        SECTION("admin user directory migration") {
-            const std::string& server_url = "https://realm.example.org:9090/realm";
-            const std::string& token = "fake-token";
-            prepare_sync_manager_test();
-            TestSyncManager init_sync_manager(base_path + "syncmanager/");
-
-            SECTION("migrating a user directory if an old identity is specified") {
-                // Create the "old directory"
-                manager.user_directory(local_identity);
-                REQUIRE_DIR_EXISTS(expected);
-                // Perform the migration.
-                auto user = SyncManager::shared().get_admin_token_user(server_url, token, local_identity);
-                REQUIRE(user);
-                const auto& newdir = manager_path + "realm-object-server/__auth" + util::make_percent_encoded_string(server_url) + "/";
-                // The directory should have been renamed properly.
-                REQUIRE_DIR_DOES_NOT_EXIST(expected);
-                REQUIRE_DIR_EXISTS(newdir);
-            }
-
-            SECTION("doing nothing if an old identity is specified but no dir exists") {
-                REQUIRE_DIR_DOES_NOT_EXIST(expected);
-                auto user = SyncManager::shared().get_admin_token_user(server_url, token, local_identity);
-                REQUIRE(user);
-                // Shouldn't throw
-            }
-        }
     }
 
     SECTION("Realm path APIs") {

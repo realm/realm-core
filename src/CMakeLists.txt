@@ -92,6 +92,9 @@ set(INCLUDE_DIRS
 
 if(REALM_ENABLE_SYNC)
     list(APPEND HEADERS
+        sync/app.hpp
+        sync/app_credentials.hpp
+        sync/generic_network_transport.hpp
         sync/async_open_task.hpp
         sync/sync_config.hpp
         sync/sync_manager.hpp
@@ -102,6 +105,9 @@ if(REALM_ENABLE_SYNC)
         sync/impl/sync_file.hpp
         sync/impl/sync_metadata.hpp)
     list(APPEND SOURCES
+        sync/app.cpp
+        sync/app_credentials.cpp
+        sync/generic_network_transport.cpp
         sync/async_open_task.cpp
         sync/sync_manager.cpp
         sync/sync_permission.cpp
@@ -116,6 +122,10 @@ if(REALM_ENABLE_SYNC)
     endif()
     find_package(ZLIB REQUIRED)
     list(APPEND INCLUDE_DIRS ${ZLIB_INCLUDE_DIRS})
+endif()
+
+if(REALM_ENABLE_SYNC OR REALM_ENABLE_SERVER)
+    list(APPEND INCLUDE_DIRS ../external/json)
 endif()
 
 add_library(realm-object-store STATIC ${SOURCES} ${HEADERS})

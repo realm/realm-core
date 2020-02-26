@@ -7,6 +7,7 @@ RUN apt-get update \
                        gcovr \
                        git \
                        lcov \
+                       libcurl4-openssl-dev \
                        libuv1-dev \
                        libprocps-dev \
                        ninja-build \

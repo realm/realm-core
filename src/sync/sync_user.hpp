@@ -24,10 +24,14 @@
 #include <unordered_map>
 #include <vector>
 #include <mutex>
+#include <map>
 
 #include "util/atomic_shared_ptr.hpp"
-
+#include <realm/util/any.hpp>
 #include <realm/util/optional.hpp>
+#include <realm/table.hpp>
+
+#include "../object_schema.hpp"
 
 namespace realm {
 
@@ -53,16 +57,150 @@ struct SyncUserIdentifier {
     }
 };
 
+// A struct that decodes a given JWT.
+struct RealmJWT {
+    // The token being decoded from.
+    std::string token;
+
+    // When the token expires.
+    long expires_at;
+    // When the token was issued.
+    long issued_at;
+    // Custom user data embedded in the encoded token.
+    util::Optional<std::map<std::string, util::Any>> user_data;
+
+    RealmJWT(const std::string& token);
+
+    bool operator==(const RealmJWT& other) const
+    {
+        return token == other.token;
+    }
+};
+
+struct SyncUserProfile {
+    // The full name of the user.
+    util::Optional<std::string> name() const
+    {
+        return m_name;
+    }
+
+    // The email address of the user.
+    util::Optional<std::string> email() const
+    {
+        return m_email;
+    }
+
+    // A URL to the user's profile picture.
+    util::Optional<std::string> picture_url() const
+    {
+        return m_picture_url;
+    }
+
+    // The first name of the user.
+    util::Optional<std::string> first_name() const
+    {
+        return m_first_name;
+    }
+
+    // The last name of the user.
+    util::Optional<std::string> last_name() const
+    {
+        return m_last_name;
+    }
+
+    // The gender of the user.
+    util::Optional<std::string> gender() const
+    {
+        return m_gender;
+    }
+
+    // The birthdate of the user.
+    util::Optional<std::string> birthday() const
+    {
+        return m_birthday;
+    }
+
+    // The minimum age of the user.
+    util::Optional<std::string> min_age() const
+    {
+        return m_min_age;
+    }
+
+    // The maximum age of the user.
+    util::Optional<std::string> max_age() const
+    {
+        return m_max_age;
+    }
+
+    SyncUserProfile(util::Optional<std::string> name,
+                    util::Optional<std::string> email,
+                    util::Optional<std::string> picture_url,
+                    util::Optional<std::string> first_name,
+                    util::Optional<std::string> last_name,
+                    util::Optional<std::string> gender,
+                    util::Optional<std::string> birthday,
+                    util::Optional<std::string> min_age,
+                    util::Optional<std::string> max_age) :
+    m_name(std::move(name)),
+    m_email(std::move(email)),
+    m_picture_url(std::move(picture_url)),
+    m_first_name(std::move(first_name)),
+    m_last_name(std::move(last_name)),
+    m_gender(std::move(gender)),
+    m_birthday(std::move(birthday)),
+    m_min_age(std::move(min_age)),
+    m_max_age(std::move(max_age)) {}
+
+    SyncUserProfile(realm::ConstObj& obj);
+    static realm::ObjectSchema schema();
+
+private:
+    // The full name of the user.
+    const util::Optional<std::string> m_name;
+
+    // The email address of the user.
+    const util::Optional<std::string> m_email;
+
+    // A URL to the user's profile picture.
+    const util::Optional<std::string> m_picture_url;
+
+    // The first name of the user.
+    const util::Optional<std::string> m_first_name;
+
+    // The last name of the user.
+    const util::Optional<std::string> m_last_name;
+
+    // The gender of the user.
+    const util::Optional<std::string> m_gender;
+
+    // The birthdate of the user.
+    const util::Optional<std::string> m_birthday;
+
+    // The minimum age of the user.
+    const util::Optional<std::string> m_min_age;
+
+    // The maximum age of the user.
+    const util::Optional<std::string> m_max_age;
+};
+
+// A struct that represents an identity that a `User` is linked to
+struct SyncUserIdentity {
+    // the id of the identity
+    std::string id;
+    // the associated provider type of the identity
+    std::string provider_type;
+
+    SyncUserIdentity(realm::ConstObj& obj);
+    SyncUserIdentity(std::string id, std::string provider_type);
+
+    static realm::ObjectSchema schema();
+};
+
 // A `SyncUser` represents a single user account. Each user manages the sessions that
 // are associated with it.
 class SyncUser {
 friend class SyncSession;
 public:
-    enum class TokenType {
-        Normal,
-        Admin,
-    };
-
     enum class State {
         LoggedOut,
         Active,
@@ -73,8 +211,7 @@ public:
     SyncUser(std::string refresh_token,
              std::string identity,
              util::Optional<std::string> server_url,
-             util::Optional<std::string> local_identity=none,
-             TokenType token_type=TokenType::Normal);
+             std::string access_token);
 
     // Return a list of all sessions belonging to this user.
     std::vector<std::shared_ptr<SyncSession>> all_sessions();
@@ -89,25 +226,18 @@ public:
     // Note that this is called by the SyncManager, and should not be directly called.
     void update_refresh_token(std::string token);
 
+    // Update the user's access token. If the user is logged out, it will log itself back in.
+    // Note that this is called by the SyncManager, and should not be directly called.
+    void update_access_token(std::string token);
+
+    // Update the user's profile.
+    void update_user_profile(std::shared_ptr<SyncUserProfile> profile);
+
+    // Update the user's identities.
+    void update_identities(std::vector<SyncUserIdentity> identities);
+
     // Log the user out and mark it as such. This will also close its associated Sessions.
     void log_out();
-
-    // Whether the user has administrator privileges.
-    bool is_admin() const noexcept
-    {
-        return m_token_type == TokenType::Admin || m_is_admin;
-    }
-
-    TokenType token_type() const noexcept
-    {
-        return m_token_type;
-    }
-
-    // Specify whether the user has administrator privileges.
-    // Note that this is an internal flag meant for bindings to communicate information
-    // originating from the server. It is *NOT* possible to unilaterally change a user's
-    // administrator status from the client through this or any other API.
-    void set_is_admin(bool);
 
     std::string const& identity() const noexcept
     {
@@ -124,7 +254,17 @@ public:
         return m_local_identity;
     }
 
+    std::string access_token() const;
+
     std::string refresh_token() const;
+
+    std::shared_ptr<SyncUserProfile> user_profile() const;
+
+    std::vector<SyncUserIdentity> identities() const;
+
+    // Custom user data embedded in the access token.
+    util::Optional<std::map<std::string, util::Any>> custom_data() const;
+
     State state() const;
 
     std::shared_ptr<SyncUserContext> binding_context() const
@@ -168,14 +308,9 @@ private:
 
     mutable std::mutex m_mutex;
 
-    // The token type of the user.
-    // FIXME: remove this flag once bindings take responsible for admin token users
-    TokenType m_token_type;
-
-    bool m_is_admin;
-
     // The user's refresh token.
-    std::string m_refresh_token;
+    RealmJWT m_refresh_token;
+
     // Set by the server. The unique ID of the user account on the Realm Object Server.
     std::string m_identity;
 
@@ -185,6 +320,14 @@ private:
 
     // Waiting sessions are those that should be asked to connect once this user is logged in.
     std::unordered_map<std::string, std::weak_ptr<SyncSession>> m_waiting_sessions;
+
+    // The user's access token.
+    RealmJWT m_access_token;
+
+    // The identities associated with this user.
+    std::vector<SyncUserIdentity> m_user_identities;
+
+    std::shared_ptr<SyncUserProfile> m_user_profile;
 };
 
 }

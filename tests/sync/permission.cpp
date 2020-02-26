@@ -58,8 +58,11 @@ TEST_CASE("`Permission` class", "[sync]") {
     }
 }
 
+static const std::string base_path = tmp_dir() + "realm_objectstore_sync_permissions/";
+
 TEST_CASE("Object-level Permissions") {
-    TestSyncManager init_sync_manager;
+    reset_test_directory(base_path);
+    TestSyncManager init_sync_manager(base_path);
 
     SyncServer server{StartImmediately{false}};
 
