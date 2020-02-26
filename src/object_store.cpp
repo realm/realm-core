@@ -22,7 +22,6 @@
 #include "object_schema.hpp"
 #include "schema.hpp"
 #include "shared_realm.hpp"
-#include "sync/partial_sync.hpp"
 
 #include <realm/group.hpp>
 #include <realm/table.hpp>
@@ -612,75 +611,6 @@ static void apply_post_migration_changes(Group& group,
     }
 }
 
-static void create_default_permissions(Transaction& group, std::vector<SchemaChange> const& changes,
-                                       std::string const& sync_user_id)
-{
-#if !REALM_ENABLE_SYNC
-    static_cast<void>(group);
-    static_cast<void>(changes);
-    static_cast<void>(sync_user_id);
-#else
-    _impl::initialize_schema(group);
-    sync::set_up_basic_permissions(group, true);
-
-    // Ensure that this user exists so that local privileges checks work immediately
-    sync::add_user_to_role(group, sync_user_id, "everyone");
-
-    // Ensure that the user's private role exists so that local privilege checks work immediately.
-    ObjectStore::ensure_private_role_exists_for_user(group, sync_user_id);
-
-    // Mark all tables we just created as fully world-accessible
-    // This has to be done after the first pass of schema init is done so that we can be
-    // sure that the permissions tables actually exist.
-    using namespace schema_change;
-    struct Applier {
-        Transaction& group;
-        void operator()(AddTable op)
-        {
-            sync::set_class_permissions_for_role(group, op.object->name, "everyone",
-                                                 static_cast<int>(ComputedPrivileges::All));
-        }
-
-        void operator()(RemoveTable) { }
-        void operator()(AddInitialProperties) { }
-        void operator()(AddProperty) { }
-        void operator()(RemoveProperty) { }
-        void operator()(MakePropertyNullable) { }
-        void operator()(MakePropertyRequired) { }
-        void operator()(ChangePrimaryKey) { }
-        void operator()(AddIndex) { }
-        void operator()(RemoveIndex) { }
-        void operator()(ChangePropertyType) { }
-    } applier{group};
-
-    for (auto& change : changes) {
-        change.visit(applier);
-    }
-#endif
-}
-
-#if REALM_ENABLE_SYNC
-void ObjectStore::ensure_private_role_exists_for_user(Transaction& group, StringData sync_user_id)
-{
-    std::string private_role_name = util::format("__User:%1", sync_user_id);
-
-    TableRef roles = ObjectStore::table_for_object_type(group, "__Role");
-    ObjKey private_role_ndx = roles->find_first_string(roles->get_column_key("name"), private_role_name);
-    if (private_role_ndx) {
-        // The private role already exists, so there's nothing for us to do.
-        return;
-    }
-
-    // Add the user to the private role, creating the private role in the process.
-    sync::add_user_to_role(group, sync_user_id, private_role_name);
-
-    // Set the private role on the user.
-    private_role_ndx = roles->find_first_string(roles->get_column_key("name"), private_role_name);
-    TableRef users = ObjectStore::table_for_object_type(group, "__User");
-    ObjKey user_ndx = users->find_first_string(users->get_column_key("id"), sync_user_id);
-    users->get_object(user_ndx).set("role", private_role_ndx);
-}
-#endif
 
 void ObjectStore::apply_schema_changes(Transaction& group, uint64_t schema_version,
                                        Schema& target_schema, uint64_t target_schema_version,
@@ -700,9 +630,6 @@ void ObjectStore::apply_schema_changes(Transaction& group, uint64_t schema_versi
 
         if (target_schema_is_newer)
             set_schema_version(group, target_schema_version);
-
-        if (sync_user_id)
-            create_default_permissions(group, changes, *sync_user_id);
 
         set_schema_keys(group, target_schema);
         return;

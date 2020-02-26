@@ -106,7 +106,7 @@ struct Property {
     Property& operator=(Property const&) = default;
     Property& operator=(Property&&) noexcept = default;
 
-    bool requires_index() const { return is_primary || is_indexed; }
+    bool requires_index() const { return is_indexed && !is_primary; }
 
     bool type_is_indexable() const noexcept;
     bool type_is_nullable() const noexcept;

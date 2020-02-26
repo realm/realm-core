@@ -38,7 +38,6 @@ if(REALM_ENABLE_SYNC)
     list(APPEND SOURCES
         sync/file.cpp
         sync/metadata.cpp
-        sync/partial_sync.cpp
         sync/permission.cpp
         sync/session/connection_change_notifications.cpp
         sync/session/progress_notifications.cpp
@@ -47,12 +46,6 @@ if(REALM_ENABLE_SYNC)
         sync/sync_manager.cpp
         sync/sync_test_utils.cpp
         sync/user.cpp
-    )
-endif()
-
-if(REALM_ENABLE_SERVER)
-    list(APPEND SOURCES
-        sync/global_notifier.cpp
     )
 endif()
 

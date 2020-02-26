@@ -296,12 +296,6 @@ Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
         if (v)
             object.set_property_value_impl(ctx, prop, *v, policy, is_default);
     }
-#if REALM_ENABLE_SYNC
-    if (realm->is_partial() && object_schema.name == "__User") {
-        object.ensure_user_in_everyone_role();
-        object.ensure_private_role_exists_for_user();
-    }
-#endif
     return object;
 }
 

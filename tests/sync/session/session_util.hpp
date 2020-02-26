@@ -113,8 +113,8 @@ std::shared_ptr<SyncSession> sync_session(SyncServer& server, std::shared_ptr<Sy
 {
     return sync_session_with_bind_handler(server, std::move(user), path,
         [&, fetch_access_token=std::forward<FetchAccessToken>(fetch_access_token)](const auto& path, const auto& config, auto session) {
-            auto token = fetch_access_token(path, config.realm_url());
-            session->refresh_access_token(std::move(token), config.realm_url());
+            auto token = fetch_access_token(path, config.realm_url);
+            session->refresh_access_token(std::move(token), config.realm_url);
         },
         std::forward<ErrorHandler>(error_handler),
         stop_policy, on_disk_path, std::move(schema), out_config);
