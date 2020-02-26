@@ -122,9 +122,9 @@ private:
 
 struct SyncTestFile : TestFile {
     template<typename BindHandler, typename ErrorHandler>
-    SyncTestFile(const realm::SyncConfig& sync_config, 
-        realm::SyncSessionStopPolicy stop_policy, 
-        BindHandler&& bind_handler, 
+    SyncTestFile(const realm::SyncConfig& sync_config,
+        realm::SyncSessionStopPolicy stop_policy,
+        BindHandler&& bind_handler,
         ErrorHandler&& error_handler)
     {
         this->sync_config = std::make_shared<realm::SyncConfig>(sync_config);
@@ -134,8 +134,7 @@ struct SyncTestFile : TestFile {
         schema_mode = realm::SchemaMode::Additive;
     }
 
-    SyncTestFile(SyncServer& server, std::string name="", bool is_partial=false,
-                 std::string user_name="test");
+    SyncTestFile(SyncServer& server, std::string name="", std::string user_name="test");
 };
 
 struct TestSyncManager {

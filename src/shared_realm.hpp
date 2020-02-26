@@ -53,7 +53,6 @@ typedef std::weak_ptr<Realm> WeakRealm;
 namespace _impl {
     class AnyHandover;
     class CollectionNotifier;
-    class PartialSyncHelper;
     class RealmCoordinator;
     class RealmFriend;
 }
@@ -293,9 +292,6 @@ public:
     Schema const& schema() const { return m_schema; }
     uint64_t schema_version() const { return m_schema_version; }
 
-    // Returns `true` if this Realm is a Partially synchronized Realm.
-    bool is_partial() const noexcept;
-
     void begin_transaction();
     void commit_transaction();
     void cancel_transaction();
@@ -376,7 +372,6 @@ public:
     // without making it public to everyone
     class Internal {
         friend class _impl::CollectionNotifier;
-        friend class _impl::PartialSyncHelper;
         friend class _impl::RealmCoordinator;
         friend class ThreadSafeReference;
         friend class GlobalNotifier;

@@ -41,10 +41,6 @@ class CollectionNotifier;
 class ExternalCommitHelper;
 class WeakRealmNotifier;
 
-namespace partial_sync {
-class WorkQueue;
-}
-
 // RealmCoordinator manages the weak cache of Realm instances and communication
 // between per-thread Realm instances for a given file
 class RealmCoordinator : public std::enable_shared_from_this<RealmCoordinator> {
@@ -183,11 +179,6 @@ public:
     template<typename Pred>
     util::CheckedUniqueLock wait_for_notifiers(Pred&& wait_predicate) REQUIRES(!m_notifier_mutex);
 
-#if REALM_ENABLE_SYNC
-    // A work queue that can be used to perform background work related to partial sync.
-    _impl::partial_sync::WorkQueue& partial_sync_work_queue();
-#endif
-
     AuditInterface* audit_context() const noexcept { return m_audit_context.get(); }
 
 private:
@@ -228,7 +219,6 @@ private:
 
 #if REALM_ENABLE_SYNC
     std::shared_ptr<SyncSession> m_sync_session;
-    std::unique_ptr<partial_sync::WorkQueue> m_partial_sync_work_queue;
 #endif
 
     std::shared_ptr<AuditInterface> m_audit_context;

@@ -22,7 +22,6 @@
 #include "object_schema.hpp"
 #include "schema.hpp"
 #include "shared_realm.hpp"
-#include "sync/partial_sync.hpp"
 
 #include <realm/group.hpp>
 #include <realm/table.hpp>
@@ -620,7 +619,6 @@ static void create_default_permissions(Transaction& group, std::vector<SchemaCha
     static_cast<void>(changes);
     static_cast<void>(sync_user_id);
 #else
-    _impl::initialize_schema(group);
     sync::set_up_basic_permissions(group, true);
 
     // Ensure that this user exists so that local privileges checks work immediately
