@@ -33,14 +33,12 @@ void ArrayDecimal128::insert(size_t ndx, Decimal128 value)
     REALM_ASSERT(ndx <= m_size);
     // Allocate room for the new value
     alloc(m_size + 1, sizeof(Decimal128)); // Throws
-    m_width = sizeof(Decimal128);
 
     auto src = reinterpret_cast<Decimal128*>(m_data) + ndx;
     auto dst = src + 1;
 
     // Make gap for new value
-    memmove(dst, src, sizeof(Decimal128) * (m_size - ndx));
-    m_size += 1;
+    memmove(dst, src, sizeof(Decimal128) * (m_size - 1 - ndx));
 
     // Set new value
     *src = value;
@@ -66,12 +64,11 @@ void ArrayDecimal128::move(ArrayDecimal128& dst_arr, size_t ndx)
 {
     size_t elements_to_move = m_size - ndx;
     if (elements_to_move) {
-        dst_arr.alloc(dst_arr.m_size + elements_to_move, sizeof(Decimal128));
-        dst_arr.m_width = sizeof(Decimal128);
-        Decimal128* dst = reinterpret_cast<Decimal128*>(dst_arr.m_data) + dst_arr.m_size;
+        const auto old_dst_size = dst_arr.m_size;
+        dst_arr.alloc(old_dst_size + elements_to_move, sizeof(Decimal128));
+        Decimal128* dst = reinterpret_cast<Decimal128*>(dst_arr.m_data) + old_dst_size;
         Decimal128* src = reinterpret_cast<Decimal128*>(m_data) + ndx;
         memmove(dst, src, elements_to_move * sizeof(Decimal128));
-        dst_arr.m_size += elements_to_move;
     }
     truncate(ndx);
 }
