@@ -68,7 +68,9 @@ inline bool response_code_is_fatal(Response response) {
     // FIXME: our tests currently only generate codes 0 and 200,
     // but we need more robust error handling here; eg. should a 300
     // redirect really be considered fatal or should we automatically redirect?
-    return response.http_status_code >= 300 || response.http_status_code < 200 || response.custom_status_code != 0;
+    return response.http_status_code >= 300
+        || (response.http_status_code < 200 && response.http_status_code != 0)
+        || response.custom_status_code != 0;
 }
 
 void App::login_with_credentials(const std::shared_ptr<AppCredentials> credentials,

@@ -281,7 +281,7 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync][app]") {
                                     [&](std::shared_ptr<realm::SyncUser> user, std::unique_ptr<realm::app::error::AppError> error) {
             CHECK(!user);
             CHECK(error);
-            CHECK(error->what() == std::string("Bad Token"));
+            CHECK(error->what() == std::string("jwt missing parts"));
             CHECK(error->type == realm::app::error::AppError::Type::JSON);
             // knowing the type, we can expect a dynamic cast to succeed
             auto specialized_error = dynamic_cast<realm::app::error::JSONError*>(error.get());
