@@ -116,6 +116,7 @@ TEST_CASE("ObjectSchema") {
 
         TableRef table = g.add_table_with_primary_key("class_table", type_Int, "pk");
         TableRef target = g.add_table("class_target");
+        TableRef embedded = g.add_embedded_table("class_embedded");
 
         table->add_column(type_Int, "int");
         table->add_column(type_Bool, "bool");
@@ -181,6 +182,9 @@ TEST_CASE("ObjectSchema") {
 
         ObjectSchema os(g, "table", table->get_key());
         REQUIRE(os.table_key == table->get_key());
+        ObjectSchema os1(g, "embedded", {});
+        REQUIRE(os1.table_key == embedded->get_key());
+        REQUIRE(os1.is_embedded);
 
 #define REQUIRE_PROPERTY(name, type, ...) do { \
     Property* prop; \
@@ -448,6 +452,16 @@ TEST_CASE("Schema") {
                 }}
             };
             REQUIRE_THROWS_CONTAINING(schema.validate(), "Properties 'pk2' and 'pk1' are both marked as the primary key of 'object'.");
+        }
+
+        SECTION("rejects primary key on embedded table") {
+            Schema schema = {
+                {"object", ObjectSchema::IsEmbedded{true}, {
+                    {"pk1", PropertyType::Int, Property::IsPrimary{true}},
+                    {"int", PropertyType::Int},
+                }}
+            };
+            REQUIRE_THROWS_CONTAINING(schema.validate(), "Embedded table 'object' cannot have primary key 'pk1'.");
         }
 
         SECTION("rejects invalid primary key types") {

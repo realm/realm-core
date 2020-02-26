@@ -433,7 +433,7 @@ void SyncSession::update_error_and_mark_file_for_deletion(SyncError& error, Shou
     SyncManager::shared().perform_metadata_update([this, action,
                                                    original_path=std::move(original_path),
                                                    recovery_path=std::move(recovery_path)](const auto& manager) {
-        auto realm_url = m_config.realm_url();
+        auto realm_url = m_config.realm_url;
         manager.make_file_action_metadata(original_path, realm_url, m_config.user->identity(), action, recovery_path);
     });
 }
@@ -513,9 +513,9 @@ void SyncSession::handle_error(SyncError error)
             case ProtocolError::bad_changeset_size:
             case ProtocolError::bad_changesets:
             case ProtocolError::bad_decompression:
-            case ProtocolError::partial_sync_disabled:
             case ProtocolError::unsupported_session_feature:
             case ProtocolError::transact_before_upload:
+            case ProtocolError::partial_sync_disabled:
                 break;
             // Session errors
             case ProtocolError::session_closed:
@@ -596,8 +596,6 @@ void SyncSession::handle_error(SyncError error)
             case ClientError::ssl_server_cert_rejected:
             case ClientError::missing_protocol_feature:
             case ClientError::unknown_message:
-            case ClientError::bad_serial_transact_status:
-            case ClientError::bad_object_id_substitutions:
             case ClientError::http_tunnel_failed:
                 // Don't do anything special for these errors.
                 // Future functionality may require special-case handling for existing
@@ -933,8 +931,6 @@ void SyncSession::update_configuration(SyncConfig new_config)
         REALM_ASSERT(m_state == &State::inactive);
         REALM_ASSERT(!m_session);
         REALM_ASSERT(m_config.user == new_config.user);
-        REALM_ASSERT(m_config.reference_realm_url == new_config.reference_realm_url);
-        REALM_ASSERT(m_config.is_partial == new_config.is_partial);
         m_config = std::move(new_config);
         break;
     }

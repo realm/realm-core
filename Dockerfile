@@ -1,23 +1,25 @@
-FROM ubuntu:xenial
+FROM ubuntu:19.10
 
-RUN apt-get update && \
-    apt-get install -y wget build-essential lcov curl cmake gcovr libprocps4-dev libssl-dev \
-      git python-cheetah libuv1-dev ninja-build adb xutils-dev
-
-# Install the Android NDK
-RUN mkdir -p /tmp/android-ndk && \
-    cd /tmp/android-ndk && \
-    wget -q http://dl.google.com/android/ndk/android-ndk-r10e-linux-x86_64.bin -O android-ndk.bin && \
-    chmod a+x ./android-ndk.bin && sync && ./android-ndk.bin && \
-    mv ./android-ndk-r10e /opt/android-ndk && \
-    chmod -R a+rX /opt/android-ndk && \
-    rm -rf /tmp/android-ndk
-
-ENV ANDROID_NDK_PATH /opt/android-ndk
+RUN apt-get update \
+    && apt-get install -y adb \
+                       build-essential \
+                       curl \
+                       gcovr \
+                       git \
+                       lcov \
+                       libcurl4-openssl-dev \
+                       libuv1-dev \
+                       libprocps-dev \
+                       ninja-build \
+                       tar \
+                       wget \
+                       xutils-dev \
+                       zlib1g-dev \
+    && apt-get clean             
 
 # Ensure a new enough version of CMake is available.
 RUN cd /opt \
-    && wget https://cmake.org/files/v3.15/cmake-3.15.2-Linux-x86_64.tar.gz \
-        && tar zxvf cmake-3.15.2-Linux-x86_64.tar.gz
+    && wget -nv https://cmake.org/files/v3.15/cmake-3.15.2-Linux-x86_64.tar.gz \
+        && tar zxf cmake-3.15.2-Linux-x86_64.tar.gz
 
 ENV PATH "/opt/cmake-3.15.2-Linux-x86_64/bin:$PATH"

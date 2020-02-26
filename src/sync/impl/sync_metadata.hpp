@@ -27,6 +27,7 @@
 
 #include "results.hpp"
 #include "shared_realm.hpp"
+#include "../sync_user.hpp"
 
 namespace realm {
 template<typename T> class BasicRowExpr;
@@ -44,11 +45,15 @@ public:
         // Whether or not this user has been marked for removal.
         ColKey idx_marked_for_removal;
         // The cached refresh token for this user.
-        ColKey idx_user_token;
+        ColKey idx_refresh_token;
         // The URL of the authentication server this user resides upon.
         ColKey idx_auth_server_url;
-        // Whether or not the auth server reported that this user is marked as an administrator.
-        ColKey idx_user_is_admin;
+        // The cached access token for this user.
+        ColKey idx_access_token;
+        // The identities for this user.
+        ColKey idx_identities;
+        // The profile for this user.
+        ColKey idx_profile;
     };
 
     // Cannot be set after creation.
@@ -57,14 +62,19 @@ public:
     // Cannot be set after creation.
     std::string local_uuid() const;
 
-    util::Optional<std::string> user_token() const;
-    void set_user_token(util::Optional<std::string>);
+    std::vector<realm::SyncUserIdentity> identities() const;
+    void set_identities(std::vector<SyncUserIdentity>);
+
+    util::Optional<std::string> refresh_token() const;
+    void set_refresh_token(util::Optional<std::string>);
+
+    util::Optional<std::string> access_token() const;
+    void set_access_token(util::Optional<std::string>);
+
+    void set_user_profile(std::shared_ptr<SyncUserProfile>);
 
     // Cannot be set after creation.
     std::string auth_server_url() const;
-
-    bool is_admin() const;
-    void set_is_admin(bool);
 
     // Mark the user as "ready for removal". Since Realm files cannot be safely deleted after being opened, the actual
     // deletion of a user must be deferred until the next time the host application is launched.
@@ -204,6 +214,8 @@ public:
     // Get the unique identifier of this client.
     const std::string& client_uuid() const { return m_client_uuid; }
 
+    util::Optional<std::string> get_current_user_identity() const;
+
     /// Construct the metadata manager.
     ///
     /// If the platform supports it, setting `should_encrypt` to `true` and not specifying an encryption key will make
@@ -219,6 +231,9 @@ private:
     SyncUserMetadata::Schema m_user_schema;
     SyncFileActionMetadata::Schema m_file_action_schema;
     SyncClientMetadata::Schema m_client_schema;
+    SyncClientMetadata::Schema m_current_user_identity_schema;
+    SyncUserMetadata::Schema m_profile_schema;
+
     std::string m_client_uuid;
 
     std::shared_ptr<Realm> get_realm() const;

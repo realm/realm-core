@@ -28,6 +28,8 @@
 #include "util/event_loop_dispatcher.hpp"
 #include "util/event_loop_signal.hpp"
 
+#include "../../external/json/json.hpp"
+
 #include "sync/sync_manager.hpp"
 #include "sync/sync_user.hpp"
 #include "sync/sync_session.hpp"
@@ -36,12 +38,11 @@
 #include <realm/util/scope_exit.hpp>
 #include <realm/global_key.hpp>
 
-#include <json.hpp>
-
 #include <condition_variable>
 #include <mutex>
 #include <queue>
 #include <stdexcept>
+#include <string>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -343,15 +344,15 @@ std::string GlobalNotifier::ChangeNotification::serialize() const
 GlobalNotifier::ChangeNotification::ChangeNotification(std::string const& serialized)
 {
     auto parsed = nlohmann::json::parse(serialized);
-    realm_path = parsed["virtual_path"];
-    m_realm_id = parsed["realm_id"];
+    realm_path = parsed["virtual_path"].get<std::string>();
+    m_realm_id = parsed["realm_id"].get<GlobalKey>();
 
     if (!parsed["is_change"].is_null()) {
         type = Type::Change;
-        m_old_version = parsed["old_version"];
-        m_new_version = parsed["new_version"];
+        m_old_version = parsed["old_version"].get<VersionID>();
+        m_new_version = parsed["new_version"].get<VersionID>();
 
-        m_config.path = parsed["path"];
+        m_config.path = parsed["path"].get<std::string>();
         m_config.force_sync_history = true;
         m_config.schema_mode = SchemaMode::Additive;
         m_config.automatic_change_notifications = false;

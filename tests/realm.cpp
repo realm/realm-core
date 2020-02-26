@@ -491,32 +491,6 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
         REQUIRE(called);
     }
 
-    SECTION("can download partial Realms") {
-        config.sync_config->is_partial = true;
-        config2.sync_config->is_partial = true;
-        {
-            auto realm = Realm::get_shared_realm(config2);
-            realm->begin_transaction();
-            realm->read_group().get_table("class_object")->create_object();
-            realm->commit_transaction();
-            wait_for_upload(*realm);
-        }
-
-        std::atomic<bool> called{false};
-        auto task = Realm::get_synchronized_realm(config);
-        task->start([&](auto, auto error) {
-            std::lock_guard<std::mutex> lock(mutex);
-            REQUIRE(!error);
-            called = true;
-        });
-        util::EventLoop::main().run_until([&]{ return called.load(); });
-        std::lock_guard<std::mutex> lock(mutex);
-        REQUIRE(called);
-
-        // No subscriptions, so no objects
-        REQUIRE(Realm::get_shared_realm(config)->read_group().get_table("class_object")->size() == 0);
-    }
-
     SECTION("can download multiple Realms at a time") {
         SyncTestFile config1(server, "realm1");
         SyncTestFile config2(server, "realm2");
@@ -1282,6 +1256,25 @@ TEST_CASE("SharedRealm: dynamic schema mode doesn't invalidate object schema poi
     // Advance to the latest version, and verify the object schema is at the same location in memory.
     r2->read_group();
     REQUIRE(object_schema == &*r2->schema().find("object"));
+}
+
+TEST_CASE("SharedRealm: declaring an object as embedded results in creating an embedded table") {
+    TestFile config;
+
+    // Prepopulate the Realm with the schema.
+    config.schema = Schema{
+        {"object1", ObjectSchema::IsEmbedded{true}, {
+            {"value", PropertyType::Int},
+        }},
+        {"object2", {
+            {"value", PropertyType::Object | PropertyType::Nullable, "object1"},
+        }}
+    };
+    auto r1 = Realm::get_shared_realm(config);
+
+    Group& g = r1->read_group();
+    auto t = g.get_table("class_object1");
+    REQUIRE(t->is_embedded());
 }
 
 TEST_CASE("SharedRealm: SchemaChangedFunction") {

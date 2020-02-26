@@ -33,15 +33,27 @@ ObjectSchema::ObjectSchema() = default;
 ObjectSchema::~ObjectSchema() = default;
 
 ObjectSchema::ObjectSchema(std::string name, std::initializer_list<Property> persisted_properties)
-: ObjectSchema(std::move(name), persisted_properties, {})
+: ObjectSchema(std::move(name), IsEmbedded{false}, persisted_properties, {})
+{
+}
+
+ObjectSchema::ObjectSchema(std::string name, IsEmbedded is_embedded, std::initializer_list<Property> persisted_properties)
+: ObjectSchema(std::move(name), is_embedded, persisted_properties, {})
 {
 }
 
 ObjectSchema::ObjectSchema(std::string name, std::initializer_list<Property> persisted_properties,
                            std::initializer_list<Property> computed_properties)
+: ObjectSchema(std::move(name), IsEmbedded{false}, persisted_properties, computed_properties)
+{
+}
+
+ObjectSchema::ObjectSchema(std::string name, IsEmbedded is_embedded, std::initializer_list<Property> persisted_properties,
+                           std::initializer_list<Property> computed_properties)
 : name(std::move(name))
 , persisted_properties(persisted_properties)
 , computed_properties(computed_properties)
+, is_embedded(is_embedded)
 {
     for (auto const& prop : persisted_properties) {
         if (prop.is_primary) {
@@ -87,6 +99,7 @@ ObjectSchema::ObjectSchema(Group const& group, StringData name, TableKey key)
         table = ObjectStore::table_for_object_type(group, name);
     }
     table_key = table->get_key();
+    is_embedded = table->is_embedded();
 
     size_t count = table->get_column_count();
     persisted_properties.reserve(count);
@@ -104,7 +117,7 @@ ObjectSchema::ObjectSchema(Group const& group, StringData name, TableKey key)
         Property property;
         property.name = column_name;
         property.type = ObjectSchema::from_core_type(*table, col_key);
-        property.is_indexed = table->has_search_index(col_key) || table->get_primary_key_column() == col_key;
+        property.is_indexed = table->has_search_index(col_key);
         property.column_key = col_key;
 
         if (property.type == PropertyType::Object) {
@@ -119,7 +132,7 @@ ObjectSchema::ObjectSchema(Group const& group, StringData name, TableKey key)
     set_primary_key_property();
 }
 
-Property *ObjectSchema::property_for_name(StringData name)
+Property *ObjectSchema::property_for_name(StringData name) noexcept
 {
     for (auto& prop : persisted_properties) {
         if (StringData(prop.name) == name) {
@@ -134,7 +147,7 @@ Property *ObjectSchema::property_for_name(StringData name)
     return nullptr;
 }
 
-Property *ObjectSchema::property_for_public_name(StringData public_name)
+Property *ObjectSchema::property_for_public_name(StringData public_name) noexcept
 {
     // If no `public_name` is defined, the internal `name` is also considered the public name.
     for (auto& prop : persisted_properties) {
@@ -146,29 +159,29 @@ Property *ObjectSchema::property_for_public_name(StringData public_name)
     // are a bit pointless since the internal name is already the "public name", but since
     // this distinction isn't visible in the Property struct we allow it anyway.
     for (auto& prop : computed_properties) {
-        if ((prop.public_name.empty() ? StringData(prop.name) :  StringData(prop.public_name)) == public_name)
+        if (StringData(prop.public_name.empty() ? prop.name : prop.public_name) == public_name)
             return &prop;
     }
     return nullptr;
 }
 
-const Property *ObjectSchema::property_for_public_name(StringData public_name) const
+const Property *ObjectSchema::property_for_public_name(StringData public_name) const noexcept
 {
     return const_cast<ObjectSchema *>(this)->property_for_public_name(public_name);
 }
 
-const Property *ObjectSchema::property_for_name(StringData name) const
+const Property *ObjectSchema::property_for_name(StringData name) const noexcept
 {
     return const_cast<ObjectSchema *>(this)->property_for_name(name);
 }
 
-bool ObjectSchema::property_is_computed(Property const& property) const
+bool ObjectSchema::property_is_computed(Property const& property) const noexcept
 {
     auto end = computed_properties.end();
     return std::find(computed_properties.begin(), end, property) != end;
 }
 
-void ObjectSchema::set_primary_key_property()
+void ObjectSchema::set_primary_key_property() noexcept
 {
     if (primary_key.length()) {
         if (auto primary_key_prop = primary_key_property()) {
@@ -330,13 +343,16 @@ void ObjectSchema::validate(Schema const& schema, std::vector<ObjectSchemaValida
         validate_property(schema, name, prop, &primary, exceptions);
     }
 
+    if (!primary_key.empty() && is_embedded) {
+        exceptions.emplace_back("Embedded table '%1' cannot have primary key '%2'.", name, primary_key);
+    }
     if (!primary_key.empty() && !primary && !primary_key_property()) {
         exceptions.emplace_back("Specified primary key '%1.%2' does not exist.", name, primary_key);
     }
 }
 
 namespace realm {
-bool operator==(ObjectSchema const& a, ObjectSchema const& b)
+bool operator==(ObjectSchema const& a, ObjectSchema const& b) noexcept
 {
     return std::tie(a.name, a.primary_key, a.persisted_properties, a.computed_properties)
         == std::tie(b.name, b.primary_key, b.persisted_properties, b.computed_properties);

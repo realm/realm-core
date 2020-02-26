@@ -102,35 +102,31 @@ InMemoryTestFile::InMemoryTestFile()
 }
 
 #if REALM_ENABLE_SYNC
-SyncTestFile::SyncTestFile(SyncServer& server, std::string name, bool is_partial, std::string user_name)
+SyncTestFile::SyncTestFile(SyncServer& server, std::string name, std::string user_name)
 {
     if (name.empty())
         name = path.substr(path.rfind('/') + 1);
     auto url = server.url_for_realm(name);
 
-    sync_config = std::make_shared<SyncConfig>(SyncManager::shared().get_user({user_name, url}, "not_a_real_token"), url);
-    sync_config->user->set_is_admin(true);
+    std::string fake_refresh_token = ENCODE_FAKE_JWT("not_a_real_token");
+    std::string fake_access_token = ENCODE_FAKE_JWT("also_not_real");
+    sync_config = std::make_shared<SyncConfig>(SyncManager::shared().get_user({user_name, url}, fake_refresh_token, fake_access_token), url);
     sync_config->stop_policy = SyncSessionStopPolicy::Immediately;
     sync_config->bind_session_handler = [=](auto&, auto& config, auto session) {
         std::string token, encoded;
         // FIXME: Tokens without a path are currently implicitly considered
         // admin tokens by the sync service, so until that changes we need to
         // add a path for non-admin users
-        if (config.user->is_admin())
-            token = util::format("{\"identity\": \"%1\", \"access\": [\"download\", \"upload\"]}", user_name);
-        else {
-            std::string suffix;
-            if (config.is_partial)
-                suffix = util::format("/__partial/%1/%2", config.user->identity(), SyncConfig::partial_sync_identifier(*config.user));
-            token = util::format("{\"identity\": \"%1\", \"path\": \"/%2%3\", \"access\": [\"download\", \"upload\"]}",
-                                 user_name, name, suffix);
-        }
+
+        std::string suffix;
+        token = util::format("{\"identity\": \"%1\", \"path\": \"/%2%3\", \"access\": [\"download\", \"upload\"]}",
+                             user_name, name, suffix);
+        
         encoded.resize(base64_encoded_size(token.size()));
         base64_encode(token.c_str(), token.size(), &encoded[0], encoded.size());
-        session->refresh_access_token(encoded, config.realm_url());
+        session->refresh_access_token(encoded, config.realm_url);
     };
     sync_config->error_handler = [](auto, auto) { abort(); };
-    sync_config->is_partial = is_partial;
     schema_mode = SchemaMode::Additive;
 }
 
@@ -156,6 +152,7 @@ SyncServer::SyncServer(StartImmediately start_immediately, std::string local_dir
     config.history_ttl = 1s;
     config.history_compaction_interval = 1s;
     config.state_realm_dir = util::make_temp_dir();
+    config.listen_address = "127.0.0.1";
 
     return config;
 })())
@@ -166,20 +163,8 @@ SyncServer::SyncServer(StartImmediately start_immediately, std::string local_dir
     SyncManager::shared().set_log_level(util::Logger::Level::off);
 #endif
 
-    uint64_t port;
-    while (true) {
-        // Try to pick a random available port, or loop forever if other
-        // problems occur because there's no specific error for "port in use"
-        try {
-            port = fastrand(65536 - 1000) + 1000;
-            m_server.start("127.0.0.1", util::to_string(port));
-            break;
-        }
-        catch (std::runtime_error const&) {
-            continue;
-        }
-    }
-    m_url = util::format("realm://127.0.0.1:%1", port);
+    m_server.start();
+    m_url = util::format("realm://127.0.0.1:%1", m_server.listen_endpoint().port());
     if (start_immediately)
         start();
 }

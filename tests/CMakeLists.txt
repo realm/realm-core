@@ -38,7 +38,6 @@ if(REALM_ENABLE_SYNC)
     list(APPEND SOURCES
         sync/file.cpp
         sync/metadata.cpp
-        sync/partial_sync.cpp
         sync/permission.cpp
         sync/session/connection_change_notifications.cpp
         sync/session/progress_notifications.cpp
@@ -47,16 +46,19 @@ if(REALM_ENABLE_SYNC)
         sync/sync_manager.cpp
         sync/sync_test_utils.cpp
         sync/user.cpp
-    )
-endif()
-
-if(REALM_ENABLE_SERVER)
-    list(APPEND SOURCES
-        sync/global_notifier.cpp
+        sync/app.cpp
     )
 endif()
 
 add_executable(tests ${SOURCES} ${HEADERS})
+
+set(REALM_ENABLE_AUTH_TESTS OFF CACHE BOOL "")
+
+if (REALM_ENABLE_AUTH_TESTS)
+    add_definitions(-DREALM_ENABLE_AUTH_TESTS=1)
+    SET_TARGET_PROPERTIES(tests PROPERTIES LINK_FLAGS -lcurl)
+endif()
+
 target_compile_definitions(tests PRIVATE ${PLATFORM_DEFINES})
 
 if(VSCODE_TEST_RUNNER)
@@ -72,6 +74,7 @@ if(REALM_ENABLE_SYNC)
 endif()
 
 target_link_libraries(tests realm-object-store ${PLATFORM_LIBRARIES})
+
 add_custom_command(TARGET tests POST_BUILD
                    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/sync-1.x.realm $<TARGET_FILE_DIR:tests>)
 

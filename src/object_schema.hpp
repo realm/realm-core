@@ -21,6 +21,7 @@
 
 #include <realm/keys.hpp>
 #include <realm/string_data.hpp>
+#include "util/tagged_bool.hpp"
 
 #include <string>
 #include <vector>
@@ -35,11 +36,21 @@ struct Property;
 
 class ObjectSchema {
 public:
+    using IsEmbedded = util::TaggedBool<class IsEmbeddedTag>;
+
     ObjectSchema();
     ObjectSchema(std::string name, std::initializer_list<Property> persisted_properties);
+    ObjectSchema(std::string name, IsEmbedded is_embedded, std::initializer_list<Property> persisted_properties);
     ObjectSchema(std::string name, std::initializer_list<Property> persisted_properties,
                  std::initializer_list<Property> computed_properties);
+    ObjectSchema(std::string name, IsEmbedded is_embedded, std::initializer_list<Property> persisted_properties,
+                 std::initializer_list<Property> computed_properties);
     ~ObjectSchema();
+
+    ObjectSchema(ObjectSchema const&) = default;
+    ObjectSchema(ObjectSchema&&) noexcept = default;
+    ObjectSchema& operator=(ObjectSchema const&) = default;
+    ObjectSchema& operator=(ObjectSchema&&) noexcept = default;
 
     // create object schema from existing table
     // if no table key is provided it is looked up in the group
@@ -50,27 +61,28 @@ public:
     std::vector<Property> computed_properties;
     std::string primary_key;
     TableKey table_key;
+    IsEmbedded is_embedded = false;
 
-    Property *property_for_public_name(StringData public_name);
-    const Property *property_for_public_name(StringData public_name) const;
-    Property *property_for_name(StringData name);
-    const Property *property_for_name(StringData name) const;
-    Property *primary_key_property() {
+    Property *property_for_public_name(StringData public_name) noexcept;
+    const Property *property_for_public_name(StringData public_name) const noexcept;
+    Property *property_for_name(StringData name) noexcept;
+    const Property *property_for_name(StringData name) const noexcept;
+    Property *primary_key_property() noexcept {
         return property_for_name(primary_key);
     }
-    const Property *primary_key_property() const {
+    const Property *primary_key_property() const noexcept {
         return property_for_name(primary_key);
     }
-    bool property_is_computed(Property const& property) const;
+    bool property_is_computed(Property const& property) const noexcept;
 
     void validate(Schema const& schema, std::vector<ObjectSchemaValidationException>& exceptions) const;
 
-    friend bool operator==(ObjectSchema const& a, ObjectSchema const& b);
+    friend bool operator==(ObjectSchema const& a, ObjectSchema const& b) noexcept;
 
     static PropertyType from_core_type(Table const& table, ColKey col);
 
 private:
-    void set_primary_key_property();
+    void set_primary_key_property() noexcept;
 };
 }
 

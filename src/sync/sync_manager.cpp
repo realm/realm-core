@@ -27,8 +27,6 @@
 using namespace realm;
 using namespace realm::_impl;
 
-constexpr const char SyncManager::c_admin_identity[];
-
 SyncManager& SyncManager::shared()
 {
     // The singleton is heap-allocated in order to fix an issue when running unit tests where tests would crash after
@@ -39,6 +37,7 @@ SyncManager& SyncManager::shared()
 
 void SyncManager::configure(SyncClientConfig config)
 {
+    reset_for_testing();
     {
         std::lock_guard<std::mutex> lock(m_mutex);
         m_config = std::move(config);
@@ -48,9 +47,10 @@ void SyncManager::configure(SyncClientConfig config)
 
     struct UserCreationData {
         std::string identity;
-        std::string user_token;
+        std::string refresh_token;
+        std::string access_token;
         std::string server_url;
-        bool is_admin;
+        std::vector<SyncUserIdentity> identities;
     };
 
     std::vector<UserCreationData> users_to_add;
@@ -106,14 +106,16 @@ void SyncManager::configure(SyncClientConfig config)
         // Load persisted users into the users map.
         SyncUserMetadataResults users = m_metadata_manager->all_unmarked_users();
         for (size_t i = 0; i < users.size(); i++) {
-            // Note that 'admin' style users are not persisted.
             auto user_data = users.get(i);
-            if (auto user_token = user_data.user_token()) {
+            auto refresh_token = user_data.refresh_token();
+            auto access_token = user_data.access_token();
+            if (refresh_token && access_token) {
                 users_to_add.push_back(UserCreationData{
                     user_data.identity(),
-                    std::move(*user_token),
+                    std::move(*refresh_token),
+                    std::move(*access_token),
                     user_data.auth_server_url(),
-                    user_data.is_admin()
+                    user_data.identities()
                 });
             }
         }
@@ -142,8 +144,10 @@ void SyncManager::configure(SyncClientConfig config)
         for (auto& user_data : users_to_add) {
             auto& identity = user_data.identity;
             auto& server_url = user_data.server_url;
-            auto user = std::make_shared<SyncUser>(user_data.user_token, identity, server_url);
-            user->set_is_admin(user_data.is_admin);
+            auto user = std::make_shared<SyncUser>(user_data.refresh_token,
+                                                   identity,
+                                                   server_url,
+                                                   user_data.access_token);
             m_users.insert({ {identity, server_url}, std::move(user) });
         }
     }
@@ -192,15 +196,15 @@ bool SyncManager::run_file_action(const SyncFileActionMetadata& md)
 void SyncManager::reset_for_testing()
 {
     std::lock_guard<std::mutex> lock(m_file_system_mutex);
+    m_file_manager->remove_metadata_realm();
     m_file_manager = nullptr;
     m_metadata_manager = nullptr;
     m_client_uuid = util::none;
-
+    
     {
         // Destroy all the users.
         std::lock_guard<std::mutex> lock(m_user_mutex);
         m_users.clear();
-        m_admin_token_users.clear();
     }
     {
         std::lock_guard<std::mutex> lock(m_mutex);
@@ -291,7 +295,9 @@ bool SyncManager::perform_metadata_update(std::function<void(const SyncMetadataM
     return true;
 }
 
-std::shared_ptr<SyncUser> SyncManager::get_user(const SyncUserIdentifier& identifier, std::string refresh_token)
+std::shared_ptr<SyncUser> SyncManager::get_user(const SyncUserIdentifier& identifier,
+                                                std::string refresh_token,
+                                                std::string access_token)
 {
     std::lock_guard<std::mutex> lock(m_user_mutex);
     auto it = m_users.find(identifier);
@@ -300,8 +306,7 @@ std::shared_ptr<SyncUser> SyncManager::get_user(const SyncUserIdentifier& identi
         auto new_user = std::make_shared<SyncUser>(std::move(refresh_token),
                                                    identifier.user_id,
                                                    identifier.auth_server_url,
-                                                   none,
-                                                   SyncUser::TokenType::Normal);
+                                                   std::move(access_token));
         m_users.insert({ identifier, new_user });
         return new_user;
     } else {
@@ -310,77 +315,21 @@ std::shared_ptr<SyncUser> SyncManager::get_user(const SyncUserIdentifier& identi
             return nullptr;
         }
         user->update_refresh_token(std::move(refresh_token));
+        user->update_access_token(std::move(access_token));
         return user;
     }
-}
-
-std::shared_ptr<SyncUser> SyncManager::get_admin_token_user_from_identity(const std::string& identity,
-                                                                          util::Optional<std::string> server_url,
-                                                                          const std::string& token)
-{
-    if (server_url)
-        return get_admin_token_user(*server_url, token, identity);
-
-    std::lock_guard<std::mutex> lock(m_user_mutex);
-    // Look up the user based off the identity.
-    // No server URL, so no migration possible.
-    auto it = m_admin_token_users.find(identity);
-    if (it == m_admin_token_users.end()) {
-        // No existing user.
-        auto new_user = std::make_shared<SyncUser>(token,
-                                                   c_admin_identity,
-                                                   std::move(server_url),
-                                                   identity,
-                                                   SyncUser::TokenType::Admin);
-        m_admin_token_users.insert({ identity, new_user });
-        return new_user;
-    } else {
-        return it->second;
-    }
-}
-
-std::shared_ptr<SyncUser> SyncManager::get_admin_token_user(const std::string& server_url,
-                                                            const std::string& token,
-                                                            util::Optional<std::string> old_identity)
-{
-    std::shared_ptr<SyncUser> user;
-    {
-        std::lock_guard<std::mutex> lock(m_user_mutex);
-        // Look up the user based off the server URL.
-        auto it = m_admin_token_users.find(server_url);
-        if (it != m_admin_token_users.end())
-            return it->second;
-
-        // No existing user.
-        user = std::make_shared<SyncUser>(token,
-                                          c_admin_identity,
-                                          server_url,
-                                          c_admin_identity + server_url,
-                                          SyncUser::TokenType::Admin);
-        m_admin_token_users.insert({ server_url, user });
-    }
-    if (old_identity) {
-        // Try renaming the user's directory to use our new naming standard, if applicable.
-        std::lock_guard<std::mutex> fm_lock(m_file_system_mutex);
-        if (m_file_manager)
-            m_file_manager->try_rename_user_directory(*old_identity, c_admin_identity + server_url);
-    }
-    return user;
 }
 
 std::vector<std::shared_ptr<SyncUser>> SyncManager::all_logged_in_users() const
 {
     std::lock_guard<std::mutex> lock(m_user_mutex);
     std::vector<std::shared_ptr<SyncUser>> users;
-    users.reserve(m_users.size() + m_admin_token_users.size());
+    users.reserve(m_users.size());
     for (auto& it : m_users) {
         auto user = it.second;
         if (user->state() == SyncUser::State::Active) {
             users.emplace_back(std::move(user));
         }
-    }
-    for (auto& it : m_admin_token_users) {
-        users.emplace_back(std::move(it.second));
     }
     return users;
 }
@@ -389,13 +338,23 @@ std::shared_ptr<SyncUser> SyncManager::get_current_user() const
 {
     std::lock_guard<std::mutex> lock(m_user_mutex);
 
-    auto is_active_user = [](auto& el) { return el.second->state() == SyncUser::State::Active; };
+    if (!m_metadata_manager) {
+        return nullptr;
+    }
+
+    auto cur_user_ident = m_metadata_manager->get_current_user_identity();
+    if (!cur_user_ident) {
+        return nullptr;
+    }
+
+    std::string ident = *cur_user_ident;
+    auto is_active_user = [&](auto& el) {
+        return el.second->identity() == ident;
+    };
+
     auto it = std::find_if(m_users.begin(), m_users.end(), is_active_user);
     if (it == m_users.end())
         return nullptr;
-
-    if (std::find_if(std::next(it), m_users.end(), is_active_user) != m_users.end())
-        throw std::logic_error("Current user is not valid if more that one valid, logged-in user exists.");
 
     return it->second;
 }

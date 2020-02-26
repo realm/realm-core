@@ -169,7 +169,7 @@ stage('unit-tests') {
     linux: doDockerBuild('linux', false, false),
     linux_sync: doDockerBuild('linux', true, true),
     linux_asan: doDockerBuild('linux', false, true, '-DSANITIZE_ADDRESS=1'),
-    linux_tsan: doDockerBuild('linux', false, true, '-DSANITIZE_THREAD=1'),
+    // linux_tsan: doDockerBuild('linux', false, true, '-DSANITIZE_THREAD=1'),
     android: doAndroidDockerBuild(),
     macos: doBuild('osx', 'macOS', false, ''),
     macos_sync: doBuild('osx', 'macOS', true, ''),

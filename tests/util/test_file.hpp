@@ -27,13 +27,16 @@
 
 #if REALM_ENABLE_SYNC
 #include "sync/sync_config.hpp"
+#include "test_utils.hpp"
 
 #include <realm/sync/client.hpp>
 #include <realm/sync/server.hpp>
 
 // {"identity":"test", "access": ["download", "upload"]}
-static const std::string s_test_token = "eyJpZGVudGl0eSI6InRlc3QiLCAiYWNjZXNzIjogWyJkb3dubG9hZCIsICJ1cGxvYWQiXX0=";
+static const std::string s_test_token = ENCODE_FAKE_JWT("s_test");
+
 #endif // REALM_ENABLE_SYNC
+
 
 namespace realm {
 class Schema;
@@ -122,9 +125,9 @@ private:
 
 struct SyncTestFile : TestFile {
     template<typename BindHandler, typename ErrorHandler>
-    SyncTestFile(const realm::SyncConfig& sync_config, 
-        realm::SyncSessionStopPolicy stop_policy, 
-        BindHandler&& bind_handler, 
+    SyncTestFile(const realm::SyncConfig& sync_config,
+        realm::SyncSessionStopPolicy stop_policy,
+        BindHandler&& bind_handler,
         ErrorHandler&& error_handler)
     {
         this->sync_config = std::make_shared<realm::SyncConfig>(sync_config);
@@ -134,8 +137,7 @@ struct SyncTestFile : TestFile {
         schema_mode = realm::SchemaMode::Additive;
     }
 
-    SyncTestFile(SyncServer& server, std::string name="", bool is_partial=false,
-                 std::string user_name="test");
+    SyncTestFile(SyncServer& server, std::string name="", std::string user_name="test");
 };
 
 struct TestSyncManager {

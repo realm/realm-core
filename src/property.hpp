@@ -95,20 +95,21 @@ struct Property {
 
     Property() = default;
 
-    Property(std::string name, PropertyType type, IsPrimary primary = false, IsIndexed indexed = false, std::string public_name = "");
+    Property(std::string name, PropertyType type, IsPrimary primary = false,
+             IsIndexed indexed = false, std::string public_name = "");
 
     Property(std::string name, PropertyType type, std::string object_type,
              std::string link_origin_property_name = "", std::string public_name = "");
 
     Property(Property const&) = default;
-    Property(Property&&) = default;
+    Property(Property&&) noexcept = default;
     Property& operator=(Property const&) = default;
-    Property& operator=(Property&&) = default;
+    Property& operator=(Property&&) noexcept = default;
 
-    bool requires_index() const { return is_primary || is_indexed; }
+    bool requires_index() const { return is_indexed && !is_primary; }
 
-    bool type_is_indexable() const;
-    bool type_is_nullable() const;
+    bool type_is_indexable() const noexcept;
+    bool type_is_nullable() const noexcept;
 
     std::string type_string() const;
 };
@@ -244,7 +245,7 @@ inline Property::Property(std::string name, PropertyType type,
 {
 }
 
-inline bool Property::type_is_indexable() const
+inline bool Property::type_is_indexable() const noexcept
 {
     return type == PropertyType::Int
         || type == PropertyType::Bool
@@ -253,7 +254,7 @@ inline bool Property::type_is_indexable() const
         || type == PropertyType::ObjectId;
 }
 
-inline bool Property::type_is_nullable() const
+inline bool Property::type_is_nullable() const noexcept
 {
     return !(is_array(type) && type == PropertyType::Object) && type != PropertyType::LinkingObjects;
 }

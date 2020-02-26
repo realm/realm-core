@@ -27,11 +27,12 @@
 
 using namespace realm;
 
-Object Object::freeze(std::shared_ptr<Realm> frozen_realm) {
+Object Object::freeze(std::shared_ptr<Realm> frozen_realm) const
+{
     return Object(frozen_realm, frozen_realm->transaction().import_copy_of(m_obj));
 }
 
-bool Object::is_frozen()
+bool Object::is_frozen() const noexcept
 {
     return m_realm->is_frozen();
 }
@@ -61,8 +62,8 @@ ReadOnlyPropertyException::ReadOnlyPropertyException(const std::string& object_t
 , object_type(object_type), property_name(property_name) {}
 
 ModifyPrimaryKeyException::ModifyPrimaryKeyException(const std::string& object_type, const std::string& property_name)
-        : std::logic_error(util::format("Cannot modify primary key after creation: '%1.%2'", object_type, property_name))
-        , object_type(object_type), property_name(property_name) {}
+: std::logic_error(util::format("Cannot modify primary key after creation: '%1.%2'", object_type, property_name))
+, object_type(object_type), property_name(property_name) {}
 
 Object::Object(SharedRealm r, ObjectSchema const& s, Obj const& o)
 : m_realm(std::move(r)), m_object_schema(&s), m_obj(o) { }
@@ -123,23 +124,3 @@ Property const& Object::property_for_name(StringData prop_name) const
     return *prop;
 }
 
-#if REALM_ENABLE_SYNC
-void Object::ensure_user_in_everyone_role()
-{
-    if (auto role_table = m_realm->read_group().get_table("class___Role")) {
-        if (ObjKey ndx = role_table->find_first_string(role_table->get_column_key("name"), "everyone")) {
-            auto role = role_table->get_object(ndx);
-            auto users = role.get_linklist(role_table->get_column_key("members"));
-            if (users.find_first(m_obj.get_key()) == realm::npos) {
-                users.add(m_obj.get_key());
-            }
-        }
-    }
-}
-
-void Object::ensure_private_role_exists_for_user()
-{
-    auto user_id = m_obj.get<StringData>("id");
-    ObjectStore::ensure_private_role_exists_for_user(static_cast<Transaction&>(m_realm->read_group()), user_id);
-}
-#endif

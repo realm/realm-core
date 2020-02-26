@@ -159,25 +159,9 @@ public:
 
     // Get a sync user for a given identity, or create one if none exists yet, and set its token.
     // If a logged-out user exists, it will marked as logged back in.
-    std::shared_ptr<SyncUser> get_user(const SyncUserIdentifier& identifier, std::string refresh_token);
-
-    // Get or create an admin token user based on the given identity.
-    // Please note: a future version will remove this method and deprecate the
-    // use of identities for admin users completely.
-    // Warning: it is an error to create or get an admin token user with a given identity and
-    // specifying a URL, and later get that same user by specifying only the identity and no
-    // URL, or vice versa.
-    std::shared_ptr<SyncUser> get_admin_token_user_from_identity(const std::string& identity,
-                                                                 util::Optional<std::string> server_url,
-                                                                 const std::string& token);
-
-    // Get or create an admin token user for the given URL.
-    // If the user already exists, the token value will be ignored.
-    // If an old identity is provided and a directory for the user already exists, the directory
-    // will be renamed.
-    std::shared_ptr<SyncUser> get_admin_token_user(const std::string& server_url,
-                                                   const std::string& token,
-                                                   util::Optional<std::string> old_identity=none);
+    std::shared_ptr<SyncUser> get_user(const SyncUserIdentifier& identifier,
+                                       std::string refresh_token,
+                                       std::string access_token);
 
     // Get an existing user for a given identifier, if one exists and is logged in.
     std::shared_ptr<SyncUser> get_existing_logged_in_user(const SyncUserIdentifier&) const;
@@ -203,8 +187,6 @@ public:
 
 private:
     using ReconnectMode = sync::Client::ReconnectMode;
-    
-    static constexpr const char c_admin_identity[] = "__auth";
 
     // Stop tracking the session for the given path if it is inactive.
     // No-op if the session is either still active or in the active sessions list
@@ -229,8 +211,6 @@ private:
 
     // A map of user ID/auth server URL pairs to (shared pointers to) SyncUser objects.
     std::unordered_map<SyncUserIdentifier, std::shared_ptr<SyncUser>> m_users;
-    // A map of local identifiers to admin token users.
-    std::unordered_map<std::string, std::shared_ptr<SyncUser>> m_admin_token_users;
 
     mutable std::unique_ptr<_impl::SyncClient> m_sync_client;
 

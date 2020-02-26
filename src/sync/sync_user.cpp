@@ -21,8 +21,93 @@
 #include "sync/impl/sync_metadata.hpp"
 #include "sync/sync_manager.hpp"
 #include "sync/sync_session.hpp"
+#include "sync/generic_network_transport.hpp"
+#include "../../external/json/json.hpp"
+
+#include <realm/util/base64.hpp>
 
 namespace realm {
+
+static std::string base64_decode(const std::string &in) {
+    std::string out;
+    out.resize(util::base64_decoded_size(in.size()));
+    util::base64_decode(in, &out[0], out.size());
+    return out;
+}
+
+static std::vector<std::string> split_token(const std::string& jwt) {
+    constexpr static char delimiter = '.';
+
+    std::vector<std::string> parts;
+    size_t pos = 0, start_from = 0;
+
+    while ((pos = jwt.find(delimiter, start_from)) != std::string::npos) {
+        parts.push_back(jwt.substr(start_from, pos - start_from));
+        start_from = pos + 1;
+    }
+
+    parts.push_back(jwt.substr(start_from));
+
+    if (parts.size() != 3) {
+        throw app::error::JSONError(app::error::JSONErrorCode::bad_token, "jwt missing parts");
+    }
+
+    return parts;
+}
+
+RealmJWT::RealmJWT(const std::string& token)
+{
+    auto parts = split_token(token);
+
+    auto json = nlohmann::json::parse(base64_decode(parts[1]));
+
+    this->token = token;
+    this->expires_at = HAS_JSON_KEY_OR_THROW(json, "exp", long);
+    this->issued_at = HAS_JSON_KEY_OR_THROW(json, "iat", long);
+
+    if (json.find("user_data") != json.end()) {
+        this->user_data = json["user_data"].get<std::map<std::string, util::Any>>();
+    }
+}
+
+ObjectSchema SyncUserProfile::schema()
+{
+    return { "user_profile",
+        {
+            {"name", PropertyType::String|PropertyType::Nullable},
+            {"email", PropertyType::String|PropertyType::Nullable},
+            {"picture_url", PropertyType::String|PropertyType::Nullable},
+            {"first_name", PropertyType::String|PropertyType::Nullable},
+            {"last_name", PropertyType::String|PropertyType::Nullable},
+            {"gender", PropertyType::String|PropertyType::Nullable},
+            {"birthday", PropertyType::String|PropertyType::Nullable},
+            {"min_age", PropertyType::String|PropertyType::Nullable},
+            {"max_age", PropertyType::String|PropertyType::Nullable}
+        }
+    };
+}
+
+ObjectSchema SyncUserIdentity::schema()
+{
+    return { "user_identity",
+        {
+            {"id", PropertyType::String},
+            {"provider_type", PropertyType::String}
+        }
+    };
+}
+
+SyncUserIdentity::SyncUserIdentity(realm::ConstObj& obj)
+{
+    this->id = obj.get<String>("id");
+    this->provider_type = obj.get<String>("provider_type");
+}
+
+SyncUserIdentity::SyncUserIdentity(std::string id, std::string provider_type)
+{
+    this->id = id;
+    this->provider_type = provider_type;
+}
 
 SyncUserContextFactory SyncUser::s_binding_context_factory;
 std::mutex SyncUser::s_binding_context_factory_mutex;
@@ -30,13 +115,12 @@ std::mutex SyncUser::s_binding_context_factory_mutex;
 SyncUser::SyncUser(std::string refresh_token,
                    std::string identity,
                    util::Optional<std::string> server_url,
-                   util::Optional<std::string> local_identity,
-                   TokenType token_type)
+                   std::string access_token)
 : m_state(State::Active)
 , m_server_url(server_url.value_or(""))
-, m_token_type(token_type)
-, m_refresh_token(std::move(refresh_token))
+, m_refresh_token(RealmJWT(std::move(refresh_token)))
 , m_identity(std::move(identity))
+, m_access_token(RealmJWT(std::move(access_token)))
 {
     {
         std::lock_guard<std::mutex> lock(s_binding_context_factory_mutex);
@@ -44,21 +128,16 @@ SyncUser::SyncUser(std::string refresh_token,
             m_binding_context = s_binding_context_factory();
         }
     }
-    if (token_type == TokenType::Normal) {
-        REALM_ASSERT(m_server_url.length() > 0);
-        bool updated = SyncManager::shared().perform_metadata_update([=](const auto& manager) {
-            auto metadata = manager.get_or_make_user_metadata(m_identity, m_server_url);
-            metadata->set_user_token(m_refresh_token);
-            m_is_admin = metadata->is_admin();
-            m_local_identity = metadata->local_uuid();
-        });
-        if (!updated)
-            m_local_identity = m_identity;
-    } else {
-        // Admin token users. The local identity serves as the directory path.
-        REALM_ASSERT(local_identity);
-        m_local_identity = std::move(*local_identity);
-    }
+
+    REALM_ASSERT(m_server_url.length() > 0);
+    bool updated = SyncManager::shared().perform_metadata_update([=](const auto& manager) {
+        auto metadata = manager.get_or_make_user_metadata(m_identity, m_server_url);
+        metadata->set_refresh_token(m_refresh_token.token);
+        metadata->set_access_token(m_access_token.token);
+        m_local_identity = metadata->local_uuid();
+    });
+    if (!updated)
+        m_local_identity = m_identity;
 }
 
 std::vector<std::shared_ptr<SyncSession>> SyncUser::all_sessions()
@@ -129,13 +208,11 @@ void SyncUser::update_refresh_token(std::string token)
                 break;
             }
         }
-        // Update persistent user metadata.
-        if (m_token_type != TokenType::Admin) {
-            SyncManager::shared().perform_metadata_update([=](const auto& manager) {
-                auto metadata = manager.get_or_make_user_metadata(m_identity, m_server_url);
-                metadata->set_user_token(token);
-            });
-        }
+
+        SyncManager::shared().perform_metadata_update([=](const auto& manager) {
+            auto metadata = manager.get_or_make_user_metadata(m_identity, m_server_url);
+            metadata->set_refresh_token(token);
+        });
     }
     // (Re)activate all pending sessions.
     // Note that we do this after releasing the lock, since the session may
@@ -145,12 +222,74 @@ void SyncUser::update_refresh_token(std::string token)
     }
 }
 
+void SyncUser::update_access_token(std::string token)
+{
+    std::vector<std::shared_ptr<SyncSession>> sessions_to_revive;
+    {
+        std::unique_lock<std::mutex> lock(m_mutex);
+        if (auto session = m_management_session.lock())
+            sessions_to_revive.emplace_back(std::move(session));
+
+        if (auto session = m_permission_session.lock())
+            sessions_to_revive.emplace_back(std::move(session));
+
+        switch (m_state) {
+            case State::Error:
+                return;
+            case State::Active:
+                m_access_token = token;
+                break;
+            case State::LoggedOut: {
+                sessions_to_revive.reserve(m_waiting_sessions.size());
+                m_access_token = token;
+                m_state = State::Active;
+                for (auto& pair : m_waiting_sessions) {
+                    if (auto ptr = pair.second.lock()) {
+                        m_sessions[pair.first] = ptr;
+                        sessions_to_revive.emplace_back(std::move(ptr));
+                    }
+                }
+                m_waiting_sessions.clear();
+                break;
+            }
+        }
+
+        SyncManager::shared().perform_metadata_update([=](const auto& manager) {
+            auto metadata = manager.get_or_make_user_metadata(m_identity, m_server_url);
+            metadata->set_access_token(token);
+        });
+    }
+
+
+    // (Re)activate all pending sessions.
+    // Note that we do this after releasing the lock, since the session may
+    // need to access protected User state in the process of binding itself.
+    for (auto& session : sessions_to_revive) {
+        session->revive_if_needed();
+    }
+}
+
+std::vector<SyncUserIdentity> SyncUser::identities() const
+{
+    std::lock_guard<std::mutex> lock(m_mutex);
+    return m_user_identities;
+}
+
+
+void SyncUser::update_identities(std::vector<SyncUserIdentity> identities)
+{
+    std::unique_lock<std::mutex> lock(m_mutex);
+
+    m_user_identities = identities;
+
+    SyncManager::shared().perform_metadata_update([=](const auto& manager) {
+        auto metadata = manager.get_or_make_user_metadata(m_identity, m_server_url);
+        metadata->set_identities(identities);
+    });
+}
+
 void SyncUser::log_out()
 {
-    if (m_token_type == TokenType::Admin) {
-        // Admin-token users cannot be logged out.
-        return;
-    }
     std::lock_guard<std::mutex> lock(m_mutex);
     if (m_state == State::LoggedOut) {
         return;
@@ -180,18 +319,6 @@ void SyncUser::log_out()
     });
 }
 
-void SyncUser::set_is_admin(bool is_admin)
-{
-    if (m_token_type == TokenType::Admin) {
-        return;
-    }
-    m_is_admin = is_admin;
-    SyncManager::shared().perform_metadata_update([=](const auto& manager) {
-        auto metadata = manager.get_or_make_user_metadata(m_identity, m_server_url);
-        metadata->set_is_admin(is_admin);
-    });
-}
-
 void SyncUser::invalidate()
 {
     std::lock_guard<std::mutex> lock(m_mutex);
@@ -201,13 +328,43 @@ void SyncUser::invalidate()
 std::string SyncUser::refresh_token() const
 {
     std::lock_guard<std::mutex> lock(m_mutex);
-    return m_refresh_token;
+    return m_refresh_token.token;
+}
+
+std::string SyncUser::access_token() const
+{
+    std::lock_guard<std::mutex> lock(m_mutex);
+    return m_access_token.token;
 }
 
 SyncUser::State SyncUser::state() const
 {
     std::lock_guard<std::mutex> lock(m_mutex);
     return m_state;
+}
+
+std::shared_ptr<SyncUserProfile> SyncUser::user_profile() const
+{
+    std::lock_guard<std::mutex> lock(m_mutex);
+    return m_user_profile;
+}
+
+util::Optional<std::map<std::string, util::Any>> SyncUser::custom_data() const
+{
+    std::lock_guard<std::mutex> lock(m_mutex);
+    return m_access_token.user_data;
+}
+
+void SyncUser::update_user_profile(std::shared_ptr<SyncUserProfile> profile)
+{
+    std::unique_lock<std::mutex> lock(m_mutex);
+
+    m_user_profile = profile;
+
+    SyncManager::shared().perform_metadata_update([=](const auto& manager) {
+        auto metadata = manager.get_or_make_user_metadata(m_identity, m_server_url);
+        metadata->set_user_profile(profile);
+    });
 }
 
 void SyncUser::register_session(std::shared_ptr<SyncSession> session)

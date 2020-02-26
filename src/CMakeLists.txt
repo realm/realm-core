@@ -65,6 +65,8 @@ set(HEADERS
 
     util/aligned_union.hpp
     util/atomic_shared_ptr.hpp
+    util/checked_mutex.hpp
+    util/copyable_atomic.hpp
     util/event_loop_dispatcher.hpp
     util/event_loop_signal.hpp
     util/tagged_bool.hpp
@@ -90,9 +92,10 @@ set(INCLUDE_DIRS
 
 if(REALM_ENABLE_SYNC)
     list(APPEND HEADERS
+        sync/app.hpp
+        sync/app_credentials.hpp
+        sync/generic_network_transport.hpp
         sync/async_open_task.hpp
-        sync/partial_sync.hpp
-        sync/subscription_state.hpp
         sync/sync_config.hpp
         sync/sync_manager.hpp
         sync/sync_permission.hpp
@@ -100,19 +103,18 @@ if(REALM_ENABLE_SYNC)
         sync/sync_user.hpp
         sync/impl/sync_client.hpp
         sync/impl/sync_file.hpp
-        sync/impl/sync_metadata.hpp
-        sync/impl/work_queue.hpp)
+        sync/impl/sync_metadata.hpp)
     list(APPEND SOURCES
+        sync/app.cpp
+        sync/app_credentials.cpp
+        sync/generic_network_transport.cpp
         sync/async_open_task.cpp
-        sync/partial_sync.cpp
-        sync/sync_config.cpp
         sync/sync_manager.cpp
         sync/sync_permission.cpp
         sync/sync_session.cpp
         sync/sync_user.cpp
         sync/impl/sync_file.cpp
-        sync/impl/sync_metadata.cpp
-        sync/impl/work_queue.cpp)
+        sync/impl/sync_metadata.cpp)
     if(APPLE)
         list(APPEND SOURCES
             sync/impl/apple/network_reachability_observer.cpp
@@ -122,15 +124,7 @@ if(REALM_ENABLE_SYNC)
     list(APPEND INCLUDE_DIRS ${ZLIB_INCLUDE_DIRS})
 endif()
 
-if(REALM_ENABLE_SERVER)
-    list(APPEND HEADERS
-        server/adapter.hpp
-        server/admin_realm.hpp
-        server/global_notifier.hpp)
-    list(APPEND SOURCES
-        server/adapter.cpp
-        server/admin_realm.cpp
-        server/global_notifier.cpp)
+if(REALM_ENABLE_SYNC OR REALM_ENABLE_SERVER)
     list(APPEND INCLUDE_DIRS ../external/json)
 endif()
 
