@@ -267,49 +267,6 @@ struct BPlusTreeBase::LeafTypeTrait<ObjKey> {
     using type = ArrayKeyNonNullable;
 };
 
-template <class T>
-struct SwapBufferType {
-    T val;
-    SwapBufferType(T v)
-        : val(v)
-    {
-    }
-    T get()
-    {
-        return val;
-    }
-};
-
-template <>
-struct SwapBufferType<StringData> {
-    std::string val;
-    bool n;
-    SwapBufferType(StringData v)
-        : val(v.data(), v.size())
-        , n(v.is_null())
-    {
-    }
-    StringData get()
-    {
-        return n ? StringData() : StringData(val);
-    }
-};
-
-template <>
-struct SwapBufferType<BinaryData> {
-    std::string val;
-    bool n;
-    SwapBufferType(BinaryData v)
-        : val(v.data(), v.size())
-        , n(v.is_null())
-    {
-    }
-    BinaryData get()
-    {
-        return n ? BinaryData() : BinaryData(val);
-    }
-};
-
 /*****************************************************************************/
 /* BPlusTree                                                                 */
 /* Actual implementation of the BPlusTree to hold elements of type T.        */
@@ -474,12 +431,30 @@ public:
 
     void swap(size_t ndx1, size_t ndx2)
     {
-        // We need two buffers. It is illegal to call set() with get() as argument
-        // in case of StingData and BinaryData. Source data may move or get overwritten
-        SwapBufferType<T> tmp1{get(ndx1)};
-        SwapBufferType<T> tmp2{get(ndx2)};
-        set(ndx1, tmp2.get());
-        set(ndx2, tmp1.get());
+        if constexpr (std::is_same_v<T, StringData> || std::is_same_v<T, BinaryData>) {
+            struct SwapBuffer {
+                std::string val;
+                bool n;
+                SwapBuffer(T v)
+                    : val(v.data(), v.size())
+                    , n(v.is_null())
+                {
+                }
+                T get()
+                {
+                    return n ? T() : T(val);
+                }
+            };
+            SwapBuffer tmp1{get(ndx1)};
+            SwapBuffer tmp2{get(ndx2)};
+            set(ndx1, tmp2.get());
+            set(ndx2, tmp1.get());
+        }
+        else {
+            T tmp = get(ndx1);
+            set(ndx1, get(ndx2));
+            set(ndx2, tmp);
+        }
     }
 
     void erase(size_t n)

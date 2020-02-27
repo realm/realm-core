@@ -60,9 +60,9 @@ enum Instruction {
     instr_ListInsert = 31, // Insert list entry
     instr_ListSet = 32,    // Assign to list entry
     instr_ListMove = 33,   // Move an entry within a link list
-    instr_ListSwap = 34,   // Swap two entries within a list
-    instr_ListErase = 35,  // Remove an entry from a list
-    instr_ListClear = 36,  // Remove all entries from a list
+    // instr_ListSwap = 34,   Swap two entries within a list (unused from file format 11)
+    instr_ListErase = 35, // Remove an entry from a list
+    instr_ListClear = 36, // Remove all entries from a list
 };
 
 class TransactLogStream {
@@ -185,10 +185,6 @@ public:
     {
         return true;
     }
-    bool list_swap(size_t, size_t)
-    {
-        return true;
-    }
     bool list_erase(size_t)
     {
         return true;
@@ -234,7 +230,6 @@ public:
     bool list_set(size_t list_ndx);
     bool list_insert(size_t ndx);
     bool list_move(size_t from_link_ndx, size_t to_link_ndx);
-    bool list_swap(size_t link1_ndx, size_t link2_ndx);
     bool list_erase(size_t list_ndx);
     bool list_clear(size_t old_list_size);
 
@@ -373,7 +368,6 @@ public:
     virtual void list_set_link(const Lst<ObjKey>&, size_t link_ndx, ObjKey value);
     virtual void list_insert_link(const Lst<ObjKey>&, size_t link_ndx, ObjKey value);
     virtual void list_move(const ConstLstBase&, size_t from_link_ndx, size_t to_link_ndx);
-    virtual void list_swap(const ConstLstBase&, size_t link_ndx_1, size_t link_ndx_2);
     virtual void list_erase(const ConstLstBase&, size_t link_ndx);
     virtual void list_clear(const ConstLstBase&);
 
@@ -1094,18 +1088,6 @@ inline void TransactLogConvenientEncoder::list_move(const ConstLstBase& list, si
     m_encoder.list_move(from_link_ndx, to_link_ndx); // Throws
 }
 
-inline bool TransactLogEncoder::list_swap(size_t link1_ndx, size_t link2_ndx)
-{
-    append_simple_instr(instr_ListSwap, link1_ndx, link2_ndx); // Throws
-    return true;
-}
-
-inline void TransactLogConvenientEncoder::list_swap(const ConstLstBase& list, size_t link1_ndx, size_t link2_ndx)
-{
-    select_list(list);                         // Throws
-    m_encoder.list_swap(link1_ndx, link2_ndx); // Throws
-}
-
 inline bool TransactLogEncoder::list_erase(size_t list_ndx)
 {
     append_simple_instr(instr_ListErase, list_ndx); // Throws
@@ -1211,13 +1193,6 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
             size_t from_link_ndx = read_int<size_t>();          // Throws
             size_t to_link_ndx = read_int<size_t>();            // Throws
             if (!handler.list_move(from_link_ndx, to_link_ndx)) // Throws
-                parser_error();
-            return;
-        }
-        case instr_ListSwap: {
-            size_t link1_ndx = read_int<size_t>();        // Throws
-            size_t link2_ndx = read_int<size_t>();        // Throws
-            if (!handler.list_swap(link1_ndx, link2_ndx)) // Throws
                 parser_error();
             return;
         }
@@ -1451,13 +1426,6 @@ public:
     bool list_move(size_t from_link_ndx, size_t to_link_ndx)
     {
         m_encoder.list_move(from_link_ndx, to_link_ndx);
-        append_instruction();
-        return true;
-    }
-
-    bool list_swap(size_t link1_ndx, size_t link2_ndx)
-    {
-        m_encoder.list_swap(link1_ndx, link2_ndx);
         append_instruction();
         return true;
     }

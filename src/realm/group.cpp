@@ -1466,11 +1466,6 @@ public:
         return true; // No-op
     }
 
-    bool list_swap(size_t, size_t) noexcept
-    {
-        return true; // No-op
-    }
-
     bool list_erase(size_t) noexcept
     {
         return true; // No-op
