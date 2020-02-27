@@ -70,7 +70,7 @@ public:
     util::Optional<std::string> access_token() const;
     void set_access_token(util::Optional<std::string>);
 
-    void set_user_profile(std::shared_ptr<SyncUserProfile>);
+    void set_user_profile(const SyncUserProfile&);
 
     // Cannot be set after creation.
     std::string auth_server_url() const;

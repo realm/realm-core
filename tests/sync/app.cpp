@@ -213,6 +213,7 @@ const std::string UnitTestTransport::user_id = "Ailuropoda melanoleuca";
 const std::string UnitTestTransport::identity_0_id = "Ursus arctos isabellinus";
 const std::string UnitTestTransport::identity_1_id = "Ursus arctos horribilis";
 
+static const std::string profile_0_name = "Ursus americanus Ursus boeckhi";
 static const std::string profile_0_first_name = "Ursus americanus";
 static const std::string profile_0_last_name = "Ursus boeckhi";
 static const std::string profile_0_email = "Ursus ursinus";
@@ -223,6 +224,7 @@ static const std::string profile_0_min_age = "Ursus maritimus";
 static const std::string profile_0_max_age = "Ursus arctos";
 
 const nlohmann::json UnitTestTransport::profile_0 = {
+    {"name", profile_0_name},
     {"first_name", profile_0_first_name},
     {"last_name", profile_0_last_name},
     {"email", profile_0_email},
@@ -242,14 +244,14 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync][app]") {
     };
     GenericNetworkTransport::set_network_transport_factory(factory);
 
-    auto app = App::app("<>", realm::util::none);
+    App app("<>", realm::util::none);
 
     SECTION("login_anonymous good") {
         UnitTestTransport::access_token = good_access_token;
 
         bool processed = false;
 
-        app->login_with_credentials(realm::app::AppCredentials::anonymous(),
+        app.login_with_credentials(realm::app::AppCredentials::anonymous(),
                                     [&](std::shared_ptr<realm::SyncUser> user, std::unique_ptr<realm::app::error::AppError> error) {
             CHECK(user);
             CHECK(!error);
@@ -257,14 +259,17 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync][app]") {
             CHECK(user->identities().size() == 2);
             CHECK(user->identities()[0].id == UnitTestTransport::identity_0_id);
             CHECK(user->identities()[1].id == UnitTestTransport::identity_1_id);
-            CHECK(user->user_profile()->first_name() == profile_0_first_name);
-            CHECK(user->user_profile()->last_name() == profile_0_last_name);
-            CHECK(user->user_profile()->email() == profile_0_email);
-            CHECK(user->user_profile()->picture_url() == profile_0_picture_url);
-            CHECK(user->user_profile()->gender() == profile_0_gender);
-            CHECK(user->user_profile()->birthday() == profile_0_birthday);
-            CHECK(user->user_profile()->min_age() == profile_0_min_age);
-            CHECK(user->user_profile()->max_age() == profile_0_max_age);
+            SyncUserProfile user_profile = user->user_profile();
+
+            CHECK(user_profile.name == profile_0_name);
+            CHECK(user_profile.first_name == profile_0_first_name);
+            CHECK(user_profile.last_name == profile_0_last_name);
+            CHECK(user_profile.email == profile_0_email);
+            CHECK(user_profile.picture_url == profile_0_picture_url);
+            CHECK(user_profile.gender == profile_0_gender);
+            CHECK(user_profile.birthday == profile_0_birthday);
+            CHECK(user_profile.min_age == profile_0_min_age);
+            CHECK(user_profile.max_age == profile_0_max_age);
 
             processed = true;
         });
@@ -277,7 +282,7 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync][app]") {
 
         bool processed = false;
 
-        app->login_with_credentials(AppCredentials::anonymous(),
+        app.login_with_credentials(AppCredentials::anonymous(),
                                     [&](std::shared_ptr<realm::SyncUser> user, std::unique_ptr<realm::app::error::AppError> error) {
             CHECK(!user);
             CHECK(error);

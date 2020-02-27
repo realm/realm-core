@@ -57,8 +57,7 @@ public:
         realm::util::Optional<uint64_t> default_request_timeout_ms;
     };
 
-    static std::shared_ptr<App> app(const std::string app_id,
-                                    const realm::util::Optional<App::Config> config);
+    App(const std::string& app_id, const realm::util::Optional<App::Config>& config);
 
     /**
     Log in a user and asynchronously retrieve a user object.
@@ -74,48 +73,11 @@ public:
     void login_with_credentials(const std::shared_ptr<AppCredentials> credentials,
                                 std::function<void(std::shared_ptr<SyncUser>, std::unique_ptr<error::AppError>)> completion_block);
 
-
-    App(const std::string app_id,
-        const realm::util::Optional<App::Config> config) :
-    m_app_id(app_id) {
-        std::string base_url = default_base_url;
-        if (config) {
-            if (config.value().base_url) {
-                base_url = config.value().base_url.value();
-            }
-
-            if (config.value().default_request_timeout_ms) {
-                m_request_timeout_ms = config.value().default_request_timeout_ms.value();
-            } else {
-                m_request_timeout_ms = default_timeout_ms;
-            }
-
-            if (config.value().transport) {
-                // TODO: Install custom transport
-            }
-        } else {
-            m_request_timeout_ms = default_timeout_ms;
-        }
-
-        m_base_route = base_url + base_path;
-        m_app_route = m_base_route + app_path + "/" + app_id;
-        m_auth_route = m_app_route + auth_path;
-    };
-
 private:
-    static const std::string default_base_url;
-    static const std::string base_path;
-    static const std::string app_path;
-    static const std::string auth_path;
-    static const uint64_t default_timeout_ms;
-
-    /// the app ID of this application
     std::string m_app_id;
-
     std::string m_base_route;
     std::string m_app_route;
     std::string m_auth_route;
-
     uint64_t m_request_timeout_ms;
 };
 

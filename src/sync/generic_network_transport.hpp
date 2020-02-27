@@ -34,8 +34,7 @@ namespace error {
 
 #pragma mark Errors
 
-struct AppError : public std::runtime_error
-{
+struct AppError : public std::runtime_error {
     enum class Type {
         Unknown,
         JSON,
@@ -43,7 +42,7 @@ struct AppError : public std::runtime_error
         Custom
     };
 
-    const std::string category() const
+    std::string category() const
     {
         switch (type) {
             case Type::JSON: return "realm::json";
@@ -53,22 +52,11 @@ struct AppError : public std::runtime_error
         }
     }
 
-    const std::string message() const
-    {
-        return this->what();
-    }
-
     int code() const
     {
         return m_code;
     }
 
-    AppError()
-    : std::runtime_error("AppError")
-    , type(Type::Unknown)
-    , m_code(-1)
-    {
-    };
     AppError(std::string msg, int code, Type classification = Type::Unknown)
     : std::runtime_error(msg),
     type(classification),
@@ -90,10 +78,7 @@ enum class JSONErrorCode {
     none = 0
 };
 
-struct JSONError : public AppError
-{
-
-
+struct JSONError : public AppError {
     JSONError(JSONErrorCode c, std::string msg)
     : AppError(msg, static_cast<int>(c), AppError::Type::JSON)
     , code(c)
@@ -161,13 +146,11 @@ enum class ServiceErrorCode {
 };
 
 /// Struct allowing for generic error data.
-struct ServiceError : public AppError
-{
+struct ServiceError : public AppError {
     ServiceError(std::string raw_code, std::string message)
     : AppError(message, static_cast<int>(error_code_for_string(raw_code)), AppError::Type::Service)
     {
     }
-    const std::string message() const { return std::runtime_error::what(); };
 
 private:
     static ServiceErrorCode error_code_for_string(const std::string& code)
@@ -338,8 +321,7 @@ struct Response {
 
 /// Generic network transport for foreign interfaces.
 struct GenericNetworkTransport {
-    typedef std::unique_ptr<GenericNetworkTransport> (*network_transport_factory)();
-
+    using network_transport_factory = std::unique_ptr<GenericNetworkTransport> (*)();
 public:
     virtual void send_request_to_server(const Request request,
                                         std::function<void(const Response)> completionBlock) = 0;
