@@ -5952,4 +5952,32 @@ TEST(LangBindHelper_SearchIndexAccessor)
     tr->commit();
 }
 
+TEST(LangBindHelper_ArrayXoverMapping)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    auto hist = make_in_realm_history(path);
+    DBRef db = DB::create(*hist);
+    ColKey my_col;
+    {
+        auto tr = db->start_write();
+        auto tbl = tr->add_table("my_table");
+        my_col = tbl->add_column(type_String, "my_col");
+        std::string s(1000000,'a');
+        for (auto i = 0; i < 1000; ++i)
+            tbl->create_object().set_all(s);
+        tr->commit();
+    }
+    REALM_ASSERT(db->compact());
+    {
+        auto tr = db->start_read();
+        auto tbl = tr->get_table("my_table");
+        for (auto i = 0; i < 1000; ++i) {
+            auto o = tbl->get_object(i);
+            StringData str = o.get<String>(my_col);
+            for (auto j = 0; j < 1000000; ++j)
+                REALM_ASSERT(str[j] == 'a');
+        }
+    }
+}
+
 #endif
