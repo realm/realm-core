@@ -215,7 +215,11 @@ void ConstLstBase::move_repl(Replication* repl, size_t from, size_t to) const
 
 void ConstLstBase::swap_repl(Replication* repl, size_t ndx1, size_t ndx2) const
 {
-    repl->list_swap(*this, ndx1, ndx2);
+    if (ndx2 < ndx1)
+        std::swap(ndx1, ndx2);
+    repl->list_move(*this, ndx2, ndx1);
+    if (ndx1 + 1 != ndx2)
+        repl->list_move(*this, ndx1 + 1, ndx2);
 }
 
 void ConstLstBase::clear_repl(Replication* repl) const

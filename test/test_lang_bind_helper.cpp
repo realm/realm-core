@@ -1873,10 +1873,6 @@ public:
     {
         return false;
     }
-    bool list_swap(size_t, size_t)
-    {
-        return false;
-    }
     bool modify_object(ColKey, ObjKey)
     {
         return false;
