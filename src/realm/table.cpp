@@ -1735,22 +1735,18 @@ void Table::batch_erase_rows(const KeyColumn& keys)
 
 void Table::clear()
 {
-    size_t old_size = size();
+    Group* g = get_parent_group();
 
-    CascadeState state(CascadeState::Mode::Strong, get_parent_group());
-    m_clusters.clear(state);
-    // FIXME: what should happen to tombstones when a table is cleared?
-    if (m_tombstones) {
-        m_tombstones->destroy();
-        m_tombstones = nullptr;
+    if (g) {
+        CascadeState state(CascadeState::Mode::Strong, g);
+        m_clusters.remove_all_links(state); // This will also delete objects loosing their last strong link
     }
-    free_collision_table();
 
-    bump_content_version();
-    bump_storage_version();
-
-    if (Replication* repl = get_repl())
-        repl->clear_table(this, old_size); // Throws
+    CascadeState state(CascadeState::Mode::None, nullptr);
+    for (auto o : *this) {
+        auto k = o.get_key();
+        m_clusters.erase(k, state);
+    }
 }
 
 

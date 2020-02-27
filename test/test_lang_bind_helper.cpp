@@ -1845,10 +1845,6 @@ public:
     {
         return false;
     }
-    bool clear_table(size_t) noexcept
-    {
-        return false;
-    }
     bool list_set(size_t)
     {
         return false;
@@ -2704,8 +2700,8 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_TableClear)
     TableRef origin = group->add_table("origin");
     TableRef target = group->add_table("target");
 
-    target->add_column(type_Int, "int");
     auto c1 = origin->add_column_link(type_LinkList, "linklist", *target);
+    target->add_column(type_Int, "int");
     auto c2 = origin->add_column_link(type_Link, "link", *target);
 
     Obj t = target->create_object();

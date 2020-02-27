@@ -49,7 +49,7 @@ enum Instruction {
     instr_RemoveObject = 12,
     instr_Set = 13,
     instr_SetDefault = 14,
-    instr_ClearTable = 15, // Remove all rows in selected table
+    // instr_ClearTable = 15, Remove all rows in selected table  (unused from file format 11)
 
     instr_InsertColumn = 20, // Insert new column into to selected descriptor
     instr_EraseColumn = 21,  // Remove column from selected descriptor
@@ -149,10 +149,6 @@ public:
     {
         return true;
     }
-    bool clear_table(size_t)
-    {
-        return true;
-    }
     bool modify_object(ColKey, ObjKey)
     {
         return true;
@@ -226,8 +222,6 @@ public:
     bool create_object(ObjKey);
     bool remove_object(ObjKey);
     bool modify_object(ColKey col_key, ObjKey key);
-
-    bool clear_table(size_t old_table_size);
 
     // Must have descriptor selected:
     bool insert_column(ColKey col_key);
@@ -373,7 +367,6 @@ public:
     virtual void create_object(const Table*, ObjKey);
     virtual void create_object_with_primary_key(const Table*, GlobalKey, Mixed);
     virtual void remove_object(const Table*, ObjKey);
-    virtual void clear_table(const Table*, size_t prior_num_rows);
 
     virtual void list_set_null(const ConstLstBase&, size_t ndx);
     virtual void list_insert_null(const ConstLstBase&, size_t ndx);
@@ -1057,18 +1050,6 @@ inline void TransactLogConvenientEncoder::remove_object(const Table* t, ObjKey k
     m_encoder.remove_object(key); // Throws
 }
 
-inline bool TransactLogEncoder::clear_table(size_t old_size)
-{
-    append_simple_instr(instr_ClearTable, old_size); // Throws
-    return true;
-}
-
-inline void TransactLogConvenientEncoder::clear_table(const Table* t, size_t prior_num_rows)
-{
-    select_table(t);                       // Throws
-    m_encoder.clear_table(prior_num_rows); // Throws
-}
-
 inline void TransactLogConvenientEncoder::list_set_null(const ConstLstBase& list, size_t list_ndx)
 {
     select_list(list);            // Throws
@@ -1217,12 +1198,6 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
             REALM_ASSERT(levels == 0);
             TableKey key = TableKey(read_int<uint32_t>());
             if (!handler.select_table(key)) // Throws
-                parser_error();
-            return;
-        }
-        case instr_ClearTable: {
-            size_t old_size = read_int<size_t>(); // Throws
-            if (!handler.clear_table(old_size))   // Throws
                 parser_error();
             return;
         }
