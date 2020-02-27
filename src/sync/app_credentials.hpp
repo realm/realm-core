@@ -20,7 +20,6 @@
 #define REALM_APP_CREDENTIALS_HPP
 
 #include <functional>
-#include <memory>
 #include <string>
 
 namespace realm {
@@ -29,23 +28,23 @@ namespace app {
 typedef std::string IdentityProvider;
 typedef std::string AppCredentialsToken;
 
-/// The username/password identity provider. User accounts are handled by the Realm Object Server directly without the
-/// involvement of a third-party identity provider.
+// The username/password identity provider. User accounts are handled by the Realm Object Server directly without the
+// involvement of a third-party identity provider.
 extern IdentityProvider const IdentityProviderUsernamePassword;
 
-/// A Facebook account as an identity provider.
+// A Facebook account as an identity provider.
 extern IdentityProvider const IdentityProviderFacebook;
 
-/// A Google account as an identity provider.
+// A Google account as an identity provider.
 extern IdentityProvider const IdentityProviderGoogle;
 
-/// A JSON Web Token as an identity provider.
+// A JSON Web Token as an identity provider.
 extern IdentityProvider const IdentityProviderJWT;
 
-/// An Anonymous account as an identity provider.
+// An Anonymous account as an identity provider.
 extern IdentityProvider const IdentityProviderAnonymous;
 
-/// A Google account as an identity provider.
+// A Google account as an identity provider.
 extern IdentityProvider const IdentityProviderApple;
 
 enum class AuthProvider {
@@ -57,53 +56,32 @@ enum class AuthProvider {
 
 IdentityProvider provider_type_from_enum(AuthProvider provider);
 
-/**
- Opaque credentials representing a specific Realm Object Server user.
- */
+// Opaque credentials representing a specific Realm Object Server user.
 struct AppCredentials {
-public:
-    /**
-     Construct and return credentials from a Facebook account token.
-     */
-    static std::shared_ptr<AppCredentials> facebook(const AppCredentialsToken access_token);
+     // Construct and return credentials from a Facebook account token.
+    static AppCredentials facebook(const AppCredentialsToken access_token);
 
-    /**
-     Construct and return anonymous credentials
-     */
-    static std::shared_ptr<AppCredentials> anonymous();
+    // Construct and return anonymous credentials
+    static AppCredentials anonymous();
 
-    /**
-     Construct and return credentials from an Apple account token.
-     */
-    static std::shared_ptr<AppCredentials> apple(const AppCredentialsToken id_token);
+     // Construct and return credentials from an Apple account token.
+    static AppCredentials apple(const AppCredentialsToken id_token);
 
-    /**
-     Construct and return credentials from a username and password.
-     */
-    static std::shared_ptr<AppCredentials> username_password(const std::string username,
-                                                             const std::string password);
+     // Construct and return credentials from a username and password.
+    static AppCredentials username_password(std::string username, std::string password);
 
-    /// The provider of the credential
+    // The provider of the credential
     AuthProvider provider() const;
+    std::string provider_as_string() const;
 
-    /// The serialized payload
+    // The serialized payload
     std::string serialize_as_json() const;
-    
-    ~AppCredentials() = default;
 
-    AppCredentials() {};
-
-    AppCredentials(AppCredentials&&) = default;
-    AppCredentials& operator=(AppCredentials&&) = default;
-    AppCredentials(AppCredentials const&) = delete;
-    AppCredentials& operator=(AppCredentials const&) = delete;
 private:
-    /// The name of the identity provider which generated the credentials token.
+    AppCredentials(AuthProvider provider, std::function<std::string()> factory);
+    // The name of the identity provider which generated the credentials token.
     AuthProvider m_provider;
-
     std::function<std::string()> m_payload_factory;
-    
-    friend class App;
 };
 
 } // namespace app

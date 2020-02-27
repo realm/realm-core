@@ -30,11 +30,6 @@ IdentityProvider const IdentityProviderFacebook  = "oauth2-facebook";
 IdentityProvider const IdentityProviderApple     = "oauth2-apple";
 IdentityProvider const IdentityProviderUsernamePassword     = "local-userpass";
 
-std::string AppCredentials::serialize_as_json() const
-{
-    return m_payload_factory();
-}
-
 IdentityProvider provider_type_from_enum(AuthProvider provider)
 {
     switch (provider)
@@ -51,66 +46,70 @@ IdentityProvider provider_type_from_enum(AuthProvider provider)
     throw std::runtime_error("unknown provider type in provider_type_from_enum");
 }
 
+AppCredentials::AppCredentials(AuthProvider provider, std::function<std::string()> factory)
+: m_provider(provider)
+, m_payload_factory(factory)
+{
+}
+
 AuthProvider AppCredentials::provider() const
 {
     return m_provider;
 }
 
-std::shared_ptr<AppCredentials> AppCredentials::anonymous()
+std::string AppCredentials::provider_as_string() const
 {
-    auto credentials = std::make_shared<AppCredentials>();
-    credentials->m_payload_factory = [=] {
-        auto raw = nlohmann::json({
-            {kAppProviderKey, IdentityProviderAnonymous}
-        }).dump();
-        return raw;
-    };
-    credentials->m_provider = AuthProvider::ANONYMOUS;
-    return credentials;
+    return provider_type_from_enum(m_provider);
 }
 
-std::shared_ptr<AppCredentials> AppCredentials::apple(const AppCredentialsToken id_token)
+std::string AppCredentials::serialize_as_json() const
 {
-    auto credentials = std::make_shared<AppCredentials>();
-    credentials->m_payload_factory = [=] {
-        auto raw = nlohmann::json({
-            {kAppProviderKey, IdentityProviderApple},
-            {"id_token", id_token}
-        }).dump();
-        return raw;
-    };
-    credentials->m_provider = AuthProvider::APPLE;
-    return credentials;
+    return m_payload_factory();
 }
 
-std::shared_ptr<AppCredentials> AppCredentials::facebook(const AppCredentialsToken access_token)
+AppCredentials AppCredentials::anonymous()
 {
-    auto credentials = std::make_shared<AppCredentials>();
-    credentials->m_payload_factory = [=] {
-        auto raw = nlohmann::json({
-            {kAppProviderKey, IdentityProviderFacebook},
-            {"access_token", access_token}
-        }).dump();
-        return raw;
-    };
-    credentials->m_provider = AuthProvider::FACEBOOK;
-    return credentials;
+    return AppCredentials(AuthProvider::ANONYMOUS,
+                          [=] {
+                              return nlohmann::json({
+                                  {kAppProviderKey, IdentityProviderAnonymous}
+                              }).dump();
+                          });
 }
 
-std::shared_ptr<AppCredentials> AppCredentials::username_password(const std::string username,
-                                                                  const std::string password)
+AppCredentials AppCredentials::apple(AppCredentialsToken id_token)
 {
-    auto credentials = std::make_shared<AppCredentials>();
-    credentials->m_payload_factory = [=] {
-        auto raw = nlohmann::json({
-            {kAppProviderKey, IdentityProviderUsernamePassword},
-            {"username", username},
-            {"password", password}
-        }).dump();
-        return raw;
-    };
-    credentials->m_provider = AuthProvider::USERNAME_PASSWORD;
-    return credentials;
+    return AppCredentials(AuthProvider::APPLE,
+                          [=] {
+                              return nlohmann::json({
+                                  {kAppProviderKey, IdentityProviderApple},
+                                  {"id_token", id_token}
+                              }).dump();
+                          });
+}
+
+AppCredentials AppCredentials::facebook(AppCredentialsToken access_token)
+{
+    return AppCredentials(AuthProvider::FACEBOOK,
+                          [=] {
+                              return nlohmann::json({
+                                  {kAppProviderKey, IdentityProviderFacebook},
+                                  {"access_token", access_token}
+                              }).dump();
+                          });
+}
+
+AppCredentials AppCredentials::username_password(std::string username,
+                                                 std::string password)
+{
+    return AppCredentials(AuthProvider::USERNAME_PASSWORD,
+                          [=] {
+                              return nlohmann::json({
+                                  {kAppProviderKey, IdentityProviderUsernamePassword},
+                                  {"username", username},
+                                  {"password", password}
+                              }).dump();
+                          });
 }
 
 } // namespace app
