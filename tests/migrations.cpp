@@ -774,7 +774,7 @@ TEST_CASE("migration: Automatic") {
                 auto list = any_cast<List>(obj.get_property_value<util::Any>(ctx, "array"));
                 REQUIRE(list.size() == 1);
 
-                CppContext list_ctx(ctx, *obj.get_object_schema().property_for_name("array"));
+                CppContext list_ctx(ctx, obj.obj(), *obj.get_object_schema().property_for_name("array"));
                 link = any_cast<Object>(list.get(list_ctx, 0));
                 REQUIRE(link.is_valid());
                 REQUIRE(any_cast<int64_t>(link.get_property_value<util::Any>(list_ctx, "value")) == 20);
@@ -830,7 +830,7 @@ TEST_CASE("migration: Automatic") {
                 auto list = any_cast<List>(obj.get_property_value<util::Any>(ctx, "array"));
                 REQUIRE(list.size() == 1);
 
-                CppContext list_ctx(ctx, *obj.get_object_schema().property_for_name("array"));
+                CppContext list_ctx(ctx, obj.obj(), *obj.get_object_schema().property_for_name("array"));
                 link = any_cast<Object>(list.get(list_ctx, 0));
                 REQUIRE(link.is_valid());
                 REQUIRE(any_cast<int64_t>(link.get_property_value<util::Any>(list_ctx, "value")) == 20);

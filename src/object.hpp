@@ -131,12 +131,6 @@ public:
                          CreatePolicy policy = CreatePolicy::ForceCreate,
                          ObjKey current_obj = ObjKey(), Obj* = nullptr);
 
-    // create an Embedded Object from a native representation
-    template<typename ValueType, typename ContextType>
-    static Object create_embedded(ContextType& ctx, std::shared_ptr<Realm> const& realm,
-                         const ObjectSchema &object_schema, ValueType value,
-                         CreatePolicy policy, Obj& parent, ColKey col, size_t ndx);
-
     template<typename ValueType, typename ContextType>
     static Object create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
                          StringData object_type, ValueType value,

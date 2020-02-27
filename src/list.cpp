@@ -56,6 +56,7 @@ List::List(std::shared_ptr<Realm> r, const Obj& parent_obj, ColKey col)
 : m_realm(std::move(r))
 , m_type(ObjectSchema::from_core_type(*parent_obj.get_table(), col) & ~PropertyType::Array)
 , m_list_base(parent_obj.get_listbase_ptr(col))
+, m_is_embedded(m_type == PropertyType::Object && as<Obj>().get_target_table()->is_embedded())
 {
 }
 
@@ -63,6 +64,7 @@ List::List(std::shared_ptr<Realm> r, const LstBase& list)
 : m_realm(std::move(r))
 , m_type(ObjectSchema::from_core_type(*list.get_table(), list.get_col_key()) & ~PropertyType::Array)
 , m_list_base(list.clone())
+, m_is_embedded(m_type == PropertyType::Object && as<Obj>().get_target_table()->is_embedded())
 {
 }
 
@@ -214,6 +216,8 @@ template<>
 void List::add(Obj o)
 {
     verify_in_transaction();
+    if (m_is_embedded)
+        throw InvalidEmbeddedOperationException();
     validate(o);
     as<Obj>().add(o.get_key());
 }
@@ -232,6 +236,8 @@ void List::insert(size_t row_ndx, Obj o)
     verify_in_transaction();
     verify_valid_row(row_ndx, true);
     validate(o);
+    if (m_is_embedded)
+        throw InvalidEmbeddedOperationException();
     as<Obj>().insert(row_ndx, o.get_key());
 }
 
@@ -274,6 +280,8 @@ void List::set(size_t row_ndx, Obj o)
     verify_in_transaction();
     verify_valid_row(row_ndx);
     validate(o);
+    if (m_is_embedded)
+        throw InvalidEmbeddedOperationException();
     as<Obj>().set(row_ndx, o.get_key());
 }
 

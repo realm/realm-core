@@ -62,9 +62,9 @@ struct TestContext : CppContext {
     std::map<std::string, AnyDict> defaults;
 
     using CppContext::CppContext;
-    TestContext(TestContext& parent, realm::Property const& prop)
-            : CppContext(parent, prop)
-            , defaults(parent.defaults)
+    TestContext(TestContext& parent, realm::Obj& obj, realm::Property const& prop)
+    : CppContext(parent, obj, prop)
+    , defaults(parent.defaults)
     { }
 
     void will_change(Object const&, Property const&) {}
