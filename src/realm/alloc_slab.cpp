@@ -757,23 +757,60 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
         size = initial_size;
     }
     ref_type top_ref;
-    File::Map<char> initial_mapping;
     try {
-        File::Map<char> map(m_file, File::access_ReadOnly, size); // Throws
         note_reader_start(this);
         // we'll read header and (potentially) footer
-        realm::util::encryption_read_barrier(map, 0, sizeof(Header));
-        realm::util::encryption_read_barrier(map, size - sizeof(Header), sizeof(Header));
-
-        validate_header(map.get_addr(), size, path); // Throws
-
-        top_ref = get_top_ref(map.get_addr(), size);
-
-        m_data = map.get_addr();
-        initial_mapping = std::move(map); // replace at end of function
-        // with correctly sized chunks instead...
-        m_baseline = 0;
+        File::Map<char> map_header(m_file, File::access_ReadOnly, sizeof(Header));
+        // if file is too small we'll catch it in validate_header - but we need to prevent an invalid mapping first
+        size_t footer_ref = size < (sizeof(StreamingFooter) + sizeof(Header)) ? 0 : (size - sizeof(StreamingFooter));
+        size_t footer_page_base = footer_ref & ~(page_size() - 1);
+        size_t footer_offset = footer_ref - footer_page_base;
+        File::Map<char> map_footer(m_file, footer_page_base, File::access_ReadOnly,
+                                   sizeof(StreamingFooter) + footer_offset, 0);
+        realm::util::encryption_read_barrier(map_header, 0, sizeof(Header));
+        realm::util::encryption_read_barrier(map_footer, footer_offset, sizeof(StreamingFooter));
+        auto header = reinterpret_cast<const Header*>(map_header.get_addr());
+        auto footer = reinterpret_cast<const StreamingFooter*>(map_footer.get_addr() + footer_offset);
+        top_ref = validate_header(header, footer, size, path); // Throws
         m_attach_mode = cfg.is_shared ? attach_SharedFile : attach_UnsharedFile;
+
+        // Make sure the database is not on streaming format. If we did not do this,
+        // a later commit would have to do it. That would require coordination with
+        // anybody concurrently joining the session, so it seems easier to do it at
+        // session initialization, even if it means writing the database during open.
+        if (cfg.session_initiator && is_file_on_streaming_form(*header)) {
+            // Don't compare file format version fields as they are allowed to differ.
+            // Also don't compare reserved fields (todo, is it correct to ignore?)
+            REALM_ASSERT_EX(header->m_flags == 0, header->m_flags, get_file_path_for_assertions());
+            REALM_ASSERT_EX(header->m_mnemonic[0] == uint8_t('T'), header->m_mnemonic[0],
+                            get_file_path_for_assertions());
+            REALM_ASSERT_EX(header->m_mnemonic[1] == uint8_t('-'), header->m_mnemonic[1],
+                            get_file_path_for_assertions());
+            REALM_ASSERT_EX(header->m_mnemonic[2] == uint8_t('D'), header->m_mnemonic[2],
+                            get_file_path_for_assertions());
+            REALM_ASSERT_EX(header->m_mnemonic[3] == uint8_t('B'), header->m_mnemonic[3],
+                            get_file_path_for_assertions());
+            REALM_ASSERT_EX(header->m_top_ref[0] == 0xFFFFFFFFFFFFFFFFULL, header->m_top_ref[0],
+                            get_file_path_for_assertions());
+            REALM_ASSERT_EX(header->m_top_ref[1] == 0, header->m_top_ref[1], get_file_path_for_assertions());
+            REALM_ASSERT_EX(footer->m_magic_cookie == footer_magic_cookie, footer->m_magic_cookie,
+                            get_file_path_for_assertions());
+            {
+                File::Map<Header> writable_map(m_file, File::access_ReadWrite, sizeof(Header)); // Throws
+                Header& writable_header = *writable_map.get_addr();
+                realm::util::encryption_read_barrier(writable_map, 0);
+                writable_header.m_top_ref[1] = footer->m_top_ref;
+                writable_header.m_file_format[1] = writable_header.m_file_format[0];
+                realm::util::encryption_write_barrier(writable_map, 0);
+                writable_map.sync();
+                realm::util::encryption_read_barrier(writable_map, 0);
+                writable_header.m_flags |= flags_SelectBit;
+                realm::util::encryption_write_barrier(writable_map, 0);
+                writable_map.sync();
+
+                realm::util::encryption_read_barrier(m_mappings[0], 0, sizeof(Header));
+            }
+        }
     }
     catch (const DecryptionFailed&) {
         note_reader_end(this);
@@ -783,6 +820,10 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
         note_reader_end(this);
         throw;
     }
+    m_baseline = 0;
+    update_reader_view(size);
+    REALM_ASSERT(m_mappings.size());
+    m_data = m_mappings[0].get_addr();
     auto handler = [this]() noexcept { note_reader_end(this); };
     auto reader_end_guard = make_scope_exit(handler);
     // make sure that any call to begin_read cause any slab to be placed in free
@@ -792,44 +833,9 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
     // Ensure clean up, if we need to back out:
     DetachGuard dg(*this);
 
-    // make sure the database is not on streaming format. If we did not do this,
-    // a later commit would have to do it. That would require coordination with
-    // anybody concurrently joining the session, so it seems easier to do it at
-    // session initialization, even if it means writing the database during open.
-    const Header& header = *reinterpret_cast<const Header*>(m_data);
-    if (cfg.session_initiator && is_file_on_streaming_form(header)) {
-        const StreamingFooter& footer = *(reinterpret_cast<const StreamingFooter*>(m_data + size) - 1);
-        // Don't compare file format version fields as they are allowed to differ.
-        // Also don't compare reserved fields (todo, is it correct to ignore?)
-        static_cast<void>(header);
-        REALM_ASSERT_EX(header.m_flags == 0, header.m_flags, get_file_path_for_assertions());
-        REALM_ASSERT_EX(header.m_mnemonic[0] == uint8_t('T'), header.m_mnemonic[0], get_file_path_for_assertions());
-        REALM_ASSERT_EX(header.m_mnemonic[1] == uint8_t('-'), header.m_mnemonic[1], get_file_path_for_assertions());
-        REALM_ASSERT_EX(header.m_mnemonic[2] == uint8_t('D'), header.m_mnemonic[2], get_file_path_for_assertions());
-        REALM_ASSERT_EX(header.m_mnemonic[3] == uint8_t('B'), header.m_mnemonic[3], get_file_path_for_assertions());
-        REALM_ASSERT_EX(header.m_top_ref[0] == 0xFFFFFFFFFFFFFFFFULL, header.m_top_ref[0], get_file_path_for_assertions());
-        REALM_ASSERT_EX(header.m_top_ref[1] == 0, header.m_top_ref[1], get_file_path_for_assertions());
-
-        REALM_ASSERT_EX(footer.m_magic_cookie == footer_magic_cookie, footer.m_magic_cookie, get_file_path_for_assertions());
-        {
-            File::Map<Header> writable_map(m_file, File::access_ReadWrite, sizeof(Header)); // Throws
-            Header& writable_header = *writable_map.get_addr();
-            realm::util::encryption_read_barrier(writable_map, 0);
-            writable_header.m_top_ref[1] = footer.m_top_ref;
-            writable_header.m_file_format[1] = writable_header.m_file_format[0];
-            realm::util::encryption_write_barrier(writable_map, 0);
-            writable_map.sync();
-            realm::util::encryption_read_barrier(writable_map, 0);
-            writable_header.m_flags |= flags_SelectBit;
-            realm::util::encryption_write_barrier(writable_map, 0);
-            writable_map.sync();
-
-            realm::util::encryption_read_barrier(initial_mapping, 0, sizeof(Header));
-        }
-    }
     int file_format_version = get_committed_file_format_version();
-    initial_mapping.unmap();
-    m_data = nullptr;
+    // initial_mapping.unmap();
+    // m_data = nullptr;
 
     // We can only safely mmap the file, if its size matches a page boundary. If not,
     // we must change the size to match before mmaping it.
@@ -890,11 +896,11 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
         m_data = m_compatibility_mapping.get_addr();
     }
     else {
-#endif
         update_reader_view(size);
         REALM_ASSERT(m_mappings.size());
         m_data = m_mappings[0].get_addr();
 //    }
+#endif
     dg.release();  // Do not detach
     fcg.release(); // Do not close
 #if REALM_ENABLE_ENCRYPTION
@@ -948,9 +954,7 @@ ref_type SlabAlloc::attach_buffer(const char* data, size_t size)
 
     // Verify the data structures
     std::string path; // No path
-    validate_header(data, size, path); // Throws
-
-    ref_type top_ref = get_top_ref(data, size);
+    ref_type top_ref = validate_header(data, size, path); // Throws
 
     m_data = data;
     size = align_size_to_section_boundary(size);
@@ -1014,10 +1018,16 @@ void SlabAlloc::throw_header_exception(std::string msg, const Header& header, co
     throw InvalidDatabase(msg, path);
 }
 
-void SlabAlloc::validate_header(const char* data, size_t size, const std::string& path)
+ref_type SlabAlloc::validate_header(const char* data, size_t size, const std::string& path)
 {
-    const Header& header = *reinterpret_cast<const Header*>(data);
+    const Header* header = reinterpret_cast<const Header*>(data);
+    const StreamingFooter* footer = reinterpret_cast<const StreamingFooter*>(data + size - sizeof(StreamingFooter));
+    return validate_header(header, footer, size, path);
+}
 
+ref_type SlabAlloc::validate_header(const Header* header, const StreamingFooter* footer, size_t size,
+                                    const std::string& path)
+{
     // Verify that size is sane and 8-byte aligned
     if (REALM_UNLIKELY(size < sizeof(Header) || size % 8 != 0)) {
         std::string msg = "Realm file has bad size (" + util::to_string(size) + ")";
@@ -1025,35 +1035,35 @@ void SlabAlloc::validate_header(const char* data, size_t size, const std::string
     }
 
     // First four bytes of info block is file format id
-    if (REALM_UNLIKELY(!(char(header.m_mnemonic[0]) == 'T' && char(header.m_mnemonic[1]) == '-' &&
-                         char(header.m_mnemonic[2]) == 'D' && char(header.m_mnemonic[3]) == 'B')))
-        throw_header_exception("Invalid mnemonic", header, path);
+    if (REALM_UNLIKELY(!(char(header->m_mnemonic[0]) == 'T' && char(header->m_mnemonic[1]) == '-' &&
+                         char(header->m_mnemonic[2]) == 'D' && char(header->m_mnemonic[3]) == 'B')))
+        throw_header_exception("Invalid mnemonic", *header, path);
 
     // Last bit in info block indicates which top_ref block is valid
-    int slot_selector = ((header.m_flags & SlabAlloc::flags_SelectBit) != 0 ? 1 : 0);
+    int slot_selector = ((header->m_flags & SlabAlloc::flags_SelectBit) != 0 ? 1 : 0);
 
     // Top-ref must always point within buffer
-    uint_fast64_t top_ref = uint_fast64_t(header.m_top_ref[slot_selector]);
+    uint_fast64_t top_ref = uint_fast64_t(header->m_top_ref[slot_selector]);
     if (slot_selector == 0 && top_ref == 0xFFFFFFFFFFFFFFFFULL) {
         if (REALM_UNLIKELY(size < sizeof(Header) + sizeof(StreamingFooter))) {
             std::string msg = "Invalid streaming format size (" + util::to_string(size) + ")";
             throw InvalidDatabase(msg, path);
         }
-        const StreamingFooter& footer = *(reinterpret_cast<const StreamingFooter*>(data + size) - 1);
-        top_ref = footer.m_top_ref;
-        if (REALM_UNLIKELY(footer.m_magic_cookie != footer_magic_cookie)) {
-            std::string msg = "Invalid streaming format cookie (" + util::to_string(footer.m_magic_cookie) + ")";
+        top_ref = footer->m_top_ref;
+        if (REALM_UNLIKELY(footer->m_magic_cookie != footer_magic_cookie)) {
+            std::string msg = "Invalid streaming format cookie (" + util::to_string(footer->m_magic_cookie) + ")";
             throw InvalidDatabase(msg, path);
         }
     }
     if (REALM_UNLIKELY(top_ref % 8 != 0)) {
         std::string msg = "Top ref not aligned (" + util::to_string(top_ref) + ")";
-        throw_header_exception(msg, header, path);
+        throw_header_exception(msg, *header, path);
     }
     if (REALM_UNLIKELY(top_ref >= size)) {
         std::string msg = "Top ref outside file (size = " + util::to_string(size) + ")";
-        throw_header_exception(msg, header, path);
+        throw_header_exception(msg, *header, path);
     }
+    return top_ref;
 }
 
 
@@ -1276,6 +1286,7 @@ void SlabAlloc::extend_fast_mapping_with_slab(char* address)
     }
     m_old_translations.emplace_back(m_youngest_live_version, m_ref_translation_ptr.load());
     new_fast_mapping[m_translation_table_size - 1].mapping_addr = address;
+    new_fast_mapping[m_translation_table_size - 1].primary_mapping_limit = 1ULL << section_shift;
     m_ref_translation_ptr = new_fast_mapping;
 }
 

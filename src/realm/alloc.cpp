@@ -144,6 +144,7 @@ char* Allocator::translate(ref_type ref) const noexcept
             }
             else {
                 // array crosses over into next mapping, we have to add a xover mapping for it.
+                std::cout << "adding xover mapping " << idx << " for " << offset << ", " << size << std::endl;
                 REALM_ASSERT(false); // unimplemented!
             }
         }

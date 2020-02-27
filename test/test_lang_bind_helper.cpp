@@ -5960,16 +5960,21 @@ TEST(LangBindHelper_ArrayXoverMapping)
     ColKey my_col;
     {
         auto tr = db->start_write();
+        std::cout << "writing" << std::endl;
         auto tbl = tr->add_table("my_table");
         my_col = tbl->add_column(type_String, "my_col");
         std::string s(1000000,'a');
-        for (auto i = 0; i < 1000; ++i)
+        for (auto i = 0; i < 100; ++i)
             tbl->create_object().set_all(s);
+        std::cout << "committing..." << std::endl;
         tr->commit();
     }
+    std::cout << "compacting..." << std::endl;
     REALM_ASSERT(db->compact());
+    std::cout << "reopening..." << std::endl;
     {
         auto tr = db->start_read();
+        std::cout << "rereading..." << std::endl;
         auto tbl = tr->get_table("my_table");
         for (auto i = 0; i < 1000; ++i) {
             auto o = tbl->get_object(i);
