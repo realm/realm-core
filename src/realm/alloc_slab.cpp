@@ -882,16 +882,19 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
     // if the file format is older than version 10 and larger than a section we have
     // to use the compatibility mapping
     // FIXME: For now always use compatibility mapping.
+
     static_cast<void>(file_format_version); // silence a warning
+#if 0
     if (size > get_section_base(1) /* && file_format_version < 10 */) {
         setup_compatibility_mapping(size);
         m_data = m_compatibility_mapping.get_addr();
     }
     else {
+#endif
         update_reader_view(size);
         REALM_ASSERT(m_mappings.size());
         m_data = m_mappings[0].get_addr();
-    }
+//    }
     dg.release();  // Do not detach
     fcg.release(); // Do not close
 #if REALM_ENABLE_ENCRYPTION
@@ -956,10 +959,13 @@ ref_type SlabAlloc::attach_buffer(const char* data, size_t size)
 
     m_translation_table_size = 1;
     m_ref_translation_ptr = new RefTranslation[1];
+    m_ref_translation_ptr[0].mapping_addr = const_cast<char*>(m_data);
+    m_ref_translation_ptr[0].primary_mapping_limit = 0;
+    m_ref_translation_ptr[0].xover_mapping_base = 0;
+    m_ref_translation_ptr[0].xover_mapping_addr = nullptr;
 #if REALM_ENABLE_ENCRYPTION
-    m_ref_translation_ptr[0] = {const_cast<char*>(m_data), nullptr};
-#else
-    m_ref_translation_ptr[0] = {const_cast<char*>(m_data)};
+    m_ref_translation_ptr[0].encrypted_mapping = nullptr;
+    m_ref_translation_ptr[0].xover_encrypted_mapping = nullptr;
 #endif
     // Below this point (assignment to `m_attach_mode`), nothing must throw.
 
@@ -985,10 +991,13 @@ void SlabAlloc::attach_empty()
     m_baseline = size;
     m_translation_table_size = 1;
     m_ref_translation_ptr = new RefTranslation[1];
+    m_ref_translation_ptr[0].mapping_addr = nullptr;
+    m_ref_translation_ptr[0].primary_mapping_limit = 0;
+    m_ref_translation_ptr[0].xover_mapping_base = 0;
+    m_ref_translation_ptr[0].xover_mapping_addr = nullptr;
 #if REALM_ENABLE_ENCRYPTION
-    m_ref_translation_ptr[0] = {nullptr, nullptr};
-#else
-    m_ref_translation_ptr[0] = {nullptr};
+    m_ref_translation_ptr[0].encrypted_mapping = nullptr;
+    m_ref_translation_ptr[0].xover_encrypted_mapping = nullptr;
 #endif
 }
 
@@ -1266,11 +1275,7 @@ void SlabAlloc::extend_fast_mapping_with_slab(char* address)
         new_fast_mapping[i] = m_ref_translation_ptr[i];
     }
     m_old_translations.emplace_back(m_youngest_live_version, m_ref_translation_ptr.load());
-#if REALM_ENABLE_ENCRYPTION
-    new_fast_mapping[m_translation_table_size - 1] = {address, nullptr};
-#else
-    new_fast_mapping[m_translation_table_size - 1] = {address};
-#endif
+    new_fast_mapping[m_translation_table_size - 1].mapping_addr = address;
     m_ref_translation_ptr = new_fast_mapping;
 }
 
@@ -1310,11 +1315,7 @@ void SlabAlloc::rebuild_translations(bool requires_new_translation, size_t old_n
         char* base = m_slabs[k].addr;
         auto i = num_mappings + m_sections_in_compatibility_mapping + k;
         REALM_ASSERT(base);
-#if REALM_ENABLE_ENCRYPTION
-        new_translation_table[i] = {base, nullptr};
-#else
-        new_translation_table[i] = {base};
-#endif
+        new_translation_table[i].mapping_addr = base;
     }
     m_ref_translation_ptr = new_translation_table;
 }

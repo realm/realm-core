@@ -116,4 +116,59 @@ Allocator& Allocator::get_default() noexcept
 {
     return default_alloc;
 }
+
+char* Allocator::translate(ref_type ref) const noexcept
+{
+    if (auto ref_translation_ptr = m_ref_translation_ptr.load(std::memory_order_acquire)) {
+        size_t idx = get_section_index(ref);
+        RefTranslation& txl = ref_translation_ptr[idx];
+        size_t offset = ref - get_section_base(idx);
+        char* addr;
+        size_t mapping_limit = txl.primary_mapping_limit.load(std::memory_order_acquire);
+        if (offset >= mapping_limit && txl.xover_mapping_addr == nullptr) {
+            // there is no xover mapping and this ref might need one...
+            // establish array size to determine if array crosses into next mapping
+            addr = txl.mapping_addr + offset;
+#if REALM_ENABLE_ENCRYPTION
+            realm::util::encryption_read_barrier(addr, NodeHeader::header_size,
+                                                 ref_translation_ptr[idx].encrypted_mapping,
+                                                 nullptr);
+#endif
+            auto size = NodeHeader::get_byte_size_from_header(addr);
+            if (get_section_index(ref + size - 1) == idx) {
+                // array fits inside primary mapping, no new mapping needed, just move the limit
+                // take into account that another thread may attempt to change it concurrently
+                if (!txl.primary_mapping_limit.compare_exchange_weak(mapping_limit, offset + size, std::memory_order_acq_rel))
+                    return translate(ref);
+                std::cout << "pushed " << idx << " to size " << offset + size << std::endl;
+            }
+            else {
+                // array crosses over into next mapping, we have to add a xover mapping for it.
+                REALM_ASSERT(false); // unimplemented!
+            }
+        }
+        REALM_ASSERT(offset <= txl.primary_mapping_limit);
+        if (offset == txl.primary_mapping_limit && txl.xover_mapping_addr != nullptr) {
+            // array is inside the established xover mapping:
+            addr =  txl.xover_mapping_addr + (offset - txl.xover_mapping_base);
+#if REALM_ENABLE_ENCRYPTION
+            realm::util::encryption_read_barrier(addr, NodeHeader::header_size,
+                                                 ref_translation_ptr[idx].xover_encrypted_mapping,
+                                                 NodeHeader::get_byte_size_from_header);
+#endif
+        } 
+        else {
+            addr = txl.mapping_addr + offset;
+#if REALM_ENABLE_ENCRYPTION
+            realm::util::encryption_read_barrier(addr, NodeHeader::header_size,
+                                                 ref_translation_ptr[idx].encrypted_mapping,
+                                                 NodeHeader::get_byte_size_from_header);
+#endif
+        }
+        return addr;
+    }
+    else
+        return do_translate(ref);
+}
+
 }

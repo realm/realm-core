@@ -159,9 +159,34 @@ protected:
     // into equal chunks.
     struct RefTranslation {
         char* mapping_addr;
+        std::atomic<size_t> primary_mapping_limit;
+        size_t xover_mapping_base = 0;
+        char* xover_mapping_addr = 0;
 #if REALM_ENABLE_ENCRYPTION
-        util::EncryptedFileMapping* encrypted_mapping;
+        util::EncryptedFileMapping* encrypted_mapping = nullptr;
+        util::EncryptedFileMapping* xover_encrypted_mapping = nullptr;
 #endif
+        RefTranslation(char* addr)
+            : mapping_addr(addr)
+        {
+            primary_mapping_limit.store(0);
+        }
+        RefTranslation() : RefTranslation(nullptr) {}
+        RefTranslation& operator=(const RefTranslation& from)
+        {
+            if (&from != this) {
+                mapping_addr = from.mapping_addr;
+                primary_mapping_limit.store(from.primary_mapping_limit);
+                xover_mapping_base = from.xover_mapping_base;
+                xover_mapping_addr = from.xover_mapping_addr;
+#if REALM_ENABLE_ENCRYPTION
+                encrypted_mapping = from.encrypted_mapping;
+                xover_encrypted_mapping = from.xover_encrypted_mapping;
+#endif
+            }
+            return *this;
+        }
+
     };
     // This pointer may be changed concurrently with access, so make sure it is
     // atomic!
@@ -495,24 +520,6 @@ inline Allocator::~Allocator() noexcept
 {
 }
 
-inline char* Allocator::translate(ref_type ref) const noexcept
-{
-    if (auto ref_translation_ptr = m_ref_translation_ptr.load(std::memory_order_acquire)) {
-        char* base_addr;
-        size_t idx = get_section_index(ref);
-        base_addr = ref_translation_ptr[idx].mapping_addr;
-        size_t offset = ref - get_section_base(idx);
-        auto addr = base_addr + offset;
-#if REALM_ENABLE_ENCRYPTION
-        realm::util::encryption_read_barrier(addr, NodeHeader::header_size,
-                                             ref_translation_ptr[idx].encrypted_mapping,
-                                             NodeHeader::get_byte_size_from_header);
-#endif
-        return addr;
-    }
-    else
-        return do_translate(ref);
-}
 
 } // namespace realm
 
