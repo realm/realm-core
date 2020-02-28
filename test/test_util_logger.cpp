@@ -21,6 +21,8 @@
 #include <locale>
 
 #include <realm/util/logger.hpp>
+#include <realm/util/hex_dump.hpp>
+#include <realm/binary_data.hpp>
 
 #include "test.hpp"
 
@@ -231,6 +233,20 @@ TEST(Util_Logger_ThreadSafe)
     std::sort(messages_1.begin(), messages_1.end());
     std::sort(messages_2.begin(), messages_2.end());
     CHECK(messages_1 == messages_2);
+}
+
+TEST(Util_HexDump)
+{
+    const unsigned char u_char_data[] = {0x00, 0x05, 0x10, 0x17, 0xff};
+    const char char_data[] = {0, 5, 10, -5, -1};
+
+    std::string str1 = util::hex_dump(u_char_data, sizeof(u_char_data));
+    CHECK_EQUAL(str1, "00 05 10 17 FF");
+    // std::cout << str1 << std::endl;
+
+    std::string str2 = util::hex_dump(char_data, sizeof(char_data));
+    CHECK_EQUAL(str2, "00 05 0A FB FF");
+    // std::cout << str2 << std::endl;
 }
 
 } // unnamed namespace

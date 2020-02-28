@@ -34,8 +34,7 @@ namespace util {
 template <class T>
 std::string hex_dump(const T* data, size_t size, const char* separator = " ", int min_digits = -1)
 {
-    // Note: common_type with int so character types print as numbers, rather than directly writing bytes.
-    using U = std::make_unsigned_t<std::common_type<T, int>>;
+    using U = std::make_unsigned_t<T>;
 
     if (min_digits < 0)
         min_digits = (std::numeric_limits<U>::digits + 3) / 4;
@@ -44,7 +43,7 @@ std::string hex_dump(const T* data, size_t size, const char* separator = " ", in
     for (const T* i = data; i != data + size; ++i) {
         if (i != data)
             out << separator;
-        out << std::setw(min_digits) << std::setfill('0') << std::hex << std::uppercase << U(*i);
+        out << std::setw(min_digits) << std::setfill('0') << std::hex << std::uppercase << int64_t(U(*i));
     }
     return out.str();
 }
