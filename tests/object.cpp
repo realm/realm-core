@@ -930,10 +930,8 @@ TEST_CASE("object") {
             r->commit_transaction();
             return obj;
         };
-        r->begin_transaction();
         create(AnyDict{{"pk", util::Any()}}, "all optional types");
         create(AnyDict{{"pk", INT64_C(0)}}, "all optional types");
-        r->commit_transaction();
         REQUIRE(Results(r, r->read_group().get_table("class_all optional types")).size() == 2);
     }
 
