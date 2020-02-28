@@ -37,7 +37,6 @@ SyncManager& SyncManager::shared()
 
 void SyncManager::configure(SyncClientConfig config)
 {
-    reset_for_testing();
     {
         std::lock_guard<std::mutex> lock(m_mutex);
         m_config = std::move(config);
