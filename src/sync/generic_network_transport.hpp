@@ -131,8 +131,8 @@ std::ostream& operator<<(std::ostream& os, AppError error);
 template <typename T>
 T value_from_json(const nlohmann::json& data, const std::string& key)
 {
-    if (data.find(key) != data.end()) {
-        return data[key].get<T>();
+    if (auto it = data.find(key); it != data.end()) {
+        return it->get<T>();
     }
     throw AppError(make_error_code(JSONErrorCode::missing_json_key), key);
 }

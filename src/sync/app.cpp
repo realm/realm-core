@@ -25,12 +25,16 @@
 #include <json.hpp>
 #include <sstream>
 
-// wrap an optional json key into the Optional type
-#define WRAP_JSON_OPT(JSON, KEY, RET_TYPE) \
-JSON.find(KEY) != JSON.end() ? Optional<RET_TYPE>(JSON[KEY].get<RET_TYPE>()) : realm::util::none
-
 namespace realm {
 namespace app {
+
+// wrap an optional json key into the Optional type
+template <typename T>
+Optional<T> get_optional(const nlohmann::json& json, const std::string& key)
+{
+    auto it = json.find(key);
+    return it != json.end() ? Optional<T>(it->get<T>()) : realm::util::none;
+}
 
 const static std::string default_base_url = "https://stitch.mongodb.com";
 const static std::string default_base_path = "/api/client/v2.0";
@@ -143,15 +147,15 @@ void App::login_with_credentials(const AppCredentials& credentials,
 
                 auto profile_data = value_from_json<nlohmann::json>(json, "data");
 
-                sync_user->update_user_profile(SyncUserProfile(WRAP_JSON_OPT(profile_data, "name", std::string),
-                                                               WRAP_JSON_OPT(profile_data, "email", std::string),
-                                                               WRAP_JSON_OPT(profile_data, "picture_url", std::string),
-                                                               WRAP_JSON_OPT(profile_data, "first_name", std::string),
-                                                               WRAP_JSON_OPT(profile_data, "last_name", std::string),
-                                                               WRAP_JSON_OPT(profile_data, "gender", std::string),
-                                                               WRAP_JSON_OPT(profile_data, "birthday", std::string),
-                                                               WRAP_JSON_OPT(profile_data, "min_age", std::string),
-                                                               WRAP_JSON_OPT(profile_data, "max_age", std::string)));
+                sync_user->update_user_profile(SyncUserProfile(get_optional<std::string>(profile_data, "name"),
+                                                               get_optional<std::string>(profile_data, "email"),
+                                                               get_optional<std::string>(profile_data, "picture_url"),
+                                                               get_optional<std::string>(profile_data, "first_name"),
+                                                               get_optional<std::string>(profile_data, "last_name"),
+                                                               get_optional<std::string>(profile_data, "gender"),
+                                                               get_optional<std::string>(profile_data, "birthday"),
+                                                               get_optional<std::string>(profile_data, "min_age"),
+                                                               get_optional<std::string>(profile_data, "max_age")));
             } catch (const AppError& err) {
                 return completion_block(nullptr, err);
             }
