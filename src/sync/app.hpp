@@ -50,14 +50,15 @@ namespace app {
 class App {
 public:
     struct Config {
-        realm::util::Optional<std::shared_ptr<GenericNetworkTransport>> transport;
+        std::string app_id;
+        GenericNetworkTransport::NetworkTransportFactory transport_generator;
         realm::util::Optional<std::string> base_url;
         realm::util::Optional<std::string> local_app_name;
         realm::util::Optional<std::string> local_app_version;
         realm::util::Optional<uint64_t> default_request_timeout_ms;
     };
 
-    App(const std::string& app_id, const realm::util::Optional<App::Config>& config);
+    App(const Config& config);
 
     /**
     Log in a user and asynchronously retrieve a user object.
@@ -74,7 +75,7 @@ public:
                                 std::function<void(std::shared_ptr<SyncUser>, std::unique_ptr<error::AppError>)> completion_block);
 
 private:
-    std::string m_app_id;
+    Config m_config;
     std::string m_base_route;
     std::string m_app_route;
     std::string m_auth_route;

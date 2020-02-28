@@ -107,10 +107,9 @@ TEST_CASE("app: login_with_credentials integration", "[sync][app]") {
         std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
             return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
         };
-        GenericNetworkTransport::set_network_transport_factory(factory);
 
         // TODO: create dummy app using Stitch CLI instead of hardcording
-        auto app = App("translate-utwuv", realm::util::none);
+        auto app = App(App::Config{"translate-utwuv", factory});
 
         bool processed = false;
 
@@ -141,7 +140,6 @@ public:
     static const std::string identity_0_id;
     static const std::string identity_1_id;
     static const nlohmann::json profile_0;
-    static const nlohmann::json profile_1;
 
 private:
     void handle_profile(const Request request,
@@ -235,16 +233,11 @@ const nlohmann::json UnitTestTransport::profile_0 = {
     {"max_age", profile_0_max_age}
 };
 
-const nlohmann::json UnitTestTransport::profile_1 = {
-};
-
 TEST_CASE("app: login_with_credentials unit_tests", "[sync][app]") {
     std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
         return std::unique_ptr<GenericNetworkTransport>(new UnitTestTransport);
     };
-    GenericNetworkTransport::set_network_transport_factory(factory);
-
-    App app("<>", realm::util::none);
+    App app(App::Config{"<>", factory});
 
     SECTION("login_anonymous good") {
         UnitTestTransport::access_token = good_access_token;

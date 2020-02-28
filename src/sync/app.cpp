@@ -38,26 +38,14 @@ const static std::string default_app_path = "/app";
 const static std::string default_auth_path = "/auth";
 const static uint64_t    default_timeout_ms = 60000;
 
-App::App(const std::string& app_id, const realm::util::Optional<App::Config>& config)
-    : m_app_id(app_id)
-    {
-    std::string base_url;
-    if (config) {
-        base_url = config->base_url.value_or(default_base_url);
-        m_request_timeout_ms = config->default_request_timeout_ms.value_or(default_timeout_ms);
-
-        if (config->transport) {
-            // TODO: Install custom transport
-        }
-    }
-    else {
-        base_url = default_base_url;
-        m_request_timeout_ms = default_timeout_ms;
-    }
-
-    m_base_route = base_url + default_base_path;
-    m_app_route = m_base_route + default_app_path + "/" + app_id;
-    m_auth_route = m_app_route + default_auth_path;
+App::App(const Config& config)
+: m_config(config)
+, m_base_route(config.base_url.value_or(default_base_url) + default_base_path)
+, m_app_route(m_base_route + default_app_path + "/" + config.app_id)
+, m_auth_route(m_app_route + default_auth_path)
+, m_request_timeout_ms(config.default_request_timeout_ms.value_or(default_timeout_ms))
+{
+    REALM_ASSERT(m_config.transport_generator);
 }
 
 static std::unique_ptr<error::AppError> handle_error(const Response& response) {
@@ -129,7 +117,7 @@ void App::login_with_credentials(const AppCredentials& credentials,
         std::string profile_route = util::format("%1/auth/profile", m_base_route);
         std::string bearer = util::format("Bearer %1", sync_user->access_token());
 
-        GenericNetworkTransport::get()->send_request_to_server({
+        m_config.transport_generator()->send_request_to_server({
             HttpMethod::get,
             profile_route,
             m_request_timeout_ms,
@@ -193,7 +181,7 @@ void App::login_with_credentials(const AppCredentials& credentials,
         { "Accept", "application/json" }
     };
 
-    GenericNetworkTransport::get()->send_request_to_server({
+    m_config.transport_generator()->send_request_to_server({
         HttpMethod::post,
         route,
         m_request_timeout_ms,
