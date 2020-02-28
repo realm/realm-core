@@ -22,7 +22,7 @@
 namespace realm {
 namespace app {
 
-error::ServiceErrorCode error::ServiceError::error_code_for_string(const std::string& code)
+ServiceErrorCode ServiceError::error_code_for_string(const std::string& code)
 {
     if (code == "MissingAuthReq")
         return ServiceErrorCode::missing_auth_req;

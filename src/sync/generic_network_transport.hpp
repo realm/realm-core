@@ -30,7 +30,6 @@
 
 namespace realm {
 namespace app {
-namespace error {
 
 #pragma mark Errors
 
@@ -90,7 +89,7 @@ struct JSONError : public AppError {
 
 #define HAS_JSON_KEY_OR_THROW(JSON, KEY, RET_TYPE) \
 JSON.find(KEY) != JSON.end() ? JSON[KEY].get<RET_TYPE>() : \
-throw app::error::JSONError(app::error::JSONErrorCode::missing_json_key, KEY)
+throw app::JSONError(app::JSONErrorCode::missing_json_key, KEY)
 
 enum class ServiceErrorCode {
     missing_auth_req = 1,
@@ -156,8 +155,6 @@ private:
     static ServiceErrorCode error_code_for_string(const std::string& code);
     const std::string m_raw_code;
 };
-
-} // namespace error
 
 /**
  * An HTTP method type.
