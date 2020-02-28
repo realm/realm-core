@@ -103,6 +103,12 @@ ServiceErrorCode service_error_code_from_string(const std::string& code);
 const std::error_category& service_error_category() noexcept;
 std::error_code make_error_code(ServiceErrorCode) noexcept;
 
+const std::error_category& http_error_category() noexcept;
+std::error_code make_http_error_code(int http_code) noexcept;
+
+const std::error_category& custom_error_category() noexcept;
+std::error_code make_custom_error_code(int code) noexcept;
+
 
 struct AppError {
 
@@ -123,6 +129,16 @@ struct AppError {
     bool is_service_error() const
     {
         return error_code.category() == service_error_category();
+    }
+
+    bool is_http_error() const
+    {
+        return error_code.category() == http_error_category();
+    }
+
+    bool is_custom_error() const
+    {
+        return error_code.category() == custom_error_category();
     }
 };
 

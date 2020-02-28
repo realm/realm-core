@@ -48,6 +48,8 @@ if(REALM_ENABLE_SYNC)
         sync/user.cpp
         sync/app.cpp
     )
+
+    list(APPEND INCLUDE_DIRS ../external/json)
 endif()
 
 add_executable(tests ${SOURCES} ${HEADERS})

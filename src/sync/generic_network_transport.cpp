@@ -24,7 +24,7 @@ namespace app {
 
 namespace {
 
-const char* get_error_message(JSONErrorCode error)
+std::string get_error_message(JSONErrorCode error)
 {
     switch (error) {
         case JSONErrorCode::bad_token:
@@ -45,8 +45,7 @@ struct JSONErrorCategory : public std::error_category {
 
     std::string message(int error_code) const override final
     {
-        const char* msg = get_error_message(JSONErrorCode(error_code));
-        return msg ? std::string {msg} : "unknown error";
+        return get_error_message(JSONErrorCode(error_code));
     }
 };
 
@@ -101,11 +100,11 @@ static const std::map<std::string, ServiceErrorCode> service_error_map = {
     {"UserDisabled", ServiceErrorCode::user_disabled},
 };
 
-const char* get_error_message(ServiceErrorCode error)
+std::string get_error_message(ServiceErrorCode error)
 {
     for (auto it : service_error_map) {
         if (it.second == error) {
-            return it.first.c_str();
+            return it.first;
         }
     }
     return "unknown";
@@ -119,12 +118,55 @@ struct ServiceErrorCategory : public std::error_category {
 
     std::string message(int error_code) const override final
     {
-        const char* msg = get_error_message(ServiceErrorCode(error_code));
-        return msg ? std::string {msg} : "unknown error";
+        return get_error_message(ServiceErrorCode(error_code));
     }
 };
 
 ServiceErrorCategory g_service_error_category;
+
+
+struct HttpErrorCategory : public std::error_category {
+    const char* name() const noexcept final override
+    {
+        return "realm::app::HttpError";
+    }
+
+    std::string message(int code) const override final
+    {
+        if (code >= 100 && code < 200) {
+            return util::format("Informational: %1", code);
+        }
+        else if (code >= 200 && code < 300) {
+            return util::format("Success: %1", code);
+        }
+        else if (code >= 300 && code < 400) {
+            return util::format("Redirection: %1", code);
+        }
+        else if (code >= 400 && code < 500) {
+            return util::format("Client Error: %1", code);
+        }
+        else if (code >= 500 && code < 600) {
+            return util::format("Server Error: %1", code);
+        }
+        return util::format("Unknown HTTP Error: %1", code);
+    }
+};
+
+HttpErrorCategory g_http_error_category;
+
+struct CustomErrorCategory : public std::error_category {
+    const char* name() const noexcept final override
+    {
+        return "realm::app::CustomError";
+    }
+
+    std::string message(int code) const override final
+    {
+        return util::format("code %1", code);
+    }
+};
+
+CustomErrorCategory g_custom_error_category;
 
 } // unnamed namespace
 
@@ -161,6 +203,27 @@ ServiceErrorCode service_error_code_from_string(const std::string& code)
     }
     return ServiceErrorCode::unknown;
 }
+
+const std::error_category& http_error_category() noexcept
+{
+    return g_http_error_category;
+}
+
+std::error_code make_http_error_code(int http_code) noexcept
+{
+    return std::error_code{http_code, g_http_error_category};
+}
+
+const std::error_category& custom_error_category() noexcept
+{
+    return g_custom_error_category;
+}
+
+std::error_code make_custom_error_code(int code) noexcept
+{
+    return std::error_code{code, g_custom_error_category};
+}
+
 
 } // namespace app
 } // namespace realm

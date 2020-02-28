@@ -52,27 +52,34 @@ App::App(const Config& config)
     REALM_ASSERT(m_config.transport_generator);
 }
 
-static Optional<AppError> handle_error(const Response& response) {
-    if (response.body.empty()) {
-        return {};
+static Optional<AppError> check_for_errors(const Response& response) {
+    try {
+        if (auto ct = response.headers.find("Content-Type"); ct != response.headers.end() && ct->second == "application/json") {
+            auto body = nlohmann::json::parse(response.body);
+            if (auto error_code = body.find("errorCode"); error_code != body.end() && !error_code->get<std::string>().empty()) {
+                auto message = body.find("error");
+                return AppError(make_error_code(service_error_code_from_string(body["errorCode"].get<std::string>())),
+                                message != body.end() ? message->get<std::string>() : "no error message");
+            }
+        }
+    } catch(const std::exception&) {
+        // ignore parse errors from our attempt to read the error from json
     }
 
-    if (auto ct = response.headers.find("Content-Type"); ct != response.headers.end() && ct->second == "application/json") {
-        auto body = nlohmann::json::parse(response.body);
-        return AppError(make_error_code(service_error_code_from_string(body["errorCode"].get<std::string>())),
-                              body["error"].get<std::string>());
+    if (response.custom_status_code != 0) {
+        return AppError(make_custom_error_code(response.custom_status_code), "non-zero custom status code considered fatal");
     }
 
-    return {};
-}
-
-inline bool response_code_is_fatal(Response const& response) {
     // FIXME: our tests currently only generate codes 0 and 200,
     // but we need more robust error handling here; eg. should a 300
     // redirect really be considered fatal or should we automatically redirect?
-    return response.http_status_code >= 300
-        || (response.http_status_code < 200 && response.http_status_code != 0)
-        || response.custom_status_code != 0;
+    if (response.http_status_code >= 300
+        || (response.http_status_code < 200 && response.http_status_code != 0))
+    {
+        return AppError(make_http_error_code(response.http_status_code), "http error code considered fatal");
+    }
+
+    return {};
 }
 
 void App::login_with_credentials(const AppCredentials& credentials,
@@ -81,15 +88,14 @@ void App::login_with_credentials(const AppCredentials& credentials,
     std::string route = util::format("%1/providers/%2/login", m_auth_route, credentials.provider_as_string());
 
     auto handler = [&](const Response& response) {
-        // if there is a already an error code, pass the error upstream
-        if (response_code_is_fatal(response)) { // FIXME: handle
-            return completion_block(nullptr, handle_error(response));
+        if (auto error = check_for_errors(response)) {
+            return completion_block(nullptr, error);
         }
 
         nlohmann::json json;
         try {
             json = nlohmann::json::parse(response.body);
-        } catch(std::domain_error e) {
+        } catch(const std::exception& e) {
             return completion_block(nullptr, AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
         }
 
@@ -121,9 +127,8 @@ void App::login_with_credentials(const AppCredentials& credentials,
             },
             std::string()
         }, [&](const Response& profile_response) {
-            // if there is a already an error code, pass the error upstream
-            if (response_code_is_fatal(profile_response)) {
-                return completion_block(nullptr, handle_error(profile_response));
+            if (auto error = check_for_errors(profile_response)) {
+                return completion_block(nullptr, error);
             }
 
             try {

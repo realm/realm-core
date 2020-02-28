@@ -291,4 +291,130 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync][app]") {
     }
 }
 
+struct ErrorCheckingTransport : public GenericNetworkTransport {
+    ErrorCheckingTransport(Response r)
+    : m_response(r)
+    {
+    }
+    void send_request_to_server(const Request, std::function<void (const Response)> completion_block) override
+    {
+        completion_block(m_response);
+    }
+private:
+    Response m_response;
+};
+
+
+TEST_CASE("app: response error handling", "[sync][app]") {
+
+    std::string response_body = nlohmann::json({
+        {"access_token", good_access_token},
+        {"refresh_token", good_access_token},
+        {"user_id", "Brown Bear"},
+        {"device_id", "Panda Bear"}}).dump();
+
+    Response response{.http_status_code = 200, .headers = {{"Content-Type", "application/json"}}, .body = response_body};
+
+    std::function<std::unique_ptr<GenericNetworkTransport>()> transport_generator = [&response] {
+        return std::unique_ptr<GenericNetworkTransport>(new ErrorCheckingTransport(response));
+    };
+    App app(App::Config{"<>", transport_generator});
+    bool processed = false;
+
+    SECTION("http 404") {
+        response.http_status_code = 404;
+        app.login_with_credentials(realm::app::AppCredentials::anonymous(),
+                                   [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+                                       CHECK(!user);
+                                       CHECK(error);
+                                       CHECK(!error->is_json_error());
+                                       CHECK(!error->is_custom_error());
+                                       CHECK(!error->is_service_error());
+                                       CHECK(error->is_http_error());
+                                       CHECK(error->error_code.value() == 404);
+                                       CHECK(error->message == std::string("http error code considered fatal"));
+                                       CHECK(error->error_code.message() == "Client Error: 404");
+                                       processed = true;
+                                   });
+        CHECK(processed);
+    }
+    SECTION("http 500") {
+        response.http_status_code = 500;
+        app.login_with_credentials(realm::app::AppCredentials::anonymous(),
+                                   [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+                                       CHECK(!user);
+                                       CHECK(error);
+                                       CHECK(!error->is_json_error());
+                                       CHECK(!error->is_custom_error());
+                                       CHECK(!error->is_service_error());
+                                       CHECK(error->is_http_error());
+                                       CHECK(error->error_code.value() == 500);
+                                       CHECK(error->message == std::string("http error code considered fatal"));
+                                       CHECK(error->error_code.message() == "Server Error: 500");
+                                       processed = true;
+                                   });
+        CHECK(processed);
+    }
+    SECTION("custom error code") {
+        response.custom_status_code = 42;
+        app.login_with_credentials(realm::app::AppCredentials::anonymous(),
+                                   [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+                                       CHECK(!user);
+                                       CHECK(error);
+                                       CHECK(!error->is_http_error());
+                                       CHECK(!error->is_json_error());
+                                       CHECK(!error->is_service_error());
+                                       CHECK(error->is_custom_error());
+                                       CHECK(error->error_code.value() == 42);
+                                       CHECK(error->message == std::string("non-zero custom status code considered fatal"));
+                                       CHECK(error->error_code.message() == "code 42");
+                                       processed = true;
+                                   });
+        CHECK(processed);
+    }
+
+    SECTION("session error code") {
+        response.body = nlohmann::json({
+            {"errorCode", "MongoDBError"},
+            {"error", "a fake MongoDB error message!"},
+            {"access_token", good_access_token},
+            {"refresh_token", good_access_token},
+            {"user_id", "Brown Bear"},
+            {"device_id", "Panda Bear"}}).dump();
+        app.login_with_credentials(realm::app::AppCredentials::anonymous(),
+                                   [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+                                       CHECK(!user);
+                                       CHECK(error);
+                                       CHECK(!error->is_http_error());
+                                       CHECK(!error->is_json_error());
+                                       CHECK(!error->is_custom_error());
+                                       CHECK(error->is_service_error());
+                                       CHECK(app::ServiceErrorCode(error->error_code.value()) == app::ServiceErrorCode::mongodb_error);
+                                       CHECK(error->message == std::string("a fake MongoDB error message!"));
+                                       CHECK(error->error_code.message() == "MongoDBError");
+                                       processed = true;
+                                   });
+        CHECK(processed);
+    }
+
+    SECTION("json error code") {
+        response.body = "this: is not{} a valid json body!";
+        app.login_with_credentials(realm::app::AppCredentials::anonymous(),
+                                   [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+                                       CHECK(!user);
+                                       CHECK(error);
+                                       CHECK(!error->is_http_error());
+                                       CHECK(error->is_json_error());
+                                       CHECK(!error->is_custom_error());
+                                       CHECK(!error->is_service_error());
+                                       CHECK(app::JSONErrorCode(error->error_code.value()) == app::JSONErrorCode::malformed_json);
+                                       CHECK(error->message == std::string("parse error - unexpected 't'"));
+                                       CHECK(error->error_code.message() == "malformed json");
+                                       processed = true;
+                                   });
+        CHECK(processed);
+    }
+}
+
+
 #endif // REALM_ENABLE_AUTH_TESTS
