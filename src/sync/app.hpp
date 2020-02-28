@@ -72,7 +72,7 @@ public:
     - parameter completion: A callback block to be invoked once the log in completes.
     */
     void login_with_credentials(const AppCredentials& credentials,
-                                std::function<void(std::shared_ptr<SyncUser>, std::unique_ptr<AppError>)> completion_block);
+                                std::function<void(std::shared_ptr<SyncUser>, Optional<AppError>)> completion_block);
 
 private:
     Config m_config;

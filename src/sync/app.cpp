@@ -48,21 +48,15 @@ App::App(const Config& config)
     REALM_ASSERT(m_config.transport_generator);
 }
 
-static std::unique_ptr<AppError> handle_error(const Response& response) {
+static Optional<AppError> handle_error(const Response& response) {
     if (response.body.empty()) {
         return {};
     }
 
     if (auto ct = response.headers.find("Content-Type"); ct != response.headers.end() && ct->second == "application/json") {
         auto body = nlohmann::json::parse(response.body);
-        return std::make_unique<AppError>(app::ServiceError(body["errorCode"].get<std::string>(),
-                              body["error"].get<std::string>()));
-    }
-
-    if (response.custom_status_code != 0) {
-        return std::make_unique<AppError>(response.body,
-                                                 response.custom_status_code,
-                                                 AppError::Type::Custom);
+        return AppError(make_error_code(service_error_code_from_string(body["errorCode"].get<std::string>())),
+                              body["error"].get<std::string>());
     }
 
     return {};
@@ -78,7 +72,7 @@ inline bool response_code_is_fatal(Response const& response) {
 }
 
 void App::login_with_credentials(const AppCredentials& credentials,
-                                 std::function<void(std::shared_ptr<SyncUser>, std::unique_ptr<AppError>)> completion_block) {
+                                 std::function<void(std::shared_ptr<SyncUser>, Optional<AppError>)> completion_block) {
     // construct the route
     std::string route = util::format("%1/providers/%2/login", m_auth_route, credentials.provider_as_string());
 
@@ -92,26 +86,21 @@ void App::login_with_credentials(const AppCredentials& credentials,
         try {
             json = nlohmann::json::parse(response.body);
         } catch(std::domain_error e) {
-            return completion_block(nullptr, std::make_unique<AppError>(app::JSONError(app::JSONErrorCode::malformed_json,
-                                                                                                       e.what())));
+            return completion_block(nullptr, AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
         }
 
         std::shared_ptr<realm::SyncUser> sync_user;
         try {
             realm::SyncUserIdentifier identifier {
-                HAS_JSON_KEY_OR_THROW(json, "user_id", std::string),
+                value_from_json<std::string>(json, "user_id"),
                 m_auth_route
             };
 
             sync_user = realm::SyncManager::shared().get_user(identifier,
-                                                              HAS_JSON_KEY_OR_THROW(json, "refresh_token", std::string),
-                                                              HAS_JSON_KEY_OR_THROW(json, "access_token", std::string));
-        } catch (const JSONError& err) {
-            return completion_block(nullptr, std::make_unique<JSONError>(err));
-        } catch (const ServiceError& err) {
-            return completion_block(nullptr, std::make_unique<ServiceError>(err));
+                                                              value_from_json<std::string>(json, "refresh_token"),
+                                                              value_from_json<std::string>(json, "access_token"));
         } catch (const AppError& err) {
-            return completion_block(nullptr, std::make_unique<AppError>(err));
+            return completion_block(nullptr, err);
         }
 
         std::string profile_route = util::format("%1/auth/profile", m_base_route);
@@ -136,24 +125,23 @@ void App::login_with_credentials(const AppCredentials& credentials,
             try {
                 json = nlohmann::json::parse(profile_response.body);
             } catch(std::domain_error e) {
-                return completion_block(nullptr, std::make_unique<AppError>(app::JSONError(app::JSONErrorCode::malformed_json,
-                                                                                                           e.what())));
+                return completion_block(nullptr, AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
             }
 
             try {
                 std::vector<SyncUserIdentity> identities;
-                nlohmann::json identities_json = HAS_JSON_KEY_OR_THROW(json, "identities", nlohmann::json);
+                nlohmann::json identities_json = value_from_json<nlohmann::json>(json, "identities");
 
                 for (size_t i = 0; i < identities_json.size(); i++)
                 {
                     auto identity_json = identities_json[i];
-                    identities.push_back(SyncUserIdentity(HAS_JSON_KEY_OR_THROW(identity_json, "id", std::string),
-                                                          HAS_JSON_KEY_OR_THROW(identity_json, "provider_type", std::string)));
+                    identities.push_back(SyncUserIdentity(value_from_json<std::string>(identity_json, "id"),
+                                                          value_from_json<std::string>(identity_json, "provider_type")));
                 }
 
                 sync_user->update_identities(identities);
 
-                auto profile_data = HAS_JSON_KEY_OR_THROW(json, "data", nlohmann::json);
+                auto profile_data = value_from_json<nlohmann::json>(json, "data");
 
                 sync_user->update_user_profile(SyncUserProfile(WRAP_JSON_OPT(profile_data, "name", std::string),
                                                                WRAP_JSON_OPT(profile_data, "email", std::string),
@@ -164,12 +152,8 @@ void App::login_with_credentials(const AppCredentials& credentials,
                                                                WRAP_JSON_OPT(profile_data, "birthday", std::string),
                                                                WRAP_JSON_OPT(profile_data, "min_age", std::string),
                                                                WRAP_JSON_OPT(profile_data, "max_age", std::string)));
-            }  catch (const JSONError& err) {
-                return completion_block(nullptr, std::make_unique<JSONError>(err));
-            } catch (const ServiceError& err) {
-                return completion_block(nullptr, std::make_unique<ServiceError>(err));
             } catch (const AppError& err) {
-                return completion_block(nullptr, std::make_unique<AppError>(err));
+                return completion_block(nullptr, err);
             }
 
             return completion_block(sync_user, {});

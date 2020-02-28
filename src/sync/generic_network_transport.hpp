@@ -20,76 +20,31 @@
 #ifndef REALM_GENERIC_NETWORK_TRANSPORT_HPP
 #define REALM_GENERIC_NETWORK_TRANSPORT_HPP
 
+#include <realm/util/to_string.hpp>
+
 #include <functional>
-#include <string>
 #include <memory>
 #include <map>
+#include <ostream>
+#include <string>
+#include <system_error>
 #include <vector>
 
-#include <realm/util/to_string.hpp>
+#include <json.hpp>
 
 namespace realm {
 namespace app {
 
 #pragma mark Errors
 
-struct AppError : public std::runtime_error {
-    enum class Type {
-        Unknown,
-        JSON,
-        Service,
-        Custom
-    };
-
-    std::string category() const
-    {
-        switch (type) {
-            case Type::JSON: return "realm::json";
-            case Type::Service: return "realm::service";
-            case Type::Custom: return "realm::custom";
-            default: return "realm::unknown";
-        }
-    }
-
-    int code() const
-    {
-        return m_code;
-    }
-
-    AppError(std::string msg, int code, Type classification = Type::Unknown)
-    : std::runtime_error(msg),
-    type(classification),
-    m_code(code)
-    {
-    }
-
-    const Type type;
-    
-private:
-    const int m_code;
-};
-
 enum class JSONErrorCode {
     bad_token = 1,
     malformed_json = 2,
     missing_json_key = 3,
-
-    none = 0
 };
 
-struct JSONError : public AppError {
-    JSONError(JSONErrorCode c, std::string msg)
-    : AppError(msg, static_cast<int>(c), AppError::Type::JSON)
-    , code(c)
-    {
-    }
-
-    const JSONErrorCode code;
-};
-
-#define HAS_JSON_KEY_OR_THROW(JSON, KEY, RET_TYPE) \
-JSON.find(KEY) != JSON.end() ? JSON[KEY].get<RET_TYPE>() : \
-throw app::JSONError(app::JSONErrorCode::missing_json_key, KEY)
+const std::error_category& json_error_category() noexcept;
+std::error_code make_error_code(JSONErrorCode) noexcept;
 
 enum class ServiceErrorCode {
     missing_auth_req = 1,
@@ -144,17 +99,43 @@ enum class ServiceErrorCode {
     none = 0
 };
 
-/// Struct allowing for generic error data.
-struct ServiceError : public AppError {
-    ServiceError(std::string raw_code, std::string message)
-    : AppError(message, static_cast<int>(error_code_for_string(raw_code)), AppError::Type::Service)
+ServiceErrorCode service_error_code_from_string(const std::string& code);
+const std::error_category& service_error_category() noexcept;
+std::error_code make_error_code(ServiceErrorCode) noexcept;
+
+
+struct AppError {
+
+    std::error_code error_code;
+    std::string message;
+
+    AppError(std::error_code error_code, std::string message)
+    : error_code(error_code)
+    , message(message)
     {
     }
 
-private:
-    static ServiceErrorCode error_code_for_string(const std::string& code);
-    const std::string m_raw_code;
+    bool is_json_error() const
+    {
+        return error_code.category() == json_error_category();
+    }
+
+    bool is_service_error() const
+    {
+        return error_code.category() == service_error_category();
+    }
 };
+
+std::ostream& operator<<(std::ostream& os, AppError error);
+
+template <typename T>
+T value_from_json(const nlohmann::json& data, const std::string& key)
+{
+    if (data.find(key) != data.end()) {
+        return data[key].get<T>();
+    }
+    throw AppError(make_error_code(JSONErrorCode::missing_json_key), key);
+}
 
 /**
  * An HTTP method type.

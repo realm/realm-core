@@ -22,100 +22,144 @@
 namespace realm {
 namespace app {
 
-ServiceErrorCode ServiceError::error_code_for_string(const std::string& code)
+namespace {
+
+const char* get_error_message(JSONErrorCode error)
 {
-    if (code == "MissingAuthReq")
-        return ServiceErrorCode::missing_auth_req;
-    else if (code == "InvalidSession")
-        return ServiceErrorCode::invalid_session;
-    else if (code == "UserAppDomainMismatch")
-        return ServiceErrorCode::user_app_domain_mismatch;
-    else if (code == "DomainNotAllowed")
-        return ServiceErrorCode::domain_not_allowed;
-    else if (code == "ReadSizeLimitExceeded")
-        return ServiceErrorCode::read_size_limit_exceeded;
-    else if (code == "InvalidParameter")
-        return ServiceErrorCode::invalid_parameter;
-    else if (code == "MissingParameter")
-        return ServiceErrorCode::missing_parameter;
-    else if (code == "TwilioError")
-        return ServiceErrorCode::twilio_error;
-    else if (code == "GCMError")
-        return ServiceErrorCode::gcm_error;
-    else if (code == "HTTPError")
-        return ServiceErrorCode::http_error;
-    else if (code == "AWSError")
-        return ServiceErrorCode::aws_error;
-    else if (code == "MongoDBError")
-        return ServiceErrorCode::mongodb_error;
-    else if (code == "ArgumentsNotAllowed")
-        return ServiceErrorCode::arguments_not_allowed;
-    else if (code == "FunctionExecutionError")
-        return ServiceErrorCode::function_execution_error;
-    else if (code == "NoMatchingRule")
-        return ServiceErrorCode::no_matching_rule_found;
-    else if (code == "InternalServerError")
-        return ServiceErrorCode::internal_server_error;
-    else if (code == "AuthProviderNotFound")
-        return ServiceErrorCode::auth_provider_not_found;
-    else if (code == "AuthProviderAlreadyExists")
-        return ServiceErrorCode::auth_provider_already_exists;
-    else if (code == "ServiceNotFound")
-        return ServiceErrorCode::service_not_found;
-    else if (code == "ServiceTypeNotFound")
-        return ServiceErrorCode::service_type_not_found;
-    else if (code == "ServiceAlreadyExists")
-        return ServiceErrorCode::service_already_exists;
-    else if (code == "ServiceCommandNotFound")
-        return ServiceErrorCode::service_command_not_found;
-    else if (code == "ValueNotFound")
-        return ServiceErrorCode::value_not_found;
-    else if (code == "ValueAlreadyExists")
-        return ServiceErrorCode::value_already_exists;
-    else if (code == "ValueDuplicateName")
-        return ServiceErrorCode::value_duplicate_name;
-    else if (code == "FunctionNotFound")
-        return ServiceErrorCode::function_not_found;
-    else if (code == "FunctionAlreadyExists")
-        return ServiceErrorCode::function_already_exists;
-    else if (code == "FunctionDuplicateName")
-        return ServiceErrorCode::function_duplicate_name;
-    else if (code == "FunctionSyntaxError")
-        return ServiceErrorCode::function_syntax_error;
-    else if (code == "FunctionInvalid")
-        return ServiceErrorCode::function_invalid;
-    else if (code == "IncomingWebhookNotFound")
-        return ServiceErrorCode::incoming_webhook_not_found;
-    else if (code == "IncomingWebhookAlreadyExists")
-        return ServiceErrorCode::incoming_webhook_already_exists;
-    else if (code == "IncomingWebhookDuplicateName")
-        return ServiceErrorCode::incoming_webhook_duplicate_name;
-    else if (code == "RuleNotFound")
-        return ServiceErrorCode::rule_not_found;
-    else if (code == "APIKeyNotFound")
-        return ServiceErrorCode::api_key_not_found;
-    else if (code == "RuleAlreadyExists")
-        return ServiceErrorCode::rule_already_exists;
-    else if (code == "AuthProviderDuplicateName")
-        return ServiceErrorCode::auth_provider_duplicate_name;
-    else if (code == "RestrictedHost")
-        return ServiceErrorCode::restricted_host;
-    else if (code == "APIKeyAlreadyExists")
-        return ServiceErrorCode::api_key_already_exists;
-    else if (code == "IncomingWebhookAuthFailed")
-        return ServiceErrorCode::incoming_webhook_auth_failed;
-    else if (code == "ExecutionTimeLimitExceeded")
-        return ServiceErrorCode::execution_time_limit_exceeded;
-    else if (code == "NotCallable")
-        return ServiceErrorCode::not_callable;
-    else if (code == "UserAlreadyConfirmed")
-        return ServiceErrorCode::user_already_confirmed;
-    else if (code == "UserNotFound")
-        return ServiceErrorCode::user_not_found;
-    else if (code == "UserDisabled")
-        return ServiceErrorCode::user_disabled;
-    else
-        return ServiceErrorCode::unknown;
+    switch (error) {
+        case JSONErrorCode::bad_token:
+            return "bad token";
+        case JSONErrorCode::malformed_json:
+            return "malformed json";
+        case JSONErrorCode::missing_json_key:
+            return "missing json key";
+    }
+    return "unknown";
+}
+
+struct JSONErrorCategory : public std::error_category {
+    const char* name() const noexcept final override
+    {
+        return "realm::app::JSONError";
+    }
+
+    std::string message(int error_code) const override final
+    {
+        const char* msg = get_error_message(JSONErrorCode(error_code));
+        return msg ? std::string {msg} : "unknown error";
+    }
+};
+
+JSONErrorCategory g_json_error_category;
+
+
+static const std::map<std::string, ServiceErrorCode> service_error_map = {
+    {"MissingAuthReq", ServiceErrorCode::missing_auth_req},
+    {"InvalidSession", ServiceErrorCode::invalid_session},
+    {"UserAppDomainMismatch", ServiceErrorCode::user_app_domain_mismatch},
+    {"DomainNotAllowed", ServiceErrorCode::domain_not_allowed},
+    {"ReadSizeLimitExceeded", ServiceErrorCode::read_size_limit_exceeded},
+    {"InvalidParameter", ServiceErrorCode::invalid_parameter},
+    {"MissingParameter", ServiceErrorCode::missing_parameter},
+    {"TwilioError", ServiceErrorCode::twilio_error},
+    {"GCMError", ServiceErrorCode::gcm_error},
+    {"HTTPError", ServiceErrorCode::http_error},
+    {"AWSError", ServiceErrorCode::aws_error},
+    {"MongoDBError", ServiceErrorCode::mongodb_error},
+    {"ArgumentsNotAllowed", ServiceErrorCode::arguments_not_allowed},
+    {"FunctionExecutionError", ServiceErrorCode::function_execution_error},
+    {"NoMatchingRule", ServiceErrorCode::no_matching_rule_found},
+    {"InternalServerError", ServiceErrorCode::internal_server_error},
+    {"AuthProviderNotFound", ServiceErrorCode::auth_provider_not_found},
+    {"AuthProviderAlreadyExists", ServiceErrorCode::auth_provider_already_exists},
+    {"ServiceNotFound", ServiceErrorCode::service_not_found},
+    {"ServiceTypeNotFound", ServiceErrorCode::service_type_not_found},
+    {"ServiceAlreadyExists", ServiceErrorCode::service_already_exists},
+    {"ServiceCommandNotFound", ServiceErrorCode::service_command_not_found},
+    {"ValueNotFound", ServiceErrorCode::value_not_found},
+    {"ValueAlreadyExists", ServiceErrorCode::value_already_exists},
+    {"ValueDuplicateName", ServiceErrorCode::value_duplicate_name},
+    {"FunctionNotFound", ServiceErrorCode::function_not_found},
+    {"FunctionAlreadyExists", ServiceErrorCode::function_already_exists},
+    {"FunctionDuplicateName", ServiceErrorCode::function_duplicate_name},
+    {"FunctionSyntaxError", ServiceErrorCode::function_syntax_error},
+    {"FunctionInvalid", ServiceErrorCode::function_invalid},
+    {"IncomingWebhookNotFound", ServiceErrorCode::incoming_webhook_not_found},
+    {"IncomingWebhookAlreadyExists", ServiceErrorCode::incoming_webhook_already_exists},
+    {"IncomingWebhookDuplicateName", ServiceErrorCode::incoming_webhook_duplicate_name},
+    {"RuleNotFound", ServiceErrorCode::rule_not_found},
+    {"APIKeyNotFound", ServiceErrorCode::api_key_not_found},
+    {"RuleAlreadyExists", ServiceErrorCode::rule_already_exists},
+    {"AuthProviderDuplicateName", ServiceErrorCode::auth_provider_duplicate_name},
+    {"RestrictedHost", ServiceErrorCode::restricted_host},
+    {"APIKeyAlreadyExists", ServiceErrorCode::api_key_already_exists},
+    {"IncomingWebhookAuthFailed", ServiceErrorCode::incoming_webhook_auth_failed},
+    {"ExecutionTimeLimitExceeded", ServiceErrorCode::execution_time_limit_exceeded},
+    {"NotCallable", ServiceErrorCode::not_callable},
+    {"UserAlreadyConfirmed", ServiceErrorCode::user_already_confirmed},
+    {"UserNotFound", ServiceErrorCode::user_not_found},
+    {"UserDisabled", ServiceErrorCode::user_disabled},
+};
+
+const char* get_error_message(ServiceErrorCode error)
+{
+    for (auto it : service_error_map) {
+        if (it.second == error) {
+            return it.first.c_str();
+        }
+    }
+    return "unknown";
+}
+
+struct ServiceErrorCategory : public std::error_category {
+    const char* name() const noexcept final override
+    {
+        return "realm::app::ServiceError";
+    }
+
+    std::string message(int error_code) const override final
+    {
+        const char* msg = get_error_message(ServiceErrorCode(error_code));
+        return msg ? std::string {msg} : "unknown error";
+    }
+};
+
+ServiceErrorCategory g_service_error_category;
+
+} // unnamed namespace
+
+std::ostream& operator<<(std::ostream& os, AppError error)
+{
+    return os << error.error_code.message() << ": " << error.message;
+}
+
+const std::error_category& json_error_category() noexcept
+{
+    return g_json_error_category;
+}
+
+std::error_code make_error_code(JSONErrorCode error) noexcept
+{
+    return std::error_code{int(error), g_json_error_category};
+}
+
+const std::error_category& service_error_category() noexcept
+{
+    return g_service_error_category;
+}
+
+std::error_code make_error_code(ServiceErrorCode error) noexcept
+{
+    return std::error_code{int(error), g_service_error_category};
+}
+
+ServiceErrorCode service_error_code_from_string(const std::string& code)
+{
+    auto search = service_error_map.find(code);
+    if (search != service_error_map.end()) {
+        return search->second;
+    }
+    return ServiceErrorCode::unknown;
 }
 
 } // namespace app

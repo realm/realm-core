@@ -118,7 +118,7 @@ TEST_CASE("app: login_with_credentials integration", "[sync][app]") {
         auto tsm = TestSyncManager(base_path);
 
         app.login_with_credentials(AppCredentials::anonymous(),
-                                   [&](std::shared_ptr<SyncUser> user, std::unique_ptr<realm::app::AppError> error) {
+                                   [&](std::shared_ptr<SyncUser> user, Optional<app::AppError> error) {
             CHECK(user);
             CHECK(!error);
             processed = true;
@@ -245,7 +245,7 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync][app]") {
         bool processed = false;
 
         app.login_with_credentials(realm::app::AppCredentials::anonymous(),
-                                    [&](std::shared_ptr<realm::SyncUser> user, std::unique_ptr<realm::app::AppError> error) {
+                                    [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
             CHECK(user);
             CHECK(!error);
 
@@ -276,15 +276,14 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync][app]") {
         bool processed = false;
 
         app.login_with_credentials(AppCredentials::anonymous(),
-                                    [&](std::shared_ptr<realm::SyncUser> user, std::unique_ptr<realm::app::AppError> error) {
+                                    [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
             CHECK(!user);
             CHECK(error);
-            CHECK(error->what() == std::string("jwt missing parts"));
-            CHECK(error->type == realm::app::AppError::Type::JSON);
-            // knowing the type, we can expect a dynamic cast to succeed
-            auto specialized_error = dynamic_cast<realm::app::JSONError*>(error.get());
-            REQUIRE(specialized_error);
-            CHECK(specialized_error->code == realm::app::JSONErrorCode::bad_token);
+            CHECK(error->message == std::string("jwt missing parts"));
+            CHECK(error->error_code.message() == "bad token");
+            CHECK(error->error_code.category() == app::json_error_category());
+            CHECK(error->is_json_error());
+            CHECK(app::JSONErrorCode(error->error_code.value()) == app::JSONErrorCode::bad_token);
             processed = true;
         });
 

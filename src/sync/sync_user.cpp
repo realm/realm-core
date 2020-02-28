@@ -49,7 +49,7 @@ static std::vector<std::string> split_token(const std::string& jwt) {
     parts.push_back(jwt.substr(start_from));
 
     if (parts.size() != 3) {
-        throw app::JSONError(app::JSONErrorCode::bad_token, "jwt missing parts");
+        throw app::AppError(make_error_code(app::JSONErrorCode::bad_token), "jwt missing parts");
     }
 
     return parts;
@@ -62,8 +62,8 @@ RealmJWT::RealmJWT(const std::string& token)
     auto json = nlohmann::json::parse(base64_decode(parts[1]));
 
     this->token = token;
-    this->expires_at = HAS_JSON_KEY_OR_THROW(json, "exp", long);
-    this->issued_at = HAS_JSON_KEY_OR_THROW(json, "iat", long);
+    this->expires_at = app::value_from_json<long>(json, "exp");
+    this->issued_at = app::value_from_json<long>(json, "iat");
 
     if (json.find("user_data") != json.end()) {
         this->user_data = json["user_data"].get<std::map<std::string, util::Any>>();
