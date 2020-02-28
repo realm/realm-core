@@ -23,7 +23,6 @@
 #include "sync/sync_manager.hpp"
 
 #include <json.hpp>
-#include <sstream>
 
 namespace realm {
 namespace app {
@@ -87,7 +86,7 @@ void App::login_with_credentials(const AppCredentials& credentials,
     // construct the route
     std::string route = util::format("%1/providers/%2/login", m_auth_route, credentials.provider_as_string());
 
-    auto handler = [&](const Response& response) {
+    auto handler = [completion_block, this](const Response& response) {
         if (auto error = check_for_errors(response)) {
             return completion_block(nullptr, error);
         }
@@ -126,20 +125,21 @@ void App::login_with_credentials(const AppCredentials& credentials,
                 { "Authorization", bearer}
             },
             std::string()
-        }, [&](const Response& profile_response) {
+        }, [completion_block, &sync_user](const Response& profile_response) {
             if (auto error = check_for_errors(profile_response)) {
                 return completion_block(nullptr, error);
             }
 
+            nlohmann::json profile_json;
             try {
-                json = nlohmann::json::parse(profile_response.body);
+                profile_json = nlohmann::json::parse(profile_response.body);
             } catch(std::domain_error e) {
                 return completion_block(nullptr, AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
             }
 
             try {
                 std::vector<SyncUserIdentity> identities;
-                nlohmann::json identities_json = value_from_json<nlohmann::json>(json, "identities");
+                nlohmann::json identities_json = value_from_json<nlohmann::json>(profile_json, "identities");
 
                 for (size_t i = 0; i < identities_json.size(); i++)
                 {
@@ -150,7 +150,7 @@ void App::login_with_credentials(const AppCredentials& credentials,
 
                 sync_user->update_identities(identities);
 
-                auto profile_data = value_from_json<nlohmann::json>(json, "data");
+                auto profile_data = value_from_json<nlohmann::json>(profile_json, "data");
 
                 sync_user->update_user_profile(SyncUserProfile(get_optional<std::string>(profile_data, "name"),
                                                                get_optional<std::string>(profile_data, "email"),

@@ -24,7 +24,6 @@
 
 #include <curl/curl.h>
 #include <json.hpp>
-#include <sstream>
 
 #pragma mark - Integration Tests
 
