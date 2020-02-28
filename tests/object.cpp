@@ -923,6 +923,20 @@ TEST_CASE("object") {
         REQUIRE(obj.obj().get<String>(col_pk_str) == "value");
     }
 
+    SECTION("create null and 0 primary keys for Int types") {
+        auto create = [&](util::Any&& value, StringData type) {
+            r->begin_transaction();
+            auto obj = Object::create(d, r, *r->schema().find(type), value);
+            r->commit_transaction();
+            return obj;
+        };
+        r->begin_transaction();
+        create(AnyDict{{"pk", util::Any()}}, "all optional types");
+        create(AnyDict{{"pk", INT64_C(0)}}, "all optional types");
+        r->commit_transaction();
+        REQUIRE(Results(r, r->read_group().get_table("class_all optional types")).size() == 2);
+    }
+
     SECTION("getters and setters") {
         r->begin_transaction();
 
