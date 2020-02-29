@@ -49,7 +49,6 @@ if(REALM_ENABLE_SYNC)
         sync/app.cpp
     )
 
-    list(APPEND INCLUDE_DIRS ../external/json)
 endif()
 
 add_executable(tests ${SOURCES} ${HEADERS})
@@ -70,6 +69,7 @@ if(VSCODE_TEST_RUNNER)
 endif()
 
 if(REALM_ENABLE_SYNC)
+    target_include_directories(tests ../external/json)
     # It's necessary to explicitly link to realm-sync here to control the order in which libraries are
     # linked to avoid link errors when using GNU ld.
     target_link_libraries(tests realm-sync realm-sync-server realm-parser)
