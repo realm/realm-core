@@ -16,15 +16,14 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <curl/curl.h>
-#include <sstream>
-#include "../../external/json/json.hpp"
-#include "util/test_utils.hpp"
-#include "util/test_file.hpp"
 #include "catch2/catch.hpp"
-
 #include "sync/app.hpp"
 #include "sync/app_credentials.hpp"
+#include "util/test_utils.hpp"
+#include "util/test_file.hpp"
+
+#include <curl/curl.h>
+#include <json.hpp>
 
 #pragma mark - Integration Tests
 
@@ -107,10 +106,9 @@ TEST_CASE("app: login_with_credentials integration", "[sync][app]") {
         std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
             return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
         };
-        GenericNetworkTransport::set_network_transport_factory(factory);
 
         // TODO: create dummy app using Stitch CLI instead of hardcording
-        auto app = App("translate-utwuv", realm::util::none);
+        auto app = App(App::Config{"translate-utwuv", factory});
 
         bool processed = false;
 
@@ -119,7 +117,7 @@ TEST_CASE("app: login_with_credentials integration", "[sync][app]") {
         auto tsm = TestSyncManager(base_path);
 
         app.login_with_credentials(AppCredentials::anonymous(),
-                                   [&](std::shared_ptr<SyncUser> user, std::unique_ptr<realm::app::error::AppError> error) {
+                                   [&](std::shared_ptr<SyncUser> user, Optional<app::AppError> error) {
             CHECK(user);
             CHECK(!error);
             processed = true;
@@ -141,7 +139,6 @@ public:
     static const std::string identity_0_id;
     static const std::string identity_1_id;
     static const nlohmann::json profile_0;
-    static const nlohmann::json profile_1;
 
 private:
     void handle_profile(const Request request,
@@ -213,6 +210,7 @@ const std::string UnitTestTransport::user_id = "Ailuropoda melanoleuca";
 const std::string UnitTestTransport::identity_0_id = "Ursus arctos isabellinus";
 const std::string UnitTestTransport::identity_1_id = "Ursus arctos horribilis";
 
+static const std::string profile_0_name = "Ursus americanus Ursus boeckhi";
 static const std::string profile_0_first_name = "Ursus americanus";
 static const std::string profile_0_last_name = "Ursus boeckhi";
 static const std::string profile_0_email = "Ursus ursinus";
@@ -223,6 +221,7 @@ static const std::string profile_0_min_age = "Ursus maritimus";
 static const std::string profile_0_max_age = "Ursus arctos";
 
 const nlohmann::json UnitTestTransport::profile_0 = {
+    {"name", profile_0_name},
     {"first_name", profile_0_first_name},
     {"last_name", profile_0_last_name},
     {"email", profile_0_email},
@@ -233,38 +232,36 @@ const nlohmann::json UnitTestTransport::profile_0 = {
     {"max_age", profile_0_max_age}
 };
 
-const nlohmann::json UnitTestTransport::profile_1 = {
-};
-
 TEST_CASE("app: login_with_credentials unit_tests", "[sync][app]") {
     std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
         return std::unique_ptr<GenericNetworkTransport>(new UnitTestTransport);
     };
-    GenericNetworkTransport::set_network_transport_factory(factory);
-
-    auto app = App::app("<>", realm::util::none);
+    App app(App::Config{"<>", factory});
 
     SECTION("login_anonymous good") {
         UnitTestTransport::access_token = good_access_token;
 
         bool processed = false;
 
-        app->login_with_credentials(realm::app::AppCredentials::anonymous(),
-                                    [&](std::shared_ptr<realm::SyncUser> user, std::unique_ptr<realm::app::error::AppError> error) {
+        app.login_with_credentials(realm::app::AppCredentials::anonymous(),
+                                    [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
             CHECK(user);
             CHECK(!error);
 
             CHECK(user->identities().size() == 2);
             CHECK(user->identities()[0].id == UnitTestTransport::identity_0_id);
             CHECK(user->identities()[1].id == UnitTestTransport::identity_1_id);
-            CHECK(user->user_profile()->first_name() == profile_0_first_name);
-            CHECK(user->user_profile()->last_name() == profile_0_last_name);
-            CHECK(user->user_profile()->email() == profile_0_email);
-            CHECK(user->user_profile()->picture_url() == profile_0_picture_url);
-            CHECK(user->user_profile()->gender() == profile_0_gender);
-            CHECK(user->user_profile()->birthday() == profile_0_birthday);
-            CHECK(user->user_profile()->min_age() == profile_0_min_age);
-            CHECK(user->user_profile()->max_age() == profile_0_max_age);
+            SyncUserProfile user_profile = user->user_profile();
+
+            CHECK(user_profile.name == profile_0_name);
+            CHECK(user_profile.first_name == profile_0_first_name);
+            CHECK(user_profile.last_name == profile_0_last_name);
+            CHECK(user_profile.email == profile_0_email);
+            CHECK(user_profile.picture_url == profile_0_picture_url);
+            CHECK(user_profile.gender == profile_0_gender);
+            CHECK(user_profile.birthday == profile_0_birthday);
+            CHECK(user_profile.min_age == profile_0_min_age);
+            CHECK(user_profile.max_age == profile_0_max_age);
 
             processed = true;
         });
@@ -277,21 +274,146 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync][app]") {
 
         bool processed = false;
 
-        app->login_with_credentials(AppCredentials::anonymous(),
-                                    [&](std::shared_ptr<realm::SyncUser> user, std::unique_ptr<realm::app::error::AppError> error) {
+        app.login_with_credentials(AppCredentials::anonymous(),
+                                    [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
             CHECK(!user);
             CHECK(error);
-            CHECK(error->what() == std::string("Bad Token"));
-            CHECK(error->type == realm::app::error::AppError::Type::JSON);
-            // knowing the type, we can expect a dynamic cast to succeed
-            auto specialized_error = dynamic_cast<realm::app::error::JSONError*>(error.get());
-            REQUIRE(specialized_error);
-            CHECK(specialized_error->code == realm::app::error::JSONErrorCode::bad_token);
+            CHECK(error->message == std::string("jwt missing parts"));
+            CHECK(error->error_code.message() == "bad token");
+            CHECK(error->error_code.category() == app::json_error_category());
+            CHECK(error->is_json_error());
+            CHECK(app::JSONErrorCode(error->error_code.value()) == app::JSONErrorCode::bad_token);
             processed = true;
         });
 
         CHECK(processed);
     }
 }
+
+struct ErrorCheckingTransport : public GenericNetworkTransport {
+    ErrorCheckingTransport(Response r)
+    : m_response(r)
+    {
+    }
+    void send_request_to_server(const Request, std::function<void (const Response)> completion_block) override
+    {
+        completion_block(m_response);
+    }
+private:
+    Response m_response;
+};
+
+
+TEST_CASE("app: response error handling", "[sync][app]") {
+
+    std::string response_body = nlohmann::json({
+        {"access_token", good_access_token},
+        {"refresh_token", good_access_token},
+        {"user_id", "Brown Bear"},
+        {"device_id", "Panda Bear"}}).dump();
+
+    Response response{.http_status_code = 200, .headers = {{"Content-Type", "application/json"}}, .body = response_body};
+
+    std::function<std::unique_ptr<GenericNetworkTransport>()> transport_generator = [&response] {
+        return std::unique_ptr<GenericNetworkTransport>(new ErrorCheckingTransport(response));
+    };
+    App app(App::Config{"<>", transport_generator});
+    bool processed = false;
+
+    SECTION("http 404") {
+        response.http_status_code = 404;
+        app.login_with_credentials(realm::app::AppCredentials::anonymous(),
+                                   [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+                                       CHECK(!user);
+                                       CHECK(error);
+                                       CHECK(!error->is_json_error());
+                                       CHECK(!error->is_custom_error());
+                                       CHECK(!error->is_service_error());
+                                       CHECK(error->is_http_error());
+                                       CHECK(error->error_code.value() == 404);
+                                       CHECK(error->message == std::string("http error code considered fatal"));
+                                       CHECK(error->error_code.message() == "Client Error: 404");
+                                       processed = true;
+                                   });
+        CHECK(processed);
+    }
+    SECTION("http 500") {
+        response.http_status_code = 500;
+        app.login_with_credentials(realm::app::AppCredentials::anonymous(),
+                                   [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+                                       CHECK(!user);
+                                       CHECK(error);
+                                       CHECK(!error->is_json_error());
+                                       CHECK(!error->is_custom_error());
+                                       CHECK(!error->is_service_error());
+                                       CHECK(error->is_http_error());
+                                       CHECK(error->error_code.value() == 500);
+                                       CHECK(error->message == std::string("http error code considered fatal"));
+                                       CHECK(error->error_code.message() == "Server Error: 500");
+                                       processed = true;
+                                   });
+        CHECK(processed);
+    }
+    SECTION("custom error code") {
+        response.custom_status_code = 42;
+        app.login_with_credentials(realm::app::AppCredentials::anonymous(),
+                                   [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+                                       CHECK(!user);
+                                       CHECK(error);
+                                       CHECK(!error->is_http_error());
+                                       CHECK(!error->is_json_error());
+                                       CHECK(!error->is_service_error());
+                                       CHECK(error->is_custom_error());
+                                       CHECK(error->error_code.value() == 42);
+                                       CHECK(error->message == std::string("non-zero custom status code considered fatal"));
+                                       CHECK(error->error_code.message() == "code 42");
+                                       processed = true;
+                                   });
+        CHECK(processed);
+    }
+
+    SECTION("session error code") {
+        response.body = nlohmann::json({
+            {"errorCode", "MongoDBError"},
+            {"error", "a fake MongoDB error message!"},
+            {"access_token", good_access_token},
+            {"refresh_token", good_access_token},
+            {"user_id", "Brown Bear"},
+            {"device_id", "Panda Bear"}}).dump();
+        app.login_with_credentials(realm::app::AppCredentials::anonymous(),
+                                   [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+                                       CHECK(!user);
+                                       CHECK(error);
+                                       CHECK(!error->is_http_error());
+                                       CHECK(!error->is_json_error());
+                                       CHECK(!error->is_custom_error());
+                                       CHECK(error->is_service_error());
+                                       CHECK(app::ServiceErrorCode(error->error_code.value()) == app::ServiceErrorCode::mongodb_error);
+                                       CHECK(error->message == std::string("a fake MongoDB error message!"));
+                                       CHECK(error->error_code.message() == "MongoDBError");
+                                       processed = true;
+                                   });
+        CHECK(processed);
+    }
+
+    SECTION("json error code") {
+        response.body = "this: is not{} a valid json body!";
+        app.login_with_credentials(realm::app::AppCredentials::anonymous(),
+                                   [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+                                       CHECK(!user);
+                                       CHECK(error);
+                                       CHECK(!error->is_http_error());
+                                       CHECK(error->is_json_error());
+                                       CHECK(!error->is_custom_error());
+                                       CHECK(!error->is_service_error());
+                                       CHECK(app::JSONErrorCode(error->error_code.value()) == app::JSONErrorCode::malformed_json);
+                                       CHECK(error->message == std::string("parse error - unexpected 't'"));
+                                       CHECK(error->error_code.message() == "malformed json");
+                                       processed = true;
+                                   });
+        CHECK(processed);
+    }
+}
+
 
 #endif // REALM_ENABLE_AUTH_TESTS

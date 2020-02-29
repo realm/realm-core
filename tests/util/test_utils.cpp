@@ -23,7 +23,7 @@
 #include <realm/util/file.hpp>
 #include <realm/string_data.hpp>
 
-#include "../../external/json/json.hpp"
+#include <json.hpp>
 
 namespace realm {
 

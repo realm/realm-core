@@ -19,19 +19,19 @@
 #ifndef REALM_OS_SYNC_USER_HPP
 #define REALM_OS_SYNC_USER_HPP
 
-#include <string>
-#include <memory>
-#include <unordered_map>
-#include <vector>
-#include <mutex>
-#include <map>
-
 #include "util/atomic_shared_ptr.hpp"
 #include <realm/util/any.hpp>
 #include <realm/util/optional.hpp>
 #include <realm/table.hpp>
 
-#include "../object_schema.hpp"
+#include "object_schema.hpp"
+
+#include <map>
+#include <memory>
+#include <mutex>
+#include <string>
+#include <unordered_map>
+#include <vector>
 
 namespace realm {
 
@@ -79,58 +79,23 @@ struct RealmJWT {
 
 struct SyncUserProfile {
     // The full name of the user.
-    util::Optional<std::string> name() const
-    {
-        return m_name;
-    }
-
+    util::Optional<std::string> name;
     // The email address of the user.
-    util::Optional<std::string> email() const
-    {
-        return m_email;
-    }
-
+    util::Optional<std::string> email;
     // A URL to the user's profile picture.
-    util::Optional<std::string> picture_url() const
-    {
-        return m_picture_url;
-    }
-
+    util::Optional<std::string> picture_url;
     // The first name of the user.
-    util::Optional<std::string> first_name() const
-    {
-        return m_first_name;
-    }
-
+    util::Optional<std::string> first_name;
     // The last name of the user.
-    util::Optional<std::string> last_name() const
-    {
-        return m_last_name;
-    }
-
+    util::Optional<std::string> last_name;
     // The gender of the user.
-    util::Optional<std::string> gender() const
-    {
-        return m_gender;
-    }
-
+    util::Optional<std::string> gender;
     // The birthdate of the user.
-    util::Optional<std::string> birthday() const
-    {
-        return m_birthday;
-    }
-
+    util::Optional<std::string> birthday;
     // The minimum age of the user.
-    util::Optional<std::string> min_age() const
-    {
-        return m_min_age;
-    }
-
+    util::Optional<std::string> min_age;
     // The maximum age of the user.
-    util::Optional<std::string> max_age() const
-    {
-        return m_max_age;
-    }
+    util::Optional<std::string> max_age;
 
     SyncUserProfile(util::Optional<std::string> name,
                     util::Optional<std::string> email,
@@ -140,47 +105,8 @@ struct SyncUserProfile {
                     util::Optional<std::string> gender,
                     util::Optional<std::string> birthday,
                     util::Optional<std::string> min_age,
-                    util::Optional<std::string> max_age) :
-    m_name(std::move(name)),
-    m_email(std::move(email)),
-    m_picture_url(std::move(picture_url)),
-    m_first_name(std::move(first_name)),
-    m_last_name(std::move(last_name)),
-    m_gender(std::move(gender)),
-    m_birthday(std::move(birthday)),
-    m_min_age(std::move(min_age)),
-    m_max_age(std::move(max_age)) {}
-
-    SyncUserProfile(realm::ConstObj& obj);
-    static realm::ObjectSchema schema();
-
-private:
-    // The full name of the user.
-    const util::Optional<std::string> m_name;
-
-    // The email address of the user.
-    const util::Optional<std::string> m_email;
-
-    // A URL to the user's profile picture.
-    const util::Optional<std::string> m_picture_url;
-
-    // The first name of the user.
-    const util::Optional<std::string> m_first_name;
-
-    // The last name of the user.
-    const util::Optional<std::string> m_last_name;
-
-    // The gender of the user.
-    const util::Optional<std::string> m_gender;
-
-    // The birthdate of the user.
-    const util::Optional<std::string> m_birthday;
-
-    // The minimum age of the user.
-    const util::Optional<std::string> m_min_age;
-
-    // The maximum age of the user.
-    const util::Optional<std::string> m_max_age;
+                    util::Optional<std::string> max_age);
+    SyncUserProfile() = default;
 };
 
 // A struct that represents an identity that a `User` is linked to
@@ -190,10 +116,7 @@ struct SyncUserIdentity {
     // the associated provider type of the identity
     std::string provider_type;
 
-    SyncUserIdentity(realm::ConstObj& obj);
-    SyncUserIdentity(std::string id, std::string provider_type);
-
-    static realm::ObjectSchema schema();
+    SyncUserIdentity(const std::string& id, const std::string& provider_type);
 };
 
 // A `SyncUser` represents a single user account. Each user manages the sessions that
@@ -231,7 +154,7 @@ public:
     void update_access_token(std::string token);
 
     // Update the user's profile.
-    void update_user_profile(std::shared_ptr<SyncUserProfile> profile);
+    void update_user_profile(const SyncUserProfile& profile);
 
     // Update the user's identities.
     void update_identities(std::vector<SyncUserIdentity> identities);
@@ -258,7 +181,7 @@ public:
 
     std::string refresh_token() const;
 
-    std::shared_ptr<SyncUserProfile> user_profile() const;
+    SyncUserProfile user_profile() const;
 
     std::vector<SyncUserIdentity> identities() const;
 
@@ -327,7 +250,7 @@ private:
     // The identities associated with this user.
     std::vector<SyncUserIdentity> m_user_identities;
 
-    std::shared_ptr<SyncUserProfile> m_user_profile;
+    SyncUserProfile m_user_profile;
 };
 
 }

@@ -20,92 +20,31 @@
 #ifndef REALM_GENERIC_NETWORK_TRANSPORT_HPP
 #define REALM_GENERIC_NETWORK_TRANSPORT_HPP
 
+#include <realm/util/to_string.hpp>
+
 #include <functional>
-#include <string>
 #include <memory>
 #include <map>
+#include <ostream>
+#include <string>
+#include <system_error>
 #include <vector>
 
-#include <realm/util/to_string.hpp>
+#include <json.hpp>
 
 namespace realm {
 namespace app {
-namespace error {
 
 #pragma mark Errors
-
-struct AppError : public std::runtime_error
-{
-    enum class Type {
-        Unknown,
-        JSON,
-        Service,
-        Custom
-    };
-
-    const std::string category() const
-    {
-        switch (type) {
-            case Type::JSON: return "realm::json";
-            case Type::Service: return "realm::service";
-            case Type::Custom: return "realm::custom";
-            default: return "realm::unknown";
-        }
-    }
-
-    const std::string message() const
-    {
-        return this->what();
-    }
-
-    int code() const
-    {
-        return m_code;
-    }
-
-    AppError()
-    : std::runtime_error("AppError")
-    , type(Type::Unknown)
-    , m_code(-1)
-    {
-    };
-    AppError(std::string msg, int code, Type classification = Type::Unknown)
-    : std::runtime_error(msg),
-    type(classification),
-    m_code(code)
-    {
-    }
-
-    const Type type;
-    
-private:
-    const int m_code;
-};
 
 enum class JSONErrorCode {
     bad_token = 1,
     malformed_json = 2,
     missing_json_key = 3,
-
-    none = 0
 };
 
-struct JSONError : public AppError
-{
-
-
-    JSONError(JSONErrorCode c, std::string msg)
-    : AppError(msg, static_cast<int>(c), AppError::Type::JSON)
-    , code(c)
-    {
-    }
-
-    const JSONErrorCode code;
-};
-
-#define HAS_JSON_KEY_OR_THROW(JSON, KEY, RET_TYPE) \
-JSON.find(KEY) != JSON.end() ? JSON[KEY].get<RET_TYPE>() : \
-throw app::error::JSONError(app::error::JSONErrorCode::missing_json_key, KEY)
+const std::error_category& json_error_category() noexcept;
+std::error_code make_error_code(JSONErrorCode) noexcept;
 
 enum class ServiceErrorCode {
     missing_auth_req = 1,
@@ -160,116 +99,59 @@ enum class ServiceErrorCode {
     none = 0
 };
 
-/// Struct allowing for generic error data.
-struct ServiceError : public AppError
-{
-    ServiceError(std::string raw_code, std::string message)
-    : AppError(message, static_cast<int>(error_code_for_string(raw_code)), AppError::Type::Service)
+ServiceErrorCode service_error_code_from_string(const std::string& code);
+const std::error_category& service_error_category() noexcept;
+std::error_code make_error_code(ServiceErrorCode) noexcept;
+
+const std::error_category& http_error_category() noexcept;
+std::error_code make_http_error_code(int http_code) noexcept;
+
+const std::error_category& custom_error_category() noexcept;
+std::error_code make_custom_error_code(int code) noexcept;
+
+
+struct AppError {
+
+    std::error_code error_code;
+    std::string message;
+
+    AppError(std::error_code error_code, std::string message)
+    : error_code(error_code)
+    , message(message)
     {
     }
-    const std::string message() const { return std::runtime_error::what(); };
 
-private:
-    static ServiceErrorCode error_code_for_string(const std::string& code)
+    bool is_json_error() const
     {
-        if (code == "MissingAuthReq")
-            return ServiceErrorCode::missing_auth_req;
-        else if (code == "InvalidSession")
-            return ServiceErrorCode::invalid_session;
-        else if (code == "UserAppDomainMismatch")
-            return ServiceErrorCode::user_app_domain_mismatch;
-        else if (code == "DomainNotAllowed")
-            return ServiceErrorCode::domain_not_allowed;
-        else if (code == "ReadSizeLimitExceeded")
-            return ServiceErrorCode::read_size_limit_exceeded;
-        else if (code == "InvalidParameter")
-            return ServiceErrorCode::invalid_parameter;
-        else if (code == "MissingParameter")
-            return ServiceErrorCode::missing_parameter;
-        else if (code == "TwilioError")
-            return ServiceErrorCode::twilio_error;
-        else if (code == "GCMError")
-            return ServiceErrorCode::gcm_error;
-        else if (code == "HTTPError")
-            return ServiceErrorCode::http_error;
-        else if (code == "AWSError")
-            return ServiceErrorCode::aws_error;
-        else if (code == "MongoDBError")
-            return ServiceErrorCode::mongodb_error;
-        else if (code == "ArgumentsNotAllowed")
-            return ServiceErrorCode::arguments_not_allowed;
-        else if (code == "FunctionExecutionError")
-            return ServiceErrorCode::function_execution_error;
-        else if (code == "NoMatchingRule")
-            return ServiceErrorCode::no_matching_rule_found;
-        else if (code == "InternalServerError")
-            return ServiceErrorCode::internal_server_error;
-        else if (code == "AuthProviderNotFound")
-            return ServiceErrorCode::auth_provider_not_found;
-        else if (code == "AuthProviderAlreadyExists")
-            return ServiceErrorCode::auth_provider_already_exists;
-        else if (code == "ServiceNotFound")
-            return ServiceErrorCode::service_not_found;
-        else if (code == "ServiceTypeNotFound")
-            return ServiceErrorCode::service_type_not_found;
-        else if (code == "ServiceAlreadyExists")
-            return ServiceErrorCode::service_already_exists;
-        else if (code == "ServiceCommandNotFound")
-            return ServiceErrorCode::service_command_not_found;
-        else if (code == "ValueNotFound")
-            return ServiceErrorCode::value_not_found;
-        else if (code == "ValueAlreadyExists")
-            return ServiceErrorCode::value_already_exists;
-        else if (code == "ValueDuplicateName")
-            return ServiceErrorCode::value_duplicate_name;
-        else if (code == "FunctionNotFound")
-            return ServiceErrorCode::function_not_found;
-        else if (code == "FunctionAlreadyExists")
-            return ServiceErrorCode::function_already_exists;
-        else if (code == "FunctionDuplicateName")
-            return ServiceErrorCode::function_duplicate_name;
-        else if (code == "FunctionSyntaxError")
-            return ServiceErrorCode::function_syntax_error;
-        else if (code == "FunctionInvalid")
-            return ServiceErrorCode::function_invalid;
-        else if (code == "IncomingWebhookNotFound")
-            return ServiceErrorCode::incoming_webhook_not_found;
-        else if (code == "IncomingWebhookAlreadyExists")
-            return ServiceErrorCode::incoming_webhook_already_exists;
-        else if (code == "IncomingWebhookDuplicateName")
-            return ServiceErrorCode::incoming_webhook_duplicate_name;
-        else if (code == "RuleNotFound")
-            return ServiceErrorCode::rule_not_found;
-        else if (code == "APIKeyNotFound")
-            return ServiceErrorCode::api_key_not_found;
-        else if (code == "RuleAlreadyExists")
-            return ServiceErrorCode::rule_already_exists;
-        else if (code == "AuthProviderDuplicateName")
-            return ServiceErrorCode::auth_provider_duplicate_name;
-        else if (code == "RestrictedHost")
-            return ServiceErrorCode::restricted_host;
-        else if (code == "APIKeyAlreadyExists")
-            return ServiceErrorCode::api_key_already_exists;
-        else if (code == "IncomingWebhookAuthFailed")
-            return ServiceErrorCode::incoming_webhook_auth_failed;
-        else if (code == "ExecutionTimeLimitExceeded")
-            return ServiceErrorCode::execution_time_limit_exceeded;
-        else if (code == "NotCallable")
-            return ServiceErrorCode::not_callable;
-        else if (code == "UserAlreadyConfirmed")
-            return ServiceErrorCode::user_already_confirmed;
-        else if (code == "UserNotFound")
-            return ServiceErrorCode::user_not_found;
-        else if (code == "UserDisabled")
-            return ServiceErrorCode::user_disabled;
-        else
-            return ServiceErrorCode::unknown;
+        return error_code.category() == json_error_category();
     }
 
-    const std::string m_raw_code;
+    bool is_service_error() const
+    {
+        return error_code.category() == service_error_category();
+    }
+
+    bool is_http_error() const
+    {
+        return error_code.category() == http_error_category();
+    }
+
+    bool is_custom_error() const
+    {
+        return error_code.category() == custom_error_category();
+    }
 };
 
-} // namespace error
+std::ostream& operator<<(std::ostream& os, AppError error);
+
+template <typename T>
+T value_from_json(const nlohmann::json& data, const std::string& key)
+{
+    if (auto it = data.find(key); it != data.end()) {
+        return it->get<T>();
+    }
+    throw AppError(make_error_code(JSONErrorCode::missing_json_key), key);
+}
 
 /**
  * An HTTP method type.
@@ -338,14 +220,10 @@ struct Response {
 
 /// Generic network transport for foreign interfaces.
 struct GenericNetworkTransport {
-    typedef std::unique_ptr<GenericNetworkTransport> (*network_transport_factory)();
-
-public:
+    using NetworkTransportFactory = std::function<std::unique_ptr<GenericNetworkTransport>()>;
     virtual void send_request_to_server(const Request request,
                                         std::function<void(const Response)> completionBlock) = 0;
     virtual ~GenericNetworkTransport() = default;
-    static void set_network_transport_factory(network_transport_factory);
-    static std::unique_ptr<GenericNetworkTransport> get();
 };
 
 } // namespace app
