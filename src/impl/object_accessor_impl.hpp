@@ -112,6 +112,7 @@ public:
     util::Any box(util::Optional<double> v) const { return v; }
     util::Any box(util::Optional<float> v) const { return v; }
     util::Any box(util::Optional<int64_t> v) const { return v; }
+    util::Any box(util::Optional<ObjectId> v) const { return v; }
     util::Any box(Obj) const;
 
     // Any properties are only supported by the Cocoa binding to enable reading
@@ -226,6 +227,12 @@ template<>
 inline util::Optional<float> CppContext::unbox(util::Any& v, CreatePolicy, ObjKey) const
 {
     return v.has_value() ? util::make_optional(unbox<float>(v)) : util::none;
+}
+
+template<>
+inline util::Optional<ObjectId> CppContext::unbox(util::Any& v, CreatePolicy, ObjKey) const
+{
+    return v.has_value() ? util::make_optional(unbox<ObjectId>(v)) : util::none;
 }
 
 template<>

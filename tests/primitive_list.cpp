@@ -163,6 +163,20 @@ struct UnboxedOptional : BaseT {
     }
 };
 
+// Override default value added to an Optional<Decimal> list given that the default constructor
+// creates '0' instead of 'null' for this type
+template<>
+struct UnboxedOptional<::Decimal> : ::Decimal {
+    static PropertyType property_type() { return Decimal::property_type()|PropertyType::Nullable; }
+    static auto values() -> decltype(::Decimal::values())
+    {
+        auto ret = ::Decimal::values();
+        ret.push_back(typename ::Decimal::Type(realm::null()));
+        return ret;
+    }
+};
+
+
 template<typename T>
 T get(Mixed) { abort(); }
 
@@ -171,6 +185,7 @@ template<> float get(Mixed m) { return m.get_type() == type_Float ? m.get_float(
 template<> double get(Mixed m) { return m.get_double(); }
 template<> Timestamp get(Mixed m) { return m.get_timestamp(); }
 template<> Decimal128 get(Mixed m) { return m.get<Decimal128>(); }
+template<> ObjectId get(Mixed m) { return m.get<ObjectId>(); }
 
 namespace realm {
 template<typename T>
@@ -262,38 +277,9 @@ struct StringMaker<util::None> {
 };
 } // namespace Catch
 
-struct less {
-    template<class T, class U>
-    auto operator()(T&& a, U&& b) const noexcept { return a < b; }
-};
-struct greater {
-    template<class T, class U>
-    auto operator()(T&& a, U&& b) const noexcept { return a > b; }
-};
-
-template<>
-auto less::operator()<Timestamp&, Timestamp&>(Timestamp& a, Timestamp& b) const noexcept
-{
-    if (b.is_null())
-        return false;
-    if (a.is_null())
-        return true;
-    return a < b;
-}
-
-template<>
-auto greater::operator()<Timestamp&, Timestamp&>(Timestamp& a, Timestamp& b) const noexcept
-{
-    if (a.is_null())
-        return false;
-    if (b.is_null())
-        return true;
-    return a > b;
-}
-
 TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::Double, ::String, ::Binary, ::Date, ::OID, ::Decimal,
-                   BoxedOptional<::Int>, BoxedOptional<::Bool>, BoxedOptional<::Float>, BoxedOptional<::Double>,
-                   UnboxedOptional<::String>, UnboxedOptional<::Binary>, UnboxedOptional<::Date>)
+                   BoxedOptional<::Int>, BoxedOptional<::Bool>, BoxedOptional<::Float>, BoxedOptional<::Double>, BoxedOptional<::OID>,
+                   UnboxedOptional<::String>, UnboxedOptional<::Binary>, UnboxedOptional<::Date>, UnboxedOptional<::Decimal>)
 {
     auto values = TestType::values();
     using T = typename TestType::Type;
@@ -563,14 +549,14 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
     }
     SECTION("sorted index_of()") {
         auto sorted = list.sort({{"self", true}});
-        std::sort(begin(values), end(values), less());
+        std::sort(begin(values), end(values), std::less<>());
         for (size_t i = 0; i < values.size(); ++i) {
             CAPTURE(i);
             REQUIRE(sorted.index_of<T>(values[i]) == i);
         }
 
         sorted = list.sort({{"self", false}});
-        std::sort(begin(values), end(values), greater());
+        std::sort(begin(values), end(values), std::greater<>());
         for (size_t i = 0; i < values.size(); ++i) {
             CAPTURE(i);
             REQUIRE(sorted.index_of<T>(values[i]) == i);
@@ -594,15 +580,23 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
 
         auto sorted = list.sort(SortDescriptor({{col}}, {true}));
         auto sorted2 = list.sort({{"self", true}});
-        std::sort(begin(values), end(values), less());
+        auto sorted3 = results.sort(SortDescriptor({{col}}, {true}));
+        auto sorted4 = results.sort({{"self", true}});
+        std::sort(begin(values), end(values), std::less<>());
         REQUIRE(sorted == values);
         REQUIRE(sorted2 == values);
+        REQUIRE(sorted3 == values);
+        REQUIRE(sorted4 == values);
 
         sorted = list.sort(SortDescriptor({{col}}, {false}));
         sorted2 = list.sort({{"self", false}});
-        std::sort(begin(values), end(values), greater());
+        sorted3 = results.sort(SortDescriptor({{col}}, {false}));
+        sorted4 = results.sort({{"self", false}});
+        std::sort(begin(values), end(values), std::greater<>());
         REQUIRE(sorted == values);
         REQUIRE(sorted2 == values);
+        REQUIRE(sorted3 == values);
+        REQUIRE(sorted4 == values);
 
         auto execption_string =
             util::format("Cannot sort on key path 'not self': arrays of '%1' can only be sorted on 'self'",
@@ -623,6 +617,7 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
         REQUIRE(undistinct == values2);
 
         auto distinct = results.distinct(DistinctDescriptor({{col}}));
+
         auto distinct2 = results.distinct({"self"});
         REQUIRE(distinct == values);
         REQUIRE(distinct2 == values);
@@ -654,55 +649,57 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
     SECTION("min()") {
         if (!TestType::can_minmax()) {
             REQUIRE_THROWS(list.min());
-            // REQUIRE_THROWS(results.min());
+            REQUIRE_THROWS(results.min());
             return;
         }
 
         REQUIRE(get<W>(*list.min()) == TestType::min());
-        // REQUIRE(get<W>(*results.min()) == TestType::min());
+        REQUIRE(get<W>(*results.min()) == TestType::min());
         list.remove_all();
         REQUIRE(list.min() == util::none);
-        // REQUIRE(results.min() == util::none);
+        REQUIRE(results.min() == util::none);
     }
 
     SECTION("max()") {
         if (!TestType::can_minmax()) {
             REQUIRE_THROWS(list.max());
-            // REQUIRE_THROWS(results.max());
+            REQUIRE_THROWS(results.max());
             return;
         }
 
         REQUIRE(get<W>(*list.max()) == TestType::max());
-        // REQUIRE(get<W>(*results.max()) == TestType::max());
+        REQUIRE(get<W>(*results.max()) == TestType::max());
         list.remove_all();
         REQUIRE(list.max() == util::none);
-        // REQUIRE(results.max() == util::none);
+        REQUIRE(results.max() == util::none);
     }
 
     SECTION("sum()") {
         if (!TestType::can_sum()) {
             REQUIRE_THROWS(list.sum());
+            REQUIRE_THROWS(results.sum());
             return;
         }
 
         REQUIRE(get<W>(list.sum()) == TestType::sum());
-        // REQUIRE(get<W>(*results.sum()) == TestType::sum());
+        REQUIRE(get<W>(*results.sum()) == TestType::sum());
         list.remove_all();
         REQUIRE(get<W>(list.sum()) == W{});
-        // REQUIRE(get<W>(*results.sum()) == W{});
+        REQUIRE(get<W>(*results.sum()) == W{});
     }
 
     SECTION("average()") {
         if (!TestType::can_average()) {
             REQUIRE_THROWS(list.average());
+            REQUIRE_THROWS(results.average());
             return;
         }
 
         REQUIRE(get<typename TestType::AvgType>(*list.average()) == TestType::average());
-        // REQUIRE(*results.average() == TestType::average());
+        REQUIRE(results.average()->get<typename TestType::AvgType>() == TestType::average());
         list.remove_all();
         REQUIRE(list.average() == util::none);
-        // REQUIRE(results.average() == util::none);
+        REQUIRE(results.average() == util::none);
     }
 
     SECTION("operator==()") {

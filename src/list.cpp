@@ -482,6 +482,7 @@ REALM_PRIMITIVE_LIST_TYPE(util::Optional<bool>)
 REALM_PRIMITIVE_LIST_TYPE(util::Optional<int64_t>)
 REALM_PRIMITIVE_LIST_TYPE(util::Optional<float>)
 REALM_PRIMITIVE_LIST_TYPE(util::Optional<double>)
+REALM_PRIMITIVE_LIST_TYPE(util::Optional<ObjectId>)
 
 #undef REALM_PRIMITIVE_LIST_TYPE
 } // namespace realm
