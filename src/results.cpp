@@ -1035,29 +1035,27 @@ REALM_RESULTS_TYPE(util::Optional<double>)
 
 #undef REALM_RESULTS_TYPE
 
-Results Results::freeze(SharedRealm frozen_realm)
+Results Results::freeze(std::shared_ptr<Realm> const& frozen_realm)
 {
     util::CheckedUniqueLock lock(m_mutex);
     if (m_mode == Mode::Empty)
         return *this;
-    auto& transaction = frozen_realm->transaction();
-    REALM_ASSERT(transaction.get_version() == m_realm->read_transaction_version().version);
     switch (m_mode) {
         case Mode::Table:
-            return Results(std::move(frozen_realm), transaction.import_copy_of(m_table));
+            return Results(frozen_realm, frozen_realm->import_copy_of(m_table));
         case Mode::List:
-            return Results(std::move(frozen_realm), transaction.import_copy_of(*m_list), m_descriptor_ordering);
+            return Results(frozen_realm, frozen_realm->import_copy_of(*m_list), m_descriptor_ordering);
         case Mode::LinkList: {
-            std::shared_ptr<LnkLst> frozen_ll(transaction.import_copy_of(std::make_unique<LnkLst>(*m_link_list)).release());
+            std::shared_ptr<LnkLst> frozen_ll(frozen_realm->import_copy_of(std::make_unique<LnkLst>(*m_link_list)).release());
 
             // If query/sort was provided for the original Results, mode would have changed to Query, so no need
             // include them here.
-            return Results(std::move(frozen_realm), std::move(frozen_ll));
+            return Results(frozen_realm, std::move(frozen_ll));
         }
         case Mode::Query:
-            return Results(std::move(frozen_realm), *transaction.import_copy_of(m_query, PayloadPolicy::Copy), m_descriptor_ordering);
+            return Results(frozen_realm, *frozen_realm->import_copy_of(m_query, PayloadPolicy::Copy), m_descriptor_ordering);
         case Mode::TableView: {
-            Results results(std::move(frozen_realm), *transaction.import_copy_of(m_table_view, PayloadPolicy::Copy), m_descriptor_ordering);
+            Results results(frozen_realm, *frozen_realm->import_copy_of(m_table_view, PayloadPolicy::Copy), m_descriptor_ordering);
             results.assert_unlocked();
             results.evaluate_query_if_needed(false);
             return results;

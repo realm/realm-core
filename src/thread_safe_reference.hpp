@@ -42,7 +42,7 @@ public:
 
     // Import the object into the destination Realm
     template<typename T>
-    T resolve(std::shared_ptr<Realm>);
+    T resolve(std::shared_ptr<Realm> const&);
 
     explicit operator bool() const noexcept { return !!m_payload; }
 
