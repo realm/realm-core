@@ -349,7 +349,6 @@ public:
         friend class _impl::CollectionNotifier;
         friend class _impl::RealmCoordinator;
         friend class ThreadSafeReference;
-        friend class GlobalNotifier;
         friend class TestHelper;
 
         static Transaction& get_transaction(Realm& realm) { return realm.transaction(); }
