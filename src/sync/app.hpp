@@ -26,11 +26,8 @@
 namespace realm {
 namespace app {
 
-#pragma mark RealmApp
-
 /**
- The `RealmApp` has the fundamental set of methods for communicating with a MongoDB
- Realm application backend.
+ The `App` has the fundamental set of methods for communicating with a MongoDB Realm application backend.
 
  This class provides access to login and authentication.
 
@@ -58,6 +55,181 @@ public:
         realm::util::Optional<uint64_t> default_request_timeout_ms;
     };
 
+    /**
+     * A struct representing a user API key as returned by the App server.
+    */
+    struct UserAPIKey {
+        // The ID of the key.
+        ObjectId id;
+
+        // The actual key. Will only be included in
+        // the response when an API key is first created.
+        Optional<std::string> key;
+
+        // The name of the key.
+        std::string name;
+
+        // Whether or not the key is disabled.
+        bool disabled;
+    };
+
+    /**
+     * A client for the user API key authentication provider which
+     * can be used to create and modify user API keys. This
+     * client should only be used by an authenticated user.
+    */
+    class UserAPIKeyProviderClient {
+    public:
+        /**
+         * Creates a user API key that can be used to authenticate as the current user.
+         *
+         * - parameters:
+         *     - name: The name of the API key to be created.
+         *     - completion_block: A callback to be invoked once the call is complete.
+        */
+        void create_api_key(const std::string& name,
+                            std::function<void(Optional<UserAPIKey>, Optional<AppError>)> completion_block);
+
+        /**
+         * Fetches a user API key associated with the current user.
+         *
+         * - parameters:
+         *     - id: The id of the API key to fetch.
+         *     - completion_block: A callback to be invoked once the call is complete.
+         */
+        void fetch_api_key(const UserAPIKey& api_key,
+                           std::function<void(Optional<UserAPIKey>, Optional<AppError>)> completion_block);
+
+        /**
+         * Fetches the user API keys associated with the current user.
+         *
+         * - parameters:
+         *     - completion_block: A callback to be invoked once the call is complete.
+         */
+        void fetch_api_keys(std::function<void(std::vector<UserAPIKey>, Optional<AppError>)> completion_block);
+
+        /**
+         * Deletes a user API key associated with the current user.
+         *
+         * - parameters:
+         *     - id: The id of the API key to delete.
+         *     - completion_block: A callback to be invoked once the call is complete.
+         */
+        void delete_api_key(const UserAPIKey& api_key,
+                            std::function<void(Optional<AppError>)> completion_block);
+
+        /**
+         * Enables a user API key associated with the current user.
+         *
+         * - parameters:
+         *     - id: The id of the API key to enable.
+         *     - completion_block: A callback to be invoked once the call is complete.
+         */
+        void enable_api_key(const UserAPIKey& api_key,
+                            std::function<void(Optional<AppError>)> completion_block);
+
+        /**
+         * Disables a user API key associated with the current user.
+         *
+         * - parameters:
+         *     - id: The id of the API key to disable.
+         *     - completion_block: A callback to be invoked once the call is complete.
+         */
+        void disable_api_key(const UserAPIKey& api_key,
+                             std::function<void(Optional<AppError>)> completion_block);
+    private:
+        UserAPIKeyProviderClient(App*);
+    };
+
+    /**
+     * A client for the username/password authentication provider which
+     * can be used to obtain a credential for logging in,
+     * and to perform requests specifically related to the username/password provider.
+    */
+    class UsernamePasswordProviderClient {
+    public:
+        /**
+         * Registers a new email identity with the username/password provider,
+         * and sends a confirmation email to the provided address.
+         *
+         * - parameters:
+         *     - email: The email address of the user to register.
+         *     - password: The password that the user created for the new username/password identity.
+         *     - completion_block: A callback to be invoked once the call is complete.
+         */
+        void register_email(const std::string& email,
+                            const std::string& password,
+                            std::function<void(Optional<AppError>)> completion_block);
+
+        /**
+         * Confirms an email identity with the username/password provider.
+         *
+         * - parameters:
+         *     - token: The confirmation token that was emailed to the user.
+         *     - token_id: The confirmation token id that was emailed to the user.
+         *     - completion_block: A callback to be invoked once the call is complete.
+         */
+        void confirm_user(const std::string& token,
+                          const std::string& token_id,
+                          std::function<void(Optional<AppError>)> completion_block);
+
+        /**
+         * Re-sends a confirmation email to a user that has registered but
+         * not yet confirmed their email address.
+         *
+         * - parameters:
+         *     - email: The email address of the user to re-send a confirmation for.
+         *     - completion_block: A callback to be invoked once the call is complete.
+         */
+        void resend_confirmation_email(const std::string& email,
+                                       std::function<void(Optional<AppError>)> completion_block);
+
+        /**
+         * Sends a password reset email to the given email address.
+         *
+         * - parameters:
+         *     - email: The email address of the user to send a password reset email for.
+         *     - completion_block: A callback to be invoked once the call is complete.
+         */
+        void send_reset_password_email(const std::string& email,
+                                       std::function<void(Optional<AppError>)> completion_block);
+
+        /**
+         * Resets the password of an email identity using the
+         * password reset token emailed to a user.
+         *
+         * - parameters:
+         *     - password: The desired new password.
+         *     - token: The password reset token that was emailed to the user.
+         *     - token_id: The password reset token id that was emailed to the user.
+         *     - completion_block: A callback to be invoked once the call is complete.
+         */
+        void reset_password(const std::string& password,
+                            const std::string& token,
+                            const std::string& token_id,
+                            std::function<void(Optional<AppError>)> completion_block);
+
+        /**
+         * Resets the password of an email identity using the
+         * password reset function set up in the application.
+         *
+         * TODO: Add an overloaded version of this method that takes
+         * TODO: raw, non-serialized args.
+         *
+         * - parameters:
+         *     - email: The email address of the user.
+         *     - password: The desired new password.
+         *     - args: A pre-serialized list of arguments. Must be a JSON array.
+         *     - completion_block: A callback to be invoked once the call is complete.
+        */
+        void call_reset_password_function(const std::string& email,
+                                          const std::string& password,
+                                          const std::string& args,
+                                          std::function<void(Optional<AppError>)> completion_block);
+    private:
+        UsernamePasswordProviderClient(App*);
+    };
+
     App(const Config& config);
 
     /**
@@ -74,6 +246,13 @@ public:
     void login_with_credentials(const AppCredentials& credentials,
                                 std::function<void(std::shared_ptr<SyncUser>, Optional<AppError>)> completion_block);
 
+    // Get a provider client for the given class type.
+    template <class T>
+    T provider_client();
+    template<>
+    UserAPIKeyProviderClient provider_client();
+    template<>
+    UsernamePasswordProviderClient provider_client();
 private:
     Config m_config;
     std::string m_base_route;
