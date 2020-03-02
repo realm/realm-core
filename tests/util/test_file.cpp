@@ -144,6 +144,7 @@ SyncServer::SyncServer(StartImmediately start_immediately, std::string local_dir
     config.logger = new TestLogger;
 #endif
     config.history_compaction_clock = this;
+    config.token_expiration_clock = this;
 #if REALM_SYNC_VER_MAJOR > 4 || (REALM_SYNC_VER_MAJOR == 4 && REALM_SYNC_VER_MINOR >= 7)
     config.disable_history_compaction = false;
 #else

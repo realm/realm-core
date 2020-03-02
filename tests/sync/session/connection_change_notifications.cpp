@@ -52,7 +52,9 @@ TEST_CASE("sync: Connection state changes", "[sync]") {
     SyncServer server;
     TestSyncManager init_sync_manager(base_path);
     const std::string realm_base_url = server.base_url();
-    auto user = SyncManager::shared().get_user({ "user", dummy_auth_url }, ENCODE_FAKE_JWT("not_a_real_token"), ENCODE_FAKE_JWT("also_not_a_real_token"));
+    auto user = SyncManager::shared().get_user({ "user", dummy_auth_url },
+                                               ENCODE_FAKE_JWT("not_a_real_token"),
+                                               ENCODE_FAKE_JWT("also_not_a_real_token"));
 
     SECTION("register connection change listener") {
         auto session = sync_session(server, user, "/connection-state-changes-1",
@@ -93,7 +95,7 @@ TEST_CASE("sync: Connection state changes", "[sync]") {
         });
 
         user->log_out();
-        EventLoop::main().run_until([&] { return sessions_are_disconnected(*session); });
+        REQUIRE(sessions_are_disconnected(*session));
         REQUIRE(listener1_called == false);
         REQUIRE(listener2_called == true);
     }

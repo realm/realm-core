@@ -192,7 +192,9 @@ TEST_CASE("sync: log-in", "[sync]") {
     SyncServer server;
     // Disable file-related functionality and metadata functionality for testing purposes.
     TestSyncManager init_sync_manager;
-    auto user = SyncManager::shared().get_user({ "user", dummy_auth_url }, ENCODE_FAKE_JWT("fake_refresh_token"), ENCODE_FAKE_JWT("fake_access_token"));
+    auto user = SyncManager::shared().get_user({ "user", dummy_auth_url },
+                                               ENCODE_FAKE_JWT("fake_refresh_token"),
+                                               ENCODE_FAKE_JWT("fake_access_token"));
 
     SECTION("Can log in") {
         std::atomic<int> error_count(0);
