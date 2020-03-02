@@ -757,6 +757,7 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
         size = initial_size;
     }
     ref_type top_ref;
+    int file_format_version;
     try {
         note_reader_start(this);
         // we'll read header and (potentially) footer
@@ -773,6 +774,7 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
         auto footer = reinterpret_cast<const StreamingFooter*>(map_footer.get_addr() + footer_offset);
         top_ref = validate_header(header, footer, size, path); // Throws
         m_attach_mode = cfg.is_shared ? attach_SharedFile : attach_UnsharedFile;
+        m_data = map_header.get_addr(); // <-- needed below
 
         // Make sure the database is not on streaming format. If we did not do this,
         // a later commit would have to do it. That would require coordination with
@@ -808,9 +810,10 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
                 realm::util::encryption_write_barrier(writable_map, 0);
                 writable_map.sync();
 
-                realm::util::encryption_read_barrier(m_mappings[0], 0, sizeof(Header));
+                realm::util::encryption_read_barrier(map_header, 0, sizeof(Header));
             }
         }
+        file_format_version = get_committed_file_format_version();
     }
     catch (const DecryptionFailed&) {
         note_reader_end(this);
@@ -821,9 +824,6 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
         throw;
     }
     m_baseline = 0;
-    update_reader_view(size);
-    REALM_ASSERT(m_mappings.size());
-    m_data = m_mappings[0].get_addr();
     auto handler = [this]() noexcept { note_reader_end(this); };
     auto reader_end_guard = make_scope_exit(handler);
     // make sure that any call to begin_read cause any slab to be placed in free
@@ -833,7 +833,6 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
     // Ensure clean up, if we need to back out:
     DetachGuard dg(*this);
 
-    int file_format_version = get_committed_file_format_version();
     // initial_mapping.unmap();
     // m_data = nullptr;
 
@@ -885,22 +884,11 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
     }
 
     reset_free_space_tracking();
-    // if the file format is older than version 10 and larger than a section we have
-    // to use the compatibility mapping
-    // FIXME: For now always use compatibility mapping.
-
     static_cast<void>(file_format_version); // silence a warning
-#if 0
-    if (size > get_section_base(1) /* && file_format_version < 10 */) {
-        setup_compatibility_mapping(size);
-        m_data = m_compatibility_mapping.get_addr();
-    }
-    else {
-        update_reader_view(size);
-        REALM_ASSERT(m_mappings.size());
-        m_data = m_mappings[0].get_addr();
-//    }
-#endif
+    update_reader_view(size);
+    REALM_ASSERT(m_mappings.size());
+    m_data = m_mappings[0].get_addr();
+    realm::util::encryption_read_barrier(m_mappings[0], 0, sizeof(Header));
     dg.release();  // Do not detach
     fcg.release(); // Do not close
 #if REALM_ENABLE_ENCRYPTION
