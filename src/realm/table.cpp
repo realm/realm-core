@@ -1735,18 +1735,9 @@ void Table::batch_erase_rows(const KeyColumn& keys)
 
 void Table::clear()
 {
-    Group* g = get_parent_group();
-
-    if (g) {
-        CascadeState state(CascadeState::Mode::Strong, g);
-        m_clusters.remove_all_links(state); // This will also delete objects loosing their last strong link
-    }
-
-    CascadeState state(CascadeState::Mode::None, nullptr);
-    for (auto o : *this) {
-        auto k = o.get_key();
-        m_clusters.erase(k, state);
-    }
+    CascadeState state(CascadeState::Mode::Strong, get_parent_group());
+    m_clusters.clear(state);
+    free_collision_table();
 }
 
 

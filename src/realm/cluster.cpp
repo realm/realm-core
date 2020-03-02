@@ -1894,6 +1894,47 @@ bool ClusterTree::update_from_parent(size_t old_baseline) noexcept
     return was_updated;
 }
 
+void ClusterTree::clear(CascadeState& state)
+{
+    size_t num_cols = get_spec().get_public_column_count();
+    for (size_t col_ndx = 0; col_ndx < num_cols; col_ndx++) {
+        auto col_key = m_owner->spec_ndx2colkey(col_ndx);
+        if (StringIndex* index = m_owner->get_search_index(col_key)) {
+            index->clear();
+        }
+    }
+
+    if (state.m_group) {
+        remove_all_links(state); // This will also delete objects loosing their last strong link
+    }
+
+    // We no longer have "clear table" instruction, so we have to report the removal of each
+    // object individually
+    auto table = m_owner;
+    if (Replication* repl = table->get_repl()) {
+        // Go through all clusters
+        traverse([repl, table](const Cluster* cluster) {
+            auto sz = cluster->node_size();
+            for (size_t i = 0; i < sz; i++) {
+                repl->remove_object(table, cluster->get_real_key(i));
+            }
+            // Continue
+            return false;
+        });
+    }
+
+    m_root->destroy_deep();
+
+    auto leaf = std::make_unique<Cluster>(0, m_root->get_alloc(), *this);
+    leaf->create(m_owner->num_leaf_cols());
+    replace_root(std::move(leaf));
+
+    bump_content_version();
+    bump_storage_version();
+
+    m_size = 0;
+}
+
 void ClusterTree::insert_fast(ObjKey k, const FieldValues& init_values, ClusterNode::State& state)
 {
     ref_type new_sibling_ref = m_root->insert(k, init_values, state);
@@ -2207,7 +2248,6 @@ void ClusterTree::remove_all_links(CascadeState& state)
                 for (size_t i = 0; i < sz; i++) {
                     if (ObjKey key = values.get(i)) {
                         cluster->remove_backlinks(cluster->get_real_key(i), col_key, {key}, state);
-                        values.set(i, ObjKey());
                     }
                 }
             }
@@ -2222,8 +2262,6 @@ void ClusterTree::remove_all_links(CascadeState& state)
                         if (links.size() > 0) {
                             cluster->remove_backlinks(cluster->get_real_key(i), col_key, links.get_all(), state);
                         }
-                        Array::destroy_deep(ref, m_alloc);
-                        values.set(i, 0);
                     }
                 }
             }
