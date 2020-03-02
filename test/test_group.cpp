@@ -1856,13 +1856,16 @@ TEST(Group_RemoveRecursive)
 TEST(Group_IntPrimaryKeyCol)
 {
     Group g;
-    TableRef table = g.add_table_with_primary_key("class_foo", type_Int, "primary");
+    TableRef table = g.add_table_with_primary_key("class_foo", type_Int, "primary", true);
     ColKey primary_key_column = table->get_primary_key_column();
     CHECK(primary_key_column);
     CHECK_NOT(table->has_search_index(primary_key_column));
 
     auto obj = table->create_object_with_primary_key({1});
     CHECK_EQUAL(obj.get<Int>(primary_key_column), 1);
+    auto obj1 = table->create_object_with_primary_key({});
+    CHECK(obj1.is_null(primary_key_column));
+    CHECK_EQUAL(table->size(), 2);
 
     table->set_primary_key_column(ColKey{});
     table->add_search_index(primary_key_column);

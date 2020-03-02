@@ -2049,9 +2049,7 @@ ObjKey Table::find_first(ColKey col_key, T value) const
         }
 
         if (col_key == m_primary_key_col) {
-            GlobalKey object_id{value};
-            ObjKey k = global_to_local_object_id_hashed(object_id);
-            return is_valid(k) ? k : ObjKey();
+            return this->find_primary_key(value);
         }
     }
 
@@ -2656,10 +2654,32 @@ Obj Table::create_object_with_primary_key(const Mixed& primary_key, FieldValues&
     return ret;
 }
 
+ObjKey Table::find_primary_key(Mixed primary_key) const
+{
+    auto primary_key_col = get_primary_key_column();
+    REALM_ASSERT(primary_key_col);
+    DataType type = DataType(primary_key_col.get_type());
+    REALM_ASSERT((primary_key.is_null() && primary_key_col.get_attrs().test(col_attr_Nullable)) ||
+                 primary_key.get_type() == type);
+
+    // Generate local ObjKey
+    GlobalKey object_id{primary_key};
+    ObjKey object_key = global_to_local_object_id_hashed(object_id);
+
+    // Check if existing
+    if (m_clusters.is_valid(object_key)) {
+        auto existing_pk_value = m_clusters.get(object_key).get_any(primary_key_col);
+
+        // It may just be the same object
+        if (existing_pk_value == primary_key) {
+            return object_key;
+        }
+    }
+    return {};
+}
+
 ObjKey Table::get_objkey_from_primary_key(const Mixed& primary_key)
 {
-    if (m_is_embedded)
-        throw LogicError(LogicError::wrong_kind_of_table);
     auto primary_key_col = get_primary_key_column();
     REALM_ASSERT(primary_key_col);
     DataType type = DataType(primary_key_col.get_type());
