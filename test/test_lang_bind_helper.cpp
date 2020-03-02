@@ -5976,7 +5976,7 @@ TEST(LangBindHelper_ArrayXoverMapping)
         auto tr = db->start_read();
         std::cout << "rereading..." << std::endl;
         auto tbl = tr->get_table("my_table");
-        for (auto i = 0; i < 1000; ++i) {
+        for (auto i = 0; i < 100; ++i) {
             auto o = tbl->get_object(i);
             StringData str = o.get<String>(my_col);
             for (auto j = 0; j < 1000000; ++j)

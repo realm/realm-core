@@ -128,8 +128,6 @@ void SlabAlloc::detach() noexcept
     m_translation_table_size = 0;
     set_read_only(true);
     purge_old_mappings(static_cast<uint64_t>(-1), 0);
-    m_compatibility_mapping.unmap();
-    m_sections_in_compatibility_mapping = 0;
     switch (m_attach_mode) {
         case attach_None:
             break;
@@ -641,7 +639,7 @@ int SlabAlloc::get_committed_file_format_version() const noexcept
         // if we have mapped a file, m_mappings will have at least one mapping and
         // the first will be to the start of the file. Don't come here, if we're
         // just attaching a buffer. They don't have mappings.
-        realm::util::encryption_read_barrier(m_mappings[0], 0, sizeof(Header));
+        realm::util::encryption_read_barrier(m_mappings[0].primary_mapping, 0, sizeof(Header));
     }
     const Header& header = *reinterpret_cast<const Header*>(m_data);
     int slot_selector = ((header.m_flags & SlabAlloc::flags_SelectBit) != 0 ? 1 : 0);
@@ -887,29 +885,14 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
     static_cast<void>(file_format_version); // silence a warning
     update_reader_view(size);
     REALM_ASSERT(m_mappings.size());
-    m_data = m_mappings[0].get_addr();
-    realm::util::encryption_read_barrier(m_mappings[0], 0, sizeof(Header));
+    m_data = m_mappings[0].primary_mapping.get_addr();
+    realm::util::encryption_read_barrier(m_mappings[0].primary_mapping, 0, sizeof(Header));
     dg.release();  // Do not detach
     fcg.release(); // Do not close
 #if REALM_ENABLE_ENCRYPTION
     m_realm_file_info = util::get_file_info_for_file(m_file);
 #endif
     return top_ref;
-}
-
-void SlabAlloc::setup_compatibility_mapping(size_t file_size)
-{
-    m_sections_in_compatibility_mapping = int(get_section_index(file_size));
-    REALM_ASSERT(m_sections_in_compatibility_mapping);
-    m_compatibility_mapping = util::File::Map<char>(get_file(), util::File::access_ReadOnly, file_size);
-    // fake that we've only mapped the number of full sections in order
-    // to allow additional mappings to start aligned to a section boundary,
-    // even though the compatibility mapping may extend further.
-    m_baseline = get_section_base(m_sections_in_compatibility_mapping);
-    update_reader_view(file_size);
-    if (m_mappings.size() == 0) {
-        rebuild_translations(true, m_sections_in_compatibility_mapping);
-    }
 }
 
 void SlabAlloc::note_reader_start(const void* reader_id)
@@ -1123,6 +1106,7 @@ inline bool randomly_false_in_debug(bool x)
 
   There are two mapping tables:
 
+  * FIXME - update description.....
   * m_mappings: This is the "source of truth" about what the current mapping is.
     It is only accessed under lock.
   * m_fast_mapping: This is generated to match m_mappings, but is also accessed without
@@ -1157,20 +1141,21 @@ void SlabAlloc::update_reader_view(size_t file_size)
     // Extend mapping by adding sections, potentially replacing older sections
     auto old_slab_base = align_size_to_section_boundary(old_baseline);
     size_t old_num_sections = get_section_index(old_slab_base);
-    REALM_ASSERT(m_mappings.size() == old_num_sections - m_sections_in_compatibility_mapping);
+    REALM_ASSERT(m_mappings.size() == old_num_sections);
     m_baseline.store(file_size, std::memory_order_relaxed);
     {
         // 0. Special case: figure out if extension is to be done entirely within a single
         // existing mapping. This is the case if the new baseline (which must be larger
         // then the old baseline) is still below the old base of the slab area.
-        auto mapping_index = old_num_sections - 1 - m_sections_in_compatibility_mapping;
+        auto mapping_index = old_num_sections - 1;
         if (file_size < old_slab_base) {
             size_t section_start_offset = get_section_base(old_num_sections - 1);
             size_t section_size = file_size - section_start_offset;
             requires_new_translation = true;
             // save the old mapping/keep it open
-            m_old_mappings.emplace_back(m_youngest_live_version, std::move(m_mappings[mapping_index]));
-            m_mappings[mapping_index] =
+            m_old_mappings.emplace_back(m_youngest_live_version,
+                                        std::move(m_mappings[mapping_index].primary_mapping));
+            m_mappings[mapping_index].primary_mapping =
                 util::File::Map<char>(m_file, section_start_offset, File::access_ReadOnly, section_size);
             m_mapping_version++;
         }
@@ -1186,8 +1171,9 @@ void SlabAlloc::update_reader_view(size_t file_size)
                 size_t section_reservation = get_section_base(old_num_sections) - section_start_offset;
                 REALM_ASSERT(section_size == section_reservation);
                 // save the old mapping/keep it open
-                m_old_mappings.emplace_back(m_youngest_live_version, std::move(m_mappings[mapping_index]));
-                m_mappings[mapping_index] =
+                m_old_mappings.emplace_back(m_youngest_live_version,
+                                            std::move(m_mappings[mapping_index].primary_mapping));
+                m_mappings[mapping_index].primary_mapping =
                     util::File::Map<char>(m_file, section_start_offset, File::access_ReadOnly, section_size);
                 m_mapping_version++;
             }
@@ -1195,36 +1181,34 @@ void SlabAlloc::update_reader_view(size_t file_size)
             // 2. add any full mappings
             //  - figure out how many full mappings we need to match the requested size
             auto new_slab_base = align_size_to_section_boundary(file_size);
-            size_t num_full_mappings = get_section_index(file_size) - m_sections_in_compatibility_mapping;
-            size_t num_mappings = get_section_index(new_slab_base) - m_sections_in_compatibility_mapping;
-            size_t old_num_mappings = old_num_sections - m_sections_in_compatibility_mapping;
+            size_t num_full_mappings = get_section_index(file_size);
+            size_t num_mappings = get_section_index(new_slab_base);
+            size_t old_num_mappings = old_num_sections;
             if (num_mappings > old_num_mappings) {
                 // we can't just resize the vector since Maps do not support copy constructionn:
                 // m_mappings.resize(num_mappings);
-                std::vector<util::File::Map<char>> next_mapping(num_mappings);
+                std::vector<MapEntry> next_mapping(num_mappings);
                 for (size_t i = 0; i < old_num_mappings; ++i) {
-                    next_mapping[i] = std::move(m_mappings[i]);
+                    next_mapping[i].primary_mapping = std::move(m_mappings[i].primary_mapping);
                 }
                 m_mappings = std::move(next_mapping);
             }
 
             for (size_t k = old_num_mappings; k < num_full_mappings; ++k) {
-                size_t section_start_offset = get_section_base(k + m_sections_in_compatibility_mapping);
-                size_t section_size =
-                    get_section_base(1 + k + m_sections_in_compatibility_mapping) - section_start_offset;
-                m_mappings[k] =
+                size_t section_start_offset = get_section_base(k);
+                size_t section_size = get_section_base(1 + k) - section_start_offset;
+                m_mappings[k].primary_mapping =
                     util::File::Map<char>(m_file, section_start_offset, File::access_ReadOnly, section_size);
             }
 
             // 3. add a final partial mapping if needed
             if (file_size < new_slab_base) {
                 REALM_ASSERT(num_mappings == num_full_mappings + 1);
-                size_t section_start_offset =
-                    get_section_base(num_full_mappings + m_sections_in_compatibility_mapping);
+                size_t section_start_offset = get_section_base(num_full_mappings);
                 size_t section_size = file_size - section_start_offset;
                 util::File::Map<char> mapping;
                 mapping = util::File::Map<char>(m_file, section_start_offset, File::access_ReadOnly, section_size);
-                m_mappings[num_full_mappings] = std::move(mapping);
+                m_mappings[num_full_mappings].primary_mapping = std::move(mapping);
             }
         }
     }
@@ -1282,7 +1266,7 @@ void SlabAlloc::rebuild_translations(bool requires_new_translation, size_t old_n
 {
     size_t free_space_size = m_slabs.size();
     auto num_mappings = m_mappings.size();
-    if (m_translation_table_size < num_mappings + free_space_size + m_sections_in_compatibility_mapping) {
+    if (m_translation_table_size < num_mappings + free_space_size) {
         requires_new_translation = true;
     }
     RefTranslation* new_translation_table = m_ref_translation_ptr;
@@ -1291,33 +1275,55 @@ void SlabAlloc::rebuild_translations(bool requires_new_translation, size_t old_n
         // may be in progress concurrently
         if (m_translation_table_size)
             m_old_translations.emplace_back(m_youngest_live_version, m_ref_translation_ptr.load());
-        m_translation_table_size = num_mappings + free_space_size + m_sections_in_compatibility_mapping;
+        m_translation_table_size = num_mappings + free_space_size;
         new_translation_table = new RefTranslation[m_translation_table_size];
-        for (int i = 0; i < m_sections_in_compatibility_mapping; ++i) {
-            new_translation_table[i].mapping_addr = m_compatibility_mapping.get_addr() + get_section_base(i);
-            REALM_ASSERT(new_translation_table[i].mapping_addr);
-#if REALM_ENABLE_ENCRYPTION
-            new_translation_table[i].encrypted_mapping = m_compatibility_mapping.get_encrypted_mapping();
-#endif
-        }
         old_num_sections = 0;
     }
     for (size_t k = old_num_sections; k < num_mappings; ++k) {
-        auto i = k + m_sections_in_compatibility_mapping;
-        new_translation_table[i].mapping_addr = m_mappings[k].get_addr();
+        auto i = k;
+        new_translation_table[i].mapping_addr = m_mappings[k].primary_mapping.get_addr();
         REALM_ASSERT(new_translation_table[i].mapping_addr);
 #if REALM_ENABLE_ENCRYPTION
-        new_translation_table[i].encrypted_mapping = m_mappings[k].get_encrypted_mapping();
+        new_translation_table[i].encrypted_mapping = m_mappings[k].primary_mapping.get_encrypted_mapping();
 #endif
     }
     for (size_t k = 0; k < free_space_size; ++k) {
         char* base = m_slabs[k].addr;
-        auto i = num_mappings + m_sections_in_compatibility_mapping + k;
+        auto i = num_mappings + k;
         REALM_ASSERT(base);
         new_translation_table[i].mapping_addr = base;
     }
     m_ref_translation_ptr = new_translation_table;
 }
+
+void SlabAlloc::get_or_add_xover_mapping(RefTranslation& txl, size_t index, size_t offset, size_t size)
+{
+    std::lock_guard<std::mutex> lock(m_mapping_mutex);
+    if (txl.xover_mapping_addr) {
+        // some other thread already added a mapping
+        // it MUST have been for the exact same address:
+        REALM_ASSERT(offset == txl.primary_mapping_limit.load(std::memory_order_acquire));
+        return;
+    }
+    MapEntry* map_entry = &m_mappings[index];
+    REALM_ASSERT(map_entry->primary_mapping.get_addr() == txl.mapping_addr);
+    if (!map_entry->xover_mapping.is_attached()) {
+        // Create a xover mapping
+        auto file_offset = get_section_base(index) + offset;
+        auto end_offset = file_offset + size;
+        auto mapping_file_offset = file_offset & ~(page_size() - 1);
+        auto minimal_mapping_size = end_offset - mapping_file_offset;
+        util::File::Map<char> mapping(m_file, mapping_file_offset, File::access_ReadOnly, minimal_mapping_size);
+        map_entry->xover_mapping = std::move(mapping);
+    }
+    txl.xover_mapping_base = offset & ~(page_size() - 1);
+    txl.xover_mapping_addr = map_entry->xover_mapping.get_addr();
+#if REALM_ENABLE_ENCRYPTION
+    txl.xover_encrypted_mapping = map_entry->xover_mapping.get_encrypted_mapping();
+#endif
+    txl.primary_mapping_limit.store(offset, std::memory_order_release);
+}
+
 
 void SlabAlloc::purge_old_mappings(uint64_t oldest_live_version, uint64_t youngest_live_version)
 {

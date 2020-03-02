@@ -217,7 +217,10 @@ protected:
     /// then entirely the responsibility of the caller that the memory
     /// is not modified by way of the returned memory pointer.
     virtual char* do_translate(ref_type ref) const noexcept = 0;
-
+    virtual void get_or_add_xover_mapping(RefTranslation&, size_t, size_t, size_t)
+    {
+        REALM_ASSERT(false);
+    };
     Allocator() noexcept;
     size_t get_section_index(size_t pos) const noexcept;
     inline size_t get_section_base(size_t index) const noexcept;
@@ -320,6 +323,12 @@ public:
     {
         switch_underlying_allocator(*m_alloc);
         set_read_only(!writable);
+    }
+
+protected:
+    virtual void get_or_add_xover_mapping(RefTranslation& txl, size_t index, size_t offset, size_t size)
+    {
+        m_alloc->get_or_add_xover_mapping(txl, index, offset, size);
     }
 
 private:
