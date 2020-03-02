@@ -280,6 +280,9 @@ template <typename T, typename U, typename... Ts>
 struct is_any<T, U, Ts...> : is_any<T, Ts...> {
 };
 
+template <typename... Ts>
+inline constexpr bool is_any_v = is_any<Ts...>::value;
+
 
 // Use realm::safe_equal() instead of std::equal() if one of the parameters can be a null pointer.
 template <class InputIterator1, class InputIterator2>
