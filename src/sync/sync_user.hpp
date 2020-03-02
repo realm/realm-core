@@ -204,10 +204,6 @@ public:
     // Optionally set a context factory. If so, must be set before any sessions are created.
     static void set_binding_context_factory(SyncUserContextFactory factory);
 
-    // Internal APIs. Do not call.
-    void register_management_session(const std::string&);
-    void register_permission_session(const std::string&);
-
 private:
     static SyncUserContextFactory s_binding_context_factory;
     static std::mutex s_binding_context_factory_mutex;
@@ -218,9 +214,6 @@ private:
 
     // A locally assigned UUID intended to provide a level of indirection for various features.
     std::string m_local_identity;
-
-    std::weak_ptr<SyncSession> m_management_session;
-    std::weak_ptr<SyncSession> m_permission_session;
 
     // The auth server URL associated with this user. Set upon creation. The empty string for
     // auth token users.

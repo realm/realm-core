@@ -249,10 +249,7 @@ public:
     // Get a provider client for the given class type.
     template <class T>
     T provider_client();
-    template<>
-    UserAPIKeyProviderClient provider_client();
-    template<>
-    UsernamePasswordProviderClient provider_client();
+
 private:
     Config m_config;
     std::string m_base_route;
