@@ -43,7 +43,8 @@ struct TaggedBool {
     template <typename Bool, typename = typename std::enable_if<std::is_same<Bool, bool>::value>::type>
     constexpr TaggedBool(Bool v) noexcept : m_value(v) {}
 
-    constexpr TaggedBool(TaggedBool const& v) noexcept : m_value(v.m_value) {}
+    constexpr TaggedBool(TaggedBool const& v) noexcept = default;
+    constexpr TaggedBool& operator=(TaggedBool const& v) noexcept = default;
 
     constexpr operator bool() const noexcept { return m_value; }
     constexpr TaggedBool operator!() const noexcept { return TaggedBool{!m_value}; }

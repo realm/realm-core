@@ -25,8 +25,6 @@
 #include <curl/curl.h>
 #include <json.hpp>
 
-#pragma mark - Integration Tests
-
 // temporarily disable these tests for now,
 // but allow opt-in by building with REALM_ENABLE_AUTH_TESTS=1
 #ifndef REALM_ENABLE_AUTH_TESTS
@@ -128,8 +126,6 @@ TEST_CASE("app: login_with_credentials integration", "[sync][app]") {
 }
 
 
-
-#pragma mark - Unit Tests
 
 class UnitTestTransport : public GenericNetworkTransport {
 
