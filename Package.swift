@@ -42,5 +42,5 @@ let package = Package(
                 .define("REALM_VERSION_STRING", to: "\"\(versionStr)\""),
             ]),
     ],
-    cxxLanguageStandard: .cxx14
+    cxxLanguageStandard: .cxx1z
 )
