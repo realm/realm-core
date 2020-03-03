@@ -365,7 +365,7 @@ public:
     virtual ConstTableRef get_base_table() const = 0;
     virtual std::string description(util::serializer::SerialisationState& state) const = 0;
 
-    virtual std::unique_ptr<Expression> clone(Transaction*) const = 0;
+    virtual std::unique_ptr<Expression> clone() const = 0;
 };
 
 template <typename T, typename... Args>
@@ -380,7 +380,7 @@ public:
     {
     }
 
-    virtual std::unique_ptr<Subexpr> clone(Transaction* = nullptr) const = 0;
+    virtual std::unique_ptr<Subexpr> clone() const = 0;
 
     // When the user constructs a query, it always "belongs" to one single base/parent table (regardless of
     // any links or not and regardless of any queries assembled with || or &&). When you do a Query::find(),
@@ -1202,7 +1202,7 @@ struct TrueExpression : Expression {
     {
         return "TRUEPREDICATE";
     }
-    std::unique_ptr<Expression> clone(Transaction*) const override
+    std::unique_ptr<Expression> clone() const override
     {
         return std::unique_ptr<Expression>(new TrueExpression(*this));
     }
@@ -1226,7 +1226,7 @@ struct FalseExpression : Expression {
     {
         return nullptr;
     }
-    std::unique_ptr<Expression> clone(Transaction*) const override
+    std::unique_ptr<Expression> clone() const override
     {
         return std::unique_ptr<Expression>(new FalseExpression(*this));
     }
@@ -1518,7 +1518,7 @@ public:
         return not_found; // no match
     }
 
-    std::unique_ptr<Subexpr> clone(Transaction*) const override
+    std::unique_ptr<Subexpr> clone() const override
     {
         return make_subexpr<Value<T>>(*this);
     }
@@ -1535,7 +1535,7 @@ public:
         init(false, 1, m_string);
     }
 
-    std::unique_ptr<Subexpr> clone(Transaction*) const override
+    std::unique_ptr<Subexpr> clone() const override
     {
         return std::unique_ptr<Subexpr>(new ConstantStringValue(*this));
     }
@@ -2274,7 +2274,7 @@ public:
         return state.describe_columns(m_link_map, m_column_key);
     }
 
-    std::unique_ptr<Subexpr> clone(Transaction* = nullptr) const override
+    std::unique_ptr<Subexpr> clone() const override
     {
         return make_subexpr<Columns<T>>(static_cast<const Columns<T>&>(*this));
     }
@@ -2293,7 +2293,7 @@ public:
 
     SizeOperator<T> size()
     {
-        return SizeOperator<T>(this->clone(nullptr));
+        return SizeOperator<T>(this->clone());
     }
 
 private:
@@ -2507,7 +2507,7 @@ public:
         return state.describe_columns(m_link_map, ColKey()) + (has_links ? " != NULL" : " == NULL");
     }
 
-    std::unique_ptr<Expression> clone(Transaction*) const override
+    std::unique_ptr<Expression> clone() const override
     {
         return std::unique_ptr<Expression>(new UnaryLinkCompare(*this));
     }
@@ -2534,7 +2534,7 @@ public:
     {
     }
 
-    std::unique_ptr<Subexpr> clone(Transaction*) const override
+    std::unique_ptr<Subexpr> clone() const override
     {
         return make_subexpr<LinkCount>(*this);
     }
@@ -2597,7 +2597,7 @@ public:
     {
     }
 
-    std::unique_ptr<Subexpr> clone(Transaction*) const override
+    std::unique_ptr<Subexpr> clone() const override
     {
         return make_subexpr<BacklinkCount<Int>>(*this);
     }
@@ -2666,6 +2666,11 @@ public:
     {
     }
 
+    SizeOperator(const SizeOperator& other)
+        : m_expr(other.m_expr->clone())
+    {
+    }
+
     // See comment in base class
     void set_base_table(ConstTableRef table) override
     {
@@ -2716,17 +2721,12 @@ public:
         return "@size";
     }
 
-    std::unique_ptr<Subexpr> clone(Transaction* tr) const override
+    std::unique_ptr<Subexpr> clone() const override
     {
-        return std::unique_ptr<Subexpr>(new SizeOperator(*this, tr));
+        return std::unique_ptr<Subexpr>(new SizeOperator(*this));
     }
 
 private:
-    SizeOperator(const SizeOperator& other, Transaction* tr)
-        : m_expr(other.m_expr->clone(tr))
-    {
-    }
-
     std::unique_ptr<TExpr> m_expr;
 };
 
@@ -2758,7 +2758,7 @@ public:
         return util::serializer::print_value(m_key);
     }
 
-    std::unique_ptr<Subexpr> clone(Transaction*) const override
+    std::unique_ptr<Subexpr> clone() const override
     {
         return std::unique_ptr<Subexpr>(new KeyValue(*this));
     }
@@ -2849,7 +2849,7 @@ public:
         return state.describe_columns(m_link_map, ColKey());
     }
 
-    std::unique_ptr<Subexpr> clone(Transaction*) const override
+    std::unique_ptr<Subexpr> clone() const override
     {
         return std::unique_ptr<Subexpr>(new Columns<Link>(*this));
     }
@@ -2934,7 +2934,7 @@ public:
     {
     }
 
-    std::unique_ptr<Subexpr> clone(Transaction*) const override
+    std::unique_ptr<Subexpr> clone() const override
     {
         return make_subexpr<Columns<Lst<T>>>(*this);
     }
@@ -3056,7 +3056,7 @@ public:
             }
         }
     }
-    std::unique_ptr<Subexpr> clone(Transaction*) const override
+    std::unique_ptr<Subexpr> clone() const override
     {
         return std::unique_ptr<Subexpr>(new ColumnListSize<T>(*this));
     }
@@ -3086,7 +3086,7 @@ public:
     {
     }
 
-    std::unique_ptr<Subexpr> clone(Transaction*) const override
+    std::unique_ptr<Subexpr> clone() const override
     {
         return make_subexpr<ListColumnAggregate>(*this);
     }
@@ -3255,7 +3255,7 @@ public:
         return *this;
     }
 
-    std::unique_ptr<Subexpr> clone(Transaction*) const override
+    std::unique_ptr<Subexpr> clone() const override
     {
         return make_subexpr<Columns<T>>(*this);
     }
@@ -3483,7 +3483,7 @@ public:
     {
     }
 
-    std::unique_ptr<Subexpr> clone(Transaction*) const override
+    std::unique_ptr<Subexpr> clone() const override
     {
         return make_subexpr<SubColumns<T>>(*this);
     }
@@ -3554,7 +3554,7 @@ public:
     {
     }
 
-    std::unique_ptr<Subexpr> clone(Transaction*) const override
+    std::unique_ptr<Subexpr> clone() const override
     {
         return make_subexpr<SubColumnAggregate>(*this);
     }
@@ -3621,6 +3621,8 @@ public:
         : m_query(q)
         , m_link_map(link_map)
     {
+        REALM_ASSERT(q.produces_results_in_table_order());
+        REALM_ASSERT(m_query.get_table() == m_link_map.get_target_table());
     }
 
     ConstTableRef get_base_table() const override
@@ -3631,6 +3633,7 @@ public:
     void set_base_table(ConstTableRef table) override
     {
         m_link_map.set_base_table(table);
+        m_query.set_table(m_link_map.get_target_table().cast_away_const());
     }
 
     void set_cluster(const Cluster* cluster) override
@@ -3669,21 +3672,12 @@ public:
         return desc;
     }
 
-    std::unique_ptr<Subexpr> clone(Transaction* tr) const override
+    std::unique_ptr<Subexpr> clone() const override
     {
-        if (tr)
-            return std::unique_ptr<Subexpr>(new SubQueryCount(*this, tr));
-
         return make_subexpr<SubQueryCount>(*this);
     }
 
 private:
-    SubQueryCount(const SubQueryCount& other, Transaction* tr)
-        : m_link_map(other.m_link_map)
-    {
-        m_query = Query(other.m_query, tr, PayloadPolicy::Copy);
-    }
-
     Query m_query;
     LinkMap m_link_map;
 };
@@ -3882,8 +3876,8 @@ public:
     {
     }
 
-    UnaryOperator(const UnaryOperator& other, Transaction* tr)
-        : m_left(other.m_left->clone(tr))
+    UnaryOperator(const UnaryOperator& other)
+        : m_left(other.m_left->clone())
     {
     }
 
@@ -3939,9 +3933,9 @@ public:
         return "";
     }
 
-    std::unique_ptr<Subexpr> clone(Transaction* tr) const override
+    std::unique_ptr<Subexpr> clone() const override
     {
-        return make_subexpr<UnaryOperator>(*this, tr);
+        return make_subexpr<UnaryOperator>(*this);
     }
 
 private:
@@ -3959,9 +3953,9 @@ public:
     {
     }
 
-    Operator(const Operator& other, Transaction* tr)
-        : m_left(other.m_left->clone(tr))
-        , m_right(other.m_right->clone(tr))
+    Operator(const Operator& other)
+        : m_left(other.m_left->clone())
+        , m_right(other.m_right->clone())
     {
     }
 
@@ -4030,9 +4024,9 @@ public:
         return s;
     }
 
-    std::unique_ptr<Subexpr> clone(Transaction* tr) const override
+    std::unique_ptr<Subexpr> clone() const override
     {
-        return make_subexpr<Operator>(*this, tr);
+        return make_subexpr<Operator>(*this);
     }
 
 private:
@@ -4197,15 +4191,15 @@ public:
                                              m_right->description(state));
     }
 
-    std::unique_ptr<Expression> clone(Transaction* tr) const override
+    std::unique_ptr<Expression> clone() const override
     {
-        return std::unique_ptr<Expression>(new Compare(*this, tr));
+        return std::unique_ptr<Expression>(new Compare(*this));
     }
 
 private:
-    Compare(const Compare& other, Transaction* tr)
-        : m_left(other.m_left->clone(tr))
-        , m_right(other.m_right->clone(tr))
+    Compare(const Compare& other)
+        : m_left(other.m_left->clone())
+        , m_right(other.m_right->clone())
         , m_left_is_const(other.m_left_is_const)
     {
         if (m_left_is_const) {
