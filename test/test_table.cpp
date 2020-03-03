@@ -5482,6 +5482,7 @@ TEST(Table_EmbeddedObjectTableClearNotifications)
 
     parent->clear();
     CHECK(calls == 2);
+    CHECK_EQUAL(parent->size(), 0);
     tr->commit();
 }
 

@@ -1735,22 +1735,9 @@ void Table::batch_erase_rows(const KeyColumn& keys)
 
 void Table::clear()
 {
-    size_t old_size = size();
-
     CascadeState state(CascadeState::Mode::Strong, get_parent_group());
     m_clusters.clear(state);
-    // FIXME: what should happen to tombstones when a table is cleared?
-    if (m_tombstones) {
-        m_tombstones->destroy();
-        m_tombstones = nullptr;
-    }
     free_collision_table();
-
-    bump_content_version();
-    bump_storage_version();
-
-    if (Replication* repl = get_repl())
-        repl->clear_table(this, old_size); // Throws
 }
 
 

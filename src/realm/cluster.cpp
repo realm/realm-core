@@ -1489,9 +1489,6 @@ void Cluster::nullify_incoming_links(ObjKey key, CascadeState& state)
 {
     size_t ndx = get_ndx(key, 0);
 
-    const Spec& spec = m_tree_top.get_spec();
-    size_t num_cols = spec.get_column_count();
-    size_t num_public_cols = spec.get_public_column_count();
     // We must start with backlink columns in case the corresponding link
     // columns are in the same table so that we can nullify links before
     // erasing rows in the link columns.
@@ -1503,8 +1500,7 @@ void Cluster::nullify_incoming_links(ObjKey key, CascadeState& state)
     // link columns). Therefore we first nullify links to this object, then
     // generate the instruction, and then delete the row in the remaining columns.
 
-    for (size_t col_ndx = num_public_cols; col_ndx < num_cols; col_ndx++) {
-        ColKey col_key = m_tree_top.get_owner()->spec_ndx2colkey(col_ndx);
+    auto nullify_fwd_links = [&](ColKey col_key) {
         ColKey::Idx leaf_ndx = col_key.get_index();
         auto type = col_key.get_type();
         REALM_ASSERT(type == col_type_BackLink);
@@ -1520,7 +1516,11 @@ void Cluster::nullify_incoming_links(ObjKey key, CascadeState& state)
         // reflected in the context here.
         values.copy_on_write();
         values.nullify_fwd_links(ndx, state);
-    }
+
+        return false;
+    };
+
+    m_tree_top.get_owner()->for_each_backlink_column(nullify_fwd_links);
 }
 
 void Cluster::upgrade_string_to_enum(ColKey col_key, ArrayString& keys)
@@ -1908,11 +1908,30 @@ void ClusterTree::clear(CascadeState& state)
         remove_all_links(state); // This will also delete objects loosing their last strong link
     }
 
+    // We no longer have "clear table" instruction, so we have to report the removal of each
+    // object individually
+    auto table = m_owner;
+    if (Replication* repl = table->get_repl()) {
+        // Go through all clusters
+        traverse([repl, table](const Cluster* cluster) {
+            auto sz = cluster->node_size();
+            for (size_t i = 0; i < sz; i++) {
+                repl->remove_object(table, cluster->get_real_key(i));
+            }
+            // Continue
+            return false;
+        });
+    }
+
     m_root->destroy_deep();
 
     auto leaf = std::make_unique<Cluster>(0, m_root->get_alloc(), *this);
     leaf->create(m_owner->num_leaf_cols());
     replace_root(std::move(leaf));
+
+    bump_content_version();
+    bump_storage_version();
+
     m_size = 0;
 }
 

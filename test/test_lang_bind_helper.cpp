@@ -1845,10 +1845,6 @@ public:
     {
         return false;
     }
-    bool clear_table(size_t) noexcept
-    {
-        return false;
-    }
     bool list_set(size_t)
     {
         return false;
@@ -2704,8 +2700,8 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_TableClear)
     TableRef origin = group->add_table("origin");
     TableRef target = group->add_table("target");
 
-    target->add_column(type_Int, "int");
     auto c1 = origin->add_column_link(type_LinkList, "linklist", *target);
+    target->add_column(type_Int, "int");
     auto c2 = origin->add_column_link(type_Link, "link", *target);
 
     Obj t = target->create_object();
@@ -2985,14 +2981,13 @@ TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
 
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
     DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
-    ColKey col;
     {
         // initialize table with 200 entries holding 0..200
         WriteTransaction wt(sg);
         TableRef tr = wt.add_table("A");
-        col = tr->add_column(type_Int, "first");
+        auto col = tr->add_column(type_Int, "first");
         for (int j = 0; j < 200; j++) {
-            tr->create_object().set_all(j);
+            tr->create_object().set(col, j);
         }
         auto table_b = wt.add_table("B");
         table_b->add_column(type_Int, "bussemand");
@@ -3037,15 +3032,6 @@ TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
 #if !REALM_ANDROID && !REALM_IOS
 // fork should not be used on android or ios.
 
-/*
-This unit test has been disabled as it occasionally gets itself into a hang
-(which has plauged the testing process for a long time). It is unknown to me
-(Kristian) whether this is due to a bug in Core or a bug in this test.
-*/
-
-#if 0
-// This disabled unittest will need porting
-// if we ever try to re-enable it.
 TEST(LangBindHelper_ImplicitTransactions_InterProcess)
 {
     const int write_process_count = 7;
@@ -3057,15 +3043,20 @@ TEST(LangBindHelper_ImplicitTransactions_InterProcess)
 
     int pid = fork();
     if (pid == 0) {
-        std::unique_ptr<Replication> hist(make_in_realm_history(path));
-        DBRef sg = DB::create(*hist);
         {
+            std::unique_ptr<Replication> hist(make_in_realm_history(path));
+            DBRef sg = DB::create(*hist);
+            // initialize table with 200 entries holding 0..200
             WriteTransaction wt(sg);
-            TableRef tr = wt.add_table("table");
-            tr->add_column(type_Int, "first");
-            for (int i = 0; i < 200; ++i)
-                tr->add_empty_row();
-            tr->set_int(0, 100, 42);
+            TableRef tr = wt.add_table("A");
+            auto col = tr->add_column(type_Int, "first");
+            for (int j = 0; j < 200; j++) {
+                tr->create_object().set(col, j);
+            }
+            auto table_b = wt.add_table("B");
+            table_b->add_column(type_Int, "bussemand");
+            table_b->create_object().set_all(99);
+            wt.add_table("C");
             wt.commit();
         }
         exit(0);
@@ -3079,7 +3070,9 @@ TEST(LangBindHelper_ImplicitTransactions_InterProcess)
     for (int i = 0; i < write_process_count; ++i) {
         writepids[i] = fork();
         if (writepids[i] == 0) {
-            multiple_trackers_writer_thread(std::string(path));
+            std::unique_ptr<Replication> hist(make_in_realm_history(path));
+            DBRef sg = DB::create(*hist);
+            multiple_trackers_writer_thread(sg);
             exit(0);
         }
     }
@@ -3088,7 +3081,9 @@ TEST(LangBindHelper_ImplicitTransactions_InterProcess)
     for (int i = 0; i < read_process_count; ++i) {
         readpids[i] = fork();
         if (readpids[i] == 0) {
-            multiple_trackers_reader_thread(test_context, path);
+            std::unique_ptr<Replication> hist(make_in_realm_history(path));
+            DBRef sg = DB::create(*hist);
+            multiple_trackers_reader_thread(test_context, sg);
             exit(0);
         }
     }
@@ -3099,27 +3094,17 @@ TEST(LangBindHelper_ImplicitTransactions_InterProcess)
         waitpid(writepids[i], &status, 0);
     }
 
-    // Wait for all reader threads to find and lock onto value '42'
-    {
-        std::unique_ptr<Replication> hist(make_in_realm_history(path));
-        DBRef sg = DB::create(*hist);
-        for (;;) {
-            TransactionRef rt = sg->start_read()
-            ConstTableRef tr = rt.get_table("table");
-            if (tr->get_int(0, 0) == read_process_count) break;
-            sched_yield();
-        }
-    }
+    // Allow readers time to catch up
+    for (int k = 0; k < 100; ++k)
+        std::this_thread::yield();
 
     // signal to all readers to complete
     {
         std::unique_ptr<Replication> hist(make_in_realm_history(path));
         DBRef sg = DB::create(*hist);
         WriteTransaction wt(sg);
-        TableRef tr = wt.get_table("table");
-        Query q = tr->where().equal(0, 42);
-        int idx = q.find();
-        tr->set_int(0, idx, 43);
+        TableRef tr = wt.get_table("C");
+        tr->create_object();
         wt.commit();
     }
 
@@ -3131,7 +3116,6 @@ TEST(LangBindHelper_ImplicitTransactions_InterProcess)
 
 }
 
-#endif // 0
 #endif // !REALM_ANDROID && !REALM_IOS
 #endif // not REALM_ENABLE_ENCRYPTION
 #endif // not defined _WIN32

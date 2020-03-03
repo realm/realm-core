@@ -1413,11 +1413,6 @@ public:
         return true;
     }
 
-    bool clear_table(size_t) noexcept
-    {
-        return true;
-    }
-
     bool modify_object(ColKey, ObjKey) noexcept
     {
         return true; // No-op

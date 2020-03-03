@@ -30,9 +30,7 @@ public:
     using value_type = int64_t;
 
     explicit ArrayInteger(Allocator&) noexcept;
-    ~ArrayInteger() noexcept override
-    {
-    }
+    ~ArrayInteger() noexcept override {}
 
     static value_type default_value(bool)
     {
@@ -328,9 +326,7 @@ inline ArrayIntNull::ArrayIntNull(Allocator& allocator) noexcept
 {
 }
 
-inline ArrayIntNull::~ArrayIntNull() noexcept
-{
-}
+inline ArrayIntNull::~ArrayIntNull() noexcept {}
 
 inline void ArrayIntNull::create(Type type, bool context_flag)
 {
@@ -662,6 +658,6 @@ inline size_t ArrayIntNull::find_first(value_type value, size_t begin, size_t en
 {
     return find_first<Equal>(value, begin, end);
 }
-}
+} // namespace realm
 
 #endif // REALM_ARRAY_INTEGER_HPP

@@ -46,8 +46,6 @@ void ArrayObjectId::insert(size_t ndx, const ObjectId& value)
     // Allocate room for the new value
     const auto new_byte_size = calc_required_bytes(old_size + 1);
     alloc(new_byte_size, 1); // Throws
-    m_size = new_byte_size;
-    m_width = 1;
 
     auto dest = get_pos(old_size);
 
@@ -104,8 +102,6 @@ void ArrayObjectId::move(ArrayObjectId& dst_arr, size_t ndx)
     // Allocate room for the new value
     const auto new_dest_byte_size = calc_required_bytes(old_dst_size + n_to_move);
     dst_arr.alloc(new_dest_byte_size, 1); // Throws
-    dst_arr.m_width = 1;
-    dst_arr.m_size = new_dest_byte_size;
 
     // Initialize last null byte.
     const auto last_in_dst = get_pos(old_dst_size + n_to_move - 1);
