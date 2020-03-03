@@ -140,12 +140,9 @@ char* Allocator::translate(ref_type ref) const noexcept
                 if (!txl.primary_mapping_limit.compare_exchange_weak(mapping_limit, offset + size,
                                                                      std::memory_order_acq_rel))
                     return translate(ref); // hopefully tail recursion optimization eliminates stack growth..
-                std::cout << "pushed " << idx << " to size " << offset + size << std::endl;
             }
             else {
                 // array crosses over into next mapping, we have to get/add a xover mapping for it.
-                std::cout << "adding xover mapping at index " << idx << " for " << offset << ", " << size
-                          << std::endl;
                 const_cast<Allocator*>(this)->get_or_add_xover_mapping(txl, idx, offset, size);
                 return translate(ref);
             }

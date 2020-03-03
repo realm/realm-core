@@ -1014,13 +1014,13 @@ ref_type SlabAlloc::validate_header(const Header* header, const StreamingFooter*
     int slot_selector = ((header->m_flags & SlabAlloc::flags_SelectBit) != 0 ? 1 : 0);
 
     // Top-ref must always point within buffer
-    ref_type top_ref = uint_fast64_t(header->m_top_ref[slot_selector]);
+    auto top_ref = uint64_t(header->m_top_ref[slot_selector]);
     if (slot_selector == 0 && top_ref == 0xFFFFFFFFFFFFFFFFULL) {
         if (REALM_UNLIKELY(size < sizeof(Header) + sizeof(StreamingFooter))) {
             std::string msg = "Invalid streaming format size (" + util::to_string(size) + ")";
             throw InvalidDatabase(msg, path);
         }
-        top_ref = footer->m_top_ref;
+        top_ref = uint64_t(footer->m_top_ref);
         if (REALM_UNLIKELY(footer->m_magic_cookie != footer_magic_cookie)) {
             std::string msg = "Invalid streaming format cookie (" + util::to_string(footer->m_magic_cookie) + ")";
             throw InvalidDatabase(msg, path);
@@ -1034,7 +1034,7 @@ ref_type SlabAlloc::validate_header(const Header* header, const StreamingFooter*
         std::string msg = "Top ref outside file (size = " + util::to_string(size) + ")";
         throw_header_exception(msg, *header, path);
     }
-    return top_ref;
+    return ref_type(top_ref);
 }
 
 
@@ -1291,8 +1291,10 @@ void SlabAlloc::rebuild_translations(bool requires_new_translation, size_t old_n
 #if REALM_ENABLE_ENCRYPTION
         new_translation_table[i].encrypted_mapping = m_mappings[k].primary_mapping.get_encrypted_mapping();
 #endif
-        // for the moment ignore copying over data for xover mappings.
-        // if they are needed, copying will happen on demand (in get_or_add_xover_mapping)
+        // for the moment ignore copying over data for xover mappings. We don't save the
+        // offset for the array request which created a xover mapping, so we cannot setup the
+        // translation mapping correctly.
+        // if the mapping is needed, copying will happen on demand (in get_or_add_xover_mapping)
     }
     for (size_t k = 0; k < free_space_size; ++k) {
         char* base = m_slabs[k].addr;
