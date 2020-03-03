@@ -220,7 +220,7 @@ protected:
     virtual void get_or_add_xover_mapping(RefTranslation&, size_t, size_t, size_t)
     {
         REALM_ASSERT(false);
-    };
+    }
     Allocator() noexcept;
     size_t get_section_index(size_t pos) const noexcept;
     inline size_t get_section_base(size_t index) const noexcept;
@@ -326,7 +326,7 @@ public:
     }
 
 protected:
-    virtual void get_or_add_xover_mapping(RefTranslation& txl, size_t index, size_t offset, size_t size)
+    void get_or_add_xover_mapping(RefTranslation& txl, size_t index, size_t offset, size_t size) override
     {
         m_alloc->get_or_add_xover_mapping(txl, index, offset, size);
     }

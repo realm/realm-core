@@ -580,7 +580,7 @@ private:
     // and in use by older transactions. These translations are in m_old_mappings.
     struct MapEntry {
         util::File::Map<char> primary_mapping;
-        size_t primary_mapping_limit;
+        size_t primary_mapping_limit = 0;
         util::File::Map<char> xover_mapping;
     };
     std::vector<MapEntry> m_mappings;
@@ -602,7 +602,7 @@ private:
     // Add a translation covering a new section in the slab area. The translation is always
     // added at the end.
     void extend_fast_mapping_with_slab(char* address);
-    virtual void get_or_add_xover_mapping(RefTranslation& txl, size_t index, size_t offset, size_t size);
+    void get_or_add_xover_mapping(RefTranslation& txl, size_t index, size_t offset, size_t size) override;
 
     const char* m_data = nullptr;
     size_t m_initial_section_size = 0;

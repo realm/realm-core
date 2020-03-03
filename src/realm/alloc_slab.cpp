@@ -1148,14 +1148,16 @@ void SlabAlloc::update_reader_view(size_t file_size)
         // existing mapping. This is the case if the new baseline (which must be larger
         // then the old baseline) is still below the old base of the slab area.
         auto mapping_index = old_num_sections - 1;
+        MapEntry& cur_entry = m_mappings[mapping_index];
         if (file_size < old_slab_base) {
             size_t section_start_offset = get_section_base(old_num_sections - 1);
             size_t section_size = file_size - section_start_offset;
             requires_new_translation = true;
             // save the old mapping/keep it open
-            m_old_mappings.emplace_back(m_youngest_live_version,
-                                        std::move(m_mappings[mapping_index].primary_mapping));
-            m_mappings[mapping_index].primary_mapping =
+            m_old_mappings.emplace_back(m_youngest_live_version, std::move(cur_entry.primary_mapping));
+            // extension cannot possibly happen if we alread have a xover mapping established
+            REALM_ASSERT(!cur_entry.xover_mapping.is_attached());
+            cur_entry.primary_mapping =
                 util::File::Map<char>(m_file, section_start_offset, File::access_ReadOnly, section_size);
             m_mapping_version++;
         }
@@ -1171,9 +1173,10 @@ void SlabAlloc::update_reader_view(size_t file_size)
                 size_t section_reservation = get_section_base(old_num_sections) - section_start_offset;
                 REALM_ASSERT(section_size == section_reservation);
                 // save the old mapping/keep it open
-                m_old_mappings.emplace_back(m_youngest_live_version,
-                                            std::move(m_mappings[mapping_index].primary_mapping));
-                m_mappings[mapping_index].primary_mapping =
+                m_old_mappings.emplace_back(m_youngest_live_version, std::move(cur_entry.primary_mapping));
+                // A xover mapping cannot be present in this case:
+                REALM_ASSERT(!cur_entry.xover_mapping.is_attached());
+                cur_entry.primary_mapping =
                     util::File::Map<char>(m_file, section_start_offset, File::access_ReadOnly, section_size);
                 m_mapping_version++;
             }
@@ -1190,6 +1193,8 @@ void SlabAlloc::update_reader_view(size_t file_size)
                 std::vector<MapEntry> next_mapping(num_mappings);
                 for (size_t i = 0; i < old_num_mappings; ++i) {
                     next_mapping[i].primary_mapping = std::move(m_mappings[i].primary_mapping);
+                    next_mapping[i].xover_mapping = std::move(m_mappings[i].xover_mapping);
+                    next_mapping[i].primary_mapping_limit = m_mappings[i].primary_mapping_limit;
                 }
                 m_mappings = std::move(next_mapping);
             }
@@ -1286,6 +1291,8 @@ void SlabAlloc::rebuild_translations(bool requires_new_translation, size_t old_n
 #if REALM_ENABLE_ENCRYPTION
         new_translation_table[i].encrypted_mapping = m_mappings[k].primary_mapping.get_encrypted_mapping();
 #endif
+        // for the moment ignore copying over data for xover mappings.
+        // if they are needed, copying will happen on demand (in get_or_add_xover_mapping)
     }
     for (size_t k = 0; k < free_space_size; ++k) {
         char* base = m_slabs[k].addr;
