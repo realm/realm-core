@@ -1,19 +1,15 @@
-# NEXT RELEASE
+# 10.0.0-alpha.2 Release notes
 
-### Enhancements
-* None.
+This release also contains the changes introduced by v6.0.4
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Table::find_first<T> on a primary key column would sometimes return the wrong object. Since v10.0.0-alpha.1.
  
-### Breaking changes
-* None.
-
 -----------
 
 ### Internals
-* None.
+* 'clear_table' and 'list_swap' removed from the replication interface.
+* Some 'safe_int_ops' has been removed.
 
 ----------------------------------------------
 
