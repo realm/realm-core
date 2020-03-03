@@ -819,7 +819,7 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
     }
     catch (...) {
         note_reader_end(this);
-        throw;
+        throw InvalidDatabase("File open failed ", path);
     }
     m_baseline = 0;
     auto handler = [this]() noexcept { note_reader_end(this); };
