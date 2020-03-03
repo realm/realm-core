@@ -5947,7 +5947,7 @@ TEST(LangBindHelper_ArrayXoverMapping)
         std::cout << "writing" << std::endl;
         auto tbl = tr->add_table("my_table");
         my_col = tbl->add_column(type_String, "my_col");
-        std::string s(1000000,'a');
+        std::string s(1000000, 'a');
         for (auto i = 0; i < 100; ++i)
             tbl->create_object().set_all(s);
         std::cout << "committing..." << std::endl;

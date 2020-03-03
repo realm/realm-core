@@ -131,14 +131,14 @@ char* Allocator::translate(ref_type ref) const noexcept
             addr = txl.mapping_addr + offset;
 #if REALM_ENABLE_ENCRYPTION
             realm::util::encryption_read_barrier(addr, NodeHeader::header_size,
-                                                 ref_translation_ptr[idx].encrypted_mapping,
-                                                 nullptr);
+                                                 ref_translation_ptr[idx].encrypted_mapping, nullptr);
 #endif
             auto size = NodeHeader::get_byte_size_from_header(addr);
             if (get_section_index(ref + size - 1) == idx) {
                 // array fits inside primary mapping, no new mapping needed, just move the limit
                 // take into account that another thread may attempt to change it concurrently
-                if (!txl.primary_mapping_limit.compare_exchange_weak(mapping_limit, offset + size, std::memory_order_acq_rel))
+                if (!txl.primary_mapping_limit.compare_exchange_weak(mapping_limit, offset + size,
+                                                                     std::memory_order_acq_rel))
                     return translate(ref); // hopefully tail recursion optimization eliminates stack growth..
                 std::cout << "pushed " << idx << " to size " << offset + size << std::endl;
             }
@@ -153,13 +153,13 @@ char* Allocator::translate(ref_type ref) const noexcept
         REALM_ASSERT(offset <= txl.primary_mapping_limit);
         if (offset == txl.primary_mapping_limit && txl.xover_mapping_addr != nullptr) {
             // array is inside the established xover mapping:
-            addr =  txl.xover_mapping_addr + (offset - txl.xover_mapping_base);
+            addr = txl.xover_mapping_addr + (offset - txl.xover_mapping_base);
 #if REALM_ENABLE_ENCRYPTION
             realm::util::encryption_read_barrier(addr, NodeHeader::header_size,
                                                  ref_translation_ptr[idx].xover_encrypted_mapping,
                                                  NodeHeader::get_byte_size_from_header);
 #endif
-        } 
+        }
         else {
             addr = txl.mapping_addr + offset;
 #if REALM_ENABLE_ENCRYPTION
@@ -173,5 +173,4 @@ char* Allocator::translate(ref_type ref) const noexcept
     else
         return do_translate(ref);
 }
-
 }

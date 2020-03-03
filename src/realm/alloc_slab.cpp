@@ -1014,7 +1014,7 @@ ref_type SlabAlloc::validate_header(const Header* header, const StreamingFooter*
     int slot_selector = ((header->m_flags & SlabAlloc::flags_SelectBit) != 0 ? 1 : 0);
 
     // Top-ref must always point within buffer
-    uint_fast64_t top_ref = uint_fast64_t(header->m_top_ref[slot_selector]);
+    ref_type top_ref = uint_fast64_t(header->m_top_ref[slot_selector]);
     if (slot_selector == 0 && top_ref == 0xFFFFFFFFFFFFFFFFULL) {
         if (REALM_UNLIKELY(size < sizeof(Header) + sizeof(StreamingFooter))) {
             std::string msg = "Invalid streaming format size (" + util::to_string(size) + ")";

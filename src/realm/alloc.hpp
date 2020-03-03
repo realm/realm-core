@@ -171,7 +171,10 @@ protected:
         {
             primary_mapping_limit.store(0);
         }
-        RefTranslation() : RefTranslation(nullptr) {}
+        RefTranslation()
+            : RefTranslation(nullptr)
+        {
+        }
         RefTranslation& operator=(const RefTranslation& from)
         {
             if (&from != this) {
@@ -186,7 +189,6 @@ protected:
             }
             return *this;
         }
-
     };
     // This pointer may be changed concurrently with access, so make sure it is
     // atomic!
