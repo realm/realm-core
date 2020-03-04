@@ -30,7 +30,6 @@
 
 #if REALM_ENABLE_SYNC
 #include <realm/sync/object.hpp>
-#include <realm/sync/permissions.hpp>
 #include <realm/sync/instruction_replication.hpp>
 #endif // REALM_ENABLE_SYNC
 
@@ -615,7 +614,6 @@ static void apply_post_migration_changes(Group& group,
 void ObjectStore::apply_schema_changes(Transaction& group, uint64_t schema_version,
                                        Schema& target_schema, uint64_t target_schema_version,
                                        SchemaMode mode, std::vector<SchemaChange> const& changes,
-                                       util::Optional<std::string> sync_user_id,
                                        std::function<void()> migration_function)
 {
     create_metadata_tables(group);

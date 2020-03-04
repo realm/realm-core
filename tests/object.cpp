@@ -119,6 +119,8 @@ TEST_CASE("object") {
             {"string", PropertyType::String|PropertyType::Nullable},
             {"data", PropertyType::Data|PropertyType::Nullable},
             {"date", PropertyType::Date|PropertyType::Nullable},
+            {"object id", PropertyType::ObjectId|PropertyType::Nullable},
+            {"decimal", PropertyType::Decimal|PropertyType::Nullable},
 
             {"bool array", PropertyType::Array|PropertyType::Bool|PropertyType::Nullable},
             {"int array", PropertyType::Array|PropertyType::Int|PropertyType::Nullable},
@@ -127,6 +129,8 @@ TEST_CASE("object") {
             {"string array", PropertyType::Array|PropertyType::String|PropertyType::Nullable},
             {"data array", PropertyType::Array|PropertyType::Data|PropertyType::Nullable},
             {"date array", PropertyType::Array|PropertyType::Date|PropertyType::Nullable},
+            {"object id array", PropertyType::Array|PropertyType::ObjectId|PropertyType::Nullable},
+            {"decimal array", PropertyType::Array|PropertyType::Decimal|PropertyType::Nullable},
         }},
         {"link target", {
             {"value", PropertyType::Int},
@@ -782,6 +786,8 @@ TEST_CASE("object") {
                 {"string", "hello"s},
                 {"data", "olleh"s},
                 {"date", Timestamp(10, 20)},
+                {"object id", ObjectId("000000000000000000000001")},
+                {"decimal", Decimal128("1.23e45")},
 
                 {"bool array", AnyVec{true, false}},
                 {"int array", AnyVec{INT64_C(5), INT64_C(6)}},
@@ -791,6 +797,8 @@ TEST_CASE("object") {
                 {"data array", AnyVec{"d"s, "e"s, "f"s}},
                 {"date array", AnyVec{}},
                 {"object array", AnyVec{AnyDict{{"value", INT64_C(20)}}}},
+                {"object id array", AnyVec{ObjectId("000000000000000000000001")}},
+                {"decimal array", AnyVec{Decimal128("1.23e45")}},
             };
             r->begin_transaction();
             auto obj = Object::create(d, r, *r->schema().find("all optional types"), util::Any(initial_values));
@@ -805,6 +813,8 @@ TEST_CASE("object") {
             REQUIRE(any_cast<double>(obj.get_property_value<util::Any>(d, "double")) == 3.3);
             REQUIRE(any_cast<std::string>(obj.get_property_value<util::Any>(d, "string")) == "hello");
             REQUIRE(any_cast<Timestamp>(obj.get_property_value<util::Any>(d, "date")) == Timestamp(10, 20));
+            REQUIRE(any_cast<Optional<ObjectId>>(obj.get_property_value<util::Any>(d, "object id")).value() == ObjectId("000000000000000000000001"));
+            REQUIRE(any_cast<Decimal128>(obj.get_property_value<util::Any>(d, "decimal")) == Decimal128("1.23e45"));
 
             REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "bool array")).get<util::Optional<bool>>(0) == true);
             REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "int array")).get<util::Optional<int64_t>>(0) == 5);
@@ -812,6 +822,8 @@ TEST_CASE("object") {
             REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "double array")).get<util::Optional<double>>(0) == 3.3);
             REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "string array")).get<StringData>(0) == "a");
             REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "date array")).size() == 0);
+            REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "object id array")).get<Optional<ObjectId>>(0) == ObjectId("000000000000000000000001"));
+            REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "decimal array")).get<Decimal128>(0) == Decimal128("1.23e45"));
 
             // Set all properties to null
             AnyDict null_values{
@@ -823,6 +835,8 @@ TEST_CASE("object") {
                 {"string", util::Any()},
                 {"data", util::Any()},
                 {"date", util::Any()},
+                {"object id", util::Any()},
+                {"decimal", util::Any()},
 
                 {"bool array", AnyVec{util::Any()}},
                 {"int array", AnyVec{util::Any()}},
@@ -831,6 +845,8 @@ TEST_CASE("object") {
                 {"string array", AnyVec{util::Any()}},
                 {"data array", AnyVec{util::Any()}},
                 {"date array", AnyVec{Timestamp()}},
+                {"object id array", AnyVec{util::Any()}},
+                {"decimal array", AnyVec{Decimal128(realm::null())}},
             };
             Object::create(d, r, *r->schema().find("all optional types"), util::Any(null_values), policy);
 
@@ -841,6 +857,8 @@ TEST_CASE("object") {
             REQUIRE_FALSE(obj.get_property_value<util::Any>(d, "string").has_value());
             REQUIRE_FALSE(obj.get_property_value<util::Any>(d, "data").has_value());
             REQUIRE_FALSE(obj.get_property_value<util::Any>(d, "date").has_value());
+            REQUIRE_FALSE(obj.get_property_value<util::Any>(d, "object id").has_value());
+            REQUIRE_FALSE(obj.get_property_value<util::Any>(d, "decimal").has_value());
 
             REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "bool array")).get<util::Optional<bool>>(0) == util::none);
             REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "int array")).get<util::Optional<int64_t>>(0) == util::none);
@@ -849,6 +867,8 @@ TEST_CASE("object") {
             REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "string array")).get<StringData>(0) == StringData());
             REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "data array")).get<BinaryData>(0) == BinaryData());
             REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "date array")).get<Timestamp>(0) == Timestamp());
+            REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "object id array")).get<Optional<ObjectId>>(0) == util::none);
+            REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "decimal array")).get<Decimal>(0) == Decimal128(realm::null()));
 
             // Set all properties back to non-null
             Object::create(d, r, *r->schema().find("all optional types"), util::Any(initial_values), policy);
@@ -858,6 +878,8 @@ TEST_CASE("object") {
             REQUIRE(any_cast<double>(obj.get_property_value<util::Any>(d, "double")) == 3.3);
             REQUIRE(any_cast<std::string>(obj.get_property_value<util::Any>(d, "string")) == "hello");
             REQUIRE(any_cast<Timestamp>(obj.get_property_value<util::Any>(d, "date")) == Timestamp(10, 20));
+            REQUIRE(any_cast<Optional<ObjectId>>(obj.get_property_value<util::Any>(d, "object id")).value() == ObjectId("000000000000000000000001"));
+            REQUIRE(any_cast<Decimal128>(obj.get_property_value<util::Any>(d, "decimal")) == Decimal128("1.23e45"));
 
             REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "bool array")).get<util::Optional<bool>>(0) == true);
             REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "int array")).get<util::Optional<int64_t>>(0) == 5);
@@ -865,6 +887,8 @@ TEST_CASE("object") {
             REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "double array")).get<util::Optional<double>>(0) == 3.3);
             REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "string array")).get<StringData>(0) == "a");
             REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "date array")).size() == 0);
+            REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "object id array")).get<Optional<ObjectId>>(0) == ObjectId("000000000000000000000001"));
+            REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "decimal array")).get<Decimal128>(0) == Decimal128("1.23e45"));
         }
     }
 

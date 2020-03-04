@@ -1,4 +1,4 @@
-include_directories(../external/catch/single_include .)
+include_directories(../external/catch/single_include ../external/json .)
 
 set(HEADERS
     util/event_loop.hpp
@@ -38,7 +38,6 @@ if(REALM_ENABLE_SYNC)
     list(APPEND SOURCES
         sync/file.cpp
         sync/metadata.cpp
-        sync/permission.cpp
         sync/session/connection_change_notifications.cpp
         sync/session/progress_notifications.cpp
         sync/session/session.cpp
@@ -48,6 +47,7 @@ if(REALM_ENABLE_SYNC)
         sync/user.cpp
         sync/app.cpp
     )
+
 endif()
 
 add_executable(tests ${SOURCES} ${HEADERS})

@@ -98,7 +98,6 @@ if(REALM_ENABLE_SYNC)
         sync/async_open_task.hpp
         sync/sync_config.hpp
         sync/sync_manager.hpp
-        sync/sync_permission.hpp
         sync/sync_session.hpp
         sync/sync_user.hpp
         sync/impl/sync_client.hpp
@@ -110,7 +109,6 @@ if(REALM_ENABLE_SYNC)
         sync/generic_network_transport.cpp
         sync/async_open_task.cpp
         sync/sync_manager.cpp
-        sync/sync_permission.cpp
         sync/sync_session.cpp
         sync/sync_user.cpp
         sync/impl/sync_file.cpp

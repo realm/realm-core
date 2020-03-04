@@ -23,7 +23,7 @@
 #include <realm/util/file.hpp>
 #include <realm/string_data.hpp>
 
-#include "../../external/json/json.hpp"
+#include <json.hpp>
 
 namespace realm {
 
@@ -83,7 +83,8 @@ std::string encode_fake_jwt(const std::string &in)
             {"token", in}
         }},
         {"exp", 123},
-        {"iat", 456}
+        {"iat", 456},
+        {"access", {"download", "upload"}}
     }).dump();
     std::string encoded_prefix, encoded_body;
     encoded_prefix.resize(util::base64_encoded_size(unencoded_prefix.size()));

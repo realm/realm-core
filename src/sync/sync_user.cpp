@@ -18,12 +18,12 @@
 
 #include "sync/sync_user.hpp"
 
+#include "sync/generic_network_transport.hpp"
 #include "sync/impl/sync_metadata.hpp"
 #include "sync/sync_manager.hpp"
 #include "sync/sync_session.hpp"
-#include "sync/generic_network_transport.hpp"
-#include "../../external/json/json.hpp"
 
+#include <json.hpp>
 #include <realm/util/base64.hpp>
 
 namespace realm {
@@ -49,7 +49,7 @@ static std::vector<std::string> split_token(const std::string& jwt) {
     parts.push_back(jwt.substr(start_from));
 
     if (parts.size() != 3) {
-        throw app::error::JSONError(app::error::JSONErrorCode::bad_token, "jwt missing parts");
+        throw app::AppError(make_error_code(app::JSONErrorCode::bad_token), "jwt missing parts");
     }
 
     return parts;
@@ -62,51 +62,39 @@ RealmJWT::RealmJWT(const std::string& token)
     auto json = nlohmann::json::parse(base64_decode(parts[1]));
 
     this->token = token;
-    this->expires_at = HAS_JSON_KEY_OR_THROW(json, "exp", long);
-    this->issued_at = HAS_JSON_KEY_OR_THROW(json, "iat", long);
+    this->expires_at = app::value_from_json<long>(json, "exp");
+    this->issued_at = app::value_from_json<long>(json, "iat");
 
     if (json.find("user_data") != json.end()) {
         this->user_data = json["user_data"].get<std::map<std::string, util::Any>>();
     }
 }
 
-ObjectSchema SyncUserProfile::schema()
+SyncUserProfile::SyncUserProfile(util::Optional<std::string> name,
+                                 util::Optional<std::string> email,
+                                 util::Optional<std::string> picture_url,
+                                 util::Optional<std::string> first_name,
+                                 util::Optional<std::string> last_name,
+                                 util::Optional<std::string> gender,
+                                 util::Optional<std::string> birthday,
+                                 util::Optional<std::string> min_age,
+                                 util::Optional<std::string> max_age)
+: name(std::move(name))
+, email(std::move(email))
+, picture_url(std::move(picture_url))
+, first_name(std::move(first_name))
+, last_name(std::move(last_name))
+, gender(std::move(gender))
+, birthday(std::move(birthday))
+, min_age(std::move(min_age))
+, max_age(std::move(max_age))
 {
-    return { "user_profile",
-        {
-            {"name", PropertyType::String|PropertyType::Nullable},
-            {"email", PropertyType::String|PropertyType::Nullable},
-            {"picture_url", PropertyType::String|PropertyType::Nullable},
-            {"first_name", PropertyType::String|PropertyType::Nullable},
-            {"last_name", PropertyType::String|PropertyType::Nullable},
-            {"gender", PropertyType::String|PropertyType::Nullable},
-            {"birthday", PropertyType::String|PropertyType::Nullable},
-            {"min_age", PropertyType::String|PropertyType::Nullable},
-            {"max_age", PropertyType::String|PropertyType::Nullable}
-        }
-    };
 }
 
-ObjectSchema SyncUserIdentity::schema()
+SyncUserIdentity::SyncUserIdentity(const std::string& id, const std::string& provider_type)
+: id(id)
+, provider_type(provider_type)
 {
-    return { "user_identity",
-        {
-            {"id", PropertyType::String},
-            {"provider_type", PropertyType::String}
-        }
-    };
-}
-
-SyncUserIdentity::SyncUserIdentity(realm::ConstObj& obj)
-{
-    this->id = obj.get<String>("id");
-    this->provider_type = obj.get<String>("provider_type");
-}
-
-SyncUserIdentity::SyncUserIdentity(std::string id, std::string provider_type)
-{
-    this->id = id;
-    this->provider_type = provider_type;
 }
 
 SyncUserContextFactory SyncUser::s_binding_context_factory;
@@ -182,12 +170,6 @@ void SyncUser::update_refresh_token(std::string token)
     std::vector<std::shared_ptr<SyncSession>> sessions_to_revive;
     {
         std::unique_lock<std::mutex> lock(m_mutex);
-        if (auto session = m_management_session.lock())
-            sessions_to_revive.emplace_back(std::move(session));
-
-        if (auto session = m_permission_session.lock())
-            sessions_to_revive.emplace_back(std::move(session));
-
         switch (m_state) {
             case State::Error:
                 return;
@@ -227,12 +209,6 @@ void SyncUser::update_access_token(std::string token)
     std::vector<std::shared_ptr<SyncSession>> sessions_to_revive;
     {
         std::unique_lock<std::mutex> lock(m_mutex);
-        if (auto session = m_management_session.lock())
-            sessions_to_revive.emplace_back(std::move(session));
-
-        if (auto session = m_permission_session.lock())
-            sessions_to_revive.emplace_back(std::move(session));
-
         switch (m_state) {
             case State::Error:
                 return;
@@ -304,12 +280,6 @@ void SyncUser::log_out()
         }
     }
     m_sessions.clear();
-    // Deactivate the sessions for the management and admin Realms.
-    if (auto session = m_management_session.lock())
-        session->log_out();
-
-    if (auto session = m_permission_session.lock())
-        session->log_out();
 
     // Mark the user as 'dead' in the persisted metadata Realm.
     SyncManager::shared().perform_metadata_update([=](const auto& manager) {
@@ -343,7 +313,7 @@ SyncUser::State SyncUser::state() const
     return m_state;
 }
 
-std::shared_ptr<SyncUserProfile> SyncUser::user_profile() const
+SyncUserProfile SyncUser::user_profile() const
 {
     std::lock_guard<std::mutex> lock(m_mutex);
     return m_user_profile;
@@ -355,7 +325,7 @@ util::Optional<std::map<std::string, util::Any>> SyncUser::custom_data() const
     return m_access_token.user_data;
 }
 
-void SyncUser::update_user_profile(std::shared_ptr<SyncUserProfile> profile)
+void SyncUser::update_user_profile(const SyncUserProfile& profile)
 {
     std::unique_lock<std::mutex> lock(m_mutex);
 
@@ -391,25 +361,6 @@ void SyncUser::set_binding_context_factory(SyncUserContextFactory factory)
     std::lock_guard<std::mutex> lock(s_binding_context_factory_mutex);
     s_binding_context_factory = std::move(factory);
 }
-
-void SyncUser::register_management_session(const std::string& path)
-{
-    std::lock_guard<std::mutex> lock(m_mutex);
-    if (m_management_session.lock() || m_state == State::Error)
-        return;
-
-    m_management_session = SyncManager::shared().get_existing_session(path);
-}
-
-void SyncUser::register_permission_session(const std::string& path)
-{
-    std::lock_guard<std::mutex> lock(m_mutex);
-    if (m_permission_session.lock() || m_state == State::Error)
-        return;
-
-    m_permission_session = SyncManager::shared().get_existing_session(path);
-}
-
 }
 
 namespace std {

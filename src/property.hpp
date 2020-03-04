@@ -192,7 +192,7 @@ static auto switch_on_type(PropertyType type, Fn&& fn)
         case PT::Data:   return fn((BinaryData*)0);
         case PT::Date:   return fn((Timestamp*)0);
         case PT::Object: return fn((ObjType*)0);
-        case PT::ObjectId: return fn((ObjectId*)0);
+        case PT::ObjectId: return is_optional ? fn((util::Optional<ObjectId>*)0) : fn((ObjectId*)0);
         case PT::Decimal: return fn((Decimal128*)0);
         default: REALM_COMPILER_HINT_UNREACHABLE();
     }

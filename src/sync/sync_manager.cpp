@@ -37,7 +37,6 @@ SyncManager& SyncManager::shared()
 
 void SyncManager::configure(SyncClientConfig config)
 {
-    reset_for_testing();
     {
         std::lock_guard<std::mutex> lock(m_mutex);
         m_config = std::move(config);
@@ -196,7 +195,8 @@ bool SyncManager::run_file_action(const SyncFileActionMetadata& md)
 void SyncManager::reset_for_testing()
 {
     std::lock_guard<std::mutex> lock(m_file_system_mutex);
-    m_file_manager->remove_metadata_realm();
+    if (m_file_manager)
+        m_file_manager->remove_metadata_realm();
     m_file_manager = nullptr;
     m_metadata_manager = nullptr;
     m_client_uuid = util::none;

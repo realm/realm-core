@@ -19,15 +19,14 @@
 #ifndef REALM_OS_SYNC_METADATA_HPP
 #define REALM_OS_SYNC_METADATA_HPP
 
-#include <string>
+#include "results.hpp"
+#include "shared_realm.hpp"
+#include "sync/sync_user.hpp"
 
 #include <realm/obj.hpp>
 #include <realm/table.hpp>
 #include <realm/util/optional.hpp>
-
-#include "results.hpp"
-#include "shared_realm.hpp"
-#include "../sync_user.hpp"
+#include <string>
 
 namespace realm {
 template<typename T> class BasicRowExpr;
@@ -71,7 +70,7 @@ public:
     util::Optional<std::string> access_token() const;
     void set_access_token(util::Optional<std::string>);
 
-    void set_user_profile(std::shared_ptr<SyncUserProfile>);
+    void set_user_profile(const SyncUserProfile&);
 
     // Cannot be set after creation.
     std::string auth_server_url() const;

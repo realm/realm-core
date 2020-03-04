@@ -174,7 +174,7 @@ ValueType Object::get_property_value_impl(ContextType& ctx, const Property &prop
         case PropertyType::String: return ctx.box(m_obj.get<StringData>(column));
         case PropertyType::Data:   return ctx.box(m_obj.get<BinaryData>(column));
         case PropertyType::Date:   return ctx.box(m_obj.get<Timestamp>(column));
-        case PropertyType::ObjectId: return ctx.box(m_obj.get<ObjectId>(column));
+        case PropertyType::ObjectId: return is_nullable(property.type) ? ctx.box(m_obj.get<util::Optional<ObjectId>>(column)) : ctx.box(m_obj.get<ObjectId>(column));
         case PropertyType::Decimal:  return ctx.box(m_obj.get<Decimal>(column));
 //        case PropertyType::Any:    return ctx.box(m_obj.get<Mixed>(column));
         case PropertyType::Object: {

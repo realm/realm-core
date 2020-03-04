@@ -47,6 +47,7 @@ static const char * const c_sync_access_token = "access_token";
 static const char * const c_sync_identities = "identities";
 
 static const char * const c_sync_profile = "profile";
+static const char * const c_sync_profile_name = "name";
 static const char * const c_sync_profile_first_name = "first_name";
 static const char * const c_sync_profile_last_name = "last_name";
 static const char * const c_sync_profile_picture_url = "picture_url";
@@ -77,6 +78,7 @@ realm::Schema make_schema()
             {c_sync_provider_type, PropertyType::String}
         }},
         {c_sync_profile, {
+            {c_sync_profile_name, PropertyType::String|PropertyType::Nullable},
             {c_sync_profile_first_name, PropertyType::String|PropertyType::Nullable},
             {c_sync_profile_last_name, PropertyType::String|PropertyType::Nullable},
             {c_sync_profile_picture_url, PropertyType::String|PropertyType::Nullable},
@@ -438,6 +440,11 @@ util::Optional<std::string> SyncUserMetadata::access_token() const
     return result.is_null() ? util::none : util::make_optional(std::string(result));
 }
 
+inline SyncUserIdentity user_identity_from_obj(const ConstObj& obj)
+{
+    return SyncUserIdentity(obj.get<String>(c_sync_provider_id), obj.get<String>(c_sync_provider_type));
+}
+
 std::vector<SyncUserIdentity> SyncUserMetadata::identities() const
 {
     REALM_ASSERT(m_realm);
@@ -450,8 +457,7 @@ std::vector<SyncUserIdentity> SyncUserMetadata::identities() const
     {
         auto obj_key = linklist.get(i);
         auto obj = linklist.get_target_table()->get_object(obj_key);
-        auto identity = SyncUserIdentity(obj);
-        identities.push_back(identity);
+        identities.push_back(user_identity_from_obj(obj));
     }
 
     return identities;
@@ -513,7 +519,7 @@ void SyncUserMetadata::set_access_token(util::Optional<std::string> user_token)
     m_realm->commit_transaction();
 }
 
-void SyncUserMetadata::set_user_profile(std::shared_ptr<SyncUserProfile> profile)
+void SyncUserMetadata::set_user_profile(const SyncUserProfile& profile)
 {
     if (m_invalid)
         return;
@@ -524,29 +530,24 @@ void SyncUserMetadata::set_user_profile(std::shared_ptr<SyncUserProfile> profile
 
     auto obj = m_obj.create_and_set_linked_object(m_schema.idx_profile);
 
-    if (profile->first_name())
-        obj.set(c_sync_profile_first_name, profile->first_name().value());
-
-    if (profile->last_name())
-        obj.set(c_sync_profile_last_name, profile->last_name().value());
-
-    if (profile->gender())
-        obj.set(c_sync_profile_gender, profile->gender().value());
-
-    if (profile->picture_url())
-        obj.set(c_sync_profile_picture_url, profile->picture_url().value());
-
-    if (profile->birthday())
-        obj.set(c_sync_profile_birthday, profile->birthday().value());
-
-    if (profile->min_age())
-        obj.set(c_sync_profile_min_age, profile->min_age().value());
-
-    if (profile->max_age())
-        obj.set(c_sync_profile_max_age, profile->max_age().value());
-
-    if (profile->email())
-        obj.set(c_sync_profile_email, profile->email().value());
+    if (profile.name)
+        obj.set(c_sync_profile_name, *profile.name);
+    if (profile.first_name)
+        obj.set(c_sync_profile_first_name, *profile.first_name);
+    if (profile.last_name)
+        obj.set(c_sync_profile_last_name, *profile.last_name);
+    if (profile.gender)
+        obj.set(c_sync_profile_gender, *profile.gender);
+    if (profile.picture_url)
+        obj.set(c_sync_profile_picture_url, *profile.picture_url);
+    if (profile.birthday)
+        obj.set(c_sync_profile_birthday, *profile.birthday);
+    if (profile.min_age)
+        obj.set(c_sync_profile_min_age, *profile.min_age);
+    if (profile.max_age)
+        obj.set(c_sync_profile_max_age, *profile.max_age);
+    if (profile.email)
+        obj.set(c_sync_profile_email, *profile.email);
 
     m_realm->commit_transaction();
 }
