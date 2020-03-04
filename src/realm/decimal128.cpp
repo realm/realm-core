@@ -357,7 +357,7 @@ bool Decimal128::operator!=(const Decimal128& rhs) const
     return !(*this == rhs);
 }
 
-bool Decimal128::operator<(const Decimal128& rhs) const
+int Decimal128::compare(const Decimal128& rhs) const
 {
     unsigned flags = 0;
     int ret;
@@ -365,65 +365,49 @@ bool Decimal128::operator<(const Decimal128& rhs) const
     BID_UINT128 r = to_BID_UINT128(rhs);
     bid128_quiet_less(&ret, &l, &r, &flags);
     if (ret)
-        return true;
+        return -1;
+    bid128_quiet_greater(&ret, &l, &r, &flags);
+    if (ret)
+        return 1;
 
-    // Check for the case that one or more is NaN
+    // Either equal or one or more is NaN
     bool lhs_is_nan = is_nan();
     bool rhs_is_nan = rhs.is_nan();
     if (!lhs_is_nan && !rhs_is_nan) {
-        // None is Nan
-        return false;
+        // Neither is NaN
+        return 0;
     }
     if (lhs_is_nan && rhs_is_nan) {
         // We should have stable sorting of NaN
         if (m_value.w[1] == rhs.m_value.w[1]) {
-            return m_value.w[0] < rhs.m_value.w[0];
+            return m_value.w[0] < rhs.m_value.w[0] ? -1 : 1;
         }
         else {
-            return m_value.w[1] < rhs.m_value.w[1];
+            return m_value.w[1] < rhs.m_value.w[1] ? -1 : 1;
         }
     }
     // nan vs non-nan should always order nan first
-    return lhs_is_nan ? true : false;
+    return lhs_is_nan ? -1 : 1;
+}
+
+bool Decimal128::operator<(const Decimal128& rhs) const
+{
+    return compare(rhs) < 0;
 }
 
 bool Decimal128::operator>(const Decimal128& rhs) const
 {
-    unsigned flags = 0;
-    int ret;
-    BID_UINT128 l = to_BID_UINT128(*this);
-    BID_UINT128 r = to_BID_UINT128(rhs);
-    bid128_quiet_greater(&ret, &l, &r, &flags);
-    if (ret)
-        return true;
-
-    bool lhs_is_nan = is_nan();
-    bool rhs_is_nan = rhs.is_nan();
-    if (!lhs_is_nan && !rhs_is_nan) {
-        // None is Nan
-        return false;
-    }
-    if (lhs_is_nan && rhs_is_nan) {
-        // We should have stable sorting of NaN
-        if (m_value.w[1] == rhs.m_value.w[1]) {
-            return m_value.w[0] > rhs.m_value.w[0];
-        }
-        else {
-            return m_value.w[1] > rhs.m_value.w[1];
-        }
-    }
-    // nan vs non-nan should always order nan first
-    return lhs_is_nan ? false : true;
+    return compare(rhs) > 0;
 }
 
 bool Decimal128::operator<=(const Decimal128& rhs) const
 {
-    return !(*this > rhs);
+    return compare(rhs) <= 0;
 }
 
 bool Decimal128::operator>=(const Decimal128& rhs) const
 {
-    return !(*this < rhs);
+    return compare(rhs) >= 0;
 }
 
 Decimal128 do_divide(BID_UINT128 x, BID_UINT128 div)

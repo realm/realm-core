@@ -66,6 +66,8 @@ public:
     bool operator<=(const Decimal128& rhs) const;
     bool operator>=(const Decimal128& rhs) const;
 
+    int compare(const Decimal128& rhs) const;
+
     Decimal128 operator/(int64_t div) const;
     Decimal128 operator/(size_t div) const;
     Decimal128 operator/(int div) const;
