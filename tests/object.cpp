@@ -149,6 +149,9 @@ TEST_CASE("object") {
         {"nullable string pk", {
             {"pk", PropertyType::String|PropertyType::Nullable, Property::IsPrimary{true}},
         }},
+        {"nullable object id pk", {
+            {"pk", PropertyType::ObjectId|PropertyType::Nullable, Property::IsPrimary{true}},
+        }},
         {"person", {
             {"name", PropertyType::String, Property::IsPrimary{true}},
             {"age", PropertyType::Int},
@@ -933,6 +936,18 @@ TEST_CASE("object") {
         create(AnyDict{{"pk", util::Any()}}, "all optional types");
         create(AnyDict{{"pk", INT64_C(0)}}, "all optional types");
         REQUIRE(Results(r, r->read_group().get_table("class_all optional types")).size() == 2);
+    }
+
+    SECTION("create null and default primary keys for ObjectId types") {
+        auto create = [&](util::Any&& value, StringData type) {
+            r->begin_transaction();
+            auto obj = Object::create(d, r, *r->schema().find(type), value);
+            r->commit_transaction();
+            return obj;
+        };
+        create(AnyDict{{"pk", util::Any()}}, "nullable object id pk");
+        create(AnyDict{{"pk", ObjectId::gen()}}, "nullable object id pk");
+        REQUIRE(Results(r, r->read_group().get_table("class_nullable object id pk")).size() == 2);
     }
 
     SECTION("getters and setters") {
