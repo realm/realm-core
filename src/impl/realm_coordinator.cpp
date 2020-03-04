@@ -295,13 +295,6 @@ void RealmCoordinator::create_session(const Realm::Config& config)
     create_sync_session(!exists);
 }
 
-void RealmCoordinator::open_with_config(Realm::Config config)
-{
-    CheckedLockGuard lock(m_realm_mutex);
-    set_config(config);
-    open_db();
-}
-
 #endif
 
 namespace realm {
