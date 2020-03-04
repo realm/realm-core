@@ -13,7 +13,7 @@
 -----------
 
 ### Internals
-* None.
+* Migrated to the final `std::filesystem` implementation on Windows from the experimental one.
 
 ----------------------------------------------
 
