@@ -1564,6 +1564,20 @@ TEST_IF(Upgrade_Database_10_11, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_S
     // original file intact and unmodified
     File::copy(path, temp_copy);
     auto hist = make_in_realm_history(temp_copy);
+    auto sg = DB::create(*hist);
+    auto rt = sg->start_read();
+
+    auto t = rt->get_table("table");
+    auto o = rt->get_table("origin");
+    auto col = o->get_column_key("link");
+
+    auto it = o->begin();
+    for (auto id : ids) {
+        auto obj = t->get_object_with_primary_key(id);
+        CHECK_EQUAL(obj.get_backlink_count(), 1);
+        CHECK_EQUAL(it->get<ObjKey>(col), obj.get_key());
+        ++it;
+    }
 
 #else
     // NOTE: This code must be executed from an old file-format-version 10
