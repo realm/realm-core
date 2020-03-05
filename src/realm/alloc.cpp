@@ -138,8 +138,9 @@ char* Allocator::translate(ref_type ref) const noexcept
                 // array fits inside primary mapping, no new mapping needed, just move the limit
                 // take into account that another thread may attempt to change it concurrently
                 if (!txl.primary_mapping_limit.compare_exchange_weak(mapping_limit, offset + size,
-                                                                     std::memory_order_acq_rel))
+                                                                     std::memory_order_acq_rel)) {
                     return translate(ref); // hopefully tail recursion optimization eliminates stack growth..
+                }
             }
             else {
                 // array crosses over into next mapping, we have to get/add a xover mapping for it.
@@ -147,8 +148,8 @@ char* Allocator::translate(ref_type ref) const noexcept
                 return translate(ref);
             }
         }
-        REALM_ASSERT(offset <= txl.primary_mapping_limit);
-        if (offset == txl.primary_mapping_limit && txl.xover_mapping_addr != nullptr) {
+        // REALM_ASSERT(offset <= mapping_limit);
+        if (offset == mapping_limit && txl.xover_mapping_addr != nullptr) {
             // array is inside the established xover mapping:
             addr = txl.xover_mapping_addr + (offset - txl.xover_mapping_base);
 #if REALM_ENABLE_ENCRYPTION

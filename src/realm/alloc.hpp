@@ -160,7 +160,10 @@ protected:
     struct RefTranslation {
         char* mapping_addr;
         std::atomic<size_t> primary_mapping_limit;
-        size_t xover_mapping_base = 0;
+        // any xover mapping must stretch past the end of the primary mapping, and it can at most
+        // hold the largest array supported, which is 16MB. Consequently, accesses to the first
+        // part of the primary mapping does not need to be checked.
+        size_t xover_mapping_base = (1 << section_shift) - 16 * 1024 * 1024;
         char* xover_mapping_addr = 0;
 #if REALM_ENABLE_ENCRYPTION
         util::EncryptedFileMapping* encrypted_mapping = nullptr;
