@@ -117,58 +117,92 @@ Allocator& Allocator::get_default() noexcept
     return default_alloc;
 }
 
-char* Allocator::translate(ref_type ref) const noexcept
+void Allocator::x_translate_bump(RefTranslation& txl, size_t idx, size_t offset) const noexcept
 {
-    if (auto ref_translation_ptr = m_ref_translation_ptr.load(std::memory_order_acquire)) {
-        size_t idx = get_section_index(ref);
-        RefTranslation& txl = ref_translation_ptr[idx];
-        size_t offset = ref - get_section_base(idx);
-        char* addr;
-        size_t mapping_limit = txl.primary_mapping_limit.load(std::memory_order_acquire);
-        if (offset >= mapping_limit && txl.xover_mapping_addr == nullptr) {
-            // there is no xover mapping and this ref might need one...
-            // establish array size to determine if array crosses into next mapping
-            addr = txl.mapping_addr + offset;
+    // there is no xover mapping and this ref might need one...
+    // establish array size to determine if array crosses into next mapping
+    char* addr = txl.mapping_addr + offset;
 #if REALM_ENABLE_ENCRYPTION
-            realm::util::encryption_read_barrier(addr, NodeHeader::header_size,
-                                                 ref_translation_ptr[idx].encrypted_mapping, nullptr);
+    realm::util::encryption_read_barrier(addr, NodeHeader::header_size, txl.encrypted_mapping, nullptr);
 #endif
-            auto size = NodeHeader::get_byte_size_from_header(addr);
-            if (get_section_index(ref + size - 1) == idx) {
-                // array fits inside primary mapping, no new mapping needed, just move the limit
-                // take into account that another thread may attempt to change it concurrently
-                if (!txl.primary_mapping_limit.compare_exchange_weak(mapping_limit, offset + size,
-                                                                     std::memory_order_acq_rel)) {
-                    return translate(ref); // hopefully tail recursion optimization eliminates stack growth..
-                }
-            }
-            else {
-                // array crosses over into next mapping, we have to get/add a xover mapping for it.
-                const_cast<Allocator*>(this)->get_or_add_xover_mapping(txl, idx, offset, size);
-                return translate(ref);
-            }
+    auto size = NodeHeader::get_byte_size_from_header(addr);
+    if (offset + size <= 1 << section_shift) {
+        size_t mapping_limit = txl.primary_mapping_limit.load(std::memory_order_relaxed);
+        // array fits inside primary mapping, no new mapping needed, just move the limit
+        // take into account that another thread may attempt to change / have changed it concurrently,
+        // by re evaluating whether we still need to bump. In case of conflict we back off and retry.
+        if (offset + size > mapping_limit) {
+            txl.primary_mapping_limit.compare_exchange_strong(mapping_limit, offset + size,
+                                                              std::memory_order_relaxed);
         }
-        // REALM_ASSERT(offset <= mapping_limit);
-        if (offset == mapping_limit && txl.xover_mapping_addr != nullptr) {
+    }
+    else {
+        // array crosses over into next mapping, we have to get/add a xover mapping for it.
+        const_cast<Allocator*>(this)->get_or_add_xover_mapping(txl, idx, offset, size);
+    }
+}
+
+char* Allocator::x_translate_extended(RefTranslation* ref_translation_ptr, ref_type ref) const noexcept
+{
+    size_t idx = get_section_index(ref);
+    RefTranslation& txl = ref_translation_ptr[idx];
+    size_t offset = ref - get_section_base(idx);
+    if (txl.xover_mapping_addr.load(std::memory_order_relaxed) == nullptr) {
+        // bump the limit / add xover mapping and retry:
+        x_translate_bump(txl, idx, offset);
+        return x_translate(ref_translation_ptr, ref);
+    }
+    else {
+        auto xover_mapping_addr = txl.xover_mapping_addr.load(std::memory_order_relaxed);
+        auto xover_mapping_base = txl.xover_mapping_base.load(std::memory_order_relaxed);
+        auto xover_encrypted_mapping = txl.xover_encrypted_mapping.load(std::memory_order_relaxed);
+        // back off in case of only partial setup of xover mapping
+        if (xover_mapping_addr && xover_mapping_base && xover_encrypted_mapping) {
+            char* addr;
             // array is inside the established xover mapping:
-            addr = txl.xover_mapping_addr + (offset - txl.xover_mapping_base);
+            addr = xover_mapping_addr + (offset - xover_mapping_base);
 #if REALM_ENABLE_ENCRYPTION
-            realm::util::encryption_read_barrier(addr, NodeHeader::header_size,
-                                                 ref_translation_ptr[idx].xover_encrypted_mapping,
+            realm::util::encryption_read_barrier(addr, NodeHeader::header_size, xover_encrypted_mapping,
                                                  NodeHeader::get_byte_size_from_header);
 #endif
+            return addr;
         }
         else {
-            addr = txl.mapping_addr + offset;
-#if REALM_ENABLE_ENCRYPTION
-            realm::util::encryption_read_barrier(addr, NodeHeader::header_size,
-                                                 ref_translation_ptr[idx].encrypted_mapping,
-                                                 NodeHeader::get_byte_size_from_header);
-#endif
+            // not a valid xover mapping established, we need to retry
+            return x_translate(ref_translation_ptr, ref);
         }
+    }
+}
+
+
+inline char* Allocator::x_translate(RefTranslation* ref_translation_ptr, ref_type ref) const noexcept
+{
+    size_t idx = get_section_index(ref);
+    RefTranslation& txl = ref_translation_ptr[idx];
+    size_t offset = ref - get_section_base(idx);
+    size_t mapping_limit = txl.primary_mapping_limit.load(std::memory_order_relaxed);
+    if (offset < mapping_limit) {
+        // the mapping limit may grow concurrently, but that will not affect this code path
+        char* addr = txl.mapping_addr + offset;
+#if REALM_ENABLE_ENCRYPTION
+        realm::util::encryption_read_barrier(addr, NodeHeader::header_size, txl.encrypted_mapping,
+                                             NodeHeader::get_byte_size_from_header);
+#endif
         return addr;
     }
-    else
+    else {
+        return x_translate_extended(ref_translation_ptr, ref);
+    }
+}
+
+char* Allocator::translate(ref_type ref) const noexcept
+{
+    auto ref_translation_ptr = m_ref_translation_ptr.load(std::memory_order_acquire);
+    if (ref_translation_ptr) {
+        return x_translate(ref_translation_ptr, ref);
+    }
+    else {
         return do_translate(ref);
+    }
 }
 }

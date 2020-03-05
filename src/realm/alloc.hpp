@@ -159,15 +159,21 @@ protected:
     // into equal chunks.
     struct RefTranslation {
         char* mapping_addr;
-        std::atomic<size_t> primary_mapping_limit;
+        // The members involved in xover mapping management need to be atomic.
+
         // any xover mapping must stretch past the end of the primary mapping, and it can at most
         // hold the largest array supported, which is 16MB. Consequently, accesses to the first
-        // part of the primary mapping does not need to be checked.
-        size_t xover_mapping_base = (1 << section_shift) - 16 * 1024 * 1024;
-        char* xover_mapping_addr = 0;
+        // part of the primary mapping does not need to be checked. We initialize xover_mapping_limit
+        // to exploit this:
+        std::atomic<size_t> primary_mapping_limit = (1 << section_shift) - 16 * 1024 * 1024;
+        // With exception of 'encrypted_mapping', the following members are accessed
+        // in unsynchronized fashion but we rely on any non-zero value to indicate validity.
+        // Hence they must each initially be zero, and from there be updated atomically.
+        std::atomic<size_t> xover_mapping_base = 0;
+        std::atomic<char*> xover_mapping_addr = 0;
 #if REALM_ENABLE_ENCRYPTION
         util::EncryptedFileMapping* encrypted_mapping = nullptr;
-        util::EncryptedFileMapping* xover_encrypted_mapping = nullptr;
+        std::atomic<util::EncryptedFileMapping*> xover_encrypted_mapping = nullptr;
 #endif
         RefTranslation(char* addr)
             : mapping_addr(addr)
@@ -182,12 +188,12 @@ protected:
         {
             if (&from != this) {
                 mapping_addr = from.mapping_addr;
-                primary_mapping_limit.store(from.primary_mapping_limit);
-                xover_mapping_base = from.xover_mapping_base;
-                xover_mapping_addr = from.xover_mapping_addr;
+                primary_mapping_limit.store(from.primary_mapping_limit, std::memory_order_relaxed);
+                xover_mapping_base.store(from.xover_mapping_base, std::memory_order_relaxed);
+                xover_mapping_addr.store(from.xover_mapping_addr, std::memory_order_relaxed);
 #if REALM_ENABLE_ENCRYPTION
                 encrypted_mapping = from.encrypted_mapping;
-                xover_encrypted_mapping = from.xover_encrypted_mapping;
+                xover_encrypted_mapping.store(from.xover_encrypted_mapping, std::memory_order_relaxed);
 #endif
             }
             return *this;
@@ -222,6 +228,9 @@ protected:
     /// then entirely the responsibility of the caller that the memory
     /// is not modified by way of the returned memory pointer.
     virtual char* do_translate(ref_type ref) const noexcept = 0;
+    char* x_translate(RefTranslation*, ref_type ref) const noexcept;
+    void x_translate_bump(RefTranslation& txl, size_t idx, size_t offset) const noexcept;
+    char* x_translate_extended(RefTranslation*, ref_type ref) const noexcept;
     virtual void get_or_add_xover_mapping(RefTranslation&, size_t, size_t, size_t)
     {
         REALM_ASSERT(false);
@@ -533,7 +542,6 @@ inline Allocator::Allocator() noexcept
 inline Allocator::~Allocator() noexcept
 {
 }
-
 
 } // namespace realm
 
