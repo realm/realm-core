@@ -824,7 +824,8 @@ template <>
 void Lst<ObjKey>::set_repl(Replication* repl, size_t ndx, ObjKey key)
 {
     if (key) {
-        repl->list_set_link(*this, ndx, key);
+        if (!key.is_unresolved())
+            repl->list_set_link(*this, ndx, key);
     }
     else {
         repl->list_set_null(*this, ndx);
@@ -966,7 +967,8 @@ template <>
 void Lst<ObjKey>::insert_repl(Replication* repl, size_t ndx, ObjKey key)
 {
     if (key) {
-        repl->list_insert_link(*this, ndx, key);
+        if (!key.is_unresolved())
+            repl->list_insert_link(*this, ndx, key);
     }
     else {
         repl->list_insert_null(*this, ndx);

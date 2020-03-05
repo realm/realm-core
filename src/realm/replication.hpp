@@ -549,7 +549,8 @@ inline void Replication::set(const Table* table, ColKey col_key, ObjKey key, Obj
                              _impl::Instruction variant)
 {
     if (target_key) {
-        set_link(table, col_key, key, target_key, variant);
+        if (!target_key.is_unresolved())
+            set_link(table, col_key, key, target_key, variant);
     }
     else {
         nullify_link(table, col_key, key);
