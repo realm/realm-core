@@ -133,7 +133,7 @@ void App::login_with_credentials(const AppCredentials& credentials,
             nlohmann::json profile_json;
             try {
                 profile_json = nlohmann::json::parse(profile_response.body);
-            } catch(std::domain_error e) {
+            } catch (const std::domain_error& e) {
                 return completion_block(nullptr, AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
             }
 

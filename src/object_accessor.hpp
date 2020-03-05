@@ -249,14 +249,19 @@ Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
         else {
             created = true;
             Mixed primary_key;
-            if (primary_prop->type == PropertyType::Int) {
-                primary_key = ctx.template unbox<util::Optional<int64_t>>(*primary_value);
-            }
-            else if (primary_prop->type == PropertyType::String) {
-                primary_key = ctx.template unbox<StringData>(*primary_value);
-            }
-            else {
-                REALM_TERMINATE("Unsupported primary key type.");
+            if (!ctx.is_null(*primary_value)) {
+                if (primary_prop->type == PropertyType::Int) {
+                    primary_key = ctx.template unbox<util::Optional<int64_t>>(*primary_value);
+                }
+                else if (primary_prop->type == PropertyType::String) {
+                    primary_key = ctx.template unbox<StringData>(*primary_value);
+                }
+                else if (primary_prop->type == PropertyType::ObjectId) {
+                    primary_key = ctx.template unbox<ObjectId>(*primary_value);
+                }
+                else {
+                    REALM_TERMINATE("Unsupported primary key type.");
+                }
             }
             obj = table->create_object_with_primary_key(primary_key);
         }
@@ -383,18 +388,24 @@ template<typename ValueType, typename ContextType>
 ObjKey Object::get_for_primary_key_impl(ContextType& ctx, Table const& table,
                                         const Property &primary_prop,
                                         ValueType primary_value) {
-    bool is_null = ctx.is_null(primary_value);
-    if (is_null && !is_nullable(primary_prop.type))
-        throw std::logic_error("Invalid null value for non-nullable primary key.");
-    if (primary_prop.type == PropertyType::String) {
-        return table.find_first(primary_prop.column_key,
-                                ctx.template unbox<StringData>(primary_value));
+    if (ctx.is_null(primary_value)) {
+        if (!is_nullable(primary_prop.type))
+            throw std::logic_error("Invalid null value for non-nullable primary key.");
+        return table.find_primary_key({});
     }
-    if (is_nullable(primary_prop.type))
-        return table.find_first(primary_prop.column_key,
-                                ctx.template unbox<util::Optional<int64_t>>(primary_value));
-    return table.find_first(primary_prop.column_key,
-                            ctx.template unbox<int64_t>(primary_value));
+    else if (primary_prop.type == PropertyType::String) {
+        return table.find_primary_key(ctx.template unbox<StringData>(primary_value));
+    }
+    else if (primary_prop.type == PropertyType::Int) {
+        if (is_nullable(primary_prop.type)) {
+            return table.find_primary_key(ctx.template unbox<util::Optional<int64_t>>(primary_value));
+        }
+        return table.find_primary_key(ctx.template unbox<int64_t>(primary_value));
+    }
+    else if (primary_prop.type == PropertyType::ObjectId) {
+        return table.find_primary_key(ctx.template unbox<ObjectId>(primary_value));
+    }
+    return {};
 }
 
 } // namespace realm
