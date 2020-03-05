@@ -197,6 +197,11 @@ void Results::evaluate_sort_and_distinct_on_list()
     if (m_descriptor_ordering.is_empty())
         return;
 
+    // We can't use the sorted list from the notifier if we're in a write
+    // transaction as we only check the transaction version to see if the data matches
+    if (m_notifier && m_notifier->get_list_indices(m_list_indices) && !m_realm->is_in_transaction())
+        return;
+
     bool needs_update = m_list->has_changed();
     if (!m_list_indices) {
         m_list_indices = std::vector<size_t>{};
@@ -214,12 +219,10 @@ void Results::evaluate_sort_and_distinct_on_list()
     auto sz = m_descriptor_ordering.size();
     for (size_t i = 0; i < sz; i++) {
         auto descr = m_descriptor_ordering[i];
-        if (descr->get_type() == DescriptorType::Sort) {
+        if (descr->get_type() == DescriptorType::Sort)
             sort_order = static_cast<const SortDescriptor*>(descr)->is_ascending(0);
-        }
-        if (descr->get_type() == DescriptorType::Distinct) {
+        if (descr->get_type() == DescriptorType::Distinct)
             do_distinct = true;
-        }
     }
 
     if (do_distinct)
@@ -980,7 +983,10 @@ void Results::prepare_async(ForCallback force) NO_THREAD_SAFETY_ANALYSIS
             return;
     }
 
-    m_notifier = std::make_shared<_impl::ResultsNotifier>(*this);
+    if (m_list)
+        m_notifier = std::make_shared<_impl::ListResultsNotifier>(*this);
+    else
+        m_notifier = std::make_shared<_impl::ResultsNotifier>(*this);
     _impl::RealmCoordinator::register_notifier(m_notifier);
 }
 
@@ -1041,29 +1047,27 @@ REALM_RESULTS_TYPE(util::Optional<ObjectId>)
 
 #undef REALM_RESULTS_TYPE
 
-Results Results::freeze(SharedRealm frozen_realm)
+Results Results::freeze(std::shared_ptr<Realm> const& frozen_realm)
 {
     util::CheckedUniqueLock lock(m_mutex);
     if (m_mode == Mode::Empty)
         return *this;
-    auto& transaction = frozen_realm->transaction();
-    REALM_ASSERT(transaction.get_version() == m_realm->read_transaction_version().version);
     switch (m_mode) {
         case Mode::Table:
-            return Results(std::move(frozen_realm), transaction.import_copy_of(m_table));
+            return Results(frozen_realm, frozen_realm->import_copy_of(m_table));
         case Mode::List:
-            return Results(std::move(frozen_realm), transaction.import_copy_of(*m_list), m_descriptor_ordering);
+            return Results(frozen_realm, frozen_realm->import_copy_of(*m_list), m_descriptor_ordering);
         case Mode::LinkList: {
-            std::shared_ptr<LnkLst> frozen_ll(transaction.import_copy_of(std::make_unique<LnkLst>(*m_link_list)).release());
+            std::shared_ptr<LnkLst> frozen_ll(frozen_realm->import_copy_of(std::make_unique<LnkLst>(*m_link_list)).release());
 
             // If query/sort was provided for the original Results, mode would have changed to Query, so no need
             // include them here.
-            return Results(std::move(frozen_realm), std::move(frozen_ll));
+            return Results(frozen_realm, std::move(frozen_ll));
         }
         case Mode::Query:
-            return Results(std::move(frozen_realm), *transaction.import_copy_of(m_query, PayloadPolicy::Copy), m_descriptor_ordering);
+            return Results(frozen_realm, *frozen_realm->import_copy_of(m_query, PayloadPolicy::Copy), m_descriptor_ordering);
         case Mode::TableView: {
-            Results results(std::move(frozen_realm), *transaction.import_copy_of(m_table_view, PayloadPolicy::Copy), m_descriptor_ordering);
+            Results results(frozen_realm, *frozen_realm->import_copy_of(m_table_view, PayloadPolicy::Copy), m_descriptor_ordering);
             results.assert_unlocked();
             results.evaluate_query_if_needed(false);
             return results;

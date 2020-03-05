@@ -32,6 +32,7 @@ if(${CMAKE_CXX_COMPILER_ID} MATCHES "Clang" OR ${CMAKE_CXX_COMPILER_ID} STREQUAL
         -Wall
         -Wextra
         -Wno-missing-field-initializers
+        -Wno-unevaluated-expression
         -Wempty-body
         -Wparentheses
         -Wunknown-pragmas

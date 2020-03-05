@@ -113,7 +113,7 @@ public:
     Results snapshot() const;
 
     // Returns a frozen copy of this result
-    List freeze(std::shared_ptr<Realm> realm) const;
+    List freeze(std::shared_ptr<Realm> const& realm) const;
 
     // Returns whether or not this List is frozen.
     bool is_frozen() const noexcept;

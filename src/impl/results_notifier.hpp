@@ -26,11 +26,19 @@
 
 namespace realm {
 namespace _impl {
-class ResultsNotifier : public CollectionNotifier {
+class ResultsNotifierBase : public CollectionNotifier {
+public:
+    using ListIndices = util::Optional<std::vector<size_t>>;
+    using CollectionNotifier::CollectionNotifier;
+
+    virtual bool get_tableview(TableView&) { return false; }
+    virtual bool get_list_indices(ListIndices&) { return false; }
+};
+
+class ResultsNotifier : public ResultsNotifierBase {
 public:
     ResultsNotifier(Results& target);
-
-    bool get_tableview(TableView& out);
+    bool get_tableview(TableView& out) override;
 
 private:
     std::unique_ptr<Query> m_query;
@@ -52,6 +60,41 @@ private:
 
     // The rows from the previous run of the query, for calculating diffs
     std::vector<int64_t> m_previous_rows;
+
+    TransactionChangeInfo* m_info = nullptr;
+    bool m_results_were_used = true;
+
+    bool need_to_run();
+    void calculate_changes();
+
+    void run() override;
+    void do_prepare_handover(Transaction&) override;
+    bool do_add_required_change_info(TransactionChangeInfo& info) override;
+    bool prepare_to_deliver() override;
+
+    void release_data() noexcept override;
+    void do_attach_to(Transaction& sg) override;
+};
+
+class ListResultsNotifier : public ResultsNotifierBase {
+public:
+    ListResultsNotifier(Results& target);
+    bool get_list_indices(ListIndices& out) override;
+
+private:
+    std::shared_ptr<LstBase> m_list;
+    util::Optional<bool> m_sort_order;
+    bool m_distinct = false;
+
+    ListIndices m_run_indices;
+
+    VersionID m_handover_transaction_version;
+    ListIndices m_handover_indices;
+    VersionID m_delivered_transaction_version;
+    ListIndices m_delivered_indices;
+
+    // The rows from the previous run of the query, for calculating diffs
+    std::vector<size_t> m_previous_indices;
 
     TransactionChangeInfo* m_info = nullptr;
     bool m_results_were_used = true;

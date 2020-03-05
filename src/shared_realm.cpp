@@ -98,6 +98,11 @@ std::shared_ptr<Transaction> Realm::transaction_ref()
     return std::static_pointer_cast<Transaction>(m_group);
 }
 
+std::shared_ptr<Transaction> Realm::duplicate() const
+{
+    return std::static_pointer_cast<Transaction>(m_coordinator->begin_read(read_transaction_version(), is_frozen()));
+}
+
 std::shared_ptr<DB>& Realm::Internal::get_db(Realm& realm) {
     return realm.m_coordinator->m_db;
 }

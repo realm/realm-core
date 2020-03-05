@@ -331,7 +331,9 @@ Results List::filter(Query q) const
 Results List::as_results() const
 {
     verify_attached();
-    return (m_type == PropertyType::Object) ? Results(m_realm, std::static_pointer_cast<LnkLst>(m_list_base)) : Results(m_realm, m_list_base);
+    return m_type == PropertyType::Object
+        ? Results(m_realm, std::static_pointer_cast<LnkLst>(m_list_base))
+        : Results(m_realm, m_list_base);
 }
 
 Results List::snapshot() const
@@ -447,9 +449,9 @@ NotificationToken List::add_notification_callback(CollectionChangeCallback cb) &
     return {m_notifier, m_notifier->add_callback(std::move(cb))};
 }
 
-List List::freeze(std::shared_ptr<Realm> frozen_realm) const
+List List::freeze(std::shared_ptr<Realm> const& frozen_realm) const
 {
-    return List(frozen_realm, *frozen_realm->transaction().import_copy_of(*m_list_base));
+    return List(frozen_realm, *frozen_realm->import_copy_of(*m_list_base));
 }
 
 bool List::is_frozen() const noexcept
