@@ -16,7 +16,6 @@ set(SOURCES
     migrations.cpp
     object.cpp
     object_store.cpp
-    primitive_list.cpp
     realm.cpp
     results.cpp
     schema.cpp

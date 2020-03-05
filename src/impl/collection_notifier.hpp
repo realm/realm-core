@@ -52,6 +52,7 @@ struct ListChangeInfo {
 
 // FIXME: this should be in core
 using TableKeyType = decltype(TableKey::value);
+using ObjKeyType = decltype(ObjKey::value);
 
 struct TransactionChangeInfo {
     std::vector<ListChangeInfo> lists;
@@ -85,7 +86,7 @@ private:
     Table const& m_root_table;
     const TableKey m_root_table_key;
     ObjectChangeSet const* const m_root_object_changes;
-    std::unordered_map<TableKeyType, IndexSet> m_not_modified;
+    std::unordered_map<TableKeyType, std::unordered_set<ObjKeyType>> m_not_modified;
     std::vector<RelatedTable> const& m_related_tables;
 
     struct Path {
@@ -95,7 +96,7 @@ private:
     };
     std::array<Path, 4> m_current_path;
 
-    bool check_row(Table const& table, int64_t obj_key, size_t depth = 0);
+    bool check_row(Table const& table, ObjKeyType obj_key, size_t depth = 0);
     bool check_outgoing_links(TableKey table_key, Table const& table,
                               int64_t obj_key, size_t depth = 0);
 };
@@ -276,7 +277,8 @@ public:
         return *this;
     }
 
-    Handle& operator=(std::shared_ptr<T>&& other)
+    template<typename U>
+    Handle& operator=(std::shared_ptr<U>&& other)
     {
         reset();
         std::shared_ptr<T>::operator=(std::move(other));

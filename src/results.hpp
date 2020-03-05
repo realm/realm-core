@@ -37,7 +37,7 @@ class Mixed;
 class ObjectSchema;
 
 namespace _impl {
-    class ResultsNotifier;
+    class ResultsNotifierBase;
 }
 
 class Results {
@@ -71,7 +71,7 @@ public:
     Query get_query() const REQUIRES(!m_mutex);
 
     // Get the Lst this Results is derived from, if any
-    const LstBase* get_list() const { return m_list.get(); }
+    std::shared_ptr<LstBase> const& get_list() const { return m_list; }
 
     // Get the list of sort and distinct operations applied for this Results.
     DescriptorOrdering const& get_descriptor_ordering() const noexcept { return m_descriptor_ordering; }
@@ -139,7 +139,7 @@ public:
     Results snapshot() && REQUIRES(!m_mutex);
 
     // Returns a frozen copy of this result
-    Results freeze(SharedRealm realm) REQUIRES(!m_mutex);
+    Results freeze(std::shared_ptr<Realm> const& realm) REQUIRES(!m_mutex);
 
     // Returns whether or not this Results is frozen.
     bool is_frozen() REQUIRES(!m_mutex);
@@ -230,13 +230,6 @@ public:
     // Returns whether the rows are guaranteed to be in table order.
     bool is_in_table_order() const;
 
-    // Helper type to let ResultsNotifier update the tableview without giving access
-    // to any other privates or letting anyone else do so
-    class Internal {
-        friend class _impl::ResultsNotifier;
-        static void set_table_view(Results& results, TableView&& tv);
-    };
-
     template<typename Context> auto first(Context&) REQUIRES(!m_mutex);
     template<typename Context> auto last(Context&) REQUIRES(!m_mutex);
 
@@ -273,7 +266,7 @@ private:
     std::shared_ptr<LstBase> m_list;
     util::Optional<std::vector<size_t>> m_list_indices GUARDED_BY(m_mutex);
 
-    _impl::CollectionNotifier::Handle<_impl::ResultsNotifier> m_notifier;
+    _impl::CollectionNotifier::Handle<_impl::ResultsNotifierBase> m_notifier;
 
     Mode m_mode GUARDED_BY(m_mutex) = Mode::Empty;
     UpdatePolicy m_update_policy = UpdatePolicy::Auto;

@@ -327,6 +327,16 @@ void ObjectSchema::validate(Schema const& schema, std::vector<ObjectSchemaValida
         };
 
         Proxy operator*() { return Proxy{os, exceptions}; }
+        ErrorWriter(ObjectSchema const& os, std::vector<ObjectSchemaValidationException>& exceptions)
+            : os(os)
+            , exceptions(exceptions)
+        {
+        }
+        ErrorWriter(const ErrorWriter& other)
+            : os(other.os)
+            , exceptions(other.exceptions)
+        {
+        }
         ErrorWriter &operator=(const ErrorWriter &) { return *this; }
         ErrorWriter &operator++() { return *this; }
         ErrorWriter &operator++(int) { return *this; }
