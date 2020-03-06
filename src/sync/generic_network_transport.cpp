@@ -100,7 +100,8 @@ static const std::map<std::string, ServiceErrorCode> service_error_map = {
     {"UserDisabled", ServiceErrorCode::user_disabled},
     {"AuthError", ServiceErrorCode::auth_error},
     {"BadRequest", ServiceErrorCode::bad_request},
-    {"AccountNameInUse", ServiceErrorCode::account_name_in_use}
+    {"AccountNameInUse", ServiceErrorCode::account_name_in_use},
+    {"Unknown", ServiceErrorCode::unknown},
 };
 
 std::string get_error_message(ServiceErrorCode error)

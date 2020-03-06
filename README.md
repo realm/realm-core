@@ -132,6 +132,20 @@ docker run --rm -it -v $(pwd):/tmp -w /tmp objectstore bash
 Refer to the rest of this document for instructions to build/test in other
 configurations.
 
+## Running [app] tests against a local MongoDB Stitch
+
+Stitch images are published to our private Github CI. Follow the steps here to
+set up authorization from docker to your Github account https://github.com/realm/ci/packages/147854
+
+```
+docker run -p 9090:9090 --rm docker.pkg.github.com/realm/ci/mongodb-realm-test-server
+# FIXME: Missing step here for importing the app in ./tests/mongodb/stitch.json
+mkdir build.sync.ninja
+sh "cmake -B build.sync.ninja -G Ninja -DREALM_ENABLE_SYNC=1 -DREALM_ENABLE_AUTH_TESTS=1 -DREALM_MONGODB_ENDPOINT=\"http://localhost:9090\" -DREALM_STITCH_CONFIG=\"./tests/mongodb/stitch.json\"
+sh "cmake --build build.sync.ninja --target tests"
+sh "./build.sync.ninja/tests/tests -d=1
+```
+
 ## Visual Studio Code
 
 The `.vscode` folder contains workspace configuration files for Visual Studio Code, which will be picked up by VSCode when it opens this folder. `.vscode/extensions.json` contains a list of recommended IDE extensions - namely C++, CMake, and Catch2 support. Make sure to accept installing the recommended extensions the first time you open this repo in VSCode.

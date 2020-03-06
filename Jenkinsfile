@@ -56,21 +56,57 @@ def nodeWithSources(String nodespec, Closure steps) {
             }
             steps()
         }
-        steps()
     } finally {
         deleteDir()
     }
   }
 }
 
+def withCustomRealmCloud(String version, String configPath, String appName, block = { it }) {
+  def mdbRealmImage = docker.image("${env.DOCKER_REGISTRY}/ci/mongodb-realm-images:${version}")
+  def stitchCliImage = docker.image("${env.DOCKER_REGISTRY}/ci/stitch-cli:190")
+  docker.withRegistry("https://${env.DOCKER_REGISTRY}", "ecr:eu-west-1:aws-ci-user") {
+    mdbRealmImage.pull()
+    stitchCliImage.pull()
+  }
+  // run image, get IP
+  withDockerNetwork { network ->
+    mdbRealmImage.withRun("--network=${network} --network-alias=mongodb-realm") {
+      stitchCliImage.inside("--network=${network}") {
+        sh '''
+          echo "Waiting for Stitch to start"
+          while ! curl --output /dev/null --silent --head --fail http://mongodb-realm:9090; do
+            sleep 1 && echo -n .;
+          done;
+        '''
+
+        def access_token = sh(
+          script: 'curl --request POST --header "Content-Type: application/json" --data \'{ "username":"unique_user@domain.com", "password":"password" }\' http://mongodb-realm:9090/api/admin/v3.0/auth/providers/local-userpass/login -s | jq ".access_token" -r',
+          returnStdout: true
+        ).trim()
+
+        def group_id = sh(
+          script: "curl --header 'Authorization: Bearer $access_token' http://mongodb-realm:9090/api/admin/v3.0/auth/profile -s | jq '.roles[0].group_id' -r",
+          returnStdout: true
+        ).trim()
+
+        sh """
+          pwd && ls && ls ${configPath}
+          /usr/bin/stitch-cli login --config-path=${configPath}/stitch-config --base-url=http://mongodb-realm:9090 --auth-provider=local-userpass --username=unique_user@domain.com --password=password
+          /usr/bin/stitch-cli import --config-path=${configPath}/stitch-config --base-url=http://mongodb-realm:9090 --app-name auth-integration-tests --path=${configPath} --project-id $group_id -y --strategy replace
+        """
+      }
+      block(network)
+    }
+  }
+}
+
+
 def doDockerBuild(String flavor, Boolean withCoverage, Boolean enableSync, String sanitizerFlags = "") {
   def sync = enableSync ? "sync" : ""
   def label = "${flavor}${enableSync ? '-sync' : ''}"
   def buildDir = "build"
   def cmakeFlags = ""
-  if (enableSync) {
-    cmakeFlags += "-DREALM_ENABLE_SYNC=1 "
-  }
   if (withCoverage) {
     cmakeFlags += "-DCMAKE_BUILD_TYPE=Coverage "
   } else {
@@ -81,21 +117,42 @@ def doDockerBuild(String flavor, Boolean withCoverage, Boolean enableSync, Strin
   return {
     nodeWithSources('docker') {
       def image = docker.build("ci/realm-object-store:${flavor}")
-      // The only reason we can't run commands directly is because sync builds need to
-      // use CI's credentials to pull from the private repository. This can be removed
-      // when sync is open sourced.
-      sshagent(['realm-ci-ssh']) {
-        image.inside("-v /etc/passwd:/etc/passwd:ro -v ${env.HOME}:${env.HOME} -v ${env.SSH_AUTH_SOCK}:${env.SSH_AUTH_SOCK} -e HOME=${env.HOME}") {
-          sh "cmake -B ${buildDir} -G Ninja ${cmakeFlags}"
-          if (withCoverage) {
-            sh "cmake --build ${buildDir} --target generate-coverage-cobertura" // builds and runs tests
-            sh "cp ${buildDir}/coverage.xml coverage-${label}.xml"
-          } else {
-            sh "cmake --build ${buildDir} --target tests"
-            sh "./${buildDir}/tests/tests ${testArguments}"
+      def buildSteps = { String dockerArgs = "" ->
+        // The only reason we can't run commands directly is because sync builds need to
+        // use CI's credentials to pull from the private repository. This can be removed
+        // when sync is open sourced.
+        sshagent(['realm-ci-ssh']) {
+          image.inside("-v /etc/passwd:/etc/passwd:ro -v ${env.HOME}:${env.HOME} -v ${env.SSH_AUTH_SOCK}:${env.SSH_AUTH_SOCK} -e HOME=${env.HOME} ${dockerArgs}") {
+            if (enableSync) {
+              sh "curl http://mongodb-realm:9090"
+            }
+            if (enableSync) {
+              def sourcesDir = pwd()
+              cmakeFlags += "-DREALM_ENABLE_SYNC=1 -DREALM_ENABLE_AUTH_TESTS=1 -DREALM_MONGODB_ENDPOINT=\"http://mongodb-realm:9090\" -DREALM_STITCH_CONFIG=\"${sourcesDir}/tests/mongodb/stitch.json\" "
+            }
+            sh "cmake -B ${buildDir} -G Ninja ${cmakeFlags}"
+            if (withCoverage) {
+              sh "cmake --build ${buildDir} --target generate-coverage-cobertura" // builds and runs tests
+              sh "cp ${buildDir}/coverage.xml coverage-${label}.xml"
+            } else {
+              sh "cmake --build ${buildDir} --target tests"
+              sh "./${buildDir}/tests/tests ${testArguments}"
+            }
           }
         }
       }
+
+      if (enableSync) {
+        // stitch images are auto-published internally to aws
+        // after authenticating to aws (and ensure you are part of the realm-ecr-users permissions group) you can find the latest image by running:
+        // `aws ecr describe-images --repository-name ci/mongodb-realm-images --query 'sort_by(imageDetails,& imagePushedAt)[-1].imageTags[0]'`
+        withCustomRealmCloud("test_server-0ed2349a36352666402d0fb2e8763ac67731768c-race", "tests/mongodb", "auth-integration-tests") { networkName ->
+          buildSteps("--network=${networkName}")
+        }
+      } else {
+        buildSteps("")
+      }
+
       if (withCoverage) {
         echo "Stashing coverage-${label}"
         stash includes: "coverage-${label}.xml", name: "coverage-${label}"

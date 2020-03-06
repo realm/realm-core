@@ -25,22 +25,74 @@
 #include <curl/curl.h>
 #include <json.hpp>
 
+using namespace realm;
+using namespace realm::app;
+
 // temporarily disable these tests for now,
 // but allow opt-in by building with REALM_ENABLE_AUTH_TESTS=1
 #ifndef REALM_ENABLE_AUTH_TESTS
 #define REALM_ENABLE_AUTH_TESTS 0
 #endif
 
-using namespace realm;
-using namespace realm::app;
+static std::string random_string(std::string::size_type length)
+{
+    static auto& chrs = "0123456789"
+    "bcdefghijklmnopqrstuvwxyz"
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    thread_local static std::mt19937 rg{std::random_device{}()};
+    thread_local static std::uniform_int_distribution<std::string::size_type> pick(0, sizeof(chrs) - 2);
+    std::string s;
+    s.reserve(length);
+    while(length--)
+        s += chrs[pick(rg)];
+    return s;
+}
 
 #if REALM_ENABLE_AUTH_TESTS
 
+// When a stitch instance starts up and imports the app at this config location,
+// it will generate a new app_id and write it back to the config. This is why we
+// need to parse it at runtime after spinning up the instance.
+static std::string get_runtime_app_id(std::string config_path)
+{
+    File config(config_path);
+    std::string contents;
+    contents.resize(config.get_size());
+    config.read(contents.data(), config.get_size());
+    nlohmann::json json;
+    json = nlohmann::json::parse(contents);
+    std::string app_id = json["app_id"].get<std::string>();
+    std::cout << "found app_id: " << app_id << " in stitch config" << std::endl;
+    return app_id;
+}
+
 class IntTestTransport : public GenericNetworkTransport {
     static size_t write(char *ptr, size_t size, size_t nmemb, std::string* data) {
+        REALM_ASSERT(data);
         size_t realsize = size * nmemb;
         data->append(ptr, realsize); // FIXME: throws std::bad_alloc when out of memory
         return realsize;
+    }
+    static size_t header_callback(char *buffer, size_t size, size_t nitems, std::map<std::string, std::string> *headers_storage)
+    {
+        REALM_ASSERT(headers_storage);
+        std::string combined(buffer, size * nitems);
+        if (auto pos = combined.find(':'); pos != std::string::npos) {
+            std::string key = combined.substr(0, pos);
+            std::string value = combined.substr(pos + 1);
+            while (value.size() > 0 && value[0] == ' ') {
+                value = value.substr(1);
+            }
+            while (value.size() > 0 && (value[value.size() - 1] == '\r' || value[value.size() - 1] == '\n')) {
+                value = value.substr(0, value.size() - 1);
+            }
+            headers_storage->insert({key, value});
+        } else {
+            if (combined.size() > 5 && combined.substr(0, 5) != "HTTP/") { // ignore for now HTTP/1.1 ...
+                std::cerr << "test transport skipping header: " << combined << std::endl;
+            }
+        }
+        return nitems * size;
     }
 
     void send_request_to_server(const Request request, std::function<void (const Response)> completion_block) override
@@ -48,9 +100,7 @@ class IntTestTransport : public GenericNetworkTransport {
         CURL *curl;
         CURLcode response_code;
         std::string response;
-        std::string content_type;
         std::map<std::string, std::string> response_headers;
-        std::string response_headers_raw;
 
         curl_global_init(CURL_GLOBAL_ALL);
         /* get a curl handle */
@@ -72,7 +122,7 @@ class IntTestTransport : public GenericNetworkTransport {
             } else if (request.method == HttpMethod::del) {
                 curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "DELETE");
             }
-                        
+
             curl_easy_setopt(curl, CURLOPT_TIMEOUT, request.timeout_ms);
 
             for (auto header : request.headers)
@@ -85,33 +135,24 @@ class IntTestTransport : public GenericNetworkTransport {
             curl_easy_setopt(curl, CURLOPT_HTTPHEADER, list);
             curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write);
             curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
-            curl_easy_setopt (curl, CURLOPT_HEADERDATA, &response_headers_raw);
+            curl_easy_setopt(curl, CURLOPT_HEADERDATA, &response_headers);
+            curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, header_callback);
 
             /* Perform the request, res will get the return code */
             response_code = curl_easy_perform(curl);
             int http_code = 0;
             curl_easy_getinfo (curl, CURLINFO_RESPONSE_CODE, &http_code);
-            
-            // Build response header map from raw string
-            auto split_header_strings = split_string(response_headers_raw);
-            for (auto &header_element : split_header_strings) {
-                // Maybe use regex instead?
-                if (header_element == "content-type: application/json") {
-                    response_headers.insert({"Content-Type", "application/json"});
-                }
-            }
-            
-            double cl;
-            curl_easy_getinfo(curl, CURLINFO_CONTENT_LENGTH_DOWNLOAD, &cl);
+
             /* Check for errors */
             if(response_code != CURLE_OK)
-                fprintf(stderr, "curl_easy_perform() failed: %s\n",
-                        curl_easy_strerror(response_code));
-            
+                fprintf(stderr, "curl_easy_perform() failed when sending request to '%s' with body '%s': %s\n",
+                        request.url.c_str(), request.body.c_str(), curl_easy_strerror(response_code));
+
             /* always cleanup */
             curl_easy_cleanup(curl);
             curl_slist_free_all(list); /* free the list again */
-            completion_block(Response{http_code, http_code, response_headers, response});
+            int binding_response_code = 0;
+            completion_block(Response{response_code, binding_response_code, response_headers, response});
         }
         
         curl_global_cleanup();
@@ -132,19 +173,30 @@ class IntTestTransport : public GenericNetworkTransport {
     }
 };
 
-static std::string random_string(std::string::size_type length)
-{
-  static auto& chrs = "0123456789"
-    "bcdefghijklmnopqrstuvwxyz"
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-  thread_local static std::mt19937 rg{std::random_device{}()};
-  thread_local static std::uniform_int_distribution<std::string::size_type> pick(0, sizeof(chrs) - 2);
-  std::string s;
-  s.reserve(length);
-  while(length--)
-    s += chrs[pick(rg)];
-  return s;
+#ifdef REALM_MONGODB_ENDPOINT
+static std::string get_base_url() {
+    // allows configuration with or without quotes
+    std::string base_url = REALM_QUOTE(REALM_MONGODB_ENDPOINT);
+    if (base_url.size() > 0 && base_url[0] == '"') {
+        base_url.erase(0, 1);
+    }
+    if (base_url.size() > 0 && base_url[base_url.size() - 1] == '"') {
+        base_url.erase(base_url.size() - 1);
+    }
+    return base_url;
 }
+
+static std::string get_config_path() {
+    std::string config_path = REALM_QUOTE(REALM_STITCH_CONFIG);
+    if (config_path.size() > 0 && config_path[0] == '"') {
+        config_path.erase(0, 1);
+    }
+    if (config_path.size() > 0 && config_path[config_path.size() - 1] == '"') {
+        config_path.erase(config_path.size() - 1);
+    }
+    return config_path;
+}
+#endif
 
 TEST_CASE("app: login_with_credentials integration", "[sync][app]") {
 
@@ -153,8 +205,15 @@ TEST_CASE("app: login_with_credentials integration", "[sync][app]") {
             return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
         };
 
-        // TODO: create dummy app using Stitch CLI instead of hardcording
-        auto app = App(App::Config{"translate-utwuv", factory});
+        std::string base_url = get_base_url();
+        std::string config_path = get_config_path();
+        std::cout << "base_url for [app] integration tests is set to: " << base_url << std::endl;
+        std::cout << "config_path for [app] integration tests is set to: " << config_path << std::endl;
+        REQUIRE(!base_url.empty());
+        REQUIRE(!config_path.empty());
+
+        // this app id is configured in tests/mongodb/stitch.json
+        auto app = App(App::Config{get_runtime_app_id(config_path), factory, base_url});
 
         bool processed = false;
 
@@ -162,7 +221,13 @@ TEST_CASE("app: login_with_credentials integration", "[sync][app]") {
         auto tsm = TestSyncManager(base_path);
 
         app.log_in_with_credentials(AppCredentials::anonymous(),
-                                    [&](std::shared_ptr<SyncUser> user, Optional<app::AppError> error) {
+                                   [&](std::shared_ptr<SyncUser> user, Optional<app::AppError> error) {
+            if (error) {
+                std::cerr << "login_with_credentials failed: "
+                    << error->message << " error_code: "
+                    << error->error_code.message() << " (value: "
+                    << error->error_code.value() << ")" <<std::endl;
+            }
             CHECK(user);
             CHECK(!error);
             processed = true;
@@ -179,20 +244,22 @@ TEST_CASE("app: login_with_credentials integration", "[sync][app]") {
 // MARK: - UsernamePasswordProviderClient Tests
 
 TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app]") {
-
     auto email = util::format("%1@%2.com", random_string(10), random_string(10));
     auto password = random_string(10);
-    
+
     std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
         return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
     };
-    
-    auto config = App::Config{"translate-utwuv", factory};
+    std::string base_url = get_base_url();
+    std::string config_path = get_config_path();
+    REQUIRE(!base_url.empty());
+    REQUIRE(!config_path.empty());
+    auto config = App::Config{get_runtime_app_id(config_path), factory, base_url};
     auto app = App(config);
     std::string base_path = tmp_dir() + "/" + config.app_id;
     reset_test_directory(base_path);
     TestSyncManager init_sync_manager(base_path);
-    
+
     bool processed = false;
 
     SECTION("register email") {
@@ -204,7 +271,7 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app]") {
                 CHECK(error->message == "name already in use");
                 CHECK(error->error_code.value() == 49);
         });
-        
+
         app.provider_client<App::UsernamePasswordProviderClient>()
             .register_email(email,
                             password,
@@ -223,7 +290,6 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app]") {
                 CHECK(error->message == "invalid token data");
                 processed = true;
         });
-
     }
 
     SECTION("resend confirmation email") {
@@ -278,7 +344,6 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app]") {
 // MARK: - UserAPIKeyProviderClient Tests
 
 TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
-        
     auto email = util::format("%1@%2.com", random_string(15), random_string(15));
     auto password = util::format("%1", random_string(15));
     auto api_key_name = util::format("%1", random_string(15));
@@ -286,13 +351,16 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
     std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
         return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
     };
-
-    auto config = App::Config{"translate-utwuv", factory};
+    std::string base_url = get_base_url();
+    std::string config_path = get_config_path();
+    REQUIRE(!base_url.empty());
+    REQUIRE(!config_path.empty());
+    auto config = App::Config{get_runtime_app_id(config_path), factory, base_url};
     auto app = App(config);
     std::string base_path = tmp_dir() + "/" + config.app_id;
     reset_test_directory(base_path);
     TestSyncManager init_sync_manager(base_path);
-    
+
     bool processed = false;
 
     app.provider_client<App::UsernamePasswordProviderClient>().register_email(email,
@@ -300,7 +368,7 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
                                                                               [&] (Optional<AppError> error) {
         CHECK(!error);
     });
-    
+
     app.log_in_with_credentials(AppCredentials::username_password(email, password),
                            [&](std::shared_ptr<SyncUser> user, Optional<app::AppError> error) {
         CHECK(user);
@@ -308,9 +376,8 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
     });
 
     App::UserAPIKey api_key;
-    
+
     SECTION("api-key") {
-        
         app.provider_client<App::UserAPIKeyProviderClient>()
             .create_api_key(api_key_name, [&](Optional<App::UserAPIKey> user_api_key, Optional<app::AppError> error) {
                 CHECK(user_api_key->name == api_key_name);
@@ -318,7 +385,7 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
                 CHECK(!error);
                 api_key = user_api_key.value();
         });
-        
+
         app.provider_client<App::UserAPIKeyProviderClient>()
             .fetch_api_key(api_key.id, [&](Optional<App::UserAPIKey> user_api_key, Optional<app::AppError> error) {
                 CHECK(user_api_key->name == api_key_name);
@@ -335,12 +402,12 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
                 }
                 CHECK(!error);
         });
-        
+
         app.provider_client<App::UserAPIKeyProviderClient>()
             .enable_api_key(api_key, [&](Optional<AppError> error) {
                 CHECK(!error);
         });
-        
+
         app.provider_client<App::UserAPIKeyProviderClient>()
             .fetch_api_key(api_key.id, [&](Optional<App::UserAPIKey> user_api_key, Optional<app::AppError> error) {
                 CHECK(user_api_key->disabled == false);
@@ -348,12 +415,12 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
                 CHECK(user_api_key->id.to_string() == user_api_key->id.to_string());
                 CHECK(!error);
         });
-        
+
         app.provider_client<App::UserAPIKeyProviderClient>()
             .disable_api_key(api_key, [&](Optional<AppError> error) {
                 CHECK(!error);
         });
-        
+
         app.provider_client<App::UserAPIKeyProviderClient>()
             .fetch_api_key(api_key.id, [&](Optional<App::UserAPIKey> user_api_key, Optional<app::AppError> error) {
                 CHECK(user_api_key->disabled == true);
@@ -361,43 +428,25 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
                 CHECK(user_api_key->id.to_string() == user_api_key->id.to_string());
                 CHECK(!error);
         });
-        
+
         app.provider_client<App::UserAPIKeyProviderClient>()
             .delete_api_key(api_key, [&](Optional<AppError> error) {
                 CHECK(!error);
         });
-        
+
         app.provider_client<App::UserAPIKeyProviderClient>()
             .fetch_api_key(api_key.id, [&](Optional<App::UserAPIKey> user_api_key, Optional<app::AppError> error) {
                 CHECK(!user_api_key);
                 CHECK(error);
                 processed = true;
         });
-        
+
         CHECK(processed);
     }
 }
 
 #endif // REALM_ENABLE_AUTH_TESTS
 
-static std::string random_string(std::string::size_type length)
-{
-    static auto& chrs = "0123456789"
-    "abcdefghijklmnopqrstuvwxyz"
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-
-    thread_local static std::mt19937 rg{std::random_device{}()};
-    thread_local static std::uniform_int_distribution<std::string::size_type> pick(0, sizeof(chrs) - 2);
-
-    std::string s;
-
-    s.reserve(length);
-
-    while(length--)
-        s += chrs[pick(rg)];
-
-    return s;
-}
 
 static const std::string profile_0_name = "Ursus americanus Ursus boeckhi";
 static const std::string profile_0_first_name = "Ursus americanus";
@@ -968,7 +1017,11 @@ TEST_CASE("app: response error handling", "[sync][app]") {
         response.http_status_code = 400;
         response.body = nlohmann::json({
             {"error_code", "MongoDBError"},
-            {"error", "a fake MongoDB error message!"}}).dump();
+            {"error", "a fake MongoDB error message!"},
+            {"access_token", good_access_token},
+            {"refresh_token", good_access_token},
+            {"user_id", "Brown Bear"},
+            {"device_id", "Panda Bear"}}).dump();
         app.log_in_with_credentials(realm::app::AppCredentials::anonymous(),
                                     [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
             CHECK(!user);
