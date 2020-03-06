@@ -1311,7 +1311,7 @@ void SlabAlloc::get_or_add_xover_mapping(RefTranslation& txl, size_t index, size
     if (txl.xover_mapping_addr) {
         // some other thread already added a mapping
         // it MUST have been for the exact same address:
-        REALM_ASSERT(offset == txl.primary_mapping_limit.load(std::memory_order_acquire));
+        REALM_ASSERT(offset == txl.primary_mapping_limit.load(std::memory_order_relaxed));
         return;
     }
     MapEntry* map_entry = &m_mappings[index];
@@ -1326,11 +1326,11 @@ void SlabAlloc::get_or_add_xover_mapping(RefTranslation& txl, size_t index, size
         map_entry->xover_mapping = std::move(mapping);
     }
     txl.xover_mapping_base = offset & ~(page_size() - 1);
-    txl.xover_mapping_addr = map_entry->xover_mapping.get_addr();
 #if REALM_ENABLE_ENCRYPTION
     txl.xover_encrypted_mapping = map_entry->xover_mapping.get_encrypted_mapping();
 #endif
-    txl.primary_mapping_limit.store(offset, std::memory_order_release);
+    txl.xover_mapping_addr.store(map_entry->xover_mapping.get_addr(), std::memory_order_release);
+    txl.primary_mapping_limit.store(offset, std::memory_order_relaxed);
 }
 
 

@@ -159,21 +159,19 @@ protected:
     // into equal chunks.
     struct RefTranslation {
         char* mapping_addr;
-        // The members involved in xover mapping management need to be atomic.
-
         // any xover mapping must stretch past the end of the primary mapping, and it can at most
         // hold the largest array supported, which is 16MB. Consequently, accesses to the first
-        // part of the primary mapping does not need to be checked. We initialize xover_mapping_limit
-        // to exploit this:
+        // part of the primary mapping does not need to be checked.
+        // We initialize 'xover_mapping_limit' to exploit this:
         std::atomic<size_t> primary_mapping_limit = (1 << section_shift) - 16 * 1024 * 1024;
-        // With exception of 'encrypted_mapping', the following members are accessed
-        // in unsynchronized fashion but we rely on any non-zero value to indicate validity.
-        // Hence they must each initially be zero, and from there be updated atomically.
-        std::atomic<size_t> xover_mapping_base = 0;
+
+        // member 'xover_mapping_addr' is used for memory synchronization of the fields
+        // 'xover_mapping_base' and 'xover_encrypted_mapping'.
         std::atomic<char*> xover_mapping_addr = 0;
+        size_t xover_mapping_base = 0;
 #if REALM_ENABLE_ENCRYPTION
         util::EncryptedFileMapping* encrypted_mapping = nullptr;
-        std::atomic<util::EncryptedFileMapping*> xover_encrypted_mapping = nullptr;
+        util::EncryptedFileMapping* xover_encrypted_mapping = nullptr;
 #endif
         RefTranslation(char* addr)
             : mapping_addr(addr)
@@ -189,12 +187,12 @@ protected:
             if (&from != this) {
                 mapping_addr = from.mapping_addr;
                 primary_mapping_limit.store(from.primary_mapping_limit, std::memory_order_relaxed);
-                xover_mapping_base.store(from.xover_mapping_base, std::memory_order_relaxed);
-                xover_mapping_addr.store(from.xover_mapping_addr, std::memory_order_relaxed);
+                xover_mapping_base = from.xover_mapping_base;
 #if REALM_ENABLE_ENCRYPTION
                 encrypted_mapping = from.encrypted_mapping;
-                xover_encrypted_mapping.store(from.xover_encrypted_mapping, std::memory_order_relaxed);
+                xover_encrypted_mapping = from.xover_encrypted_mapping;
 #endif
+                xover_mapping_addr.store(from.xover_mapping_addr, std::memory_order_release);
             }
             return *this;
         }
@@ -229,7 +227,6 @@ protected:
     /// is not modified by way of the returned memory pointer.
     virtual char* do_translate(ref_type ref) const noexcept = 0;
     char* x_translate(RefTranslation*, ref_type ref) const noexcept;
-    void x_translate_bump(RefTranslation& txl, size_t idx, size_t offset) const noexcept;
     char* x_translate_extended(RefTranslation*, ref_type ref) const noexcept;
     virtual void get_or_add_xover_mapping(RefTranslation&, size_t, size_t, size_t)
     {
@@ -542,6 +539,40 @@ inline Allocator::Allocator() noexcept
 inline Allocator::~Allocator() noexcept
 {
 }
+
+
+inline char* Allocator::x_translate(RefTranslation* ref_translation_ptr, ref_type ref) const noexcept
+{
+    size_t idx = get_section_index(ref);
+    RefTranslation& txl = ref_translation_ptr[idx];
+    size_t offset = ref - get_section_base(idx);
+    size_t mapping_limit = txl.primary_mapping_limit.load(std::memory_order_relaxed);
+    if (REALM_LIKELY(offset < mapping_limit)) {
+        // the mapping limit may grow concurrently, but that will not affect this code path
+        char* addr = txl.mapping_addr + offset;
+#if REALM_ENABLE_ENCRYPTION
+        realm::util::encryption_read_barrier(addr, NodeHeader::header_size, txl.encrypted_mapping,
+                                             NodeHeader::get_byte_size_from_header);
+#endif
+        return addr;
+    }
+    else {
+        // the mapping limit may grow concurrently, but that will be handled inside the call
+        return x_translate_extended(ref_translation_ptr, ref);
+    }
+}
+
+inline char* Allocator::translate(ref_type ref) const noexcept
+{
+    auto ref_translation_ptr = m_ref_translation_ptr.load(std::memory_order_acquire);
+    if (REALM_LIKELY(ref_translation_ptr)) {
+        return x_translate(ref_translation_ptr, ref);
+    }
+    else {
+        return do_translate(ref);
+    }
+}
+
 
 } // namespace realm
 
