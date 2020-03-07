@@ -387,6 +387,7 @@ public:
         friend class _impl::RealmCoordinator;
         friend class GlobalNotifier;
         friend class TestHelper;
+        friend class ThreadSafeReference;
 
         static Transaction& get_transaction(Realm& realm) { return realm.transaction(); }
         static std::shared_ptr<Transaction> get_transaction_ref(Realm& realm) { return realm.transaction_ref(); }
