@@ -48,11 +48,17 @@ private:
 
 void ThreadSafeReference::Payload::refresh_target_realm(Realm& realm)
 {
-    if (!realm.is_in_read_transaction())
-        realm.read_group();
-    auto version = realm.read_transaction_version();
-    if (version < m_target_version || (version == m_target_version && m_created_in_write_transaction))
-        realm.refresh();
+    if (!realm.is_in_read_transaction()) {
+        if (m_created_in_write_transaction)
+            realm.read_group();
+        else
+            Realm::Internal::begin_read(realm, m_target_version);
+    }
+    else {
+        auto version = realm.read_transaction_version();
+        if (version < m_target_version || (version == m_target_version && m_created_in_write_transaction))
+            realm.refresh();
+    }
 }
 
 template<>
