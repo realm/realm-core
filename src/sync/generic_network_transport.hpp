@@ -92,6 +92,9 @@ enum class ServiceErrorCode {
     user_already_confirmed = 44,
     user_not_found = 45,
     user_disabled = 46,
+    auth_error = 47,
+    bad_request = 48,
+    account_name_in_use = 49,
 
     unknown = -1,
     none = 0

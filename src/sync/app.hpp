@@ -97,7 +97,7 @@ public:
          *     - id: The id of the API key to fetch.
          *     - completion_block: A callback to be invoked once the call is complete.
          */
-        void fetch_api_key(const UserAPIKey& api_key,
+        void fetch_api_key(const realm::ObjectId& id,
                            std::function<void(Optional<UserAPIKey>, Optional<AppError>)> completion_block);
 
         /**
@@ -138,7 +138,9 @@ public:
         void disable_api_key(const UserAPIKey& api_key,
                              std::function<void(Optional<AppError>)> completion_block);
     private:
-        UserAPIKeyProviderClient(App*);
+        friend class App;
+        UserAPIKeyProviderClient(App* app) : parent(app) {}
+        App* parent;
     };
 
     /**
@@ -227,7 +229,9 @@ public:
                                           const std::string& args,
                                           std::function<void(Optional<AppError>)> completion_block);
     private:
-        UsernamePasswordProviderClient(App*);
+        friend class App;
+        UsernamePasswordProviderClient(App* app) : parent(app) {}
+        App* parent;
     };
 
     App(const Config& config);
@@ -248,7 +252,9 @@ public:
 
     // Get a provider client for the given class type.
     template <class T>
-    T provider_client();
+    T provider_client() {
+        return T(this);
+    }
 
 private:
     Config m_config;
@@ -257,6 +263,11 @@ private:
     std::string m_auth_route;
     uint64_t m_request_timeout_ms;
 };
+
+template<>
+App::UsernamePasswordProviderClient App::provider_client <App::UsernamePasswordProviderClient> ();
+template<>
+App::UserAPIKeyProviderClient App::provider_client <App::UserAPIKeyProviderClient>();
 
 } // namespace app
 } // namespace realm
