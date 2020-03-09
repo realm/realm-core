@@ -1390,7 +1390,8 @@ void writer_threads_thread(TestContext& test_context, const DBRef& sg, ObjKey ke
         // read and write transactions
         {
             ReadTransaction rt(sg);
-            rt.get_group().verify();
+            // rt.get_group().verify(); // verify() is not supported on a read transaction
+            // concurrently with writes.
             auto t = rt.get_table("test");
             auto cols = t->get_column_keys();
             int64_t v = t->get_object(key).get<Int>(cols[0]);
