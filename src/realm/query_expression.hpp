@@ -297,9 +297,9 @@ struct Pow {
 };
 
 // Finds a common type for T1 and T2 according to C++ conversion/promotion in arithmetic (float + int => float, etc)
-template <class T1, class T2, bool T1_is_int = std::numeric_limits<T1>::is_integer || std::is_same<T1, null>::value,
-          bool T2_is_int = std::numeric_limits<T2>::is_integer || std::is_same<T2, null>::value,
-          bool T1_is_widest = (sizeof(T1) > sizeof(T2) || std::is_same<T2, null>::value)>
+template <class T1, class T2, bool T1_is_int = std::numeric_limits<T1>::is_integer || std::is_same_v<T1, null>,
+          bool T2_is_int = std::numeric_limits<T2>::is_integer || std::is_same_v<T2, null>,
+          bool T1_is_widest = (sizeof(T1) > sizeof(T2) || std::is_same_v<T2, null>)>
 struct Common;
 template <class T1, class T2, bool b>
 struct Common<T1, T2, b, b, true> {
@@ -475,46 +475,46 @@ Query create(L left, const Subexpr2<R>& right)
 
     if (column &&
         ((std::numeric_limits<L>::is_integer && std::numeric_limits<R>::is_integer) ||
-         (std::is_same<L, double>::value && std::is_same<R, double>::value) ||
-         (std::is_same<L, float>::value && std::is_same<R, float>::value) ||
-         (std::is_same<L, Timestamp>::value && std::is_same<R, Timestamp>::value) ||
-         (std::is_same<L, StringData>::value && std::is_same<R, StringData>::value) ||
-         (std::is_same<L, BinaryData>::value && std::is_same<R, BinaryData>::value)) &&
+         (std::is_same_v<L, double> && std::is_same_v<R, double>) ||
+         (std::is_same_v<L, float> && std::is_same_v<R, float>) ||
+         (std::is_same_v<L, Timestamp> && std::is_same_v<R, Timestamp>) ||
+         (std::is_same_v<L, StringData> && std::is_same_v<R, StringData>) ||
+         (std::is_same_v<L, BinaryData> && std::is_same_v<R, BinaryData>)) &&
         !column->links_exist()) {
         ConstTableRef t = column->get_base_table();
         Query q = Query(t);
 
-        if (std::is_same<Cond, Less>::value)
+        if (std::is_same_v<Cond, Less>)
             q.greater(column->column_key(), _impl::only_numeric<R>(left));
-        else if (std::is_same<Cond, Greater>::value)
+        else if (std::is_same_v<Cond, Greater>)
             q.less(column->column_key(), _impl::only_numeric<R>(left));
-        else if (std::is_same<Cond, Equal>::value)
+        else if (std::is_same_v<Cond, Equal>)
             q.equal(column->column_key(), left);
-        else if (std::is_same<Cond, NotEqual>::value)
+        else if (std::is_same_v<Cond, NotEqual>)
             q.not_equal(column->column_key(), left);
-        else if (std::is_same<Cond, LessEqual>::value)
+        else if (std::is_same_v<Cond, LessEqual>)
             q.greater_equal(column->column_key(), _impl::only_numeric<R>(left));
-        else if (std::is_same<Cond, GreaterEqual>::value)
+        else if (std::is_same_v<Cond, GreaterEqual>)
             q.less_equal(column->column_key(), _impl::only_numeric<R>(left));
-        else if (std::is_same<Cond, EqualIns>::value)
+        else if (std::is_same_v<Cond, EqualIns>)
             q.equal(column->column_key(), _impl::only_string_op_types(left), false);
-        else if (std::is_same<Cond, NotEqualIns>::value)
+        else if (std::is_same_v<Cond, NotEqualIns>)
             q.not_equal(column->column_key(), _impl::only_string_op_types(left), false);
-        else if (std::is_same<Cond, BeginsWith>::value)
+        else if (std::is_same_v<Cond, BeginsWith>)
             q.begins_with(column->column_key(), _impl::only_string_op_types(left));
-        else if (std::is_same<Cond, BeginsWithIns>::value)
+        else if (std::is_same_v<Cond, BeginsWithIns>)
             q.begins_with(column->column_key(), _impl::only_string_op_types(left), false);
-        else if (std::is_same<Cond, EndsWith>::value)
+        else if (std::is_same_v<Cond, EndsWith>)
             q.ends_with(column->column_key(), _impl::only_string_op_types(left));
-        else if (std::is_same<Cond, EndsWithIns>::value)
+        else if (std::is_same_v<Cond, EndsWithIns>)
             q.ends_with(column->column_key(), _impl::only_string_op_types(left), false);
-        else if (std::is_same<Cond, Contains>::value)
+        else if (std::is_same_v<Cond, Contains>)
             q.contains(column->column_key(), _impl::only_string_op_types(left));
-        else if (std::is_same<Cond, ContainsIns>::value)
+        else if (std::is_same_v<Cond, ContainsIns>)
             q.contains(column->column_key(), _impl::only_string_op_types(left), false);
-        else if (std::is_same<Cond, Like>::value)
+        else if (std::is_same_v<Cond, Like>)
             q.like(column->column_key(), _impl::only_string_op_types(left));
-        else if (std::is_same<Cond, LikeIns>::value)
+        else if (std::is_same_v<Cond, LikeIns>)
             q.like(column->column_key(), _impl::only_string_op_types(left), false);
         else {
             // query_engine.hpp does not support this Cond. Please either add support for it in query_engine.hpp or
@@ -530,7 +530,7 @@ Query create(L left, const Subexpr2<R>& right)
         // Return query_expression.hpp node
         using CommonType = typename Common<L, R>::type;
         using ValueType =
-            typename std::conditional<std::is_same<L, StringData>::value, ConstantStringValue, Value<L>>::type;
+            typename std::conditional<std::is_same_v<L, StringData>, ConstantStringValue, Value<L>>::type;
         return make_expression<Compare<Cond, CommonType>>(make_subexpr<ValueType>(left), right.clone());
     }
 }
@@ -630,75 +630,56 @@ public:
         // query_engine supports 'T-column <op> <T-column>' for T = {int64_t, float, double}, op = {<, >, ==, !=, <=,
         // >=},
         // but only if both columns are non-nullable, and aren't in linked tables.
-        if (left_col && right_col && std::is_same<L, R>::value && !left_col->is_nullable() &&
-            !right_col->is_nullable() && !left_col->links_exist() && !right_col->links_exist() &&
-            !std::is_same<L, Timestamp>::value) {
+        if (left_col && right_col && std::is_same_v<L, R> && !left_col->is_nullable() && !right_col->is_nullable() &&
+            !left_col->links_exist() && !right_col->links_exist()) {
             ConstTableRef t = left_col->get_base_table();
-            Query q = Query(t);
 
             if (std::numeric_limits<L>::is_integer) {
-                if (std::is_same<Cond, Less>::value)
-                    q.less_int(left_col->column_key(), right_col->column_key());
-                else if (std::is_same<Cond, Greater>::value)
-                    q.greater_int(left_col->column_key(), right_col->column_key());
-                else if (std::is_same<Cond, Equal>::value)
-                    q.equal_int(left_col->column_key(), right_col->column_key());
-                else if (std::is_same<Cond, NotEqual>::value)
-                    q.not_equal_int(left_col->column_key(), right_col->column_key());
-                else if (std::is_same<Cond, LessEqual>::value)
-                    q.less_equal_int(left_col->column_key(), right_col->column_key());
-                else if (std::is_same<Cond, GreaterEqual>::value)
-                    q.greater_equal_int(left_col->column_key(), right_col->column_key());
-                else {
-                    REALM_ASSERT(false);
-                }
+                if (std::is_same_v<Cond, Less>)
+                    return Query(t).less_int(left_col->column_key(), right_col->column_key());
+                if (std::is_same_v<Cond, Greater>)
+                    return Query(t).greater_int(left_col->column_key(), right_col->column_key());
+                if (std::is_same_v<Cond, Equal>)
+                    return Query(t).equal_int(left_col->column_key(), right_col->column_key());
+                if (std::is_same_v<Cond, NotEqual>)
+                    return Query(t).not_equal_int(left_col->column_key(), right_col->column_key());
+                if (std::is_same_v<Cond, LessEqual>)
+                    return Query(t).less_equal_int(left_col->column_key(), right_col->column_key());
+                if (std::is_same_v<Cond, GreaterEqual>)
+                    return Query(t).greater_equal_int(left_col->column_key(), right_col->column_key());
             }
-            else if (std::is_same<L, float>::value) {
-                if (std::is_same<Cond, Less>::value)
-                    q.less_float(left_col->column_key(), right_col->column_key());
-                else if (std::is_same<Cond, Greater>::value)
-                    q.greater_float(left_col->column_key(), right_col->column_key());
-                else if (std::is_same<Cond, Equal>::value)
-                    q.equal_float(left_col->column_key(), right_col->column_key());
-                else if (std::is_same<Cond, NotEqual>::value)
-                    q.not_equal_float(left_col->column_key(), right_col->column_key());
-                else if (std::is_same<Cond, LessEqual>::value)
-                    q.less_equal_float(left_col->column_key(), right_col->column_key());
-                else if (std::is_same<Cond, GreaterEqual>::value)
-                    q.greater_equal_float(left_col->column_key(), right_col->column_key());
-                else {
-                    REALM_ASSERT(false);
-                }
+            else if (std::is_same_v<L, float>) {
+                if (std::is_same_v<Cond, Less>)
+                    return Query(t).less_float(left_col->column_key(), right_col->column_key());
+                if (std::is_same_v<Cond, Greater>)
+                    return Query(t).greater_float(left_col->column_key(), right_col->column_key());
+                if (std::is_same_v<Cond, Equal>)
+                    return Query(t).equal_float(left_col->column_key(), right_col->column_key());
+                if (std::is_same_v<Cond, NotEqual>)
+                    return Query(t).not_equal_float(left_col->column_key(), right_col->column_key());
+                if (std::is_same_v<Cond, LessEqual>)
+                    return Query(t).less_equal_float(left_col->column_key(), right_col->column_key());
+                if (std::is_same_v<Cond, GreaterEqual>)
+                    return Query(t).greater_equal_float(left_col->column_key(), right_col->column_key());
             }
-            else if (std::is_same<L, double>::value) {
-                if (std::is_same<Cond, Less>::value)
-                    q.less_double(left_col->column_key(), right_col->column_key());
-                else if (std::is_same<Cond, Greater>::value)
-                    q.greater_double(left_col->column_key(), right_col->column_key());
-                else if (std::is_same<Cond, Equal>::value)
-                    q.equal_double(left_col->column_key(), right_col->column_key());
-                else if (std::is_same<Cond, NotEqual>::value)
-                    q.not_equal_double(left_col->column_key(), right_col->column_key());
-                else if (std::is_same<Cond, LessEqual>::value)
-                    q.less_equal_double(left_col->column_key(), right_col->column_key());
-                else if (std::is_same<Cond, GreaterEqual>::value)
-                    q.greater_equal_double(left_col->column_key(), right_col->column_key());
-                else {
-                    REALM_ASSERT(false);
-                }
+            else if (std::is_same_v<L, double>) {
+                if (std::is_same_v<Cond, Less>)
+                    return Query(t).less_double(left_col->column_key(), right_col->column_key());
+                if (std::is_same_v<Cond, Greater>)
+                    return Query(t).greater_double(left_col->column_key(), right_col->column_key());
+                if (std::is_same_v<Cond, Equal>)
+                    return Query(t).equal_double(left_col->column_key(), right_col->column_key());
+                if (std::is_same_v<Cond, NotEqual>)
+                    return Query(t).not_equal_double(left_col->column_key(), right_col->column_key());
+                if (std::is_same_v<Cond, LessEqual>)
+                    return Query(t).less_equal_double(left_col->column_key(), right_col->column_key());
+                if (std::is_same_v<Cond, GreaterEqual>)
+                    return Query(t).greater_equal_double(left_col->column_key(), right_col->column_key());
             }
-            else {
-                REALM_ASSERT(false);
-            }
-            // Return query_engine.hpp node
-            return q;
         }
-        else
 #endif
-        {
-            // Return query_expression.hpp node
-            return make_expression<Compare<Cond, typename Common<L, R>::type>>(clone_subexpr(), right.clone());
-        }
+        // Return query_expression.hpp node
+        return make_expression<Compare<Cond, typename Common<L, R>::type>>(clone_subexpr(), right.clone());
     }
 
     // Compare, right side subexpression
@@ -895,20 +876,20 @@ struct NullableVector {
 
     inline bool is_null(size_t index) const
     {
-        REALM_ASSERT((std::is_same<t_storage, int64_t>::value));
+        REALM_ASSERT((std::is_same_v<t_storage, int64_t>));
         return m_first[index] == m_null;
     }
 
     inline void set_null(size_t index)
     {
-        REALM_ASSERT((std::is_same<t_storage, int64_t>::value));
+        REALM_ASSERT((std::is_same_v<t_storage, int64_t>));
         m_first[index] = m_null;
     }
 
     template <typename Type = t_storage>
-    typename std::enable_if<std::is_same<Type, int64_t>::value, void>::type set(size_t index, t_storage value)
+    typename std::enable_if<std::is_same_v<Type, int64_t>, void>::type set(size_t index, t_storage value)
     {
-        REALM_ASSERT((std::is_same<t_storage, int64_t>::value));
+        REALM_ASSERT((std::is_same_v<t_storage, int64_t>));
 
         // If value collides with magic null value, then switch to a new unique representation for null
         if (REALM_UNLIKELY(value == m_null)) {
@@ -951,7 +932,7 @@ struct NullableVector {
     void fill(T value)
     {
         for (size_t t = 0; t < m_size; t++) {
-            if (std::is_same<T, null>::value)
+            if (std::is_same_v<T, null>)
                 set_null(t);
             else
                 set(t, value);
@@ -1434,27 +1415,27 @@ public:
 
     REALM_FORCEINLINE void import(const ValueBase& source) override
     {
-        if (std::is_same<T, int>::value)
+        if (std::is_same_v<T, int>)
             source.export_int(*this);
-        else if (std::is_same<T, Timestamp>::value)
+        else if (std::is_same_v<T, Timestamp>)
             source.export_Timestamp(*this);
-        else if (std::is_same<T, ObjectId>::value)
+        else if (std::is_same_v<T, ObjectId>)
             source.export_ObjectId(*this);
-        else if (std::is_same<T, Decimal128>::value)
+        else if (std::is_same_v<T, Decimal128>)
             source.export_Decimal(*this);
-        else if (std::is_same<T, bool>::value)
+        else if (std::is_same_v<T, bool>)
             source.export_bool(*this);
-        else if (std::is_same<T, float>::value)
+        else if (std::is_same_v<T, float>)
             source.export_float(*this);
-        else if (std::is_same<T, double>::value)
+        else if (std::is_same_v<T, double>)
             source.export_double(*this);
-        else if (std::is_same<T, int64_t>::value || std::is_same<T, bool>::value)
+        else if (std::is_same_v<T, int64_t> || std::is_same_v<T, bool>)
             source.export_int64_t(*this);
-        else if (std::is_same<T, StringData>::value)
+        else if (std::is_same_v<T, StringData>)
             source.export_StringData(*this);
-        else if (std::is_same<T, BinaryData>::value)
+        else if (std::is_same_v<T, BinaryData>)
             source.export_BinaryData(*this);
-        else if (std::is_same<T, null>::value)
+        else if (std::is_same_v<T, null>)
             source.export_null(*this);
         else
             REALM_ASSERT_DEBUG(false);
@@ -3154,7 +3135,7 @@ private:
 template <class Operator>
 Query compare(const Subexpr2<Link>& left, const ConstObj& obj)
 {
-    static_assert(std::is_same<Operator, Equal>::value || std::is_same<Operator, NotEqual>::value,
+    static_assert(std::is_same_v<Operator, Equal> || std::is_same_v<Operator, NotEqual>,
                   "Links can only be compared for equality.");
     const Columns<Link>* column = dynamic_cast<const Columns<Link>*>(&left);
     if (column) {
@@ -3166,11 +3147,11 @@ Query compare(const Subexpr2<Link>& left, const ConstObj& obj)
             // for == on link lists. This is because negating query.links_to() is equivalent to
             // to "ALL linklist != row" rather than the "ANY linklist != row" semantics we're after.
             if (link_map.m_link_types[0] == col_type_Link ||
-                (link_map.m_link_types[0] == col_type_LinkList && std::is_same<Operator, Equal>::value)) {
+                (link_map.m_link_types[0] == col_type_LinkList && std::is_same_v<Operator, Equal>)) {
                 ConstTableRef t = column->get_base_table();
                 Query query(t);
 
-                if (std::is_same<Operator, NotEqual>::value) {
+                if (std::is_same_v<Operator, NotEqual>) {
                     // Negate the following `links_to`.
                     query.Not();
                 }
@@ -3203,7 +3184,7 @@ inline Query operator!=(const ConstObj& row, const Subexpr2<Link>& right)
 template <class Operator>
 Query compare(const Subexpr2<Link>& left, null)
 {
-    static_assert(std::is_same<Operator, Equal>::value || std::is_same<Operator, NotEqual>::value,
+    static_assert(std::is_same_v<Operator, Equal> || std::is_same_v<Operator, NotEqual>,
                   "Links can only be compared for equality.");
     return make_expression<Compare<Operator, ObjKey>>(left.clone(), make_subexpr<KeyValue>(ObjKey{}));
 }
@@ -3295,7 +3276,7 @@ public:
         std::vector<ObjKey> ret;
         std::vector<ObjKey> result;
 
-        if (m_nullable && std::is_same<T, int64_t>::value) {
+        if (m_nullable && std::is_same_v<T, int64_t>) {
             util::Optional<int64_t> val;
             if (!value.is_null()) {
                 val = value.get_int();
@@ -3362,7 +3343,7 @@ public:
             // Now load `ValueBase::chunk_size` rows from from the leaf into m_storage. If it's an integer
             // leaf, then it contains the method get_chunk() which copies these values in a super fast way (first
             // case of the `if` below. Otherwise, copy the values one by one in a for-loop (the `else` case).
-            if (std::is_same<U, int64_t>::value && index + ValueBase::chunk_size <= colsize) {
+            if (std::is_same_v<U, int64_t> && index + ValueBase::chunk_size <= colsize) {
                 Value<int64_t> v(false, ValueBase::chunk_size);
 
                 // If you want to modify 'chunk_size' then update Array::get_chunk()
@@ -3395,10 +3376,10 @@ public:
     // Load values from Column into destination
     void evaluate(size_t index, ValueBase& destination) override
     {
-        if (m_nullable && std::is_same<typename LeafType::value_type, int64_t>::value) {
+        if (m_nullable && std::is_same_v<typename LeafType::value_type, int64_t>) {
             evaluate_internal<ArrayIntNull>(index, destination);
         }
-        else if (m_nullable && std::is_same<typename LeafType::value_type, bool>::value) {
+        else if (m_nullable && std::is_same_v<typename LeafType::value_type, bool>) {
             evaluate_internal<ArrayBoolNull>(index, destination);
         }
         else {
@@ -3410,12 +3391,12 @@ public:
     {
         auto table = m_link_map.get_target_table();
         auto obj = table.unchecked_ptr()->get_object(key);
-        if (m_nullable && std::is_same<typename LeafType::value_type, int64_t>::value) {
+        if (m_nullable && std::is_same_v<typename LeafType::value_type, int64_t>) {
             Value<int64_t> v(false, 1);
             v.m_storage.set(0, obj.template get<util::Optional<int64_t>>(m_column_key));
             destination.import(v);
         }
-        else if (m_nullable && std::is_same<typename LeafType::value_type, bool>::value) {
+        else if (m_nullable && std::is_same_v<typename LeafType::value_type, bool>) {
             Value<bool> v(false, 1);
             v.m_storage.set(0, obj.template get<util::Optional<bool>>(m_column_key));
             destination.import(v);
@@ -4083,7 +4064,7 @@ public:
     double init() override
     {
         double dT = m_left_is_const ? 10.0 : 50.0;
-        if (std::is_same<TCond, Equal>::value && m_left_is_const && m_right->has_search_index()) {
+        if (std::is_same_v<TCond, Equal> && m_left_is_const && m_right->has_search_index()) {
             if (m_left_value.m_storage.is_null(0)) {
                 m_matches = m_right->find_all(Mixed());
             }
@@ -4178,10 +4159,8 @@ public:
 
     virtual std::string description(util::serializer::SerialisationState& state) const override
     {
-        if (std::is_same<TCond, BeginsWith>::value || std::is_same<TCond, BeginsWithIns>::value ||
-            std::is_same<TCond, EndsWith>::value || std::is_same<TCond, EndsWithIns>::value ||
-            std::is_same<TCond, Contains>::value || std::is_same<TCond, ContainsIns>::value ||
-            std::is_same<TCond, Like>::value || std::is_same<TCond, LikeIns>::value) {
+        if (realm::is_any_v<TCond, BeginsWith, BeginsWithIns, EndsWith, EndsWithIns, Contains, ContainsIns, Like,
+                            LikeIns>) {
             // these string conditions have the arguments reversed but the order is important
             // operations ==, and != can be reversed because the produce the same results both ways
             return util::serializer::print_value(m_right->description(state) + " " + TCond::description() + " " +
