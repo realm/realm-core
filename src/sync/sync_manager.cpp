@@ -48,8 +48,9 @@ void SyncManager::configure(SyncClientConfig config)
         std::string identity;
         std::string refresh_token;
         std::string access_token;
-        std::string server_url;
+        std::string provider_type;
         std::vector<SyncUserIdentity> identities;
+        SyncUser::State state;
     };
 
     std::vector<UserCreationData> users_to_add;
@@ -113,8 +114,9 @@ void SyncManager::configure(SyncClientConfig config)
                     user_data.identity(),
                     std::move(*refresh_token),
                     std::move(*access_token),
-                    user_data.auth_server_url(),
-                    user_data.identities()
+                    user_data.provider_type(),
+                    user_data.identities(),
+                    user_data.state()
                 });
             }
         }
@@ -142,12 +144,13 @@ void SyncManager::configure(SyncClientConfig config)
         std::lock_guard<std::mutex> lock(m_user_mutex);
         for (auto& user_data : users_to_add) {
             auto& identity = user_data.identity;
-            auto& server_url = user_data.server_url;
+            auto& provider_type = user_data.provider_type;
             auto user = std::make_shared<SyncUser>(user_data.refresh_token,
                                                    identity,
-                                                   server_url,
-                                                   user_data.access_token);
-            m_users.insert({ {identity, server_url}, std::move(user) });
+                                                   provider_type,
+                                                   user_data.access_token,
+                                                   user_data.state);
+            m_users.emplace_back(std::move(user));
         }
     }
 }
@@ -295,43 +298,48 @@ bool SyncManager::perform_metadata_update(std::function<void(const SyncMetadataM
     return true;
 }
 
-std::shared_ptr<SyncUser> SyncManager::get_user(const SyncUserIdentifier& identifier,
+std::shared_ptr<SyncUser> SyncManager::get_user(const std::string& user_id,
                                                 std::string refresh_token,
-                                                std::string access_token)
+                                                std::string access_token,
+                                                const std::string provider_type)
 {
     std::lock_guard<std::mutex> lock(m_user_mutex);
-    auto it = m_users.find(identifier);
+    auto it = std::find_if(m_users.begin(),
+                           m_users.end(),
+                           [user_id, provider_type](const auto& user) {
+        return user->identity() == user_id && user->provider_type() == provider_type;
+    });
     if (it == m_users.end()) {
         // No existing user.
         auto new_user = std::make_shared<SyncUser>(std::move(refresh_token),
-                                                   identifier.user_id,
-                                                   identifier.auth_server_url,
-                                                   std::move(access_token));
-        m_users.insert({ identifier, new_user });
+                                                   user_id,
+                                                   provider_type,
+                                                   std::move(access_token),
+                                                   SyncUser::State::Active);
+        m_users.emplace(m_users.begin(), new_user);
         return new_user;
     } else {
-        auto user = it->second;
+        auto user = *it;
         if (user->state() == SyncUser::State::Error) {
             return nullptr;
         }
         user->update_refresh_token(std::move(refresh_token));
         user->update_access_token(std::move(access_token));
+
+        if (user->state() == SyncUser::State::LoggedOut) {
+            user->set_state(SyncUser::State::Active);
+        }
         return user;
     }
 }
 
-std::vector<std::shared_ptr<SyncUser>> SyncManager::all_logged_in_users() const
+std::vector<std::shared_ptr<SyncUser>> SyncManager::all_users()
 {
     std::lock_guard<std::mutex> lock(m_user_mutex);
-    std::vector<std::shared_ptr<SyncUser>> users;
-    users.reserve(m_users.size());
-    for (auto& it : m_users) {
-        auto user = it.second;
-        if (user->state() == SyncUser::State::Active) {
-            users.emplace_back(std::move(user));
-        }
-    }
-    return users;
+    m_users.erase(std::remove_if(m_users.begin(), m_users.end(), [](auto& user) {
+        return user->state() == SyncUser::State::Error;
+    }), m_users.end());
+    return m_users;
 }
 
 std::shared_ptr<SyncUser> SyncManager::get_current_user() const
@@ -349,24 +357,72 @@ std::shared_ptr<SyncUser> SyncManager::get_current_user() const
 
     std::string ident = *cur_user_ident;
     auto is_active_user = [&](auto& el) {
-        return el.second->identity() == ident;
+        return el->identity() == ident;
     };
 
     auto it = std::find_if(m_users.begin(), m_users.end(), is_active_user);
     if (it == m_users.end())
         return nullptr;
 
-    return it->second;
+    return *it;
 }
 
-std::shared_ptr<SyncUser> SyncManager::get_existing_logged_in_user(const SyncUserIdentifier& identifier) const
+void SyncManager::log_out_user(const std::string& user_id)
+{
+    // Erase and insert this user as the end of the vector
+    std::lock_guard<std::mutex> lock(m_user_mutex);
+
+    if (!m_metadata_manager) {
+        return;
+    }
+
+    if (m_users.size() > 1) {
+        auto it = std::find_if(m_users.begin(),
+                               m_users.end(),
+                               [user_id](const auto& user) {
+            return user->identity() == user_id;
+        });
+
+        if (it == m_users.end())
+            return;
+
+        std::rotate(it, it + 1, m_users.end());
+    }
+
+    // Set the current active user to the next logged in user, or null if none
+    for (auto& user : m_users) {
+        if (user->state() == SyncUser::State::Active) {
+            m_metadata_manager->set_current_user_identity(user->identity());
+            return;
+        }
+    }
+
+    m_metadata_manager->set_current_user_identity("");
+}
+
+void SyncManager::set_current_user(const std::string& user_id)
 {
     std::lock_guard<std::mutex> lock(m_user_mutex);
-    auto it = m_users.find(identifier);
+
+    if (!m_metadata_manager) {
+        return;
+    }
+
+    m_metadata_manager->set_current_user_identity(user_id);
+}
+
+std::shared_ptr<SyncUser> SyncManager::get_existing_logged_in_user(const std::string& user_id) const
+{
+    std::lock_guard<std::mutex> lock(m_user_mutex);
+    auto it = std::find_if(m_users.begin(),
+                           m_users.end(),
+                           [user_id](const auto& user) {
+        return user->identity() == user_id;
+    });
     if (it == m_users.end())
         return nullptr;
 
-    auto user = it->second;
+    auto user = *it;
     return user->state() == SyncUser::State::Active ? user : nullptr;
 }
 

@@ -31,7 +31,6 @@
 #define REALM_ENABLE_AUTH_TESTS 0
 #endif
 
-
 using namespace realm;
 using namespace realm::app;
 
@@ -159,14 +158,21 @@ TEST_CASE("app: login_with_credentials integration", "[sync][app]") {
 
         bool processed = false;
 
-        app.login_with_credentials(AppCredentials::anonymous(),
-                                   [&](std::shared_ptr<SyncUser> user, Optional<app::AppError> error) {
+        static const std::string base_path = realm::tmp_dir();
+        auto tsm = TestSyncManager(base_path);
+
+        app.log_in_with_credentials(AppCredentials::anonymous(),
+                                    [&](std::shared_ptr<SyncUser> user, Optional<app::AppError> error) {
             CHECK(user);
             CHECK(!error);
             processed = true;
         });
 
         CHECK(processed);
+        processed = false;
+        app.log_out([](auto error) {
+            CHECK(!error);
+        });
     }
 }
 
@@ -295,7 +301,7 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
         CHECK(!error);
     });
     
-    app.login_with_credentials(AppCredentials::username_password(email, password),
+    app.log_in_with_credentials(AppCredentials::username_password(email, password),
                            [&](std::shared_ptr<SyncUser> user, Optional<app::AppError> error) {
         CHECK(user);
         CHECK(!error);
@@ -374,12 +380,85 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
 
 #endif // REALM_ENABLE_AUTH_TESTS
 
+static std::string random_string(std::string::size_type length)
+{
+    static auto& chrs = "0123456789"
+    "abcdefghijklmnopqrstuvwxyz"
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+    thread_local static std::mt19937 rg{std::random_device{}()};
+    thread_local static std::uniform_int_distribution<std::string::size_type> pick(0, sizeof(chrs) - 2);
+
+    std::string s;
+
+    s.reserve(length);
+
+    while(length--)
+        s += chrs[pick(rg)];
+
+    return s;
+}
+
+static const std::string profile_0_name = "Ursus americanus Ursus boeckhi";
+static const std::string profile_0_first_name = "Ursus americanus";
+static const std::string profile_0_last_name = "Ursus boeckhi";
+static const std::string profile_0_email = "Ursus ursinus";
+static const std::string profile_0_picture_url = "Ursus malayanus";
+static const std::string profile_0_gender = "Ursus thibetanus";
+static const std::string profile_0_birthday = "Ursus americanus";
+static const std::string profile_0_min_age = "Ursus maritimus";
+static const std::string profile_0_max_age = "Ursus arctos";
+
+static const nlohmann::json profile_0 = {
+    {"name", profile_0_name},
+    {"first_name", profile_0_first_name},
+    {"last_name", profile_0_last_name},
+    {"email", profile_0_email},
+    {"picture_url", profile_0_picture_url},
+    {"gender", profile_0_gender},
+    {"birthday", profile_0_birthday},
+    {"min_age", profile_0_min_age},
+    {"max_age", profile_0_max_age}
+};
+
+static nlohmann::json user_json(std::string access_token, std::string user_id = random_string(15)) {
+    return {
+        {"access_token", access_token},
+        {"refresh_token", access_token},
+        {"user_id", user_id},
+        {"device_id", "Panda Bear"}
+    };
+}
+
+static nlohmann::json user_profile_json(std::string user_id = random_string(15),
+                                        std::string identity_0_id = "Ursus arctos isabellinus",
+                                        std::string identity_1_id = "Ursus arctos horribilis",
+                                        std::string provider_type = "anon-user") {
+    return {
+        {"user_id", user_id},
+        {"identities", {
+            {
+                {"id", identity_0_id},
+                {"provider_type", provider_type},
+                {"provider_id", "lol"}
+            },
+            {
+                {"id", identity_1_id},
+                {"provider_type", "lol_wut"},
+                {"provider_id", "nah_dawg"}
+            }
+        }},
+        {"data", profile_0}
+    };
+}
+
 // MARK: - Unit Tests
 
 class UnitTestTransport : public GenericNetworkTransport {
 
 public:
     static std::string access_token;
+    static std::string provider_type;
     static const std::string api_key;
     static const std::string api_key_id;
     static const std::string api_key_name;
@@ -387,7 +466,6 @@ public:
     static const std::string user_id;
     static const std::string identity_0_id;
     static const std::string identity_1_id;
-    static const nlohmann::json profile_0;
 
 private:
     void handle_profile(const Request request,
@@ -404,7 +482,7 @@ private:
             {"identities", {
                 {
                     {"id", identity_0_id},
-                    {"provider_type", "anon-user"},
+                    {"provider_type", provider_type},
                     {"provider_id", "lol"}
                 },
                 {
@@ -425,24 +503,20 @@ private:
         CHECK(request.method == HttpMethod::post);
         CHECK(request.headers.at("Content-Type") == "application/json;charset=utf-8");
 
-        CHECK(nlohmann::json::parse(request.body) == nlohmann::json({{"provider", "anon-user"}}));
+        CHECK(nlohmann::json::parse(request.body) == nlohmann::json({{"provider", provider_type}}));
         CHECK(request.timeout_ms == 60000);
 
         std::string response = nlohmann::json({
             {"access_token", access_token},
             {"refresh_token", access_token},
-            {"user_id", "Brown Bear"},
+            {"user_id", random_string(15)},
             {"device_id", "Panda Bear"}}).dump();
         
         try {
-            realm::SyncUserIdentifier identifier {
-                "Brown Bear",
-                "some_auth_route"
-            };
-
-            realm::SyncManager::shared().get_user(identifier,
+            realm::SyncManager::shared().get_user(user_id,
                                                   access_token,
-                                                  access_token);
+                                                  access_token,
+                                                  provider_type);
             
         } catch (const AppError& err) {
             return completion_block({});
@@ -458,7 +532,6 @@ private:
     {
         CHECK(request.method == HttpMethod::post);
         CHECK(request.headers.at("Content-Type") == "application/json;charset=utf-8");
-
         CHECK(nlohmann::json::parse(request.body) == nlohmann::json({{"name", api_key_name}}));
         CHECK(request.timeout_ms == 60000);
 
@@ -515,11 +588,6 @@ private:
                                     .custom_status_code = 0,
                                     .headers = {},
                                     .body = nlohmann::json(elements).dump() });
-
-        completion_block(Response { .http_status_code = 200,
-                                    .custom_status_code = 0,
-                                    .headers = {},
-                                    .body = nlohmann::json(elements).dump() });
     }
 
 public:
@@ -529,6 +597,8 @@ public:
             handle_login(request, completion_block);
         } else if (request.url.find("/profile") != std::string::npos) {
             handle_profile(request, completion_block);
+        } else if (request.url.find("/session") != std::string::npos) {
+            completion_block(Response { .http_status_code = 200, .custom_status_code = 0, .headers = {}, .body = "" });
         } else if (request.url.find("/api_keys") != std::string::npos && request.method == HttpMethod::post) {
             handle_create_api_key(request, completion_block);
         } else if (request.url.find(util::format("/api_keys/%1", api_key_id)) != std::string::npos && request.method == HttpMethod::get) {
@@ -541,6 +611,8 @@ public:
 
 static const std::string good_access_token =  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE1ODE1MDc3OTYsImlhdCI6MTU4MTUwNTk5NiwiaXNzIjoiNWU0M2RkY2M2MzZlZTEwNmVhYTEyYmRjIiwic3RpdGNoX2RldklkIjoiMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwIiwic3RpdGNoX2RvbWFpbklkIjoiNWUxNDk5MTNjOTBiNGFmMGViZTkzNTI3Iiwic3ViIjoiNWU0M2RkY2M2MzZlZTEwNmVhYTEyYmRhIiwidHlwIjoiYWNjZXNzIn0.0q3y9KpFxEnbmRwahvjWU1v9y1T1s3r2eozu93vMc3s";
 
+static const std::string good_access_token2 =  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCF9.eyJleHAiOjE1ODE1MDc3OTYsImlhdCI6MTU4MTUwNTk5NiwiaXNzIjoiNWU0M2RkY2M2MzZlZTEwNmVhYTEyYmRjIiwic3RpdGNoX2RldklkIjoiMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwIiwic3RpdGNoX2RvbWFpbklkIjoiNWUxNDk5MTNjOTBiNGFmMGViZTkzNTI3Iiwic3ViIjoiNWU0M2RkY2M2MzZlZTEwNmVhYTEyYmRhIiwidHlwIjoiYWNjZXNzIn0.0q3y9KpFxEnbmRwahvjWU1v9y1T1s3r2eozu93vMc3s";
+
 std::string UnitTestTransport::access_token = good_access_token;
 
 static const std::string bad_access_token = "lolwut";
@@ -550,45 +622,28 @@ const std::string UnitTestTransport::api_key_id = "5e5e6f0abe4ae2a2c2c2d329";
 const std::string UnitTestTransport::api_key_name = "some_api_key_name";
 const std::string UnitTestTransport::auth_route = "https://mongodb.com/unittests";
 const std::string UnitTestTransport::user_id = "Ailuropoda melanoleuca";
+std::string UnitTestTransport::provider_type = "anon-user";
 const std::string UnitTestTransport::identity_0_id = "Ursus arctos isabellinus";
 const std::string UnitTestTransport::identity_1_id = "Ursus arctos horribilis";
 
-static const std::string profile_0_name = "Ursus americanus Ursus boeckhi";
-static const std::string profile_0_first_name = "Ursus americanus";
-static const std::string profile_0_last_name = "Ursus boeckhi";
-static const std::string profile_0_email = "Ursus ursinus";
-static const std::string profile_0_picture_url = "Ursus malayanus";
-static const std::string profile_0_gender = "Ursus thibetanus";
-static const std::string profile_0_birthday = "Ursus americanus";
-static const std::string profile_0_min_age = "Ursus maritimus";
-static const std::string profile_0_max_age = "Ursus arctos";
-
-const nlohmann::json UnitTestTransport::profile_0 = {
-    {"name", profile_0_name},
-    {"first_name", profile_0_first_name},
-    {"last_name", profile_0_last_name},
-    {"email", profile_0_email},
-    {"picture_url", profile_0_picture_url},
-    {"gender", profile_0_gender},
-    {"birthday", profile_0_birthday},
-    {"min_age", profile_0_min_age},
-    {"max_age", profile_0_max_age}
-};
-
 //FIXME: - Broken test
-/*
+
 TEST_CASE("app: login_with_credentials unit_tests", "[sync][app]") {
+    static const std::string base_path = realm::tmp_dir();
+    auto tsm = TestSyncManager(base_path);
+    
     std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
         return std::unique_ptr<GenericNetworkTransport>(new UnitTestTransport);
     };
-    App app(App::Config{"<>", factory});
+
+    App app(App::Config{"django", factory});
 
     SECTION("login_anonymous good") {
         UnitTestTransport::access_token = good_access_token;
 
         bool processed = false;
 
-        app.login_with_credentials(realm::app::AppCredentials::anonymous(),
+        app.log_in_with_credentials(realm::app::AppCredentials::anonymous(),
                                     [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
             CHECK(user);
             CHECK(!error);
@@ -615,11 +670,29 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync][app]") {
     }
 
     SECTION("login_anonymous bad") {
-        UnitTestTransport::access_token = bad_access_token;
+        std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
+            struct transport : GenericNetworkTransport {
+                void send_request_to_server(const Request request,
+                                            std::function<void (const Response)> completion_block)
+                {
+                    if (request.url.find("/login") != std::string::npos) {
+                        completion_block({
+                            200, 0, {}, user_json(bad_access_token).dump()
+                        });
+                    } else if (request.url.find("/profile") != std::string::npos) {
+                        completion_block({
+                            200, 0, {}, user_profile_json().dump()
+                        });
+                    }
+                }
+            };
+            return std::unique_ptr<GenericNetworkTransport>(new transport);
+        };
+        app = App(App::Config{"django", factory});
 
         bool processed = false;
 
-        app.login_with_credentials(AppCredentials::anonymous(),
+        app.log_in_with_credentials(AppCredentials::anonymous(),
                                     [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
             CHECK(!user);
             CHECK(error);
@@ -634,21 +707,17 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync][app]") {
         CHECK(processed);
     }
 }
-*/
 
 TEST_CASE("app: UserAPIKeyProviderClient unit_tests", "[sync][app]") {
-    
     auto setup_user = []() {
         if (realm::SyncManager::shared().get_current_user()) {
             return;
         }
-        realm::SyncUserIdentifier identifier {
-            UnitTestTransport::user_id,
-            UnitTestTransport::auth_route
-        };
-        realm::SyncManager::shared().get_user(identifier,
+
+        realm::SyncManager::shared().get_user(UnitTestTransport::user_id,
                                               good_access_token,
-                                              good_access_token);
+                                              good_access_token,
+                                              "anon-user");
     };
     
     std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
@@ -703,6 +772,115 @@ TEST_CASE("app: UserAPIKeyProviderClient unit_tests", "[sync][app]") {
     }
 }
 
+
+TEST_CASE("app: user_semantics", "[app]") {
+    static const std::string base_path = realm::tmp_dir();
+    auto tsm = TestSyncManager(base_path);
+
+    std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
+        struct transport : GenericNetworkTransport {
+            void send_request_to_server(const Request request,
+                                        std::function<void (const Response)> completion_block)
+            {
+                if (request.url.find("/login") != std::string::npos) {
+                    completion_block({
+                        200, 0, {}, user_json(good_access_token).dump()
+                    });
+                } else if (request.url.find("/profile") != std::string::npos) {
+                    completion_block({
+                        200, 0, {}, user_profile_json().dump()
+                    });
+                } else if (request.url.find("/session") != std::string::npos) {
+                    CHECK(request.method == HttpMethod::del);
+                    completion_block({ 200, 0, {}, "" });
+                }
+            }
+        };
+        return std::unique_ptr<GenericNetworkTransport>(new transport);
+    };
+
+    const auto app_id = random_string(36);
+    const App app(App::Config{app_id, factory});
+
+    const std::function<std::shared_ptr<SyncUser>(app::AppCredentials)> login_user = [app](app::AppCredentials creds) {
+        std::shared_ptr<SyncUser> test_user;
+        app.log_in_with_credentials(creds,
+                                    [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+            CHECK(!error);
+            test_user = user;
+        });
+        return test_user;
+    };
+
+    const std::function<std::shared_ptr<SyncUser>(void)> login_user_email_pass = [login_user] {
+        return login_user(realm::app::AppCredentials::username_password("bob", "thompson"));
+    };
+
+    const std::function<std::shared_ptr<SyncUser>(void)> login_user_anonymous = [login_user] {
+        return login_user(realm::app::AppCredentials::anonymous());
+    };
+
+    CHECK(!app.current_user());
+
+    SECTION("current user is populated") {
+        const auto user1 = login_user_anonymous();
+        CHECK(app.current_user()->identity() == user1->identity());
+    }
+
+    SECTION("current user is updated on login") {
+        const auto user1 = login_user_anonymous();
+        CHECK(app.current_user()->identity() == user1->identity());
+        const auto user2 = login_user_anonymous();
+        CHECK(app.current_user()->identity() == user2->identity());
+        CHECK(user1->identity() != user2->identity());
+    }
+
+    SECTION("current user is updated on login") {
+        const auto user1 = login_user_anonymous();
+        CHECK(app.current_user()->identity() == user1->identity());
+        const auto user2 = login_user_anonymous();
+        CHECK(app.current_user()->identity() == user2->identity());
+        CHECK(user1->identity() != user2->identity());
+    }
+
+    SECTION("current user is updated to last used user on logout") {
+        const auto user1 = login_user_anonymous();
+        CHECK(app.current_user()->identity() == user1->identity());
+        CHECK(app.all_users()[0]->state() == SyncUser::State::Active);
+
+        const auto user2 = login_user_email_pass();
+        CHECK(app.all_users()[0]->state() == SyncUser::State::Active);
+        CHECK(app.all_users()[1]->state() == SyncUser::State::Active);
+        CHECK(app.current_user()->identity() == user2->identity());
+        CHECK(user1->identity() != user2->identity());
+
+        app.log_out([&](auto){});
+        CHECK(app.current_user()->identity() == user1->identity());
+
+        CHECK(app.all_users().size() == 2);
+        CHECK(app.all_users()[0]->state() == SyncUser::State::Active);
+        CHECK(app.all_users()[1]->state() == SyncUser::State::LoggedOut);
+    }
+
+    SECTION("anon users are removed on logout") {
+        const auto user1 = login_user_anonymous();
+        CHECK(app.current_user()->identity() == user1->identity());
+        CHECK(app.all_users()[0]->state() == SyncUser::State::Active);
+
+        const auto user2 = login_user_anonymous();
+        CHECK(app.all_users()[0]->state() == SyncUser::State::Active);
+        CHECK(app.all_users()[1]->state() == SyncUser::State::Active);
+        CHECK(app.current_user()->identity() == user2->identity());
+        CHECK(user1->identity() != user2->identity());
+
+        app.log_out([&](auto){});
+        CHECK(app.current_user()->identity() == user1->identity());
+
+        CHECK(app.all_users().size() == 1);
+        CHECK(app.all_users()[0]->state() == SyncUser::State::Active);
+    }
+}
+
 struct ErrorCheckingTransport : public GenericNetworkTransport {
     ErrorCheckingTransport(Response r)
     : m_response(r)
@@ -716,9 +894,9 @@ private:
     Response m_response;
 };
 
-//FIXME: - Broken tests
-/*
 TEST_CASE("app: response error handling", "[sync][app]") {
+    static const std::string base_path = realm::tmp_dir();
+    auto tsm = TestSyncManager(base_path);
 
     std::string response_body = nlohmann::json({
         {"access_token", good_access_token},
@@ -731,102 +909,97 @@ TEST_CASE("app: response error handling", "[sync][app]") {
     std::function<std::unique_ptr<GenericNetworkTransport>()> transport_generator = [&response] {
         return std::unique_ptr<GenericNetworkTransport>(new ErrorCheckingTransport(response));
     };
-    App app(App::Config{"<>", transport_generator});
+    App app(App::Config{"my-app-id", transport_generator});
     bool processed = false;
 
     SECTION("http 404") {
         response.http_status_code = 404;
-        app.login_with_credentials(realm::app::AppCredentials::anonymous(),
-                                   [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
-                                       CHECK(!user);
-                                       CHECK(error);
-                                       CHECK(!error->is_json_error());
-                                       CHECK(!error->is_custom_error());
-                                       CHECK(!error->is_service_error());
-                                       CHECK(error->is_http_error());
-                                       CHECK(error->error_code.value() == 404);
-                                       CHECK(error->message == std::string("http error code considered fatal"));
-                                       CHECK(error->error_code.message() == "Client Error: 404");
-                                       processed = true;
-                                   });
+        app.log_in_with_credentials(realm::app::AppCredentials::anonymous(),
+                                    [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+            CHECK(!user);
+            CHECK(error);
+            CHECK(!error->is_json_error());
+            CHECK(!error->is_custom_error());
+            CHECK(!error->is_service_error());
+            CHECK(error->is_http_error());
+            CHECK(error->error_code.value() == 404);
+            CHECK(error->message == std::string("http error code considered fatal"));
+            CHECK(error->error_code.message() == "Client Error: 404");
+            processed = true;
+        });
         CHECK(processed);
     }
     SECTION("http 500") {
         response.http_status_code = 500;
-        app.login_with_credentials(realm::app::AppCredentials::anonymous(),
-                                   [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
-                                       CHECK(!user);
-                                       CHECK(error);
-                                       CHECK(!error->is_json_error());
-                                       CHECK(!error->is_custom_error());
-                                       CHECK(!error->is_service_error());
-                                       CHECK(error->is_http_error());
-                                       CHECK(error->error_code.value() == 500);
-                                       CHECK(error->message == std::string("http error code considered fatal"));
-                                       CHECK(error->error_code.message() == "Server Error: 500");
-                                       processed = true;
-                                   });
+        app.log_in_with_credentials(realm::app::AppCredentials::anonymous(),
+                                    [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+            CHECK(!user);
+            CHECK(error);
+            CHECK(!error->is_json_error());
+            CHECK(!error->is_custom_error());
+            CHECK(!error->is_service_error());
+            CHECK(error->is_http_error());
+            CHECK(error->error_code.value() == 500);
+            CHECK(error->message == std::string("http error code considered fatal"));
+            CHECK(error->error_code.message() == "Server Error: 500");
+            processed = true;
+        });
         CHECK(processed);
     }
     SECTION("custom error code") {
         response.custom_status_code = 42;
-        app.login_with_credentials(realm::app::AppCredentials::anonymous(),
-                                   [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
-                                       CHECK(!user);
-                                       CHECK(error);
-                                       CHECK(!error->is_http_error());
-                                       CHECK(!error->is_json_error());
-                                       CHECK(!error->is_service_error());
-                                       CHECK(error->is_custom_error());
-                                       CHECK(error->error_code.value() == 42);
-                                       CHECK(error->message == std::string("non-zero custom status code considered fatal"));
-                                       CHECK(error->error_code.message() == "code 42");
-                                       processed = true;
-                                   });
+        app.log_in_with_credentials(realm::app::AppCredentials::anonymous(),
+                                    [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+            CHECK(!user);
+            CHECK(error);
+            CHECK(!error->is_http_error());
+            CHECK(!error->is_json_error());
+            CHECK(!error->is_service_error());
+            CHECK(error->is_custom_error());
+            CHECK(error->error_code.value() == 42);
+            CHECK(error->message == std::string("non-zero custom status code considered fatal"));
+            CHECK(error->error_code.message() == "code 42");
+            processed = true;
+        });
         CHECK(processed);
     }
 
     SECTION("session error code") {
+        response.http_status_code = 400;
         response.body = nlohmann::json({
-            {"errorCode", "MongoDBError"},
-            {"error", "a fake MongoDB error message!"},
-            {"access_token", good_access_token},
-            {"refresh_token", good_access_token},
-            {"user_id", "Brown Bear"},
-            {"device_id", "Panda Bear"}}).dump();
-        app.login_with_credentials(realm::app::AppCredentials::anonymous(),
-                                   [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
-                                       CHECK(!user);
-                                       CHECK(error);
-                                       CHECK(!error->is_http_error());
-                                       CHECK(!error->is_json_error());
-                                       CHECK(!error->is_custom_error());
-                                       CHECK(error->is_service_error());
-                                       CHECK(app::ServiceErrorCode(error->error_code.value()) == app::ServiceErrorCode::mongodb_error);
-                                       CHECK(error->message == std::string("a fake MongoDB error message!"));
-                                       CHECK(error->error_code.message() == "MongoDBError");
-                                       processed = true;
-                                   });
+            {"error_code", "MongoDBError"},
+            {"error", "a fake MongoDB error message!"}}).dump();
+        app.log_in_with_credentials(realm::app::AppCredentials::anonymous(),
+                                    [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+            CHECK(!user);
+            CHECK(error);
+            CHECK(!error->is_http_error());
+            CHECK(!error->is_json_error());
+            CHECK(!error->is_custom_error());
+            CHECK(error->is_service_error());
+            CHECK(app::ServiceErrorCode(error->error_code.value()) == app::ServiceErrorCode::mongodb_error);
+            CHECK(error->message == std::string("a fake MongoDB error message!"));
+            CHECK(error->error_code.message() == "MongoDBError");
+            processed = true;
+        });
         CHECK(processed);
     }
 
     SECTION("json error code") {
         response.body = "this: is not{} a valid json body!";
-        app.login_with_credentials(realm::app::AppCredentials::anonymous(),
-                                   [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
-                                       CHECK(!user);
-                                       CHECK(error);
-                                       CHECK(!error->is_http_error());
-                                       CHECK(error->is_json_error());
-                                       CHECK(!error->is_custom_error());
-                                       CHECK(!error->is_service_error());
-                                       CHECK(app::JSONErrorCode(error->error_code.value()) == app::JSONErrorCode::malformed_json);
-                                       CHECK(error->message == std::string("parse error - unexpected 't'"));
-                                       CHECK(error->error_code.message() == "malformed json");
-                                       processed = true;
-                                   });
+        app.log_in_with_credentials(realm::app::AppCredentials::anonymous(),
+                                    [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+            CHECK(!user);
+            CHECK(error);
+            CHECK(!error->is_http_error());
+            CHECK(error->is_json_error());
+            CHECK(!error->is_custom_error());
+            CHECK(!error->is_service_error());
+            CHECK(app::JSONErrorCode(error->error_code.value()) == app::JSONErrorCode::malformed_json);
+            CHECK(error->message == std::string("parse error - unexpected 't'"));
+            CHECK(error->error_code.message() == "malformed json");
+            processed = true;
+        });
         CHECK(processed);
     }
 }
-*/
-

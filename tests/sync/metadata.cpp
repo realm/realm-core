@@ -41,14 +41,14 @@ TEST_CASE("sync_metadata: migration", "[sync]") {
     const std::string identity_1 = "id_1";
     const std::string identity_2 = "id_2";
     const std::string identity_3 = "id_3";
-    const std::string auth_server_url = "https://realm.example.org";
+    const std::string provider_type = "https://realm.example.org";
     const std::string token = "dummy_token";
 
     const Schema v0_schema{
         {"UserMetadata", {
             {"identity", PropertyType::String, Property::IsPrimary{true}},
             {"marked_for_removal", PropertyType::Bool},
-            {"auth_server_url", PropertyType::String|PropertyType::Nullable},
+            {"provider_type", PropertyType::String|PropertyType::Nullable},
             {"refresh_token", PropertyType::String|PropertyType::Nullable},
             {"access_token", PropertyType::String|PropertyType::Nullable},
         }},
@@ -65,7 +65,7 @@ TEST_CASE("sync_metadata: migration", "[sync]") {
         {"UserMetadata", {
             {"identity", PropertyType::String, Property::IsPrimary{true}},
             {"marked_for_removal", PropertyType::Bool},
-            {"auth_server_url", PropertyType::String|PropertyType::Nullable},
+            {"provider_type", PropertyType::String|PropertyType::Nullable},
             {"refresh_token", PropertyType::String|PropertyType::Nullable},
             {"access_token", PropertyType::String|PropertyType::Nullable},
             {"user_is_admin", PropertyType::Bool},
@@ -103,7 +103,7 @@ TEST_CASE("sync_metadata: migration", "[sync]") {
             Object::create<util::Any>(context, realm, user_metadata_schema, AnyDict{
                 { "identity", identity_2 },
                 { "marked_for_removal", false },
-                { "auth_server_url", auth_server_url }
+                { "provider_type", provider_type }
             });
             realm->commit_transaction();
         }
@@ -115,25 +115,25 @@ TEST_CASE("sync_metadata: migration", "[sync]") {
                 REQUIRE(bool(md_1));
                 CHECK(md_1->identity() == identity_1);
                 CHECK(md_1->local_uuid() == identity_1);
-                CHECK(md_1->auth_server_url() == "");
+                CHECK(md_1->provider_type() == "");
                 CHECK(md_1->access_token() == token);
                 CHECK(md_1->is_valid());
-                auto md_2 = manager.get_or_make_user_metadata(identity_2, auth_server_url, false);
+                auto md_2 = manager.get_or_make_user_metadata(identity_2, provider_type, false);
                 REQUIRE(bool(md_2));
                 CHECK(md_2->identity() == identity_2);
                 CHECK(md_2->local_uuid() == identity_2);
-                CHECK(md_2->auth_server_url() == auth_server_url);
+                CHECK(md_2->provider_type() == provider_type);
                 CHECK(!md_2->access_token());
                 CHECK(md_2->is_valid());
             }
 
             SECTION("and creates new entries properly") {
-                auto user_metadata = manager.get_or_make_user_metadata(identity_3, auth_server_url);
+                auto user_metadata = manager.get_or_make_user_metadata(identity_3, provider_type);
                 REQUIRE(user_metadata->is_valid());
                 CHECK(user_metadata->identity() == identity_3);
                 CHECK(user_metadata->local_uuid() != "");
                 CHECK(user_metadata->local_uuid() != identity_3);
-                CHECK(user_metadata->auth_server_url() == auth_server_url);
+                CHECK(user_metadata->provider_type() == provider_type);
             }
         }
     }
@@ -162,7 +162,7 @@ TEST_CASE("sync_metadata: migration", "[sync]") {
             Object::create<util::Any>(context, realm, user_metadata_schema, AnyDict{
                 { "identity", identity_2 },
                 { "marked_for_removal", false },
-                { "auth_server_url", auth_server_url },
+                { "provider_type", provider_type },
                 { "user_is_admin", true }
             });
             realm->commit_transaction();
@@ -175,25 +175,25 @@ TEST_CASE("sync_metadata: migration", "[sync]") {
                 REQUIRE(bool(md_1));
                 CHECK(md_1->identity() == identity_1);
                 CHECK(md_1->local_uuid() == identity_1);
-                CHECK(md_1->auth_server_url() == "");
+                CHECK(md_1->provider_type() == "");
                 CHECK(md_1->access_token() == token);
                 CHECK(md_1->is_valid());
-                auto md_2 = manager.get_or_make_user_metadata(identity_2, auth_server_url, false);
+                auto md_2 = manager.get_or_make_user_metadata(identity_2, provider_type, false);
                 REQUIRE(bool(md_2));
                 CHECK(md_2->identity() == identity_2);
                 CHECK(md_2->local_uuid() == identity_2);
-                CHECK(md_2->auth_server_url() == auth_server_url);
+                CHECK(md_2->provider_type() == provider_type);
                 CHECK(!md_2->access_token());
                 CHECK(md_2->is_valid());
             }
 
             SECTION("and creates new entries properly") {
-                auto user_metadata = manager.get_or_make_user_metadata(identity_3, auth_server_url);
+                auto user_metadata = manager.get_or_make_user_metadata(identity_3, provider_type);
                 REQUIRE(user_metadata->is_valid());
                 CHECK(user_metadata->identity() == identity_3);
                 CHECK(user_metadata->local_uuid() != "");
                 CHECK(user_metadata->local_uuid() != identity_3);
-                CHECK(user_metadata->auth_server_url() == auth_server_url);
+                CHECK(user_metadata->provider_type() == provider_type);
 
                 CHECK(manager.client_uuid().size());
             }
@@ -204,64 +204,64 @@ TEST_CASE("sync_metadata: migration", "[sync]") {
 TEST_CASE("sync_metadata: user metadata", "[sync]") {
     reset_test_directory(base_path);
     SyncMetadataManager manager(metadata_path, false);
-    const std::string auth_server_url = "https://realm.example.org";
+    const std::string provider_type = "https://realm.example.org";
 
     SECTION("can be properly constructed") {
         const auto identity = "testcase1a";
-        auto user_metadata = manager.get_or_make_user_metadata(identity, auth_server_url);
+        auto user_metadata = manager.get_or_make_user_metadata(identity, provider_type);
         REQUIRE(user_metadata->identity() == identity);
-        REQUIRE(user_metadata->auth_server_url() == auth_server_url);
+        REQUIRE(user_metadata->provider_type() == provider_type);
         REQUIRE(user_metadata->access_token() == none);
     }
 
     SECTION("properly reflects updating state") {
         const auto identity = "testcase1b";
         const std::string sample_token = "this_is_a_user_token";
-        auto user_metadata = manager.get_or_make_user_metadata(identity, auth_server_url);
+        auto user_metadata = manager.get_or_make_user_metadata(identity, provider_type);
         user_metadata->set_access_token(sample_token);
         REQUIRE(user_metadata->identity() == identity);
-        REQUIRE(user_metadata->auth_server_url() == auth_server_url);
+        REQUIRE(user_metadata->provider_type() == provider_type);
         REQUIRE(user_metadata->access_token() == sample_token);
     }
 
     SECTION("can be properly re-retrieved from the same manager") {
         const auto identity = "testcase1c";
         const std::string sample_token = "this_is_a_user_token";
-        auto first = manager.get_or_make_user_metadata(identity, auth_server_url);
+        auto first = manager.get_or_make_user_metadata(identity, provider_type);
         first->set_access_token(sample_token);
         // Get a second instance of the user metadata for the same identity.
-        auto second = manager.get_or_make_user_metadata(identity, auth_server_url, false);
+        auto second = manager.get_or_make_user_metadata(identity, provider_type, false);
         REQUIRE(second->identity() == identity);
-        REQUIRE(second->auth_server_url() == auth_server_url);
+        REQUIRE(second->provider_type() == provider_type);
         REQUIRE(second->access_token() == sample_token);
     }
 
     SECTION("properly reflects changes across different instances") {
         const auto identity = "testcase1d";
         const std::string sample_token_1 = "this_is_a_user_token";
-        auto first = manager.get_or_make_user_metadata(identity, auth_server_url);
-        auto second = manager.get_or_make_user_metadata(identity, auth_server_url);
+        auto first = manager.get_or_make_user_metadata(identity, provider_type);
+        auto second = manager.get_or_make_user_metadata(identity, provider_type);
         first->set_access_token(sample_token_1);
         REQUIRE(first->identity() == identity);
-        REQUIRE(first->auth_server_url() == auth_server_url);
+        REQUIRE(first->provider_type() == provider_type);
         REQUIRE(first->access_token() == sample_token_1);
         REQUIRE(second->identity() == identity);
-        REQUIRE(second->auth_server_url() == auth_server_url);
+        REQUIRE(second->provider_type() == provider_type);
         REQUIRE(second->access_token() == sample_token_1);
         // Set the state again.
         const std::string sample_token_2 = "this_is_another_user_token";
         second->set_access_token(sample_token_2);
         REQUIRE(first->identity() == identity);
-        REQUIRE(first->auth_server_url() == auth_server_url);
+        REQUIRE(first->provider_type() == provider_type);
         REQUIRE(first->access_token() == sample_token_2);
         REQUIRE(second->identity() == identity);
-        REQUIRE(second->auth_server_url() == auth_server_url);
+        REQUIRE(second->provider_type() == provider_type);
         REQUIRE(second->access_token() == sample_token_2);
     }
 
     SECTION("can be removed") {
         const auto identity = "testcase1e";
-        auto user_metadata = manager.get_or_make_user_metadata(identity, auth_server_url);
+        auto user_metadata = manager.get_or_make_user_metadata(identity, provider_type);
         REQUIRE(user_metadata->is_valid());
         user_metadata->remove();
         REQUIRE(!user_metadata->is_valid());
@@ -272,25 +272,25 @@ TEST_CASE("sync_metadata: user metadata", "[sync]") {
 
         SECTION("with no prior metadata for the identifier") {
             const auto identity = "testcase1g1";
-            auto user_metadata = manager.get_or_make_user_metadata(identity, auth_server_url, false);
+            auto user_metadata = manager.get_or_make_user_metadata(identity, provider_type, false);
             REQUIRE(!user_metadata);
         }
         SECTION("with valid prior metadata for the identifier") {
             const auto identity = "testcase1g2";
-            auto first = manager.get_or_make_user_metadata(identity, auth_server_url);
+            auto first = manager.get_or_make_user_metadata(identity, provider_type);
             first->set_access_token(sample_token);
-            auto second = manager.get_or_make_user_metadata(identity, auth_server_url, false);
+            auto second = manager.get_or_make_user_metadata(identity, provider_type, false);
             REQUIRE(second->is_valid());
             REQUIRE(second->identity() == identity);
-            REQUIRE(second->auth_server_url() == auth_server_url);
+            REQUIRE(second->provider_type() == provider_type);
             REQUIRE(second->access_token() == sample_token);
         }
         SECTION("with invalid prior metadata for the identifier") {
             const auto identity = "testcase1g3";
-            auto first = manager.get_or_make_user_metadata(identity, auth_server_url);
+            auto first = manager.get_or_make_user_metadata(identity, provider_type);
             first->set_access_token(sample_token);
             first->mark_for_removal();
-            auto second = manager.get_or_make_user_metadata(identity, auth_server_url, false);
+            auto second = manager.get_or_make_user_metadata(identity, provider_type, false);
             REQUIRE(!second);
         }
     }
@@ -299,23 +299,23 @@ TEST_CASE("sync_metadata: user metadata", "[sync]") {
 TEST_CASE("sync_metadata: user metadata APIs", "[sync]") {
     reset_test_directory(base_path);
     SyncMetadataManager manager(metadata_path, false);
-    const std::string auth_server_url = "https://realm.example.org";
+    const std::string provider_type = "https://realm.example.org";
 
     SECTION("properly list all marked and unmarked users") {
         const auto identity1 = "testcase2a1";
         const auto identity2 = "testcase2a1";   // same as identity 1
         const auto identity3 = "testcase2a3";
-        const std::string auth_server_url_1 = "https://foobar.example.org";
-        const std::string auth_server_url_2 = "https://realm.example.org";
-        const std::string auth_server_url_3 = "https://realm.example.org";
-        auto first = manager.get_or_make_user_metadata(identity1, auth_server_url_1);
-        auto second = manager.get_or_make_user_metadata(identity2, auth_server_url_2);
-        auto third = manager.get_or_make_user_metadata(identity3, auth_server_url_3);
+        const std::string provider_type_1 = "https://foobar.example.org";
+        const std::string provider_type_2 = "https://realm.example.org";
+        const std::string provider_type_3 = "https://realm.example.org";
+        auto first = manager.get_or_make_user_metadata(identity1, provider_type_1);
+        auto second = manager.get_or_make_user_metadata(identity2, provider_type_2);
+        auto third = manager.get_or_make_user_metadata(identity3, provider_type_3);
         auto unmarked_users = manager.all_unmarked_users();
         REQUIRE(unmarked_users.size() == 3);
-        REQUIRE(results_contains_user(unmarked_users, identity1, auth_server_url_1));
-        REQUIRE(results_contains_user(unmarked_users, identity2, auth_server_url_2));
-        REQUIRE(results_contains_user(unmarked_users, identity3, auth_server_url_3));
+        REQUIRE(results_contains_user(unmarked_users, identity1, provider_type_1));
+        REQUIRE(results_contains_user(unmarked_users, identity2, provider_type_2));
+        REQUIRE(results_contains_user(unmarked_users, identity3, provider_type_3));
         auto marked_users = manager.all_users_marked_for_removal();
         REQUIRE(marked_users.size() == 0);
         // Now, mark a few users for removal.
@@ -323,11 +323,11 @@ TEST_CASE("sync_metadata: user metadata APIs", "[sync]") {
         third->mark_for_removal();
         unmarked_users = manager.all_unmarked_users();
         REQUIRE(unmarked_users.size() == 1);
-        REQUIRE(results_contains_user(unmarked_users, identity2, auth_server_url_2));
+        REQUIRE(results_contains_user(unmarked_users, identity2, provider_type_2));
         marked_users = manager.all_users_marked_for_removal();
         REQUIRE(marked_users.size() == 2);
-        REQUIRE(results_contains_user(marked_users, identity1, auth_server_url_1));
-        REQUIRE(results_contains_user(marked_users, identity3, auth_server_url_3));
+        REQUIRE(results_contains_user(marked_users, identity1, provider_type_1));
+        REQUIRE(results_contains_user(marked_users, identity3, provider_type_3));
     }
 }
 
@@ -405,42 +405,42 @@ TEST_CASE("sync_metadata: results", "[sync]") {
     const auto identity1 = "testcase3a1";
     const auto identity2 = "testcase3a1";   // same as identity 1
     const auto identity3 = "testcase3a3";
-    const std::string auth_server_url_1 = "https://realm.example.org";
-    const std::string auth_server_url_2 = "https://foobar.example.org";
-    const std::string auth_server_url_3 = "https://realm.example.org";
+    const std::string provider_type_1 = "https://realm.example.org";
+    const std::string provider_type_2 = "https://foobar.example.org";
+    const std::string provider_type_3 = "https://realm.example.org";
 
 
     SECTION("properly update as underlying items are added") {
         auto results = manager.all_unmarked_users();
         REQUIRE(results.size() == 0);
         // Add users, one at a time.
-        auto first = manager.get_or_make_user_metadata(identity1, auth_server_url_1);
+        auto first = manager.get_or_make_user_metadata(identity1, provider_type_1);
         REQUIRE(results.size() == 1);
-        REQUIRE(results_contains_user(results, identity1, auth_server_url_1));
-        auto second = manager.get_or_make_user_metadata(identity2, auth_server_url_2);
+        REQUIRE(results_contains_user(results, identity1, provider_type_1));
+        auto second = manager.get_or_make_user_metadata(identity2, provider_type_2);
         REQUIRE(results.size() == 2);
-        REQUIRE(results_contains_user(results, identity2, auth_server_url_2));
-        auto third = manager.get_or_make_user_metadata(identity3, auth_server_url_3);
+        REQUIRE(results_contains_user(results, identity2, provider_type_2));
+        auto third = manager.get_or_make_user_metadata(identity3, provider_type_3);
         REQUIRE(results.size() == 3);
-        REQUIRE(results_contains_user(results, identity3, auth_server_url_3));
+        REQUIRE(results_contains_user(results, identity3, provider_type_3));
     }
 
     SECTION("properly update as underlying items are removed") {
         auto results = manager.all_unmarked_users();
-        auto first = manager.get_or_make_user_metadata(identity1, auth_server_url_1);
-        auto second = manager.get_or_make_user_metadata(identity2, auth_server_url_2);
-        auto third = manager.get_or_make_user_metadata(identity3, auth_server_url_3);
+        auto first = manager.get_or_make_user_metadata(identity1, provider_type_1);
+        auto second = manager.get_or_make_user_metadata(identity2, provider_type_2);
+        auto third = manager.get_or_make_user_metadata(identity3, provider_type_3);
         REQUIRE(results.size() == 3);
-        REQUIRE(results_contains_user(results, identity1, auth_server_url_1));
-        REQUIRE(results_contains_user(results, identity2, auth_server_url_2));
-        REQUIRE(results_contains_user(results, identity3, auth_server_url_3));
+        REQUIRE(results_contains_user(results, identity1, provider_type_1));
+        REQUIRE(results_contains_user(results, identity2, provider_type_2));
+        REQUIRE(results_contains_user(results, identity3, provider_type_3));
         // Remove users, one at a time.
         third->remove();
         REQUIRE(results.size() == 2);
-        REQUIRE(!results_contains_user(results, identity3, auth_server_url_3));
+        REQUIRE(!results_contains_user(results, identity3, provider_type_3));
         first->remove();
         REQUIRE(results.size() == 1);
-        REQUIRE(!results_contains_user(results, identity1, auth_server_url_1));
+        REQUIRE(!results_contains_user(results, identity1, provider_type_1));
         second->remove();
         REQUIRE(results.size() == 0);
     }
@@ -451,22 +451,24 @@ TEST_CASE("sync_metadata: persistence across metadata manager instances", "[sync
 
     SECTION("works for the basic case") {
         const auto identity = "testcase4a";
-        const std::string auth_server_url = "https://realm.example.org";
+        const std::string provider_type = "any-type";
         const std::string sample_token = "this_is_a_user_token";
         SyncMetadataManager first_manager(metadata_path, false);
-        auto first = first_manager.get_or_make_user_metadata(identity, auth_server_url);
+        auto first = first_manager.get_or_make_user_metadata(identity, provider_type);
         first->set_access_token(sample_token);
         REQUIRE(first->identity() == identity);
-        REQUIRE(first->auth_server_url() == auth_server_url);
+        REQUIRE(first->provider_type() == provider_type);
         REQUIRE(first->access_token() == sample_token);
+        REQUIRE(first->state() == SyncUser::State::Active);
         auto first_client_uuid = first_manager.client_uuid();
+        first->set_state(SyncUser::State::LoggedOut);
 
         SyncMetadataManager second_manager(metadata_path, false);
-        auto second = second_manager.get_or_make_user_metadata(identity, auth_server_url, false);
+        auto second = second_manager.get_or_make_user_metadata(identity, provider_type, false);
         REQUIRE(second->identity() == identity);
-        REQUIRE(second->auth_server_url() == auth_server_url);
+        REQUIRE(second->provider_type() == provider_type);
         REQUIRE(second->access_token() == sample_token);
-
+        REQUIRE(second->state() == SyncUser::State::LoggedOut);
         REQUIRE(second_manager.client_uuid() == first_client_uuid);
     }
 }
@@ -493,7 +495,7 @@ TEST_CASE("sync_metadata: encryption", "[sync]") {
         auto user_metadata = manager.get_or_make_user_metadata(identity, auth_url);
         REQUIRE(bool(user_metadata));
         CHECK(user_metadata->identity() == identity);
-        CHECK(user_metadata->auth_server_url() == auth_url);
+        CHECK(user_metadata->provider_type() == auth_url);
         CHECK(user_metadata->access_token() == none);
         CHECK(user_metadata->is_valid());
         // Reopen the metadata file with the same key.
@@ -501,7 +503,7 @@ TEST_CASE("sync_metadata: encryption", "[sync]") {
         auto user_metadata_2 = manager_2.get_or_make_user_metadata(identity, auth_url, false);
         REQUIRE(bool(user_metadata_2));
         CHECK(user_metadata_2->identity() == identity);
-        CHECK(user_metadata_2->auth_server_url() == auth_url);
+        CHECK(user_metadata_2->provider_type() == auth_url);
         CHECK(user_metadata_2->is_valid());
     }
 }

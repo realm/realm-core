@@ -46,17 +46,6 @@ public:
 
 using SyncUserContextFactory = std::function<std::shared_ptr<SyncUserContext>()>;
 
-// A struct that uniquely identifies a user. Consists of ROS identity and auth server URL.
-struct SyncUserIdentifier {
-    std::string user_id;
-    std::string auth_server_url;
-
-    bool operator==(const SyncUserIdentifier& other) const
-    {
-        return user_id == other.user_id && auth_server_url == other.auth_server_url;
-    }
-};
-
 // A struct that decodes a given JWT.
 struct RealmJWT {
     // The token being decoded from.
@@ -117,6 +106,16 @@ struct SyncUserIdentity {
     std::string provider_type;
 
     SyncUserIdentity(const std::string& id, const std::string& provider_type);
+
+    bool operator==(const SyncUserIdentity& other) const
+    {
+        return id == other.id && provider_type == other.provider_type;
+    }
+
+    bool operator!=(const SyncUserIdentity& other) const
+    {
+        return id != other.id || provider_type != other.provider_type;
+    }
 };
 
 // A `SyncUser` represents a single user account. Each user manages the sessions that
@@ -124,7 +123,7 @@ struct SyncUserIdentity {
 class SyncUser {
 friend class SyncSession;
 public:
-    enum class State {
+    enum class State : std::size_t {
         LoggedOut,
         Active,
         Error,
@@ -132,9 +131,10 @@ public:
 
     // Don't use this directly; use the `SyncManager` APIs. Public for use with `make_shared`.
     SyncUser(std::string refresh_token,
-             std::string identity,
-             util::Optional<std::string> server_url,
-             std::string access_token);
+             const std::string id,
+             const std::string provider_type,
+             std::string access_token,
+             SyncUser::State state);
 
     // Return a list of all sessions belonging to this user.
     std::vector<std::shared_ptr<SyncSession>> all_sessions();
@@ -162,14 +162,14 @@ public:
     // Log the user out and mark it as such. This will also close its associated Sessions.
     void log_out();
 
-    std::string const& identity() const noexcept
+    const std::string& identity() const noexcept
     {
         return m_identity;
     }
 
-    const std::string& server_url() const noexcept
+    const std::string& provider_type() const noexcept
     {
-        return m_server_url;
+        return m_provider_type;
     }
 
     const std::string& local_identity() const noexcept
@@ -189,7 +189,8 @@ public:
     util::Optional<std::map<std::string, util::Any>> custom_data() const;
 
     State state() const;
-
+    void set_state(SyncUser::State state);
+    
     std::shared_ptr<SyncUserContext> binding_context() const
     {
         return m_binding_context.load();
@@ -215,9 +216,8 @@ private:
     // A locally assigned UUID intended to provide a level of indirection for various features.
     std::string m_local_identity;
 
-    // The auth server URL associated with this user. Set upon creation. The empty string for
-    // auth token users.
-    std::string m_server_url;
+    // The auth provider used to login this user.
+    const std::string m_provider_type;
 
     // Mark the user as invalid, since a fatal user-related error was encountered.
     void invalidate();
@@ -227,8 +227,8 @@ private:
     // The user's refresh token.
     RealmJWT m_refresh_token;
 
-    // Set by the server. The unique ID of the user account on the Realm Object Server.
-    std::string m_identity;
+    // Set by the server. The unique ID of the user account on the Realm Applcication.
+    const std::string m_identity;
 
     // Sessions are owned by the SyncManager, but the user keeps a map of weak references
     // to them.
@@ -249,8 +249,8 @@ private:
 }
 
 namespace std {
-template<> struct hash<realm::SyncUserIdentifier> {
-    size_t operator()(realm::SyncUserIdentifier const&) const;
+template<> struct hash<realm::SyncUserIdentity> {
+    size_t operator()(realm::SyncUserIdentity const&) const;
 };
 }
 

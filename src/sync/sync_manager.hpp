@@ -159,17 +159,25 @@ public:
 
     // Get a sync user for a given identity, or create one if none exists yet, and set its token.
     // If a logged-out user exists, it will marked as logged back in.
-    std::shared_ptr<SyncUser> get_user(const SyncUserIdentifier& identifier,
+    std::shared_ptr<SyncUser> get_user(const std::string& id,
+                                       const std::string provider_type,
                                        std::string refresh_token,
                                        std::string access_token);
 
     // Get an existing user for a given identifier, if one exists and is logged in.
-    std::shared_ptr<SyncUser> get_existing_logged_in_user(const SyncUserIdentifier&) const;
+    std::shared_ptr<SyncUser> get_existing_logged_in_user(const std::string& user_id) const;
 
     // Get all the users that are logged in and not errored out.
-    std::vector<std::shared_ptr<SyncUser>> all_logged_in_users() const;
-    // Gets the currently logged in user. If there are more than 1 users logged in, an exception is thrown.
+    std::vector<std::shared_ptr<SyncUser>> all_users();
+
+    // Gets the currently active user.
     std::shared_ptr<SyncUser> get_current_user() const;
+
+    // Log out a given user
+    void log_out_user(const std::string& user_id);
+    
+    // Sets the currently active user.
+    void set_current_user(const std::string& user_id);
 
     // Get the default path for a Realm for the given user and absolute unresolved URL.
     std::string path_for_realm(const SyncUser& user, const std::string& raw_realm_url) const;
@@ -209,8 +217,8 @@ private:
     // Protects m_users
     mutable std::mutex m_user_mutex;
 
-    // A map of user ID/auth server URL pairs to (shared pointers to) SyncUser objects.
-    std::unordered_map<SyncUserIdentifier, std::shared_ptr<SyncUser>> m_users;
+    // A vector of all SyncUser objects.
+    std::vector<std::shared_ptr<SyncUser>> m_users;
 
     mutable std::unique_ptr<_impl::SyncClient> m_sync_client;
 

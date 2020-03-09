@@ -46,13 +46,15 @@ public:
         // The cached refresh token for this user.
         ColKey idx_refresh_token;
         // The URL of the authentication server this user resides upon.
-        ColKey idx_auth_server_url;
+        ColKey idx_provider_type;
         // The cached access token for this user.
         ColKey idx_access_token;
         // The identities for this user.
         ColKey idx_identities;
         // The profile for this user.
         ColKey idx_profile;
+        // The current state of this user.
+        ColKey idx_state;
     };
 
     // Cannot be set after creation.
@@ -72,8 +74,12 @@ public:
 
     void set_user_profile(const SyncUserProfile&);
 
+    void set_state(SyncUser::State);
+
+    SyncUser::State state() const;
+    
     // Cannot be set after creation.
-    std::string auth_server_url() const;
+    std::string provider_type() const;
 
     // Mark the user as "ready for removal". Since Realm files cannot be safely deleted after being opened, the actual
     // deletion of a user must be deferred until the next time the host application is launched.
@@ -214,7 +220,8 @@ public:
     const std::string& client_uuid() const { return m_client_uuid; }
 
     util::Optional<std::string> get_current_user_identity() const;
-
+    void set_current_user_identity(const std::string& identity);
+    
     /// Construct the metadata manager.
     ///
     /// If the platform supports it, setting `should_encrypt` to `true` and not specifying an encryption key will make

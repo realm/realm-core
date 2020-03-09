@@ -26,6 +26,7 @@ namespace app {
 std::string const kAppProviderKey = "provider";
 
 IdentityProvider const IdentityProviderAnonymous = "anon-user";
+IdentityProvider const IdentityProviderGoogle = "oauth2-google";
 IdentityProvider const IdentityProviderFacebook  = "oauth2-facebook";
 IdentityProvider const IdentityProviderApple     = "oauth2-apple";
 IdentityProvider const IdentityProviderUsernamePassword     = "local-userpass";
