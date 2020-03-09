@@ -3508,7 +3508,7 @@ TEST(Parser_ObjectId)
         obj.set(nullable_oid_col_key, oid);
     }
     // add one object with default values, we assume time > now, and null
-    auto obj_generated = table->create_object();
+    auto obj_generated = table->create_object_with_primary_key(ObjectId{});
     ObjectId generated_pk = obj_generated.get<ObjectId>(pk_col_key);
     auto generated_nullable = obj_generated.get<util::Optional<ObjectId>>(nullable_oid_col_key);
     CHECK_GREATER_EQUAL(Timestamp{now}, generated_pk.get_timestamp());

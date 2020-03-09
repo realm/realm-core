@@ -65,7 +65,7 @@ TEST(Links_Columns)
     // Use a key where the first has the the second most significant bit set.
     // When this is shifted up and down again, the most significant bit must
     // still be 0.
-    ObjKeys table_1_keys({5, 1LL << 62});
+    ObjKeys table_1_keys({5, 1LL << 61});
     ObjKeys table_2_keys({2, 7});
     // add some rows
     table1->create_objects(table_1_keys);

@@ -1404,7 +1404,7 @@ TEST(Table_IndexString)
     // Use a key where the first has the the second most significant bit set.
     // When this is shifted up and down again, the most significant bit must
     // still be 0.
-    ObjKey k6 = table.create_object(ObjKey(1LL << 62)).set_all(int(Sun), "johnny").get_key();
+    ObjKey k6 = table.create_object(ObjKey(1LL << 61)).set_all(int(Sun), "johnny").get_key();
     table.create_object().set_all(int(Mon), "jennifer"); // duplicate
 
     ObjKey r1 = table.find_first_string(col_str, "jimmi");

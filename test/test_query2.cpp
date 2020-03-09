@@ -1555,7 +1555,7 @@ TEST(Query_Nulls_Fuzzy)
                         CHECK(o.get<String>(col).is_null());
                     }
                     else {
-                        CHECK(o.get<String>(col) == v[k]);
+                        CHECK_EQUAL(o.get<String>(col), v[k]);
                     }
                 }
             }
@@ -4690,8 +4690,8 @@ TEST(Query_StringPrimaryKey)
     auto col = table.add_column(type_String, "name");
     table.set_primary_key_column(col);
 
-    table.create_object().set(col, "RASMUS");
-    table.create_object().set(col, "Rasmus");
+    table.create_object_with_primary_key("RASMUS");
+    table.create_object_with_primary_key("Rasmus");
 
     Query q = table.where().equal(col, "rasmus", false);
     CHECK_EQUAL(q.count(), 2);
