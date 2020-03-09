@@ -13,7 +13,15 @@
 -----------
 
 ### Internals
-* None.
+* Objects created with `Table::create_object(GlobalKey)` are now subject to
+  tombstone resurrection.
+* The contract of `Table::create_object(ObjKey)` has changed to disallow
+  creation with keys that clobber the internal bits used to track dangling links
+  and hash collisions (in other words, only the lower 62 bits are free).
+* Calling `Table::create_object(ObjKey)` on a table with a primary key column is
+  now an error.
+* `Table::get_objkey_from_global_key()` was introduced to allow finding the
+  `ObjKey` of a potentially tombstoned object identified by its `GlobalKey`.
 
 ----------------------------------------------
 
