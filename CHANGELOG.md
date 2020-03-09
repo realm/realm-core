@@ -1,3 +1,22 @@
+# NEXT RELEASE
+
+### Enhancements
+* None.
+
+### Fixed
+* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* None.
+ 
+### Breaking changes
+* None.
+
+-----------
+
+### Internals
+* None.
+
+----------------------------------------------
+
 # 10.0.0-alpha.2 Release notes
 
 This release also contains the changes introduced by v6.0.4
