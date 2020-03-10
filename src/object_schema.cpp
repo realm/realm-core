@@ -191,11 +191,13 @@ void ObjectSchema::set_primary_key_property() noexcept
 }
 
 static void validate_property(Schema const& schema,
-                              std::string const& object_name,
+                              ObjectSchema const& parent_object_schema,
                               Property const& prop,
                               Property const** primary,
                               std::vector<ObjectSchemaValidationException>& exceptions)
 {
+    auto& object_name = parent_object_schema.name;
+
     if (prop.type == PropertyType::LinkingObjects && !is_array(prop.type)) {
         exceptions.emplace_back("Linking Objects property '%1.%2' must be an array.",
                                 object_name, prop.name);
@@ -256,6 +258,12 @@ static void validate_property(Schema const& schema,
         return;
     }
     if (prop.type != PropertyType::LinkingObjects) {
+        if (parent_object_schema.is_embedded && !it->is_embedded) {
+            exceptions.emplace_back("Property '%1.%2' of type '%3' cannot link to top-level object type '%4'",
+                                    object_name, prop.name, string_for_property_type(prop.type), prop.object_type);
+            return;
+        }
+
         return;
     }
 
@@ -311,50 +319,35 @@ void ObjectSchema::validate(Schema const& schema, std::vector<ObjectSchemaValida
 
     // Check that no aliases conflict with property names
     struct ErrorWriter {
-        ObjectSchema const &os;
-        std::vector<ObjectSchemaValidationException> &exceptions;
+        ObjectSchema const& os;
+        std::vector<ObjectSchemaValidationException>& exceptions;
 
-        struct Proxy {
-            ObjectSchema const &os;
-            std::vector<ObjectSchemaValidationException> &exceptions;
-
-            Proxy &operator=(StringData name) {
-                exceptions.emplace_back(
-                        "Property '%1.%2' has an alias '%3' that conflicts with a property of the same name.",
-                        os.name, os.property_for_public_name(name)->name, name);
-                return *this;
-            }
-        };
-
-        Proxy operator*() { return Proxy{os, exceptions}; }
-        ErrorWriter(ObjectSchema const& os, std::vector<ObjectSchemaValidationException>& exceptions)
-            : os(os)
-            , exceptions(exceptions)
-        {
+        ErrorWriter& operator=(StringData name) {
+            exceptions.emplace_back("Property '%1.%2' has an alias '%3' that conflicts with a property of the same name.",
+                                    os.name, os.property_for_public_name(name)->name, name);
+            return *this;
         }
-        ErrorWriter(const ErrorWriter& other)
-            : os(other.os)
-            , exceptions(other.exceptions)
-        {
-        }
-        ErrorWriter &operator=(const ErrorWriter &) { return *this; }
-        ErrorWriter &operator++() { return *this; }
-        ErrorWriter &operator++(int) { return *this; }
+
+        ErrorWriter(ErrorWriter const&) = default;
+        ErrorWriter& operator=(ErrorWriter const&) { return *this; }
+        ErrorWriter& operator*() { return *this; }
+        ErrorWriter& operator++() { return *this; }
+        ErrorWriter& operator++(int) { return *this; }
     } writer{*this, exceptions};
     std::set_intersection(public_property_names.begin(), public_property_names.end(),
                           internal_property_names.begin(), internal_property_names.end(), writer);
 
     // Validate all properties
-    const Property *primary = nullptr;
+    const Property* primary = nullptr;
     for (auto const& prop : persisted_properties) {
-        validate_property(schema, name, prop, &primary, exceptions);
+        validate_property(schema, *this, prop, &primary, exceptions);
     }
     for (auto const& prop : computed_properties) {
-        validate_property(schema, name, prop, &primary, exceptions);
+        validate_property(schema, *this, prop, &primary, exceptions);
     }
 
     if (!primary_key.empty() && is_embedded) {
-        exceptions.emplace_back("Embedded table '%1' cannot have primary key '%2'.", name, primary_key);
+        exceptions.emplace_back("Embedded object type '%1' cannot have a primary key.", name);
     }
     if (!primary_key.empty() && !primary && !primary_key_property()) {
         exceptions.emplace_back("Specified primary key '%1.%2' does not exist.", name, primary_key);

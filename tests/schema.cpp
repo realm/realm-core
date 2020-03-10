@@ -85,7 +85,6 @@ struct StringMaker<SchemaChange> {
     REQUIRE_THROWS_WITH(expr, Catch::Matchers::Contains(msg))
 
 TEST_CASE("ObjectSchema") {
-
     SECTION("Aliases are still present in schema returned from the Realm") {
         TestFile config;
         config.schema_version = 1;
@@ -294,6 +293,44 @@ TEST_CASE("Schema") {
             REQUIRE_THROWS_CONTAINING(schema.validate(), "Property 'object.array' of type 'array' has unknown object type 'invalid target'");
         }
 
+        SECTION("rejects link properties from embedded to top-level") {
+            Schema schema = {
+                {"target", {
+                    {"value", PropertyType::Int}
+                }},
+                {"origin", ObjectSchema::IsEmbedded{true}, {
+                    {"link", PropertyType::Object|PropertyType::Nullable, "target"}
+                }}
+            };
+            REQUIRE_THROWS_CONTAINING(schema.validate(), "Property 'origin.link' of type 'object' cannot link to top-level object type 'target'");
+        }
+
+        SECTION("rejects array properties from embedded to top-level") {
+            Schema schema = {
+                {"target", {
+                    {"value", PropertyType::Int}
+                }},
+                {"origin", ObjectSchema::IsEmbedded{true}, {
+                    {"array", PropertyType::Array|PropertyType::Object, "target"}
+                }}
+            };
+            REQUIRE_THROWS_CONTAINING(schema.validate(), "Property 'origin.array' of type 'array' cannot link to top-level object type 'target'");
+        }
+
+        SECTION("allows linking objects from embedded to top-level") {
+            Schema schema = {
+                {"target", ObjectSchema::IsEmbedded{true}, {
+                    {"value", PropertyType::Int}
+                }, {
+                    {"incoming", PropertyType::Array|PropertyType::LinkingObjects, "origin", "array"}
+                }},
+                {"origin", {
+                    {"array", PropertyType::Array|PropertyType::Object, "target"}
+                }}
+            };
+            REQUIRE_NOTHROW(schema.validate());
+        }
+
         SECTION("rejects linking objects without a source object") {
             Schema schema = {
                 {"object", {
@@ -349,7 +386,6 @@ TEST_CASE("Schema") {
                 }}
             };
             REQUIRE_THROWS_CONTAINING(schema.validate(), "Property 'object.link' declared as origin of linking objects property 'object.incoming' links to type 'object 2'");
-
         }
 
         SECTION("rejects non-array linking objects") {
@@ -462,7 +498,7 @@ TEST_CASE("Schema") {
                     {"int", PropertyType::Int},
                 }}
             };
-            REQUIRE_THROWS_CONTAINING(schema.validate(), "Embedded table 'object' cannot have primary key 'pk1'.");
+            REQUIRE_THROWS_CONTAINING(schema.validate(), "Embedded object type 'object' cannot have a primary key.");
         }
 
         SECTION("rejects invalid primary key types") {

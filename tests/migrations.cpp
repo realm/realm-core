@@ -678,7 +678,11 @@ TEST_CASE("migration: Automatic") {
                 {"not a pk", PropertyType::Int},
                 {"object", PropertyType::Object|PropertyType::Nullable, "object"},
                 {"array", PropertyType::Array|PropertyType::Object, "object"},
-            }}
+            }},
+            {"no pk object", {
+                {"value", PropertyType::Int, Property::IsPrimary{false}, Property::IsIndexed{true}},
+                {"optional", PropertyType::Int|PropertyType::Nullable},
+            }},
         };
         realm->update_schema(schema);
 
@@ -704,7 +708,7 @@ TEST_CASE("migration: Automatic") {
             }}));
         }
         SECTION("change table type") {
-            VERIFY_SCHEMA_IN_MIGRATION(set_embedded(schema, "link origin", true));
+            VERIFY_SCHEMA_IN_MIGRATION(set_embedded(schema, "no pk object", true));
         }
         SECTION("add property to table") {
             VERIFY_SCHEMA_IN_MIGRATION(add_property(schema, "object", {"new", PropertyType::Int}));
