@@ -16,12 +16,15 @@
  *
  **************************************************************************/
 
+#include <realm/decimal128.hpp>
+
+#include <realm/string_data.hpp>
+#include <realm/util/to_string.hpp>
+
 #include <external/IntelRDFPMathLib20U2/LIBRARY/src/bid_conf.h>
 #include <external/IntelRDFPMathLib20U2/LIBRARY/src/bid_functions.h>
-#include <realm/decimal128.hpp>
 #include <cstring>
 #include <stdexcept>
-#include <sstream>
 
 namespace {
 constexpr int DECIMAL_EXPONENT_BIAS_128 = 6176;
@@ -33,13 +36,13 @@ namespace realm {
 // This is a cut down version of bid128_from_string() from the IntelRDFPMathLib20U2 library.
 // If we can live with only 19 significant digits, we can avoid a lot of complex code
 // as the significant can be stored in w[0] only.
-void Decimal128::from_string(const char* ps)
+Decimal128::ParseError Decimal128::from_string(const char* ps) noexcept
 {
     m_value.w[0] = 0;
     // if null string, return NaN
     if (!ps) {
         m_value.w[1] = 0x7c00000000000000ull;
-        return;
+        return ParseError::Invalid;
     }
     // eliminate leading white space
     while ((*ps == ' ') || (*ps == '\t'))
@@ -64,14 +67,14 @@ void Decimal128::from_string(const char* ps)
             chr = tolower(chr);
         if (inf == "inf" || inf == "infinity") {
             m_value.w[1] = 0x7800000000000000ull | sign_x;
-            return;
+            return ParseError::None;
         }
     }
 
     // if c isn't a decimal point or a decimal digit, return NaN
     if (!(c == '.' || (c >= '0' && c <= '9'))) {
         m_value.w[1] = 0x7c00000000000000ull | sign_x;
-        return;
+        return ParseError::Invalid;
     }
 
     bool rdx_pt_enc = false;
@@ -105,14 +108,14 @@ void Decimal128::from_string(const char* ps)
                     if (!*(ps + 1)) {
                         uint64_t tmp = right_radix_leading_zeros;
                         m_value.w[1] = (0x3040000000000000ull - (tmp << 49)) | sign_x;
-                        return;
+                        return ParseError::None;
                     }
                     ps = ps + 1;
                 }
                 else {
                     // if 2 radix points, return NaN
                     m_value.w[1] = 0x7c00000000000000ull | sign_x;
-                    return;
+                    return ParseError::Invalid;
                 }
             }
             else if (!*(ps)) {
@@ -120,7 +123,7 @@ void Decimal128::from_string(const char* ps)
                     right_radix_leading_zeros = 6176;
                 uint64_t tmp = right_radix_leading_zeros;
                 m_value.w[1] = (0x3040000000000000ull - (tmp << 49)) | sign_x;
-                return;
+                return ParseError::None;
             }
         }
     }
@@ -138,7 +141,7 @@ void Decimal128::from_string(const char* ps)
         // investigate string (before radix point)
         while (c >= '0' && c <= '9') {
             if (ndigits_before == MAX_STRING_DIGITS) {
-                throw std::overflow_error("Too many digits before radix point");
+                return ParseError::TooLongBeforeRadix;
             }
             buffer[ndigits_before] = c;
             ps++;
@@ -156,7 +159,7 @@ void Decimal128::from_string(const char* ps)
         // investigate string (after radix point)
         while (c >= '0' && c <= '9') {
             if (ndigits_total == MAX_STRING_DIGITS) {
-                throw std::overflow_error("Too many digits");
+                return ParseError::TooLong;
             }
             buffer[ndigits_total] = c;
             ps++;
@@ -172,7 +175,7 @@ void Decimal128::from_string(const char* ps)
         if (c != 'e' && c != 'E') {
             // return NaN
             m_value.w[1] = 0x7c00000000000000ull;
-            return;
+            return ParseError::Invalid;
         }
         ps++;
         c = *ps;
@@ -183,7 +186,7 @@ void Decimal128::from_string(const char* ps)
         if (!((c >= '0' && c <= '9') || ((c == '+' || c == '-') && c1 >= '0' && c1 <= '9'))) {
             // return NaN
             m_value.w[1] = 0x7c00000000000000ull;
-            return;
+            return ParseError::Invalid;
         }
 
         if (c == '-') {
@@ -226,6 +229,7 @@ void Decimal128::from_string(const char* ps)
     m_value.w[0] = coeff;
     uint64_t tmp = dec_expon;
     m_value.w[1] = sign_x | (tmp << 49);
+    return ParseError::None;
 }
 
 Decimal128 to_decimal128(const BID_UINT128& val)
@@ -249,10 +253,7 @@ Decimal128::Decimal128()
 
 Decimal128::Decimal128(double val)
 {
-    std::stringstream ss;
-    ss.imbue(std::locale::classic());
-    ss << val;
-    from_string(ss.str().c_str());
+    from_string(util::to_string(val).c_str());
 }
 
 void Decimal128::from_int64_t(int64_t val)
@@ -303,9 +304,15 @@ Decimal128::Decimal128(Bid128 coefficient, int exponent, bool sign)
     m_value.w[1] |= (sign_x | (tmp << 49));
 }
 
-Decimal128::Decimal128(const std::string& init)
+Decimal128::Decimal128(StringData init)
 {
-    from_string(const_cast<char*>(init.c_str()));
+    auto ret = from_string(init.data());
+    if (ret == ParseError::TooLongBeforeRadix) {
+        throw std::overflow_error("Too many digits before radix point");
+    }
+    if (ret == ParseError::TooLong) {
+        throw std::overflow_error("Too many digits");
+    }
 }
 
 Decimal128::Decimal128(null) noexcept
@@ -350,7 +357,7 @@ bool Decimal128::operator!=(const Decimal128& rhs) const
     return !(*this == rhs);
 }
 
-bool Decimal128::operator<(const Decimal128& rhs) const
+int Decimal128::compare(const Decimal128& rhs) const
 {
     unsigned flags = 0;
     int ret;
@@ -358,65 +365,49 @@ bool Decimal128::operator<(const Decimal128& rhs) const
     BID_UINT128 r = to_BID_UINT128(rhs);
     bid128_quiet_less(&ret, &l, &r, &flags);
     if (ret)
-        return true;
+        return -1;
+    bid128_quiet_greater(&ret, &l, &r, &flags);
+    if (ret)
+        return 1;
 
-    // Check for the case that one or more is NaN
+    // Either equal or one or more is NaN
     bool lhs_is_nan = is_nan();
     bool rhs_is_nan = rhs.is_nan();
     if (!lhs_is_nan && !rhs_is_nan) {
-        // None is Nan
-        return false;
+        // Neither is NaN
+        return 0;
     }
     if (lhs_is_nan && rhs_is_nan) {
         // We should have stable sorting of NaN
         if (m_value.w[1] == rhs.m_value.w[1]) {
-            return m_value.w[0] < rhs.m_value.w[0];
+            return m_value.w[0] < rhs.m_value.w[0] ? -1 : 1;
         }
         else {
-            return m_value.w[1] < rhs.m_value.w[1];
+            return m_value.w[1] < rhs.m_value.w[1] ? -1 : 1;
         }
     }
     // nan vs non-nan should always order nan first
-    return lhs_is_nan ? true : false;
+    return lhs_is_nan ? -1 : 1;
+}
+
+bool Decimal128::operator<(const Decimal128& rhs) const
+{
+    return compare(rhs) < 0;
 }
 
 bool Decimal128::operator>(const Decimal128& rhs) const
 {
-    unsigned flags = 0;
-    int ret;
-    BID_UINT128 l = to_BID_UINT128(*this);
-    BID_UINT128 r = to_BID_UINT128(rhs);
-    bid128_quiet_greater(&ret, &l, &r, &flags);
-    if (ret)
-        return true;
-
-    bool lhs_is_nan = is_nan();
-    bool rhs_is_nan = rhs.is_nan();
-    if (!lhs_is_nan && !rhs_is_nan) {
-        // None is Nan
-        return false;
-    }
-    if (lhs_is_nan && rhs_is_nan) {
-        // We should have stable sorting of NaN
-        if (m_value.w[1] == rhs.m_value.w[1]) {
-            return m_value.w[0] > rhs.m_value.w[0];
-        }
-        else {
-            return m_value.w[1] > rhs.m_value.w[1];
-        }
-    }
-    // nan vs non-nan should always order nan first
-    return lhs_is_nan ? false : true;
+    return compare(rhs) > 0;
 }
 
 bool Decimal128::operator<=(const Decimal128& rhs) const
 {
-    return !(*this > rhs);
+    return compare(rhs) <= 0;
 }
 
 bool Decimal128::operator>=(const Decimal128& rhs) const
 {
-    return !(*this < rhs);
+    return compare(rhs) >= 0;
 }
 
 Decimal128 do_divide(BID_UINT128 x, BID_UINT128 div)
@@ -466,6 +457,11 @@ Decimal128& Decimal128::operator+=(Decimal128 rhs)
     return *this;
 }
 
+bool Decimal128::is_valid_str(StringData str) noexcept
+{
+    return Decimal128().from_string(str.data()) == ParseError::None;
+}
+
 std::string Decimal128::to_string() const
 {
     /*
@@ -504,10 +500,7 @@ std::string Decimal128::to_string() const
         return ret;
     }
 
-    std::ostringstream ostr;
-    ostr << m_value.w[0];
-    auto digits = ostr.str();
-    ostr.clear();
+    auto digits = util::to_string(m_value.w[0]);
     int64_t exponen = m_value.w[1] & 0x7fffffffffffffffull;
     exponen >>= 49;
     exponen -= DECIMAL_EXPONENT_BIAS_128;
@@ -523,10 +516,8 @@ std::string Decimal128::to_string() const
         ret += digits.substr(digits_before);
     }
     if (exponen != 0) {
-        ostr.str("");
-        ostr << exponen;
         ret += 'E';
-        ret += ostr.str();
+        ret += util::to_string(exponen);
     }
 
     return ret;

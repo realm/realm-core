@@ -30,18 +30,23 @@ public:
     /**
      * Constructs an ObjectId with all bytes 0x00.
      */
-    ObjectId() noexcept;
+    ObjectId() noexcept = default;
     ObjectId(null) noexcept
         : ObjectId()
     {
     }
 
     /**
+     * Checks if the given string is a valid object id.
+     */
+    static bool is_valid_str(StringData) noexcept;
+
+    /**
      * Constructs an ObjectId from 24 hex characters.
      */
-    ObjectId(const char* init);
+    ObjectId(const char* init) noexcept;
 
-    ObjectId(Timestamp d, int machine_id = 0, int process_id = 0);
+    ObjectId(Timestamp d, int machine_id = 0, int process_id = 0) noexcept;
 
     /**
      * Generates a new ObjectId using the algorithm to attempt to avoid collisions.
@@ -78,7 +83,7 @@ public:
     size_t hash() const noexcept;
 
 private:
-    uint8_t m_bytes[12];
+    uint8_t m_bytes[12] = {};
 };
 
 inline std::ostream& operator<<(std::ostream& ostr, const ObjectId& id)
