@@ -249,6 +249,9 @@ public:
     {
         return m_clusters.is_valid(key);
     }
+    bool is_valid_tombstone(ObjKey key) const {
+        return key.is_unresolved() && m_tombstones && m_tombstones->is_valid(key);
+    }
     ObjKey get_obj_key(GlobalKey id) const;
     GlobalKey get_object_id(ObjKey key) const;
     Obj get_object(ObjKey key)
@@ -268,6 +271,12 @@ public:
     ConstObj get_object(size_t ndx) const
     {
         return m_clusters.get(ndx);
+    }
+    ConstObj get_tombstone(ObjKey key) const
+    {
+        REALM_ASSERT(key.is_unresolved());
+        REALM_ASSERT(m_tombstones);
+        return m_tombstones->get(key);
     }
     // Get object based on primary key
     Obj get_object_with_primary_key(Mixed pk);

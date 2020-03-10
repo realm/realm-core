@@ -210,12 +210,19 @@ void ArrayBacklink::verify() const
         if (!target_key) {
             return;
         }
-        REALM_ASSERT(target_table->is_valid(target_key));
-        Obj target = target_table->get_object(target_key);
+        ConstObj target;
+        if (!target_key.is_unresolved()) {
+            REALM_ASSERT(target_table->is_valid(target_key));
+            target = target_table->get_object(target_key);
+        }
+        else {
+            REALM_ASSERT(target_table->is_valid_tombstone(target_key));
+            target = target_table->get_tombstone(target_key);
+        }
         size_t cnt = target.get_backlink_count(*src_table, src_col_key);
         REALM_ASSERT(cnt > 0);
         for (size_t i = 0; i < cnt; ++i) {
-            if (target.get_backlink(target_col_key, i)  == src) {
+            if (target.get_backlink(*src_table, src_col_key, i) == src) {
                 return;
             }
         }
