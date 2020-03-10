@@ -125,13 +125,13 @@ TableRef create_table(Group& group, ObjectSchema const& object_schema)
 {
     auto name = ObjectStore::table_name_for_object_type(object_schema.name);
 
-    TableRef table;
+    TableRef table = group.get_table(name);
+    if (table)
+        return table;
+
     if (auto* pk_property = object_schema.primary_key_property()) {
-        table = group.get_table(name);
-        if (!table) {
-            table = group.add_table_with_primary_key(name, to_core_type(pk_property->type), pk_property->name,
-                                                     is_nullable(pk_property->type));
-        }
+        table = group.add_table_with_primary_key(name, to_core_type(pk_property->type), pk_property->name,
+                                                 is_nullable(pk_property->type));
     }
     else {
         if (object_schema.is_embedded) {

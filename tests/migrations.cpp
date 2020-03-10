@@ -200,6 +200,21 @@ TEST_CASE("migration: Automatic") {
             REQUIRE_UPDATE_SUCCEEDS(*realm, schema3, 0);
         }
 
+        SECTION("add embedded object schema") {
+            auto realm = Realm::get_shared_realm(config);
+
+            Schema schema1 = {};
+            Schema schema2 = add_table(schema1, {"object", IsEmbedded{true}, {
+                {"value", PropertyType::Int}
+            }});
+            Schema schema3 = add_table(schema2, {"object2", IsEmbedded{true}, {
+                {"value", PropertyType::Int}
+            }});
+            REQUIRE_UPDATE_SUCCEEDS(*realm, schema1, 0);
+            REQUIRE_UPDATE_SUCCEEDS(*realm, schema2, 0);
+            REQUIRE_UPDATE_SUCCEEDS(*realm, schema3, 0);
+        }
+
         SECTION("remove object schema") {
             auto realm = Realm::get_shared_realm(config);
 
@@ -393,6 +408,20 @@ TEST_CASE("migration: Automatic") {
 
             auto& table = *get_table(realm, "object2");
             REQUIRE(table.get_column_count() == 1);
+        }
+
+        SECTION("adding column and embedded table in same migration") {
+            auto realm = Realm::get_shared_realm(config);
+
+            Schema schema1 = {
+                {"object", {
+                    {"col1", PropertyType::Int},
+                }},
+            };
+            auto schema2 = add_table(add_property(schema1, "object", {"col2", PropertyType::Int}),
+                                     {"object2", IsEmbedded{true}, {{"value", PropertyType::Int}}});
+            REQUIRE_UPDATE_SUCCEEDS(*realm, schema1, 0);
+            REQUIRE_UPDATE_SUCCEEDS(*realm, schema2, 1);
         }
 
         SECTION("change table from embedded to top-level") {
@@ -704,6 +733,11 @@ TEST_CASE("migration: Automatic") {
 
         SECTION("add new table") {
             VERIFY_SCHEMA_IN_MIGRATION(add_table(schema, {"new table", {
+                {"value", PropertyType::Int},
+            }}));
+        }
+        SECTION("add embedded table") {
+            VERIFY_SCHEMA_IN_MIGRATION(add_table(schema, {"new table", IsEmbedded{true}, {
                 {"value", PropertyType::Int},
             }}));
         }
