@@ -252,7 +252,6 @@ void App::UsernamePasswordProviderClient::reset_password(const std::string& pass
 
 void App::UsernamePasswordProviderClient::call_reset_password_function(const std::string& email,
                                                                        const std::string& password,
-                                                                       const std::string& args,
                                                                        std::function<void(Optional<AppError>)> completion_block)
 {
     REALM_ASSERT(parent);
@@ -265,9 +264,8 @@ void App::UsernamePasswordProviderClient::call_reset_password_function(const std
     nlohmann::json body = {
         { "email", email },
         { "password", password },
-        { "arguments", nlohmann::json::parse(args) }
     };
-    
+
     parent->m_config.transport_generator()->send_request_to_server({
         HttpMethod::post,
         route,
@@ -284,20 +282,20 @@ void App::UsernamePasswordProviderClient::call_reset_password_function(const std
 {
     REALM_ASSERT(parent);
     std::string route = util::format("%1/auth/%2", parent->m_base_route, user_api_key_provider_key);
-    
+
     auto handler = [completion_block](const Response& response) {
 
         if (auto error = check_for_errors(response)) {
             return completion_block({}, error);
         }
-                    
+
         nlohmann::json json;
         try {
             json = nlohmann::json::parse(response.body);
         } catch (const std::exception& e) {
             return completion_block({}, AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
         }
-        
+
         try {
             auto user_api_key = App::UserAPIKey {
                     ObjectId(value_from_json<std::string>(json, "_id").c_str()),
@@ -314,7 +312,7 @@ void App::UsernamePasswordProviderClient::call_reset_password_function(const std
     nlohmann::json body = {
         { "name", name }
     };
-    
+
     parent->m_config.transport_generator()->send_request_to_server({
         HttpMethod::post,
         route,
@@ -329,20 +327,20 @@ void App::UserAPIKeyProviderClient::fetch_api_key(const realm::ObjectId& id,
 {
     REALM_ASSERT(parent);
     std::string route = util::format("%1/auth/%2/%3", parent->m_base_route, user_api_key_provider_key, id.to_string());
-    
+
     auto handler = [completion_block](const Response& response) {
 
         if (auto error = check_for_errors(response)) {
             return completion_block({}, error);
         }
-                    
+
         nlohmann::json json;
         try {
             json = nlohmann::json::parse(response.body);
         } catch (const std::exception& e) {
             return completion_block({}, AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
         }
-        
+
         try {
             auto user_api_key = App::UserAPIKey {
                     ObjectId(value_from_json<std::string>(json, "_id").c_str()),
@@ -355,7 +353,7 @@ void App::UserAPIKeyProviderClient::fetch_api_key(const realm::ObjectId& id,
             return completion_block({}, AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
         }
     };
-    
+
     parent->m_config.transport_generator()->send_request_to_server({
         HttpMethod::get,
         route,

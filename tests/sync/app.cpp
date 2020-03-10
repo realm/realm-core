@@ -36,9 +36,9 @@ using namespace realm::app;
 
 static std::string random_string(std::string::size_type length)
 {
-    static auto& chrs = "0123456789"
-    "bcdefghijklmnopqrstuvwxyz"
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    static auto& chrs = 
+        "abcdefghijklmnopqrstuvwxyz"
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
     thread_local static std::mt19937 rg{std::random_device{}()};
     thread_local static std::uniform_int_distribution<std::string::size_type> pick(0, sizeof(chrs) - 2);
     std::string s;
@@ -55,15 +55,18 @@ static std::string random_string(std::string::size_type length)
 // need to parse it at runtime after spinning up the instance.
 static std::string get_runtime_app_id(std::string config_path)
 {
-    File config(config_path);
-    std::string contents;
-    contents.resize(config.get_size());
-    config.read(contents.data(), config.get_size());
-    nlohmann::json json;
-    json = nlohmann::json::parse(contents);
-    std::string app_id = json["app_id"].get<std::string>();
-    std::cout << "found app_id: " << app_id << " in stitch config" << std::endl;
-    return app_id;
+    static std::string cached_app_id;
+    if (cached_app_id.empty()) {
+        File config(config_path);
+        std::string contents;
+        contents.resize(config.get_size());
+        config.read(contents.data(), config.get_size());
+        nlohmann::json json;
+        json = nlohmann::json::parse(contents);
+        cached_app_id = json["app_id"].get<std::string>();
+        std::cout << "found app_id: " << cached_app_id << " in stitch config" << std::endl;
+    }
+    return cached_app_id;
 }
 
 class IntTestTransport : public GenericNetworkTransport {
@@ -185,7 +188,8 @@ static std::string get_base_url() {
     }
     return base_url;
 }
-
+#endif
+#ifdef REALM_STITCH_CONFIG
 static std::string get_config_path() {
     std::string config_path = REALM_QUOTE(REALM_STITCH_CONFIG);
     if (config_path.size() > 0 && config_path[0] == '"') {
@@ -244,7 +248,8 @@ TEST_CASE("app: login_with_credentials integration", "[sync][app]") {
 // MARK: - UsernamePasswordProviderClient Tests
 
 TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app]") {
-    auto email = util::format("%1@%2.com", random_string(10), random_string(10));
+    auto email = util::format("realm_tests_do_autoverify%1@%2.com", random_string(10), random_string(10));
+
     auto password = random_string(10);
 
     std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
@@ -262,24 +267,57 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app]") {
 
     bool processed = false;
 
-    SECTION("register email") {
-        app.provider_client<App::UsernamePasswordProviderClient>()
-            .register_email("username@10gen.com",
-                            "M0ng0@B2020",
-                            [&](Optional<app::AppError> error) {
-                // Error returned states the account has already been created
-                CHECK(error->message == "name already in use");
-                CHECK(error->error_code.value() == 49);
-        });
+    app.provider_client<App::UsernamePasswordProviderClient>()
+    .register_email(email,
+                    password,
+                    [&](Optional<app::AppError> error) {
+                        CHECK(!error); // first registration success
+                        if (error) {
+                            std::cout << "register failed for email: " << email << " pw: " << password << " message: " << error->error_code.message() << "+" << error->message << std::endl;
+                        }
+                    });
 
+    SECTION("double registration should fail") {
         app.provider_client<App::UsernamePasswordProviderClient>()
             .register_email(email,
                             password,
                             [&](Optional<app::AppError> error) {
                 // Error returned states the account has already been created
-                CHECK(!error);
+                REQUIRE(error);
+                CHECK(error->message == "name already in use");
+                CHECK(app::ServiceErrorCode(error->error_code.value()) == app::ServiceErrorCode::account_name_in_use);
                 processed = true;
         });
+        CHECK(processed);
+    }
+
+    SECTION("double registration should fail") {
+        // the server registration function will reject emails that do not contain "realm_tests_do_autoverify"
+        std::string email_to_reject = util::format("%1@%2.com", random_string(10), random_string(10));
+        app.provider_client<App::UsernamePasswordProviderClient>()
+            .register_email(email_to_reject,
+                password,
+                [&](Optional<app::AppError> error) {
+                    REQUIRE(error);
+                    CHECK(error->message == util::format("failed to confirm user %1", email_to_reject));
+                    CHECK(app::ServiceErrorCode(error->error_code.value()) == app::ServiceErrorCode::bad_request);
+                    processed = true;
+                });
+        CHECK(processed);
+    }
+
+    SECTION("can login with registered account") {
+        app.log_in_with_credentials(realm::app::AppCredentials::username_password(email, password),
+            [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+                REQUIRE(user);
+                CHECK(!error);
+                processed = true;
+            });
+        CHECK(processed);
+        processed = false;
+        auto user = app.current_user();
+        REQUIRE(user);
+        CHECK(user->user_profile().email == email);
     }
 
     SECTION("confirm user") {
@@ -287,64 +325,83 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app]") {
             .confirm_user("a_token",
                           "a_token_id",
                           [&](Optional<app::AppError> error) {
+                REQUIRE(error);
                 CHECK(error->message == "invalid token data");
                 processed = true;
         });
+        CHECK(processed);
     }
 
     SECTION("resend confirmation email") {
         app.provider_client<App::UsernamePasswordProviderClient>()
-            .resend_confirmation_email("username@10gen.com",
+            .resend_confirmation_email(email,
                                        [&](Optional<app::AppError> error) {
+                REQUIRE(error);
                 CHECK(error->message == "already confirmed");
                 processed = true;
         });
+        CHECK(processed);
     }
-    
-    SECTION("send reset password") {
-        app.provider_client<App::UsernamePasswordProviderClient>()
-            .send_reset_password_email("username@10gen.com",
-                                       [&](Optional<app::AppError> error) {
-                CHECK(!error);
-        });
 
-        app.provider_client<App::UsernamePasswordProviderClient>()
-            .send_reset_password_email(email,
-                                       [&](Optional<app::AppError> error) {
-                CHECK(error->message == "user not found");
-                processed = true;
-        });
-    }
-    
-    SECTION("reset password") {
+    SECTION("reset password invalid tokens") {
         app.provider_client<App::UsernamePasswordProviderClient>()
             .reset_password(password,
                             "token_sample",
                             "token_id_sample",
                             [&](Optional<app::AppError> error) {
+                REQUIRE(error);
                 CHECK(error->message == "invalid token data");
                 processed = true;
         });
-    }
-    
-    SECTION("call reset password function") {
-        app.provider_client<App::UsernamePasswordProviderClient>()
-            .call_reset_password_function(email,
-                                          password,
-                                          "[0,1]",
-                                          [&](Optional<app::AppError> error) {
-                CHECK(error->message == "user not found");
-                processed = true;
-        });
+        CHECK(processed);
     }
 
-    CHECK(processed);
+    SECTION("reset password function success") {
+        // the imported test app will accept password reset if the password contains "realm_tests_do_reset" via a function
+        std::string accepted_new_password = util::format("realm_tests_do_reset%1", random_string(10));
+        app.provider_client<App::UsernamePasswordProviderClient>()
+            .call_reset_password_function(email,
+                accepted_new_password,
+                [&](Optional<app::AppError> error) {
+                    REQUIRE(!error);
+                    processed = true;
+            });
+        CHECK(processed);
+    }
+
+    SECTION("reset password function failure") {
+        std::string rejected_password = util::format("%1", random_string(10));
+        app.provider_client<App::UsernamePasswordProviderClient>()
+            .call_reset_password_function(email,
+                rejected_password,
+                [&](Optional<app::AppError> error) {
+                    REQUIRE(error);
+                    CHECK(error->message == util::format("failed to reset password for user %1", email));
+                    CHECK(error->is_service_error());
+                    processed = true;
+                });
+        CHECK(processed);
+    }
+
+    SECTION("reset password function for invalid user fails") {
+        app.provider_client<App::UsernamePasswordProviderClient>()
+            .call_reset_password_function(util::format("%1@%2.com", random_string(5), random_string(5)),
+                password,
+                [&](Optional<app::AppError> error) {
+                    REQUIRE(error);
+                    CHECK(error->message == "user not found");
+                    CHECK(error->is_service_error());
+                    CHECK(app::ServiceErrorCode(error->error_code.value()) == app::ServiceErrorCode::user_not_found);
+                    processed = true;
+                });
+        CHECK(processed);
+    }
 }
 
 // MARK: - UserAPIKeyProviderClient Tests
 
 TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
-    auto email = util::format("%1@%2.com", random_string(15), random_string(15));
+    auto email = util::format("realm_tests_do_autoverify%1@%2.com", random_string(10), random_string(10));
     auto password = util::format("%1", random_string(15));
     auto api_key_name = util::format("%1", random_string(15));
 
@@ -363,34 +420,43 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
 
     bool processed = false;
 
-    app.provider_client<App::UsernamePasswordProviderClient>().register_email(email,
-                                                                              password,
-                                                                              [&] (Optional<AppError> error) {
-        CHECK(!error);
-    });
+    app.provider_client<App::UsernamePasswordProviderClient>()
+        .register_email(email,
+            password,
+            [&](Optional<app::AppError> error) {
+                CHECK(!error); // first registration should succeed
+                if (error) {
+                    std::cout << "register failed for email: " << email << " pw: " << password << " message: " << error->error_code.message() << "+" << error->message << std::endl;
+                }
+            });
 
-    app.log_in_with_credentials(AppCredentials::username_password(email, password),
-                           [&](std::shared_ptr<SyncUser> user, Optional<app::AppError> error) {
-        CHECK(user);
-        CHECK(!error);
-    });
+    app.log_in_with_credentials(realm::app::AppCredentials::username_password(email, password),
+        [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+            REQUIRE(user);
+            CHECK(!error);
+            processed = true;
+        });
+    CHECK(processed);
+    processed = false;
 
     App::UserAPIKey api_key;
 
     SECTION("api-key") {
         app.provider_client<App::UserAPIKeyProviderClient>()
             .create_api_key(api_key_name, [&](Optional<App::UserAPIKey> user_api_key, Optional<app::AppError> error) {
+                CHECK(!error);
+                REQUIRE(bool(user_api_key));
                 CHECK(user_api_key->name == api_key_name);
                 CHECK(user_api_key->id.to_string() == user_api_key->id.to_string());
-                CHECK(!error);
                 api_key = user_api_key.value();
         });
 
         app.provider_client<App::UserAPIKeyProviderClient>()
             .fetch_api_key(api_key.id, [&](Optional<App::UserAPIKey> user_api_key, Optional<app::AppError> error) {
+                CHECK(!error);
+                REQUIRE(bool(user_api_key));
                 CHECK(user_api_key->name == api_key_name);
                 CHECK(user_api_key->id.to_string() == user_api_key->id.to_string());
-                CHECK(!error);
         });
 
         app.provider_client<App::UserAPIKeyProviderClient>()
@@ -410,10 +476,11 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
 
         app.provider_client<App::UserAPIKeyProviderClient>()
             .fetch_api_key(api_key.id, [&](Optional<App::UserAPIKey> user_api_key, Optional<app::AppError> error) {
+                CHECK(!error);
+                REQUIRE(bool(user_api_key));
                 CHECK(user_api_key->disabled == false);
                 CHECK(user_api_key->name == api_key_name);
                 CHECK(user_api_key->id.to_string() == user_api_key->id.to_string());
-                CHECK(!error);
         });
 
         app.provider_client<App::UserAPIKeyProviderClient>()
@@ -423,10 +490,11 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
 
         app.provider_client<App::UserAPIKeyProviderClient>()
             .fetch_api_key(api_key.id, [&](Optional<App::UserAPIKey> user_api_key, Optional<app::AppError> error) {
+                CHECK(!error);
+                REQUIRE(bool(user_api_key));
                 CHECK(user_api_key->disabled == true);
                 CHECK(user_api_key->name == api_key_name);
                 CHECK(user_api_key->id.to_string() == user_api_key->id.to_string());
-                CHECK(!error);
         });
 
         app.provider_client<App::UserAPIKeyProviderClient>()
