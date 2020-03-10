@@ -377,4 +377,23 @@ TEST(Unresolved_PkCollission)
     CHECK_NOT_EQUAL(k2, k3);
 }
 
+TEST(Unresolved_CondensedIndices)
+{
+    Group g;
+    auto t1 = g.add_table_with_primary_key("Table", type_Int, "id");
+    auto t2 = g.add_table_with_primary_key("Table2", type_Int, "id");
+    t1->add_column_link(type_LinkList, "t2s", *t2);
+
+    auto t2_obj = t2->create_object_with_primary_key(123);
+    auto t1_obj = t1->create_object_with_primary_key(123);
+    t1_obj.get_linklist("t2s").insert(0, t2_obj.get_key());
+
+    t2_obj.invalidate();
+
+    CHECK_EQUAL(t1_obj.get_linklist("t2s").size(), 0);
+
+    ConstObj const_t1_obj = t1_obj;
+    CHECK_EQUAL(const_t1_obj.get_linklist("t2s").size(), 0);
+}
+
 #endif
