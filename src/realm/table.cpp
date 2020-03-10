@@ -2567,7 +2567,10 @@ Obj Table::create_object(ObjKey key, const FieldValues& values)
         if (is_valid(key)) {
             throw InvalidKey{"requested object key already in use"};
         }
-        object_id = get_object_id(key);
+
+        // Convert the incoming ObjKey to a GlobalKey tagged with the local sync
+        // file ID.
+        object_id = GlobalKey(key, get_sync_file_id());
     }
 
     // Forward to the GlobalKey version of create_object(), so it can revive
