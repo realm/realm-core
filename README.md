@@ -136,10 +136,19 @@ configurations.
 
 Stitch images are published to our private Github CI. Follow the steps here to
 set up authorization from docker to your Github account https://github.com/realm/ci/packages/147854
+Once authorized, run the following docker commands from the top directory to start a local instance:
 
 ```
-docker run -p 9090:9090 --rm docker.pkg.github.com/realm/ci/mongodb-realm-test-server
-# FIXME: Missing step here for importing the app in ./tests/mongodb/stitch.json
+docker build --rm --tag local-stitch -f workflow/stitch.Dockerfile workflow
+docker run -p 9090:9090 -it -v $(pwd)/tests/mongodb:/app_config:rw local-stitch /bin/bash -c "(import_app.sh&) && run.sh"
+```
+
+This will make the stitch UI available in your browser at `localhost:9090` where you can login with "unique_user@domain.com" and "password".
+Once logged in, you can make changes to the integration-tests app and those changes will be persisted to your disk, because the docker image
+has a mapped volume to the `tests/mongodb` directory.
+
+To run the [app] tests against the local image, you need to configure a build with some cmake options to tell the tests where to point to.
+```
 mkdir build.sync.ninja
 sh "cmake -B build.sync.ninja -G Ninja -DREALM_ENABLE_SYNC=1 -DREALM_ENABLE_AUTH_TESTS=1 -DREALM_MONGODB_ENDPOINT=\"http://localhost:9090\" -DREALM_STITCH_CONFIG=\"./tests/mongodb/stitch.json\"
 sh "cmake --build build.sync.ninja --target tests"
