@@ -156,7 +156,7 @@ public:
                 // return an invalid Results rather than an Empty Results, to
                 // match what happens for other types of handover where the
                 // object doesn't exist.
-                switch_on_type(ObjectSchema::from_core_type(*table, m_col_key), [&](auto* t) -> void {
+                switch_on_type(ObjectSchema::from_core_type(m_col_key), [&](auto* t) -> void {
                     list = std::make_unique<typename ListType<decltype(*t)>::type>();
                 });
             }

@@ -33,7 +33,7 @@ ObjectSchema::ObjectSchema() = default;
 ObjectSchema::~ObjectSchema() = default;
 
 ObjectSchema::ObjectSchema(std::string name, std::initializer_list<Property> persisted_properties)
-: ObjectSchema(std::move(name), IsEmbedded{false}, persisted_properties, {})
+: ObjectSchema(std::move(name), persisted_properties, {})
 {
 }
 
@@ -63,27 +63,27 @@ ObjectSchema::ObjectSchema(std::string name, IsEmbedded is_embedded, std::initia
     }
 }
 
-PropertyType ObjectSchema::from_core_type(Table const& table, ColKey col)
+PropertyType ObjectSchema::from_core_type(ColKey col)
 {
     auto flags = PropertyType::Required;
-    auto attr = table.get_column_attr(col);
+    auto attr = col.get_attrs();
     if (attr.test(col_attr_Nullable))
         flags |= PropertyType::Nullable;
     if (attr.test(col_attr_List))
         flags |= PropertyType::Array;
-    switch (table.get_column_type(col)) {
-        case type_Int:       return PropertyType::Int | flags;
-        case type_Float:     return PropertyType::Float | flags;
-        case type_Double:    return PropertyType::Double | flags;
-        case type_Bool:      return PropertyType::Bool | flags;
-        case type_String:    return PropertyType::String | flags;
-        case type_Binary:    return PropertyType::Data | flags;
-        case type_Timestamp: return PropertyType::Date | flags;
-        case type_OldMixed:  return PropertyType::Any | flags;
-        case type_ObjectId:  return PropertyType::ObjectId | flags;
-        case type_Decimal:   return PropertyType::Decimal | flags;
-        case type_Link:      return PropertyType::Object | PropertyType::Nullable;
-        case type_LinkList:  return PropertyType::Object | PropertyType::Array;
+    switch (col.get_type()) {
+        case col_type_Int:       return PropertyType::Int | flags;
+        case col_type_Float:     return PropertyType::Float | flags;
+        case col_type_Double:    return PropertyType::Double | flags;
+        case col_type_Bool:      return PropertyType::Bool | flags;
+        case col_type_String:    return PropertyType::String | flags;
+        case col_type_Binary:    return PropertyType::Data | flags;
+        case col_type_Timestamp: return PropertyType::Date | flags;
+        case col_type_OldMixed:  return PropertyType::Any | flags;
+        case col_type_ObjectId:  return PropertyType::ObjectId | flags;
+        case col_type_Decimal:   return PropertyType::Decimal | flags;
+        case col_type_Link:      return PropertyType::Object | PropertyType::Nullable;
+        case col_type_LinkList:  return PropertyType::Object | PropertyType::Array;
         default: REALM_UNREACHABLE();
     }
 }
@@ -116,7 +116,7 @@ ObjectSchema::ObjectSchema(Group const& group, StringData name, TableKey key)
 
         Property property;
         property.name = column_name;
-        property.type = ObjectSchema::from_core_type(*table, col_key);
+        property.type = ObjectSchema::from_core_type(col_key);
         property.is_indexed = table->has_search_index(col_key);
         property.column_key = col_key;
 
@@ -364,8 +364,8 @@ void ObjectSchema::validate(Schema const& schema, std::vector<ObjectSchemaValida
 namespace realm {
 bool operator==(ObjectSchema const& a, ObjectSchema const& b) noexcept
 {
-    return std::tie(a.name, a.primary_key, a.persisted_properties, a.computed_properties)
-        == std::tie(b.name, b.primary_key, b.persisted_properties, b.computed_properties);
+    return std::tie(a.name, a.is_embedded, a.primary_key, a.persisted_properties, a.computed_properties)
+        == std::tie(b.name, b.is_embedded, b.primary_key, b.persisted_properties, b.computed_properties);
 
 }
 }

@@ -57,6 +57,7 @@ struct SchemaChangePrinter {
     REALM_SC_PRINT(AddProperty, v.object, v.property)
     REALM_SC_PRINT(AddTable, v.object)
     REALM_SC_PRINT(RemoveTable, v.object)
+    REALM_SC_PRINT(ChangeTableType, v.object)
     REALM_SC_PRINT(AddInitialProperties, v.object)
     REALM_SC_PRINT(ChangePrimaryKey, v.object, v.property)
     REALM_SC_PRINT(ChangePropertyType, v.object, v.old_property, v.new_property)

@@ -79,7 +79,7 @@ public:
 
     friend bool operator==(ObjectSchema const& a, ObjectSchema const& b) noexcept;
 
-    static PropertyType from_core_type(Table const& table, ColKey col);
+    static PropertyType from_core_type(ColKey col);
 
 private:
     void set_primary_key_property() noexcept;

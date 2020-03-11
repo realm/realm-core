@@ -86,6 +86,10 @@ struct RemoveTable {
     const ObjectSchema* object;
 };
 
+struct ChangeTableType {
+    const ObjectSchema* object;
+};
+
 struct AddInitialProperties {
     const ObjectSchema* object;
 };
@@ -135,6 +139,7 @@ struct ChangePrimaryKey {
 #define REALM_FOR_EACH_SCHEMA_CHANGE_TYPE(macro) \
     macro(AddTable) \
     macro(RemoveTable) \
+    macro(ChangeTableType) \
     macro(AddInitialProperties) \
     macro(AddProperty) \
     macro(RemoveProperty) \
