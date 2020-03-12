@@ -403,7 +403,17 @@ void Transaction::upgrade_file_format(int target_file_format_version)
         remove_pk_table();
     }
     if (current_file_format_version <= 10 && target_file_format_version >= 11) {
-        // No upgrade needed
+        auto table_keys = get_table_keys();
+        for (auto k : table_keys) {
+            auto t = get_table(k);
+            if (auto col = t->get_primary_key_column()) {
+                if (col.get_type() == col_type_Int) {
+                    // Tables with integer primary keys have to be rebuilt
+                    t->remove_search_index(col);
+                    t->rebuild_table_with_pk_column();
+                }
+            }
+        }
     }
     // NOTE: Additional future upgrade steps go here.
 }
@@ -1413,11 +1423,6 @@ public:
         return true;
     }
 
-    bool clear_table(size_t) noexcept
-    {
-        return true;
-    }
-
     bool modify_object(ColKey, ObjKey) noexcept
     {
         return true; // No-op
@@ -1467,11 +1472,6 @@ public:
     }
 
     bool list_move(size_t, size_t) noexcept
-    {
-        return true; // No-op
-    }
-
-    bool list_swap(size_t, size_t) noexcept
     {
         return true; // No-op
     }

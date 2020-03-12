@@ -190,13 +190,9 @@
 using namespace realm;
 using namespace realm::util;
 
-void QueryStateBase::dyncast()
-{
-}
+void QueryStateBase::dyncast() {}
 
-ArrayPayload::~ArrayPayload()
-{
-}
+ArrayPayload::~ArrayPayload() {}
 
 size_t Array::bit_width(int64_t v)
 {
@@ -225,8 +221,7 @@ void Array::init_from_mem(MemRef mem) noexcept
     m_is_inner_bptree_node = get_is_inner_bptree_node_from_header(header);
     m_has_refs = get_hasrefs_from_header(header);
     m_context_flag = get_context_flag_from_header(header);
-
-    set_width(m_width);
+    update_width_cache_from_header();
 }
 
 bool Array::update_from_parent(size_t old_baseline) noexcept
@@ -370,13 +365,13 @@ void Array::move(size_t begin, size_t end, size_t dest_begin)
 
 void Array::move(Array& dst, size_t ndx)
 {
+    size_t dest_begin = dst.m_size;
     size_t nb_to_move = m_size - ndx;
     dst.copy_on_write();
     dst.ensure_minimum_width(this->m_ubound);
     dst.alloc(dst.m_size + nb_to_move, dst.m_width); // Make room for the new elements
 
     // cache variables used in tight loop
-    size_t dest_begin = dst.m_size;
     auto getter = m_getter;
     auto setter = dst.m_vtable->setter;
     size_t sz = m_size;
@@ -386,7 +381,6 @@ void Array::move(Array& dst, size_t ndx)
         (dst.*setter)(dest_begin++, v);
     }
 
-    dst.m_size += nb_to_move;
     truncate(ndx);
 }
 
@@ -461,35 +455,35 @@ void Array::insert(size_t ndx, int_fast64_t value)
 {
     REALM_ASSERT_DEBUG(ndx <= m_size);
 
-
-    Getter old_getter = m_getter; // Save old getter before potential width expansion
+    const auto old_width = m_width;
+    const auto old_size = m_size;
+    const Getter old_getter = m_getter; // Save old getter before potential width expansion
 
     bool do_expand = value < m_lbound || value > m_ubound;
     if (do_expand) {
         size_t width = bit_width(value);
         REALM_ASSERT_DEBUG(width > m_width);
         alloc(m_size + 1, width); // Throws
-        set_width(width);
     }
     else {
         alloc(m_size + 1, m_width); // Throws
     }
 
     // Move values below insertion (may expand)
-    if (do_expand || m_width < 8) {
-        size_t i = m_size;
+    if (do_expand || old_width < 8) {
+        size_t i = old_size;
         while (i > ndx) {
             --i;
             int64_t v = (this->*old_getter)(i);
             (this->*(m_vtable->setter))(i + 1, v);
         }
     }
-    else if (ndx != m_size) {
+    else if (ndx != old_size) {
         // when byte sized and no expansion, use memmove
         // FIXME: Optimize by simply dividing by 8 (or shifting right by 3 bit positions)
-        size_t w = (m_width == 64) ? 8 : (m_width == 32) ? 4 : (m_width == 16) ? 2 : 1;
+        size_t w = (old_width == 64) ? 8 : (old_width == 32) ? 4 : (old_width == 16) ? 2 : 1;
         char* src_begin = m_data + ndx * w;
-        char* src_end = m_data + m_size * w;
+        char* src_end = m_data + old_size * w;
         char* dst_end = src_end + w;
         std::copy_backward(src_begin, src_end, dst_end);
     }
@@ -506,10 +500,6 @@ void Array::insert(size_t ndx, int_fast64_t value)
             (this->*(m_vtable->setter))(i, v);
         }
     }
-
-    // Update size
-    // (no need to do it in header as it has been done by Alloc)
-    ++m_size;
 }
 
 
@@ -542,8 +532,8 @@ void Array::truncate(size_t new_size)
     // If the array is completely cleared, we take the opportunity to
     // drop the width back to zero.
     if (new_size == 0) {
-        set_width(0);
         set_width_in_header(0, get_header());
+        update_width_cache_from_header();
     }
 }
 
@@ -575,8 +565,8 @@ void Array::truncate_and_destroy_children(size_t new_size)
     // If the array is completely cleared, we take the opportunity to
     // drop the width back to zero.
     if (new_size == 0) {
-        set_width(0);
         set_width_in_header(0, get_header());
+        update_width_cache_from_header();
     }
 }
 
@@ -585,12 +575,12 @@ void Array::do_ensure_minimum_width(int_fast64_t value)
 {
 
     // Make room for the new value
-    size_t width = bit_width(value);
+    const size_t width = bit_width(value);
+
     REALM_ASSERT_3(width, >, m_width);
 
     Getter old_getter = m_getter; // Save old getter before width expansion
     alloc(m_size, width);         // Throws
-    set_width(width);
 
     // Expand the old values
     size_t i = m_size;
@@ -608,8 +598,8 @@ void Array::set_all_to_zero()
 
     copy_on_write(); // Throws
 
-    set_width(0);
     set_width_in_header(0, get_header());
+    update_width_cache_from_header();
 }
 
 void Array::adjust_ge(int_fast64_t limit, int_fast64_t diff)
@@ -890,8 +880,10 @@ size_t find_zero(uint64_t v)
         }
     }
 
-    uint64_t mask = (width == 64 ? ~0ULL : ((1ULL << (width == 64 ? 0 : width)) -
-                                            1ULL)); // Warning free way of computing (1ULL << width) - 1
+    uint64_t mask =
+        (width == 64
+             ? ~0ULL
+             : ((1ULL << (width == 64 ? 0 : width)) - 1ULL)); // Warning free way of computing (1ULL << width) - 1
     while (eq == (((v >> (width * start)) & mask) != 0)) {
         start++;
     }
@@ -899,7 +891,7 @@ size_t find_zero(uint64_t v)
     return start;
 }
 
-} // anonymous namesapce
+} // namespace
 
 
 template <bool find_max, size_t w>
@@ -1478,12 +1470,6 @@ MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t 
 
 int_fast64_t Array::lbound_for_width(size_t width) noexcept
 {
-    REALM_TEMPEX(return lbound_for_width, width, ());
-}
-
-template <size_t width>
-int_fast64_t Array::lbound_for_width() noexcept
-{
     if (width == 0) {
         return 0;
     }
@@ -1514,12 +1500,6 @@ int_fast64_t Array::lbound_for_width() noexcept
 }
 
 int_fast64_t Array::ubound_for_width(size_t width) noexcept
-{
-    REALM_TEMPEX(return ubound_for_width, width, ());
-}
-
-template <size_t width>
-int_fast64_t Array::ubound_for_width() noexcept
 {
     if (width == 0) {
         return 0;
@@ -1571,20 +1551,15 @@ struct Array::VTableForWidth {
 template <size_t width>
 const typename Array::VTableForWidth<width>::PopulatedVTable Array::VTableForWidth<width>::vtable;
 
-void Array::set_width(size_t width) noexcept
+void Array::update_width_cache_from_header() noexcept
 {
-    REALM_TEMPEX(set_width, width, ());
-}
-
-template <size_t width>
-void Array::set_width() noexcept
-{
-    m_lbound = lbound_for_width<width>();
-    m_ubound = ubound_for_width<width>();
+    auto width = get_width_from_header(get_header());
+    m_lbound = lbound_for_width(width);
+    m_ubound = ubound_for_width(width);
 
     m_width = width;
 
-    m_vtable = &VTableForWidth<width>::vtable;
+    REALM_TEMPEX(m_vtable = &VTableForWidth, width, ::vtable);
     m_getter = m_vtable->getter;
 }
 

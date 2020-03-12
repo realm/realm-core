@@ -1,3 +1,48 @@
+# NEXT RELEASE
+
+### Enhancements
+* None.
+
+### Fixed
+* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* None.
+ 
+### Breaking changes
+* None.
+
+-----------
+
+### Internals
+* None.
+
+----------------------------------------------
+
+# 10.0.0-alpha.2 Release notes
+
+This release also contains the changes introduced by v6.0.4
+
+### Fixed
+* Table::find_first<T> on a primary key column would sometimes return the wrong object. Since v10.0.0-alpha.1.
+ 
+-----------
+
+### Internals
+* 'clear_table' and 'list_swap' removed from the replication interface.
+* Some 'safe_int_ops' has been removed.
+
+----------------------------------------------
+
+# 10.0.0-alpha.1 Release notes
+
+### Fixed
+* Table::find_first() now handles tables with int primary key correctly.
+* We will not delete dangling links when otherwise modifying a list.
+
+-----------
+
+### Internals
+* Sync should now use Lst<ObjKey> interface when setting possibly dangling links
+
 # 6.1.0-alpha.5 Release notes
 
 ### Enhancements
@@ -8,9 +53,6 @@
 ### Fixed
 * None.
  
-### Breaking changes
-* None.
-
 -----------
 
 ### Internals
@@ -63,6 +105,11 @@
 ### Internals
 * File format bumped to 11.
 
+# 6.0.4 Release notes
+
+### Fixed
+* It was not possible to make client resync if a table contained binary data. ([#3619](https://github.com/realm/realm-core/issues/3619), v6.0.0-alpha.0)
+ 
 ----------------------------------------------
 
 # 6.0.3 Release notes

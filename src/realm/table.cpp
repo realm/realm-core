@@ -1735,18 +1735,9 @@ void Table::batch_erase_rows(const KeyColumn& keys)
 
 void Table::clear()
 {
-    size_t old_size = size();
-
     CascadeState state(CascadeState::Mode::Strong, get_parent_group());
     m_clusters.clear(state);
-    // FIXME: what should happen to tombstones when a table is cleared?
-    // m_tombstones->clear(state); <-- does not work.
-
-    bump_content_version();
-    bump_storage_version();
-
-    if (Replication* repl = get_repl())
-        repl->clear_table(this, old_size); // Throws
+    free_collision_table();
 }
 
 
@@ -2058,9 +2049,7 @@ ObjKey Table::find_first(ColKey col_key, T value) const
         }
 
         if (col_key == m_primary_key_col) {
-            GlobalKey object_id{value};
-            ObjKey k = global_to_local_object_id_hashed(object_id);
-            return is_valid(k) ? k : ObjKey();
+            return this->find_primary_key(value);
         }
     }
 
@@ -2610,12 +2599,12 @@ Obj Table::create_object_with_primary_key(const Mixed& primary_key, FieldValues&
     REALM_ASSERT((primary_key.is_null() && primary_key_col.get_attrs().test(col_attr_Nullable)) ||
                  primary_key.get_type() == type);
 
-    ObjKey object_key;
-    GlobalKey object_id{primary_key};
-
     REALM_ASSERT(type == type_String || type == type_ObjectId || type == type_Int);
+
     // Generate local ObjKey
-    object_key = global_to_local_object_id_hashed(object_id);
+    GlobalKey object_id{primary_key};
+    ObjKey object_key = global_to_local_object_id_hashed(object_id);
+
     // Check for collision
     if (is_valid(object_key)) {
         Obj existing_obj = get_object(object_key);
@@ -2630,6 +2619,22 @@ Obj Table::create_object_with_primary_key(const Mixed& primary_key, FieldValues&
         object_key = allocate_local_id_after_hash_collision(object_id, existing_id, object_key);
     }
 
+    // Check for collision with tombstones
+    ObjKey unres_key = object_key.get_unresolved();
+    bool needs_resurrection = false;
+    if (m_tombstones && m_tombstones->is_valid(unres_key)) {
+        auto existing_pk_value = m_tombstones->get(unres_key).get_any(primary_key_col);
+
+        // If the primary key is the same, the object should be resurrected below
+        if (existing_pk_value == primary_key) {
+            needs_resurrection = true;
+        }
+        else {
+            GlobalKey existing_id{existing_pk_value};
+            object_key = allocate_local_id_after_hash_collision(object_id, existing_id, object_key);
+        }
+    }
+
     if (auto repl = get_repl()) {
         repl->create_object_with_primary_key(this, object_id, primary_key);
     }
@@ -2637,39 +2642,78 @@ Obj Table::create_object_with_primary_key(const Mixed& primary_key, FieldValues&
     field_values.emplace_back(primary_key_col, primary_key);
     Obj ret = create_object(object_key, field_values);
     // Check if unresolved exists
-    ObjKey unres_key = object_key.get_unresolved();
-    if (m_tombstones && m_tombstones->is_valid(unres_key)) {
+    if (needs_resurrection) {
         auto tombstone = m_tombstones->get(unres_key);
-        // When last link to tombstone is removed, the object will be deleted
-        ret.assign(tombstone);
-        REALM_ASSERT(!m_tombstones->is_valid(unres_key));
+        ret.assign_pk_and_backlinks(tombstone);
+        // If tombstones had no links to it, it may still be alive
+        if (m_tombstones->is_valid(unres_key)) {
+            CascadeState state(CascadeState::Mode::None);
+            m_tombstones->erase(unres_key, state);
+        }
     }
     return ret;
 }
 
-ObjKey Table::get_objkey_from_primary_key(const Mixed& primary_key)
+ObjKey Table::find_primary_key(Mixed primary_key) const
 {
-    if (m_is_embedded)
-        throw LogicError(LogicError::wrong_kind_of_table);
     auto primary_key_col = get_primary_key_column();
     REALM_ASSERT(primary_key_col);
     DataType type = DataType(primary_key_col.get_type());
     REALM_ASSERT((primary_key.is_null() && primary_key_col.get_attrs().test(col_attr_Nullable)) ||
                  primary_key.get_type() == type);
 
-    ObjKey object_key;
-    GlobalKey object_id{primary_key};
-
     // Generate local ObjKey
-    object_key = global_to_local_object_id_hashed(object_id);
+    GlobalKey object_id{primary_key};
+    ObjKey object_key = global_to_local_object_id_hashed(object_id);
 
     // Check if existing
     if (m_clusters.is_valid(object_key)) {
-        return object_key;
+        auto existing_pk_value = m_clusters.get(object_key).get_any(primary_key_col);
+
+        // It may just be the same object
+        if (existing_pk_value == primary_key) {
+            return object_key;
+        }
     }
+    return {};
+}
+
+ObjKey Table::get_objkey_from_primary_key(const Mixed& primary_key)
+{
+    auto primary_key_col = get_primary_key_column();
+    REALM_ASSERT(primary_key_col);
+    DataType type = DataType(primary_key_col.get_type());
+    REALM_ASSERT((primary_key.is_null() && primary_key_col.get_attrs().test(col_attr_Nullable)) ||
+                 primary_key.get_type() == type);
+
+    // Generate local ObjKey
+    GlobalKey object_id{primary_key};
+    ObjKey object_key = global_to_local_object_id_hashed(object_id);
+
+    // Check if existing
+    if (m_clusters.is_valid(object_key)) {
+        auto existing_pk_value = m_clusters.get(object_key).get_any(primary_key_col);
+
+        // It may just be the same object
+        if (existing_pk_value == primary_key) {
+            return object_key;
+        }
+
+        GlobalKey existing_id{existing_pk_value};
+        object_key = allocate_local_id_after_hash_collision(object_id, existing_id, object_key);
+    }
+
     auto unres_key = object_key.get_unresolved();
     if (m_tombstones && m_tombstones->is_valid(unres_key)) {
-        return unres_key;
+        auto existing_pk_value = m_tombstones->get(unres_key).get_any(primary_key_col);
+
+        // It may just be the same object
+        if (existing_pk_value == primary_key) {
+            return unres_key;
+        }
+
+        GlobalKey existing_id{existing_pk_value};
+        object_key = allocate_local_id_after_hash_collision(object_id, existing_id, object_key);
     }
     return allocate_unresolved_key(object_key, {{primary_key_col, primary_key}});
 }
@@ -2716,6 +2760,36 @@ GlobalKey Table::get_object_id(ObjKey key) const
         return {key, get_sync_file_id()};
     }
     return {};
+}
+
+Obj Table::get_object_with_primary_key(Mixed primary_key)
+{
+    auto primary_key_col = get_primary_key_column();
+    REALM_ASSERT(primary_key_col);
+    DataType type = DataType(primary_key_col.get_type());
+    REALM_ASSERT((primary_key.is_null() && primary_key_col.get_attrs().test(col_attr_Nullable)) ||
+                 primary_key.get_type() == type);
+
+    ObjKey object_key;
+    GlobalKey object_id{primary_key};
+
+    // Generate local ObjKey
+    object_key = global_to_local_object_id_hashed(object_id);
+
+    return m_clusters.get(object_key);
+}
+
+Mixed Table::get_primary_key(ObjKey key)
+{
+    auto primary_key_col = get_primary_key_column();
+    REALM_ASSERT(primary_key_col);
+    if (key.is_unresolved()) {
+        REALM_ASSERT(m_tombstones);
+        return m_tombstones->get(key).get_any(primary_key_col);
+    }
+    else {
+        return m_clusters.get(key).get_any(primary_key_col);
+    }
 }
 
 GlobalKey Table::allocate_object_id_squeezed()
@@ -2868,9 +2942,8 @@ void Table::free_local_id_after_hash_collision(ObjKey key)
 {
     if (ref_type collision_map_ref = to_ref(m_top.get(top_position_for_collision_map))) {
         // FIXME: Cache these accessors
-        Allocator& alloc = m_top.get_alloc();
-        Array collision_map{alloc};
-        Array local_id{alloc};
+        Array collision_map{m_alloc};
+        Array local_id{m_alloc};
 
         collision_map.set_parent(&m_top, top_position_for_collision_map);
         local_id.set_parent(&collision_map, s_collision_map_local_id);
@@ -2878,8 +2951,8 @@ void Table::free_local_id_after_hash_collision(ObjKey key)
         local_id.init_from_parent();
         auto ndx = local_id.find_first(key.value);
         if (ndx != realm::npos) {
-            Array hi{alloc};
-            Array lo{alloc};
+            Array hi{m_alloc};
+            Array lo{m_alloc};
 
             hi.set_parent(&collision_map, s_collision_map_hi);
             lo.set_parent(&collision_map, s_collision_map_lo);
@@ -2889,7 +2962,18 @@ void Table::free_local_id_after_hash_collision(ObjKey key)
             hi.erase(ndx);
             lo.erase(ndx);
             local_id.erase(ndx);
+            if (hi.size() == 0) {
+                free_collision_table();
+            }
         }
+    }
+}
+
+void Table::free_collision_table()
+{
+    if (ref_type collision_map_ref = to_ref(m_top.get(top_position_for_collision_map))) {
+        Array::destroy_deep(collision_map_ref, m_alloc);
+        m_top.set(top_position_for_collision_map, 0);
     }
 }
 
@@ -2935,16 +3019,23 @@ void Table::invalidate_object(ObjKey key)
 {
     if (m_is_embedded)
         throw LogicError(LogicError::wrong_kind_of_table);
-    auto primary_key_col = get_primary_key_column();
-    if (!primary_key_col)
-        throw LogicError(LogicError::wrong_kind_of_table);
-    if (m_tombstones && m_tombstones->is_valid(key)) // idempotence
-        return;
+    REALM_ASSERT(!key.is_unresolved());
+
     auto obj = get_object(key);
-    auto pk = obj.get_any(primary_key_col);
-    auto tombstone_key = allocate_unresolved_key(key, {{primary_key_col, pk}});
-    auto tombstone = m_tombstones->get(tombstone_key);
-    tombstone.assign(obj);
+    if (obj.has_backlinks(false)) {
+        // If the object has backlinks, we should make a tombstone
+        // and make inward links point to it,
+        ObjKey tombstone_key;
+        if (auto primary_key_col = get_primary_key_column()) {
+            auto pk = obj.get_any(primary_key_col);
+            tombstone_key = allocate_unresolved_key(key, {{primary_key_col, pk}});
+        }
+        else {
+            tombstone_key = allocate_unresolved_key(key, {{}});
+        }
+        auto tombstone = m_tombstones->get(tombstone_key);
+        tombstone.assign_pk_and_backlinks(obj);
+    }
     CascadeState state(CascadeState::Mode::None);
     m_clusters.erase(key, state);
 }

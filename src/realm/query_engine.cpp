@@ -25,8 +25,8 @@
 
 using namespace realm;
 
-ParentNode::ParentNode(const ParentNode& from, Transaction* tr)
-    : m_child(from.m_child ? from.m_child->clone(tr) : nullptr)
+ParentNode::ParentNode(const ParentNode& from)
+    : m_child(from.m_child ? from.m_child->clone() : nullptr)
     , m_condition_column_name(from.m_condition_column_name)
     , m_condition_column_key(from.m_condition_column_key)
     , m_dD(from.m_dD)
@@ -594,13 +594,13 @@ size_t ExpressionNode::find_first_local(size_t start, size_t end)
     return m_expression->find_first(start, end);
 }
 
-std::unique_ptr<ParentNode> ExpressionNode::clone(Transaction* tr) const
+std::unique_ptr<ParentNode> ExpressionNode::clone() const
 {
-    return std::unique_ptr<ParentNode>(new ExpressionNode(*this, tr));
+    return std::unique_ptr<ParentNode>(new ExpressionNode(*this));
 }
 
-ExpressionNode::ExpressionNode(const ExpressionNode& from, Transaction* tr)
-    : ParentNode(from, tr)
-    , m_expression(from.m_expression->clone(tr))
+ExpressionNode::ExpressionNode(const ExpressionNode& from)
+    : ParentNode(from)
+    , m_expression(from.m_expression->clone())
 {
 }

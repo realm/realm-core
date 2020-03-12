@@ -49,7 +49,7 @@ enum Instruction {
     instr_RemoveObject = 12,
     instr_Set = 13,
     instr_SetDefault = 14,
-    instr_ClearTable = 15, // Remove all rows in selected table
+    // instr_ClearTable = 15, Remove all rows in selected table  (unused from file format 11)
 
     instr_InsertColumn = 20, // Insert new column into to selected descriptor
     instr_EraseColumn = 21,  // Remove column from selected descriptor
@@ -60,9 +60,9 @@ enum Instruction {
     instr_ListInsert = 31, // Insert list entry
     instr_ListSet = 32,    // Assign to list entry
     instr_ListMove = 33,   // Move an entry within a link list
-    instr_ListSwap = 34,   // Swap two entries within a list
-    instr_ListErase = 35,  // Remove an entry from a list
-    instr_ListClear = 36,  // Remove all entries from a list
+    // instr_ListSwap = 34,   Swap two entries within a list (unused from file format 11)
+    instr_ListErase = 35, // Remove an entry from a list
+    instr_ListClear = 36, // Remove all entries from a list
 };
 
 class TransactLogStream {
@@ -149,10 +149,6 @@ public:
     {
         return true;
     }
-    bool clear_table(size_t)
-    {
-        return true;
-    }
     bool modify_object(ColKey, ObjKey)
     {
         return true;
@@ -186,10 +182,6 @@ public:
 
     // Must have linklist selected:
     bool list_move(size_t, size_t)
-    {
-        return true;
-    }
-    bool list_swap(size_t, size_t)
     {
         return true;
     }
@@ -227,8 +219,6 @@ public:
     bool remove_object(ObjKey);
     bool modify_object(ColKey col_key, ObjKey key);
 
-    bool clear_table(size_t old_table_size);
-
     // Must have descriptor selected:
     bool insert_column(ColKey col_key);
     bool erase_column(ColKey col_key);
@@ -240,7 +230,6 @@ public:
     bool list_set(size_t list_ndx);
     bool list_insert(size_t ndx);
     bool list_move(size_t from_link_ndx, size_t to_link_ndx);
-    bool list_swap(size_t link1_ndx, size_t link2_ndx);
     bool list_erase(size_t list_ndx);
     bool list_clear(size_t old_list_size);
 
@@ -373,14 +362,12 @@ public:
     virtual void create_object(const Table*, ObjKey);
     virtual void create_object_with_primary_key(const Table*, GlobalKey, Mixed);
     virtual void remove_object(const Table*, ObjKey);
-    virtual void clear_table(const Table*, size_t prior_num_rows);
 
     virtual void list_set_null(const ConstLstBase&, size_t ndx);
     virtual void list_insert_null(const ConstLstBase&, size_t ndx);
     virtual void list_set_link(const Lst<ObjKey>&, size_t link_ndx, ObjKey value);
     virtual void list_insert_link(const Lst<ObjKey>&, size_t link_ndx, ObjKey value);
     virtual void list_move(const ConstLstBase&, size_t from_link_ndx, size_t to_link_ndx);
-    virtual void list_swap(const ConstLstBase&, size_t link_ndx_1, size_t link_ndx_2);
     virtual void list_erase(const ConstLstBase&, size_t link_ndx);
     virtual void list_clear(const ConstLstBase&);
 
@@ -620,7 +607,7 @@ template <class T>
 char* TransactLogEncoder::encode_int(char* ptr, T value)
 {
     static_assert(std::numeric_limits<T>::is_integer, "Integer required");
-    bool negative = util::is_negative(value);
+    bool negative = value < 0;
     if (negative) {
         // The following conversion is guaranteed by C++11 to never
         // overflow (contrast this with "-value" which indeed could
@@ -632,7 +619,7 @@ char* TransactLogEncoder::encode_int(char* ptr, T value)
     }
     // At this point 'value' is always a positive number. Also, small
     // negative numbers have been converted to small positive numbers.
-    REALM_ASSERT(!util::is_negative(value));
+    REALM_ASSERT(value >= 0);
     // One sign bit plus number of value bits
     const int num_bits = 1 + std::numeric_limits<T>::digits;
     // Only the first 7 bits are available per byte. Had it not been
@@ -1057,18 +1044,6 @@ inline void TransactLogConvenientEncoder::remove_object(const Table* t, ObjKey k
     m_encoder.remove_object(key); // Throws
 }
 
-inline bool TransactLogEncoder::clear_table(size_t old_size)
-{
-    append_simple_instr(instr_ClearTable, old_size); // Throws
-    return true;
-}
-
-inline void TransactLogConvenientEncoder::clear_table(const Table* t, size_t prior_num_rows)
-{
-    select_table(t);                       // Throws
-    m_encoder.clear_table(prior_num_rows); // Throws
-}
-
 inline void TransactLogConvenientEncoder::list_set_null(const ConstLstBase& list, size_t list_ndx)
 {
     select_list(list);            // Throws
@@ -1111,18 +1086,6 @@ inline void TransactLogConvenientEncoder::list_move(const ConstLstBase& list, si
 {
     select_list(list);                               // Throws
     m_encoder.list_move(from_link_ndx, to_link_ndx); // Throws
-}
-
-inline bool TransactLogEncoder::list_swap(size_t link1_ndx, size_t link2_ndx)
-{
-    append_simple_instr(instr_ListSwap, link1_ndx, link2_ndx); // Throws
-    return true;
-}
-
-inline void TransactLogConvenientEncoder::list_swap(const ConstLstBase& list, size_t link1_ndx, size_t link2_ndx)
-{
-    select_list(list);                         // Throws
-    m_encoder.list_swap(link1_ndx, link2_ndx); // Throws
 }
 
 inline bool TransactLogEncoder::list_erase(size_t list_ndx)
@@ -1182,8 +1145,6 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
     char instr_ch = 0; // silence a warning
     if (!read_char(instr_ch))
         parser_error(); // Throws
-    //    std::cerr << "parsing " << util::promote(instr) << " @ " << std::hex << long(m_input_begin) << std::dec <<
-    //    "\n";
     Instruction instr = Instruction(instr_ch);
     switch (instr) {
         case instr_Set: {
@@ -1222,12 +1183,6 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
                 parser_error();
             return;
         }
-        case instr_ClearTable: {
-            size_t old_size = read_int<size_t>(); // Throws
-            if (!handler.clear_table(old_size))   // Throws
-                parser_error();
-            return;
-        }
         case instr_ListInsert: {
             size_t list_ndx = read_int<size_t>();
             if (!handler.list_insert(list_ndx)) // Throws
@@ -1238,13 +1193,6 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
             size_t from_link_ndx = read_int<size_t>();          // Throws
             size_t to_link_ndx = read_int<size_t>();            // Throws
             if (!handler.list_move(from_link_ndx, to_link_ndx)) // Throws
-                parser_error();
-            return;
-        }
-        case instr_ListSwap: {
-            size_t link1_ndx = read_int<size_t>();        // Throws
-            size_t link2_ndx = read_int<size_t>();        // Throws
-            if (!handler.list_swap(link1_ndx, link2_ndx)) // Throws
                 parser_error();
             return;
         }
@@ -1478,13 +1426,6 @@ public:
     bool list_move(size_t from_link_ndx, size_t to_link_ndx)
     {
         m_encoder.list_move(from_link_ndx, to_link_ndx);
-        append_instruction();
-        return true;
-    }
-
-    bool list_swap(size_t link1_ndx, size_t link2_ndx)
-    {
-        m_encoder.list_swap(link1_ndx, link2_ndx);
         append_instruction();
         return true;
     }

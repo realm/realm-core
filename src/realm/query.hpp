@@ -73,8 +73,6 @@ struct QueryGroup {
     QueryGroup(QueryGroup&&) = default;
     QueryGroup& operator=(QueryGroup&&) = default;
 
-    QueryGroup(const QueryGroup&, Transaction*);
-
     std::unique_ptr<ParentNode> m_root_node;
 
     bool m_pending_not = false;

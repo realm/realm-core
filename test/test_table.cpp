@@ -5366,6 +5366,11 @@ TEST(Table_EmbeddedObjectCreateAndDestroyList)
     parent_ll.create_and_set_linked_object(1); // implicitly remove entry for 02
     CHECK(!o2.is_valid());
     CHECK(table->size() == 4);
+    parent_ll.clear();
+    CHECK(table->size() == 0);
+    parent_ll.create_and_insert_linked_object(0);
+    parent_ll.create_and_insert_linked_object(1);
+    CHECK(table->size() == 2);
     o.remove();
     CHECK(table->size() == 0);
     tr->commit();
@@ -5477,6 +5482,7 @@ TEST(Table_EmbeddedObjectTableClearNotifications)
 
     parent->clear();
     CHECK(calls == 2);
+    CHECK_EQUAL(parent->size(), 0);
     tr->commit();
 }
 

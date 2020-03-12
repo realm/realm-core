@@ -1033,6 +1033,8 @@ TEST(Parser_TwoColumnExpressionBasics)
     ColKey int_col = table->add_column(type_Int, "ints", true);
     ColKey double_col = table->add_column(type_Double, "doubles");
     ColKey string_col = table->add_column(type_String, "strings");
+    ColKey decimal_col = table->add_column(type_Decimal, "decimals");
+    ColKey objectid_col = table->add_column(type_ObjectId, "objectids");
     ColKey link_col = table->add_column_link(type_Link, "link", *table);
     std::vector<ObjKey> keys;
     table->create_objects(3, keys);
@@ -1042,6 +1044,8 @@ TEST(Parser_TwoColumnExpressionBasics)
         obj.set(double_col, double(i));
         std::string str(i, 'a');
         obj.set(string_col, StringData(str));
+        obj.set(decimal_col, Decimal128(int64_t(i)));
+        obj.set(objectid_col, ObjectId::gen());
     }
     table->get_object(keys[1]).set(link_col, keys[0]);
 
@@ -1057,12 +1061,16 @@ TEST(Parser_TwoColumnExpressionBasics)
     verify_query(test_context, table, "doubles == doubles", 3);
     verify_query(test_context, table, "strings == strings", 3);
     verify_query(test_context, table, "ints == link.@count", 2); // row 0 has 0 links, row 1 has 1 link
+    verify_query(test_context, table, "decimals == decimals", 3);
+    verify_query(test_context, table, "objectids == objectids", 3);
 
     // type mismatch
     CHECK_THROW_ANY(verify_query(test_context, table, "doubles == ints", 0));
     CHECK_THROW_ANY(verify_query(test_context, table, "doubles == strings", 0));
     CHECK_THROW_ANY(verify_query(test_context, table, "ints == doubles", 0));
     CHECK_THROW_ANY(verify_query(test_context, table, "strings == doubles", 0));
+    CHECK_THROW_ANY(verify_query(test_context, table, "ints == decimals", 0));
+    CHECK_THROW_ANY(verify_query(test_context, table, "objectids == ints", 0));
 }
 
 TEST(Parser_TwoColumnAggregates)

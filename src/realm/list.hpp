@@ -873,8 +873,6 @@ public:
         insert(size(), value);
     }
     void set(size_t ndx, ObjKey value);
-    // As set, but without translating ndx
-    void set_direct(size_t ndx, ObjKey value);
     void insert(size_t ndx, ObjKey value);
     ObjKey get(size_t ndx)
     {
@@ -882,20 +880,18 @@ public:
     }
     void remove(size_t ndx)
     {
-        clean_unres();
-        Lst<ObjKey>::remove(ndx);
+        Lst<ObjKey>::remove(virtual2real(ndx));
     }
     void remove(size_t from, size_t to) override
     {
-        clean_unres();
         while (from < to) {
-            Lst<ObjKey>::remove(--to);
+            remove(--to);
         }
     }
     void clear() override
     {
-        clean_unres();
         Lst<ObjKey>::clear();
+        m_unresolved.clear();
     }
     // Create a new object in insert a link to it
     Obj create_and_insert_linked_object(size_t ndx);
@@ -927,12 +923,6 @@ private:
 
     // Translate from userfacing index to internal index.
     size_t virtual2real(size_t ndx) const;
-    // Add ndx to m_unresolved - if not already there
-    void add_unres(size_t ndx);
-    // Remove ndx from m_unresolved - if there
-    void remove_unres(size_t ndx);
-    // Remove all unresolved entries
-    void clean_unres();
     // Scan through the list to find unresolved links
     void update_unresolved() const;
 };

@@ -125,6 +125,7 @@ ref_type ArrayBlob::replace(size_t begin, size_t end, const char* data, size_t d
     REALM_ASSERT(!get_context_flag());
     size_t remove_size = end - begin;
     size_t add_size = add_zero_term ? data_size + 1 : data_size;
+    size_t old_size = m_size;
     size_t new_size = m_size - remove_size + add_size;
 
     // If size of BinaryData is below 'max_binary_size', the data is stored directly
@@ -151,9 +152,9 @@ ref_type ArrayBlob::replace(size_t begin, size_t end, const char* data, size_t d
 
     // Resize previous space to fit new data
     // (not needed if we append to end)
-    if (begin != m_size) {
+    if (begin != old_size) {
         const char* old_begin = m_data + end;
-        const char* old_end = m_data + m_size;
+        const char* old_end = m_data + old_size;
         if (remove_size < add_size) { // expand gap
             char* new_end = m_data + new_size;
             std::copy_backward(old_begin, old_end, new_end);
@@ -168,8 +169,6 @@ ref_type ArrayBlob::replace(size_t begin, size_t end, const char* data, size_t d
     modify_begin = realm::safe_copy_n(data, data_size, modify_begin);
     if (add_zero_term)
         *modify_begin = 0;
-
-    m_size = new_size;
 
     return get_ref();
 }

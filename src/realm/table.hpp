@@ -77,32 +77,16 @@ class QueryInfo;
 class Table {
 public:
     /// Construct a new freestanding top-level table with static
-    /// lifetime.
-    ///
-    /// This constructor should be used only when placing a table
-    /// instance on the stack, and it is then the responsibility of
-    /// the application that there are no objects of type TableRef or
-    /// ConstTableRef that refer to it, or to any of its subtables,
-    /// when it goes out of scope.
+    /// lifetime. For debugging only.
     Table(Allocator& = Allocator::get_default());
 
     /// Construct a copy of the specified table as a new freestanding
-    /// top-level table with static lifetime.
-    ///
-    /// This constructor should be used only when placing a table
-    /// instance on the stack, and it is then the responsibility of
-    /// the application that there are no objects of type TableRef or
-    /// ConstTableRef that refer to it, or to any of its subtables,
-    /// when it goes out of scope.
+    /// top-level table with static lifetime. For debugging only.
     Table(const Table&, Allocator& = Allocator::get_default());
 
     ~Table() noexcept;
 
     Allocator& get_alloc() const;
-
-    /// Construct a copy of the specified table as a new freestanding top-level
-    /// table with dynamic lifetime. This method is deprecated.
-    TableRef copy(Allocator& = Allocator::get_default()) const;
 
     /// Get the name of this table, if it has one. Only group-level tables have
     /// names. For a table of any other kind, this function returns the empty
@@ -145,7 +129,7 @@ public:
 
     ColKey add_column_link(DataType type, StringData name, Table& target);
 
-    // Pass a ColKey() as first argument to have a new colkey generated
+    // Pass a default ColKey() as first argument to have a new colkey generated
     // Requesting a specific ColKey may fail with invalidkey exception, if the key is already in use
     // We recommend allowing Core to choose the ColKey.
     ColKey insert_column(ColKey col_key, DataType type, StringData name, bool nullable = false);
@@ -231,7 +215,9 @@ public:
     Obj create_object(GlobalKey object_id, const FieldValues& = {});
     // Create an object with primary key - or return already existing object
     Obj create_object_with_primary_key(const Mixed& primary_key, FieldValues&& = {});
-    // Return existing object or return unresolved key.
+    // Return key for existing object or return null key.
+    ObjKey find_primary_key(Mixed value) const;
+    // Return key for existing object or return unresolved key.
     // Important: This is to be used ONLY by the Sync client. SDKs should NEVER
     // observe an unresolved key. Ever.
     ObjKey get_objkey_from_primary_key(const Mixed& primary_key);
@@ -264,6 +250,10 @@ public:
     {
         return m_clusters.get(ndx);
     }
+    // Get object based on primary key
+    Obj get_object_with_primary_key(Mixed pk);
+    // Get primary key based on ObjKey
+    Mixed get_primary_key(ObjKey key);
     // Get logical index for object. This function is not very efficient
     size_t get_object_ndx(ObjKey key) const
     {
@@ -309,10 +299,6 @@ public:
     static const size_t max_string_size = 0xFFFFF8 - Array::header_size - 1;
     static const size_t max_binary_size = 0xFFFFF8 - Array::header_size;
 
-    // FIXME: These limits should be chosen independently of the underlying
-    // platform's choice to define int64_t and independent of the integer
-    // representation. The current values only work for 2's complement, which is
-    // not guaranteed by the standard.
     static constexpr int_fast64_t max_integer = std::numeric_limits<int64_t>::max();
     static constexpr int_fast64_t min_integer = std::numeric_limits<int64_t>::min();
 
@@ -746,6 +732,8 @@ private:
     ObjKey allocate_unresolved_key(ObjKey key, const FieldValues& values);
     /// Should be called when an object is deleted
     void free_local_id_after_hash_collision(ObjKey key);
+    /// Should be called when last entry is removed - or when table is cleared
+    void free_collision_table();
 
     /// Called in the context of Group::commit() to ensure that
     /// attached table accessors stay valid across a commit. Please

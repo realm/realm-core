@@ -19,6 +19,8 @@
 #ifndef REALM_DECIMAL_HPP
 #define REALM_DECIMAL_HPP
 
+#include <realm/string_data.hpp>
+
 #include <string>
 #include <cstring>
 
@@ -45,13 +47,14 @@ public:
     explicit Decimal128(double);
     Decimal128(Bid128 coefficient, int exponent, bool sign);
     explicit Decimal128(Bid64);
-    explicit Decimal128(const std::string&);
+    explicit Decimal128(StringData);
     explicit Decimal128(Bid128 val)
     {
         m_value = val;
     }
     Decimal128(null) noexcept;
     static Decimal128 nan(const char*);
+    static bool is_valid_str(StringData) noexcept;
 
     bool is_null() const;
     bool is_nan() const;
@@ -62,6 +65,8 @@ public:
     bool operator>(const Decimal128& rhs) const;
     bool operator<=(const Decimal128& rhs) const;
     bool operator>=(const Decimal128& rhs) const;
+
+    int compare(const Decimal128& rhs) const;
 
     Decimal128 operator/(int64_t div) const;
     Decimal128 operator/(size_t div) const;
@@ -90,7 +95,9 @@ public:
 private:
     Bid128 m_value;
 
-    void from_string(const char* ps);
+    enum class ParseError { None, Invalid, TooLongBeforeRadix, TooLong };
+
+    ParseError from_string(const char* ps) noexcept;
     void from_int64_t(int64_t val);
 };
 

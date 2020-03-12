@@ -165,10 +165,7 @@ Query::Query(const Query* source, Transaction* tr, PayloadPolicy policy)
         m_source_link_list = tr->import_copy_of(source->m_source_link_list);
         m_view = m_source_link_list.get();
     }
-    m_groups.reserve(source->m_groups.size());
-    for (const auto& cur_group : source->m_groups) {
-        m_groups.emplace_back(cur_group, tr);
-    }
+    m_groups = source->m_groups;
     if (source->m_table)
         set_table(tr->import_copy_of(source->m_table));
     // otherwise: empty query.
@@ -185,7 +182,10 @@ Query::Query(std::unique_ptr<Expression> expr)
 
 void Query::set_table(TableRef tr)
 {
-    REALM_ASSERT(!m_table);
+    if (tr == m_table) {
+        return;
+    }
+
     m_table = tr;
     if (m_table) {
         ParentNode* root = root_node();
@@ -1953,10 +1953,3 @@ QueryGroup& QueryGroup::operator=(const QueryGroup& other)
     return *this;
 }
 
-QueryGroup::QueryGroup(const QueryGroup& other, Transaction* tr)
-    : m_root_node(other.m_root_node ? other.m_root_node->clone(tr) : nullptr)
-    , m_pending_not(other.m_pending_not)
-    , m_subtable_column(other.m_subtable_column)
-    , m_state(other.m_state)
-{
-}

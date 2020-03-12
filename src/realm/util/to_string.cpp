@@ -43,6 +43,9 @@ void Printable::print(std::ostream& out, bool quote) const
         case Printable::Type::Int:
             out << m_int;
             break;
+        case Printable::Type::Double:
+            out << m_double;
+            break;
         case Printable::Type::String:
             if (quote) {
 #if __cplusplus >= 201402L

@@ -30,9 +30,7 @@ public:
     using value_type = int64_t;
 
     explicit ArrayInteger(Allocator&) noexcept;
-    ~ArrayInteger() noexcept override
-    {
-    }
+    ~ArrayInteger() noexcept override {}
 
     static value_type default_value(bool)
     {
@@ -271,14 +269,7 @@ inline void ArrayInteger::set(size_t ndx, int64_t value)
 
 inline void ArrayInteger::set_uint(size_t ndx, uint_fast64_t value) noexcept
 {
-    // When a value of a signed type is converted to an unsigned type, the C++
-    // standard guarantees that negative values are converted from the native
-    // representation to 2's complement, but the effect of conversions in the
-    // opposite direction is left unspecified by the
-    // standard. `realm::util::from_twos_compl()` is used here to perform the
-    // correct opposite unsigned-to-signed conversion, which reduces to a no-op
-    // when 2's complement is the native representation of negative values.
-    set(ndx, util::from_twos_compl<int_fast64_t>(value));
+    set(ndx, int_fast64_t(value));
 }
 
 inline bool ArrayInteger::compare(const ArrayInteger& a) const noexcept
@@ -335,9 +326,7 @@ inline ArrayIntNull::ArrayIntNull(Allocator& allocator) noexcept
 {
 }
 
-inline ArrayIntNull::~ArrayIntNull() noexcept
-{
-}
+inline ArrayIntNull::~ArrayIntNull() noexcept {}
 
 inline void ArrayIntNull::create(Type type, bool context_flag)
 {
@@ -669,6 +658,6 @@ inline size_t ArrayIntNull::find_first(value_type value, size_t begin, size_t en
 {
     return find_first<Equal>(value, begin, end);
 }
-}
+} // namespace realm
 
 #endif // REALM_ARRAY_INTEGER_HPP

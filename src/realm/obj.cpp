@@ -1390,7 +1390,7 @@ void Obj::assign(const ConstObj& other)
                 auto l = linking_obj.get_linklist(c);
                 auto n = l.find_first(other.get_key());
                 REALM_ASSERT(n != realm::npos);
-                l.set_direct(n, get_key());
+                l.set(n, get_key());
             }
         }
         return false;
@@ -1398,6 +1398,37 @@ void Obj::assign(const ConstObj& other)
     m_table->for_each_backlink_column(copy_links);
 }
 
+
+void Obj::assign_pk_and_backlinks(const ConstObj& other)
+{
+    REALM_ASSERT(get_table() == other.get_table());
+    if (auto col_pk = m_table->get_primary_key_column()) {
+        Mixed val = other.get_any(col_pk);
+        this->set(col_pk, val);
+    }
+
+    auto copy_links = [this, &other](ColKey col) {
+        auto t = m_table->get_opposite_table(col);
+        auto c = m_table->get_opposite_column(col);
+        auto backlinks = other.get_all_backlinks(col);
+        for (auto bl : backlinks) {
+            auto linking_obj = t->get_object(bl);
+            if (c.get_type() == col_type_Link) {
+                // Single link
+                REALM_ASSERT(!linking_obj.get<ObjKey>(c) || linking_obj.get<ObjKey>(c) == other.get_key());
+                linking_obj.set(c, get_key());
+            }
+            else {
+                auto l = linking_obj.get_list<ObjKey>(c);
+                auto n = l.find_first(other.get_key());
+                REALM_ASSERT(n != realm::npos);
+                l.set(n, get_key());
+            }
+        }
+        return false;
+    };
+    m_table->for_each_backlink_column(copy_links);
+}
 
 template util::Optional<int64_t> ConstObj::get<util::Optional<int64_t>>(ColKey col_key) const;
 template util::Optional<Bool> ConstObj::get<util::Optional<Bool>>(ColKey col_key) const;

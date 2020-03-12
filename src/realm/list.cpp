@@ -215,7 +215,11 @@ void ConstLstBase::move_repl(Replication* repl, size_t from, size_t to) const
 
 void ConstLstBase::swap_repl(Replication* repl, size_t ndx1, size_t ndx2) const
 {
-    repl->list_swap(*this, ndx1, ndx2);
+    if (ndx2 < ndx1)
+        std::swap(ndx1, ndx2);
+    repl->list_move(*this, ndx2, ndx1);
+    if (ndx1 + 1 != ndx2)
+        repl->list_move(*this, ndx1 + 1, ndx2);
 }
 
 void ConstLstBase::clear_repl(Replication* repl) const
@@ -434,6 +438,22 @@ ConstObj ConstLnkLst::get_object(size_t link_ndx) const
 
 /********************************* Lst<Key> *********************************/
 
+namespace {
+void check_for_last_unresolved(BPlusTree<ObjKey>& tree)
+{
+    bool no_more_unresolved = true;
+    size_t sz = tree.size();
+    for (size_t n = 0; n < sz; n++) {
+        if (tree.get(n).is_unresolved()) {
+            no_more_unresolved = false;
+            break;
+        }
+    }
+    if (no_more_unresolved)
+        tree.set_context_flag(true);
+}
+} // namespace
+
 template <>
 void Lst<ObjKey>::do_set(size_t ndx, ObjKey target_key)
 {
@@ -447,6 +467,14 @@ void Lst<ObjKey>::do_set(size_t ndx, ObjKey target_key)
         auto table = m_obj.get_table();
         _impl::TableFriend::remove_recursive(*table, state); // Throws
     }
+    if (target_key.is_unresolved()) {
+        if (!old_key.is_unresolved())
+            m_tree->set_context_flag(true);
+    }
+    else if (old_key.is_unresolved()) {
+        // We might have removed the last unresolved link - check it
+        check_for_last_unresolved(*m_tree);
+    }
 }
 
 template <>
@@ -454,6 +482,9 @@ void Lst<ObjKey>::do_insert(size_t ndx, ObjKey target_key)
 {
     m_obj.set_backlink(m_col_key, target_key);
     m_tree->insert(ndx, target_key);
+    if (target_key.is_unresolved()) {
+        m_tree->set_context_flag(true);
+    }
 }
 
 template <>
@@ -470,20 +501,27 @@ void Lst<ObjKey>::do_remove(size_t ndx)
         auto table = m_obj.get_table();
         _impl::TableFriend::remove_recursive(*table, state); // Throws
     }
+    if (old_key.is_unresolved()) {
+        // We might have removed the last unresolved link - check it
+        check_for_last_unresolved(*m_tree);
+    }
 }
 
 template <>
 void Lst<ObjKey>::clear()
 {
     update_if_needed();
-    if (size() > 0) {
+    auto sz = Lst<ObjKey>::size();
+
+    if (sz > 0) {
         auto origin_table = m_obj.get_table();
+        TableRef target_table = m_obj.get_target_table(m_col_key);
 
         if (Replication* repl = m_const_obj->get_replication())
             repl->list_clear(*this); // Throws
 
-        if (!origin_table->get_column_attr(m_col_key).test(col_attr_StrongLinks)) {
-            size_t ndx = size();
+        if (!target_table->is_embedded()) {
+            size_t ndx = sz;
             while (ndx--) {
                 do_set(ndx, null_key);
                 m_tree->erase(ndx);
@@ -491,10 +529,10 @@ void Lst<ObjKey>::clear()
             }
             // m_obj.bump_both_versions();
             m_obj.bump_content_version();
+            m_tree->set_context_flag(false);
             return;
         }
 
-        TableRef target_table = m_obj.get_target_table(m_col_key);
         TableKey target_table_key = target_table->get_key();
         ColKey backlink_col = origin_table->get_opposite_column(m_col_key);
 
@@ -514,6 +552,7 @@ void Lst<ObjKey>::clear()
 
         m_tree->clear();
         m_obj.bump_both_versions();
+        m_tree->set_context_flag(false);
 
         tf::remove_recursive(*origin_table, state); // Throws
     }
@@ -543,48 +582,6 @@ size_t LnkLst::virtual2real(size_t ndx) const
         ndx++;
     }
     return ndx;
-}
-
-void LnkLst::add_unres(size_t ndx)
-{
-    bool empty_before = m_unresolved.empty();
-    auto end = m_unresolved.end();
-    auto it = std::lower_bound(m_unresolved.begin(), end, ndx);
-    // if *it == ndx, the index is already there
-    if (it == end || *it > ndx) {
-        m_unresolved.insert(it, ndx);
-
-        if (empty_before) {
-            m_tree->set_context_flag(true);
-        }
-    }
-}
-
-void LnkLst::remove_unres(size_t ndx)
-{
-    auto end = m_unresolved.end();
-    auto it = std::lower_bound(m_unresolved.begin(), end, ndx);
-    // if *it != ndx, the index is not there
-    if (it != end && *it == ndx) {
-        m_unresolved.erase(it);
-
-        if (m_unresolved.empty()) {
-            // Clear context flag
-            m_tree->set_context_flag(false);
-        }
-    }
-}
-
-void LnkLst::clean_unres()
-{
-    if (!m_unresolved.empty()) {
-        // Delete all unresolved links
-        for (auto i : m_unresolved) {
-            Lst<ObjKey>::remove(i);
-        }
-        m_unresolved.clear();
-        m_tree->set_context_flag(false);
-    }
 }
 
 bool LnkLst::init_from_parent() const
@@ -623,32 +620,7 @@ void LnkLst::set(size_t ndx, ObjKey value)
     if (get_target_table()->is_embedded() && value != ObjKey())
         throw LogicError(LogicError::wrong_kind_of_table);
 
-    if (value.is_unresolved()) {
-        // Might be that the index is already there
-        // In that case it will not be added again
-        add_unres(ndx);
-    }
-    else {
-        clean_unres();
-    }
-    Lst<ObjKey>::set(ndx, value);
-}
-
-void LnkLst::set_direct(size_t ndx, ObjKey value)
-{
-    if (value.is_unresolved()) {
-        // Might be that the index is already there
-        // In that case it will not be added again
-        add_unres(ndx);
-    }
-    else {
-        if (!m_unresolved.empty()) {
-            // Might be that the index is not in m_unresolved
-            // In that case nothing will happen
-            remove_unres(ndx);
-        }
-    }
-    Lst<ObjKey>::set(ndx, value);
+    Lst<ObjKey>::set(virtual2real(ndx), value);
 }
 
 void LnkLst::insert(size_t ndx, ObjKey value)
@@ -656,16 +628,7 @@ void LnkLst::insert(size_t ndx, ObjKey value)
     if (get_target_table()->is_embedded() && value != ObjKey())
         throw LogicError(LogicError::wrong_kind_of_table);
 
-    if (!value.is_unresolved()) {
-        clean_unres();
-    }
-
-    Lst<ObjKey>::insert(ndx, value);
-
-    if (value.is_unresolved()) {
-        // We definitely got a new entry
-        add_unres(ndx);
-    }
+    Lst<ObjKey>::insert(virtual2real(ndx), value);
 }
 
 Obj LnkLst::create_and_insert_linked_object(size_t ndx)

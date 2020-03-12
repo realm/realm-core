@@ -133,7 +133,6 @@ TEST(Transactions_Frozen)
 }
 
 
-
 TEST(Transactions_ConcurrentFrozenTableGetByName)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -1183,7 +1182,7 @@ void deleter_thread(ConcurrentQueue<LnkLstPtr>& queue)
         // just let 'r' die
     }
 }
-}
+} // namespace
 
 TEST(LangBindHelper_ConcurrentLinkViewDeletes)
 {
@@ -1742,9 +1741,7 @@ private:
     ObjKey m_current_linkview_row;
 
 public:
-    void parse_complete()
-    {
-    }
+    void parse_complete() {}
 
     bool select_table(TableKey t)
     {
@@ -1845,10 +1842,6 @@ public:
     {
         return false;
     }
-    bool clear_table(size_t) noexcept
-    {
-        return false;
-    }
     bool list_set(size_t)
     {
         return false;
@@ -1870,10 +1863,6 @@ public:
         return false;
     }
     bool list_move(size_t, size_t)
-    {
-        return false;
-    }
-    bool list_swap(size_t, size_t)
     {
         return false;
     }
@@ -2704,8 +2693,8 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_TableClear)
     TableRef origin = group->add_table("origin");
     TableRef target = group->add_table("target");
 
-    target->add_column(type_Int, "int");
     auto c1 = origin->add_column_link(type_LinkList, "linklist", *target);
+    target->add_column(type_Int, "int");
     auto c2 = origin->add_column_link(type_Link, "link", *target);
 
     Obj t = target->create_object();
@@ -2985,14 +2974,13 @@ TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
 
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
     DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
-    ColKey col;
     {
         // initialize table with 200 entries holding 0..200
         WriteTransaction wt(sg);
         TableRef tr = wt.add_table("A");
-        col = tr->add_column(type_Int, "first");
+        auto col = tr->add_column(type_Int, "first");
         for (int j = 0; j < 200; j++) {
-            tr->create_object().set_all(j);
+            tr->create_object().set(col, j);
         }
         auto table_b = wt.add_table("B");
         table_b->add_column(type_Int, "bussemand");
@@ -3037,15 +3025,6 @@ TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
 #if !REALM_ANDROID && !REALM_IOS
 // fork should not be used on android or ios.
 
-/*
-This unit test has been disabled as it occasionally gets itself into a hang
-(which has plauged the testing process for a long time). It is unknown to me
-(Kristian) whether this is due to a bug in Core or a bug in this test.
-*/
-
-#if 0
-// This disabled unittest will need porting
-// if we ever try to re-enable it.
 TEST(LangBindHelper_ImplicitTransactions_InterProcess)
 {
     const int write_process_count = 7;
@@ -3057,15 +3036,20 @@ TEST(LangBindHelper_ImplicitTransactions_InterProcess)
 
     int pid = fork();
     if (pid == 0) {
-        std::unique_ptr<Replication> hist(make_in_realm_history(path));
-        DBRef sg = DB::create(*hist);
         {
+            std::unique_ptr<Replication> hist(make_in_realm_history(path));
+            DBRef sg = DB::create(*hist);
+            // initialize table with 200 entries holding 0..200
             WriteTransaction wt(sg);
-            TableRef tr = wt.add_table("table");
-            tr->add_column(type_Int, "first");
-            for (int i = 0; i < 200; ++i)
-                tr->add_empty_row();
-            tr->set_int(0, 100, 42);
+            TableRef tr = wt.add_table("A");
+            auto col = tr->add_column(type_Int, "first");
+            for (int j = 0; j < 200; j++) {
+                tr->create_object().set(col, j);
+            }
+            auto table_b = wt.add_table("B");
+            table_b->add_column(type_Int, "bussemand");
+            table_b->create_object().set_all(99);
+            wt.add_table("C");
             wt.commit();
         }
         exit(0);
@@ -3079,7 +3063,9 @@ TEST(LangBindHelper_ImplicitTransactions_InterProcess)
     for (int i = 0; i < write_process_count; ++i) {
         writepids[i] = fork();
         if (writepids[i] == 0) {
-            multiple_trackers_writer_thread(std::string(path));
+            std::unique_ptr<Replication> hist(make_in_realm_history(path));
+            DBRef sg = DB::create(*hist);
+            multiple_trackers_writer_thread(sg);
             exit(0);
         }
     }
@@ -3088,7 +3074,9 @@ TEST(LangBindHelper_ImplicitTransactions_InterProcess)
     for (int i = 0; i < read_process_count; ++i) {
         readpids[i] = fork();
         if (readpids[i] == 0) {
-            multiple_trackers_reader_thread(test_context, path);
+            std::unique_ptr<Replication> hist(make_in_realm_history(path));
+            DBRef sg = DB::create(*hist);
+            multiple_trackers_reader_thread(test_context, sg);
             exit(0);
         }
     }
@@ -3099,27 +3087,17 @@ TEST(LangBindHelper_ImplicitTransactions_InterProcess)
         waitpid(writepids[i], &status, 0);
     }
 
-    // Wait for all reader threads to find and lock onto value '42'
-    {
-        std::unique_ptr<Replication> hist(make_in_realm_history(path));
-        DBRef sg = DB::create(*hist);
-        for (;;) {
-            TransactionRef rt = sg->start_read()
-            ConstTableRef tr = rt.get_table("table");
-            if (tr->get_int(0, 0) == read_process_count) break;
-            sched_yield();
-        }
-    }
+    // Allow readers time to catch up
+    for (int k = 0; k < 100; ++k)
+        std::this_thread::yield();
 
     // signal to all readers to complete
     {
         std::unique_ptr<Replication> hist(make_in_realm_history(path));
         DBRef sg = DB::create(*hist);
         WriteTransaction wt(sg);
-        TableRef tr = wt.get_table("table");
-        Query q = tr->where().equal(0, 42);
-        int idx = q.find();
-        tr->set_int(0, idx, 43);
+        TableRef tr = wt.get_table("C");
+        tr->create_object();
         wt.commit();
     }
 
@@ -3131,7 +3109,6 @@ TEST(LangBindHelper_ImplicitTransactions_InterProcess)
 
 }
 
-#endif // 0
 #endif // !REALM_ANDROID && !REALM_IOS
 #endif // not REALM_ENABLE_ENCRYPTION
 #endif // not defined _WIN32
@@ -3723,9 +3700,7 @@ struct HandoverControl {
         m_has_feedback = false;
     }
     HandoverControl(const HandoverControl&) = delete;
-    HandoverControl()
-    {
-    }
+    HandoverControl() {}
 };
 
 void handover_writer(DBRef db)
@@ -3852,7 +3827,9 @@ void attacher(std::string path, ColKey col)
 } // anonymous namespace
 
 
-TEST(LangBindHelper_RacingAttachers)
+// Disable with TSAN because it needs to synchronize between multiple DBs, and TSAN isn't able to track
+// acquire/release across multiple mappings of the same underlying memory.
+TEST_IF(LangBindHelper_RacingAttachers, !running_with_tsan)
 {
     const int num_attachers = 10;
     SHARED_GROUP_TEST_PATH(path);
@@ -4087,13 +4064,14 @@ TEST(LangBindHelper_HandoverTableViewWithQueryOnLink)
 }
 
 
-#ifdef LEGACY_TESTS   // (not useful as std unittest)
+#ifdef LEGACY_TESTS // (not useful as std unittest)
 namespace {
 
-void do_write_work(std::string path, size_t id, size_t num_rows) {
+void do_write_work(std::string path, size_t id, size_t num_rows)
+{
     const size_t num_iterations = 5000000; // this makes it run for a loooong time
     const size_t payload_length_small = 10;
-    const size_t payload_length_large = 5000; // > 4096 == page_size
+    const size_t payload_length_large = 5000;   // > 4096 == page_size
     Random random(random_int<unsigned long>()); // Seed from slow global generator
     const char* key = crypt_key(true);
     for (size_t rep = 0; rep < num_iterations; ++rep) {
@@ -4118,7 +4096,8 @@ void do_write_work(std::string path, size_t id, size_t num_rows) {
     }
 }
 
-void do_read_verify(std::string path) {
+void do_read_verify(std::string path)
+{
     Random random(random_int<unsigned long>()); // Seed from slow global generator
     const char* key = crypt_key(true);
     while (true) {
@@ -4134,7 +4113,8 @@ void do_read_verify(std::string path) {
             StringData c = t->get_string(1, r);
             if (c == "stop reading") {
                 return;
-            } else {
+            }
+            else {
                 REALM_ASSERT_EX(c.size() == 1, c.size());
             }
             REALM_ASSERT_EX(t->get_name() == StringData("class_Table_Emulation_Name"), t->get_name().data());
@@ -4164,7 +4144,7 @@ TEST_IF(Thread_AsynchronousIODataConsistency, false)
     SHARED_GROUP_TEST_PATH(path);
     const int num_writer_threads = 2;
     const int num_reader_threads = 2;
-    const int num_rows = 200; //2 + REALM_MAX_BPNODE_SIZE;
+    const int num_rows = 200; // 2 + REALM_MAX_BPNODE_SIZE;
     const char* key = crypt_key(true);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
     DBRef sg = DB::create(*hist, DBOptions(key));
@@ -4194,7 +4174,7 @@ TEST_IF(Thread_AsynchronousIODataConsistency, false)
 
     {
         WriteTransaction wt(sg);
-        Group &group = wt.get_group();
+        Group& group = wt.get_group();
         TableRef t = rt->get_table("class_Table_Emulation_Name");
         t->set_string(1, 0, "stop reading");
         wt.commit();
@@ -4905,9 +4885,9 @@ TEST(LangBindHelper_CloseDBvsTransactions)
     CHECK_THROW(sg->close(), LogicError);
     tr1->rollback();
     // closing the DB explicitly while there are open read transactions will fail
-    CHECK_THROW(sg->close(), LogicError); 
+    CHECK_THROW(sg->close(), LogicError);
     // unless we explicitly ask for it to succeed()
-    sg->close(true); 
+    sg->close(true);
     CHECK(!sg->is_attached());
     CHECK(!tr0->is_attached());
     CHECK(!tr1->is_attached());
@@ -5009,8 +4989,8 @@ TEST_IF(LangBindHelper_HandoverFuzzyTest, TEST_DURATION > 0)
         }
         rt->verify();
         {
-        	realm::Query query = dog->link(c3).column<String>(c0) == "owner" + to_string(rand() % numberOfOwner);
-        	query.find_all(); // <-- fails
+            realm::Query query = dog->link(c3).column<String>(c0) == "owner" + to_string(rand() % numberOfOwner);
+            query.find_all(); // <-- fails
         }
         rt->commit();
     }
@@ -5024,7 +5004,7 @@ TEST_IF(LangBindHelper_HandoverFuzzyTest, TEST_DURATION > 0)
             vector_mutex.lock();
             if (qs.size() > 0) {
 
-            	auto t = vids[0];
+                auto t = vids[0];
                 vids.erase(vids.begin());
                 auto q = std::move(qs[0]);
                 qs.erase(qs.begin());
@@ -5059,7 +5039,7 @@ TEST_IF(LangBindHelper_HandoverFuzzyTest, TEST_DURATION > 0)
         rt->commit_and_continue_as_read();
         if (qs.size() < 100) {
             for (size_t t = 0; t < 5; t++) {
-            	auto t2 = rt->duplicate();
+                auto t2 = rt->duplicate();
                 qs.push_back(t2->import_copy_of(query, PayloadPolicy::Move));
                 vids.push_back(t2);
             }
@@ -5540,7 +5520,7 @@ TEST(LangBindHelper_Bug2295)
     CHECK_EQUAL(lv1.size(), i);
 }
 
-#ifdef LEGACY_TESTS   // FIXME: Requires get_at() method to be available on ConstObj.
+#ifdef LEGACY_TESTS // FIXME: Requires get_at() method to be available on ConstObj.
 ONLY(LangBindHelper_BigBinary)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -5661,7 +5641,8 @@ TEST(LangBindHelper_OpenAsEncrypted)
         bool is_okay = false;
         try {
             DBRef sg_encrypt = DB::create(*hist_encrypt, DBOptions(key));
-        } catch (std::runtime_error&) {
+        }
+        catch (std::runtime_error&) {
             is_okay = true;
         }
         CHECK(is_okay);

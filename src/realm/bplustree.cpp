@@ -34,7 +34,11 @@ void BPlusTreeNode::set_context_flag(bool cf) noexcept
 {
     auto ref = get_ref();
     MemRef mem(ref, m_tree->get_alloc());
-    Array::set_context_flag_in_header(cf, mem.get_addr());
+    if (Array::get_context_flag_from_header(mem.get_addr()) != cf) {
+        Array arr(m_tree->get_alloc());
+        arr.init_from_mem(mem);
+        arr.set_context_flag(cf);
+    }
 }
 
 

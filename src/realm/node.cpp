@@ -115,6 +115,7 @@ void Node::alloc(size_t init_size, size_t new_width)
         set_width_in_header(int(new_width), header);
     }
     set_size_in_header(init_size, header);
+    m_size = init_size;
 }
 
 void Node::do_copy_on_write(size_t minimum_size)
@@ -122,7 +123,7 @@ void Node::do_copy_on_write(size_t minimum_size)
     const char* header = get_header_from_data(m_data);
 
     // Calculate size in bytes
-    size_t array_size = calc_byte_len(m_size, m_width);
+    size_t array_size = calc_byte_len(m_size, get_width_from_header(header));
     size_t new_size = std::max(array_size, minimum_size);
     new_size = (new_size + 0x7) & ~size_t(0x7); // 64bit blocks
     // Plus a bit of matchcount room for expansion
