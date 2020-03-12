@@ -227,13 +227,18 @@ public:
          * Resets the password of an email identity using the
          * password reset function set up in the application.
          *
+         * TODO: Add an overloaded version of this method that takes
+         * TODO: raw, non-serialized args.
+         *
          * - parameters:
          *     - email: The email address of the user.
          *     - password: The desired new password.
+         *     - args: A pre-serialized list of arguments. Must be a JSON array.
          *     - completion_block: A callback to be invoked once the call is complete.
         */
         void call_reset_password_function(const std::string& email,
                                           const std::string& password,
+                                          const std::string& args,
                                           std::function<void(Optional<AppError>)> completion_block);
     private:
         friend class App;

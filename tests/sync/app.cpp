@@ -362,6 +362,7 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app]") {
         app.provider_client<App::UsernamePasswordProviderClient>()
             .call_reset_password_function(email,
                 accepted_new_password,
+                "[]",
                 [&](Optional<app::AppError> error) {
                     REQUIRE(!error);
                     processed = true;
@@ -374,6 +375,7 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app]") {
         app.provider_client<App::UsernamePasswordProviderClient>()
             .call_reset_password_function(email,
                 rejected_password,
+                "[\"foo\", \"bar\"]",
                 [&](Optional<app::AppError> error) {
                     REQUIRE(error);
                     CHECK(error->message == util::format("failed to reset password for user %1", email));
@@ -387,6 +389,7 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app]") {
         app.provider_client<App::UsernamePasswordProviderClient>()
             .call_reset_password_function(util::format("%1@%2.com", random_string(5), random_string(5)),
                 password,
+                "[\"foo\", \"bar\"]",
                 [&](Optional<app::AppError> error) {
                     REQUIRE(error);
                     CHECK(error->message == "user not found");

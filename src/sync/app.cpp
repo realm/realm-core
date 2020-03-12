@@ -252,6 +252,7 @@ void App::UsernamePasswordProviderClient::reset_password(const std::string& pass
 
 void App::UsernamePasswordProviderClient::call_reset_password_function(const std::string& email,
                                                                        const std::string& password,
+                                                                       const std::string& args,
                                                                        std::function<void(Optional<AppError>)> completion_block)
 {
     REALM_ASSERT(parent);
@@ -264,6 +265,7 @@ void App::UsernamePasswordProviderClient::call_reset_password_function(const std
     nlohmann::json body = {
         { "email", email },
         { "password", password },
+        { "arguments", nlohmann::json::parse(args) },
     };
 
     parent->m_config.transport_generator()->send_request_to_server({
