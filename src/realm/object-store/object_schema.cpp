@@ -117,7 +117,7 @@ ObjectSchema::ObjectSchema(Group const& group, StringData name, TableKey key)
         Property property;
         property.name = column_name;
         property.type = ObjectSchema::from_core_type(*table, col_key);
-        property.is_indexed = table->has_search_index(col_key) || table->get_primary_key_column() == col_key;
+        property.is_indexed = table->has_search_index(col_key);
         property.column_key = col_key;
 
         if (property.type == PropertyType::Object) {
@@ -327,6 +327,16 @@ void ObjectSchema::validate(Schema const& schema, std::vector<ObjectSchemaValida
         };
 
         Proxy operator*() { return Proxy{os, exceptions}; }
+        ErrorWriter(ObjectSchema const& os, std::vector<ObjectSchemaValidationException>& exceptions)
+            : os(os)
+            , exceptions(exceptions)
+        {
+        }
+        ErrorWriter(const ErrorWriter& other)
+            : os(other.os)
+            , exceptions(other.exceptions)
+        {
+        }
         ErrorWriter &operator=(const ErrorWriter &) { return *this; }
         ErrorWriter &operator++() { return *this; }
         ErrorWriter &operator++(int) { return *this; }

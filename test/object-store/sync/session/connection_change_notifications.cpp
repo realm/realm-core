@@ -42,14 +42,20 @@ using namespace realm::util;
 
 static const std::string dummy_auth_url = "https://realm.example.org";
 
+static const std::string base_path = tmp_dir() + "realm_objectstore_sync_connection_state_changes/";
+
 TEST_CASE("sync: Connection state changes", "[sync]") {
     if (!EventLoop::has_implementation())
         return;
 
+    reset_test_directory(base_path);
     SyncServer server;
-    TestSyncManager init_sync_manager;
+    TestSyncManager init_sync_manager(base_path);
     const std::string realm_base_url = server.base_url();
-    auto user = SyncManager::shared().get_user({ "user", dummy_auth_url }, "not_a_real_token");
+    auto user = SyncManager::shared().get_user("user",
+                                               ENCODE_FAKE_JWT("not_a_real_token"),
+                                               ENCODE_FAKE_JWT("also_not_a_real_token"),
+                                               dummy_auth_url);
 
     SECTION("register connection change listener") {
         auto session = sync_session(server, user, "/connection-state-changes-1",
@@ -90,7 +96,7 @@ TEST_CASE("sync: Connection state changes", "[sync]") {
         });
 
         user->log_out();
-        EventLoop::main().run_until([&] { return sessions_are_disconnected(*session); });
+        REQUIRE(sessions_are_disconnected(*session));
         REQUIRE(listener1_called == false);
         REQUIRE(listener2_called == true);
     }

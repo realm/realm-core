@@ -73,9 +73,6 @@ public:
 
     NotificationToken add_notification_callback(CollectionChangeCallback callback) &;
 
-    void ensure_user_in_everyone_role();
-    void ensure_private_role_exists_for_user();
-
     template<typename ValueType>
     void set_column_value(StringData prop_name, ValueType&& value) { m_obj.set(prop_name, value); }
 

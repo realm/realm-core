@@ -20,10 +20,10 @@
 
 namespace realm {
 
-bool results_contains_user(SyncUserMetadataResults& results, const std::string& identity, const std::string& auth_server) {
+bool results_contains_user(SyncUserMetadataResults& results, const std::string& identity, const std::string& provider_type) {
     for (size_t i = 0; i < results.size(); i++) {
         auto this_result = results.get(i);
-        if (this_result.identity() == identity && this_result.auth_server_url() == auth_server) {
+        if (this_result.identity() == identity && this_result.provider_type() == provider_type) {
             return true;
         }
     }

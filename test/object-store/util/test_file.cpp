@@ -102,35 +102,31 @@ InMemoryTestFile::InMemoryTestFile()
 }
 
 #if REALM_ENABLE_SYNC
-SyncTestFile::SyncTestFile(SyncServer& server, std::string name, bool is_partial, std::string user_name)
+SyncTestFile::SyncTestFile(SyncServer& server, std::string name, std::string user_name)
 {
     if (name.empty())
         name = path.substr(path.rfind('/') + 1);
     auto url = server.url_for_realm(name);
 
-    sync_config = std::make_shared<SyncConfig>(SyncManager::shared().get_user({user_name, url}, "not_a_real_token"), url);
-    sync_config->user->set_is_admin(true);
+    std::string fake_refresh_token = ENCODE_FAKE_JWT("not_a_real_token");
+    std::string fake_access_token = ENCODE_FAKE_JWT("also_not_real");
+    sync_config = std::make_shared<SyncConfig>(SyncManager::shared().get_user(user_name, fake_refresh_token, fake_access_token, url), url);
     sync_config->stop_policy = SyncSessionStopPolicy::Immediately;
     sync_config->bind_session_handler = [=](auto&, auto& config, auto session) {
         std::string token, encoded;
         // FIXME: Tokens without a path are currently implicitly considered
         // admin tokens by the sync service, so until that changes we need to
         // add a path for non-admin users
-        if (config.user->is_admin())
-            token = util::format("{\"identity\": \"%1\", \"access\": [\"download\", \"upload\"]}", user_name);
-        else {
-            std::string suffix;
-            if (config.is_partial)
-                suffix = util::format("/__partial/%1/%2", config.user->identity(), SyncConfig::partial_sync_identifier(*config.user));
-            token = util::format("{\"identity\": \"%1\", \"path\": \"/%2%3\", \"access\": [\"download\", \"upload\"]}",
-                                 user_name, name, suffix);
-        }
+
+        std::string suffix;
+        token = util::format("{\"identity\": \"%1\", \"path\": \"/%2%3\", \"access\": [\"download\", \"upload\"]}",
+                             user_name, name, suffix);
+        
         encoded.resize(base64_encoded_size(token.size()));
         base64_encode(token.c_str(), token.size(), &encoded[0], encoded.size());
-        session->refresh_access_token(encoded, config.realm_url());
+        session->refresh_access_token(encoded, config.realm_url);
     };
     sync_config->error_handler = [](auto, auto) { abort(); };
-    sync_config->is_partial = is_partial;
     schema_mode = SchemaMode::Additive;
 }
 
@@ -148,6 +144,7 @@ SyncServer::SyncServer(StartImmediately start_immediately, std::string local_dir
     config.logger = new TestLogger;
 #endif
     config.history_compaction_clock = this;
+    config.token_expiration_clock = this;
 #if REALM_SYNC_VER_MAJOR > 4 || (REALM_SYNC_VER_MAJOR == 4 && REALM_SYNC_VER_MINOR >= 7)
     config.disable_history_compaction = false;
 #else

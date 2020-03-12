@@ -595,7 +595,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
                 VALIDATE_CHANGES(changes) {
                     lv.swap(3, 5);
                 }
-                REQUIRE_MOVES(changes, {3, 5}, {5, 3});
+                REQUIRE_MOVES(changes, {5, 3}, {3, 5});
             }
         }
 

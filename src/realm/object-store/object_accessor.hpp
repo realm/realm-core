@@ -174,7 +174,7 @@ ValueType Object::get_property_value_impl(ContextType& ctx, const Property &prop
         case PropertyType::String: return ctx.box(m_obj.get<StringData>(column));
         case PropertyType::Data:   return ctx.box(m_obj.get<BinaryData>(column));
         case PropertyType::Date:   return ctx.box(m_obj.get<Timestamp>(column));
-        case PropertyType::ObjectId: return ctx.box(m_obj.get<ObjectId>(column));
+        case PropertyType::ObjectId: return is_nullable(property.type) ? ctx.box(m_obj.get<util::Optional<ObjectId>>(column)) : ctx.box(m_obj.get<ObjectId>(column));
         case PropertyType::Decimal:  return ctx.box(m_obj.get<Decimal>(column));
 //        case PropertyType::Any:    return ctx.box(m_obj.get<Mixed>(column));
         case PropertyType::Object: {
@@ -249,14 +249,19 @@ Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
         else {
             created = true;
             Mixed primary_key;
-            if (primary_prop->type == PropertyType::Int) {
-                primary_key = ctx.template unbox<util::Optional<int64_t>>(*primary_value);
-            }
-            else if (primary_prop->type == PropertyType::String) {
-                primary_key = ctx.template unbox<StringData>(*primary_value);
-            }
-            else {
-                REALM_TERMINATE("Unsupported primary key type.");
+            if (!ctx.is_null(*primary_value)) {
+                if (primary_prop->type == PropertyType::Int) {
+                    primary_key = ctx.template unbox<util::Optional<int64_t>>(*primary_value);
+                }
+                else if (primary_prop->type == PropertyType::String) {
+                    primary_key = ctx.template unbox<StringData>(*primary_value);
+                }
+                else if (primary_prop->type == PropertyType::ObjectId) {
+                    primary_key = ctx.template unbox<ObjectId>(*primary_value);
+                }
+                else {
+                    REALM_TERMINATE("Unsupported primary key type.");
+                }
             }
             obj = table->create_object_with_primary_key(primary_key);
         }
@@ -296,12 +301,6 @@ Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
         if (v)
             object.set_property_value_impl(ctx, prop, *v, policy, is_default);
     }
-#if REALM_ENABLE_SYNC
-    if (realm->is_partial() && object_schema.name == "__User") {
-        object.ensure_user_in_everyone_role();
-        object.ensure_private_role_exists_for_user();
-    }
-#endif
     return object;
 }
 
@@ -389,18 +388,24 @@ template<typename ValueType, typename ContextType>
 ObjKey Object::get_for_primary_key_impl(ContextType& ctx, Table const& table,
                                         const Property &primary_prop,
                                         ValueType primary_value) {
-    bool is_null = ctx.is_null(primary_value);
-    if (is_null && !is_nullable(primary_prop.type))
-        throw std::logic_error("Invalid null value for non-nullable primary key.");
-    if (primary_prop.type == PropertyType::String) {
-        return table.find_first(primary_prop.column_key,
-                                ctx.template unbox<StringData>(primary_value));
+    if (ctx.is_null(primary_value)) {
+        if (!is_nullable(primary_prop.type))
+            throw std::logic_error("Invalid null value for non-nullable primary key.");
+        return table.find_primary_key({});
     }
-    if (is_nullable(primary_prop.type))
-        return table.find_first(primary_prop.column_key,
-                                ctx.template unbox<util::Optional<int64_t>>(primary_value));
-    return table.find_first(primary_prop.column_key,
-                            ctx.template unbox<int64_t>(primary_value));
+    else if (primary_prop.type == PropertyType::String) {
+        return table.find_primary_key(ctx.template unbox<StringData>(primary_value));
+    }
+    else if (primary_prop.type == PropertyType::Int) {
+        if (is_nullable(primary_prop.type)) {
+            return table.find_primary_key(ctx.template unbox<util::Optional<int64_t>>(primary_value));
+        }
+        return table.find_primary_key(ctx.template unbox<int64_t>(primary_value));
+    }
+    else if (primary_prop.type == PropertyType::ObjectId) {
+        return table.find_primary_key(ctx.template unbox<ObjectId>(primary_value));
+    }
+    return {};
 }
 
 } // namespace realm

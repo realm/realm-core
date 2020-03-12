@@ -88,7 +88,6 @@ public:
     static void apply_schema_changes(Transaction& group, uint64_t schema_version,
                                      Schema& target_schema, uint64_t target_schema_version,
                                      SchemaMode mode, std::vector<SchemaChange> const& changes,
-                                     util::Optional<std::string> sync_user_id,
                                      std::function<void()> migration_function={});
 
     static void apply_additive_changes(Group&, std::vector<SchemaChange> const&, bool update_indexes);
@@ -124,9 +123,6 @@ public:
 
     static std::string table_name_for_object_type(StringData class_name);
     static StringData object_type_for_table_name(StringData table_name);
-
-    // creates the private role for the given user if it does not exist
-    static void ensure_private_role_exists_for_user(Transaction& group, StringData sync_user_id);
 
 private:
     friend class ObjectSchema;

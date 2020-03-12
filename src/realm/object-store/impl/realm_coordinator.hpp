@@ -41,10 +41,6 @@ class CollectionNotifier;
 class ExternalCommitHelper;
 class WeakRealmNotifier;
 
-namespace partial_sync {
-class WorkQueue;
-}
-
 // RealmCoordinator manages the weak cache of Realm instances and communication
 // between per-thread Realm instances for a given file
 class RealmCoordinator : public std::enable_shared_from_this<RealmCoordinator> {
@@ -71,8 +67,6 @@ public:
     // Timeouts and interruptions are not handled by this method and must be handled by upper layers.
     std::shared_ptr<AsyncOpenTask> get_synchronized_realm(Realm::Config config)
         REQUIRES(!m_realm_mutex, !m_schema_cache_mutex);
-    // Used by GlobalNotifier to bypass the normal initialization path
-    void open_with_config(Realm::Config config) REQUIRES(!m_realm_mutex, !m_schema_cache_mutex);
 
     // Creates the underlying sync session if it doesn't already exists.
     // This is also created as part of opening a Realm, so only use this
@@ -183,11 +177,6 @@ public:
     template<typename Pred>
     util::CheckedUniqueLock wait_for_notifiers(Pred&& wait_predicate) REQUIRES(!m_notifier_mutex);
 
-#if REALM_ENABLE_SYNC
-    // A work queue that can be used to perform background work related to partial sync.
-    _impl::partial_sync::WorkQueue& partial_sync_work_queue();
-#endif
-
     AuditInterface* audit_context() const noexcept { return m_audit_context.get(); }
 
 private:
@@ -228,7 +217,6 @@ private:
 
 #if REALM_ENABLE_SYNC
     std::shared_ptr<SyncSession> m_sync_session;
-    std::unique_ptr<partial_sync::WorkQueue> m_partial_sync_work_queue;
 #endif
 
     std::shared_ptr<AuditInterface> m_audit_context;

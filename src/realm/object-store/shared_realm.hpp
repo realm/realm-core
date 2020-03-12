@@ -53,13 +53,8 @@ typedef std::weak_ptr<Realm> WeakRealm;
 namespace _impl {
     class AnyHandover;
     class CollectionNotifier;
-    class PartialSyncHelper;
     class RealmCoordinator;
     class RealmFriend;
-}
-namespace sync {
-    struct PermissionsCache;
-    struct TableInfoCache;
 }
 
 // How to handle update_schema() being called on a file which has
@@ -134,23 +129,6 @@ enum class SchemaMode : uint8_t {
     // This mode requires that all threads and processes which open a
     // file use identical schemata.
     Manual
-};
-
-enum class ComputedPrivileges : uint8_t {
-    None = 0,
-
-    Read = (1 << 0),
-    Update = (1 << 1),
-    Delete = (1 << 2),
-    SetPermissions = (1 << 3),
-    Query = (1 << 4),
-    Create = (1 << 5),
-    ModifySchema = (1 << 6),
-
-    AllRealm = Read | Update | SetPermissions | ModifySchema,
-    AllClass = Read | Update | Create | Query | SetPermissions,
-    AllObject = Read | Update | Delete | SetPermissions,
-    All = (1 << 7) - 1
 };
 
 class Realm : public std::enable_shared_from_this<Realm> {
@@ -293,9 +271,6 @@ public:
     Schema const& schema() const { return m_schema; }
     uint64_t schema_version() const { return m_schema_version; }
 
-    // Returns `true` if this Realm is a Partially synchronized Realm.
-    bool is_partial() const noexcept;
-
     void begin_transaction();
     void commit_transaction();
     void cancel_transaction();
@@ -316,11 +291,12 @@ public:
 
     VersionID read_transaction_version() const;
     Group& read_group();
-    Transaction& transaction();
 
     // Get the version of the current read or frozen transaction, or `none` if the Realm
     // is not in a read transaction
     util::Optional<VersionID> current_transaction_version() const;
+
+    TransactionRef duplicate() const;
 
     void enable_wait_for_change();
     bool wait_for_change();
@@ -361,11 +337,13 @@ public:
     Realm& operator=(Realm&&) = delete;
     ~Realm();
 
-    ComputedPrivileges get_privileges();
-    ComputedPrivileges get_privileges(StringData object_type);
-    ComputedPrivileges get_privileges(ConstObj const& obj);
-
     AuditInterface* audit_context() const noexcept;
+
+    template<typename... Args>
+    auto import_copy_of(Args&&... args)
+    {
+        return transaction().import_copy_of(std::forward<Args>(args)...);
+    }
 
     static SharedRealm make_shared_realm(Config config, util::Optional<VersionID> version, std::shared_ptr<_impl::RealmCoordinator> coordinator)
     {
@@ -376,10 +354,7 @@ public:
     // without making it public to everyone
     class Internal {
         friend class _impl::CollectionNotifier;
-        friend class _impl::PartialSyncHelper;
         friend class _impl::RealmCoordinator;
-        friend class ThreadSafeReference;
-        friend class GlobalNotifier;
         friend class TestHelper;
 
         static Transaction& get_transaction(Realm& realm) { return realm.transaction(); }
@@ -398,8 +373,6 @@ private:
     struct MakeSharedTag {};
 
     std::shared_ptr<_impl::RealmCoordinator> m_coordinator;
-    std::unique_ptr<sync::TableInfoCache> m_table_info_cache;
-    std::unique_ptr<sync::PermissionsCache> m_permissions_cache;
 
     Config m_config;
     util::Optional<VersionID> m_frozen_version;
@@ -442,9 +415,7 @@ private:
     void translate_schema_error();
     void notify_schema_changed();
 
-    bool init_permission_cache();
-    void invalidate_permission_cache();
-
+    Transaction& transaction();
     Transaction& transaction() const;
     std::shared_ptr<Transaction> transaction_ref();
 

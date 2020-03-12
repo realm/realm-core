@@ -43,15 +43,7 @@
 #include "sync/sync_manager.hpp"
 
 #include <realm/sync/history.hpp>
-#include <realm/sync/permissions.hpp>
 #include <realm/sync/version.hpp>
-#else
-namespace realm {
-namespace sync {
-    struct PermissionsCache {};
-    struct TableInfoCache {};
-}
-}
 #endif
 
 using namespace realm;
@@ -79,15 +71,6 @@ Realm::~Realm()
     }
 }
 
-bool Realm::is_partial() const noexcept
-{
-#if REALM_ENABLE_SYNC
-    return m_config.sync_config && m_config.sync_config->is_partial;
-#else
-    return false;
-#endif
-}
-
 Group& Realm::read_group()
 {
     verify_open();
@@ -113,6 +96,11 @@ Transaction& Realm::transaction() const
 std::shared_ptr<Transaction> Realm::transaction_ref()
 {
     return std::static_pointer_cast<Transaction>(m_group);
+}
+
+std::shared_ptr<Transaction> Realm::duplicate() const
+{
+    return std::static_pointer_cast<Transaction>(m_coordinator->begin_read(read_transaction_version(), is_frozen()));
 }
 
 std::shared_ptr<DB>& Realm::Internal::get_db(Realm& realm) {
@@ -394,16 +382,11 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
         });
 
         ObjectStore::apply_schema_changes(transaction(), version, m_schema, m_schema_version,
-                                          m_config.schema_mode, required_changes, util::none, wrapper);
+                                          m_config.schema_mode, required_changes, wrapper);
     }
     else {
-        util::Optional<std::string> sync_user_id;
-#if REALM_ENABLE_SYNC
-        if (m_config.sync_config && m_config.sync_config->is_partial)
-            sync_user_id = m_config.sync_config->user->identity();
-#endif
         ObjectStore::apply_schema_changes(transaction(), m_schema_version, schema, version,
-                                          m_config.schema_mode, required_changes, std::move(sync_user_id));
+                                          m_config.schema_mode, required_changes);
         REALM_ASSERT_DEBUG(additive || (required_changes = ObjectStore::schema_from_group(read_group()).compare(schema)).empty());
     }
 
@@ -658,7 +641,6 @@ void Realm::commit_transaction()
         m_coordinator->commit_write(*this);
     }
     cache_new_schema();
-    invalidate_permission_cache();
 }
 
 void Realm::cancel_transaction()
@@ -671,7 +653,6 @@ void Realm::cancel_transaction()
     }
 
     transaction::cancel(transaction(), m_binding_context.get());
-    invalidate_permission_cache();
 }
 
 void Realm::invalidate()
@@ -688,8 +669,6 @@ void Realm::invalidate()
         cancel_transaction();
     }
 
-    m_permissions_cache = nullptr;
-    m_table_info_cache = nullptr;
     m_group = nullptr;
 }
 
@@ -741,7 +720,6 @@ void Realm::notify()
     }
 
     verify_thread();
-    invalidate_permission_cache();
 
     // Any of the callbacks to user code below could drop the last remaining
     // strong reference to `this`
@@ -812,7 +790,6 @@ bool Realm::refresh()
     if (m_is_sending_notifications) {
         return false;
     }
-    invalidate_permission_cache();
 
     // Any of the callbacks to user code below could drop the last remaining
     // strong reference to `this`
@@ -895,8 +872,6 @@ void Realm::close()
         transaction().close();
     }
 
-    m_permissions_cache = nullptr;
-    m_table_info_cache = nullptr;
     m_group = nullptr;
     m_binding_context = nullptr;
     m_coordinator = nullptr;
@@ -906,100 +881,6 @@ AuditInterface* Realm::audit_context() const noexcept
 {
     return m_coordinator ? m_coordinator->audit_context() : nullptr;
 }
-
-#if REALM_ENABLE_SYNC
-static_assert(static_cast<int>(ComputedPrivileges::Read) == static_cast<int>(sync::Privilege::Read), "");
-static_assert(static_cast<int>(ComputedPrivileges::Update) == static_cast<int>(sync::Privilege::Update), "");
-static_assert(static_cast<int>(ComputedPrivileges::Delete) == static_cast<int>(sync::Privilege::Delete), "");
-static_assert(static_cast<int>(ComputedPrivileges::SetPermissions) == static_cast<int>(sync::Privilege::SetPermissions), "");
-static_assert(static_cast<int>(ComputedPrivileges::Query) == static_cast<int>(sync::Privilege::Query), "");
-static_assert(static_cast<int>(ComputedPrivileges::Create) == static_cast<int>(sync::Privilege::Create), "");
-static_assert(static_cast<int>(ComputedPrivileges::ModifySchema) == static_cast<int>(sync::Privilege::ModifySchema), "");
-
-static constexpr const uint8_t s_allRealmPrivileges = sync::Privilege::Read
-                                                    | sync::Privilege::Update
-                                                    | sync::Privilege::SetPermissions
-                                                    | sync::Privilege::ModifySchema;
-static constexpr const uint8_t s_allClassPrivileges = sync::Privilege::Read
-                                                    | sync::Privilege::Update
-                                                    | sync::Privilege::Create
-                                                    | sync::Privilege::Query
-                                                    | sync::Privilege::SetPermissions;
-static constexpr const uint8_t s_allObjectPrivileges = sync::Privilege::Read
-                                                     | sync::Privilege::Update
-                                                     | sync::Privilege::Delete
-                                                     | sync::Privilege::SetPermissions;
-
-bool Realm::init_permission_cache()
-{
-    verify_thread();
-
-    if (m_permissions_cache) {
-        // Rather than trying to track changes to permissions tables, just skip the caching
-        // entirely within write transactions for now
-        if (is_in_transaction())
-            m_permissions_cache->clear();
-        return true;
-    }
-
-    // Admin users bypass permissions checks outside of the logic in PermissionsCache
-    if (m_config.sync_config && m_config.sync_config->is_partial && !m_config.sync_config->user->is_admin()) {
-        m_table_info_cache = std::make_unique<sync::TableInfoCache>(transaction());
-        m_permissions_cache = std::make_unique<sync::PermissionsCache>(transaction(), *m_table_info_cache,
-                                                                       m_config.sync_config->user->identity());
-        return true;
-    }
-    return false;
-}
-
-void Realm::invalidate_permission_cache()
-{
-    if (m_permissions_cache)
-        m_permissions_cache->clear();
-}
-
-ComputedPrivileges Realm::get_privileges()
-{
-    if (!init_permission_cache())
-        return static_cast<ComputedPrivileges>(s_allRealmPrivileges);
-    return static_cast<ComputedPrivileges>(m_permissions_cache->get_realm_privileges() & s_allRealmPrivileges);
-}
-
-static uint8_t inherited_mask(uint32_t privileges)
-{
-    uint8_t mask = ~0;
-    if (!(privileges & sync::Privilege::Read))
-        mask = 0;
-    else if (!(privileges & sync::Privilege::Update))
-        mask = static_cast<uint8_t>(sync::Privilege::Read | sync::Privilege::Query);
-    return mask;
-}
-
-ComputedPrivileges Realm::get_privileges(StringData object_type)
-{
-    if (!init_permission_cache())
-        return static_cast<ComputedPrivileges>(s_allClassPrivileges);
-    auto privileges = inherited_mask(m_permissions_cache->get_realm_privileges())
-                    & m_permissions_cache->get_class_privileges(object_type);
-    return static_cast<ComputedPrivileges>(privileges & s_allClassPrivileges);
-}
-
-ComputedPrivileges Realm::get_privileges(ConstObj const& obj)
-{
-    if (!init_permission_cache())
-        return static_cast<ComputedPrivileges>(s_allObjectPrivileges);
-
-    auto table = obj.get_table();
-    auto object_type = ObjectStore::object_type_for_table_name(table->get_name());
-    sync::GlobalID global_id{object_type, table->get_object_id(obj.get_key())};
-    auto privileges = inherited_mask(m_permissions_cache->get_realm_privileges())
-                    & inherited_mask(m_permissions_cache->get_class_privileges(object_type))
-                    & m_permissions_cache->get_object_privileges(global_id);
-    return static_cast<ComputedPrivileges>(privileges & s_allObjectPrivileges);
-}
-#else
-void Realm::invalidate_permission_cache() { }
-#endif
 
 MismatchedConfigException::MismatchedConfigException(StringData message, StringData path)
 : std::logic_error(util::format(message.data(), path)) { }
