@@ -27,6 +27,12 @@
 
 using namespace realm;
 
+CreatePolicy CreatePolicy::Skip = {.create = false, .copy = false, .update = false, .diff = false};
+CreatePolicy CreatePolicy::ForceCreate = {.create = true, .copy = true, .update = false, .diff = false};
+CreatePolicy CreatePolicy::UpdateAll = {.create = true, .copy = true, .update = true, .diff = false};
+CreatePolicy CreatePolicy::UpdateModified = {.create = true, .copy = true, .update = true, .diff = true};
+CreatePolicy CreatePolicy::SetLink = {.create = true, .copy = false, .update = false, .diff = false};
+
 Object Object::freeze(std::shared_ptr<Realm> frozen_realm) const
 {
     return Object(frozen_realm, frozen_realm->import_copy_of(m_obj));

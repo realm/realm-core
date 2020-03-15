@@ -653,7 +653,7 @@ TEST_CASE("list") {
         REQUIRE(results.get_mode() == Results::Mode::Query);
         REQUIRE(results.size() == 4);
 
-        for (size_t i = 0; i < 4; ++i) {
+        for (int64_t i = 0; i < 4; ++i) {
             REQUIRE(results.get(i).get_key().value == i + 6);
         }
     }

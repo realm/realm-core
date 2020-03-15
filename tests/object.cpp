@@ -776,7 +776,7 @@ TEST_CASE("object") {
     }
 
     for (auto policy : {CreatePolicy::UpdateAll, CreatePolicy::UpdateModified}) {
-        SECTION("set existing fields to null with update "s + (policy == CreatePolicy::UpdateModified ? "(diffed)" : "(all)")) {
+        SECTION("set existing fields to null with update "s + (policy.diff ? "(diffed)" : "(all)")) {
             AnyDict initial_values{
                 {"pk", INT64_C(1)},
                 {"bool", true},

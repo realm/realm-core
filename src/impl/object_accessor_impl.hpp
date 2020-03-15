@@ -193,7 +193,7 @@ inline Obj CppContext::unbox(util::Any& v, CreatePolicy policy, ObjKey current_o
         return object->obj();
     if (auto obj = any_cast<Obj>(&v))
         return *obj;
-    if (policy == CreatePolicy::Skip)
+    if (!policy.create)
         return Obj();
 
     REALM_ASSERT(object_schema);

@@ -31,16 +31,41 @@ namespace _impl {
     class ObjectNotifier;
 }
 
-enum class CreatePolicy : int8_t {
-    // Do not create objects if given something that could be converted to a
-    // Realm object but isn't. Used for things like find().
-    Skip,
-    // Throw an exception if an object with the same PK already exists.
-    ForceCreate,
-    // If an object with the same PK already exists, set all fields in the input.
-    UpdateAll,
-    // If an object with the same PK already exists, only set fields which have changed.
-    UpdateModified
+/// Options for how objects should be unboxed by a context.
+///
+/// unbox<Obj>() is used for several different operations which want an Obj
+/// from a SDK type. CreatePolicy packs together all of the different options
+/// around what unbox() should do.
+struct CreatePolicy {
+    /// If given something that is not a managed Object, should an object be
+    /// created in the Realm? False for pure lookup functions such as find(),
+    /// index_of() and queries, true for everything else.
+    bool create : 1;
+    /// Should the input object be copied into the Realm even if it is already
+    /// an object managed by the current Realm? True for realm.create(), false
+    /// for things like setting a link property.
+    bool copy : 1;
+    /// If the object has a primary key and an object with the same primary key
+    /// already exists, should the existing object be updated rather than
+    /// throwing an exception? Only meaningful if .create is true.
+    bool update : 1;
+    /// When updating an object, should the old and new objects be diffed and
+    /// only the values which are different be set, or should all fields be set?
+    /// Only meaningful if .create and .update are true.
+    bool diff : 1;
+
+    // Shorthand aliases for some of the common configurations
+
+    /// {.create = false}}
+    static CreatePolicy Skip;
+    /// {.create = true, .copy = true, .update = false}
+    static CreatePolicy ForceCreate;
+    /// {.create = true, .copy = true, .update = true, .diff = false}
+    static CreatePolicy UpdateAll;
+    /// {.create = true, .copy = true, .update = true, .diff = true}
+    static CreatePolicy UpdateModified;
+    /// {.create = true, .copy = false, .update = false, .diff = false}
+    static CreatePolicy SetLink;
 };
 
 class Object {
@@ -88,7 +113,10 @@ public:
     // property getter/setter
     template<typename ValueType, typename ContextType>
     void set_property_value(ContextType& ctx, StringData prop_name,
-                            ValueType value, CreatePolicy policy = CreatePolicy::ForceCreate);
+                            ValueType value, CreatePolicy policy = CreatePolicy::SetLink);
+    template<typename ValueType, typename ContextType>
+    void set_property_value(ContextType& ctx, Property const& prop,
+                            ValueType value, CreatePolicy policy = CreatePolicy::SetLink);
 
     template<typename ValueType, typename ContextType>
     ValueType get_property_value(ContextType& ctx, StringData prop_name) const;

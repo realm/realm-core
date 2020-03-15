@@ -138,15 +138,15 @@ public:
     size_t find(Context&, T&& value) const;
 
     template<typename T, typename Context>
-    void add(Context&, T&& value, CreatePolicy=CreatePolicy::ForceCreate);
+    void add(Context&, T&& value, CreatePolicy=CreatePolicy::SetLink);
     template<typename T, typename Context>
-    void insert(Context&, size_t list_ndx, T&& value, CreatePolicy=CreatePolicy::ForceCreate);
+    void insert(Context&, size_t list_ndx, T&& value, CreatePolicy=CreatePolicy::SetLink);
     template<typename T, typename Context>
-    void set(Context&, size_t row_ndx, T&& value, CreatePolicy=CreatePolicy::ForceCreate);
+    void set(Context&, size_t row_ndx, T&& value, CreatePolicy=CreatePolicy::SetLink);
 
     // Replace the values in this list with the values from an enumerable object
     template<typename T, typename Context>
-    void assign(Context&, T&& value, CreatePolicy=CreatePolicy::ForceCreate);
+    void assign(Context&, T&& value, CreatePolicy=CreatePolicy::SetLink);
 
     // The List object has been invalidated (due to the Realm being invalidated,
     // or the containing object being deleted)
@@ -287,7 +287,7 @@ void List::assign(Context& ctx, T&& values, CreatePolicy policy)
         return;
     }
 
-    if (policy == CreatePolicy::UpdateModified) {
+    if (policy.diff) {
         size_t sz = size();
         size_t index = 0;
         ctx.enumerate_list(values, [&](auto&& element) {

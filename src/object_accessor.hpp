@@ -43,9 +43,15 @@ template <typename ValueType, typename ContextType>
 void Object::set_property_value(ContextType& ctx, StringData prop_name,
                                 ValueType value, CreatePolicy policy)
 {
+    set_property_value(ctx, property_for_name(prop_name), value, policy);
+}
+
+template <typename ValueType, typename ContextType>
+void Object::set_property_value(ContextType& ctx, Property const& property,
+                                ValueType value, CreatePolicy policy)
+{
     verify_attached();
     m_realm->verify_in_write();
-    auto& property = property_for_name(prop_name);
 
     // Modifying primary keys is allowed in migrations to make it possible to
     // add a new primary key to a type (or change the property type), but it
@@ -88,7 +94,7 @@ struct ValueUpdater {
         else {
             auto curr_link = obj.get<ObjKey>(col);
             auto link = child_ctx.template unbox<Obj>(value, policy, curr_link);
-            if (policy != CreatePolicy::UpdateModified || curr_link != link.get_key()) {
+            if (!policy.diff || curr_link != link.get_key()) {
                 obj.set(col, link.get_key());
             }
         }
@@ -98,7 +104,7 @@ struct ValueUpdater {
     void operator()(T*)
     {
         auto new_val = ctx.template unbox<T>(value);
-        if (policy != CreatePolicy::UpdateModified || obj.get<T>(col) != new_val) {
+        if (!policy.diff || obj.get<T>(col) != new_val) {
             obj.set(col, new_val, is_default);
         }
     }
@@ -113,7 +119,7 @@ void Object::set_property_value_impl(ContextType& ctx, const Property &property,
 
     ColKey col{property.column_key};
     if (is_nullable(property.type) && ctx.is_null(value)) {
-        if (policy != CreatePolicy::UpdateModified || !m_obj.is_null(col)) {
+        if (!policy.diff || !m_obj.is_null(col)) {
             if (property.type == PropertyType::Object) {
                 if (!is_default)
                     m_obj.set_null(col);
@@ -230,10 +236,9 @@ Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
         }
         auto key = get_for_primary_key_impl(ctx, *table, *primary_prop, *primary_value);
         if (key) {
-            if (policy == CreatePolicy::ForceCreate) {
+            if (!policy.update)
                 throw std::logic_error(util::format("Attempting to create an object of type '%1' with an existing primary key value '%2'.",
                                                     object_schema.name, ctx.print(*primary_value)));
-            }
             obj = table->get_object(key);
         }
         else {
@@ -257,11 +262,11 @@ Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
         }
     }
     else {
-        if (policy == CreatePolicy::UpdateModified && current_obj) {
+        if (policy.diff && current_obj) {
             obj = table->get_object(current_obj);
         }
         else {
-        obj = table->create_object();
+            obj = table->create_object();
             created = true;
         }
     }
@@ -307,7 +312,7 @@ Object Object::create_embedded(ContextType& ctx, std::shared_ptr<Realm> const& r
         auto ll = parent.get_linklist(col);
         auto sz = ll.size();
         if (ndx < sz) {
-            if (policy == CreatePolicy::UpdateModified) {
+            if (policy.diff) {
                 obj = ll.get_object(ndx);
             }
             else {
@@ -320,7 +325,7 @@ Object Object::create_embedded(ContextType& ctx, std::shared_ptr<Realm> const& r
     }
     else {
         ObjKey current_obj = parent.get<ObjKey>(col);
-        if (policy == CreatePolicy::UpdateModified && current_obj) {
+        if (policy.diff && current_obj) {
             auto table = realm->read_group().get_table(object_schema.table_key);
             obj = table->get_object(current_obj);
         }
