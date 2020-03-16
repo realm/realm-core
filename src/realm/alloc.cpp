@@ -173,5 +173,4 @@ char* Allocator::x_translate_extended(RefTranslation* ref_translation_ptr, ref_t
         return x_translate_extended(ref_translation_ptr, ref);
     }
 }
-
 }
