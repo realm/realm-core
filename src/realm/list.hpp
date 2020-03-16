@@ -767,13 +767,10 @@ void Lst<ObjKey>::do_remove(size_t ndx);
 template <>
 void Lst<ObjKey>::clear();
 
-class UnresolvedList : public std::vector<size_t> {
-public:
-    // Translate from userfacing index to internal index.
-    size_t virtual2real(size_t ndx) const;
-    // Scan through the list to find unresolved links
-    void update_unresolved(const BPlusTree<ObjKey>& tree);
-};
+// Translate from userfacing index to internal index.
+size_t virtual2real(const std::vector<size_t>& vec, size_t ndx);
+// Scan through the list to find unresolved links
+void update_unresolved(std::vector<size_t>& vec, const BPlusTree<ObjKey>& tree);
 
 class ConstLnkLst : public ConstLstIf<ObjKey> {
 public:
@@ -813,7 +810,7 @@ public:
     // Getting links
     ObjKey get(size_t ndx) const
     {
-        return ConstLstIf<ObjKey>::get(m_unresolved.virtual2real(ndx));
+        return ConstLstIf<ObjKey>::get(virtual2real(m_unresolved, ndx));
     }
 
     ConstObj operator[](size_t link_ndx) const
@@ -829,7 +826,7 @@ public:
 private:
     ConstObj m_obj;
     // Sorted set of indices containing unresolved links.
-    mutable UnresolvedList m_unresolved;
+    mutable std::vector<size_t> m_unresolved;
     bool init_from_parent() const override;
 };
 
@@ -908,11 +905,11 @@ public:
     void insert(size_t ndx, ObjKey value);
     ObjKey get(size_t ndx)
     {
-        return Lst<ObjKey>::get(m_unresolved.virtual2real(ndx));
+        return Lst<ObjKey>::get(virtual2real(m_unresolved, ndx));
     }
     void remove(size_t ndx)
     {
-        Lst<ObjKey>::remove(m_unresolved.virtual2real(ndx));
+        Lst<ObjKey>::remove(virtual2real(m_unresolved, ndx));
     }
     void remove(size_t from, size_t to) override
     {
@@ -947,7 +944,7 @@ private:
     friend class Query;
 
     // Sorted set of indices containing unresolved links.
-    mutable UnresolvedList m_unresolved;
+    mutable std::vector<size_t> m_unresolved;
 
     void get_dependencies(TableVersions&) const override;
     void sync_if_needed() const override;
