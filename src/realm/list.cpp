@@ -34,7 +34,7 @@
 #include "realm/group.hpp"
 #include "realm/replication.hpp"
 
-using namespace realm;
+namespace realm {
 
 ConstLstBasePtr ConstObj::get_listbase_ptr(ColKey col_key) const
 {
@@ -164,7 +164,7 @@ LstBasePtr Obj::get_listbase_ptr(ColKey col_key) const
 
 /********************************* LstBase **********************************/
 
-ConstLstBase::ConstLstBase(ColKey col_key, const ConstObj* obj)
+ConstLstBase::ConstLstBase(ColKey col_key, ConstObj* obj)
     : m_const_obj(obj)
     , m_col_key(col_key)
 {
@@ -397,7 +397,6 @@ void ConstLstIf<T>::distinct(std::vector<size_t>& indices, util::Optional<bool> 
 
 /************************* template instantiations ***************************/
 
-namespace realm {
 template ConstLst<int64_t>::ConstLst(const ConstObj& obj, ColKey col_key);
 template ConstLst<util::Optional<Int>>::ConstLst(const ConstObj& obj, ColKey col_key);
 template ConstLst<bool>::ConstLst(const ConstObj& obj, ColKey col_key);
@@ -429,11 +428,18 @@ template Lst<ObjKey>::Lst(const Obj& obj, ColKey col_key);
 template Lst<Decimal128>::Lst(const Obj& obj, ColKey col_key);
 template Lst<ObjectId>::Lst(const Obj& obj, ColKey col_key);
 template Lst<util::Optional<ObjectId>>::Lst(const Obj& obj, ColKey col_key);
-}
 
 ConstObj ConstLnkLst::get_object(size_t link_ndx) const
 {
-    return m_const_obj->get_target_table(m_col_key)->get_object(ConstLstIf<ObjKey>::get(link_ndx));
+    return m_const_obj->get_target_table(m_col_key)->get_object(get(link_ndx));
+}
+
+bool ConstLnkLst::init_from_parent() const
+{
+    ConstLstIf<ObjKey>::init_from_parent();
+    update_unresolved(m_unresolved, *m_tree);
+
+    return m_valid;
 }
 
 /********************************* Lst<Key> *********************************/
@@ -558,25 +564,23 @@ void Lst<ObjKey>::clear()
     }
 }
 
-#ifdef _WIN32
-namespace realm {
-// Explicit instantiation required on some windows builds
-template void Lst<ObjKey>::do_insert(size_t ndx, ObjKey target_key);
-template void Lst<ObjKey>::do_set(size_t ndx, ObjKey target_key);
-template void Lst<ObjKey>::do_remove(size_t ndx);
-template void Lst<ObjKey>::clear();
-}
-#endif
-
 Obj LnkLst::get_object(size_t ndx)
 {
     ObjKey k = get(ndx);
     return get_target_table()->get_object(k);
 }
 
-size_t LnkLst::virtual2real(size_t ndx) const
+bool LnkLst::init_from_parent() const
 {
-    for (auto i : m_unresolved) {
+    ConstLstIf<ObjKey>::init_from_parent();
+    update_unresolved(m_unresolved, *m_tree);
+
+    return m_valid;
+}
+
+size_t virtual2real(const std::vector<size_t>& vec, size_t ndx)
+{
+    for (auto i : vec) {
         if (i > ndx)
             break;
         ndx++;
@@ -584,33 +588,25 @@ size_t LnkLst::virtual2real(size_t ndx) const
     return ndx;
 }
 
-bool LnkLst::init_from_parent() const
+void update_unresolved(std::vector<size_t>& vec, const BPlusTree<ObjKey>& tree)
 {
-    ConstLstIf<ObjKey>::init_from_parent();
-    update_unresolved();
-
-    return m_valid;
-}
-
-void LnkLst::update_unresolved() const
-{
-    m_unresolved.clear();
-    if (m_valid) {
+    vec.clear();
+    if (tree.is_attached()) {
         // Only do the scan if context flag is set.
-        if (m_tree->get_context_flag()) {
-            auto func = [this](BPlusTreeNode* node, size_t offset) {
+        if (tree.get_context_flag()) {
+            auto func = [&vec](BPlusTreeNode* node, size_t offset) {
                 auto leaf = static_cast<typename BPlusTree<ObjKey>::LeafNode*>(node);
                 size_t sz = leaf->size();
                 for (size_t i = 0; i < sz; i++) {
                     auto k = leaf->get(i);
                     if (k.is_unresolved()) {
-                        m_unresolved.push_back(i + offset);
+                        vec.push_back(i + offset);
                     }
                 }
                 return false;
             };
 
-            m_tree->traverse(func);
+            tree.traverse(func);
         }
     }
 }
@@ -620,7 +616,7 @@ void LnkLst::set(size_t ndx, ObjKey value)
     if (get_target_table()->is_embedded() && value != ObjKey())
         throw LogicError(LogicError::wrong_kind_of_table);
 
-    Lst<ObjKey>::set(virtual2real(ndx), value);
+    Lst<ObjKey>::set(virtual2real(m_unresolved, ndx), value);
 }
 
 void LnkLst::insert(size_t ndx, ObjKey value)
@@ -628,7 +624,7 @@ void LnkLst::insert(size_t ndx, ObjKey value)
     if (get_target_table()->is_embedded() && value != ObjKey())
         throw LogicError(LogicError::wrong_kind_of_table);
 
-    Lst<ObjKey>::insert(virtual2real(ndx), value);
+    Lst<ObjKey>::insert(virtual2real(m_unresolved, ndx), value);
 }
 
 Obj LnkLst::create_and_insert_linked_object(size_t ndx)
@@ -681,7 +677,7 @@ LnkLst::LnkLst(const Obj& owner, ColKey col_key)
     , Lst<ObjKey>(owner, col_key)
     , ObjList(this->m_tree.get(), m_obj.get_target_table(m_col_key))
 {
-    update_unresolved();
+    update_unresolved(m_unresolved, *m_tree);
 }
 
 void LnkLst::get_dependencies(TableVersions& versions) const
@@ -699,7 +695,6 @@ void LnkLst::sync_if_needed() const
     }
 }
 
-namespace realm {
 /***************************** Lst<T>::set_repl *****************************/
 template <>
 void Lst<Int>::set_repl(Replication* repl, size_t ndx, int64_t value)
@@ -983,15 +978,17 @@ void Lst<Decimal128>::insert_repl(Replication* repl, size_t ndx, Decimal128 valu
         repl->list_insert_decimal(*this, ndx, value);
     }
 }
-}
 
 #ifdef _WIN32
 // For some strange reason these functions needs to be explicitly instantiated
 // on Visual Studio 2017. Otherwise the code is not generated.
-namespace realm {
 template void Lst<ObjKey>::add(ObjKey target_key);
 template void Lst<ObjKey>::insert(size_t ndx, ObjKey target_key);
 template ObjKey Lst<ObjKey>::remove(size_t ndx);
 template void Lst<ObjKey>::clear();
-}
+template void Lst<ObjKey>::do_insert(size_t ndx, ObjKey target_key);
+template void Lst<ObjKey>::do_set(size_t ndx, ObjKey target_key);
+template void Lst<ObjKey>::do_remove(size_t ndx);
 #endif
+
+} // namespace realm
