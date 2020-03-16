@@ -111,7 +111,7 @@ class IntTestTransport : public GenericNetworkTransport {
             /* always cleanup */
             curl_easy_cleanup(curl);
             curl_slist_free_all(list); /* free the list again */
-            completion_block(Response{http_code, http_code, response_headers, response});
+            completion_block(Response{http_code, 0, response_headers, response});
         }
         
         curl_global_cleanup();
@@ -165,14 +165,13 @@ TEST_CASE("app: login_with_credentials integration", "[sync][app]") {
                                     [&](std::shared_ptr<SyncUser> user, Optional<app::AppError> error) {
             CHECK(user);
             CHECK(!error);
-            processed = true;
         });
 
-        CHECK(processed);
-        processed = false;
-        app.log_out([](auto error) {
+        app.log_out([&](auto error) {
             CHECK(!error);
+            processed = true;
         });
+        CHECK(processed);
     }
 }
 
