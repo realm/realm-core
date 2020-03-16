@@ -91,7 +91,6 @@ def withCustomRealmCloud(String version, String configPath, String appName, bloc
         ).trim()
 
         sh """
-          pwd && ls && ls ${configPath}
           /usr/bin/stitch-cli login --config-path=${configPath}/stitch-config --base-url=http://mongodb-realm:9090 --auth-provider=local-userpass --username=unique_user@domain.com --password=password
           /usr/bin/stitch-cli import --config-path=${configPath}/stitch-config --base-url=http://mongodb-realm:9090 --app-name auth-integration-tests --path=${configPath} --project-id $group_id -y --strategy replace
         """
@@ -116,7 +115,7 @@ def doDockerBuild(String flavor, Boolean withCoverage, Boolean enableSync, Strin
 
   return {
     nodeWithSources('docker') {
-      def image = docker.build("ci/realm-object-store:${flavor}")
+      def image = buildDockerEnv("ci/realm-object-store:${flavor}", push: env.BRANCH_NAME == 'master')
       def buildSteps = { String dockerArgs = "" ->
         // The only reason we can't run commands directly is because sync builds need to
         // use CI's credentials to pull from the private repository. This can be removed
@@ -124,9 +123,8 @@ def doDockerBuild(String flavor, Boolean withCoverage, Boolean enableSync, Strin
         sshagent(['realm-ci-ssh']) {
           image.inside("-v /etc/passwd:/etc/passwd:ro -v ${env.HOME}:${env.HOME} -v ${env.SSH_AUTH_SOCK}:${env.SSH_AUTH_SOCK} -e HOME=${env.HOME} ${dockerArgs}") {
             if (enableSync) {
+              // sanity check the network to local stitch before continuing to compile everything
               sh "curl http://mongodb-realm:9090"
-            }
-            if (enableSync) {
               def sourcesDir = pwd()
               cmakeFlags += "-DREALM_ENABLE_SYNC=1 -DREALM_ENABLE_AUTH_TESTS=1 -DREALM_MONGODB_ENDPOINT=\"http://mongodb-realm:9090\" -DREALM_STITCH_CONFIG=\"${sourcesDir}/tests/mongodb/stitch.json\" "
             }
@@ -167,7 +165,7 @@ def doAndroidDockerBuild() {
       try {
         rlmCheckout(scm)
         wrap([$class: 'AnsiColorBuildWrapper']) {
-          def image = docker.build('realm-object-store:ndk21', '-f android.Dockerfile .')
+          def image = buildDockerEnv('realm-object-store:android', extra_args: '-f android.Dockerfile', push: env.BRANCH_NAME == 'master')
           docker.image('tracer0tong/android-emulator').withRun { emulator ->
             image.inside("--link ${emulator.id}:emulator") {
               sh """
@@ -232,10 +230,6 @@ def doWindowsUniversalBuild() {
 
 def setBuildName(newBuildName) {
   currentBuild.displayName = "${currentBuild.displayName} - ${newBuildName}"
-}
-
-if (env.BRANCH_NAME == 'master') {
-  env.DOCKER_PUSH = "1"
 }
 
 jobWrapper { // sets the max build time to 2 hours

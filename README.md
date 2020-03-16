@@ -139,8 +139,8 @@ set up authorization from docker to your Github account https://github.com/realm
 Once authorized, run the following docker commands from the top directory to start a local instance:
 
 ```
-docker build --rm --tag local-stitch -f workflow/stitch.Dockerfile workflow
-docker run -p 9090:9090 -it -v $(pwd)/tests/mongodb:/app_config:rw local-stitch /bin/bash -c "(import_app.sh&) && run.sh"
+docker build --tag local-stitch -f workflow/stitch.Dockerfile workflow
+docker run --rm -p 9090:9090 -v $(pwd)/tests/mongodb:/app_config:rw -it local-stitch /bin/bash -c "(import_app.sh&) && run.sh"
 ```
 
 This will make the stitch UI available in your browser at `localhost:9090` where you can login with "unique_user@domain.com" and "password".
