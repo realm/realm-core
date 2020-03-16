@@ -564,7 +564,7 @@ void Lst<ObjKey>::clear()
     }
 }
 
-Obj LnkLst::get_object(size_t ndx)
+Obj LnkLst::get_object(size_t ndx) const
 {
     ObjKey k = get(ndx);
     return get_target_table()->get_object(k);
@@ -675,7 +675,6 @@ void LnkLst::remove_all_target_rows()
 LnkLst::LnkLst(const Obj& owner, ColKey col_key)
     : ConstLstBase(col_key, &m_obj)
     , Lst<ObjKey>(owner, col_key)
-    , ObjList(this->m_tree.get(), m_obj.get_target_table(m_col_key))
 {
     update_unresolved(m_unresolved, *m_tree);
 }
