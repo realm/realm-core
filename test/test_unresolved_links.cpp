@@ -384,16 +384,24 @@ TEST(Unresolved_CondensedIndices)
     auto t2 = g.add_table_with_primary_key("Table2", type_Int, "id");
     t1->add_column_link(type_LinkList, "t2s", *t2);
 
-    auto t2_obj = t2->create_object_with_primary_key(123);
-    auto t1_obj = t1->create_object_with_primary_key(123);
-    t1_obj.get_linklist("t2s").insert(0, t2_obj.get_key());
+    auto obj123 = t2->create_object_with_primary_key(123);
+    auto obj456 = t2->create_object_with_primary_key(456);
+    auto obj789 = t1->create_object_with_primary_key(789);
+    auto ll = obj789.get_linklist("t2s");
+    ll.insert(0, obj123.get_key());
+    ll.insert(1, obj456.get_key());
 
-    t2_obj.invalidate();
+    obj123.invalidate();
 
-    CHECK_EQUAL(t1_obj.get_linklist("t2s").size(), 0);
+    CHECK_EQUAL(obj789.get_linklist("t2s").size(), 1);
 
-    ConstObj const_t1_obj = t1_obj;
-    CHECK_EQUAL(const_t1_obj.get_linklist("t2s").size(), 0);
+    ConstObj const_obj789 = obj789;
+    ConstLnkLst list1 = const_obj789.get_linklist("t2s");
+    ConstLnkLst list2;
+    CHECK_EQUAL(list1.size(), 1);
+    CHECK_EQUAL(list1.get_object(0).get_key(), obj456.get_key());
+    list2 = list1;
+    CHECK_EQUAL(list2.size(), 1);
 }
 
 #endif

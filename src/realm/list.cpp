@@ -164,7 +164,7 @@ LstBasePtr Obj::get_listbase_ptr(ColKey col_key) const
 
 /********************************* LstBase **********************************/
 
-ConstLstBase::ConstLstBase(ColKey col_key, const ConstObj* obj)
+ConstLstBase::ConstLstBase(ColKey col_key, ConstObj* obj)
     : m_const_obj(obj)
     , m_col_key(col_key)
 {
@@ -433,7 +433,15 @@ template Lst<util::Optional<ObjectId>>::Lst(const Obj& obj, ColKey col_key);
 
 ConstObj ConstLnkLst::get_object(size_t link_ndx) const
 {
-    return m_const_obj->get_target_table(m_col_key)->get_object(ConstLstIf<ObjKey>::get(link_ndx));
+    return m_const_obj->get_target_table(m_col_key)->get_object(get(link_ndx));
+}
+
+bool ConstLnkLst::init_from_parent() const
+{
+    ConstLstIf<ObjKey>::init_from_parent();
+    m_unresolved.update_unresolved(*m_tree);
+
+    return m_valid;
 }
 
 /********************************* Lst<Key> *********************************/
@@ -574,9 +582,9 @@ Obj LnkLst::get_object(size_t ndx)
     return get_target_table()->get_object(k);
 }
 
-size_t LnkLst::virtual2real(size_t ndx) const
+size_t UnresolvedList::virtual2real(size_t ndx) const
 {
-    for (auto i : m_unresolved) {
+    for (auto i : *this) {
         if (i > ndx)
             break;
         ndx++;
@@ -587,30 +595,30 @@ size_t LnkLst::virtual2real(size_t ndx) const
 bool LnkLst::init_from_parent() const
 {
     ConstLstIf<ObjKey>::init_from_parent();
-    update_unresolved();
+    m_unresolved.update_unresolved(*m_tree);
 
     return m_valid;
 }
 
-void LnkLst::update_unresolved() const
+void UnresolvedList::update_unresolved(const BPlusTree<ObjKey>& tree)
 {
-    m_unresolved.clear();
-    if (m_valid) {
+    clear();
+    if (tree.is_attached()) {
         // Only do the scan if context flag is set.
-        if (m_tree->get_context_flag()) {
+        if (tree.get_context_flag()) {
             auto func = [this](BPlusTreeNode* node, size_t offset) {
                 auto leaf = static_cast<typename BPlusTree<ObjKey>::LeafNode*>(node);
                 size_t sz = leaf->size();
                 for (size_t i = 0; i < sz; i++) {
                     auto k = leaf->get(i);
                     if (k.is_unresolved()) {
-                        m_unresolved.push_back(i + offset);
+                        push_back(i + offset);
                     }
                 }
                 return false;
             };
 
-            m_tree->traverse(func);
+            tree.traverse(func);
         }
     }
 }
@@ -620,7 +628,7 @@ void LnkLst::set(size_t ndx, ObjKey value)
     if (get_target_table()->is_embedded() && value != ObjKey())
         throw LogicError(LogicError::wrong_kind_of_table);
 
-    Lst<ObjKey>::set(virtual2real(ndx), value);
+    Lst<ObjKey>::set(m_unresolved.virtual2real(ndx), value);
 }
 
 void LnkLst::insert(size_t ndx, ObjKey value)
@@ -628,7 +636,7 @@ void LnkLst::insert(size_t ndx, ObjKey value)
     if (get_target_table()->is_embedded() && value != ObjKey())
         throw LogicError(LogicError::wrong_kind_of_table);
 
-    Lst<ObjKey>::insert(virtual2real(ndx), value);
+    Lst<ObjKey>::insert(m_unresolved.virtual2real(ndx), value);
 }
 
 Obj LnkLst::create_and_insert_linked_object(size_t ndx)
@@ -681,7 +689,7 @@ LnkLst::LnkLst(const Obj& owner, ColKey col_key)
     , Lst<ObjKey>(owner, col_key)
     , ObjList(this->m_tree.get(), m_obj.get_target_table(m_col_key))
 {
-    update_unresolved();
+    m_unresolved.update_unresolved(*m_tree);
 }
 
 void LnkLst::get_dependencies(TableVersions& versions) const
