@@ -834,21 +834,18 @@ class LnkLst : public Lst<ObjKey>, public ObjList {
 public:
     LnkLst()
         : ConstLstBase({}, &m_obj)
-        , ObjList(this->m_tree.get())
     {
     }
     LnkLst(const Obj& owner, ColKey col_key);
     LnkLst(const LnkLst& other)
         : ConstLstBase(other.m_col_key, &m_obj)
         , Lst<ObjKey>(other)
-        , ObjList(this->m_tree.get(), m_obj.get_target_table(m_col_key))
         , m_unresolved(other.m_unresolved)
     {
     }
     LnkLst(LnkLst&& other) noexcept
         : ConstLstBase(other.m_col_key, &m_obj)
         , Lst<ObjKey>(std::move(other))
-        , ObjList(this->m_tree.get(), m_obj.get_target_table(m_col_key))
         , m_unresolved(std::move(other.m_unresolved))
     {
     }
@@ -856,7 +853,6 @@ public:
     {
         Lst<ObjKey>::operator=(other);
         m_unresolved = other.m_unresolved;
-        this->ObjList::assign(this->m_tree.get(), m_obj.get_target_table(m_col_key));
         return *this;
     }
 
@@ -869,9 +865,9 @@ public:
             return std::make_unique<LnkLst>();
         }
     }
-    TableRef get_target_table() const
+    TableRef get_target_table() const override
     {
-        return m_table.cast_away_const();
+        return m_obj.get_target_table(m_col_key);
     }
     bool is_in_sync() const override
     {
@@ -888,7 +884,13 @@ public:
         return !m_unresolved.empty();
     }
 
-    Obj get_object(size_t ndx);
+    bool is_obj_valid(size_t) const noexcept override
+    {
+        // A link list cannot contain null values
+        return true;
+    }
+
+    Obj get_object(size_t ndx) const override;
 
     Obj operator[](size_t ndx)
     {
@@ -903,9 +905,13 @@ public:
     }
     void set(size_t ndx, ObjKey value);
     void insert(size_t ndx, ObjKey value);
-    ObjKey get(size_t ndx)
+    ObjKey get(size_t ndx) const
     {
         return Lst<ObjKey>::get(virtual2real(m_unresolved, ndx));
+    }
+    ObjKey get_key(size_t ndx) const override
+    {
+        return get(ndx);
     }
     void remove(size_t ndx)
     {

@@ -263,12 +263,16 @@ TEST(Unresolved_QueryOverLinks)
     CHECK_EQUAL(q.count(), 1);
 
     auto new_tesla = cars->get_objkey_from_primary_key("Tesla 10");
-    bilmekka.get_linklist(col_has).add(new_tesla);
+    bilmekka.get_linklist(col_has).insert(0, new_tesla);
     CHECK_EQUAL(q.count(), 1);
 
     q = persons->link(col_owns).column<Decimal128>(col_price) < Decimal128("1000000");
     CHECK_EQUAL(q.count(), 1);
     mathias.set(col_owns, new_tesla);
+    CHECK_EQUAL(q.count(), 1);
+
+    auto stock = bilmekka.get_linklist(col_has);
+    q = cars->where(stock).and_query(cars->column<Decimal128>(col_price) < Decimal128("2000000"));
     CHECK_EQUAL(q.count(), 1);
 }
 

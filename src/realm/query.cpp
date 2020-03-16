@@ -42,10 +42,6 @@ Query::Query(ConstTableRef table, const LnkLst& list)
     , m_source_link_list(list.clone())
 {
     m_view = m_source_link_list.get();
-#ifdef REALM_DEBUG
-    if (m_view)
-        m_view->check_cookie();
-#endif
     REALM_ASSERT_DEBUG(list.get_target_table() == m_table);
     create();
 }
@@ -55,10 +51,6 @@ Query::Query(ConstTableRef table, LnkLstPtr&& ll)
     , m_source_link_list(std::move(ll))
 {
     m_view = m_source_link_list.get();
-#ifdef REALM_DEBUG
-    if (m_view)
-        m_view->check_cookie();
-#endif
     REALM_ASSERT_DEBUG(ll->get_target_table() == m_table);
     create();
 }
@@ -68,10 +60,6 @@ Query::Query(ConstTableRef table, ConstTableView* tv)
     , m_view(tv)
     , m_source_table_view(tv)
 {
-#ifdef REALM_DEBUG
-    if (m_view)
-        m_view->check_cookie();
-#endif
     create();
 }
 
@@ -81,10 +69,6 @@ Query::Query(ConstTableRef table, std::unique_ptr<ConstTableView> tv)
     , m_source_table_view(tv.get())
     , m_owned_source_table_view(std::move(tv))
 {
-#ifdef REALM_DEBUG
-    if (m_view)
-        m_view->check_cookie();
-#endif
     create();
 }
 
@@ -943,11 +927,6 @@ Query& Query::like(ColKey column_key, StringData value, bool case_sensitive)
 
 bool Query::eval_object(ConstObj& obj) const
 {
-#ifdef REALM_DEBUG
-    if (m_view)
-        m_view->check_cookie();
-#endif
-
     if (has_conditions())
         return root_node()->match(obj);
 
@@ -1356,7 +1335,7 @@ void Query::find_all(ConstTableView& ret, size_t begin, size_t end, size_t limit
         for (size_t t = begin; t < end && ret.size() < limit; t++) {
             ConstObj obj = m_view->get_object(t);
             if (eval_object(obj)) {
-                ret.m_key_values->add(obj.get_key());
+                ret.m_key_values.add(obj.get_key());
             }
         }
     }
@@ -1364,9 +1343,9 @@ void Query::find_all(ConstTableView& ret, size_t begin, size_t end, size_t limit
         if (end == size_t(-1))
             end = m_table->size();
         if (!has_conditions()) {
-            KeyColumn* refs = ret.m_key_values;
+            KeyColumn& refs = ret.m_key_values;
 
-            auto f = [&begin, &end, &limit, refs](const Cluster* cluster) {
+            auto f = [&begin, &end, &limit, &refs](const Cluster* cluster) {
                 size_t e = cluster->node_size();
                 if (begin < e) {
                     if (e > end) {
@@ -1375,7 +1354,7 @@ void Query::find_all(ConstTableView& ret, size_t begin, size_t end, size_t limit
                     auto offset = cluster->get_offset();
                     auto key_values = cluster->get_key_array();
                     for (size_t i = begin; (i < e) && limit; i++) {
-                        refs->add(ObjKey(key_values->get(i) + offset));
+                        refs.add(ObjKey(key_values->get(i) + offset));
                         --limit;
                     }
                     begin = 0;
@@ -1397,7 +1376,7 @@ void Query::find_all(ConstTableView& ret, size_t begin, size_t end, size_t limit
                 // translate begin/end limiters into corresponding keys
                 auto begin_key = (begin >= m_table->size()) ? ObjKey() : m_table->get_object(begin).get_key();
                 auto end_key = (end >= m_table->size()) ? ObjKey() : m_table->get_object(end).get_key();
-                KeyColumn* refs = ret.m_key_values;
+                KeyColumn& refs = ret.m_key_values;
                 node->index_based_aggregate(limit, [&](ConstObj& obj) -> bool {
                     auto key = obj.get_key();
                     if (begin_key && key < begin_key)
@@ -1405,7 +1384,7 @@ void Query::find_all(ConstTableView& ret, size_t begin, size_t end, size_t limit
                     if (end_key && !(key < end_key))
                         return false;
                     if (eval_object(obj)) {
-                        refs->add(key);
+                        refs.add(key);
                         return true;
                     }
                     else {
@@ -1416,7 +1395,7 @@ void Query::find_all(ConstTableView& ret, size_t begin, size_t end, size_t limit
             }
             // no index on best node (and likely no index at all), descend B+-tree
             node = pn;
-            QueryState<int64_t> st(act_FindAll, ret.m_key_values, limit);
+            QueryState<int64_t> st(act_FindAll, &ret.m_key_values, limit);
 
             for (size_t c = 0; c < node->m_children.size(); c++)
                 node->m_children[c]->aggregate_local_prepare(act_FindAll, type_Int, false);
