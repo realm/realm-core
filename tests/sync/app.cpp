@@ -234,14 +234,13 @@ TEST_CASE("app: login_with_credentials integration", "[sync][app]") {
             }
             CHECK(user);
             CHECK(!error);
-            processed = true;
         });
 
-        CHECK(processed);
-        processed = false;
-        app.log_out([](auto error) {
+        app.log_out([&](auto error) {
             CHECK(!error);
+            processed = true;
         });
+        CHECK(processed);
     }
 }
 
