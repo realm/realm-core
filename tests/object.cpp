@@ -1318,4 +1318,30 @@ TEST_CASE("Embedded Object") {
         REQUIRE(!obj_callback_called);
         REQUIRE(list_callback_called);
     }
+
+    SECTION("deleting parent object sends change notification") {
+        auto parent = create(AnyDict{
+            {"pk", INT64_C(1)},
+            {"object", AnyDict{{"value", INT64_C(10)}}},
+            {"array", AnyVector{AnyDict{{"value", INT64_C(20)}}, AnyDict{{"value", INT64_C(30)}}}},
+        });
+
+        CppContext ctx(realm);
+        auto child = any_cast<Object>(parent.get_property_value<util::Any>(ctx, "object"));
+
+        int calls = 0;
+        auto token = child.add_notification_callback([&](CollectionChangeSet const& c, std::exception_ptr) {
+            if (++calls == 2) {
+                REQUIRE_INDICES(c.deletions, 0);
+            }
+        });
+        advance_and_notify(*realm);
+        REQUIRE(calls == 1);
+
+        realm->begin_transaction();
+        parent.obj().remove();
+        realm->commit_transaction();
+        advance_and_notify(*realm);
+        REQUIRE(calls == 2);
+    }
 }
