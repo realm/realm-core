@@ -165,7 +165,7 @@ def doAndroidDockerBuild() {
       try {
         rlmCheckout(scm)
         wrap([$class: 'AnsiColorBuildWrapper']) {
-          def image = buildDockerEnv('realm-object-store:android', extra_args: '-f android.Dockerfile', push: env.BRANCH_NAME == 'master')
+          def image = buildDockerEnv('ci/realm-object-store:android', extra_args: '-f android.Dockerfile', push: env.BRANCH_NAME == 'master')
           docker.image('tracer0tong/android-emulator').withRun { emulator ->
             image.inside("--link ${emulator.id}:emulator") {
               sh """
