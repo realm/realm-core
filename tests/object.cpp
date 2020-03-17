@@ -1119,6 +1119,11 @@ TEST_CASE("Embedded Object") {
             {"object", PropertyType::Object|PropertyType::Nullable, "link target"},
             {"array", PropertyType::Object|PropertyType::Array, "array target"},
         }},
+        {"all types no pk", {
+            {"value", PropertyType::Int},
+            {"object", PropertyType::Object|PropertyType::Nullable, "link target"},
+            {"array", PropertyType::Object|PropertyType::Array, "array target"},
+        }},
         {"link target", ObjectSchema::IsEmbedded{true}, {
             {"value", PropertyType::Int},
         }},

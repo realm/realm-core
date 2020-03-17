@@ -407,9 +407,7 @@ size_t Results::index_of(Obj const& row)
     if (m_table && row.get_table() != m_table) {
         throw IncorrectTableException(
             ObjectStore::object_type_for_table_name(m_table->get_name()),
-            ObjectStore::object_type_for_table_name(row.get_table()->get_name()),
-            "Attempting to get the index of a Row of the wrong type"
-        );
+            ObjectStore::object_type_for_table_name(row.get_table()->get_name()));
     }
 
     switch (m_mode) {
@@ -1083,8 +1081,13 @@ bool Results::is_frozen()
 }
 
 Results::OutOfBoundsIndexException::OutOfBoundsIndexException(size_t r, size_t c)
-: std::out_of_range(util::format("Requested index %1 greater than max %2", r, c - 1))
+: std::out_of_range(c == 0 ? util::format("Requested index %1 in empty Results", r)
+                           : util::format("Requested index %1 greater than max %2", r, c - 1))
 , requested(r), valid_count(c) {}
+
+Results::IncorrectTableException::IncorrectTableException(StringData e, StringData a)
+: std::logic_error(util::format("Object of type '%1' does not match Results type '%2'", a, e))
+, expected(e), actual(a) {}
 
 static std::string unsupported_operation_msg(ColKey column, Table const& table, const char* operation)
 {

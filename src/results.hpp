@@ -189,13 +189,12 @@ public:
 
     // The input Row object is not attached
     struct DetatchedAccessorException : public std::logic_error {
-        DetatchedAccessorException() : std::logic_error("Atempting to access an invalid object") {}
+        DetatchedAccessorException() : std::logic_error("Attempting to access an invalid object") {}
     };
 
     // The input Row object belongs to a different table
     struct IncorrectTableException : public std::logic_error {
-        IncorrectTableException(StringData e, StringData a, const std::string &error) :
-            std::logic_error(error), expected(e), actual(a) {}
+        IncorrectTableException(StringData e, StringData a);
         const StringData expected;
         const StringData actual;
     };
