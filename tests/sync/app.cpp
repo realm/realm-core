@@ -517,6 +517,41 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
 
 #endif // REALM_ENABLE_AUTH_TESTS
 
+class CustomErrorTransport : public GenericNetworkTransport {
+public:
+    CustomErrorTransport(int code, const std::string& message) : m_code(code), m_message(message) { }
+
+    void send_request_to_server(const Request, std::function<void (const Response)> completion_block) override
+    {
+        completion_block(Response{0, m_code, std::map<std::string, std::string>(), m_message});
+    }
+
+private:
+    int m_code;
+    std::string m_message;
+};
+
+TEST_CASE("app: custom error handling", "[sync][app][custom_errors]") {
+    SECTION("custom code and message is sent back") {
+        std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
+            return std::unique_ptr<GenericNetworkTransport>(new CustomErrorTransport(1001, "Boom!"));
+        };
+
+        auto app = App(App::Config{"anything", factory});
+        bool processed = false;
+        app.log_in_with_credentials(AppCredentials::anonymous(),
+            [&](std::shared_ptr<SyncUser> user, Optional<app::AppError> error) {
+                CHECK(!user);
+                CHECK(error);
+                CHECK(error->is_custom_error());
+                CHECK(error->error_code.value() == 1001);
+                CHECK(error->message == "Boom!");
+                processed = true;
+            });
+        CHECK(processed);
+    }
+}
+
 
 static const std::string profile_0_name = "Ursus americanus Ursus boeckhi";
 static const std::string profile_0_first_name = "Ursus americanus";
@@ -1067,6 +1102,7 @@ TEST_CASE("app: response error handling", "[sync][app]") {
     }
     SECTION("custom error code") {
         response.custom_status_code = 42;
+        response.body = "Custom error message";
         app.log_in_with_credentials(realm::app::AppCredentials::anonymous(),
                                     [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
             CHECK(!user);
@@ -1076,7 +1112,7 @@ TEST_CASE("app: response error handling", "[sync][app]") {
             CHECK(!error->is_service_error());
             CHECK(error->is_custom_error());
             CHECK(error->error_code.value() == 42);
-            CHECK(error->message == std::string("non-zero custom status code considered fatal"));
+            CHECK(error->message == std::string("Custom error message"));
             CHECK(error->error_code.message() == "code 42");
             processed = true;
         });

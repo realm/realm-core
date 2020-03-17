@@ -95,7 +95,8 @@ static Optional<AppError> check_for_errors(const Response& response)
     }
 
     if (response.custom_status_code != 0) {
-        return AppError(make_custom_error_code(response.custom_status_code), "non-zero custom status code considered fatal");
+        std::string error_msg = (!response.body.empty()) ? response.body : "non-zero custom status code considered fatal";
+        return AppError(make_custom_error_code(response.custom_status_code), error_msg);
     }
 
     if (http_status_code_is_fatal)
