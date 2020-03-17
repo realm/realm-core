@@ -132,10 +132,10 @@ class IntTestTransport : public GenericNetworkTransport {
     }
 };
 
-class CustomErrorTransport(int code, const std::string& message)
-        : m_code(code),
-          m_message(message)
-{
+class CustomErrorTransport : public GenericNetworkTransport {
+public:
+    CustomErrorTransport(int code, const std::string& message) : m_code(code), m_message(message) { }
+
     void send_request_to_server(const Request, std::function<void (const Response)> completion_block) override
     {
         completion_block(Response{0, m_code, std::map<std::string, std::string>(), m_message});
