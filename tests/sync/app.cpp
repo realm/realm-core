@@ -25,22 +25,77 @@
 #include <curl/curl.h>
 #include <json.hpp>
 
+using namespace realm;
+using namespace realm::app;
+
 // temporarily disable these tests for now,
 // but allow opt-in by building with REALM_ENABLE_AUTH_TESTS=1
 #ifndef REALM_ENABLE_AUTH_TESTS
 #define REALM_ENABLE_AUTH_TESTS 0
 #endif
 
-using namespace realm;
-using namespace realm::app;
+static std::string random_string(std::string::size_type length)
+{
+    static auto& chrs = 
+        "abcdefghijklmnopqrstuvwxyz"
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    thread_local static std::mt19937 rg{std::random_device{}()};
+    thread_local static std::uniform_int_distribution<std::string::size_type> pick(0, sizeof(chrs) - 2);
+    std::string s;
+    s.reserve(length);
+    while(length--)
+        s += chrs[pick(rg)];
+    return s;
+}
 
 #if REALM_ENABLE_AUTH_TESTS
 
+// When a stitch instance starts up and imports the app at this config location,
+// it will generate a new app_id and write it back to the config. This is why we
+// need to parse it at runtime after spinning up the instance.
+static std::string get_runtime_app_id(std::string config_path)
+{
+    static std::string cached_app_id;
+    if (cached_app_id.empty()) {
+        File config(config_path);
+        std::string contents;
+        contents.resize(config.get_size());
+        config.read(contents.data(), config.get_size());
+        nlohmann::json json;
+        json = nlohmann::json::parse(contents);
+        cached_app_id = json["app_id"].get<std::string>();
+        std::cout << "found app_id: " << cached_app_id << " in stitch config" << std::endl;
+    }
+    return cached_app_id;
+}
+
 class IntTestTransport : public GenericNetworkTransport {
     static size_t write(char *ptr, size_t size, size_t nmemb, std::string* data) {
+        REALM_ASSERT(data);
         size_t realsize = size * nmemb;
         data->append(ptr, realsize); // FIXME: throws std::bad_alloc when out of memory
         return realsize;
+    }
+    static size_t header_callback(char *buffer, size_t size, size_t nitems, std::map<std::string, std::string> *headers_storage)
+    {
+        REALM_ASSERT(headers_storage);
+        std::string combined(buffer, size * nitems);
+        if (auto pos = combined.find(':'); pos != std::string::npos) {
+            std::string key = combined.substr(0, pos);
+            std::string value = combined.substr(pos + 1);
+            while (value.size() > 0 && value[0] == ' ') {
+                value = value.substr(1);
+            }
+            while (value.size() > 0 && (value[value.size() - 1] == '\r' || value[value.size() - 1] == '\n')) {
+                value = value.substr(0, value.size() - 1);
+            }
+            headers_storage->insert({key, value});
+        } else {
+            if (combined.size() > 5 && combined.substr(0, 5) != "HTTP/") { // ignore for now HTTP/1.1 ...
+                std::cerr << "test transport skipping header: " << combined << std::endl;
+            }
+        }
+        return nitems * size;
     }
 
     void send_request_to_server(const Request request, std::function<void (const Response)> completion_block) override
@@ -48,9 +103,7 @@ class IntTestTransport : public GenericNetworkTransport {
         CURL *curl;
         CURLcode response_code;
         std::string response;
-        std::string content_type;
         std::map<std::string, std::string> response_headers;
-        std::string response_headers_raw;
 
         curl_global_init(CURL_GLOBAL_ALL);
         /* get a curl handle */
@@ -72,7 +125,7 @@ class IntTestTransport : public GenericNetworkTransport {
             } else if (request.method == HttpMethod::del) {
                 curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "DELETE");
             }
-                        
+
             curl_easy_setopt(curl, CURLOPT_TIMEOUT, request.timeout_ms);
 
             for (auto header : request.headers)
@@ -85,35 +138,26 @@ class IntTestTransport : public GenericNetworkTransport {
             curl_easy_setopt(curl, CURLOPT_HTTPHEADER, list);
             curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write);
             curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
-            curl_easy_setopt (curl, CURLOPT_HEADERDATA, &response_headers_raw);
+            curl_easy_setopt(curl, CURLOPT_HEADERDATA, &response_headers);
+            curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, header_callback);
 
             /* Perform the request, res will get the return code */
             response_code = curl_easy_perform(curl);
             int http_code = 0;
             curl_easy_getinfo (curl, CURLINFO_RESPONSE_CODE, &http_code);
-            
-            // Build response header map from raw string
-            auto split_header_strings = split_string(response_headers_raw);
-            for (auto &header_element : split_header_strings) {
-                // Maybe use regex instead?
-                if (header_element == "content-type: application/json") {
-                    response_headers.insert({"Content-Type", "application/json"});
-                }
-            }
-            
-            double cl;
-            curl_easy_getinfo(curl, CURLINFO_CONTENT_LENGTH_DOWNLOAD, &cl);
+
             /* Check for errors */
             if(response_code != CURLE_OK)
-                fprintf(stderr, "curl_easy_perform() failed: %s\n",
-                        curl_easy_strerror(response_code));
-            
+                fprintf(stderr, "curl_easy_perform() failed when sending request to '%s' with body '%s': %s\n",
+                        request.url.c_str(), request.body.c_str(), curl_easy_strerror(response_code));
+
             /* always cleanup */
             curl_easy_cleanup(curl);
             curl_slist_free_all(list); /* free the list again */
-            completion_block(Response{http_code, 0, response_headers, response});
+            int binding_response_code = 0;
+            completion_block(Response{response_code, binding_response_code, response_headers, response});
         }
-        
+
         curl_global_cleanup();
     }
     
@@ -132,54 +176,31 @@ class IntTestTransport : public GenericNetworkTransport {
     }
 };
 
-class CustomErrorTransport : public GenericNetworkTransport {
-public:
-    CustomErrorTransport(int code, const std::string& message) : m_code(code), m_message(message) { }
-
-    void send_request_to_server(const Request, std::function<void (const Response)> completion_block) override
-    {
-        completion_block(Response{0, m_code, std::map<std::string, std::string>(), m_message});
+#ifdef REALM_MONGODB_ENDPOINT
+static std::string get_base_url() {
+    // allows configuration with or without quotes
+    std::string base_url = REALM_QUOTE(REALM_MONGODB_ENDPOINT);
+    if (base_url.size() > 0 && base_url[0] == '"') {
+        base_url.erase(0, 1);
     }
-
-private:
-    int m_code;
-    std::string m_message;
-}
-
-static std::string random_string(std::string::size_type length)
-{
-  static auto& chrs = "0123456789"
-    "bcdefghijklmnopqrstuvwxyz"
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-  thread_local static std::mt19937 rg{std::random_device{}()};
-  thread_local static std::uniform_int_distribution<std::string::size_type> pick(0, sizeof(chrs) - 2);
-  std::string s;
-  s.reserve(length);
-  while(length--)
-    s += chrs[pick(rg)];
-  return s;
-}
-
-TEST_CASE("app: custom error handling", "[sync][app][custom_errors]") {
-    SECTION("custom code and message is sent back") {
-        std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
-            return std::unique_ptr<GenericNetworkTransport>(new CustomErrorTransport(1001, "Boom!"));
-        };
-
-        auto app = App(App::Config{"translate-utwuv", factory});
-        bool processed = false;
-        app.login_with_credentials(AppCredentials::anonymous(),
-                                   [&](std::shared_ptr<SyncUser> user, Optional<app::AppError> error) {
-            CHECK(!user);
-            CHECK(error);
-            CHECK(error->is_custom_error());
-            CHECK(error->error_code.value() == 1001);
-            CHECK(error->message == "Boom!");
-            processed = true;
-        });
-        CHECK(processed);
+    if (base_url.size() > 0 && base_url[base_url.size() - 1] == '"') {
+        base_url.erase(base_url.size() - 1);
     }
+    return base_url;
 }
+#endif
+#ifdef REALM_STITCH_CONFIG
+static std::string get_config_path() {
+    std::string config_path = REALM_QUOTE(REALM_STITCH_CONFIG);
+    if (config_path.size() > 0 && config_path[0] == '"') {
+        config_path.erase(0, 1);
+    }
+    if (config_path.size() > 0 && config_path[config_path.size() - 1] == '"') {
+        config_path.erase(config_path.size() - 1);
+    }
+    return config_path;
+}
+#endif
 
 TEST_CASE("app: login_with_credentials integration", "[sync][app]") {
 
@@ -188,8 +209,15 @@ TEST_CASE("app: login_with_credentials integration", "[sync][app]") {
             return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
         };
 
-        // TODO: create dummy app using Stitch CLI instead of hardcording
-        auto app = App(App::Config{"translate-utwuv", factory});
+        std::string base_url = get_base_url();
+        std::string config_path = get_config_path();
+        std::cout << "base_url for [app] integration tests is set to: " << base_url << std::endl;
+        std::cout << "config_path for [app] integration tests is set to: " << config_path << std::endl;
+        REQUIRE(!base_url.empty());
+        REQUIRE(!config_path.empty());
+
+        // this app id is configured in tests/mongodb/stitch.json
+        auto app = App(App::Config{get_runtime_app_id(config_path), factory, base_url});
 
         bool processed = false;
 
@@ -197,7 +225,13 @@ TEST_CASE("app: login_with_credentials integration", "[sync][app]") {
         auto tsm = TestSyncManager(base_path);
 
         app.log_in_with_credentials(AppCredentials::anonymous(),
-                                    [&](std::shared_ptr<SyncUser> user, Optional<app::AppError> error) {
+                                   [&](std::shared_ptr<SyncUser> user, Optional<app::AppError> error) {
+            if (error) {
+                std::cerr << "login_with_credentials failed: "
+                    << error->message << " error_code: "
+                    << error->error_code.message() << " (value: "
+                    << error->error_code.value() << ")" <<std::endl;
+            }
             CHECK(user);
             CHECK(!error);
         });
@@ -213,40 +247,76 @@ TEST_CASE("app: login_with_credentials integration", "[sync][app]") {
 // MARK: - UsernamePasswordProviderClient Tests
 
 TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app]") {
+    auto email = util::format("realm_tests_do_autoverify%1@%2.com", random_string(10), random_string(10));
 
-    auto email = util::format("%1@%2.com", random_string(10), random_string(10));
     auto password = random_string(10);
-    
+
     std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
         return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
     };
-    
-    auto config = App::Config{"translate-utwuv", factory};
+    std::string base_url = get_base_url();
+    std::string config_path = get_config_path();
+    REQUIRE(!base_url.empty());
+    REQUIRE(!config_path.empty());
+    auto config = App::Config{get_runtime_app_id(config_path), factory, base_url};
     auto app = App(config);
     std::string base_path = tmp_dir() + "/" + config.app_id;
     reset_test_directory(base_path);
     TestSyncManager init_sync_manager(base_path);
-    
+
     bool processed = false;
 
-    SECTION("register email") {
-        app.provider_client<App::UsernamePasswordProviderClient>()
-            .register_email("username@10gen.com",
-                            "M0ng0@B2020",
-                            [&](Optional<app::AppError> error) {
-                // Error returned states the account has already been created
-                CHECK(error->message == "name already in use");
-                CHECK(error->error_code.value() == 49);
-        });
-        
+    app.provider_client<App::UsernamePasswordProviderClient>()
+    .register_email(email,
+                    password,
+                    [&](Optional<app::AppError> error) {
+                        CHECK(!error); // first registration success
+                        if (error) {
+                            std::cout << "register failed for email: " << email << " pw: " << password << " message: " << error->error_code.message() << "+" << error->message << std::endl;
+                        }
+                    });
+
+    SECTION("double registration should fail") {
         app.provider_client<App::UsernamePasswordProviderClient>()
             .register_email(email,
                             password,
                             [&](Optional<app::AppError> error) {
                 // Error returned states the account has already been created
-                CHECK(!error);
+                REQUIRE(error);
+                CHECK(error->message == "name already in use");
+                CHECK(app::ServiceErrorCode(error->error_code.value()) == app::ServiceErrorCode::account_name_in_use);
                 processed = true;
         });
+        CHECK(processed);
+    }
+
+    SECTION("double registration should fail") {
+        // the server registration function will reject emails that do not contain "realm_tests_do_autoverify"
+        std::string email_to_reject = util::format("%1@%2.com", random_string(10), random_string(10));
+        app.provider_client<App::UsernamePasswordProviderClient>()
+            .register_email(email_to_reject,
+                password,
+                [&](Optional<app::AppError> error) {
+                    REQUIRE(error);
+                    CHECK(error->message == util::format("failed to confirm user %1", email_to_reject));
+                    CHECK(app::ServiceErrorCode(error->error_code.value()) == app::ServiceErrorCode::bad_request);
+                    processed = true;
+                });
+        CHECK(processed);
+    }
+
+    SECTION("can login with registered account") {
+        app.log_in_with_credentials(realm::app::AppCredentials::username_password(email, password),
+            [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+                REQUIRE(user);
+                CHECK(!error);
+                processed = true;
+            });
+        CHECK(processed);
+        processed = false;
+        auto user = app.current_user();
+        REQUIRE(user);
+        CHECK(user->user_profile().email == email);
     }
 
     SECTION("confirm user") {
@@ -254,110 +324,141 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app]") {
             .confirm_user("a_token",
                           "a_token_id",
                           [&](Optional<app::AppError> error) {
+                REQUIRE(error);
                 CHECK(error->message == "invalid token data");
                 processed = true;
         });
-
+        CHECK(processed);
     }
 
     SECTION("resend confirmation email") {
         app.provider_client<App::UsernamePasswordProviderClient>()
-            .resend_confirmation_email("username@10gen.com",
+            .resend_confirmation_email(email,
                                        [&](Optional<app::AppError> error) {
+                REQUIRE(error);
                 CHECK(error->message == "already confirmed");
                 processed = true;
         });
+        CHECK(processed);
     }
-    
-    SECTION("send reset password") {
-        app.provider_client<App::UsernamePasswordProviderClient>()
-            .send_reset_password_email("username@10gen.com",
-                                       [&](Optional<app::AppError> error) {
-                CHECK(!error);
-        });
 
-        app.provider_client<App::UsernamePasswordProviderClient>()
-            .send_reset_password_email(email,
-                                       [&](Optional<app::AppError> error) {
-                CHECK(error->message == "user not found");
-                processed = true;
-        });
-    }
-    
-    SECTION("reset password") {
+    SECTION("reset password invalid tokens") {
         app.provider_client<App::UsernamePasswordProviderClient>()
             .reset_password(password,
                             "token_sample",
                             "token_id_sample",
                             [&](Optional<app::AppError> error) {
+                REQUIRE(error);
                 CHECK(error->message == "invalid token data");
                 processed = true;
         });
-    }
-    
-    SECTION("call reset password function") {
-        app.provider_client<App::UsernamePasswordProviderClient>()
-            .call_reset_password_function(email,
-                                          password,
-                                          "[0,1]",
-                                          [&](Optional<app::AppError> error) {
-                CHECK(error->message == "user not found");
-                processed = true;
-        });
+        CHECK(processed);
     }
 
-    CHECK(processed);
+    SECTION("reset password function success") {
+        // the imported test app will accept password reset if the password contains "realm_tests_do_reset" via a function
+        std::string accepted_new_password = util::format("realm_tests_do_reset%1", random_string(10));
+        app.provider_client<App::UsernamePasswordProviderClient>()
+            .call_reset_password_function(email,
+                accepted_new_password,
+                "[]",
+                [&](Optional<app::AppError> error) {
+                    REQUIRE(!error);
+                    processed = true;
+            });
+        CHECK(processed);
+    }
+
+    SECTION("reset password function failure") {
+        std::string rejected_password = util::format("%1", random_string(10));
+        app.provider_client<App::UsernamePasswordProviderClient>()
+            .call_reset_password_function(email,
+                rejected_password,
+                "[\"foo\", \"bar\"]",
+                [&](Optional<app::AppError> error) {
+                    REQUIRE(error);
+                    CHECK(error->message == util::format("failed to reset password for user %1", email));
+                    CHECK(error->is_service_error());
+                    processed = true;
+                });
+        CHECK(processed);
+    }
+
+    SECTION("reset password function for invalid user fails") {
+        app.provider_client<App::UsernamePasswordProviderClient>()
+            .call_reset_password_function(util::format("%1@%2.com", random_string(5), random_string(5)),
+                password,
+                "[\"foo\", \"bar\"]",
+                [&](Optional<app::AppError> error) {
+                    REQUIRE(error);
+                    CHECK(error->message == "user not found");
+                    CHECK(error->is_service_error());
+                    CHECK(app::ServiceErrorCode(error->error_code.value()) == app::ServiceErrorCode::user_not_found);
+                    processed = true;
+                });
+        CHECK(processed);
+    }
 }
 
 // MARK: - UserAPIKeyProviderClient Tests
 
 TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
-        
-    auto email = util::format("%1@%2.com", random_string(15), random_string(15));
+    auto email = util::format("realm_tests_do_autoverify%1@%2.com", random_string(10), random_string(10));
     auto password = util::format("%1", random_string(15));
     auto api_key_name = util::format("%1", random_string(15));
 
     std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
         return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
     };
-
-    auto config = App::Config{"translate-utwuv", factory};
+    std::string base_url = get_base_url();
+    std::string config_path = get_config_path();
+    REQUIRE(!base_url.empty());
+    REQUIRE(!config_path.empty());
+    auto config = App::Config{get_runtime_app_id(config_path), factory, base_url};
     auto app = App(config);
     std::string base_path = tmp_dir() + "/" + config.app_id;
     reset_test_directory(base_path);
     TestSyncManager init_sync_manager(base_path);
-    
+
     bool processed = false;
 
-    app.provider_client<App::UsernamePasswordProviderClient>().register_email(email,
-                                                                              password,
-                                                                              [&] (Optional<AppError> error) {
-        CHECK(!error);
-    });
-    
-    app.log_in_with_credentials(AppCredentials::username_password(email, password),
-                           [&](std::shared_ptr<SyncUser> user, Optional<app::AppError> error) {
-        CHECK(user);
-        CHECK(!error);
-    });
+    app.provider_client<App::UsernamePasswordProviderClient>()
+        .register_email(email,
+            password,
+            [&](Optional<app::AppError> error) {
+                CHECK(!error); // first registration should succeed
+                if (error) {
+                    std::cout << "register failed for email: " << email << " pw: " << password << " message: " << error->error_code.message() << "+" << error->message << std::endl;
+                }
+            });
+
+    app.log_in_with_credentials(realm::app::AppCredentials::username_password(email, password),
+        [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+            REQUIRE(user);
+            CHECK(!error);
+            processed = true;
+        });
+    CHECK(processed);
+    processed = false;
 
     App::UserAPIKey api_key;
-    
+
     SECTION("api-key") {
-        
         app.provider_client<App::UserAPIKeyProviderClient>()
             .create_api_key(api_key_name, [&](Optional<App::UserAPIKey> user_api_key, Optional<app::AppError> error) {
+                CHECK(!error);
+                REQUIRE(bool(user_api_key));
                 CHECK(user_api_key->name == api_key_name);
                 CHECK(user_api_key->id.to_string() == user_api_key->id.to_string());
-                CHECK(!error);
                 api_key = user_api_key.value();
         });
-        
+
         app.provider_client<App::UserAPIKeyProviderClient>()
             .fetch_api_key(api_key.id, [&](Optional<App::UserAPIKey> user_api_key, Optional<app::AppError> error) {
+                CHECK(!error);
+                REQUIRE(bool(user_api_key));
                 CHECK(user_api_key->name == api_key_name);
                 CHECK(user_api_key->id.to_string() == user_api_key->id.to_string());
-                CHECK(!error);
         });
 
         app.provider_client<App::UserAPIKeyProviderClient>()
@@ -369,69 +470,88 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
                 }
                 CHECK(!error);
         });
-        
+
         app.provider_client<App::UserAPIKeyProviderClient>()
             .enable_api_key(api_key, [&](Optional<AppError> error) {
                 CHECK(!error);
         });
-        
+
         app.provider_client<App::UserAPIKeyProviderClient>()
             .fetch_api_key(api_key.id, [&](Optional<App::UserAPIKey> user_api_key, Optional<app::AppError> error) {
+                CHECK(!error);
+                REQUIRE(bool(user_api_key));
                 CHECK(user_api_key->disabled == false);
                 CHECK(user_api_key->name == api_key_name);
                 CHECK(user_api_key->id.to_string() == user_api_key->id.to_string());
-                CHECK(!error);
         });
-        
+
         app.provider_client<App::UserAPIKeyProviderClient>()
             .disable_api_key(api_key, [&](Optional<AppError> error) {
                 CHECK(!error);
         });
-        
+
         app.provider_client<App::UserAPIKeyProviderClient>()
             .fetch_api_key(api_key.id, [&](Optional<App::UserAPIKey> user_api_key, Optional<app::AppError> error) {
+                CHECK(!error);
+                REQUIRE(bool(user_api_key));
                 CHECK(user_api_key->disabled == true);
                 CHECK(user_api_key->name == api_key_name);
                 CHECK(user_api_key->id.to_string() == user_api_key->id.to_string());
-                CHECK(!error);
         });
-        
+
         app.provider_client<App::UserAPIKeyProviderClient>()
             .delete_api_key(api_key, [&](Optional<AppError> error) {
                 CHECK(!error);
         });
-        
+
         app.provider_client<App::UserAPIKeyProviderClient>()
             .fetch_api_key(api_key.id, [&](Optional<App::UserAPIKey> user_api_key, Optional<app::AppError> error) {
                 CHECK(!user_api_key);
                 CHECK(error);
                 processed = true;
         });
-        
+
         CHECK(processed);
     }
 }
 
 #endif // REALM_ENABLE_AUTH_TESTS
 
-static std::string random_string(std::string::size_type length)
-{
-    static auto& chrs = "0123456789"
-    "abcdefghijklmnopqrstuvwxyz"
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+class CustomErrorTransport : public GenericNetworkTransport {
+public:
+    CustomErrorTransport(int code, const std::string& message) : m_code(code), m_message(message) { }
 
-    thread_local static std::mt19937 rg{std::random_device{}()};
-    thread_local static std::uniform_int_distribution<std::string::size_type> pick(0, sizeof(chrs) - 2);
+    void send_request_to_server(const Request, std::function<void (const Response)> completion_block) override
+    {
+        completion_block(Response{0, m_code, std::map<std::string, std::string>(), m_message});
+    }
 
-    std::string s;
+private:
+    int m_code;
+    std::string m_message;
+};
 
-    s.reserve(length);
+TEST_CASE("app: custom error handling", "[sync][app][custom_errors]") {
+    SECTION("custom code and message is sent back") {
+        std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
+            return std::unique_ptr<GenericNetworkTransport>(new CustomErrorTransport(1001, "Boom!"));
+        };
 
-    while(length--)
-        s += chrs[pick(rg)];
-
-    return s;
+        auto app = App(App::Config{"anything", factory});
+        bool processed = false;
+        app.log_in_with_credentials(AppCredentials::anonymous(),
+            [&](std::shared_ptr<SyncUser> user, Optional<app::AppError> error) {
+                CHECK(!user);
+                CHECK(error);
+                CHECK(error->is_custom_error());
+                CHECK(error->error_code.value() == 1001);
+                CHECK(error->message == "Boom!");
+                processed = true;
+            });
+        CHECK(processed);
+    }
 }
+
 
 static const std::string profile_0_name = "Ursus americanus Ursus boeckhi";
 static const std::string profile_0_first_name = "Ursus americanus";
@@ -1003,7 +1123,11 @@ TEST_CASE("app: response error handling", "[sync][app]") {
         response.http_status_code = 400;
         response.body = nlohmann::json({
             {"error_code", "MongoDBError"},
-            {"error", "a fake MongoDB error message!"}}).dump();
+            {"error", "a fake MongoDB error message!"},
+            {"access_token", good_access_token},
+            {"refresh_token", good_access_token},
+            {"user_id", "Brown Bear"},
+            {"device_id", "Panda Bear"}}).dump();
         app.log_in_with_credentials(realm::app::AppCredentials::anonymous(),
                                     [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
             CHECK(!user);

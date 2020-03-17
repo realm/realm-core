@@ -53,9 +53,21 @@ add_executable(tests ${SOURCES} ${HEADERS})
 
 set(REALM_ENABLE_AUTH_TESTS OFF CACHE BOOL "")
 
+if(REALM_ENABLE_AUTH_TESTS AND NOT REALM_MONGODB_ENDPOINT)
+    message(FATAL_ERROR "REALM_MONGODB_ENDPOINT must be set when specifying REALM_ENABLE_AUTH_TESTS.")
+endif()
+
+if(REALM_ENABLE_AUTH_TESTS AND NOT REALM_STITCH_CONFIG)
+    message(FATAL_ERROR "REALM_STITCH_CONFIG must be set when specifying REALM_ENABLE_AUTH_TESTS.")
+endif()
+
+set(EXTRA_LIBRARIES "")
+
 if (REALM_ENABLE_AUTH_TESTS)
     add_definitions(-DREALM_ENABLE_AUTH_TESTS=1)
-    SET_TARGET_PROPERTIES(tests PROPERTIES LINK_FLAGS -lcurl)
+    add_definitions(-DREALM_MONGODB_ENDPOINT="${REALM_MONGODB_ENDPOINT}")
+    add_definitions(-DREALM_STITCH_CONFIG="${REALM_STITCH_CONFIG}")
+    SET(EXTRA_LIBRARIES curl)
 endif()
 
 target_compile_definitions(tests PRIVATE ${PLATFORM_DEFINES})
@@ -72,7 +84,7 @@ if(REALM_ENABLE_SYNC)
     target_link_libraries(tests realm-sync realm-sync-server realm-parser)
 endif()
 
-target_link_libraries(tests realm-object-store ${PLATFORM_LIBRARIES})
+target_link_libraries(tests realm-object-store ${EXTRA_LIBRARIES} ${PLATFORM_LIBRARIES})
 
 add_custom_command(TARGET tests POST_BUILD
                    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/sync-1.x.realm $<TARGET_FILE_DIR:tests>)
