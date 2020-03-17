@@ -1373,10 +1373,8 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
     ObjKey real_key = get_real_key(ndx);
     auto table = m_tree_top.get_owner();
     const_cast<Table*>(table)->free_local_id_after_hash_collision(real_key);
-    if (!table->is_embedded()) {
-        if (Replication* repl = table->get_repl()) {
-            repl->remove_object(table, real_key);
-        }
+    if (Replication* repl = table->get_repl()) {
+        repl->remove_object(table, real_key);
     }
 
     std::vector<ColKey> backlink_column_keys;
