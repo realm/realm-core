@@ -37,6 +37,7 @@ if(${CMAKE_CXX_COMPILER_ID} MATCHES "Clang" OR ${CMAKE_CXX_COMPILER_ID} STREQUAL
         -Wparentheses
         -Wunknown-pragmas
         -Wunreachable-code
+        -Wunused-parameter
         -DREALM_HAVE_CONFIG
     )
 endif()
