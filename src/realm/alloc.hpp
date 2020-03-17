@@ -158,16 +158,12 @@ protected:
     // The ref translation splits the full ref-space (both below and above baseline)
     // into equal chunks.
     struct RefTranslation {
-        char* mapping_addr;
-        // any xover mapping must stretch past the end of the primary mapping, and it can at most
-        // hold the largest array supported, which is 16MB. Consequently, accesses to the first
-        // part of the primary mapping does not need to be checked.
-        // We initialize 'xover_mapping_limit' to exploit this:
-        std::atomic<size_t> primary_mapping_limit = (1 << section_shift) - 16 * 1024 * 1024;
+        char* mapping_addr = nullptr;
+        std::atomic<size_t> lowest_possible_xover_offset = 0;
 
         // member 'xover_mapping_addr' is used for memory synchronization of the fields
         // 'xover_mapping_base' and 'xover_encrypted_mapping'.
-        std::atomic<char*> xover_mapping_addr = 0;
+        std::atomic<char*> xover_mapping_addr = nullptr;
         size_t xover_mapping_base = 0;
 #if REALM_ENABLE_ENCRYPTION
         util::EncryptedFileMapping* encrypted_mapping = nullptr;
@@ -176,17 +172,13 @@ protected:
         RefTranslation(char* addr)
             : mapping_addr(addr)
         {
-            primary_mapping_limit.store(0);
         }
-        RefTranslation()
-            : RefTranslation(nullptr)
-        {
-        }
+        RefTranslation() = default;
         RefTranslation& operator=(const RefTranslation& from)
         {
             if (&from != this) {
                 mapping_addr = from.mapping_addr;
-                primary_mapping_limit.store(from.primary_mapping_limit, std::memory_order_relaxed);
+                lowest_possible_xover_offset.store(from.lowest_possible_xover_offset, std::memory_order_relaxed);
                 xover_mapping_base = from.xover_mapping_base;
 #if REALM_ENABLE_ENCRYPTION
                 encrypted_mapping = from.encrypted_mapping;
@@ -228,10 +220,7 @@ protected:
     virtual char* do_translate(ref_type ref) const noexcept = 0;
     char* x_translate(RefTranslation*, ref_type ref) const noexcept;
     char* x_translate_extended(RefTranslation*, ref_type ref) const noexcept;
-    virtual void get_or_add_xover_mapping(RefTranslation&, size_t, size_t, size_t)
-    {
-        REALM_ASSERT(false);
-    }
+    virtual void get_or_add_xover_mapping(RefTranslation&, size_t, size_t, size_t) = 0;
     Allocator() noexcept;
     size_t get_section_index(size_t pos) const noexcept;
     inline size_t get_section_base(size_t index) const noexcept;
@@ -546,7 +535,7 @@ inline char* Allocator::x_translate(RefTranslation* ref_translation_ptr, ref_typ
     size_t idx = get_section_index(ref);
     RefTranslation& txl = ref_translation_ptr[idx];
     size_t offset = ref - get_section_base(idx);
-    size_t mapping_limit = txl.primary_mapping_limit.load(std::memory_order_relaxed);
+    size_t mapping_limit = txl.lowest_possible_xover_offset.load(std::memory_order_relaxed);
     if (REALM_LIKELY(offset < mapping_limit)) {
         // the mapping limit may grow concurrently, but that will not affect this code path
         char* addr = txl.mapping_addr + offset;

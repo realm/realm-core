@@ -580,7 +580,7 @@ private:
     // and in use by older transactions. These translations are in m_old_mappings.
     struct MapEntry {
         util::File::Map<char> primary_mapping;
-        size_t primary_mapping_limit = 0;
+        size_t lowest_possible_xover_offset = 0;
         util::File::Map<char> xover_mapping;
     };
     std::vector<MapEntry> m_mappings;

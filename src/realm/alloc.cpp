@@ -101,6 +101,10 @@ public:
     }
 
     void verify() const override {}
+    void get_or_add_xover_mapping(RefTranslation&, size_t, size_t, size_t) override
+    {
+        REALM_ASSERT(false);
+    }
 };
 
 // This variable is declared such that get_default() can return it. It could be a static local variable, but
@@ -121,7 +125,7 @@ Allocator& Allocator::get_default() noexcept
 // memory mapping. This requires one of three:
 // * bumping the limit of the mapping. (if the entire array is inside the mapping)
 // * adding a cross-over mapping. (if the array crosses a mapping boundary)
-// * using an already established cross-over mapping. (do)
+// * using an already established cross-over mapping. (ditto)
 // this can proceed concurrently with other calls to translate()
 char* Allocator::x_translate_extended(RefTranslation* ref_translation_ptr, ref_type ref) const noexcept
 {
@@ -139,9 +143,10 @@ char* Allocator::x_translate_extended(RefTranslation* ref_translation_ptr, ref_t
         // use of the existing primary mapping.
         // Take into account that another thread may attempt to change / have changed it concurrently,
         // by re-evaluating whether we still need to bump. In case of conflict we back off.
-        size_t mapping_limit = txl.primary_mapping_limit.load(std::memory_order_relaxed);
+        size_t mapping_limit = txl.lowest_possible_xover_offset.load(std::memory_order_relaxed);
         if (offset + size > mapping_limit) {
-            txl.primary_mapping_limit.compare_exchange_weak(mapping_limit, offset + size, std::memory_order_relaxed);
+            txl.lowest_possible_xover_offset.compare_exchange_weak(mapping_limit, offset + size,
+                                                                   std::memory_order_relaxed);
         }
         // retry with (potentially) increased limit - this tail recursive call is a camouflaged
         // loop going back over x_translate(), from which it will eventually exit as it finds

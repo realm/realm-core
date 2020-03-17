@@ -193,7 +193,7 @@ MemRef SlabAlloc::do_alloc(size_t size)
     REALM_ASSERT_EX(0 < size, size, get_file_path_for_assertions());
     REALM_ASSERT_EX((size & 0x7) == 0, size, get_file_path_for_assertions()); // only allow sizes that are multiples of 8
     REALM_ASSERT_EX(is_attached(), get_file_path_for_assertions());
-    REALM_ASSERT_EX(size < 1 * 1024 * 1024 * 1024, size, get_file_path_for_assertions());
+    REALM_ASSERT_EX(size < (1 << section_shift), size, get_file_path_for_assertions());
 
     // If we failed to correctly record free space, new allocations cannot be
     // carried out until the free space record is reset.
@@ -935,7 +935,7 @@ ref_type SlabAlloc::attach_buffer(const char* data, size_t size)
     m_translation_table_size = 1;
     m_ref_translation_ptr = new RefTranslation[1];
     m_ref_translation_ptr[0].mapping_addr = const_cast<char*>(m_data);
-    m_ref_translation_ptr[0].primary_mapping_limit = 0;
+    m_ref_translation_ptr[0].lowest_possible_xover_offset = 0;
     m_ref_translation_ptr[0].xover_mapping_base = 0;
     m_ref_translation_ptr[0].xover_mapping_addr = nullptr;
 #if REALM_ENABLE_ENCRYPTION
@@ -967,7 +967,7 @@ void SlabAlloc::attach_empty()
     m_translation_table_size = 1;
     m_ref_translation_ptr = new RefTranslation[1];
     m_ref_translation_ptr[0].mapping_addr = nullptr;
-    m_ref_translation_ptr[0].primary_mapping_limit = 0;
+    m_ref_translation_ptr[0].lowest_possible_xover_offset = 0;
     m_ref_translation_ptr[0].xover_mapping_base = 0;
     m_ref_translation_ptr[0].xover_mapping_addr = nullptr;
 #if REALM_ENABLE_ENCRYPTION
@@ -1194,7 +1194,7 @@ void SlabAlloc::update_reader_view(size_t file_size)
                 for (size_t i = 0; i < old_num_mappings; ++i) {
                     next_mapping[i].primary_mapping = std::move(m_mappings[i].primary_mapping);
                     next_mapping[i].xover_mapping = std::move(m_mappings[i].xover_mapping);
-                    next_mapping[i].primary_mapping_limit = m_mappings[i].primary_mapping_limit;
+                    next_mapping[i].lowest_possible_xover_offset = m_mappings[i].lowest_possible_xover_offset;
                 }
                 m_mappings = std::move(next_mapping);
             }
@@ -1263,7 +1263,7 @@ void SlabAlloc::extend_fast_mapping_with_slab(char* address)
     }
     m_old_translations.emplace_back(m_youngest_live_version, m_ref_translation_ptr.load());
     new_fast_mapping[m_translation_table_size - 1].mapping_addr = address;
-    new_fast_mapping[m_translation_table_size - 1].primary_mapping_limit = 1ULL << section_shift;
+    new_fast_mapping[m_translation_table_size - 1].lowest_possible_xover_offset = 1ULL << section_shift;
     m_ref_translation_ptr = new_fast_mapping;
 }
 
@@ -1311,7 +1311,7 @@ void SlabAlloc::get_or_add_xover_mapping(RefTranslation& txl, size_t index, size
     if (txl.xover_mapping_addr) {
         // some other thread already added a mapping
         // it MUST have been for the exact same address:
-        REALM_ASSERT(offset == txl.primary_mapping_limit.load(std::memory_order_relaxed));
+        REALM_ASSERT(offset == txl.lowest_possible_xover_offset.load(std::memory_order_relaxed));
         return;
     }
     MapEntry* map_entry = &m_mappings[index];
@@ -1330,7 +1330,7 @@ void SlabAlloc::get_or_add_xover_mapping(RefTranslation& txl, size_t index, size
     txl.xover_encrypted_mapping = map_entry->xover_mapping.get_encrypted_mapping();
 #endif
     txl.xover_mapping_addr.store(map_entry->xover_mapping.get_addr(), std::memory_order_release);
-    txl.primary_mapping_limit.store(offset, std::memory_order_relaxed);
+    txl.lowest_possible_xover_offset.store(offset, std::memory_order_relaxed);
 }
 
 

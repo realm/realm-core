@@ -3625,7 +3625,7 @@ TEST(Table_QuickSort2)
 TEST(Table_object_sequential)
 {
 #ifdef PERFORMACE_TESTING
-    int nb_rows = 10000000;
+    int nb_rows = 10'000'000;
     int num_runs = 1;
 #else
     int nb_rows = 1024;
@@ -3774,10 +3774,10 @@ TEST(Table_object_sequential)
 TEST(Table_object_seq_rnd)
 {
 #ifdef PERFORMACE_TESTING
-    size_t rows = 1000000;
+    size_t rows = 1'000'000;
     int runs = 100;     // runs for building scenario
 #else
-    size_t rows = 50000;
+    size_t rows = 50'000;
     int runs = 1;
 #endif
     int64_t next_key = 0;
@@ -3889,7 +3889,7 @@ TEST(Table_object_seq_rnd)
 TEST(Table_object_random)
 {
 #ifdef PERFORMACE_TESTING
-    int nb_rows = 1000000;
+    int nb_rows = 1'000'000;
     int num_runs = 10;
 #else
     int nb_rows = 1024;
