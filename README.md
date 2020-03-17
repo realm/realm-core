@@ -135,12 +135,11 @@ configurations.
 ## Running [app] tests against a local MongoDB Stitch
 
 Stitch images are published to our private Github CI. Follow the steps here to
-set up authorization from docker to your Github account https://github.com/realm/ci/packages/147854
+set up authorization from docker to your Github account https://github.com/realm/ci/tree/master/realm/docker/mongodb-realm
 Once authorized, run the following docker commands from the top directory to start a local instance:
 
 ```
-docker build --tag local-stitch -f workflow/stitch.Dockerfile workflow
-docker run --rm -p 9090:9090 -v $(pwd)/tests/mongodb:/app_config:rw -it local-stitch /bin/bash -c "(import_app.sh&) && run.sh"
+docker run --rm -v $(pwd)/tests/mongodb:/apps/os-integration-tests -p 9090:9090 -it docker.pkg.github.com/realm/ci/mongodb-realm-test-server:latest
 ```
 
 This will make the stitch UI available in your browser at `localhost:9090` where you can login with "unique_user@domain.com" and "password".

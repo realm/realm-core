@@ -62,44 +62,15 @@ def nodeWithSources(String nodespec, Closure steps) {
   }
 }
 
-def withCustomRealmCloud(String version, String configPath, String appName, block = { it }) {
-  def mdbRealmImage = docker.image("${env.DOCKER_REGISTRY}/ci/mongodb-realm-images:${version}")
-  def stitchCliImage = docker.image("${env.DOCKER_REGISTRY}/ci/stitch-cli:190")
-  docker.withRegistry("https://${env.DOCKER_REGISTRY}", "ecr:eu-west-1:aws-ci-user") {
-    mdbRealmImage.pull()
-    stitchCliImage.pull()
-  }
+def withCustomRealmCloud(String version, block = { it }) {
+  def mdbRealmImage = buildDockerEnv("${env.DOCKER_REGISTRY}/ci/mongodb-realm-test-server:${version}")
   // run image, get IP
   withDockerNetwork { network ->
     mdbRealmImage.withRun("--network=${network} --network-alias=mongodb-realm") {
-      stitchCliImage.inside("--network=${network}") {
-        sh '''
-          echo "Waiting for Stitch to start"
-          while ! curl --output /dev/null --silent --head --fail http://mongodb-realm:9090; do
-            sleep 1 && echo -n .;
-          done;
-        '''
-
-        def access_token = sh(
-          script: 'curl --request POST --header "Content-Type: application/json" --data \'{ "username":"unique_user@domain.com", "password":"password" }\' http://mongodb-realm:9090/api/admin/v3.0/auth/providers/local-userpass/login -s | jq ".access_token" -r',
-          returnStdout: true
-        ).trim()
-
-        def group_id = sh(
-          script: "curl --header 'Authorization: Bearer $access_token' http://mongodb-realm:9090/api/admin/v3.0/auth/profile -s | jq '.roles[0].group_id' -r",
-          returnStdout: true
-        ).trim()
-
-        sh """
-          /usr/bin/stitch-cli login --config-path=${configPath}/stitch-config --base-url=http://mongodb-realm:9090 --auth-provider=local-userpass --username=unique_user@domain.com --password=password
-          /usr/bin/stitch-cli import --config-path=${configPath}/stitch-config --base-url=http://mongodb-realm:9090 --app-name auth-integration-tests --path=${configPath} --project-id $group_id -y --strategy replace
-        """
-      }
       block(network)
     }
   }
 }
-
 
 def doDockerBuild(String flavor, Boolean withCoverage, Boolean enableSync, String sanitizerFlags = "") {
   def sync = enableSync ? "sync" : ""
@@ -116,16 +87,16 @@ def doDockerBuild(String flavor, Boolean withCoverage, Boolean enableSync, Strin
   return {
     nodeWithSources('docker') {
       def image = buildDockerEnv("ci/realm-object-store:${flavor}", push: env.BRANCH_NAME == 'master')
+      def sourcesDir = pwd()
       def buildSteps = { String dockerArgs = "" ->
         // The only reason we can't run commands directly is because sync builds need to
         // use CI's credentials to pull from the private repository. This can be removed
         // when sync is open sourced.
         sshagent(['realm-ci-ssh']) {
-          image.inside("-v /etc/passwd:/etc/passwd:ro -v ${env.HOME}:${env.HOME} -v ${env.SSH_AUTH_SOCK}:${env.SSH_AUTH_SOCK} -e HOME=${env.HOME} ${dockerArgs}") {
+          image.inside("-v /etc/passwd:/etc/passwd:ro -v ${sourcesDir}/tests/mongodb:/apps/os-integration-tests:rw -v ${env.HOME}:${env.HOME} -v ${env.SSH_AUTH_SOCK}:${env.SSH_AUTH_SOCK} -e HOME=${env.HOME} ${dockerArgs}") {
             if (enableSync) {
               // sanity check the network to local stitch before continuing to compile everything
               sh "curl http://mongodb-realm:9090"
-              def sourcesDir = pwd()
               cmakeFlags += "-DREALM_ENABLE_SYNC=1 -DREALM_ENABLE_AUTH_TESTS=1 -DREALM_MONGODB_ENDPOINT=\"http://mongodb-realm:9090\" -DREALM_STITCH_CONFIG=\"${sourcesDir}/tests/mongodb/stitch.json\" "
             }
             sh "cmake -B ${buildDir} -G Ninja ${cmakeFlags}"
@@ -141,11 +112,10 @@ def doDockerBuild(String flavor, Boolean withCoverage, Boolean enableSync, Strin
       }
 
       if (enableSync) {
-        // stitch images are auto-published internally to aws
-        // after authenticating to aws (and ensure you are part of the realm-ecr-users permissions group) you can find the latest image by running:
-        // `aws ecr describe-images --repository-name ci/mongodb-realm-images --query 'sort_by(imageDetails,& imagePushedAt)[-1].imageTags[0]'`
-        withCustomRealmCloud("test_server-0ed2349a36352666402d0fb2e8763ac67731768c-race", "tests/mongodb", "auth-integration-tests") { networkName ->
-          buildSteps("--network=${networkName}")
+          // stitch images are auto-published every day to our CI
+          // see https://github.com/realm/ci/tree/master/realm/docker/mongodb-realm
+          withCustomRealmCloud("2020-03-16-2") { networkName ->
+            buildSteps("--network=${networkName}")
         }
       } else {
         buildSteps("")
