@@ -117,9 +117,6 @@ public:
     void bptree_access(size_t n, AccessFunc) override;
     size_t bptree_erase(size_t n, EraseFunc) override;
     bool bptree_traverse(TraverseFunc) override;
-    void verify() const override
-    {
-    }
 };
 
 /*****************************************************************************/
@@ -322,6 +319,10 @@ public:
         {
             LeafNode* dst(static_cast<LeafNode*>(new_node));
             LeafArray::move(*dst, ndx);
+        }
+        void verify() const override
+        {
+            LeafArray::verify();
         }
     };
 

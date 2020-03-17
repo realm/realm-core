@@ -1592,7 +1592,26 @@ void Cluster::verify() const
         auto attr = spec.get_column_attr(i);
         if (attr.test(col_attr_List)) {
             // FIXME: implement
-            verify<ArrayRef>(ref, col, sz);
+            ArrayRef arr(get_alloc());
+            arr.set_parent(const_cast<Cluster*>(this), col);
+            arr.init_from_ref(ref);
+            arr.verify();
+            if (sz) {
+                REALM_ASSERT(arr.size() == *sz);
+            }
+            else {
+                sz = arr.size();
+            }
+            if (spec.get_column_type(i) == col_type_LinkList) {
+                for (size_t n = 0; n < *sz; n++) {
+                    if (ref_type bp_tree_ref = arr.get(n)) {
+                        BPlusTree<ObjKey> links(m_alloc);
+                        links.init_from_ref(bp_tree_ref);
+                        links.set_parent(&arr, n);
+                        links.verify();
+                    }
+                }
+            }
             continue;
         }
 
