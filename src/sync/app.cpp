@@ -588,10 +588,9 @@ void App::log_in_with_credentials(const AppCredentials& credentials,
     }, handler);
 }
 
-void App::log_out(std::function<void (Optional<AppError>)> completion_block) const
+void App::log_out(std::shared_ptr<SyncUser> user, std::function<void (Optional<AppError>)> completion_block) const
 {
-    auto user = current_user();
-    if (!user) {
+    if (!user || user->state() != SyncUser::State::Active) {
         return completion_block(util::none);
     }
     std::string bearer = util::format("Bearer %1", current_user()->refresh_token());
@@ -617,6 +616,10 @@ void App::log_out(std::function<void (Optional<AppError>)> completion_block) con
         },
         ""
     }, handler);
+}
+
+void App::log_out(std::function<void (Optional<AppError>)> completion_block) const {
+    log_out(current_user(), completion_block);
 }
 
 } // namespace app

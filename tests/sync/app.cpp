@@ -1033,6 +1033,34 @@ TEST_CASE("app: user_semantics", "[app]") {
         CHECK(app.all_users().size() == 1);
         CHECK(app.all_users()[0]->state() == SyncUser::State::Active);
     }
+
+    SECTION("logout user") {
+        auto user1 = login_user_email_pass();
+        auto user2 = login_user_anonymous();
+
+        // Anonymous users are special
+        app.log_out(user2, [](Optional<AppError> error) {
+            CHECK(!error);
+        });
+        CHECK(user2->state() == SyncUser::State::Error);
+
+        // Other users can be LoggedOut
+        app.log_out(user1, [](Optional<AppError> error) {
+            CHECK(!error);
+        });
+        CHECK(user1->state() == SyncUser::State::LoggedOut);
+
+        // Logging out already logged out users, does nothing
+        app.log_out(user1, [](Optional<AppError> error) {
+            CHECK(!error);
+        });
+        CHECK(user1->state() == SyncUser::State::LoggedOut);
+
+        app.log_out(user2, [](Optional<AppError> error) {
+            CHECK(!error);
+        });
+        CHECK(user2->state() == SyncUser::State::Error);
+    }
 }
 
 struct ErrorCheckingTransport : public GenericNetworkTransport {
