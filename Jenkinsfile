@@ -62,16 +62,6 @@ def nodeWithSources(String nodespec, Closure steps) {
   }
 }
 
-def withCustomRealmCloud(String version, block = { it }) {
-  def mdbRealmImage = buildDockerEnv("${env.DOCKER_REGISTRY}/ci/mongodb-realm-test-server:${version}")
-  // run image, get IP
-  withDockerNetwork { network ->
-    mdbRealmImage.withRun("--network=${network} --network-alias=mongodb-realm") {
-      block(network)
-    }
-  }
-}
-
 def doDockerBuild(String flavor, Boolean withCoverage, Boolean enableSync, String sanitizerFlags = "") {
   def sync = enableSync ? "sync" : ""
   def label = "${flavor}${enableSync ? '-sync' : ''}"
@@ -93,7 +83,7 @@ def doDockerBuild(String flavor, Boolean withCoverage, Boolean enableSync, Strin
         // use CI's credentials to pull from the private repository. This can be removed
         // when sync is open sourced.
         sshagent(['realm-ci-ssh']) {
-          image.inside("-v /etc/passwd:/etc/passwd:ro -v ${sourcesDir}/tests/mongodb:/apps/os-integration-tests:rw -v ${env.HOME}:${env.HOME} -v ${env.SSH_AUTH_SOCK}:${env.SSH_AUTH_SOCK} -e HOME=${env.HOME} ${dockerArgs}") {
+          image.inside("-v /etc/passwd:/etc/passwd:ro -v ${env.HOME}:${env.HOME} -v ${env.SSH_AUTH_SOCK}:${env.SSH_AUTH_SOCK} -e HOME=${env.HOME} ${dockerArgs}") {
             if (enableSync) {
               // sanity check the network to local stitch before continuing to compile everything
               sh "curl http://mongodb-realm:9090"
@@ -114,7 +104,7 @@ def doDockerBuild(String flavor, Boolean withCoverage, Boolean enableSync, Strin
       if (enableSync) {
           // stitch images are auto-published every day to our CI
           // see https://github.com/realm/ci/tree/master/realm/docker/mongodb-realm
-          withCustomRealmCloud("2020-03-16-2") { networkName ->
+        withRealmCloud(version: 'latest', appsToImport: ['auth-integration-tests': "${env.WORKSPACE}/tests/mongodb"]) { networkName ->
             buildSteps("--network=${networkName}")
         }
       } else {

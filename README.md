@@ -136,7 +136,7 @@ configurations.
 
 Stitch images are published to our private Github CI. Follow the steps here to
 set up authorization from docker to your Github account https://github.com/realm/ci/tree/master/realm/docker/mongodb-realm
-Once authorized, run the following docker commands from the top directory to start a local instance:
+Once authorized, run the following docker command from the top directory to start a local instance:
 
 ```
 docker run --rm -v $(pwd)/tests/mongodb:/apps/os-integration-tests -p 9090:9090 -it docker.pkg.github.com/realm/ci/mongodb-realm-test-server:latest
