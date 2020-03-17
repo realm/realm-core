@@ -157,7 +157,7 @@ class IntTestTransport : public GenericNetworkTransport {
             int binding_response_code = 0;
             completion_block(Response{response_code, binding_response_code, response_headers, response});
         }
-        
+
         curl_global_cleanup();
     }
     
