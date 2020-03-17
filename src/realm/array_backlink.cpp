@@ -184,10 +184,10 @@ void ArrayBacklink::verify() const
     REALM_ASSERT(dynamic_cast<Cluster*>(get_parent()));
     auto cluster = static_cast<Cluster*>(get_parent());
     const Table* target_table = cluster->get_owning_table();
-    ColKey target_col_key = cluster->get_col_key(get_ndx_in_parent());
+    ColKey backlink_col_key = cluster->get_col_key(get_ndx_in_parent());
 
-    TableRef src_table = target_table->get_opposite_table(target_col_key);
-    ColKey src_col_key = target_table->get_opposite_column(target_col_key);
+    TableRef src_table = target_table->get_opposite_table(backlink_col_key);
+    ColKey src_col_key = target_table->get_opposite_column(backlink_col_key);
 
     // Verify that each backlink has a corresponding forward link
     ColumnAttrMask src_attr = src_col_key.get_attrs();
@@ -202,34 +202,6 @@ void ArrayBacklink::verify() const
             else {
                 REALM_ASSERT(src_obj.get<ObjKey>(src_col_key) == target_key);
             }
-        }
-    }
-
-    // Verify that each forward link has a corresponding backlink
-    auto verify_backlink = [&](ObjKey src, ObjKey target_key) {
-        if (!target_key) {
-            return;
-        }
-        REALM_ASSERT(target_table->is_valid(target_key));
-        Obj target = target_table->get_object(target_key);
-        size_t cnt = target.get_backlink_count(*src_table, src_col_key);
-        REALM_ASSERT(cnt > 0);
-        for (size_t i = 0; i < cnt; ++i) {
-            if (target.get_backlink(target_col_key, i)  == src) {
-                return;
-            }
-        }
-        REALM_ASSERT(false);
-    };
-    for (auto src_obj : *src_table) {
-        if (src_attr.test(col_attr_List)) {
-            auto list = src_obj.get_list<ObjKey>(src_col_key);
-            for (size_t i = 0; i < list.size(); ++i) {
-                verify_backlink(src_obj.get_key(), list.get(i));
-            }
-        }
-        else {
-            verify_backlink(src_obj.get_key(), src_obj.get<ObjKey>(src_col_key));
         }
     }
 #endif

@@ -278,6 +278,12 @@ public:
     // - turns the object into a tombstone if links exist
     // - otherwise works just as remove_object()
     void invalidate_object(ObjKey key);
+    ConstObj get_tombstone(ObjKey key) const
+    {
+        REALM_ASSERT(key.is_unresolved());
+        REALM_ASSERT(m_tombstones);
+        return m_tombstones->get(key);
+    }
 
     void clear();
     using Iterator = ClusterTree::Iterator;
