@@ -193,6 +193,8 @@ MemRef SlabAlloc::do_alloc(size_t size)
     REALM_ASSERT_EX(0 < size, size, get_file_path_for_assertions());
     REALM_ASSERT_EX((size & 0x7) == 0, size, get_file_path_for_assertions()); // only allow sizes that are multiples of 8
     REALM_ASSERT_EX(is_attached(), get_file_path_for_assertions());
+    // This limits the size of any array to ensure it can fit within a memory section.
+    // NOTE: This limit is lower than the limit set by the encoding in node_header.hpp
     REALM_ASSERT_EX(size < (1 << section_shift), size, get_file_path_for_assertions());
 
     // If we failed to correctly record free space, new allocations cannot be
