@@ -1580,18 +1580,36 @@ void Cluster::verify(ref_type ref, size_t index, util::Optional<size_t>& sz) con
         sz = arr.size();
     }
 }
+namespace {
+
+template <typename ArrayType>
+void verify_list(ArrayRef& arr, size_t sz)
+{
+    for (size_t n = 0; n < sz; n++) {
+        if (ref_type bp_tree_ref = arr.get(n)) {
+            BPlusTree<ArrayType> links(arr.get_alloc());
+            links.init_from_ref(bp_tree_ref);
+            links.set_parent(&arr, n);
+            links.verify();
+        }
+    }
+}
+
+} // namespace
 
 void Cluster::verify() const
 {
 #ifdef REALM_DEBUG
-    auto& spec = m_tree_top.get_spec();
     util::Optional<size_t> sz;
-    for (size_t i = 0; i < spec.get_column_count(); i++) {
-        size_t col = spec.get_key(i).get_index().val + s_first_col_index;
+
+    auto verify_column = [this, &sz](ColKey col_key) {
+        size_t col = col_key.get_index().val + s_first_col_index;
         ref_type ref = Array::get_as_ref(col);
-        auto attr = spec.get_column_attr(i);
+        auto attr = col_key.get_attrs();
+        auto col_type = col_key.get_type();
+        bool nullable = attr.test(col_attr_Nullable);
+
         if (attr.test(col_attr_List)) {
-            // FIXME: implement
             ArrayRef arr(get_alloc());
             arr.set_parent(const_cast<Cluster*>(this), col);
             arr.init_from_ref(ref);
@@ -1602,21 +1620,50 @@ void Cluster::verify() const
             else {
                 sz = arr.size();
             }
-            if (spec.get_column_type(i) == col_type_LinkList) {
-                for (size_t n = 0; n < *sz; n++) {
-                    if (ref_type bp_tree_ref = arr.get(n)) {
-                        BPlusTree<ObjKey> links(m_alloc);
-                        links.init_from_ref(bp_tree_ref);
-                        links.set_parent(&arr, n);
-                        links.verify();
+
+            switch (col_type) {
+                case col_type_Int:
+                    if (nullable) {
+                        verify_list<util::Optional<int64_t>>(arr, *sz);
                     }
-                }
+                    else {
+                        verify_list<int64_t>(arr, *sz);
+                    }
+                    break;
+                case col_type_Bool:
+                    verify_list<Bool>(arr, *sz);
+                    break;
+                case col_type_Float:
+                    verify_list<Float>(arr, *sz);
+                    break;
+                case col_type_Double:
+                    verify_list<Double>(arr, *sz);
+                    break;
+                case col_type_String:
+                    verify_list<String>(arr, *sz);
+                    break;
+                case col_type_Binary:
+                    verify_list<Binary>(arr, *sz);
+                    break;
+                case col_type_Timestamp:
+                    verify_list<Timestamp>(arr, *sz);
+                    break;
+                case col_type_Decimal:
+                    verify_list<Decimal128>(arr, *sz);
+                    break;
+                case col_type_ObjectId:
+                    verify_list<ObjectId>(arr, *sz);
+                    break;
+                case col_type_LinkList:
+                    verify_list<ObjKey>(arr, *sz);
+                    break;
+                default:
+                    break;
             }
-            continue;
+            return false;
         }
 
-        bool nullable = attr.test(col_attr_Nullable);
-        switch (spec.get_column_type(i)) {
+        switch (col_type) {
             case col_type_Int:
                 if (nullable) {
                     verify<ArrayIntNull>(ref, col, sz);
@@ -1658,7 +1705,10 @@ void Cluster::verify() const
             default:
                 break;
         }
-    }
+        return false;
+    };
+
+    m_tree_top.get_owner()->for_each_and_every_column(verify_column);
 #endif
 }
 
