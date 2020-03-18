@@ -1600,12 +1600,13 @@ void verify_list(ArrayRef& arr, size_t sz)
 void Cluster::verify() const
 {
 #ifdef REALM_DEBUG
-    auto& spec = m_tree_top.get_spec();
     util::Optional<size_t> sz;
-    for (size_t i = 0; i < spec.get_column_count(); i++) {
-        size_t col = spec.get_key(i).get_index().val + s_first_col_index;
+
+    auto verify_column = [this, &sz](ColKey col_key) {
+        size_t col = col_key.get_index().val + s_first_col_index;
         ref_type ref = Array::get_as_ref(col);
-        auto attr = spec.get_column_attr(i);
+        auto attr = col_key.get_attrs();
+        auto col_type = col_key.get_type();
         bool nullable = attr.test(col_attr_Nullable);
 
         if (attr.test(col_attr_List)) {
@@ -1620,7 +1621,7 @@ void Cluster::verify() const
                 sz = arr.size();
             }
 
-            switch (spec.get_column_type(i)) {
+            switch (col_type) {
                 case col_type_Int:
                     if (nullable) {
                         verify_list<util::Optional<int64_t>>(arr, *sz);
@@ -1659,10 +1660,10 @@ void Cluster::verify() const
                 default:
                     break;
             }
-            continue;
+            return false;
         }
 
-        switch (spec.get_column_type(i)) {
+        switch (col_type) {
             case col_type_Int:
                 if (nullable) {
                     verify<ArrayIntNull>(ref, col, sz);
@@ -1704,7 +1705,10 @@ void Cluster::verify() const
             default:
                 break;
         }
-    }
+        return false;
+    };
+
+    m_tree_top.get_owner()->for_each_and_every_column(verify_column);
 #endif
 }
 
