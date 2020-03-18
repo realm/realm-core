@@ -144,7 +144,8 @@ private:
         REALM_ASSERT_DEBUG(!m_offsets.is_attached());
         return size_t(Array::get(0)) >> 1;
     }
-    ref_type get_child_ref(size_t ndx) const noexcept override
+    // Should not be mixed up with Array::get_child_ref
+    ref_type _get_child_ref(size_t ndx) const noexcept
     {
         return Array::get_as_ref(ndx + 1);
     }
@@ -265,7 +266,7 @@ void BPlusTreeInner::bptree_access(size_t n, AccessFunc func)
         child_offset = child_ndx * elems_per_child;
     }
 
-    ref_type child_ref = get_child_ref(child_ndx);
+    ref_type child_ref = _get_child_ref(child_ndx);
     char* child_header = m_alloc.translate(child_ref);
     MemRef mem(child_header, child_ref, m_alloc);
     bool child_is_leaf = !Array::get_is_inner_bptree_node_from_header(child_header);
@@ -305,7 +306,7 @@ ref_type BPlusTreeInner::bptree_insert(size_t ndx, State& state, InsertFunc func
         }
     }
 
-    ref_type child_ref = get_child_ref(child_ndx);
+    ref_type child_ref = _get_child_ref(child_ndx);
     char* child_header = m_alloc.translate(child_ref);
     MemRef mem(child_header, child_ref, m_alloc);
     bool child_is_leaf = !Array::get_is_inner_bptree_node_from_header(child_header);
@@ -343,7 +344,7 @@ size_t BPlusTreeInner::bptree_erase(size_t n, EraseFunc func)
 
     // Call bptree_erase recursively and ultimately call 'func' on leaf
     size_t erase_node_size;
-    ref_type child_ref = get_child_ref(child_ndx);
+    ref_type child_ref = _get_child_ref(child_ndx);
     char* child_header = m_alloc.translate(child_ref);
     MemRef mem(child_header, child_ref, m_alloc);
     BPlusTreeLeaf* leaf = nullptr;
@@ -384,7 +385,7 @@ size_t BPlusTreeInner::bptree_erase(size_t n, EraseFunc func)
         // Candidate for merge. First calculate if the combined size of current and
         // next sibling is small enough.
         size_t sibling_ndx = child_ndx + 1;
-        ref_type sibling_ref = get_child_ref(sibling_ndx);
+        ref_type sibling_ref = _get_child_ref(sibling_ndx);
         std::unique_ptr<BPlusTreeLeaf> sibling_leaf;
         BPlusTreeInner node2(m_tree);
         BPlusTreeNode* sibling_node;
@@ -453,7 +454,7 @@ bool BPlusTreeInner::bptree_traverse(TraverseFunc func)
         }
 
         bool done;
-        ref_type child_ref = get_child_ref(i);
+        ref_type child_ref = _get_child_ref(i);
         char* child_header = m_alloc.translate(child_ref);
         MemRef mem(child_header, child_ref, m_alloc);
         bool child_is_leaf = !Array::get_is_inner_bptree_node_from_header(child_header);
@@ -484,7 +485,7 @@ void BPlusTreeInner::move(BPlusTreeNode* new_node, size_t ndx, int64_t adj)
     // Copy refs
     for (size_t i = ndx; i < sz; i++) {
         size_t offs = get_child_offset(i);
-        dst->add_child_ref(get_child_ref(i), offs - adj);
+        dst->add_child_ref(_get_child_ref(i), offs - adj);
     }
     truncate(ndx + 1);
     if (ndx > 0)
@@ -520,7 +521,7 @@ inline BPlusTreeLeaf* BPlusTreeInner::cache_leaf(MemRef mem, size_t ndx, size_t 
 
 void BPlusTreeInner::erase_and_destroy_child(size_t ndx)
 {
-    ref_type ref = get_child_ref(ndx);
+    ref_type ref = _get_child_ref(ndx);
     erase(ndx + 1);
     Array::destroy_deep(ref, m_tree->get_alloc());
     REALM_ASSERT_DEBUG(m_offsets.is_attached());
@@ -625,7 +626,7 @@ void BPlusTreeInner::verify() const
 
     size_t num_elems = 0;
     for (size_t i = 0; i < num_children; i++) {
-        ref_type child_ref = get_child_ref(i);
+        ref_type child_ref = _get_child_ref(i);
         char* child_header = m_alloc.translate(child_ref);
         MemRef mem(child_header, child_ref, m_alloc);
         bool child_is_leaf = !Array::get_is_inner_bptree_node_from_header(child_header);
@@ -633,6 +634,7 @@ void BPlusTreeInner::verify() const
         if (child_is_leaf) {
             auto leaf = const_cast<BPlusTreeInner*>(this)->cache_leaf(mem, i, 0);
             elems_in_child = leaf->get_node_size();
+            leaf->verify();
         }
         else {
             BPlusTreeInner node(m_tree);

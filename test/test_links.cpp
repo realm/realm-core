@@ -838,10 +838,15 @@ TEST(Links_LinkList_Backlinks)
     links->add(key2);
     links->add(key1);
     links->add(key0);
+    links->add(key2);
+    links->add(key1);
+    links->add(key0);
+
+    group.verify();
 
     // remove a target row and check that origin links are removed as well
     target->remove_object(key1);
-    CHECK_EQUAL(2, origin_obj.get_link_count(col_link));
+    CHECK_EQUAL(4, origin_obj.get_link_count(col_link));
     CHECK_EQUAL(key2, links->get(0));
     CHECK_EQUAL(key0, links->get(1));
 
