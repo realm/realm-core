@@ -2817,7 +2817,7 @@ TEST(Table_object_basic)
 
     table.create_object(ObjKey(5)).set_all(100, 7);
     CHECK_EQUAL(table.size(), 1);
-    CHECK_THROW(table.create_object(ObjKey(5)), InvalidKey);
+    CHECK_THROW(table.create_object(ObjKey(5)), KeyAlreadyUsed);
     CHECK_EQUAL(table.size(), 1);
     table.create_object(ObjKey(2));
     Obj x = table.create_object(ObjKey(7));
@@ -2953,7 +2953,7 @@ TEST(Table_object_basic)
 
     // Check that accessing a removed object will throw
     table.remove_object(ObjKey(5));
-    CHECK_THROW(y.get<int64_t>(intnull_col), InvalidKey);
+    CHECK_THROW(y.get<int64_t>(intnull_col), KeyNotFound);
 
     CHECK(table.get_object(ObjKey(8)).is_null(intnull_col));
 }

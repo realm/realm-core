@@ -103,11 +103,37 @@ public:
     /// runtime_error::what() returns the msg provided in the constructor.
 };
 
-/// Thrown when a key can not be used (either not found or already existing
-/// when trying to create a new object)
-class InvalidKey : public std::runtime_error {
+/// Thrown when a key can not by found
+class KeyNotFound : public std::runtime_error {
 public:
-    InvalidKey(const std::string& msg)
+    KeyNotFound(const std::string& msg)
+        : std::runtime_error(msg)
+    {
+    }
+};
+
+/// Thrown when a column can not by found
+class ColumnNotFound : public std::runtime_error {
+public:
+    ColumnNotFound()
+        : std::runtime_error("Column not found")
+    {
+    }
+};
+
+/// Thrown when a column key is already used
+class ColumnAlreadyExists : public std::runtime_error {
+public:
+    ColumnAlreadyExists()
+        : std::runtime_error("Column already exists")
+    {
+    }
+};
+
+/// Thrown when a key is already existing when trying to create a new object
+class KeyAlreadyUsed : public std::runtime_error {
+public:
+    KeyAlreadyUsed(const std::string& msg)
         : std::runtime_error(msg)
     {
     }

@@ -239,7 +239,7 @@ TEST(Links_SetLinkLogicErrors)
     // not properly check it yet.
 
     origin->remove_object(obj.get_key());
-    CHECK_THROW(obj.set(col0, ObjKey(10)), InvalidKey);
+    CHECK_THROW(obj.set(col0, ObjKey(10)), KeyNotFound);
 
     group.remove_table("origin");
     CHECK_THROW(obj.set(col0, ObjKey(10)), realm::NoSuchTable);

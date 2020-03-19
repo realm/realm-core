@@ -222,7 +222,7 @@ void ClusterNode::IteratorState::init(const ConstObj& obj)
 void ClusterNode::get(ObjKey k, ClusterNode::State& state) const
 {
     if (!k || !try_get(k, state)) {
-        throw InvalidKey("Key not found");
+        throw KeyNotFound("When getting");
     }
 }
 
@@ -282,7 +282,7 @@ T ClusterNodeInner::recurse(ObjKey key, F func)
 {
     ChildInfo child_info;
     if (!find_child(key, child_info)) {
-        throw InvalidKey("Key not found");
+        throw KeyNotFound("Recurse");
     }
     return recurse<T>(child_info, func);
 }
@@ -412,7 +412,7 @@ size_t ClusterNodeInner::get_ndx(ObjKey key, size_t ndx) const
 {
     ChildInfo child_info;
     if (!find_child(key, child_info)) {
-        throw InvalidKey("Key not found");
+        throw KeyNotFound("find_child");
     }
 
     // First figure out how many objects there are in nodes before actual one
@@ -1251,14 +1251,14 @@ ref_type Cluster::insert(ObjKey k, const FieldValues& init_values, ClusterNode::
         if (ndx < sz) {
             current_key_value = m_keys.get(ndx);
             if (k.value == current_key_value) {
-                throw InvalidKey("Key already used");
+                throw KeyAlreadyUsed("When inserting");
             }
         }
     }
     else {
         sz = size_t(Array::get(s_key_ref_or_size_index)) >> 1; // Size is stored as tagged integer
         if (uint64_t(k.value) < sz) {
-            throw InvalidKey("Key already used");
+            throw KeyAlreadyUsed("When inserting");
         }
         // Key value is bigger than all other values, should be put last
         ndx = sz;
@@ -1355,13 +1355,13 @@ size_t Cluster::get_ndx(ObjKey k, size_t ndx) const
     if (m_keys.is_attached()) {
         index = m_keys.lower_bound(uint64_t(k.value));
         if (index == m_keys.size() || m_keys.get(index) != uint64_t(k.value)) {
-            throw InvalidKey("Key not found");
+            throw KeyNotFound("Get index");
         }
     }
     else {
         index = size_t(k.value);
         if (index >= get_as_ref_or_tagged(s_key_ref_or_size_index).get_as_int()) {
-            throw InvalidKey("Key not found");
+            throw KeyNotFound("Get index");
         }
     }
     return index + ndx;

@@ -1416,7 +1416,7 @@ bool inline Table::valid_column(ColKey col_key) const noexcept
 inline void Table::check_column(ColKey col_key) const
 {
     if (REALM_UNLIKELY(!valid_column(col_key)))
-        throw InvalidKey("No such column");
+        throw ColumnNotFound();
 }
 
 // The purpose of this class is to give internal access to some, but

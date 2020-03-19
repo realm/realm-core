@@ -327,8 +327,8 @@ ColKey Table::add_column_link(DataType type, StringData name, Table& target)
 
 ColKey Table::insert_column_link(ColKey col_key, DataType type, StringData name, Table& target)
 {
-    if (REALM_UNLIKELY(col_key && !valid_column(col_key)))
-        throw InvalidKey("Requested key in use");
+    if (REALM_UNLIKELY(col_key && valid_column(col_key)))
+        throw ColumnAlreadyExists();
     if (REALM_UNLIKELY(!is_link_type(ColumnType(type))))
         throw LogicError(LogicError::illegal_type);
     // Both origin and target must be group-level tables, and in the same group.
@@ -388,7 +388,7 @@ void Table::nullify_links(CascadeState& cascade_state)
 ColKey Table::insert_column(ColKey col_key, DataType type, StringData name, bool nullable)
 {
     if (REALM_UNLIKELY(col_key && valid_column(col_key)))
-        throw InvalidKey("Requested key in use");
+        throw ColumnAlreadyExists();
     if (REALM_UNLIKELY(is_link_type(ColumnType(type))))
         throw LogicError(LogicError::illegal_type);
 
