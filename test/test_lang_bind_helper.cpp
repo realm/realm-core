@@ -500,6 +500,14 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
         WriteTransaction wt(sg_w);
         TableRef foo_w = wt.get_table("foo");
         foo_w->add_column(type_String, "s");
+        foo_w->add_column(type_Bool, "b");
+        foo_w->add_column(type_Float, "f");
+        foo_w->add_column(type_Double, "d");
+        foo_w->add_column(type_Binary, "bin");
+        foo_w->add_column(type_Timestamp, "t");
+        foo_w->add_column(type_Decimal, "dec");
+        foo_w->add_column(type_ObjectId, "oid");
+        foo_w->add_column_link(type_Link, "link", *foo_w);
         cols = foo_w->get_column_keys();
         k1 = foo_w->create_object().get_key();
         auto obj0 = foo_w->get_object(k0);
@@ -508,13 +516,22 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
         obj1.set<int>(cols[0], 2);
         obj0.set<StringData>(cols[1], "a");
         obj1.set<StringData>(cols[1], "b");
+        obj1.set<Bool>(cols[2], true);
+        obj1.set<float>(cols[3], 1.1f);
+        obj1.set<double>(cols[4], 1.2);
+        obj1.set<BinaryData>(cols[5], BinaryData("hopla"));
+        obj1.set<Timestamp>(cols[6], Timestamp(100,300));
+        obj1.set<Decimal>(cols[7], Decimal("100"));
+        obj1.set<ObjectId>(cols[8], ObjectId("abcdefabcdef0bcdefabcdef")); // << fails
+        obj1.set(cols[8], Mixed(ObjectId("abcdefabcdefabcdefabcdef")));    // << fails
+        obj1.set<ObjKey>(cols[9], obj1.get_key());
         wt.commit();
     }
     rt->advance_read();
     CHECK(version != foo->get_content_version());
     rt->verify();
     cols = foo->get_column_keys();
-    CHECK_EQUAL(2, foo->get_column_count());
+    CHECK_EQUAL(10, foo->get_column_count());
     CHECK_EQUAL(type_Int, foo->get_column_type(cols[0]));
     CHECK_EQUAL(type_String, foo->get_column_type(cols[1]));
     CHECK_EQUAL(2, foo->size());
@@ -524,12 +541,20 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
     CHECK_EQUAL(2, obj1.get<int64_t>(cols[0]));
     CHECK_EQUAL("a", obj0.get<StringData>(cols[1]));
     CHECK_EQUAL("b", obj1.get<StringData>(cols[1]));
+    CHECK_EQUAL(obj1.get<Bool>(cols[2]), true);
+    CHECK_EQUAL(obj1.get<float>(cols[3]), 1.1f);
+    CHECK_EQUAL(obj1.get<double>(cols[4]), 1.2);
+    CHECK_EQUAL(obj1.get<BinaryData>(cols[5]), BinaryData("hopla"));
+    CHECK_EQUAL(obj1.get<Timestamp>(cols[6]), Timestamp(100,300));
+    CHECK_EQUAL(obj1.get<Decimal>(cols[7]), Decimal("100"));
+    CHECK_EQUAL(obj1.get<ObjectId>(cols[8]), ObjectId("abcdefabcdefabcdefabcdef"));
+    CHECK_EQUAL(obj1.get<ObjKey>(cols[9]), obj1.get_key());
     CHECK_EQUAL(foo, rt->get_table("foo"));
 
     // Again, with no change
     rt->advance_read();
     rt->verify();
-    CHECK_EQUAL(2, foo->get_column_count());
+    CHECK_EQUAL(10, foo->get_column_count());
     CHECK_EQUAL(type_Int, foo->get_column_type(cols[0]));
     CHECK_EQUAL(type_String, foo->get_column_type(cols[1]));
     CHECK_EQUAL(2, foo->size());
@@ -570,7 +595,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
     rt->advance_read();
     rt->verify();
     CHECK_EQUAL(2, rt->size());
-    CHECK_EQUAL(2, foo->get_column_count());
+    CHECK_EQUAL(10, foo->get_column_count());
     cols = foo->get_column_keys();
     CHECK_EQUAL(type_Int, foo->get_column_type(cols[0]));
     CHECK_EQUAL(type_String, foo->get_column_type(cols[1]));
@@ -607,7 +632,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
     CHECK_EQUAL(2, rt->size());
     CHECK(foo);
     cols = foo->get_column_keys();
-    CHECK_EQUAL(2, foo->get_column_count());
+    CHECK_EQUAL(10, foo->get_column_count());
     CHECK_EQUAL(type_Int, foo->get_column_type(cols[0]));
     CHECK_EQUAL(type_String, foo->get_column_type(cols[1]));
     CHECK_EQUAL(0, foo->size());
