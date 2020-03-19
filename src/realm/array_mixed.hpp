@@ -54,6 +54,7 @@ public:
     }
 
     void init_from_mem(MemRef mem) noexcept;
+
     void init_from_ref(ref_type ref) noexcept override
     {
         init_from_mem(MemRef(m_alloc.translate(ref), ref, m_alloc));
@@ -65,7 +66,7 @@ public:
     void init_from_parent()
     {
         ref_type ref = get_ref_from_parent();
-        init_from_ref(ref);
+        ArrayMixed::init_from_ref(ref);
     }
 
     size_t size() const

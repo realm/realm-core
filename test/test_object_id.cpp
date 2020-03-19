@@ -284,8 +284,13 @@ TEST(ObjectId_Query)
         Query q2 = table->column<ObjectId>(col_id) == alternative_id;
         CHECK_EQUAL(q2.count(), 34);
 
+        // just check that it does not crash
         std::ostringstream ostr;
-        tv.to_json(ostr); // just check that it does not crash
+        tv.to_json(ostr);
+        Query q3 = table->column<ObjectId>(col) >= t0;
+        CHECK_EQUAL(q3.count(), 1000);
+        Query q4 = table->column<ObjectId>(col) <= t25;
+        CHECK_EQUAL(q4.count(), 26);
     }
 }
 
