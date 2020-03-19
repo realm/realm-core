@@ -457,7 +457,7 @@ TEST(Transactions_RollbackCreateObject)
 
     tr->rollback_and_continue_as_read();
 
-    CHECK_THROW(o.get<int64_t>(col), InvalidKey);
+    CHECK_THROW(o.get<int64_t>(col), KeyNotFound);
     tr->verify();
 
     tr->promote_to_write();

@@ -212,7 +212,7 @@ size_t ConstTableView::aggregate_count(ColKey column_key, T count_target) const
                 cnt++;
             }
         }
-        catch (const realm::InvalidKey&) {
+        catch (const realm::KeyNotFound&) {
         }
     }
 
@@ -367,7 +367,7 @@ size_t ConstTableView::count_timestamp(ColKey column_key, Timestamp target) cons
                 count++;
             }
         }
-        catch (const InvalidKey&) {
+        catch (const KeyNotFound&) {
             // Just skip objects that might have been deleted
         }
     }

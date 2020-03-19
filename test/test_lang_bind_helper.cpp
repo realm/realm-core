@@ -1668,7 +1668,7 @@ TEST(LangBindHelper_AdvanceReadTransact_TableClear)
     // key is still there...
     CHECK(tv.get_key(0));
     // but no obj for that key...
-    CHECK_THROW(tv.get(0), realm::InvalidKey);
+    CHECK_THROW(tv.get(0), realm::KeyNotFound);
 
     tv.sync_if_needed();
     CHECK_EQUAL(tv.size(), 0);
@@ -5741,7 +5741,7 @@ TEST(LangBindHelper_RemoveObject)
         wt->commit();
     }
     rt->advance_read();
-    CHECK_THROW(o1.get<int64_t>(col), InvalidKey);
+    CHECK_THROW(o1.get<int64_t>(col), KeyNotFound);
     CHECK_EQUAL(o2.get<int64_t>(col), 2);
 }
 
