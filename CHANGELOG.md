@@ -16,6 +16,8 @@
 * Migrated to the final `std::filesystem` implementation on Windows from the experimental one.
 * Exception class InvalidKey is replaced with KeyNotFound, KeyAlreadyUsed, ColumnNotFound and ColumnAlreadyExists
 * Calling `Table::create_object(ObjKey)` on a table with a primary key column is now an error.
+* Objects created with `Table::create_object(GlobalKey)` are now subject to tombstone resurrection.
+* Table::get_objkey_from_global_key() was introduced to allow getting the ObjKey of an object (dead or alive) identified by its GlobalKey.
 
 ----------------------------------------------
 

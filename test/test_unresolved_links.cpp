@@ -43,6 +43,7 @@ TEST(Unresolved_Basic)
     ColKey col_price;
     ColKey col_owns;
     ColKey col_has;
+    ColKey col_part;
 
     {
         // Sync operations
@@ -53,6 +54,8 @@ TEST(Unresolved_Basic)
         col_owns = persons->add_column_link(type_Link, "car", *cars);
         auto dealers = wt->add_table_with_primary_key("Dealer", type_Int, "cvr");
         col_has = dealers->add_column_link(type_LinkList, "stock", *cars);
+        auto parts = wt->add_table("Parts"); // No primary key
+        col_part = cars->add_column_link(type_Link, "part", *parts);
 
         auto finn = persons->create_object_with_primary_key("finn.schiermer-andersen@mongodb.com");
         auto mathias = persons->create_object_with_primary_key("mathias@10gen.com");
@@ -63,6 +66,8 @@ TEST(Unresolved_Basic)
         auto stock = joergen.get_list<ObjKey>(col_has);
 
         auto skoda = cars->create_object_with_primary_key("Skoda Fabia").set(col_price, Decimal128("149999.5"));
+        auto thingamajig = parts->create_object();
+        skoda.set(col_part, thingamajig.get_key());
 
         auto new_tesla = cars->get_objkey_from_primary_key("Tesla 10");
         CHECK(new_tesla.is_unresolved());
@@ -72,6 +77,11 @@ TEST(Unresolved_Basic)
         auto another_tesla = cars->get_objkey_from_primary_key("Tesla 10");
         stock.insert(0, another_tesla);
         stock.insert(1, skoda.get_key());
+
+        // Create a tombstone implicitly
+        auto doodad = parts->get_objkey_from_global_key(GlobalKey{999, 999});
+        CHECK(doodad.is_unresolved());
+        CHECK_EQUAL(parts->nb_unresolved(), 1);
 
         wt->commit();
     }
@@ -124,7 +134,17 @@ TEST(Unresolved_Basic)
     {
         // Sync operations
         auto wt = db->start_write();
-        wt->get_table("Car")->create_object_with_primary_key("Tesla 10").set(col_price, Decimal128("499999.5"));
+        auto parts = wt->get_table("Parts");
+        auto tesla = wt->get_table("Car")->create_object_with_primary_key("Tesla 10");
+        tesla.set(col_price, Decimal128("499999.5"));
+        auto doodad = parts->create_object(GlobalKey{999, 999});
+        auto doodad1 = parts->create_object(GlobalKey{999, 999}); // Check idempotency
+        CHECK_EQUAL(doodad.get_key(), doodad1.get_key());
+        tesla.set(col_part, doodad.get_key());
+        auto doodad_key = parts->get_objkey_from_global_key(GlobalKey{999, 999});
+        CHECK(!doodad_key.is_unresolved());
+        CHECK_EQUAL(wt->get_table("Parts")->nb_unresolved(), 0);
+
         wt->commit();
     }
 

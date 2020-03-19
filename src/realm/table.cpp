@@ -2578,9 +2578,26 @@ Obj Table::create_object(GlobalKey object_id, const FieldValues& values)
     if (auto repl = get_repl())
         repl->create_object(this, object_id);
 
-    Obj obj = m_clusters.insert(key, values);
+    try {
+        Obj obj = m_clusters.insert(key, values);
+        // Check if tombstone exists
+        if (m_tombstones && m_tombstones->is_valid(key.get_unresolved())) {
+            auto unres_key = key.get_unresolved();
+            // Copy links over
+            auto tombstone = m_tombstones->get(unres_key);
+            obj.assign_pk_and_backlinks(tombstone);
+            // If tombstones had no links to it, it may still be alive
+            if (m_tombstones->is_valid(unres_key)) {
+                CascadeState state(CascadeState::Mode::None);
+                m_tombstones->erase(unres_key, state);
+            }
+        }
 
-    return obj;
+        return obj;
+    }
+    catch (const KeyAlreadyUsed&) {
+        return m_clusters.get(key);
+    }
 }
 
 Obj Table::create_object_with_primary_key(const Mixed& primary_key, FieldValues&& field_values)
@@ -2713,32 +2730,37 @@ ObjKey Table::get_objkey_from_primary_key(const Mixed& primary_key)
     return allocate_unresolved_key(object_key, {{primary_key_col, primary_key}});
 }
 
-ObjKey Table::get_obj_key(GlobalKey id) const
+ObjKey Table::get_objkey_from_global_key(GlobalKey global_key)
+{
+    REALM_ASSERT(!m_primary_key_col);
+    auto object_key = global_key.get_local_key(get_sync_file_id());
+
+    // Check if existing
+    if (m_clusters.is_valid(object_key)) {
+        return object_key;
+    }
+
+    auto unres_key = object_key.get_unresolved();
+    if (m_tombstones && m_tombstones->is_valid(unres_key)) {
+        return unres_key;
+    }
+    return allocate_unresolved_key(object_key, {{}});
+}
+
+ObjKey Table::get_objkey(GlobalKey global_key) const
 {
     ObjKey key;
-    auto col = get_primary_key_column();
-    if (col) {
-        if (col.get_type() == col_type_Int) {
-            REALM_ASSERT(id.hi() == 0 || col.get_attrs().test(col_attr_Nullable));
-            if (id.hi() != 0 && id.lo() == 0) {
-                key = find_first_null(col);
-            }
-            else {
-                key = find_first_int(col, int64_t(id.lo()));
-            }
-        }
-        else {
-            key = global_to_local_object_id_hashed(id);
-        }
+    if (m_primary_key_col) {
+        key = global_to_local_object_id_hashed(global_key);
     }
     else {
         uint32_t max = std::numeric_limits<uint32_t>::max();
-        if (id.hi() <= max && id.lo() <= max) {
-            key = id.get_local_key(get_sync_file_id());
-            if (!is_valid(key)) {
-                key = realm::null_key;
-            }
+        if (global_key.hi() <= max && global_key.lo() <= max) {
+            key = global_key.get_local_key(get_sync_file_id());
         }
+    }
+    if (key && !is_valid(key)) {
+        key = realm::null_key;
     }
     return key;
 }
