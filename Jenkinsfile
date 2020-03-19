@@ -23,10 +23,11 @@ def buildDockerEnv(name, dockerfile='Dockerfile', extra_args='') {
   return docker.image(name)
 }
 
-def publishReport(String label) {
+def publishCoverageReport(String label) {
   // Unfortunately, we cannot add a title or tag to individual coverage reports.
   echo "Unstashing coverage-${label}"
   unstash("coverage-${label}")
+
   step([
     $class: 'CoberturaPublisher',
     autoUpdateHealth: false,
@@ -58,14 +59,12 @@ def doDockerBuild(String flavor, Boolean withCoverage, Boolean enableSync, Strin
         image.inside("-v /etc/passwd:/etc/passwd:ro -v ${env.HOME}:${env.HOME} -v ${env.SSH_AUTH_SOCK}:${env.SSH_AUTH_SOCK} -e HOME=${env.HOME}") {
           if(withCoverage) {
             sh "rm -rf coverage.build ${label}.build && ./workflow/test_coverage.sh ${sync} && mv coverage.build ${label}.build"
+            echo "Stashing coverage-${label}"
+            stash includes: "${label}.build/coverage.xml", name: "coverage-${label}"
           } else {
             sh "./workflow/build.sh ${flavor} ${sync} ${sanitizerFlags}"
           }
         }
-      }
-      if(withCoverage) {
-        echo "Stashing coverage-${label}"
-        stash includes: "${label}.build/coverage.xml", name: "coverage-${label}"
       }
     }
   }
@@ -181,7 +180,12 @@ stage('unit-tests') {
 
 stage('publish') {
   node('docker') {
-    publishReport('linux-sync')
-    publishReport('macOS-sync')
+    // we need sources to allow the coverage report to display them
+    rlmCheckout(scm)
+    // coverage reports assume sources are in the parent directory
+    dir("build") {
+      publishCoverageReport('linux-sync')
+      publishCoverageReport('macOS-sync')
+    }
   }
 }
