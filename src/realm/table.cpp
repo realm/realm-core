@@ -2537,7 +2537,7 @@ MemStats Table::stats() const
 
 Obj Table::create_object(ObjKey key, const FieldValues& values)
 {
-    if (m_is_embedded)
+    if (m_is_embedded || m_primary_key_col)
         throw LogicError(LogicError::wrong_kind_of_table);
     if (key == null_key) {
         GlobalKey object_id = allocate_object_id_squeezed();
@@ -2548,8 +2548,6 @@ Obj Table::create_object(ObjKey key, const FieldValues& values)
 
     REALM_ASSERT(key.value >= 0);
 
-    bump_content_version();
-    bump_storage_version();
     Obj obj = m_clusters.insert(key, values);
 
     return obj;
@@ -2566,8 +2564,6 @@ Obj Table::create_linked_object(GlobalKey object_id)
 
     REALM_ASSERT(key.value >= 0);
 
-    bump_content_version();
-    bump_storage_version();
     Obj obj = m_clusters.insert(key, {});
 
     return obj;
@@ -2575,15 +2571,13 @@ Obj Table::create_linked_object(GlobalKey object_id)
 
 Obj Table::create_object(GlobalKey object_id, const FieldValues& values)
 {
-    if (m_is_embedded)
+    if (m_is_embedded || m_primary_key_col)
         throw LogicError(LogicError::wrong_kind_of_table);
     ObjKey key = object_id.get_local_key(get_sync_file_id());
 
     if (auto repl = get_repl())
         repl->create_object(this, object_id);
 
-    bump_content_version();
-    bump_storage_version();
     Obj obj = m_clusters.insert(key, values);
 
     return obj;
@@ -2640,7 +2634,8 @@ Obj Table::create_object_with_primary_key(const Mixed& primary_key, FieldValues&
     }
 
     field_values.emplace_back(primary_key_col, primary_key);
-    Obj ret = create_object(object_key, field_values);
+    Obj ret = m_clusters.insert(object_key, field_values);
+
     // Check if unresolved exists
     if (needs_resurrection) {
         auto tombstone = m_tombstones->get(unres_key);
@@ -3230,12 +3225,12 @@ void Table::rebuild_table_with_pk_column()
             // and then we'll move the object to its final key in a second pass.
             uint64_t sequence_number_for_local_id = allocate_sequence_number();
             ObjKey temp_key = make_tagged_local_id_after_hash_collision(sequence_number_for_local_id);
-            auto tmp_obj = create_object(temp_key);
+            auto tmp_obj = m_clusters.insert(temp_key, {});
             tmp_obj.assign(old_obj);
             tmp_keys.push_back(temp_key);
         }
         else {
-            create_object(new_key).assign(old_obj);
+            m_clusters.insert(new_key, {}).assign(old_obj);
         }
         remove_object(old_key);
     }

@@ -2112,6 +2112,9 @@ Obj ClusterTree::insert(ObjKey k, const FieldValues& values)
         }
     }
 
+    bump_content_version();
+    bump_storage_version();
+
     return Obj(get_table_ref(), state.mem, k, state.index);
 }
 
