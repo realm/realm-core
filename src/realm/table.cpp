@@ -2715,19 +2715,17 @@ ObjKey Table::get_objkey_from_primary_key(const Mixed& primary_key)
         object_key = allocate_local_id_after_hash_collision(object_id, existing_id, object_key);
     }
 
-    auto unres_key = object_key.get_unresolved();
-    if (m_tombstones && m_tombstones->is_valid(unres_key)) {
-        auto existing_pk_value = m_tombstones->get(unres_key).get_any(primary_key_col);
-
-        // It may just be the same object
-        if (existing_pk_value == primary_key) {
-            return unres_key;
-        }
-
-        GlobalKey existing_id{existing_pk_value};
-        object_key = allocate_local_id_after_hash_collision(object_id, existing_id, object_key);
+    // Object does not exist - create tombstone
+    auto tombstone = get_or_create_tombstone(object_key, {{primary_key_col, primary_key}});
+    auto existing_pk_value = tombstone.get_any(primary_key_col);
+    // It may just be the same object
+    if (existing_pk_value == primary_key) {
+        return tombstone.get_key();
     }
-    return allocate_unresolved_key(object_key, {{primary_key_col, primary_key}});
+    // We have a collision - create new ObjKey
+    GlobalKey existing_id{existing_pk_value};
+    object_key = allocate_local_id_after_hash_collision(object_id, existing_id, object_key);
+    return get_or_create_tombstone(object_key, {{primary_key_col, primary_key}}).get_key();
 }
 
 ObjKey Table::get_objkey_from_global_key(GlobalKey global_key)
@@ -2740,11 +2738,7 @@ ObjKey Table::get_objkey_from_global_key(GlobalKey global_key)
         return object_key;
     }
 
-    auto unres_key = object_key.get_unresolved();
-    if (m_tombstones && m_tombstones->is_valid(unres_key)) {
-        return unres_key;
-    }
-    return allocate_unresolved_key(object_key, {{}});
+    return get_or_create_tombstone(object_key, {{}}).get_key();
 }
 
 ObjKey Table::get_objkey(GlobalKey global_key) const
@@ -2942,17 +2936,21 @@ ObjKey Table::allocate_local_id_after_hash_collision(GlobalKey incoming_id, Glob
     return new_local_id;
 }
 
-ObjKey Table::allocate_unresolved_key(ObjKey key, const FieldValues& values)
+Obj Table::get_or_create_tombstone(ObjKey key, const FieldValues& values)
 {
     auto unres_key = key.get_unresolved();
 
     ensure_graveyard();
 
-    Obj tombstone = m_tombstones->insert(unres_key, values);
-    bump_content_version();
-    bump_storage_version();
-
-    return tombstone.get_key();
+    try {
+        Obj tombstone = m_tombstones->insert(unres_key, values);
+        bump_content_version();
+        bump_storage_version();
+        return tombstone;
+    }
+    catch (const KeyAlreadyUsed&) {
+        return m_tombstones->get(unres_key);
+    }
 }
 
 void Table::free_local_id_after_hash_collision(ObjKey key)
@@ -3042,15 +3040,12 @@ void Table::invalidate_object(ObjKey key)
     if (obj.has_backlinks(false)) {
         // If the object has backlinks, we should make a tombstone
         // and make inward links point to it,
-        ObjKey tombstone_key;
+        FieldValues init_values;
         if (auto primary_key_col = get_primary_key_column()) {
             auto pk = obj.get_any(primary_key_col);
-            tombstone_key = allocate_unresolved_key(key, {{primary_key_col, pk}});
+            init_values.emplace_back(primary_key_col, pk);
         }
-        else {
-            tombstone_key = allocate_unresolved_key(key, {{}});
-        }
-        auto tombstone = m_tombstones->get(tombstone_key);
+        auto tombstone = get_or_create_tombstone(key, init_values);
         tombstone.assign_pk_and_backlinks(obj);
     }
     CascadeState state(CascadeState::Mode::None);

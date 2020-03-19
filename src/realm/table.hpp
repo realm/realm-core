@@ -743,7 +743,7 @@ private:
     ObjKey allocate_local_id_after_hash_collision(GlobalKey incoming_id, GlobalKey colliding_id,
                                                   ObjKey colliding_local_id);
     /// Create a placeholder for a not yet existing object and return key to it
-    ObjKey allocate_unresolved_key(ObjKey key, const FieldValues& values);
+    Obj get_or_create_tombstone(ObjKey key, const FieldValues& values);
     /// Should be called when an object is deleted
     void free_local_id_after_hash_collision(ObjKey key);
     /// Should be called when last entry is removed - or when table is cleared
