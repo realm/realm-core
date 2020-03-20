@@ -782,7 +782,7 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
         // session initialization, even if it means writing the database during open.
         if (cfg.session_initiator && is_file_on_streaming_form(*header)) {
             // Don't compare file format version fields as they are allowed to differ.
-            // Also don't compare reserved fields (todo, is it correct to ignore?)
+            // Also don't compare reserved fields.
             REALM_ASSERT_EX(header->m_flags == 0, header->m_flags, get_file_path_for_assertions());
             REALM_ASSERT_EX(header->m_mnemonic[0] == uint8_t('T'), header->m_mnemonic[0],
                             get_file_path_for_assertions());
@@ -1213,9 +1213,8 @@ void SlabAlloc::update_reader_view(size_t file_size)
                 REALM_ASSERT(num_mappings == num_full_mappings + 1);
                 size_t section_start_offset = get_section_base(num_full_mappings);
                 size_t section_size = file_size - section_start_offset;
-                util::File::Map<char> mapping;
-                mapping = util::File::Map<char>(m_file, section_start_offset, File::access_ReadOnly, section_size);
-                m_mappings[num_full_mappings].primary_mapping = std::move(mapping);
+                m_mappings[num_full_mappings].primary_mapping =
+                    util::File::Map<char>(m_file, section_start_offset, File::access_ReadOnly, section_size);
             }
         }
     }
@@ -1265,6 +1264,8 @@ void SlabAlloc::extend_fast_mapping_with_slab(char* address)
     }
     m_old_translations.emplace_back(m_youngest_live_version, m_ref_translation_ptr.load());
     new_fast_mapping[m_translation_table_size - 1].mapping_addr = address;
+    // Memory ranges with slab (working memory) can never have arrays that straddle a boundary,
+    // so optimize by clamping the lowest possible xover offset to the end of the section.
     new_fast_mapping[m_translation_table_size - 1].lowest_possible_xover_offset = 1ULL << section_shift;
     m_ref_translation_ptr = new_fast_mapping;
 }
@@ -1286,23 +1287,22 @@ void SlabAlloc::rebuild_translations(bool requires_new_translation, size_t old_n
         new_translation_table = new RefTranslation[m_translation_table_size];
         old_num_sections = 0;
     }
-    for (size_t k = old_num_sections; k < num_mappings; ++k) {
-        auto i = k;
-        new_translation_table[i].mapping_addr = m_mappings[k].primary_mapping.get_addr();
+    for (size_t i = old_num_sections; i < num_mappings; ++i) {
+        new_translation_table[i].mapping_addr = m_mappings[i].primary_mapping.get_addr();
         REALM_ASSERT(new_translation_table[i].mapping_addr);
 #if REALM_ENABLE_ENCRYPTION
-        new_translation_table[i].encrypted_mapping = m_mappings[k].primary_mapping.get_encrypted_mapping();
+        new_translation_table[i].encrypted_mapping = m_mappings[i].primary_mapping.get_encrypted_mapping();
 #endif
-        // for the moment ignore copying over data for xover mappings. We don't save the
-        // offset for the array request which created a xover mapping, so we cannot setup the
-        // translation mapping correctly.
-        // if the mapping is needed, copying will happen on demand (in get_or_add_xover_mapping)
+        // We don't copy over data for the cross over mapping. If the mapping is needed,
+        // copying will happen on demand (in get_or_add_xover_mapping).
+        // Note: that may never be needed, because if the array that needed the original cross over
+        // mapping is freed, any new array allocated at the same position will NOT need a cross
+        // over mapping, but just use the primary mapping.
     }
     for (size_t k = 0; k < free_space_size; ++k) {
         char* base = m_slabs[k].addr;
-        auto i = num_mappings + k;
         REALM_ASSERT(base);
-        new_translation_table[i].mapping_addr = base;
+        new_translation_table[num_mappings + k].mapping_addr = base;
     }
     m_ref_translation_ptr = new_translation_table;
 }

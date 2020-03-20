@@ -184,7 +184,8 @@ protected:
                 encrypted_mapping = from.encrypted_mapping;
                 xover_encrypted_mapping = from.xover_encrypted_mapping;
 #endif
-                xover_mapping_addr.store(from.xover_mapping_addr, std::memory_order_release);
+                xover_mapping_addr.store(from.xover_mapping_addr.load(std::memory_order_relaxed),
+                                         std::memory_order_release);
             }
             return *this;
         }
