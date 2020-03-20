@@ -65,6 +65,7 @@ set(NORMAL_TESTS
     test_util_any.cpp
     test_util_backtrace.cpp
     test_util_base64.cpp
+    test_util_chunked_binary.cpp
     test_util_error.cpp
     test_util_file.cpp
     test_util_inspect.cpp
