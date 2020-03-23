@@ -86,7 +86,14 @@ void ArrayString::init_from_parent()
 
 void ArrayString::destroy()
 {
-    Array::destroy_deep(m_arr->get_ref(), m_arr->get_alloc());
+    if (m_arr->is_attached()) {
+        Array::destroy_deep(m_arr->get_ref(), m_alloc);
+
+        // Make sure the object is in a state like right after construction
+        // Next call must be to create()
+        m_arr = new (&m_storage.m_string_short) ArrayStringShort(m_alloc, true);
+        m_type = Type::small_strings;
+    }
 }
 
 size_t ArrayString::size() const
