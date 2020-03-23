@@ -154,6 +154,9 @@ void ArrayMixed::clear()
     m_ints.destroy();
     m_int_pairs.destroy();
     m_strings.destroy();
+    Array::set(payload_idx_int, 0);
+    Array::set(payload_idx_pair, 0);
+    Array::set(payload_idx_str, 0);
 }
 
 void ArrayMixed::erase(size_t ndx)
