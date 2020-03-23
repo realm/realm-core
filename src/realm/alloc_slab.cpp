@@ -776,11 +776,17 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
         m_attach_mode = cfg.is_shared ? attach_SharedFile : attach_UnsharedFile;
         m_data = map_header.get_addr(); // <-- needed below
 
+        // If the file is opened in writable mode:
         // Make sure the database is not on streaming format. If we did not do this,
         // a later commit would have to do it. That would require coordination with
         // anybody concurrently joining the session, so it seems easier to do it at
         // session initialization, even if it means writing the database during open.
-        if (cfg.session_initiator && is_file_on_streaming_form(*header)) {
+        //
+        // If the file is opened in read-only mode:
+        // Even if it is on streaming format, leave the file unchanged. Since all attempts
+        // to open it are required to also use read-only mode, no other process or thread
+        // will need to change it either.
+        if (cfg.session_initiator && is_file_on_streaming_form(*header) && !cfg.read_only) {
             // Don't compare file format version fields as they are allowed to differ.
             // Also don't compare reserved fields.
             REALM_ASSERT_EX(header->m_flags == 0, header->m_flags, get_file_path_for_assertions());

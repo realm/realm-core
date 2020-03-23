@@ -5,7 +5,7 @@
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Opening a realm file on streaming form read-only now works correctly.
  
 ### Breaking changes
 * None.
