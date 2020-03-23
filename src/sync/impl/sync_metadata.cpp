@@ -338,7 +338,7 @@ util::Optional<SyncUserMetadata> SyncMetadataManager::get_or_make_user_metadata(
             obj.set(schema.idx_provider_type, provider_type);
             obj.set(schema.idx_local_uuid, uuid);
             obj.set(schema.idx_marked_for_removal, false);
-            obj.set(schema.idx_state, (int64_t)SyncUser::State::Active);
+            obj.set(schema.idx_state, (int64_t)SyncUser::State::LoggedIn);
             realm->commit_transaction();
             return SyncUserMetadata(schema, std::move(realm), std::move(obj));
         } else {

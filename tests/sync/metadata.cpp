@@ -459,7 +459,7 @@ TEST_CASE("sync_metadata: persistence across metadata manager instances", "[sync
         REQUIRE(first->identity() == identity);
         REQUIRE(first->provider_type() == provider_type);
         REQUIRE(first->access_token() == sample_token);
-        REQUIRE(first->state() == SyncUser::State::Active);
+        REQUIRE(first->state() == SyncUser::State::LoggedIn);
         auto first_client_uuid = first_manager.client_uuid();
         first->set_state(SyncUser::State::LoggedOut);
 

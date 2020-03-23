@@ -178,6 +178,9 @@ public:
     
     // Sets the currently active user.
     void set_current_user(const std::string& user_id);
+    
+    // Removes a user
+    void remove_user(const std::string& user_id);
 
     // Get the default path for a Realm for the given user and absolute unresolved URL.
     std::string path_for_realm(const SyncUser& user, const std::string& raw_realm_url) const;

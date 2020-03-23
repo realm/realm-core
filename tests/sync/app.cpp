@@ -666,15 +666,6 @@ private:
             {"user_id", random_string(15)},
             {"device_id", "Panda Bear"}}).dump();
         
-        try {
-            realm::SyncManager::shared().get_user(user_id,
-                                                  access_token,
-                                                  access_token,
-                                                  provider_type);
-            
-        } catch (const AppError& err) {
-            return completion_block({});
-        }
         completion_block(Response { .http_status_code = 200,
                                     .custom_status_code = 0,
                                     .headers = {},
@@ -1000,11 +991,11 @@ TEST_CASE("app: user_semantics", "[app]") {
     SECTION("current user is updated to last used user on logout") {
         const auto user1 = login_user_anonymous();
         CHECK(app.current_user()->identity() == user1->identity());
-        CHECK(app.all_users()[0]->state() == SyncUser::State::Active);
+        CHECK(app.all_users()[0]->state() == SyncUser::State::LoggedIn);
 
         const auto user2 = login_user_email_pass();
-        CHECK(app.all_users()[0]->state() == SyncUser::State::Active);
-        CHECK(app.all_users()[1]->state() == SyncUser::State::Active);
+        CHECK(app.all_users()[0]->state() == SyncUser::State::LoggedIn);
+        CHECK(app.all_users()[1]->state() == SyncUser::State::LoggedIn);
         CHECK(app.current_user()->identity() == user2->identity());
         CHECK(user1->identity() != user2->identity());
 
@@ -1012,18 +1003,18 @@ TEST_CASE("app: user_semantics", "[app]") {
         CHECK(app.current_user()->identity() == user1->identity());
 
         CHECK(app.all_users().size() == 2);
-        CHECK(app.all_users()[0]->state() == SyncUser::State::Active);
+        CHECK(app.all_users()[0]->state() == SyncUser::State::LoggedIn);
         CHECK(app.all_users()[1]->state() == SyncUser::State::LoggedOut);
     }
 
     SECTION("anon users are removed on logout") {
         const auto user1 = login_user_anonymous();
         CHECK(app.current_user()->identity() == user1->identity());
-        CHECK(app.all_users()[0]->state() == SyncUser::State::Active);
+        CHECK(app.all_users()[0]->state() == SyncUser::State::LoggedIn);
 
         const auto user2 = login_user_anonymous();
-        CHECK(app.all_users()[0]->state() == SyncUser::State::Active);
-        CHECK(app.all_users()[1]->state() == SyncUser::State::Active);
+        CHECK(app.all_users()[0]->state() == SyncUser::State::LoggedIn);
+        CHECK(app.all_users()[1]->state() == SyncUser::State::LoggedIn);
         CHECK(app.current_user()->identity() == user2->identity());
         CHECK(user1->identity() != user2->identity());
 
@@ -1031,7 +1022,7 @@ TEST_CASE("app: user_semantics", "[app]") {
         CHECK(app.current_user()->identity() == user1->identity());
 
         CHECK(app.all_users().size() == 1);
-        CHECK(app.all_users()[0]->state() == SyncUser::State::Active);
+        CHECK(app.all_users()[0]->state() == SyncUser::State::LoggedIn);
     }
 
     SECTION("logout user") {
@@ -1042,7 +1033,7 @@ TEST_CASE("app: user_semantics", "[app]") {
         app.log_out(user2, [](Optional<AppError> error) {
             CHECK(!error);
         });
-        CHECK(user2->state() == SyncUser::State::Error);
+        CHECK(user2->state() == SyncUser::State::Removed);
 
         // Other users can be LoggedOut
         app.log_out(user1, [](Optional<AppError> error) {
@@ -1059,7 +1050,7 @@ TEST_CASE("app: user_semantics", "[app]") {
         app.log_out(user2, [](Optional<AppError> error) {
             CHECK(!error);
         });
-        CHECK(user2->state() == SyncUser::State::Error);
+        CHECK(user2->state() == SyncUser::State::Removed);
     }
 }
 
@@ -1189,4 +1180,243 @@ TEST_CASE("app: response error handling", "[sync][app]") {
         });
         CHECK(processed);
     }
+}
+
+TEST_CASE("app: switch user", "[sync][app]") {
+        
+    std::function<std::unique_ptr<GenericNetworkTransport>()> transport_generator = [&] {
+        return std::unique_ptr<GenericNetworkTransport>(new UnitTestTransport());
+    };
+
+    auto config = App::Config{"translate-utwuv", transport_generator};
+    auto app = App(config);
+    
+    std::string base_path = tmp_dir() + "/" + config.app_id;
+    reset_test_directory(base_path);
+
+    auto tsm = TestSyncManager(base_path);
+    
+    bool processed = false;
+    
+    std::shared_ptr<SyncUser> user_a;
+    std::shared_ptr<SyncUser> user_b;
+
+    SECTION("switch user expect success") {
+        
+        CHECK(SyncManager::shared().all_users().size() == 0);
+
+        // Log in user 1
+        app.log_in_with_credentials(realm::app::AppCredentials::anonymous(),
+                                    [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+            CHECK(!error);
+            CHECK(SyncManager::shared().get_current_user() == user);
+            user_a = user;
+        });
+        
+        // Log in user 2
+        app.log_in_with_credentials(realm::app::AppCredentials::anonymous(),
+                                    [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+            CHECK(!error);
+            CHECK(SyncManager::shared().get_current_user() == user);
+            user_b = user;
+        });
+        
+        CHECK(SyncManager::shared().all_users().size() == 2);
+
+        auto user1 = app.switch_user(user_a);
+        CHECK(user1 == user_a);
+        
+        CHECK(SyncManager::shared().get_current_user() == user_a);
+
+        auto user2 = app.switch_user(user_b);
+        CHECK(user2 == user_b);
+
+        CHECK(SyncManager::shared().get_current_user() == user_b);
+        processed = true;
+        CHECK(processed);
+    }
+        
+    SECTION("switch user expect fail") {
+        CHECK(SyncManager::shared().all_users().size() == 0);
+
+        // Log in user 1
+        app.log_in_with_credentials(realm::app::AppCredentials::anonymous(),
+                                    [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+            user_a = user;
+            CHECK(!error);
+        });
+        
+        CHECK(SyncManager::shared().get_current_user() == user_a);
+        
+        app.log_out([&](Optional<app::AppError> error) {
+            CHECK(!error);
+        });
+
+        CHECK(SyncManager::shared().get_current_user() == nullptr);
+        CHECK(user_a->state() == SyncUser::State::Removed);
+
+        // Log in user 2
+        app.log_in_with_credentials(realm::app::AppCredentials::anonymous(),
+                                    [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+            user_b = user;
+            CHECK(!error);
+        });
+        
+        CHECK(SyncManager::shared().get_current_user() == user_b);
+        CHECK(SyncManager::shared().all_users().size() == 1);
+
+        try {
+            auto user = app.switch_user(user_a);
+            CHECK(!user);
+        } catch (AppError error) {
+            CHECK(error.error_code.value() > 0);
+        }
+        
+        CHECK(SyncManager::shared().get_current_user() == user_b);
+        
+        processed = true;
+        CHECK(processed);
+    }
+    
+}
+
+TEST_CASE("app: remove anonymous user", "[sync][app]") {
+    
+    std::function<std::unique_ptr<GenericNetworkTransport>()> transport_generator = [&] {
+        return std::unique_ptr<GenericNetworkTransport>(new UnitTestTransport());
+    };
+
+    auto config = App::Config{"translate-utwuv", transport_generator};
+    auto app = App(config);
+    
+    std::string base_path = tmp_dir() + "/" + config.app_id;
+    reset_test_directory(base_path);
+
+    auto tsm = TestSyncManager(base_path);
+    
+    bool processed = false;
+    std::shared_ptr<SyncUser> user_a;
+    std::shared_ptr<SyncUser> user_b;
+
+    SECTION("remove user expect success") {
+        CHECK(SyncManager::shared().all_users().size() == 0);
+
+        // Log in user 1
+        app.log_in_with_credentials(realm::app::AppCredentials::anonymous(),
+                                    [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+            CHECK(!error);
+            CHECK(SyncManager::shared().get_current_user() == user);
+            user_a = user;
+        });
+        
+        CHECK(user_a->state() == SyncUser::State::LoggedIn);
+        
+        app.log_out(user_a, [&](Optional<app::AppError> error) {
+            CHECK(!error);
+            // a logged out anon user will be marked as Removed, not LoggedOut
+            CHECK(user_a->state() == SyncUser::State::Removed);
+        });
+        
+        app.remove_user(user_a, [&](Optional<app::AppError> error) {
+            CHECK(error->message == "User has already been removed");
+            CHECK(SyncManager::shared().all_users().size() == 0);
+        });
+                
+        // Log in user 2
+        app.log_in_with_credentials(realm::app::AppCredentials::anonymous(),
+                                    [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+            CHECK(!error);
+            CHECK(SyncManager::shared().get_current_user() == user);
+            user_b = user;
+        });
+        
+        CHECK(user_b->state() == SyncUser::State::LoggedIn);
+        CHECK(SyncManager::shared().all_users().size() == 1);
+
+        app.remove_user(user_b, [&](Optional<app::AppError> error) {
+            CHECK(!error);
+            CHECK(SyncManager::shared().all_users().size() == 0);
+        });
+        
+        CHECK(SyncManager::shared().get_current_user() == nullptr);
+        
+        //check both handles are no longer valid
+        CHECK(user_a->state() == SyncUser::State::Removed);
+        CHECK(user_b->state() == SyncUser::State::Removed);
+
+        processed = true;
+        CHECK(processed);
+    }
+    
+}
+
+TEST_CASE("app: remove user with credentials", "[sync][app]") {
+        
+    std::unique_ptr<GenericNetworkTransport> (*transport_generator)() = []{
+        struct transport : GenericNetworkTransport {
+            void send_request_to_server(const Request request,
+                                        std::function<void (const Response)> completion_block)
+            {
+                if (request.url.find("/login") != std::string::npos) {
+                    completion_block({
+                        200, 0, {}, user_json(good_access_token).dump()
+                    });
+                } else if (request.url.find("/profile") != std::string::npos) {
+                    completion_block({
+                        200, 0, {}, user_profile_json().dump()
+                    });
+                } else if (request.url.find("/session") != std::string::npos) {
+                    CHECK(request.method == HttpMethod::del);
+                    completion_block({ 200, 0, {}, "" });
+                }
+            }
+        };
+        return std::unique_ptr<GenericNetworkTransport>(new transport);
+    };
+    
+    auto config = App::Config{"translate-utwuv", transport_generator};
+    std::string base_path = tmp_dir() + "/" + config.app_id;
+    reset_test_directory(base_path);
+    auto tsm = TestSyncManager(base_path);
+    
+    auto app = App(config);
+
+    CHECK(!app.current_user());
+    bool processed = false;
+    std::shared_ptr<SyncUser> test_user;
+
+    SECTION("log in, log out and remove") {
+        
+        CHECK(SyncManager::shared().all_users().size() == 0);
+        CHECK(SyncManager::shared().get_current_user() == nullptr);
+        
+        app.log_in_with_credentials(realm::app::AppCredentials::username_password("email", "pass"),
+                                    [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+            CHECK(!error);
+            test_user = user;
+        });
+        
+        CHECK(test_user->state() == SyncUser::State::LoggedIn);
+        
+        app.log_out(test_user, [&](Optional<app::AppError> error) {
+            CHECK(!error);
+        });
+        
+        CHECK(test_user->state() == SyncUser::State::LoggedOut);
+        
+        app.remove_user(test_user, [&](Optional<app::AppError> error) {
+            CHECK(!error);
+            CHECK(SyncManager::shared().all_users().size() == 0);
+        });
+        
+        app.remove_user(test_user, [&](Optional<app::AppError> error) {
+            CHECK(error->error_code.value() > 0);
+            CHECK(SyncManager::shared().all_users().size() == 0);
+            processed = true;
+        });
+        
+        CHECK(test_user->state() == SyncUser::State::Removed);
+        CHECK(processed);
+    }
+    
 }

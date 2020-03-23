@@ -125,8 +125,8 @@ friend class SyncSession;
 public:
     enum class State : std::size_t {
         LoggedOut,
-        Active,
-        Error,
+        LoggedIn,
+        Removed,
     };
 
     // Don't use this directly; use the `SyncManager` APIs. Public for use with `make_shared`.
@@ -161,6 +161,9 @@ public:
 
     // Log the user out and mark it as such. This will also close its associated Sessions.
     void log_out();
+    
+    /// Returns true id the users access_token and refresh_token are set.
+    bool is_logged_in() const;
 
     const std::string& identity() const noexcept
     {

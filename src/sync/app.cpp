@@ -569,7 +569,7 @@ void App::log_in_with_credentials(const AppCredentials& credentials,
                                                                get_optional<std::string>(profile_data, "min_age"),
                                                                get_optional<std::string>(profile_data, "max_age")));
 
-                sync_user->set_state(SyncUser::State::Active);
+                sync_user->set_state(SyncUser::State::LoggedIn);
                 SyncManager::shared().set_current_user(sync_user->identity());
             } catch (const AppError& err) {
                 return completion_block(nullptr, err);
@@ -590,7 +590,7 @@ void App::log_in_with_credentials(const AppCredentials& credentials,
 
 void App::log_out(std::shared_ptr<SyncUser> user, std::function<void (Optional<AppError>)> completion_block) const
 {
-    if (!user || user->state() != SyncUser::State::Active) {
+    if (!user || user->state() != SyncUser::State::LoggedIn) {
         return completion_block(util::none);
     }
     std::string bearer = util::format("Bearer %1", current_user()->refresh_token());
@@ -620,6 +620,56 @@ void App::log_out(std::shared_ptr<SyncUser> user, std::function<void (Optional<A
 
 void App::log_out(std::function<void (Optional<AppError>)> completion_block) const {
     log_out(current_user(), completion_block);
+}
+
+std::shared_ptr<SyncUser> App::switch_user(std::shared_ptr<SyncUser> user) const
+{
+    if (!user || user->state() != SyncUser::State::LoggedIn) {
+        throw AppError(make_custom_error_code(ClientErrorCode::user_not_logged_in),
+                       "User is no longer valid or is logged out");
+    }
+    
+    auto users = SyncManager::shared().all_users();
+    auto it = std::find(users.begin(),
+                        users.end(),
+                        user);
+    
+    if (it == users.end()) {
+        throw AppError(make_custom_error_code(ClientErrorCode::user_not_found),
+                       "User does not exist");
+    }
+
+    SyncManager::shared().set_current_user(user->identity());
+    return current_user();
+}
+
+void App::remove_user(std::shared_ptr<SyncUser> user,
+                      std::function<void(Optional<AppError>)> completion_block) const
+{
+    if (user->state() == SyncUser::State::Removed) {
+        return completion_block(AppError(make_custom_error_code(ClientErrorCode::user_not_found),
+                                         "User has already been removed"));
+    }
+    
+    auto users = SyncManager::shared().all_users();
+    auto it = std::find(users.begin(),
+                        users.end(),
+                        user);
+    
+    if (it == users.end()) {
+        return completion_block(AppError(make_custom_error_code(ClientErrorCode::user_not_found),
+                                         "No user has been found"));
+    }
+    
+    if (user->is_logged_in()) {
+        log_out(user, [user, completion_block](const Optional<AppError>& error){
+            SyncManager::shared().remove_user(user->identity());
+            return completion_block(error);
+        });
+    } else {
+        SyncManager::shared().remove_user(user->identity());
+        return completion_block({});
+    }
 }
 
 } // namespace app
