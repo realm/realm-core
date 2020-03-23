@@ -127,7 +127,7 @@ Allocator& Allocator::get_default() noexcept
 // * adding a cross-over mapping. (if the array crosses a mapping boundary)
 // * using an already established cross-over mapping. (ditto)
 // this can proceed concurrently with other calls to translate()
-char* Allocator::x_translate_extended(RefTranslation* ref_translation_ptr, ref_type ref) const noexcept
+char* Allocator::translate_less_critical(RefTranslation* ref_translation_ptr, ref_type ref) const noexcept
 {
     size_t idx = get_section_index(ref);
     RefTranslation& txl = ref_translation_ptr[idx];
@@ -138,17 +138,17 @@ char* Allocator::x_translate_extended(RefTranslation* ref_translation_ptr, ref_t
 #endif
     auto size = NodeHeader::get_byte_size_from_header(addr);
     bool crosses_mapping = offset + size > (1 << section_shift);
+    // Move the limit on use of the existing primary mapping.
+    // Take into account that another thread may attempt to change / have changed it concurrently,
+    size_t lowest_possible_xover_offset = txl.lowest_possible_xover_offset.load(std::memory_order_relaxed);
+    auto new_lowest_possible_xover_offset = offset + (crosses_mapping ? 0 : size);
+    while (new_lowest_possible_xover_offset > lowest_possible_xover_offset) {
+        if (txl.lowest_possible_xover_offset.compare_exchange_weak(
+                lowest_possible_xover_offset, new_lowest_possible_xover_offset, std::memory_order_relaxed))
+            break;
+    }
     if (REALM_LIKELY(!crosses_mapping)) {
-        // Array fits inside primary mapping, no new mapping needed, just move the limit on
-        // use of the existing primary mapping.
-        // Take into account that another thread may attempt to change / have changed it concurrently,
-        size_t lowest_possible_xover_offset = txl.lowest_possible_xover_offset.load(std::memory_order_relaxed);
-        auto new_lowest_possible_xover_offset = offset + size;
-        while (new_lowest_possible_xover_offset > lowest_possible_xover_offset) {
-            if (txl.lowest_possible_xover_offset.compare_exchange_weak(
-                    lowest_possible_xover_offset, new_lowest_possible_xover_offset, std::memory_order_relaxed))
-                break;
-        }
+        // Array fits inside primary mapping, no new mapping needed.
         return addr;
     }
     else {

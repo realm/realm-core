@@ -162,14 +162,16 @@ protected:
         std::atomic<size_t> lowest_possible_xover_offset = 0;
 
         // member 'xover_mapping_addr' is used for memory synchronization of the fields
-        // 'xover_mapping_base' and 'xover_encrypted_mapping'.
+        // 'xover_mapping_base' and 'xover_encrypted_mapping'. It also imposes an ordering
+        // on 'lowest_possible_xover_offset' such that once a non-null value of 'xover_mapping_addr'
+        // has been acquired, 'lowest_possible_xover_offset' will never change.
         std::atomic<char*> xover_mapping_addr = nullptr;
         size_t xover_mapping_base = 0;
 #if REALM_ENABLE_ENCRYPTION
         util::EncryptedFileMapping* encrypted_mapping = nullptr;
         util::EncryptedFileMapping* xover_encrypted_mapping = nullptr;
 #endif
-        RefTranslation(char* addr)
+        explicit RefTranslation(char* addr)
             : mapping_addr(addr)
         {
         }
@@ -178,14 +180,21 @@ protected:
         {
             if (&from != this) {
                 mapping_addr = from.mapping_addr;
-                lowest_possible_xover_offset.store(from.lowest_possible_xover_offset, std::memory_order_relaxed);
-                xover_mapping_base = from.xover_mapping_base;
 #if REALM_ENABLE_ENCRYPTION
                 encrypted_mapping = from.encrypted_mapping;
-                xover_encrypted_mapping = from.xover_encrypted_mapping;
 #endif
-                xover_mapping_addr.store(from.xover_mapping_addr.load(std::memory_order_relaxed),
-                                         std::memory_order_release);
+                const auto local_xover_mapping_addr = from.xover_mapping_addr.load(std::memory_order_acquire);
+
+                // This must be loaded after xover_mapping_addr to ensure it isn't stale.
+                lowest_possible_xover_offset.store(from.lowest_possible_xover_offset, std::memory_order_relaxed);
+
+                if (local_xover_mapping_addr) {
+                    xover_mapping_base = from.xover_mapping_base;
+#if REALM_ENABLE_ENCRYPTION
+                    xover_encrypted_mapping = from.xover_encrypted_mapping;
+#endif
+                    xover_mapping_addr.store(local_xover_mapping_addr, std::memory_order_release);
+                }
             }
             return *this;
         }
@@ -219,8 +228,8 @@ protected:
     /// then entirely the responsibility of the caller that the memory
     /// is not modified by way of the returned memory pointer.
     virtual char* do_translate(ref_type ref) const noexcept = 0;
-    char* x_translate(RefTranslation*, ref_type ref) const noexcept;
-    char* x_translate_extended(RefTranslation*, ref_type ref) const noexcept;
+    char* translate_critical(RefTranslation*, ref_type ref) const noexcept;
+    char* translate_less_critical(RefTranslation*, ref_type ref) const noexcept;
     virtual void get_or_add_xover_mapping(RefTranslation&, size_t, size_t, size_t) = 0;
     Allocator() noexcept;
     size_t get_section_index(size_t pos) const noexcept;
@@ -530,15 +539,15 @@ inline Allocator::~Allocator() noexcept
 {
 }
 
-
-inline char* Allocator::x_translate(RefTranslation* ref_translation_ptr, ref_type ref) const noexcept
+// performance critical part of the translation process. Less critical code is in translate_less_critical.
+inline char* Allocator::translate_critical(RefTranslation* ref_translation_ptr, ref_type ref) const noexcept
 {
     size_t idx = get_section_index(ref);
     RefTranslation& txl = ref_translation_ptr[idx];
     size_t offset = ref - get_section_base(idx);
-    size_t mapping_limit = txl.lowest_possible_xover_offset.load(std::memory_order_relaxed);
-    if (REALM_LIKELY(offset < mapping_limit)) {
-        // the mapping limit may grow concurrently, but that will not affect this code path
+    size_t lowest_possible_xover_offset = txl.lowest_possible_xover_offset.load(std::memory_order_relaxed);
+    if (REALM_LIKELY(offset < lowest_possible_xover_offset)) {
+        // the lowest possible xover offset may grow concurrently, but that will not affect this code path
         char* addr = txl.mapping_addr + offset;
 #if REALM_ENABLE_ENCRYPTION
         realm::util::encryption_read_barrier(addr, NodeHeader::header_size, txl.encrypted_mapping,
@@ -547,8 +556,8 @@ inline char* Allocator::x_translate(RefTranslation* ref_translation_ptr, ref_typ
         return addr;
     }
     else {
-        // the mapping limit may grow concurrently, but that will be handled inside the call
-        return x_translate_extended(ref_translation_ptr, ref);
+        // the lowest possible xover offset may grow concurrently, but that will be handled inside the call
+        return translate_less_critical(ref_translation_ptr, ref);
     }
 }
 
@@ -556,7 +565,7 @@ inline char* Allocator::translate(ref_type ref) const noexcept
 {
     auto ref_translation_ptr = m_ref_translation_ptr.load(std::memory_order_acquire);
     if (REALM_LIKELY(ref_translation_ptr)) {
-        return x_translate(ref_translation_ptr, ref);
+        return translate_critical(ref_translation_ptr, ref);
     }
     else {
         return do_translate(ref);
