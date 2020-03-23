@@ -20,6 +20,7 @@ set(REALM_SOURCES
     array_string_short.cpp
     array_timestamp.cpp
     bplustree.cpp
+    chunked_binary.cpp
     cluster.cpp
     column_binary.cpp
     decimal128.cpp
@@ -96,6 +97,7 @@ set(REALM_INSTALL_GENERAL_HEADERS
     array_unsigned.hpp
     binary_data.hpp
     bplustree.hpp
+    chunked_binary.hpp
     cluster.hpp
     cluster_tree.hpp
     column_binary.hpp
@@ -163,6 +165,7 @@ set(REALM_INSTALL_UTIL_HEADERS
     util/basic_system_errors.hpp
     util/bind_ptr.hpp
     util/buffer.hpp
+    util/buffer_stream.hpp
     util/call_with_tuple.hpp
     util/fixed_size_buffer.hpp
     util/cf_ptr.hpp
