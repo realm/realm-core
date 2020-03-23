@@ -148,6 +148,14 @@ Mixed ArrayMixed::get(size_t ndx) const
     return {};
 }
 
+void ArrayMixed::clear()
+{
+    m_composite.clear();
+    m_ints.destroy();
+    m_int_pairs.destroy();
+    m_strings.destroy();
+}
+
 void ArrayMixed::erase(size_t ndx)
 {
     erase_linked_payload(ndx);
@@ -192,6 +200,10 @@ size_t ArrayMixed::find_first(Mixed value, size_t begin, size_t end) const noexc
     return realm::npos;
 }
 
+void ArrayMixed::verify() const
+{
+    // TODO: Implement
+}
 
 void ArrayMixed::ensure_array_accessor(Array& arr, size_t ndx_in_parent) const
 {
