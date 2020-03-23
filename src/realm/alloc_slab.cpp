@@ -1332,7 +1332,6 @@ void SlabAlloc::get_or_add_xover_mapping(RefTranslation& txl, size_t index, size
     txl.xover_encrypted_mapping = map_entry->xover_mapping.get_encrypted_mapping();
 #endif
     txl.xover_mapping_addr.store(map_entry->xover_mapping.get_addr(), std::memory_order_release);
-    txl.lowest_possible_xover_offset.store(offset, std::memory_order_relaxed);
 }
 
 
