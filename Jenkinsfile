@@ -107,7 +107,9 @@ def doDockerBuild(String flavor, Boolean withCoverage, Boolean enableSync, Strin
       if (enableSync) {
           // stitch images are auto-published every day to our CI
           // see https://github.com/realm/ci/tree/master/realm/docker/mongodb-realm
-        withRealmCloud(version: 'latest', appsToImport: ['auth-integration-tests': "${env.WORKSPACE}/tests/mongodb"]) { networkName ->
+          // we refrain from using "latest" here to optimise docker pull cost due to a new image being built every day
+          // if there's really a new feature you need from the latest stitch, upgrade this manually
+        withRealmCloud(version: '2020-03-23', appsToImport: ['auth-integration-tests': "${env.WORKSPACE}/tests/mongodb"]) { networkName ->
             buildSteps("--network=${networkName}")
         }
       } else {
