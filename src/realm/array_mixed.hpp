@@ -25,6 +25,7 @@
 #include <realm/array_binary.hpp>
 #include <realm/array_string.hpp>
 #include <realm/array_timestamp.hpp>
+#include <realm/array_key.hpp>
 #include <realm/array_integer.hpp>
 
 namespace realm {

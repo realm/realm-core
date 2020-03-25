@@ -42,6 +42,9 @@ void ArrayMixed::init_from_mem(MemRef mem) noexcept
 {
     Array::init_from_mem(mem);
     m_composite.init_from_parent();
+    m_ints.detach();
+    m_int_pairs.detach();
+    m_strings.detach();
 }
 
 void ArrayMixed::add(Mixed value)
