@@ -73,7 +73,7 @@ class IntTestTransport : public GenericNetworkTransport {
     static size_t write(char *ptr, size_t size, size_t nmemb, std::string* data) {
         REALM_ASSERT(data);
         size_t realsize = size * nmemb;
-        data->append(ptr, realsize); // FIXME: throws std::bad_alloc when out of memory
+        data->append(ptr, realsize);
         return realsize;
     }
     static size_t header_callback(char *buffer, size_t size, size_t nitems, std::map<std::string, std::string> *headers_storage)
@@ -997,7 +997,6 @@ std::string UnitTestTransport::provider_type = "anon-user";
 const std::string UnitTestTransport::identity_0_id = "Ursus arctos isabellinus";
 const std::string UnitTestTransport::identity_1_id = "Ursus arctos horribilis";
 
-//FIXME: - Broken test
 
 TEST_CASE("app: login_with_credentials unit_tests", "[sync][app]") {
     static const std::string base_path = realm::tmp_dir();

@@ -893,6 +893,11 @@ TEST_CASE("sync: client resync") {
     config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
 
     SECTION("add table in discarded transaction") {
+        setup([&](auto& realm) {
+            auto table = ObjectStore::table_for_object_type(realm.read_group(), "object2");
+            REQUIRE(!table);
+        });
+
         auto realm = trigger_client_reset([](auto& realm) {
             realm.update_schema({
                 {"object2", {
@@ -902,12 +907,15 @@ TEST_CASE("sync: client resync") {
             ObjectStore::table_for_object_type(realm.read_group(), "object2")->create_object();
         }, [](auto&){});
         wait_for_download(*realm);
+        // test local realm that changes were persisted
         REQUIRE_THROWS(realm->refresh());
-        /* FIXME: Current understanding is that local schema changes are discarded
         auto table = ObjectStore::table_for_object_type(realm->read_group(), "object2");
         REQUIRE(table);
-        REQUIRE(table->size() == 0);
-        */
+        REQUIRE(table->size() == 1);
+        // test resync'd realm that changes were overwritten
+        realm = Realm::get_shared_realm(config);
+        table = ObjectStore::table_for_object_type(realm->read_group(), "object2");
+        REQUIRE(!table);
     }
 
     SECTION("add column in discarded transaction") {
@@ -920,17 +928,22 @@ TEST_CASE("sync: client resync") {
             ObjectStore::table_for_object_type(realm.read_group(), "object")->begin()->set("value2", 123);
         }, [](auto&){});
         wait_for_download(*realm);
+        // test local realm that changes were persisted
         REQUIRE_THROWS(realm->refresh());
-        /* FIXME: Current understanding is that local schema changes are discarded
         auto table = ObjectStore::table_for_object_type(realm->read_group(), "object");
         REQUIRE(table->get_column_count() == 2);
-        REQUIRE(table->begin()->get<Int>("value2") == 0);
-        */
+        REQUIRE(table->begin()->get<Int>("value2") == 123);
+        REQUIRE_THROWS(realm->refresh());
+        // test resync'd realm that changes were overwritten
+        realm = Realm::get_shared_realm(config);
+        table = ObjectStore::table_for_object_type(realm->read_group(), "object");
+        REQUIRE(table);
+        REQUIRE(table->get_column_count() == 1);
+        REQUIRE(!bool(table->get_column_key("value2")));
     }
 
     config.sync_config->client_resync_mode = ClientResyncMode::Recover;
 
-    /* FIXME: Currently not working in Sync
     SECTION("add table without pk in recovered transaction") {
         auto realm = trigger_client_reset([](auto& realm) {
             realm.update_schema({
@@ -944,7 +957,8 @@ TEST_CASE("sync: client resync") {
         REQUIRE_NOTHROW(realm->refresh());
         auto table = ObjectStore::table_for_object_type(realm->read_group(), "object2");
         REQUIRE(table);
-        REQUIRE(table->size() == 1);
+        REQUIRE(bool(table->get_column_key("value2")));
+        REQUIRE(table->size() == 0);
     }
 
     SECTION("add table pk in recovered transaction") {
@@ -962,7 +976,11 @@ TEST_CASE("sync: client resync") {
         REQUIRE_NOTHROW(realm->refresh());
         auto table = ObjectStore::table_for_object_type(realm->read_group(), "object2");
         REQUIRE(table);
-        REQUIRE(table->size() == 2);
+        ColKey pk_col_key = table->get_column_key("pk");
+        REQUIRE(bool(pk_col_key));
+        REQUIRE(table->get_column_attr(pk_col_key).test(col_attr_Nullable));
+        // FIXME: sync has object recovery disabled currently
+        // REQUIRE(table->size() == 2);
     }
 
     SECTION("add column in recovered transaction") {
@@ -981,9 +999,10 @@ TEST_CASE("sync: client resync") {
         REQUIRE_NOTHROW(realm->refresh());
         auto table = ObjectStore::table_for_object_type(realm->read_group(), "object");
         REQUIRE(table->get_column_count() == 4);
-        REQUIRE(table->begin()->get<Int>(table->get_column_key("value2")) == 123);
+        REQUIRE(bool(table->get_column_key("value2")));
+        // FIXME: sync has object recovery disabled currently
+        // REQUIRE(table->begin()->get<Int>(table->get_column_key("value2")) == 123);
     }
-    */
 
     SECTION("compatible schema changes in both remote and recovered transactions") {
         auto realm = trigger_client_reset([](auto& realm) {
