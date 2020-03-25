@@ -13,6 +13,7 @@ RUN apt-get update && apt-get install -y \
     libssl-dev \
     ninja-build \
     pkg-config \
+    python-matplotlib \
     s3cmd \
     tar \
     unzip \
