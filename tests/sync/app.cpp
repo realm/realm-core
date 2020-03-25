@@ -403,9 +403,6 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app]") {
 // MARK: - UserAPIKeyProviderClient Tests
 
 TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
-    auto email = util::format("realm_tests_do_autoverify%1@%2.com", random_string(10), random_string(10));
-    auto password = util::format("%1", random_string(15));
-    auto api_key_name = util::format("%1", random_string(15));
 
     std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
         return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
@@ -422,90 +419,101 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
 
     bool processed = false;
 
-    app.provider_client<App::UsernamePasswordProviderClient>()
-        .register_email(email,
-            password,
-            [&](Optional<app::AppError> error) {
-                CHECK(!error); // first registration should succeed
-                if (error) {
-                    std::cout << "register failed for email: " << email << " pw: " << password << " message: " << error->error_code.message() << "+" << error->message << std::endl;
-                }
+    auto register_and_log_in_user = [&]() -> std::shared_ptr<SyncUser> {
+        auto email = util::format("realm_tests_do_autoverify%1@%2.com", random_string(10), random_string(10));
+        auto password = util::format("%1", random_string(15));
+        app.provider_client<App::UsernamePasswordProviderClient>()
+            .register_email(email,
+                password,
+                [&](Optional<app::AppError> error) {
+                    CHECK(!error); // first registration should succeed
+                    if (error) {
+                        std::cout << "register failed for email: " << email << " pw: " << password << " message: " << error->error_code.message() << "+" << error->message << std::endl;
+                    }
+                });
+        std::shared_ptr<SyncUser> logged_in_user;
+        app.log_in_with_credentials(realm::app::AppCredentials::username_password(email, password),
+            [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+                REQUIRE(user);
+                CHECK(!error);
+                logged_in_user = user;
+                processed = true;
             });
-
-    app.log_in_with_credentials(realm::app::AppCredentials::username_password(email, password),
-        [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
-            REQUIRE(user);
-            CHECK(!error);
-            processed = true;
-        });
-    CHECK(processed);
-    processed = false;
+        CHECK(processed);
+        processed = false;
+        return logged_in_user;
+    };
 
     App::UserAPIKey api_key;
 
     SECTION("api-key") {
+        std::shared_ptr<SyncUser> logged_in_user = register_and_log_in_user();
+        auto api_key_name = util::format("%1", random_string(15));
         app.provider_client<App::UserAPIKeyProviderClient>()
-            .create_api_key(api_key_name, [&](Optional<App::UserAPIKey> user_api_key, Optional<app::AppError> error) {
+            .create_api_key(api_key_name, logged_in_user,
+                            [&](Optional<App::UserAPIKey> user_api_key, Optional<app::AppError> error) {
                 CHECK(!error);
                 REQUIRE(bool(user_api_key));
                 CHECK(user_api_key->name == api_key_name);
-                CHECK(user_api_key->id.to_string() == user_api_key->id.to_string());
                 api_key = user_api_key.value();
         });
 
         app.provider_client<App::UserAPIKeyProviderClient>()
-            .fetch_api_key(api_key.id, [&](Optional<App::UserAPIKey> user_api_key, Optional<app::AppError> error) {
+            .fetch_api_key(api_key.id, logged_in_user,
+                           [&](Optional<App::UserAPIKey> user_api_key, Optional<app::AppError> error) {
                 CHECK(!error);
                 REQUIRE(bool(user_api_key));
                 CHECK(user_api_key->name == api_key_name);
-                CHECK(user_api_key->id.to_string() == user_api_key->id.to_string());
+                CHECK(user_api_key->id == api_key.id);
         });
 
         app.provider_client<App::UserAPIKeyProviderClient>()
-            .fetch_api_keys([&](std::vector<App::UserAPIKey> api_keys, Optional<AppError> error) {
+            .fetch_api_keys(logged_in_user,
+                            [&](std::vector<App::UserAPIKey> api_keys, Optional<AppError> error) {
                 CHECK(api_keys.size() == 1);
-                for(auto api_key : api_keys) {
-                    CHECK(api_key.id.to_string() == api_key.id.to_string());
+                for(auto key : api_keys) {
+                    CHECK(key.id.to_string() == api_key.id.to_string());
                     CHECK(api_key.name == api_key_name);
+                    CHECK(key.id == api_key.id);
                 }
                 CHECK(!error);
         });
 
         app.provider_client<App::UserAPIKeyProviderClient>()
-            .enable_api_key(api_key, [&](Optional<AppError> error) {
+            .enable_api_key(api_key, logged_in_user, [&](Optional<AppError> error) {
                 CHECK(!error);
         });
 
         app.provider_client<App::UserAPIKeyProviderClient>()
-            .fetch_api_key(api_key.id, [&](Optional<App::UserAPIKey> user_api_key, Optional<app::AppError> error) {
+            .fetch_api_key(api_key.id, logged_in_user,
+                           [&](Optional<App::UserAPIKey> user_api_key, Optional<app::AppError> error) {
                 CHECK(!error);
                 REQUIRE(bool(user_api_key));
                 CHECK(user_api_key->disabled == false);
                 CHECK(user_api_key->name == api_key_name);
-                CHECK(user_api_key->id.to_string() == user_api_key->id.to_string());
+                CHECK(user_api_key->id == api_key.id);
         });
 
         app.provider_client<App::UserAPIKeyProviderClient>()
-            .disable_api_key(api_key, [&](Optional<AppError> error) {
+            .disable_api_key(api_key, logged_in_user, [&](Optional<AppError> error) {
                 CHECK(!error);
         });
 
         app.provider_client<App::UserAPIKeyProviderClient>()
-            .fetch_api_key(api_key.id, [&](Optional<App::UserAPIKey> user_api_key, Optional<app::AppError> error) {
+            .fetch_api_key(api_key.id, logged_in_user, [&](Optional<App::UserAPIKey> user_api_key, Optional<app::AppError> error) {
                 CHECK(!error);
                 REQUIRE(bool(user_api_key));
                 CHECK(user_api_key->disabled == true);
                 CHECK(user_api_key->name == api_key_name);
-                CHECK(user_api_key->id.to_string() == user_api_key->id.to_string());
         });
 
         app.provider_client<App::UserAPIKeyProviderClient>()
-            .delete_api_key(api_key, [&](Optional<AppError> error) {
+            .delete_api_key(api_key, logged_in_user, [&](Optional<AppError> error) {
                 CHECK(!error);
         });
 
         app.provider_client<App::UserAPIKeyProviderClient>()
-            .fetch_api_key(api_key.id, [&](Optional<App::UserAPIKey> user_api_key, Optional<app::AppError> error) {
+            .fetch_api_key(api_key.id, logged_in_user, [&](Optional<App::UserAPIKey> user_api_key, Optional<app::AppError> error) {
                 CHECK(!user_api_key);
                 CHECK(error);
                 processed = true;
@@ -513,6 +521,224 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
 
         CHECK(processed);
     }
+
+    SECTION("api-key without a user") {
+        std::shared_ptr<SyncUser> no_user = nullptr;
+        auto api_key_name = util::format("%1", random_string(15));
+        app.provider_client<App::UserAPIKeyProviderClient>()
+            .create_api_key(api_key_name, no_user,
+                            [&](Optional<App::UserAPIKey> user_api_key, Optional<app::AppError> error) {
+                                REQUIRE(error);
+                                CHECK(error->is_service_error());
+                                CHECK(error->message == "must authenticate first");
+                                CHECK(!bool(user_api_key));
+                            });
+
+        app.provider_client<App::UserAPIKeyProviderClient>()
+            .fetch_api_key(api_key.id, no_user,
+                           [&](Optional<App::UserAPIKey> user_api_key, Optional<app::AppError> error) {
+                               REQUIRE(error);
+                               CHECK(error->is_service_error());
+                               CHECK(error->message == "must authenticate first");
+                               CHECK(!bool(user_api_key));
+                           });
+
+        app.provider_client<App::UserAPIKeyProviderClient>()
+            .fetch_api_keys(no_user,
+                            [&](std::vector<App::UserAPIKey> api_keys, Optional<AppError> error) {
+                                REQUIRE(error);
+                                CHECK(error->is_service_error());
+                                CHECK(error->message == "must authenticate first");
+                                CHECK(api_keys.size() == 0);
+                            });
+
+        app.provider_client<App::UserAPIKeyProviderClient>()
+            .enable_api_key(api_key, no_user,
+                            [&](Optional<AppError> error) {
+                                REQUIRE(error);
+                                CHECK(error->is_service_error());
+                                CHECK(error->message == "must authenticate first");
+                            });
+
+        app.provider_client<App::UserAPIKeyProviderClient>()
+            .fetch_api_key(api_key.id, no_user,
+                           [&](Optional<App::UserAPIKey> user_api_key, Optional<app::AppError> error) {
+                               REQUIRE(error);
+                               CHECK(error->is_service_error());
+                               CHECK(error->message == "must authenticate first");
+                               CHECK(!bool(user_api_key));
+                           });
+
+        app.provider_client<App::UserAPIKeyProviderClient>()
+            .disable_api_key(api_key, no_user,
+                             [&](Optional<AppError> error) {
+                                 REQUIRE(error);
+                                 CHECK(error->is_service_error());
+                                 CHECK(error->message == "must authenticate first");
+                             });
+
+        app.provider_client<App::UserAPIKeyProviderClient>()
+            .fetch_api_key(api_key.id, no_user,
+                           [&](Optional<App::UserAPIKey> user_api_key, Optional<app::AppError> error) {
+                               REQUIRE(error);
+                               CHECK(error->is_service_error());
+                               CHECK(error->message == "must authenticate first");
+                               CHECK(!bool(user_api_key));
+                           });
+
+        app.provider_client<App::UserAPIKeyProviderClient>()
+            .delete_api_key(api_key, no_user,
+                            [&](Optional<AppError> error) {
+                                REQUIRE(error);
+                                CHECK(error->is_service_error());
+                                CHECK(error->message == "must authenticate first");
+                            });
+
+        app.provider_client<App::UserAPIKeyProviderClient>()
+            .fetch_api_key(api_key.id, no_user,
+                           [&](Optional<App::UserAPIKey> user_api_key, Optional<app::AppError> error) {
+                               CHECK(!user_api_key);
+                               REQUIRE(error);
+                               CHECK(error->is_service_error());
+                               CHECK(error->message == "must authenticate first");
+                               processed = true;
+                           });
+        CHECK(processed);
+    }
+
+    SECTION("api-key against the wrong user") {
+        std::shared_ptr<SyncUser> first_user = register_and_log_in_user();
+        std::shared_ptr<SyncUser> second_user = register_and_log_in_user();
+        auto api_key_name = util::format("%1", random_string(15));
+        App::UserAPIKey api_key;
+        App::UserAPIKeyProviderClient provider = app.provider_client<App::UserAPIKeyProviderClient>();
+
+        provider.create_api_key(api_key_name, first_user,
+                        [&](Optional<App::UserAPIKey> user_api_key, Optional<app::AppError> error) {
+                            CHECK(!error);
+                            REQUIRE(bool(user_api_key));
+                            CHECK(user_api_key->name == api_key_name);
+                            api_key = user_api_key.value();
+                        });
+
+        provider.fetch_api_key(api_key.id, first_user,
+                       [&](Optional<App::UserAPIKey> user_api_key, Optional<app::AppError> error) {
+                           CHECK(!error);
+                           REQUIRE(bool(user_api_key));
+                           CHECK(user_api_key->name == api_key_name);
+                           CHECK(user_api_key->id.to_string() == user_api_key->id.to_string());
+                       });
+
+        provider.fetch_api_key(api_key.id, second_user,
+                       [&](Optional<App::UserAPIKey> user_api_key, Optional<app::AppError> error) {
+                           REQUIRE(error);
+                           CHECK(error->message == "API key not found");
+                           CHECK(error->is_service_error());
+                           CHECK(app::ServiceErrorCode(error->error_code.value()) == app::ServiceErrorCode::api_key_not_found);
+                           REQUIRE(!bool(user_api_key));
+                       });
+
+        provider.fetch_api_keys(first_user,
+                        [&](std::vector<App::UserAPIKey> api_keys, Optional<AppError> error) {
+                            CHECK(api_keys.size() == 1);
+                            for(auto api_key : api_keys) {
+                                CHECK(api_key.name == api_key_name);
+                            }
+                            CHECK(!error);
+                        });
+
+        provider.fetch_api_keys(second_user,
+                                [&](std::vector<App::UserAPIKey> api_keys, Optional<AppError> error) {
+                                    CHECK(api_keys.size() == 0);
+                                    CHECK(!error);
+                                });
+
+        provider.enable_api_key(api_key, first_user, [&](Optional<AppError> error) {
+            CHECK(!error);
+        });
+
+        provider.enable_api_key(api_key, second_user, [&](Optional<AppError> error) {
+            REQUIRE(error);
+            CHECK(error->message == "API key not found");
+            CHECK(error->is_service_error());
+            CHECK(app::ServiceErrorCode(error->error_code.value()) == app::ServiceErrorCode::api_key_not_found);
+        });
+
+        provider.fetch_api_key(api_key.id, first_user,
+                       [&](Optional<App::UserAPIKey> user_api_key, Optional<app::AppError> error) {
+                           CHECK(!error);
+                           REQUIRE(bool(user_api_key));
+                           CHECK(user_api_key->disabled == false);
+                           CHECK(user_api_key->name == api_key_name);
+                       });
+
+        provider.fetch_api_key(api_key.id, second_user,
+                               [&](Optional<App::UserAPIKey> user_api_key, Optional<app::AppError> error) {
+                                   REQUIRE(error);
+                                   REQUIRE(!bool(user_api_key));
+                                   CHECK(error->message == "API key not found");
+                                   CHECK(error->is_service_error());
+                                   CHECK(app::ServiceErrorCode(error->error_code.value()) == app::ServiceErrorCode::api_key_not_found);
+                               });
+
+        provider.disable_api_key(api_key, first_user, [&](Optional<AppError> error) {
+            CHECK(!error);
+        });
+
+        provider.disable_api_key(api_key, second_user, [&](Optional<AppError> error) {
+            REQUIRE(error);
+            CHECK(error->message == "API key not found");
+            CHECK(error->is_service_error());
+            CHECK(app::ServiceErrorCode(error->error_code.value()) == app::ServiceErrorCode::api_key_not_found);
+        });
+
+        provider.fetch_api_key(api_key.id, first_user, [&](Optional<App::UserAPIKey> user_api_key, Optional<app::AppError> error) {
+            CHECK(!error);
+            REQUIRE(bool(user_api_key));
+            CHECK(user_api_key->disabled == true);
+            CHECK(user_api_key->name == api_key_name);
+        });
+
+        provider.fetch_api_key(api_key.id, second_user, [&](Optional<App::UserAPIKey> user_api_key, Optional<app::AppError> error) {
+            REQUIRE(error);
+            REQUIRE(!bool(user_api_key));
+            CHECK(error->message == "API key not found");
+            CHECK(error->is_service_error());
+            CHECK(app::ServiceErrorCode(error->error_code.value()) == app::ServiceErrorCode::api_key_not_found);
+        });
+
+        provider.delete_api_key(api_key, second_user, [&](Optional<AppError> error) {
+            REQUIRE(error);
+            CHECK(error->message == "API key not found");
+            CHECK(error->is_service_error());
+            CHECK(app::ServiceErrorCode(error->error_code.value()) == app::ServiceErrorCode::api_key_not_found);
+        });
+
+        provider.delete_api_key(api_key, first_user, [&](Optional<AppError> error) {
+            CHECK(!error);
+        });
+
+        provider.fetch_api_key(api_key.id, first_user, [&](Optional<App::UserAPIKey> user_api_key, Optional<app::AppError> error) {
+            CHECK(!user_api_key);
+            REQUIRE(error);
+            CHECK(error->message == "API key not found");
+            CHECK(error->is_service_error());
+            CHECK(app::ServiceErrorCode(error->error_code.value()) == app::ServiceErrorCode::api_key_not_found);
+            processed = true;
+        });
+
+        provider.fetch_api_key(api_key.id, second_user, [&](Optional<App::UserAPIKey> user_api_key, Optional<app::AppError> error) {
+            CHECK(!user_api_key);
+            REQUIRE(error);
+            CHECK(error->message == "API key not found");
+            CHECK(error->is_service_error());
+            CHECK(app::ServiceErrorCode(error->error_code.value()) == app::ServiceErrorCode::api_key_not_found);
+            processed = true;
+        });
+
+        CHECK(processed);
+    }
+
 }
 
 #endif // REALM_ENABLE_AUTH_TESTS
@@ -854,17 +1080,6 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync][app]") {
 }
 
 TEST_CASE("app: UserAPIKeyProviderClient unit_tests", "[sync][app]") {
-    auto setup_user = []() {
-        if (realm::SyncManager::shared().get_current_user()) {
-            return;
-        }
-
-        realm::SyncManager::shared().get_user(UnitTestTransport::user_id,
-                                              good_access_token,
-                                              good_access_token,
-                                              "anon-user");
-    };
-    
     std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
         return std::unique_ptr<GenericNetworkTransport>(new UnitTestTransport);
     };
@@ -874,13 +1089,15 @@ TEST_CASE("app: UserAPIKeyProviderClient unit_tests", "[sync][app]") {
     std::string base_path = tmp_dir() + "/" + config.app_id;
     reset_test_directory(base_path);
     TestSyncManager init_sync_manager(base_path);
-    
+    std::shared_ptr<SyncUser> logged_in_user = realm::SyncManager::shared().get_user(UnitTestTransport::user_id,
+                                                                                     good_access_token,
+                                                                                     good_access_token,
+                                                                                     "anon-user");
     bool processed = false;
     ObjectId obj_id(UnitTestTransport::api_key_id.c_str());
 
     SECTION("create api key") {
-        setup_user();
-        app.provider_client<App::UserAPIKeyProviderClient>().create_api_key(UnitTestTransport::api_key_name,
+        app.provider_client<App::UserAPIKeyProviderClient>().create_api_key(UnitTestTransport::api_key_name, logged_in_user,
                                                                             [&](Optional<App::UserAPIKey> user_api_key, Optional<AppError> error) {
             CHECK(!error);
             CHECK(user_api_key->disabled == false);
@@ -891,8 +1108,7 @@ TEST_CASE("app: UserAPIKeyProviderClient unit_tests", "[sync][app]") {
     }
     
     SECTION("fetch api key") {
-        setup_user();
-        app.provider_client<App::UserAPIKeyProviderClient>().fetch_api_key(obj_id,
+        app.provider_client<App::UserAPIKeyProviderClient>().fetch_api_key(obj_id, logged_in_user,
                                                                            [&](Optional<App::UserAPIKey> user_api_key, Optional<AppError> error) {
             CHECK(!error);
             CHECK(user_api_key->disabled == false);
@@ -902,8 +1118,8 @@ TEST_CASE("app: UserAPIKeyProviderClient unit_tests", "[sync][app]") {
     }
     
     SECTION("fetch api keys") {
-        setup_user();
-        app.provider_client<App::UserAPIKeyProviderClient>().fetch_api_keys([&](std::vector<App::UserAPIKey> user_api_keys, Optional<AppError> error) {
+        app.provider_client<App::UserAPIKeyProviderClient>().fetch_api_keys(logged_in_user,
+                                                                            [&](std::vector<App::UserAPIKey> user_api_keys, Optional<AppError> error) {
             CHECK(!error);
             CHECK(user_api_keys.size() == 2);
             for(auto user_api_key : user_api_keys) {

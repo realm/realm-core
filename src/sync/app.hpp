@@ -99,7 +99,7 @@ public:
          *     - name: The name of the API key to be created.
          *     - completion_block: A callback to be invoked once the call is complete.
         */
-        void create_api_key(const std::string& name,
+        void create_api_key(const std::string& name, std::shared_ptr<SyncUser> user,
                             std::function<void(Optional<UserAPIKey>, Optional<AppError>)> completion_block);
 
         /**
@@ -109,7 +109,7 @@ public:
          *     - id: The id of the API key to fetch.
          *     - completion_block: A callback to be invoked once the call is complete.
          */
-        void fetch_api_key(const realm::ObjectId& id,
+        void fetch_api_key(const realm::ObjectId& id, std::shared_ptr<SyncUser> user,
                            std::function<void(Optional<UserAPIKey>, Optional<AppError>)> completion_block);
 
         /**
@@ -118,7 +118,8 @@ public:
          * - parameters:
          *     - completion_block: A callback to be invoked once the call is complete.
          */
-        void fetch_api_keys(std::function<void(std::vector<UserAPIKey>, Optional<AppError>)> completion_block);
+        void fetch_api_keys(std::shared_ptr<SyncUser> user,
+                            std::function<void(std::vector<UserAPIKey>, Optional<AppError>)> completion_block);
 
         /**
          * Deletes a user API key associated with the current user.
@@ -127,7 +128,7 @@ public:
          *     - id: The id of the API key to delete.
          *     - completion_block: A callback to be invoked once the call is complete.
          */
-        void delete_api_key(const UserAPIKey& api_key,
+        void delete_api_key(const UserAPIKey& api_key, std::shared_ptr<SyncUser> user,
                             std::function<void(Optional<AppError>)> completion_block);
 
         /**
@@ -137,7 +138,7 @@ public:
          *     - id: The id of the API key to enable.
          *     - completion_block: A callback to be invoked once the call is complete.
          */
-        void enable_api_key(const UserAPIKey& api_key,
+        void enable_api_key(const UserAPIKey& api_key, std::shared_ptr<SyncUser> user,
                             std::function<void(Optional<AppError>)> completion_block);
 
         /**
@@ -147,12 +148,16 @@ public:
          *     - id: The id of the API key to disable.
          *     - completion_block: A callback to be invoked once the call is complete.
          */
-        void disable_api_key(const UserAPIKey& api_key,
+        void disable_api_key(const UserAPIKey& api_key, std::shared_ptr<SyncUser> user,
                              std::function<void(Optional<AppError>)> completion_block);
     private:
         friend class App;
-        UserAPIKeyProviderClient(App* app) : parent(app) {}
-        App* parent;
+        UserAPIKeyProviderClient(App* app)
+        : m_parent(app)
+        {
+            REALM_ASSERT(app);
+        }
+        App* m_parent;
     };
 
     /**
@@ -242,8 +247,12 @@ public:
                                           std::function<void(Optional<AppError>)> completion_block);
     private:
         friend class App;
-        UsernamePasswordProviderClient(App* app) : parent(app) {}
-        App* parent;
+        UsernamePasswordProviderClient(App* app)
+        : m_parent(app)
+        {
+            REALM_ASSERT(app);
+        }
+        App* m_parent;
     };
 
     /**
@@ -301,9 +310,9 @@ private:
 };
 
 template<>
-App::UsernamePasswordProviderClient App::provider_client <App::UsernamePasswordProviderClient> ();
+App::UsernamePasswordProviderClient App::provider_client<App::UsernamePasswordProviderClient>();
 template<>
-App::UserAPIKeyProviderClient App::provider_client <App::UserAPIKeyProviderClient>();
+App::UserAPIKeyProviderClient App::provider_client<App::UserAPIKeyProviderClient>();
 
 } // namespace app
 } // namespace realm
