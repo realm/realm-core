@@ -47,7 +47,7 @@ public:
 
         m_initial.reserve(lv.size());
         for (size_t i = 0; i < lv.size(); ++i)
-            m_initial.push_back(lv.ObjList::get_key(i));
+            m_initial.push_back(lv.get_key(i));
     }
 
     CollectionChangeSet finish() {
@@ -100,12 +100,12 @@ private:
         m_list.size();
         for (auto const& range : info.insertions) {
             for (auto i = range.first; i < range.second; ++i)
-                m_initial.insert(m_initial.begin() + i, m_list.ObjList::get_key(i));
+                m_initial.insert(m_initial.begin() + i, m_list.get_key(i));
         }
 
         for (auto const& range : info.modifications) {
             for (auto i = range.first; i < range.second; ++i)
-                m_initial[i] = m_list.ObjList::get_key(i);
+                m_initial[i] = m_list.get_key(i);
         }
 
         REQUIRE(m_list.is_attached());
@@ -116,12 +116,12 @@ private:
         }
         REQUIRE(m_initial.size() == m_list.size());
         for (size_t i = 0; i < m_initial.size(); ++i)
-            CHECK(m_initial[i] == m_list.ObjList::get_key(i));
+            CHECK(m_initial[i] == m_list.get_key(i));
 
         // Verify that everything marked as a move actually is one
         for (size_t i = 0; i < move_sources.size(); ++i) {
             if (!info.modifications.contains(info.moves[i].to)) {
-                CHECK(m_list.ObjList::get_key(info.moves[i].to) == move_sources[i]);
+                CHECK(m_list.get_key(info.moves[i].to) == move_sources[i]);
             }
         }
     }

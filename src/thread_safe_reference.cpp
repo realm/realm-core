@@ -145,7 +145,7 @@ public:
             try {
                 list = table->get_object(m_key).get_listbase_ptr(m_col_key);
             }
-            catch (InvalidKey const&) {
+            catch (KeyNotFound const&) {
                 // Create a detached list of the appropriate type so that we
                 // return an invalid Results rather than an Empty Results, to
                 // match what happens for other types of handover where the
@@ -224,7 +224,7 @@ T ThreadSafeReference::resolve(std::shared_ptr<Realm> const& realm)
     try {
         return payload.import_into(realm);
     }
-    catch (InvalidKey const&) {
+    catch (KeyNotFound const&) {
         // Object was deleted in a version after when the TSR was created
         return {};
     }

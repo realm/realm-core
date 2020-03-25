@@ -673,7 +673,7 @@ void SyncSession::create_sync_session()
     session_config.custom_http_headers = m_config.custom_http_headers;
 
     if (m_config.url_prefix) {
-        session_config.url_prefix = *m_config.url_prefix;
+        session_config.service_identifier = *m_config.url_prefix;
     }
 
     if (m_force_client_resync) {
