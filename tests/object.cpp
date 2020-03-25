@@ -978,7 +978,7 @@ TEST_CASE("object") {
         r->begin_transaction();
 
         auto table = r->read_group().get_table("class_all types");
-        table->create_object();
+        table->create_object_with_primary_key(1);
         Object obj(r, *r->schema().find("all types"), *table->begin());
 
         auto link_table = r->read_group().get_table("class_link target");

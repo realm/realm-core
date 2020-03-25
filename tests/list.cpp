@@ -45,7 +45,6 @@ TEST_CASE("list") {
     auto r = Realm::get_shared_realm(config);
     r->update_schema({
         {"origin", {
-            {"pk", PropertyType::Int, Property::IsPrimary{true}},
             {"array", PropertyType::Array|PropertyType::Object, "target"}
         }},
         {"target", {

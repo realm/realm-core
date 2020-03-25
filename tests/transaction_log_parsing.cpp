@@ -274,7 +274,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
         auto r = Realm::get_shared_realm(config);
         r->update_schema({
             {"table", {
-                {"pk", PropertyType::Int, Property::IsPrimary{true}},
+                {"pk", PropertyType::Int},
                 {"value", PropertyType::Int}
             }},
         });
@@ -924,7 +924,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
                 {"array", PropertyType::Array|PropertyType::Object, "target"}
             }},
             {"target", {
-                {"pk", PropertyType::Int, Property::IsPrimary{true}},
+                {"pk", PropertyType::Int},
                 {"value 1", PropertyType::Int},
                 {"value 2", PropertyType::Int},
             }},
@@ -942,25 +942,24 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
         for (int i = 0; i < 10; ++i)
             target->get_object(target_keys[i]).set_all(i, i, i);
 
-        std::vector<ObjKey> origin_keys;
-        origin->create_objects(3, origin_keys);
-        origin->get_object(origin_keys[0]).set_all(5, target_keys[5]);
-        origin->get_object(origin_keys[1]).set_all(5, target_keys[6]);
+        auto obj0 = origin->create_object_with_primary_key(5).set("link", target_keys[5]);
+        auto obj1 = origin->create_object_with_primary_key(6).set("link", target_keys[6]);
+        auto obj2 = origin->create_object_with_primary_key(7);
 
-        auto lv = origin->get_object(origin_keys[0]).get_linklist(origin_cols[2]);
+        auto lv = obj0.get_linklist(origin_cols[2]);
         for (auto key : target_keys)
             lv.add(key);
-        auto lv2 = origin->get_object(origin_keys[1]).get_linklist(origin_cols[2]);
+        auto lv2 = obj1.get_linklist(origin_cols[2]);
         lv2.add(target_keys[0]);
 
-        auto tr = origin->get_object(origin_keys[0]).get_list<int64_t>(origin_cols[3]);
+        auto tr = obj0.get_list<int64_t>(origin_cols[3]);
         for (int i = 0; i < 10; ++i)
             tr.add(i);
-        auto tr2 = origin->get_object(origin_keys[1]).get_list<int64_t>(origin_cols[3]);
+        auto tr2 = obj1.get_list<int64_t>(origin_cols[3]);
         for (int i = 0; i < 10; ++i)
             tr2.add(0);
 
-        realm->read_group().get_table("class_origin 2")->create_object();
+        realm->read_group().get_table("class_origin 2")->create_object_with_primary_key(48);
 
         realm->commit_transaction();
 
@@ -1090,7 +1089,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
         }
 
         SECTION("deleting the target of a link marks the link as modified") {
-            auto o = origin->get_object(origin_keys[0]);
+            auto o = obj0;
             auto changes = observe({o}, [&] {
                 o.get_linked_object(origin_cols[1]).remove();
             });
@@ -1098,7 +1097,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
         }
 
         SECTION("clearing the target table of a link marks the link as modified") {
-            auto o = origin->get_object(origin_keys[0]);
+            auto o = obj0;
             auto changes = observe({o}, [&] {
                 target->clear();
             });
@@ -1108,7 +1107,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
         SECTION("clearing a table invalidates all observers for that table") {
             auto r1 = target->get_object(target_keys[0]);
             auto r2 = target->get_object(target_keys[5]);
-            auto r3 = origin->get_object(origin_keys[0]);
+            auto r3 = obj0;
             auto changes = observe({r1, r2, r3}, [&] {
                 target->clear();
             });
@@ -1118,7 +1117,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
         }
 
         using Kind = BindingContext::ColumnInfo::Kind;
-        auto o = origin->get_object(origin_keys[0]);
+        auto o = obj0;
         const auto lv_col = origin_cols[2];
         SECTION("array: add()") {
             auto changes = observe({o}, [&] {

@@ -217,7 +217,6 @@ Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
     Obj obj;
     auto table = realm->read_group().get_table(object_schema.table_key);
 
-    bool skip_primary = true;
     if (auto primary_prop = object_schema.primary_key_property()) {
         // search for existing object based on primary key type
         auto primary_value = ctx.value_for_property(value, *primary_prop,
@@ -231,20 +230,11 @@ Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
         }
         auto key = get_for_primary_key_impl(ctx, *table, *primary_prop, *primary_value);
         if (key) {
-            if (policy != CreatePolicy::ForceCreate)
-                obj = table->get_object(key);
-            else if (realm->is_in_migration()) {
-                // Creating objects with duplicate primary keys is allowed in migrations
-                // as long as there are no duplicates at the end, as adding an entirely
-                // new column which is the PK will inherently result in duplicates at first
-                obj = table->create_object();
-                created = true;
-                skip_primary = false;
-            }
-            else {
+            if (policy == CreatePolicy::ForceCreate) {
                 throw std::logic_error(util::format("Attempting to create an object of type '%1' with an existing primary key value '%2'.",
                                                     object_schema.name, ctx.print(*primary_value)));
             }
+            obj = table->get_object(key);
         }
         else {
             created = true;
@@ -282,7 +272,8 @@ Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
         *out_row = obj;
     for (size_t i = 0; i < object_schema.persisted_properties.size(); ++i) {
         auto& prop = object_schema.persisted_properties[i];
-        if (skip_primary && prop.is_primary)
+        // If table has primary key, it must have been set during object creation
+        if (prop.is_primary)
             continue;
 
         auto v = ctx.value_for_property(value, prop, i);
