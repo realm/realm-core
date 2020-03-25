@@ -1089,7 +1089,7 @@ Obj& Obj::set<ObjKey>(ColKey col_key, ObjKey target_key, bool is_default)
     return *this;
 }
 
-Obj Obj::create_and_set_linked_object(ColKey col_key)
+Obj Obj::create_and_set_linked_object(ColKey col_key, bool is_default)
 {
     update_if_needed();
     get_table()->report_invalid_key(col_key);
@@ -1123,7 +1123,6 @@ Obj Obj::create_and_set_linked_object(ColKey col_key)
         values.set(m_row_ndx, target_key);
 
         if (Replication* repl = get_replication()) {
-            bool is_default = true; // FIXME: Is this correct?
             repl->set(m_table.unchecked_ptr(), col_key, m_key, target_key,
                       is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
         }
