@@ -1,15 +1,11 @@
-# NEXT RELEASE
+# 10.0.0-alpha.3 Release notes
 
 ### Enhancements
-* None.
+* Requirement to have a contiguous memory mapping of the entire realm file is removed.
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* ConstLnkLst filters out unresolved links.
  
-### Breaking changes
-* None.
-
 -----------
 
 ### Internals
@@ -18,6 +14,7 @@
 * Calling `Table::create_object(ObjKey)` on a table with a primary key column is now an error.
 * Objects created with `Table::create_object(GlobalKey)` are now subject to tombstone resurrection.
 * Table::get_objkey_from_global_key() was introduced to allow getting the ObjKey of an object (dead or alive) identified by its GlobalKey.
+* ChunkedBinaryData moved from Sync to Core
 
 ----------------------------------------------
 
