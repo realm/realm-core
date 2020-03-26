@@ -3505,7 +3505,7 @@ TEST(Parser_ObjectId)
     auto pk_col_key = table->get_primary_key_column();
     auto nullable_oid_col_key = table->add_column(type_ObjectId, "nid", true);
 
-    auto now = std::chrono::steady_clock::now();
+    auto now = std::chrono::system_clock::now();
     ObjectId t1{Timestamp{0, 1}};
     ObjectId tNow{now};
     ObjectId t25{now + std::chrono::seconds(25)};
@@ -3516,7 +3516,7 @@ TEST(Parser_ObjectId)
         obj.set(nullable_oid_col_key, oid);
     }
     // add one object with default values, we assume time > now, and null
-    auto obj_generated = table->create_object();
+    auto obj_generated = table->create_object_with_primary_key(ObjectId::gen());
     ObjectId generated_pk = obj_generated.get<ObjectId>(pk_col_key);
     auto generated_nullable = obj_generated.get<util::Optional<ObjectId>>(nullable_oid_col_key);
     CHECK_GREATER_EQUAL(Timestamp{now}, generated_pk.get_timestamp());

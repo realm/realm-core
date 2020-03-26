@@ -25,6 +25,7 @@
 #include <realm/array_binary.hpp>
 #include <realm/array_string.hpp>
 #include <realm/array_timestamp.hpp>
+#include <realm/array_key.hpp>
 #include <realm/array_integer.hpp>
 
 namespace realm {
@@ -84,11 +85,14 @@ public:
         return m_composite.get(ndx) == 0;
     }
 
+    void clear();
     void erase(size_t ndx);
     void truncate_and_destroy_children(size_t ndx);
     void move(ArrayMixed& dst, size_t ndx);
 
     size_t find_first(Mixed value, size_t begin = 0, size_t end = realm::npos) const noexcept;
+
+    void verify() const;
 
 private:
     enum { payload_idx_type, payload_idx_int, payload_idx_pair, payload_idx_str, payload_idx_size };

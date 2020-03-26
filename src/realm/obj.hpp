@@ -267,7 +267,7 @@ public:
     // object is already set, we throw LogicError (to prevent
     // dangling objects, since they do not delete automatically
     // if they are not embedded...)
-    Obj create_and_set_linked_object(ColKey col_key);
+    Obj create_and_set_linked_object(ColKey col_key, bool is_default = false);
     // Clear all fields of a linked object returning it to its
     // default state. If the object does not exist, create a
     // new object and link it. (To Be Implemented)

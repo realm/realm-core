@@ -23,6 +23,7 @@
 #include "realm/array_bool.hpp"
 #include "realm/array_string.hpp"
 #include "realm/array_binary.hpp"
+#include "realm/array_mixed.hpp"
 #include "realm/array_timestamp.hpp"
 #include "realm/array_decimal128.hpp"
 #include "realm/array_key.hpp"
@@ -128,6 +129,8 @@ int ConstObj::cmp(const ConstObj& other, ColKey col_key) const
             return cmp<String>(other, col_ndx);
         case type_Binary:
             return cmp<Binary>(other, col_ndx);
+        case type_OldMixed:
+            return cmp<Mixed>(other, col_ndx);
         case type_Timestamp:
             return cmp<Timestamp>(other, col_ndx);
         case type_Decimal:
@@ -141,7 +144,6 @@ int ConstObj::cmp(const ConstObj& other, ColKey col_key) const
             return cmp<ObjKey>(other, col_ndx);
         case type_OldDateTime:
         case type_OldTable:
-        case type_OldMixed:
         case type_LinkList:
             REALM_ASSERT(false);
             break;
@@ -417,6 +419,8 @@ Mixed ConstObj::get_any(ColKey col_key) const
             return Mixed{_get<String>(col_ndx)};
         case col_type_Binary:
             return Mixed{_get<Binary>(col_ndx)};
+        case col_type_OldMixed:
+            return get<Mixed>(col_key);
         case col_type_Timestamp:
             return Mixed{_get<Timestamp>(col_ndx)};
         case col_type_Decimal:
@@ -494,6 +498,8 @@ bool ConstObj::is_null(ColKey col_key) const
                 return do_is_null<ArrayString>(col_ndx);
             case col_type_Binary:
                 return do_is_null<ArrayBinary>(col_ndx);
+            case col_type_OldMixed:
+                return do_is_null<ArrayMixed>(col_ndx);
             case col_type_Timestamp:
                 return do_is_null<ArrayTimestamp>(col_ndx);
             case col_type_Link:
@@ -887,7 +893,8 @@ Obj& Obj::set(ColKey col_key, Mixed value)
         set_null(col_key);
     }
     else {
-        REALM_ASSERT(value.get_type() == DataType(col_key.get_type()));
+        auto col_type = col_key.get_type();
+        REALM_ASSERT(value.get_type() == DataType(col_type) || col_type == col_type_OldMixed);
         switch (col_key.get_type()) {
             case col_type_Int:
                 if (col_key.get_attrs().test(col_attr_Nullable)) {
@@ -911,6 +918,9 @@ Obj& Obj::set(ColKey col_key, Mixed value)
                 break;
             case col_type_Binary:
                 set(col_key, value.get<Binary>());
+                break;
+            case col_type_OldMixed:
+                set(col_key, value, false);
                 break;
             case col_type_Timestamp:
                 set(col_key, value.get<Timestamp>());
@@ -1079,7 +1089,7 @@ Obj& Obj::set<ObjKey>(ColKey col_key, ObjKey target_key, bool is_default)
     return *this;
 }
 
-Obj Obj::create_and_set_linked_object(ColKey col_key)
+Obj Obj::create_and_set_linked_object(ColKey col_key, bool is_default)
 {
     update_if_needed();
     get_table()->report_invalid_key(col_key);
@@ -1113,7 +1123,6 @@ Obj Obj::create_and_set_linked_object(ColKey col_key)
         values.set(m_row_ndx, target_key);
 
         if (Replication* repl = get_replication()) {
-            bool is_default = true; // FIXME: Is this correct?
             repl->set(m_table.unchecked_ptr(), col_key, m_key, target_key,
                       is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
         }

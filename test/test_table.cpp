@@ -46,7 +46,7 @@ using namespace std::chrono;
 #include "test_table_helper.hpp"
 
 // #include <valgrind/callgrind.h>
-// #define PERFORMACE_TESTING
+//#define PERFORMACE_TESTING
 
 using namespace realm;
 using namespace realm::util;
@@ -2817,7 +2817,7 @@ TEST(Table_object_basic)
 
     table.create_object(ObjKey(5)).set_all(100, 7);
     CHECK_EQUAL(table.size(), 1);
-    CHECK_THROW(table.create_object(ObjKey(5)), InvalidKey);
+    CHECK_THROW(table.create_object(ObjKey(5)), KeyAlreadyUsed);
     CHECK_EQUAL(table.size(), 1);
     table.create_object(ObjKey(2));
     Obj x = table.create_object(ObjKey(7));
@@ -2953,7 +2953,7 @@ TEST(Table_object_basic)
 
     // Check that accessing a removed object will throw
     table.remove_object(ObjKey(5));
-    CHECK_THROW(y.get<int64_t>(intnull_col), InvalidKey);
+    CHECK_THROW(y.get<int64_t>(intnull_col), KeyNotFound);
 
     CHECK(table.get_object(ObjKey(8)).is_null(intnull_col));
 }
@@ -3625,7 +3625,7 @@ TEST(Table_QuickSort2)
 TEST(Table_object_sequential)
 {
 #ifdef PERFORMACE_TESTING
-    int nb_rows = 10000000;
+    int nb_rows = 10'000'000;
     int num_runs = 1;
 #else
     int nb_rows = 1024;
@@ -3661,7 +3661,12 @@ TEST(Table_object_sequential)
         CHECK_EQUAL(table->size(), nb_rows);
         wt.commit();
     }
-
+    {
+        auto t1 = steady_clock::now();
+        sg->compact();
+        auto t2 = steady_clock::now();
+        std::cout << "  compaction time: " << duration_cast<milliseconds>(t2 - t1).count() << " ms" << std::endl;
+    }
     {
         ReadTransaction rt(sg);
         auto table = rt.get_table("test");
@@ -3769,10 +3774,10 @@ TEST(Table_object_sequential)
 TEST(Table_object_seq_rnd)
 {
 #ifdef PERFORMACE_TESTING
-    size_t rows = 100000;
+    size_t rows = 1'000'000;
     int runs = 100;     // runs for building scenario
 #else
-    size_t rows = 50000;
+    size_t rows = 50'000;
     int runs = 1;
 #endif
     int64_t next_key = 0;
@@ -3811,10 +3816,16 @@ TEST(Table_object_seq_rnd)
     // scenario established!
     int nb_rows = int(key_values.size());
 #ifdef PERFORMACE_TESTING
-    int num_runs = 100; // runs for timing access
+    int num_runs = 10; // runs for timing access
 #else
     int num_runs = 1; // runs for timing access
 #endif
+    {
+        auto t1 = steady_clock::now();
+        sg->compact();
+        auto t2 = steady_clock::now();
+        std::cout << "  compaction time: " << duration_cast<milliseconds>(t2 - t1).count() << " ms" << std::endl;
+    }
     std::cout << "Scenario has " << nb_rows << " rows. Timing...." << std::endl;
     {
         ReadTransaction rt(sg);
@@ -3878,8 +3889,8 @@ TEST(Table_object_seq_rnd)
 TEST(Table_object_random)
 {
 #ifdef PERFORMACE_TESTING
-    int nb_rows = 100000;
-    int num_runs = 100;
+    int nb_rows = 1'000'000;
+    int num_runs = 10;
 #else
     int nb_rows = 1024;
     int num_runs = 1;
@@ -3930,6 +3941,12 @@ TEST(Table_object_random)
 
         CHECK_EQUAL(table->size(), nb_rows);
         wt.commit();
+    }
+    {
+        auto t1 = steady_clock::now();
+        sg->compact();
+        auto t2 = steady_clock::now();
+        std::cout << "  compaction time: " << duration_cast<milliseconds>(t2 - t1).count() << " ms" << std::endl;
     }
 
     {

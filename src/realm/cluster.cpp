@@ -23,6 +23,7 @@
 #include "realm/array_bool.hpp"
 #include "realm/array_string.hpp"
 #include "realm/array_binary.hpp"
+#include "realm/array_mixed.hpp"
 #include "realm/array_timestamp.hpp"
 #include "realm/array_decimal128.hpp"
 #include "realm/array_object_id.hpp"
@@ -222,7 +223,7 @@ void ClusterNode::IteratorState::init(const ConstObj& obj)
 void ClusterNode::get(ObjKey k, ClusterNode::State& state) const
 {
     if (!k || !try_get(k, state)) {
-        throw InvalidKey("Key not found");
+        throw KeyNotFound("When getting");
     }
 }
 
@@ -282,7 +283,7 @@ T ClusterNodeInner::recurse(ObjKey key, F func)
 {
     ChildInfo child_info;
     if (!find_child(key, child_info)) {
-        throw InvalidKey("Key not found");
+        throw KeyNotFound("Recurse");
     }
     return recurse<T>(child_info, func);
 }
@@ -412,7 +413,7 @@ size_t ClusterNodeInner::get_ndx(ObjKey key, size_t ndx) const
 {
     ChildInfo child_info;
     if (!find_child(key, child_info)) {
-        throw InvalidKey("Key not found");
+        throw KeyNotFound("find_child");
     }
 
     // First figure out how many objects there are in nodes before actual one
@@ -823,6 +824,9 @@ void Cluster::create(size_t nb_leaf_columns)
             case col_type_Binary:
                 do_create<ArrayBinary>(col_key);
                 break;
+            case col_type_OldMixed:
+                do_create<ArrayMixed>(col_key);
+                break;
             case col_type_Timestamp:
                 do_create<ArrayTimestamp>(col_key);
                 break;
@@ -995,6 +999,13 @@ void Cluster::insert_row(size_t ndx, ObjKey k, const FieldValues& init_values)
             case col_type_Binary:
                 do_insert_row<ArrayBinary>(ndx, col_key, init_value, nullable);
                 break;
+            case col_type_OldMixed: {
+                ArrayMixed arr(m_alloc);
+                arr.set_parent(this, col_key.get_index().val + s_first_col_index);
+                arr.init_from_parent();
+                arr.insert(ndx, init_value);
+                break;
+            }
             case col_type_Timestamp:
                 do_insert_row<ArrayTimestamp>(ndx, col_key, init_value, nullable);
                 break;
@@ -1080,6 +1091,9 @@ void Cluster::move(size_t ndx, ClusterNode* new_node, int64_t offset)
             }
             case col_type_Binary:
                 do_move<ArrayBinary>(ndx, col_key, new_leaf);
+                break;
+            case col_type_OldMixed:
+                do_move<ArrayMixed>(ndx, col_key, new_leaf);
                 break;
             case col_type_Timestamp:
                 do_move<ArrayTimestamp>(ndx, col_key, new_leaf);
@@ -1204,6 +1218,9 @@ void Cluster::insert_column(ColKey col_key)
         case col_type_Binary:
             do_insert_column<ArrayBinary>(col_key, nullable);
             break;
+        case col_type_OldMixed:
+            do_insert_column<ArrayMixed>(col_key, nullable);
+            break;
         case col_type_Timestamp:
             do_insert_column<ArrayTimestamp>(col_key, nullable);
             break;
@@ -1251,14 +1268,14 @@ ref_type Cluster::insert(ObjKey k, const FieldValues& init_values, ClusterNode::
         if (ndx < sz) {
             current_key_value = m_keys.get(ndx);
             if (k.value == current_key_value) {
-                throw InvalidKey("Key already used");
+                throw KeyAlreadyUsed("When inserting");
             }
         }
     }
     else {
         sz = size_t(Array::get(s_key_ref_or_size_index)) >> 1; // Size is stored as tagged integer
         if (uint64_t(k.value) < sz) {
-            throw InvalidKey("Key already used");
+            throw KeyAlreadyUsed("When inserting");
         }
         // Key value is bigger than all other values, should be put last
         ndx = sz;
@@ -1355,13 +1372,13 @@ size_t Cluster::get_ndx(ObjKey k, size_t ndx) const
     if (m_keys.is_attached()) {
         index = m_keys.lower_bound(uint64_t(k.value));
         if (index == m_keys.size() || m_keys.get(index) != uint64_t(k.value)) {
-            throw InvalidKey("Key not found");
+            throw KeyNotFound("Get index");
         }
     }
     else {
         index = size_t(k.value);
         if (index >= get_as_ref_or_tagged(s_key_ref_or_size_index).get_as_int()) {
-            throw InvalidKey("Key not found");
+            throw KeyNotFound("Get index");
         }
     }
     return index + ndx;
@@ -1373,10 +1390,8 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
     ObjKey real_key = get_real_key(ndx);
     auto table = m_tree_top.get_owner();
     const_cast<Table*>(table)->free_local_id_after_hash_collision(real_key);
-    if (!table->is_embedded()) {
-        if (Replication* repl = table->get_repl()) {
-            repl->remove_object(table, real_key);
-        }
+    if (Replication* repl = table->get_repl()) {
+        repl->remove_object(table, real_key);
     }
 
     std::vector<ColKey> backlink_column_keys;
@@ -1430,6 +1445,9 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
                 break;
             case col_type_Binary:
                 do_erase<ArrayBinary>(ndx, col_key);
+                break;
+            case col_type_OldMixed:
+                do_erase<ArrayMixed>(ndx, col_key);
                 break;
             case col_type_Timestamp:
                 do_erase<ArrayTimestamp>(ndx, col_key);
@@ -1687,6 +1705,9 @@ void Cluster::verify() const
             case col_type_Binary:
                 verify<ArrayBinary>(ref, col, sz);
                 break;
+            case col_type_OldMixed:
+                verify<ArrayMixed>(ref, col, sz);
+                break;
             case col_type_Timestamp:
                 verify<ArrayTimestamp>(ref, col, sz);
                 break;
@@ -1798,6 +1819,13 @@ void Cluster::dump_objects(int64_t key_offset, std::string lead) const
                 }
                 case col_type_Binary: {
                     ArrayBinary arr(m_alloc);
+                    ref_type ref = Array::get_as_ref(j);
+                    arr.init_from_ref(ref);
+                    std::cout << ", " << arr.get(i);
+                    break;
+                }
+                case col_type_OldMixed: {
+                    ArrayMixed arr(m_alloc);
                     ref_type ref = Array::get_as_ref(j);
                     arr.init_from_ref(ref);
                     std::cout << ", " << arr.get(i);
@@ -2111,6 +2139,9 @@ Obj ClusterTree::insert(ObjKey k, const FieldValues& values)
             }
         }
     }
+
+    bump_content_version();
+    bump_storage_version();
 
     return Obj(get_table_ref(), state.mem, k, state.index);
 }
