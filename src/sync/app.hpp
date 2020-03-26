@@ -128,7 +128,7 @@ public:
          *     - id: The id of the API key to delete.
          *     - completion_block: A callback to be invoked once the call is complete.
          */
-        void delete_api_key(const UserAPIKey& api_key, std::shared_ptr<SyncUser> user,
+        void delete_api_key(const realm::ObjectId& id, std::shared_ptr<SyncUser> user,
                             std::function<void(Optional<AppError>)> completion_block);
 
         /**
@@ -138,7 +138,7 @@ public:
          *     - id: The id of the API key to enable.
          *     - completion_block: A callback to be invoked once the call is complete.
          */
-        void enable_api_key(const UserAPIKey& api_key, std::shared_ptr<SyncUser> user,
+        void enable_api_key(const realm::ObjectId& id, std::shared_ptr<SyncUser> user,
                             std::function<void(Optional<AppError>)> completion_block);
 
         /**
@@ -148,7 +148,7 @@ public:
          *     - id: The id of the API key to disable.
          *     - completion_block: A callback to be invoked once the call is complete.
          */
-        void disable_api_key(const UserAPIKey& api_key, std::shared_ptr<SyncUser> user,
+        void disable_api_key(const realm::ObjectId& id, std::shared_ptr<SyncUser> user,
                              std::function<void(Optional<AppError>)> completion_block);
     private:
         friend class App;

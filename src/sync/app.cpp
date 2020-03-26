@@ -414,11 +414,11 @@ void App::UserAPIKeyProviderClient::fetch_api_keys(std::shared_ptr<SyncUser> use
 }
 
 
-void App::UserAPIKeyProviderClient::delete_api_key(const UserAPIKey& api_key, std::shared_ptr<SyncUser> user,
+void App::UserAPIKeyProviderClient::delete_api_key(const realm::ObjectId& id, std::shared_ptr<SyncUser> user,
                                                    std::function<void(Optional<AppError>)> completion_block)
 {
     REALM_ASSERT(m_parent);
-    std::string route = util::format("%1/auth/%2/%3", m_parent->m_base_route, user_api_key_provider_key, api_key.id.to_string());
+    std::string route = util::format("%1/auth/%2/%3", m_parent->m_base_route, user_api_key_provider_key, id.to_string());
 
     auto handler = [completion_block](const Response& response) {
         if (auto error = check_for_errors(response)) {
@@ -436,11 +436,11 @@ void App::UserAPIKeyProviderClient::delete_api_key(const UserAPIKey& api_key, st
     }, handler);
 }
 
-void App::UserAPIKeyProviderClient::enable_api_key(const UserAPIKey& api_key, std::shared_ptr<SyncUser> user,
+void App::UserAPIKeyProviderClient::enable_api_key(const realm::ObjectId& id, std::shared_ptr<SyncUser> user,
                                                    std::function<void(Optional<AppError> error)> completion_block)
 {
     REALM_ASSERT(m_parent);
-    std::string route = util::format("%1/auth/%2/%3/enable", m_parent->m_base_route, user_api_key_provider_key, api_key.id.to_string());
+    std::string route = util::format("%1/auth/%2/%3/enable", m_parent->m_base_route, user_api_key_provider_key, id.to_string());
 
     auto handler = [completion_block](const Response& response) {
         if (auto error = check_for_errors(response)) {
@@ -458,11 +458,11 @@ void App::UserAPIKeyProviderClient::enable_api_key(const UserAPIKey& api_key, st
     }, handler);
 }
 
-void App::UserAPIKeyProviderClient::disable_api_key(const UserAPIKey& api_key, std::shared_ptr<SyncUser> user,
+void App::UserAPIKeyProviderClient::disable_api_key(const realm::ObjectId& id, std::shared_ptr<SyncUser> user,
                                                    std::function<void(Optional<AppError> error)> completion_block)
 {
     REALM_ASSERT(m_parent);
-    std::string route = util::format("%1/auth/%2/%3/disable", m_parent->m_base_route, user_api_key_provider_key, api_key.id.to_string());
+    std::string route = util::format("%1/auth/%2/%3/disable", m_parent->m_base_route, user_api_key_provider_key, id.to_string());
 
     auto handler = [completion_block](const Response& response) {
         if (auto error = check_for_errors(response)) {

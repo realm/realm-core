@@ -480,7 +480,7 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
         });
 
         app.provider_client<App::UserAPIKeyProviderClient>()
-            .enable_api_key(api_key, logged_in_user, [&](Optional<AppError> error) {
+            .enable_api_key(api_key.id, logged_in_user, [&](Optional<AppError> error) {
                 CHECK(!error);
         });
 
@@ -495,7 +495,7 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
         });
 
         app.provider_client<App::UserAPIKeyProviderClient>()
-            .disable_api_key(api_key, logged_in_user, [&](Optional<AppError> error) {
+            .disable_api_key(api_key.id, logged_in_user, [&](Optional<AppError> error) {
                 CHECK(!error);
         });
 
@@ -508,7 +508,7 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
         });
 
         app.provider_client<App::UserAPIKeyProviderClient>()
-            .delete_api_key(api_key, logged_in_user, [&](Optional<AppError> error) {
+            .delete_api_key(api_key.id, logged_in_user, [&](Optional<AppError> error) {
                 CHECK(!error);
         });
 
@@ -553,7 +553,7 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
                             });
 
         app.provider_client<App::UserAPIKeyProviderClient>()
-            .enable_api_key(api_key, no_user,
+            .enable_api_key(api_key.id, no_user,
                             [&](Optional<AppError> error) {
                                 REQUIRE(error);
                                 CHECK(error->is_service_error());
@@ -570,7 +570,7 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
                            });
 
         app.provider_client<App::UserAPIKeyProviderClient>()
-            .disable_api_key(api_key, no_user,
+            .disable_api_key(api_key.id, no_user,
                              [&](Optional<AppError> error) {
                                  REQUIRE(error);
                                  CHECK(error->is_service_error());
@@ -587,7 +587,7 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
                            });
 
         app.provider_client<App::UserAPIKeyProviderClient>()
-            .delete_api_key(api_key, no_user,
+            .delete_api_key(api_key.id, no_user,
                             [&](Optional<AppError> error) {
                                 REQUIRE(error);
                                 CHECK(error->is_service_error());
@@ -653,11 +653,11 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
                                     CHECK(!error);
                                 });
 
-        provider.enable_api_key(api_key, first_user, [&](Optional<AppError> error) {
+        provider.enable_api_key(api_key.id, first_user, [&](Optional<AppError> error) {
             CHECK(!error);
         });
 
-        provider.enable_api_key(api_key, second_user, [&](Optional<AppError> error) {
+        provider.enable_api_key(api_key.id, second_user, [&](Optional<AppError> error) {
             REQUIRE(error);
             CHECK(error->message == "API key not found");
             CHECK(error->is_service_error());
@@ -681,11 +681,11 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
                                    CHECK(app::ServiceErrorCode(error->error_code.value()) == app::ServiceErrorCode::api_key_not_found);
                                });
 
-        provider.disable_api_key(api_key, first_user, [&](Optional<AppError> error) {
+        provider.disable_api_key(api_key.id, first_user, [&](Optional<AppError> error) {
             CHECK(!error);
         });
 
-        provider.disable_api_key(api_key, second_user, [&](Optional<AppError> error) {
+        provider.disable_api_key(api_key.id, second_user, [&](Optional<AppError> error) {
             REQUIRE(error);
             CHECK(error->message == "API key not found");
             CHECK(error->is_service_error());
@@ -707,14 +707,14 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
             CHECK(app::ServiceErrorCode(error->error_code.value()) == app::ServiceErrorCode::api_key_not_found);
         });
 
-        provider.delete_api_key(api_key, second_user, [&](Optional<AppError> error) {
+        provider.delete_api_key(api_key.id, second_user, [&](Optional<AppError> error) {
             REQUIRE(error);
             CHECK(error->message == "API key not found");
             CHECK(error->is_service_error());
             CHECK(app::ServiceErrorCode(error->error_code.value()) == app::ServiceErrorCode::api_key_not_found);
         });
 
-        provider.delete_api_key(api_key, first_user, [&](Optional<AppError> error) {
+        provider.delete_api_key(api_key.id, first_user, [&](Optional<AppError> error) {
             CHECK(!error);
         });
 
