@@ -389,7 +389,7 @@ void App::UserAPIKeyProviderClient::fetch_api_keys(std::shared_ptr<SyncUser> use
 
         try {
             auto api_key_array = std::vector<UserAPIKey>();
-            auto json_array = std::vector<nlohmann::json>(json);
+            auto json_array = json.get<std::vector<nlohmann::json>>();
             for (nlohmann::json& api_key_json : json_array) {
                 api_key_array.push_back(
                     App::UserAPIKey {
