@@ -1,3 +1,22 @@
+# NEXT RELEASE
+
+### Enhancements
+* None.
+
+### Fixed
+* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* Opening a realm file on streaming form in read-only mode now works correctly. Since Core-6, this would trigger an actual
+  write to the file, which would fail if the file was not writable.
+ 
+### Breaking changes
+* None.
+
+-----------
+
+### Internals
+* None.
+
+----------------------------------------------
 # 6.0.4 Release notes
 
 ### Fixed
