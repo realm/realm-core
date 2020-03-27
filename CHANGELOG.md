@@ -1,22 +1,3 @@
-# NEXT RELEASE
-
-### Enhancements
-* None.
-
-### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
- 
-### Breaking changes
-* None.
-
------------
-
-### Internals
-* None.
-
-----------------------------------------------
-
 # 6.0.4 Release notes
 
 ### Fixed
@@ -576,6 +557,21 @@ This release was never published
 * Speed improvement for Sort().
 
 ---------------------------------------------
+
+# 5.23.9 Release notes
+
+### Fixed
+* Fix a crash on startup on macOS 10.10 and 10.11. ([Cocoa #6403](https://github.com/realm/realm-cocoa/issues/6403), since 2.9.0).
+
+----------------------------------------------
+
+# 5.23.8 Release notes
+
+### Fixed
+* A NOT query on a LinkList would incorrectly match rows which have a row index one less than a correctly matching row which appeared earlier in the LinkList. ([Cocoa #6289](https://github.com/realm/realm-cocoa/issues/6289), since 0.87.6).
+* Columns with float and double values would not be sorted correctly (since 5.23.7)
+ 
+----------------------------------------------
 
 # 5.23.7 Release notes
 

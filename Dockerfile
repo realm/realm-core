@@ -14,6 +14,7 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
     ninja-build \
     python-matplotlib \
     pkg-config \
+    python-matplotlib \
     s3cmd \
     tar \
     unzip \
