@@ -100,7 +100,7 @@ public:
          *     - completion_block: A callback to be invoked once the call is complete.
         */
         void create_api_key(const std::string& name, std::shared_ptr<SyncUser> user,
-                            std::function<void(Optional<UserAPIKey>, Optional<AppError>)> completion_block);
+                            std::function<void(UserAPIKey, Optional<AppError>)> completion_block);
 
         /**
          * Fetches a user API key associated with the current user.
@@ -110,7 +110,7 @@ public:
          *     - completion_block: A callback to be invoked once the call is complete.
          */
         void fetch_api_key(const realm::ObjectId& id, std::shared_ptr<SyncUser> user,
-                           std::function<void(Optional<UserAPIKey>, Optional<AppError>)> completion_block);
+                           std::function<void(UserAPIKey, Optional<AppError>)> completion_block);
 
         /**
          * Fetches the user API keys associated with the current user.

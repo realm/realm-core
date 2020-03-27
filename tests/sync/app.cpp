@@ -451,20 +451,18 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
         auto api_key_name = util::format("%1", random_string(15));
         app.provider_client<App::UserAPIKeyProviderClient>()
             .create_api_key(api_key_name, logged_in_user,
-                            [&](Optional<App::UserAPIKey> user_api_key, Optional<app::AppError> error) {
+                            [&](App::UserAPIKey user_api_key, Optional<app::AppError> error) {
                 CHECK(!error);
-                REQUIRE(bool(user_api_key));
-                CHECK(user_api_key->name == api_key_name);
-                api_key = user_api_key.value();
+                CHECK(user_api_key.name == api_key_name);
+                api_key = user_api_key;
         });
 
         app.provider_client<App::UserAPIKeyProviderClient>()
             .fetch_api_key(api_key.id, logged_in_user,
-                           [&](Optional<App::UserAPIKey> user_api_key, Optional<app::AppError> error) {
+                           [&](App::UserAPIKey user_api_key, Optional<app::AppError> error) {
                 CHECK(!error);
-                REQUIRE(bool(user_api_key));
-                CHECK(user_api_key->name == api_key_name);
-                CHECK(user_api_key->id == api_key.id);
+                CHECK(user_api_key.name == api_key_name);
+                CHECK(user_api_key.id == api_key.id);
         });
 
         app.provider_client<App::UserAPIKeyProviderClient>()
@@ -486,12 +484,11 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
 
         app.provider_client<App::UserAPIKeyProviderClient>()
             .fetch_api_key(api_key.id, logged_in_user,
-                           [&](Optional<App::UserAPIKey> user_api_key, Optional<app::AppError> error) {
+                           [&](App::UserAPIKey user_api_key, Optional<app::AppError> error) {
                 CHECK(!error);
-                REQUIRE(bool(user_api_key));
-                CHECK(user_api_key->disabled == false);
-                CHECK(user_api_key->name == api_key_name);
-                CHECK(user_api_key->id == api_key.id);
+                CHECK(user_api_key.disabled == false);
+                CHECK(user_api_key.name == api_key_name);
+                CHECK(user_api_key.id == api_key.id);
         });
 
         app.provider_client<App::UserAPIKeyProviderClient>()
@@ -500,11 +497,10 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
         });
 
         app.provider_client<App::UserAPIKeyProviderClient>()
-            .fetch_api_key(api_key.id, logged_in_user, [&](Optional<App::UserAPIKey> user_api_key, Optional<app::AppError> error) {
+            .fetch_api_key(api_key.id, logged_in_user, [&](App::UserAPIKey user_api_key, Optional<app::AppError> error) {
                 CHECK(!error);
-                REQUIRE(bool(user_api_key));
-                CHECK(user_api_key->disabled == true);
-                CHECK(user_api_key->name == api_key_name);
+                CHECK(user_api_key.disabled == true);
+                CHECK(user_api_key.name == api_key_name);
         });
 
         app.provider_client<App::UserAPIKeyProviderClient>()
@@ -513,8 +509,8 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
         });
 
         app.provider_client<App::UserAPIKeyProviderClient>()
-            .fetch_api_key(api_key.id, logged_in_user, [&](Optional<App::UserAPIKey> user_api_key, Optional<app::AppError> error) {
-                CHECK(!user_api_key);
+            .fetch_api_key(api_key.id, logged_in_user, [&](App::UserAPIKey user_api_key, Optional<app::AppError> error) {
+                CHECK(user_api_key.name == "");
                 CHECK(error);
                 processed = true;
         });
@@ -527,20 +523,20 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
         auto api_key_name = util::format("%1", random_string(15));
         app.provider_client<App::UserAPIKeyProviderClient>()
             .create_api_key(api_key_name, no_user,
-                            [&](Optional<App::UserAPIKey> user_api_key, Optional<app::AppError> error) {
+                            [&](App::UserAPIKey user_api_key, Optional<app::AppError> error) {
                                 REQUIRE(error);
                                 CHECK(error->is_service_error());
                                 CHECK(error->message == "must authenticate first");
-                                CHECK(!bool(user_api_key));
+                                CHECK(user_api_key.name == "");
                             });
 
         app.provider_client<App::UserAPIKeyProviderClient>()
             .fetch_api_key(api_key.id, no_user,
-                           [&](Optional<App::UserAPIKey> user_api_key, Optional<app::AppError> error) {
+                           [&](App::UserAPIKey user_api_key, Optional<app::AppError> error) {
                                REQUIRE(error);
                                CHECK(error->is_service_error());
                                CHECK(error->message == "must authenticate first");
-                               CHECK(!bool(user_api_key));
+                               CHECK(user_api_key.name == "");
                            });
 
         app.provider_client<App::UserAPIKeyProviderClient>()
@@ -562,11 +558,11 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
 
         app.provider_client<App::UserAPIKeyProviderClient>()
             .fetch_api_key(api_key.id, no_user,
-                           [&](Optional<App::UserAPIKey> user_api_key, Optional<app::AppError> error) {
+                           [&](App::UserAPIKey user_api_key, Optional<app::AppError> error) {
                                REQUIRE(error);
                                CHECK(error->is_service_error());
                                CHECK(error->message == "must authenticate first");
-                               CHECK(!bool(user_api_key));
+                               CHECK(user_api_key.name == "");
                            });
 
         app.provider_client<App::UserAPIKeyProviderClient>()
@@ -579,11 +575,11 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
 
         app.provider_client<App::UserAPIKeyProviderClient>()
             .fetch_api_key(api_key.id, no_user,
-                           [&](Optional<App::UserAPIKey> user_api_key, Optional<app::AppError> error) {
+                           [&](App::UserAPIKey user_api_key, Optional<app::AppError> error) {
                                REQUIRE(error);
                                CHECK(error->is_service_error());
                                CHECK(error->message == "must authenticate first");
-                               CHECK(!bool(user_api_key));
+                               CHECK(user_api_key.name == "");
                            });
 
         app.provider_client<App::UserAPIKeyProviderClient>()
@@ -596,8 +592,8 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
 
         app.provider_client<App::UserAPIKeyProviderClient>()
             .fetch_api_key(api_key.id, no_user,
-                           [&](Optional<App::UserAPIKey> user_api_key, Optional<app::AppError> error) {
-                               CHECK(!user_api_key);
+                           [&](App::UserAPIKey user_api_key, Optional<app::AppError> error) {
+                               CHECK(user_api_key.name == "");
                                REQUIRE(error);
                                CHECK(error->is_service_error());
                                CHECK(error->message == "must authenticate first");
@@ -614,28 +610,26 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
         App::UserAPIKeyProviderClient provider = app.provider_client<App::UserAPIKeyProviderClient>();
 
         provider.create_api_key(api_key_name, first_user,
-                        [&](Optional<App::UserAPIKey> user_api_key, Optional<app::AppError> error) {
+                        [&](App::UserAPIKey user_api_key, Optional<app::AppError> error) {
                             CHECK(!error);
-                            REQUIRE(bool(user_api_key));
-                            CHECK(user_api_key->name == api_key_name);
-                            api_key = user_api_key.value();
+                            CHECK(user_api_key.name == api_key_name);
+                            api_key = user_api_key;
                         });
 
         provider.fetch_api_key(api_key.id, first_user,
-                       [&](Optional<App::UserAPIKey> user_api_key, Optional<app::AppError> error) {
+                       [&](App::UserAPIKey user_api_key, Optional<app::AppError> error) {
                            CHECK(!error);
-                           REQUIRE(bool(user_api_key));
-                           CHECK(user_api_key->name == api_key_name);
-                           CHECK(user_api_key->id.to_string() == user_api_key->id.to_string());
+                           CHECK(user_api_key.name == api_key_name);
+                           CHECK(user_api_key.id.to_string() == user_api_key.id.to_string());
                        });
 
         provider.fetch_api_key(api_key.id, second_user,
-                       [&](Optional<App::UserAPIKey> user_api_key, Optional<app::AppError> error) {
+                       [&](App::UserAPIKey user_api_key, Optional<app::AppError> error) {
                            REQUIRE(error);
                            CHECK(error->message == "API key not found");
                            CHECK(error->is_service_error());
                            CHECK(app::ServiceErrorCode(error->error_code.value()) == app::ServiceErrorCode::api_key_not_found);
-                           REQUIRE(!bool(user_api_key));
+                           CHECK(user_api_key.name == "");
                        });
 
         provider.fetch_api_keys(first_user,
@@ -665,17 +659,16 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
         });
 
         provider.fetch_api_key(api_key.id, first_user,
-                       [&](Optional<App::UserAPIKey> user_api_key, Optional<app::AppError> error) {
+                       [&](App::UserAPIKey user_api_key, Optional<app::AppError> error) {
                            CHECK(!error);
-                           REQUIRE(bool(user_api_key));
-                           CHECK(user_api_key->disabled == false);
-                           CHECK(user_api_key->name == api_key_name);
+                           CHECK(user_api_key.disabled == false);
+                           CHECK(user_api_key.name == api_key_name);
                        });
 
         provider.fetch_api_key(api_key.id, second_user,
-                               [&](Optional<App::UserAPIKey> user_api_key, Optional<app::AppError> error) {
+                               [&](App::UserAPIKey user_api_key, Optional<app::AppError> error) {
                                    REQUIRE(error);
-                                   REQUIRE(!bool(user_api_key));
+                                   CHECK(user_api_key.name == "");
                                    CHECK(error->message == "API key not found");
                                    CHECK(error->is_service_error());
                                    CHECK(app::ServiceErrorCode(error->error_code.value()) == app::ServiceErrorCode::api_key_not_found);
@@ -692,16 +685,15 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
             CHECK(app::ServiceErrorCode(error->error_code.value()) == app::ServiceErrorCode::api_key_not_found);
         });
 
-        provider.fetch_api_key(api_key.id, first_user, [&](Optional<App::UserAPIKey> user_api_key, Optional<app::AppError> error) {
+        provider.fetch_api_key(api_key.id, first_user, [&](App::UserAPIKey user_api_key, Optional<app::AppError> error) {
             CHECK(!error);
-            REQUIRE(bool(user_api_key));
-            CHECK(user_api_key->disabled == true);
-            CHECK(user_api_key->name == api_key_name);
+            CHECK(user_api_key.disabled == true);
+            CHECK(user_api_key.name == api_key_name);
         });
 
-        provider.fetch_api_key(api_key.id, second_user, [&](Optional<App::UserAPIKey> user_api_key, Optional<app::AppError> error) {
+        provider.fetch_api_key(api_key.id, second_user, [&](App::UserAPIKey user_api_key, Optional<app::AppError> error) {
             REQUIRE(error);
-            REQUIRE(!bool(user_api_key));
+            CHECK(user_api_key.name == "");
             CHECK(error->message == "API key not found");
             CHECK(error->is_service_error());
             CHECK(app::ServiceErrorCode(error->error_code.value()) == app::ServiceErrorCode::api_key_not_found);
@@ -718,8 +710,8 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
             CHECK(!error);
         });
 
-        provider.fetch_api_key(api_key.id, first_user, [&](Optional<App::UserAPIKey> user_api_key, Optional<app::AppError> error) {
-            CHECK(!user_api_key);
+        provider.fetch_api_key(api_key.id, first_user, [&](App::UserAPIKey user_api_key, Optional<app::AppError> error) {
+            CHECK(user_api_key.name == "");
             REQUIRE(error);
             CHECK(error->message == "API key not found");
             CHECK(error->is_service_error());
@@ -727,8 +719,8 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
             processed = true;
         });
 
-        provider.fetch_api_key(api_key.id, second_user, [&](Optional<App::UserAPIKey> user_api_key, Optional<app::AppError> error) {
-            CHECK(!user_api_key);
+        provider.fetch_api_key(api_key.id, second_user, [&](App::UserAPIKey user_api_key, Optional<app::AppError> error) {
+            CHECK(user_api_key.name == "");
             REQUIRE(error);
             CHECK(error->message == "API key not found");
             CHECK(error->is_service_error());
@@ -1097,22 +1089,22 @@ TEST_CASE("app: UserAPIKeyProviderClient unit_tests", "[sync][app]") {
 
     SECTION("create api key") {
         app.provider_client<App::UserAPIKeyProviderClient>().create_api_key(UnitTestTransport::api_key_name, logged_in_user,
-                                                                            [&](Optional<App::UserAPIKey> user_api_key, Optional<AppError> error) {
+                                                                            [&](App::UserAPIKey user_api_key, Optional<AppError> error) {
             CHECK(!error);
-            CHECK(user_api_key->disabled == false);
-            CHECK(user_api_key->id.to_string() == UnitTestTransport::api_key_id);
-            CHECK(user_api_key->key == UnitTestTransport::api_key);
-            CHECK(user_api_key->name == UnitTestTransport::api_key_name);
+            CHECK(user_api_key.disabled == false);
+            CHECK(user_api_key.id.to_string() == UnitTestTransport::api_key_id);
+            CHECK(user_api_key.key == UnitTestTransport::api_key);
+            CHECK(user_api_key.name == UnitTestTransport::api_key_name);
         });        
     }
     
     SECTION("fetch api key") {
         app.provider_client<App::UserAPIKeyProviderClient>().fetch_api_key(obj_id, logged_in_user,
-                                                                           [&](Optional<App::UserAPIKey> user_api_key, Optional<AppError> error) {
+                                                                           [&](App::UserAPIKey user_api_key, Optional<AppError> error) {
             CHECK(!error);
-            CHECK(user_api_key->disabled == false);
-            CHECK(user_api_key->id.to_string() == UnitTestTransport::api_key_id);
-            CHECK(user_api_key->name == UnitTestTransport::api_key_name);
+            CHECK(user_api_key.disabled == false);
+            CHECK(user_api_key.id.to_string() == UnitTestTransport::api_key_id);
+            CHECK(user_api_key.name == UnitTestTransport::api_key_name);
         });
     }
     

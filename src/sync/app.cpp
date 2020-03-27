@@ -283,7 +283,7 @@ void App::UsernamePasswordProviderClient::call_reset_password_function(const std
 // MARK: - UserAPIKeyProviderClient
 
  void App::UserAPIKeyProviderClient::create_api_key(const std::string &name, std::shared_ptr<SyncUser> user,
-                                                   std::function<void (Optional<UserAPIKey>, Optional<AppError>)> completion_block)
+                                                   std::function<void (UserAPIKey, Optional<AppError>)> completion_block)
 {
     REALM_ASSERT(m_parent);
     std::string route = util::format("%1/auth/%2", m_parent->m_base_route, user_api_key_provider_key);
@@ -328,7 +328,7 @@ void App::UsernamePasswordProviderClient::call_reset_password_function(const std
 }
 
 void App::UserAPIKeyProviderClient::fetch_api_key(const realm::ObjectId& id, std::shared_ptr<SyncUser> user,
-                                                   std::function<void (Optional<UserAPIKey>, Optional<AppError>)> completion_block)
+                                                   std::function<void (UserAPIKey, Optional<AppError>)> completion_block)
 {
     REALM_ASSERT(m_parent);
     std::string route = util::format("%1/auth/%2/%3", m_parent->m_base_route, user_api_key_provider_key, id.to_string());
