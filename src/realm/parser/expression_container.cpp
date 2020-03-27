@@ -28,67 +28,121 @@ ExpressionContainer::ExpressionContainer(Query& query, const parser::Expression&
                                          parser::KeyPathMapping& mapping)
 {
     if (e.type == parser::Expression::Type::KeyPath) {
-        PropertyExpression pe(query, e.s, mapping);
-        bool primitive_list = pe.dest_type_is_list_of_primitives();
-        switch (e.collection_op) {
-            case parser::Expression::KeyPathOp::Min:
-                type = ExpressionInternal::exp_OpMin;
-                storage = CollectionOperatorExpression<parser::Expression::KeyPathOp::Min>(std::move(pe), e.op_suffix,
-                                                                                           mapping);
-                break;
-            case parser::Expression::KeyPathOp::Max:
-                type = ExpressionInternal::exp_OpMax;
-                storage = CollectionOperatorExpression<parser::Expression::KeyPathOp::Max>(std::move(pe), e.op_suffix,
-                                                                                           mapping);
-                break;
-            case parser::Expression::KeyPathOp::Sum:
-                type = ExpressionInternal::exp_OpSum;
-                storage = CollectionOperatorExpression<parser::Expression::KeyPathOp::Sum>(std::move(pe), e.op_suffix,
-                                                                                           mapping);
-                break;
-            case parser::Expression::KeyPathOp::Avg:
-                type = ExpressionInternal::exp_OpAvg;
-                storage = CollectionOperatorExpression<parser::Expression::KeyPathOp::Avg>(std::move(pe), e.op_suffix,
-                                                                                           mapping);
-                break;
-            case parser::Expression::KeyPathOp::BacklinkCount:
-                type = ExpressionInternal::exp_OpBacklinkCount;
-                storage = CollectionOperatorExpression<parser::Expression::KeyPathOp::BacklinkCount>(
-                    std::move(pe), e.op_suffix, mapping);
-                break;
-            case parser::Expression::KeyPathOp::Count:
-                REALM_FALLTHROUGH;
-            case parser::Expression::KeyPathOp::SizeString:
-                REALM_FALLTHROUGH;
-            case parser::Expression::KeyPathOp::SizeBinary:
-                if (pe.get_dest_type() == type_LinkList || pe.get_dest_type() == type_Link) {
-                    type = ExpressionInternal::exp_OpCount;
-                    storage = CollectionOperatorExpression<parser::Expression::KeyPathOp::Count, false>(
+        std::vector<KeyPathElement> link_chain = parser::generate_link_chain_from_string(query, e.s, mapping);
+        if (link_chain.back().is_list_of_primitives) {
+            PrimitiveListExpression ple(query, std::move(link_chain));
+            switch (e.collection_op) {
+                case parser::Expression::KeyPathOp::Min:
+                    type = ExpressionInternal::exp_OpMinPrimitive;
+                    storage =
+                        CollectionOperatorExpression<parser::Expression::KeyPathOp::Min, PrimitiveListExpression>(
+                            std::move(ple), e.op_suffix, mapping);
+                    break;
+                case parser::Expression::KeyPathOp::Max:
+                    type = ExpressionInternal::exp_OpMaxPrimitive;
+                    storage =
+                        CollectionOperatorExpression<parser::Expression::KeyPathOp::Max, PrimitiveListExpression>(
+                            std::move(ple), e.op_suffix, mapping);
+                    break;
+                case parser::Expression::KeyPathOp::Sum:
+                    type = ExpressionInternal::exp_OpSumPrimitive;
+                    storage =
+                        CollectionOperatorExpression<parser::Expression::KeyPathOp::Sum, PrimitiveListExpression>(
+                            std::move(ple), e.op_suffix, mapping);
+                    break;
+                case parser::Expression::KeyPathOp::Avg:
+                    type = ExpressionInternal::exp_OpAvgPrimitive;
+                    storage =
+                        CollectionOperatorExpression<parser::Expression::KeyPathOp::Avg, PrimitiveListExpression>(
+                            std::move(ple), e.op_suffix, mapping);
+                    break;
+                case parser::Expression::KeyPathOp::Count:
+                    REALM_FALLTHROUGH;
+                case parser::Expression::KeyPathOp::SizeString:
+                    REALM_FALLTHROUGH;
+                case parser::Expression::KeyPathOp::SizeBinary:
+                    type = ExpressionInternal::exp_OpCountPrimitive;
+                    storage =
+                        CollectionOperatorExpression<parser::Expression::KeyPathOp::Count, PrimitiveListExpression>(
+                            std::move(ple), e.op_suffix, mapping);
+                    break;
+                case parser::Expression::KeyPathOp::None:
+                    type = ExpressionInternal::exp_PrimitiveList;
+                    storage = std::move(ple);
+                    break;
+                default:
+                    throw std::runtime_error(util::format(
+                        "Invalid query: '%1' is not a valid operator for a list of primitives property '%2'",
+                        e.op_suffix, e.s));
+            }
+        }
+        else {
+            PropertyExpression pe(query, std::move(link_chain));
+            switch (e.collection_op) {
+                case parser::Expression::KeyPathOp::Min:
+                    type = ExpressionInternal::exp_OpMin;
+                    storage = CollectionOperatorExpression<parser::Expression::KeyPathOp::Min, PropertyExpression>(
                         std::move(pe), e.op_suffix, mapping);
-                }
-                else if (pe.dest_type_is_list_of_primitives()) {
-                    type = ExpressionInternal::exp_OpCount;
-                    storage = CollectionOperatorExpression<parser::Expression::KeyPathOp::Count, true>(
+                    break;
+                case parser::Expression::KeyPathOp::Max:
+                    type = ExpressionInternal::exp_OpMax;
+                    storage = CollectionOperatorExpression<parser::Expression::KeyPathOp::Max, PropertyExpression>(
                         std::move(pe), e.op_suffix, mapping);
-                }
-                else if (pe.get_dest_type() == type_String) {
-                    type = ExpressionInternal::exp_OpSizeString;
-                    storage = CollectionOperatorExpression<parser::Expression::KeyPathOp::SizeString>(
+                    break;
+                case parser::Expression::KeyPathOp::Sum:
+                    type = ExpressionInternal::exp_OpSum;
+                    storage = CollectionOperatorExpression<parser::Expression::KeyPathOp::Sum, PropertyExpression>(
                         std::move(pe), e.op_suffix, mapping);
-                }
-                else if (pe.get_dest_type() == type_Binary) {
-                    type = ExpressionInternal::exp_OpSizeBinary;
-                    storage = CollectionOperatorExpression<parser::Expression::KeyPathOp::SizeBinary>(
+                    break;
+                case parser::Expression::KeyPathOp::Avg:
+                    type = ExpressionInternal::exp_OpAvg;
+                    storage = CollectionOperatorExpression<parser::Expression::KeyPathOp::Avg, PropertyExpression>(
                         std::move(pe), e.op_suffix, mapping);
-                }
-                else {
-                    throw std::runtime_error("Invalid query: @size and @count can only operate on types list, binary, or string");
-                }
-                break;
-            case parser::Expression::KeyPathOp::None:
-                type = ExpressionInternal::exp_Property;
-                storage = std::move(pe);
-                break;
+                    break;
+                case parser::Expression::KeyPathOp::BacklinkCount:
+                    type = ExpressionInternal::exp_OpBacklinkCount;
+                    storage = CollectionOperatorExpression<parser::Expression::KeyPathOp::BacklinkCount,
+                                                           PropertyExpression>(std::move(pe), e.op_suffix, mapping);
+                    break;
+                case parser::Expression::KeyPathOp::Count:
+                    REALM_FALLTHROUGH;
+                case parser::Expression::KeyPathOp::SizeString:
+                    REALM_FALLTHROUGH;
+                case parser::Expression::KeyPathOp::SizeBinary:
+                    if (pe.get_dest_type() == type_LinkList || pe.get_dest_type() == type_Link) {
+                        type = ExpressionInternal::exp_OpCount;
+                        storage =
+                            CollectionOperatorExpression<parser::Expression::KeyPathOp::Count, PropertyExpression>(
+                                std::move(pe), e.op_suffix, mapping);
+                    }
+                    else if (pe.dest_type_is_list_of_primitives()) {
+                        type = ExpressionInternal::exp_OpCount;
+                        storage =
+                            CollectionOperatorExpression<parser::Expression::KeyPathOp::Count, PropertyExpression>(
+                                std::move(pe), e.op_suffix, mapping);
+                    }
+                    else if (pe.get_dest_type() == type_String) {
+                        type = ExpressionInternal::exp_OpSizeString;
+                        storage =
+                            CollectionOperatorExpression<parser::Expression::KeyPathOp::SizeString,
+                                                         PropertyExpression>(std::move(pe), e.op_suffix, mapping);
+                    }
+                    else if (pe.get_dest_type() == type_Binary) {
+                        type = ExpressionInternal::exp_OpSizeBinary;
+                        storage =
+                            CollectionOperatorExpression<parser::Expression::KeyPathOp::SizeBinary,
+                                                         PropertyExpression>(std::move(pe), e.op_suffix, mapping);
+                    }
+                    else {
+                        throw std::runtime_error(
+                            "Invalid query: @size and @count can only operate on types list, binary, or string");
+                    }
+                    break;
+                case parser::Expression::KeyPathOp::None:
+                    type = ExpressionInternal::exp_Property;
+                    storage = std::move(pe);
+                    break;
+            }
         }
     }
     else if (e.type == parser::Expression::Type::SubQuery) {
@@ -119,50 +173,103 @@ PropertyExpression& ExpressionContainer::get_property()
     return util::any_cast<PropertyExpression&>(storage);
 }
 
+PrimitiveListExpression& ExpressionContainer::get_primitive_list()
+{
+    REALM_ASSERT_DEBUG(type == ExpressionInternal::exp_PrimitiveList);
+    return util::any_cast<PrimitiveListExpression&>(storage);
+}
+
 ValueExpression& ExpressionContainer::get_value()
 {
     REALM_ASSERT_DEBUG(type == ExpressionInternal::exp_Value);
     return util::any_cast<ValueExpression&>(storage);
 }
-CollectionOperatorExpression<parser::Expression::KeyPathOp::Min>& ExpressionContainer::get_min()
+CollectionOperatorExpression<parser::Expression::KeyPathOp::Min, PropertyExpression>& ExpressionContainer::get_min()
 {
     REALM_ASSERT_DEBUG(type == ExpressionInternal::exp_OpMin);
-    return util::any_cast<CollectionOperatorExpression<parser::Expression::KeyPathOp::Min>&>(storage);
+    return util::any_cast<CollectionOperatorExpression<parser::Expression::KeyPathOp::Min, PropertyExpression>&>(
+        storage);
 }
-CollectionOperatorExpression<parser::Expression::KeyPathOp::Max>& ExpressionContainer::get_max()
+CollectionOperatorExpression<parser::Expression::KeyPathOp::Max, PropertyExpression>& ExpressionContainer::get_max()
 {
     REALM_ASSERT_DEBUG(type == ExpressionInternal::exp_OpMax);
-    return util::any_cast<CollectionOperatorExpression<parser::Expression::KeyPathOp::Max>&>(storage);
+    return util::any_cast<CollectionOperatorExpression<parser::Expression::KeyPathOp::Max, PropertyExpression>&>(
+        storage);
 }
-CollectionOperatorExpression<parser::Expression::KeyPathOp::Sum>& ExpressionContainer::get_sum()
+CollectionOperatorExpression<parser::Expression::KeyPathOp::Sum, PropertyExpression>& ExpressionContainer::get_sum()
 {
     REALM_ASSERT_DEBUG(type == ExpressionInternal::exp_OpSum);
-    return util::any_cast<CollectionOperatorExpression<parser::Expression::KeyPathOp::Sum>&>(storage);
+    return util::any_cast<CollectionOperatorExpression<parser::Expression::KeyPathOp::Sum, PropertyExpression>&>(
+        storage);
 }
-CollectionOperatorExpression<parser::Expression::KeyPathOp::Avg>& ExpressionContainer::get_avg()
+CollectionOperatorExpression<parser::Expression::KeyPathOp::Avg, PropertyExpression>& ExpressionContainer::get_avg()
 {
     REALM_ASSERT_DEBUG(type == ExpressionInternal::exp_OpAvg);
-    return util::any_cast<CollectionOperatorExpression<parser::Expression::KeyPathOp::Avg>&>(storage);
+    return util::any_cast<CollectionOperatorExpression<parser::Expression::KeyPathOp::Avg, PropertyExpression>&>(
+        storage);
 }
-CollectionOperatorExpression<parser::Expression::KeyPathOp::Count, true>& ExpressionContainer::get_count()
+CollectionOperatorExpression<parser::Expression::KeyPathOp::Count, PropertyExpression>&
+ExpressionContainer::get_count()
 {
     REALM_ASSERT_DEBUG(type == ExpressionInternal::exp_OpCount);
-    return util::any_cast<CollectionOperatorExpression<parser::Expression::KeyPathOp::Count, true>&>(storage);
+    return util::any_cast<CollectionOperatorExpression<parser::Expression::KeyPathOp::Count, PropertyExpression>&>(
+        storage);
 }
-CollectionOperatorExpression<parser::Expression::KeyPathOp::BacklinkCount>& ExpressionContainer::get_backlink_count()
+CollectionOperatorExpression<parser::Expression::KeyPathOp::Min, PrimitiveListExpression>&
+ExpressionContainer::get_primitive_min()
+{
+    REALM_ASSERT_DEBUG(type == ExpressionInternal::exp_OpMinPrimitive);
+    return util::any_cast<CollectionOperatorExpression<parser::Expression::KeyPathOp::Min, PrimitiveListExpression>&>(
+        storage);
+}
+CollectionOperatorExpression<parser::Expression::KeyPathOp::Max, PrimitiveListExpression>&
+ExpressionContainer::get_primitive_max()
+{
+    REALM_ASSERT_DEBUG(type == ExpressionInternal::exp_OpMaxPrimitive);
+    return util::any_cast<CollectionOperatorExpression<parser::Expression::KeyPathOp::Max, PrimitiveListExpression>&>(
+        storage);
+}
+CollectionOperatorExpression<parser::Expression::KeyPathOp::Sum, PrimitiveListExpression>&
+ExpressionContainer::get_primitive_sum()
+{
+    REALM_ASSERT_DEBUG(type == ExpressionInternal::exp_OpSumPrimitive);
+    return util::any_cast<CollectionOperatorExpression<parser::Expression::KeyPathOp::Sum, PrimitiveListExpression>&>(
+        storage);
+}
+CollectionOperatorExpression<parser::Expression::KeyPathOp::Avg, PrimitiveListExpression>&
+ExpressionContainer::get_primitive_avg()
+{
+    REALM_ASSERT_DEBUG(type == ExpressionInternal::exp_OpAvgPrimitive);
+    return util::any_cast<CollectionOperatorExpression<parser::Expression::KeyPathOp::Avg, PrimitiveListExpression>&>(
+        storage);
+}
+CollectionOperatorExpression<parser::Expression::KeyPathOp::Count, PrimitiveListExpression>&
+ExpressionContainer::get_primitive_count()
+{
+    REALM_ASSERT_DEBUG(type == ExpressionInternal::exp_OpCountPrimitive);
+    return util::any_cast<
+        CollectionOperatorExpression<parser::Expression::KeyPathOp::Count, PrimitiveListExpression>&>(storage);
+}
+CollectionOperatorExpression<parser::Expression::KeyPathOp::BacklinkCount, PropertyExpression>&
+ExpressionContainer::get_backlink_count()
 {
     REALM_ASSERT_DEBUG(type == ExpressionInternal::exp_OpBacklinkCount);
-    return util::any_cast<CollectionOperatorExpression<parser::Expression::KeyPathOp::BacklinkCount>&>(storage);
+    return util::any_cast<
+        CollectionOperatorExpression<parser::Expression::KeyPathOp::BacklinkCount, PropertyExpression>&>(storage);
 }
-CollectionOperatorExpression<parser::Expression::KeyPathOp::SizeString>& ExpressionContainer::get_size_string()
+CollectionOperatorExpression<parser::Expression::KeyPathOp::SizeString, PropertyExpression>&
+ExpressionContainer::get_size_string()
 {
     REALM_ASSERT_DEBUG(type == ExpressionInternal::exp_OpSizeString);
-    return util::any_cast<CollectionOperatorExpression<parser::Expression::KeyPathOp::SizeString>&>(storage);
+    return util::any_cast<
+        CollectionOperatorExpression<parser::Expression::KeyPathOp::SizeString, PropertyExpression>&>(storage);
 }
-CollectionOperatorExpression<parser::Expression::KeyPathOp::SizeBinary>& ExpressionContainer::get_size_binary()
+CollectionOperatorExpression<parser::Expression::KeyPathOp::SizeBinary, PropertyExpression>&
+ExpressionContainer::get_size_binary()
 {
     REALM_ASSERT_DEBUG(type == ExpressionInternal::exp_OpSizeBinary);
-    return util::any_cast<CollectionOperatorExpression<parser::Expression::KeyPathOp::SizeBinary>&>(storage);
+    return util::any_cast<
+        CollectionOperatorExpression<parser::Expression::KeyPathOp::SizeBinary, PropertyExpression>&>(storage);
 }
 
 SubqueryExpression& ExpressionContainer::get_subexpression()
@@ -182,16 +289,34 @@ DataType ExpressionContainer::check_type_compatibility(DataType other_type)
             self_type = get_property().get_dest_type(); // must match
             break;
         case ExpressionInternal::exp_OpMin:
-            self_type = get_min().post_link_col_type;
+            self_type = get_min().operative_col_type;
             break;
         case ExpressionInternal::exp_OpMax:
-            self_type = get_max().post_link_col_type;
+            self_type = get_max().operative_col_type;
             break;
         case ExpressionInternal::exp_OpSum:
-            self_type = get_sum().post_link_col_type;
+            self_type = get_sum().operative_col_type;
             break;
         case ExpressionInternal::exp_OpAvg:
-            self_type = get_avg().post_link_col_type;
+            self_type = get_avg().operative_col_type;
+            break;
+        case ExpressionInternal::exp_PrimitiveList:
+            self_type = get_primitive_list().get_dest_type();
+            break;
+        case ExpressionInternal::exp_OpMinPrimitive:
+            self_type = get_primitive_min().operative_col_type;
+            break;
+        case ExpressionInternal::exp_OpMaxPrimitive:
+            self_type = get_primitive_max().operative_col_type;
+            break;
+        case ExpressionInternal::exp_OpSumPrimitive:
+            self_type = get_primitive_sum().operative_col_type;
+            break;
+        case ExpressionInternal::exp_OpAvgPrimitive:
+            self_type = get_primitive_avg().operative_col_type;
+            break;
+        case ExpressionInternal::exp_OpCountPrimitive:
+            self_type = get_primitive_count().operative_col_type;
             break;
         case ExpressionInternal::exp_SubQuery:
             REALM_FALLTHROUGH;
@@ -225,10 +350,32 @@ DataType ExpressionContainer::check_type_compatibility(DataType other_type)
 bool is_count_type(ExpressionContainer::ExpressionInternal exp_type)
 {
     return exp_type == ExpressionContainer::ExpressionInternal::exp_OpCount ||
+           exp_type == ExpressionContainer::ExpressionInternal::exp_OpCountPrimitive ||
            exp_type == ExpressionContainer::ExpressionInternal::exp_OpBacklinkCount ||
            exp_type == ExpressionContainer::ExpressionInternal::exp_OpSizeString ||
            exp_type == ExpressionContainer::ExpressionInternal::exp_OpSizeBinary ||
            exp_type == ExpressionContainer::ExpressionInternal::exp_SubQuery;
+}
+
+Optional<DataType> primitive_list_property_type(ExpressionContainer& exp)
+{
+    using ExpType = ExpressionContainer::ExpressionInternal;
+    if (exp.type == ExpType::exp_PrimitiveList) {
+        return exp.get_primitive_list().get_dest_type();
+    }
+    else if (exp.type == ExpType::exp_OpMinPrimitive) {
+        return exp.get_primitive_min().operative_col_type;
+    }
+    else if (exp.type == ExpType::exp_OpMaxPrimitive) {
+        return exp.get_primitive_max().operative_col_type;
+    }
+    else if (exp.type == ExpType::exp_OpSumPrimitive) {
+        return exp.get_primitive_sum().operative_col_type;
+    }
+    else if (exp.type == ExpType::exp_OpAvgPrimitive) {
+        return exp.get_primitive_avg().operative_col_type;
+    }
+    return util::none;
 }
 
 DataType ExpressionContainer::get_comparison_type(ExpressionContainer& rhs) {
@@ -237,28 +384,44 @@ DataType ExpressionContainer::get_comparison_type(ExpressionContainer& rhs) {
         return rhs.check_type_compatibility(get_property().get_dest_type());
     } else if (rhs.type == ExpressionInternal::exp_Property) {
         return check_type_compatibility(rhs.get_property().get_dest_type());
-    } else if (type == ExpressionInternal::exp_OpMin) {
-        return rhs.check_type_compatibility(get_min().post_link_col_type);
-    } else if (type == ExpressionInternal::exp_OpMax) {
-        return rhs.check_type_compatibility(get_max().post_link_col_type);
-    } else if (type == ExpressionInternal::exp_OpSum) {
-        return rhs.check_type_compatibility(get_sum().post_link_col_type);
-    } else if (type == ExpressionInternal::exp_OpAvg) {
-        return rhs.check_type_compatibility(get_avg().post_link_col_type);
-    } else if (rhs.type == ExpressionInternal::exp_OpMin) {
-        return check_type_compatibility(rhs.get_min().post_link_col_type);
-    } else if (rhs.type == ExpressionInternal::exp_OpMax) {
-        return check_type_compatibility(rhs.get_max().post_link_col_type);
-    } else if (rhs.type == ExpressionInternal::exp_OpSum) {
-        return check_type_compatibility(rhs.get_sum().post_link_col_type);
-    } else if (rhs.type == ExpressionInternal::exp_OpAvg) {
-        return check_type_compatibility(rhs.get_avg().post_link_col_type);
-    } else if (is_count_type(type) && is_count_type(rhs.type)) {
+    }
+    else if (auto primitive_type_lhs = primitive_list_property_type(*this)) {
+        return rhs.check_type_compatibility(*primitive_type_lhs);
+    }
+    else if (auto primitive_type_rhs = primitive_list_property_type(rhs)) {
+        return check_type_compatibility(*primitive_type_rhs);
+    }
+    else if (type == ExpressionInternal::exp_OpMin) {
+        return rhs.check_type_compatibility(get_min().operative_col_type);
+    }
+    else if (type == ExpressionInternal::exp_OpMax) {
+        return rhs.check_type_compatibility(get_max().operative_col_type);
+    }
+    else if (type == ExpressionInternal::exp_OpSum) {
+        return rhs.check_type_compatibility(get_sum().operative_col_type);
+    }
+    else if (type == ExpressionInternal::exp_OpAvg) {
+        return rhs.check_type_compatibility(get_avg().operative_col_type);
+    }
+    else if (rhs.type == ExpressionInternal::exp_OpMin) {
+        return check_type_compatibility(rhs.get_min().operative_col_type);
+    }
+    else if (rhs.type == ExpressionInternal::exp_OpMax) {
+        return check_type_compatibility(rhs.get_max().operative_col_type);
+    }
+    else if (rhs.type == ExpressionInternal::exp_OpSum) {
+        return check_type_compatibility(rhs.get_sum().operative_col_type);
+    }
+    else if (rhs.type == ExpressionInternal::exp_OpAvg) {
+        return check_type_compatibility(rhs.get_avg().operative_col_type);
+    }
+    else if (is_count_type(type) && is_count_type(rhs.type)) {
         return type_Int;
         // check weakly typed expressions last, we return type_Int for count/size because at this point the
         // comparison is between a @count/@size and a value which is untyped. The value should be numeric if the query
         // is well formed but we don't know what type it actually is so we will perform int promotion in a conversion.
-    } else if (is_count_type(type) || is_count_type(rhs.type)) {
+    }
+    else if (is_count_type(type) || is_count_type(rhs.type)) {
         return type_Int;
     }
 

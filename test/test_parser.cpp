@@ -1859,14 +1859,35 @@ ONLY(Parser_collection_aggregates_on_list_of_primitives)
         Obj obj = t->create_object();
         obj.get_list<Int>(col_int_list).add(i);
     }
-//    auto query = t->get_subtable(int_col, 2)->column<Int>(0) > 225;
 
     Query q = t->where();
-
+    q.and_query(t->sub)
+        //    q.and_query(t->column<Lst<Int>>(col_int_list) == 2);
+        CHECK_EQUAL(q.count(), 1);
+    for (size_t i = 0; i < num_objects; ++i) {
+        verify_query(test_context, t, util::format("integers == %1", i), 1);
+        verify_query(test_context, t, util::format("integers.@min == %1", i), 1);
+        verify_query(test_context, t, util::format("integers.@max == %1", i), 1);
+        verify_query(test_context, t, util::format("integers.@avg == %1", i), 1);
+        verify_query(test_context, t, util::format("integers.@sum == %1", i), 1);
+        verify_query(test_context, t, util::format("SUBQUERY(integers, $x, $x == %1).@count > 0", i), 1);
+        verify_query(test_context, t, util::format("ANY integers == %1", i), 1);
+        verify_query(test_context, t, util::format("SOME integers == %1", i), 1);
+        verify_query(test_context, t, util::format("ALL integers == %1", i), 1);
+        verify_query(test_context, t, util::format("NONE integers == %1", i), num_objects - 1);
+        verify_query(test_context, t, util::format("%1 IN integers", i), 1);
+    }
     verify_query(test_context, t, "integers.@count == 0", 0);
+    verify_query(test_context, t, "integers.@size == 0", 0);
     verify_query(test_context, t, "integers.@count == 1", num_objects);
+    verify_query(test_context, t, "integers.@size == 1", num_objects);
 
     // verify_query(test_context, t, "integers == 0", 1);
+
+    std::string message;
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "integers.@min.no_property == 0", 0), message);
+    CHECK_EQUAL(message, "An extraneous property 'no_property' was found for operation '@min' when applied to a list "
+                         "of primitive values 'integers'");
 }
 
 TEST(Parser_SortAndDistinctSerialisation)

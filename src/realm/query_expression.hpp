@@ -3144,9 +3144,9 @@ public:
         destination.import(v);
     }
 
-    virtual std::string description(util::serializer::SerialisationState&) const override
+    virtual std::string description(util::serializer::SerialisationState& state) const override
     {
-        throw SerialisationError("Serialisation of queries involving subtable expressions is not yet supported.");
+        return m_list.description(state) + util::serializer::value_separator + Operation::description();
     }
 
 private:

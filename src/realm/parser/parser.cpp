@@ -98,10 +98,14 @@ struct false_value : string_token_t("false") {};
 struct null_value : seq<sor<string_token_t("null"), string_token_t("nil")>> {};
 
 // following operators must allow proceeding string characters
-struct min : TAOCPP_PEGTL_ISTRING(".@min.") {};
-struct max : TAOCPP_PEGTL_ISTRING(".@max.") {};
-struct sum : TAOCPP_PEGTL_ISTRING(".@sum.") {};
-struct avg : TAOCPP_PEGTL_ISTRING(".@avg.") {};
+struct min : TAOCPP_PEGTL_ISTRING(".@min") {
+};
+struct max : TAOCPP_PEGTL_ISTRING(".@max") {
+};
+struct sum : TAOCPP_PEGTL_ISTRING(".@sum") {
+};
+struct avg : TAOCPP_PEGTL_ISTRING(".@avg") {
+};
 // these operators are normal strings (no proceeding string characters)
 struct count : string_token_t(".@count") {};
 struct size : string_token_t(".@size") {};
@@ -124,7 +128,7 @@ struct key_path : list<sor<backlink_path, one_key_path>, one<'.'>> {
 struct key_path_prefix : disable< key_path > {};
 struct key_path_suffix : disable< key_path > {};
 struct collection_operator_match
-    : sor<seq<key_path_prefix, key_collection_operators, key_path_suffix>,
+    : sor<seq<key_path_prefix, key_collection_operators, opt<seq<dot, key_path_suffix>>>,
           seq<opt<key_path_prefix, dot>, backlink_count>, seq<key_path_prefix, single_collection_operators>> {
 };
 

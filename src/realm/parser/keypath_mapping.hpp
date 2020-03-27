@@ -76,6 +76,9 @@ protected:
     std::unordered_map<std::pair<ConstTableRef, std::string>, std::string, TableAndColHash> m_mapping;
 };
 
+std::vector<KeyPathElement> generate_link_chain_from_string(Query& q, const std::string& key_path_string,
+                                                            KeyPathMapping& mapping);
+
 } // namespace parser
 } // namespace realm
 

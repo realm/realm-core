@@ -23,6 +23,7 @@
 
 #include "collection_operator_expression.hpp"
 #include "parser.hpp"
+#include "primitive_list_expression.hpp"
 #include "property_expression.hpp"
 #include "query_builder.hpp"
 #include "subquery_expression.hpp"
@@ -40,15 +41,23 @@ public:
     bool is_null();
 
     PropertyExpression& get_property();
+    PrimitiveListExpression& get_primitive_list();
     ValueExpression& get_value();
-    CollectionOperatorExpression<parser::Expression::KeyPathOp::Min>& get_min();
-    CollectionOperatorExpression<parser::Expression::KeyPathOp::Max>& get_max();
-    CollectionOperatorExpression<parser::Expression::KeyPathOp::Sum>& get_sum();
-    CollectionOperatorExpression<parser::Expression::KeyPathOp::Avg>& get_avg();
-    CollectionOperatorExpression<parser::Expression::KeyPathOp::Count, true>& get_count();
-    CollectionOperatorExpression<parser::Expression::KeyPathOp::BacklinkCount>& get_backlink_count();
-    CollectionOperatorExpression<parser::Expression::KeyPathOp::SizeString>& get_size_string();
-    CollectionOperatorExpression<parser::Expression::KeyPathOp::SizeBinary>& get_size_binary();
+    CollectionOperatorExpression<parser::Expression::KeyPathOp::Min, PropertyExpression>& get_min();
+    CollectionOperatorExpression<parser::Expression::KeyPathOp::Max, PropertyExpression>& get_max();
+    CollectionOperatorExpression<parser::Expression::KeyPathOp::Sum, PropertyExpression>& get_sum();
+    CollectionOperatorExpression<parser::Expression::KeyPathOp::Avg, PropertyExpression>& get_avg();
+    CollectionOperatorExpression<parser::Expression::KeyPathOp::Count, PropertyExpression>& get_count();
+    CollectionOperatorExpression<parser::Expression::KeyPathOp::Min, PrimitiveListExpression>& get_primitive_min();
+    CollectionOperatorExpression<parser::Expression::KeyPathOp::Max, PrimitiveListExpression>& get_primitive_max();
+    CollectionOperatorExpression<parser::Expression::KeyPathOp::Sum, PrimitiveListExpression>& get_primitive_sum();
+    CollectionOperatorExpression<parser::Expression::KeyPathOp::Avg, PrimitiveListExpression>& get_primitive_avg();
+    CollectionOperatorExpression<parser::Expression::KeyPathOp::Count, PrimitiveListExpression>&
+    get_primitive_count();
+    CollectionOperatorExpression<parser::Expression::KeyPathOp::BacklinkCount, PropertyExpression>&
+    get_backlink_count();
+    CollectionOperatorExpression<parser::Expression::KeyPathOp::SizeString, PropertyExpression>& get_size_string();
+    CollectionOperatorExpression<parser::Expression::KeyPathOp::SizeBinary, PropertyExpression>& get_size_binary();
     SubqueryExpression& get_subexpression();
 
     DataType check_type_compatibility(DataType type);
@@ -57,11 +66,17 @@ public:
     enum class ExpressionInternal {
         exp_Value,
         exp_Property,
+        exp_PrimitiveList,
         exp_OpMin,
         exp_OpMax,
         exp_OpSum,
         exp_OpAvg,
         exp_OpCount,
+        exp_OpMinPrimitive,
+        exp_OpMaxPrimitive,
+        exp_OpSumPrimitive,
+        exp_OpAvgPrimitive,
+        exp_OpCountPrimitive,
         exp_OpSizeString,
         exp_OpSizeBinary,
         exp_OpBacklinkCount,

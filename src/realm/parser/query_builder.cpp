@@ -36,8 +36,9 @@ using namespace query_builder;
 namespace {
 
 
-template<typename T, parser::Expression::KeyPathOp OpType>
-void do_add_null_comparison_to_query(Query &, Predicate::Operator, const CollectionOperatorExpression<OpType> &)
+template <typename T, parser::Expression::KeyPathOp OpType, typename ExpressionType>
+void do_add_null_comparison_to_query(Query&, Predicate::Operator,
+                                     const CollectionOperatorExpression<OpType, ExpressionType>&)
 {
     throw std::logic_error("Comparing a collection aggregate operation to 'null' is not supported.");
 }
@@ -209,6 +210,93 @@ void add_string_constraint_to_query(realm::Query& query, const Predicate::Compar
     }
 }
 
+// primitive list of strings column vs string column
+void add_string_constraint_to_query(realm::Query& query, const Predicate::Comparison& cmp,
+                                    Columns<Lst<String>>&& lhs_col, Columns<String>&& rhs_col)
+{
+    bool case_sensitive = (cmp.option != Predicate::OperatorOption::CaseInsensitive);
+    switch (cmp.op) {
+        case Predicate::Operator::BeginsWith:
+            query.and_query(lhs_col.begins_with(rhs_col, case_sensitive));
+            break;
+        case Predicate::Operator::EndsWith:
+            query.and_query(lhs_col.ends_with(rhs_col, case_sensitive));
+            break;
+        case Predicate::Operator::Contains:
+            query.and_query(lhs_col.contains(rhs_col, case_sensitive));
+            break;
+        case Predicate::Operator::Equal:
+            query.and_query(lhs_col.equal(rhs_col, case_sensitive));
+            break;
+        case Predicate::Operator::NotEqual:
+            query.and_query(lhs_col.not_equal(rhs_col, case_sensitive));
+            break;
+        case Predicate::Operator::Like:
+            query.and_query(lhs_col.like(rhs_col, case_sensitive));
+            break;
+        default:
+            throw std::logic_error("Unsupported operator for string queries.");
+    }
+}
+
+// string column vs primitive list of strings column doesn't make sense
+void add_string_constraint_to_query(realm::Query&, const Predicate::Comparison&, Columns<String>&&,
+                                    Columns<Lst<String>>&&)
+{
+    throw std::logic_error("Comparing a string property to a list of primitive strings is not supported");
+}
+
+// FIXME: share these functions as they're the same code, possibly with std::enable_if<T, Columns<Lst<String>>,
+// Columns<String>
+void add_string_constraint_to_query(Query& query, const Predicate::Comparison& cmp, Columns<Lst<String>>&& column,
+                                    StringData&& value)
+{
+    bool case_sensitive = (cmp.option != Predicate::OperatorOption::CaseInsensitive);
+    switch (cmp.op) {
+        case Predicate::Operator::BeginsWith:
+            query.and_query(column.begins_with(value, case_sensitive));
+            break;
+        case Predicate::Operator::EndsWith:
+            query.and_query(column.ends_with(value, case_sensitive));
+            break;
+        case Predicate::Operator::Contains:
+            query.and_query(column.contains(value, case_sensitive));
+            break;
+        case Predicate::Operator::Equal:
+            query.and_query(column.equal(value, case_sensitive));
+            break;
+        case Predicate::Operator::NotEqual:
+            query.and_query(column.not_equal(value, case_sensitive));
+            break;
+        case Predicate::Operator::Like:
+            query.and_query(column.like(value, case_sensitive));
+            break;
+        default:
+            throw std::logic_error("Unsupported operator for string queries.");
+    }
+}
+
+void add_string_constraint_to_query(Query&, const Predicate::Comparison&, StringData&&, Columns<Lst<String>>&&)
+{
+    throw std::logic_error("Comparing a string literal with a list of primitive strings is not supported.");
+}
+
+void add_string_constraint_to_query(Query&, const Predicate::Comparison&, Columns<Lst<String>>&&,
+                                    Columns<Lst<String>>&&)
+{
+    throw std::logic_error(
+        "Comparing a primitive string list against a list of primitive strings is not implemented.");
+}
+
+
+// FIXME: actually implement these specialiszations
+template <typename LHS, typename RHS>
+void add_binary_constraint_to_query(Query&, const Predicate::Comparison&, RHS&&, LHS&&)
+{
+    throw std::logic_error("Unsupported operation for binary comparison.");
+}
+
+template <>
 void add_binary_constraint_to_query(Query& query, const Predicate::Comparison& cmp, Columns<Binary>&& column,
                                     BinaryData&& value)
 {
@@ -237,6 +325,7 @@ void add_binary_constraint_to_query(Query& query, const Predicate::Comparison& c
     }
 }
 
+template <>
 void add_binary_constraint_to_query(realm::Query& query, const Predicate::Comparison& cmp, BinaryData&& value,
                                     Columns<Binary>&& column)
 {
@@ -254,6 +343,7 @@ void add_binary_constraint_to_query(realm::Query& query, const Predicate::Compar
     }
 }
 
+template <>
 void add_binary_constraint_to_query(Query& query, const Predicate::Comparison& cmp, Columns<Binary>&& lhs_col,
                                     Columns<Binary>&& rhs_col)
 {
@@ -453,16 +543,16 @@ void add_null_comparison_to_query(Query& query, const Predicate::Comparison& cmp
                                             location);
             break;
         case ExpressionContainer::ExpressionInternal::exp_OpMin:
-            do_add_null_comparison_to_query(query, cmp, exp.get_min(), exp.get_min().post_link_col_type, location);
+            do_add_null_comparison_to_query(query, cmp, exp.get_min(), exp.get_min().operative_col_type, location);
             break;
         case ExpressionContainer::ExpressionInternal::exp_OpMax:
-            do_add_null_comparison_to_query(query, cmp, exp.get_max(), exp.get_max().post_link_col_type, location);
+            do_add_null_comparison_to_query(query, cmp, exp.get_max(), exp.get_max().operative_col_type, location);
             break;
         case ExpressionContainer::ExpressionInternal::exp_OpSum:
-            do_add_null_comparison_to_query(query, cmp, exp.get_sum(), exp.get_sum().post_link_col_type, location);
+            do_add_null_comparison_to_query(query, cmp, exp.get_sum(), exp.get_sum().operative_col_type, location);
             break;
         case ExpressionContainer::ExpressionInternal::exp_OpAvg:
-            do_add_null_comparison_to_query(query, cmp, exp.get_avg(), exp.get_avg().post_link_col_type, location);
+            do_add_null_comparison_to_query(query, cmp, exp.get_avg(), exp.get_avg().operative_col_type, location);
             break;
         case ExpressionContainer::ExpressionInternal::exp_SubQuery:
             REALM_FALLTHROUGH;
@@ -515,6 +605,24 @@ void internal_add_comparison_to_query(Query& query, LHS_T& lhs, const Predicate:
         case realm::parser::ExpressionContainer::ExpressionInternal::exp_SubQuery:
             do_add_comparison_to_query(query, cmp, lhs, rhs.get_subexpression(), comparison_type);
             return;
+        case realm::parser::ExpressionContainer::ExpressionInternal::exp_PrimitiveList:
+            do_add_comparison_to_query(query, cmp, lhs, rhs.get_primitive_list(), comparison_type);
+            return;
+        case realm::parser::ExpressionContainer::ExpressionInternal::exp_OpMinPrimitive:
+            do_add_comparison_to_query(query, cmp, lhs, rhs.get_primitive_min(), comparison_type);
+            return;
+        case realm::parser::ExpressionContainer::ExpressionInternal::exp_OpMaxPrimitive:
+            do_add_comparison_to_query(query, cmp, lhs, rhs.get_primitive_max(), comparison_type);
+            return;
+        case realm::parser::ExpressionContainer::ExpressionInternal::exp_OpSumPrimitive:
+            do_add_comparison_to_query(query, cmp, lhs, rhs.get_primitive_sum(), comparison_type);
+            return;
+        case realm::parser::ExpressionContainer::ExpressionInternal::exp_OpAvgPrimitive:
+            do_add_comparison_to_query(query, cmp, lhs, rhs.get_primitive_avg(), comparison_type);
+            return;
+        case realm::parser::ExpressionContainer::ExpressionInternal::exp_OpCountPrimitive:
+            do_add_comparison_to_query(query, cmp, lhs, rhs.get_primitive_count(), comparison_type);
+            return;
     }
 }
 
@@ -555,6 +663,24 @@ void add_comparison_to_query(Query& query, ExpressionContainer& lhs, const Predi
             return;
         case realm::parser::ExpressionContainer::ExpressionInternal::exp_SubQuery:
             internal_add_comparison_to_query(query, lhs.get_subexpression(), cmp, rhs, comparison_type);
+            return;
+        case realm::parser::ExpressionContainer::ExpressionInternal::exp_PrimitiveList:
+            internal_add_comparison_to_query(query, lhs.get_primitive_list(), cmp, rhs, comparison_type);
+            return;
+        case realm::parser::ExpressionContainer::ExpressionInternal::exp_OpMinPrimitive:
+            internal_add_comparison_to_query(query, lhs.get_primitive_min(), cmp, rhs, comparison_type);
+            return;
+        case realm::parser::ExpressionContainer::ExpressionInternal::exp_OpMaxPrimitive:
+            internal_add_comparison_to_query(query, lhs.get_primitive_max(), cmp, rhs, comparison_type);
+            return;
+        case realm::parser::ExpressionContainer::ExpressionInternal::exp_OpSumPrimitive:
+            internal_add_comparison_to_query(query, lhs.get_primitive_sum(), cmp, rhs, comparison_type);
+            return;
+        case realm::parser::ExpressionContainer::ExpressionInternal::exp_OpAvgPrimitive:
+            internal_add_comparison_to_query(query, lhs.get_primitive_avg(), cmp, rhs, comparison_type);
+            return;
+        case realm::parser::ExpressionContainer::ExpressionInternal::exp_OpCountPrimitive:
+            internal_add_comparison_to_query(query, lhs.get_primitive_count(), cmp, rhs, comparison_type);
             return;
     }
 }

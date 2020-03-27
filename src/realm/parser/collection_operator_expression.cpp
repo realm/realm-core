@@ -1,6 +1,6 @@
 ////////////////////////////////////////////////////////////////////////////
 //
-// Copyright 2015 Realm Inc.
+// Copyright 2020 Realm Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,27 +16,14 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "property_expression.hpp"
-#include "parser_utils.hpp"
+#include <string>
+#include <utility>
 
-#include <realm/table.hpp>
-
-#include <sstream>
+#include "collection_operator_expression.hpp"
 
 namespace realm {
 namespace parser {
 
-PropertyExpression::PropertyExpression(Query& q, std::vector<KeyPathElement>&& chain)
-    : query(q)
-    , link_chain(std::move(chain))
-{
-}
-
-LinkChain PropertyExpression::link_chain_getter() const
-{
-    auto& tbl = query.get_table();
-    return KeyPathMapping::link_chain_getter(tbl, link_chain);
-}
 
 } // namespace parser
 } // namespace realm
