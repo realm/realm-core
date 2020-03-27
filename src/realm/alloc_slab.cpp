@@ -792,12 +792,18 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
     // Ensure clean up, if we need to back out:
     DetachGuard dg(*this);
 
+    // If the file is opened in writable mode:
     // make sure the database is not on streaming format. If we did not do this,
     // a later commit would have to do it. That would require coordination with
     // anybody concurrently joining the session, so it seems easier to do it at
     // session initialization, even if it means writing the database during open.
+    //
+    // If the file is opened in read-only mode:
+    // Even if it is on streaming format, leave the file unchanged. Since all attempts
+    // to open it are required to also use read-only mode, no other process or thread
+    // will need to change it either.
     const Header& header = *reinterpret_cast<const Header*>(m_data);
-    if (cfg.session_initiator && is_file_on_streaming_form(header)) {
+    if (cfg.session_initiator && is_file_on_streaming_form(header) && !cfg.read_only) {
         const StreamingFooter& footer = *(reinterpret_cast<const StreamingFooter*>(m_data + size) - 1);
         // Don't compare file format version fields as they are allowed to differ.
         // Also don't compare reserved fields (todo, is it correct to ignore?)
