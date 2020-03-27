@@ -1061,7 +1061,7 @@ Obj& Obj::set<ObjKey>(ColKey col_key, ObjKey target_key, bool is_default)
     ObjKey old_key = get_unfiltered_link(col_key); // Will update if needed
 
     if (target_key != old_key) {
-        CascadeState state(old_key.is_unresolved() ? CascadeState::Mode::All : CascadeState::Mode::Strong);
+        CascadeState state(CascadeState::Mode::Strong);
 
         ensure_writeable();
         bool recurse = replace_backlink(col_key, old_key, target_key, state);
@@ -1334,10 +1334,21 @@ bool Obj::remove_backlink(ColKey col_key, ObjKey old_key, CascadeState& state)
     bool strong_links = target_table->is_embedded();
 
     if (old_key != realm::null_key) {
-        ClusterTree* ct = old_key.is_unresolved() ? target_table->m_tombstones.get() : &target_table->m_clusters;
-        Obj target_obj = ct->get(old_key);
+        bool is_unres = old_key.is_unresolved();
+        Obj target_obj = is_unres ? target_table->m_tombstones->get(old_key) : target_table->m_clusters.get(old_key);
         bool last_removed = target_obj.remove_one_backlink(backlink_col_key, m_key); // Throws
-        return state.enqueue_for_cascade(target_obj, strong_links, last_removed);
+        if (is_unres) {
+            if (last_removed) {
+                // Check is there are more backlinks
+                if (!target_obj.has_backlinks(false)) {
+                    // Tombstones can be erased right away - there is no cascading effect
+                    target_table->m_tombstones->erase(old_key, state);
+                }
+            }
+        }
+        else {
+            return state.enqueue_for_cascade(target_obj, strong_links, last_removed);
+        }
     }
 
     return false;

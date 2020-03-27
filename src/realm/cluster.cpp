@@ -1900,9 +1900,21 @@ void Cluster::remove_backlinks(ObjKey origin_key, ColKey origin_col_key, const s
 
     for (auto key : keys) {
         if (key != null_key) {
-            Obj target_obj = target_table->get_object(key);
+            bool is_unres = key.is_unresolved();
+            Obj target_obj = is_unres ? target_table->m_tombstones->get(key) : target_table->m_clusters.get(key);
             bool last_removed = target_obj.remove_one_backlink(backlink_col_key, origin_key); // Throws
-            state.enqueue_for_cascade(target_obj, strong_links, last_removed);
+            if (is_unres) {
+                if (last_removed) {
+                    // Check is there are more backlinks
+                    if (!target_obj.has_backlinks(false)) {
+                        // Tombstones can be erased right away - there is no cascading effect
+                        target_table->m_tombstones->erase(key, state);
+                    }
+                }
+            }
+            else {
+                state.enqueue_for_cascade(target_obj, strong_links, last_removed);
+            }
         }
     }
 }

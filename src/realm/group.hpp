@@ -1365,7 +1365,7 @@ public:
     bool enqueue_for_cascade(const Obj& target_obj, bool link_is_strong, bool last_removed)
     {
         // Check if the object should be cascade deleted
-        if (m_mode == Mode::None && last_removed) {
+        if (m_mode == Mode::None || !last_removed) {
             return false;
         }
         if (m_mode == Mode::All || link_is_strong) {
