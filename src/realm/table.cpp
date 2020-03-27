@@ -363,12 +363,8 @@ void Table::remove_recursive(CascadeState& cascade_state)
         for (auto obj : to_delete) {
             auto table = group->get_table(obj.first);
             // This might add to the list of objects that should be deleted
-            if (obj.second.is_unresolved()) {
-                table->m_tombstones->erase(obj.second, cascade_state);
-            }
-            else {
-                table->m_clusters.erase(obj.second, cascade_state);
-            }
+            REALM_ASSERT(!obj.second.is_unresolved());
+            table->m_clusters.erase(obj.second, cascade_state);
         }
         nullify_links(cascade_state);
     } while (!cascade_state.m_to_be_deleted.empty() || !cascade_state.m_to_be_nullified.empty());

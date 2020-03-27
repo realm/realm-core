@@ -464,7 +464,7 @@ template <>
 void Lst<ObjKey>::do_set(size_t ndx, ObjKey target_key)
 {
     ObjKey old_key = get(ndx);
-    CascadeState state(old_key.is_unresolved() ? CascadeState::Mode::All : CascadeState::Mode::Strong);
+    CascadeState state(CascadeState::Mode::Strong);
     bool recurse = m_obj.replace_backlink(m_col_key, old_key, target_key, state);
 
     m_tree->set(ndx, target_key);
