@@ -19,9 +19,9 @@
 #ifndef REALM_APP_HPP
 #define REALM_APP_HPP
 
-#include "app_credentials.hpp"
-#include "generic_network_transport.hpp"
-#include "sync_user.hpp"
+#include "sync/app_credentials.hpp"
+#include "sync/generic_network_transport.hpp"
+#include "sync/sync_user.hpp"
 
 namespace realm {
 namespace app {
