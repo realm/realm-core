@@ -2999,8 +2999,8 @@ TEST_CASE("results: set property value on all objects", "[batch_updates]") {
     auto realm = Realm::get_shared_realm(config);
     auto table = realm->read_group().get_table("class_AllTypes");
     realm->begin_transaction();
-    table->create_object();
-    table->create_object();
+    table->create_object_with_primary_key(1);
+    table->create_object_with_primary_key(2);
     realm->commit_transaction();
     Results r(realm, table);
 
@@ -3084,14 +3084,14 @@ TEST_CASE("results: set property value on all objects", "[batch_updates]") {
             CHECK(r.get(i).get<Decimal128>("decimal") == any_cast<Decimal128>(decimal));
         }
 
-        ObjKey object_key = table->create_object().get_key();
+        ObjKey object_key = table->create_object_with_primary_key(3).get_key();
         Object linked_obj(realm, "AllTypes", object_key);
         r.set_property_value(ctx, "object", util::Any(linked_obj));
         for (size_t i = 0; i < r.size(); i++) {
             CHECK(r.get(i).get<ObjKey>("object") == object_key);
         }
 
-        ObjKey list_object_key = table->create_object().get_key();
+        ObjKey list_object_key = table->create_object_with_primary_key(4).get_key();
         Object list_object(realm, "AllTypes", list_object_key);
         r.set_property_value(ctx, "list", util::Any(AnyVector{list_object, list_object}));
         for (size_t i = 0; i < r.size(); i++) {

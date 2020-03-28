@@ -1108,7 +1108,7 @@ Results::UnsupportedColumnTypeException::UnsupportedColumnTypeException(ColKey c
 
 Results::UnsupportedColumnTypeException::UnsupportedColumnTypeException(ColKey column, TableView const& tv,
                                                                         const char* operation)
-: UnsupportedColumnTypeException(column, tv.ObjList::get_parent(), operation)
+: UnsupportedColumnTypeException(column, *tv.get_target_table(), operation)
 {
 }
 

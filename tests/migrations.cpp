@@ -444,7 +444,8 @@ TEST_CASE("migration: Automatic") {
             realm->update_schema(schema, 1);
             REQUIRE_THROWS(realm->update_schema(schema, 2, [](SharedRealm, SharedRealm realm, Schema&) {
                 auto table = ObjectStore::table_for_object_type(realm->read_group(), "object");
-                create_objects(*table, 2);
+                table->create_object_with_primary_key(1);
+                table->create_object_with_primary_key(2).set("value", 1);
             }));
         }
 
@@ -938,22 +939,19 @@ TEST_CASE("migration: Automatic") {
 
         SECTION("set primary key to duplicate values in migration") {
             auto bad_migration = [&](auto, auto new_realm, Schema&) {
-                // shoud be able to create a new object with the same PK
-                REQUIRE_NOTHROW(Object::create(ctx, new_realm, "all types", values));
-                REQUIRE(get_table(new_realm, "all types")->size() == 2);
-
-                // but it'll fail at the end
+                // shoud not be able to create a new object with the same PK
+                Object::create(ctx, new_realm, "all types", values);
             };
-            REQUIRE_THROWS_AS(realm->update_schema(schema, 2, bad_migration), DuplicatePrimaryKeyValueException);
+            REQUIRE_THROWS_AS(realm->update_schema(schema, 2, bad_migration), std::logic_error);
             REQUIRE(get_table(realm, "all types")->size() == 1);
 
             auto good_migration = [&](auto, auto new_realm, Schema&) {
-                REQUIRE_NOTHROW(Object::create(ctx, new_realm, "all types", values));
-
                 // Change the old object's PK to elminate the duplication
                 Object old_obj(new_realm, "all types", 0);
                 CppContext ctx(new_realm);
                 old_obj.set_property_value(ctx, "pk", util::Any(INT64_C(5)));
+
+                REQUIRE_NOTHROW(Object::create(ctx, new_realm, "all types", values));
             };
             REQUIRE_NOTHROW(realm->update_schema(schema, 2, good_migration));
             REQUIRE(get_table(realm, "all types")->size() == 2);
@@ -1083,7 +1081,12 @@ TEST_CASE("migration: Automatic") {
             realm->update_schema(old_schema, 1);
             realm->begin_transaction();
             auto table = ObjectStore::table_for_object_type(realm->read_group(), "object");
-            table->create_object().set_all(10);
+            auto col = table->get_primary_key_column();
+            if (col)
+                table->create_object_with_primary_key(10);
+            else
+                table->create_object().set_all(10);
+
             realm->commit_transaction();
         };
 
