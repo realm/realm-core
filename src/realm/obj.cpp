@@ -56,7 +56,7 @@ GlobalKey ConstObj::get_object_id() const
     return m_table->get_object_id(m_key);
 }
 
-const ClusterTree* ConstObj::get_tree_top() const
+const TableClusterTree* ConstObj::get_tree_top() const
 {
     if (m_key.is_unresolved()) {
         return m_table.unchecked_ptr()->m_tombstones.get();
@@ -866,7 +866,7 @@ bool Obj::ensure_writeable()
 {
     Allocator& alloc = get_alloc();
     if (alloc.is_read_only(m_mem.get_ref())) {
-        m_mem = const_cast<ClusterTree*>(get_tree_top())->ensure_writeable(m_key);
+        m_mem = const_cast<TableClusterTree*>(get_tree_top())->ensure_writeable(m_key);
         m_storage_version = alloc.get_storage_version();
         return true;
     }
@@ -1309,7 +1309,7 @@ void Obj::set_backlink(ColKey col_key, ObjKey new_key)
         ColKey backlink_col_key = m_table->get_opposite_column(col_key);
         REALM_ASSERT(target_table->valid_column(backlink_col_key));
 
-        ClusterTree* ct = new_key.is_unresolved() ? target_table->m_tombstones.get() : &target_table->m_clusters;
+        TableClusterTree* ct = new_key.is_unresolved() ? target_table->m_tombstones.get() : &target_table->m_clusters;
         ct->get(new_key).add_backlink(backlink_col_key, m_key);
     }
 }
@@ -1334,7 +1334,7 @@ bool Obj::remove_backlink(ColKey col_key, ObjKey old_key, CascadeState& state)
     bool strong_links = target_table->is_embedded();
 
     if (old_key != realm::null_key) {
-        ClusterTree* ct = old_key.is_unresolved() ? target_table->m_tombstones.get() : &target_table->m_clusters;
+        TableClusterTree* ct = old_key.is_unresolved() ? target_table->m_tombstones.get() : &target_table->m_clusters;
         Obj target_obj = ct->get(old_key);
         bool last_removed = target_obj.remove_one_backlink(backlink_col_key, m_key); // Throws
         return state.enqueue_for_cascade(target_obj, strong_links, last_removed);

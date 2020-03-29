@@ -294,8 +294,8 @@ public:
     }
 
     void clear();
-    using Iterator = ClusterTree::Iterator;
-    using ConstIterator = ClusterTree::ConstIterator;
+    using Iterator = TableClusterTree::Iterator;
+    using ConstIterator = TableClusterTree::ConstIterator;
     ConstIterator begin() const;
     ConstIterator end() const;
     Iterator begin();
@@ -652,8 +652,8 @@ private:
         m_alloc.update_from_underlying_allocator(writable);
     }
     Spec m_spec;            // 1st slot in m_top
-    ClusterTree m_clusters; // 3rd slot in m_top
-    std::unique_ptr<ClusterTree> m_tombstones; // 13th slot in m_top
+    TableClusterTree m_clusters;                    // 3rd slot in m_top
+    std::unique_ptr<TableClusterTree> m_tombstones; // 13th slot in m_top
     TableKey m_key;     // 4th slot in m_top
     Array m_index_refs; // 5th slot in m_top
     Array m_opposite_table;  // 7th slot in m_top
@@ -934,6 +934,7 @@ private:
     friend class Transaction;
     friend class Cluster;
     friend class ClusterTree;
+    friend class TableClusterTree;
     friend class ColKeyIterator;
     friend class ConstObj;
     friend class Obj;

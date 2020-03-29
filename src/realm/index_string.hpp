@@ -116,7 +116,7 @@ using StringConversionBuffer = std::array<char, string_conversion_buffer_size>;
 // field based on the key for the object.
 class ClusterColumn {
 public:
-    ClusterColumn(const ClusterTree* cluster_tree, ColKey column_key)
+    ClusterColumn(const TableClusterTree* cluster_tree, ColKey column_key)
         : m_cluster_tree(cluster_tree)
         , m_column_key(column_key)
     {
@@ -125,14 +125,14 @@ public:
     {
         return m_cluster_tree->size();
     }
-    ClusterTree::ConstIterator begin() const
+    TableClusterTree::ConstIterator begin() const
     {
-        return ClusterTree::ConstIterator(*m_cluster_tree, 0);
+        return TableClusterTree::ConstIterator(*m_cluster_tree, 0);
     }
 
-    ClusterTree::ConstIterator end() const
+    TableClusterTree::ConstIterator end() const
     {
-        return ClusterTree::ConstIterator(*m_cluster_tree, size());
+        return TableClusterTree::ConstIterator(*m_cluster_tree, size());
     }
 
 
@@ -145,7 +145,7 @@ public:
     StringData get_index_data(ObjKey key, StringConversionBuffer& buffer) const;
 
 private:
-    const ClusterTree* m_cluster_tree;
+    const TableClusterTree* m_cluster_tree;
     ColKey m_column_key;
 };
 
@@ -316,7 +316,7 @@ private:
 
 class SortedListComparator {
 public:
-    SortedListComparator(const ClusterTree* cluster_tree, ColKey column_key)
+    SortedListComparator(const TableClusterTree* cluster_tree, ColKey column_key)
         : m_column(cluster_tree, column_key)
     {
     }

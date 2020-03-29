@@ -29,6 +29,7 @@
 
 namespace realm {
 
+class TableClusterTree;
 class Replication;
 class TableView;
 class ConstLstBase;
@@ -150,13 +151,7 @@ public:
     // be tested. Will allow a function to be called in the context
     // of the owning cluster.
     template <class T>
-    bool evaluate(T func) const
-    {
-        Cluster cluster(0, get_alloc(), *get_tree_top());
-        cluster.init(m_mem);
-        cluster.set_offset(m_key.value - cluster.get_key_value(m_row_ndx));
-        return func(&cluster, m_row_ndx);
-    }
+    bool evaluate(T func) const;
 
     void to_json(std::ostream& out, size_t link_depth, std::map<std::string, std::string>& renames,
                  std::vector<ColKey>& followed) const;
@@ -229,7 +224,7 @@ protected:
     template <class T>
     bool do_is_null(ColKey::Idx col_ndx) const;
 
-    const ClusterTree* get_tree_top() const;
+    const TableClusterTree* get_tree_top() const;
     ColKey get_column_key(StringData col_name) const;
     TableKey get_table_key() const;
     TableRef get_target_table(ColKey col_key) const;
