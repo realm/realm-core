@@ -27,9 +27,10 @@ std::string const kAppProviderKey = "provider";
 
 IdentityProvider const IdentityProviderAnonymous = "anon-user";
 IdentityProvider const IdentityProviderGoogle = "oauth2-google";
-IdentityProvider const IdentityProviderFacebook  = "oauth2-facebook";
-IdentityProvider const IdentityProviderApple     = "oauth2-apple";
-IdentityProvider const IdentityProviderUsernamePassword     = "local-userpass";
+IdentityProvider const IdentityProviderFacebook = "oauth2-facebook";
+IdentityProvider const IdentityProviderApple = "oauth2-apple";
+IdentityProvider const IdentityProviderUsernamePassword = "local-userpass";
+IdentityProvider const IdentityProviderCustom = "custom-token";
 
 IdentityProvider provider_type_from_enum(AuthProvider provider)
 {
@@ -41,6 +42,10 @@ IdentityProvider provider_type_from_enum(AuthProvider provider)
             return IdentityProviderApple;
         case AuthProvider::FACEBOOK:
             return IdentityProviderFacebook;
+        case AuthProvider::GOOGLE:
+            return IdentityProviderGoogle;
+        case AuthProvider::CUSTOM:
+            return IdentityProviderCustom;
         case AuthProvider::USERNAME_PASSWORD:
             return IdentityProviderUsernamePassword;
     }
@@ -96,6 +101,28 @@ AppCredentials AppCredentials::facebook(AppCredentialsToken access_token)
                               return nlohmann::json({
                                   {kAppProviderKey, IdentityProviderFacebook},
                                   {"access_token", access_token}
+                              }).dump();
+                          });
+}
+
+AppCredentials AppCredentials::google(AppCredentialsToken auth_token)
+{
+    return AppCredentials(AuthProvider::GOOGLE,
+                          [=] {
+                              return nlohmann::json({
+                                  {kAppProviderKey, IdentityProviderGoogle},
+                                  {"authCode", auth_token}
+                              }).dump();
+                          });
+}
+
+AppCredentials AppCredentials::custom(AppCredentialsToken token)
+{
+    return AppCredentials(AuthProvider::CUSTOM,
+                          [=] {
+                              return nlohmann::json({
+                                  {kAppProviderKey, IdentityProviderCustom},
+                                  {"token", token}
                               }).dump();
                           });
 }

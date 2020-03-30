@@ -155,7 +155,7 @@ class IntTestTransport : public GenericNetworkTransport {
             curl_easy_cleanup(curl);
             curl_slist_free_all(list); /* free the list again */
             int binding_response_code = 0;
-            completion_block(Response{response_code, binding_response_code, response_headers, response});
+            completion_block(Response{http_code, binding_response_code, response_headers, response});
         }
 
         curl_global_cleanup();
@@ -1626,4 +1626,189 @@ TEST_CASE("app: remove user with credentials", "[sync][app]") {
         CHECK(processed);
     }
     
+}
+
+TEST_CASE("app: link_user", "[sync][app]") {
+
+    SECTION("link_user") {
+        std::unique_ptr<GenericNetworkTransport> (*transport_generator)() = []{
+            struct transport : GenericNetworkTransport {
+                void send_request_to_server(const Request request,
+                                            std::function<void (const Response)> completion_block)
+                {
+                    if (request.url.find("/login?link=true") != std::string::npos) {
+                        completion_block({
+                            200, 0, {}, user_json(good_access_token).dump()
+                        });
+                    }else if (request.url.find("/login") != std::string::npos) {
+                        completion_block({
+                            200, 0, {}, user_json(good_access_token).dump()
+                        });
+                    } else if (request.url.find("/profile") != std::string::npos) {
+                        completion_block({
+                            200, 0, {}, user_profile_json().dump()
+                        });
+                    } else if (request.url.find("/session") != std::string::npos) {
+                        CHECK(request.method == HttpMethod::del);
+                        completion_block({ 200, 0, {}, "" });
+                    }
+                }
+            };
+            return std::unique_ptr<GenericNetworkTransport>(new transport);
+        };
+        
+        auto config = App::Config{"translate-utwuv", transport_generator};
+        std::string base_path = tmp_dir() + "/" + config.app_id;
+        reset_test_directory(base_path);
+        auto tsm = TestSyncManager(base_path);
+        
+        auto app = App(config);
+
+        bool processed = false;
+
+        std::shared_ptr<SyncUser> sync_user;
+        
+        auto email = util::format("realm_tests_do_autoverify%1@%2.com", random_string(10), random_string(10));
+        auto password = random_string(10);
+        
+        auto custom_credentials = realm::app::AppCredentials::facebook("a_token");
+        auto email_pass_credentials = realm::app::AppCredentials::username_password(email, password);
+
+        app.log_in_with_credentials(email_pass_credentials,
+                                    [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+            REQUIRE(user);
+            CHECK(!error);
+            sync_user = user;
+        });
+        
+        CHECK(sync_user->provider_type() == IdentityProviderUsernamePassword);
+
+        app.link_user(sync_user,
+                      custom_credentials,
+                      [&](std::shared_ptr<SyncUser> user, Optional<app::AppError> error) {
+            CHECK(!error);
+            REQUIRE(user);
+            CHECK(user->identity() != sync_user->identity());
+            CHECK(sync_user->provider_type() == IdentityProviderUsernamePassword);
+            CHECK(user->provider_type() == IdentityProviderFacebook);
+            processed = true;
+        });
+
+        CHECK(sync_user->provider_type() == IdentityProviderUsernamePassword);
+
+        CHECK(processed);
+    }
+    
+    SECTION("link_user should fail") {
+        std::unique_ptr<GenericNetworkTransport> (*transport_generator)() = []{
+            struct transport : GenericNetworkTransport {
+                void send_request_to_server(const Request request,
+                                            std::function<void (const Response)> completion_block)
+                {
+                    if (request.url.find("/login") != std::string::npos) {
+                        completion_block({
+                            200, 0, {}, user_json(good_access_token).dump()
+                        });
+                    } else if (request.url.find("/profile") != std::string::npos) {
+                        completion_block({
+                            200, 0, {}, user_profile_json().dump()
+                        });
+                    } else if (request.url.find("/session") != std::string::npos) {
+                        CHECK(request.method == HttpMethod::del);
+                        completion_block({ 200, 0, {}, "" });
+                    }
+                }
+            };
+            return std::unique_ptr<GenericNetworkTransport>(new transport);
+        };
+        
+        auto config = App::Config{"translate-utwuv", transport_generator};
+        std::string base_path = tmp_dir() + "/" + config.app_id;
+        reset_test_directory(base_path);
+        auto tsm = TestSyncManager(base_path);
+        
+        auto app = App(config);
+
+        bool processed = false;
+
+        std::shared_ptr<SyncUser> sync_user;
+        
+        auto email = util::format("realm_tests_do_autoverify%1@%2.com", random_string(10), random_string(10));
+        auto password = random_string(10);
+        
+        auto custom_credentials = realm::app::AppCredentials::facebook("a_token");
+        auto email_pass_credentials = realm::app::AppCredentials::username_password(email, password);
+
+        app.log_in_with_credentials(email_pass_credentials,
+                                    [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+            REQUIRE(user);
+            CHECK(!error);
+            sync_user = user;
+        });
+        
+        app.log_out([&](Optional<app::AppError> error) {
+            CHECK(!error);
+        });
+        
+        CHECK(sync_user->provider_type() == IdentityProviderUsernamePassword);
+
+        app.link_user(sync_user,
+                      custom_credentials,
+                      [&](std::shared_ptr<SyncUser> user, Optional<app::AppError> error) {
+            CHECK(error->message == "The specified user is not logged in");
+            CHECK(!user);
+            processed = true;
+        });
+
+        CHECK(processed);
+    }
+}
+
+TEST_CASE("app: auth providers", "[sync][app]") {
+    
+    /*
+     USERNAME_PASSWORD
+     */
+    
+    SECTION("auth providers facebook") {
+        auto credentials = realm::app::AppCredentials::facebook("a_token");
+        CHECK(credentials.provider() == AuthProvider::FACEBOOK);
+        CHECK(credentials.provider_as_string() == IdentityProviderFacebook);
+        CHECK(credentials.serialize_as_json() == "{\"access_token\":\"a_token\",\"provider\":\"oauth2-facebook\"}");
+    }
+    
+    SECTION("auth providers anonymous") {
+        auto credentials = realm::app::AppCredentials::anonymous();
+        CHECK(credentials.provider() == AuthProvider::ANONYMOUS);
+        CHECK(credentials.provider_as_string() == IdentityProviderAnonymous);
+        CHECK(credentials.serialize_as_json() == "{\"provider\":\"anon-user\"}");
+    }
+    
+    SECTION("auth providers google") {
+        auto credentials = realm::app::AppCredentials::google("a_token");
+        CHECK(credentials.provider() == AuthProvider::GOOGLE);
+        CHECK(credentials.provider_as_string() == IdentityProviderGoogle);
+        CHECK(credentials.serialize_as_json() == "{\"authCode\":\"a_token\",\"provider\":\"oauth2-google\"}");
+    }
+    
+    SECTION("auth providers apple") {
+        auto credentials = realm::app::AppCredentials::apple("a_token");
+        CHECK(credentials.provider() == AuthProvider::APPLE);
+        CHECK(credentials.provider_as_string() == IdentityProviderApple);
+        CHECK(credentials.serialize_as_json() == "{\"id_token\":\"a_token\",\"provider\":\"oauth2-apple\"}");
+    }
+    
+    SECTION("auth providers custom") {
+        auto credentials = realm::app::AppCredentials::custom("a_token");
+        CHECK(credentials.provider() == AuthProvider::CUSTOM);
+        CHECK(credentials.provider_as_string() == IdentityProviderCustom);
+        CHECK(credentials.serialize_as_json() == "{\"provider\":\"custom-token\",\"token\":\"a_token\"}");
+    }
+    
+    SECTION("auth providers username password") {
+        auto credentials = realm::app::AppCredentials::username_password("user", "pass");
+        CHECK(credentials.provider() == AuthProvider::USERNAME_PASSWORD);
+        CHECK(credentials.provider_as_string() == IdentityProviderUsernamePassword);
+        CHECK(credentials.serialize_as_json() == "{\"password\":\"pass\",\"provider\":\"local-userpass\",\"username\":\"user\"}");
+    }
 }
