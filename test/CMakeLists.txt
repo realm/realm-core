@@ -37,6 +37,7 @@ set(NORMAL_TESTS
     test_column_timestamp.cpp
     test_decimal128.cpp
     test_destroy_guard.cpp
+    test_dictionary.cpp
     test_file.cpp
     test_file_locks.cpp
     test_group.cpp

@@ -319,6 +319,16 @@ ColKey Table::add_column_list(DataType type, StringData name, bool nullable)
     return do_insert_column(ColKey(), type, name, invalid_link, nullable, true); // Throws
 }
 
+ColKey Table::add_column_dictionary(StringData name)
+{
+    auto col_key = do_insert_root_column(ColKey(), col_type_Dictionary, name, false, false); // Throws
+
+    if (Replication* repl = get_repl())
+        repl->insert_column(this, col_key, col_type_Dictionary, name, nullptr); // Throws
+
+    return col_key;
+}
+
 ColKey Table::add_column_link(DataType type, StringData name, Table& target)
 {
     return insert_column_link(ColKey(), type, name, target); // Throws
@@ -547,7 +557,7 @@ ColKey Table::do_insert_column(ColKey col_key, DataType type, StringData name, T
     }
 
     if (Replication* repl = get_repl())
-        repl->insert_column(this, col_key, type, name, target_table, nullable, listtype); // Throws
+        repl->insert_column(this, col_key, ColumnType(type), name, target_table, nullable, listtype); // Throws
 
     return col_key;
 }

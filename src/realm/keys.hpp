@@ -100,7 +100,7 @@ struct ColKey {
         : value(val)
     {
     }
-    explicit ColKey(Idx index, ColumnType type, ColumnAttrMask attrs, unsigned tag) noexcept
+    constexpr ColKey(Idx index, ColumnType type, ColumnAttrMask attrs, unsigned tag) noexcept
         : ColKey((index.val & 0xFFFFUL) | ((type & 0x3FUL) << 16) | ((attrs.m_value & 0xFFUL) << 22) |
                  ((tag & 0xFFFFFFFFUL) << 30))
     {

@@ -26,6 +26,7 @@ set(REALM_SOURCES
     table_cluster_tree.cpp
     column_binary.cpp
     decimal128.cpp
+    dictionary.cpp
     disable_sync_to_disk.cpp
     exceptions.cpp
     group.cpp
@@ -109,6 +110,7 @@ set(REALM_INSTALL_GENERAL_HEADERS
     column_type_traits.hpp
     data_type.hpp
     decimal128.hpp
+    dictionary.hpp
     disable_sync_to_disk.hpp
     exceptions.hpp
     group.hpp

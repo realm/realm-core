@@ -312,7 +312,7 @@ public:
     virtual void insert_group_level_table(TableKey table_key, size_t num_tables, StringData name);
     virtual void erase_group_level_table(TableKey table_key, size_t num_tables);
     virtual void rename_group_level_table(TableKey table_key, StringData new_name);
-    virtual void insert_column(const Table*, ColKey col_key, DataType type, StringData name, Table* target_table,
+    virtual void insert_column(const Table*, ColKey col_key, ColumnType type, StringData name, Table* target_table,
                                bool nullable = false, bool listtype = false);
     virtual void erase_column(const Table*, ColKey col_key);
     virtual void rename_column(const Table*, ColKey col_key, StringData name);
@@ -756,8 +756,8 @@ inline bool TransactLogEncoder::insert_column(ColKey col_key)
     return true;
 }
 
-inline void TransactLogConvenientEncoder::insert_column(const Table* t, ColKey col_key, DataType, StringData, Table*,
-                                                        bool, bool)
+inline void TransactLogConvenientEncoder::insert_column(const Table* t, ColKey col_key, ColumnType, StringData,
+                                                        Table*, bool, bool)
 {
     select_table(t);                  // Throws
     m_encoder.insert_column(col_key); // Throws

@@ -476,7 +476,7 @@ bool Spec::operator==(const Spec& spec) const noexcept
             case col_type_Bool:
             case col_type_Binary:
             case col_type_String:
-            case col_type_OldStringEnum:
+            case col_type_Dictionary:
             case col_type_OldTable:
             case col_type_OldMixed:
             case col_type_OldDateTime:

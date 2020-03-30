@@ -33,6 +33,7 @@
 #include "realm/index_string.hpp"
 #include "realm/cluster_tree.hpp"
 #include "realm/spec.hpp"
+#include "realm/dictionary.hpp"
 #include "realm/table_view.hpp"
 #include "realm/replication.hpp"
 #include "realm/util/base64.hpp"
@@ -479,6 +480,12 @@ size_t ConstObj::get_link_count(ColKey col_key) const
     return get_list<ObjKey>(col_key).size();
 }
 
+Dictionary ConstObj::get_dictionary(ColKey col_key) const
+{
+    update_if_needed();
+    return Dictionary(Obj(*this), col_key);
+}
+
 bool ConstObj::is_null(ColKey col_key) const
 {
     update_if_needed();
@@ -774,14 +781,14 @@ void ConstObj::to_json(std::ostream& out, size_t link_depth, std::map<std::strin
     auto col_keys = m_table->get_column_keys();
     for (auto ck : col_keys) {
         name = m_table->get_column_name(ck);
-        DataType type = DataType(ck.get_type());
+        auto type = ck.get_type();
         if (renames[name] != "")
             name = renames[name];
 
         out << ",\"" << name << "\":";
 
         if (ck.get_attrs().test(col_attr_List)) {
-            if (type == type_LinkList) {
+            if (type == col_type_LinkList) {
                 TableRef target_table = get_target_table(ck);
                 auto ll = get_linklist(ck);
                 auto sz = ll.size();
@@ -824,7 +831,7 @@ void ConstObj::to_json(std::ostream& out, size_t link_depth, std::map<std::strin
             }
         }
         else {
-            if (type == type_Link) {
+            if (type == col_type_Link) {
                 TableRef target_table = get_target_table(ck);
                 auto k = get<ObjKey>(ck);
                 if (k) {
@@ -844,6 +851,20 @@ void ConstObj::to_json(std::ostream& out, size_t link_depth, std::map<std::strin
                 else {
                     out << "null";
                 }
+            }
+            else if (type == col_type_Dictionary) {
+                auto dict = get_dictionary(ck);
+                out << "{";
+                bool first = true;
+                for (auto it : dict) {
+                    if (!first)
+                        out << ",";
+                    first = false;
+                    out_mixed(out, it.first);
+                    out << ":";
+                    out_mixed(out, it.second);
+                }
+                out << "}";
             }
             else {
                 out_mixed(out, get_any(ck));
