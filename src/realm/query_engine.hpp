@@ -1305,6 +1305,168 @@ protected:
     }
 };
 
+class DecimalNodeBase : public ParentNode {
+public:
+    using TConditionValue = Decimal128;
+    static const bool special_null_node = false;
+
+    DecimalNodeBase(Decimal128 v, ColKey column)
+        : m_value(v)
+    {
+        m_condition_column_key = column;
+    }
+
+    DecimalNodeBase(null, ColKey column)
+        : DecimalNodeBase(Decimal128{}, column)
+    {
+    }
+
+    void cluster_changed() override
+    {
+        m_array_ptr = nullptr;
+        m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) ArrayDecimal128(m_table.unchecked_ptr()->get_alloc()));
+        m_cluster->init_leaf(this->m_condition_column_key, m_array_ptr.get());
+        m_leaf_ptr = m_array_ptr.get();
+    }
+
+    void init() override
+    {
+        ParentNode::init();
+
+        m_dD = 100.0;
+    }
+
+protected:
+    DecimalNodeBase(const DecimalNodeBase& from)
+        : ParentNode(from)
+        , m_value(from.m_value)
+    {
+    }
+
+    Decimal128 m_value;
+    using LeafCacheStorage = typename std::aligned_storage<sizeof(ArrayDecimal128), alignof(ArrayDecimal128)>::type;
+    using LeafPtr = std::unique_ptr<ArrayDecimal128, PlacementDelete>;
+    LeafCacheStorage m_leaf_cache_storage;
+    LeafPtr m_array_ptr;
+    const ArrayDecimal128* m_leaf_ptr = nullptr;
+};
+
+template <class TConditionFunction>
+class DecimalNode : public DecimalNodeBase {
+public:
+    using DecimalNodeBase::DecimalNodeBase;
+
+    size_t find_first_local(size_t start, size_t end) override
+    {
+        TConditionFunction cond;
+        for (size_t i = start; i < end; i++) {
+            Decimal128 val = m_leaf_ptr->get(i);
+            if (cond(val, m_value))
+                return i;
+        }
+        return realm::npos;
+    }
+
+    std::string describe(util::serializer::SerialisationState& state) const override
+    {
+        REALM_ASSERT(m_condition_column_key);
+        return state.describe_column(ParentNode::m_table, m_condition_column_key) + " " +
+               TConditionFunction::description() + " " + util::serializer::print_value(DecimalNode::m_value);
+    }
+
+    std::unique_ptr<ParentNode> clone() const override
+    {
+        return std::unique_ptr<ParentNode>(new DecimalNode(*this));
+    }
+
+protected:
+    DecimalNode(const DecimalNode& from, Transaction* tr)
+        : DecimalNodeBase(from, tr)
+    {
+    }
+};
+
+class ObjectIdNodeBase : public ParentNode {
+public:
+    using TConditionValue = ObjectId;
+    static const bool special_null_node = false;
+
+    ObjectIdNodeBase(ObjectId v, ColKey column)
+        : m_value(v)
+    {
+        m_condition_column_key = column;
+    }
+
+    ObjectIdNodeBase(null, ColKey column)
+        : ObjectIdNodeBase(ObjectId{}, column)
+    {
+    }
+
+    void cluster_changed() override
+    {
+        m_array_ptr = nullptr;
+        m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) ArrayObjectId(m_table.unchecked_ptr()->get_alloc()));
+        m_cluster->init_leaf(this->m_condition_column_key, m_array_ptr.get());
+        m_leaf_ptr = m_array_ptr.get();
+    }
+
+    void init() override
+    {
+        ParentNode::init();
+
+        m_dD = 100.0;
+    }
+
+protected:
+    ObjectIdNodeBase(const ObjectIdNodeBase& from)
+        : ParentNode(from)
+        , m_value(from.m_value)
+    {
+    }
+
+    ObjectId m_value;
+    using LeafCacheStorage = typename std::aligned_storage<sizeof(ArrayObjectId), alignof(ArrayObjectId)>::type;
+    using LeafPtr = std::unique_ptr<ArrayObjectId, PlacementDelete>;
+    LeafCacheStorage m_leaf_cache_storage;
+    LeafPtr m_array_ptr;
+    const ArrayObjectId* m_leaf_ptr = nullptr;
+};
+
+template <class TConditionFunction>
+class ObjectIdNode : public ObjectIdNodeBase {
+public:
+    using ObjectIdNodeBase::ObjectIdNodeBase;
+
+    size_t find_first_local(size_t start, size_t end) override
+    {
+        TConditionFunction cond;
+        for (size_t i = start; i < end; i++) {
+            ObjectId val = m_leaf_ptr->get(i);
+            if (cond(val, m_value))
+                return i;
+        }
+        return realm::npos;
+    }
+
+    std::string describe(util::serializer::SerialisationState& state) const override
+    {
+        REALM_ASSERT(m_condition_column_key);
+        return state.describe_column(ParentNode::m_table, m_condition_column_key) + " " +
+               TConditionFunction::description() + " " + util::serializer::print_value(ObjectIdNode::m_value);
+    }
+
+    std::unique_ptr<ParentNode> clone() const override
+    {
+        return std::unique_ptr<ParentNode>(new ObjectIdNode(*this));
+    }
+
+protected:
+    ObjectIdNode(const ObjectIdNode& from, Transaction* tr)
+        : ObjectIdNode(from, tr)
+    {
+    }
+};
+
 class StringNodeBase : public ParentNode {
 public:
     using TConditionValue = StringData;

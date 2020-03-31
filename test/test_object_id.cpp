@@ -274,8 +274,14 @@ TEST(ObjectId_Query)
         auto col_id = table->get_column_key("alternative_id");
         Query q = table->column<ObjectId>(col) > t0;
         CHECK_EQUAL(q.count(), 999);
+        q = table->where().greater(col, t0);
+        CHECK_EQUAL(q.count(), 999);
         Query q1 = table->column<ObjectId>(col) < t25;
         CHECK_EQUAL(q1.count(), 25);
+        q1 = table->where().less(col, t25);
+        CHECK_EQUAL(q1.count(), 25);
+        q1 = table->where().less_equal(col, t25);
+        CHECK_EQUAL(q1.count(), 26);
         auto tv = q1.find_all();
         tv.sort(col, true);
         for (int i = 0; i < 25; i++) {

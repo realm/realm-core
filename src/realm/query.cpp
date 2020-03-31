@@ -341,6 +341,12 @@ std::unique_ptr<ParentNode> make_condition_node(const Table& table, ColKey colum
         case type_Timestamp: {
             return MakeConditionNode<TimestampNode<Cond>>::make(column_key, value);
         }
+        case type_Decimal: {
+            return MakeConditionNode<DecimalNode<Cond>>::make(column_key, value);
+        }
+        case type_ObjectId: {
+            return MakeConditionNode<ObjectIdNode<Cond>>::make(column_key, value);
+        }
         default: {
             throw LogicError{LogicError::type_mismatch};
         }
@@ -762,79 +768,55 @@ Query& Query::less(ColKey column_key, Timestamp value)
 }
 
 // ------------- ObjectId
-Query& Query::greater(ColKey, ObjectId)
+Query& Query::greater(ColKey column_key, ObjectId value)
 {
-    REALM_ASSERT(false);
-    return *this;
-    // return add_condition<Greater>(column_key, value);
+    return add_condition<Greater>(column_key, value);
 }
-Query& Query::equal(ColKey, ObjectId)
+Query& Query::equal(ColKey column_key, ObjectId value)
 {
-    REALM_ASSERT(false);
-    return *this;
-    // return add_condition<Equal>(column_key, value);
+    return add_condition<Equal>(column_key, value);
 }
-Query& Query::not_equal(ColKey, ObjectId)
+Query& Query::not_equal(ColKey column_key, ObjectId value)
 {
-    REALM_ASSERT(false);
-    return *this;
-    // return add_condition<NotEqual>(column_key, value);
+    return add_condition<NotEqual>(column_key, value);
 }
-Query& Query::greater_equal(ColKey, ObjectId)
+Query& Query::greater_equal(ColKey column_key, ObjectId value)
 {
-    REALM_ASSERT(false);
-    return *this;
-    // return add_condition<GreaterEqual>(column_key, value);
+    return add_condition<GreaterEqual>(column_key, value);
 }
-Query& Query::less_equal(ColKey, ObjectId)
+Query& Query::less_equal(ColKey column_key, ObjectId value)
 {
-    REALM_ASSERT(false);
-    return *this;
-    // return add_condition<LessEqual>(column_key, value);
+    return add_condition<LessEqual>(column_key, value);
 }
-Query& Query::less(ColKey, ObjectId)
+Query& Query::less(ColKey column_key, ObjectId value)
 {
-    REALM_ASSERT(false);
-    return *this;
-    // return add_condition<Less>(column_key, value);
+    return add_condition<Less>(column_key, value);
 }
 
 // ------------- Decimal128
-Query& Query::greater(ColKey, Decimal128)
+Query& Query::greater(ColKey column_key, Decimal128 value)
 {
-    REALM_ASSERT(false);
-    return *this;
-    // return add_condition<Greater>(column_key, value);
+    return add_condition<Greater>(column_key, value);
 }
-Query& Query::equal(ColKey, Decimal128)
+Query& Query::equal(ColKey column_key, Decimal128 value)
 {
-    REALM_ASSERT(false);
-    return *this;
-    // return add_condition<Equal>(column_key, value);
+    return add_condition<Equal>(column_key, value);
 }
-Query& Query::not_equal(ColKey, Decimal128)
+Query& Query::not_equal(ColKey column_key, Decimal128 value)
 {
-    REALM_ASSERT(false);
-    return *this;
-    // return add_condition<NotEqual>(column_key, value);
+    return add_condition<NotEqual>(column_key, value);
 }
-Query& Query::greater_equal(ColKey, Decimal128)
+Query& Query::greater_equal(ColKey column_key, Decimal128 value)
 {
-    REALM_ASSERT(false);
-    return *this;
-    // return add_condition<GreaterEqual>(column_key, value);
+    return add_condition<GreaterEqual>(column_key, value);
 }
-Query& Query::less_equal(ColKey, Decimal128)
+Query& Query::less_equal(ColKey column_key, Decimal128 value)
 {
-    REALM_ASSERT(false);
-    return *this;
-    // return add_condition<LessEqual>(column_key, value);
+    return add_condition<LessEqual>(column_key, value);
 }
-Query& Query::less(ColKey, Decimal128)
+Query& Query::less(ColKey column_key, Decimal128 value)
 {
-    REALM_ASSERT(false);
-    return *this;
-    // return add_condition<Less>(column_key, value);
+    return add_condition<Less>(column_key, value);
 }
 
 // ------------- size

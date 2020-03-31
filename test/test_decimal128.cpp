@@ -159,8 +159,14 @@ TEST(Decimal128_Query)
         auto col = table->get_column_key("price");
         Query q = table->column<Decimal>(col) > Decimal128(0);
         CHECK_EQUAL(q.count(), 99);
+        q = table->where().greater(col, Decimal128(0));
+        CHECK_EQUAL(q.count(), 99);
         Query q1 = table->column<Decimal>(col) < Decimal128(25);
         CHECK_EQUAL(q1.count(), 25);
+        q1 = table->where().less(col, Decimal128(25));
+        CHECK_EQUAL(q1.count(), 25);
+        q1 = table->where().less_equal(col, Decimal128(25));
+        CHECK_EQUAL(q1.count(), 26);
     }
 }
 
