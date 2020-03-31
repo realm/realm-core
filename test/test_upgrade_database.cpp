@@ -1554,7 +1554,7 @@ TEST_IF(Upgrade_Database_10_11, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_S
 {
     std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
                        util::to_string(REALM_MAX_BPNODE_SIZE) + "_10_to_11.realm";
-    std::vector<int64_t> ids = {0, 15, 42, 100, 7000};
+    std::vector<int64_t> ids = {0, 2, 3, 15, 42, 100, 7000};
 #if TEST_READ_UPGRADE_MODE
     CHECK_OR_RETURN(File::exists(path));
 
