@@ -3253,7 +3253,7 @@ void Table::rebuild_table_with_pk_column()
     }
     for (auto key : tmp_keys) {
         auto old_obj = get_object(key);
-        StringData pk(old_obj.get<String>(m_primary_key_col));
+        Mixed pk(old_obj.get_any(m_primary_key_col));
         auto new_obj = create_object_with_primary_key(pk);
         new_obj.assign(old_obj);
         remove_object(key);
