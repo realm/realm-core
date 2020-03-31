@@ -61,8 +61,7 @@ namespace {
 
 TEST(Util_Logger_LevelToFromString)
 {
-    auto check = [& test_context = test_context](util::Logger::Level level, const char* name)
-    {
+    auto check = [& test_context = test_context](util::Logger::Level level, const char* name) {
         std::ostringstream out;
         out.imbue(std::locale::classic());
         out << level;
@@ -238,15 +237,20 @@ TEST(Util_Logger_ThreadSafe)
 TEST(Util_HexDump)
 {
     const unsigned char u_char_data[] = {0x00, 0x05, 0x10, 0x17, 0xff};
-    const char char_data[] = {0, 5, 10, -5, -1};
+    const signed char s_char_data[] = {0, 5, 10, -5, -1};
+    const char char_data[] = {0, 5, 10, char(-5), char(-1)};
 
     std::string str1 = util::hex_dump(u_char_data, sizeof(u_char_data));
     CHECK_EQUAL(str1, "00 05 10 17 FF");
     // std::cout << str1 << std::endl;
 
-    std::string str2 = util::hex_dump(char_data, sizeof(char_data));
+    std::string str2 = util::hex_dump(s_char_data, sizeof(s_char_data));
     CHECK_EQUAL(str2, "00 05 0A FB FF");
     // std::cout << str2 << std::endl;
+
+    std::string str3 = util::hex_dump(char_data, sizeof(char_data));
+    CHECK_EQUAL(str3, "00 05 0A FB FF");
+    // std::cout << str3 << std::endl;
 }
 
 } // unnamed namespace
