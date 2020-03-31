@@ -104,12 +104,14 @@ jobWrapper {
             checkWin32DebugUWP      : doBuildWindows('Debug', true, 'Win32', true),
             iosDebug                : doBuildAppleDevice('ios', 'MinSizeDebug'),
             androidArm64Debug       : doAndroidBuildInDocker('arm64-v8a', 'Debug', false),
+            checkRaspberryPi        : doLinuxCrossCompile('armhf', 'Debug', 'qemu-arm -cpu cortex-a7'),
             threadSanitizer         : doCheckSanity('Debug', '1000', 'thread'),
             addressSanitizer        : doCheckSanity('Debug', '1000', 'address'),
         ]
         if (releaseTesting) {
             extendedChecks = [
                 checkLinuxRelease       : doCheckInDocker('Release'),
+                checkRaspberryPiRelease : doLinuxCrossCompile('armhf', 'Release', 'qemu-arm -cpu cortex-a7'),
                 checkMacOsDebug         : doBuildMacOs('Debug', true),
                 buildUwpx64Debug        : doBuildWindows('Debug', true, 'x64', false),
                 androidArmeabiRelease   : doAndroidBuildInDocker('armeabi-v7a', 'Release', true),
@@ -130,20 +132,6 @@ jobWrapper {
                 buildCatalystDebug  : doBuildMacOsCatalyst('MinSizeDebug'),
                 buildCatalystRelease: doBuildMacOsCatalyst('Release'),
 
-                buildWin32Debug     : doBuildWindows('Debug', false, 'Win32', false),
-                buildWin32Release   : doBuildWindows('Release', false, 'Win32', false),
-                buildWin64Debug     : doBuildWindows('Debug', false, 'x64', false),
-                buildWin64Release   : doBuildWindows('Release', false, 'x64', false),
-                buildUwpWin32Debug  : doBuildWindows('Debug', true, 'Win32', false),
-                buildUwpWin32Release: doBuildWindows('Release', true, 'Win32', false),
-                buildUwpx64Debug    : doBuildWindows('Debug', true, 'x64', false),
-                buildUwpx64Release  : doBuildWindows('Release', true, 'x64', false),
-                buildUwpArmDebug    : doBuildWindows('Debug', true, 'ARM', false),
-                buildUwpArmRelease  : doBuildWindows('Release', true, 'ARM', false),
-
-                buildLinuxDebug     : doBuildLinux('Debug'),
-                buildLinuxRelease   : doBuildLinux('Release'),
-                buildLinuxRelAssert : doBuildLinux('RelAssert'),
                 buildLinuxASAN      : doBuildLinuxClang("RelASAN"),
                 buildLinuxTSAN      : doBuildLinuxClang("RelTSAN")
             ]
@@ -164,6 +152,27 @@ jobWrapper {
                 for (buildType in appleBuildTypes) {
                     parallelExecutors["${sdk}${buildType}"] = doBuildAppleDevice(sdk, buildType)
                 }
+            }
+
+            linuxBuildTypes = ['Debug', 'Release', 'RelAssert']
+            linuxCrossCompileTargets = ['armhf']
+
+            for (buildType in linuxBuildTypes) {
+                parallelExecutors["buildLinux${buildType}"] = doBuildLinux(buildType)
+                for (target in linuxCrossCompileTargets) {
+                    parallelExecutors["crossCompileLinux-${target}-${buildType}"] = doLinuxCrossCompile(target, buildType)
+                }
+            }
+
+            windowsBuildTypes = ['Debug', 'Release']
+            windowsPlatforms = ['Win32', 'x64']
+
+            for (buildType in windowsBuildTypes) {
+                for (platform in windowsPlatforms) {
+                    parallelExecutors["buildWindows-${platform}-${buildType}"] = doBuildWindows(buildType, false, platform, false)
+                    parallelExecutors["buildWindowsUniversal-${platform}-${buildType}"] = doBuildWindows(buildType, true, platform, false)
+                }
+                parallelExecutors["buildWindowsUniversal-ARM-${buildType}"] = doBuildWindows(buildType, true, 'ARM', false)
             }
 
             parallel parallelExecutors
@@ -608,6 +617,54 @@ def doBuildAppleDevice(String sdk, String buildType) {
             cocoaStashes << stashName
             if(gitTag) {
                 publishingStashes << stashName
+            }
+        }
+    }
+}
+
+def doLinuxCrossCompile(String target, String buildType, String emulator = null) {
+    return {
+        node('docker') {
+            getArchive()
+            docker.build("realm-core-crosscompiling:${target}", "-f ${target}.Dockerfile .").inside {
+                dir('build-dir') {
+                    sh """
+                        cmake -GNinja \
+                            -DREALM_SKIP_SHARED_LIB=ON \
+                            -DCMAKE_TOOLCHAIN_FILE=$WORKSPACE/tools/cmake/${target}.toolchain.cmake \
+                            -DCMAKE_BUILD_TYPE=${buildType} \
+                            -DREALM_NO_TESTS=${emulator ? 'OFF' : 'ON'} \
+                            -DCPACK_SYSTEM_NAME=Linux-${target} \
+                            ..
+                    """
+
+                    runAndCollectWarnings(script: "ninja")
+
+                    if (emulator != null) {
+                        try {
+                            def environment = environment()
+                            environment << 'UNITTEST_PROGRESS=1'
+                            environment << 'UNITTEST_FILTER=- Thread_RobustMutex*'  // robust mutexes can't work under qemu
+                            withEnv(environment) {
+                                sh """
+                                    cd test
+                                    ulimit -s 256 # launching thousands of threads in 32-bit address space requires smaller stacks
+                                    LD_LIBRARY_PATH=/usr/arm-linux-gnueabihf/lib ${emulator} realm-tests
+                                """
+                            }
+                        } finally {
+                            dir('..') {
+                                recordTests("Linux-${target}-${buildType}")
+                            }
+                        }
+                    } else {
+                        sh 'cpack'
+                            archiveArtifacts '*.tar.gz'
+                            def stashName = "linux-${target}___${buildType}"
+                            stash includes:"*.tar.gz", name:stashName
+                            publishingStashes << stashName
+                    }
+                }
             }
         }
     }
