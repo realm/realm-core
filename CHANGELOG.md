@@ -13,7 +13,7 @@
 -----------
 
 ### Internals
-* None.
+* Table::insert_column and Table::insert_column_link methods are removed.
 
 ----------------------------------------------
 
