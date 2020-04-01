@@ -52,8 +52,8 @@ struct TestContext : CppContext {
     std::map<std::string, AnyDict> defaults;
 
     using CppContext::CppContext;
-    TestContext(TestContext& parent, realm::Property const& prop)
-    : CppContext(parent, prop)
+    TestContext(TestContext& parent, realm::Obj& obj, realm::Property const& prop)
+    : CppContext(parent, obj, prop)
     , defaults(parent.defaults)
     { }
 
@@ -776,7 +776,7 @@ TEST_CASE("object") {
     }
 
     for (auto policy : {CreatePolicy::UpdateAll, CreatePolicy::UpdateModified}) {
-        SECTION("set existing fields to null with update "s + (policy == CreatePolicy::UpdateModified ? "(diffed)" : "(all)")) {
+        SECTION("set existing fields to null with update "s + (policy.diff ? "(diffed)" : "(all)")) {
             AnyDict initial_values{
                 {"pk", INT64_C(1)},
                 {"bool", true},
@@ -1112,51 +1112,183 @@ TEST_CASE("object") {
 #endif
 }
 
-TEST_CASE("Embedded Object")
-{
-    SECTION("Object creation") {
-        Schema schema{
-            {"all types", {
-                {"pk", PropertyType::Int, Property::IsPrimary{true}},
-                {"object", PropertyType::Object|PropertyType::Nullable, "link target"},
-                {"array", PropertyType::Object|PropertyType::Array, "array target"},
-            }},
-            {"link target", ObjectSchema::IsEmbedded{true}, {
-                {"value", PropertyType::Int},
-            }},
-            {"array target", ObjectSchema::IsEmbedded{true}, {
-                {"value", PropertyType::Int},
-            }},
-        };
+TEST_CASE("Embedded Object") {
+    Schema schema{
+        {"all types", {
+            {"pk", PropertyType::Int, Property::IsPrimary{true}},
+            {"object", PropertyType::Object|PropertyType::Nullable, "link target"},
+            {"array", PropertyType::Object|PropertyType::Array, "array target"},
+        }},
+        {"all types no pk", {
+            {"value", PropertyType::Int},
+            {"object", PropertyType::Object|PropertyType::Nullable, "link target"},
+            {"array", PropertyType::Object|PropertyType::Array, "array target"},
+        }},
+        {"link target", ObjectSchema::IsEmbedded{true}, {
+            {"value", PropertyType::Int},
+        }},
+        {"array target", ObjectSchema::IsEmbedded{true}, {
+            {"value", PropertyType::Int},
+        }},
+    };
+    InMemoryTestFile config;
+    config.automatic_change_notifications = false;
+    config.schema_mode = SchemaMode::Automatic;
+    config.schema = schema;
 
-        InMemoryTestFile config;
-        config.automatic_change_notifications = false;
-        config.schema_mode = SchemaMode::Automatic;
-        config.schema = schema;
-        auto realm = Realm::get_shared_realm(config);
-        CppContext ctx(realm);
+    auto realm = Realm::get_shared_realm(config);
+    CppContext ctx(realm);
 
-        auto create = [&](util::Any&& value, CreatePolicy policy = CreatePolicy::UpdateAll) {
-            realm->begin_transaction();
-            auto obj = Object::create(ctx, realm, *realm->schema().find("all types"), value, policy);
-            realm->commit_transaction();
-            return obj;
-        };
+    auto create = [&](util::Any&& value, CreatePolicy policy = CreatePolicy::UpdateAll) {
+        realm->begin_transaction();
+        auto obj = Object::create(ctx, realm, *realm->schema().find("all types"), value, policy);
+        realm->commit_transaction();
+        return obj;
+    };
 
+    SECTION("Basic object creation") {
         auto obj = create(AnyDict{
             {"pk", INT64_C(1)},
             {"object", AnyDict{{"value", INT64_C(10)}}},
             {"array", AnyVector{AnyDict{{"value", INT64_C(20)}}, AnyDict{{"value", INT64_C(30)}}}},
         });
-        // realm->read_group().to_json(std::cout);
 
-        bool obj_callback_called;
-        bool list_callback_called;
+        REQUIRE(obj.obj().get<int64_t>("pk") == 1);
+        auto linked_obj = any_cast<Object>(obj.get_property_value<util::Any>(ctx, "object")).obj();
+        REQUIRE(linked_obj.is_valid());
+        REQUIRE(linked_obj.get<int64_t>("value") == 10);
+        auto list = any_cast<List>(obj.get_property_value<util::Any>(ctx, "array"));
+        REQUIRE(list.size() == 2);
+        REQUIRE(list.get(0).get<int64_t>("value") == 20);
+        REQUIRE(list.get(1).get<int64_t>("value") == 30);
+    }
+
+    SECTION("set_property_value() on link to embedded object") {
+        auto obj = create(AnyDict{
+            {"pk", INT64_C(1)},
+            {"object", AnyDict{{"value", INT64_C(10)}}},
+            {"array", AnyVector{AnyDict{{"value", INT64_C(20)}}, AnyDict{{"value", INT64_C(30)}}}},
+        });
+
+        SECTION("throws when given a managed object") {
+            realm->begin_transaction();
+            REQUIRE_THROWS_WITH(obj.set_property_value(ctx, "object", obj.get_property_value<util::Any>(ctx, "object")),
+                                "Cannot set a link to an existing managed embedded object");
+            realm->cancel_transaction();
+        }
+
+        SECTION("replaces object when given a dictionary and CreatePolicy::UpdateAll") {
+            realm->begin_transaction();
+            auto old_linked = any_cast<Object>(obj.get_property_value<util::Any>(ctx, "object"));
+            obj.set_property_value(ctx, "object", util::Any(AnyDict{{"value", INT64_C(40)}}));
+            auto new_linked = any_cast<Object>(obj.get_property_value<util::Any>(ctx, "object"));
+            REQUIRE_FALSE(old_linked.is_valid());
+            REQUIRE(new_linked.obj().get<int64_t>("value") == 40);
+            realm->cancel_transaction();
+        }
+
+        SECTION("mutates existing object when given a dictionary and CreatePolicy::UpdateModified") {
+            realm->begin_transaction();
+            auto old_linked = any_cast<Object>(obj.get_property_value<util::Any>(ctx, "object"));
+            obj.set_property_value(ctx, "object",
+                                   util::Any(AnyDict{{"value", INT64_C(40)}}),
+                                   CreatePolicy::UpdateModified);
+            auto new_linked = any_cast<Object>(obj.get_property_value<util::Any>(ctx, "object"));
+            REQUIRE(old_linked.is_valid());
+            REQUIRE(old_linked.obj() == new_linked.obj());
+            REQUIRE(new_linked.obj().get<int64_t>("value") == 40);
+            realm->cancel_transaction();
+        }
+
+        SECTION("can set embedded link to null") {
+            realm->begin_transaction();
+            auto old_linked = any_cast<Object>(obj.get_property_value<util::Any>(ctx, "object"));
+            obj.set_property_value(ctx, "object", util::Any());
+            auto new_linked = obj.get_property_value<util::Any>(ctx, "object");
+            REQUIRE_FALSE(old_linked.is_valid());
+            REQUIRE_FALSE(new_linked.has_value());
+            realm->cancel_transaction();
+        }
+    }
+
+    SECTION("set_property_value() on list of embedded objects") {
+        auto obj = create(AnyDict{
+            {"pk", INT64_C(1)},
+            {"array", AnyVector{AnyDict{{"value", INT64_C(1)}}, AnyDict{{"value", INT64_C(2)}}}},
+        });
+        List list(realm, obj.obj().get_linklist("array"));
+        auto obj2 = create(AnyDict{
+            {"pk", INT64_C(2)},
+            {"array", AnyVector{AnyDict{{"value", INT64_C(1)}}, AnyDict{{"value", INT64_C(2)}}}},
+        });
+        List list2(realm, obj2.obj().get_linklist("array"));
+
+        SECTION("throws when given a managed object") {
+            realm->begin_transaction();
+            REQUIRE_THROWS_WITH(obj.set_property_value(ctx, "array", util::Any{AnyVector{list2.get(0)}}),
+                                "Cannot add an existing managed embedded object to a List.");
+            realm->cancel_transaction();
+        }
+
+        SECTION("replaces objects when given a dictionary and CreatePolicy::UpdateAll") {
+            realm->begin_transaction();
+            auto old_obj_1 = list.get(0);
+            auto old_obj_2 = list.get(1);
+            obj.set_property_value(ctx, "array", util::Any(AnyVector{
+                AnyDict{{"value", INT64_C(1)}},
+                AnyDict{{"value", INT64_C(2)}},
+                AnyDict{{"value", INT64_C(3)}}
+            }), CreatePolicy::UpdateAll);
+            REQUIRE(list.size() == 3);
+            REQUIRE_FALSE(old_obj_1.is_valid());
+            REQUIRE_FALSE(old_obj_2.is_valid());
+            REQUIRE(list.get(0).get<int64_t>("value") == 1);
+            REQUIRE(list.get(1).get<int64_t>("value") == 2);
+            REQUIRE(list.get(2).get<int64_t>("value") == 3);
+            realm->cancel_transaction();
+        }
+
+        SECTION("mutates existing objects when given a dictionary and CreatePolicy::UpdateModified") {
+            realm->begin_transaction();
+            auto old_obj_1 = list.get(0);
+            auto old_obj_2 = list.get(1);
+            obj.set_property_value(ctx, "array", util::Any(AnyVector{
+                AnyDict{{"value", INT64_C(1)}},
+                AnyDict{{"value", INT64_C(2)}},
+                AnyDict{{"value", INT64_C(3)}}
+            }), CreatePolicy::UpdateModified);
+            REQUIRE(list.size() == 3);
+            REQUIRE(old_obj_1.is_valid());
+            REQUIRE(old_obj_2.is_valid());
+            REQUIRE(old_obj_1.get<int64_t>("value") == 1);
+            REQUIRE(old_obj_2.get<int64_t>("value") == 2);
+            REQUIRE(list.get(2).get<int64_t>("value") == 3);
+            realm->cancel_transaction();
+        }
+
+        SECTION("clears list when given null") {
+            realm->begin_transaction();
+            obj.set_property_value(ctx, "array", util::Any());
+            REQUIRE(list.size() == 0);
+            realm->cancel_transaction();
+        }
+    }
+
+    SECTION("create with UpdateModified diffs child objects") {
+        auto obj = create(AnyDict{
+            {"pk", INT64_C(1)},
+            {"object", AnyDict{{"value", INT64_C(10)}}},
+            {"array", AnyVector{AnyDict{{"value", INT64_C(20)}}, AnyDict{{"value", INT64_C(30)}}}},
+        });
+
+        auto array_table = realm->read_group().get_table("class_array target");
+        Results result(realm, array_table);
+
+        bool obj_callback_called = false;
         auto token = obj.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
             obj_callback_called = true;
         });
-        auto array_table = realm->read_group().get_table("class_array target");
-        Results result(realm, array_table);
+        bool list_callback_called = false;
         auto token1 = result.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
             list_callback_called = true;
         });
@@ -1174,6 +1306,7 @@ TEST_CASE("Embedded Object")
         REQUIRE(!obj_callback_called);
         REQUIRE(!list_callback_called);
 
+        // Update with different values
         create(AnyDict{
             {"pk", INT64_C(1)},
             {"array", AnyVector{AnyDict{{"value", INT64_C(40)}}, AnyDict{{"value", INT64_C(50)}}}},
@@ -1184,7 +1317,31 @@ TEST_CASE("Embedded Object")
         advance_and_notify(*realm);
         REQUIRE(!obj_callback_called);
         REQUIRE(list_callback_called);
+    }
 
-        // realm->read_group().to_json(std::cout);
+    SECTION("deleting parent object sends change notification") {
+        auto parent = create(AnyDict{
+            {"pk", INT64_C(1)},
+            {"object", AnyDict{{"value", INT64_C(10)}}},
+            {"array", AnyVector{AnyDict{{"value", INT64_C(20)}}, AnyDict{{"value", INT64_C(30)}}}},
+        });
+
+        CppContext ctx(realm);
+        auto child = any_cast<Object>(parent.get_property_value<util::Any>(ctx, "object"));
+
+        int calls = 0;
+        auto token = child.add_notification_callback([&](CollectionChangeSet const& c, std::exception_ptr) {
+            if (++calls == 2) {
+                REQUIRE_INDICES(c.deletions, 0);
+            }
+        });
+        advance_and_notify(*realm);
+        REQUIRE(calls == 1);
+
+        realm->begin_transaction();
+        parent.obj().remove();
+        realm->commit_transaction();
+        advance_and_notify(*realm);
+        REQUIRE(calls == 2);
     }
 }

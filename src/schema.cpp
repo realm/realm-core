@@ -188,9 +188,12 @@ std::vector<SchemaChange> Schema::compare(Schema const& target_schema, bool incl
         if (target && !existing) {
             changes.emplace_back(schema_change::AddTable{target});
         }
-        else if (include_table_removals && existing && !target) {
-            changes.emplace_back(schema_change::RemoveTable{existing});
+        else if (existing && !target) {
+            if (include_table_removals)
+                changes.emplace_back(schema_change::RemoveTable{existing});
         }
+        else if (existing->is_embedded != target->is_embedded)
+            changes.emplace_back(schema_change::ChangeTableType{target});
     });
 
     // Modify columns
@@ -244,6 +247,7 @@ bool operator==(SchemaChange const& lft, SchemaChange const& rgt) noexcept
         REALM_SC_COMPARE(AddInitialProperties, v.object)
         REALM_SC_COMPARE(AddTable, v.object)
         REALM_SC_COMPARE(RemoveTable, v.object)
+        REALM_SC_COMPARE(ChangeTableType, v.object)
         REALM_SC_COMPARE(ChangePrimaryKey, v.object, v.property)
         REALM_SC_COMPARE(ChangePropertyType, v.object, v.old_property, v.new_property)
         REALM_SC_COMPARE(MakePropertyNullable, v.object, v.property)

@@ -23,9 +23,9 @@
 #include <realm/util/to_string.hpp>
 
 #include <functional>
-#include <memory>
+#include <iosfwd>
 #include <map>
-#include <ostream>
+#include <memory>
 #include <string>
 #include <system_error>
 #include <vector>

@@ -653,7 +653,7 @@ TEST_CASE("list") {
         REQUIRE(results.get_mode() == Results::Mode::Query);
         REQUIRE(results.size() == 4);
 
-        for (size_t i = 0; i < 4; ++i) {
+        for (int64_t i = 0; i < 4; ++i) {
             REQUIRE(results.get(i).get_key().value == i + 6);
         }
     }
@@ -907,5 +907,448 @@ TEST_CASE("list") {
         REQUIRE_NOTHROW(obj = any_cast<Object&&>(list.get(ctx, 1)));
         REQUIRE(obj.is_valid());
         REQUIRE(obj.obj().get_key() == target_keys[1]);
+    }
+}
+
+TEST_CASE("embedded List") {
+    InMemoryTestFile config;
+    config.automatic_change_notifications = false;
+    auto r = Realm::get_shared_realm(config);
+    r->update_schema({
+        {"origin", {
+            {"pk", PropertyType::Int, Property::IsPrimary{true}},
+            {"array", PropertyType::Array|PropertyType::Object, "target"}
+        }},
+        {"target", ObjectSchema::IsEmbedded{true}, {
+            {"value", PropertyType::Int}
+        }},
+        {"other_origin", {
+            {"array", PropertyType::Array|PropertyType::Object, "other_target"}
+        }},
+        {"other_target", ObjectSchema::IsEmbedded{true}, {
+            {"value", PropertyType::Int}
+        }},
+    });
+
+    auto& coordinator = *_impl::RealmCoordinator::get_coordinator(config.path);
+
+    auto origin = r->read_group().get_table("class_origin");
+    auto target = r->read_group().get_table("class_target");
+    auto other_origin = r->read_group().get_table("class_other_origin");
+    ColKey col_link = origin->get_column_key("array");
+    ColKey col_value = target->get_column_key("value");
+    ColKey other_col_link = other_origin->get_column_key("array");
+
+    r->begin_transaction();
+
+    Obj obj = origin->create_object_with_primary_key(0);
+    auto lv = obj.get_linklist_ptr(col_link);
+    for (int i = 0; i < 10; ++i)
+        lv->create_and_insert_linked_object(i).set_all(i);
+    auto lv2 = origin->create_object_with_primary_key(1).get_linklist_ptr(col_link);
+    for (int i = 0; i < 10; ++i)
+        lv2->create_and_insert_linked_object(i).set_all(i);
+
+
+    Obj other_obj = other_origin->create_object();
+    auto other_lv = other_obj.get_linklist_ptr(other_col_link);
+    for (int i = 0; i < 10; ++i)
+        other_lv->create_and_insert_linked_object(i).set_all(i);
+
+    r->commit_transaction();
+    lv->size();
+    lv2->size();
+    other_lv->size();
+
+    auto r2 = coordinator.get_realm();
+    auto r2_lv = r2->read_group().get_table("class_origin")->get_object(0).get_linklist_ptr(col_link);
+
+    SECTION("add_notification_block()") {
+        CollectionChangeSet change;
+        List lst(r, obj, col_link);
+
+        auto write = [&](auto&& f) {
+            r->begin_transaction();
+            f();
+            r->commit_transaction();
+
+            advance_and_notify(*r);
+        };
+
+        auto require_change = [&] {
+            auto token = lst.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+                change = c;
+            });
+            advance_and_notify(*r);
+            return token;
+        };
+
+        auto require_no_change = [&] {
+            bool first = true;
+            auto token = lst.add_notification_callback([&, first](CollectionChangeSet, std::exception_ptr) mutable {
+                REQUIRE(first);
+                first = false;
+            });
+            advance_and_notify(*r);
+            return token;
+        };
+
+        SECTION("modifying the list sends a change notifications") {
+            auto token = require_change();
+            write([&] { lst.remove(5); });
+            REQUIRE_INDICES(change.deletions, 5);
+        }
+
+        SECTION("modifying a different list doesn't send a change notification") {
+            auto token = require_no_change();
+            write([&] { lv2->remove(5); });
+        }
+
+        SECTION("deleting the list sends a change notification") {
+            auto token = require_change();
+            write([&] { obj.remove(); });
+            REQUIRE_INDICES(change.deletions, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9);
+
+            // Should not resend delete all notification after another commit
+            change = {};
+            write([&] { lv2->size(); lv2->create_and_insert_linked_object(0); });
+            REQUIRE(change.empty());
+        }
+
+        SECTION("deleting list before first run of notifier reports deletions") {
+            auto token = lst.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+                change = c;
+            });
+            advance_and_notify(*r);
+            write([&] { origin->begin()->remove(); });
+            REQUIRE_INDICES(change.deletions, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9);
+        }
+
+        SECTION("modifying one of the target rows sends a change notification") {
+            auto token = require_change();
+            write([&] { lst.get(5).set(col_value, 6); });
+            REQUIRE_INDICES(change.modifications, 5);
+        }
+
+        SECTION("deleting a target row sends a change notification") {
+            auto token = require_change();
+            write([&] { target->remove_object(lv->get(5)); });
+            REQUIRE_INDICES(change.deletions, 5);
+        }
+
+        SECTION("modifying and then moving a row reports move/insert but not modification") {
+            auto token = require_change();
+            write([&] {
+                target->get_object(lv->get(5)).set(col_value, 10);
+                lst.move(5, 8);
+            });
+            REQUIRE_INDICES(change.insertions, 8);
+            REQUIRE_INDICES(change.deletions, 5);
+            REQUIRE_MOVES(change, {5, 8});
+            REQUIRE(change.modifications.empty());
+        }
+
+        SECTION("clearing the target table sends a change notification") {
+            auto token = require_change();
+            write([&] { target->clear(); });
+            REQUIRE_INDICES(change.deletions, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9);
+        }
+
+    }
+
+    SECTION("sorted add_notification_block()") {
+        List lst(r, *lv);
+        Results results = lst.sort({{{col_value}}, {false}});
+
+        int notification_calls = 0;
+        CollectionChangeSet change;
+        auto token = results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr err) {
+            REQUIRE_FALSE(err);
+            change = c;
+            ++notification_calls;
+        });
+
+        advance_and_notify(*r);
+
+        auto write = [&](auto&& f) {
+            r->begin_transaction();
+            f();
+            r->commit_transaction();
+
+            advance_and_notify(*r);
+        };
+
+        SECTION("change order by modifying target") {
+            write([&] {
+                lst.get(5).set(col_value, 15);
+            });
+            REQUIRE(notification_calls == 2);
+            REQUIRE_INDICES(change.deletions, 4);
+            REQUIRE_INDICES(change.insertions, 0);
+        }
+
+        SECTION("swap") {
+            write([&] {
+                lst.swap(1, 2);
+            });
+            REQUIRE(notification_calls == 1);
+        }
+
+        SECTION("move") {
+            write([&] {
+                lst.move(5, 3);
+            });
+            REQUIRE(notification_calls == 1);
+        }
+    }
+
+    SECTION("filtered add_notification_block()") {
+        List lst(r, *lv);
+        Results results = lst.filter(target->where().less(col_value, 9));
+
+        int notification_calls = 0;
+        CollectionChangeSet change;
+        auto token = results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr err) {
+            REQUIRE_FALSE(err);
+            change = c;
+            ++notification_calls;
+        });
+
+        advance_and_notify(*r);
+
+        auto write = [&](auto&& f) {
+            r->begin_transaction();
+            f();
+            r->commit_transaction();
+
+            advance_and_notify(*r);
+        };
+
+        SECTION("swap") {
+            write([&] {
+                lst.swap(1, 2);
+            });
+            REQUIRE(notification_calls == 2);
+            REQUIRE_INDICES(change.deletions, 2);
+            REQUIRE_INDICES(change.insertions, 1);
+
+            write([&] {
+                lst.swap(5, 8);
+            });
+            REQUIRE(notification_calls == 3);
+            REQUIRE_INDICES(change.deletions, 5, 8);
+            REQUIRE_INDICES(change.insertions, 5, 8);
+        }
+
+        SECTION("move") {
+            write([&] {
+                lst.move(5, 3);
+            });
+            REQUIRE(notification_calls == 2);
+            REQUIRE_INDICES(change.deletions, 5);
+            REQUIRE_INDICES(change.insertions, 3);
+        }
+
+        SECTION("move non-matching entry") {
+            write([&] {
+                lst.move(9, 3);
+            });
+            REQUIRE(notification_calls == 1);
+        }
+    }
+
+    auto initial_view_size = lv->size();
+    auto initial_target_size = target->size();
+    SECTION("delete_at()") {
+        List list(r, *lv);
+        r->begin_transaction();
+        list.delete_at(1);
+        REQUIRE(lv->size() == initial_view_size - 1);
+        REQUIRE(target->size() == initial_target_size - 1);
+        r->cancel_transaction();
+    }
+
+    SECTION("delete_all()") {
+        List list(r, *lv);
+        r->begin_transaction();
+        list.delete_all();
+        REQUIRE(lv->size() == 0);
+        REQUIRE(target->size() == initial_target_size - 10);
+        r->cancel_transaction();
+    }
+
+    SECTION("as_results().clear()") {
+        List list(r, *lv);
+        r->begin_transaction();
+        list.as_results().clear();
+        REQUIRE(lv->size() == 0);
+        REQUIRE(target->size() == initial_target_size - 10);
+        r->cancel_transaction();
+    }
+
+    SECTION("snapshot().clear()") {
+        List list(r, *lv);
+        r->begin_transaction();
+        auto snapshot = list.snapshot();
+        snapshot.clear();
+        REQUIRE(snapshot.size() == 10);
+        REQUIRE(list.size() == 0);
+        REQUIRE(lv->size() == 0);
+        REQUIRE(target->size() == initial_target_size - 10);
+        r->cancel_transaction();
+    }
+
+    SECTION("add(), insert(), and set() to existing object is not allowed") {
+        List list(r, *lv);
+        r->begin_transaction();
+        REQUIRE_THROWS_AS(list.add(target->get_object(0)),
+                          List::InvalidEmbeddedOperationException);
+        REQUIRE_THROWS_AS(list.insert(0, target->get_object(0)),
+                          List::InvalidEmbeddedOperationException);
+        REQUIRE_THROWS_AS(list.set(0, target->get_object(0)),
+                          List::InvalidEmbeddedOperationException);
+        r->cancel_transaction();
+    }
+
+    SECTION("find(RowExpr)") {
+        List list(r, *lv);
+        Obj obj1 = target->get_object(1);
+        Obj obj5 = target->get_object(5);
+
+        SECTION("returns index in list for values in the list") {
+            REQUIRE(list.find(obj5) == 5);
+        }
+
+        SECTION("returns index in list and not index in table") {
+            r->begin_transaction();
+            list.remove(1);
+            REQUIRE(list.find(obj5) == 4);
+            REQUIRE(list.as_results().index_of(obj5) == 4);
+            r->cancel_transaction();
+        }
+
+        SECTION("returns npos for values not in the list") {
+            r->begin_transaction();
+            list.remove(1);
+            REQUIRE(list.find(obj1) == npos);
+            REQUIRE_THROWS_AS(list.as_results().index_of(obj1), Results::DetatchedAccessorException);
+            r->cancel_transaction();
+        }
+
+        SECTION("throws for row in wrong table") {
+            REQUIRE_THROWS(list.find(obj));
+            REQUIRE_THROWS(list.as_results().index_of(obj));
+        }
+    }
+
+    SECTION("find(Query)") {
+        List list(r, *lv);
+
+        SECTION("returns index in list for values in the list") {
+            REQUIRE(list.find(std::move(target->where().equal(col_value, 5))) == 5);
+        }
+
+        SECTION("returns index in list and not index in table") {
+            r->begin_transaction();
+            list.remove(1);
+            REQUIRE(list.find(std::move(target->where().equal(col_value, 5))) == 4);
+            r->cancel_transaction();
+        }
+
+        SECTION("returns npos for values not in the list") {
+            REQUIRE(list.find(std::move(target->where().equal(col_value, 11))) == npos);
+        }
+    }
+
+    SECTION("add(Context)") {
+        List list(r, *lv);
+        CppContext ctx(r, &list.get_object_schema());
+        r->begin_transaction();
+
+        auto initial_target_size = target->size();
+        SECTION("rejects boxed Obj and Object") {
+            REQUIRE_THROWS_AS(list.add(ctx, util::Any(target->get_object(5))),
+                              List::InvalidEmbeddedOperationException);
+            REQUIRE_THROWS_AS(list.add(ctx, util::Any(Object(r, target->get_object(5)))),
+                              List::InvalidEmbeddedOperationException);
+        }
+
+        SECTION("creates new object for dictionary") {
+            list.add(ctx, util::Any(AnyDict{{"value", INT64_C(20)}}));
+            REQUIRE(list.size() == 11);
+            REQUIRE(target->size() == initial_target_size + 1);
+            REQUIRE(list.get(10).get<Int>(col_value) == 20);
+        }
+
+        r->cancel_transaction();
+    }
+
+    SECTION("set(Context)") {
+        List list(r, *lv);
+        CppContext ctx(r, &list.get_object_schema());
+        r->begin_transaction();
+
+        auto initial_target_size = target->size();
+        SECTION("rejects boxed Obj and Object") {
+            REQUIRE_THROWS_AS(list.set(ctx, 0, util::Any(target->get_object(5))),
+                              List::InvalidEmbeddedOperationException);
+            REQUIRE_THROWS_AS(list.set(ctx, 0, util::Any(Object(r, target->get_object(5)))),
+                              List::InvalidEmbeddedOperationException);
+        }
+
+        SECTION("creates new object for update mode All") {
+            auto old_object = list.get<Obj>(0);
+            list.set(ctx, 0, util::Any(AnyDict{{"value", INT64_C(20)}}));
+            REQUIRE(list.size() == 10);
+            REQUIRE(target->size() == initial_target_size);
+            REQUIRE(list.get(0).get<Int>(col_value) == 20);
+            REQUIRE_FALSE(old_object.is_valid());
+        }
+
+        SECTION("mutates the existing object for update mode Modified") {
+            auto old_object = list.get<Obj>(0);
+            list.set(ctx, 0, util::Any(AnyDict{{"value", INT64_C(20)}}), CreatePolicy::UpdateModified);
+            REQUIRE(list.size() == 10);
+            REQUIRE(target->size() == initial_target_size);
+            REQUIRE(list.get(0).get<Int>(col_value) == 20);
+            REQUIRE(old_object.is_valid());
+            REQUIRE(list.get(0) == old_object);
+        }
+
+        r->cancel_transaction();
+    }
+
+    SECTION("find(Context)") {
+        List list(r, *lv);
+        CppContext ctx(r, &list.get_object_schema());
+
+        SECTION("returns index in list for boxed Obj") {
+            REQUIRE(list.find(ctx, util::Any(list.get(5))) == 5);
+        }
+
+        SECTION("returns index in list for boxed Object") {
+            realm::Object obj(r, *r->schema().find("origin"), list.get(5));
+            REQUIRE(list.find(ctx, util::Any(obj)) == 5);
+        }
+
+        SECTION("does not insert new objects for dictionaries") {
+            auto initial_target_size = target->size();
+            REQUIRE(list.find(ctx, util::Any(AnyDict{{"value", INT64_C(20)}})) == npos);
+            REQUIRE(target->size() == initial_target_size);
+        }
+
+        SECTION("throws for object in wrong table") {
+            REQUIRE_THROWS(list.find(ctx, util::Any(obj)));
+        }
+    }
+
+    SECTION("get(Context)") {
+        List list(r, *lv);
+        CppContext ctx(r, &list.get_object_schema());
+
+        Object obj;
+        REQUIRE_NOTHROW(obj = any_cast<Object&&>(list.get(ctx, 1)));
+        REQUIRE(obj.is_valid());
+        REQUIRE(obj.obj().get<int64_t>(col_value) == 1);
     }
 }

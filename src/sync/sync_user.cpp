@@ -18,7 +18,7 @@
 
 #include "sync/sync_user.hpp"
 
-#include "app_credentials.hpp"
+#include "sync/app_credentials.hpp"
 #include "sync/generic_network_transport.hpp"
 #include "sync/impl/sync_metadata.hpp"
 #include "sync/sync_manager.hpp"

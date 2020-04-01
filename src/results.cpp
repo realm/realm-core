@@ -407,9 +407,7 @@ size_t Results::index_of(Obj const& row)
     if (m_table && row.get_table() != m_table) {
         throw IncorrectTableException(
             ObjectStore::object_type_for_table_name(m_table->get_name()),
-            ObjectStore::object_type_for_table_name(row.get_table()->get_name()),
-            "Attempting to get the index of a Row of the wrong type"
-        );
+            ObjectStore::object_type_for_table_name(row.get_table()->get_name()));
     }
 
     switch (m_mode) {
@@ -698,7 +696,7 @@ PropertyType Results::do_get_type() const
         case Mode::Table:
             return PropertyType::Object;
         case Mode::List:
-            return ObjectSchema::from_core_type(*m_list->get_table(), m_list->get_col_key());
+            return ObjectSchema::from_core_type(m_list->get_col_key());
     }
     REALM_COMPILER_HINT_UNREACHABLE();
 }
@@ -1083,12 +1081,17 @@ bool Results::is_frozen()
 }
 
 Results::OutOfBoundsIndexException::OutOfBoundsIndexException(size_t r, size_t c)
-: std::out_of_range(util::format("Requested index %1 greater than max %2", r, c - 1))
+: std::out_of_range(c == 0 ? util::format("Requested index %1 in empty Results", r)
+                           : util::format("Requested index %1 greater than max %2", r, c - 1))
 , requested(r), valid_count(c) {}
+
+Results::IncorrectTableException::IncorrectTableException(StringData e, StringData a)
+: std::logic_error(util::format("Object of type '%1' does not match Results type '%2'", a, e))
+, expected(e), actual(a) {}
 
 static std::string unsupported_operation_msg(ColKey column, Table const& table, const char* operation)
 {
-    auto type = ObjectSchema::from_core_type(table, column);
+    auto type = ObjectSchema::from_core_type(column);
     const char* column_type = string_for_property_type(type & ~PropertyType::Array);
     if (!is_array(type))
         return util::format("Cannot %1 property '%2': operation not supported for '%3' properties",
@@ -1102,7 +1105,7 @@ Results::UnsupportedColumnTypeException::UnsupportedColumnTypeException(ColKey c
 : std::logic_error(unsupported_operation_msg(column, table, operation))
 , column_key(column)
 , column_name(table.get_column_name(column))
-, property_type(ObjectSchema::from_core_type(table, ColKey(column)) & ~PropertyType::Array)
+, property_type(ObjectSchema::from_core_type(column) & ~PropertyType::Array)
 {
 }
 

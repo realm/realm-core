@@ -36,6 +36,7 @@
 #endif
 
 using namespace realm;
+using IsEmbedded = ObjectSchema::IsEmbedded;
 
 #define VERIFY_SCHEMA(r, m) verify_schema((r), __LINE__, m)
 
@@ -79,7 +80,7 @@ void verify_schema(Realm& r, int line, bool in_migration)
             CAPTURE(prop.name);
             REQUIRE(col);
             REQUIRE(col == prop.column_key);
-            REQUIRE(to_underlying(ObjectSchema::from_core_type(*table, col)) ==
+            REQUIRE(to_underlying(ObjectSchema::from_core_type(col)) ==
                     to_underlying(prop.type));
             REQUIRE(table->has_search_index(col) == prop.requires_index());
             REQUIRE(bool(prop.is_primary) == (prop.name == primary_key));
@@ -164,7 +165,15 @@ Schema set_primary_key(Schema schema, StringData object_name, StringData new_pri
     object_schema.primary_key = new_primary_property;
     return schema;
 }
-auto create_objects(Table& table, size_t count) {
+
+Schema set_embedded(Schema schema, StringData object_name, IsEmbedded embedded)
+{
+    schema.find(object_name)->is_embedded = embedded;
+    return schema;
+}
+
+auto create_objects(Table& table, size_t count)
+{
     std::vector<ObjKey> keys;
     table.create_objects(count, keys);
     return keys;
@@ -184,6 +193,21 @@ TEST_CASE("migration: Automatic") {
                 {"value", PropertyType::Int}
             }});
             Schema schema3 = add_table(schema2, {"object2", {
+                {"value", PropertyType::Int}
+            }});
+            REQUIRE_UPDATE_SUCCEEDS(*realm, schema1, 0);
+            REQUIRE_UPDATE_SUCCEEDS(*realm, schema2, 0);
+            REQUIRE_UPDATE_SUCCEEDS(*realm, schema3, 0);
+        }
+
+        SECTION("add embedded object schema") {
+            auto realm = Realm::get_shared_realm(config);
+
+            Schema schema1 = {};
+            Schema schema2 = add_table(schema1, {"object", IsEmbedded{true}, {
+                {"value", PropertyType::Int}
+            }});
+            Schema schema3 = add_table(schema2, {"object2", IsEmbedded{true}, {
                 {"value", PropertyType::Int}
             }});
             REQUIRE_UPDATE_SUCCEEDS(*realm, schema1, 0);
@@ -385,6 +409,43 @@ TEST_CASE("migration: Automatic") {
             auto& table = *get_table(realm, "object2");
             REQUIRE(table.get_column_count() == 1);
         }
+
+        SECTION("adding column and embedded table in same migration") {
+            auto realm = Realm::get_shared_realm(config);
+
+            Schema schema1 = {
+                {"object", {
+                    {"col1", PropertyType::Int},
+                }},
+            };
+            auto schema2 = add_table(add_property(schema1, "object", {"col2", PropertyType::Int}),
+                                     {"object2", IsEmbedded{true}, {{"value", PropertyType::Int}}});
+            REQUIRE_UPDATE_SUCCEEDS(*realm, schema1, 0);
+            REQUIRE_UPDATE_SUCCEEDS(*realm, schema2, 1);
+        }
+
+        SECTION("change table from embedded to top-level") {
+            auto realm = Realm::get_shared_realm(config);
+
+            Schema schema = {
+                {"object", IsEmbedded{true}, {
+                    {"value", PropertyType::Int},
+                }},
+            };
+            REQUIRE_MIGRATION_NEEDED(*realm, schema, set_embedded(schema, "object", false));
+
+        }
+
+        SECTION("change table from top-level to embedded") {
+            auto realm = Realm::get_shared_realm(config);
+
+            Schema schema = {
+                {"object", {
+                    {"value", PropertyType::Int},
+                }},
+            };
+            REQUIRE_MIGRATION_NEEDED(*realm, schema, set_embedded(schema, "object", true));
+        }
     }
 
     SECTION("migration block invocations") {
@@ -489,6 +550,29 @@ TEST_CASE("migration: Automatic") {
             REQUIRE(realm->schema_version() == 1);
             REQUIRE(realm->schema() == schema1);
         }
+
+        SECTION("make object with multiple pre-existing incoming links embedded") {
+            Schema schema = {
+                {"target", {
+                    {"value", PropertyType::Int},
+                }},
+                {"link", {
+                    {"link", PropertyType::Object|PropertyType::Nullable, "target"},
+                }},
+            };
+            auto realm = Realm::get_shared_realm(config);
+            realm->update_schema(schema, 1);
+
+            realm->begin_transaction();
+            auto target_table = ObjectStore::table_for_object_type(realm->read_group(), "target");
+            auto obj = target_table->create_object().get_key();
+            auto link_table = ObjectStore::table_for_object_type(realm->read_group(), "link");
+            link_table->create_object().set_all(obj);
+            link_table->create_object().set_all(obj);
+            realm->commit_transaction();
+
+            REQUIRE_THROWS(realm->update_schema(set_embedded(schema, "target", true), 2, nullptr));
+        }
     }
 
     SECTION("valid migrations") {
@@ -534,7 +618,7 @@ TEST_CASE("migration: Automatic") {
                 REQUIRE(table->get_object(i).get<util::Optional<int64_t>>(key) == i);
         }
 
-        SECTION("values for nullable properties are discarded when converitng to required") {
+        SECTION("values for nullable properties are discarded when converting to required") {
             Schema schema = {
                 {"object", {
                     {"value", PropertyType::Int|PropertyType::Nullable},
@@ -623,7 +707,11 @@ TEST_CASE("migration: Automatic") {
                 {"not a pk", PropertyType::Int},
                 {"object", PropertyType::Object|PropertyType::Nullable, "object"},
                 {"array", PropertyType::Array|PropertyType::Object, "object"},
-            }}
+            }},
+            {"no pk object", {
+                {"value", PropertyType::Int, Property::IsPrimary{false}, Property::IsIndexed{true}},
+                {"optional", PropertyType::Int|PropertyType::Nullable},
+            }},
         };
         realm->update_schema(schema);
 
@@ -632,7 +720,9 @@ TEST_CASE("migration: Automatic") {
     realm->update_schema(new_schema, 1, [&](SharedRealm old_realm, SharedRealm new_realm, Schema&) { \
         REQUIRE(old_realm->schema_version() == 0); \
         REQUIRE(old_realm->schema() == schema); \
+        REQUIRE(old_realm->schema() != new_schema); \
         REQUIRE(new_realm->schema_version() == 1); \
+        REQUIRE(new_realm->schema() != schema); \
         REQUIRE(new_realm->schema() == new_schema); \
         VERIFY_SCHEMA(*old_realm, true); \
         VERIFY_SCHEMA(*new_realm, true); \
@@ -645,6 +735,14 @@ TEST_CASE("migration: Automatic") {
             VERIFY_SCHEMA_IN_MIGRATION(add_table(schema, {"new table", {
                 {"value", PropertyType::Int},
             }}));
+        }
+        SECTION("add embedded table") {
+            VERIFY_SCHEMA_IN_MIGRATION(add_table(schema, {"new table", IsEmbedded{true}, {
+                {"value", PropertyType::Int},
+            }}));
+        }
+        SECTION("change table type") {
+            VERIFY_SCHEMA_IN_MIGRATION(set_embedded(schema, "no pk object", true));
         }
         SECTION("add property to table") {
             VERIFY_SCHEMA_IN_MIGRATION(add_property(schema, "object", {"new", PropertyType::Int}));
@@ -774,7 +872,7 @@ TEST_CASE("migration: Automatic") {
                 auto list = any_cast<List>(obj.get_property_value<util::Any>(ctx, "array"));
                 REQUIRE(list.size() == 1);
 
-                CppContext list_ctx(ctx, *obj.get_object_schema().property_for_name("array"));
+                CppContext list_ctx(ctx, obj.obj(), *obj.get_object_schema().property_for_name("array"));
                 link = any_cast<Object>(list.get(list_ctx, 0));
                 REQUIRE(link.is_valid());
                 REQUIRE(any_cast<int64_t>(link.get_property_value<util::Any>(list_ctx, "value")) == 20);
@@ -830,7 +928,7 @@ TEST_CASE("migration: Automatic") {
                 auto list = any_cast<List>(obj.get_property_value<util::Any>(ctx, "array"));
                 REQUIRE(list.size() == 1);
 
-                CppContext list_ctx(ctx, *obj.get_object_schema().property_for_name("array"));
+                CppContext list_ctx(ctx, obj.obj(), *obj.get_object_schema().property_for_name("array"));
                 link = any_cast<Object>(list.get(list_ctx, 0));
                 REQUIRE(link.is_valid());
                 REQUIRE(any_cast<int64_t>(link.get_property_value<util::Any>(list_ctx, "value")) == 20);
@@ -927,8 +1025,6 @@ TEST_CASE("migration: Automatic") {
 
         SECTION("change primary key property type") {
             schema = set_type(schema, "all types", "pk", PropertyType::String);
-            // FIXME: changing the primary key of a type with binary columns currently crashes in core
-            schema = remove_property(schema, "all types", "data");
             realm->update_schema(schema, 2, [](auto, auto new_realm, auto&) {
                 Object obj(new_realm, "all types", 0);
 
@@ -1240,6 +1336,16 @@ TEST_CASE("migration: Immutable") {
             };
             REQUIRE_NOTHROW(realm->update_schema(schema));
         }
+
+        SECTION("differing embeddedness") {
+            auto realm = realm_with_schema({
+                {"object", {
+                    {"value", PropertyType::Int},
+                }},
+            });
+            Schema schema = set_embedded(realm->schema(), "object", true);
+            REQUIRE_NOTHROW(realm->update_schema(schema));
+        }
     }
 
     SECTION("disallowed mismatches") {
@@ -1357,6 +1463,16 @@ TEST_CASE("migration: ReadOnly") {
             };
             auto realm = realm_with_schema(schema);
             REQUIRE_NOTHROW(realm->update_schema(schema, 1));
+        }
+
+        SECTION("differing embeddedness") {
+            Schema schema = {
+                {"object", {
+                    {"value", PropertyType::Int},
+                }},
+            };
+            auto realm = realm_with_schema(schema);
+            REQUIRE_NOTHROW(realm->update_schema(set_embedded(realm->schema(), "object", true)));
         }
     }
 
@@ -1500,6 +1616,10 @@ TEST_CASE("migration: Additive") {
         }})));
         REQUIRE(ObjectStore::table_for_object_type(realm->read_group(), "object"));
         REQUIRE(ObjectStore::table_for_object_type(realm->read_group(), "object 2"));
+    }
+
+    SECTION("cannot change existing table type") {
+        REQUIRE_THROWS(realm->update_schema(set_embedded(schema, "object", true)));
     }
 
     SECTION("indexes are updated when schema version is bumped") {
