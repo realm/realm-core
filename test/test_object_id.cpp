@@ -288,7 +288,13 @@ TEST(ObjectId_Query)
             CHECK_EQUAL(tv.get(i).get<int64_t>(col_int), i);
         }
         Query q2 = table->column<ObjectId>(col_id) == alternative_id;
+        // std::cout << q2.get_description() << std::endl;
         CHECK_EQUAL(q2.count(), 34);
+        q2 = table->column<ObjectId>(col_id) == realm::null();
+        // std::cout << q2.get_description() << std::endl;
+        CHECK_EQUAL(q2.count(), 1000 - 34);
+        q2 = table->where().equal(col_id, realm::null());
+        CHECK_EQUAL(q2.count(), 1000 - 34);
 
         std::ostringstream ostr;
         tv.to_json(ostr); // just check that it does not crash

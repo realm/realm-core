@@ -147,10 +147,11 @@ TEST(Decimal128_Query)
     {
         auto wt = db->start_write();
         auto table = wt->add_table("Foo");
-        auto col_dec = table->add_column(type_Decimal, "price");
+        auto col_dec = table->add_column(type_Decimal, "price", true);
         for (int i = 0; i < 100; i++) {
             table->create_object().set(col_dec, Decimal128(i));
         }
+        table->create_object(); // Contains null
         wt->commit();
     }
     {
@@ -167,6 +168,10 @@ TEST(Decimal128_Query)
         CHECK_EQUAL(q1.count(), 25);
         q1 = table->where().less_equal(col, Decimal128(25));
         CHECK_EQUAL(q1.count(), 26);
+        Query q2 = table->column<Decimal>(col) == realm::null();
+        CHECK_EQUAL(q2.count(), 1);
+        q2 = table->where().equal(col, realm::null());
+        CHECK_EQUAL(q2.count(), 1);
     }
 }
 

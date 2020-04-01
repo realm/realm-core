@@ -1317,7 +1317,7 @@ public:
     }
 
     DecimalNodeBase(null, ColKey column)
-        : DecimalNodeBase(Decimal128{}, column)
+        : DecimalNodeBase(Decimal128{null()}, column)
     {
     }
 
@@ -1359,9 +1359,10 @@ public:
     size_t find_first_local(size_t start, size_t end) override
     {
         TConditionFunction cond;
+        bool value_is_null = m_value.is_null();
         for (size_t i = start; i < end; i++) {
             Decimal128 val = m_leaf_ptr->get(i);
-            if (cond(val, m_value))
+            if (cond(val, m_value, val.is_null(), value_is_null))
                 return i;
         }
         return realm::npos;
@@ -1400,12 +1401,13 @@ public:
     ObjectIdNodeBase(null, ColKey column)
         : ObjectIdNodeBase(ObjectId{}, column)
     {
+        m_value_is_null = true;
     }
 
     void cluster_changed() override
     {
         m_array_ptr = nullptr;
-        m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) ArrayObjectId(m_table.unchecked_ptr()->get_alloc()));
+        m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) ArrayObjectIdNull(m_table.unchecked_ptr()->get_alloc()));
         m_cluster->init_leaf(this->m_condition_column_key, m_array_ptr.get());
         m_leaf_ptr = m_array_ptr.get();
     }
@@ -1421,15 +1423,18 @@ protected:
     ObjectIdNodeBase(const ObjectIdNodeBase& from)
         : ParentNode(from)
         , m_value(from.m_value)
+        , m_value_is_null(from.m_value_is_null)
     {
     }
 
     ObjectId m_value;
-    using LeafCacheStorage = typename std::aligned_storage<sizeof(ArrayObjectId), alignof(ArrayObjectId)>::type;
-    using LeafPtr = std::unique_ptr<ArrayObjectId, PlacementDelete>;
+    bool m_value_is_null = false;
+    using LeafCacheStorage =
+        typename std::aligned_storage<sizeof(ArrayObjectIdNull), alignof(ArrayObjectIdNull)>::type;
+    using LeafPtr = std::unique_ptr<ArrayObjectIdNull, PlacementDelete>;
     LeafCacheStorage m_leaf_cache_storage;
     LeafPtr m_array_ptr;
-    const ArrayObjectId* m_leaf_ptr = nullptr;
+    const ArrayObjectIdNull* m_leaf_ptr = nullptr;
 };
 
 template <class TConditionFunction>
@@ -1441,9 +1446,15 @@ public:
     {
         TConditionFunction cond;
         for (size_t i = start; i < end; i++) {
-            ObjectId val = m_leaf_ptr->get(i);
-            if (cond(val, m_value))
-                return i;
+            util::Optional<ObjectId> val = m_leaf_ptr->get(i);
+            if (val) {
+                if (cond(*val, m_value, false, m_value_is_null))
+                    return i;
+            }
+            else {
+                if (cond(ObjectId{}, m_value, true, m_value_is_null))
+                    return i;
+            }
         }
         return realm::npos;
     }
@@ -1452,7 +1463,9 @@ public:
     {
         REALM_ASSERT(m_condition_column_key);
         return state.describe_column(ParentNode::m_table, m_condition_column_key) + " " +
-               TConditionFunction::description() + " " + util::serializer::print_value(ObjectIdNode::m_value);
+               TConditionFunction::description() + " " +
+               (m_value_is_null ? util::serializer::print_value(realm::null())
+                                : util::serializer::print_value(ObjectIdNode::m_value));
     }
 
     std::unique_ptr<ParentNode> clone() const override
