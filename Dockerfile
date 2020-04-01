@@ -5,6 +5,7 @@ RUN apt-get update \
                        build-essential \
                        curl \
                        gcovr \
+                       gdb \
                        git \
                        lcov \
                        libcurl4-openssl-dev \
@@ -16,6 +17,9 @@ RUN apt-get update \
                        xutils-dev \
                        zlib1g-dev \
     && apt-get clean             
+
+RUN mkdir -p ~/.ssh \
+ && ssh-keyscan -H github.com >> ~/.ssh/known_hosts
 
 # Ensure a new enough version of CMake is available.
 RUN cd /opt \

@@ -5,6 +5,8 @@
 // printing the timings is a placeholder until we can fix and integrate junit reporting via "-r junit"
 testArguments = "-d=1"
 
+dependencies = null
+
 def readGitTag() {
   sh "git describe --exact-match --tags HEAD | tail -n 1 > tag.txt 2>&1 || true"
   def tag = readFile('tag.txt').trim()
@@ -109,7 +111,7 @@ def doDockerBuild(String flavor, Boolean withCoverage, Boolean enableSync, Strin
           // see https://github.com/realm/ci/tree/master/realm/docker/mongodb-realm
           // we refrain from using "latest" here to optimise docker pull cost due to a new image being built every day
           // if there's really a new feature you need from the latest stitch, upgrade this manually
-        withRealmCloud(version: '2020-03-23', appsToImport: ['auth-integration-tests': "${env.WORKSPACE}/tests/mongodb"]) { networkName ->
+        withRealmCloud(version: dependencies.MDBREALM_TEST_SERVER_TAG, appsToImport: ['auth-integration-tests': "${env.WORKSPACE}/tests/mongodb"]) { networkName ->
             buildSteps("--network=${networkName}")
         }
       } else {
@@ -195,6 +197,7 @@ def setBuildName(newBuildName) {
 jobWrapper { // sets the max build time to 2 hours
   stage('prepare') {
     nodeWithSources('docker') {
+      dependencies = readProperties(file: 'dependencies.list')
       gitTag = readGitTag()
       gitSha = readGitSha()
       echo "tag: ${gitTag}"
