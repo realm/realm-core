@@ -144,10 +144,6 @@ public:
     void verify() const override
     {
     }
-    void get_or_add_xover_mapping(RefTranslation&, size_t, size_t, size_t) override
-    {
-        REALM_ASSERT(false);
-    }
 
 private:
     ref_type m_offset;
