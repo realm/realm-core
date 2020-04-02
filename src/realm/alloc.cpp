@@ -101,10 +101,6 @@ public:
     }
 
     void verify() const override {}
-    void get_or_add_xover_mapping(RefTranslation&, size_t, size_t, size_t) override
-    {
-        REALM_ASSERT(false);
-    }
 };
 
 // This variable is declared such that get_default() can return it. It could be a static local variable, but
@@ -119,50 +115,5 @@ namespace realm {
 Allocator& Allocator::get_default() noexcept
 {
     return default_alloc;
-}
-
-// This function is called to handle translation of a ref which is above the limit for its
-// memory mapping. This requires one of three:
-// * bumping the limit of the mapping. (if the entire array is inside the mapping)
-// * adding a cross-over mapping. (if the array crosses a mapping boundary)
-// * using an already established cross-over mapping. (ditto)
-// this can proceed concurrently with other calls to translate()
-char* Allocator::translate_less_critical(RefTranslation* ref_translation_ptr, ref_type ref) const noexcept
-{
-    size_t idx = get_section_index(ref);
-    RefTranslation& txl = ref_translation_ptr[idx];
-    size_t offset = ref - get_section_base(idx);
-    char* addr = txl.mapping_addr + offset;
-#if REALM_ENABLE_ENCRYPTION
-    realm::util::encryption_read_barrier(addr, NodeHeader::header_size, txl.encrypted_mapping, nullptr);
-#endif
-    auto size = NodeHeader::get_byte_size_from_header(addr);
-    bool crosses_mapping = offset + size > (1 << section_shift);
-    // Move the limit on use of the existing primary mapping.
-    // Take into account that another thread may attempt to change / have changed it concurrently,
-    size_t lowest_possible_xover_offset = txl.lowest_possible_xover_offset.load(std::memory_order_relaxed);
-    auto new_lowest_possible_xover_offset = offset + (crosses_mapping ? 0 : size);
-    while (new_lowest_possible_xover_offset > lowest_possible_xover_offset) {
-        if (txl.lowest_possible_xover_offset.compare_exchange_weak(
-                lowest_possible_xover_offset, new_lowest_possible_xover_offset, std::memory_order_relaxed))
-            break;
-    }
-    if (REALM_LIKELY(!crosses_mapping)) {
-        // Array fits inside primary mapping, no new mapping needed.
-        return addr;
-    }
-    else {
-        // we need a cross-over mapping. If one is already established, use that.
-        auto xover_mapping_addr = txl.xover_mapping_addr.load(std::memory_order_acquire);
-        if (!xover_mapping_addr) {
-            // we need to establish a xover mapping - or wait for another thread to finish
-            // establishing one:
-            const_cast<Allocator*>(this)->get_or_add_xover_mapping(txl, idx, offset, size);
-            // reload (can be relaxed since the call above synchronizes on a mutex)
-            xover_mapping_addr = txl.xover_mapping_addr.load(std::memory_order_relaxed);
-        }
-        // array is now known to be inside the established xover mapping:
-        return xover_mapping_addr + (offset - txl.xover_mapping_base);
-    }
 }
 }
