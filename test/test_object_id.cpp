@@ -274,15 +274,27 @@ TEST(ObjectId_Query)
         auto col_id = table->get_column_key("alternative_id");
         Query q = table->column<ObjectId>(col) > t0;
         CHECK_EQUAL(q.count(), 999);
+        q = table->where().greater(col, t0);
+        CHECK_EQUAL(q.count(), 999);
         Query q1 = table->column<ObjectId>(col) < t25;
         CHECK_EQUAL(q1.count(), 25);
+        q1 = table->where().less(col, t25);
+        CHECK_EQUAL(q1.count(), 25);
+        q1 = table->where().less_equal(col, t25);
+        CHECK_EQUAL(q1.count(), 26);
         auto tv = q1.find_all();
         tv.sort(col, true);
         for (int i = 0; i < 25; i++) {
             CHECK_EQUAL(tv.get(i).get<int64_t>(col_int), i);
         }
         Query q2 = table->column<ObjectId>(col_id) == alternative_id;
+        // std::cout << q2.get_description() << std::endl;
         CHECK_EQUAL(q2.count(), 34);
+        q2 = table->column<ObjectId>(col_id) == realm::null();
+        // std::cout << q2.get_description() << std::endl;
+        CHECK_EQUAL(q2.count(), 1000 - 34);
+        q2 = table->where().equal(col_id, realm::null());
+        CHECK_EQUAL(q2.count(), 1000 - 34);
 
         std::ostringstream ostr;
         tv.to_json(ostr); // just check that it does not crash
