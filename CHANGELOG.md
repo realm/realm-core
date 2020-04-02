@@ -4,6 +4,7 @@
 * 'old-query' support added for Decimal128 and ObjectId
 
 ### Fixed
+* Previous enhancement "Requirement to have a contiguous memory mapping of the entire realm file is removed." is reverted. Caused various problems.
 * When upgrading a realm file containing a table with integer primary keys, the program could sometimes crash.
  
 ### This release also includes the fixes contained in v5.27.9:
