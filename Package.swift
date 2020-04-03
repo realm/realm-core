@@ -14,6 +14,10 @@ let package = Package(
         .library(
             name: "RealmCore",
             targets: ["RealmCore"]),
+        .library(
+            name: "RealmCoreDynamic",
+            type: .dynamic,
+            targets: ["RealmCore"]),
     ],
     targets: [
         .target(
@@ -25,7 +29,20 @@ let package = Package(
                 "realm/metrics",
                 "realm/exec",
                 "win32",
-                "external"
+            ],
+            sources: [
+                "realm",
+                "external/IntelRDFPMathLib20U2/LIBRARY/src/bid128.c",
+                "external/IntelRDFPMathLib20U2/LIBRARY/src/bid128_compare.c",
+                "external/IntelRDFPMathLib20U2/LIBRARY/src/bid128_div.c",
+                "external/IntelRDFPMathLib20U2/LIBRARY/src/bid128_add.c",
+                "external/IntelRDFPMathLib20U2/LIBRARY/src/bid128_fma.c",
+                "external/IntelRDFPMathLib20U2/LIBRARY/src/bid64_to_bid128.c",
+                "external/IntelRDFPMathLib20U2/LIBRARY/src/bid_convert_data.c",
+                "external/IntelRDFPMathLib20U2/LIBRARY/src/bid_decimal_data.c",
+                "external/IntelRDFPMathLib20U2/LIBRARY/src/bid_decimal_globals.c",
+                "external/IntelRDFPMathLib20U2/LIBRARY/src/bid_from_int.c",
+                "external/IntelRDFPMathLib20U2/LIBRARY/src/bid_round.c"
             ],
             publicHeadersPath: ".",
             cxxSettings: [
