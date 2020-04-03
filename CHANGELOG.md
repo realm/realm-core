@@ -1,19 +1,14 @@
-# NEXT RELEASE
+# 10.0.0-alpha.4 Release notes
 
 ### Enhancements
-* None.
+* 'old-query' support added for Decimal128 and ObjectId
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Previous enhancement "Requirement to have a contiguous memory mapping of the entire realm file is removed." is reverted. Caused various problems.
+* When upgrading a realm file containing a table with integer primary keys, the program could sometimes crash.
  
-### Breaking changes
-* None.
-
------------
-
-### Internals
-* None.
+### This release also includes the fixes contained in v5.27.9:
+* Fix a crash on startup on macOS 10.10 and 10.11. ([Cocoa #6403](https://github.com/realm/realm-cocoa/issues/6403), since 2.9.0).
 
 ----------------------------------------------
 
