@@ -529,6 +529,9 @@ def doBuildMacOs(String buildType, boolean runTests) {
                     runAndCollectWarnings(parser: 'clang', script: 'ninja package')
                 }
             }
+            withEnv(['DEVELOPER_DIR=/Applications/Xcode-11.app/Contents/Developer/']) {
+                runAndCollectWarnings(parser: 'clang', script: 'xcrun swift build')
+            }
 
             archiveArtifacts("build-macosx-${buildType}/*.tar.gz")
 
