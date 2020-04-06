@@ -26,7 +26,6 @@
 #include "object_store.hpp"
 #include "results.hpp"
 #include "util/event_loop_dispatcher.hpp"
-#include "util/event_loop_signal.hpp"
 
 #include "sync/sync_manager.hpp"
 #include "sync/sync_user.hpp"
@@ -107,18 +106,7 @@ public:
     std::queue<RealmToCalculate*> m_work_queue;
     std::unordered_map<GlobalKey, RealmToCalculate> m_realms;
 
-    struct SignalCallback {
-        std::weak_ptr<Impl> notifier;
-        void operator()()
-        {
-            if (auto alive = notifier.lock()) {
-                GlobalNotifier notifier(alive);
-                alive->m_target->realm_changed(&notifier);
-            }
-        }
-    };
-
-    std::shared_ptr<util::EventLoopSignal<SignalCallback>> m_signal;
+    std::shared_ptr<util::Scheduler> m_scheduler = util::Scheduler::make_default();
 };
 
 GlobalNotifier::Impl::Impl(std::unique_ptr<Callback> async_target,
@@ -172,7 +160,7 @@ void GlobalNotifier::Impl::register_realm(GlobalKey id, StringData path) {
         if (info->versions.size() == 1) {
             m_logger->trace("Global notifier: Signaling main thread");
             m_work_queue.push(info);
-            m_signal->notify();
+            m_scheduler->notify();
         }
     });
 }
@@ -193,7 +181,7 @@ void GlobalNotifier::Impl::unregister_realm(GlobalKey id, StringData path) {
 
     if (realm->second.versions.empty()) {
         m_work_queue.push(&realm->second);
-        m_signal->notify();
+        m_scheduler->notify();
     }
 }
 
@@ -241,7 +229,7 @@ void GlobalNotifier::Impl::release_version(GlobalKey id, VersionID old_version, 
 
     if (!m_work_queue.empty()) {
         m_logger->trace("Global notifier: Signaling main thread");
-        m_signal->notify();
+        m_scheduler->notify();
     }
 }
 
@@ -252,7 +240,12 @@ GlobalNotifier::GlobalNotifier(std::unique_ptr<Callback> async_target,
                                                 std::move(sync_config_template)))
 {
     std::weak_ptr<GlobalNotifier::Impl> weak_impl = m_impl;
-    m_impl->m_signal = std::make_shared<util::EventLoopSignal<Impl::SignalCallback>>(Impl::SignalCallback{weak_impl});
+    m_impl->m_scheduler->set_notify_callback([weak_impl] {
+        if (auto impl = weak_impl.lock()) {
+            GlobalNotifier notifier(impl);
+            impl->m_target->realm_changed(&notifier);
+        }
+    });
 }
 
 void GlobalNotifier::start()

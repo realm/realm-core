@@ -28,6 +28,7 @@
 #include "results.hpp"
 #include "schema.hpp"
 #include "thread_safe_reference.hpp"
+#include "util/scheduler.hpp"
 
 #include "impl/object_accessor_impl.hpp"
 
@@ -486,6 +487,7 @@ TEST_CASE("thread safe reference") {
             REQUIRE(results.get<int64_t>(2) == 2);
             auto ref = ThreadSafeReference(results);
             std::thread([ref = std::move(ref), config]() mutable {
+                config.scheduler = util::Scheduler::get_frozen();
                 SharedRealm r = Realm::get_shared_realm(config);
                 Results results = ref.resolve<Results>(r);
 
@@ -537,6 +539,7 @@ TEST_CASE("thread safe reference") {
 
             auto ref = ThreadSafeReference(results);
             std::thread([ref = std::move(ref), config]() mutable {
+                config.scheduler = util::Scheduler::get_frozen();
                 SharedRealm r = Realm::get_shared_realm(config);
                 Results results = ref.resolve<Results>(r);
 

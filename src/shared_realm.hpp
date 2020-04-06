@@ -19,7 +19,6 @@
 #ifndef REALM_REALM_HPP
 #define REALM_REALM_HPP
 
-#include "execution_context_id.hpp"
 #include "schema.hpp"
 
 #include <realm/util/optional.hpp>
@@ -44,11 +43,15 @@ class Realm;
 class Replication;
 class StringData;
 class Table;
-class Transaction;
 class ThreadSafeReference;
+class Transaction;
 struct SyncConfig;
 typedef std::shared_ptr<Realm> SharedRealm;
 typedef std::weak_ptr<Realm> WeakRealm;
+
+namespace util {
+class Scheduler;
+}
 
 namespace _impl {
     class AnyHandover;
@@ -237,7 +240,7 @@ public:
 
         // The identifier of the abstract execution context in which this Realm will be used.
         // If unset, the current thread's identifier will be used to identify the execution context.
-        util::Optional<AbstractExecutionContextID> execution_context;
+        std::shared_ptr<util::Scheduler> scheduler;
 
         /// A data structure storing data used to configure the Realm for sync support.
         std::shared_ptr<SyncConfig> sync_config;
@@ -259,7 +262,7 @@ public:
 
     // Get a Realm for the given execution context (or current thread if `none`)
     // from the thread safe reference. May return a cached Realm or create a new one.
-    static SharedRealm get_shared_realm(ThreadSafeReference, util::Optional<AbstractExecutionContextID> = util::none);
+    static SharedRealm get_shared_realm(ThreadSafeReference, std::shared_ptr<util::Scheduler> = nullptr);
 
 #if REALM_ENABLE_SYNC
     // Open a synchronized Realm and make sure it is fully up to date before
@@ -348,6 +351,7 @@ public:
     bool verify_notifications_available(bool throw_on_error = true) const;
 
     bool can_deliver_notifications() const noexcept;
+    std::shared_ptr<util::Scheduler> scheduler() const noexcept { return m_scheduler; }
 
     // Close this Realm. Continuing to use a Realm after closing it will throw ClosedRealmException
     void close();
@@ -410,7 +414,7 @@ private:
 
     Config m_config;
     util::Optional<VersionID> m_frozen_version;
-    AnyExecutionContextID m_execution_context;
+    std::shared_ptr<util::Scheduler> m_scheduler;
     bool m_auto_refresh = true;
 
     std::shared_ptr<Group> m_group;

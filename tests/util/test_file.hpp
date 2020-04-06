@@ -25,6 +25,8 @@
 #include <realm/util/logger.hpp>
 #include <realm/util/optional.hpp>
 
+#include <thread>
+
 #if REALM_ENABLE_SYNC
 #include "sync/sync_config.hpp"
 

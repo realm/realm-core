@@ -27,7 +27,7 @@
 #include "sync/sync_manager.hpp"
 #include "sync/sync_session.hpp"
 #include "sync/sync_user.hpp"
-#include "util/event_loop_signal.hpp"
+#include "util/scheduler.hpp"
 #include "util/uuid.hpp"
 
 #include <realm/query_expression.hpp>

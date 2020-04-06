@@ -19,8 +19,6 @@
 #ifndef REALM_WEAK_REALM_NOTIFIER_HPP
 #define REALM_WEAK_REALM_NOTIFIER_HPP
 
-#include "execution_context_id.hpp"
-
 #include <memory>
 #include <thread>
 
@@ -28,7 +26,7 @@ namespace realm {
 class Realm;
 
 namespace util {
-template<typename> class EventLoopSignal;
+class Scheduler;
 }
 
 namespace _impl {
@@ -39,7 +37,7 @@ namespace _impl {
 // a Realm instance is released from within a function holding the cache lock.
 class WeakRealmNotifier {
 public:
-    WeakRealmNotifier(const std::shared_ptr<Realm>& realm, bool bind_to_context);
+    WeakRealmNotifier(const std::shared_ptr<Realm>& realm);
     ~WeakRealmNotifier();
 
     // Get a strong reference to the cached realm
@@ -53,18 +51,12 @@ public:
 
     void notify();
 
-    void bind_to_execution_context(AnyExecutionContextID context);
+    void bind_to_execution_context();
 
 private:
     std::weak_ptr<Realm> m_realm;
-    AnyExecutionContextID m_execution_context;
     void* m_realm_key;
-
-    struct Callback {
-        const std::weak_ptr<Realm> weak_realm;
-        void operator()() const;
-    };
-    std::shared_ptr<util::EventLoopSignal<Callback>> m_signal;
+    std::shared_ptr<util::Scheduler> m_scheduler;
 };
 
 } // namespace _impl

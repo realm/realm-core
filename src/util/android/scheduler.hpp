@@ -19,11 +19,11 @@
 #include <algorithm>
 #include <memory>
 #include <mutex>
-#include <shared_mutex>
 #include <vector>
 
 #include <errno.h>
 #include <fcntl.h>
+#include <pthread.h>
 #include <unistd.h>
 #include <android/log.h>
 #include <android/looper.h>
@@ -33,44 +33,76 @@
     __android_log_print(ANDROID_LOG_ERROR, "REALM", __VA_ARGS__); \
 } while (0)
 
-namespace realm {
-namespace util {
-template<typename Callback>
-class EventLoopSignal : public std::enable_shared_from_this<EventLoopSignal<Callback>> {
-public:
-    EventLoopSignal(Callback&& callback)
-    : m_callback(std::move(callback)), m_looper(ALooper_forThread()) {
-        if (!m_looper) {
-            return;
-        }
-        ALooper_acquire(m_looper);
-        // Delay the alooper initialization to the first time notify called.
+namespace {
+using namespace realm;
+
+// Write a byte to a pipe to notify anyone waiting for data on the pipe
+void notify_fd(int write_fd)
+{
+    char c = 0;
+    ssize_t ret = write(write_fd, &c, 1);
+    if (ret == 1) {
+        return;
     }
 
-    ~EventLoopSignal()
-    {
-        if (!m_looper) {
-            return;
+    // If the pipe's buffer is full, ALOOPER_EVENT_INPUT will be triggered anyway. Also the buffer clearing happens
+    // before calling the callback. So after this call, the callback will be called. Just return here.
+    if (ret != 0) {
+        int err = errno;
+        if (err != EAGAIN) {
+            throw std::system_error(err, std::system_category());
         }
+    }
+}
 
-        if (inited) {
+// ALooper doesn't have any functionality for managing the lifetime of the data
+// pointer object for the callback, and also doesn't make any guarantees about
+// the behavior that make it possible to safely manage the lifetime externally.
+//
+// Our solution is to keep track of the addresses of currently live schedulers.
+// The looper callback checks if the data pointer is in this list, and if so
+// attempts to acquire a strong reference to it. If the callback runs after
+// the scheduler's destructor the first check will fail; if it runs during the
+// scheduler's destructor the second will fail.
+//
+// There is a possible false-positive here where a scheduler could be destroyed
+// and then a new one is allocated at the same memory address, which will result
+// in the new one's callback being invoked.
+std::mutex s_schedulers_mutex;
+std::vector<void*> s_live_schedulers;
+
+class ALooperScheduler : public util::Scheduler, public std::enable_shared_from_this<ALooperScheduler> {
+public:
+    ALooperScheduler()
+    {
+        if (m_looper)
+            ALooper_acquire(m_looper);
+    }
+
+    ~ALooperScheduler()
+    {
+        if (!m_looper)
+            return;
+
+        if (m_initialized) {
             ALooper_removeFd(m_looper, m_message_pipe.read);
             ::close(m_message_pipe.write);
             ::close(m_message_pipe.read);
             {
-                std::unique_lock<std::shared_timed_mutex> lock(s_mutex);
-                s_weak_ptrs.erase(std::remove(s_weak_ptrs.begin(), s_weak_ptrs.end(), &m_weak), s_weak_ptrs.end());
+                std::unique_lock<std::mutex> lock(s_schedulers_mutex);
+                s_live_schedulers.erase(std::remove(s_live_schedulers.begin(), s_live_schedulers.end(), this),
+                                        s_live_schedulers.end());
             }
         }
         ALooper_release(m_looper);
     }
 
-    EventLoopSignal(EventLoopSignal&&) = delete;
-    EventLoopSignal& operator=(EventLoopSignal&&) = delete;
-    EventLoopSignal(EventLoopSignal const&) = delete;
-    EventLoopSignal& operator=(EventLoopSignal const&) = delete;
+    void set_notify_callback(std::function<void()> fn) override
+    {
+        m_callback = std::move(fn);
+    }
 
-    void notify()
+    void notify() override
     {
         if (m_looper) {
             init();
@@ -78,21 +110,17 @@ public:
         }
     }
 
-private:
-    Callback m_callback;
-    // Acquire a ref to looper since we may init/destroy in a different thread.
-    ALooper* m_looper;
-    // weak_ptr points to this.
-    std::weak_ptr<EventLoopSignal> m_weak;
-    // Flag to avoid checking the weak_ptr.
-    bool inited = false;
+    bool can_deliver_notifications() const noexcept override { return true; }
+    bool is_on_thread() const noexcept override
+    {
+        return m_thread == pthread_self();
+    }
 
-    // We cannot unregister in the looper callback since it may not be called at all (eg. IntentService).
-    // And we have to ensure the looper callback has a valid this pointer to use.
-    // To achieve that, a list is used to maintain every weak_ptr to this object, and check if the data in the
-    // callback param is in the list.
-    static std::vector<std::weak_ptr<EventLoopSignal>*> s_weak_ptrs;
-    static std::shared_timed_mutex s_mutex; // shared_mutex is available from C++ 17
+private:
+    std::function<void()> m_callback;
+    ALooper* m_looper = ALooper_forThread();
+    pthread_t m_thread = pthread_self();
+    bool m_initialized = false;
 
     // pipe file descriptor pair we use to signal ALooper
     struct {
@@ -100,18 +128,15 @@ private:
       int write = -1;
     } m_message_pipe;
 
-    // We need to delay the init to the first time notify since we cannot get the weak_ptr in the contructor.
-    inline void init()
+    void init()
     {
-        if (inited) {
+        if (m_initialized)
             return;
-        }
-        inited = true;
+        m_initialized = true;
 
-        m_weak = this->shared_from_this();
         {
-            std::unique_lock<std::shared_timed_mutex> lock(s_mutex);
-            s_weak_ptrs.push_back(&m_weak);
+            std::unique_lock<std::mutex> lock(s_schedulers_mutex);
+            s_live_schedulers.push_back(this);
         }
 
         int message_pipe[2];
@@ -130,7 +155,7 @@ private:
 
         if (ALooper_addFd(m_looper, message_pipe[0], ALOOPER_POLL_CALLBACK,
                           ALOOPER_EVENT_INPUT,
-                          &looper_callback, &m_weak) != 1) {
+                          &looper_callback, this) != 1) {
             LOGE("Error adding WeakRealmNotifier callback to looper.");
             ::close(message_pipe[0]);
             ::close(message_pipe[1]);
@@ -145,14 +170,13 @@ private:
     static int looper_callback(int fd, int events, void* data)
     {
         if ((events & ALOOPER_EVENT_INPUT) != 0) {
-            std::shared_ptr<EventLoopSignal> shared;
+            std::shared_ptr<ALooperScheduler> shared;
             {
-                std::shared_lock<std::shared_timed_mutex> lock(s_mutex);
-                auto weak = static_cast<std::weak_ptr<EventLoopSignal>*>(data);
-                if (std::find(s_weak_ptrs.begin(), s_weak_ptrs.end(), weak) != s_weak_ptrs.end()) {
+                std::lock_guard<std::mutex> lock(s_schedulers_mutex);
+                if (std::find(s_live_schedulers.begin(), s_live_schedulers.end(), data) != s_live_schedulers.end()) {
                     // Even if the weak_ptr can be found in the list, the object still can be destroyed in between.
                     // But share_ptr can ensure we either have a valid pointer or the object has gone.
-                    shared = weak->lock();
+                    shared = static_cast<ALooperScheduler*>(data)->shared_from_this();
                 }
             }
             if (shared) {
@@ -178,31 +202,14 @@ private:
         // return 1 to continue receiving events
         return 1;
     }
-
-    // Write a byte to a pipe to notify anyone waiting for data on the pipe
-    static void notify_fd(int write_fd)
-    {
-        char c = 0;
-        ssize_t ret = write(write_fd, &c, 1);
-        if (ret == 1) {
-            return;
-        }
-
-        // If the pipe's buffer is full, ALOOPER_EVENT_INPUT will be triggered anyway. Also the buffer clearing happens
-        // before calling the callback. So after this call, the callback will be called. Just return here.
-        if (ret != 0) {
-            int err = errno;
-            if (err != EAGAIN) {
-                throw std::system_error(err, std::system_category());
-            }
-        }
-    }
 };
+} // anonymous namespace
 
-template<typename Callback>
-std::vector<std::weak_ptr<EventLoopSignal<Callback>>*> EventLoopSignal<Callback>::s_weak_ptrs;
-template<typename Callback>
-std::shared_timed_mutex EventLoopSignal<Callback>::s_mutex;
-
+namespace realm {
+namespace util {
+std::shared_ptr<Scheduler> Scheduler::make_default()
+{
+    return std::make_shared<ALooperScheduler>();
+}
 } // namespace util
 } // namespace realm
