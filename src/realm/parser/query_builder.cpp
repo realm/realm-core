@@ -841,10 +841,10 @@ void add_comparison_to_query(Query& query, const Predicate& pred, Arguments& arg
         // value vs value expressions are not supported (ex: 2 < 3 or null != null)
         throw std::logic_error("Predicate expressions must compare a keypath and another keypath or a constant value");
     }
-    ExpressionContainer lhs(query, cmpr.expr[0], args, mapping);
+    ExpressionContainer lhs(query, cmpr.expr[0], args, mapping, cmpr.compare_type);
     ExpressionContainer rhs(query, cmpr.expr[1], args, mapping);
 
-    preprocess_for_comparison_types(query, cmpr, lhs, rhs, args, mapping);
+    // preprocess_for_comparison_types(query, cmpr, lhs, rhs, args, mapping);
 
     if (lhs.is_null()) {
         add_null_comparison_to_query(query, cmpr, rhs, NullLocation::NullOnLHS);

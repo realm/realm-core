@@ -35,8 +35,9 @@ namespace parser {
 class ExpressionContainer
 {
 public:
-    ExpressionContainer(Query& query, const parser::Expression& e, query_builder::Arguments& args,
-                        parser::KeyPathMapping& mapping);
+    ExpressionContainer(
+        Query& query, const parser::Expression& e, query_builder::Arguments& args, parser::KeyPathMapping& mapping,
+        parser::Predicate::ComparisonType comparison_type = parser::Predicate::ComparisonType::Unspecified);
 
     bool is_null();
 

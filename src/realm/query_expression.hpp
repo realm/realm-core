@@ -430,6 +430,11 @@ public:
     {
         REALM_ASSERT(false); // Unimplemented
     }
+
+    virtual ExpressionComparisonType get_comparison_type() const
+    {
+        return ExpressionComparisonType::Any;
+    }
 };
 
 template <typename T, typename... Args>
@@ -1441,20 +1446,48 @@ public:
             REALM_ASSERT_DEBUG(false);
     }
 
+    // FIXME: move comparison type to scope to a Compare<> instead of a Columns.?
+
+
     // Given a TCond (==, !=, >, <, >=, <=) and two Value<T>, return index of first match
     template <class TCond>
-    REALM_FORCEINLINE static size_t compare_const(const Value<T>* left, Value<T>* right)
+    REALM_FORCEINLINE static size_t compare_const(const Value<T>* left, Value<T>* right,
+                                                  ExpressionComparisonType comparison)
     {
         TCond c;
 
-        size_t sz = right->ValueBase::m_values;
-        bool left_is_null = left->m_storage.is_null(0);
-        for (size_t m = 0; m < sz; m++) {
-            if (c(left->m_storage[0], right->m_storage[m], left_is_null, right->m_storage.is_null(m)))
-                return right->m_from_link_list ? 0 : m;
-        }
+        if (comparison == ExpressionComparisonType::None) {
+            size_t sz = right->ValueBase::m_values;
+            bool left_is_null = left->m_storage.is_null(0);
+            for (size_t m = 0; m < sz; m++) {
+                if (c(left->m_storage[0], right->m_storage[m], left_is_null, right->m_storage.is_null(m)))
+                    return not_found;
+                return 0; // FIXME: check index
+            }
 
-        return not_found; // no match
+            return not_found; // no match
+        }
+        else if (comparison == ExpressionComparisonType::All) {
+            size_t sz = right->ValueBase::m_values;
+            bool left_is_null = left->m_storage.is_null(0);
+            for (size_t m = 0; m < sz; m++) {
+                if (!c(left->m_storage[0], right->m_storage[m], left_is_null, right->m_storage.is_null(m)))
+                    return not_found;
+                return 0; // FIXME: return the right index
+            }
+
+            return not_found; // no match
+        }
+        else {
+            size_t sz = right->ValueBase::m_values;
+            bool left_is_null = left->m_storage.is_null(0);
+            for (size_t m = 0; m < sz; m++) {
+                if (c(left->m_storage[0], right->m_storage[m], left_is_null, right->m_storage.is_null(m)))
+                    return right->m_from_link_list ? 0 : m;
+            }
+
+            return not_found; // no match
+        }
     }
 
     template <class TCond>
@@ -2120,9 +2153,11 @@ Value<T> make_value_for_link(bool only_unary_links, size_t size)
 template <class T>
 class SimpleQuerySupport : public Subexpr2<T> {
 public:
-    SimpleQuerySupport(ColKey column, ConstTableRef table, std::vector<ColKey> links = {})
+    SimpleQuerySupport(ColKey column, ConstTableRef table, std::vector<ColKey> links = {},
+                       ExpressionComparisonType type = ExpressionComparisonType::Any)
         : m_link_map(table, std::move(links))
         , m_column_key(column)
+        , m_comparison_type(type)
     {
     }
 
@@ -2274,7 +2309,7 @@ public:
 
     virtual std::string description(util::serializer::SerialisationState& state) const override
     {
-        return state.describe_columns(m_link_map, m_column_key);
+        return state.describe_expression_type(m_comparison_type) + state.describe_columns(m_link_map, m_column_key);
     }
 
     std::unique_ptr<Subexpr> clone() const override
@@ -2286,6 +2321,7 @@ public:
         : Subexpr2<T>(other)
         , m_link_map(other.m_link_map)
         , m_column_key(other.m_column_key)
+        , m_comparison_type(other.m_comparison_type)
     {
     }
 
@@ -2312,6 +2348,7 @@ private:
     LeafCacheStorage m_leaf_cache_storage;
     LeafPtr m_array_ptr;
     LeafType* m_leaf_ptr = nullptr;
+    ExpressionComparisonType m_comparison_type;
 };
 
 
@@ -2338,8 +2375,9 @@ class Columns<Decimal128> : public SimpleQuerySupport<Decimal128> {
 template <>
 class Columns<StringData> : public SimpleQuerySupport<StringData> {
 public:
-    Columns(ColKey column, ConstTableRef table, std::vector<ColKey> links = {})
-        : SimpleQuerySupport(column, table, links)
+    Columns(ColKey column, ConstTableRef table, std::vector<ColKey> links = {},
+            ExpressionComparisonType type = ExpressionComparisonType::Any)
+        : SimpleQuerySupport(column, table, links, type)
     {
     }
 
@@ -2865,11 +2903,79 @@ private:
     friend class Table;
     friend class LinkChain;
 
-    Columns(ColKey column_key, ConstTableRef table, const std::vector<ColKey>& links = {})
+    Columns(ColKey column_key, ConstTableRef table, const std::vector<ColKey>& links = {},
+            ExpressionComparisonType type = ExpressionComparisonType::Any)
         : m_link_map(table, links)
     {
         static_cast<void>(column_key);
     }
+};
+
+class PrimitiveListCount : public Subexpr2<Int> {
+public:
+    PrimitiveListCount(const Query& q, const LinkMap& link_map)
+        : m_query(q)
+        , m_link_map(link_map)
+    {
+        REALM_ASSERT(q.produces_results_in_table_order());
+        REALM_ASSERT(m_query.get_table() == m_link_map.get_target_table());
+    }
+
+    ConstTableRef get_base_table() const override
+    {
+        return m_link_map.get_base_table();
+    }
+
+    void set_base_table(ConstTableRef table) override
+    {
+        m_link_map.set_base_table(table);
+        m_query.set_table(m_link_map.get_target_table().cast_away_const());
+    }
+
+    void set_cluster(const Cluster* cluster) override
+    {
+        m_link_map.set_cluster(cluster);
+    }
+
+    void collect_dependencies(std::vector<TableKey>& tables) const override
+    {
+        m_link_map.collect_dependencies(tables);
+    }
+
+    void evaluate(size_t index, ValueBase& destination) override
+    {
+        std::vector<ObjKey> links = m_link_map.get_links(index);
+        // std::sort(links.begin(), links.end());
+        m_query.init();
+
+        size_t count = std::accumulate(links.begin(), links.end(), size_t(0), [this](size_t running_count, ObjKey k) {
+            ConstObj obj = m_link_map.get_target_table()->get_object(k);
+            return running_count + m_query.eval_object(obj);
+        });
+
+        destination.import(Value<Int>(false, 1, size_t(count)));
+    }
+
+    virtual std::string description(util::serializer::SerialisationState& state) const override
+    {
+        REALM_ASSERT(m_link_map.get_base_table() != nullptr);
+        std::string target = state.describe_columns(m_link_map, ColKey());
+        std::string var_name = state.get_variable_name(m_link_map.get_base_table());
+        state.subquery_prefix_list.push_back(var_name);
+        std::string desc = "SUBQUERY(" + target + ", " + var_name + ", " + m_query.get_description(state) + ")" +
+                           util::serializer::value_separator + "@count";
+        state.subquery_prefix_list.pop_back();
+        return desc;
+    }
+
+    std::unique_ptr<Subexpr> clone() const override
+    {
+        return make_subexpr<PrimitiveListCount>(*this);
+    }
+
+private:
+    Query m_query;
+    LinkMap m_link_map;
 };
 
 template <typename T>
@@ -2889,15 +2995,18 @@ class Average;
 
 class ColumnListBase {
 public:
-    ColumnListBase(ColKey column_key, ConstTableRef table, const std::vector<ColKey>& links)
+    ColumnListBase(ColKey column_key, ConstTableRef table, const std::vector<ColKey>& links,
+                   ExpressionComparisonType type = ExpressionComparisonType::Any)
         : m_column_key(column_key)
         , m_link_map(table, links)
+        , m_comparison_type(type)
     {
     }
 
     ColumnListBase(const ColumnListBase& other)
         : m_column_key(other.m_column_key)
         , m_link_map(other.m_link_map)
+        , m_comparison_type(other.m_comparison_type)
     {
     }
 
@@ -2907,7 +3016,7 @@ public:
 
     std::string description(util::serializer::SerialisationState& state) const
     {
-        return state.describe_columns(m_link_map, m_column_key);
+        return state.describe_expression_type(m_comparison_type) + state.describe_columns(m_link_map, m_column_key);
     }
 
     bool links_exist() const
@@ -2923,6 +3032,7 @@ public:
     LeafCacheStorage m_leaf_cache_storage;
     LeafPtr m_array_ptr;
     ArrayList* m_leaf_ptr = nullptr;
+    ExpressionComparisonType m_comparison_type = ExpressionComparisonType::Any;
 };
 
 template <typename>
@@ -2996,6 +3106,11 @@ public:
         return ColumnListBase::description(state);
     }
 
+    virtual ExpressionComparisonType get_comparison_type() const override
+    {
+        return ColumnListBase::m_comparison_type;
+    }
+
     SizeOperator<SizeOfList> size();
 
     ListColumnAggregate<T, aggregate_operations::Minimum<T>> min() const
@@ -3018,13 +3133,18 @@ public:
         return {m_column_key, *this};
     }
 
+    PrimitiveListCount subquery(const Query& q) const
+    {
+        return PrimitiveListCount(q, m_link_map);
+    }
 
 private:
     friend class Table;
     friend class LinkChain;
 
-    Columns(ColKey column_key, ConstTableRef table, const std::vector<ColKey>& links = {})
-        : ColumnListBase(column_key, table, links)
+    Columns(ColKey column_key, ConstTableRef table, const std::vector<ColKey>& links = {},
+            ExpressionComparisonType type = ExpressionComparisonType::Any)
+        : ColumnListBase(column_key, table, links, type)
     {
     }
 };
@@ -3234,10 +3354,12 @@ class Columns : public Subexpr2<T> {
 public:
     using LeafType = typename ColumnTypeTraits<T>::cluster_leaf_type;
 
-    Columns(ColKey column, ConstTableRef table, std::vector<ColKey> links = {})
+    Columns(ColKey column, ConstTableRef table, std::vector<ColKey> links = {},
+            ExpressionComparisonType type = ExpressionComparisonType::Any)
         : m_link_map(table, std::move(links))
         , m_column_key(column)
         , m_nullable(m_link_map.get_target_table()->is_nullable(m_column_key))
+        , m_comparison_type(type)
     {
     }
 
@@ -3245,6 +3367,7 @@ public:
         : m_link_map(other.m_link_map)
         , m_column_key(other.m_column_key)
         , m_nullable(other.m_nullable)
+        , m_comparison_type(other.m_comparison_type)
     {
     }
 
@@ -3254,6 +3377,7 @@ public:
             m_link_map = other.m_link_map;
             m_column_key = other.m_column_key;
             m_nullable = other.m_nullable;
+            m_comparison_type = other.m_comparison_type;
         }
         return *this;
     }
@@ -3456,6 +3580,11 @@ public:
         return m_column_key;
     }
 
+    virtual ExpressionComparisonType get_comparison_type() const override
+    {
+        return m_comparison_type;
+    }
+
 private:
     LinkMap m_link_map;
 
@@ -3472,6 +3601,7 @@ private:
     // set to false by default for stand-alone Columns declaration that are not yet associated with any table
     // or oclumn. Call init() to update it or use a constructor that takes table + column index as argument.
     bool m_nullable = false;
+    ExpressionComparisonType m_comparison_type = ExpressionComparisonType::Any;
 };
 
 template <typename T, typename Operation>
@@ -4160,7 +4290,8 @@ public:
         for (; start < end;) {
             if (m_left_is_const) {
                 m_right->evaluate(start, right);
-                match = Value<T>::template compare_const<TCond>(&m_left_value, &right);
+                match =
+                    Value<T>::template compare_const<TCond>(&m_left_value, &right, m_right->get_comparison_type());
             }
             else {
                 m_left->evaluate(start, left);

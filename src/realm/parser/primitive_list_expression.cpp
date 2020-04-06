@@ -24,16 +24,18 @@
 namespace realm {
 namespace parser {
 
-PrimitiveListExpression::PrimitiveListExpression(Query& q, std::vector<KeyPathElement>&& chain)
+PrimitiveListExpression::PrimitiveListExpression(Query& q, std::vector<KeyPathElement>&& chain,
+                                                 ExpressionComparisonType type)
     : query(q)
     , link_chain(std::move(chain))
+    , comparison_type(type)
 {
 }
 
 LinkChain PrimitiveListExpression::link_chain_getter() const
 {
     auto& tbl = query.get_table();
-    return KeyPathMapping::link_chain_getter(tbl, link_chain);
+    return KeyPathMapping::link_chain_getter(tbl, link_chain, comparison_type);
 }
 
 } // namespace parser

@@ -29,11 +29,12 @@ namespace parser {
 struct PrimitiveListExpression {
     Query& query;
     std::vector<KeyPathElement> link_chain;
+    ExpressionComparisonType comparison_type;
     DataType get_dest_type() const;
     ColKey get_dest_col_key() const;
     ConstTableRef get_dest_table() const;
 
-    PrimitiveListExpression(Query& q, std::vector<KeyPathElement>&& chain);
+    PrimitiveListExpression(Query& q, std::vector<KeyPathElement>&& chain, ExpressionComparisonType type);
 
     LinkChain link_chain_getter() const;
 

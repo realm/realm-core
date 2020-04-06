@@ -68,7 +68,8 @@ public:
         return m_allow_backlinks;
     }
     void set_backlink_class_prefix(std::string prefix);
-    static LinkChain link_chain_getter(ConstTableRef table, const std::vector<KeyPathElement>& links);
+    static LinkChain link_chain_getter(ConstTableRef table, const std::vector<KeyPathElement>& links,
+                                       ExpressionComparisonType type = ExpressionComparisonType::Any);
 
 protected:
     bool m_allow_backlinks;
