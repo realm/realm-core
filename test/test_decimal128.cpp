@@ -50,6 +50,7 @@ TEST(Decimal_Basics)
     test_str("9.99e6144", "9.99E6144");  // largest decimal128
     test_str("1.701e38", "1.701E38");    // largest float
     test_str("1.797e308", "1.797E308");  // largest double
+    test_str("9.990000000000000000000000000000000E+6144", "9.99E6144"); // from BSON.Decimal128
 
     Decimal128 pi = Decimal128("3.141592653589793238"); // 19 significant digits
     CHECK_EQUAL(pi.to_string(), "3.141592653589793238");
