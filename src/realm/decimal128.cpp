@@ -505,7 +505,7 @@ std::string Decimal128::to_string() const
     exponen >>= 49;
     exponen -= DECIMAL_EXPONENT_BIAS_128;
     size_t digits_before = digits.length();
-    while (digits_before > 1 && exponen < 0) {
+    while (digits_before > 1 && exponen != 0) {
         digits_before--;
         exponen++;
     }
