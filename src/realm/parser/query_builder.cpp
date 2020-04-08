@@ -685,127 +685,63 @@ void add_comparison_to_query(Query& query, ExpressionContainer& lhs, const Predi
     }
 }
 
-
-std::pair<std::string, std::string> separate_list_parts(PropertyExpression& pe)
+// precheck some expressions to make sure we support them and if not, provide a meaningful error message
+void preprocess_for_comparison_types(Predicate::Comparison& cmpr, ExpressionContainer& lhs,
+                                     ExpressionContainer& rhs)
 {
-    std::string pre_and_list = "";
-    std::string post_list = "";
-    bool past_list = false;
-    for (KeyPathElement& e : pe.link_chain) {
-        std::string cur_name;
-        if (e.is_backlink) {
-            cur_name = std::string("@links") + util::serializer::value_separator + std::string(e.table->get_name()) +
-                       util::serializer::value_separator + std::string(e.table->get_column_name(e.col_key));
+    auto get_cmp_type_name = [&](parser::Expression::ComparisonType compare_type) {
+        if (compare_type == parser::Expression::ComparisonType::Any) {
+            return util::format("'%1' or 'SOME'", comparison_type_to_str(parser::Expression::ComparisonType::Any));
         }
-        else {
-            cur_name = e.table->get_column_name(e.col_key);
-        }
-        if (!past_list) {
-            if (!pre_and_list.empty()) {
-                pre_and_list += util::serializer::value_separator;
-            }
-            pre_and_list += cur_name;
-        }
-        else {
-            realm_precondition(
-                !e.is_backlink && e.col_type != type_LinkList,
-                util::format(
-                    "The keypath after '%1' must not contain any additional list properties, but '%2' is a list.",
-                    pre_and_list, cur_name));
-            if (!post_list.empty()) {
-                post_list += util::serializer::value_separator;
-            }
-            post_list += cur_name;
-        }
-        if (e.is_backlink || e.col_type == type_LinkList) {
-            past_list = true;
-        }
-    }
-    return {pre_and_list, post_list};
-}
-
-
-// some query types are not supported in core but can be produced by a transformation:
-// "ALL path.to.list.property >= 20"    --> "SUBQUERY(path.to.list, $x, $x.property >= 20).@count ==
-// path.to.list.@count"
-// "NONE path.to.list.property >= 20"   --> "SUBQUERY(path.to.list, $x, $x.property >= 20).@count == 0"
-void preprocess_for_comparison_types(Query& query, Predicate::Comparison& cmpr, ExpressionContainer& lhs,
-                                     ExpressionContainer& rhs, Arguments& args, parser::KeyPathMapping& mapping)
-{
-    auto get_cmp_type_name = [&]() {
-        if (cmpr.compare_type == Predicate::ComparisonType::Any) {
-            return util::format("'%1' or 'SOME'", comparison_type_to_str(Predicate::ComparisonType::Any));
-        }
-        return util::format("'%1'", comparison_type_to_str(cmpr.compare_type));
+        return util::format("'%1'", comparison_type_to_str(compare_type));
     };
 
-    if (cmpr.compare_type != Predicate::ComparisonType::Unspecified) {
-        realm_precondition(
-            lhs.type == ExpressionContainer::ExpressionInternal::exp_Property,
-            util::format("The expression after %1 must be a keypath containing a list", get_cmp_type_name()));
+    auto verify_comparison_type = [&](ExpressionContainer expression, parser::Expression::ComparisonType compare_type,
+                                      ExpressionContainer::ExpressionInternal opposite_type) {
         size_t list_count = 0;
-        for (KeyPathElement e : lhs.get_property().link_chain) {
-            if (e.col_type == type_LinkList || e.is_backlink) {
-                list_count++;
+        if (expression.type == ExpressionContainer::ExpressionInternal::exp_Property) {
+            for (KeyPathElement e : expression.get_property().link_chain) {
+                if (e.col_type == type_LinkList || e.is_backlink) {
+                    list_count++;
+                }
             }
         }
-        realm_precondition(list_count > 0,
-                           util::format("The keypath following %1 must contain a list", get_cmp_type_name()));
-        realm_precondition(list_count == 1,
-                           util::format("The keypath following %1 must contain only one list", get_cmp_type_name()));
-    }
-
-    if (cmpr.compare_type == Predicate::ComparisonType::All || cmpr.compare_type == Predicate::ComparisonType::None) {
-        realm_precondition(rhs.type == ExpressionContainer::ExpressionInternal::exp_Value,
-                           util::format("The comparison in an %1 clause must be between a keypath and a value",
-                                        get_cmp_type_name()));
-
-        parser::Expression exp(parser::Expression::Type::SubQuery);
-        std::pair<std::string, std::string> path_parts = separate_list_parts(lhs.get_property());
-        exp.subquery_path = path_parts.first;
-
-        util::serializer::SerialisationState temp_state;
-        std::string var_name;
-        for (var_name = temp_state.get_variable_name(query.get_table());
-             mapping.has_mapping(query.get_table(), var_name);
-             var_name = temp_state.get_variable_name(query.get_table())) {
-            temp_state.subquery_prefix_list.push_back(var_name);
+        else if (expression.type == ExpressionContainer::ExpressionInternal::exp_PrimitiveList) {
+            for (KeyPathElement e : expression.get_primitive_list().link_chain) {
+                if (e.col_type == type_LinkList || e.is_backlink || e.is_list_of_primitives) {
+                    list_count++;
+                }
+            }
+        }
+        if (compare_type != parser::Expression::ComparisonType::Unspecified) {
+            realm_precondition(expression.type == ExpressionContainer::ExpressionInternal::exp_Property
+                               || expression.type == ExpressionContainer::ExpressionInternal::exp_PrimitiveList,
+                               util::format("The expression after %1 must be a keypath containing a list", get_cmp_type_name(compare_type)));
+            realm_precondition(list_count > 0,
+                               util::format("The keypath following %1 must contain a list", get_cmp_type_name(compare_type)));
+            realm_precondition(list_count == 1,
+                               util::format("The keypath following %1 must contain only one list", get_cmp_type_name(compare_type)));
         }
 
-        exp.subquery_var = var_name;
-        exp.subquery = std::make_shared<Predicate>(Predicate::Type::Comparison);
-        exp.subquery->cmpr.expr[0] = parser::Expression(
-            parser::Expression::Type::KeyPath, var_name + util::serializer::value_separator + path_parts.second);
-        exp.subquery->cmpr.op = cmpr.op;
-        exp.subquery->cmpr.option = cmpr.option;
-        exp.subquery->cmpr.expr[1] = cmpr.expr[1];
-        cmpr.expr[0] = exp;
+        if (compare_type == parser::Expression::ComparisonType::All || compare_type == parser::Expression::ComparisonType::None) {
+            realm_precondition(opposite_type == ExpressionContainer::ExpressionInternal::exp_Value,
+                               util::format("The comparison in an %1 clause must be between a keypath and a value",
+                                            get_cmp_type_name(compare_type)));
+        }
+    };
 
-        lhs = ExpressionContainer(query, cmpr.expr[0], args, mapping);
-        cmpr.op = parser::Predicate::Operator::Equal;
-        cmpr.option = parser::Predicate::OperatorOption::None;
-
-        if (cmpr.compare_type == Predicate::ComparisonType::All) {
-            cmpr.expr[1] = parser::Expression(path_parts.first, parser::Expression::KeyPathOp::Count, "");
-            rhs = ExpressionContainer(query, cmpr.expr[1], args, mapping);
-        }
-        else if (cmpr.compare_type == Predicate::ComparisonType::None) {
-            cmpr.expr[1] = parser::Expression(parser::Expression::Type::Number, "0");
-            rhs = ExpressionContainer(query, cmpr.expr[1], args, mapping);
-        }
-        else {
-            REALM_UNREACHABLE();
-        }
-    }
+    verify_comparison_type(lhs, cmpr.expr[0].comparison_type, rhs.type);
+    verify_comparison_type(rhs, cmpr.expr[1].comparison_type, lhs.type);
 
     // Check that operator "IN" has a RHS keypath which is a list
     if (cmpr.op == Predicate::Operator::In) {
-        realm_precondition(rhs.type == ExpressionContainer::ExpressionInternal::exp_Property,
+        realm_precondition(rhs.type == ExpressionContainer::ExpressionInternal::exp_Property
+                           || rhs.type == ExpressionContainer::ExpressionInternal::exp_PrimitiveList,
                            "The expression following 'IN' must be a keypath to a list");
         auto get_list_count = [](const std::vector<KeyPathElement>& target_link_chain) {
             size_t list_count = 0;
             for (KeyPathElement e : target_link_chain) {
-                if (e.col_type == type_LinkList || e.is_backlink) {
+                if (e.col_type == type_LinkList || e.is_backlink || e.is_list_of_primitives) {
                     list_count++;
                 }
             }
@@ -819,8 +755,19 @@ void preprocess_for_comparison_types(Query& query, Predicate::Comparison& cmpr, 
             realm_precondition(lhs_list_count == 0, "The keypath preceeding 'IN' must not contain a list, list vs "
                                                     "list comparisons are not currently supported");
         }
+        else if (lhs.type == ExpressionContainer::ExpressionInternal::exp_PrimitiveList) {
+            size_t lhs_list_count = get_list_count(lhs.get_primitive_list().link_chain);
+            realm_precondition(lhs_list_count == 0, "The keypath preceeding 'IN' must not contain a list, list vs "
+                               "list comparisons are not currently supported");
+        }
 
-        size_t rhs_list_count = get_list_count(rhs.get_property().link_chain);
+        size_t rhs_list_count = 0;
+        if (rhs.type == ExpressionContainer::ExpressionInternal::exp_Property) {
+            rhs_list_count = get_list_count(rhs.get_property().link_chain);
+        }
+        else if (rhs.type == ExpressionContainer::ExpressionInternal::exp_PrimitiveList) {
+            rhs_list_count = get_list_count(rhs.get_primitive_list().link_chain);
+        }
         realm_precondition(rhs_list_count > 0, "The keypath following 'IN' must contain a list");
         realm_precondition(rhs_list_count == 1, "The keypath following 'IN' must contain only one list");
     }
@@ -841,10 +788,10 @@ void add_comparison_to_query(Query& query, const Predicate& pred, Arguments& arg
         // value vs value expressions are not supported (ex: 2 < 3 or null != null)
         throw std::logic_error("Predicate expressions must compare a keypath and another keypath or a constant value");
     }
-    ExpressionContainer lhs(query, cmpr.expr[0], args, mapping, cmpr.compare_type);
+    ExpressionContainer lhs(query, cmpr.expr[0], args, mapping);
     ExpressionContainer rhs(query, cmpr.expr[1], args, mapping);
 
-    // preprocess_for_comparison_types(query, cmpr, lhs, rhs, args, mapping);
+    preprocess_for_comparison_types(cmpr, lhs, rhs);
 
     if (lhs.is_null()) {
         add_null_comparison_to_query(query, cmpr, rhs, NullLocation::NullOnLHS);

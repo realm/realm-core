@@ -30,13 +30,14 @@ struct PropertyExpression
 {
     Query &query;
     std::vector<KeyPathElement> link_chain;
+    ExpressionComparisonType comparison_type;
     DataType get_dest_type() const;
     ColKey get_dest_col_key() const;
     ConstTableRef get_dest_table() const;
     bool dest_type_is_backlink() const;
     bool dest_type_is_list_of_primitives() const;
 
-    PropertyExpression(Query& q, std::vector<KeyPathElement>&& chain);
+    PropertyExpression(Query& q, std::vector<KeyPathElement>&& chain, ExpressionComparisonType type);
 
     LinkChain link_chain_getter() const;
 

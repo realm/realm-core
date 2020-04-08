@@ -24,28 +24,28 @@
 namespace realm {
 namespace parser {
 
-ExpressionComparisonType convert(parser::Predicate::ComparisonType type)
+ExpressionComparisonType convert(parser::Expression::ComparisonType type)
 {
     switch (type) {
-        case Predicate::ComparisonType::Unspecified:
+        case Expression::ComparisonType::Unspecified:
             REALM_FALLTHROUGH;
-        case Predicate::ComparisonType::Any:
+        case Expression::ComparisonType::Any:
             return ExpressionComparisonType::Any;
-        case Predicate::ComparisonType::All:
+        case Expression::ComparisonType::All:
             return ExpressionComparisonType::All;
-        case Predicate::ComparisonType::None:
+        case Expression::ComparisonType::None:
             return ExpressionComparisonType::None;
     }
+    REALM_UNREACHABLE();
 }
 
 ExpressionContainer::ExpressionContainer(Query& query, const parser::Expression& e, query_builder::Arguments& args,
-                                         parser::KeyPathMapping& mapping,
-                                         parser::Predicate::ComparisonType comparison_type)
+                                         parser::KeyPathMapping& mapping)
 {
     if (e.type == parser::Expression::Type::KeyPath) {
         std::vector<KeyPathElement> link_chain = parser::generate_link_chain_from_string(query, e.s, mapping);
-        if (link_chain.back().is_list_of_primitives) {
-            PrimitiveListExpression ple(query, std::move(link_chain), convert(comparison_type));
+        if (link_chain.size() > 0 && link_chain.back().is_list_of_primitives) {
+            PrimitiveListExpression ple(query, std::move(link_chain), convert(e.comparison_type));
             switch (e.collection_op) {
                 case parser::Expression::KeyPathOp::Min:
                     type = ExpressionInternal::exp_OpMinPrimitive;
@@ -92,7 +92,7 @@ ExpressionContainer::ExpressionContainer(Query& query, const parser::Expression&
             }
         }
         else {
-            PropertyExpression pe(query, std::move(link_chain));
+            PropertyExpression pe(query, std::move(link_chain), convert(e.comparison_type));
             switch (e.collection_op) {
                 case parser::Expression::KeyPathOp::Min:
                     type = ExpressionInternal::exp_OpMin;

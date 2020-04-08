@@ -123,7 +123,8 @@ KeyPathElement KeyPathMapping::process_next_path(ConstTableRef table, KeyPath& k
 
     DataType cur_col_type = table->get_column_type(col_key);
 
-    bool is_primitive_list = table->get_column_attr(col_key).test(ColumnAttr::col_attr_List);
+    bool is_primitive_list = table->get_column_attr(col_key).test(ColumnAttr::col_attr_List)
+        && cur_col_type != type_LinkList;
 
     index++;
     KeyPathElement element;

@@ -83,7 +83,7 @@ struct CollectionOperatorGetter {
 
 template <typename RetType>
 struct CollectionOperatorGetter<
-    RetType, parser::Expression::KeyPathOp::Min, PropertyExpression
+    RetType, parser::Expression::KeyPathOp::Min, PropertyExpression,
     typename std::enable_if_t<realm::is_any<RetType, Int, Float, Double, Decimal128>::value>> {
     static SubColumnAggregate<RetType, aggregate_operations::Minimum<RetType>>
     convert(const CollectionOperatorExpression<parser::Expression::KeyPathOp::Min, PropertyExpression>& expr)
@@ -107,7 +107,7 @@ template <typename RetType>
 struct CollectionOperatorGetter<
     RetType, parser::Expression::KeyPathOp::Min, PrimitiveListExpression,
     typename std::enable_if_t<realm::is_any<RetType, Int, Float, Double, Decimal128>::value>> {
-    static SubColumnAggregate<RetType, aggregate_operations::Minimum<RetType>>
+    static ListColumnAggregate<RetType, aggregate_operations::Minimum<RetType>>
     convert(const CollectionOperatorExpression<parser::Expression::KeyPathOp::Min, PrimitiveListExpression>& expr)
     {
         return expr.link_chain_getter().template column<Lst<RetType>>(expr.pe.get_dest_col_key()).min();
@@ -204,9 +204,9 @@ struct CollectionOperatorGetter<
 
 template <typename RetType>
 struct CollectionOperatorGetter<
-RetType, parser::Expression::KeyPathOp::Avg, PrimitiveListExpression,
-typename std::enable_if_t<realm::is_any<RetType, Int, Float, Double, Decimal128>::value>> {
-    static ListColumnAggregate<RetType, aggregate_operations::Sum<RetType>>
+    RetType, parser::Expression::KeyPathOp::Avg, PrimitiveListExpression,
+    typename std::enable_if_t<realm::is_any<RetType, Int, Float, Double, Decimal128>::value>> {
+    static ListColumnAggregate<RetType, aggregate_operations::Average<RetType>>
     convert(const CollectionOperatorExpression<parser::Expression::KeyPathOp::Avg, PrimitiveListExpression>& expr)
     {
         return expr.link_chain_getter().template column<Lst<RetType>>(expr.pe.get_dest_col_key()).average();
