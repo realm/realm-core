@@ -572,7 +572,12 @@ void SyncUserMetadata::set_user_profile(const SyncUserProfile& profile)
     m_realm->verify_thread();
     m_realm->begin_transaction();
 
-    auto obj = m_obj.create_and_set_linked_object(m_schema.idx_profile);
+    Obj obj;
+    if (m_obj.is_null(m_schema.idx_profile)) {
+        obj = m_obj.create_and_set_linked_object(m_schema.idx_profile);
+    } else {
+        obj = m_obj.get_linked_object(m_schema.idx_profile);
+    }
 
     if (profile.name)
         obj.set(c_sync_profile_name, *profile.name);

@@ -510,10 +510,9 @@ std::vector<std::shared_ptr<SyncUser>> App::all_users() const {
     return SyncManager::shared().all_users();
 }
 
-void App::get_profile(std::function<void(std::shared_ptr<SyncUser>, Optional<AppError>)> completion_block) const
+void App::get_profile(std::shared_ptr<SyncUser> sync_user,
+                      std::function<void(std::shared_ptr<SyncUser>, Optional<AppError>)> completion_block) const
 {
-    auto sync_user = current_user();
-
     auto profile_handler = [completion_block, sync_user](const Response& profile_response) {
         if (auto error = check_for_errors(profile_response)) {
             return completion_block(nullptr, error);
@@ -586,7 +585,7 @@ void App::log_in_with_credentials(const AppCredentials& credentials,
                                      credentials.provider_as_string(),
                                      linking_user ? "?link=true" : "");
 
-    auto handler = [completion_block, credentials, this](const Response& response) {
+    auto handler = [completion_block, credentials, linking_user, this](const Response& response) {
         if (auto error = check_for_errors(response)) {
             return completion_block(nullptr, error);
         }
@@ -600,18 +599,19 @@ void App::log_in_with_credentials(const AppCredentials& credentials,
 
         std::shared_ptr<realm::SyncUser> sync_user;
         try {
-            sync_user = realm::SyncManager::shared().get_user(value_from_json<std::string>(json, "user_id"),
-                                                              value_from_json<std::string>(json, "refresh_token"),
-                                                              value_from_json<std::string>(json, "access_token"),
-                                                              credentials.provider_as_string());
+            if (linking_user) {
+                linking_user->update_access_token(value_from_json<std::string>(json, "access_token"));
+            } else {
+                sync_user = realm::SyncManager::shared().get_user(value_from_json<std::string>(json, "user_id"),
+                                                                  value_from_json<std::string>(json, "refresh_token"),
+                                                                  value_from_json<std::string>(json, "access_token"),
+                                                                  credentials.provider_as_string());
+            }
         } catch (const AppError& err) {
             return completion_block(nullptr, err);
         }
 
-        std::string profile_route = util::format("%1/auth/profile", m_base_route);
-        std::string bearer = util::format("Bearer %1", sync_user->access_token());
-
-        App::get_profile(completion_block);
+        App::get_profile(linking_user ? linking_user : sync_user, completion_block);
     };
 
     m_config.transport_generator()->send_request_to_server({

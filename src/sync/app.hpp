@@ -281,13 +281,13 @@ public:
     
     /// Links the currently authenticated user with a new identity, where the identity is defined by the credential
     /// specified as a parameter. This will only be successful if this `SyncUser` is the currently authenticated
-    /// with the client from which it was created. On success a new user will be returned with the new linked credentials.
+    /// with the client from which it was created. On success the user will be returned with the new identity.
     ///
     /// @param user The user which will have the credentials linked to, the user must be logged in
     /// @param credentials The `AppCredentials` used to link the user to a new identity.
     /// @param completion_block The completion handler to call when the linking is complete.
-    ///                         If the operation is  successful, the result will contain a new
-    ///                         `SyncUser` object representing the currently logged in user.
+    ///                         If the operation is  successful, the result will contain the original
+    ///                         `SyncUser` object representing the user.
     void link_user(std::shared_ptr<SyncUser> user, const AppCredentials& credentials,
                    std::function<void(std::shared_ptr<SyncUser>, Optional<AppError>)> completion_block) const;
 
@@ -320,7 +320,8 @@ private:
     std::string m_auth_route;
     uint64_t m_request_timeout_ms;
     
-    void get_profile(std::function<void(std::shared_ptr<SyncUser>, Optional<AppError>)> completion_block) const;
+    void get_profile(std::shared_ptr<SyncUser> sync_user,
+                     std::function<void(std::shared_ptr<SyncUser>, Optional<AppError>)> completion_block) const;
     
     void log_in_with_credentials(const AppCredentials& credentials,
                                  const std::shared_ptr<SyncUser> linking_user,
