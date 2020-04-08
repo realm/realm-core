@@ -31,6 +31,9 @@ IdentityProvider const IdentityProviderFacebook = "oauth2-facebook";
 IdentityProvider const IdentityProviderApple = "oauth2-apple";
 IdentityProvider const IdentityProviderUsernamePassword = "local-userpass";
 IdentityProvider const IdentityProviderCustom = "custom-token";
+IdentityProvider const IdentityProviderFunction = "custom-function";
+IdentityProvider const IdentityProviderUserAPIKey = "api-key";
+IdentityProvider const IdentityProviderServerAPIKey = "api-key";
 
 IdentityProvider provider_type_from_enum(AuthProvider provider)
 {
@@ -48,6 +51,12 @@ IdentityProvider provider_type_from_enum(AuthProvider provider)
             return IdentityProviderCustom;
         case AuthProvider::USERNAME_PASSWORD:
             return IdentityProviderUsernamePassword;
+        case AuthProvider::FUNCTION:
+            return IdentityProviderFunction;
+        case AuthProvider::USER_API_KEY:
+            return IdentityProviderUserAPIKey;
+        case AuthProvider::SERVER_API_KEY:
+            return IdentityProviderServerAPIKey;
     }
     throw std::runtime_error("unknown provider type in provider_type_from_enum");
 }
@@ -136,6 +145,36 @@ AppCredentials AppCredentials::username_password(std::string username,
                                   {kAppProviderKey, IdentityProviderUsernamePassword},
                                   {"username", username},
                                   {"password", password}
+                              }).dump();
+                          });
+}
+
+AppCredentials AppCredentials::function(std::string payload_json)
+{
+    return AppCredentials(AuthProvider::FUNCTION,
+                          [=] {
+                            return payload_json;
+                          });
+}
+
+AppCredentials AppCredentials::user_api_key(std::string api_key)
+{
+    return AppCredentials(AuthProvider::USER_API_KEY,
+                          [=] {
+                              return nlohmann::json({
+                                  {kAppProviderKey, IdentityProviderUserAPIKey},
+                                  {"key", api_key}
+                              }).dump();
+                          });
+}
+
+AppCredentials AppCredentials::server_api_key(std::string api_key)
+{
+    return AppCredentials(AuthProvider::SERVER_API_KEY,
+                          [=] {
+                              return nlohmann::json({
+                                  {kAppProviderKey, IdentityProviderServerAPIKey},
+                                  {"key", api_key}
                               }).dump();
                           });
 }
