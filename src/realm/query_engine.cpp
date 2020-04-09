@@ -77,6 +77,32 @@ bool ParentNode::match(ConstObj& obj)
     return obj.evaluate(cb);
 }
 
+template <Action action>
+void ParentNode::aggregate_local_prepare(DataType col_id, bool nullable)
+{
+    switch (col_id) {
+        case type_Int: {
+            if (nullable)
+                m_column_action_specializer = &ThisType::column_action_specialization<action, ArrayIntNull>;
+            else
+                m_column_action_specializer = &ThisType::column_action_specialization<action, ArrayInteger>;
+            break;
+        }
+        case type_Float:
+            m_column_action_specializer = &ThisType::column_action_specialization<action, ArrayFloat>;
+            break;
+        case type_Double:
+            m_column_action_specializer = &ThisType::column_action_specialization<action, ArrayDouble>;
+            break;
+        case type_Decimal:
+            m_column_action_specializer = &ThisType::column_action_specialization<action, ArrayDecimal128>;
+            break;
+        default:
+            REALM_ASSERT(false);
+            break;
+    }
+}
+
 void ParentNode::aggregate_local_prepare(Action TAction, DataType col_id, bool nullable)
 {
     switch (TAction) {
@@ -91,92 +117,28 @@ void ParentNode::aggregate_local_prepare(Action TAction, DataType col_id, bool n
             // For find_all(), the column below is a dummy and the caller sets it to nullptr. Hence, no data is being
             // read from any column upon each query match (just matchcount++ is performed), and we pass nullable =
             // false simply by convention. FIXME: Clean up all this.
-            if (nullable)
-                REALM_ASSERT(false);
-            else
-                m_column_action_specializer = &ThisType::column_action_specialization<act_FindAll, ArrayInteger>;
+            REALM_ASSERT(!nullable);
+            m_column_action_specializer = &ThisType::column_action_specialization<act_FindAll, ArrayInteger>;
             break;
         }
         case act_Count: {
             // For count(), the column below is a dummy and the caller sets it to nullptr. Hence, no data is being
             // read from any column upon each query match (just matchcount++ is performed), and we pass nullable =
             // false simply by convention. FIXME: Clean up all this.
-            if (nullable)
-                REALM_ASSERT(false);
-            else
-                m_column_action_specializer = &ThisType::column_action_specialization<act_Count, ArrayInteger>;
+            REALM_ASSERT(!nullable);
+            m_column_action_specializer = &ThisType::column_action_specialization<act_Count, ArrayInteger>;
             break;
         }
         case act_Sum: {
-            switch (col_id) {
-                case type_Int: {
-                    if (nullable)
-                        m_column_action_specializer = &ThisType::column_action_specialization<act_Sum, ArrayIntNull>;
-                    else
-                        m_column_action_specializer = &ThisType::column_action_specialization<act_Sum, ArrayInteger>;
-                    break;
-                }
-                case type_Float:
-                    m_column_action_specializer = &ThisType::column_action_specialization<act_Sum, ArrayFloat>;
-                    break;
-                case type_Double:
-                    m_column_action_specializer = &ThisType::column_action_specialization<act_Sum, ArrayDouble>;
-                    break;
-                case type_Decimal:
-                    m_column_action_specializer = &ThisType::column_action_specialization<act_Sum, ArrayDecimal128>;
-                    break;
-                default:
-                    REALM_ASSERT(false);
-                    break;
-            }
+            aggregate_local_prepare<act_Sum>(col_id, nullable);
             break;
         }
         case act_Min: {
-            switch (col_id) {
-                case type_Int: {
-                    if (nullable)
-                        m_column_action_specializer = &ThisType::column_action_specialization<act_Min, ArrayIntNull>;
-                    else
-                        m_column_action_specializer = &ThisType::column_action_specialization<act_Min, ArrayInteger>;
-                    break;
-                }
-                case type_Float:
-                    m_column_action_specializer = &ThisType::column_action_specialization<act_Min, ArrayFloat>;
-                    break;
-                case type_Double:
-                    m_column_action_specializer = &ThisType::column_action_specialization<act_Min, ArrayDouble>;
-                    break;
-                case type_Decimal:
-                    m_column_action_specializer = &ThisType::column_action_specialization<act_Min, ArrayDecimal128>;
-                    break;
-                default:
-                    REALM_ASSERT(false);
-                    break;
-            }
+            aggregate_local_prepare<act_Min>(col_id, nullable);
             break;
         }
         case act_Max: {
-            switch (col_id) {
-                case type_Int: {
-                    if (nullable)
-                        m_column_action_specializer = &ThisType::column_action_specialization<act_Max, ArrayIntNull>;
-                    else
-                        m_column_action_specializer = &ThisType::column_action_specialization<act_Max, ArrayInteger>;
-                    break;
-                }
-                case type_Float:
-                    m_column_action_specializer = &ThisType::column_action_specialization<act_Max, ArrayFloat>;
-                    break;
-                case type_Double:
-                    m_column_action_specializer = &ThisType::column_action_specialization<act_Max, ArrayDouble>;
-                    break;
-                case type_Decimal:
-                    m_column_action_specializer = &ThisType::column_action_specialization<act_Max, ArrayDecimal128>;
-                    break;
-                default:
-                    REALM_ASSERT(false);
-                    break;
-            }
+            aggregate_local_prepare<act_Max>(col_id, nullable);
             break;
         }
         case act_CallbackIdx: {

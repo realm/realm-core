@@ -158,6 +158,12 @@ TEST(Decimal_Query)
             }
         }
         table->create_object(); // Contains null
+
+        auto bar = wt->add_table("Bar");
+        bar->add_column(type_Decimal, "dummy", true);
+        ObjKeys keys;
+        bar->create_objects(10, keys); // All nulls
+
         wt->commit();
     }
     {
@@ -197,13 +203,25 @@ TEST(Decimal_Query)
                     min = val;
             }
         }
-        CHECK_EQUAL(table->where().equal(col_int, 3).average_decimal128(col), sum / cnt);
+        size_t actual;
+        CHECK_EQUAL(table->where().equal(col_int, 3).average_decimal128(col, &actual), sum / cnt);
+        CHECK_EQUAL(actual, cnt);
         CHECK_EQUAL(table->where().equal(col_int, 3).maximum_decimal128(col), max);
         CHECK_EQUAL(table->where().equal(col_int, 3).minimum_decimal128(col), min);
         CHECK_EQUAL(table->where().equal(col_str, "Nice").average_decimal128(col), Decimal128(57));
         CHECK_EQUAL(table->where().equal(col_str, "Nice").maximum_decimal128(col), Decimal128(95));
         CHECK_EQUAL(table->where().equal(col_str, "Nice").minimum_decimal128(col), Decimal128(19));
         CHECK_EQUAL(table->where().average_decimal128(col), Decimal128(50));
+
+        table = rt->get_table("Bar");
+        col = table->get_column_key("dummy");
+        CHECK_EQUAL(table->where().average_decimal128(col, &actual), Decimal128(0));
+        CHECK_EQUAL(actual, 0);
+        ObjKey k;
+        CHECK_EQUAL(table->where().maximum_decimal128(col, &k), Decimal128(0));
+        CHECK_NOT(k);
+        CHECK_EQUAL(table->where().minimum_decimal128(col, &k), Decimal128(0));
+        CHECK_NOT(k);
     }
 }
 
