@@ -248,12 +248,26 @@ TEST(ObjectId_Query)
     ObjectId t0;
     ObjectId t25;
     ObjectId alternative_id("000004560000000000170232");
+    ColKey col_id;
+    ColKey col_int;
+    ColKey col_owns;
+    ColKey col_has;
 
     {
         auto wt = db->start_write();
+
+        auto target = wt->add_table("Target");
+        auto origin = wt->add_table("Origin");
         auto table = wt->add_table_with_primary_key("Foo", type_ObjectId, "id");
-        auto col_id = table->add_column(type_ObjectId, "alternative_id", true);
-        auto col_int = table->add_column(type_Int, "int");
+
+        col_id = table->add_column(type_ObjectId, "alternative_id", true);
+        col_int = table->add_column(type_Int, "int");
+        col_has = table->add_column_link(type_Link, "Has", *target);
+        col_owns = origin->add_column_link(type_Link, "Owns", *table);
+
+        ObjKeys target_keys;
+        target->create_objects(16, target_keys);
+
         for (int i = 0; i < 1000; i++) {
             ObjectId id{now + std::chrono::seconds(i / 20)};
             if (i == 0)
@@ -263,15 +277,18 @@ TEST(ObjectId_Query)
             auto obj = table->create_object_with_primary_key(id).set(col_int, i);
             if (i % 30 == 0)
                 obj.set(col_id, alternative_id);
+            origin->create_object().set(col_owns, obj.get_key());
+            obj.set(col_has, target_keys[i % target_keys.size()]);
         }
         wt->commit();
     }
     {
         auto rt = db->start_read();
         auto table = rt->get_table("Foo");
+        auto origin = rt->get_table("Origin");
+        auto target = rt->get_table("Target");
         auto col = table->get_primary_key_column();
-        auto col_int = table->get_column_key("int");
-        auto col_id = table->get_column_key("alternative_id");
+
         Query q = table->column<ObjectId>(col) > t0;
         CHECK_EQUAL(q.count(), 999);
         q = table->where().greater(col, t0);
@@ -295,6 +312,14 @@ TEST(ObjectId_Query)
         CHECK_EQUAL(q2.count(), 1000 - 34);
         q2 = table->where().equal(col_id, realm::null());
         CHECK_EQUAL(q2.count(), 1000 - 34);
+
+        // Test query over links
+        Query q3 = origin->link(col_owns).column<ObjectId>(col_id) == alternative_id;
+        CHECK_EQUAL(q3.count(), 34);
+
+        // Test query over backlink (link list)
+        Query q4 = target->backlink(*table, col_has).column<ObjectId>(col_id) == alternative_id;
+        CHECK_EQUAL(q4.count(), 8);
 
         std::ostringstream ostr;
         tv.to_json(ostr); // just check that it does not crash

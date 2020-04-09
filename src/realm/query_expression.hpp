@@ -2128,7 +2128,7 @@ public:
 
     bool is_nullable() const noexcept
     {
-        return m_link_map.get_base_table()->is_nullable(m_column_key);
+        return m_column_key.get_attrs().test(col_attr_Nullable);
     }
 
     ConstTableRef get_base_table() const override
@@ -2202,8 +2202,14 @@ public:
                 auto link_translation_key = this->m_link_map.get_unary_link_or_not_found(index);
                 if (link_translation_key) {
                     ConstObj obj = m_link_map.get_target_table()->get_object(link_translation_key);
-                    if (obj.is_null(m_column_key)) {
-                        d.m_storage.set_null(0);
+                    if constexpr (std::is_same_v<T, ObjectId>) {
+                        auto opt_val = obj.get<util::Optional<ObjectId>>(m_column_key);
+                        if (opt_val) {
+                            d.m_storage.set(0, *opt_val);
+                        }
+                        else {
+                            d.m_storage.set_null(0);
+                        }
                     }
                     else {
                         d.m_storage.set(0, obj.get<T>(m_column_key));
@@ -2215,8 +2221,14 @@ public:
                 Value<T> v = make_value_for_link<T>(false /*only_unary_links*/, links.size());
                 for (size_t t = 0; t < links.size(); t++) {
                     ConstObj obj = m_link_map.get_target_table()->get_object(links[t]);
-                    if (obj.is_null(m_column_key)) {
-                        v.m_storage.set_null(t);
+                    if constexpr (std::is_same_v<T, ObjectId>) {
+                        auto opt_val = obj.get<util::Optional<ObjectId>>(m_column_key);
+                        if (opt_val) {
+                            v.m_storage.set(t, *opt_val);
+                        }
+                        else {
+                            v.m_storage.set_null(t);
+                        }
                     }
                     else {
                         v.m_storage.set(t, obj.get<T>(m_column_key));
