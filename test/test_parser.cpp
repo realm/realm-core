@@ -385,7 +385,7 @@ Query verify_query(test_util::unit_test::TestContext& test_context, TableRef t, 
 
     CHECK_EQUAL(q.count(), num_results);
     std::string description = q.get_description();
-    std::cerr << "original: " << query_string << "\tdescribed: " << description << "\n";
+    // std::cerr << "original: " << query_string << "\tdescribed: " << description << "\n";
     Query q2 = t->where();
 
     parser::ParserResult res2 = realm::parser::parse(description);
@@ -1847,7 +1847,7 @@ TEST(Parser_NegativeAgg)
     verify_query(test_context, t, "items.@avg.price_decimal == -6.375", 1); // person0
 }
 
-ONLY(Parser_collection_aggregates_on_list_of_primitives)
+TEST(Parser_collection_aggregates_on_list_of_primitives)
 {
     Group g;
     TableRef t = g.add_table("table");
@@ -3164,6 +3164,12 @@ TEST(Parser_AggregateShortcuts)
     verify_query(test_context, t, "SOME items.price == 5.5", 2); // 0, 1
     verify_query(test_context, t, "ALL items.price == 5.5", 1);  // 1
     verify_query(test_context, t, "NONE items.price == 5.5", 1); // 2
+
+    // basic string equality
+    verify_query(test_context, t, "ANY items.name == 'milk'", 2);  // 0, 1
+    verify_query(test_context, t, "SOME items.name == 'milk'", 2); // 0, 1
+    verify_query(test_context, t, "ALL items.name == 'milk'", 1);  // 1
+    verify_query(test_context, t, "NONE items.name == 'milk'", 1); // 2
 
     // and
     verify_query(test_context, t, "customer_id > 0 and ANY items.price == 5.5", 1);

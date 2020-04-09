@@ -1446,54 +1446,52 @@ public:
             REALM_ASSERT_DEBUG(false);
     }
 
-    // FIXME: move comparison type to scope to a Compare<> instead of a Columns.?
-
-
     // Given a TCond (==, !=, >, <, >=, <=) and two Value<T>, return index of first match
     template <class TCond>
     REALM_FORCEINLINE static size_t compare_const(const Value<T>* left, Value<T>* right,
                                                   ExpressionComparisonType comparison)
     {
         TCond c;
-
-        if (comparison == ExpressionComparisonType::None) {
-            size_t sz = right->ValueBase::m_values;
-            bool left_is_null = left->m_storage.is_null(0);
+        const size_t sz = right->ValueBase::m_values;
+        bool left_is_null = left->m_storage.is_null(0);
+        if (!right->m_from_link_list) {
+            REALM_ASSERT_DEBUG(comparison == ExpressionComparisonType::Any); // ALL/NONE not supported for non list types
+            for (size_t m = 0; m < sz; m++) {
+                if (c(left->m_storage[0], right->m_storage[m], left_is_null, right->m_storage.is_null(m)))
+                    return m;
+            }
+        } else if (comparison == ExpressionComparisonType::None) {
             for (size_t m = 0; m < sz; m++) {
                 if (c(left->m_storage[0], right->m_storage[m], left_is_null, right->m_storage.is_null(m)))
                     return not_found;
-                return 0; // FIXME: check index
             }
-
-            return not_found; // no match
+            return 0; // no values matched, return match
         }
         else if (comparison == ExpressionComparisonType::All) {
-            size_t sz = right->ValueBase::m_values;
-            bool left_is_null = left->m_storage.is_null(0);
             for (size_t m = 0; m < sz; m++) {
                 if (!c(left->m_storage[0], right->m_storage[m], left_is_null, right->m_storage.is_null(m)))
-                    return not_found;
+                    return not_found; // one did not match
             }
-            return 0; // FIXME: return the right index
+            return 0;
         }
-        else {
-            size_t sz = right->ValueBase::m_values;
-            bool left_is_null = left->m_storage.is_null(0);
+        else { // ANY from list
             for (size_t m = 0; m < sz; m++) {
                 if (c(left->m_storage[0], right->m_storage[m], left_is_null, right->m_storage.is_null(m)))
-                    return right->m_from_link_list ? 0 : m;
+                    return 0;
             }
-
             return not_found; // no match
         }
+        return not_found;
     }
 
     template <class TCond>
-    REALM_FORCEINLINE static size_t compare(Value<T>* left, Value<T>* right)
+    REALM_FORCEINLINE static size_t compare(Value<T>* left, Value<T>* right, ExpressionComparisonType left_cmp_type, ExpressionComparisonType right_cmp_type)
     {
         TCond c;
 
         if (!left->m_from_link_list && !right->m_from_link_list) {
+            REALM_ASSERT_DEBUG(left_cmp_type == ExpressionComparisonType::Any); // ALL/NONE not supported for non list types
+            REALM_ASSERT_DEBUG(right_cmp_type == ExpressionComparisonType::Any); // ALL/NONE not supported for non list types
             // Compare values one-by-one (one value is one row; no link lists)
             size_t min = minimum(left->ValueBase::m_values, right->ValueBase::m_values);
             for (size_t m = 0; m < min; m++) {
@@ -1505,25 +1503,67 @@ public:
         }
         else if (left->m_from_link_list && right->m_from_link_list) {
             // FIXME: Many-to-many links not supported yet. Need to specify behaviour
+            // knowing the comparison types means we can potentially support things such as:
+            // ALL list.int > list.[FIRST].int
+            // ANY list.int > ALL list2.int
+            // NONE list.int > ANY list2.int
             REALM_ASSERT_DEBUG(false);
         }
         else if (!left->m_from_link_list && right->m_from_link_list) {
             // Right values come from link list. Left must come from single row. Semantics: Match if at least 1
             // linked-to-value fulfills the condition
             REALM_ASSERT_DEBUG(left->m_values > 0);
-            for (size_t r = 0; r < right->m_values; r++) {
-                if (c(left->m_storage[0], right->m_storage[r], left->m_storage.is_null(0),
-                      right->m_storage.is_null(r)))
-                    return 0;
+            const size_t num_right_values = right->m_values;
+            if (right_cmp_type == ExpressionComparisonType::Any) {
+                for (size_t r = 0; r < num_right_values; r++) {
+                    if (c(left->m_storage[0], right->m_storage[r], left->m_storage.is_null(0),
+                          right->m_storage.is_null(r)))
+                        return 0;
+                }
+            }
+            else if (right_cmp_type == ExpressionComparisonType::All) {
+                for (size_t r = 0; r < num_right_values; r++) {
+                    if (!c(left->m_storage[0], right->m_storage[r], left->m_storage.is_null(0),
+                          right->m_storage.is_null(r)))
+                        return not_found; // one didn't match
+                }
+                return 0; // all matched
+            }
+            else if (right_cmp_type == ExpressionComparisonType::None) {
+                for (size_t r = 0; r < num_right_values; r++) {
+                    if (c(left->m_storage[0], right->m_storage[r], left->m_storage.is_null(0),
+                           right->m_storage.is_null(r)))
+                        return not_found; // one matched, none not satisfied
+                }
+                return 0; // none matched
             }
         }
         else if (left->m_from_link_list && !right->m_from_link_list) {
             // Same as above, but with left values coming from link list.
             REALM_ASSERT_DEBUG(right->m_values > 0);
-            for (size_t l = 0; l < left->m_values; l++) {
-                if (c(left->m_storage[l], right->m_storage[0], left->m_storage.is_null(l),
-                      right->m_storage.is_null(0)))
-                    return 0;
+            const size_t num_left_values = left->m_values;
+            if (left_cmp_type == ExpressionComparisonType::Any) {
+                for (size_t l = 0; l < num_left_values; l++) {
+                    if (c(left->m_storage[l], right->m_storage[0], left->m_storage.is_null(l),
+                          right->m_storage.is_null(0)))
+                        return 0;
+                }
+            }
+            else if (left_cmp_type == ExpressionComparisonType::All) {
+                for (size_t l = 0; l < num_left_values; l++) {
+                    if (!c(left->m_storage[l], right->m_storage[0], left->m_storage.is_null(l),
+                          right->m_storage.is_null(0)))
+                        return not_found; // one did not match, All not satisfied
+                }
+                return 0; // all matched
+            }
+            else if (left_cmp_type == ExpressionComparisonType::None) {
+                for (size_t l = 0; l < num_left_values; l++) {
+                    if (c(left->m_storage[l], right->m_storage[0], left->m_storage.is_null(l),
+                          right->m_storage.is_null(0)))
+                        return not_found; // one matched, none not satisfied
+                }
+                return 0; // none matched
             }
         }
 
@@ -4227,7 +4267,7 @@ public:
             else {
                 m_left->evaluate(start, left);
                 m_right->evaluate(start, right);
-                match = Value<T>::template compare<TCond>(&left, &right);
+                match = Value<T>::template compare<TCond>(&left, &right, m_left->get_comparison_type(), m_right->get_comparison_type());
             }
 
             if (match != not_found && match + start < end)
