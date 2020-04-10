@@ -269,6 +269,11 @@ struct GetLeafType<type_Timestamp, N> {
     // FIXME: Null definition
     using type = ArrayTimestamp;
 };
+template <bool N>
+struct GetLeafType<type_Decimal, N> {
+    // FIXME: Null definition
+    using type = ArrayDecimal128;
+};
 
 template <class T>
 inline bool value_is_null(const T& val)

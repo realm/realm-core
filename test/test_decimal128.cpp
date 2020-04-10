@@ -39,12 +39,13 @@ TEST(Decimal_Basics)
     test_str("3.1416", "3.1416");
     test_str("3.1416e-4", "3.1416E-4");
     test_str("-3.1416e-4", "-3.1416E-4");
-    test_str("10e2", "10E2");
-    test_str("10e+2", "10E2");
+    test_str("10e2", "1.0E3");
+    test_str("10e+2", "1.0E3");
     test_str("1e-00021", "1E-21");
     test_str("10.100e2", "1010.0");
     test_str(".00000001", "1E-8");
     test_str(".00000001000000000", "1.000000000E-8");
+    test_str("1.14142E27", "1.14142E27");
     test_str("+Infinity", "Inf");
     test_str("-INF", "-Inf");
 
@@ -121,7 +122,7 @@ TEST(Decimal_Array)
     arr1.destroy();
 }
 
-TEST(Decimal128_Table)
+TEST(Decimal_Table)
 {
     const char str0[] = "12345.67";
     const char str1[] = "1000.00";
@@ -139,7 +140,7 @@ TEST(Decimal128_Table)
 }
 
 
-TEST(Decimal128_Query)
+TEST(Decimal_Query)
 {
     SHARED_GROUP_TEST_PATH(path);
     DBRef db = DB::create(path);
@@ -148,34 +149,83 @@ TEST(Decimal128_Query)
         auto wt = db->start_write();
         auto table = wt->add_table("Foo");
         auto col_dec = table->add_column(type_Decimal, "price", true);
-        for (int i = 0; i < 100; i++) {
-            table->create_object().set(col_dec, Decimal128(i));
+        auto col_int = table->add_column(type_Int, "size");
+        auto col_str = table->add_column(type_String, "description");
+        for (int i = 1; i < 100; i++) {
+            auto obj = table->create_object().set(col_dec, Decimal128(i)).set(col_int, i % 10);
+            if ((i % 19) == 0) {
+                obj.set(col_str, "Nice");
+            }
         }
         table->create_object(); // Contains null
+
+        auto bar = wt->add_table("Bar");
+        bar->add_column(type_Decimal, "dummy", true);
+        ObjKeys keys;
+        bar->create_objects(10, keys); // All nulls
+
         wt->commit();
     }
     {
         auto rt = db->start_read();
         auto table = rt->get_table("Foo");
         auto col = table->get_column_key("price");
+        auto col_int = table->get_column_key("size");
+        auto col_str = table->get_column_key("description");
         Query q = table->column<Decimal>(col) > Decimal128(0);
         CHECK_EQUAL(q.count(), 99);
         q = table->where().greater(col, Decimal128(0));
         CHECK_EQUAL(q.count(), 99);
         Query q1 = table->column<Decimal>(col) < Decimal128(25);
-        CHECK_EQUAL(q1.count(), 25);
+        CHECK_EQUAL(q1.count(), 24);
         q1 = table->where().less(col, Decimal128(25));
-        CHECK_EQUAL(q1.count(), 25);
+        CHECK_EQUAL(q1.count(), 24);
         q1 = table->where().less_equal(col, Decimal128(25));
-        CHECK_EQUAL(q1.count(), 26);
+        CHECK_EQUAL(q1.count(), 25);
         Query q2 = table->column<Decimal>(col) == realm::null();
         CHECK_EQUAL(q2.count(), 1);
         q2 = table->where().equal(col, realm::null());
         CHECK_EQUAL(q2.count(), 1);
+        q2 = table->where().between(col, Decimal128(25), Decimal128(60));
+        CHECK_EQUAL(q2.count(), 36);
+        Decimal128 sum;
+        Decimal128 max;
+        Decimal128 min(100);
+        size_t cnt = 0;
+        for (auto o : *table) {
+            if (o.get<Int>(col_int) == 3) {
+                auto val = o.get<Decimal128>(col);
+                sum += val;
+                cnt++;
+                if (val > max)
+                    max = val;
+                if (val < min)
+                    min = val;
+            }
+        }
+        size_t actual;
+        CHECK_EQUAL(table->where().equal(col_int, 3).average_decimal128(col, &actual), sum / cnt);
+        CHECK_EQUAL(actual, cnt);
+        CHECK_EQUAL(table->where().equal(col_int, 3).maximum_decimal128(col), max);
+        CHECK_EQUAL(table->where().equal(col_int, 3).minimum_decimal128(col), min);
+        CHECK_EQUAL(table->where().equal(col_str, "Nice").average_decimal128(col), Decimal128(57));
+        CHECK_EQUAL(table->where().equal(col_str, "Nice").maximum_decimal128(col), Decimal128(95));
+        CHECK_EQUAL(table->where().equal(col_str, "Nice").minimum_decimal128(col), Decimal128(19));
+        CHECK_EQUAL(table->where().average_decimal128(col), Decimal128(50));
+
+        table = rt->get_table("Bar");
+        col = table->get_column_key("dummy");
+        CHECK_EQUAL(table->where().average_decimal128(col, &actual), Decimal128(0));
+        CHECK_EQUAL(actual, 0);
+        ObjKey k;
+        CHECK_EQUAL(table->where().maximum_decimal128(col, &k), Decimal128(0));
+        CHECK_NOT(k);
+        CHECK_EQUAL(table->where().minimum_decimal128(col, &k), Decimal128(0));
+        CHECK_NOT(k);
     }
 }
 
-TEST(Decimal128_Aggregates)
+TEST(Decimal_Aggregates)
 {
     SHARED_GROUP_TEST_PATH(path);
     DBRef db = DB::create(path);

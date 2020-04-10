@@ -95,6 +95,7 @@ AggregateState      State of the aggregate - contains a state variable that stor
 #include <realm/array_string.hpp>
 #include <realm/array_binary.hpp>
 #include <realm/array_timestamp.hpp>
+#include <realm/array_decimal128.hpp>
 #include <realm/array_list.hpp>
 #include <realm/array_backlink.hpp>
 #include <realm/column_type_traits.hpp>
@@ -218,6 +219,8 @@ public:
     virtual size_t find_first_local(size_t start, size_t end) = 0;
 
     virtual void aggregate_local_prepare(Action TAction, DataType col_id, bool nullable);
+    template <Action action>
+    void aggregate_local_prepare(DataType col_id, bool nullable);
 
     template <Action TAction, class LeafType>
     bool column_action_specialization(QueryStateBase* st, ArrayPayload* source_column, size_t r)
@@ -228,9 +231,8 @@ public:
         using TResult = typename AggregateResultType<TSourceValue, TAction>::result_type;
 
         // Sum of float column must accumulate in double
-        static_assert(!(TAction == act_Sum &&
-                        (std::is_same<TSourceValue, float>::value && !std::is_same<TResult, double>::value)),
-                      "");
+        static_assert(
+            !(TAction == act_Sum && (std::is_same_v<TSourceValue, float> && !std::is_same_v<TResult, double>)), "");
 
         TSourceValue av{};
         // uses_val test because compiler cannot see that IntegerColumn::get has no side effect and result is
@@ -589,6 +591,8 @@ protected:
                 return get_specialized_callback_3<TAction, type_Double, TConditionFunction>(is_nullable);
             case type_Timestamp:
                 return get_specialized_callback_3<TAction, type_Timestamp, TConditionFunction>(is_nullable);
+            case type_Decimal:
+                return get_specialized_callback_3<TAction, type_Decimal, TConditionFunction>(is_nullable);
             default:
                 break;
         }

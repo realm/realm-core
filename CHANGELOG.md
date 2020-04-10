@@ -1,7 +1,8 @@
 # NEXT RELEASE
 
 ### Enhancements
-* None.
+* average, min and max operations addded to Decimal128 queries.
+* between condition added to Decimal128 queries.
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)

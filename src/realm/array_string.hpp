@@ -166,7 +166,7 @@ public:
     template <Action action>
     bool uses_val()
     {
-        return (action == act_Count);
+        return false;
     }
 
     QueryState(Action, Array* = nullptr, size_t limit = -1)
