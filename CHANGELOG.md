@@ -6,7 +6,7 @@
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Querying for a null ObjectId value over links could crash.
  
 ### Breaking changes
 * None.
