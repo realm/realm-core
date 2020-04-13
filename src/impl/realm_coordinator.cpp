@@ -607,7 +607,7 @@ void RealmCoordinator::unregister_realm(Realm* realm)
 // instances of this type
 void RealmCoordinator::clear_cache() NO_THREAD_SAFETY_ANALYSIS
 {
-    std::vector<WeakRealm> realms_to_close;
+    std::vector<std::shared_ptr<Realm>> realms_to_close;
     {
         std::lock_guard<std::mutex> lock(s_coordinator_mutex);
 
@@ -633,11 +633,8 @@ void RealmCoordinator::clear_cache() NO_THREAD_SAFETY_ANALYSIS
 
     // Close all of the previously cached Realms. This can't be done while
     // s_coordinator_mutex is held as it may try to re-lock it.
-    for (auto& weak_realm : realms_to_close) {
-        if (auto realm = weak_realm.lock()) {
-            realm->close();
-        }
-    }
+    for (auto& realm : realms_to_close)
+        realm->close();
 }
 
 void RealmCoordinator::clear_all_caches()
