@@ -67,6 +67,30 @@ void do_add_null_comparison_to_query(Query &query, Predicate::Operator op, const
     }
 }
 
+template<typename T>
+void do_add_null_comparison_to_query(Query &query, Predicate::Operator op, const PrimitiveListExpression &expr)
+{
+    Columns<Lst<T>> column = expr.value_of_type_for_query<T>();
+    switch (op) {
+        case Predicate::Operator::NotEqual:
+            query.and_query(column != realm::null());
+            break;
+        case Predicate::Operator::In:
+            REALM_FALLTHROUGH;
+        case Predicate::Operator::Equal:
+            query.and_query(column == realm::null());
+            break;
+        default:
+            throw std::logic_error("Only 'equal' and 'not equal' operators supported when comparing against 'null'.");
+    }
+}
+
+template<>
+void do_add_null_comparison_to_query<Link>(Query &, Predicate::Operator, const PrimitiveListExpression &)
+{
+    throw std::logic_error("Invalid query, list of primitive links is not a valid Realm contruct");
+}
+
 template<>
 void do_add_null_comparison_to_query<Link>(Query &query, Predicate::Operator op, const PropertyExpression &expr)
 {
@@ -542,6 +566,10 @@ void add_null_comparison_to_query(Query& query, const Predicate::Comparison& cmp
             do_add_null_comparison_to_query(query, cmp, exp.get_property(), exp.get_property().get_dest_type(),
                                             location);
             break;
+        case ExpressionContainer::ExpressionInternal::exp_PrimitiveList:
+            do_add_null_comparison_to_query(query, cmp, exp.get_primitive_list(), exp.get_primitive_list().get_dest_type(),
+                                            location);
+            break;
         case ExpressionContainer::ExpressionInternal::exp_OpMin:
             do_add_null_comparison_to_query(query, cmp, exp.get_min(), exp.get_min().operative_col_type, location);
             break;
@@ -554,6 +582,18 @@ void add_null_comparison_to_query(Query& query, const Predicate::Comparison& cmp
         case ExpressionContainer::ExpressionInternal::exp_OpAvg:
             do_add_null_comparison_to_query(query, cmp, exp.get_avg(), exp.get_avg().operative_col_type, location);
             break;
+        case ExpressionContainer::ExpressionInternal::exp_OpMinPrimitive:
+            do_add_null_comparison_to_query(query, cmp, exp.get_primitive_min(), exp.get_primitive_min().operative_col_type, location);
+            break;
+        case ExpressionContainer::ExpressionInternal::exp_OpMaxPrimitive:
+            do_add_null_comparison_to_query(query, cmp, exp.get_primitive_max(), exp.get_primitive_max().operative_col_type, location);
+            break;
+        case ExpressionContainer::ExpressionInternal::exp_OpSumPrimitive:
+            do_add_null_comparison_to_query(query, cmp, exp.get_primitive_sum(), exp.get_primitive_sum().operative_col_type, location);
+            break;
+        case ExpressionContainer::ExpressionInternal::exp_OpAvgPrimitive:
+            do_add_null_comparison_to_query(query, cmp, exp.get_primitive_avg(), exp.get_primitive_avg().operative_col_type, location);
+            break;
         case ExpressionContainer::ExpressionInternal::exp_SubQuery:
             REALM_FALLTHROUGH;
         case ExpressionContainer::ExpressionInternal::exp_OpCount:
@@ -563,6 +603,8 @@ void add_null_comparison_to_query(Query& query, const Predicate::Comparison& cmp
         case ExpressionContainer::ExpressionInternal::exp_OpSizeString:
             REALM_FALLTHROUGH;
         case ExpressionContainer::ExpressionInternal::exp_OpSizeBinary:
+            REALM_FALLTHROUGH;
+        case ExpressionContainer::ExpressionInternal::exp_OpCountPrimitive:
             throw std::runtime_error("Invalid predicate: comparison between 'null' and @size or @count");
     }
 }
@@ -732,6 +774,10 @@ void preprocess_for_comparison_types(Predicate::Comparison& cmpr, ExpressionCont
 
     verify_comparison_type(lhs, cmpr.expr[0].comparison_type, rhs.type);
     verify_comparison_type(rhs, cmpr.expr[1].comparison_type, lhs.type);
+
+    if (lhs.type == ExpressionContainer::ExpressionInternal::exp_PrimitiveList && rhs.type == ExpressionContainer::ExpressionInternal::exp_PrimitiveList) {
+        throw std::logic_error(util::format("Ordered comparison between two primitive lists is not implemented yet ('%1' and '%2')", cmpr.expr[0].s, cmpr.expr[1].s));
+    }
 
     // Check that operator "IN" has a RHS keypath which is a list
     if (cmpr.op == Predicate::Operator::In) {

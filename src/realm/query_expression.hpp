@@ -974,6 +974,20 @@ struct NullableVector {
         }
     }
 
+    void init(const std::vector<Optional<T>>& values)
+    {
+        size_t sz = values.size();
+        init(sz);
+        for (size_t t = 0; t < sz; t++) {
+            if (values[t]) {
+                set(t, values[t]);
+            }
+            else {
+                set_null(t);
+            }
+        }
+    }
+
     void dealloc()
     {
         if (m_first) {
@@ -1266,6 +1280,13 @@ public:
         ValueBase::m_values = values.size();
     }
 
+    void init(bool from_link_list, const std::vector<Optional<T>>& values)
+    {
+        m_storage.init(values);
+        ValueBase::m_from_link_list = from_link_list;
+        ValueBase::m_values = values.size();
+    }
+
     std::string description(util::serializer::SerialisationState&) const override
     {
         if (ValueBase::m_from_link_list) {
@@ -1472,7 +1493,7 @@ public:
                 if (!c(left->m_storage[0], right->m_storage[m], left_is_null, right->m_storage.is_null(m)))
                     return not_found; // one did not match
             }
-            return 0;
+            return 0; // all values matched (or there this is an empty list), return match
         }
         else { // ANY from list
             for (size_t m = 0; m < sz; m++) {
@@ -3053,16 +3074,29 @@ public:
         Allocator& alloc = get_base_table()->get_alloc();
         Value<ref_type> list_refs;
         get_lists(index, list_refs, 1);
-        size_t sz = 0;
-        for (size_t i = 0; i < list_refs.m_values; i++) {
-            ref_type val = list_refs.m_storage[i];
-            if (val) {
-                char* header = alloc.translate(val);
-                sz += Array::get_size_from_header(header);
+        const bool is_from_list = true;
+        if constexpr (std::is_same_v<T, ObjectId> || std::is_same_v<T, Int>) {
+            bool nullable = m_column_key.get_attrs().test(col_attr_Nullable);
+            if (nullable) {
+                std::vector<Optional<T>> values;
+                for (size_t i = 0; i < list_refs.m_values; i++) {
+                    ref_type list_ref = list_refs.m_storage[i];
+                    if (list_ref) {
+                        BPlusTree<Optional<T>> list(alloc);
+                        list.init_from_ref(list_ref);
+                        size_t s = list.size();
+                        for (size_t j = 0; j < s; j++) {
+                            values.push_back(list.get(j));
+                        }
+                    }
+                }
+                Value<T> v;
+                v.init(is_from_list, values);
+                destination.import(v);
+                return;
             }
         }
-        auto v = make_value_for_link<typename util::RemoveOptional<T>::type>(false, sz);
-        size_t k = 0;
+        std::vector<T> values;
         for (size_t i = 0; i < list_refs.m_values; i++) {
             ref_type list_ref = list_refs.m_storage[i];
             if (list_ref) {
@@ -3070,10 +3104,12 @@ public:
                 list.init_from_ref(list_ref);
                 size_t s = list.size();
                 for (size_t j = 0; j < s; j++) {
-                    v.m_storage.set(k++, list.get(j));
+                    values.push_back(list.get(j));
                 }
             }
         }
+        Value<T> v;
+        v.init(is_from_list, values);
         destination.import(v);
     }
 
@@ -3136,7 +3172,6 @@ public:
         Value<ref_type> list_refs;
         this->get_lists(index, list_refs, 1);
         d->init(list_refs.m_from_link_list, list_refs.m_values);
-
         for (size_t i = 0; i < list_refs.m_values; i++) {
             ref_type list_ref = list_refs.m_storage[i];
             if (list_ref) {
@@ -3146,7 +3181,7 @@ public:
                 d->m_storage.set(i, SizeOfList(s));
             }
             else {
-                d->m_storage.set_null(i);
+                d->m_storage.set(i, SizeOfList(0));
             }
         }
     }
@@ -4246,7 +4281,7 @@ public:
                 ObjKey last_key = m_cluster->get_real_key(end - 1);
                 if (actual_key > last_key)
                     return not_found;
-
+                // FIXME: handle ALL/NONE on indexed columns
                 // key is known to be in this leaf, so find key whithin leaf keys
                 return m_cluster->lower_bound_key(ObjKey(actual_key.value - m_cluster->get_offset()));
             }
@@ -4255,27 +4290,35 @@ public:
 
         size_t match;
 
-        Value<T> left;
         Value<T> right;
-
-        for (; start < end;) {
-            if (m_left_is_const) {
+        const ExpressionComparisonType right_cmp_type = m_right->get_comparison_type();
+        if (m_left_is_const) {
+            for (; start < end;) {
                 m_right->evaluate(start, right);
                 match =
-                    Value<T>::template compare_const<TCond>(&m_left_value, &right, m_right->get_comparison_type());
+                    Value<T>::template compare_const<TCond>(&m_left_value, &right, right_cmp_type);
+                if (match != not_found && match + start < end)
+                    return start + match;
+
+                size_t rows =
+                    (m_left_value.m_from_link_list || right.m_from_link_list) ? 1 : minimum(right.m_values, m_left_value.m_values);
+                start += rows;
             }
-            else {
+        }
+        else {
+            Value<T> left;
+            const ExpressionComparisonType left_cmp_type = m_left->get_comparison_type();
+            for (; start < end;) {
                 m_left->evaluate(start, left);
                 m_right->evaluate(start, right);
-                match = Value<T>::template compare<TCond>(&left, &right, m_left->get_comparison_type(), m_right->get_comparison_type());
-            }
+                match = Value<T>::template compare<TCond>(&left, &right, left_cmp_type, right_cmp_type);
+                if (match != not_found && match + start < end)
+                    return start + match;
 
-            if (match != not_found && match + start < end)
-                return start + match;
-
-            size_t rows =
+                size_t rows =
                 (left.m_from_link_list || right.m_from_link_list) ? 1 : minimum(right.m_values, left.m_values);
-            start += rows;
+                start += rows;
+            }
         }
 
         return not_found; // no match

@@ -1847,20 +1847,26 @@ TEST(Parser_NegativeAgg)
     verify_query(test_context, t, "items.@avg.price_decimal == -6.375", 1); // person0
 }
 
-TEST(Parser_collection_aggregates_on_list_of_primitives)
+TEST(Parser_list_of_primitive_ints)
 {
     Group g;
     TableRef t = g.add_table("table");
 
     auto col_int_list = t->add_column_list(type_Int, "integers");
+    auto col_int = t->add_column(type_Int, "single_int");
+    auto col_int_list_nullable = t->add_column_list(type_Int, "integers_nullable", true);
+    auto col_int_nullable = t->add_column(type_Int, "single_int_nullable", true);
+    CHECK_THROW_ANY(t->add_search_index(col_int_list));
 
     size_t num_objects = 10;
     for (size_t i = 0; i < num_objects; ++i) {
         Obj obj = t->create_object();
         obj.get_list<Int>(col_int_list).add(i);
+        obj.set<Int>(col_int, i);
+        obj.get_list<Optional<Int>>(col_int_list_nullable).add(i);
+        obj.set<Optional<Int>>(col_int_nullable, i);
     }
 
-    Query q = t->where();
     for (size_t i = 0; i < num_objects; ++i) {
         verify_query(test_context, t, util::format("integers == %1", i), 1);
         verify_query(test_context, t, util::format("integers.@min == %1", i), 1);
@@ -1871,6 +1877,14 @@ TEST(Parser_collection_aggregates_on_list_of_primitives)
         verify_query(test_context, t, util::format("SOME integers == %1", i), 1);
         verify_query(test_context, t, util::format("ALL integers == %1", i), 1);
         verify_query(test_context, t, util::format("NONE integers == %1", i), num_objects - 1);
+        verify_query(test_context, t, util::format("!(ANY integers == %1)", i), num_objects - 1);
+        verify_query(test_context, t, util::format("!(SOME integers == %1)", i), num_objects - 1);
+        verify_query(test_context, t, util::format("!(ALL integers == %1)", i), num_objects - 1);
+        verify_query(test_context, t, util::format("!(NONE integers == %1)", i), 1);
+        verify_query(test_context, t, util::format("ANY integers != %1", i), num_objects - 1);
+        verify_query(test_context, t, util::format("SOME integers != %1", i), num_objects - 1);
+        verify_query(test_context, t, util::format("ALL integers != %1", i), num_objects - 1);
+        verify_query(test_context, t, util::format("NONE integers != %1", i), 1);
         verify_query(test_context, t, util::format("%1 IN integers", i), 1);
     }
     verify_query(test_context, t, "integers.@count == 0", 0);
@@ -1878,7 +1892,30 @@ TEST(Parser_collection_aggregates_on_list_of_primitives)
     verify_query(test_context, t, "integers.@count == 1", num_objects);
     verify_query(test_context, t, "integers.@size == 1", num_objects);
 
-    // verify_query(test_context, t, "integers == 0", 1);
+    // list vs property
+    verify_query(test_context, t, "integers == single_int", num_objects);
+    verify_query(test_context, t, "integers_nullable == single_int", num_objects);
+    verify_query(test_context, t, "integers == single_int_nullable", num_objects);
+    verify_query(test_context, t, "integers_nullable == single_int_nullable", num_objects);
+
+    // add two more objects; one with defaults, one with null in the list
+    Obj obj_defaults = t->create_object();
+    Obj obj_nulls_in_lists = t->create_object();
+    obj_nulls_in_lists.get_list<Optional<Int>>(col_int_list_nullable).add(Optional<Int>());
+    num_objects += 2;
+    verify_query(test_context, t, "integers.@count == 0", 2);
+    verify_query(test_context, t, "integers == NULL", 0);
+    verify_query(test_context, t, "ALL integers == NULL", 2);  // the two empty lists match ALL
+    verify_query(test_context, t, "NONE integers == NULL", num_objects);
+    verify_query(test_context, t, "integers_nullable.@count == 0", 1);
+    verify_query(test_context, t, "integers_nullable == NULL", 1);
+    verify_query(test_context, t, "ALL integers_nullable == NULL", 2); // matches the empty list and the list containing one NULL
+    verify_query(test_context, t, "NONE integers_nullable == NULL", num_objects - 1);
+
+    Obj obj0 = *t->begin();
+    util::Any args[] = {Int(1) };
+    size_t num_args = 1;
+    verify_query_sub(test_context, t, "integers == $0", args, num_args, 1);
 
     std::string message;
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "integers.@min.no_property == 0", 0), message);
@@ -1886,6 +1923,34 @@ TEST(Parser_collection_aggregates_on_list_of_primitives)
                          "of primitive values 'integers'");
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "SUBQUERY(integers, $x, $x == 1).@count > 0", 0), message);
     CHECK_EQUAL(message, "A subquery can not operate on a list of primitive values (property 'integers')");
+    // list vs list is not implemented yet
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "integers == integers", 0), message);
+    CHECK_EQUAL(message, "Ordered comparison between two primitive lists is not implemented yet ('integers' and 'integers')");
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "integers != integers", 0), message);
+    CHECK_EQUAL(message, "Ordered comparison between two primitive lists is not implemented yet ('integers' and 'integers')");
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "integers > integers", 0), message);
+    CHECK_EQUAL(message, "Ordered comparison between two primitive lists is not implemented yet ('integers' and 'integers')");
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "integers < integers", 0), message);
+    CHECK_EQUAL(message, "Ordered comparison between two primitive lists is not implemented yet ('integers' and 'integers')");
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "integers contains integers", 0), message);
+    CHECK_EQUAL(message, "Ordered comparison between two primitive lists is not implemented yet ('integers' and 'integers')");
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "integers beginswith integers", 0), message);
+    CHECK_EQUAL(message, "Ordered comparison between two primitive lists is not implemented yet ('integers' and 'integers')");
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "integers endswith integers", 0), message);
+    CHECK_EQUAL(message, "Ordered comparison between two primitive lists is not implemented yet ('integers' and 'integers')");
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "integers like integers", 0), message);
+    CHECK_EQUAL(message, "Ordered comparison between two primitive lists is not implemented yet ('integers' and 'integers')");
+    // string operators are not supported on an integer column
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "integers like 0", 0), message);
+    CHECK_EQUAL(message, "Unsupported operator for numeric queries.");
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "integers contains[c] 0", 0), message);
+    CHECK_EQUAL(message, "Unsupported operator for numeric queries.");
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "integers beginswith 0", 0), message);
+    CHECK_EQUAL(message, "Unsupported operator for numeric queries.");
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "integers ENDSWITH 0", 0), message);
+    CHECK_EQUAL(message, "Unsupported operator for numeric queries.");
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "integers == 'string'", 0), message);
+    CHECK_EQUAL(message, "Cannot convert string 'string'");
 }
 
 TEST(Parser_SortAndDistinctSerialisation)
