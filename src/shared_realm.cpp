@@ -289,7 +289,7 @@ bool Realm::schema_change_needs_write_transaction(Schema& schema,
 Schema Realm::get_full_schema()
 {
     if (!m_config.immutable())
-        refresh();
+        do_refresh();
 
     // If the user hasn't specified a schema previously then m_schema is always
     // the full schema
@@ -344,10 +344,13 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
 {
     schema.validate();
 
+    bool was_in_read_transaction =  is_in_read_transaction();
     Schema actual_schema = get_full_schema();
     std::vector<SchemaChange> required_changes = actual_schema.compare(schema);
 
     if (!schema_change_needs_write_transaction(schema, required_changes, version)) {
+        if (!was_in_read_transaction)
+            m_group = nullptr;
         set_schema(actual_schema, std::move(schema));
         return;
     }
@@ -376,6 +379,8 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
         // When in_transaction is true, caller is responsible to cancel the transaction.
         if (!in_transaction && is_in_transaction())
             cancel_transaction();
+        if (!was_in_read_transaction)
+            m_group = nullptr;
     });
 
     uint64_t old_schema_version = m_schema_version;
@@ -427,14 +432,18 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
         initialization_function(shared_from_this());
     }
 
-    if (!in_transaction) {
-        commit_transaction();
-    }
-
     m_schema = std::move(schema);
+    m_new_schema = ObjectStore::schema_from_group(read_group());
     m_schema_version = ObjectStore::get_schema_version(read_group());
     m_dynamic_schema = false;
     m_coordinator->clear_schema_cache_and_set_schema_version(version);
+
+    if (!in_transaction) {
+        m_coordinator->commit_write(*this);
+        invalidate_permission_cache();
+        cache_new_schema();
+    }
+
     notify_schema_changed();
 }
 
@@ -801,7 +810,11 @@ bool Realm::refresh()
 {
     verify_thread();
     check_can_create_any_transaction(this);
+    return do_refresh();
+}
 
+bool Realm::do_refresh()
+{
     // Frozen Realms never change.
     if (is_frozen()) {
         return false;

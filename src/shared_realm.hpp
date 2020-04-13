@@ -438,6 +438,7 @@ private:
     bool m_in_migration = false;
 
     void begin_read(VersionID);
+    bool do_refresh();
 
     void set_schema(Schema const& reference, Schema schema);
     bool reset_file(Schema& schema, std::vector<SchemaChange>& changes_required);
