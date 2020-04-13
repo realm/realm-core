@@ -27,19 +27,20 @@
 #include <realm/db.hpp>
 #include <realm/keys.hpp>
 
-using namespace realm;
-
 namespace realm {
 class ThreadSafeReference::Payload {
 public:
     virtual ~Payload() = default;
     Payload(Realm& realm)
-    : m_target_version(realm.current_transaction_version().value_or(VersionID{}))
+    : m_transaction(realm.is_in_read_transaction() ? realm.duplicate() : nullptr)
     , m_created_in_write_transaction(realm.is_in_transaction())
     {
     }
 
     void refresh_target_realm(Realm&);
+
+protected:
+    const TransactionRef m_transaction;
 
 private:
     const VersionID m_target_version;
@@ -52,11 +53,12 @@ void ThreadSafeReference::Payload::refresh_target_realm(Realm& realm)
         if (m_created_in_write_transaction)
             realm.read_group();
         else
-            Realm::Internal::begin_read(realm, m_target_version);
+            Realm::Internal::begin_read(realm, m_transaction->get_version_of_current_transaction());
     }
     else {
         auto version = realm.read_transaction_version();
-        if (version < m_target_version || (version == m_target_version && m_created_in_write_transaction))
+        auto target_version = m_transaction->get_version_of_current_transaction();
+        if (version < target_version || (version == target_version && m_created_in_write_transaction))
             realm.refresh();
     }
 }
@@ -138,7 +140,6 @@ public:
                 // if the source view is valid so we have to forbid it always.
                 throw std::logic_error("Cannot create a ThreadSafeReference to Results backed by a List of objects or LinkingObjects inside a write transaction");
             }
-            m_transaction = r.get_realm()->duplicate();
             m_query = m_transaction->import_copy_of(q, PayloadPolicy::Stay);
         }
     }
@@ -167,7 +168,6 @@ public:
     }
 
 private:
-    TransactionRef m_transaction;
     DescriptorOrdering m_ordering;
     std::unique_ptr<Query> m_query;
     ObjKey m_key;
