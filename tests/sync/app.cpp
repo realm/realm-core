@@ -24,6 +24,7 @@
 
 #include <curl/curl.h>
 #include <json.hpp>
+#include <thread>
 
 using namespace realm;
 using namespace realm::app;
@@ -70,6 +71,16 @@ static std::string get_runtime_app_id(std::string config_path)
 }
 
 class IntTestTransport : public GenericNetworkTransport {
+public:
+    
+    IntTestTransport() {
+        curl_global_init(CURL_GLOBAL_ALL);
+    }
+    
+    ~IntTestTransport() {
+        curl_global_cleanup();
+    }
+    
     static size_t write(char *ptr, size_t size, size_t nmemb, std::string* data) {
         REALM_ASSERT(data);
         size_t realsize = size * nmemb;
@@ -104,8 +115,7 @@ class IntTestTransport : public GenericNetworkTransport {
         CURLcode response_code;
         std::string response;
         std::map<std::string, std::string> response_headers;
-
-        curl_global_init(CURL_GLOBAL_ALL);
+        
         /* get a curl handle */
         curl = curl_easy_init();
 
@@ -160,20 +170,7 @@ class IntTestTransport : public GenericNetworkTransport {
 
         curl_global_cleanup();
     }
-    
-    std::vector<std::string> split_string(std::string string) {
-        std::stringstream ss(string);
-        std::string item;
-        std::vector<std::string> split_strings;
-        while (std::getline(ss, item, '\r'))
-        {
-            item.erase(std::remove(item.begin(),
-                                   item.end(), '\n'),
-                                   item.end());
-            split_strings.push_back(item);
-        }
-        return split_strings;
-    }
+
 };
 
 #ifdef REALM_MONGODB_ENDPOINT
@@ -1046,6 +1043,26 @@ private:
                                     .headers = {},
                                     .body = nlohmann::json(elements).dump() });
     }
+    
+    void handle_token_refresh(const Request request,
+                              std::function<void (Response)> completion_block) {
+        CHECK(request.method == HttpMethod::post);
+        CHECK(request.headers.at("Content-Type") == "application/json;charset=utf-8");
+
+        CHECK(request.body == "");
+        CHECK(request.timeout_ms == 60000);
+        
+        auto elements = std::vector<nlohmann::json>();
+        nlohmann::json json {
+            {"access_token", access_token }
+        };
+        
+        completion_block(Response { .http_status_code = 200,
+                                    .custom_status_code = 0,
+                                    .headers = {},
+                                    .body = json.dump() });
+        
+    }
 
 public:
     void send_request_to_server(const Request request, std::function<void (const Response)> completion_block) override
@@ -1054,7 +1071,7 @@ public:
             handle_login(request, completion_block);
         } else if (request.url.find("/profile") != std::string::npos) {
             handle_profile(request, completion_block);
-        } else if (request.url.find("/session") != std::string::npos) {
+        } else if (request.url.find("/session") != std::string::npos && request.method != HttpMethod::post) {
             completion_block(Response { .http_status_code = 200, .custom_status_code = 0, .headers = {}, .body = "" });
         } else if (request.url.find("/api_keys") != std::string::npos && request.method == HttpMethod::post) {
             handle_create_api_key(request, completion_block);
@@ -1062,13 +1079,17 @@ public:
             handle_fetch_api_key(request, completion_block);
         } else if (request.url.find("/api_keys") != std::string::npos && request.method == HttpMethod::get) {
             handle_fetch_api_keys(request, completion_block);
+        } else if (request.url.find("/session") != std::string::npos && request.method == HttpMethod::post) {
+            handle_token_refresh(request, completion_block);
+        } else {
+            completion_block(Response { .http_status_code = 200, .custom_status_code = 0, .headers = {}, .body = "something arbitrary" });
         }
     }
 };
 
 static const std::string good_access_token =  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE1ODE1MDc3OTYsImlhdCI6MTU4MTUwNTk5NiwiaXNzIjoiNWU0M2RkY2M2MzZlZTEwNmVhYTEyYmRjIiwic3RpdGNoX2RldklkIjoiMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwIiwic3RpdGNoX2RvbWFpbklkIjoiNWUxNDk5MTNjOTBiNGFmMGViZTkzNTI3Iiwic3ViIjoiNWU0M2RkY2M2MzZlZTEwNmVhYTEyYmRhIiwidHlwIjoiYWNjZXNzIn0.0q3y9KpFxEnbmRwahvjWU1v9y1T1s3r2eozu93vMc3s";
 
-static const std::string good_access_token2 =  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCF9.eyJleHAiOjE1ODE1MDc3OTYsImlhdCI6MTU4MTUwNTk5NiwiaXNzIjoiNWU0M2RkY2M2MzZlZTEwNmVhYTEyYmRjIiwic3RpdGNoX2RldklkIjoiMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwIiwic3RpdGNoX2RvbWFpbklkIjoiNWUxNDk5MTNjOTBiNGFmMGViZTkzNTI3Iiwic3ViIjoiNWU0M2RkY2M2MzZlZTEwNmVhYTEyYmRhIiwidHlwIjoiYWNjZXNzIn0.0q3y9KpFxEnbmRwahvjWU1v9y1T1s3r2eozu93vMc3s";
+static const std::string good_access_token2 =  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE1ODkzMDE3MjAsImlhdCI6MTU4NDExODcyMCwiaXNzIjoiNWU2YmJiYzBhNmI3ZGZkM2UyNTA0OGI3Iiwic3RpdGNoX2RldklkIjoiMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwIiwic3RpdGNoX2RvbWFpbklkIjoiNWUxNDk5MTNjOTBiNGFmMGViZTkzNTI3Iiwic3ViIjoiNWU2YmJiYzBhNmI3ZGZkM2UyNTA0OGIzIiwidHlwIjoiYWNjZXNzIn0.eSX4QMjIOLbdOYOPzQrD_racwLUk1HGFgxtx2a34k80";
 
 std::string UnitTestTransport::access_token = good_access_token;
 
@@ -1920,3 +1941,210 @@ TEST_CASE("app: auth providers", "[sync][app]") {
     }
     
 }
+
+TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
+    
+    SECTION("refresh custom data happy path") {
+        
+        auto setup_user = []() {
+            if (realm::SyncManager::shared().get_current_user()) {
+                return;
+            }
+            
+            realm::SyncManager::shared().get_user("a_user_id",
+                                                  good_access_token,
+                                                  good_access_token,
+                                                  "anon-user");
+        };
+        
+        static bool session_route_hit = false;
+        
+        std::unique_ptr<GenericNetworkTransport> (*generic_factory)() = [] {
+            struct transport : GenericNetworkTransport {
+                void send_request_to_server(const Request request,
+                                            std::function<void (const Response)> completion_block)
+                {
+                    if (request.url.find("/session") != std::string::npos) {
+                        session_route_hit = true;
+                        nlohmann::json json {
+                            { "access_token", good_access_token }
+                        };
+                        completion_block({ 200, 0, {}, json.dump() });
+                    }
+                }
+            };
+            return std::unique_ptr<GenericNetworkTransport>(new transport);
+        };
+        
+        auto config = App::Config{"translate-utwuv", generic_factory};
+        auto app = App(config);
+        std::string base_path = tmp_dir() + "/" + config.app_id;
+        reset_test_directory(base_path);
+        TestSyncManager init_sync_manager(base_path);
+        
+        setup_user();
+        
+        bool processed = false;
+        
+        app.refresh_custom_data(SyncManager::shared().get_current_user(), [&](const Optional<AppError>& error) {
+            CHECK(!error);
+            CHECK(session_route_hit);
+            processed = true;
+        });
+        
+        CHECK(processed);
+    }
+    
+    SECTION("refresh custom data sad path") {
+        
+        auto setup_user = []() {
+            if (realm::SyncManager::shared().get_current_user()) {
+                return;
+            }
+            
+            realm::SyncManager::shared().get_user("a_user_id",
+                                                  good_access_token,
+                                                  good_access_token,
+                                                  "anon-user");
+        };
+        
+        static bool session_route_hit = false;
+        
+        std::unique_ptr<GenericNetworkTransport> (*generic_factory)() = [] {
+            struct transport : GenericNetworkTransport {
+                void send_request_to_server(const Request request,
+                                            std::function<void (const Response)> completion_block)
+                {
+                    if (request.url.find("/session") != std::string::npos) {
+                        session_route_hit = true;
+                        nlohmann::json json {
+                            { "access_token", bad_access_token }
+                        };
+                        completion_block({ 200, 0, {}, json.dump() });
+                    }
+                }
+            };
+            return std::unique_ptr<GenericNetworkTransport>(new transport);
+        };
+        
+        auto config = App::Config{"translate-utwuv", generic_factory};
+        auto app = App(config);
+        std::string base_path = tmp_dir() + "/" + config.app_id;
+        reset_test_directory(base_path);
+        TestSyncManager init_sync_manager(base_path);
+        
+        setup_user();
+        
+        bool processed = false;
+        
+        app.refresh_custom_data(SyncManager::shared().get_current_user(), [&](const Optional<AppError>& error) {
+            CHECK(error->message == "jwt missing parts");
+            CHECK(error->error_code.value() == 1);
+            CHECK(session_route_hit);
+            processed = true;
+        });
+        
+        CHECK(processed);
+    }
+    
+    SECTION("refresh token ensure flow is correct") {
+        
+        auto setup_user = []() {
+            if (realm::SyncManager::shared().get_current_user()) {
+                return;
+            }
+            
+            realm::SyncManager::shared().get_user("a_user_id",
+                                                  good_access_token,
+                                                  good_access_token,
+                                                  "anon-user");
+        };
+        
+        /*
+         Expected flow:
+         Login - this gets access and refresh tokens
+         Get profile - throw back a 401 error
+         Refresh token - get a new token for the user
+         Get profile - get the profile with the new token
+         */
+        
+        static bool login_hit = false;
+        static bool get_profile_1_hit = false;
+        static bool get_profile_2_hit = false;
+        static bool refresh_hit = false;
+        
+        std::unique_ptr<GenericNetworkTransport> (*factory)() = [](){
+            struct transport : GenericNetworkTransport {
+                
+                void send_request_to_server(const Request request,
+                                            std::function<void (const Response)> completion_block)
+                {
+                    if (request.url.find("/login") != std::string::npos) {
+                        login_hit = true;
+                        completion_block({
+                            200, 0, {}, user_json(good_access_token).dump()
+                        });
+                    } else if (request.url.find("/profile") != std::string::npos) {
+                        
+                        CHECK(login_hit);
+                        
+                        auto access_token = request.headers.at("Authorization");
+                        // simulated bad token request
+                        if (access_token.find(good_access_token2) != std::string::npos) {
+                            CHECK(login_hit);
+                            CHECK(get_profile_1_hit);
+                            CHECK(refresh_hit);
+                            
+                            get_profile_2_hit = true;
+                            
+                            completion_block({
+                                200, 0, {}, user_profile_json().dump()
+                            });
+                        } else if (access_token.find(good_access_token) != std::string::npos) {
+                            CHECK(!get_profile_2_hit);
+                            get_profile_1_hit = true;
+                            
+                            completion_block({
+                                401, 0, {}
+                            });
+                        }
+                        
+                    } else if (request.url.find("/session") != std::string::npos &&
+                               request.method == HttpMethod::post) {
+                        
+                        CHECK(login_hit);
+                        CHECK(get_profile_1_hit);
+                        CHECK(!get_profile_2_hit);
+                        refresh_hit = true;
+                        
+                        nlohmann::json json {
+                            { "access_token", good_access_token2 }
+                        };
+                        completion_block({ 200, 0, {}, json.dump() });
+                    }
+                }
+            };
+            return std::unique_ptr<GenericNetworkTransport>(new transport);
+        };
+        
+        auto config = App::Config{"translate-utwuv", factory};
+        auto app = App(config);
+        std::string base_path = tmp_dir() + "/" + config.app_id;
+        reset_test_directory(base_path);
+        TestSyncManager init_sync_manager(base_path);
+        
+        setup_user();
+        
+        bool processed = false;
+        
+        app.log_in_with_credentials(AppCredentials::anonymous(),
+                                    [&](std::shared_ptr<SyncUser> user, Optional<app::AppError> error) {
+                                        CHECK(user);
+                                        CHECK(!error);
+                                        processed = true;
+                                    });
+        
+        CHECK(processed);
+    }
+}
+

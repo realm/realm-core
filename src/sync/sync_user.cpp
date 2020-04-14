@@ -237,7 +237,6 @@ void SyncUser::update_access_token(std::string token)
         });
     }
 
-
     // (Re)activate all pending sessions.
     // Note that we do this after releasing the lock, since the session may
     // need to access protected User state in the process of binding itself.

@@ -173,6 +173,20 @@ struct CustomErrorCategory : public std::error_category {
 
 CustomErrorCategory g_custom_error_category;
 
+struct ClientErrorCategory : public std::error_category {
+    const char* name() const noexcept final override
+    {
+        return "realm::app::ClientError";
+    }
+    
+    std::string message(int code) const override final
+    {
+        return util::format("code %1", code);
+    }
+};
+
+ClientErrorCategory g_client_error_category;
+
 } // unnamed namespace
 
 std::ostream& operator<<(std::ostream& os, AppError error)
@@ -228,13 +242,16 @@ std::error_code make_custom_error_code(int code) noexcept
 {
     return std::error_code{code, g_custom_error_category};
 }
-    
-std::error_code make_custom_error_code(ClientErrorCode error) noexcept
+
+const std::error_category& client_error_category() noexcept
 {
-    return std::error_code{int(error), g_custom_error_category};
+    return g_client_error_category;
 }
 
-
+std::error_code make_client_error_code(ClientErrorCode error) noexcept
+{
+    return std::error_code{int(error), g_client_error_category};
+}
 
 } // namespace app
 } // namespace realm
