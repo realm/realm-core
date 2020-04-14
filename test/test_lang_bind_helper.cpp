@@ -133,7 +133,8 @@ TEST(Transactions_Frozen)
 }
 
 
-
+// disable this test on x86 Windows
+#if !(defined(_WIN32) && defined(_M_IX86))
 TEST(Transactions_ConcurrentFrozenTableGetByName)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -164,6 +165,7 @@ TEST(Transactions_ConcurrentFrozenTableGetByName)
     for (int j = 0; j < 1000; ++j)
         threads[j].join();
 }
+#endif
 
 
 TEST(Transactions_ConcurrentFrozenTableGetByKey)
