@@ -3242,6 +3242,23 @@ public:
 
     void evaluate(size_t index, ValueBase& destination) override
     {
+        if constexpr (std::is_same_v<T, ObjectId> || std::is_same_v<T, Int>) {
+            if (m_column_key.get_attrs().test(col_attr_Nullable)) {
+                evaluate<Optional<T>>(index, destination);
+                return;
+            }
+        }
+        evaluate<T>(index, destination);
+    }
+
+    virtual std::string description(util::serializer::SerialisationState& state) const override
+    {
+        return m_list.description(state) + util::serializer::value_separator + Operation::description();
+    }
+
+private:
+    template <typename StorageType>
+    void evaluate(size_t index, ValueBase& destination) {
         Allocator& alloc = get_base_table()->get_alloc();
         Value<ref_type> list_refs;
         m_list.get_lists(index, list_refs, 1);
@@ -3253,7 +3270,7 @@ public:
             auto list_ref = list_refs.m_storage[i];
             Operation op;
             if (list_ref) {
-                BPlusTree<T> list(alloc);
+                BPlusTree<StorageType> list(alloc);
                 list.init_from_ref(list_ref);
                 size_t s = list.size();
                 for (unsigned j = 0; j < s; j++) {
@@ -3269,13 +3286,6 @@ public:
         }
         destination.import(v);
     }
-
-    virtual std::string description(util::serializer::SerialisationState& state) const override
-    {
-        return m_list.description(state) + util::serializer::value_separator + Operation::description();
-    }
-
-private:
     ColKey m_column_key;
     Columns<Lst<T>> m_list;
 };
@@ -3855,6 +3865,14 @@ public:
     {
         m_count++;
         m_result = Derived::apply(m_result, value);
+    }
+
+    void accumulate(Optional<T> value)
+    {
+        if (value) {
+            m_count++;
+            m_result = Derived::apply(m_result, *value);
+        }
     }
 
     bool is_null() const

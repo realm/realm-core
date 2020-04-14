@@ -1892,12 +1892,6 @@ TEST(Parser_list_of_primitive_ints)
     verify_query(test_context, t, "integers.@count == 1", num_objects);
     verify_query(test_context, t, "integers.@size == 1", num_objects);
 
-    // list vs property
-    verify_query(test_context, t, "integers == single_int", num_objects);
-    verify_query(test_context, t, "integers_nullable == single_int", num_objects);
-    verify_query(test_context, t, "integers == single_int_nullable", num_objects);
-    verify_query(test_context, t, "integers_nullable == single_int_nullable", num_objects);
-
     // add two more objects; one with defaults, one with null in the list
     Obj obj_defaults = t->create_object();
     Obj obj_nulls_in_lists = t->create_object();
@@ -1911,6 +1905,32 @@ TEST(Parser_list_of_primitive_ints)
     verify_query(test_context, t, "integers_nullable == NULL", 1);
     verify_query(test_context, t, "ALL integers_nullable == NULL", 2); // matches the empty list and the list containing one NULL
     verify_query(test_context, t, "NONE integers_nullable == NULL", num_objects - 1);
+    // list vs property
+    verify_query(test_context, t, "integers == single_int", num_objects - 2);
+    verify_query(test_context, t, "integers_nullable == single_int", num_objects - 2);
+    verify_query(test_context, t, "integers == single_int_nullable", num_objects - 2);
+    verify_query(test_context, t, "integers_nullable == single_int_nullable", num_objects - 1);
+    // aggregate vs property x nullable
+    verify_query(test_context, t, "integers.@min == single_int", num_objects - 2); // two empty lists don't match
+    verify_query(test_context, t, "integers.@min == single_int_nullable", num_objects); // the min of 2 empty lists is null which matches the nullable int
+    verify_query(test_context, t, "integers_nullable.@min == single_int", num_objects - 2); // two empty lists don't match 0
+    verify_query(test_context, t, "integers_nullable.@min == single_int_nullable", num_objects); // the min of empty list matches null, and the min of only null matches null
+    verify_query(test_context, t, "integers.@max == single_int", num_objects - 2); // two empty lists don't match 0s
+    verify_query(test_context, t, "integers.@max == single_int_nullable", num_objects); // the max of 2 empty lists is null which matches the null int
+    verify_query(test_context, t, "integers_nullable.@max == single_int", num_objects - 2); // max of null doesn't match 0
+    verify_query(test_context, t, "integers_nullable.@max == single_int_nullable", num_objects); // the max of an empty list matches null, and the max of only null matches null
+    verify_query(test_context, t, "integers.@sum == single_int", num_objects); // sum of an empty list matches 0
+    verify_query(test_context, t, "integers.@sum == single_int_nullable", num_objects - 2); // sum of empty list does not match null
+    verify_query(test_context, t, "integers_nullable.@sum == single_int", num_objects); // sum of empty list matches 0, sum of list containing null matches 0
+    verify_query(test_context, t, "integers_nullable.@sum == single_int_nullable", num_objects - 2); // sum of empty list does not match null, sum of list containing null does not match null
+    verify_query(test_context, t, "integers.@avg == single_int", num_objects - 2); // avg of empty lists is null, does not match 0
+    verify_query(test_context, t, "integers.@avg == single_int_nullable", num_objects); // avg of empty lists matches null
+    verify_query(test_context, t, "integers_nullable.@avg == single_int", num_objects - 2); // avg of empty list is null does not match 0, avg of list containing null is not 0
+    verify_query(test_context, t, "integers_nullable.@avg == single_int_nullable", num_objects); // avg of empty list matches null, avg of list containing null matches null
+    verify_query(test_context, t, "integers.@count == single_int", 2 + 1); // 2x count of empty list matches 0, count of {1} matches 1
+    verify_query(test_context, t, "integers.@count == single_int_nullable", 1); // count of empty list matches 0
+    verify_query(test_context, t, "integers_nullable.@count == single_int", 1 + 1); // count of {1} matches 1, count of empty list matches 0
+    verify_query(test_context, t, "integers_nullable.@count == single_int_nullable", 1); // count of {1} matches 1
 
     Obj obj0 = *t->begin();
     util::Any args[] = {Int(1) };
