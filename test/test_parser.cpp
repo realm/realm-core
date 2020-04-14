@@ -1867,6 +1867,28 @@ TEST(Parser_list_of_primitive_ints)
         obj.set<Optional<Int>>(col_int_nullable, i);
     }
 
+    TableRef t2 = g.add_table("table2");
+
+    auto col_link = t2->add_column_link(type_Link, "link", *t);
+    auto col_list = t2->add_column_link(type_LinkList, "list", *t);
+    {
+        // object with link to 1, list with {1}
+        Obj obj0 = t2->create_object();
+        ObjKey linkedObj0 = t->find_first(col_int, Int(1));
+        obj0.set(col_link, linkedObj0);
+        LnkLst list0 = obj0.get_linklist(col_list);
+        list0.add(linkedObj0);
+        // object with link to 2, list with all values
+        Obj obj1 = t2->create_object();
+        obj1.set(col_link, t->find_first(col_int, Int(2)));
+        LnkLst list1 = obj1.get_linklist(col_list);
+        for (auto it = t->begin(); it != t->end(); ++it) {
+            list1.add(it->get_key());
+        }
+        // empty object, null link, empty list
+        Obj obj2 = t2->create_object();
+    }
+
     for (size_t i = 0; i < num_objects; ++i) {
         verify_query(test_context, t, util::format("integers == %1", i), 1);
         verify_query(test_context, t, util::format("integers.@min == %1", i), 1);
@@ -1931,6 +1953,34 @@ TEST(Parser_list_of_primitive_ints)
     verify_query(test_context, t, "integers.@count == single_int_nullable", 1); // count of empty list matches 0
     verify_query(test_context, t, "integers_nullable.@count == single_int", 1 + 1); // count of {1} matches 1, count of empty list matches 0
     verify_query(test_context, t, "integers_nullable.@count == single_int_nullable", 1); // count of {1} matches 1
+    // operations across links
+    verify_query(test_context, t2, "link.integers == 0 || link.integers == 3", 0);
+    verify_query(test_context, t2, "link.integers == 1", 1);
+    verify_query(test_context, t2, "link.integers == 2", 1);
+    verify_query(test_context, t2, "link.integers == NULL", 0);
+    verify_query(test_context, t2, "link.integers_nullable == NULL", 0);
+    verify_query(test_context, t2, "link.integers.@count == 1", 2);
+    verify_query(test_context, t2, "link.integers.@count == 0", 1);
+    verify_query(test_context, t2, "link.integers.@min == 1", 1);
+    verify_query(test_context, t2, "link.integers.@max == 1", 1);
+    verify_query(test_context, t2, "link.integers.@sum == 1", 1);
+    verify_query(test_context, t2, "link.integers.@avg == 1", 1);
+    // operations across lists
+    verify_query(test_context, t2, "list.integers == 1", 2);
+    verify_query(test_context, t2, "list.integers == 2", 1);
+    verify_query(test_context, t2, "list.integers == NULL", 0);
+    verify_query(test_context, t2, "list.integers.@count == 1", 2);
+    verify_query(test_context, t2, "list.integers.@min == 1", 2);
+    verify_query(test_context, t2, "list.integers.@max == 1", 2);
+    verify_query(test_context, t2, "list.integers.@avg == 1", 2);
+    verify_query(test_context, t2, "list.integers.@sum == 1", 2);
+    verify_query(test_context, t2, "list.integers.@min == 1", 2);
+    // aggregate operators across multiple lists
+    // we haven't supported aggregates across multiple lists previously
+    // but the implementation works and applies the aggregate to the primitive list
+    // this may be surprising, but it is one way to interpret the expression
+    verify_query(test_context, t2, "ALL list.integers == 1", 2); // row 0 matches {1}. row 1 matches (any of) {} {1}
+    verify_query(test_context, t2, "NONE list.integers == 1", 1); // row 1 matches (any of) {}, {0}, {2}, {3} ...
 
     Obj obj0 = *t->begin();
     util::Any args[] = {Int(1) };
@@ -3163,10 +3213,10 @@ TEST(Parser_Subquery)
 }
 
 
-TEST(Parser_AggregateShortcuts)
+TEST_TYPES(Parser_AggregateShortcuts, std::true_type, std::false_type)
 {
     Group g;
-
+    constexpr bool indexed_toggle = TEST_TYPE::value;
     TableRef allergens = g.add_table("class_Allergens");
     ColKey ingredient_name_col = allergens->add_column(type_String, "name");
     ColKey population_col = allergens->add_column(type_Double, "population_affected");
@@ -3239,6 +3289,12 @@ TEST(Parser_AggregateShortcuts)
             list.add(items_keys[2]);
             list.add(items_keys[3]);
         }
+    }
+
+    if (indexed_toggle) {
+        allergens->add_search_index(ingredient_name_col);
+        items->add_search_index(item_name_col);
+        t->add_search_index(id_col);
     }
 
     // any is implied over list properties

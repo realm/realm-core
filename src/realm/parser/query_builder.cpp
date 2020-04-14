@@ -741,6 +741,7 @@ void preprocess_for_comparison_types(Predicate::Comparison& cmpr, ExpressionCont
     auto verify_comparison_type = [&](ExpressionContainer expression, parser::Expression::ComparisonType compare_type,
                                       ExpressionContainer::ExpressionInternal opposite_type) {
         size_t list_count = 0;
+        size_t primitive_list_count = 0;
         if (expression.type == ExpressionContainer::ExpressionInternal::exp_Property) {
             for (KeyPathElement e : expression.get_property().link_chain) {
                 if (e.col_type == type_LinkList || e.is_backlink) {
@@ -750,8 +751,10 @@ void preprocess_for_comparison_types(Predicate::Comparison& cmpr, ExpressionCont
         }
         else if (expression.type == ExpressionContainer::ExpressionInternal::exp_PrimitiveList) {
             for (KeyPathElement e : expression.get_primitive_list().link_chain) {
-                if (e.col_type == type_LinkList || e.is_backlink || e.is_list_of_primitives) {
+                if (e.col_type == type_LinkList || e.is_backlink) {
                     list_count++;
+                } else if (e.is_list_of_primitives) {
+                    primitive_list_count++;
                 }
             }
         }
@@ -759,9 +762,9 @@ void preprocess_for_comparison_types(Predicate::Comparison& cmpr, ExpressionCont
             realm_precondition(expression.type == ExpressionContainer::ExpressionInternal::exp_Property
                                || expression.type == ExpressionContainer::ExpressionInternal::exp_PrimitiveList,
                                util::format("The expression after %1 must be a keypath containing a list", get_cmp_type_name(compare_type)));
-            realm_precondition(list_count > 0,
+            realm_precondition(list_count > 0 || primitive_list_count > 0,
                                util::format("The keypath following %1 must contain a list", get_cmp_type_name(compare_type)));
-            realm_precondition(list_count == 1,
+            realm_precondition(list_count == 1 || primitive_list_count == 1,
                                util::format("The keypath following %1 must contain only one list", get_cmp_type_name(compare_type)));
         }
 

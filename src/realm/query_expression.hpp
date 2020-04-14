@@ -4251,7 +4251,8 @@ public:
     double init() override
     {
         double dT = m_left_is_const ? 10.0 : 50.0;
-        if (std::is_same_v<TCond, Equal> && m_left_is_const && m_right->has_search_index()) {
+        if (std::is_same_v<TCond, Equal> && m_left_is_const && m_right->has_search_index()
+            && m_right->get_comparison_type() == ExpressionComparisonType::Any) {
             if (m_left_value.m_storage.is_null(0)) {
                 m_matches = m_right->find_all(Mixed());
             }
@@ -4310,7 +4311,7 @@ public:
                 ObjKey last_key = m_cluster->get_real_key(end - 1);
                 if (actual_key > last_key)
                     return not_found;
-                // FIXME: handle ALL/NONE on indexed columns
+
                 // key is known to be in this leaf, so find key whithin leaf keys
                 return m_cluster->lower_bound_key(ObjKey(actual_key.value - m_cluster->get_offset()));
             }
@@ -4318,7 +4319,6 @@ public:
         }
 
         size_t match;
-
         Value<T> right;
         const ExpressionComparisonType right_cmp_type = m_right->get_comparison_type();
         if (m_left_is_const) {
