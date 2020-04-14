@@ -1,7 +1,26 @@
+# NEXT RELEASE
+
+### Enhancements
+* None.
+
+### Fixed
+* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* None.
+ 
+### Breaking changes
+* None.
+
+-----------
+
+### Internals
+* None.
+
+----------------------------------------------
+
 # 10.0.0-alpha.5 Release notes
 
 ### Enhancements
-* average, min and max operations addded to Decimal128 queries.
+* average, min and max operations added to Decimal128 queries.
 * 'between' condition added to Decimal128 queries.
 
 ### Fixed
