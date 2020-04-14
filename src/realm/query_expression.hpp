@@ -2887,6 +2887,7 @@ public:
     Columns(const Columns& other)
         : Subexpr2<Link>(other)
         , m_link_map(other.m_link_map)
+        , m_comparison_type(other.m_comparison_type)
     {
     }
 
@@ -2920,6 +2921,10 @@ public:
     template <typename C>
     SubColumns<C> column(ColKey column_key) const
     {
+        // no need to pass along m_comparison_type because the only operations supported from
+        // the subsequent SubColumns are aggregate operations such as sum, min, max, avg where
+        // having
+        REALM_ASSERT_DEBUG(m_comparison_type == ExpressionComparisonType::Any);
         return SubColumns<C>(Columns<C>(column_key, m_link_map.get_target_table()), m_link_map);
     }
 
@@ -2951,7 +2956,12 @@ public:
 
     std::string description(util::serializer::SerialisationState& state) const override
     {
-        return state.describe_columns(m_link_map, ColKey());
+        return state.describe_expression_type(m_comparison_type) + state.describe_columns(m_link_map, ColKey());
+    }
+
+    virtual ExpressionComparisonType get_comparison_type() const override
+    {
+        return m_comparison_type;
     }
 
     std::unique_ptr<Subexpr> clone() const override
@@ -2961,15 +2971,16 @@ public:
 
     void evaluate(size_t index, ValueBase& destination) override;
 
-
 private:
     LinkMap m_link_map;
+    ExpressionComparisonType m_comparison_type;
     friend class Table;
     friend class LinkChain;
 
     Columns(ColKey column_key, ConstTableRef table, const std::vector<ColKey>& links = {},
             ExpressionComparisonType type = ExpressionComparisonType::Any)
         : m_link_map(table, links)
+        , m_comparison_type(type)
     {
         static_cast<void>(column_key);
     }
