@@ -1,21 +1,13 @@
-# NEXT RELEASE
+# 10.0.0-alpha.5 Release notes
 
 ### Enhancements
 * average, min and max operations addded to Decimal128 queries.
-* between condition added to Decimal128 queries.
+* 'between' condition added to Decimal128 queries.
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Querying for a null ObjectId value over links could crash.
+* Several fixes around tombstone handling
  
-### Breaking changes
-* None.
-
------------
-
-### Internals
-* None.
-
 ----------------------------------------------
 
 # 10.0.0-alpha.4 Release notes
