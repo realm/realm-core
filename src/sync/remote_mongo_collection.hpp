@@ -19,7 +19,7 @@
 #ifndef REMOTE_MONGO_COLLECTION_HPP
 #define REMOTE_MONGO_COLLECTION_HPP
 
-#include "remote_mongo_read_operation.hpp"
+#include "sync/remote_mongo_read_operation.hpp"
 #include <realm/util/optional.hpp>
 #include <json.hpp>
 #include <string>

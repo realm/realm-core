@@ -19,10 +19,10 @@
 #ifndef REALM_APP_HPP
 #define REALM_APP_HPP
 
-#include "auth_request_client.hpp"
-#include "app_credentials.hpp"
-#include "generic_network_transport.hpp"
-#include "sync_user.hpp"
+#include "sync/auth_request_client.hpp"
+#include "sync/app_credentials.hpp"
+#include "sync/generic_network_transport.hpp"
+#include "sync/sync_user.hpp"
 
 namespace realm {
 namespace app {
@@ -100,19 +100,16 @@ public:
                             std::function<void(std::vector<UserAPIKey>, Optional<AppError>)> completion_block);
 
         /// Deletes a user API key associated with the current user.
-        /// @param api_key The id of the API key to delete.
         /// @param completion_block A callback to be invoked once the call is complete.
         void delete_api_key(const realm::ObjectId& id, std::shared_ptr<SyncUser> user,
                             std::function<void(Optional<AppError>)> completion_block);
 
         /// Enables a user API key associated with the current user.
-        /// @param api_key The id of the API key to enable.
         /// @param completion_block A callback to be invoked once the call is complete.
         void enable_api_key(const realm::ObjectId& id, std::shared_ptr<SyncUser> user,
                             std::function<void(Optional<AppError>)> completion_block);
 
         /// Disables a user API key associated with the current user.
-        /// @param api_key The id of the API key to disable.
         /// @param completion_block A callback to be invoked once the call is complete.
         void disable_api_key(const realm::ObjectId& id, std::shared_ptr<SyncUser> user,
                              std::function<void(Optional<AppError>)> completion_block);

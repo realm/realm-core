@@ -19,7 +19,7 @@
 #ifndef REMOTE_MONGO_DATABASE_HPP
 #define REMOTE_MONGO_DATABASE_HPP
 
-#include "remote_mongo_collection.hpp"
+#include "sync/remote_mongo_collection.hpp"
 #include <json.hpp>
 #include <string>
 

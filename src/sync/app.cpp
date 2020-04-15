@@ -686,7 +686,7 @@ std::shared_ptr<SyncUser> App::switch_user(std::shared_ptr<SyncUser> user) const
 void App::remove_user(std::shared_ptr<SyncUser> user,
                       std::function<void(Optional<AppError>)> completion_block) const
 {
-    if (user->state() == SyncUser::State::Removed) {
+    if (!user || user->state() == SyncUser::State::Removed) {
         return completion_block(AppError(make_client_error_code(ClientErrorCode::user_not_found),
                                          "User has already been removed"));
     }
@@ -716,7 +716,7 @@ void App::link_user(std::shared_ptr<SyncUser> user,
                     const AppCredentials& credentials,
                     std::function<void(std::shared_ptr<SyncUser>, Optional<AppError>)> completion_block) const
 {
-    if (user->state() != SyncUser::State::LoggedIn) {
+    if (!user || user->state() != SyncUser::State::LoggedIn) {
         return completion_block(nullptr, AppError(make_client_error_code(ClientErrorCode::user_not_found),
                                                   "The specified user is not logged in"));
     }

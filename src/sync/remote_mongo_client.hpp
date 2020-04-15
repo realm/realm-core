@@ -19,7 +19,7 @@
 #ifndef REMOTE_MONGO_CLIENT_HPP
 #define REMOTE_MONGO_CLIENT_HPP
 
-#include "app_service_client.hpp"
+#include "sync/app_service_client.hpp"
 #include <realm/util/optional.hpp>
 #include <string>
 #include <map>

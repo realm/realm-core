@@ -19,7 +19,7 @@
 #ifndef REMOTE_MONGO_READ_OPERATION_HPP
 #define REMOTE_MONGO_READ_OPERATION_HPP
 
-#include "remote_mongo_client.hpp"
+#include "sync/remote_mongo_client.hpp"
 
 namespace realm {
 namespace app {
