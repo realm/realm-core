@@ -29,10 +29,29 @@ TransactLogConvenientEncoder::TransactLogConvenientEncoder(TransactLogStream& st
 
 TransactLogConvenientEncoder::~TransactLogConvenientEncoder() {}
 
-void TransactLogConvenientEncoder::add_class(StringData, bool) {}
-void TransactLogConvenientEncoder::add_class_with_primary_key(StringData, DataType, StringData, bool) {}
-void TransactLogConvenientEncoder::create_object(const Table*, GlobalKey) {}
-void TransactLogConvenientEncoder::create_object_with_primary_key(const Table*, GlobalKey, Mixed) {}
+void TransactLogConvenientEncoder::add_class(TableKey table_key, StringData, bool)
+{
+    unselect_all();
+    m_encoder.insert_group_level_table(table_key); // Throws
+}
+
+void TransactLogConvenientEncoder::add_class_with_primary_key(TableKey tk, StringData, DataType, StringData, bool)
+{
+    unselect_all();
+    m_encoder.insert_group_level_table(tk); // Throws
+}
+
+void TransactLogConvenientEncoder::create_object(const Table* t, GlobalKey id)
+{
+    select_table(t);                              // Throws
+    m_encoder.create_object(id.get_local_key(0)); // Throws
+}
+
+void TransactLogConvenientEncoder::create_object_with_primary_key(const Table* t, GlobalKey id, Mixed)
+{
+    select_table(t);                                                                       // Throws
+    m_encoder.create_object(_impl::TableFriend::global_to_local_object_id_hashed(*t, id)); // Throws
+}
 
 bool TransactLogEncoder::select_table(TableKey key)
 {

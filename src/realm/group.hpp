@@ -729,9 +729,7 @@ private:
     const Table* do_get_table(size_t ndx) const;
     Table* do_get_table(StringData name);
     const Table* do_get_table(StringData name) const;
-    Table* do_add_table(StringData name);
-
-    Table* do_get_or_add_table(StringData name, bool is_embedded, bool* was_added = nullptr);
+    Table* do_add_table(StringData name, bool is_embedded, bool do_repl = true);
 
     void create_and_insert_table(TableKey key, StringData name);
     Table* create_table_accessor(size_t table_ndx);
@@ -1015,8 +1013,8 @@ inline TableRef Group::add_table(StringData name)
     if (!is_attached())
         throw LogicError(LogicError::detached_accessor);
     check_table_name_uniqueness(name);
-    Table* table = do_add_table(name); // Throws
-    return TableRef(table, table ? table->m_alloc.get_instance_version() : 0);
+    Table* table = do_add_table(name, false); // Throws
+    return TableRef(table, table->m_alloc.get_instance_version());
 }
 
 inline TableRef Group::add_embedded_table(StringData name)
@@ -1024,16 +1022,21 @@ inline TableRef Group::add_embedded_table(StringData name)
     if (!is_attached())
         throw LogicError(LogicError::detached_accessor);
     check_table_name_uniqueness(name);
-    Table* table = do_get_or_add_table(name, true); // Throws
-    return TableRef(table, table ? table->m_alloc.get_instance_version() : 0);
+    Table* table = do_add_table(name, true); // Throws
+    return TableRef(table, table->m_alloc.get_instance_version());
 }
 
 inline TableRef Group::get_or_add_table(StringData name, bool* was_added)
 {
     if (!is_attached())
         throw LogicError(LogicError::detached_accessor);
-    Table* table = do_get_or_add_table(name, false, was_added); // Throws
-    return TableRef(table, table ? table->m_alloc.get_instance_version() : 0);
+    auto table = do_get_table(name);
+    if (was_added)
+        *was_added = !table;
+    if (!table) {
+        table = do_add_table(name, false);
+    }
+    return TableRef(table, table->m_alloc.get_instance_version());
 }
 
 template <class S>
