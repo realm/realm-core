@@ -20,7 +20,7 @@
 #ifndef APP_SERVICE_CLIENT_HPP
 #define APP_SERVICE_CLIENT_HPP
 
-#include <sync/generic_network_transport.hpp>
+#include "sync/generic_network_transport.hpp"
 #include <realm/util/optional.hpp>
 #include <string>
 
