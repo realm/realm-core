@@ -2023,6 +2023,80 @@ TEST(Parser_list_of_primitive_ints)
     CHECK_EQUAL(message, "Cannot convert string 'string'");
 }
 
+TEST(Parser_list_of_primitive_strings)
+{
+    Group g;
+    TableRef t = g.add_table("table");
+
+    auto col_str_list = t->add_column_list(type_String, "strings");
+    auto col_str = t->add_column(type_String, "single_string");
+    auto col_str_list_nullable = t->add_column_list(type_String, "strings_nullable", true);
+    auto col_str_nullable = t->add_column(type_String, "single_int_nullable", true);
+    CHECK_THROW_ANY(t->add_search_index(col_str_list));
+
+    auto get_string = [](size_t i) -> std::string {
+        return util::format("string_%1", i);
+    };
+    size_t num_objects = 10;
+    for (size_t i = 0; i < num_objects; ++i) {
+        Obj obj = t->create_object();
+        std::string si = get_string(i);
+        obj.get_list<String>(col_str_list).add(si);
+        obj.set<String>(col_str, si);
+        obj.get_list<String>(col_str_list_nullable).add(si);
+        obj.set<String>(col_str_nullable, si);
+    }
+
+    for (size_t i = 0; i < num_objects; ++i) {
+        std::string si = get_string(i);
+        verify_query(test_context, t, util::format("strings == '%1'", si), 1);
+        verify_query(test_context, t, util::format("ANY strings == '%1'", si), 1);
+        verify_query(test_context, t, util::format("SOME strings == '%1'", si), 1);
+        verify_query(test_context, t, util::format("ALL strings == '%1'", si), 1);
+        verify_query(test_context, t, util::format("NONE strings == '%1'", si), num_objects - 1);
+        verify_query(test_context, t, util::format("!(ANY strings == '%1')", si), num_objects - 1);
+        verify_query(test_context, t, util::format("!(SOME strings == '%1')", si), num_objects - 1);
+        verify_query(test_context, t, util::format("!(ALL strings == '%1')", si), num_objects - 1);
+        verify_query(test_context, t, util::format("!(NONE strings == '%1')", si), 1);
+        verify_query(test_context, t, util::format("ANY strings != '%1'", si), num_objects - 1);
+        verify_query(test_context, t, util::format("SOME strings != '%1'", si), num_objects - 1);
+        verify_query(test_context, t, util::format("ALL strings != '%1'", si), num_objects - 1);
+        verify_query(test_context, t, util::format("NONE strings != '%1'", si), 1);
+        verify_query(test_context, t, util::format("'%1' IN strings", si), 1);
+        verify_query(test_context, t, util::format("strings CONTAINS[c] '%1'", si), 1);
+        verify_query(test_context, t, util::format("strings BEGINSWITH[c] '%1'", si), 1);
+        verify_query(test_context, t, util::format("strings ENDSWITH[c] '%1'", si), 1);
+        verify_query(test_context, t, util::format("strings LIKE[c] '%1'", si), 1);
+    }
+    verify_query(test_context, t, "strings CONTAINS[c] 'STR'", num_objects);
+    verify_query(test_context, t, "strings BEGINSWITH[c] 'STR'", num_objects);
+    verify_query(test_context, t, "strings ENDSWITH[c] 'G_1'", 1);
+    verify_query(test_context, t, "strings LIKE[c] 'StRiNg_*'", num_objects);
+    verify_query(test_context, t, "ALL strings CONTAINS[c] 'STR'", num_objects);
+    verify_query(test_context, t, "ALL strings BEGINSWITH[c] 'STR'", num_objects);
+    verify_query(test_context, t, "ALL strings ENDSWITH[c] 'G_1'", 1);
+    verify_query(test_context, t, "ALL strings LIKE[c] 'StRiNg_*'", num_objects);
+    verify_query(test_context, t, "NONE strings CONTAINS[c] 'STR'", 0);
+    verify_query(test_context, t, "NONE strings BEGINSWITH[c] 'STR'", 0);
+    verify_query(test_context, t, "NONE strings ENDSWITH[c] 'G_1'", num_objects - 1);
+    verify_query(test_context, t, "NONE strings LIKE[c] 'StRiNg_*'", 0);
+
+    verify_query(test_context, t, "strings.@count == 0", 0);
+    verify_query(test_context, t, "strings.@size == 0", 0);
+    verify_query(test_context, t, "strings.@count == 1", num_objects);
+    verify_query(test_context, t, "strings.@size == 1", num_objects);
+
+    std::string message;
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "strings.@min == 2", 0), message);
+    CHECK_EQUAL(message, "Predicate error: comparison of type 'String' with result of '@min' is not supported.");
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "strings.@max == 2", 0), message);
+    CHECK_EQUAL(message, "Predicate error: comparison of type 'String' with result of '@max' is not supported.");
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "strings.@sum == 2", 0), message);
+    CHECK_EQUAL(message, "Predicate error: comparison of type 'String' with result of '@sum' is not supported.");
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "strings.@avg == 2", 0), message);
+    CHECK_EQUAL(message, "Predicate error: comparison of type 'String' with result of '@avg' is not supported.");
+}
+
 TEST(Parser_SortAndDistinctSerialisation)
 {
     Group g;

@@ -158,158 +158,95 @@ void add_bool_constraint_to_query(Query &query, Predicate::Operator operatorType
     }
 }
 
-void add_string_constraint_to_query(Query& query, const Predicate::Comparison& cmp, Columns<String>&& column,
-                                    StringData&& value)
+std::string operator_description(const Predicate::Operator& op) {
+    switch (op) {
+        case Predicate::Operator::None:
+            return "NONE";
+        case realm::parser::Predicate::Operator::Equal:
+            return "==";
+        case realm::parser::Predicate::Operator::NotEqual:
+            return "!=";
+        case realm::parser::Predicate::Operator::LessThan:
+            return "<";
+        case realm::parser::Predicate::Operator::LessThanOrEqual:
+            return "<=";
+        case realm::parser::Predicate::Operator::GreaterThan:
+            return ">";
+        case realm::parser::Predicate::Operator::GreaterThanOrEqual:
+            return ">=";
+        case realm::parser::Predicate::Operator::BeginsWith:
+            return "BEGINSWITH";
+        case realm::parser::Predicate::Operator::EndsWith:
+            return "ENDSWITH";
+        case realm::parser::Predicate::Operator::Contains:
+            return "CONTAINS";
+        case realm::parser::Predicate::Operator::Like:
+            return "LIKE";
+        case realm::parser::Predicate::Operator::In:
+            return "IN";
+    }
+}
+
+// (string column OR list of primitive strings) vs (string literal OR string column)
+template <typename LHS, typename RHS>
+std::enable_if_t<realm::is_any<LHS, Columns<String>, Columns<Lst<String>>>::value
+&& realm::is_any<RHS, StringData, Columns<String>>::value, void>
+add_string_constraint_to_query(Query& query, const Predicate::Comparison& cmp, LHS&& lhs, RHS&& rhs)
 {
     bool case_sensitive = (cmp.option != Predicate::OperatorOption::CaseInsensitive);
     switch (cmp.op) {
         case Predicate::Operator::BeginsWith:
-            query.and_query(column.begins_with(value, case_sensitive));
+            query.and_query(lhs.begins_with(rhs, case_sensitive));
             break;
         case Predicate::Operator::EndsWith:
-            query.and_query(column.ends_with(value, case_sensitive));
+            query.and_query(lhs.ends_with(rhs, case_sensitive));
             break;
         case Predicate::Operator::Contains:
-            query.and_query(column.contains(value, case_sensitive));
+            query.and_query(lhs.contains(rhs, case_sensitive));
             break;
         case Predicate::Operator::Equal:
-            query.and_query(column.equal(value, case_sensitive));
+            query.and_query(lhs.equal(rhs, case_sensitive));
             break;
         case Predicate::Operator::NotEqual:
-            query.and_query(column.not_equal(value, case_sensitive));
+            query.and_query(lhs.not_equal(rhs, case_sensitive));
             break;
         case Predicate::Operator::Like:
-            query.and_query(column.like(value, case_sensitive));
+            query.and_query(lhs.like(rhs, case_sensitive));
             break;
         default:
-            throw std::logic_error("Unsupported operator for string queries.");
+            throw std::logic_error(util::format("Unsupported operator '%1' for string queries.", operator_description(cmp.op)));
     }
 }
 
-void add_string_constraint_to_query(realm::Query& query, const Predicate::Comparison& cmp, StringData&& value,
-                                    Columns<String>&& column)
+// ((string literal) vs (string column OR list of primitive strings)) OR ((string column) vs (list of primitive strings column))
+template <typename LHS, typename RHS>
+std::enable_if_t<(realm::is_any<LHS, StringData>::value
+&& realm::is_any<RHS, Columns<String>, Columns<Lst<String>>>::value)
+|| (std::is_same_v<LHS, Columns<String>> && std::is_same_v<RHS, Columns<Lst<String>>>), void>
+add_string_constraint_to_query(Query& query, const Predicate::Comparison& cmp, LHS&& lhs, RHS&& rhs)
 {
     bool case_sensitive = (cmp.option != Predicate::OperatorOption::CaseInsensitive);
     switch (cmp.op) {
         case Predicate::Operator::In:
             REALM_FALLTHROUGH;
         case Predicate::Operator::Equal:
-            query.and_query(column.equal(value, case_sensitive));
+            query.and_query(rhs.equal(lhs, case_sensitive));
             break;
         case Predicate::Operator::NotEqual:
-            query.and_query(column.not_equal(value, case_sensitive));
+            query.and_query(rhs.not_equal(lhs, case_sensitive));
             break;
             // operators CONTAINS, BEGINSWITH, ENDSWITH, LIKE are not supported in this direction
             // These queries are not the same: "'asdf' CONTAINS string_property" vs "string_property CONTAINS 'asdf'"
         default:
-            throw std::logic_error("Unsupported operator for keypath substring queries.");
+            throw std::logic_error(util::format("Unsupported query comparison '%1' for a single string vs a string property.", operator_description(cmp.op)));
     }
-}
-
-void add_string_constraint_to_query(realm::Query& query, const Predicate::Comparison& cmp, Columns<String>&& lhs_col,
-                                    Columns<String>&& rhs_col)
-{
-    bool case_sensitive = (cmp.option != Predicate::OperatorOption::CaseInsensitive);
-    switch (cmp.op) {
-        case Predicate::Operator::BeginsWith:
-            query.and_query(lhs_col.begins_with(rhs_col, case_sensitive));
-            break;
-        case Predicate::Operator::EndsWith:
-            query.and_query(lhs_col.ends_with(rhs_col, case_sensitive));
-            break;
-        case Predicate::Operator::Contains:
-            query.and_query(lhs_col.contains(rhs_col, case_sensitive));
-            break;
-        case Predicate::Operator::Equal:
-            query.and_query(lhs_col.equal(rhs_col, case_sensitive));
-            break;
-        case Predicate::Operator::NotEqual:
-            query.and_query(lhs_col.not_equal(rhs_col, case_sensitive));
-            break;
-        case Predicate::Operator::Like:
-            query.and_query(lhs_col.like(rhs_col, case_sensitive));
-            break;
-        default:
-            throw std::logic_error("Unsupported operator for string queries.");
-    }
-}
-
-// primitive list of strings column vs string column
-void add_string_constraint_to_query(realm::Query& query, const Predicate::Comparison& cmp,
-                                    Columns<Lst<String>>&& lhs_col, Columns<String>&& rhs_col)
-{
-    bool case_sensitive = (cmp.option != Predicate::OperatorOption::CaseInsensitive);
-    switch (cmp.op) {
-        case Predicate::Operator::BeginsWith:
-            query.and_query(lhs_col.begins_with(rhs_col, case_sensitive));
-            break;
-        case Predicate::Operator::EndsWith:
-            query.and_query(lhs_col.ends_with(rhs_col, case_sensitive));
-            break;
-        case Predicate::Operator::Contains:
-            query.and_query(lhs_col.contains(rhs_col, case_sensitive));
-            break;
-        case Predicate::Operator::Equal:
-            query.and_query(lhs_col.equal(rhs_col, case_sensitive));
-            break;
-        case Predicate::Operator::NotEqual:
-            query.and_query(lhs_col.not_equal(rhs_col, case_sensitive));
-            break;
-        case Predicate::Operator::Like:
-            query.and_query(lhs_col.like(rhs_col, case_sensitive));
-            break;
-        default:
-            throw std::logic_error("Unsupported operator for string queries.");
-    }
-}
-
-// string column vs primitive list of strings column doesn't make sense
-void add_string_constraint_to_query(realm::Query&, const Predicate::Comparison&, Columns<String>&&,
-                                    Columns<Lst<String>>&&)
-{
-    throw std::logic_error("Comparing a string property to a list of primitive strings is not supported");
-}
-
-// FIXME: share these functions as they're the same code, possibly with std::enable_if<T, Columns<Lst<String>>,
-// Columns<String>
-void add_string_constraint_to_query(Query& query, const Predicate::Comparison& cmp, Columns<Lst<String>>&& column,
-                                    StringData&& value)
-{
-    bool case_sensitive = (cmp.option != Predicate::OperatorOption::CaseInsensitive);
-    switch (cmp.op) {
-        case Predicate::Operator::BeginsWith:
-            query.and_query(column.begins_with(value, case_sensitive));
-            break;
-        case Predicate::Operator::EndsWith:
-            query.and_query(column.ends_with(value, case_sensitive));
-            break;
-        case Predicate::Operator::Contains:
-            query.and_query(column.contains(value, case_sensitive));
-            break;
-        case Predicate::Operator::Equal:
-            query.and_query(column.equal(value, case_sensitive));
-            break;
-        case Predicate::Operator::NotEqual:
-            query.and_query(column.not_equal(value, case_sensitive));
-            break;
-        case Predicate::Operator::Like:
-            query.and_query(column.like(value, case_sensitive));
-            break;
-        default:
-            throw std::logic_error("Unsupported operator for string queries.");
-    }
-}
-
-void add_string_constraint_to_query(Query&, const Predicate::Comparison&, StringData&&, Columns<Lst<String>>&&)
-{
-    throw std::logic_error("Comparing a string literal with a list of primitive strings is not supported.");
 }
 
 void add_string_constraint_to_query(Query&, const Predicate::Comparison&, Columns<Lst<String>>&&,
                                     Columns<Lst<String>>&&)
 {
     throw std::logic_error(
-        "Comparing a primitive string list against a list of primitive strings is not implemented.");
+        "Comparing two primitive string lists against each other is not implemented yet.");
 }
 
 

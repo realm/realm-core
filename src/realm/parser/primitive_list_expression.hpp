@@ -33,6 +33,8 @@ struct PrimitiveListExpression {
     DataType get_dest_type() const;
     ColKey get_dest_col_key() const;
     ConstTableRef get_dest_table() const;
+    template <class T>
+    T size_of_list() const;
 
     PrimitiveListExpression(Query& q, std::vector<KeyPathElement>&& chain, ExpressionComparisonType type);
 

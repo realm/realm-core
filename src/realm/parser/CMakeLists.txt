@@ -1,5 +1,4 @@
 set(REALM_PARSER_SOURCES
-    collection_operator_expression.cpp
     expression_container.cpp
     keypath_mapping.cpp
     parser.cpp

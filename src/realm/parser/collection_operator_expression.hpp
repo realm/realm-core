@@ -238,7 +238,7 @@ struct CollectionOperatorGetter<
     static SizeOperator<SizeOfList>
     convert(const CollectionOperatorExpression<parser::Expression::KeyPathOp::Count, PrimitiveListExpression>& expr)
     {
-        return expr.link_chain_getter().template column<Lst<RetType>>(expr.pe.get_dest_col_key()).size();
+        return expr.pe.size_of_list<SizeOperator<SizeOfList>>();
     }
 };
 
