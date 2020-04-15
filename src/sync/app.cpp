@@ -338,16 +338,14 @@ void App::UsernamePasswordProviderClient::call_reset_password_function(const std
     nlohmann::json body = {
         { "name", name }
     };
-    
-    m_parent->do_authenticated_request({
+    Request req = {
         .method = HttpMethod::post,
         .url = route,
         .timeout_ms = m_parent->m_request_timeout_ms,
         .body = body.dump(),
         .uses_refresh_token = true
-    },
-    user,
-    handler);
+    };
+    m_parent->do_authenticated_request(req, user, handler);
 }
 
 void App::UserAPIKeyProviderClient::fetch_api_key(const realm::ObjectId& id, std::shared_ptr<SyncUser> user,
@@ -382,14 +380,13 @@ void App::UserAPIKeyProviderClient::fetch_api_key(const realm::ObjectId& id, std
         }
     };
 
-    m_parent->do_authenticated_request({
+    Request req = {
         .method = HttpMethod::get,
         .url = route,
         .timeout_ms = m_parent->m_request_timeout_ms,
         .uses_refresh_token = true
-    },
-    user,
-    handler);
+    };
+    m_parent->do_authenticated_request(req, user, handler);
 }
 
 void App::UserAPIKeyProviderClient::fetch_api_keys(std::shared_ptr<SyncUser> user,
@@ -430,14 +427,13 @@ void App::UserAPIKeyProviderClient::fetch_api_keys(std::shared_ptr<SyncUser> use
         }
     };
     
-    m_parent->do_authenticated_request({
+    Request req = {
         .method = HttpMethod::get,
         .url = route,
         .timeout_ms = m_parent->m_request_timeout_ms,
         .uses_refresh_token = true
-    },
-    user,
-    handler);
+    };
+    m_parent->do_authenticated_request(req, user, handler);
 }
 
 
@@ -455,14 +451,13 @@ void App::UserAPIKeyProviderClient::delete_api_key(const realm::ObjectId& id, st
         }
     };
     
-    m_parent->do_authenticated_request({
+    Request req = {
         .method = HttpMethod::del,
         .url = route,
         .timeout_ms = m_parent->m_request_timeout_ms,
         .uses_refresh_token = true
-    },
-    user,
-    handler);
+    };
+    m_parent->do_authenticated_request(req, user, handler);
 }
 
 void App::UserAPIKeyProviderClient::enable_api_key(const realm::ObjectId& id, std::shared_ptr<SyncUser> user,
@@ -479,14 +474,13 @@ void App::UserAPIKeyProviderClient::enable_api_key(const realm::ObjectId& id, st
         }
     };
 
-    m_parent->do_authenticated_request({
+    Request req = {
         .method = HttpMethod::put,
         .url = route,
         .timeout_ms = m_parent->m_request_timeout_ms,
         .uses_refresh_token = true
-    },
-    user,
-    handler);
+    };
+    m_parent->do_authenticated_request(req, user, handler);
 }
 
 void App::UserAPIKeyProviderClient::disable_api_key(const realm::ObjectId& id, std::shared_ptr<SyncUser> user,
@@ -503,14 +497,13 @@ void App::UserAPIKeyProviderClient::disable_api_key(const realm::ObjectId& id, s
         }
     };
 
-    m_parent->do_authenticated_request({
+    Request req = {
         .method = HttpMethod::put,
         .url = route,
         .timeout_ms = m_parent->m_request_timeout_ms,
         .uses_refresh_token = true
-    },
-    user,
-    handler);
+    };
+    m_parent->do_authenticated_request(req, user, handler);
 }
 
 // MARK: - App
@@ -576,14 +569,13 @@ void App::get_profile(std::shared_ptr<SyncUser> sync_user,
     
     std::string profile_route = util::format("%1/auth/profile", m_base_route);
     
-    do_authenticated_request({
+    Request req = {
         .method = HttpMethod::get,
         .url = profile_route,
         .timeout_ms = m_request_timeout_ms,
         .uses_refresh_token = false
-    },
-    sync_user,
-    profile_handler);
+    };
+    do_authenticated_request(req, sync_user, profile_handler);
 }
 
 void App::log_in_with_credentials(const AppCredentials& credentials,
@@ -657,14 +649,13 @@ void App::log_out(std::shared_ptr<SyncUser> user, std::function<void (Optional<A
 
     std::string route = util::format("%1/auth/session", m_base_route);
     
-    do_authenticated_request({
+    Request req = {
         .method = HttpMethod::del,
         .url = route,
         .timeout_ms = m_request_timeout_ms,
         .uses_refresh_token = true
-    },
-    user,
-    handler);
+    };
+    do_authenticated_request(req, user, handler);
 }
 
 void App::log_out(std::function<void (Optional<AppError>)> completion_block) const {
