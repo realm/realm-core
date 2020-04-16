@@ -128,8 +128,6 @@ void SlabAlloc::detach() noexcept
     m_translation_table_size = 0;
     set_read_only(true);
     purge_old_mappings(static_cast<uint64_t>(-1), 0);
-    m_compatibility_mapping.unmap();
-    m_sections_in_compatibility_mapping = 0;
     switch (m_attach_mode) {
         case attach_None:
             break;
@@ -195,7 +193,9 @@ MemRef SlabAlloc::do_alloc(size_t size)
     REALM_ASSERT_EX(0 < size, size, get_file_path_for_assertions());
     REALM_ASSERT_EX((size & 0x7) == 0, size, get_file_path_for_assertions()); // only allow sizes that are multiples of 8
     REALM_ASSERT_EX(is_attached(), get_file_path_for_assertions());
-    REALM_ASSERT_EX(size < 1 * 1024 * 1024 * 1024, size, get_file_path_for_assertions());
+    // This limits the size of any array to ensure it can fit within a memory section.
+    // NOTE: This limit is lower than the limit set by the encoding in node_header.hpp
+    REALM_ASSERT_RELEASE_EX(size < (1 << section_shift), size, get_file_path_for_assertions());
 
     // If we failed to correctly record free space, new allocations cannot be
     // carried out until the free space record is reset.
@@ -641,7 +641,7 @@ int SlabAlloc::get_committed_file_format_version() const noexcept
         // if we have mapped a file, m_mappings will have at least one mapping and
         // the first will be to the start of the file. Don't come here, if we're
         // just attaching a buffer. They don't have mappings.
-        realm::util::encryption_read_barrier(m_mappings[0], 0, sizeof(Header));
+        realm::util::encryption_read_barrier(m_mappings[0].primary_mapping, 0, sizeof(Header));
     }
     const Header& header = *reinterpret_cast<const Header*>(m_data);
     int slot_selector = ((header.m_flags & SlabAlloc::flags_SelectBit) != 0 ? 1 : 0);
@@ -757,23 +757,61 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
         size = initial_size;
     }
     ref_type top_ref;
-    File::Map<char> initial_mapping;
     try {
-        File::Map<char> map(m_file, File::access_ReadOnly, size); // Throws
         note_reader_start(this);
         // we'll read header and (potentially) footer
-        realm::util::encryption_read_barrier(map, 0, sizeof(Header));
-        realm::util::encryption_read_barrier(map, size - sizeof(Header), sizeof(Header));
-
-        validate_header(map.get_addr(), size, path); // Throws
-
-        top_ref = get_top_ref(map.get_addr(), size);
-
-        m_data = map.get_addr();
-        initial_mapping = std::move(map); // replace at end of function
-        // with correctly sized chunks instead...
-        m_baseline = 0;
+        File::Map<char> map_header(m_file, File::access_ReadOnly, sizeof(Header));
+        // if file is too small we'll catch it in validate_header - but we need to prevent an invalid mapping first
+        size_t footer_ref = size < (sizeof(StreamingFooter) + sizeof(Header)) ? 0 : (size - sizeof(StreamingFooter));
+        size_t footer_page_base = footer_ref & ~(page_size() - 1);
+        size_t footer_offset = footer_ref - footer_page_base;
+        File::Map<char> map_footer(m_file, footer_page_base, File::access_ReadOnly,
+                                   sizeof(StreamingFooter) + footer_offset, 0);
+        realm::util::encryption_read_barrier(map_header, 0, sizeof(Header));
+        realm::util::encryption_read_barrier(map_footer, footer_offset, sizeof(StreamingFooter));
+        auto header = reinterpret_cast<const Header*>(map_header.get_addr());
+        auto footer = reinterpret_cast<const StreamingFooter*>(map_footer.get_addr() + footer_offset);
+        top_ref = validate_header(header, footer, size, path); // Throws
         m_attach_mode = cfg.is_shared ? attach_SharedFile : attach_UnsharedFile;
+        m_data = map_header.get_addr(); // <-- needed below
+
+        // Make sure the database is not on streaming format. If we did not do this,
+        // a later commit would have to do it. That would require coordination with
+        // anybody concurrently joining the session, so it seems easier to do it at
+        // session initialization, even if it means writing the database during open.
+        if (cfg.session_initiator && is_file_on_streaming_form(*header)) {
+            // Don't compare file format version fields as they are allowed to differ.
+            // Also don't compare reserved fields.
+            REALM_ASSERT_EX(header->m_flags == 0, header->m_flags, get_file_path_for_assertions());
+            REALM_ASSERT_EX(header->m_mnemonic[0] == uint8_t('T'), header->m_mnemonic[0],
+                            get_file_path_for_assertions());
+            REALM_ASSERT_EX(header->m_mnemonic[1] == uint8_t('-'), header->m_mnemonic[1],
+                            get_file_path_for_assertions());
+            REALM_ASSERT_EX(header->m_mnemonic[2] == uint8_t('D'), header->m_mnemonic[2],
+                            get_file_path_for_assertions());
+            REALM_ASSERT_EX(header->m_mnemonic[3] == uint8_t('B'), header->m_mnemonic[3],
+                            get_file_path_for_assertions());
+            REALM_ASSERT_EX(header->m_top_ref[0] == 0xFFFFFFFFFFFFFFFFULL, header->m_top_ref[0],
+                            get_file_path_for_assertions());
+            REALM_ASSERT_EX(header->m_top_ref[1] == 0, header->m_top_ref[1], get_file_path_for_assertions());
+            REALM_ASSERT_EX(footer->m_magic_cookie == footer_magic_cookie, footer->m_magic_cookie,
+                            get_file_path_for_assertions());
+            {
+                File::Map<Header> writable_map(m_file, File::access_ReadWrite, sizeof(Header)); // Throws
+                Header& writable_header = *writable_map.get_addr();
+                realm::util::encryption_read_barrier(writable_map, 0);
+                writable_header.m_top_ref[1] = footer->m_top_ref;
+                writable_header.m_file_format[1] = writable_header.m_file_format[0];
+                realm::util::encryption_write_barrier(writable_map, 0);
+                writable_map.sync();
+                realm::util::encryption_read_barrier(writable_map, 0);
+                writable_header.m_flags |= flags_SelectBit;
+                realm::util::encryption_write_barrier(writable_map, 0);
+                writable_map.sync();
+
+                realm::util::encryption_read_barrier(map_header, 0, sizeof(Header));
+            }
+        }
     }
     catch (const DecryptionFailed&) {
         note_reader_end(this);
@@ -781,8 +819,10 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
     }
     catch (...) {
         note_reader_end(this);
-        throw;
+        // we end up here if any of the file or mapping operations fail.
+        throw InvalidDatabase("Realm file initial open failed", path);
     }
+    m_baseline = 0;
     auto handler = [this]() noexcept { note_reader_end(this); };
     auto reader_end_guard = make_scope_exit(handler);
     // make sure that any call to begin_read cause any slab to be placed in free
@@ -791,45 +831,6 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
 
     // Ensure clean up, if we need to back out:
     DetachGuard dg(*this);
-
-    // make sure the database is not on streaming format. If we did not do this,
-    // a later commit would have to do it. That would require coordination with
-    // anybody concurrently joining the session, so it seems easier to do it at
-    // session initialization, even if it means writing the database during open.
-    const Header& header = *reinterpret_cast<const Header*>(m_data);
-    if (cfg.session_initiator && is_file_on_streaming_form(header)) {
-        const StreamingFooter& footer = *(reinterpret_cast<const StreamingFooter*>(m_data + size) - 1);
-        // Don't compare file format version fields as they are allowed to differ.
-        // Also don't compare reserved fields (todo, is it correct to ignore?)
-        static_cast<void>(header);
-        REALM_ASSERT_EX(header.m_flags == 0, header.m_flags, get_file_path_for_assertions());
-        REALM_ASSERT_EX(header.m_mnemonic[0] == uint8_t('T'), header.m_mnemonic[0], get_file_path_for_assertions());
-        REALM_ASSERT_EX(header.m_mnemonic[1] == uint8_t('-'), header.m_mnemonic[1], get_file_path_for_assertions());
-        REALM_ASSERT_EX(header.m_mnemonic[2] == uint8_t('D'), header.m_mnemonic[2], get_file_path_for_assertions());
-        REALM_ASSERT_EX(header.m_mnemonic[3] == uint8_t('B'), header.m_mnemonic[3], get_file_path_for_assertions());
-        REALM_ASSERT_EX(header.m_top_ref[0] == 0xFFFFFFFFFFFFFFFFULL, header.m_top_ref[0], get_file_path_for_assertions());
-        REALM_ASSERT_EX(header.m_top_ref[1] == 0, header.m_top_ref[1], get_file_path_for_assertions());
-
-        REALM_ASSERT_EX(footer.m_magic_cookie == footer_magic_cookie, footer.m_magic_cookie, get_file_path_for_assertions());
-        {
-            File::Map<Header> writable_map(m_file, File::access_ReadWrite, sizeof(Header)); // Throws
-            Header& writable_header = *writable_map.get_addr();
-            realm::util::encryption_read_barrier(writable_map, 0);
-            writable_header.m_top_ref[1] = footer.m_top_ref;
-            writable_header.m_file_format[1] = writable_header.m_file_format[0];
-            realm::util::encryption_write_barrier(writable_map, 0);
-            writable_map.sync();
-            realm::util::encryption_read_barrier(writable_map, 0);
-            writable_header.m_flags |= flags_SelectBit;
-            realm::util::encryption_write_barrier(writable_map, 0);
-            writable_map.sync();
-
-            realm::util::encryption_read_barrier(initial_mapping, 0, sizeof(Header));
-        }
-    }
-    int file_format_version = get_committed_file_format_version();
-    initial_mapping.unmap();
-    m_data = nullptr;
 
     // We can only safely mmap the file, if its size matches a page boundary. If not,
     // we must change the size to match before mmaping it.
@@ -879,40 +880,16 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
     }
 
     reset_free_space_tracking();
-    // if the file format is older than version 10 and larger than a section we have
-    // to use the compatibility mapping
-    // FIXME: For now always use compatibility mapping.
-    static_cast<void>(file_format_version); // silence a warning
-    if (size > get_section_base(1) /* && file_format_version < 10 */) {
-        setup_compatibility_mapping(size);
-        m_data = m_compatibility_mapping.get_addr();
-    }
-    else {
-        update_reader_view(size);
-        REALM_ASSERT(m_mappings.size());
-        m_data = m_mappings[0].get_addr();
-    }
+    update_reader_view(size);
+    REALM_ASSERT(m_mappings.size());
+    m_data = m_mappings[0].primary_mapping.get_addr();
+    realm::util::encryption_read_barrier(m_mappings[0].primary_mapping, 0, sizeof(Header));
     dg.release();  // Do not detach
     fcg.release(); // Do not close
 #if REALM_ENABLE_ENCRYPTION
     m_realm_file_info = util::get_file_info_for_file(m_file);
 #endif
     return top_ref;
-}
-
-void SlabAlloc::setup_compatibility_mapping(size_t file_size)
-{
-    m_sections_in_compatibility_mapping = int(get_section_index(file_size));
-    REALM_ASSERT(m_sections_in_compatibility_mapping);
-    m_compatibility_mapping = util::File::Map<char>(get_file(), util::File::access_ReadOnly, file_size);
-    // fake that we've only mapped the number of full sections in order
-    // to allow additional mappings to start aligned to a section boundary,
-    // even though the compatibility mapping may extend further.
-    m_baseline = get_section_base(m_sections_in_compatibility_mapping);
-    update_reader_view(file_size);
-    if (m_mappings.size() == 0) {
-        rebuild_translations(true, m_sections_in_compatibility_mapping);
-    }
 }
 
 void SlabAlloc::note_reader_start(const void* reader_id)
@@ -945,9 +922,7 @@ ref_type SlabAlloc::attach_buffer(const char* data, size_t size)
 
     // Verify the data structures
     std::string path; // No path
-    validate_header(data, size, path); // Throws
-
-    ref_type top_ref = get_top_ref(data, size);
+    ref_type top_ref = validate_header(data, size, path); // Throws
 
     m_data = data;
     size = align_size_to_section_boundary(size);
@@ -955,14 +930,7 @@ ref_type SlabAlloc::attach_buffer(const char* data, size_t size)
     m_attach_mode = attach_UsersBuffer;
 
     m_translation_table_size = 1;
-    m_ref_translation_ptr = new RefTranslation[1];
-#if REALM_ENABLE_ENCRYPTION
-    m_ref_translation_ptr[0] = {const_cast<char*>(m_data), nullptr};
-#else
-    m_ref_translation_ptr[0] = {const_cast<char*>(m_data)};
-#endif
-    // Below this point (assignment to `m_attach_mode`), nothing must throw.
-
+    m_ref_translation_ptr = new RefTranslation[1]{RefTranslation{const_cast<char*>(m_data)}};
     return top_ref;
 }
 
@@ -984,12 +952,7 @@ void SlabAlloc::attach_empty()
     size_t size = align_size_to_section_boundary(sizeof(Header));
     m_baseline = size;
     m_translation_table_size = 1;
-    m_ref_translation_ptr = new RefTranslation[1];
-#if REALM_ENABLE_ENCRYPTION
-    m_ref_translation_ptr[0] = {nullptr, nullptr};
-#else
-    m_ref_translation_ptr[0] = {nullptr};
-#endif
+    m_ref_translation_ptr = new RefTranslation[1]{RefTranslation{nullptr}};
 }
 
 void SlabAlloc::throw_header_exception(std::string msg, const Header& header, const std::string& path)
@@ -1005,10 +968,18 @@ void SlabAlloc::throw_header_exception(std::string msg, const Header& header, co
     throw InvalidDatabase(msg, path);
 }
 
-void SlabAlloc::validate_header(const char* data, size_t size, const std::string& path)
+// Note: This relies on proper mappings having been established by the caller
+// for both the header and the streaming footer
+ref_type SlabAlloc::validate_header(const char* data, size_t size, const std::string& path)
 {
-    const Header& header = *reinterpret_cast<const Header*>(data);
+    auto header = reinterpret_cast<const Header*>(data);
+    auto footer = reinterpret_cast<const StreamingFooter*>(data + size - sizeof(StreamingFooter));
+    return validate_header(header, footer, size, path);
+}
 
+ref_type SlabAlloc::validate_header(const Header* header, const StreamingFooter* footer, size_t size,
+                                    const std::string& path)
+{
     // Verify that size is sane and 8-byte aligned
     if (REALM_UNLIKELY(size < sizeof(Header) || size % 8 != 0)) {
         std::string msg = "Realm file has bad size (" + util::to_string(size) + ")";
@@ -1016,35 +987,35 @@ void SlabAlloc::validate_header(const char* data, size_t size, const std::string
     }
 
     // First four bytes of info block is file format id
-    if (REALM_UNLIKELY(!(char(header.m_mnemonic[0]) == 'T' && char(header.m_mnemonic[1]) == '-' &&
-                         char(header.m_mnemonic[2]) == 'D' && char(header.m_mnemonic[3]) == 'B')))
-        throw_header_exception("Invalid mnemonic", header, path);
+    if (REALM_UNLIKELY(!(char(header->m_mnemonic[0]) == 'T' && char(header->m_mnemonic[1]) == '-' &&
+                         char(header->m_mnemonic[2]) == 'D' && char(header->m_mnemonic[3]) == 'B')))
+        throw_header_exception("Invalid mnemonic", *header, path);
 
     // Last bit in info block indicates which top_ref block is valid
-    int slot_selector = ((header.m_flags & SlabAlloc::flags_SelectBit) != 0 ? 1 : 0);
+    int slot_selector = ((header->m_flags & SlabAlloc::flags_SelectBit) != 0 ? 1 : 0);
 
     // Top-ref must always point within buffer
-    uint_fast64_t top_ref = uint_fast64_t(header.m_top_ref[slot_selector]);
+    auto top_ref = header->m_top_ref[slot_selector];
     if (slot_selector == 0 && top_ref == 0xFFFFFFFFFFFFFFFFULL) {
         if (REALM_UNLIKELY(size < sizeof(Header) + sizeof(StreamingFooter))) {
             std::string msg = "Invalid streaming format size (" + util::to_string(size) + ")";
             throw InvalidDatabase(msg, path);
         }
-        const StreamingFooter& footer = *(reinterpret_cast<const StreamingFooter*>(data + size) - 1);
-        top_ref = footer.m_top_ref;
-        if (REALM_UNLIKELY(footer.m_magic_cookie != footer_magic_cookie)) {
-            std::string msg = "Invalid streaming format cookie (" + util::to_string(footer.m_magic_cookie) + ")";
+        top_ref = footer->m_top_ref;
+        if (REALM_UNLIKELY(footer->m_magic_cookie != footer_magic_cookie)) {
+            std::string msg = "Invalid streaming format cookie (" + util::to_string(footer->m_magic_cookie) + ")";
             throw InvalidDatabase(msg, path);
         }
     }
     if (REALM_UNLIKELY(top_ref % 8 != 0)) {
         std::string msg = "Top ref not aligned (" + util::to_string(top_ref) + ")";
-        throw_header_exception(msg, header, path);
+        throw_header_exception(msg, *header, path);
     }
     if (REALM_UNLIKELY(top_ref >= size)) {
         std::string msg = "Top ref outside file (size = " + util::to_string(size) + ")";
-        throw_header_exception(msg, header, path);
+        throw_header_exception(msg, *header, path);
     }
+    return ref_type(top_ref);
 }
 
 
@@ -1118,22 +1089,22 @@ inline bool randomly_false_in_debug(bool x)
 
   * m_mappings: This is the "source of truth" about what the current mapping is.
     It is only accessed under lock.
-  * m_fast_mapping: This is generated to match m_mappings, but is also accessed without
-    any locking from the translate function. Because of the lock free operation this
-    table can only be extended. Entries in it cannot be changed. The fast mapping also
-    maps the slab area used for allocations - as mappings are added, the slab area *moves*,
-    corresponding to the movement of m_baseline. This movement does not need to trigger
-    generation of a new m_fast_mapping table, because it is only relevant to memory
-    allocation and release, which is already serialized (since write transactions are
+  * m_fast_mapping: This is generated to match m_mappings, but is also accessed in a
+    mostly lock-free fashion from the translate function. Because of the lock free operation this
+    table can only be extended. Only selected members in each entry can be changed.
+    See RefTranslation in alloc.hpp for more details.
+    The fast mapping also maps the slab area used for allocations - as mappings are added,
+    the slab area *moves*, corresponding to the movement of m_baseline. This movement does
+    not need to trigger generation of a new m_fast_mapping table, because it is only relevant
+    to memory allocation and release, which is already serialized (since write transactions are
     single threaded).
 
   When m_mappings is changed due to an extend operation changing a mapping, or when
-  it has grown such that it cannot be reflected in m_fast_mapping:
+  it has grown such that it cannot be reflected in m_fast_mapping, we use read-copy-update:
 
   * A new fast mapping table is created. The old one is not modified.
   * The old one is held in a waiting area until it is no longer relevant because no
     live transaction can refer to it any more.
-
  */
 void SlabAlloc::update_reader_view(size_t file_size)
 {
@@ -1148,22 +1119,25 @@ void SlabAlloc::update_reader_view(size_t file_size)
     bool requires_new_translation = false;
 
     // Extend mapping by adding sections, potentially replacing older sections
-    auto old_slab_base = align_size_to_section_boundary(old_baseline);
-    size_t old_num_sections = get_section_index(old_slab_base);
-    REALM_ASSERT(m_mappings.size() == old_num_sections - m_sections_in_compatibility_mapping);
+    const auto old_slab_base = align_size_to_section_boundary(old_baseline);
+    const size_t old_num_mappings = get_section_index(old_slab_base);
+    REALM_ASSERT(m_mappings.size() == old_num_mappings);
     m_baseline.store(file_size, std::memory_order_relaxed);
     {
         // 0. Special case: figure out if extension is to be done entirely within a single
         // existing mapping. This is the case if the new baseline (which must be larger
         // then the old baseline) is still below the old base of the slab area.
-        auto mapping_index = old_num_sections - 1 - m_sections_in_compatibility_mapping;
+        const auto earlier_last_index = old_num_mappings - 1;
+        MapEntry& cur_entry = m_mappings[earlier_last_index];
         if (file_size < old_slab_base) {
-            size_t section_start_offset = get_section_base(old_num_sections - 1);
-            size_t section_size = file_size - section_start_offset;
+            const size_t section_start_offset = get_section_base(earlier_last_index);
+            const size_t section_size = file_size - section_start_offset;
             requires_new_translation = true;
             // save the old mapping/keep it open
-            m_old_mappings.emplace_back(m_youngest_live_version, std::move(m_mappings[mapping_index]));
-            m_mappings[mapping_index] =
+            m_old_mappings.emplace_back(m_youngest_live_version, std::move(cur_entry.primary_mapping));
+            // extension cannot possibly happen if we alread have a xover mapping established
+            REALM_ASSERT(!cur_entry.xover_mapping.is_attached());
+            cur_entry.primary_mapping =
                 util::File::Map<char>(m_file, section_start_offset, File::access_ReadOnly, section_size);
             m_mapping_version++;
         }
@@ -1172,57 +1146,49 @@ void SlabAlloc::update_reader_view(size_t file_size)
             // 1. figure out if there is a partially completed mapping, that we need to extend
             // to cover a full mapping section
             if (old_baseline < old_slab_base) {
-                size_t section_start_offset = get_section_base(old_num_sections - 1);
-                size_t section_size = old_slab_base - section_start_offset;
+                const size_t section_start_offset = get_section_base(earlier_last_index);
+                const size_t section_size = old_slab_base - section_start_offset;
                 // we could not extend the old mapping, so replace it with a full, new one
                 requires_new_translation = true;
-                size_t section_reservation = get_section_base(old_num_sections) - section_start_offset;
+                const size_t section_reservation = get_section_base(old_num_mappings) - section_start_offset;
                 REALM_ASSERT(section_size == section_reservation);
                 // save the old mapping/keep it open
-                m_old_mappings.emplace_back(m_youngest_live_version, std::move(m_mappings[mapping_index]));
-                m_mappings[mapping_index] =
+                m_old_mappings.emplace_back(m_youngest_live_version, std::move(cur_entry.primary_mapping));
+                // A xover mapping cannot be present in this case:
+                REALM_ASSERT(!cur_entry.xover_mapping.is_attached());
+                cur_entry.primary_mapping =
                     util::File::Map<char>(m_file, section_start_offset, File::access_ReadOnly, section_size);
                 m_mapping_version++;
             }
 
             // 2. add any full mappings
             //  - figure out how many full mappings we need to match the requested size
-            auto new_slab_base = align_size_to_section_boundary(file_size);
-            size_t num_full_mappings = get_section_index(file_size) - m_sections_in_compatibility_mapping;
-            size_t num_mappings = get_section_index(new_slab_base) - m_sections_in_compatibility_mapping;
-            size_t old_num_mappings = old_num_sections - m_sections_in_compatibility_mapping;
+            const auto new_slab_base = align_size_to_section_boundary(file_size);
+            const size_t num_full_mappings = get_section_index(file_size);
+            const size_t num_mappings = get_section_index(new_slab_base);
             if (num_mappings > old_num_mappings) {
-                // we can't just resize the vector since Maps do not support copy constructionn:
-                // m_mappings.resize(num_mappings);
-                std::vector<util::File::Map<char>> next_mapping(num_mappings);
-                for (size_t i = 0; i < old_num_mappings; ++i) {
-                    next_mapping[i] = std::move(m_mappings[i]);
-                }
-                m_mappings = std::move(next_mapping);
+                m_mappings.resize(num_mappings);
             }
 
             for (size_t k = old_num_mappings; k < num_full_mappings; ++k) {
-                size_t section_start_offset = get_section_base(k + m_sections_in_compatibility_mapping);
-                size_t section_size =
-                    get_section_base(1 + k + m_sections_in_compatibility_mapping) - section_start_offset;
-                m_mappings[k] =
+                const size_t section_start_offset = get_section_base(k);
+                const size_t section_size = 1 << section_shift;
+                m_mappings[k].primary_mapping =
                     util::File::Map<char>(m_file, section_start_offset, File::access_ReadOnly, section_size);
             }
 
             // 3. add a final partial mapping if needed
             if (file_size < new_slab_base) {
                 REALM_ASSERT(num_mappings == num_full_mappings + 1);
-                size_t section_start_offset =
-                    get_section_base(num_full_mappings + m_sections_in_compatibility_mapping);
-                size_t section_size = file_size - section_start_offset;
-                util::File::Map<char> mapping;
-                mapping = util::File::Map<char>(m_file, section_start_offset, File::access_ReadOnly, section_size);
-                m_mappings[num_full_mappings] = std::move(mapping);
+                const size_t section_start_offset = get_section_base(num_full_mappings);
+                const size_t section_size = file_size - section_start_offset;
+                m_mappings[num_full_mappings].primary_mapping =
+                    util::File::Map<char>(m_file, section_start_offset, File::access_ReadOnly, section_size);
             }
         }
     }
-    size_t ref_start = align_size_to_section_boundary(file_size);
-    size_t ref_displacement = ref_start - old_slab_base;
+    const size_t ref_start = align_size_to_section_boundary(file_size);
+    const size_t ref_displacement = ref_start - old_slab_base;
     if (ref_displacement > 0) {
         // Rebase slabs as m_baseline is now bigger than old_slab_base
         for (auto& e : m_slabs) {
@@ -1247,7 +1213,7 @@ void SlabAlloc::update_reader_view(size_t file_size)
     // that is achieved by being single threaded, interlocked or run from a sequential
     // scheduling queue.
     //
-    rebuild_translations(requires_new_translation, old_num_sections);
+    rebuild_translations(requires_new_translation, old_num_mappings);
 }
 
 size_t SlabAlloc::get_allocated_size() const noexcept
@@ -1266,11 +1232,10 @@ void SlabAlloc::extend_fast_mapping_with_slab(char* address)
         new_fast_mapping[i] = m_ref_translation_ptr[i];
     }
     m_old_translations.emplace_back(m_youngest_live_version, m_ref_translation_ptr.load());
-#if REALM_ENABLE_ENCRYPTION
-    new_fast_mapping[m_translation_table_size - 1] = {address, nullptr};
-#else
-    new_fast_mapping[m_translation_table_size - 1] = {address};
-#endif
+    new_fast_mapping[m_translation_table_size - 1].mapping_addr = address;
+    // Memory ranges with slab (working memory) can never have arrays that straddle a boundary,
+    // so optimize by clamping the lowest possible xover offset to the end of the section.
+    new_fast_mapping[m_translation_table_size - 1].lowest_possible_xover_offset = 1ULL << section_shift;
     m_ref_translation_ptr = new_fast_mapping;
 }
 
@@ -1278,7 +1243,7 @@ void SlabAlloc::rebuild_translations(bool requires_new_translation, size_t old_n
 {
     size_t free_space_size = m_slabs.size();
     auto num_mappings = m_mappings.size();
-    if (m_translation_table_size < num_mappings + free_space_size + m_sections_in_compatibility_mapping) {
+    if (m_translation_table_size < num_mappings + free_space_size) {
         requires_new_translation = true;
     }
     RefTranslation* new_translation_table = m_ref_translation_ptr;
@@ -1287,37 +1252,58 @@ void SlabAlloc::rebuild_translations(bool requires_new_translation, size_t old_n
         // may be in progress concurrently
         if (m_translation_table_size)
             m_old_translations.emplace_back(m_youngest_live_version, m_ref_translation_ptr.load());
-        m_translation_table_size = num_mappings + free_space_size + m_sections_in_compatibility_mapping;
+        m_translation_table_size = num_mappings + free_space_size;
         new_translation_table = new RefTranslation[m_translation_table_size];
-        for (int i = 0; i < m_sections_in_compatibility_mapping; ++i) {
-            new_translation_table[i].mapping_addr = m_compatibility_mapping.get_addr() + get_section_base(i);
-            REALM_ASSERT(new_translation_table[i].mapping_addr);
-#if REALM_ENABLE_ENCRYPTION
-            new_translation_table[i].encrypted_mapping = m_compatibility_mapping.get_encrypted_mapping();
-#endif
-        }
         old_num_sections = 0;
     }
-    for (size_t k = old_num_sections; k < num_mappings; ++k) {
-        auto i = k + m_sections_in_compatibility_mapping;
-        new_translation_table[i].mapping_addr = m_mappings[k].get_addr();
+    for (size_t i = old_num_sections; i < num_mappings; ++i) {
+        new_translation_table[i].mapping_addr = m_mappings[i].primary_mapping.get_addr();
         REALM_ASSERT(new_translation_table[i].mapping_addr);
 #if REALM_ENABLE_ENCRYPTION
-        new_translation_table[i].encrypted_mapping = m_mappings[k].get_encrypted_mapping();
+        new_translation_table[i].encrypted_mapping = m_mappings[i].primary_mapping.get_encrypted_mapping();
 #endif
+        // We don't copy over data for the cross over mapping. If the mapping is needed,
+        // copying will happen on demand (in get_or_add_xover_mapping).
+        // Note: that may never be needed, because if the array that needed the original cross over
+        // mapping is freed, any new array allocated at the same position will NOT need a cross
+        // over mapping, but just use the primary mapping.
     }
     for (size_t k = 0; k < free_space_size; ++k) {
         char* base = m_slabs[k].addr;
-        auto i = num_mappings + m_sections_in_compatibility_mapping + k;
         REALM_ASSERT(base);
-#if REALM_ENABLE_ENCRYPTION
-        new_translation_table[i] = {base, nullptr};
-#else
-        new_translation_table[i] = {base};
-#endif
+        new_translation_table[num_mappings + k].mapping_addr = base;
     }
     m_ref_translation_ptr = new_translation_table;
 }
+
+void SlabAlloc::get_or_add_xover_mapping(RefTranslation& txl, size_t index, size_t offset, size_t size)
+{
+    auto _page_size = page_size();
+    std::lock_guard<std::mutex> lock(m_mapping_mutex);
+    if (txl.xover_mapping_addr.load(std::memory_order_relaxed)) {
+        // some other thread already added a mapping
+        // it MUST have been for the exact same address:
+        REALM_ASSERT(offset == txl.lowest_possible_xover_offset.load(std::memory_order_relaxed));
+        return;
+    }
+    MapEntry* map_entry = &m_mappings[index];
+    REALM_ASSERT(map_entry->primary_mapping.get_addr() == txl.mapping_addr);
+    if (!map_entry->xover_mapping.is_attached()) {
+        // Create a xover mapping
+        auto file_offset = get_section_base(index) + offset;
+        auto end_offset = file_offset + size;
+        auto mapping_file_offset = file_offset & ~(_page_size - 1);
+        auto minimal_mapping_size = end_offset - mapping_file_offset;
+        util::File::Map<char> mapping(m_file, mapping_file_offset, File::access_ReadOnly, minimal_mapping_size);
+        map_entry->xover_mapping = std::move(mapping);
+    }
+    txl.xover_mapping_base = offset & ~(_page_size - 1);
+#if REALM_ENABLE_ENCRYPTION
+    txl.xover_encrypted_mapping = map_entry->xover_mapping.get_encrypted_mapping();
+#endif
+    txl.xover_mapping_addr.store(map_entry->xover_mapping.get_addr(), std::memory_order_release);
+}
+
 
 void SlabAlloc::purge_old_mappings(uint64_t oldest_live_version, uint64_t youngest_live_version)
 {

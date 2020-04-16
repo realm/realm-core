@@ -46,7 +46,7 @@ using namespace std::chrono;
 #include "test_table_helper.hpp"
 
 // #include <valgrind/callgrind.h>
-// #define PERFORMACE_TESTING
+//#define PERFORMACE_TESTING
 
 using namespace realm;
 using namespace realm::util;
@@ -3625,14 +3625,15 @@ TEST(Table_QuickSort2)
 TEST(Table_object_sequential)
 {
 #ifdef PERFORMACE_TESTING
-    int nb_rows = 10000000;
+    int nb_rows = 10'000'000;
     int num_runs = 1;
 #else
-    int nb_rows = 1024;
+    int nb_rows = 100'000;
     int num_runs = 1;
 #endif
     SHARED_GROUP_TEST_PATH(path);
-    DBRef sg = DB::create(path);
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
     ColKey c0;
     ColKey c1;
 
@@ -3661,7 +3662,12 @@ TEST(Table_object_sequential)
         CHECK_EQUAL(table->size(), nb_rows);
         wt.commit();
     }
-
+    {
+        auto t1 = steady_clock::now();
+        sg->compact();
+        auto t2 = steady_clock::now();
+        std::cout << "  compaction time: " << duration_cast<milliseconds>(t2 - t1).count() << " ms" << std::endl;
+    }
     {
         ReadTransaction rt(sg);
         auto table = rt.get_table("test");
@@ -3769,17 +3775,18 @@ TEST(Table_object_sequential)
 TEST(Table_object_seq_rnd)
 {
 #ifdef PERFORMACE_TESTING
-    size_t rows = 100000;
+    size_t rows = 1'000'000;
     int runs = 100;     // runs for building scenario
 #else
-    size_t rows = 50000;
-    int runs = 1;
+    size_t rows = 100'000;
+    int runs = 100;
 #endif
     int64_t next_key = 0;
     std::vector<int64_t> key_values;
     std::set<int64_t> key_set;
     SHARED_GROUP_TEST_PATH(path);
-    DBRef sg = DB::create(path);
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
     ColKey c0;
     {
         std::cout << "Establishing scenario seq ins/rnd erase " << std::endl;
@@ -3811,10 +3818,16 @@ TEST(Table_object_seq_rnd)
     // scenario established!
     int nb_rows = int(key_values.size());
 #ifdef PERFORMACE_TESTING
-    int num_runs = 100; // runs for timing access
+    int num_runs = 10; // runs for timing access
 #else
     int num_runs = 1; // runs for timing access
 #endif
+    {
+        auto t1 = steady_clock::now();
+        sg->compact();
+        auto t2 = steady_clock::now();
+        std::cout << "  compaction time: " << duration_cast<milliseconds>(t2 - t1).count() << " ms" << std::endl;
+    }
     std::cout << "Scenario has " << nb_rows << " rows. Timing...." << std::endl;
     {
         ReadTransaction rt(sg);
@@ -3878,14 +3891,15 @@ TEST(Table_object_seq_rnd)
 TEST(Table_object_random)
 {
 #ifdef PERFORMACE_TESTING
-    int nb_rows = 100000;
-    int num_runs = 100;
+    int nb_rows = 1'000'000;
+    int num_runs = 10;
 #else
-    int nb_rows = 1024;
+    int nb_rows = 100'000;
     int num_runs = 1;
 #endif
     SHARED_GROUP_TEST_PATH(path);
-    DBRef sg = DB::create(path);
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
     ColKey c0;
     ColKey c1;
     std::vector<int64_t> key_values;
@@ -3930,6 +3944,12 @@ TEST(Table_object_random)
 
         CHECK_EQUAL(table->size(), nb_rows);
         wt.commit();
+    }
+    {
+        auto t1 = steady_clock::now();
+        sg->compact();
+        auto t2 = steady_clock::now();
+        std::cout << "  compaction time: " << duration_cast<milliseconds>(t2 - t1).count() << " ms" << std::endl;
     }
 
     {
