@@ -15,7 +15,7 @@ jobWrapper {
     stage('gather-info') {
         isPullRequest = !!env.CHANGE_TARGET
         targetBranch = isPullRequest ? env.CHANGE_TARGET : "none"
-        node('docker') {
+        node('docker && !cph') {
             getSourceArchive()
             stash includes: '**', name: 'core-source', useDefaultExcludes: false
 
@@ -71,7 +71,7 @@ jobWrapper {
 
     if (isPullRequest) {
         stage('FormatCheck') {
-            node('docker') {
+            node('docker && !cph') {
                 getArchive()
                 docker.build('realm-core-clang:snapshot', '-f clang.Dockerfile .').inside() {
                     echo "Checking code formatting"
@@ -171,7 +171,7 @@ jobWrapper {
         stage('Aggregate') {
             parallel (
                 cocoa: {
-                    node('docker') {
+                    node('docker && !cph') {
                         getArchive()
                         for (cocoaStash in cocoaStashes) {
                             unstash name: cocoaStash
@@ -184,7 +184,7 @@ jobWrapper {
                     }
                 },
                 android: {
-                    node('docker') {
+                    node('docker && !cph') {
                         getArchive()
                         for (androidStash in androidStashes) {
                             unstash name: androidStash
@@ -208,7 +208,7 @@ jobWrapper {
 
 def doCheckInDocker(String buildType, String maxBpNodeSize = '1000', String enableEncryption = 'ON') {
     return {
-        node('docker') {
+        node('docker && !cph') {
             getArchive()
             def buildEnv = docker.build 'realm-core-linux:18.04'
             def environment = environment()
@@ -238,7 +238,7 @@ def doCheckInDocker(String buildType, String maxBpNodeSize = '1000', String enab
 
 def doCheckSanity(String buildType, String maxBpNodeSize = '1000', String sanitizeMode='') {
     return {
-        node('docker') {
+        node('docker && !cph') {
             getArchive()
             def buildEnv = docker.build('realm-core-linux:clang', '-f clang.Dockerfile .')
             def environment = environment()
@@ -275,7 +275,7 @@ def doCheckSanity(String buildType, String maxBpNodeSize = '1000', String saniti
 
 def doBuildLinux(String buildType) {
     return {
-        node('docker') {
+        node('docker && !cph') {
             getSourceArchive()
 
             docker.build('realm-core-generic:gcc-8', '-f generic.Dockerfile .').inside {
@@ -302,7 +302,7 @@ def doBuildLinux(String buildType) {
 
 def doBuildLinuxClang(String buildType) {
     return {
-        node('docker') {
+        node('docker && !cph') {
             getArchive()
             docker.build('realm-core-linux:clang', '-f clang.Dockerfile .').inside() {
                 sh """
@@ -325,7 +325,7 @@ def doBuildLinuxClang(String buildType) {
 
 def doCheckValgrind() {
     return {
-        node('docker') {
+        node('docker && !cph') {
             getArchive()
             def buildEnv = docker.build 'realm-core-linux:18.04'
             def environment = environment()
@@ -429,7 +429,7 @@ def doBuildWindows(String buildType, boolean isUWP, String platform, boolean run
     }
 
     return {
-        node('windows') {
+        node('windows-vs2019') {
             getArchive()
 
             dir('build-dir') {
@@ -618,7 +618,7 @@ def doBuildAppleDevice(String sdk, String buildType) {
 
 def doBuildCoverage() {
   return {
-    node('docker') {
+    node('docker && !cph') {
       getArchive()
       docker.build('realm-core-linux:18.04').inside {
         def workspace = pwd()
@@ -678,7 +678,7 @@ def readGitTag() {
 
 def doPublishLocalArtifacts() {
     return {
-        node('docker') {
+        node('docker && !cph') {
             deleteDir()
             dir('temp') {
                 withAWS(credentials: 'aws-credentials', region: 'us-east-1') {

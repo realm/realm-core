@@ -328,14 +328,20 @@ public:
     StringData get_table_name(TableKey key) const;
 
     TableRef get_table(TableKey key);
-    ConstTableRef get_table(TableKey key) const;
+    ConstTableRef get_table(TableKey key) const
+    {
+        return const_cast<Group*>(this)->get_table(key);
+    }
 
     // Catch some implicit conversions
     TableRef get_table(int) = delete;
     ConstTableRef get_table(int) const = delete;
 
     TableRef get_table(StringData name);
-    ConstTableRef get_table(StringData name) const;
+    ConstTableRef get_table(StringData name) const
+    {
+        return const_cast<Group*>(this)->get_table(name);
+    }
 
     TableRef add_table(StringData name);
     TableRef add_embedded_table(StringData name);
@@ -981,33 +987,20 @@ inline TableRef Group::get_table(TableKey key)
     if (!is_attached())
         throw LogicError(LogicError::detached_accessor);
     auto ndx = key2ndx_checked(key);
-    Table* table = do_get_table(ndx); // Throws
-    return TableRef(table, table ? table->m_alloc.get_instance_version() : 0);
-}
-
-inline ConstTableRef Group::get_table(TableKey key) const
-{
-    if (!is_attached())
-        throw LogicError(LogicError::detached_accessor);
-    auto ndx = key2ndx_checked(key);
-    const Table* table = do_get_table(ndx); // Throws
-    return ConstTableRef(table, table ? table->m_alloc.get_instance_version() : 0);
+    if (Table* table = do_get_table(ndx)) {
+        return TableRef(table, table->m_alloc.get_instance_version());
+    }
+    return {};
 }
 
 inline TableRef Group::get_table(StringData name)
 {
     if (!is_attached())
         throw LogicError(LogicError::detached_accessor);
-    Table* table = do_get_table(name); // Throws
-    return TableRef(table, table ? table->m_alloc.get_instance_version() : 0);
-}
-
-inline ConstTableRef Group::get_table(StringData name) const
-{
-    if (!is_attached())
-        throw LogicError(LogicError::detached_accessor);
-    const Table* table = do_get_table(name); // Throws
-    return ConstTableRef(table, table ? table->m_alloc.get_instance_version() : 0);
+    if (Table* table = do_get_table(name)) {
+        return TableRef(table, table->m_alloc.get_instance_version());
+    }
+    return {};
 }
 
 inline TableRef Group::add_table(StringData name)
