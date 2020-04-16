@@ -88,8 +88,7 @@ public:
 
     uint64_t bump_content_version()
     {
-        m_alloc.bump_content_version();
-        return m_alloc.get_content_version();
+        return m_alloc.bump_content_version();
     }
     void bump_storage_version()
     {
