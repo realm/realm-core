@@ -241,9 +241,9 @@ protected:
         return m_content_versioning_counter.load(std::memory_order_acquire);
     }
 
-    inline void bump_content_version() noexcept
+    inline uint_fast64_t bump_content_version() noexcept
     {
-        m_content_versioning_counter.fetch_add(1, std::memory_order_acq_rel);
+        return m_content_versioning_counter.fetch_add(1, std::memory_order_acq_rel) + 1;
     }
 
     inline uint_fast64_t get_instance_version() noexcept

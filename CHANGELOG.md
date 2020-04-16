@@ -13,7 +13,7 @@
 -----------
 
 ### Internals
-* None.
+* Work around an issue with MSVC in Visual Studio 2019 where Release optimizations crash the compiler because of a regression in 64bit atomic loads on 32bit Windows.
 
 ----------------------------------------------
 
