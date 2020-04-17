@@ -3047,6 +3047,9 @@ template <typename>
 class ColumnListSize;
 
 template <typename T>
+class ColumnListElementLength;
+
+template <typename T>
 class Columns<Lst<T>> : public Subexpr2<T>, public ColumnListBase {
 public:
     Columns(const Columns<Lst<T>>& other)
@@ -3136,6 +3139,11 @@ public:
 
     SizeOperator<SizeOfList> size();
 
+    ColumnListElementLength<T> element_lengths() const
+    {
+        return {*this};
+    }
+
     ListColumnAggregate<T, aggregate_operations::Minimum<T>> min() const
     {
         return {m_column_key, *this};
@@ -3201,6 +3209,76 @@ public:
         return std::unique_ptr<Subexpr>(new ColumnListSize<T>(*this));
     }
 };
+
+
+template <typename T>
+class ColumnListElementLength : public Subexpr2<Int> {
+public:
+    ColumnListElementLength(const Columns<Lst<T>>& source)
+    : m_list(source)
+    {
+    }
+    void evaluate(size_t index, ValueBase& destination) override
+    {
+        Allocator& alloc = m_list.get_base_table()->get_alloc();
+        Value<ref_type> list_refs;
+        m_list.get_lists(index, list_refs, 1);
+        std::vector<Int> sizes;
+        for (size_t i = 0; i < list_refs.m_values; i++) {
+            ref_type list_ref = list_refs.m_storage[i];
+            if (list_ref) {
+                BPlusTree<T> list(alloc);
+                list.init_from_ref(list_ref);
+                const size_t list_size = list.size();
+                sizes.reserve(sizes.size() + list_size);
+                for (size_t j = 0; j < list_size; j++) {
+                    sizes.push_back(list.get(j).size());
+                }
+            }
+        }
+        constexpr bool is_from_list = true;
+        Value<Int> values;
+        values.init(is_from_list, sizes);
+        destination.import(values);
+    }
+    ConstTableRef get_base_table() const override
+    {
+        return m_list.get_base_table();
+    }
+
+    void set_base_table(ConstTableRef table) override
+    {
+        m_list.set_base_table(table);
+    }
+
+    void set_cluster(const Cluster* cluster) override
+    {
+        m_list.set_cluster(cluster);
+    }
+
+    void collect_dependencies(std::vector<TableKey>& tables) const override
+    {
+        m_list.collect_dependencies(tables);
+    }
+
+    std::unique_ptr<Subexpr> clone() const override
+    {
+        return std::unique_ptr<Subexpr>(new ColumnListElementLength<T>(*this));
+    }
+
+    std::string description(util::serializer::SerialisationState& state) const override
+    {
+        return m_list.description(state) + util::serializer::value_separator + "length";
+    }
+
+    virtual ExpressionComparisonType get_comparison_type() const override
+    {
+        return m_list.get_comparison_type();
+    }
+private:
+    Columns<Lst<T>> m_list;
+};
+
 
 template <typename T>
 SizeOperator<SizeOfList> Columns<Lst<T>>::size()

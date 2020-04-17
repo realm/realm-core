@@ -2028,63 +2028,67 @@ TEST(Parser_list_of_primitive_strings)
     Group g;
     TableRef t = g.add_table("table");
 
-    auto col_str_list = t->add_column_list(type_String, "strings");
-    auto col_str = t->add_column(type_String, "single_string");
-    auto col_str_list_nullable = t->add_column_list(type_String, "strings_nullable", true);
-    auto col_str_nullable = t->add_column(type_String, "single_int_nullable", true);
+    constexpr bool nullable = true;
+    auto col_str_list = t->add_column_list(type_String, "strings", nullable);
     CHECK_THROW_ANY(t->add_search_index(col_str_list));
 
     auto get_string = [](size_t i) -> std::string {
         return util::format("string_%1", i);
     };
-    size_t num_objects = 10;
-    for (size_t i = 0; i < num_objects; ++i) {
+    size_t num_populated_objects = 10;
+    for (size_t i = 0; i < num_populated_objects; ++i) {
         Obj obj = t->create_object();
         std::string si = get_string(i);
         obj.get_list<String>(col_str_list).add(si);
-        obj.set<String>(col_str, si);
-        obj.get_list<String>(col_str_list_nullable).add(si);
-        obj.set<String>(col_str_nullable, si);
     }
+    Obj obj_empty_list = t->create_object();
+    Obj obj_with_null = t->create_object();
+    obj_with_null.get_list<String>(col_str_list).add(StringData(realm::null()));
+    Obj obj_with_empty_string = t->create_object();
+    obj_with_empty_string.get_list<String>(col_str_list).add("");
+    size_t num_special_objects = 3;
+    size_t num_total_objects = num_populated_objects + num_special_objects;
 
-    for (size_t i = 0; i < num_objects; ++i) {
+    for (size_t i = 0; i < num_populated_objects; ++i) {
         std::string si = get_string(i);
         verify_query(test_context, t, util::format("strings == '%1'", si), 1);
         verify_query(test_context, t, util::format("ANY strings == '%1'", si), 1);
         verify_query(test_context, t, util::format("SOME strings == '%1'", si), 1);
-        verify_query(test_context, t, util::format("ALL strings == '%1'", si), 1);
-        verify_query(test_context, t, util::format("NONE strings == '%1'", si), num_objects - 1);
-        verify_query(test_context, t, util::format("!(ANY strings == '%1')", si), num_objects - 1);
-        verify_query(test_context, t, util::format("!(SOME strings == '%1')", si), num_objects - 1);
-        verify_query(test_context, t, util::format("!(ALL strings == '%1')", si), num_objects - 1);
+        verify_query(test_context, t, util::format("ALL strings == '%1'", si), 2); // empty list also matches
+        verify_query(test_context, t, util::format("NONE strings == '%1'", si), num_total_objects - 1);
+        verify_query(test_context, t, util::format("!(ANY strings == '%1')", si), num_total_objects - 1);
+        verify_query(test_context, t, util::format("!(SOME strings == '%1')", si), num_total_objects - 1);
+        verify_query(test_context, t, util::format("!(ALL strings == '%1')", si), num_total_objects - 2); // empty list also does not match
         verify_query(test_context, t, util::format("!(NONE strings == '%1')", si), 1);
-        verify_query(test_context, t, util::format("ANY strings != '%1'", si), num_objects - 1);
-        verify_query(test_context, t, util::format("SOME strings != '%1'", si), num_objects - 1);
-        verify_query(test_context, t, util::format("ALL strings != '%1'", si), num_objects - 1);
-        verify_query(test_context, t, util::format("NONE strings != '%1'", si), 1);
+        verify_query(test_context, t, util::format("ANY strings != '%1'", si), num_total_objects - 2); // empty list also does not match
+        verify_query(test_context, t, util::format("SOME strings != '%1'", si), num_total_objects - 2); // empty list also does not match
+        verify_query(test_context, t, util::format("ALL strings != '%1'", si), num_total_objects - 1);
+        verify_query(test_context, t, util::format("NONE strings != '%1'", si), 2); // empty list also matches
         verify_query(test_context, t, util::format("'%1' IN strings", si), 1);
         verify_query(test_context, t, util::format("strings CONTAINS[c] '%1'", si), 1);
         verify_query(test_context, t, util::format("strings BEGINSWITH[c] '%1'", si), 1);
         verify_query(test_context, t, util::format("strings ENDSWITH[c] '%1'", si), 1);
         verify_query(test_context, t, util::format("strings LIKE[c] '%1'", si), 1);
     }
-    verify_query(test_context, t, "strings CONTAINS[c] 'STR'", num_objects);
-    verify_query(test_context, t, "strings BEGINSWITH[c] 'STR'", num_objects);
+    verify_query(test_context, t, "strings CONTAINS[c] 'STR'", num_populated_objects);
+    verify_query(test_context, t, "strings BEGINSWITH[c] 'STR'", num_populated_objects);
     verify_query(test_context, t, "strings ENDSWITH[c] 'G_1'", 1);
-    verify_query(test_context, t, "strings LIKE[c] 'StRiNg_*'", num_objects);
-    verify_query(test_context, t, "ALL strings CONTAINS[c] 'STR'", num_objects);
-    verify_query(test_context, t, "ALL strings BEGINSWITH[c] 'STR'", num_objects);
-    verify_query(test_context, t, "ALL strings ENDSWITH[c] 'G_1'", 1);
-    verify_query(test_context, t, "ALL strings LIKE[c] 'StRiNg_*'", num_objects);
-    verify_query(test_context, t, "NONE strings CONTAINS[c] 'STR'", 0);
-    verify_query(test_context, t, "NONE strings BEGINSWITH[c] 'STR'", 0);
-    verify_query(test_context, t, "NONE strings ENDSWITH[c] 'G_1'", num_objects - 1);
-    verify_query(test_context, t, "NONE strings LIKE[c] 'StRiNg_*'", 0);
+    verify_query(test_context, t, "strings LIKE[c] 'StRiNg_*'", num_populated_objects);
+    verify_query(test_context, t, "ALL strings CONTAINS[c] 'STR'", num_populated_objects + 1); // + empty list
+    verify_query(test_context, t, "ALL strings BEGINSWITH[c] 'STR'", num_populated_objects + 1); // + empty list
+    verify_query(test_context, t, "ALL strings ENDSWITH[c] 'G_1'", 2); // {"string_1"} and {}
+    verify_query(test_context, t, "ALL strings LIKE[c] 'StRiNg_*'", num_populated_objects + 1); // + empty list
+    verify_query(test_context, t, "NONE strings CONTAINS[c] 'STR'", 3); // {}, {null}, {""}
+    verify_query(test_context, t, "NONE strings BEGINSWITH[c] 'STR'", 3); // {}, {null}, {""}
+    verify_query(test_context, t, "NONE strings ENDSWITH[c] 'G_1'", num_populated_objects - 1 + 3); // - {"string_1"} + {}, {null}, {""}
+    verify_query(test_context, t, "NONE strings LIKE[c] 'StRiNg_*'", 3); // {}, {null}, {""}
 
-    verify_query(test_context, t, "strings.@count == 0", 0);
-    verify_query(test_context, t, "strings.@size == 0", 0);
-    verify_query(test_context, t, "strings.@count == 1", num_objects);
-    verify_query(test_context, t, "strings.@size == 1", num_objects);
+    verify_query(test_context, t, "strings.@count == 0", 1); // {}
+    verify_query(test_context, t, "strings.@size == 0", 1); // {}
+    verify_query(test_context, t, "strings.@count == 1", num_total_objects - 1); // - empty list
+    verify_query(test_context, t, "strings.@size == 1", num_total_objects - 1); // - empty list
+    verify_query(test_context, t, "strings.length == 0", 2); // {""}, {null}
+    verify_query(test_context, t, "strings.length == 8", num_populated_objects); // "strings_0", ...  "strings_9"
 
     std::string message;
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "strings.@min == 2", 0), message);
@@ -2096,6 +2100,81 @@ TEST(Parser_list_of_primitive_strings)
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "strings.@avg == 2", 0), message);
     CHECK_EQUAL(message, "Predicate error: comparison of type 'String' with result of '@avg' is not supported.");
 }
+
+TEST_TYPES(Parser_list_of_primitive_element_lengths, StringData, BinaryData)
+{
+    Group g;
+    TableRef t = g.add_table("table");
+
+    constexpr bool nullable = true;
+    auto col_list = t->add_column_list(ColumnTypeTraits<TEST_TYPE>::id, "values", nullable);
+    t->add_column(type_Int, "length"); // "length" is still a usable column name
+    auto col_link = t->add_column_link(type_Link, "link", *t);
+
+    Obj obj_empty_list = t->create_object();
+    Obj obj_with_null = t->create_object();
+    TEST_TYPE null_value;
+    CHECK(null_value.is_null());
+    obj_with_null.get_list<TEST_TYPE>(col_list).add(null_value);
+    Obj obj_with_empty_string = t->create_object();
+    TEST_TYPE empty_value("", 0);
+    CHECK_EQUAL(empty_value.size(), 0);
+    CHECK_EQUAL(empty_value.is_null(), false);
+    obj_with_empty_string.get_list<TEST_TYPE>(col_list).add(empty_value);
+    std::string value1 = "value1";
+    std::string value2 = "value2";
+    TEST_TYPE v1(value1);
+    TEST_TYPE v2(value2);
+    Obj obj_with_v1 = t->create_object();
+    obj_with_v1.get_list<TEST_TYPE>(col_list).add(v1);
+    Obj obj_with_v2 = t->create_object();
+    obj_with_v2.get_list<TEST_TYPE>(col_list).add(v2);
+    Obj obj_with_v1_v2 = t->create_object();
+    obj_with_v1_v2.get_list<TEST_TYPE>(col_list).add(v1);
+    obj_with_v1_v2.get_list<TEST_TYPE>(col_list).add(v2);
+
+    for (auto it = t->begin(); it != t->end(); ++it) {
+        it->set<ObjKey>(col_link, it->get_key());
+    }
+
+    // repeat the same tests but over links, the tests are only the same because the links are self cycles
+    std::vector<std::string> column_prefix = {"", "link.", "link.link."};
+
+    for (auto path : column_prefix) {
+        // {}, {null}, {""}, {"value1"}, {"value2"}, {"value1", "value2"}
+        verify_query(test_context, t, util::format("%1values.@count == 0", path), 1);
+        verify_query(test_context, t, util::format("%1values.@size == 0", path), 1);
+        verify_query(test_context, t, util::format("%1values.@count == 1", path), 4);
+        verify_query(test_context, t, util::format("%1values.@size == 1", path), 4);
+        verify_query(test_context, t, util::format("%1values.@count == 2", path), 1);
+        verify_query(test_context, t, util::format("%1values.@size == 2", path), 1);
+        verify_query(test_context, t, util::format("%1length == 0", path), 6);
+        verify_query(test_context, t, util::format("%1link == null", path), 0);
+        verify_query(test_context, t, util::format("%1values == null", path), 1);
+
+        std::vector<std::string> any_prefix = {"", "ANY", "SOME", "aNy", "sOME"};
+        for (auto prefix : any_prefix) {
+            verify_query(test_context, t, util::format("0 IN %1 %2values.length", prefix, path), 2);
+            verify_query(test_context, t, util::format("%1 %2values.length == 0", prefix, path), 2);
+            verify_query(test_context, t, util::format("%1 %2values.length > 0", prefix, path), 3);
+            verify_query(test_context, t, util::format("%1 %2values.length == 6", prefix, path), 3);
+            verify_query(test_context, t, util::format("%1 %2values.length == length", prefix, path), 2); // element length vs column
+        }
+
+        verify_query(test_context, t, util::format("ALL %1values.length == 0", path), 3); // {}, {null}, {""}
+        verify_query(test_context, t, util::format("ALL %1values.length == length", path), 3); // {}, {null}, {""}
+        verify_query(test_context, t, util::format("ALL %1values.length == 6", path), 4); // the empty list matches
+
+        verify_query(test_context, t, util::format("NONE %1values.length == 0", path), 4);        // {}, {"value1"}, {"value2"}, {"value1", "value2"}
+        verify_query(test_context, t, util::format("NONE %1values.length == length", path), 4);   // {}, {"value1"}, {"value2"}, {"value1", "value2"}
+        verify_query(test_context, t, util::format("NONE %1values.length == 6", path), 3);        // {}, {null}, {""}
+    }
+
+    std::string message;
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "values.len == 2", 0), message);
+    CHECK_EQUAL(message, "Property 'values' is not a link in object of type 'table'");
+}
+
 
 TEST(Parser_SortAndDistinctSerialisation)
 {
@@ -3437,16 +3516,11 @@ TEST_TYPES(Parser_AggregateShortcuts, std::true_type, std::false_type)
     verify_query(test_context, t, "ANY items.price > items.@avg.price", 2);
     verify_query(test_context, t, "SOME items.price > items.@avg.price", 2);
 
-    // ALL/NONE do not support testing against other columns currently because of how they are implemented in a
-    // subquery
-    // The restriction is because subqueries must operate on properties on the target table and cannot reference
-    // properties in the parent scope. This restriction may be lifted if we actually implement ALL/NONE in core.
-    std::string message;
-    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "ALL items.name == fav_item.name", 1), message);
-    CHECK_EQUAL(message, "The comparison in an 'ALL' clause must be between a keypath and a value");
-    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "NONE items.name == fav_item.name", 1), message);
-    CHECK_EQUAL(message, "The comparison in an 'NONE' clause must be between a keypath and a value");
+    // aggregate list compared with column (over links)
+    verify_query(test_context, t, "ALL items.name == fav_item.name", 0); // no people have bought only their favourite item
+    verify_query(test_context, t, "NONE items.name == fav_item.name", 1); // only person 1 has items which are not their favourite
 
+    std::string message;
     // no list in path should throw
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "ANY fav_item.name == 'milk'", 1), message);
     CHECK_EQUAL(message, "The keypath following 'ANY' or 'SOME' must contain a list");

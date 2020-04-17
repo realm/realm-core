@@ -66,6 +66,13 @@ bool is_backlinks_prefix(const std::string& s)
            (s[3] == 'n' || s[3] == 'N') && (s[4] == 'k' || s[4] == 'K') && (s[5] == 's' || s[5] == 'S');
 }
 
+bool is_length_suffix(const std::string& s)
+{
+    return s.size() == 6 && (s[0] == 'l' || s[0] == 'L') && (s[1] == 'e' || s[1] == 'E')
+        && (s[2] == 'n' || s[2] == 'N') && (s[3] == 'g' || s[3] == 'G') && (s[4] == 't' || s[4] == 'T')
+        && (s[5] == 'h' || s[5] == 'H');
+}
+
 KeyPathElement KeyPathMapping::process_next_path(ConstTableRef table, KeyPath& keypath, size_t& index)
 {
     REALM_ASSERT_DEBUG(index < keypath.size());
@@ -91,6 +98,8 @@ KeyPathElement KeyPathMapping::process_next_path(ConstTableRef table, KeyPath& k
             element.col_key = ColKey(); // unused
             element.col_type = type_LinkList;
             element.is_backlink = false;
+            element.is_list_of_primitives = false;
+            element.is_primitive_element_length_op = false;
             return element;
         }
         realm_precondition(index + 2 < keypath.size(), "'@links' must be proceeded by type name and a property name");
@@ -113,6 +122,8 @@ KeyPathElement KeyPathMapping::process_next_path(ConstTableRef table, KeyPath& k
         element.col_key = info->second;
         element.col_type = type_LinkList; // backlinks should be operated on as a list
         element.is_backlink = true;
+        element.is_list_of_primitives = false;
+        element.is_primitive_element_length_op = false;
         return element;
     }
 
@@ -125,6 +136,17 @@ KeyPathElement KeyPathMapping::process_next_path(ConstTableRef table, KeyPath& k
 
     bool is_primitive_list = table->get_column_attr(col_key).test(ColumnAttr::col_attr_List)
         && cur_col_type != type_LinkList;
+    bool is_length_op = false;
+    if (is_primitive_list) {
+        if (index + 2 == keypath.size() && is_length_suffix(keypath[index + 1])) {
+            realm_precondition(cur_col_type == type_String || cur_col_type == type_Binary,
+                               util::format("The '.length' operation only applies to string or binary "
+                                            "elements within a list of primitives, but this is a list of type '%1'.",
+                                            data_type_to_str(cur_col_type)));
+            is_length_op = true;
+            ++index; // consume .length too
+        }
+    }
 
     index++;
     KeyPathElement element;
@@ -133,6 +155,7 @@ KeyPathElement KeyPathMapping::process_next_path(ConstTableRef table, KeyPath& k
     element.col_type = cur_col_type;
     element.is_backlink = false;
     element.is_list_of_primitives = is_primitive_list;
+    element.is_primitive_element_length_op = is_length_op;
     return element;
 }
 

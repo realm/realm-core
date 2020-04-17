@@ -35,6 +35,7 @@ struct KeyPathElement {
     DataType col_type;
     bool is_backlink;
     bool is_list_of_primitives;
+    bool is_primitive_element_length_op;
 };
 
 class BacklinksRestrictedError : public std::runtime_error {
