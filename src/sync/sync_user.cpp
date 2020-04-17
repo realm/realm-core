@@ -24,7 +24,6 @@
 #include "sync/sync_manager.hpp"
 #include "sync/sync_session.hpp"
 
-#include <json.hpp>
 #include <realm/util/base64.hpp>
 
 namespace realm {
@@ -60,14 +59,15 @@ RealmJWT::RealmJWT(const std::string& token)
 {
     auto parts = split_token(token);
 
-    auto json = nlohmann::json::parse(base64_decode(parts[1]));
+    auto json_str = base64_decode(parts[1]);
+    auto json = static_cast<bson::BsonDocument>(bson::parse(json_str));
 
     this->token = token;
-    this->expires_at = app::value_from_json<long>(json, "exp");
-    this->issued_at = app::value_from_json<long>(json, "iat");
+    this->expires_at = static_cast<int64_t>(json["exp"]);
+    this->issued_at = static_cast<int64_t>(json["iat"]);
 
     if (json.find("user_data") != json.end()) {
-        this->user_data = json["user_data"].get<std::map<std::string, util::Any>>();
+        this->user_data = static_cast<bson::BsonDocument>(json["user_data"]);
     }
 }
 
@@ -347,7 +347,7 @@ SyncUserProfile SyncUser::user_profile() const
     return m_user_profile;
 }
 
-util::Optional<std::map<std::string, util::Any>> SyncUser::custom_data() const
+util::Optional<bson::BsonDocument> SyncUser::custom_data() const
 {
     std::lock_guard<std::mutex> lock(m_mutex);
     return m_access_token.user_data;

@@ -19,12 +19,13 @@
 #ifndef REALM_OS_SYNC_USER_HPP
 #define REALM_OS_SYNC_USER_HPP
 
+#include "object_schema.hpp"
 #include "util/atomic_shared_ptr.hpp"
+#include "util/bson/bson.hpp"
+
 #include <realm/util/any.hpp>
 #include <realm/util/optional.hpp>
 #include <realm/table.hpp>
-
-#include "object_schema.hpp"
 
 #include <map>
 #include <memory>
@@ -56,7 +57,7 @@ struct RealmJWT {
     // When the token was issued.
     long issued_at;
     // Custom user data embedded in the encoded token.
-    util::Optional<std::map<std::string, util::Any>> user_data;
+    util::Optional<bson::BsonDocument> user_data;
 
     RealmJWT(const std::string& token);
 
@@ -189,7 +190,7 @@ public:
     std::vector<SyncUserIdentity> identities() const;
 
     // Custom user data embedded in the access token.
-    util::Optional<std::map<std::string, util::Any>> custom_data() const;
+    util::Optional<bson::BsonDocument> custom_data() const;
 
     State state() const;
     void set_state(SyncUser::State state);
