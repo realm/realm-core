@@ -310,7 +310,7 @@ void RealmCoordinator::bind_to_context(Realm& realm)
     for (auto& cached_realm : m_weak_realm_notifiers) {
         if (!cached_realm.is_for_realm(&realm))
             continue;
-        cached_realm.bind_to_execution_context();
+        cached_realm.bind_to_scheduler();
         return;
     }
     REALM_TERMINATE("Invalid Realm passed to bind_to_context()");

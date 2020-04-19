@@ -29,7 +29,7 @@ WeakRealmNotifier::WeakRealmNotifier(const std::shared_ptr<Realm>& realm)
 : m_realm(realm)
 , m_realm_key(realm.get())
 {
-    bind_to_execution_context();
+    bind_to_scheduler();
 }
 
 WeakRealmNotifier::~WeakRealmNotifier() = default;
@@ -40,7 +40,7 @@ void WeakRealmNotifier::notify()
         m_scheduler->notify();
 }
 
-void WeakRealmNotifier::bind_to_execution_context()
+void WeakRealmNotifier::bind_to_scheduler()
 {
     REALM_ASSERT(!m_scheduler);
     m_scheduler = realm()->scheduler();

@@ -238,8 +238,8 @@ public:
         // speeds up tests that don't need notifications.
         bool automatic_change_notifications = true;
 
-        // The identifier of the abstract execution context in which this Realm will be used.
-        // If unset, the current thread's identifier will be used to identify the execution context.
+        // The Scheduler which this Realm should be bound to. If not supplied,
+        // a default one for the current thread will be used.
         std::shared_ptr<util::Scheduler> scheduler;
 
         /// A data structure storing data used to configure the Realm for sync support.
@@ -260,8 +260,8 @@ public:
     // Returns a thread-confined live Realm for the given configuration
     static SharedRealm get_shared_realm(Config config);
 
-    // Get a Realm for the given execution context (or current thread if `none`)
-    // from the thread safe reference. May return a cached Realm or create a new one.
+    // Get a Realm for the given scheduler (or current thread if `none`)
+    // from the thread safe reference.
     static SharedRealm get_shared_realm(ThreadSafeReference, std::shared_ptr<util::Scheduler> = nullptr);
 
 #if REALM_ENABLE_SYNC

@@ -49,9 +49,11 @@ public:
     // Is this a WeakRealmNotifier for the given Realm instance?
     bool is_for_realm(Realm* realm) const { return realm == m_realm_key; }
 
+    // Invoke m_realm.notify() on the Realm's thread via the scheduler.
     void notify();
 
-    void bind_to_execution_context();
+    // Bind this notifier to the Realm's scheduler.
+    void bind_to_scheduler();
 
 private:
     std::weak_ptr<Realm> m_realm;
