@@ -673,8 +673,7 @@ void preprocess_for_comparison_types(Predicate::Comparison& cmpr, ExpressionCont
         return util::format("'%1'", comparison_type_to_str(compare_type));
     };
 
-    auto verify_comparison_type = [&](ExpressionContainer expression, parser::Expression::ComparisonType compare_type,
-                                      ExpressionContainer::ExpressionInternal opposite_type) {
+    auto verify_comparison_type = [&](ExpressionContainer expression, parser::Expression::ComparisonType compare_type) {
         size_t list_count = 0;
         size_t primitive_list_count = 0;
         std::vector<KeyPathElement> link_chain = expression.get_keypaths();
@@ -699,8 +698,8 @@ void preprocess_for_comparison_types(Predicate::Comparison& cmpr, ExpressionCont
         }
     };
 
-    verify_comparison_type(lhs, cmpr.expr[0].comparison_type, rhs.type);
-    verify_comparison_type(rhs, cmpr.expr[1].comparison_type, lhs.type);
+    verify_comparison_type(lhs, cmpr.expr[0].comparison_type);
+    verify_comparison_type(rhs, cmpr.expr[1].comparison_type);
 
     if (lhs.type == ExpressionContainer::ExpressionInternal::exp_PrimitiveList && rhs.type == ExpressionContainer::ExpressionInternal::exp_PrimitiveList) {
         throw std::logic_error(util::format("Ordered comparison between two primitive lists is not implemented yet ('%1' and '%2')", cmpr.expr[0].s, cmpr.expr[1].s));

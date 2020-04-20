@@ -62,6 +62,7 @@
 #include <realm/util/encrypted_file_mapping.hpp>
 #include <realm/util/to_string.hpp>
 #include "test_table_helper.hpp"
+#include "test_types_helper.hpp"
 
 #include <chrono>
 #include <string>
@@ -2175,6 +2176,61 @@ TEST_TYPES(Parser_list_of_primitive_element_lengths, StringData, BinaryData)
     CHECK_EQUAL(message, "Property 'values' is not a link in object of type 'table'");
 }
 
+TEST_TYPES(Parser_list_of_primitive_types, Int, Optional<Int>, Bool, Optional<Bool>, Float, Optional<Float>, Double, Optional<Double>, Decimal128, ObjectId, Optional<ObjectId>)
+{
+    Group g;
+    TableRef t = g.add_table("table");
+
+    using underlying_type = typename util::RemoveOptional<TEST_TYPE>::type;
+    constexpr bool is_optional = !std::is_same<underlying_type, TEST_TYPE>::value;
+    ColKey col = t->add_column_list(ColumnTypeTraits<TEST_TYPE>::id, "values", is_optional);
+    auto col_link = t->add_column_link(type_Link, "link", *t);
+
+    auto obj1 = t->create_object();
+    std::vector<TEST_TYPE> values = values_from_int<TEST_TYPE, underlying_type>({0, 9, 4, 2, 7, 4, 1, 8, 11, 3, 4, 5, 22});
+    obj1.set_list_values(col, values);
+    auto obj2 = t->create_object(); // empty list
+    auto obj3 = t->create_object(); // {1}
+    underlying_type value_1 = convert_for_test<underlying_type>(1);
+    obj3.get_list<TEST_TYPE>(col).add(value_1);
+    auto obj4 = t->create_object(); // {1, 1}
+    obj4.get_list<TEST_TYPE>(col).add(value_1);
+    obj4.get_list<TEST_TYPE>(col).add(value_1);
+    auto obj5 = t->create_object(); // {null} or {0}
+    if constexpr (is_optional) {
+        obj5.get_list<TEST_TYPE>(col).add(none);
+    }
+    else {
+        obj5.get_list<TEST_TYPE>(col).add(convert_for_test<underlying_type>(0));
+    }
+    for (auto it = t->begin(); it != t->end(); ++it) {
+        it->set<ObjKey>(col_link, it->get_key()); // self links
+    }
+
+    // repeat the same tests but over links, the tests are only the same because the links are self cycles
+    std::vector<std::string> column_prefix = {"", "link.", "link.link."};
+
+    for (auto path : column_prefix) {
+        verify_query(test_context, t, util::format("%1values.@count == 0", path), 1); // obj2
+        verify_query(test_context, t, util::format("%1values.@count == 1", path), 2); // obj3, obj5
+        verify_query(test_context, t, util::format("%1values.@count == 2", path), 1); // obj4
+        verify_query(test_context, t, util::format("%1values.@count > 0", path), 4);  // obj1, obj3, obj4, obj5
+        verify_query(test_context, t, util::format("%1values.@count == 13", path), 1); // obj1
+        verify_query(test_context, t, util::format("%1values == NULL", path), (is_optional ? 1 : 0)); // obj5
+
+        util::Any args[] = {value_1};
+        size_t num_args = 1;
+        verify_query_sub(test_context, t, util::format("%1values == $0", path), args, num_args, 3); // obj1, obj3, obj4
+        verify_query_sub(test_context, t, util::format("%1values != $0", path), args, num_args, 2); // obj1, obj5
+        verify_query_sub(test_context, t, util::format("ANY %1values == $0", path), args, num_args, 3); // obj1, obj3, obj4
+        verify_query_sub(test_context, t, util::format("ANY %1values != $0", path), args, num_args, 2); // obj1, obj5
+
+        verify_query_sub(test_context, t, util::format("ALL %1values == $0", path), args, num_args, 3); // obj2, obj3, obj4
+        verify_query_sub(test_context, t, util::format("ALL %1values != $0", path), args, num_args, 2); // obj2, obj5
+        verify_query_sub(test_context, t, util::format("NONE %1values == $0", path), args, num_args, 2); // obj2, obj5
+        verify_query_sub(test_context, t, util::format("NONE %1values != $0", path), args, num_args, 3); // obj2, obj3, obj4
+    }
+}
 
 TEST(Parser_SortAndDistinctSerialisation)
 {

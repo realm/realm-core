@@ -3055,6 +3055,7 @@ public:
     Columns(const Columns<Lst<T>>& other)
         : Subexpr2<T>(other)
         , ColumnListBase(other)
+        , m_is_nullable_storage(this->m_column_key.get_attrs().test(col_attr_Nullable))
     {
     }
 
@@ -3085,46 +3086,13 @@ public:
 
     void evaluate(size_t index, ValueBase& destination) override
     {
-        Allocator& alloc = get_base_table()->get_alloc();
-        Value<ref_type> list_refs;
-        get_lists(index, list_refs, 1);
-        const bool is_from_list = true;
-        if constexpr (std::is_same_v<T, ObjectId> || std::is_same_v<T, Int>) {
-            bool nullable = m_column_key.get_attrs().test(col_attr_Nullable);
-            if (nullable) {
-                std::vector<Optional<T>> values;
-                for (size_t i = 0; i < list_refs.m_values; i++) {
-                    ref_type list_ref = list_refs.m_storage[i];
-                    if (list_ref) {
-                        BPlusTree<Optional<T>> list(alloc);
-                        list.init_from_ref(list_ref);
-                        size_t s = list.size();
-                        for (size_t j = 0; j < s; j++) {
-                            values.push_back(list.get(j));
-                        }
-                    }
-                }
-                Value<T> v;
-                v.init(is_from_list, values);
-                destination.import(v);
+        if constexpr (std::is_same_v<T, ObjectId> || std::is_same_v<T, Int> || std::is_same_v<T, Bool>) {
+            if (m_is_nullable_storage) {
+                evaluate<Optional<T>>(index, destination);
                 return;
             }
         }
-        std::vector<T> values;
-        for (size_t i = 0; i < list_refs.m_values; i++) {
-            ref_type list_ref = list_refs.m_storage[i];
-            if (list_ref) {
-                BPlusTree<T> list(alloc);
-                list.init_from_ref(list_ref);
-                size_t s = list.size();
-                for (size_t j = 0; j < s; j++) {
-                    values.push_back(list.get(j));
-                }
-            }
-        }
-        Value<T> v;
-        v.init(is_from_list, values);
-        destination.import(v);
+        evaluate<T>(index, destination);
     }
 
     virtual std::string description(util::serializer::SerialisationState& state) const override
@@ -3163,14 +3131,41 @@ public:
     {
         return {m_column_key, *this};
     }
+    const bool m_is_nullable_storage;
 
 private:
     friend class Table;
     friend class LinkChain;
 
+    template <typename StorageType>
+    void evaluate(size_t index, ValueBase& destination)
+    {
+        Allocator& alloc = get_base_table()->get_alloc();
+        Value<ref_type> list_refs;
+        get_lists(index, list_refs, 1);
+        const bool is_from_list = true;
+
+        std::vector<StorageType> values;
+        for (size_t i = 0; i < list_refs.m_values; i++) {
+            ref_type list_ref = list_refs.m_storage[i];
+            if (list_ref) {
+                BPlusTree<StorageType> list(alloc);
+                list.init_from_ref(list_ref);
+                size_t s = list.size();
+                for (size_t j = 0; j < s; j++) {
+                    values.push_back(list.get(j));
+                }
+            }
+        }
+        Value<T> v;
+        v.init(is_from_list, values);
+        destination.import(v);
+    }
+
     Columns(ColKey column_key, ConstTableRef table, const std::vector<ColKey>& links = {},
             ExpressionComparisonType type = ExpressionComparisonType::Any)
         : ColumnListBase(column_key, table, links, type)
+        , m_is_nullable_storage(this->m_column_key.get_attrs().test(col_attr_Nullable))
     {
     }
 };
@@ -3181,8 +3176,26 @@ public:
     ColumnListSize(const Columns<Lst<T>>& other)
         : Columns<Lst<T>>(other)
     {
+
     }
     void evaluate(size_t index, ValueBase& destination) override
+    {
+        if constexpr (std::is_same_v<T, ObjectId> || std::is_same_v<T, Int> || std::is_same_v<T, Bool>) {
+            if (this->m_is_nullable_storage) {
+                evaluate<Optional<T>>(index, destination);
+                return;
+            }
+        }
+        evaluate<T>(index, destination);
+    }
+
+    std::unique_ptr<Subexpr> clone() const override
+    {
+        return std::unique_ptr<Subexpr>(new ColumnListSize<T>(*this));
+    }
+private:
+    template <typename StorageType>
+    void evaluate(size_t index, ValueBase& destination)
     {
         REALM_ASSERT_DEBUG(dynamic_cast<Value<SizeOfList>*>(&destination) != nullptr);
         Value<SizeOfList>* d = static_cast<Value<SizeOfList>*>(&destination);
@@ -3194,7 +3207,7 @@ public:
         for (size_t i = 0; i < list_refs.m_values; i++) {
             ref_type list_ref = list_refs.m_storage[i];
             if (list_ref) {
-                BPlusTree<T> list(alloc);
+                BPlusTree<StorageType> list(alloc);
                 list.init_from_ref(list_ref);
                 size_t s = list.size();
                 d->m_storage.set(i, SizeOfList(s));
@@ -3203,10 +3216,6 @@ public:
                 d->m_storage.set(i, SizeOfList(0));
             }
         }
-    }
-    std::unique_ptr<Subexpr> clone() const override
-    {
-        return std::unique_ptr<Subexpr>(new ColumnListSize<T>(*this));
     }
 };
 
@@ -3331,8 +3340,8 @@ public:
 
     void evaluate(size_t index, ValueBase& destination) override
     {
-        if constexpr (std::is_same_v<T, ObjectId> || std::is_same_v<T, Int>) {
-            if (m_column_key.get_attrs().test(col_attr_Nullable)) {
+        if constexpr (std::is_same_v<T, ObjectId> || std::is_same_v<T, Int> || std::is_same_v<T, Bool>) {
+            if (m_list.m_is_nullable_storage) {
                 evaluate<Optional<T>>(index, destination);
                 return;
             }
