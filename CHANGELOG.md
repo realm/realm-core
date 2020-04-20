@@ -1,19 +1,16 @@
-# NEXT RELEASE
+# 10.0.0-alpha.6 Release notes
 
 ### Enhancements
-* None.
+* Produces builds for RaspberryPi.
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Requirement to have a contiguous memory mapping of the entire realm file is removed. (Now fixed)
  
-### Breaking changes
-* None.
-
 -----------
 
 ### Internals
 * Table::insert_column and Table::insert_column_link methods are removed.
+* Can now be built with MSVC 2019
 
 ----------------------------------------------
 
