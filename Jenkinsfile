@@ -15,7 +15,7 @@ jobWrapper {
     stage('gather-info') {
         isPullRequest = !!env.CHANGE_TARGET
         targetBranch = isPullRequest ? env.CHANGE_TARGET : "none"
-        node('docker && !cph') {
+        node('docker') {
             getSourceArchive()
             stash includes: '**', name: 'core-source', useDefaultExcludes: false
 
@@ -71,7 +71,7 @@ jobWrapper {
 
     if (isPullRequest) {
         stage('FormatCheck') {
-            node('docker && !cph') {
+            node('docker') {
                 getArchive()
                 docker.build('realm-core-clang:snapshot', '-f clang.Dockerfile .').inside() {
                     echo "Checking code formatting"
@@ -180,7 +180,7 @@ jobWrapper {
         stage('Aggregate') {
             parallel (
                 cocoa: {
-                    node('docker && !cph') {
+                    node('docker') {
                         getArchive()
                         for (cocoaStash in cocoaStashes) {
                             unstash name: cocoaStash
@@ -193,7 +193,7 @@ jobWrapper {
                     }
                 },
                 android: {
-                    node('docker && !cph') {
+                    node('docker') {
                         getArchive()
                         for (androidStash in androidStashes) {
                             unstash name: androidStash
@@ -217,7 +217,7 @@ jobWrapper {
 
 def doCheckInDocker(String buildType, String maxBpNodeSize = '1000', String enableEncryption = 'ON') {
     return {
-        node('docker && !cph') {
+        node('docker') {
             getArchive()
             def buildEnv = docker.build 'realm-core-linux:18.04'
             def environment = environment()
@@ -247,7 +247,7 @@ def doCheckInDocker(String buildType, String maxBpNodeSize = '1000', String enab
 
 def doCheckSanity(String buildType, String maxBpNodeSize = '1000', String sanitizeMode='') {
     return {
-        node('docker && !cph') {
+        node('docker') {
             getArchive()
             def buildEnv = docker.build('realm-core-linux:clang', '-f clang.Dockerfile .')
             def environment = environment()
@@ -284,7 +284,7 @@ def doCheckSanity(String buildType, String maxBpNodeSize = '1000', String saniti
 
 def doBuildLinux(String buildType) {
     return {
-        node('docker && !cph') {
+        node('docker') {
             getSourceArchive()
 
             docker.build('realm-core-generic:gcc-8', '-f generic.Dockerfile .').inside {
@@ -311,7 +311,7 @@ def doBuildLinux(String buildType) {
 
 def doBuildLinuxClang(String buildType) {
     return {
-        node('docker && !cph') {
+        node('docker') {
             getArchive()
             docker.build('realm-core-linux:clang', '-f clang.Dockerfile .').inside() {
                 sh """
@@ -334,7 +334,7 @@ def doBuildLinuxClang(String buildType) {
 
 def doCheckValgrind() {
     return {
-        node('docker && !cph') {
+        node('docker') {
             getArchive()
             def buildEnv = docker.build 'realm-core-linux:18.04'
             def environment = environment()
@@ -438,7 +438,7 @@ def doBuildWindows(String buildType, boolean isUWP, String platform, boolean run
     }
 
     return {
-        node('windows-vs2019') {
+        node('windows') {
             getArchive()
 
             dir('build-dir') {
@@ -627,7 +627,7 @@ def doBuildAppleDevice(String sdk, String buildType) {
 
 def doLinuxCrossCompile(String target, String buildType, String emulator = null) {
     return {
-        node('docker && !cph') {
+        node('docker') {
             getArchive()
             docker.build("realm-core-crosscompiling:${target}", "-f ${target}.Dockerfile .").inside {
                 dir('build-dir') {
@@ -675,7 +675,7 @@ def doLinuxCrossCompile(String target, String buildType, String emulator = null)
 
 def doBuildCoverage() {
   return {
-    node('docker && !cph') {
+    node('docker') {
       getArchive()
       docker.build('realm-core-linux:18.04').inside {
         def workspace = pwd()
@@ -735,7 +735,7 @@ def readGitTag() {
 
 def doPublishLocalArtifacts() {
     return {
-        node('docker && !cph') {
+        node('docker') {
             deleteDir()
             dir('temp') {
                 withAWS(credentials: 'aws-credentials', region: 'us-east-1') {
