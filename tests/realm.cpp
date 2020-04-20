@@ -557,6 +557,7 @@ TEST_CASE("SharedRealm: notifications") {
 
     size_t change_count = 0;
     auto realm = Realm::get_shared_realm(config);
+    realm->read_group();
     realm->m_binding_context.reset(new Context{&change_count});
     realm->m_binding_context->realm = realm;
 
@@ -1303,6 +1304,7 @@ TEST_CASE("SharedRealm: SchemaChangedFunction") {
     };
     config.schema_version = 1;
     auto r1 = Realm::get_shared_realm(config);
+    r1->read_group();
     r1->m_binding_context.reset(new Context(&schema_changed_called, &changed_fixed_schema));
 
     SECTION("Fixed schema") {
