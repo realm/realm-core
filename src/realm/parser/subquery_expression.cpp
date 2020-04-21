@@ -57,9 +57,10 @@ SubqueryExpression::SubqueryExpression(Query& q, const std::string& key_path_str
             else {
                 dest_type = data_type_to_str(element.col_type);
             }
-            realm_precondition(!element.is_list_of_primitives,
-                               util::format("A subquery can not operate on a list of primitive values (property '%1')",
-                                            element.table->get_column_name(element.col_key)));
+            realm_precondition(
+                !element.is_list_of_primitives,
+                util::format("A subquery can not operate on a list of primitive values (property '%1')",
+                             element.table->get_column_name(element.col_key)));
 
             realm_precondition(element.col_type == type_LinkList,
                                util::format("A subquery must operate on a list property, but '%1' is type '%2'",

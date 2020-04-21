@@ -288,8 +288,8 @@ struct CollectionOperatorGetter<Int, parser::Expression::KeyPathOp::SizeBinary, 
 
 template <>
 struct CollectionOperatorGetter<Int, parser::Expression::KeyPathOp::SizeString, PrimitiveListExpression> {
-    static ColumnListElementLength<String>
-    convert(const CollectionOperatorExpression<parser::Expression::KeyPathOp::SizeString, PrimitiveListExpression>& expr)
+    static ColumnListElementLength<String> convert(
+        const CollectionOperatorExpression<parser::Expression::KeyPathOp::SizeString, PrimitiveListExpression>& expr)
     {
         return expr.link_chain_getter().template column<Lst<String>>(expr.pe.get_dest_col_key()).element_lengths();
     }
@@ -297,8 +297,8 @@ struct CollectionOperatorGetter<Int, parser::Expression::KeyPathOp::SizeString, 
 
 template <>
 struct CollectionOperatorGetter<Int, parser::Expression::KeyPathOp::SizeBinary, PrimitiveListExpression> {
-    static ColumnListElementLength<Binary>
-    convert(const CollectionOperatorExpression<parser::Expression::KeyPathOp::SizeBinary, PrimitiveListExpression>& expr)
+    static ColumnListElementLength<Binary> convert(
+        const CollectionOperatorExpression<parser::Expression::KeyPathOp::SizeBinary, PrimitiveListExpression>& expr)
     {
         return expr.link_chain_getter().template column<Lst<Binary>>(expr.pe.get_dest_col_key()).element_lengths();
     }

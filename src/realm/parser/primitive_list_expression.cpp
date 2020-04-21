@@ -63,7 +63,8 @@ SizeOperator<SizeOfList> PrimitiveListExpression::size_of_list() const
         return link_chain_getter().template column<Lst<Decimal128>>(col).size();
     else if (type == col_type_ObjectId)
         return link_chain_getter().template column<Lst<ObjectId>>(col).size();
-    throw std::runtime_error(util::format("query contains unsupported list of primitives type %1 for operation .@count", type));
+    throw std::runtime_error(
+        util::format("query contains unsupported list of primitives type %1 for operation .@count", type));
 }
 
 } // namespace parser

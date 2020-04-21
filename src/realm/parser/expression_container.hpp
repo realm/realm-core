@@ -35,8 +35,8 @@ namespace parser {
 class ExpressionContainer
 {
 public:
-    ExpressionContainer(
-        Query& query, const parser::Expression& e, query_builder::Arguments& args, parser::KeyPathMapping& mapping);
+    ExpressionContainer(Query& query, const parser::Expression& e, query_builder::Arguments& args,
+                        parser::KeyPathMapping& mapping);
 
     bool is_null();
 
@@ -52,9 +52,12 @@ public:
     CollectionOperatorExpression<parser::Expression::KeyPathOp::Max, PrimitiveListExpression>& get_primitive_max();
     CollectionOperatorExpression<parser::Expression::KeyPathOp::Sum, PrimitiveListExpression>& get_primitive_sum();
     CollectionOperatorExpression<parser::Expression::KeyPathOp::Avg, PrimitiveListExpression>& get_primitive_avg();
-    CollectionOperatorExpression<parser::Expression::KeyPathOp::Count, PrimitiveListExpression>& get_primitive_count();
-    CollectionOperatorExpression<parser::Expression::KeyPathOp::SizeString, PrimitiveListExpression>& get_primitive_string_length();
-    CollectionOperatorExpression<parser::Expression::KeyPathOp::SizeBinary, PrimitiveListExpression>& get_primitive_binary_length();
+    CollectionOperatorExpression<parser::Expression::KeyPathOp::Count, PrimitiveListExpression>&
+    get_primitive_count();
+    CollectionOperatorExpression<parser::Expression::KeyPathOp::SizeString, PrimitiveListExpression>&
+    get_primitive_string_length();
+    CollectionOperatorExpression<parser::Expression::KeyPathOp::SizeBinary, PrimitiveListExpression>&
+    get_primitive_binary_length();
     CollectionOperatorExpression<parser::Expression::KeyPathOp::BacklinkCount, PropertyExpression>&
     get_backlink_count();
     CollectionOperatorExpression<parser::Expression::KeyPathOp::SizeString, PropertyExpression>& get_size_string();

@@ -1922,11 +1922,12 @@ TEST(Parser_list_of_primitive_ints)
     num_objects += 2;
     verify_query(test_context, t, "integers.@count == 0", 2);
     verify_query(test_context, t, "integers == NULL", 0);
-    verify_query(test_context, t, "ALL integers == NULL", 2);  // the two empty lists match ALL
+    verify_query(test_context, t, "ALL integers == NULL", 2); // the two empty lists match ALL
     verify_query(test_context, t, "NONE integers == NULL", num_objects);
     verify_query(test_context, t, "integers_nullable.@count == 0", 1);
     verify_query(test_context, t, "integers_nullable == NULL", 1);
-    verify_query(test_context, t, "ALL integers_nullable == NULL", 2); // matches the empty list and the list containing one NULL
+    verify_query(test_context, t, "ALL integers_nullable == NULL",
+                 2); // matches the empty list and the list containing one NULL
     verify_query(test_context, t, "NONE integers_nullable == NULL", num_objects - 1);
     // list vs property
     verify_query(test_context, t, "integers == single_int", num_objects - 2);
@@ -1935,24 +1936,40 @@ TEST(Parser_list_of_primitive_ints)
     verify_query(test_context, t, "integers_nullable == single_int_nullable", num_objects - 1);
     // aggregate vs property x nullable
     verify_query(test_context, t, "integers.@min == single_int", num_objects - 2); // two empty lists don't match
-    verify_query(test_context, t, "integers.@min == single_int_nullable", num_objects); // the min of 2 empty lists is null which matches the nullable int
-    verify_query(test_context, t, "integers_nullable.@min == single_int", num_objects - 2); // two empty lists don't match 0
-    verify_query(test_context, t, "integers_nullable.@min == single_int_nullable", num_objects); // the min of empty list matches null, and the min of only null matches null
+    verify_query(test_context, t, "integers.@min == single_int_nullable",
+                 num_objects); // the min of 2 empty lists is null which matches the nullable int
+    verify_query(test_context, t, "integers_nullable.@min == single_int",
+                 num_objects - 2); // two empty lists don't match 0
+    verify_query(test_context, t, "integers_nullable.@min == single_int_nullable",
+                 num_objects); // the min of empty list matches null, and the min of only null matches null
     verify_query(test_context, t, "integers.@max == single_int", num_objects - 2); // two empty lists don't match 0s
-    verify_query(test_context, t, "integers.@max == single_int_nullable", num_objects); // the max of 2 empty lists is null which matches the null int
-    verify_query(test_context, t, "integers_nullable.@max == single_int", num_objects - 2); // max of null doesn't match 0
-    verify_query(test_context, t, "integers_nullable.@max == single_int_nullable", num_objects); // the max of an empty list matches null, and the max of only null matches null
+    verify_query(test_context, t, "integers.@max == single_int_nullable",
+                 num_objects); // the max of 2 empty lists is null which matches the null int
+    verify_query(test_context, t, "integers_nullable.@max == single_int",
+                 num_objects - 2); // max of null doesn't match 0
+    verify_query(test_context, t, "integers_nullable.@max == single_int_nullable",
+                 num_objects); // the max of an empty list matches null, and the max of only null matches null
     verify_query(test_context, t, "integers.@sum == single_int", num_objects); // sum of an empty list matches 0
-    verify_query(test_context, t, "integers.@sum == single_int_nullable", num_objects - 2); // sum of empty list does not match null
-    verify_query(test_context, t, "integers_nullable.@sum == single_int", num_objects); // sum of empty list matches 0, sum of list containing null matches 0
-    verify_query(test_context, t, "integers_nullable.@sum == single_int_nullable", num_objects - 2); // sum of empty list does not match null, sum of list containing null does not match null
-    verify_query(test_context, t, "integers.@avg == single_int", num_objects - 2); // avg of empty lists is null, does not match 0
-    verify_query(test_context, t, "integers.@avg == single_int_nullable", num_objects); // avg of empty lists matches null
-    verify_query(test_context, t, "integers_nullable.@avg == single_int", num_objects - 2); // avg of empty list is null does not match 0, avg of list containing null is not 0
-    verify_query(test_context, t, "integers_nullable.@avg == single_int_nullable", num_objects); // avg of empty list matches null, avg of list containing null matches null
-    verify_query(test_context, t, "integers.@count == single_int", 2 + 1); // 2x count of empty list matches 0, count of {1} matches 1
+    verify_query(test_context, t, "integers.@sum == single_int_nullable",
+                 num_objects - 2); // sum of empty list does not match null
+    verify_query(test_context, t, "integers_nullable.@sum == single_int",
+                 num_objects); // sum of empty list matches 0, sum of list containing null matches 0
+    verify_query(test_context, t, "integers_nullable.@sum == single_int_nullable",
+                 num_objects -
+                     2); // sum of empty list does not match null, sum of list containing null does not match null
+    verify_query(test_context, t, "integers.@avg == single_int",
+                 num_objects - 2); // avg of empty lists is null, does not match 0
+    verify_query(test_context, t, "integers.@avg == single_int_nullable",
+                 num_objects); // avg of empty lists matches null
+    verify_query(test_context, t, "integers_nullable.@avg == single_int",
+                 num_objects - 2); // avg of empty list is null does not match 0, avg of list containing null is not 0
+    verify_query(test_context, t, "integers_nullable.@avg == single_int_nullable",
+                 num_objects); // avg of empty list matches null, avg of list containing null matches null
+    verify_query(test_context, t, "integers.@count == single_int",
+                 2 + 1); // 2x count of empty list matches 0, count of {1} matches 1
     verify_query(test_context, t, "integers.@count == single_int_nullable", 1); // count of empty list matches 0
-    verify_query(test_context, t, "integers_nullable.@count == single_int", 1 + 1); // count of {1} matches 1, count of empty list matches 0
+    verify_query(test_context, t, "integers_nullable.@count == single_int",
+                 1 + 1); // count of {1} matches 1, count of empty list matches 0
     verify_query(test_context, t, "integers_nullable.@count == single_int_nullable", 1); // count of {1} matches 1
     // operations across links
     verify_query(test_context, t2, "link.integers == 0 || link.integers == 3", 0);
@@ -1980,11 +1997,11 @@ TEST(Parser_list_of_primitive_ints)
     // we haven't supported aggregates across multiple lists previously
     // but the implementation works and applies the aggregate to the primitive list
     // this may be surprising, but it is one way to interpret the expression
-    verify_query(test_context, t2, "ALL list.integers == 1", 2); // row 0 matches {1}. row 1 matches (any of) {} {1}
+    verify_query(test_context, t2, "ALL list.integers == 1", 2);  // row 0 matches {1}. row 1 matches (any of) {} {1}
     verify_query(test_context, t2, "NONE list.integers == 1", 1); // row 1 matches (any of) {}, {0}, {2}, {3} ...
 
     Obj obj0 = *t->begin();
-    util::Any args[] = {Int(1) };
+    util::Any args[] = {Int(1)};
     size_t num_args = 1;
     verify_query_sub(test_context, t, "integers == $0", args, num_args, 1);
 
@@ -1992,25 +2009,34 @@ TEST(Parser_list_of_primitive_ints)
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "integers.@min.no_property == 0", 0), message);
     CHECK_EQUAL(message, "An extraneous property 'no_property' was found for operation '@min' when applied to a list "
                          "of primitive values 'integers'");
-    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "SUBQUERY(integers, $x, $x == 1).@count > 0", 0), message);
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "SUBQUERY(integers, $x, $x == 1).@count > 0", 0),
+                                message);
     CHECK_EQUAL(message, "A subquery can not operate on a list of primitive values (property 'integers')");
     // list vs list is not implemented yet
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "integers == integers", 0), message);
-    CHECK_EQUAL(message, "Ordered comparison between two primitive lists is not implemented yet ('integers' and 'integers')");
+    CHECK_EQUAL(message,
+                "Ordered comparison between two primitive lists is not implemented yet ('integers' and 'integers')");
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "integers != integers", 0), message);
-    CHECK_EQUAL(message, "Ordered comparison between two primitive lists is not implemented yet ('integers' and 'integers')");
+    CHECK_EQUAL(message,
+                "Ordered comparison between two primitive lists is not implemented yet ('integers' and 'integers')");
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "integers > integers", 0), message);
-    CHECK_EQUAL(message, "Ordered comparison between two primitive lists is not implemented yet ('integers' and 'integers')");
+    CHECK_EQUAL(message,
+                "Ordered comparison between two primitive lists is not implemented yet ('integers' and 'integers')");
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "integers < integers", 0), message);
-    CHECK_EQUAL(message, "Ordered comparison between two primitive lists is not implemented yet ('integers' and 'integers')");
+    CHECK_EQUAL(message,
+                "Ordered comparison between two primitive lists is not implemented yet ('integers' and 'integers')");
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "integers contains integers", 0), message);
-    CHECK_EQUAL(message, "Ordered comparison between two primitive lists is not implemented yet ('integers' and 'integers')");
+    CHECK_EQUAL(message,
+                "Ordered comparison between two primitive lists is not implemented yet ('integers' and 'integers')");
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "integers beginswith integers", 0), message);
-    CHECK_EQUAL(message, "Ordered comparison between two primitive lists is not implemented yet ('integers' and 'integers')");
+    CHECK_EQUAL(message,
+                "Ordered comparison between two primitive lists is not implemented yet ('integers' and 'integers')");
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "integers endswith integers", 0), message);
-    CHECK_EQUAL(message, "Ordered comparison between two primitive lists is not implemented yet ('integers' and 'integers')");
+    CHECK_EQUAL(message,
+                "Ordered comparison between two primitive lists is not implemented yet ('integers' and 'integers')");
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "integers like integers", 0), message);
-    CHECK_EQUAL(message, "Ordered comparison between two primitive lists is not implemented yet ('integers' and 'integers')");
+    CHECK_EQUAL(message,
+                "Ordered comparison between two primitive lists is not implemented yet ('integers' and 'integers')");
     // string operators are not supported on an integer column
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "integers like 0", 0), message);
     CHECK_EQUAL(message, "Unsupported operator for numeric queries.");
@@ -2033,9 +2059,7 @@ TEST(Parser_list_of_primitive_strings)
     auto col_str_list = t->add_column_list(type_String, "strings", nullable);
     CHECK_THROW_ANY(t->add_search_index(col_str_list));
 
-    auto get_string = [](size_t i) -> std::string {
-        return util::format("string_%1", i);
-    };
+    auto get_string = [](size_t i) -> std::string { return util::format("string_%1", i); };
     size_t num_populated_objects = 10;
     for (size_t i = 0; i < num_populated_objects; ++i) {
         Obj obj = t->create_object();
@@ -2059,10 +2083,13 @@ TEST(Parser_list_of_primitive_strings)
         verify_query(test_context, t, util::format("NONE strings == '%1'", si), num_total_objects - 1);
         verify_query(test_context, t, util::format("!(ANY strings == '%1')", si), num_total_objects - 1);
         verify_query(test_context, t, util::format("!(SOME strings == '%1')", si), num_total_objects - 1);
-        verify_query(test_context, t, util::format("!(ALL strings == '%1')", si), num_total_objects - 2); // empty list also does not match
+        verify_query(test_context, t, util::format("!(ALL strings == '%1')", si),
+                     num_total_objects - 2); // empty list also does not match
         verify_query(test_context, t, util::format("!(NONE strings == '%1')", si), 1);
-        verify_query(test_context, t, util::format("ANY strings != '%1'", si), num_total_objects - 2); // empty list also does not match
-        verify_query(test_context, t, util::format("SOME strings != '%1'", si), num_total_objects - 2); // empty list also does not match
+        verify_query(test_context, t, util::format("ANY strings != '%1'", si),
+                     num_total_objects - 2); // empty list also does not match
+        verify_query(test_context, t, util::format("SOME strings != '%1'", si),
+                     num_total_objects - 2); // empty list also does not match
         verify_query(test_context, t, util::format("ALL strings != '%1'", si), num_total_objects - 1);
         verify_query(test_context, t, util::format("NONE strings != '%1'", si), 2); // empty list also matches
         verify_query(test_context, t, util::format("'%1' IN strings", si), 1);
@@ -2075,20 +2102,21 @@ TEST(Parser_list_of_primitive_strings)
     verify_query(test_context, t, "strings BEGINSWITH[c] 'STR'", num_populated_objects);
     verify_query(test_context, t, "strings ENDSWITH[c] 'G_1'", 1);
     verify_query(test_context, t, "strings LIKE[c] 'StRiNg_*'", num_populated_objects);
-    verify_query(test_context, t, "ALL strings CONTAINS[c] 'STR'", num_populated_objects + 1); // + empty list
+    verify_query(test_context, t, "ALL strings CONTAINS[c] 'STR'", num_populated_objects + 1);   // + empty list
     verify_query(test_context, t, "ALL strings BEGINSWITH[c] 'STR'", num_populated_objects + 1); // + empty list
-    verify_query(test_context, t, "ALL strings ENDSWITH[c] 'G_1'", 2); // {"string_1"} and {}
+    verify_query(test_context, t, "ALL strings ENDSWITH[c] 'G_1'", 2);                          // {"string_1"} and {}
     verify_query(test_context, t, "ALL strings LIKE[c] 'StRiNg_*'", num_populated_objects + 1); // + empty list
-    verify_query(test_context, t, "NONE strings CONTAINS[c] 'STR'", 3); // {}, {null}, {""}
-    verify_query(test_context, t, "NONE strings BEGINSWITH[c] 'STR'", 3); // {}, {null}, {""}
-    verify_query(test_context, t, "NONE strings ENDSWITH[c] 'G_1'", num_populated_objects - 1 + 3); // - {"string_1"} + {}, {null}, {""}
+    verify_query(test_context, t, "NONE strings CONTAINS[c] 'STR'", 3);                         // {}, {null}, {""}
+    verify_query(test_context, t, "NONE strings BEGINSWITH[c] 'STR'", 3);                       // {}, {null}, {""}
+    verify_query(test_context, t, "NONE strings ENDSWITH[c] 'G_1'",
+                 num_populated_objects - 1 + 3);                         // - {"string_1"} + {}, {null}, {""}
     verify_query(test_context, t, "NONE strings LIKE[c] 'StRiNg_*'", 3); // {}, {null}, {""}
 
-    verify_query(test_context, t, "strings.@count == 0", 1); // {}
-    verify_query(test_context, t, "strings.@size == 0", 1); // {}
+    verify_query(test_context, t, "strings.@count == 0", 1);                     // {}
+    verify_query(test_context, t, "strings.@size == 0", 1);                      // {}
     verify_query(test_context, t, "strings.@count == 1", num_total_objects - 1); // - empty list
-    verify_query(test_context, t, "strings.@size == 1", num_total_objects - 1); // - empty list
-    verify_query(test_context, t, "strings.length == 0", 2); // {""}, {null}
+    verify_query(test_context, t, "strings.@size == 1", num_total_objects - 1);  // - empty list
+    verify_query(test_context, t, "strings.length == 0", 2);                     // {""}, {null}
     verify_query(test_context, t, "strings.length == 8", num_populated_objects); // "strings_0", ...  "strings_9"
 
     std::string message;
@@ -2159,16 +2187,19 @@ TEST_TYPES(Parser_list_of_primitive_element_lengths, StringData, BinaryData)
             verify_query(test_context, t, util::format("%1 %2values.length == 0", prefix, path), 2);
             verify_query(test_context, t, util::format("%1 %2values.length > 0", prefix, path), 3);
             verify_query(test_context, t, util::format("%1 %2values.length == 6", prefix, path), 3);
-            verify_query(test_context, t, util::format("%1 %2values.length == length", prefix, path), 2); // element length vs column
+            verify_query(test_context, t, util::format("%1 %2values.length == length", prefix, path),
+                         2); // element length vs column
         }
 
-        verify_query(test_context, t, util::format("ALL %1values.length == 0", path), 3); // {}, {null}, {""}
+        verify_query(test_context, t, util::format("ALL %1values.length == 0", path), 3);      // {}, {null}, {""}
         verify_query(test_context, t, util::format("ALL %1values.length == length", path), 3); // {}, {null}, {""}
         verify_query(test_context, t, util::format("ALL %1values.length == 6", path), 4); // the empty list matches
 
-        verify_query(test_context, t, util::format("NONE %1values.length == 0", path), 4);        // {}, {"value1"}, {"value2"}, {"value1", "value2"}
-        verify_query(test_context, t, util::format("NONE %1values.length == length", path), 4);   // {}, {"value1"}, {"value2"}, {"value1", "value2"}
-        verify_query(test_context, t, util::format("NONE %1values.length == 6", path), 3);        // {}, {null}, {""}
+        verify_query(test_context, t, util::format("NONE %1values.length == 0", path),
+                     4); // {}, {"value1"}, {"value2"}, {"value1", "value2"}
+        verify_query(test_context, t, util::format("NONE %1values.length == length", path),
+                     4); // {}, {"value1"}, {"value2"}, {"value1", "value2"}
+        verify_query(test_context, t, util::format("NONE %1values.length == 6", path), 3); // {}, {null}, {""}
     }
 
     std::string message;
@@ -2176,7 +2207,8 @@ TEST_TYPES(Parser_list_of_primitive_element_lengths, StringData, BinaryData)
     CHECK_EQUAL(message, "Property 'values' is not a link in object of type 'table'");
 }
 
-TEST_TYPES(Parser_list_of_primitive_types, Int, Optional<Int>, Bool, Optional<Bool>, Float, Optional<Float>, Double, Optional<Double>, Decimal128, ObjectId, Optional<ObjectId>)
+TEST_TYPES(Parser_list_of_primitive_types, Int, Optional<Int>, Bool, Optional<Bool>, Float, Optional<Float>, Double,
+           Optional<Double>, Decimal128, ObjectId, Optional<ObjectId>)
 {
     Group g;
     TableRef t = g.add_table("table");
@@ -2187,7 +2219,8 @@ TEST_TYPES(Parser_list_of_primitive_types, Int, Optional<Int>, Bool, Optional<Bo
     auto col_link = t->add_column_link(type_Link, "link", *t);
 
     auto obj1 = t->create_object();
-    std::vector<TEST_TYPE> values = values_from_int<TEST_TYPE, underlying_type>({0, 9, 4, 2, 7, 4, 1, 8, 11, 3, 4, 5, 22});
+    std::vector<TEST_TYPE> values =
+        values_from_int<TEST_TYPE, underlying_type>({0, 9, 4, 2, 7, 4, 1, 8, 11, 3, 4, 5, 22});
     obj1.set_list_values(col, values);
     auto obj2 = t->create_object(); // empty list
     auto obj3 = t->create_object(); // {1}
@@ -2211,24 +2244,28 @@ TEST_TYPES(Parser_list_of_primitive_types, Int, Optional<Int>, Bool, Optional<Bo
     std::vector<std::string> column_prefix = {"", "link.", "link.link."};
 
     for (auto path : column_prefix) {
-        verify_query(test_context, t, util::format("%1values.@count == 0", path), 1); // obj2
-        verify_query(test_context, t, util::format("%1values.@count == 1", path), 2); // obj3, obj5
-        verify_query(test_context, t, util::format("%1values.@count == 2", path), 1); // obj4
-        verify_query(test_context, t, util::format("%1values.@count > 0", path), 4);  // obj1, obj3, obj4, obj5
+        verify_query(test_context, t, util::format("%1values.@count == 0", path), 1);  // obj2
+        verify_query(test_context, t, util::format("%1values.@count == 1", path), 2);  // obj3, obj5
+        verify_query(test_context, t, util::format("%1values.@count == 2", path), 1);  // obj4
+        verify_query(test_context, t, util::format("%1values.@count > 0", path), 4);   // obj1, obj3, obj4, obj5
         verify_query(test_context, t, util::format("%1values.@count == 13", path), 1); // obj1
         verify_query(test_context, t, util::format("%1values == NULL", path), (is_optional ? 1 : 0)); // obj5
 
         util::Any args[] = {value_1};
         size_t num_args = 1;
-        verify_query_sub(test_context, t, util::format("%1values == $0", path), args, num_args, 3); // obj1, obj3, obj4
+        verify_query_sub(test_context, t, util::format("%1values == $0", path), args, num_args,
+                         3); // obj1, obj3, obj4
         verify_query_sub(test_context, t, util::format("%1values != $0", path), args, num_args, 2); // obj1, obj5
-        verify_query_sub(test_context, t, util::format("ANY %1values == $0", path), args, num_args, 3); // obj1, obj3, obj4
+        verify_query_sub(test_context, t, util::format("ANY %1values == $0", path), args, num_args,
+                         3); // obj1, obj3, obj4
         verify_query_sub(test_context, t, util::format("ANY %1values != $0", path), args, num_args, 2); // obj1, obj5
 
-        verify_query_sub(test_context, t, util::format("ALL %1values == $0", path), args, num_args, 3); // obj2, obj3, obj4
-        verify_query_sub(test_context, t, util::format("ALL %1values != $0", path), args, num_args, 2); // obj2, obj5
+        verify_query_sub(test_context, t, util::format("ALL %1values == $0", path), args, num_args,
+                         3); // obj2, obj3, obj4
+        verify_query_sub(test_context, t, util::format("ALL %1values != $0", path), args, num_args, 2);  // obj2, obj5
         verify_query_sub(test_context, t, util::format("NONE %1values == $0", path), args, num_args, 2); // obj2, obj5
-        verify_query_sub(test_context, t, util::format("NONE %1values != $0", path), args, num_args, 3); // obj2, obj3, obj4
+        verify_query_sub(test_context, t, util::format("NONE %1values != $0", path), args, num_args,
+                         3); // obj2, obj3, obj4
     }
 }
 
@@ -3573,8 +3610,10 @@ TEST_TYPES(Parser_AggregateShortcuts, std::true_type, std::false_type)
     verify_query(test_context, t, "SOME items.price > items.@avg.price", 2);
 
     // aggregate list compared with column (over links)
-    verify_query(test_context, t, "ALL items.name == fav_item.name", 0); // no people have bought only their favourite item
-    verify_query(test_context, t, "NONE items.name == fav_item.name", 1); // only person 1 has items which are not their favourite
+    verify_query(test_context, t, "ALL items.name == fav_item.name",
+                 0); // no people have bought only their favourite item
+    verify_query(test_context, t, "NONE items.name == fav_item.name",
+                 1); // only person 1 has items which are not their favourite
 
     std::string message;
     // no list in path should throw

@@ -53,9 +53,28 @@ struct Expression
     std::string subquery_path, subquery_var;
     std::shared_ptr<Predicate> subquery;
     enum class ComparisonType { Unspecified, Any, All, None } comparison_type = ComparisonType::Unspecified;
-    Expression(Type t = Type::None, std::string input = "") : type(t), collection_op(KeyPathOp::None), s(input), comparison_type(ComparisonType::Unspecified) {}
-    Expression(std::vector<std::string>&& timestamp) : type(Type::Timestamp), collection_op(KeyPathOp::None), time_inputs(timestamp), comparison_type(ComparisonType::Unspecified) {}
-    Expression(std::string prefix, KeyPathOp op, std::string suffix, ComparisonType agg_type) : type(Type::KeyPath), collection_op(op), s(prefix), op_suffix(suffix), comparison_type(agg_type) {}
+    Expression(Type t = Type::None, std::string input = "")
+        : type(t)
+        , collection_op(KeyPathOp::None)
+        , s(input)
+        , comparison_type(ComparisonType::Unspecified)
+    {
+    }
+    Expression(std::vector<std::string>&& timestamp)
+        : type(Type::Timestamp)
+        , collection_op(KeyPathOp::None)
+        , time_inputs(timestamp)
+        , comparison_type(ComparisonType::Unspecified)
+    {
+    }
+    Expression(std::string prefix, KeyPathOp op, std::string suffix, ComparisonType agg_type)
+        : type(Type::KeyPath)
+        , collection_op(op)
+        , s(prefix)
+        , op_suffix(suffix)
+        , comparison_type(agg_type)
+    {
+    }
 };
 
 struct Predicate

@@ -47,8 +47,10 @@ ExpressionContainer::ExpressionContainer(Query& query, const parser::Expression&
         if (link_chain.size() > 0 && link_chain.back().is_list_of_primitives) {
             parser::Expression::KeyPathOp collection_op = e.collection_op;
             if (link_chain.back().is_primitive_element_length_op) {
-                realm_precondition(collection_op == parser::Expression::KeyPathOp::None,
-                                   util::format("Invalid combination of aggregate operation '%1' with list of primitives '.length'", collection_operator_to_str(e.collection_op)));
+                realm_precondition(
+                    collection_op == parser::Expression::KeyPathOp::None,
+                    util::format("Invalid combination of aggregate operation '%1' with list of primitives '.length'",
+                                 collection_operator_to_str(e.collection_op)));
                 if (link_chain.back().col_type == type_String) {
                     collection_op = parser::Expression::KeyPathOp::SizeString;
                 }
@@ -88,14 +90,14 @@ ExpressionContainer::ExpressionContainer(Query& query, const parser::Expression&
                 case parser::Expression::KeyPathOp::SizeString:
                     type = ExpressionInternal::exp_OpSizeStringPrimitive;
                     storage =
-                        CollectionOperatorExpression<parser::Expression::KeyPathOp::SizeString, PrimitiveListExpression>(
-                            std::move(ple), e.op_suffix, mapping);
+                        CollectionOperatorExpression<parser::Expression::KeyPathOp::SizeString,
+                                                     PrimitiveListExpression>(std::move(ple), e.op_suffix, mapping);
                     break;
                 case parser::Expression::KeyPathOp::SizeBinary:
                     type = ExpressionInternal::exp_OpSizeBinaryPrimitive;
                     storage =
-                        CollectionOperatorExpression<parser::Expression::KeyPathOp::SizeBinary, PrimitiveListExpression>(
-                            std::move(ple), e.op_suffix, mapping);
+                        CollectionOperatorExpression<parser::Expression::KeyPathOp::SizeBinary,
+                                                     PrimitiveListExpression>(std::move(ple), e.op_suffix, mapping);
                     break;
                 case parser::Expression::KeyPathOp::Count:
                     type = ExpressionInternal::exp_OpCountPrimitive;
@@ -281,15 +283,19 @@ ExpressionContainer::get_primitive_count()
     return util::any_cast<
         CollectionOperatorExpression<parser::Expression::KeyPathOp::Count, PrimitiveListExpression>&>(storage);
 }
-CollectionOperatorExpression<parser::Expression::KeyPathOp::SizeString, PrimitiveListExpression>& ExpressionContainer::get_primitive_string_length()
+CollectionOperatorExpression<parser::Expression::KeyPathOp::SizeString, PrimitiveListExpression>&
+ExpressionContainer::get_primitive_string_length()
 {
     REALM_ASSERT_DEBUG(type == ExpressionInternal::exp_OpSizeStringPrimitive);
-    return util::any_cast<CollectionOperatorExpression<parser::Expression::KeyPathOp::SizeString, PrimitiveListExpression>&>(storage);
+    return util::any_cast<
+        CollectionOperatorExpression<parser::Expression::KeyPathOp::SizeString, PrimitiveListExpression>&>(storage);
 }
-CollectionOperatorExpression<parser::Expression::KeyPathOp::SizeBinary, PrimitiveListExpression>& ExpressionContainer::get_primitive_binary_length()
+CollectionOperatorExpression<parser::Expression::KeyPathOp::SizeBinary, PrimitiveListExpression>&
+ExpressionContainer::get_primitive_binary_length()
 {
     REALM_ASSERT_DEBUG(type == ExpressionInternal::exp_OpSizeBinaryPrimitive);
-    return util::any_cast<CollectionOperatorExpression<parser::Expression::KeyPathOp::SizeBinary, PrimitiveListExpression>&>(storage);
+    return util::any_cast<
+        CollectionOperatorExpression<parser::Expression::KeyPathOp::SizeBinary, PrimitiveListExpression>&>(storage);
 }
 CollectionOperatorExpression<parser::Expression::KeyPathOp::BacklinkCount, PropertyExpression>&
 ExpressionContainer::get_backlink_count()
@@ -486,8 +492,7 @@ bool ExpressionContainer::is_null() {
 std::vector<KeyPathElement> ExpressionContainer::get_keypaths()
 {
     std::vector<KeyPathElement> links;
-    switch (type)
-    {
+    switch (type) {
         case ExpressionInternal::exp_Value:
             return {};
         case ExpressionInternal::exp_Property:

@@ -68,9 +68,9 @@ bool is_backlinks_prefix(const std::string& s)
 
 bool is_length_suffix(const std::string& s)
 {
-    return s.size() == 6 && (s[0] == 'l' || s[0] == 'L') && (s[1] == 'e' || s[1] == 'E')
-        && (s[2] == 'n' || s[2] == 'N') && (s[3] == 'g' || s[3] == 'G') && (s[4] == 't' || s[4] == 'T')
-        && (s[5] == 'h' || s[5] == 'H');
+    return s.size() == 6 && (s[0] == 'l' || s[0] == 'L') && (s[1] == 'e' || s[1] == 'E') &&
+           (s[2] == 'n' || s[2] == 'N') && (s[3] == 'g' || s[3] == 'G') && (s[4] == 't' || s[4] == 'T') &&
+           (s[5] == 'h' || s[5] == 'H');
 }
 
 KeyPathElement KeyPathMapping::process_next_path(ConstTableRef table, KeyPath& keypath, size_t& index)
@@ -134,8 +134,8 @@ KeyPathElement KeyPathMapping::process_next_path(ConstTableRef table, KeyPath& k
 
     DataType cur_col_type = table->get_column_type(col_key);
 
-    bool is_primitive_list = table->get_column_attr(col_key).test(ColumnAttr::col_attr_List)
-        && cur_col_type != type_LinkList;
+    bool is_primitive_list =
+        table->get_column_attr(col_key).test(ColumnAttr::col_attr_List) && cur_col_type != type_LinkList;
     bool is_length_op = false;
     if (is_primitive_list) {
         if (index + 2 == keypath.size() && is_length_suffix(keypath[index + 1])) {

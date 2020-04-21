@@ -1476,12 +1476,14 @@ public:
         const size_t sz = right->ValueBase::m_values;
         bool left_is_null = left->m_storage.is_null(0);
         if (!right->m_from_link_list) {
-            REALM_ASSERT_DEBUG(comparison == ExpressionComparisonType::Any); // ALL/NONE not supported for non list types
+            REALM_ASSERT_DEBUG(comparison ==
+                               ExpressionComparisonType::Any); // ALL/NONE not supported for non list types
             for (size_t m = 0; m < sz; m++) {
                 if (c(left->m_storage[0], right->m_storage[m], left_is_null, right->m_storage.is_null(m)))
                     return m;
             }
-        } else if (comparison == ExpressionComparisonType::None) {
+        }
+        else if (comparison == ExpressionComparisonType::None) {
             for (size_t m = 0; m < sz; m++) {
                 if (c(left->m_storage[0], right->m_storage[m], left_is_null, right->m_storage.is_null(m)))
                     return not_found;
@@ -1506,13 +1508,16 @@ public:
     }
 
     template <class TCond>
-    REALM_FORCEINLINE static size_t compare(Value<T>* left, Value<T>* right, ExpressionComparisonType left_cmp_type, ExpressionComparisonType right_cmp_type)
+    REALM_FORCEINLINE static size_t compare(Value<T>* left, Value<T>* right, ExpressionComparisonType left_cmp_type,
+                                            ExpressionComparisonType right_cmp_type)
     {
         TCond c;
 
         if (!left->m_from_link_list && !right->m_from_link_list) {
-            REALM_ASSERT_DEBUG(left_cmp_type == ExpressionComparisonType::Any); // ALL/NONE not supported for non list types
-            REALM_ASSERT_DEBUG(right_cmp_type == ExpressionComparisonType::Any); // ALL/NONE not supported for non list types
+            REALM_ASSERT_DEBUG(left_cmp_type ==
+                               ExpressionComparisonType::Any); // ALL/NONE not supported for non list types
+            REALM_ASSERT_DEBUG(right_cmp_type ==
+                               ExpressionComparisonType::Any); // ALL/NONE not supported for non list types
             // Compare values one-by-one (one value is one row; no link lists)
             size_t min = minimum(left->ValueBase::m_values, right->ValueBase::m_values);
             for (size_t m = 0; m < min; m++) {
@@ -1545,7 +1550,7 @@ public:
             else if (right_cmp_type == ExpressionComparisonType::All) {
                 for (size_t r = 0; r < num_right_values; r++) {
                     if (!c(left->m_storage[0], right->m_storage[r], left->m_storage.is_null(0),
-                          right->m_storage.is_null(r)))
+                           right->m_storage.is_null(r)))
                         return not_found; // one didn't match
                 }
                 return 0; // all matched
@@ -1553,7 +1558,7 @@ public:
             else if (right_cmp_type == ExpressionComparisonType::None) {
                 for (size_t r = 0; r < num_right_values; r++) {
                     if (c(left->m_storage[0], right->m_storage[r], left->m_storage.is_null(0),
-                           right->m_storage.is_null(r)))
+                          right->m_storage.is_null(r)))
                         return not_found; // one matched, none not satisfied
                 }
                 return 0; // none matched
@@ -1573,7 +1578,7 @@ public:
             else if (left_cmp_type == ExpressionComparisonType::All) {
                 for (size_t l = 0; l < num_left_values; l++) {
                     if (!c(left->m_storage[l], right->m_storage[0], left->m_storage.is_null(l),
-                          right->m_storage.is_null(0)))
+                           right->m_storage.is_null(0)))
                         return not_found; // one did not match, All not satisfied
                 }
                 return 0; // all matched
@@ -3176,7 +3181,6 @@ public:
     ColumnListSize(const Columns<Lst<T>>& other)
         : Columns<Lst<T>>(other)
     {
-
     }
     void evaluate(size_t index, ValueBase& destination) override
     {
@@ -3193,6 +3197,7 @@ public:
     {
         return std::unique_ptr<Subexpr>(new ColumnListSize<T>(*this));
     }
+
 private:
     template <typename StorageType>
     void evaluate(size_t index, ValueBase& destination)
@@ -3224,7 +3229,7 @@ template <typename T>
 class ColumnListElementLength : public Subexpr2<Int> {
 public:
     ColumnListElementLength(const Columns<Lst<T>>& source)
-    : m_list(source)
+        : m_list(source)
     {
     }
     void evaluate(size_t index, ValueBase& destination) override
@@ -3284,6 +3289,7 @@ public:
     {
         return m_list.get_comparison_type();
     }
+
 private:
     Columns<Lst<T>> m_list;
 };
@@ -3356,7 +3362,8 @@ public:
 
 private:
     template <typename StorageType>
-    void evaluate(size_t index, ValueBase& destination) {
+    void evaluate(size_t index, ValueBase& destination)
+    {
         Allocator& alloc = get_base_table()->get_alloc();
         Value<ref_type> list_refs;
         m_list.get_lists(index, list_refs, 1);
@@ -4338,8 +4345,8 @@ public:
     double init() override
     {
         double dT = m_left_is_const ? 10.0 : 50.0;
-        if (std::is_same_v<TCond, Equal> && m_left_is_const && m_right->has_search_index()
-            && m_right->get_comparison_type() == ExpressionComparisonType::Any) {
+        if (std::is_same_v<TCond, Equal> && m_left_is_const && m_right->has_search_index() &&
+            m_right->get_comparison_type() == ExpressionComparisonType::Any) {
             if (m_left_value.m_storage.is_null(0)) {
                 m_matches = m_right->find_all(Mixed());
             }
@@ -4411,13 +4418,13 @@ public:
         if (m_left_is_const) {
             for (; start < end;) {
                 m_right->evaluate(start, right);
-                match =
-                    Value<T>::template compare_const<TCond>(&m_left_value, &right, right_cmp_type);
+                match = Value<T>::template compare_const<TCond>(&m_left_value, &right, right_cmp_type);
                 if (match != not_found && match + start < end)
                     return start + match;
 
-                size_t rows =
-                    (m_left_value.m_from_link_list || right.m_from_link_list) ? 1 : minimum(right.m_values, m_left_value.m_values);
+                size_t rows = (m_left_value.m_from_link_list || right.m_from_link_list)
+                                  ? 1
+                                  : minimum(right.m_values, m_left_value.m_values);
                 start += rows;
             }
         }
@@ -4432,7 +4439,7 @@ public:
                     return start + match;
 
                 size_t rows =
-                (left.m_from_link_list || right.m_from_link_list) ? 1 : minimum(right.m_values, left.m_values);
+                    (left.m_from_link_list || right.m_from_link_list) ? 1 : minimum(right.m_values, left.m_values);
                 start += rows;
             }
         }

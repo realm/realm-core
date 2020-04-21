@@ -288,7 +288,8 @@ struct ParserState
 
     void add_collection_aggregate_expression()
     {
-        add_expression(Expression(collection_key_path_prefix, pending_op, collection_key_path_suffix, pending_comparison_type));
+        add_expression(
+            Expression(collection_key_path_prefix, pending_op, collection_key_path_suffix, pending_comparison_type));
         collection_key_path_prefix = "";
         collection_key_path_suffix = "";
         pending_op = Expression::KeyPathOp::None;
