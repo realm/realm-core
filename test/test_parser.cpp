@@ -2119,15 +2119,10 @@ TEST(Parser_list_of_primitive_strings)
     verify_query(test_context, t, "strings.length == 0", 2);                     // {""}, {null}
     verify_query(test_context, t, "strings.length == 8", num_populated_objects); // "strings_0", ...  "strings_9"
 
-    std::string message;
-    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "strings.@min == 2", 0), message);
-    CHECK_EQUAL(message, "Predicate error: comparison of type 'String' with result of '@min' is not supported.");
-    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "strings.@max == 2", 0), message);
-    CHECK_EQUAL(message, "Predicate error: comparison of type 'String' with result of '@max' is not supported.");
-    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "strings.@sum == 2", 0), message);
-    CHECK_EQUAL(message, "Predicate error: comparison of type 'String' with result of '@sum' is not supported.");
-    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "strings.@avg == 2", 0), message);
-    CHECK_EQUAL(message, "Predicate error: comparison of type 'String' with result of '@avg' is not supported.");
+    CHECK_THROW_ANY(verify_query(test_context, t, "strings.@min == 2", 0));
+    CHECK_THROW_ANY(verify_query(test_context, t, "strings.@max == 2", 0));
+    CHECK_THROW_ANY(verify_query(test_context, t, "strings.@sum == 2", 0));
+    CHECK_THROW_ANY(verify_query(test_context, t, "strings.@avg == 2", 0));
 }
 
 TEST_TYPES(Parser_list_of_primitive_element_lengths, StringData, BinaryData)
