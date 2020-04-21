@@ -356,6 +356,15 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
     }
     // Either the schema version has changed or we need to do non-migration changes
 
+    // Cancel the write transaction if we exit this function before committing it
+    auto cleanup = util::make_scope_exit([&]() noexcept {
+        // When in_transaction is true, caller is responsible to cancel the transaction.
+        if (!in_transaction && is_in_transaction())
+            cancel_transaction();
+        if (!was_in_read_transaction)
+            m_group = nullptr;
+    });
+
     if (!in_transaction) {
         transaction().promote_to_write();
 
@@ -373,15 +382,6 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
         }
         cache_new_schema();
     }
-
-    // Cancel the write transaction if we exit this function before committing it
-    auto cleanup = util::make_scope_exit([&]() noexcept {
-        // When in_transaction is true, caller is responsible to cancel the transaction.
-        if (!in_transaction && is_in_transaction())
-            cancel_transaction();
-        if (!was_in_read_transaction)
-            m_group = nullptr;
-    });
 
     uint64_t old_schema_version = m_schema_version;
     bool additive = m_config.schema_mode == SchemaMode::Additive;
