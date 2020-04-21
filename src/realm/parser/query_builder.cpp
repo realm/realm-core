@@ -186,6 +186,8 @@ std::string operator_description(const Predicate::Operator& op)
         case realm::parser::Predicate::Operator::In:
             return "IN";
     }
+    REALM_ASSERT_DEBUG(false);
+    return "";
 }
 
 // (string column OR list of primitive strings) vs (string literal OR string column)
