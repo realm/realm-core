@@ -136,8 +136,8 @@ public:
     bool can_deliver_notifications() const noexcept override { return true; }
 
 private:
-    dispatch_queue_t m_queue;
-    void (^m_callback)();
+    dispatch_queue_t m_queue = nullptr;
+    void (^m_callback)() = nullptr;
 };
 
 static const void* c_queue_key = &c_queue_key;
