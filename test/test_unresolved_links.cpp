@@ -353,6 +353,12 @@ TEST(Unresolved_GarbageCollect)
     CHECK_EQUAL(cars->nb_unresolved(), 1);
     bilmekka.get_linklist(col_has).clear();
     CHECK_EQUAL(cars->nb_unresolved(), 0);
+
+    new_tesla = cars->get_objkey_from_primary_key("Tesla 10");
+    bilcentrum.get_list<ObjKey>(col_has).insert(0, new_tesla);
+    CHECK_EQUAL(cars->nb_unresolved(), 1);
+    bilcentrum.remove();
+    CHECK_EQUAL(cars->nb_unresolved(), 0);
 }
 
 TEST(Unresolved_PkCollission)

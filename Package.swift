@@ -3,7 +3,7 @@
 import PackageDescription
 import Foundation
 
-let versionStr = "10.0.0-alpha.2"
+let versionStr = "10.0.0-alpha.6"
 let versionPieces = versionStr.split(separator: "-")
 let versionCompontents = versionPieces[0].split(separator: ".")
 let versionExtra = versionPieces.count > 1 ? versionPieces[1] : ""
@@ -13,6 +13,10 @@ let package = Package(
     products: [
         .library(
             name: "RealmCore",
+            targets: ["RealmCore"]),
+        .library(
+            name: "RealmCoreDynamic",
+            type: .dynamic,
             targets: ["RealmCore"]),
     ],
     targets: [
@@ -25,7 +29,20 @@ let package = Package(
                 "realm/metrics",
                 "realm/exec",
                 "win32",
-                "external"
+            ],
+            sources: [
+                "realm",
+                "external/IntelRDFPMathLib20U2/LIBRARY/src/bid128.c",
+                "external/IntelRDFPMathLib20U2/LIBRARY/src/bid128_compare.c",
+                "external/IntelRDFPMathLib20U2/LIBRARY/src/bid128_div.c",
+                "external/IntelRDFPMathLib20U2/LIBRARY/src/bid128_add.c",
+                "external/IntelRDFPMathLib20U2/LIBRARY/src/bid128_fma.c",
+                "external/IntelRDFPMathLib20U2/LIBRARY/src/bid64_to_bid128.c",
+                "external/IntelRDFPMathLib20U2/LIBRARY/src/bid_convert_data.c",
+                "external/IntelRDFPMathLib20U2/LIBRARY/src/bid_decimal_data.c",
+                "external/IntelRDFPMathLib20U2/LIBRARY/src/bid_decimal_globals.c",
+                "external/IntelRDFPMathLib20U2/LIBRARY/src/bid_from_int.c",
+                "external/IntelRDFPMathLib20U2/LIBRARY/src/bid_round.c"
             ],
             publicHeadersPath: ".",
             cxxSettings: [

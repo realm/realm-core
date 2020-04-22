@@ -129,11 +129,6 @@ public:
 
     ColKey add_column_link(DataType type, StringData name, Table& target);
 
-    // Pass a default ColKey() as first argument to have a new colkey generated
-    // Requesting a specific ColKey may fail with invalidkey exception, if the key is already in use
-    // We recommend allowing Core to choose the ColKey.
-    ColKey insert_column(ColKey col_key, DataType type, StringData name, bool nullable = false);
-    ColKey insert_column_link(ColKey col_key, DataType type, StringData name, Table& target);
     void remove_column(ColKey col_key);
     void rename_column(ColKey col_key, StringData new_name);
     bool valid_column(ColKey col_key) const noexcept;
@@ -709,16 +704,14 @@ private:
 
     void set_key(TableKey key);
 
-    ColKey do_insert_column(ColKey col_key, DataType type, StringData name, Table* target_table,
-                            bool nullable = false, bool listtype = false);
+    ColKey do_insert_column(ColKey col_key, DataType type, StringData name, Table* target_table);
 
     struct InsertSubtableColumns;
     struct EraseSubtableColumns;
     struct RenameSubtableColumns;
 
     void erase_root_column(ColKey col_key);
-    ColKey do_insert_root_column(ColKey col_key, ColumnType, StringData name, bool nullable = false,
-                                 bool listtype = false);
+    ColKey do_insert_root_column(ColKey col_key, ColumnType, StringData name);
     void do_erase_root_column(ColKey col_key);
 
     void set_opposite_column(ColKey col_key, TableKey opposite_table, ColKey opposite_column);

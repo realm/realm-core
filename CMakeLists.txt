@@ -18,6 +18,7 @@ include(SpecialtyBuilds)
 include(GetVersion)
 include(CheckCXXCompilerFlag)
 include(CheckCXXSourceRuns)
+include(CheckTypeSize)
 
 # Get accurate git-describe version
 git_describe(REALM_VERSION)
@@ -179,6 +180,15 @@ if(APPLE)
     find_library(Foundation Foundation)
 elseif(ANDROID)
     list(APPEND PLATFORM_LIBRARIES log android)
+endif()
+
+if(UNIX AND NOT ANDROID)
+    # Use large-file APIs by default even on 32-bit platforms
+    # Does not work for Android: https://android.googlesource.com/platform/bionic/+/master/docs/32-bit-abi.md
+    check_type_size(off_t SIZEOF_OFF_T)
+    if(SIZEOF_OFF_T EQUAL "4")
+        add_compile_definitions("_FILE_OFFSET_BITS=64")
+    endif()
 endif()
 
 # Find dependencies

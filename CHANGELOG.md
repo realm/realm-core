@@ -13,11 +13,69 @@
 -----------
 
 ### Internals
+* None.
+
+----------------------------------------------
+
+# 10.0.0-alpha.6 Release notes
+
+### Enhancements
+* Produces builds for RaspberryPi.
+
+### Fixed
+* Requirement to have a contiguous memory mapping of the entire realm file is removed. (Now fixed)
+ 
+-----------
+
+### Internals
+* Table::insert_column and Table::insert_column_link methods are removed.
+* Can now be built with MSVC 2019
+
+----------------------------------------------
+
+# 10.0.0-alpha.5 Release notes
+
+### Enhancements
+* average, min and max operations added to Decimal128 queries.
+* 'between' condition added to Decimal128 queries.
+
+### Fixed
+* Querying for a null ObjectId value over links could crash.
+* Several fixes around tombstone handling
+ 
+----------------------------------------------
+
+# 10.0.0-alpha.4 Release notes
+
+### Enhancements
+* 'old-query' support added for Decimal128 and ObjectId
+
+### Fixed
+* Previous enhancement "Requirement to have a contiguous memory mapping of the entire realm file is removed." is reverted. Caused various problems.
+* When upgrading a realm file containing a table with integer primary keys, the program could sometimes crash.
+ 
+### This release also includes the fixes contained in v5.27.9:
+* Fix a crash on startup on macOS 10.10 and 10.11. ([Cocoa #6403](https://github.com/realm/realm-cocoa/issues/6403), since 2.9.0).
+
+----------------------------------------------
+
+# 10.0.0-alpha.3 Release notes
+
+### Enhancements
+* Requirement to have a contiguous memory mapping of the entire realm file is removed.
+
+### Fixed
+* ConstLnkLst filters out unresolved links.
+ 
+-----------
+
+### Internals
 * Migrated to the final `std::filesystem` implementation on Windows from the experimental one.
 * Exception class InvalidKey is replaced with KeyNotFound, KeyAlreadyUsed, ColumnNotFound and ColumnAlreadyExists
 * Calling `Table::create_object(ObjKey)` on a table with a primary key column is now an error.
 * Objects created with `Table::create_object(GlobalKey)` are now subject to tombstone resurrection.
 * Table::get_objkey_from_global_key() was introduced to allow getting the ObjKey of an object (dead or alive) identified by its GlobalKey.
+* ChunkedBinaryData moved from Sync to Core
 
 ----------------------------------------------
 
@@ -109,6 +167,18 @@ This release also contains the changes introduced by v6.0.4
 ### Internals
 * File format bumped to 11.
 
+----------------------------------------------
+
+# 6.0.5 Release notes
+
+### Fixed
+* Opening a realm file on streaming form in read-only mode now works correctly. Since Core-6, this would trigger an actual
+  write to the file, which would fail if the file was not writable.
+
+### This release also includes the fixes contained in v5.27.9:
+* Fix a crash on startup on macOS 10.10 and 10.11. ([Cocoa #6403](https://github.com/realm/realm-cocoa/issues/6403), since 2.9.0).
+
+----------------------------------------------
 # 6.0.4 Release notes
 
 ### Fixed
@@ -668,6 +738,21 @@ This release was never published
 * Speed improvement for Sort().
 
 ---------------------------------------------
+
+# 5.23.9 Release notes
+
+### Fixed
+* Fix a crash on startup on macOS 10.10 and 10.11. ([Cocoa #6403](https://github.com/realm/realm-cocoa/issues/6403), since 2.9.0).
+
+----------------------------------------------
+
+# 5.23.8 Release notes
+
+### Fixed
+* A NOT query on a LinkList would incorrectly match rows which have a row index one less than a correctly matching row which appeared earlier in the LinkList. ([Cocoa #6289](https://github.com/realm/realm-cocoa/issues/6289), since 0.87.6).
+* Columns with float and double values would not be sorted correctly (since 5.23.7)
+ 
+----------------------------------------------
 
 # 5.23.7 Release notes
 

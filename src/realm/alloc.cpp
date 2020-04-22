@@ -149,6 +149,9 @@ char* Allocator::translate_less_critical(RefTranslation* ref_translation_ptr, re
     }
     if (REALM_LIKELY(!crosses_mapping)) {
         // Array fits inside primary mapping, no new mapping needed.
+#if REALM_ENABLE_ENCRYPTION
+        realm::util::encryption_read_barrier(addr, size, txl.encrypted_mapping, nullptr);
+#endif
         return addr;
     }
     else {
@@ -162,7 +165,11 @@ char* Allocator::translate_less_critical(RefTranslation* ref_translation_ptr, re
             xover_mapping_addr = txl.xover_mapping_addr.load(std::memory_order_relaxed);
         }
         // array is now known to be inside the established xover mapping:
-        return xover_mapping_addr + (offset - txl.xover_mapping_base);
+        addr = xover_mapping_addr + (offset - txl.xover_mapping_base);
+#if REALM_ENABLE_ENCRYPTION
+        realm::util::encryption_read_barrier(addr, size, txl.xover_encrypted_mapping, nullptr);
+#endif
+        return addr;
     }
 }
 }

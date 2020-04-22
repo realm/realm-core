@@ -4864,7 +4864,6 @@ TEST(LangBindHelper_Compact)
     }
 }
 
-#if !REALM_ANDROID // FIXME
 TEST(LangBindHelper_CompactLargeEncryptedFile)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -4896,7 +4895,6 @@ TEST(LangBindHelper_CompactLargeEncryptedFile)
         CHECK_EQUAL(N, table->size());
     }
 }
-#endif
 
 TEST(LangBindHelper_CloseDBvsTransactions)
 {

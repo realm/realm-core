@@ -3628,11 +3628,12 @@ TEST(Table_object_sequential)
     int nb_rows = 10'000'000;
     int num_runs = 1;
 #else
-    int nb_rows = 1024;
+    int nb_rows = 100'000;
     int num_runs = 1;
 #endif
     SHARED_GROUP_TEST_PATH(path);
-    DBRef sg = DB::create(path);
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
     ColKey c0;
     ColKey c1;
 
@@ -3777,14 +3778,15 @@ TEST(Table_object_seq_rnd)
     size_t rows = 1'000'000;
     int runs = 100;     // runs for building scenario
 #else
-    size_t rows = 50'000;
-    int runs = 1;
+    size_t rows = 100'000;
+    int runs = 100;
 #endif
     int64_t next_key = 0;
     std::vector<int64_t> key_values;
     std::set<int64_t> key_set;
     SHARED_GROUP_TEST_PATH(path);
-    DBRef sg = DB::create(path);
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
     ColKey c0;
     {
         std::cout << "Establishing scenario seq ins/rnd erase " << std::endl;
@@ -3892,11 +3894,12 @@ TEST(Table_object_random)
     int nb_rows = 1'000'000;
     int num_runs = 10;
 #else
-    int nb_rows = 1024;
+    int nb_rows = 100'000;
     int num_runs = 1;
 #endif
     SHARED_GROUP_TEST_PATH(path);
-    DBRef sg = DB::create(path);
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
     ColKey c0;
     ColKey c1;
     std::vector<int64_t> key_values;
