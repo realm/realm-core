@@ -608,6 +608,7 @@ void RealmCoordinator::unregister_realm(Realm* realm)
 void RealmCoordinator::clear_cache() NO_THREAD_SAFETY_ANALYSIS
 {
     std::vector<std::shared_ptr<Realm>> realms_to_close;
+    std::vector<std::shared_ptr<RealmCoordinator>> coordinators;
     {
         std::lock_guard<std::mutex> lock(s_coordinator_mutex);
 
@@ -616,6 +617,7 @@ void RealmCoordinator::clear_cache() NO_THREAD_SAFETY_ANALYSIS
             if (!coordinator) {
                 continue;
             }
+            coordinators.push_back(coordinator);
 
             coordinator->m_notifier = nullptr;
 
@@ -630,6 +632,7 @@ void RealmCoordinator::clear_cache() NO_THREAD_SAFETY_ANALYSIS
 
         s_coordinators_per_path.clear();
     }
+    coordinators.clear();
 
     // Close all of the previously cached Realms. This can't be done while
     // s_coordinator_mutex is held as it may try to re-lock it.
