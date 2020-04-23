@@ -1,19 +1,15 @@
-# NEXT RELEASE
+# 10.0.0-alpha.7 Release notes
 
 ### Enhancements
-* None.
+* Query::sum_decimal128 added.
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * None.
  
-### Breaking changes
-* None.
-
 -----------
 
 ### Internals
-* None.
+* Switch back to default off_t size so consumers don't need to define _FILE_OFFSET_BITS=64
 
 ----------------------------------------------
 
