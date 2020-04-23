@@ -94,7 +94,7 @@ Group& Realm::read_group()
     verify_open();
 
     if (!m_group)
-        begin_read(VersionID{});
+        begin_read(m_frozen_version.value_or(VersionID{}));
     return *m_group;
 }
 
