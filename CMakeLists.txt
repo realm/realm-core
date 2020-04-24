@@ -18,6 +18,7 @@ include(SpecialtyBuilds)
 include(GetVersion)
 include(CheckCXXCompilerFlag)
 include(CheckCXXSourceRuns)
+include(CheckSymbolExists)
 
 # Get accurate git-describe version
 git_describe(REALM_VERSION)
@@ -179,6 +180,14 @@ if(APPLE)
     find_library(Foundation Foundation)
 elseif(ANDROID)
     list(APPEND PLATFORM_LIBRARIES log android)
+endif()
+
+if(UNIX)
+    # Enable access to large file APIs, but don't make them the default.
+    add_compile_definitions("_LARGEFILE_SOURCE" "_LARGEFILE64_SOURCE")
+    set(CMAKE_REQUIRED_DEFINITIONS "-D_LARGEFILE_SOURCE" "-D_LARGEFILE64_SOURCE")
+    # Use readdir64 if available.
+    check_symbol_exists(readdir64 "dirent.h" REALM_HAVE_READDIR64)
 endif()
 
 # Find dependencies

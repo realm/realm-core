@@ -17,6 +17,37 @@
 
 ----------------------------------------------
 
+# 10.0.0-alpha.7 Release notes
+
+### Enhancements
+* Query::sum_decimal128 added.
+
+### Fixed
+* None.
+ 
+-----------
+
+### Internals
+* Switch back to default off_t size so consumers don't need to define _FILE_OFFSET_BITS=64
+
+----------------------------------------------
+
+# 10.0.0-alpha.6 Release notes
+
+### Enhancements
+* Produces builds for RaspberryPi.
+
+### Fixed
+* Requirement to have a contiguous memory mapping of the entire realm file is removed. (Now fixed)
+ 
+-----------
+
+### Internals
+* Table::insert_column and Table::insert_column_link methods are removed.
+* Can now be built with MSVC 2019
+
+----------------------------------------------
+
 # 10.0.0-alpha.5 Release notes
 
 ### Enhancements
