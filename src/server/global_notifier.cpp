@@ -345,15 +345,15 @@ std::string GlobalNotifier::ChangeNotification::serialize() const
 GlobalNotifier::ChangeNotification::ChangeNotification(std::string const& serialized)
 {
     auto parsed = nlohmann::json::parse(serialized);
-    realm_path = parsed["virtual_path"];
-    m_realm_id = parsed["realm_id"];
+    parsed["virtual_path"].get_to(realm_path);
+    parsed["realm_id"].get_to(m_realm_id);
 
     if (!parsed["is_change"].is_null()) {
         type = Type::Change;
-        m_old_version = parsed["old_version"];
-        m_new_version = parsed["new_version"];
+        parsed["old_version"].get_to(m_old_version);
+        parsed["new_version"].get_to(m_new_version);
 
-        m_config.path = parsed["path"];
+        parsed["path"].get_to(m_config.path);
         m_config.force_sync_history = true;
         m_config.schema_mode = SchemaMode::Additive;
         m_config.cache = false;
