@@ -476,8 +476,7 @@ template <>
 void Lst<ObjKey>::do_set(size_t ndx, ObjKey target_key)
 {
     auto origin_table = m_obj.get_table();
-    auto target_table = origin_table->get_opposite_table(m_col_key);
-    auto target_table_key = target_table->get_key();
+    auto target_table_key = origin_table->get_opposite_table_key(m_col_key);
     ObjKey old_key = get(ndx);
     CascadeState state(CascadeState::Mode::Strong);
     bool recurse =
@@ -502,8 +501,7 @@ template <>
 void Lst<ObjKey>::do_insert(size_t ndx, ObjKey target_key)
 {
     auto origin_table = m_obj.get_table();
-    auto target_table = origin_table->get_opposite_table(m_col_key);
-    auto target_table_key = target_table->get_key();
+    auto target_table_key = origin_table->get_opposite_table_key(m_col_key);
     m_obj.set_backlink(m_col_key, {target_table_key, target_key});
     m_tree->insert(ndx, target_key);
     if (target_key.is_unresolved()) {
@@ -515,8 +513,7 @@ template <>
 void Lst<ObjKey>::do_remove(size_t ndx)
 {
     auto origin_table = m_obj.get_table();
-    auto target_table = origin_table->get_opposite_table(m_col_key);
-    auto target_table_key = target_table->get_key();
+    auto target_table_key = origin_table->get_opposite_table_key(m_col_key);
     ObjKey old_key = get(ndx);
     CascadeState state(old_key.is_unresolved() ? CascadeState::Mode::All : CascadeState::Mode::Strong);
 
@@ -659,21 +656,22 @@ void Lst<Mixed>::do_insert(size_t ndx, Mixed value)
 template <>
 void Lst<Mixed>::do_remove(size_t ndx)
 {
-    ObjLink old_link;
-    Mixed old_value = get(ndx);
+    if (Mixed old_value = get(ndx); old_value.get_type() == type_TypedLink) {
+        auto old_link = old_value.get<ObjLink>();
 
-    if (old_value.get_type() == type_TypedLink) {
-        old_link = old_value.get<ObjLink>();
+        CascadeState state(old_link.get_obj_key().is_unresolved() ? CascadeState::Mode::All
+                                                                  : CascadeState::Mode::Strong);
+        bool recurse = m_obj.remove_backlink(m_col_key, old_link, state);
+
+        m_tree->erase(ndx);
+
+        if (recurse) {
+            auto table = m_obj.get_table();
+            _impl::TableFriend::remove_recursive(*table, state); // Throws
+        }
     }
-
-    CascadeState state(old_link.get_obj_key().is_unresolved() ? CascadeState::Mode::All : CascadeState::Mode::Strong);
-    bool recurse = m_obj.remove_backlink(m_col_key, old_link, state);
-
-    m_tree->erase(ndx);
-
-    if (recurse) {
-        auto table = m_obj.get_table();
-        _impl::TableFriend::remove_recursive(*table, state); // Throws
+    else {
+        m_tree->erase(ndx);
     }
 }
 

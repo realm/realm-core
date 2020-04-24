@@ -28,7 +28,6 @@ namespace realm {
 
 class ConstObj;
 class Obj;
-class Group;
 
 struct TableKey {
     static constexpr uint32_t null_value = uint32_t(-1) >> 1; // free top bit
@@ -281,10 +280,6 @@ public:
     {
         return m_obj_key;
     }
-    ConstObj get_obj(const Group& g) const;
-    Obj get_obj(Group& g) const;
-
-    void validate(const Group& g) const;
 
 private:
     TableKey m_table_key;

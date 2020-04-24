@@ -40,35 +40,6 @@
 
 namespace realm {
 
-ConstObj ObjLink::get_obj(const Group& g) const
-{
-    return g.get_table(m_table_key)->get_object(m_obj_key);
-}
-
-Obj ObjLink::get_obj(Group& g) const
-{
-    auto target_table = g.get_table(m_table_key);
-    ObjKey key = get_obj_key();
-    ClusterTree* ct = key.is_unresolved() ? target_table->m_tombstones.get() : &target_table->m_clusters;
-    return ct->get(key);
-}
-
-void ObjLink::validate(const Group& g) const
-{
-    if (m_table_key.operator bool()) {
-        auto target_key = get_obj_key();
-        auto target_table = g.get_table(get_table_key());
-        const ClusterTree* ct =
-            target_key.is_unresolved() ? target_table->m_tombstones.get() : &target_table->m_clusters;
-        if (!ct->is_valid(target_key)) {
-            throw LogicError(LogicError::target_row_index_out_of_range);
-        }
-        if (target_table->is_embedded()) {
-            throw LogicError(LogicError::wrong_kind_of_table);
-        }
-    }
-}
-
 /********************************* ConstObj **********************************/
 
 ConstObj::ConstObj(ConstTableRef table, MemRef mem, ObjKey key, size_t row_ndx)
@@ -957,7 +928,7 @@ Obj& Obj::set<Mixed>(ColKey col_key, Mixed value, bool is_default)
             if (new_link == old_link)
                 return *this;
         }
-        new_link.validate(*m_table->get_parent_group());
+        m_table->get_parent_group()->validate(new_link);
         recurse = replace_backlink(col_key, old_link, new_link, state);
     }
 
@@ -1196,7 +1167,7 @@ Obj& Obj::set<ObjLink>(ColKey col_key, ObjLink target_link, bool is_default)
     ColumnType type = col_key.get_type();
     if (type != ColumnTypeTraits<ObjLink>::column_id)
         throw LogicError(LogicError::illegal_type);
-    target_link.validate(*m_table->get_parent_group());
+    m_table->get_parent_group()->validate(target_link);
 
     ObjLink old_link = get<ObjLink>(col_key); // Will update if needed
 
@@ -1400,6 +1371,32 @@ bool Obj::remove_one_backlink(ColKey backlink_col_key, ObjKey origin_key)
     return backlinks.remove(m_row_ndx, origin_key);
 }
 
+namespace {
+template <class T>
+inline void nullify(Obj& obj, ColKey origin_col_key, T target)
+{
+    Lst<T> link_list(obj, origin_col_key);
+    size_t ndx = link_list.find_first(target);
+
+    REALM_ASSERT(ndx != realm::npos); // There has to be one
+
+    if (Replication* repl = obj.get_replication()) {
+        if constexpr (std::is_same_v<T, ObjKey>) {
+            repl->link_list_nullify(link_list, ndx); // Throws
+        }
+        else {
+            repl->list_erase(link_list, ndx); // Throws
+        }
+    }
+
+    // We cannot just call 'remove' on link_list as it would produce the wrong
+    // replication instruction and also attempt an update on the backlinks from
+    // the object that we in the process of removing.
+    BPlusTree<T>& tree = const_cast<BPlusTree<T>&>(link_list.get_tree());
+    tree.erase(ndx);
+}
+} // namespace
+
 void Obj::nullify_link(ColKey origin_col_key, ObjLink target_link)
 {
     ensure_writeable();
@@ -1413,52 +1410,13 @@ void Obj::nullify_link(ColKey origin_col_key, ObjLink target_link)
     ColumnAttrMask attr = origin_col_key.get_attrs();
     if (attr.test(col_attr_List)) {
         if (origin_col_key.get_type() == col_type_LinkList) {
-            Lst<ObjKey> link_list(*this, origin_col_key);
-            size_t ndx = link_list.find_first(target_link.get_obj_key());
-
-            REALM_ASSERT(ndx != realm::npos); // There has to be one
-
-            if (Replication* repl = get_replication()) {
-                repl->link_list_nullify(link_list, ndx); // Throws
-            }
-
-            // We cannot just call 'remove' on link_list as it would produce the wrong
-            // replication instruction and also attempt an update on the backlinks from
-            // the object that we in the process of removing.
-            BPlusTree<ObjKey>& tree = const_cast<BPlusTree<ObjKey>&>(link_list.get_tree());
-            tree.erase(ndx);
+            nullify(*this, origin_col_key, target_link.get_obj_key());
         }
         else if (origin_col_key.get_type() == col_type_TypedLink) {
-            Lst<ObjLink> link_list(*this, origin_col_key);
-            size_t ndx = link_list.find_first(target_link);
-
-            REALM_ASSERT(ndx != realm::npos); // There has to be one
-
-            if (Replication* repl = get_replication()) {
-                repl->list_erase(link_list, ndx); // Throws
-            }
-
-            // We cannot just call 'remove' on link_list as it would produce the wrong
-            // replication instruction and also attempt an update on the backlinks from
-            // the object that we in the process of removing.
-            BPlusTree<ObjLink>& tree = const_cast<BPlusTree<ObjLink>&>(link_list.get_tree());
-            tree.erase(ndx);
+            nullify(*this, origin_col_key, target_link);
         }
         else if (origin_col_key.get_type() == col_type_Mixed) {
-            Lst<Mixed> link_list(*this, origin_col_key);
-            size_t ndx = link_list.find_first(Mixed(target_link));
-
-            REALM_ASSERT(ndx != realm::npos); // There has to be one
-
-            if (Replication* repl = get_replication()) {
-                repl->list_erase(link_list, ndx); // Throws
-            }
-
-            // We cannot just call 'remove' on link_list as it would produce the wrong
-            // replication instruction and also attempt an update on the backlinks from
-            // the object that we in the process of removing.
-            BPlusTree<Mixed>& tree = const_cast<BPlusTree<Mixed>&>(link_list.get_tree());
-            tree.erase(ndx);
+            nullify(*this, origin_col_key, Mixed(target_link));
         }
         else {
             REALM_ASSERT(false);
@@ -1505,7 +1463,7 @@ void Obj::nullify_link(ColKey origin_col_key, ObjLink target_link)
 void Obj::set_backlink(ColKey col_key, ObjLink new_link)
 {
     if (new_link && new_link.get_obj_key()) {
-        auto target_obj = new_link.get_obj(*m_table->get_parent_group());
+        auto target_obj = m_table->get_parent_group()->get_object(new_link);
         ColKey backlink_col_key;
         auto type = col_key.get_type();
         if (type == col_type_TypedLink || type == col_type_Mixed) {
@@ -1531,7 +1489,7 @@ bool Obj::remove_backlink(ColKey col_key, ObjLink old_link, CascadeState& state)
     if (old_link && old_link.get_obj_key()) {
         REALM_ASSERT(m_table->valid_column(col_key));
         ObjKey old_key = old_link.get_obj_key();
-        Obj target_obj = old_link.get_obj(*m_table->get_parent_group());
+        auto target_obj = m_table->get_parent_group()->get_object(old_link);
         TableRef target_table = target_obj.get_table();
         ColKey backlink_col_key;
         auto type = col_key.get_type();

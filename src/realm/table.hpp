@@ -932,7 +932,6 @@ private:
     friend class ColKeyIterator;
     friend class ConstObj;
     friend class Obj;
-    friend struct ObjLink;
     friend class LnkLst;
     friend class IncludeDescriptor;
 };

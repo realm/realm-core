@@ -959,7 +959,7 @@ inline void Cluster::do_insert_link(size_t ndx, ColKey col_key, Mixed init_val, 
     // Insert backlink if link is not null
     if (target_link) {
         Table* origin_table = const_cast<Table*>(m_tree_top.get_owner());
-        Obj target_obj = target_link.get_obj(*origin_table->get_parent_group());
+        Obj target_obj = origin_table->get_parent_group()->get_object(target_link);
         auto target_table = target_obj.get_table();
         ColKey backlink_col_key = target_table->find_or_add_backlink_column(col_key, origin_table->get_key());
         target_obj.add_backlink(backlink_col_key, origin_key);
@@ -1385,7 +1385,7 @@ inline void Cluster::do_erase(size_t ndx, ColKey col_key)
         ObjLink link = values.get(ndx);
         if (link) {
             const Table* origin_table = m_tree_top.get_owner();
-            Obj target_obj = link.get_obj(*origin_table->get_parent_group());
+            auto target_obj = origin_table->get_parent_group()->get_object(link);
 
             ColKey backlink_col_key = target_obj.get_table()->find_backlink_column(col_key, origin_table->get_key());
 
@@ -1397,7 +1397,7 @@ inline void Cluster::do_erase(size_t ndx, ColKey col_key)
         if (!value.is_null() && value.get_type() == type_TypedLink) {
             ObjLink link = value.get<ObjLink>();
             const Table* origin_table = m_tree_top.get_owner();
-            Obj target_obj = link.get_obj(*origin_table->get_parent_group());
+            auto target_obj = origin_table->get_parent_group()->get_object(link);
 
             ColKey backlink_col_key = target_obj.get_table()->find_backlink_column(col_key, origin_table->get_key());
 
@@ -1477,7 +1477,7 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
                     const Table* origin_table = m_tree_top.get_owner();
                     for (size_t i = 0; i < links.size(); i++) {
                         ObjLink link = links.get(i);
-                        Obj target_obj = link.get_obj(*origin_table->get_parent_group());
+                        auto target_obj = origin_table->get_parent_group()->get_object(link);
                         ColKey backlink_col_key =
                             target_obj.get_table()->find_backlink_column(col_key, origin_table->get_key());
                         target_obj.remove_one_backlink(backlink_col_key, ObjKey(key.value + m_offset));
@@ -1491,7 +1491,7 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
                         Mixed val = list.get(i);
                         if (val.get_type() == type_TypedLink) {
                             ObjLink link = val.get<ObjLink>();
-                            Obj target_obj = link.get_obj(*origin_table->get_parent_group());
+                            auto target_obj = origin_table->get_parent_group()->get_object(link);
                             ColKey backlink_col_key =
                                 target_obj.get_table()->find_backlink_column(col_key, origin_table->get_key());
                             target_obj.remove_one_backlink(backlink_col_key, ObjKey(key.value + m_offset));

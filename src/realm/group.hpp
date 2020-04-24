@@ -348,6 +348,9 @@ public:
     void rename_table(TableKey key, StringData new_name, bool require_unique_name = true);
     void rename_table(StringData name, StringData new_name, bool require_unique_name = true);
 
+    Obj get_object(ObjLink link);
+    void validate(ObjLink link) const;
+
     //@}
 
     // Serialization
