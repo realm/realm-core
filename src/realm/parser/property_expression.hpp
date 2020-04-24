@@ -51,19 +51,20 @@ struct PropertyExpression
 inline DataType PropertyExpression::get_dest_type() const
 {
     REALM_ASSERT_DEBUG(link_chain.size() > 0);
-    return link_chain.back().col_type;
+    REALM_ASSERT_DEBUG(link_chain.back().operation != KeyPathElement::KeyPathOperation::BacklinkCount);
+    return DataType(link_chain.back().col_key.get_type());
 }
 
 inline bool PropertyExpression::dest_type_is_backlink() const
 {
     REALM_ASSERT_DEBUG(link_chain.size() > 0);
-    return link_chain.back().is_backlink;
+    return link_chain.back().operation == KeyPathElement::KeyPathOperation::BacklinkTraversal;
 }
 
 inline bool PropertyExpression::dest_type_is_list_of_primitives() const
 {
     REALM_ASSERT_DEBUG(link_chain.size() > 0);
-    return link_chain.back().is_list_of_primitives;
+    return link_chain.back().is_list_of_primitives();
 }
 
 inline ColKey PropertyExpression::get_dest_col_key() const

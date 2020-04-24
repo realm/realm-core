@@ -38,11 +38,12 @@ SubqueryExpression::SubqueryExpression(Query& q, const std::string& key_path_str
     while (index < key_path.size()) {
         KeyPathElement element = mapping.process_next_path(cur_table, key_path, index);
         if (index != key_path.size()) {
-            realm_precondition(element.col_type == type_Link || element.col_type == type_LinkList,
+            ColumnType col_type = element.col_key.get_type();
+            realm_precondition(col_type == col_type_Link || col_type == col_type_LinkList,
                                util::format("Property '%1' is not a link in object of type '%2'",
                                             element.table->get_column_name(element.col_key),
                                             get_printable_table_name(*element.table)));
-            if (element.is_backlink) {
+            if (element.operation == KeyPathElement::KeyPathOperation::BacklinkTraversal) {
                 cur_table = element.table; // advance through backlink
             }
             else {
@@ -50,23 +51,18 @@ SubqueryExpression::SubqueryExpression(Query& q, const std::string& key_path_str
             }
         }
         else {
-            StringData dest_type;
-            if (element.is_backlink) {
-                dest_type = "linking object";
-            }
-            else {
-                dest_type = data_type_to_str(element.col_type);
-            }
             realm_precondition(
-                !element.is_list_of_primitives,
+                !element.is_list_of_primitives(),
                 util::format("A subquery can not operate on a list of primitive values (property '%1')",
                              element.table->get_column_name(element.col_key)));
 
-            realm_precondition(element.col_type == type_LinkList,
+            realm_precondition(element.col_key.get_type() == col_type_LinkList ||
+                                   element.operation == KeyPathElement::KeyPathOperation::BacklinkTraversal,
                                util::format("A subquery must operate on a list property, but '%1' is type '%2'",
-                                            element.table->get_column_name(element.col_key), dest_type));
+                                            element.table->get_column_name(element.col_key),
+                                            data_type_to_str(DataType(element.col_key.get_type()))));
             ConstTableRef subquery_table;
-            if (element.is_backlink) {
+            if (element.operation == KeyPathElement::KeyPathOperation::BacklinkTraversal) {
                 subquery_table = element.table; // advance through backlink
             }
             else {

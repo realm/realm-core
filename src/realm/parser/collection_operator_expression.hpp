@@ -351,7 +351,7 @@ void do_init(CollectionOperatorExpression<OpType, PropertyExpression>& expressio
                          suffix_path));
 
         expression.operative_col_key = element.col_key;
-        expression.operative_col_type = element.col_type;
+        expression.operative_col_type = DataType(element.col_key.get_type());
     }
     else { // !requires_suffix_path
         if (!expression.pe.link_chain.empty()) {

@@ -3066,10 +3066,10 @@ TEST(Parser_Backlinks)
 
     std::string message;
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, items, "@links.class_Person.items == NULL", 1), message);
-    CHECK_EQUAL(message, "Comparing a list property to 'null' is not supported");
+    CHECK_EQUAL(message, "Comparing linking object properties to 'null' is not supported");
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, items, "@links.class_Person.fav_item == NULL", 1),
                                 message);
-    CHECK_EQUAL(message, "Comparing a list property to 'null' is not supported");
+    CHECK_EQUAL(message, "Comparing linking object properties to 'null' is not supported");
     CHECK_THROW_ANY(verify_query(test_context, items, "@links.attr. > 0", 1));
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, items, "@links.class_Factory.items > 0", 1), message);
     CHECK_EQUAL(message, "No property 'items' found in type 'Factory' which links to type 'Items'");

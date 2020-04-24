@@ -50,7 +50,7 @@ struct PrimitiveListExpression {
 inline DataType PrimitiveListExpression::get_dest_type() const
 {
     REALM_ASSERT_DEBUG(link_chain.size() > 0);
-    return link_chain.back().col_type;
+    return DataType(link_chain.back().col_key.get_type());
 }
 
 inline ColKey PrimitiveListExpression::get_dest_col_key() const

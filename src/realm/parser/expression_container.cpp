@@ -44,17 +44,17 @@ ExpressionContainer::ExpressionContainer(Query& query, const parser::Expression&
 {
     if (e.type == parser::Expression::Type::KeyPath) {
         std::vector<KeyPathElement> link_chain = parser::generate_link_chain_from_string(query, e.s, mapping);
-        if (link_chain.size() > 0 && link_chain.back().is_list_of_primitives) {
+        if (link_chain.size() > 0 && link_chain.back().is_list_of_primitives()) {
             parser::Expression::KeyPathOp collection_op = e.collection_op;
-            if (link_chain.back().is_primitive_element_length_op) {
+            if (link_chain.back().operation == KeyPathElement::KeyPathOperation::ListOfPrimitivesElementLength) {
                 realm_precondition(
                     collection_op == parser::Expression::KeyPathOp::None,
                     util::format("Invalid combination of aggregate operation '%1' with list of primitives '.length'",
                                  collection_operator_to_str(e.collection_op)));
-                if (link_chain.back().col_type == type_String) {
+                if (link_chain.back().col_key.get_type() == col_type_String) {
                     collection_op = parser::Expression::KeyPathOp::SizeString;
                 }
-                else if (link_chain.back().col_type == type_Binary) {
+                else if (link_chain.back().col_key.get_type() == col_type_Binary) {
                     collection_op = parser::Expression::KeyPathOp::SizeBinary;
                 }
                 else {
@@ -363,8 +363,7 @@ DataType ExpressionContainer::check_type_compatibility(DataType other_type)
             self_type = get_primitive_avg().operative_col_type;
             break;
         case ExpressionInternal::exp_OpCountPrimitive:
-            self_type = get_primitive_count().operative_col_type;
-            break;
+            REALM_FALLTHROUGH;
         case ExpressionInternal::exp_SubQuery:
             REALM_FALLTHROUGH;
         case ExpressionInternal::exp_OpBacklinkCount:

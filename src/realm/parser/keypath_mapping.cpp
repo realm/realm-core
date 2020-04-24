@@ -96,10 +96,7 @@ KeyPathElement KeyPathMapping::process_next_path(ConstTableRef table, KeyPath& k
             KeyPathElement element;
             element.table = table;
             element.col_key = ColKey(); // unused
-            element.col_type = type_LinkList;
-            element.is_backlink = false;
-            element.is_list_of_primitives = false;
-            element.is_primitive_element_length_op = false;
+            element.operation = KeyPathElement::KeyPathOperation::BacklinkCount;
             return element;
         }
         realm_precondition(index + 2 < keypath.size(), "'@links' must be proceeded by type name and a property name");
@@ -120,10 +117,7 @@ KeyPathElement KeyPathMapping::process_next_path(ConstTableRef table, KeyPath& k
         KeyPathElement element;
         element.table = info->first;
         element.col_key = info->second;
-        element.col_type = type_LinkList; // backlinks should be operated on as a list
-        element.is_backlink = true;
-        element.is_list_of_primitives = false;
-        element.is_primitive_element_length_op = false;
+        element.operation = KeyPathElement::KeyPathOperation::BacklinkTraversal;
         return element;
     }
 
@@ -132,17 +126,16 @@ KeyPathElement KeyPathMapping::process_next_path(ConstTableRef table, KeyPath& k
     realm_precondition(col_key != ColKey(), util::format("No property '%1' on object of type '%2'", keypath[index],
                                                          get_printable_table_name(*table)));
 
-    DataType cur_col_type = table->get_column_type(col_key);
+    ColumnType cur_col_type = col_key.get_type();
 
-    bool is_primitive_list =
-        table->get_column_attr(col_key).test(ColumnAttr::col_attr_List) && cur_col_type != type_LinkList;
+    bool is_primitive_list = col_key.get_attrs().test(ColumnAttr::col_attr_List) && cur_col_type != col_type_LinkList;
     bool is_length_op = false;
     if (is_primitive_list) {
         if (index + 2 == keypath.size() && is_length_suffix(keypath[index + 1])) {
-            realm_precondition(cur_col_type == type_String || cur_col_type == type_Binary,
+            realm_precondition(cur_col_type == col_type_String || cur_col_type == col_type_Binary,
                                util::format("The '.length' operation only applies to string or binary "
                                             "elements within a list of primitives, but this is a list of type '%1'.",
-                                            data_type_to_str(cur_col_type)));
+                                            data_type_to_str(DataType(cur_col_type))));
             is_length_op = true;
             ++index; // consume .length too
         }
@@ -152,10 +145,8 @@ KeyPathElement KeyPathMapping::process_next_path(ConstTableRef table, KeyPath& k
     KeyPathElement element;
     element.table = table;
     element.col_key = col_key;
-    element.col_type = cur_col_type;
-    element.is_backlink = false;
-    element.is_list_of_primitives = is_primitive_list;
-    element.is_primitive_element_length_op = is_length_op;
+    element.operation = is_length_op ? KeyPathElement::KeyPathOperation::ListOfPrimitivesElementLength
+                                     : KeyPathElement::KeyPathOperation::None;
     return element;
 }
 
@@ -178,7 +169,7 @@ LinkChain KeyPathMapping::link_chain_getter(ConstTableRef table, const std::vect
     }
     // mutates m_link_chain on table
     for (size_t i = 0; i < links.size() - 1; i++) {
-        if (links[i].is_backlink) {
+        if (links[i].operation == KeyPathElement::KeyPathOperation::BacklinkTraversal) {
             lc.backlink(*links[i].table, links[i].col_key);
         }
         else {
@@ -198,12 +189,12 @@ std::vector<KeyPathElement> generate_link_chain_from_string(Query& q, const std:
     while (index < key_path.size()) {
         KeyPathElement element = mapping.process_next_path(cur_table, key_path, index);
         if (index != key_path.size()) {
-            realm_precondition(element.col_type == type_Link || element.col_type == type_LinkList,
+            realm_precondition(element.table->is_link_type(element.col_key.get_type()),
                                util::format("Property '%1' is not a link in object of type '%2'",
                                             element.table->get_column_name(element.col_key),
                                             get_printable_table_name(*element.table)));
             if (element.table == cur_table) {
-                if (element.col_key == ColKey()) {
+                if (!element.col_key) {
                     cur_table = element.table;
                 }
                 else {

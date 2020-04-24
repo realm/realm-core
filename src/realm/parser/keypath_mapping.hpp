@@ -32,10 +32,11 @@ namespace parser {
 struct KeyPathElement {
     ConstTableRef table;
     ColKey col_key;
-    DataType col_type;
-    bool is_backlink;
-    bool is_list_of_primitives;
-    bool is_primitive_element_length_op;
+    enum class KeyPathOperation { None, BacklinkTraversal, BacklinkCount, ListOfPrimitivesElementLength } operation;
+    bool is_list_of_primitives() const
+    {
+        return bool(col_key) && col_key.get_type() != col_type_LinkList && col_key.get_attrs().test(col_attr_List);
+    }
 };
 
 class BacklinksRestrictedError : public std::runtime_error {

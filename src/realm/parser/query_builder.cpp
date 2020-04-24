@@ -94,6 +94,7 @@ void do_add_null_comparison_to_query<Link>(Query&, Predicate::Operator, const Pr
 template<>
 void do_add_null_comparison_to_query<Link>(Query &query, Predicate::Operator op, const PropertyExpression &expr)
 {
+    REALM_ASSERT_DEBUG(!expr.dest_type_is_backlink()); // this case should be handled at a higher layer
     switch (op) {
         case Predicate::Operator::NotEqual:
             query.Not();
@@ -103,7 +104,8 @@ void do_add_null_comparison_to_query<Link>(Query &query, Predicate::Operator op,
         case Predicate::Operator::Equal: {
             Columns<Link> column = expr.value_of_type_for_query<Link>();
             query.and_query(column == realm::null());
-        } break;
+            break;
+        }
         default:
             throw std::logic_error("Only 'equal' and 'not equal' operators supported for object comparison.");
     }
@@ -432,7 +434,12 @@ template <class T>
 void do_add_null_comparison_to_query(Query& query, const Predicate::Comparison& cmp, const T& expr, DataType type,
                                      NullLocation location)
 {
-    if (type == type_LinkList) { // this handles backlinks as well since they are set to type LinkList
+    if constexpr (std::is_same_v<T, PropertyExpression>) {
+        if (expr.dest_type_is_backlink()) {
+            throw std::logic_error("Comparing linking object properties to 'null' is not supported");
+        }
+    }
+    if (type == type_LinkList) {
         throw std::logic_error("Comparing a list property to 'null' is not supported");
     }
     switch (type) {
@@ -690,10 +697,11 @@ void preprocess_for_comparison_types(Predicate::Comparison& cmpr, ExpressionCont
         size_t primitive_list_count = 0;
         std::vector<KeyPathElement> link_chain = expression.get_keypaths();
         for (KeyPathElement e : link_chain) {
-            if (e.col_type == type_LinkList || e.is_backlink) {
+            if (e.col_key.get_type() == col_type_LinkList ||
+                e.operation == KeyPathElement::KeyPathOperation::BacklinkTraversal) {
                 list_count++;
             }
-            else if (e.is_list_of_primitives) {
+            else if (e.is_list_of_primitives()) {
                 primitive_list_count++;
             }
         }
@@ -734,7 +742,8 @@ void preprocess_for_comparison_types(Predicate::Comparison& cmpr, ExpressionCont
         auto get_list_count = [](const std::vector<KeyPathElement>& target_link_chain) {
             size_t list_count = 0;
             for (KeyPathElement e : target_link_chain) {
-                if (e.col_type == type_LinkList || e.is_backlink || e.is_list_of_primitives) {
+                if (e.col_key.get_type() == col_type_LinkList || e.is_list_of_primitives() ||
+                    e.operation == KeyPathElement::KeyPathOperation::BacklinkTraversal) {
                     list_count++;
                 }
             }
@@ -911,7 +920,8 @@ void apply_ordering(DescriptorOrdering& ordering, ConstTableRef target, const pa
                 while (index < path.size()) {
                     KeyPathElement element = mapping.process_next_path(cur_table, path, index); // throws if invalid
                     // backlinks use type_LinkList since list operations apply to them (and is_backlink is set)
-                    if (element.col_type != type_Link && element.col_type != type_LinkList) {
+                    if (element.col_key.get_type() != col_type_Link &&
+                        element.col_key.get_type() != col_type_LinkList) {
                         throw InvalidPathError(
                             util::format("Property '%1' is not a link in object of type '%2' in 'INCLUDE' clause",
                                          element.table->get_column_name(element.col_key),
@@ -930,7 +940,7 @@ void apply_ordering(DescriptorOrdering& ordering, ConstTableRef target, const pa
                         cur_table = element.table; // advance through backlink
                     }
                     ConstTableRef tr;
-                    if (element.is_backlink) {
+                    if (element.operation == KeyPathElement::KeyPathOperation::BacklinkTraversal) {
                         tr = element.table;
                         links.push_back(LinkPathPart(element.col_key, tr));
                     }
