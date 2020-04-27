@@ -93,6 +93,7 @@ set(INCLUDE_DIRS
 if(REALM_ENABLE_SYNC)
     list(APPEND HEADERS
         sync/app.hpp
+        sync/app_utils.hpp
         sync/app_credentials.hpp
         sync/generic_network_transport.hpp
         sync/async_open_task.hpp
@@ -100,6 +101,12 @@ if(REALM_ENABLE_SYNC)
         sync/sync_manager.hpp
         sync/sync_session.hpp
         sync/sync_user.hpp
+        sync/app_service_client.hpp
+        sync/auth_request_client.hpp
+        sync/remote_mongo_client.hpp
+        sync/remote_mongo_collection.hpp
+        sync/remote_mongo_database.hpp
+
         sync/impl/sync_client.hpp
         sync/impl/sync_file.hpp
         sync/impl/sync_metadata.hpp
@@ -117,6 +124,10 @@ if(REALM_ENABLE_SYNC)
         sync/sync_manager.cpp
         sync/sync_session.cpp
         sync/sync_user.cpp
+        sync/remote_mongo_client.cpp
+        sync/remote_mongo_collection.cpp
+        sync/remote_mongo_database.cpp
+        sync/app_service_client.cpp
         sync/impl/sync_file.cpp
         sync/impl/sync_metadata.cpp
         util/bson/bson.cpp

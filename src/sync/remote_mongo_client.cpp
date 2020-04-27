@@ -17,3 +17,20 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #include "sync/remote_mongo_client.hpp"
+#include "sync/remote_mongo_database.hpp"
+
+namespace realm {
+namespace app {
+
+RemoteMongoDatabase RemoteMongoClient::operator[](const std::string& name) const
+{
+    return RemoteMongoDatabase(name, m_service);
+}
+
+RemoteMongoDatabase RemoteMongoClient::db(const std::string& name) const
+{
+    return RemoteMongoDatabase(name, m_service);
+}
+
+} // namespace app
+} // namespace realm

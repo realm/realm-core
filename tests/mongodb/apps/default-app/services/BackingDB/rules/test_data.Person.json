@@ -1,0 +1,41 @@
+{
+    "database": "test_data",
+    "collection": "Person",
+    "roles": [
+        {
+            "name": "default",
+            "apply_when": {},
+            "insert": true,
+            "delete": true,
+            "additional_fields": {}
+        }
+    ],
+    "schema": {
+        "title": "Person",
+        "properties": {
+            "_id": {
+                "bsonType": "objectId"
+            },
+            "firstName": {
+                "bsonType": "string"
+            },
+            "lastName": {
+                "bsonType": "string"
+            },
+            "age": {
+                "bsonType": "int"
+            },
+            "dogs": {
+                "bsonType": "array",
+                "items": {
+                    "bsonType": "objectId"
+                }
+            }
+        },
+        "required": [
+            "firstName",
+            "lastName",
+            "age"
+        ]
+    }
+}

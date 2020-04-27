@@ -34,23 +34,23 @@ public:
 
     /// The name of this database
     const std::string name;
-    
+                                                     
     RemoteMongoDatabase(const std::string& name,
-                        std::unique_ptr<AppServiceClient> service) :
-    name(name), m_service(std::move(service)) { }
+                        const AppServiceClient& service)
+    : name(name), m_service(service) { };
     
     /// Gets a collection.
     /// @param collection_name The name of the collection to return
     /// @returns The collection as json
-    RemoteMongoCollection collection(const std::string& collection_name);
+    RemoteMongoCollection collection(const std::string& collection_name) const;
     
     /// Gets a collection.
     /// @param collection_name The name of the collection to return
     /// @returns The collection as json
-    RemoteMongoCollection operator[](const std::string& collection_name);
+    RemoteMongoCollection operator[](const std::string& collection_name) const;
     
 private:
-    std::unique_ptr<AppServiceClient> m_service;
+    const AppServiceClient& m_service;
 };
 
 } // namespace app

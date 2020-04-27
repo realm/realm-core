@@ -20,6 +20,7 @@
 #define REALM_APP_HPP
 
 #include "sync/auth_request_client.hpp"
+#include "sync/app_service_client.hpp"
 #include "sync/app_credentials.hpp"
 #include "sync/generic_network_transport.hpp"
 #include "sync/sync_user.hpp"
@@ -28,6 +29,7 @@ namespace realm {
 namespace app {
 
 class RemoteMongoClient;
+class AppServiceClient;
 
 /// The `App` has the fundamental set of methods for communicating with a MongoDB Realm application backend.
 ///
@@ -37,7 +39,7 @@ class RemoteMongoClient;
 /// and writing on the database.
 ///
 /// You can also use it to execute [Functions](https://docs.mongodb.com/stitch/functions/).
-class App : private AuthRequestClient {
+class App : public AuthRequestClient {
 public:
     struct Config {
         std::string app_id;
@@ -51,7 +53,7 @@ public:
     App(const Config& config);
     App() = default;
     App(const App&) = default;
-    App(App&&) = default;
+    App(App&&) noexcept = default;
     App& operator=(App const&) = default;
     App& operator=(App&&) = default;
 
@@ -100,27 +102,34 @@ public:
                             std::function<void(std::vector<UserAPIKey>, Optional<AppError>)> completion_block);
 
         /// Deletes a user API key associated with the current user.
+        /// @param id The id of the API key to delete.
+        /// @param user The user to perform this operation.
         /// @param completion_block A callback to be invoked once the call is complete.
         void delete_api_key(const realm::ObjectId& id, std::shared_ptr<SyncUser> user,
                             std::function<void(Optional<AppError>)> completion_block);
 
         /// Enables a user API key associated with the current user.
+        /// @param id The id of the API key to enable.
+        /// @param user The user to perform this operation.
         /// @param completion_block A callback to be invoked once the call is complete.
         void enable_api_key(const realm::ObjectId& id, std::shared_ptr<SyncUser> user,
                             std::function<void(Optional<AppError>)> completion_block);
 
         /// Disables a user API key associated with the current user.
+        /// @param id The id of the API key to disable.
+        /// @param user The user to perform this operation.
         /// @param completion_block A callback to be invoked once the call is complete.
         void disable_api_key(const realm::ObjectId& id, std::shared_ptr<SyncUser> user,
                              std::function<void(Optional<AppError>)> completion_block);
     private:
         friend class App;
-        UserAPIKeyProviderClient(App* app)
-        : m_parent(app)
+        UserAPIKeyProviderClient(const AuthRequestClient& auth_request_client)
+        : m_auth_request_client(auth_request_client)
         {
-            REALM_ASSERT(app);
         }
-        App* m_parent;
+
+        std::string url_for_path(const std::string& path) const;
+        const AuthRequestClient& m_auth_request_client;
     };
 
     /// A client for the username/password authentication provider which
@@ -249,9 +258,10 @@ public:
     T provider_client() {
         return T(this);
     }
-    
-    /// Retrieves a general-purpose service client for the Stitch service
-    RemoteMongoClient remote_mongo_client();
+
+    /// Retrieves a general-purpose service client for the Realm Cloud service
+    /// @param service_name The name of the cluster
+    RemoteMongoClient remote_mongo_client(const std::string& service_name) const;
     
 private:
     Config m_config;
@@ -259,7 +269,6 @@ private:
     std::string m_app_route;
     std::string m_auth_route;
     uint64_t m_request_timeout_ms;
-
     
     /// Refreshes the access token for a specified `SyncUser`
     /// @param completion_block Passes an error should one occur.
@@ -278,7 +287,8 @@ private:
                              Request request,
                              std::shared_ptr<SyncUser> sync_user,
                              std::function<void (Response)> completion_block) const;
-    
+
+    std::string url_for_path(const std::string& path) const override;
     
     /// Performs an authenticated request to the Stitch server, using the current authentication state
     /// @param request The request to be performed

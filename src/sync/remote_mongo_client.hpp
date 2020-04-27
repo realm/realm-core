@@ -33,19 +33,19 @@ class RemoteMongoDatabase;
 class RemoteMongoClient {
 public:
 
-    RemoteMongoClient(std::unique_ptr<AppServiceClient> service) :
+    RemoteMongoClient(AppServiceClient&& service) :
     m_service(std::move(service)) { }
     
     /// Gets a `RemoteMongoDatabase` instance for the given database name.
     /// @param name the name of the database to retrieve
-    RemoteMongoDatabase operator[](const std::string& name);
+    RemoteMongoDatabase operator[](const std::string& name) const;
   
     /// Gets a `RemoteMongoDatabase` instance for the given database name.
     /// @param name the name of the database to retrieve
-    RemoteMongoDatabase db(const std::string& name);
+    RemoteMongoDatabase db(const std::string& name) const;
     
 private:
-    std::unique_ptr<AppServiceClient> m_service;
+    const AppServiceClient m_service;
 };
 
 } // namespace app
