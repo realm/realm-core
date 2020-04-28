@@ -1668,7 +1668,7 @@ TEST(LangBindHelper_AdvanceReadTransact_TableClear)
     // key is still there...
     CHECK(tv.get_key(0));
     // but no obj for that key...
-    CHECK_THROW(tv.get(0), realm::InvalidKey);
+    CHECK_THROW(tv.get(0), realm::KeyNotFound);
 
     tv.sync_if_needed();
     CHECK_EQUAL(tv.size(), 0);
@@ -4839,7 +4839,6 @@ TEST(LangBindHelper_Compact)
     }
 }
 
-#if !REALM_ANDROID // FIXME
 TEST(LangBindHelper_CompactLargeEncryptedFile)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -4871,7 +4870,6 @@ TEST(LangBindHelper_CompactLargeEncryptedFile)
         CHECK_EQUAL(N, table->size());
     }
 }
-#endif
 
 TEST(LangBindHelper_CloseDBvsTransactions)
 {
@@ -5741,7 +5739,7 @@ TEST(LangBindHelper_RemoveObject)
         wt->commit();
     }
     rt->advance_read();
-    CHECK_THROW(o1.get<int64_t>(col), InvalidKey);
+    CHECK_THROW(o1.get<int64_t>(col), KeyNotFound);
     CHECK_EQUAL(o2.get<int64_t>(col), 2);
 }
 
@@ -5931,6 +5929,34 @@ TEST(LangBindHelper_SearchIndexAccessor)
         persons->create_object().set(col_name, "Poul");
     }
     tr->commit();
+}
+
+TEST(LangBindHelper_ArrayXoverMapping)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    auto hist = make_in_realm_history(path);
+    DBRef db = DB::create(*hist);
+    ColKey my_col;
+    {
+        auto tr = db->start_write();
+        auto tbl = tr->add_table("my_table");
+        my_col = tbl->add_column(type_String, "my_col");
+        std::string s(1'000'000, 'a');
+        for (auto i = 0; i < 100; ++i)
+            tbl->create_object().set_all(s);
+        tr->commit();
+    }
+    REALM_ASSERT(db->compact());
+    {
+        auto tr = db->start_read();
+        auto tbl = tr->get_table("my_table");
+        for (auto i = 0; i < 100; ++i) {
+            auto o = tbl->get_object(i);
+            StringData str = o.get<String>(my_col);
+            for (auto j = 0; j < 1'000'000; ++j)
+                REALM_ASSERT(str[j] == 'a');
+        }
+    }
 }
 
 #endif

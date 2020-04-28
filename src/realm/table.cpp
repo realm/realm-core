@@ -310,25 +310,31 @@ const char* get_data_type_name(DataType type) noexcept
 
 ColKey Table::add_column(DataType type, StringData name, bool nullable)
 {
-    return insert_column(ColKey(), type, name, nullable); // Throws
+    if (REALM_UNLIKELY(is_link_type(ColumnType(type))))
+        throw LogicError(LogicError::illegal_type);
+
+    Table* invalid_link = nullptr;
+    ColumnAttrMask attr;
+    if (nullable)
+        attr.set(col_attr_Nullable);
+    ColKey col_key = generate_col_key(ColumnType(type), attr);
+
+    return do_insert_column(col_key, type, name, invalid_link); // Throws
 }
 
 ColKey Table::add_column_list(DataType type, StringData name, bool nullable)
 {
     Table* invalid_link = nullptr;
-    return do_insert_column(ColKey(), type, name, invalid_link, nullable, true); // Throws
+    ColumnAttrMask attr;
+    attr.set(col_attr_List);
+    if (nullable)
+        attr.set(col_attr_Nullable);
+    ColKey col_key = generate_col_key(ColumnType(type), attr);
+    return do_insert_column(col_key, type, name, invalid_link); // Throws
 }
 
 ColKey Table::add_column_link(DataType type, StringData name, Table& target)
 {
-    return insert_column_link(ColKey(), type, name, target); // Throws
-}
-
-
-ColKey Table::insert_column_link(ColKey col_key, DataType type, StringData name, Table& target)
-{
-    if (REALM_UNLIKELY(col_key && !valid_column(col_key)))
-        throw InvalidKey("Requested key in use");
     if (REALM_UNLIKELY(!is_link_type(ColumnType(type))))
         throw LogicError(LogicError::illegal_type);
     // Both origin and target must be group-level tables, and in the same group.
@@ -340,7 +346,15 @@ ColKey Table::insert_column_link(ColKey col_key, DataType type, StringData name,
         throw LogicError(LogicError::group_mismatch);
 
     m_has_any_embedded_objects |= target.is_embedded();
-    auto retval = do_insert_column(col_key, type, name, &target, false, type == type_LinkList); // Throws
+
+    ColumnAttrMask attr;
+    if (type == type_Link)
+        attr.set(col_attr_Nullable);
+    if (type == type_LinkList)
+        attr.set(col_attr_List);
+    ColKey col_key = generate_col_key(ColumnType(type), attr);
+
+    auto retval = do_insert_column(col_key, type, name, &target); // Throws
     return retval;
 }
 
@@ -363,12 +377,8 @@ void Table::remove_recursive(CascadeState& cascade_state)
         for (auto obj : to_delete) {
             auto table = group->get_table(obj.first);
             // This might add to the list of objects that should be deleted
-            if (obj.second.is_unresolved()) {
-                table->m_tombstones->erase(obj.second, cascade_state);
-            }
-            else {
-                table->m_clusters.erase(obj.second, cascade_state);
-            }
+            REALM_ASSERT(!obj.second.is_unresolved());
+            table->m_clusters.erase(obj.second, cascade_state);
         }
         nullify_links(cascade_state);
     } while (!cascade_state.m_to_be_deleted.empty() || !cascade_state.m_to_be_nullified.empty());
@@ -382,18 +392,6 @@ void Table::nullify_links(CascadeState& cascade_state)
         auto table = group->get_table(to_delete.first);
         table->m_clusters.nullify_links(to_delete.second, cascade_state);
     }
-}
-
-
-ColKey Table::insert_column(ColKey col_key, DataType type, StringData name, bool nullable)
-{
-    if (REALM_UNLIKELY(col_key && valid_column(col_key)))
-        throw InvalidKey("Requested key in use");
-    if (REALM_UNLIKELY(is_link_type(ColumnType(type))))
-        throw LogicError(LogicError::illegal_type);
-
-    Table* invalid_link = nullptr;
-    return do_insert_column(col_key, type, name, invalid_link, nullable); // Throws
 }
 
 
@@ -527,13 +525,9 @@ void Table::init(ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent, bo
 }
 
 
-ColKey Table::do_insert_column(ColKey col_key, DataType type, StringData name, Table* target_table, bool nullable,
-                               bool listtype)
+ColKey Table::do_insert_column(ColKey col_key, DataType type, StringData name, Table* target_table)
 {
-    if (type == type_Link)
-        nullable = true;
-
-    col_key = do_insert_root_column(col_key, ColumnType(type), name, nullable, listtype); // Throws
+    col_key = do_insert_root_column(col_key, ColumnType(type), name); // Throws
 
     // When the inserted column is a link-type column, we must also add a
     // backlink column to the target table.
@@ -547,7 +541,7 @@ ColKey Table::do_insert_column(ColKey col_key, DataType type, StringData name, T
     }
 
     if (Replication* repl = get_repl())
-        repl->insert_column(this, col_key, type, name, target_table, nullable, listtype); // Throws
+        repl->insert_column(this, col_key, type, name, target_table); // Throws
 
     return col_key;
 }
@@ -706,7 +700,7 @@ void Table::erase_root_column(ColKey col_key)
 }
 
 
-ColKey Table::do_insert_root_column(ColKey col_key, ColumnType type, StringData name, bool nullable, bool listtype)
+ColKey Table::do_insert_root_column(ColKey col_key, ColumnType type, StringData name)
 {
     // if col_key specifies a key, it must be unused
     REALM_ASSERT(!col_key || !valid_column(col_key));
@@ -714,20 +708,11 @@ ColKey Table::do_insert_root_column(ColKey col_key, ColumnType type, StringData 
     // locate insertion point: ordinary columns must come before backlink columns
     size_t spec_ndx = (type == col_type_BackLink) ? m_spec.get_column_count() : m_spec.get_public_column_count();
 
-    int attr = col_attr_None;
-    if (nullable)
-        attr |= col_attr_Nullable;
-    if (listtype)
-        attr |= col_attr_List;
-    // if col_key does not specify a key, one must be generated
     if (!col_key) {
-        col_key = generate_col_key(type, attr);
-    }
-    else {
-        REALM_ASSERT(col_key.get_attrs() == attr); // FIXME
+        col_key = generate_col_key(type, {});
     }
 
-    m_spec.insert_column(spec_ndx, col_key, type, name, attr); // Throws
+    m_spec.insert_column(spec_ndx, col_key, type, name, col_key.get_attrs().m_value); // Throws
     auto col_ndx = col_key.get_index().val;
     build_column_mapping();
     REALM_ASSERT(col_ndx <= m_index_refs.size());
@@ -2537,7 +2522,7 @@ MemStats Table::stats() const
 
 Obj Table::create_object(ObjKey key, const FieldValues& values)
 {
-    if (m_is_embedded)
+    if (m_is_embedded || m_primary_key_col)
         throw LogicError(LogicError::wrong_kind_of_table);
     if (key == null_key) {
         GlobalKey object_id = allocate_object_id_squeezed();
@@ -2548,8 +2533,6 @@ Obj Table::create_object(ObjKey key, const FieldValues& values)
 
     REALM_ASSERT(key.value >= 0);
 
-    bump_content_version();
-    bump_storage_version();
     Obj obj = m_clusters.insert(key, values);
 
     return obj;
@@ -2566,8 +2549,6 @@ Obj Table::create_linked_object(GlobalKey object_id)
 
     REALM_ASSERT(key.value >= 0);
 
-    bump_content_version();
-    bump_storage_version();
     Obj obj = m_clusters.insert(key, {});
 
     return obj;
@@ -2575,18 +2556,33 @@ Obj Table::create_linked_object(GlobalKey object_id)
 
 Obj Table::create_object(GlobalKey object_id, const FieldValues& values)
 {
-    if (m_is_embedded)
+    if (m_is_embedded || m_primary_key_col)
         throw LogicError(LogicError::wrong_kind_of_table);
     ObjKey key = object_id.get_local_key(get_sync_file_id());
 
     if (auto repl = get_repl())
         repl->create_object(this, object_id);
 
-    bump_content_version();
-    bump_storage_version();
-    Obj obj = m_clusters.insert(key, values);
+    try {
+        Obj obj = m_clusters.insert(key, values);
+        // Check if tombstone exists
+        if (m_tombstones && m_tombstones->is_valid(key.get_unresolved())) {
+            auto unres_key = key.get_unresolved();
+            // Copy links over
+            auto tombstone = m_tombstones->get(unres_key);
+            obj.assign_pk_and_backlinks(tombstone);
+            // If tombstones had no links to it, it may still be alive
+            if (m_tombstones->is_valid(unres_key)) {
+                CascadeState state(CascadeState::Mode::None);
+                m_tombstones->erase(unres_key, state);
+            }
+        }
 
-    return obj;
+        return obj;
+    }
+    catch (const KeyAlreadyUsed&) {
+        return m_clusters.get(key);
+    }
 }
 
 Obj Table::create_object_with_primary_key(const Mixed& primary_key, FieldValues&& field_values)
@@ -2640,7 +2636,8 @@ Obj Table::create_object_with_primary_key(const Mixed& primary_key, FieldValues&
     }
 
     field_values.emplace_back(primary_key_col, primary_key);
-    Obj ret = create_object(object_key, field_values);
+    Obj ret = m_clusters.insert(object_key, field_values);
+
     // Check if unresolved exists
     if (needs_resurrection) {
         auto tombstone = m_tombstones->get(unres_key);
@@ -2703,47 +2700,46 @@ ObjKey Table::get_objkey_from_primary_key(const Mixed& primary_key)
         object_key = allocate_local_id_after_hash_collision(object_id, existing_id, object_key);
     }
 
-    auto unres_key = object_key.get_unresolved();
-    if (m_tombstones && m_tombstones->is_valid(unres_key)) {
-        auto existing_pk_value = m_tombstones->get(unres_key).get_any(primary_key_col);
-
-        // It may just be the same object
-        if (existing_pk_value == primary_key) {
-            return unres_key;
-        }
-
-        GlobalKey existing_id{existing_pk_value};
-        object_key = allocate_local_id_after_hash_collision(object_id, existing_id, object_key);
+    // Object does not exist - create tombstone
+    auto tombstone = get_or_create_tombstone(object_key, {{primary_key_col, primary_key}});
+    auto existing_pk_value = tombstone.get_any(primary_key_col);
+    // It may just be the same object
+    if (existing_pk_value == primary_key) {
+        return tombstone.get_key();
     }
-    return allocate_unresolved_key(object_key, {{primary_key_col, primary_key}});
+    // We have a collision - create new ObjKey
+    GlobalKey existing_id{existing_pk_value};
+    object_key = allocate_local_id_after_hash_collision(object_id, existing_id, object_key);
+    return get_or_create_tombstone(object_key, {{primary_key_col, primary_key}}).get_key();
 }
 
-ObjKey Table::get_obj_key(GlobalKey id) const
+ObjKey Table::get_objkey_from_global_key(GlobalKey global_key)
+{
+    REALM_ASSERT(!m_primary_key_col);
+    auto object_key = global_key.get_local_key(get_sync_file_id());
+
+    // Check if existing
+    if (m_clusters.is_valid(object_key)) {
+        return object_key;
+    }
+
+    return get_or_create_tombstone(object_key, {{}}).get_key();
+}
+
+ObjKey Table::get_objkey(GlobalKey global_key) const
 {
     ObjKey key;
-    auto col = get_primary_key_column();
-    if (col) {
-        if (col.get_type() == col_type_Int) {
-            REALM_ASSERT(id.hi() == 0 || col.get_attrs().test(col_attr_Nullable));
-            if (id.hi() != 0 && id.lo() == 0) {
-                key = find_first_null(col);
-            }
-            else {
-                key = find_first_int(col, int64_t(id.lo()));
-            }
-        }
-        else {
-            key = global_to_local_object_id_hashed(id);
-        }
+    if (m_primary_key_col) {
+        key = global_to_local_object_id_hashed(global_key);
     }
     else {
         uint32_t max = std::numeric_limits<uint32_t>::max();
-        if (id.hi() <= max && id.lo() <= max) {
-            key = id.get_local_key(get_sync_file_id());
-            if (!is_valid(key)) {
-                key = realm::null_key;
-            }
+        if (global_key.hi() <= max && global_key.lo() <= max) {
+            key = global_key.get_local_key(get_sync_file_id());
         }
+    }
+    if (key && !is_valid(key)) {
+        key = realm::null_key;
     }
     return key;
 }
@@ -2925,17 +2921,21 @@ ObjKey Table::allocate_local_id_after_hash_collision(GlobalKey incoming_id, Glob
     return new_local_id;
 }
 
-ObjKey Table::allocate_unresolved_key(ObjKey key, const FieldValues& values)
+Obj Table::get_or_create_tombstone(ObjKey key, const FieldValues& values)
 {
     auto unres_key = key.get_unresolved();
 
     ensure_graveyard();
 
-    Obj tombstone = m_tombstones->insert(unres_key, values);
-    bump_content_version();
-    bump_storage_version();
-
-    return tombstone.get_key();
+    try {
+        Obj tombstone = m_tombstones->insert(unres_key, values);
+        bump_content_version();
+        bump_storage_version();
+        return tombstone;
+    }
+    catch (const KeyAlreadyUsed&) {
+        return m_tombstones->get(unres_key);
+    }
 }
 
 void Table::free_local_id_after_hash_collision(ObjKey key)
@@ -3025,15 +3025,12 @@ void Table::invalidate_object(ObjKey key)
     if (obj.has_backlinks(false)) {
         // If the object has backlinks, we should make a tombstone
         // and make inward links point to it,
-        ObjKey tombstone_key;
+        FieldValues init_values;
         if (auto primary_key_col = get_primary_key_column()) {
             auto pk = obj.get_any(primary_key_col);
-            tombstone_key = allocate_unresolved_key(key, {{primary_key_col, pk}});
+            init_values.emplace_back(primary_key_col, pk);
         }
-        else {
-            tombstone_key = allocate_unresolved_key(key, {{}});
-        }
-        auto tombstone = m_tombstones->get(tombstone_key);
+        auto tombstone = get_or_create_tombstone(key, init_values);
         tombstone.assign_pk_and_backlinks(obj);
     }
     CascadeState state(CascadeState::Mode::None);
@@ -3230,18 +3227,18 @@ void Table::rebuild_table_with_pk_column()
             // and then we'll move the object to its final key in a second pass.
             uint64_t sequence_number_for_local_id = allocate_sequence_number();
             ObjKey temp_key = make_tagged_local_id_after_hash_collision(sequence_number_for_local_id);
-            auto tmp_obj = create_object(temp_key);
+            auto tmp_obj = m_clusters.insert(temp_key, {});
             tmp_obj.assign(old_obj);
             tmp_keys.push_back(temp_key);
         }
         else {
-            create_object(new_key).assign(old_obj);
+            m_clusters.insert(new_key, {}).assign(old_obj);
         }
         remove_object(old_key);
     }
     for (auto key : tmp_keys) {
         auto old_obj = get_object(key);
-        StringData pk(old_obj.get<String>(m_primary_key_col));
+        Mixed pk(old_obj.get_any(m_primary_key_col));
         auto new_obj = create_object_with_primary_key(pk);
         new_obj.assign(old_obj);
         remove_object(key);
@@ -3504,15 +3501,22 @@ void Table::convert_column(ColKey from, ColKey to, bool throw_on_null)
 
 ColKey Table::set_nullability(ColKey col_key, bool nullable, bool throw_on_null)
 {
-    if (is_nullable(col_key) == nullable)
+    if (col_key.is_nullable() == nullable)
         return col_key;
 
     bool si = has_search_index(col_key);
     std::string column_name(get_column_name(col_key));
-    auto type = get_real_column_type(col_key);
-    auto list = is_list(col_key);
+    auto type = col_key.get_type();
+    auto attr = col_key.get_attrs();
+    if (nullable) {
+        attr.set(col_attr_Nullable);
+    }
+    else {
+        attr.reset(col_attr_Nullable);
+    }
 
-    ColKey new_col = do_insert_root_column(ColKey(), type, "__temporary", nullable, list);
+    ColKey new_col = generate_col_key(type, attr);
+    do_insert_root_column(new_col, type, "__temporary");
 
     try {
         convert_column(col_key, new_col, throw_on_null);

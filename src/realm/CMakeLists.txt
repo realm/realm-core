@@ -12,6 +12,7 @@ set(REALM_SOURCES
     array_blobs_big.cpp
     array_decimal128.cpp
     array_integer.cpp
+    array_key.cpp
     array_mixed.cpp
     array_object_id.cpp
     array_unsigned.cpp
@@ -19,6 +20,7 @@ set(REALM_SOURCES
     array_string_short.cpp
     array_timestamp.cpp
     bplustree.cpp
+    chunked_binary.cpp
     cluster.cpp
     column_binary.cpp
     decimal128.cpp
@@ -95,6 +97,7 @@ set(REALM_INSTALL_GENERAL_HEADERS
     array_unsigned.hpp
     binary_data.hpp
     bplustree.hpp
+    chunked_binary.hpp
     cluster.hpp
     cluster_tree.hpp
     column_binary.hpp
@@ -162,6 +165,7 @@ set(REALM_INSTALL_UTIL_HEADERS
     util/basic_system_errors.hpp
     util/bind_ptr.hpp
     util/buffer.hpp
+    util/buffer_stream.hpp
     util/call_with_tuple.hpp
     util/fixed_size_buffer.hpp
     util/cf_ptr.hpp
@@ -336,32 +340,39 @@ if(NOT REALM_SKIP_SHARED_LIB)
 endif()
 
 if(UNIX AND NOT APPLE)
-    if(NOT OpenSSL_DIR)
-        if(NOT EXISTS ${CMAKE_CURRENT_BINARY_DIR}/openssl/lib/cmake/OpenSSL/OpenSSLConfig.cmake)
-            if(ANDROID)
-                set(OPENSSL_URL "http://static.realm.io/downloads/openssl/${OPENSSL_VERSION}/Android/${CMAKE_ANDROID_ARCH_ABI}/openssl.tgz")
-            else()
-                set(OPENSSL_URL "http://static.realm.io/downloads/openssl/${OPENSSL_VERSION}/Linux/x86_64/openssl.tgz")
+    if(REALM_USE_SYSTEM_OPENSSL)
+        # Use system OpenSSL
+        find_package(OpenSSL REQUIRED)
+    else()
+        # Use our OpenSSL
+        if(NOT OpenSSL_DIR)
+            if(NOT EXISTS ${CMAKE_CURRENT_BINARY_DIR}/openssl/lib/cmake/OpenSSL/OpenSSLConfig.cmake)
+                if(ANDROID)
+                    set(OPENSSL_URL "http://static.realm.io/downloads/openssl/${OPENSSL_VERSION}/Android/${CMAKE_ANDROID_ARCH_ABI}/openssl.tgz")
+                else()
+                    set(OPENSSL_URL "http://static.realm.io/downloads/openssl/${OPENSSL_VERSION}/Linux/x86_64/openssl.tgz")
+                endif()
+
+                message(STATUS "Getting ${OPENSSL_URL}...")
+                file(DOWNLOAD "${OPENSSL_URL}" "${CMAKE_CURRENT_BINARY_DIR}/openssl/openssl.tgz" STATUS download_status)
+
+                list(GET download_status 0 status_code)
+                if (NOT "${status_code}" STREQUAL "0")
+                    message(FATAL_ERROR "Downloading ${url}... Failed. Status: ${download_status}")
+                endif()
+
+                message(STATUS "Uncompressing OpenSSL...")
+                execute_process(
+                    COMMAND ${CMAKE_COMMAND} -E tar xfz "openssl.tgz"
+                    WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/openssl"
+                )
             endif()
 
-            message(STATUS "Getting ${OPENSSL_URL}...")
-            file(DOWNLOAD "${OPENSSL_URL}" "${CMAKE_CURRENT_BINARY_DIR}/openssl/openssl.tgz" STATUS download_status)
-
-            list(GET download_status 0 status_code)
-            if (NOT "${status_code}" STREQUAL "0")
-                message(FATAL_ERROR "Downloading ${url}... Failed. Status: ${download_status}")
-            endif()
-
-            message(STATUS "Uncompressing OpenSSL...")
-            execute_process(
-                COMMAND ${CMAKE_COMMAND} -E tar xfz "openssl.tgz"
-                WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/openssl"
-            )
+            set(OpenSSL_DIR "${CMAKE_CURRENT_BINARY_DIR}/openssl/lib/cmake/OpenSSL")
         endif()
-
-        set(OpenSSL_DIR "${CMAKE_CURRENT_BINARY_DIR}/openssl/lib/cmake/OpenSSL")
+        find_package(OpenSSL REQUIRED CONFIG)
     endif()
-    find_package(OpenSSL REQUIRED CONFIG)
+
     get_target_property(OPENSSL_INCLUDE_DIR OpenSSL::Crypto INTERFACE_INCLUDE_DIRECTORIES)
 
     target_include_directories(CoreObjects SYSTEM PUBLIC ${OPENSSL_INCLUDE_DIR})

@@ -18,6 +18,7 @@
 
 #include "testsettings.hpp"
 
+#include <realm.hpp>
 #include <realm/array_mixed.hpp>
 
 #include "test.hpp"
@@ -138,8 +139,26 @@ TEST(ArrayMixed_Basics)
     CHECK(arr2.is_null(5));
     CHECK_EQUAL(arr2.get(6).get_timestamp(), Timestamp(2345, 6789));
 
+    arr2.clear();
+    CHECK_EQUAL(arr2.size(), 0);
+    arr2.clear(); // Check idempotency
+    CHECK_EQUAL(arr2.size(), 0);
+    arr2.add("Hello");
+    CHECK_EQUAL(arr2.size(), 1);
+
     arr.destroy();
     arr2.destroy();
 }
+
+TEST(Mixed_Table)
+{
+    Table t;
+    auto col_data = t.add_column(type_OldMixed, "data");
+    auto obj0 = t.create_object().set(col_data, Mixed(5));
+    auto obj1 = t.create_object().set(col_data, Mixed("Hello"));
+    CHECK_EQUAL(obj0.get_any(col_data), Mixed(5));
+    CHECK_EQUAL(obj1.get_any(col_data), Mixed("Hello"));
+}
+
 
 #endif // TEST_ARRAY_VARIANT

@@ -994,7 +994,7 @@ inline ConstTableRef Group::get_table(TableKey key) const
     return ConstTableRef(table, table ? table->m_alloc.get_instance_version() : 0);
 }
 
-inline TableRef Group::get_table(StringData name)
+REALM_NOINLINE inline TableRef Group::get_table(StringData name)
 {
     if (!is_attached())
         throw LogicError(LogicError::detached_accessor);
@@ -1365,7 +1365,7 @@ public:
     bool enqueue_for_cascade(const Obj& target_obj, bool link_is_strong, bool last_removed)
     {
         // Check if the object should be cascade deleted
-        if (m_mode == Mode::None && last_removed) {
+        if (m_mode == Mode::None || !last_removed) {
             return false;
         }
         if (m_mode == Mode::All || link_is_strong) {

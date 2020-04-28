@@ -179,6 +179,14 @@ public:
     {
         return compare(other) != 0;
     }
+    bool operator<(const Mixed& other) const
+    {
+        return compare(other) < 0;
+    }
+    bool operator>(const Mixed& other) const
+    {
+        return compare(other) > 0;
+    }
 
 private:
     friend std::ostream& operator<<(std::ostream& out, const Mixed& m);

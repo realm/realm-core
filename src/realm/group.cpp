@@ -246,7 +246,7 @@ TableKey Group::ndx2key(size_t ndx) const
     // slow path:
     RefOrTagged rot = m_tables.get_as_ref_or_tagged(ndx);
     if (rot.is_tagged())
-        throw InvalidKey("No such table");
+        throw NoSuchTable();
     ref_type ref = rot.get_as_ref();
     REALM_ASSERT(ref);
     return Table::get_key_direct(m_tables.get_alloc(), ref);
@@ -279,7 +279,7 @@ size_t Group::key2ndx_checked(TableKey key) const
             return idx;
         }
     }
-    throw InvalidKey("No corresponding table");
+    throw NoSuchTable();
 }
 
 
@@ -836,7 +836,7 @@ Table* Group::create_table_accessor(size_t table_ndx)
     RefOrTagged rot = m_tables.get_as_ref_or_tagged(table_ndx);
     ref_type ref = rot.get_as_ref();
     if (ref == 0) {
-        throw InvalidKey("No such table");
+        throw NoSuchTable();
     }
     Table* table = 0;
     {

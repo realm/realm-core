@@ -45,6 +45,11 @@ public:
         return m_arr->is_attached();
     }
 
+    void detach() const
+    {
+        m_arr->detach();
+    }
+
     ref_type get_ref() const
     {
         return m_arr->get_ref();
@@ -161,7 +166,7 @@ public:
     template <Action action>
     bool uses_val()
     {
-        return (action == act_Count);
+        return false;
     }
 
     QueryState(Action, Array* = nullptr, size_t limit = -1)

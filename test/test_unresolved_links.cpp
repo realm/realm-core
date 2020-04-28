@@ -43,6 +43,7 @@ TEST(Unresolved_Basic)
     ColKey col_price;
     ColKey col_owns;
     ColKey col_has;
+    ColKey col_part;
 
     {
         // Sync operations
@@ -53,6 +54,8 @@ TEST(Unresolved_Basic)
         col_owns = persons->add_column_link(type_Link, "car", *cars);
         auto dealers = wt->add_table_with_primary_key("Dealer", type_Int, "cvr");
         col_has = dealers->add_column_link(type_LinkList, "stock", *cars);
+        auto parts = wt->add_table("Parts"); // No primary key
+        col_part = cars->add_column_link(type_Link, "part", *parts);
 
         auto finn = persons->create_object_with_primary_key("finn.schiermer-andersen@mongodb.com");
         auto mathias = persons->create_object_with_primary_key("mathias@10gen.com");
@@ -63,6 +66,8 @@ TEST(Unresolved_Basic)
         auto stock = joergen.get_list<ObjKey>(col_has);
 
         auto skoda = cars->create_object_with_primary_key("Skoda Fabia").set(col_price, Decimal128("149999.5"));
+        auto thingamajig = parts->create_object();
+        skoda.set(col_part, thingamajig.get_key());
 
         auto new_tesla = cars->get_objkey_from_primary_key("Tesla 10");
         CHECK(new_tesla.is_unresolved());
@@ -72,6 +77,11 @@ TEST(Unresolved_Basic)
         auto another_tesla = cars->get_objkey_from_primary_key("Tesla 10");
         stock.insert(0, another_tesla);
         stock.insert(1, skoda.get_key());
+
+        // Create a tombstone implicitly
+        auto doodad = parts->get_objkey_from_global_key(GlobalKey{999, 999});
+        CHECK(doodad.is_unresolved());
+        CHECK_EQUAL(parts->nb_unresolved(), 1);
 
         wt->commit();
     }
@@ -99,6 +109,7 @@ TEST(Unresolved_Basic)
     }
 
     rt->advance_read();
+    rt->verify();
     CHECK_EQUAL(cars->get_object_with_primary_key("Tesla 10").get_backlink_count(), 3);
     CHECK_EQUAL(stock.size(), 2);
     CHECK_EQUAL(cars->size(), 2);
@@ -115,6 +126,7 @@ TEST(Unresolved_Basic)
     }
 
     rt->advance_read();
+    rt->verify();
     CHECK_EQUAL(stock.size(), 1);
     CHECK_EQUAL(stock.get(0), cars->get_object_with_primary_key("Skoda Fabia").get_key());
     CHECK_EQUAL(cars->size(), 1);
@@ -122,7 +134,17 @@ TEST(Unresolved_Basic)
     {
         // Sync operations
         auto wt = db->start_write();
-        wt->get_table("Car")->create_object_with_primary_key("Tesla 10").set(col_price, Decimal128("499999.5"));
+        auto parts = wt->get_table("Parts");
+        auto tesla = wt->get_table("Car")->create_object_with_primary_key("Tesla 10");
+        tesla.set(col_price, Decimal128("499999.5"));
+        auto doodad = parts->create_object(GlobalKey{999, 999});
+        auto doodad1 = parts->create_object(GlobalKey{999, 999}); // Check idempotency
+        CHECK_EQUAL(doodad.get_key(), doodad1.get_key());
+        tesla.set(col_part, doodad.get_key());
+        auto doodad_key = parts->get_objkey_from_global_key(GlobalKey{999, 999});
+        CHECK(!doodad_key.is_unresolved());
+        CHECK_EQUAL(wt->get_table("Parts")->nb_unresolved(), 0);
+
         wt->commit();
     }
 
@@ -263,12 +285,16 @@ TEST(Unresolved_QueryOverLinks)
     CHECK_EQUAL(q.count(), 1);
 
     auto new_tesla = cars->get_objkey_from_primary_key("Tesla 10");
-    bilmekka.get_linklist(col_has).add(new_tesla);
+    bilmekka.get_linklist(col_has).insert(0, new_tesla);
     CHECK_EQUAL(q.count(), 1);
 
     q = persons->link(col_owns).column<Decimal128>(col_price) < Decimal128("1000000");
     CHECK_EQUAL(q.count(), 1);
     mathias.set(col_owns, new_tesla);
+    CHECK_EQUAL(q.count(), 1);
+
+    auto stock = bilmekka.get_linklist(col_has);
+    q = cars->where(stock).and_query(cars->column<Decimal128>(col_price) < Decimal128("2000000"));
     CHECK_EQUAL(q.count(), 1);
 }
 
@@ -327,6 +353,12 @@ TEST(Unresolved_GarbageCollect)
     CHECK_EQUAL(cars->nb_unresolved(), 1);
     bilmekka.get_linklist(col_has).clear();
     CHECK_EQUAL(cars->nb_unresolved(), 0);
+
+    new_tesla = cars->get_objkey_from_primary_key("Tesla 10");
+    bilcentrum.get_list<ObjKey>(col_has).insert(0, new_tesla);
+    CHECK_EQUAL(cars->nb_unresolved(), 1);
+    bilcentrum.remove();
+    CHECK_EQUAL(cars->nb_unresolved(), 0);
 }
 
 TEST(Unresolved_PkCollission)
@@ -375,6 +407,33 @@ TEST(Unresolved_PkCollission)
     k3 = t->create_object_with_primary_key(5, {{col_str, "Bar"}}).get_key();
     // Collision table should have be cleared
     CHECK_NOT_EQUAL(k2, k3);
+}
+
+TEST(Unresolved_CondensedIndices)
+{
+    Group g;
+    auto t1 = g.add_table_with_primary_key("Table", type_Int, "id");
+    auto t2 = g.add_table_with_primary_key("Table2", type_Int, "id");
+    t1->add_column_link(type_LinkList, "t2s", *t2);
+
+    auto obj123 = t2->create_object_with_primary_key(123);
+    auto obj456 = t2->create_object_with_primary_key(456);
+    auto obj789 = t1->create_object_with_primary_key(789);
+    auto ll = obj789.get_linklist("t2s");
+    ll.insert(0, obj123.get_key());
+    ll.insert(1, obj456.get_key());
+
+    obj123.invalidate();
+
+    CHECK_EQUAL(obj789.get_linklist("t2s").size(), 1);
+
+    ConstObj const_obj789 = obj789;
+    ConstLnkLst list1 = const_obj789.get_linklist("t2s");
+    ConstLnkLst list2;
+    CHECK_EQUAL(list1.size(), 1);
+    CHECK_EQUAL(list1.get_object(0).get_key(), obj456.get_key());
+    list2 = list1;
+    CHECK_EQUAL(list2.size(), 1);
 }
 
 #endif

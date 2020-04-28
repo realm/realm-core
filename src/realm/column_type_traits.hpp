@@ -30,11 +30,13 @@ namespace realm {
 struct ObjKey;
 class Decimal128;
 class ObjectId;
+class Mixed;
 class Timestamp;
 class ArraySmallBlobs;
 class ArrayString;
 class ArrayStringShort;
 class ArrayBinary;
+class ArrayMixed;
 class ArrayTimestamp;
 class ArrayInteger;
 class ArrayRef;
@@ -122,6 +124,13 @@ struct ColumnTypeTraits<ObjKey> {
     using cluster_leaf_type = ArrayKey;
     static const DataType id = type_Link;
     static const ColumnType column_id = col_type_Link;
+};
+
+template <>
+struct ColumnTypeTraits<Mixed> {
+    using cluster_leaf_type = ArrayMixed;
+    static const DataType id = type_OldMixed;
+    static const ColumnType column_id = col_type_OldMixed;
 };
 
 template <>
@@ -259,6 +268,11 @@ template <bool N>
 struct GetLeafType<type_Timestamp, N> {
     // FIXME: Null definition
     using type = ArrayTimestamp;
+};
+template <bool N>
+struct GetLeafType<type_Decimal, N> {
+    // FIXME: Null definition
+    using type = ArrayDecimal128;
 };
 
 template <class T>

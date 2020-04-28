@@ -188,6 +188,7 @@ public:
     Query& greater_equal(ColKey column_key, Decimal128 value);
     Query& less_equal(ColKey column_key, Decimal128 value);
     Query& less(ColKey column_key, Decimal128 value);
+    Query& between(ColKey column_key, Decimal128 from, Decimal128 to);
 
     // Conditions: size
     Query& size_equal(ColKey column_key, int64_t value);
@@ -261,6 +262,10 @@ public:
     double minimum_double(ColKey column_key, ObjKey* return_ndx = nullptr) const;
     Timestamp maximum_timestamp(ColKey column_key, ObjKey* return_ndx = nullptr);
     Timestamp minimum_timestamp(ColKey column_key, ObjKey* return_ndx = nullptr);
+    Decimal128 sum_decimal128(ColKey column_key) const;
+    Decimal128 maximum_decimal128(ColKey column_key, ObjKey* return_ndx = nullptr) const;
+    Decimal128 minimum_decimal128(ColKey column_key, ObjKey* return_ndx = nullptr) const;
+    Decimal128 average_decimal128(ColKey column_key, size_t* resultcount = nullptr) const;
 
     // Deletion
     size_t remove();

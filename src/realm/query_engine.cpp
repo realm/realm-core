@@ -77,79 +77,83 @@ bool ParentNode::match(ConstObj& obj)
     return obj.evaluate(cb);
 }
 
+template <Action action>
+void ParentNode::aggregate_local_prepare(DataType col_id, bool nullable)
+{
+    switch (col_id) {
+        case type_Int: {
+            if (nullable)
+                m_column_action_specializer = &ThisType::column_action_specialization<action, ArrayIntNull>;
+            else
+                m_column_action_specializer = &ThisType::column_action_specialization<action, ArrayInteger>;
+            break;
+        }
+        case type_Float:
+            m_column_action_specializer = &ThisType::column_action_specialization<action, ArrayFloat>;
+            break;
+        case type_Double:
+            m_column_action_specializer = &ThisType::column_action_specialization<action, ArrayDouble>;
+            break;
+        case type_Decimal:
+            m_column_action_specializer = &ThisType::column_action_specialization<action, ArrayDecimal128>;
+            break;
+        default:
+            REALM_ASSERT(false);
+            break;
+    }
+}
+
 void ParentNode::aggregate_local_prepare(Action TAction, DataType col_id, bool nullable)
 {
-    if (TAction == act_ReturnFirst) {
-        if (nullable)
-            m_column_action_specializer = &ThisType::column_action_specialization<act_ReturnFirst, ArrayIntNull>;
-        else
-            m_column_action_specializer = &ThisType::column_action_specialization<act_ReturnFirst, ArrayInteger>;
-    }
-    else if (TAction == act_Count) {
-        // For count(), the column below is a dummy and the caller sets it to nullptr. Hence, no data is being read
-        // from any column upon each query match (just matchcount++ is performed), and we pass nullable = false simply
-        // by convention. FIXME: Clean up all this.
-        if (nullable)
-            REALM_ASSERT(false);
-        else
-            m_column_action_specializer = &ThisType::column_action_specialization<act_Count, ArrayInteger>;
-    }
-    else if (TAction == act_Sum && col_id == type_Int) {
-        if (nullable)
-            m_column_action_specializer = &ThisType::column_action_specialization<act_Sum, ArrayIntNull>;
-        else
-            m_column_action_specializer = &ThisType::column_action_specialization<act_Sum, ArrayInteger>;
-    }
-    else if (TAction == act_Sum && col_id == type_Float) {
-        m_column_action_specializer = &ThisType::column_action_specialization<act_Sum, ArrayFloat>;
-    }
-    else if (TAction == act_Sum && col_id == type_Double) {
-        m_column_action_specializer = &ThisType::column_action_specialization<act_Sum, ArrayDouble>;
-    }
-    else if (TAction == act_Max && col_id == type_Int) {
-        if (nullable)
-            m_column_action_specializer = &ThisType::column_action_specialization<act_Max, ArrayIntNull>;
-        else
-            m_column_action_specializer = &ThisType::column_action_specialization<act_Max, ArrayInteger>;
-    }
-    else if (TAction == act_Max && col_id == type_Float) {
-        m_column_action_specializer = &ThisType::column_action_specialization<act_Max, ArrayFloat>;
-    }
-    else if (TAction == act_Max && col_id == type_Double) {
-        m_column_action_specializer = &ThisType::column_action_specialization<act_Max, ArrayDouble>;
-    }
-    else if (TAction == act_Min && col_id == type_Int) {
-        if (nullable)
-            m_column_action_specializer = &ThisType::column_action_specialization<act_Min, ArrayIntNull>;
-        else
-            m_column_action_specializer = &ThisType::column_action_specialization<act_Min, ArrayInteger>;
-    }
-    else if (TAction == act_Min && col_id == type_Float) {
-        m_column_action_specializer = &ThisType::column_action_specialization<act_Min, ArrayFloat>;
-    }
-    else if (TAction == act_Min && col_id == type_Double) {
-        m_column_action_specializer = &ThisType::column_action_specialization<act_Min, ArrayDouble>;
-    }
-    else if (TAction == act_FindAll) {
-        // For find_all(), the column below is a dummy and the caller sets it to nullptr. Hence, no data is being read
-        // from any column upon each query match (just a TableView.add(size_t index) is performed), and we pass
-        // nullable = false simply by convention. FIXME: Clean up all this.
-        if (nullable)
-            REALM_ASSERT(false);
-        else
+    switch (TAction) {
+        case act_ReturnFirst: {
+            if (nullable)
+                m_column_action_specializer = &ThisType::column_action_specialization<act_ReturnFirst, ArrayIntNull>;
+            else
+                m_column_action_specializer = &ThisType::column_action_specialization<act_ReturnFirst, ArrayInteger>;
+            break;
+        }
+        case act_FindAll: {
+            // For find_all(), the column below is a dummy and the caller sets it to nullptr. Hence, no data is being
+            // read from any column upon each query match (just matchcount++ is performed), and we pass nullable =
+            // false simply by convention. FIXME: Clean up all this.
+            REALM_ASSERT(!nullable);
             m_column_action_specializer = &ThisType::column_action_specialization<act_FindAll, ArrayInteger>;
-    }
-    else if (TAction == act_CallbackIdx) {
-        // Future features where for each query match, you want to perform an action that only requires knowlege
-        // about the row index, and not the payload there. Examples could be find_all(), however, this code path
-        // below is for new features given in a callback method and not yet supported by core.
-        if (nullable)
-            m_column_action_specializer = &ThisType::column_action_specialization<act_CallbackIdx, ArrayIntNull>;
-        else
-            m_column_action_specializer = &ThisType::column_action_specialization<act_CallbackIdx, ArrayInteger>;
-    }
-    else {
-        REALM_ASSERT(false);
+            break;
+        }
+        case act_Count: {
+            // For count(), the column below is a dummy and the caller sets it to nullptr. Hence, no data is being
+            // read from any column upon each query match (just matchcount++ is performed), and we pass nullable =
+            // false simply by convention. FIXME: Clean up all this.
+            REALM_ASSERT(!nullable);
+            m_column_action_specializer = &ThisType::column_action_specialization<act_Count, ArrayInteger>;
+            break;
+        }
+        case act_Sum: {
+            aggregate_local_prepare<act_Sum>(col_id, nullable);
+            break;
+        }
+        case act_Min: {
+            aggregate_local_prepare<act_Min>(col_id, nullable);
+            break;
+        }
+        case act_Max: {
+            aggregate_local_prepare<act_Max>(col_id, nullable);
+            break;
+        }
+        case act_CallbackIdx: {
+            // Future features where for each query match, you want to perform an action that only requires knowlege
+            // about the row index, and not the payload there. Examples could be find_all(), however, this code path
+            // below is for new features given in a callback method and not yet supported by core.
+            if (nullable)
+                m_column_action_specializer = &ThisType::column_action_specialization<act_CallbackIdx, ArrayIntNull>;
+            else
+                m_column_action_specializer = &ThisType::column_action_specialization<act_CallbackIdx, ArrayInteger>;
+            break;
+        }
+        default:
+            REALM_ASSERT(false);
+            break;
     }
 }
 
