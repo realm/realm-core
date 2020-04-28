@@ -39,7 +39,7 @@ extern IdentityProvider const IdentityProviderFacebook;
 extern IdentityProvider const IdentityProviderGoogle;
 
 // A JSON Web Token as an identity provider.
-extern IdentityProvider const IdentityProviderJWT;
+extern IdentityProvider const IdentityProviderCustom;
 
 // An Anonymous account as an identity provider.
 extern IdentityProvider const IdentityProviderAnonymous;
@@ -47,11 +47,28 @@ extern IdentityProvider const IdentityProviderAnonymous;
 // A Google account as an identity provider.
 extern IdentityProvider const IdentityProviderApple;
 
+// The `FunctionCredential` can be used to log in using
+// the [Function Authentication Provider](https://docs.mongodb.com/stitch/authentication/custom-function/).
+extern IdentityProvider const IdentityProviderFunction;
+
+// A credential which can be used to log in as a Stitch user
+// using the User API Key authentication provider.
+extern IdentityProvider const IdentityProviderUserAPIKey;
+
+// A credential which can be used to log in as a Stitch user
+// using the Server API Key authentication provider.
+extern IdentityProvider const IdentityProviderServerAPIKey;
+
 enum class AuthProvider {
     ANONYMOUS,
     FACEBOOK,
+    GOOGLE,
     APPLE,
-    USERNAME_PASSWORD
+    CUSTOM,
+    USERNAME_PASSWORD,
+    FUNCTION,
+    USER_API_KEY,
+    SERVER_API_KEY
 };
 
 IdentityProvider provider_type_from_enum(AuthProvider provider);
@@ -64,11 +81,28 @@ struct AppCredentials {
     // Construct and return anonymous credentials
     static AppCredentials anonymous();
 
-     // Construct and return credentials from an Apple account token.
+    // Construct and return credentials from an Apple account token.
     static AppCredentials apple(const AppCredentialsToken id_token);
+    
+    // Construct and return credentials from a google account token.
+    static AppCredentials google(const AppCredentialsToken id_token);
+    
+    // Construct and return credentials from a jwt token.
+    static AppCredentials custom(const AppCredentialsToken token);
 
-     // Construct and return credentials from a username and password.
+    // Construct and return credentials from a username and password.
     static AppCredentials username_password(std::string username, std::string password);
+
+    // Construct and return credentials with the payload.
+    // The payload is a MongoDB document as json
+    static AppCredentials function(std::string payload_json);
+    
+    // Construct and return credentials with the user api key.
+    static AppCredentials user_api_key(std::string api_key);
+
+    // Construct and return credentials with the server api key.
+    static AppCredentials server_api_key(std::string api_key);
+
 
     // The provider of the credential
     AuthProvider provider() const;

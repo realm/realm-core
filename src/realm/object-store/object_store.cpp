@@ -125,13 +125,13 @@ TableRef create_table(Group& group, ObjectSchema const& object_schema)
 {
     auto name = ObjectStore::table_name_for_object_type(object_schema.name);
 
-    TableRef table;
+    TableRef table = group.get_table(name);
+    if (table)
+        return table;
+
     if (auto* pk_property = object_schema.primary_key_property()) {
-        table = group.get_table(name);
-        if (!table) {
-            table = group.add_table_with_primary_key(name, to_core_type(pk_property->type), pk_property->name,
-                                                     is_nullable(pk_property->type));
-        }
+        table = group.add_table_with_primary_key(name, to_core_type(pk_property->type), pk_property->name,
+                                                 is_nullable(pk_property->type));
     }
     else {
         if (object_schema.is_embedded) {
@@ -243,6 +243,14 @@ struct SchemaDifferenceExplainer {
         // We never do anything for RemoveTable
     }
 
+    void operator()(schema_change::ChangeTableType op)
+    {
+        if (op.object->is_embedded)
+            errors.emplace_back("Class '%1' has been changed from top-level to embedded.", op.object->name);
+        else
+            errors.emplace_back("Class '%1' has been changed from embedded to top-level.", op.object->name);
+    }
+
     void operator()(schema_change::AddInitialProperties)
     {
         // Nothing. Always preceded by AddTable.
@@ -343,6 +351,7 @@ bool ObjectStore::needs_migration(std::vector<SchemaChange> const& changes)
         bool operator()(AddProperty) { return true; }
         bool operator()(AddTable) { return false; }
         bool operator()(RemoveTable) { return false; }
+        bool operator()(ChangeTableType) { return true; }
         bool operator()(ChangePrimaryKey) { return true; }
         bool operator()(ChangePropertyType) { return true; }
         bool operator()(MakePropertyNullable) { return true; }
@@ -393,7 +402,7 @@ bool ObjectStore::verify_valid_additive_changes(std::vector<SchemaChange> const&
         void operator()(AddIndex) { index_changes = true; }
         void operator()(RemoveIndex) { index_changes = true; }
     } verifier;
-    verify_no_errors<InvalidSchemaChangeException>(verifier, changes);
+    verify_no_errors<InvalidAdditiveSchemaChangeException>(verifier, changes);
     return verifier.other_changes || (verifier.index_changes && update_indexes);
 }
 
@@ -426,11 +435,12 @@ void ObjectStore::verify_compatible_for_immutable_and_readonly(std::vector<Schem
 
         void operator()(AddTable) { }
         void operator()(AddInitialProperties) { }
+        void operator()(ChangeTableType) { }
         void operator()(RemoveProperty) { }
         void operator()(AddIndex) { }
         void operator()(RemoveIndex) { }
     } verifier;
-    verify_no_errors<InvalidSchemaChangeException>(verifier, changes);
+    verify_no_errors<InvalidReadOnlySchemaChangeException>(verifier, changes);
 }
 
 static void apply_non_migration_changes(Group& group, std::vector<SchemaChange> const& changes)
@@ -453,6 +463,15 @@ static void apply_non_migration_changes(Group& group, std::vector<SchemaChange> 
     verify_no_errors<SchemaMismatchException>(applier, changes);
 }
 
+static void set_embedded(Table& table, ObjectSchema::IsEmbedded is_embedded)
+{
+    if (!table.set_embedded(is_embedded) && is_embedded) {
+        auto msg = util::format("Cannot convert object type '%1' to embedded because objects have multiple incoming links.",
+                                ObjectStore::object_type_for_table_name(table.get_name()));
+        throw std::logic_error(std::move(msg));
+    }
+}
+
 static void create_initial_tables(Group& group, std::vector<SchemaChange> const& changes)
 {
     using namespace schema_change;
@@ -470,6 +489,7 @@ static void create_initial_tables(Group& group, std::vector<SchemaChange> const&
         // Implementing these makes us better able to handle weird
         // not-quite-correct files produced by other things and has no obvious
         // downside.
+        void operator()(ChangeTableType op) { set_embedded(table(op.object), op.object->is_embedded); }
         void operator()(AddProperty op) { add_column(group, table(op.object), *op.property); }
         void operator()(RemoveProperty op) { table(op.object).remove_column(op.property->column_key); }
         void operator()(MakePropertyNullable op) { make_property_optional(table(op.object), *op.property); }
@@ -508,6 +528,7 @@ void ObjectStore::apply_additive_changes(Group& group, std::vector<SchemaChange>
         void operator()(RemoveProperty) { }
 
         // No need for errors for these, as we've already verified that they aren't present
+        void operator()(ChangeTableType) { }
         void operator()(ChangePrimaryKey) { }
         void operator()(ChangePropertyType) { }
         void operator()(MakePropertyNullable) { }
@@ -529,6 +550,7 @@ static void apply_pre_migration_changes(Group& group, std::vector<SchemaChange> 
 
         void operator()(AddTable op) { create_table(group, *op.object); }
         void operator()(RemoveTable) { }
+        void operator()(ChangeTableType op) { set_embedded(table(op.object), op.object->is_embedded); }
         void operator()(AddInitialProperties op) { add_initial_columns(group, *op.object); }
         void operator()(AddProperty op) { add_column(group, table(op.object), *op.property); }
         void operator()(RemoveProperty) { /* delayed until after the migration */ }
@@ -598,6 +620,7 @@ static void apply_post_migration_changes(Group& group,
         void operator()(AddIndex op) { table(op.object).add_search_index(op.property->column_key); }
         void operator()(RemoveIndex op) { table(op.object).remove_search_index(op.property->column_key); }
 
+        void operator()(ChangeTableType) { }
         void operator()(RemoveTable) { }
         void operator()(ChangePropertyType) { }
         void operator()(MakePropertyNullable) { }
@@ -696,7 +719,7 @@ util::Optional<Property> ObjectStore::property_for_column_key(ConstTableRef& tab
 
     Property property;
     property.name = column_name;
-    property.type = ObjectSchema::from_core_type(*table, column_key);
+    property.type = ObjectSchema::from_core_type(column_key);
     property.is_primary = table->get_primary_key_column() == column_key;
     property.is_indexed = table->has_search_index(column_key);
     property.column_key = column_key;
@@ -810,12 +833,18 @@ InvalidSchemaVersionException::InvalidSchemaVersionException(uint64_t old_versio
 {
 }
 
+static void append_errors(std::string& message, std::vector<ObjectSchemaValidationException> const& errors)
+{
+    for (auto const& error : errors) {
+        message += "\n- ";
+        message += error.what();
+    }
+}
+
 SchemaValidationException::SchemaValidationException(std::vector<ObjectSchemaValidationException> const& errors)
 : std::logic_error([&] {
     std::string message = "Schema validation failed due to the following errors:";
-    for (auto const& error : errors) {
-        message += std::string("\n- ") + error.what();
-    }
+    append_errors(message, errors);
     return message;
 }())
 {
@@ -824,20 +853,25 @@ SchemaValidationException::SchemaValidationException(std::vector<ObjectSchemaVal
 SchemaMismatchException::SchemaMismatchException(std::vector<ObjectSchemaValidationException> const& errors)
 : std::logic_error([&] {
     std::string message = "Migration is required due to the following errors:";
-    for (auto const& error : errors) {
-        message += std::string("\n- ") + error.what();
-    }
+    append_errors(message, errors);
     return message;
 }())
 {
 }
 
-InvalidSchemaChangeException::InvalidSchemaChangeException(std::vector<ObjectSchemaValidationException> const& errors)
+InvalidReadOnlySchemaChangeException::InvalidReadOnlySchemaChangeException(std::vector<ObjectSchemaValidationException> const& errors)
+: std::logic_error([&] {
+    std::string message = "The following changes cannot be made in read-only schema mode:";
+    append_errors(message, errors);
+    return message;
+}())
+{
+}
+
+InvalidAdditiveSchemaChangeException::InvalidAdditiveSchemaChangeException(std::vector<ObjectSchemaValidationException> const& errors)
 : std::logic_error([&] {
     std::string message = "The following changes cannot be made in additive-only schema mode:";
-    for (auto const& error : errors) {
-        message += std::string("\n- ") + error.what();
-    }
+    append_errors(message, errors);
     return message;
 }())
 {
@@ -849,9 +883,7 @@ InvalidExternalSchemaChangeException::InvalidExternalSchemaChangeException(std::
         "Unsupported schema changes were made by another client or process. For a "
         "synchronized Realm, this may be due to the server reverting schema changes which "
         "the local user did not have permission to make.";
-    for (auto const& error : errors) {
-        message += std::string("\n- ") + error.what();
-    }
+    append_errors(message, errors);
     return message;
 }())
 {

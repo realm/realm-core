@@ -338,7 +338,7 @@ util::Optional<SyncUserMetadata> SyncMetadataManager::get_or_make_user_metadata(
             obj.set(schema.idx_provider_type, provider_type);
             obj.set(schema.idx_local_uuid, uuid);
             obj.set(schema.idx_marked_for_removal, false);
-            obj.set(schema.idx_state, (int64_t)SyncUser::State::Active);
+            obj.set(schema.idx_state, (int64_t)SyncUser::State::LoggedIn);
             realm->commit_transaction();
             return SyncUserMetadata(schema, std::move(realm), std::move(obj));
         } else {
@@ -572,7 +572,12 @@ void SyncUserMetadata::set_user_profile(const SyncUserProfile& profile)
     m_realm->verify_thread();
     m_realm->begin_transaction();
 
-    auto obj = m_obj.create_and_set_linked_object(m_schema.idx_profile);
+    Obj obj;
+    if (m_obj.is_null(m_schema.idx_profile)) {
+        obj = m_obj.create_and_set_linked_object(m_schema.idx_profile);
+    } else {
+        obj = m_obj.get_linked_object(m_schema.idx_profile);
+    }
 
     if (profile.name)
         obj.set(c_sync_profile_name, *profile.name);

@@ -38,6 +38,7 @@
 #include "sync/async_open_task.hpp"
 #endif
 
+#include <realm/util/fifo_helper.hpp>
 #include <realm/util/scope_exit.hpp>
 
 namespace realm {
@@ -370,9 +371,9 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
 // The ExternalCommitHelper implementation on Windows doesn't rely on files
 #ifndef _WIN32
     SECTION("should throw when creating the notification pipe fails") {
-        util::try_make_dir(config.path + ".note");
-        auto sys_fallback_file = util::format("%1realm_%2.note", DBOptions::get_sys_tmp_dir(), std::hash<std::string>()(config.path)); // Mirror internal implementation
-        util::try_make_dir(sys_fallback_file);
+        REQUIRE(util::try_make_dir(config.path + ".note"));
+        auto sys_fallback_file = util::format("%1realm_%2.note", util::normalize_dir(DBOptions::get_sys_tmp_dir()), std::hash<std::string>()(config.path)); // Mirror internal implementation
+        REQUIRE(util::try_make_dir(sys_fallback_file));
         REQUIRE_THROWS(Realm::get_shared_realm(config));
         util::remove_dir(config.path + ".note");
         util::remove_dir(sys_fallback_file);

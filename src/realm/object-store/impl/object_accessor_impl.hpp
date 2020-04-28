@@ -36,9 +36,11 @@ public:
     // This constructor is the only one used by the object accessor code, and is
     // used when recurring into a link or array property during object creation
     // (i.e. prop.type will always be Object or Array).
-    CppContext(CppContext& c, Property const& prop)
+    CppContext(CppContext& c, Obj parent, Property const& prop)
     : realm(c.realm)
     , object_schema(prop.type == PropertyType::Object ? &*realm->schema().find(prop.object_type) : c.object_schema)
+    , m_parent(std::move(parent))
+    , m_property(&prop)
     { }
 
     CppContext() = default;
@@ -61,11 +63,6 @@ public:
         auto const& v = any_cast<AnyDict&>(dict);
         auto it = v.find(prop.name);
         return it == v.end() ? util::none : util::make_optional(it->second);
-    }
-
-    bool is_embedded() const
-    {
-        return object_schema ? bool(object_schema->is_embedded) : false;
     }
 
     // Get the default value for the given property in the given object schema,
@@ -137,7 +134,7 @@ public:
     template<typename T>
     T unbox(util::Any& v, CreatePolicy = CreatePolicy::Skip, ObjKey /*current_row*/ = ObjKey()) const { return any_cast<T>(v); }
 
-    Obj unbox_embedded(util::Any& v, CreatePolicy policy, Obj& parent, ColKey col, size_t ndx) const;
+    Obj create_embedded_object();
 
     bool is_null(util::Any const& v) const noexcept { return !v.has_value(); }
     util::Any null_value() const noexcept { return {}; }
@@ -159,6 +156,8 @@ public:
 private:
     std::shared_ptr<Realm> realm;
     const ObjectSchema* object_schema = nullptr;
+    Obj m_parent;
+    const Property* m_property = nullptr;
 
 };
 
@@ -193,16 +192,11 @@ inline Obj CppContext::unbox(util::Any& v, CreatePolicy policy, ObjKey current_o
         return object->obj();
     if (auto obj = any_cast<Obj>(&v))
         return *obj;
-    if (policy == CreatePolicy::Skip)
+    if (!policy.create)
         return Obj();
 
     REALM_ASSERT(object_schema);
     return Object::create(const_cast<CppContext&>(*this), realm, *object_schema, v, policy, current_obj).obj();
-}
-
-inline Obj CppContext::unbox_embedded(util::Any& v, CreatePolicy policy, Obj& parent, ColKey col, size_t ndx) const
-{
-    return Object::create_embedded(const_cast<CppContext&>(*this), realm, *object_schema, v, policy, parent, col, ndx).obj();
 }
 
 template<>
@@ -239,6 +233,11 @@ template<>
 inline Mixed CppContext::unbox(util::Any&, CreatePolicy, ObjKey) const
 {
     throw std::logic_error("'Any' type is unsupported");
+}
+
+inline Obj CppContext::create_embedded_object()
+{
+    return m_parent.create_and_set_linked_object(m_property->column_key);
 }
 }
 

@@ -18,13 +18,12 @@
 
 #include "sync/sync_user.hpp"
 
-#include "app_credentials.hpp"
+#include "sync/app_credentials.hpp"
 #include "sync/generic_network_transport.hpp"
 #include "sync/impl/sync_metadata.hpp"
 #include "sync/sync_manager.hpp"
 #include "sync/sync_session.hpp"
 
-#include <json.hpp>
 #include <realm/util/base64.hpp>
 
 namespace realm {
@@ -60,14 +59,15 @@ RealmJWT::RealmJWT(const std::string& token)
 {
     auto parts = split_token(token);
 
-    auto json = nlohmann::json::parse(base64_decode(parts[1]));
+    auto json_str = base64_decode(parts[1]);
+    auto json = static_cast<bson::BsonDocument>(bson::parse(json_str));
 
     this->token = token;
-    this->expires_at = app::value_from_json<long>(json, "exp");
-    this->issued_at = app::value_from_json<long>(json, "iat");
+    this->expires_at = static_cast<int64_t>(json["exp"]);
+    this->issued_at = static_cast<int64_t>(json["iat"]);
 
     if (json.find("user_data") != json.end()) {
-        this->user_data = json["user_data"].get<std::map<std::string, util::Any>>();
+        this->user_data = static_cast<bson::BsonDocument>(json["user_data"]);
     }
 }
 
@@ -133,7 +133,7 @@ std::vector<std::shared_ptr<SyncSession>> SyncUser::all_sessions()
 {
     std::lock_guard<std::mutex> lock(m_mutex);
     std::vector<std::shared_ptr<SyncSession>> sessions;
-    if (m_state == State::Error) {
+    if (m_state == State::Removed) {
         return sessions;
     }
     for (auto it = m_sessions.begin(); it != m_sessions.end();) {
@@ -151,7 +151,7 @@ std::vector<std::shared_ptr<SyncSession>> SyncUser::all_sessions()
 std::shared_ptr<SyncSession> SyncUser::session_for_on_disk_path(const std::string& path)
 {
     std::lock_guard<std::mutex> lock(m_mutex);
-    if (m_state == State::Error) {
+    if (m_state == State::Removed) {
         return nullptr;
     }
     auto it = m_sessions.find(path);
@@ -172,15 +172,15 @@ void SyncUser::update_refresh_token(std::string token)
     {
         std::unique_lock<std::mutex> lock(m_mutex);
         switch (m_state) {
-            case State::Error:
+            case State::Removed:
                 return;
-            case State::Active:
+            case State::LoggedIn:
                 m_refresh_token = token;
                 break;
             case State::LoggedOut: {
                 sessions_to_revive.reserve(m_waiting_sessions.size());
                 m_refresh_token = token;
-                m_state = State::Active;
+                m_state = State::LoggedIn;
                 for (auto& pair : m_waiting_sessions) {
                     if (auto ptr = pair.second.lock()) {
                         m_sessions[pair.first] = ptr;
@@ -211,15 +211,15 @@ void SyncUser::update_access_token(std::string token)
     {
         std::unique_lock<std::mutex> lock(m_mutex);
         switch (m_state) {
-            case State::Error:
+            case State::Removed:
                 return;
-            case State::Active:
+            case State::LoggedIn:
                 m_access_token = token;
                 break;
             case State::LoggedOut: {
                 sessions_to_revive.reserve(m_waiting_sessions.size());
                 m_access_token = token;
-                m_state = State::Active;
+                m_state = State::LoggedIn;
                 for (auto& pair : m_waiting_sessions) {
                     if (auto ptr = pair.second.lock()) {
                         m_sessions[pair.first] = ptr;
@@ -236,7 +236,6 @@ void SyncUser::update_access_token(std::string token)
             metadata->set_access_token(token);
         });
     }
-
 
     // (Re)activate all pending sessions.
     // Note that we do this after releasing the lock, since the session may
@@ -289,7 +288,8 @@ void SyncUser::log_out()
     }
 
     SyncManager::shared().log_out_user(m_identity);
-
+    m_access_token.token = "";
+    
     // Mark the user as 'dead' in the persisted metadata Realm
     // if they were an anonymous user
     if (this->m_provider_type == app::IdentityProviderAnonymous) {
@@ -302,9 +302,15 @@ void SyncUser::log_out()
     }
 }
 
+bool SyncUser::is_logged_in() const
+{
+    std::lock_guard<std::mutex> lock(m_mutex);
+    return !m_access_token.token.empty() && !m_refresh_token.token.empty();
+}
+
 void SyncUser::invalidate()
 {
-    set_state(SyncUser::State::Error);
+    set_state(SyncUser::State::Removed);
 }
 
 std::string SyncUser::refresh_token() const
@@ -341,7 +347,7 @@ SyncUserProfile SyncUser::user_profile() const
     return m_user_profile;
 }
 
-util::Optional<std::map<std::string, util::Any>> SyncUser::custom_data() const
+util::Optional<bson::BsonDocument> SyncUser::custom_data() const
 {
     std::lock_guard<std::mutex> lock(m_mutex);
     return m_access_token.user_data;
@@ -364,7 +370,7 @@ void SyncUser::register_session(std::shared_ptr<SyncSession> session)
     const std::string& path = session->path();
     std::unique_lock<std::mutex> lock(m_mutex);
     switch (m_state) {
-        case State::Active:
+        case State::LoggedIn:
             // Immediately ask the session to come online.
             m_sessions[path] = session;
             lock.unlock();
@@ -373,7 +379,7 @@ void SyncUser::register_session(std::shared_ptr<SyncSession> session)
         case State::LoggedOut:
             m_waiting_sessions[path] = session;
             break;
-        case State::Error:
+        case State::Removed:
             break;
     }
 }

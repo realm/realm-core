@@ -19,9 +19,10 @@
 #ifndef REALM_OBJECT_SCHEMA_HPP
 #define REALM_OBJECT_SCHEMA_HPP
 
+#include "util/tagged_bool.hpp"
+
 #include <realm/keys.hpp>
 #include <realm/string_data.hpp>
-#include "util/tagged_bool.hpp"
 
 #include <string>
 #include <vector>
@@ -79,7 +80,7 @@ public:
 
     friend bool operator==(ObjectSchema const& a, ObjectSchema const& b) noexcept;
 
-    static PropertyType from_core_type(Table const& table, ColKey col);
+    static PropertyType from_core_type(ColKey col);
 
 private:
     void set_primary_key_property() noexcept;

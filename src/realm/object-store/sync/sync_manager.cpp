@@ -315,19 +315,19 @@ std::shared_ptr<SyncUser> SyncManager::get_user(const std::string& user_id,
                                                    user_id,
                                                    provider_type,
                                                    std::move(access_token),
-                                                   SyncUser::State::Active);
+                                                   SyncUser::State::LoggedIn);
         m_users.emplace(m_users.begin(), new_user);
         return new_user;
     } else {
         auto user = *it;
-        if (user->state() == SyncUser::State::Error) {
+        if (user->state() == SyncUser::State::Removed) {
             return nullptr;
         }
         user->update_refresh_token(std::move(refresh_token));
         user->update_access_token(std::move(access_token));
 
         if (user->state() == SyncUser::State::LoggedOut) {
-            user->set_state(SyncUser::State::Active);
+            user->set_state(SyncUser::State::LoggedIn);
         }
         return user;
     }
@@ -337,7 +337,7 @@ std::vector<std::shared_ptr<SyncUser>> SyncManager::all_users()
 {
     std::lock_guard<std::mutex> lock(m_user_mutex);
     m_users.erase(std::remove_if(m_users.begin(), m_users.end(), [](auto& user) {
-        return user->state() == SyncUser::State::Error;
+        return user->state() == SyncUser::State::Removed;
     }), m_users.end());
     return m_users;
 }
@@ -391,7 +391,7 @@ void SyncManager::log_out_user(const std::string& user_id)
 
     // Set the current active user to the next logged in user, or null if none
     for (auto& user : m_users) {
-        if (user->state() == SyncUser::State::Active) {
+        if (user->state() == SyncUser::State::LoggedIn) {
             m_metadata_manager->set_current_user_identity(user->identity());
             return;
         }
@@ -411,6 +411,34 @@ void SyncManager::set_current_user(const std::string& user_id)
     m_metadata_manager->set_current_user_identity(user_id);
 }
 
+void SyncManager::remove_user(const std::string& user_id)
+{
+    std::lock_guard<std::mutex> lock(m_user_mutex);
+
+    auto it = std::find_if(m_users.begin(),
+                           m_users.end(),
+                           [user_id](const auto& user) {
+        return user->identity() == user_id;
+    });
+    
+    if (it == m_users.end())
+        return;
+    
+    auto user = *it;
+    
+    if (!m_metadata_manager) {
+        return;
+    }
+    
+    for (size_t i = 0; i < m_metadata_manager->all_unmarked_users().size(); i++) {
+        auto metadata = m_metadata_manager->all_unmarked_users().get(i);
+        if (user->identity() == metadata.identity()) {
+            metadata.mark_for_removal();
+            user->set_state(SyncUser::State::Removed);
+        }
+    }
+}
+
 std::shared_ptr<SyncUser> SyncManager::get_existing_logged_in_user(const std::string& user_id) const
 {
     std::lock_guard<std::mutex> lock(m_user_mutex);
@@ -423,7 +451,7 @@ std::shared_ptr<SyncUser> SyncManager::get_existing_logged_in_user(const std::st
         return nullptr;
 
     auto user = *it;
-    return user->state() == SyncUser::State::Active ? user : nullptr;
+    return user->state() == SyncUser::State::LoggedIn ? user : nullptr;
 }
 
 std::string SyncManager::path_for_realm(const SyncUser& user, const std::string& raw_realm_url) const

@@ -50,7 +50,7 @@ TEST_CASE("sync_user: SyncManager `get_user()` API", "[sync]") {
         REQUIRE(user->provider_type() == server_url);
         REQUIRE(user->refresh_token() == refresh_token);
         REQUIRE(user->access_token() == access_token);
-        REQUIRE(user->state() == SyncUser::State::Active);
+        REQUIRE(user->state() == SyncUser::State::LoggedIn);
     }
 
     SECTION("properly retrieves a previously created user, updating fields as necessary") {
@@ -82,7 +82,7 @@ TEST_CASE("sync_user: SyncManager `get_user()` API", "[sync]") {
         REQUIRE(second == first);
         REQUIRE(second->identity() == identity);
         REQUIRE(second->refresh_token() == second_refresh_token);
-        REQUIRE(second->state() == SyncUser::State::Active);
+        REQUIRE(second->state() == SyncUser::State::LoggedIn);
     }
 }
 
@@ -102,7 +102,7 @@ TEST_CASE("sync_user: SyncManager `get_existing_logged_in_user()` API", "[sync]"
     SECTION("properly returns an existing logged-in user") {
         auto first = SyncManager::shared().get_user(identity, refresh_token, access_token, server_url);
         REQUIRE(first->identity() == identity);
-        REQUIRE(first->state() == SyncUser::State::Active);
+        REQUIRE(first->state() == SyncUser::State::LoggedIn);
         // Get that user using the 'existing user' API.
         auto second = SyncManager::shared().get_existing_logged_in_user(identity);
         REQUIRE(second == first);
@@ -130,7 +130,7 @@ TEST_CASE("sync_user: logout", "[sync]") {
 
     SECTION("properly changes the state of the user object") {
         auto user = SyncManager::shared().get_user(identity, refresh_token, access_token, server_url);
-        REQUIRE(user->state() == SyncUser::State::Active);
+        REQUIRE(user->state() == SyncUser::State::LoggedIn);
         user->log_out();
         REQUIRE(user->state() == SyncUser::State::LoggedOut);
     }
@@ -218,6 +218,6 @@ TEST_CASE("sync_user: user persistence", "[sync]") {
         const std::string a_token_2 = ENCODE_FAKE_JWT("atoken-4b");
         auto second = SyncManager::shared().get_user(identity, r_token_2, a_token_2, provider_type);
         REQUIRE(SyncManager::shared().all_users().size() == 1);
-        REQUIRE(SyncManager::shared().all_users()[0]->state() == SyncUser::State::Active);
+        REQUIRE(SyncManager::shared().all_users()[0]->state() == SyncUser::State::LoggedIn);
     }
 }

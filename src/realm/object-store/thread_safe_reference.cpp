@@ -48,11 +48,17 @@ private:
 
 void ThreadSafeReference::Payload::refresh_target_realm(Realm& realm)
 {
-    if (!realm.is_in_read_transaction())
-        realm.read_group();
-    auto version = realm.read_transaction_version();
-    if (version < m_target_version || (version == m_target_version && m_created_in_write_transaction))
-        realm.refresh();
+    if (!realm.is_in_read_transaction()) {
+        if (m_created_in_write_transaction)
+            realm.read_group();
+        else
+            Realm::Internal::begin_read(realm, m_target_version);
+    }
+    else {
+        auto version = realm.read_transaction_version();
+        if (version < m_target_version || (version == m_target_version && m_created_in_write_transaction))
+            realm.refresh();
+    }
 }
 
 template<>
@@ -145,12 +151,12 @@ public:
             try {
                 list = table->get_object(m_key).get_listbase_ptr(m_col_key);
             }
-            catch (InvalidKey const&) {
+            catch (KeyNotFound const&) {
                 // Create a detached list of the appropriate type so that we
                 // return an invalid Results rather than an Empty Results, to
                 // match what happens for other types of handover where the
                 // object doesn't exist.
-                switch_on_type(ObjectSchema::from_core_type(*table, m_col_key), [&](auto* t) -> void {
+                switch_on_type(ObjectSchema::from_core_type(m_col_key), [&](auto* t) -> void {
                     list = std::make_unique<typename ListType<decltype(*t)>::type>();
                 });
             }
@@ -224,7 +230,7 @@ T ThreadSafeReference::resolve(std::shared_ptr<Realm> const& realm)
     try {
         return payload.import_into(realm);
     }
-    catch (InvalidKey const&) {
+    catch (KeyNotFound const&) {
         // Object was deleted in a version after when the TSR was created
         return {};
     }

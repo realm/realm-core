@@ -16,7 +16,8 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "generic_network_transport.hpp"
+#include "sync/generic_network_transport.hpp"
+
 #include <string>
 
 namespace realm {
@@ -100,7 +101,8 @@ static const std::map<std::string, ServiceErrorCode> service_error_map = {
     {"UserDisabled", ServiceErrorCode::user_disabled},
     {"AuthError", ServiceErrorCode::auth_error},
     {"BadRequest", ServiceErrorCode::bad_request},
-    {"AccountNameInUse", ServiceErrorCode::account_name_in_use}
+    {"AccountNameInUse", ServiceErrorCode::account_name_in_use},
+    {"Unknown", ServiceErrorCode::unknown},
 };
 
 std::string get_error_message(ServiceErrorCode error)
@@ -171,6 +173,20 @@ struct CustomErrorCategory : public std::error_category {
 
 CustomErrorCategory g_custom_error_category;
 
+struct ClientErrorCategory : public std::error_category {
+    const char* name() const noexcept final override
+    {
+        return "realm::app::ClientError";
+    }
+    
+    std::string message(int code) const override final
+    {
+        return util::format("code %1", code);
+    }
+};
+
+ClientErrorCategory g_client_error_category;
+
 } // unnamed namespace
 
 std::ostream& operator<<(std::ostream& os, AppError error)
@@ -227,6 +243,15 @@ std::error_code make_custom_error_code(int code) noexcept
     return std::error_code{code, g_custom_error_category};
 }
 
+const std::error_category& client_error_category() noexcept
+{
+    return g_client_error_category;
+}
+
+std::error_code make_client_error_code(ClientErrorCode error) noexcept
+{
+    return std::error_code{int(error), g_client_error_category};
+}
 
 } // namespace app
 } // namespace realm

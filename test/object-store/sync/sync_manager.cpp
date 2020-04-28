@@ -189,12 +189,7 @@ TEST_CASE("sync_manager: user state management", "[sync]") {
         REQUIRE(u_current == u1);
 
         auto u2 = SyncManager::shared().get_user(identity_2, r_token_2, a_token_2, url_2);
-
-        // FIXME: what is the new expected behaviour here?
-        // The old behaviour was to throw when there was more than one active user.
-        // Now, the current user has switched to return the first one available "u2"
-        // REQUIRE_THROWS_AS(SyncManager::shared().get_current_user(), std::logic_error);
-
+        // The current user has switched to return the most recently used: "u2"
         u_current = SyncManager::shared().get_current_user();
         REQUIRE(u_current == u2);
     }

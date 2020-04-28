@@ -6,6 +6,7 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
     build-essential \
     curl \
     gcovr \
+    gdb \
     git \
     gcc-7 \
     g++-7 \
@@ -22,6 +23,10 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
     wget \
     && rm -rf /var/lib/apt/lists/*
 
+RUN mkdir -p ~/.ssh \
+ && ssh-keyscan -H github.com >> ~/.ssh/known_hosts
+
+# Ensure a new enough version of CMake is available.
 RUN cd /opt \
     && wget -nv https://cmake.org/files/v3.15/cmake-3.15.2-Linux-x86_64.tar.gz \
     && tar zxf cmake-3.15.2-Linux-x86_64.tar.gz

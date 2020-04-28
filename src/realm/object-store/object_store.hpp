@@ -154,8 +154,11 @@ struct SchemaMismatchException : public std::logic_error {
     SchemaMismatchException(std::vector<ObjectSchemaValidationException> const& errors);
 };
 
-struct InvalidSchemaChangeException : public std::logic_error {
-    InvalidSchemaChangeException(std::vector<ObjectSchemaValidationException> const& errors);
+struct InvalidAdditiveSchemaChangeException : public std::logic_error {
+    InvalidAdditiveSchemaChangeException(std::vector<ObjectSchemaValidationException> const& errors);
+};
+struct InvalidReadOnlySchemaChangeException : public std::logic_error {
+    InvalidReadOnlySchemaChangeException(std::vector<ObjectSchemaValidationException> const& errors);
 };
 
 struct InvalidExternalSchemaChangeException : public std::logic_error {

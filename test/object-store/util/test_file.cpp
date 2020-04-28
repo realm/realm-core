@@ -114,13 +114,8 @@ SyncTestFile::SyncTestFile(SyncServer& server, std::string name, std::string use
     sync_config->stop_policy = SyncSessionStopPolicy::Immediately;
     sync_config->bind_session_handler = [=](auto&, auto& config, auto session) {
         std::string token, encoded;
-        // FIXME: Tokens without a path are currently implicitly considered
-        // admin tokens by the sync service, so until that changes we need to
-        // add a path for non-admin users
-
-        std::string suffix;
-        token = util::format("{\"identity\": \"%1\", \"path\": \"/%2%3\", \"access\": [\"download\", \"upload\"]}",
-                             user_name, name, suffix);
+        token = util::format("{\"identity\": \"%1\", \"path\": \"/%2\", \"access\": [\"download\", \"upload\"]}",
+                             user_name, name);
         
         encoded.resize(base64_encoded_size(token.size()));
         base64_encode(token.c_str(), token.size(), &encoded[0], encoded.size());

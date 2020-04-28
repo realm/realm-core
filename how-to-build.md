@@ -163,6 +163,39 @@ These are the available variables:
    testing process as soon as a check fails or an unexpected exception is thrown
    in a test.
 
+## Running [app] tests against a local MongoDB Stitch
+
+Stitch images are published to our private Github CI. Follow the steps here to
+set up authorization from docker to your Github account https://github.com/realm/ci/tree/master/realm/docker/mongodb-realm
+Once authorized, run the following docker command from the top directory to start a local instance:
+
+```
+docker run --rm -v $(pwd)/tests/mongodb:/apps/os-integration-tests -p 9090:9090 -it docker.pkg.github.com/realm/ci/mongodb-realm-test-server:latest
+```
+
+This will make the stitch UI available in your browser at `localhost:9090` where you can login with "unique_user@domain.com" and "password".
+Once logged in, you can make changes to the integration-tests app and those changes will be persisted to your disk, because the docker image
+has a mapped volume to the `tests/mongodb` directory.
+
+To run the [app] tests against the local image, you need to configure a build with some cmake options to tell the tests where to point to.
+```
+mkdir build.sync.ninja
+sh "cmake -B build.sync.ninja -G Ninja -DREALM_ENABLE_SYNC=1 -DREALM_ENABLE_AUTH_TESTS=1 -DREALM_MONGODB_ENDPOINT=\"http://localhost:9090\" -DREALM_STITCH_CONFIG=\"./tests/mongodb/stitch.json\"
+sh "cmake --build build.sync.ninja --target tests"
+sh "./build.sync.ninja/tests/tests -d=1
+```
+### Developing inside a container
+
+The `.devcontainer` folders contains configuration for the [Visual Stuio Code Remote - Containers](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers) extension, which allows you to develop inside the same Docker container that CI runs in, which is especially useful because it also sets up the MongoDB Realm Test Server container. Make sure you have the `Remote - Containers` extension installed (it's part of the recommended extensions list for this repository) and run the `Remote-Containers: Reopen in Container` (or `Rebuild and Reopen in Container`) command. VSCode will build the image described in `Dockerfile`, spin up a container group using Docker Compose, and reopen the workspace from inside the container.
+
+#### `ssh-agent` forwarding
+
+The dev container needs your SSH key to clone the realm-sync repository during build. Make sure your agent is running and configured as described [here](https://developer.github.com/v3/guides/using-ssh-agent-forwarding/#your-local-ssh-agent-must-be-running).
+
+#### Docker resources
+
+Assign more memory and CPU to Docker for faster builds. The link step may fail inside the container if there's not enough memory, too.
+
 ### Memory debugging:
 
 Realm currently allows for uninitialized data to be written to a database
