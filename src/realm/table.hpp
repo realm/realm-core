@@ -1455,6 +1455,10 @@ public:
     {
         return table.create_linked_object(id);
     }
+    static ObjKey global_to_local_object_id_hashed(const Table& table, GlobalKey global_id)
+    {
+        return table.global_to_local_object_id_hashed(global_id);
+    }
 };
 
 } // namespace realm
