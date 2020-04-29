@@ -20,7 +20,7 @@
 #define REMOTE_MONGO_DATABASE_HPP
 
 #include "sync/remote_mongo_collection.hpp"
-#include <json.hpp>
+#include <external/json/json.hpp>
 #include <string>
 
 namespace realm {

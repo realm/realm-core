@@ -17,7 +17,7 @@
  **************************************************************************/
 
 #include "util/bson/bson.hpp"
-#include <json.hpp>
+#include <external/json/json.hpp>
 #include <stack>
 
 namespace realm {

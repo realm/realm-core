@@ -21,7 +21,7 @@
 
 #include "sync/app_service_client.hpp"
 #include <realm/util/optional.hpp>
-#include <json.hpp>
+#include <external/json/json.hpp>
 #include <string>
 #include <vector>
 

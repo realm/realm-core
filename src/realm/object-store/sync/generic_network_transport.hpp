@@ -30,7 +30,7 @@
 #include <system_error>
 #include <vector>
 
-#include <json.hpp>
+#include <external/json/json.hpp>
 
 namespace realm {
 namespace app {

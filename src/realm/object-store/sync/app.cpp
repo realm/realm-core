@@ -24,7 +24,7 @@
 #include "sync/remote_mongo_client.hpp"
 #include "sync/app_utils.hpp"
 
-#include <json.hpp>
+#include <external/json/json.hpp>
 
 namespace realm {
 namespace app {

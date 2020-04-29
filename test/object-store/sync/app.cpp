@@ -26,7 +26,7 @@
 #include "util/test_file.hpp"
 
 #include <curl/curl.h>
-#include <json.hpp>
+#include <external/json/json.hpp>
 #include <thread>
 
 using namespace realm;

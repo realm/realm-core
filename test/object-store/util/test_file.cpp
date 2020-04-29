@@ -147,7 +147,6 @@ SyncServer::SyncServer(StartImmediately start_immediately, std::string local_dir
 #endif
     config.history_ttl = 1s;
     config.history_compaction_interval = 1s;
-    config.state_realm_dir = util::make_temp_dir();
     config.listen_address = "127.0.0.1";
 
     return config;
