@@ -430,6 +430,11 @@ public:
     {
         REALM_ASSERT(false); // Unimplemented
     }
+
+    virtual ExpressionComparisonType get_comparison_type() const
+    {
+        return ExpressionComparisonType::Any;
+    }
 };
 
 template <typename T, typename... Args>
@@ -969,6 +974,20 @@ struct NullableVector {
         }
     }
 
+    void init(const std::vector<Optional<T>>& values)
+    {
+        size_t sz = values.size();
+        init(sz);
+        for (size_t t = 0; t < sz; t++) {
+            if (values[t]) {
+                set(t, values[t]);
+            }
+            else {
+                set_null(t);
+            }
+        }
+    }
+
     void dealloc()
     {
         if (m_first) {
@@ -1261,6 +1280,13 @@ public:
         ValueBase::m_values = values.size();
     }
 
+    void init(bool from_link_list, const std::vector<Optional<T>>& values)
+    {
+        m_storage.init(values);
+        ValueBase::m_from_link_list = from_link_list;
+        ValueBase::m_values = values.size();
+    }
+
     std::string description(util::serializer::SerialisationState&) const override
     {
         if (ValueBase::m_from_link_list) {
@@ -1443,26 +1469,55 @@ public:
 
     // Given a TCond (==, !=, >, <, >=, <=) and two Value<T>, return index of first match
     template <class TCond>
-    REALM_FORCEINLINE static size_t compare_const(const Value<T>* left, Value<T>* right)
+    REALM_FORCEINLINE static size_t compare_const(const Value<T>* left, Value<T>* right,
+                                                  ExpressionComparisonType comparison)
     {
         TCond c;
-
-        size_t sz = right->ValueBase::m_values;
+        const size_t sz = right->ValueBase::m_values;
         bool left_is_null = left->m_storage.is_null(0);
-        for (size_t m = 0; m < sz; m++) {
-            if (c(left->m_storage[0], right->m_storage[m], left_is_null, right->m_storage.is_null(m)))
-                return right->m_from_link_list ? 0 : m;
+        if (!right->m_from_link_list) {
+            REALM_ASSERT_DEBUG(comparison ==
+                               ExpressionComparisonType::Any); // ALL/NONE not supported for non list types
+            for (size_t m = 0; m < sz; m++) {
+                if (c(left->m_storage[0], right->m_storage[m], left_is_null, right->m_storage.is_null(m)))
+                    return m;
+            }
         }
-
-        return not_found; // no match
+        else if (comparison == ExpressionComparisonType::None) {
+            for (size_t m = 0; m < sz; m++) {
+                if (c(left->m_storage[0], right->m_storage[m], left_is_null, right->m_storage.is_null(m)))
+                    return not_found;
+            }
+            return 0; // no values matched, return match
+        }
+        else if (comparison == ExpressionComparisonType::All) {
+            for (size_t m = 0; m < sz; m++) {
+                if (!c(left->m_storage[0], right->m_storage[m], left_is_null, right->m_storage.is_null(m)))
+                    return not_found; // one did not match
+            }
+            return 0; // all values matched (or there this is an empty list), return match
+        }
+        else { // ANY from list
+            for (size_t m = 0; m < sz; m++) {
+                if (c(left->m_storage[0], right->m_storage[m], left_is_null, right->m_storage.is_null(m)))
+                    return 0;
+            }
+            return not_found; // no match
+        }
+        return not_found;
     }
 
     template <class TCond>
-    REALM_FORCEINLINE static size_t compare(Value<T>* left, Value<T>* right)
+    REALM_FORCEINLINE static size_t compare(Value<T>* left, Value<T>* right, ExpressionComparisonType left_cmp_type,
+                                            ExpressionComparisonType right_cmp_type)
     {
         TCond c;
 
         if (!left->m_from_link_list && !right->m_from_link_list) {
+            REALM_ASSERT_DEBUG(left_cmp_type ==
+                               ExpressionComparisonType::Any); // ALL/NONE not supported for non list types
+            REALM_ASSERT_DEBUG(right_cmp_type ==
+                               ExpressionComparisonType::Any); // ALL/NONE not supported for non list types
             // Compare values one-by-one (one value is one row; no link lists)
             size_t min = minimum(left->ValueBase::m_values, right->ValueBase::m_values);
             for (size_t m = 0; m < min; m++) {
@@ -1474,25 +1529,67 @@ public:
         }
         else if (left->m_from_link_list && right->m_from_link_list) {
             // FIXME: Many-to-many links not supported yet. Need to specify behaviour
+            // knowing the comparison types means we can potentially support things such as:
+            // ALL list.int > list.[FIRST].int
+            // ANY list.int > ALL list2.int
+            // NONE list.int > ANY list2.int
             REALM_ASSERT_DEBUG(false);
         }
         else if (!left->m_from_link_list && right->m_from_link_list) {
             // Right values come from link list. Left must come from single row. Semantics: Match if at least 1
             // linked-to-value fulfills the condition
             REALM_ASSERT_DEBUG(left->m_values > 0);
-            for (size_t r = 0; r < right->m_values; r++) {
-                if (c(left->m_storage[0], right->m_storage[r], left->m_storage.is_null(0),
-                      right->m_storage.is_null(r)))
-                    return 0;
+            const size_t num_right_values = right->m_values;
+            if (right_cmp_type == ExpressionComparisonType::Any) {
+                for (size_t r = 0; r < num_right_values; r++) {
+                    if (c(left->m_storage[0], right->m_storage[r], left->m_storage.is_null(0),
+                          right->m_storage.is_null(r)))
+                        return 0;
+                }
+            }
+            else if (right_cmp_type == ExpressionComparisonType::All) {
+                for (size_t r = 0; r < num_right_values; r++) {
+                    if (!c(left->m_storage[0], right->m_storage[r], left->m_storage.is_null(0),
+                           right->m_storage.is_null(r)))
+                        return not_found; // one didn't match
+                }
+                return 0; // all matched
+            }
+            else if (right_cmp_type == ExpressionComparisonType::None) {
+                for (size_t r = 0; r < num_right_values; r++) {
+                    if (c(left->m_storage[0], right->m_storage[r], left->m_storage.is_null(0),
+                          right->m_storage.is_null(r)))
+                        return not_found; // one matched, none not satisfied
+                }
+                return 0; // none matched
             }
         }
         else if (left->m_from_link_list && !right->m_from_link_list) {
             // Same as above, but with left values coming from link list.
             REALM_ASSERT_DEBUG(right->m_values > 0);
-            for (size_t l = 0; l < left->m_values; l++) {
-                if (c(left->m_storage[l], right->m_storage[0], left->m_storage.is_null(l),
-                      right->m_storage.is_null(0)))
-                    return 0;
+            const size_t num_left_values = left->m_values;
+            if (left_cmp_type == ExpressionComparisonType::Any) {
+                for (size_t l = 0; l < num_left_values; l++) {
+                    if (c(left->m_storage[l], right->m_storage[0], left->m_storage.is_null(l),
+                          right->m_storage.is_null(0)))
+                        return 0;
+                }
+            }
+            else if (left_cmp_type == ExpressionComparisonType::All) {
+                for (size_t l = 0; l < num_left_values; l++) {
+                    if (!c(left->m_storage[l], right->m_storage[0], left->m_storage.is_null(l),
+                           right->m_storage.is_null(0)))
+                        return not_found; // one did not match, All not satisfied
+                }
+                return 0; // all matched
+            }
+            else if (left_cmp_type == ExpressionComparisonType::None) {
+                for (size_t l = 0; l < num_left_values; l++) {
+                    if (c(left->m_storage[l], right->m_storage[0], left->m_storage.is_null(l),
+                          right->m_storage.is_null(0)))
+                        return not_found; // one matched, none not satisfied
+                }
+                return 0; // none matched
             }
         }
 
@@ -2120,9 +2217,11 @@ Value<T> make_value_for_link(bool only_unary_links, size_t size)
 template <class T>
 class SimpleQuerySupport : public Subexpr2<T> {
 public:
-    SimpleQuerySupport(ColKey column, ConstTableRef table, std::vector<ColKey> links = {})
+    SimpleQuerySupport(ColKey column, ConstTableRef table, std::vector<ColKey> links = {},
+                       ExpressionComparisonType type = ExpressionComparisonType::Any)
         : m_link_map(table, std::move(links))
         , m_column_key(column)
+        , m_comparison_type(type)
     {
     }
 
@@ -2274,7 +2373,12 @@ public:
 
     virtual std::string description(util::serializer::SerialisationState& state) const override
     {
-        return state.describe_columns(m_link_map, m_column_key);
+        return state.describe_expression_type(m_comparison_type) + state.describe_columns(m_link_map, m_column_key);
+    }
+
+    virtual ExpressionComparisonType get_comparison_type() const override
+    {
+        return m_comparison_type;
     }
 
     std::unique_ptr<Subexpr> clone() const override
@@ -2286,6 +2390,7 @@ public:
         : Subexpr2<T>(other)
         , m_link_map(other.m_link_map)
         , m_column_key(other.m_column_key)
+        , m_comparison_type(other.m_comparison_type)
     {
     }
 
@@ -2312,6 +2417,7 @@ private:
     LeafCacheStorage m_leaf_cache_storage;
     LeafPtr m_array_ptr;
     LeafType* m_leaf_ptr = nullptr;
+    ExpressionComparisonType m_comparison_type;
 };
 
 
@@ -2338,8 +2444,9 @@ class Columns<Decimal128> : public SimpleQuerySupport<Decimal128> {
 template <>
 class Columns<StringData> : public SimpleQuerySupport<StringData> {
 public:
-    Columns(ColKey column, ConstTableRef table, std::vector<ColKey> links = {})
-        : SimpleQuerySupport(column, table, links)
+    Columns(ColKey column, ConstTableRef table, std::vector<ColKey> links = {},
+            ExpressionComparisonType type = ExpressionComparisonType::Any)
+        : SimpleQuerySupport(column, table, links, type)
     {
     }
 
@@ -2785,6 +2892,7 @@ public:
     Columns(const Columns& other)
         : Subexpr2<Link>(other)
         , m_link_map(other.m_link_map)
+        , m_comparison_type(other.m_comparison_type)
     {
     }
 
@@ -2818,6 +2926,10 @@ public:
     template <typename C>
     SubColumns<C> column(ColKey column_key) const
     {
+        // no need to pass along m_comparison_type because the only operations supported from
+        // the subsequent SubColumns are aggregate operations such as sum, min, max, avg where
+        // having
+        REALM_ASSERT_DEBUG(m_comparison_type == ExpressionComparisonType::Any);
         return SubColumns<C>(Columns<C>(column_key, m_link_map.get_target_table()), m_link_map);
     }
 
@@ -2849,7 +2961,12 @@ public:
 
     std::string description(util::serializer::SerialisationState& state) const override
     {
-        return state.describe_columns(m_link_map, ColKey());
+        return state.describe_expression_type(m_comparison_type) + state.describe_columns(m_link_map, ColKey());
+    }
+
+    virtual ExpressionComparisonType get_comparison_type() const override
+    {
+        return m_comparison_type;
     }
 
     std::unique_ptr<Subexpr> clone() const override
@@ -2859,14 +2976,16 @@ public:
 
     void evaluate(size_t index, ValueBase& destination) override;
 
-
 private:
     LinkMap m_link_map;
+    ExpressionComparisonType m_comparison_type;
     friend class Table;
     friend class LinkChain;
 
-    Columns(ColKey column_key, ConstTableRef table, const std::vector<ColKey>& links = {})
+    Columns(ColKey column_key, ConstTableRef table, const std::vector<ColKey>& links = {},
+            ExpressionComparisonType type = ExpressionComparisonType::Any)
         : m_link_map(table, links)
+        , m_comparison_type(type)
     {
         static_cast<void>(column_key);
     }
@@ -2889,15 +3008,18 @@ class Average;
 
 class ColumnListBase {
 public:
-    ColumnListBase(ColKey column_key, ConstTableRef table, const std::vector<ColKey>& links)
+    ColumnListBase(ColKey column_key, ConstTableRef table, const std::vector<ColKey>& links,
+                   ExpressionComparisonType type = ExpressionComparisonType::Any)
         : m_column_key(column_key)
         , m_link_map(table, links)
+        , m_comparison_type(type)
     {
     }
 
     ColumnListBase(const ColumnListBase& other)
         : m_column_key(other.m_column_key)
         , m_link_map(other.m_link_map)
+        , m_comparison_type(other.m_comparison_type)
     {
     }
 
@@ -2905,9 +3027,9 @@ public:
 
     void get_lists(size_t index, Value<ref_type>& destination, size_t nb_elements);
 
-    std::string description(util::serializer::SerialisationState&) const
+    std::string description(util::serializer::SerialisationState& state) const
     {
-        throw SerialisationError("Serialisation of query expressions involving subtables is not yet supported.");
+        return state.describe_expression_type(m_comparison_type) + state.describe_columns(m_link_map, m_column_key);
     }
 
     bool links_exist() const
@@ -2923,10 +3045,14 @@ public:
     LeafCacheStorage m_leaf_cache_storage;
     LeafPtr m_array_ptr;
     ArrayList* m_leaf_ptr = nullptr;
+    ExpressionComparisonType m_comparison_type = ExpressionComparisonType::Any;
 };
 
 template <typename>
 class ColumnListSize;
+
+template <typename T>
+class ColumnListElementLength;
 
 template <typename T>
 class Columns<Lst<T>> : public Subexpr2<T>, public ColumnListBase {
@@ -2934,6 +3060,7 @@ public:
     Columns(const Columns<Lst<T>>& other)
         : Subexpr2<T>(other)
         , ColumnListBase(other)
+        , m_is_nullable_storage(this->m_column_key.get_attrs().test(col_attr_Nullable))
     {
     }
 
@@ -2964,39 +3091,31 @@ public:
 
     void evaluate(size_t index, ValueBase& destination) override
     {
-        Allocator& alloc = get_base_table()->get_alloc();
-        Value<ref_type> list_refs;
-        get_lists(index, list_refs, 1);
-        size_t sz = 0;
-        for (size_t i = 0; i < list_refs.m_values; i++) {
-            ref_type val = list_refs.m_storage[i];
-            if (val) {
-                char* header = alloc.translate(val);
-                sz += Array::get_size_from_header(header);
+        if constexpr (std::is_same_v<T, ObjectId> || std::is_same_v<T, Int> || std::is_same_v<T, Bool>) {
+            if (m_is_nullable_storage) {
+                evaluate<Optional<T>>(index, destination);
+                return;
             }
         }
-        auto v = make_value_for_link<typename util::RemoveOptional<T>::type>(false, sz);
-        size_t k = 0;
-        for (size_t i = 0; i < list_refs.m_values; i++) {
-            ref_type list_ref = list_refs.m_storage[i];
-            if (list_ref) {
-                BPlusTree<T> list(alloc);
-                list.init_from_ref(list_ref);
-                size_t s = list.size();
-                for (size_t j = 0; j < s; j++) {
-                    v.m_storage.set(k++, list.get(j));
-                }
-            }
-        }
-        destination.import(v);
+        evaluate<T>(index, destination);
     }
 
-    virtual std::string description(util::serializer::SerialisationState&) const override
+    virtual std::string description(util::serializer::SerialisationState& state) const override
     {
-        throw SerialisationError("Serialisation of subtable expressions is not yet supported.");
+        return ColumnListBase::description(state);
+    }
+
+    virtual ExpressionComparisonType get_comparison_type() const override
+    {
+        return ColumnListBase::m_comparison_type;
     }
 
     SizeOperator<SizeOfList> size();
+
+    ColumnListElementLength<T> element_lengths() const
+    {
+        return {*this};
+    }
 
     ListColumnAggregate<T, aggregate_operations::Minimum<T>> min() const
     {
@@ -3017,14 +3136,41 @@ public:
     {
         return {m_column_key, *this};
     }
-
+    const bool m_is_nullable_storage;
 
 private:
     friend class Table;
     friend class LinkChain;
 
-    Columns(ColKey column_key, ConstTableRef table, const std::vector<ColKey>& links = {})
-        : ColumnListBase(column_key, table, links)
+    template <typename StorageType>
+    void evaluate(size_t index, ValueBase& destination)
+    {
+        Allocator& alloc = get_base_table()->get_alloc();
+        Value<ref_type> list_refs;
+        get_lists(index, list_refs, 1);
+        const bool is_from_list = true;
+
+        std::vector<StorageType> values;
+        for (size_t i = 0; i < list_refs.m_values; i++) {
+            ref_type list_ref = list_refs.m_storage[i];
+            if (list_ref) {
+                BPlusTree<StorageType> list(alloc);
+                list.init_from_ref(list_ref);
+                size_t s = list.size();
+                for (size_t j = 0; j < s; j++) {
+                    values.push_back(list.get(j));
+                }
+            }
+        }
+        Value<T> v;
+        v.init(is_from_list, values);
+        destination.import(v);
+    }
+
+    Columns(ColKey column_key, ConstTableRef table, const std::vector<ColKey>& links = {},
+            ExpressionComparisonType type = ExpressionComparisonType::Any)
+        : ColumnListBase(column_key, table, links, type)
+        , m_is_nullable_storage(this->m_column_key.get_attrs().test(col_attr_Nullable))
     {
     }
 };
@@ -3038,6 +3184,24 @@ public:
     }
     void evaluate(size_t index, ValueBase& destination) override
     {
+        if constexpr (std::is_same_v<T, ObjectId> || std::is_same_v<T, Int> || std::is_same_v<T, Bool>) {
+            if (this->m_is_nullable_storage) {
+                evaluate<Optional<T>>(index, destination);
+                return;
+            }
+        }
+        evaluate<T>(index, destination);
+    }
+
+    std::unique_ptr<Subexpr> clone() const override
+    {
+        return std::unique_ptr<Subexpr>(new ColumnListSize<T>(*this));
+    }
+
+private:
+    template <typename StorageType>
+    void evaluate(size_t index, ValueBase& destination)
+    {
         REALM_ASSERT_DEBUG(dynamic_cast<Value<SizeOfList>*>(&destination) != nullptr);
         Value<SizeOfList>* d = static_cast<Value<SizeOfList>*>(&destination);
 
@@ -3045,25 +3209,91 @@ public:
         Value<ref_type> list_refs;
         this->get_lists(index, list_refs, 1);
         d->init(list_refs.m_from_link_list, list_refs.m_values);
-
         for (size_t i = 0; i < list_refs.m_values; i++) {
             ref_type list_ref = list_refs.m_storage[i];
             if (list_ref) {
-                BPlusTree<T> list(alloc);
+                BPlusTree<StorageType> list(alloc);
                 list.init_from_ref(list_ref);
                 size_t s = list.size();
                 d->m_storage.set(i, SizeOfList(s));
             }
             else {
-                d->m_storage.set_null(i);
+                d->m_storage.set(i, SizeOfList(0));
             }
         }
     }
+};
+
+
+template <typename T>
+class ColumnListElementLength : public Subexpr2<Int> {
+public:
+    ColumnListElementLength(const Columns<Lst<T>>& source)
+        : m_list(source)
+    {
+    }
+    void evaluate(size_t index, ValueBase& destination) override
+    {
+        Allocator& alloc = m_list.get_base_table()->get_alloc();
+        Value<ref_type> list_refs;
+        m_list.get_lists(index, list_refs, 1);
+        std::vector<Int> sizes;
+        for (size_t i = 0; i < list_refs.m_values; i++) {
+            ref_type list_ref = list_refs.m_storage[i];
+            if (list_ref) {
+                BPlusTree<T> list(alloc);
+                list.init_from_ref(list_ref);
+                const size_t list_size = list.size();
+                sizes.reserve(sizes.size() + list_size);
+                for (size_t j = 0; j < list_size; j++) {
+                    sizes.push_back(list.get(j).size());
+                }
+            }
+        }
+        constexpr bool is_from_list = true;
+        Value<Int> values;
+        values.init(is_from_list, sizes);
+        destination.import(values);
+    }
+    ConstTableRef get_base_table() const override
+    {
+        return m_list.get_base_table();
+    }
+
+    void set_base_table(ConstTableRef table) override
+    {
+        m_list.set_base_table(table);
+    }
+
+    void set_cluster(const Cluster* cluster) override
+    {
+        m_list.set_cluster(cluster);
+    }
+
+    void collect_dependencies(std::vector<TableKey>& tables) const override
+    {
+        m_list.collect_dependencies(tables);
+    }
+
     std::unique_ptr<Subexpr> clone() const override
     {
-        return std::unique_ptr<Subexpr>(new ColumnListSize<T>(*this));
+        return std::unique_ptr<Subexpr>(new ColumnListElementLength<T>(*this));
     }
+
+    std::string description(util::serializer::SerialisationState& state) const override
+    {
+        return m_list.description(state) + util::serializer::value_separator + "length";
+    }
+
+    virtual ExpressionComparisonType get_comparison_type() const override
+    {
+        return m_list.get_comparison_type();
+    }
+
+private:
+    Columns<Lst<T>> m_list;
 };
+
 
 template <typename T>
 SizeOperator<SizeOfList> Columns<Lst<T>>::size()
@@ -3116,6 +3346,24 @@ public:
 
     void evaluate(size_t index, ValueBase& destination) override
     {
+        if constexpr (std::is_same_v<T, ObjectId> || std::is_same_v<T, Int> || std::is_same_v<T, Bool>) {
+            if (m_list.m_is_nullable_storage) {
+                evaluate<Optional<T>>(index, destination);
+                return;
+            }
+        }
+        evaluate<T>(index, destination);
+    }
+
+    virtual std::string description(util::serializer::SerialisationState& state) const override
+    {
+        return m_list.description(state) + util::serializer::value_separator + Operation::description();
+    }
+
+private:
+    template <typename StorageType>
+    void evaluate(size_t index, ValueBase& destination)
+    {
         Allocator& alloc = get_base_table()->get_alloc();
         Value<ref_type> list_refs;
         m_list.get_lists(index, list_refs, 1);
@@ -3127,7 +3375,7 @@ public:
             auto list_ref = list_refs.m_storage[i];
             Operation op;
             if (list_ref) {
-                BPlusTree<T> list(alloc);
+                BPlusTree<StorageType> list(alloc);
                 list.init_from_ref(list_ref);
                 size_t s = list.size();
                 for (unsigned j = 0; j < s; j++) {
@@ -3143,13 +3391,6 @@ public:
         }
         destination.import(v);
     }
-
-    virtual std::string description(util::serializer::SerialisationState&) const override
-    {
-        throw SerialisationError("Serialisation of queries involving subtable expressions is not yet supported.");
-    }
-
-private:
     ColKey m_column_key;
     Columns<Lst<T>> m_list;
 };
@@ -3234,10 +3475,12 @@ class Columns : public Subexpr2<T> {
 public:
     using LeafType = typename ColumnTypeTraits<T>::cluster_leaf_type;
 
-    Columns(ColKey column, ConstTableRef table, std::vector<ColKey> links = {})
+    Columns(ColKey column, ConstTableRef table, std::vector<ColKey> links = {},
+            ExpressionComparisonType type = ExpressionComparisonType::Any)
         : m_link_map(table, std::move(links))
         , m_column_key(column)
         , m_nullable(m_link_map.get_target_table()->is_nullable(m_column_key))
+        , m_comparison_type(type)
     {
     }
 
@@ -3245,6 +3488,7 @@ public:
         : m_link_map(other.m_link_map)
         , m_column_key(other.m_column_key)
         , m_nullable(other.m_nullable)
+        , m_comparison_type(other.m_comparison_type)
     {
     }
 
@@ -3254,6 +3498,7 @@ public:
             m_link_map = other.m_link_map;
             m_column_key = other.m_column_key;
             m_nullable = other.m_nullable;
+            m_comparison_type = other.m_comparison_type;
         }
         return *this;
     }
@@ -3392,7 +3637,7 @@ public:
 
     virtual std::string description(util::serializer::SerialisationState& state) const override
     {
-        return state.describe_columns(m_link_map, m_column_key);
+        return state.describe_expression_type(m_comparison_type) + state.describe_columns(m_link_map, m_column_key);
     }
 
     // Load values from Column into destination
@@ -3456,6 +3701,11 @@ public:
         return m_column_key;
     }
 
+    virtual ExpressionComparisonType get_comparison_type() const override
+    {
+        return m_comparison_type;
+    }
+
 private:
     LinkMap m_link_map;
 
@@ -3472,6 +3722,7 @@ private:
     // set to false by default for stand-alone Columns declaration that are not yet associated with any table
     // or oclumn. Call init() to update it or use a constructor that takes table + column index as argument.
     bool m_nullable = false;
+    ExpressionComparisonType m_comparison_type = ExpressionComparisonType::Any;
 };
 
 template <typename T, typename Operation>
@@ -3719,6 +3970,14 @@ public:
     {
         m_count++;
         m_result = Derived::apply(m_result, value);
+    }
+
+    void accumulate(Optional<T> value)
+    {
+        if (value) {
+            m_count++;
+            m_result = Derived::apply(m_result, *value);
+        }
     }
 
     bool is_null() const
@@ -4086,7 +4345,8 @@ public:
     double init() override
     {
         double dT = m_left_is_const ? 10.0 : 50.0;
-        if (std::is_same_v<TCond, Equal> && m_left_is_const && m_right->has_search_index()) {
+        if (std::is_same_v<TCond, Equal> && m_left_is_const && m_right->has_search_index() &&
+            m_right->get_comparison_type() == ExpressionComparisonType::Any) {
             if (m_left_value.m_storage.is_null(0)) {
                 m_matches = m_right->find_all(Mixed());
             }
@@ -4153,27 +4413,35 @@ public:
         }
 
         size_t match;
-
-        Value<T> left;
         Value<T> right;
-
-        for (; start < end;) {
-            if (m_left_is_const) {
+        const ExpressionComparisonType right_cmp_type = m_right->get_comparison_type();
+        if (m_left_is_const) {
+            for (; start < end;) {
                 m_right->evaluate(start, right);
-                match = Value<T>::template compare_const<TCond>(&m_left_value, &right);
+                match = Value<T>::template compare_const<TCond>(&m_left_value, &right, right_cmp_type);
+                if (match != not_found && match + start < end)
+                    return start + match;
+
+                size_t rows = (m_left_value.m_from_link_list || right.m_from_link_list)
+                                  ? 1
+                                  : minimum(right.m_values, m_left_value.m_values);
+                start += rows;
             }
-            else {
+        }
+        else {
+            Value<T> left;
+            const ExpressionComparisonType left_cmp_type = m_left->get_comparison_type();
+            for (; start < end;) {
                 m_left->evaluate(start, left);
                 m_right->evaluate(start, right);
-                match = Value<T>::template compare<TCond>(&left, &right);
+                match = Value<T>::template compare<TCond>(&left, &right, left_cmp_type, right_cmp_type);
+                if (match != not_found && match + start < end)
+                    return start + match;
+
+                size_t rows =
+                    (left.m_from_link_list || right.m_from_link_list) ? 1 : minimum(right.m_values, left.m_values);
+                start += rows;
             }
-
-            if (match != not_found && match + start < end)
-                return start + match;
-
-            size_t rows =
-                (left.m_from_link_list || right.m_from_link_list) ? 1 : minimum(right.m_values, left.m_values);
-            start += rows;
         }
 
         return not_found; // no match

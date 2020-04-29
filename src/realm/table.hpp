@@ -1009,13 +1009,20 @@ private:
     const Table* m_table;
 };
 
+enum class ExpressionComparisonType : unsigned char {
+    Any,
+    All,
+    None,
+};
+
 // Class used to collect a chain of links when building up a Query following links.
 // It has member functions corresponding to the ones defined on Table.
 class LinkChain {
 public:
-    LinkChain(ConstTableRef t)
+    LinkChain(ConstTableRef t, ExpressionComparisonType type = ExpressionComparisonType::Any)
         : m_current_table(t.unchecked_ptr())
         , m_base_table(t)
+        , m_comparison_type(type)
     {
     }
     const Table* get_base_table()
@@ -1052,7 +1059,7 @@ public:
             m_link_cols.push_back(col_key);
         }
 
-        return Columns<T>(col_key, m_base_table, m_link_cols);
+        return Columns<T>(col_key, m_base_table, m_link_cols, m_comparison_type);
     }
     template <class T>
     Columns<T> column(const Table& origin, ColKey origin_col_key)
@@ -1091,6 +1098,7 @@ private:
     std::vector<ColKey> m_link_cols;
     const Table* m_current_table;
     ConstTableRef m_base_table;
+    ExpressionComparisonType m_comparison_type;
 
     void add(ColKey ck)
     {

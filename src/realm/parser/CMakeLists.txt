@@ -3,6 +3,7 @@ set(REALM_PARSER_SOURCES
     keypath_mapping.cpp
     parser.cpp
     parser_utils.cpp
+    primitive_list_expression.cpp
     property_expression.cpp
     query_builder.cpp
     subquery_expression.cpp
@@ -15,6 +16,7 @@ set(REALM_PARSER_HEADERS
     keypath_mapping.hpp
     parser.hpp
     parser_utils.hpp
+    primitive_list_expression.hpp
     property_expression.hpp
     query_builder.hpp
     subquery_expression.hpp
