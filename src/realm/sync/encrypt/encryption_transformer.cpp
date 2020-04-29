@@ -11,7 +11,7 @@
 #include <realm/group.hpp>
 #include <realm/db.hpp>
 #include <realm/history.hpp>
-#include <realm/noinst/server_history.hpp>
+#include <realm/sync/noinst/server_history.hpp>
 #include <realm/replication.hpp>
 
 

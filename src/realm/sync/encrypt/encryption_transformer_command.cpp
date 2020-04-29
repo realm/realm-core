@@ -9,7 +9,7 @@
 
 #include "encryption_transformer.hpp"
 
-#include <realm/noinst/command_line_util.hpp>
+#include <realm/sync/noinst/command_line_util.hpp>
 #include <realm/util/base64.hpp>
 #include <realm/util/file.hpp>
 #include <realm/util/load_file.hpp>

@@ -1,5 +1,5 @@
 #include <realm/history.hpp>
-#include <realm/noinst/client_history_impl.hpp>
+#include <realm/sync/noinst/client_history_impl.hpp>
 
 namespace realm {
 namespace sync {

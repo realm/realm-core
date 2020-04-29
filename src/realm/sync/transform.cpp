@@ -24,8 +24,8 @@
 #include <realm/sync/transform.hpp>
 #include <realm/sync/changeset_parser.hpp>
 #include <realm/sync/changeset_encoder.hpp>
-#include <realm/noinst/changeset_index.hpp>
-#include <realm/noinst/protocol_codec.hpp>
+#include <realm/sync/noinst/changeset_index.hpp>
+#include <realm/sync/noinst/protocol_codec.hpp>
 #include <realm/util/allocation_metrics.hpp>
 #include <realm/util/metered/vector.hpp>
 #include <realm/util/metered/map.hpp>

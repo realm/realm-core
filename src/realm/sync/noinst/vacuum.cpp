@@ -1,8 +1,8 @@
-#include <realm/noinst/vacuum.hpp>
+#include <realm/sync/noinst/vacuum.hpp>
 
 #include <realm/group.hpp>
 #include <realm/sync/history.hpp>
-#include <realm/noinst/server_history.hpp>
+#include <realm/sync/noinst/server_history.hpp>
 #include <realm/sync/history.hpp>
 
 #include <realm/version.hpp>

@@ -5,7 +5,8 @@
         "functional": "cpp",
         "istream": "cpp",
         "tuple": "cpp",
-        "utility": "cpp"
+        "utility": "cpp",
+        "*.ipp": "cpp"
     },
     "C_Cpp.intelliSenseEngine": "Tag Parser",
     "cmake.configureOnOpen": false

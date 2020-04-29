@@ -215,6 +215,10 @@ if(NOT REALM_PLATFORM OR REALM_PLATFORM STREQUAL "Node")
     endif()
 endif()
 
+if(REALM_ENABLE_SYNC)
+  find_package(ZLIB REQUIRED)
+endif()
+
 if(REALM_PLATFORM STREQUAL "Node")
     set(PLATFORM_DEFINES "REALM_PLATFORM_NODE=1")
     if(NOT UV_LIBRARY)
@@ -237,6 +241,10 @@ option(REALM_METRICS "Enable various metric tracking" ON)
 set(REALM_MAX_BPNODE_SIZE "1000" CACHE STRING "Max B+ tree node size.")
 
 check_include_files(malloc.h HAVE_MALLOC_H)
+
+if(UNIX AND NOT APPLE)
+    set(REALM_HAVE_OPENSSL "1")
+endif()
 
 # Store configuration in header file
 configure_file(src/realm/util/config.h.in src/realm/util/config.h)

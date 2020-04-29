@@ -51,6 +51,11 @@ set(REALM_SOURCES
     table_view.cpp
     sort_descriptor.cpp
     unicode.cpp
+    utilities.cpp
+    version.cpp
+) # REALM_SOURCES
+
+set(UTIL_SOURCES
     util/allocator.cpp
     util/backtrace.cpp
     util/base64.cpp
@@ -62,15 +67,36 @@ set(REALM_SOURCES
     util/interprocess_condvar.cpp
     util/logger.cpp
     util/memory_stream.cpp
+    util/platform_info.cpp
     util/misc_errors.cpp
     util/serializer.cpp
     util/sha_crypto.cpp
     util/terminate.cpp
+    util/time.cpp
+    util/timestamp_formatter.cpp
+    util/timestamp_logger.cpp
     util/thread.cpp
     util/to_string.cpp
-    utilities.cpp
-    version.cpp
-) # REALM_SOURCES
+    util/allocation_metrics.cpp
+    util/copy_dir_recursive.cpp
+    util/demangle.cpp
+    util/duplicating_logger.cpp
+    util/enum.cpp
+    util/file_is_regular.cpp
+    util/http.cpp
+    util/json_parser.cpp
+    util/load_file.cpp
+    util/misc_ext_errors.cpp
+    util/network_ssl.cpp
+    util/network.cpp
+    util/parent_dir.cpp
+    util/random.cpp
+    util/resource_limits.cpp
+    util/substitute.cpp
+    util/system_process.cpp
+    util/uri.cpp
+    util/websocket.cpp
+)
 
 set(REALM_INSTALL_GENERAL_HEADERS
     alloc.hpp
@@ -232,7 +258,7 @@ endif()
 
 # We add the headers to the library only so they show up in dev
 # environments. It won't actually affect compilation process.
-add_library(CoreObjects OBJECT ${REALM_SOURCES} ${REALM_INSTALL_ALL_HEADERS})
+add_library(CoreObjects OBJECT ${REALM_SOURCES} ${UTIL_SOURCES} ${REALM_INSTALL_ALL_HEADERS})
 set_target_properties(CoreObjects PROPERTIES
     POSITION_INDEPENDENT_CODE ON
 )
@@ -377,6 +403,10 @@ if(UNIX AND NOT APPLE)
 
     target_include_directories(CoreObjects SYSTEM PUBLIC ${OPENSSL_INCLUDE_DIR})
     target_link_libraries(Storage PUBLIC OpenSSL::Crypto)
+    if (REALM_ENABLE_SYNC)
+	    target_link_libraries(Storage PUBLIC OpenSSL::SSL)
+    endif()
+    
     if(NOT REALM_SKIP_SHARED_LIB)
         target_link_libraries(StorageShared PUBLIC OpenSSL::Crypto)
     endif()
@@ -440,3 +470,6 @@ endif()
 add_subdirectory(parser)
 add_subdirectory(exec)
 add_subdirectory(object-store)
+if (REALM_ENABLE_SYNC)
+    add_subdirectory(sync)
+endif()

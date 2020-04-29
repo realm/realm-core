@@ -6,8 +6,8 @@
 #include <realm/sync/history.hpp>
 #include <realm/sync/changeset_parser.hpp>
 #include <realm/sync/instruction_applier.hpp>
-#include <realm/noinst/client_history_impl.hpp>
-#include <realm/noinst/client_reset.hpp>
+#include <realm/sync/noinst/client_history_impl.hpp>
+#include <realm/sync/noinst/client_reset.hpp>
 
 using namespace realm;
 using namespace _impl;

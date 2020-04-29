@@ -5,7 +5,7 @@
 
 #include <realm/util/features.h>
 #include <realm/util/scope_exit.hpp>
-#include <realm/noinst/client_history_impl.hpp>
+#include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/version.hpp>
 #include <realm/sync/object.hpp>
 #include <realm/sync/changeset.hpp>

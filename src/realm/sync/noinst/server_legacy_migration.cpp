@@ -3,8 +3,8 @@
 #include <random>
 
 #include <realm/util/file.hpp>
-#include <realm/noinst/server_history.hpp>
-#include <realm/noinst/server_legacy_migration.hpp>
+#include <realm/sync/noinst/server_history.hpp>
+#include <realm/sync/noinst/server_legacy_migration.hpp>
 #include <realm/sync/object.hpp>
 
 using namespace realm;

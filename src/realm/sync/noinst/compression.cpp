@@ -4,7 +4,7 @@
 #include <zlib.h>
 #include <zconf.h> // for zlib
 
-#include <realm/noinst/compression.hpp>
+#include <realm/sync/noinst/compression.hpp>
 #include <realm/util/assert.hpp>
 #include <realm/util/aes_cryptor.hpp>
 

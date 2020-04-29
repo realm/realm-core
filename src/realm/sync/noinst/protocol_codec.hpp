@@ -14,9 +14,9 @@
 #include <realm/util/logger.hpp>
 #include <realm/binary_data.hpp>
 #include <realm/chunked_binary.hpp>
-#include <realm/impl/clamped_hex_dump.hpp>
-#include <realm/noinst/compression.hpp>
-#include <realm/noinst/integer_codec.hpp>
+#include <realm/sync/impl/clamped_hex_dump.hpp>
+#include <realm/sync/noinst/compression.hpp>
+#include <realm/sync/noinst/integer_codec.hpp>
 #include <realm/sync/protocol.hpp>
 #include <realm/sync/transform.hpp>
 #include <realm/sync/changeset_parser.hpp>

@@ -23,7 +23,7 @@
 #include <realm/sync/transform.hpp>
 #include <realm/sync/instruction_replication.hpp>
 #include <realm/sync/permissions.hpp>
-#include <realm/noinst/object_id_history_state.hpp>
+#include <realm/sync/noinst/object_id_history_state.hpp>
 
 namespace realm {
 namespace sync {

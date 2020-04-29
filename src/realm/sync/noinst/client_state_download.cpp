@@ -1,11 +1,11 @@
 #include <realm/db.hpp>
-#include <realm/encrypt/fingerprint.hpp>
+#include <realm/sync/encrypt/fingerprint.hpp>
 #include <realm/sync/history.hpp>
-#include <realm/noinst/common_dir.hpp>
-#include <realm/noinst/compression.hpp>
-#include <realm/noinst/client_history_impl.hpp>
-#include <realm/noinst/client_reset.hpp>
-#include <realm/noinst/client_state_download.hpp>
+#include <realm/sync/noinst/common_dir.hpp>
+#include <realm/sync/noinst/compression.hpp>
+#include <realm/sync/noinst/client_history_impl.hpp>
+#include <realm/sync/noinst/client_reset.hpp>
+#include <realm/sync/noinst/client_state_download.hpp>
 
 using namespace realm;
 using namespace _impl;

@@ -1,6 +1,6 @@
 
 #include <realm/util/metered/set.hpp>
-#include <realm/noinst/integer_codec.hpp>
+#include <realm/sync/noinst/integer_codec.hpp>
 #include <realm/table.hpp>
 #include <realm/sync/changeset_parser.hpp>
 

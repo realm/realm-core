@@ -1,4 +1,4 @@
-#include <realm/noinst/changeset_index.hpp>
+#include <realm/sync/noinst/changeset_index.hpp>
 #include <realm/sync/object_id.hpp>
 
 #include <iterator> // std::distance, std::advance

@@ -1,4 +1,4 @@
-#include <realm/noinst/client_file_access_cache.hpp>
+#include <realm/sync/noinst/client_file_access_cache.hpp>
 
 using namespace realm;
 using namespace _impl;

@@ -1,5 +1,5 @@
 #include <realm/db.hpp>
-#include <realm/noinst/common_dir.hpp>
+#include <realm/sync/noinst/common_dir.hpp>
 #include <realm/util/file.hpp>
 
 using namespace realm;

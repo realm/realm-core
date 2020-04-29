@@ -1,5 +1,5 @@
-#include <realm/noinst/compact_changesets.hpp>
-#include <realm/noinst/changeset_index.hpp>
+#include <realm/sync/noinst/compact_changesets.hpp>
+#include <realm/sync/noinst/changeset_index.hpp>
 
 #include <realm/util/metered/map.hpp>
 #include <realm/util/metered/set.hpp>

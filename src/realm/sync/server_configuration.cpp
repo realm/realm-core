@@ -8,12 +8,12 @@
 #include <realm/util/file.hpp>
 #include <realm/util/network.hpp>
 #include <realm/string_data.hpp>
-#include <realm/encrypt/fingerprint.hpp>
-#include <realm/noinst/server_legacy_migration.hpp>
+#include <realm/sync/encrypt/fingerprint.hpp>
+#include <realm/sync/noinst/server_legacy_migration.hpp>
 #include <realm/sync/server_configuration.hpp>
 
 #if !REALM_MOBILE
-#include <realm/noinst/command_line_util.hpp>
+#include <realm/sync/noinst/command_line_util.hpp>
 using realm::config::show_help;
 #endif
 

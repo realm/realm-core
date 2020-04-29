@@ -145,5 +145,5 @@ target_link_libraries(realm-object-store PUBLIC realm ${PLATFORM_LIBRARIES})
 
 if(REALM_ENABLE_SYNC)
     # Add the sync libraries separately to reduce merge conflicts.
-    target_link_libraries(realm-object-store PUBLIC realm-sync ${ZLIB_LIBRARIES})
+    target_link_libraries(realm-object-store PUBLIC Sync ${ZLIB_LIBRARIES})
 endif()

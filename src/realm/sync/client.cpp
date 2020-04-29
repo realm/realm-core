@@ -7,8 +7,8 @@
 #include <realm/util/uri.hpp>
 #include <realm/util/thread.hpp>
 #include <realm/util/platform_info.hpp>
-#include <realm/noinst/client_file_access_cache.hpp>
-#include <realm/noinst/client_impl_base.hpp>
+#include <realm/sync/noinst/client_file_access_cache.hpp>
+#include <realm/sync/noinst/client_impl_base.hpp>
 #include <realm/version.hpp>
 #include <realm/sync/version.hpp>
 #include <realm/sync/client.hpp>

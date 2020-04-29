@@ -1,6 +1,6 @@
 #include <locale>
 
-#include <realm/noinst/server_dir.hpp>
+#include <realm/sync/noinst/server_dir.hpp>
 
 using namespace realm;
 

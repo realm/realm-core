@@ -10,11 +10,11 @@
 #include <realm/util/uri.hpp>
 #include <realm/util/http.hpp>
 #include <realm/util/platform_info.hpp>
-#include <realm/impl/clock.hpp>
+#include <realm/sync/impl/clock.hpp>
 #include <realm/impl/simulated_failure.hpp>
-#include <realm/noinst/client_history_impl.hpp>
-#include <realm/noinst/client_impl_base.hpp>
-#include <realm/noinst/compact_changesets.hpp>
+#include <realm/sync/noinst/client_history_impl.hpp>
+#include <realm/sync/noinst/client_impl_base.hpp>
+#include <realm/sync/noinst/compact_changesets.hpp>
 #include <realm/sync/version.hpp>
 #include <realm/sync/changeset_parser.hpp>
 

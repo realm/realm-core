@@ -8,13 +8,13 @@
 #include <realm/parser/query_builder.hpp>
 #include <realm/table_view.hpp>
 #include <realm/impl/input_stream.hpp>
-#include <realm/impl/clamped_hex_dump.hpp>
-#include <realm/noinst/server_history.hpp>
+#include <realm/sync/impl/clamped_hex_dump.hpp>
+#include <realm/sync/noinst/server_history.hpp>
 #include <realm/sync/version.hpp>
 #include <realm/sync/instruction_applier.hpp>
 #include <realm/sync/changeset_parser.hpp>
 #include <realm/sync/changeset_encoder.hpp>
-#include <realm/noinst/compact_changesets.hpp>
+#include <realm/sync/noinst/compact_changesets.hpp>
 
 using namespace realm;
 using namespace realm::sync;

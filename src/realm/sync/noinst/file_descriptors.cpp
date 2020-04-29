@@ -9,7 +9,7 @@
 #include <unistd.h>
 #endif
 
-#include <realm/noinst/file_descriptors.hpp>
+#include <realm/sync/noinst/file_descriptors.hpp>
 
 std::string realm::_impl::get_lsof_output()
 {

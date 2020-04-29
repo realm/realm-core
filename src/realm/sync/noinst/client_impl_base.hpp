@@ -16,8 +16,8 @@
 #include <realm/util/logger.hpp>
 #include <realm/util/network_ssl.hpp>
 #include <realm/util/websocket.hpp>
-#include <realm/noinst/protocol_codec.hpp>
-#include <realm/noinst/client_state_download.hpp>
+#include <realm/sync/noinst/protocol_codec.hpp>
+#include <realm/sync/noinst/client_state_download.hpp>
 #include <realm/sync/protocol.hpp>
 #include <realm/sync/history.hpp>
 #include <realm/sync/client.hpp>

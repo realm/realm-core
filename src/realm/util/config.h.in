@@ -6,6 +6,7 @@
 
 // Realm-specific configuration
 #cmakedefine REALM_HAVE_READDIR64
+#cmakedefine REALM_HAVE_OPENSSL @REALM_HAVE_OPENSSL@
 #cmakedefine REALM_MAX_BPNODE_SIZE @REALM_MAX_BPNODE_SIZE@
 #cmakedefine01 REALM_ENABLE_ASSERTIONS
 #cmakedefine01 REALM_ENABLE_ALLOC_SET_ZERO

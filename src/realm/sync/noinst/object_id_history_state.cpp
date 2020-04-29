@@ -1,6 +1,6 @@
 #include <realm/util/safe_int_ops.hpp> // FIXME: Remove this include when Core' alloc.hpp is fixed.
 
-#include <realm/noinst/object_id_history_state.hpp>
+#include <realm/sync/noinst/object_id_history_state.hpp>
 #include <realm/impl/destroy_guard.hpp>
 
 using namespace realm;
