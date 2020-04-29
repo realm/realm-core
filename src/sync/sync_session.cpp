@@ -520,6 +520,7 @@ void SyncSession::handle_error(SyncError error)
             case ProtocolError::unsupported_session_feature:
             case ProtocolError::transact_before_upload:
             case ProtocolError::partial_sync_disabled:
+            case ProtocolError::user_mismatch:
                 break;
             // Session errors
             case ProtocolError::session_closed:
