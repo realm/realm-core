@@ -751,7 +751,7 @@ TableRef Group::add_table_with_primary_key(StringData name, DataType pk_type, St
     if (Replication* repl = *get_repl())
         repl->add_class_with_primary_key(table->get_key(), name, pk_type, pk_name, nullable);
 
-    return TableRef(table, table ? table->m_alloc.get_instance_version() : 0);
+    return TableRef(table, table->m_alloc.get_instance_version());
 }
 
 Table* Group::do_add_table(StringData name, bool is_embedded, bool do_repl)
