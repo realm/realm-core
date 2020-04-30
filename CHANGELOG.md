@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 10.0.0-alpha.8 Release notes
 
 ### Enhancements
 
@@ -20,13 +20,10 @@
 * Throw an exception when someone tries to add a search index to a list of primitives instead of crashing
 * Changed query parser ALL/NONE support to belong to one side of a comparison instead of the entire expression, this enables support for reversing expressions (in addition to `ALL prices > 20` we now also support `20 < ALL prices`)
 
-### Breaking changes
-* None.
-
 -----------
 
 ### Internals
-* None.
+* Replication interface for adding tables and creating objects changed. Adaptation required in Sync.
 
 ----------------------------------------------
 
