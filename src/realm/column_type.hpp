@@ -32,7 +32,7 @@ enum ColumnType {
     col_type_OldStringEnum = 3, // double refs
     col_type_Binary = 4,
     col_type_OldTable = 5,
-    col_type_OldMixed = 6,
+    col_type_Mixed = 6,
     col_type_OldDateTime = 7,
     col_type_Timestamp = 8,
     col_type_Float = 9,
@@ -41,7 +41,8 @@ enum ColumnType {
     col_type_Link = 12,
     col_type_LinkList = 13,
     col_type_BackLink = 14,
-    col_type_ObjectId = 15
+    col_type_ObjectId = 15,
+    col_type_TypedLink = 16
 };
 
 

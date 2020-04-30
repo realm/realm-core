@@ -348,6 +348,9 @@ public:
     void rename_table(TableKey key, StringData new_name, bool require_unique_name = true);
     void rename_table(StringData name, StringData new_name, bool require_unique_name = true);
 
+    Obj get_object(ObjLink link);
+    void validate(ObjLink link) const;
+
     //@}
 
     // Serialization
@@ -1335,7 +1338,7 @@ public:
         /// The target row index which is being removed. Mostly relevant for
         /// LinkList (to know which entries are being removed), but also
         /// valid for Link.
-        ObjKey old_target_key;
+        ObjLink old_target_link;
     };
 
     CascadeState(Mode mode = Mode::Strong, Group* g = nullptr) noexcept
@@ -1379,17 +1382,17 @@ public:
         return false;
     }
 
-    void enqueue_for_nullification(Table& src_table, ColKey src_col_key, ObjKey origin_key, ObjKey target_key)
+    void enqueue_for_nullification(Table& src_table, ColKey src_col_key, ObjKey origin_key, ObjLink target_link)
     {
         // Nullify immediately if we don't need to send cascade notifications
         if (!notification_handler()) {
             Obj obj = src_table.get_object(origin_key);
-            obj.nullify_link(src_col_key, target_key);
+            obj.nullify_link(src_col_key, target_link);
             return;
         }
 
         // Otherwise enqueue it
-        m_to_be_nullified.push_back({src_table.get_key(), src_col_key, origin_key, target_key});
+        m_to_be_nullified.push_back({src_table.get_key(), src_col_key, origin_key, target_link});
     }
 
     void send_notifications()
@@ -1401,7 +1404,8 @@ public:
         for (auto& o : m_to_be_deleted)
             notification.rows.emplace_back(o.first, o.second);
         for (auto& l : m_to_be_nullified)
-            notification.links.emplace_back(l.origin_table, l.origin_col_key, l.origin_key, l.old_target_key);
+            notification.links.emplace_back(l.origin_table, l.origin_col_key, l.origin_key,
+                                            l.old_target_link.get_obj_key());
         send_notifications(notification);
     }
 };

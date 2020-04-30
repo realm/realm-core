@@ -154,6 +154,12 @@ int Mixed::compare(const Mixed& b) const
             else if (get<ObjKey>() < b.get<ObjKey>())
                 return -1;
             break;
+        case type_TypedLink:
+            if (get<ObjLink>() > b.get<ObjLink>())
+                return 1;
+            else if (get<ObjLink>() < b.get<ObjLink>())
+                return -1;
+            break;
         default:
             REALM_ASSERT_RELEASE(false && "Compare not supported for this column type");
             break;
@@ -202,9 +208,12 @@ std::ostream& operator<<(std::ostream& out, const Mixed& m)
             case type_Link:
                 out << ObjKey(m.int_val);
                 break;
+            case type_TypedLink:
+                out << m.link_val;
+                break;
             case type_OldDateTime:
             case type_OldTable:
-            case type_OldMixed:
+            case type_Mixed:
             case type_LinkList:
                 REALM_ASSERT(false);
         }

@@ -28,6 +28,7 @@
 #include "realm/array_decimal128.hpp"
 #include "realm/array_object_id.hpp"
 #include "realm/array_key.hpp"
+#include "realm/array_typed_link.hpp"
 #include "realm/array_backlink.hpp"
 #include "realm/index_string.hpp"
 #include "realm/column_type_traits.hpp"
@@ -824,7 +825,7 @@ void Cluster::create(size_t nb_leaf_columns)
             case col_type_Binary:
                 do_create<ArrayBinary>(col_key);
                 break;
-            case col_type_OldMixed:
+            case col_type_Mixed:
                 do_create<ArrayMixed>(col_key);
                 break;
             case col_type_Timestamp:
@@ -838,6 +839,9 @@ void Cluster::create(size_t nb_leaf_columns)
                 break;
             case col_type_Link:
                 do_create<ArrayKey>(col_key);
+                break;
+            case col_type_TypedLink:
+                do_create<ArrayTypedLink>(col_key);
                 break;
             case col_type_BackLink:
                 do_create<ArrayBacklink>(col_key);
@@ -926,20 +930,39 @@ inline void Cluster::do_insert_row(size_t ndx, ColKey col, Mixed init_val, bool 
 
 inline void Cluster::do_insert_key(size_t ndx, ColKey col_key, Mixed init_val, ObjKey origin_key)
 {
-    ObjKey key = init_val.is_null() ? ObjKey{} : init_val.get<ObjKey>();
+    ObjKey target_key = init_val.is_null() ? ObjKey{} : init_val.get<ObjKey>();
     ArrayKey arr(m_alloc);
     auto col_ndx = col_key.get_index();
     arr.set_parent(this, col_ndx.val + s_first_col_index);
     arr.init_from_parent();
-    arr.insert(ndx, key);
+    arr.insert(ndx, target_key);
 
     // Insert backlink if link is not null
-    if (key) {
+    if (target_key) {
         const Table* origin_table = m_tree_top.get_owner();
-        TableRef opp_table = origin_table->get_opposite_table(col_key);
         ColKey opp_col = origin_table->get_opposite_column(col_key);
-        Obj target_obj = opp_table->get_object(key);
+        TableRef opp_table = origin_table->get_opposite_table(col_key);
+        Obj target_obj = opp_table->get_object(target_key);
         target_obj.add_backlink(opp_col, origin_key);
+    }
+}
+
+inline void Cluster::do_insert_link(size_t ndx, ColKey col_key, Mixed init_val, ObjKey origin_key)
+{
+    ObjLink target_link = init_val.is_null() ? ObjLink{} : init_val.get<ObjLink>();
+    ArrayTypedLink arr(m_alloc);
+    auto col_ndx = col_key.get_index();
+    arr.set_parent(this, col_ndx.val + s_first_col_index);
+    arr.init_from_parent();
+    arr.insert(ndx, target_link);
+
+    // Insert backlink if link is not null
+    if (target_link) {
+        Table* origin_table = const_cast<Table*>(m_tree_top.get_owner());
+        Obj target_obj = origin_table->get_parent_group()->get_object(target_link);
+        auto target_table = target_obj.get_table();
+        ColKey backlink_col_key = target_table->find_or_add_backlink_column(col_key, origin_table->get_key());
+        target_obj.add_backlink(backlink_col_key, origin_key);
     }
 }
 
@@ -999,7 +1022,7 @@ void Cluster::insert_row(size_t ndx, ObjKey k, const FieldValues& init_values)
             case col_type_Binary:
                 do_insert_row<ArrayBinary>(ndx, col_key, init_value, nullable);
                 break;
-            case col_type_OldMixed: {
+            case col_type_Mixed: {
                 ArrayMixed arr(m_alloc);
                 arr.set_parent(this, col_key.get_index().val + s_first_col_index);
                 arr.init_from_parent();
@@ -1017,6 +1040,9 @@ void Cluster::insert_row(size_t ndx, ObjKey k, const FieldValues& init_values)
                 break;
             case col_type_Link:
                 do_insert_key(ndx, col_key, init_value, ObjKey(k.value + get_offset()));
+                break;
+            case col_type_TypedLink:
+                do_insert_link(ndx, col_key, init_value, ObjKey(k.value + get_offset()));
                 break;
             case col_type_BackLink: {
                 ArrayBacklink arr(m_alloc);
@@ -1092,7 +1118,7 @@ void Cluster::move(size_t ndx, ClusterNode* new_node, int64_t offset)
             case col_type_Binary:
                 do_move<ArrayBinary>(ndx, col_key, new_leaf);
                 break;
-            case col_type_OldMixed:
+            case col_type_Mixed:
                 do_move<ArrayMixed>(ndx, col_key, new_leaf);
                 break;
             case col_type_Timestamp:
@@ -1106,6 +1132,9 @@ void Cluster::move(size_t ndx, ClusterNode* new_node, int64_t offset)
                 break;
             case col_type_Link:
                 do_move<ArrayKey>(ndx, col_key, new_leaf);
+                break;
+            case col_type_TypedLink:
+                do_move<ArrayTypedLink>(ndx, col_key, new_leaf);
                 break;
             case col_type_BackLink:
                 do_move<ArrayBacklink>(ndx, col_key, new_leaf);
@@ -1218,7 +1247,7 @@ void Cluster::insert_column(ColKey col_key)
         case col_type_Binary:
             do_insert_column<ArrayBinary>(col_key, nullable);
             break;
-        case col_type_OldMixed:
+        case col_type_Mixed:
             do_insert_column<ArrayMixed>(col_key, nullable);
             break;
         case col_type_Timestamp:
@@ -1232,6 +1261,9 @@ void Cluster::insert_column(ColKey col_key)
             break;
         case col_type_Link:
             do_insert_column<ArrayKey>(col_key, nullable);
+            break;
+        case col_type_TypedLink:
+            do_insert_column<ArrayTypedLink>(col_key, nullable);
             break;
         case col_type_BackLink:
             do_insert_column<ArrayBacklink>(col_key, nullable);
@@ -1349,6 +1381,29 @@ inline void Cluster::do_erase(size_t ndx, ColKey col_key)
     values.set_parent(this, col_ndx.val + s_first_col_index);
     set_spec<T>(values, col_ndx);
     values.init_from_parent();
+    if constexpr (std::is_same_v<T, ArrayTypedLink>) {
+        ObjLink link = values.get(ndx);
+        if (link) {
+            const Table* origin_table = m_tree_top.get_owner();
+            auto target_obj = origin_table->get_parent_group()->get_object(link);
+
+            ColKey backlink_col_key = target_obj.get_table()->find_backlink_column(col_key, origin_table->get_key());
+
+            target_obj.remove_one_backlink(backlink_col_key, get_real_key(ndx)); // Throws
+        }
+    }
+    if constexpr (std::is_same_v<T, ArrayMixed>) {
+        Mixed value = values.get(ndx);
+        if (!value.is_null() && value.get_type() == type_TypedLink) {
+            ObjLink link = value.get<ObjLink>();
+            const Table* origin_table = m_tree_top.get_owner();
+            auto target_obj = origin_table->get_parent_group()->get_object(link);
+
+            ColKey backlink_col_key = target_obj.get_table()->find_backlink_column(col_key, origin_table->get_key());
+
+            target_obj.remove_one_backlink(backlink_col_key, get_real_key(ndx)); // Throws
+        }
+    }
     values.erase(ndx);
 }
 
@@ -1416,6 +1471,33 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
                         remove_backlinks(ObjKey(key.value + m_offset), col_key, links.get_all(), state);
                     }
                 }
+                else if (col_type == col_type_TypedLink) {
+                    BPlusTree<ObjLink> links(m_alloc);
+                    links.init_from_ref(ref);
+                    const Table* origin_table = m_tree_top.get_owner();
+                    for (size_t i = 0; i < links.size(); i++) {
+                        ObjLink link = links.get(i);
+                        auto target_obj = origin_table->get_parent_group()->get_object(link);
+                        ColKey backlink_col_key =
+                            target_obj.get_table()->find_backlink_column(col_key, origin_table->get_key());
+                        target_obj.remove_one_backlink(backlink_col_key, ObjKey(key.value + m_offset));
+                    }
+                }
+                else if (col_type == col_type_Mixed) {
+                    BPlusTree<Mixed> list(m_alloc);
+                    list.init_from_ref(ref);
+                    const Table* origin_table = m_tree_top.get_owner();
+                    for (size_t i = 0; i < list.size(); i++) {
+                        Mixed val = list.get(i);
+                        if (val.get_type() == type_TypedLink) {
+                            ObjLink link = val.get<ObjLink>();
+                            auto target_obj = origin_table->get_parent_group()->get_object(link);
+                            ColKey backlink_col_key =
+                                target_obj.get_table()->find_backlink_column(col_key, origin_table->get_key());
+                            target_obj.remove_one_backlink(backlink_col_key, ObjKey(key.value + m_offset));
+                        }
+                    }
+                }
                 Array::destroy_deep(ref, m_alloc);
             }
 
@@ -1448,7 +1530,7 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
             case col_type_Binary:
                 do_erase<ArrayBinary>(ndx, col_key);
                 break;
-            case col_type_OldMixed:
+            case col_type_Mixed:
                 do_erase<ArrayMixed>(ndx, col_key);
                 break;
             case col_type_Timestamp:
@@ -1462,6 +1544,9 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
                 break;
             case col_type_Link:
                 do_erase_key(ndx, col_key, state);
+                break;
+            case col_type_TypedLink:
+                do_erase<ArrayTypedLink>(ndx, col_key);
                 break;
             case col_type_BackLink:
                 if (state.m_mode == CascadeState::Mode::None) {
@@ -1707,7 +1792,7 @@ void Cluster::verify() const
             case col_type_Binary:
                 verify<ArrayBinary>(ref, col, sz);
                 break;
-            case col_type_OldMixed:
+            case col_type_Mixed:
                 verify<ArrayMixed>(ref, col, sz);
                 break;
             case col_type_Timestamp:
@@ -1826,7 +1911,7 @@ void Cluster::dump_objects(int64_t key_offset, std::string lead) const
                     std::cout << ", " << arr.get(i);
                     break;
                 }
-                case col_type_OldMixed: {
+                case col_type_Mixed: {
                     ArrayMixed arr(m_alloc);
                     ref_type ref = Array::get_as_ref(j);
                     arr.init_from_ref(ref);
