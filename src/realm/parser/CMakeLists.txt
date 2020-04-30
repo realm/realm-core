@@ -23,6 +23,9 @@ set(REALM_PARSER_HEADERS
     value_expression.hpp
 ) # REALM_PARSER_HEADERS
 
+if (MSVC)
+    set_source_files_properties(query_builder.cpp PROPERTIES COMPILE_FLAGS /bigobj)
+endif()
 
 add_library(QueryParser STATIC ${REALM_PARSER_SOURCES} ${REALM_PARSER_HEADERS})
 add_library(realm-parser ALIAS QueryParser)
