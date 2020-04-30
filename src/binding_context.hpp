@@ -78,10 +78,6 @@ public:
 
     std::weak_ptr<Realm> realm;
 
-    // If the user adds a notification handler to the Realm, will it ever
-    // actually be called?
-    virtual bool can_deliver_notifications() const noexcept { return true; }
-
     // Called when the Realm is about to send notifications about Realm,
     // Collection or Object changes. This method will be called even if
     // no notification callbacks have been registered.

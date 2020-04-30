@@ -32,10 +32,11 @@
 #include "schema.hpp"
 #include "thread_safe_reference.hpp"
 
+#include "util/scheduler.hpp"
+
 #include <realm/db.hpp>
 #include <realm/util/scope_exit.hpp>
 #include <realm/util/fifo_helper.hpp>
-
 
 #if REALM_ENABLE_SYNC
 #include "sync/impl/sync_file.hpp"
@@ -60,7 +61,7 @@ using namespace realm::_impl;
 Realm::Realm(Config config, util::Optional<VersionID> version, std::shared_ptr<_impl::RealmCoordinator> coordinator, MakeSharedTag)
 : m_config(std::move(config))
 , m_frozen_version(std::move(version))
-, m_execution_context(m_config.execution_context)
+, m_scheduler(m_config.scheduler)
 {
     if (!coordinator->get_cached_schema(m_schema, m_schema_version, m_schema_transaction_version)) {
         m_group = coordinator->begin_read();
@@ -93,7 +94,7 @@ Group& Realm::read_group()
     verify_open();
 
     if (!m_group)
-        begin_read(VersionID{});
+        begin_read(m_frozen_version.value_or(VersionID{}));
     return *m_group;
 }
 
@@ -151,14 +152,16 @@ SharedRealm Realm::get_frozen_realm(Config config, VersionID version)
     return realm;
 }
 
-SharedRealm Realm::get_shared_realm(ThreadSafeReference ref, util::Optional<AbstractExecutionContextID> execution_context)
+SharedRealm Realm::get_shared_realm(ThreadSafeReference ref, std::shared_ptr<util::Scheduler> scheduler)
 {
+    if (!scheduler)
+        scheduler = util::Scheduler::make_default();
     SharedRealm realm = ref.resolve<std::shared_ptr<Realm>>(nullptr);
     REALM_ASSERT(realm);
     auto& config = realm->config();
     auto coordinator = RealmCoordinator::get_coordinator(config.path);
-    coordinator->bind_to_context(*realm, execution_context);
-    realm->m_execution_context = execution_context;
+    realm->m_scheduler = scheduler;
+    coordinator->bind_to_context(*realm);
     return realm;
 }
 
@@ -286,7 +289,7 @@ bool Realm::schema_change_needs_write_transaction(Schema& schema,
 Schema Realm::get_full_schema()
 {
     if (!m_config.immutable())
-        refresh();
+        do_refresh();
 
     // If the user hasn't specified a schema previously then m_schema is always
     // the full schema
@@ -341,14 +344,26 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
 {
     schema.validate();
 
+    bool was_in_read_transaction =  is_in_read_transaction();
     Schema actual_schema = get_full_schema();
     std::vector<SchemaChange> required_changes = actual_schema.compare(schema);
 
     if (!schema_change_needs_write_transaction(schema, required_changes, version)) {
+        if (!was_in_read_transaction)
+            m_group = nullptr;
         set_schema(actual_schema, std::move(schema));
         return;
     }
     // Either the schema version has changed or we need to do non-migration changes
+
+    // Cancel the write transaction if we exit this function before committing it
+    auto cleanup = util::make_scope_exit([&]() noexcept {
+        // When in_transaction is true, caller is responsible to cancel the transaction.
+        if (!in_transaction && is_in_transaction())
+            cancel_transaction();
+        if (!was_in_read_transaction)
+            m_group = nullptr;
+    });
 
     if (!in_transaction) {
         transaction().promote_to_write();
@@ -367,13 +382,6 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
         }
         cache_new_schema();
     }
-
-    // Cancel the write transaction if we exit this function before committing it
-    auto cleanup = util::make_scope_exit([&]() noexcept {
-        // When in_transaction is true, caller is responsible to cancel the transaction.
-        if (!in_transaction && is_in_transaction())
-            cancel_transaction();
-    });
 
     uint64_t old_schema_version = m_schema_version;
     bool additive = m_config.schema_mode == SchemaMode::Additive;
@@ -424,14 +432,18 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
         initialization_function(shared_from_this());
     }
 
-    if (!in_transaction) {
-        commit_transaction();
-    }
-
     m_schema = std::move(schema);
+    m_new_schema = ObjectStore::schema_from_group(read_group());
     m_schema_version = ObjectStore::get_schema_version(read_group());
     m_dynamic_schema = false;
     m_coordinator->clear_schema_cache_and_set_schema_version(version);
+
+    if (!in_transaction) {
+        m_coordinator->commit_write(*this);
+        invalidate_permission_cache();
+        cache_new_schema();
+    }
+
     notify_schema_changed();
 }
 
@@ -509,11 +521,7 @@ static void check_can_create_write_transaction(const Realm* realm)
 
 void Realm::verify_thread() const
 {
-    if (m_frozen_version || !m_execution_context.contains<std::thread::id>())
-        return;
-
-    auto thread_id = m_execution_context.get<std::thread::id>();
-    if (thread_id != std::this_thread::get_id())
+    if (m_scheduler && !m_scheduler->is_on_thread())
         throw IncorrectThreadException();
 }
 
@@ -802,7 +810,11 @@ bool Realm::refresh()
 {
     verify_thread();
     check_can_create_any_transaction(this);
+    return do_refresh();
+}
 
+bool Realm::do_refresh()
+{
     // Frozen Realms never change.
     if (is_frozen()) {
         return false;
@@ -863,7 +875,7 @@ bool Realm::can_deliver_notifications() const noexcept
         return false;
     }
 
-    if (m_binding_context && !m_binding_context->can_deliver_notifications()) {
+    if (!m_scheduler || !m_scheduler->can_deliver_notifications()) {
         return false;
     }
 
@@ -887,8 +899,11 @@ bool Realm::is_frozen() const
     return result;
 }
 
-SharedRealm Realm::freeze() {
-    return Realm::get_frozen_realm(m_config, read_transaction_version());
+SharedRealm Realm::freeze()
+{
+    auto config = m_config;
+    config.scheduler = util::Scheduler::get_frozen();
+    return Realm::get_frozen_realm(std::move(config), read_transaction_version());
 }
 
 void Realm::close()

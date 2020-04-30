@@ -17,21 +17,34 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #include <atomic>
+#include <thread>
 #include <uv.h>
 
-namespace realm {
-namespace util {
-template<typename Callback>
-class EventLoopSignal {
-public:
-    struct Data {
-        Callback callback;
-        std::atomic<bool> close_requested;
-    };
+namespace {
+using namespace realm;
 
-    EventLoopSignal(Callback&& callback)
+class UvMainLoopScheduler : public util::Scheduler {
+public:
+    UvMainLoopScheduler() = default;
+    ~UvMainLoopScheduler()
     {
-        m_handle->data = new Data { std::move(callback), {false} };
+        if (m_handle && m_handle->data) {
+            static_cast<Data*>(m_handle->data)->close_requested = true;
+            uv_async_send(m_handle);
+            // Don't delete anything here as we need to delete it from within the event loop instead
+        }
+        else {
+            delete m_handle;
+        }
+    }
+
+    bool is_on_thread() const noexcept override { return m_id == std::this_thread::get_id(); }
+    bool can_deliver_notifications() const noexcept override { return true; }
+
+    void set_notify_callback(std::function<void()> fn) override
+    {
+        m_handle = new uv_async_t;
+        m_handle->data = new Data{std::move(fn), {false}};
 
         // This assumes that only one thread matters: the main thread (default loop).
         uv_async_init(uv_default_loop(), m_handle, [](uv_async_t* handle) {
@@ -47,24 +60,27 @@ public:
         });
     }
 
-    ~EventLoopSignal()
-    {
-        static_cast<Data*>(m_handle->data)->close_requested = true;
-        uv_async_send(m_handle);
-    }
-
-    EventLoopSignal(EventLoopSignal&&) = delete;
-    EventLoopSignal& operator=(EventLoopSignal&&) = delete;
-    EventLoopSignal(EventLoopSignal const&) = delete;
-    EventLoopSignal& operator=(EventLoopSignal const&) = delete;
-
-    void notify()
+    void notify() override
     {
         uv_async_send(m_handle);
     }
 
 private:
-    uv_async_t* m_handle = new uv_async_t;
+    struct Data {
+        std::function<void()> callback;
+        std::atomic<bool> close_requested;
+    };
+    uv_async_t* m_handle = nullptr;
+    std::thread::id m_id = std::this_thread::get_id();
 };
+
+} // anonymous namespace
+
+namespace realm {
+namespace util {
+std::shared_ptr<Scheduler> Scheduler::make_default()
+{
+    return std::make_shared<UvMainLoopScheduler>();
+}
 } // namespace util
 } // namespace realm
