@@ -18,6 +18,8 @@ services:
     volumes:
       - ../tests/mongodb:/apps/auth-integration-tests
     hostname: mongodb-realm
+    environment: 
+      MONGODB_REALM_HOSTNAME: mongodb-realm
     ports:
       - 9090:9090
     healthcheck:

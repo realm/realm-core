@@ -26,7 +26,7 @@ namespace app {
 void AppServiceClient::call_function(const std::string& name,
                                      const std::string& args_json,
                                      const util::Optional<std::string>& service_name,
-                                     std::function<void (util::Optional<AppError>, util::Optional<std::string>)> completion_block) const
+                                     std::function<void (util::Optional<AppError>, util::Optional<std::string>)> completion_block)
 {
     auto handler = [completion_block](const Response& response) {
         
@@ -58,7 +58,7 @@ void AppServiceClient::call_function(const std::string& name,
 
 void AppServiceClient::call_function(const std::string& name,
                                 const std::string& args_json,
-                                std::function<void (util::Optional<AppError>, util::Optional<std::string>)> completion_block) const
+                                std::function<void (util::Optional<AppError>, util::Optional<std::string>)> completion_block)
 {
     call_function(name, args_json, service_name, completion_block);
 }

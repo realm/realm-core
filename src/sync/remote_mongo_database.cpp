@@ -21,12 +21,12 @@
 namespace realm {
 namespace app {
 
-RemoteMongoCollection RemoteMongoDatabase::collection(const std::string& collection_name) const
+RemoteMongoCollection RemoteMongoDatabase::collection(const std::string& collection_name)
 {
     return RemoteMongoCollection(collection_name, name, m_service);
 }
 
-RemoteMongoCollection RemoteMongoDatabase::operator[](const std::string& collection_name) const
+RemoteMongoCollection RemoteMongoDatabase::operator[](const std::string& collection_name)
 {
     return RemoteMongoCollection(collection_name, name, m_service);
 }

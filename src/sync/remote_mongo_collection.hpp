@@ -96,7 +96,7 @@ public:
     
     RemoteMongoCollection(std::string name,
                           std::string database_name,
-                          const AppServiceClient& service)
+                          AppServiceClient& service)
     : name(name), database_name(database_name), m_service(service) { }
 
     /// Finds the documents in this collection which match the provided filter.
@@ -303,7 +303,7 @@ private:
         { "collection" , name }
     };
     
-    const AppServiceClient& m_service;
+    AppServiceClient& m_service;
 };
 
 } // namespace app
