@@ -98,10 +98,14 @@ struct false_value : string_token_t("false") {};
 struct null_value : seq<sor<string_token_t("null"), string_token_t("nil")>> {};
 
 // following operators must allow proceeding string characters
-struct min : TAOCPP_PEGTL_ISTRING(".@min.") {};
-struct max : TAOCPP_PEGTL_ISTRING(".@max.") {};
-struct sum : TAOCPP_PEGTL_ISTRING(".@sum.") {};
-struct avg : TAOCPP_PEGTL_ISTRING(".@avg.") {};
+struct min : TAOCPP_PEGTL_ISTRING(".@min") {
+};
+struct max : TAOCPP_PEGTL_ISTRING(".@max") {
+};
+struct sum : TAOCPP_PEGTL_ISTRING(".@sum") {
+};
+struct avg : TAOCPP_PEGTL_ISTRING(".@avg") {
+};
 // these operators are normal strings (no proceeding string characters)
 struct count : string_token_t(".@count") {};
 struct size : string_token_t(".@size") {};
@@ -124,7 +128,7 @@ struct key_path : list<sor<backlink_path, one_key_path>, one<'.'>> {
 struct key_path_prefix : disable< key_path > {};
 struct key_path_suffix : disable< key_path > {};
 struct collection_operator_match
-    : sor<seq<key_path_prefix, key_collection_operators, key_path_suffix>,
+    : sor<seq<key_path_prefix, key_collection_operators, opt<seq<dot, key_path_suffix>>>,
           seq<opt<key_path_prefix, dot>, backlink_count>, seq<key_path_prefix, single_collection_operators>> {
 };
 
@@ -152,21 +156,18 @@ struct subquery : seq<sub_preamble, pad<pred, blank>, pad<subq_suffix, blank>, s
 // list aggregate operations
 struct agg_target : seq<key_path> {
 };
-struct agg_any : seq<sor<string_token_t("any"), string_token_t("some")>, plus<blank>, agg_target,
-                     pad<sor<string_oper, symbolic_oper>, blank>, expr> {
+struct agg_any : sor<string_token_t("any"), string_token_t("some")> {
 };
-struct agg_all
-    : seq<string_token_t("all"), plus<blank>, agg_target, pad<sor<string_oper, symbolic_oper>, blank>, expr> {
+struct agg_all : string_token_t("all") {
 };
-struct agg_none
-    : seq<string_token_t("none"), plus<blank>, agg_target, pad<sor<string_oper, symbolic_oper>, blank>, expr> {
+struct agg_none : string_token_t("none") {
 };
-struct agg_shortcut_pred : sor<agg_any, agg_all, agg_none> {
+struct agg_expr : seq< sor<agg_any, agg_all, agg_none>, plus<blank>, key_path> {
 };
 
 // expressions and operators
 struct expr : sor<dq_string, sq_string, timestamp, oid, number, argument, true_value, false_value, null_value, base64,
-                  collection_operator_match, subquery, key_path> {
+                  collection_operator_match, subquery, agg_expr, key_path> {
 };
 struct case_insensitive : TAOCPP_PEGTL_ISTRING("[c]") {};
 
@@ -224,7 +225,7 @@ struct false_pred : string_token_t("falsepredicate") {};
 
 struct not_pre : seq< sor< one< '!' >, string_token_t("not") > > {};
 struct atom_pred
-    : seq<opt<not_pre>, pad<sor<group_pred, true_pred, false_pred, agg_shortcut_pred, comparison_pred>, blank>,
+    : seq<opt<not_pre>, pad<sor<group_pred, true_pred, false_pred, comparison_pred>, blank>,
           star<pad<predicate_suffix_modifier, blank>>> {
 };
 
@@ -250,7 +251,7 @@ struct ParserState
     DescriptorOrderingState::SingleOrderingState temp_ordering;
     std::string subquery_path, subquery_var;
     std::vector<Predicate> subqueries;
-    Predicate::ComparisonType pending_comparison_type;
+    Expression::ComparisonType pending_comparison_type = Expression::ComparisonType::Unspecified;
 
     Predicate *current_group()
     {
@@ -287,20 +288,18 @@ struct ParserState
 
     void add_collection_aggregate_expression()
     {
-        add_expression(Expression(collection_key_path_prefix, pending_op, collection_key_path_suffix));
+        add_expression(
+            Expression(collection_key_path_prefix, pending_op, collection_key_path_suffix, pending_comparison_type));
         collection_key_path_prefix = "";
         collection_key_path_suffix = "";
         pending_op = Expression::KeyPathOp::None;
-    }
-
-    void apply_list_aggregate_operation()
-    {
-        last_predicate()->cmpr.compare_type = pending_comparison_type;
-        pending_comparison_type = Predicate::ComparisonType::Unspecified;
+        pending_comparison_type = Expression::ComparisonType::Unspecified;
     }
 
     void add_expression(Expression && exp)
     {
+        exp.comparison_type = pending_comparison_type;
+        pending_comparison_type = Expression::ComparisonType::Unspecified;
         Predicate *current = last_predicate();
         if (current->type == Predicate::Type::Comparison && current->cmpr.expr[1].type == parser::Expression::Type::None) {
             current->cmpr.expr[1] = std::move(exp);
@@ -633,7 +632,7 @@ COLLECTION_OPERATION_ACTION(max, Expression::KeyPathOp::Max)
 COLLECTION_OPERATION_ACTION(sum, Expression::KeyPathOp::Sum)
 COLLECTION_OPERATION_ACTION(avg, Expression::KeyPathOp::Avg)
 COLLECTION_OPERATION_ACTION(count, Expression::KeyPathOp::Count)
-COLLECTION_OPERATION_ACTION(size, Expression::KeyPathOp::SizeString)
+COLLECTION_OPERATION_ACTION(size, Expression::KeyPathOp::Count)
 COLLECTION_OPERATION_ACTION(backlink_count, Expression::KeyPathOp::BacklinkCount)
 
 template<> struct action< key_path_prefix > {
@@ -671,19 +670,9 @@ template<> struct action< collection_operator_match > {
         }                                                                                                            \
     };
 
-LIST_AGG_OP_TYPE_ACTION(agg_any, Predicate::ComparisonType::Any)
-LIST_AGG_OP_TYPE_ACTION(agg_all, Predicate::ComparisonType::All)
-LIST_AGG_OP_TYPE_ACTION(agg_none, Predicate::ComparisonType::None)
-
-template <>
-struct action<agg_shortcut_pred> {
-    template <typename Input>
-    static void apply(const Input& in, ParserState& state)
-    {
-        DEBUG_PRINT_TOKEN(in.string() + " Aggregate shortcut matched");
-        state.apply_list_aggregate_operation();
-    }
-};
+LIST_AGG_OP_TYPE_ACTION(agg_any, Expression::ComparisonType::Any)
+LIST_AGG_OP_TYPE_ACTION(agg_all, Expression::ComparisonType::All)
+LIST_AGG_OP_TYPE_ACTION(agg_none, Expression::ComparisonType::None)
 
 template<> struct action< true_pred >
 {

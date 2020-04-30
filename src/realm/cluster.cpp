@@ -2224,10 +2224,10 @@ Obj ClusterTree::insert(ObjKey k, const FieldValues& values)
         };
         get_owner()->for_each_public_column(insert_in_column);
 
-        if (!table->is_embedded()) {
-            if (Replication* repl = table->get_repl()) {
-                repl->create_object(table, k);
-                for (const auto& v : values) {
+        if (Replication* repl = table->get_repl()) {
+            auto pk_col = table->get_primary_key_column();
+            for (const auto& v : values) {
+                if (v.col_key != pk_col) {
                     if (v.value.is_null()) {
                         repl->set_null(table, v.col_key, k, _impl::instr_Set);
                     }

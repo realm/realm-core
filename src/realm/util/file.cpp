@@ -1545,13 +1545,17 @@ bool DirScanner::next(std::string& name)
     if (!m_dirp)
         return false;
 
-    for (;;) {
-        // Note: readdir_r() is deprecated. However, all implementations
-        // implement readdir() to be thread-safe when operating on separate
-        // directory streams.
-        // More information: lwn.net/Articles/696475/
+// Use readdir64 if it is available. This is necessary to support filesystems that return dirent fields that don't fit
+// in 32-bits.
+#ifdef REALM_HAVE_READDIR64
+#define REALM_READDIR(...) readdir64(__VA_ARGS__)
+#else
+#define REALM_READDIR(...) readdir(__VA_ARGS__)
+#endif
 
-        struct dirent* dirent;
+    for (;;) {
+        using DirentPtr = decltype(REALM_READDIR(m_dirp));
+        DirentPtr dirent;
         do {
             // readdir() signals both errors and end-of-stream by returning a
             // null pointer. To distinguish between end-of-stream and errors,
@@ -1559,7 +1563,7 @@ bool DirScanner::next(std::string& name)
             // calling it...
             errno = 0;
 
-            dirent = readdir(m_dirp);
+            dirent = REALM_READDIR(m_dirp);
         } while (!dirent && errno == EAGAIN);
 
         if (!dirent) {

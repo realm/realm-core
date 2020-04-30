@@ -738,18 +738,23 @@ TableRef Group::add_table_with_primary_key(StringData name, DataType pk_type, St
         throw LogicError(LogicError::detached_accessor);
     check_table_name_uniqueness(name);
 
-    if (Replication* repl = *get_repl())
-        repl->add_class_with_primary_key(name, pk_type, pk_name, nullable);
+    auto table = do_add_table(name, false, false);
 
-    auto table = do_add_table(name);
-
-    ColKey pk_col = table->add_column(pk_type, pk_name, nullable);
+    // Add pk column - without replication
+    ColumnAttrMask attr;
+    if (nullable)
+        attr.set(col_attr_Nullable);
+    ColKey pk_col = table->generate_col_key(ColumnType(pk_type), attr);
+    table->do_insert_root_column(pk_col, ColumnType(pk_type), pk_name);
     table->do_set_primary_key_column(pk_col);
 
-    return TableRef(table, table ? table->m_alloc.get_instance_version() : 0);
+    if (Replication* repl = *get_repl())
+        repl->add_class_with_primary_key(table->get_key(), name, pk_type, pk_name, nullable);
+
+    return TableRef(table, table->m_alloc.get_instance_version());
 }
 
-Table* Group::do_add_table(StringData name)
+Table* Group::do_add_table(StringData name, bool is_embedded, bool do_repl)
 {
     if (!m_is_writable)
         throw LogicError(LogicError::wrong_transact_state);
@@ -767,39 +772,7 @@ Table* Group::do_add_table(StringData name)
     bool gen_null_tag = (j == m_tables.size()); // new tags start at zero
     uint32_t tag = gen_null_tag ? 0 : uint32_t(rot.get_as_int());
     TableKey key = TableKey((tag << 16) | j);
-    create_and_insert_table(key, name);
-    Table* table = create_table_accessor(j);
 
-    return table;
-}
-
-
-Table* Group::do_get_or_add_table(StringData name, bool is_embedded, bool* was_added)
-{
-    REALM_ASSERT(m_table_names.is_attached());
-    auto table = do_get_table(name);
-    if (table) {
-        if (was_added)
-            *was_added = false;
-        return table;
-    }
-    else {
-        Replication* repl = *get_repl();
-        if (repl && name.begins_with(g_class_name_prefix))
-            repl->add_class(name, is_embedded);
-
-        table = do_add_table(name);
-        if (is_embedded)
-            table->do_set_embedded(true);
-        if (was_added)
-            *was_added = true;
-        return table;
-    }
-}
-
-
-void Group::create_and_insert_table(TableKey key, StringData name)
-{
     if (REALM_UNLIKELY(name.size() > max_table_name_length))
         throw LogicError(LogicError::table_name_too_long);
 
@@ -807,8 +780,8 @@ void Group::create_and_insert_table(TableKey key, StringData name)
     size_t table_ndx = key2ndx(key);
     ref_type ref = Table::create_empty_table(m_alloc, key); // Throws
     REALM_ASSERT_3(m_tables.size(), ==, m_table_names.size());
-    size_t prior_num_tables = m_tables.size();
-    RefOrTagged rot = RefOrTagged::make_ref(ref);
+
+    rot = RefOrTagged::make_ref(ref);
     REALM_ASSERT(m_table_accessors.size() == m_tables.size());
 
     if (table_ndx == m_tables.size()) {
@@ -822,9 +795,17 @@ void Group::create_and_insert_table(TableKey key, StringData name)
         m_table_names.set(table_ndx, name); // Throws
     }
 
-    if (Replication* repl = *get_repl())
-        repl->insert_group_level_table(key, prior_num_tables, name); // Throws
+    Replication* repl = *get_repl();
+    if (do_repl && repl && name.begins_with(g_class_name_prefix))
+        repl->add_class(key, name, is_embedded);
+
     ++m_num_tables;
+
+    Table* table = create_table_accessor(j);
+    if (is_embedded)
+        table->do_set_embedded(true);
+
+    return table;
 }
 
 

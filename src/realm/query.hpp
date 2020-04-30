@@ -262,6 +262,7 @@ public:
     double minimum_double(ColKey column_key, ObjKey* return_ndx = nullptr) const;
     Timestamp maximum_timestamp(ColKey column_key, ObjKey* return_ndx = nullptr);
     Timestamp minimum_timestamp(ColKey column_key, ObjKey* return_ndx = nullptr);
+    Decimal128 sum_decimal128(ColKey column_key) const;
     Decimal128 maximum_decimal128(ColKey column_key, ObjKey* return_ndx = nullptr) const;
     Decimal128 minimum_decimal128(ColKey column_key, ObjKey* return_ndx = nullptr) const;
     Decimal128 average_decimal128(ColKey column_key, size_t* resultcount = nullptr) const;
@@ -376,6 +377,7 @@ private:
     friend class Table;
     friend class ConstTableView;
     friend class SubQueryCount;
+    friend class PrimitiveListCount;
     friend class metrics::QueryInfo;
 
     std::string error_code;

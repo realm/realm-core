@@ -144,16 +144,16 @@ const char* collection_operator_to_str(parser::Expression::KeyPathOp op)
     return "";
 }
 
-const char* comparison_type_to_str(parser::Predicate::ComparisonType type)
+const char* comparison_type_to_str(parser::Expression::ComparisonType type)
 {
     switch (type) {
-        case parser::Predicate::ComparisonType::Unspecified:
+        case parser::Expression::ComparisonType::Unspecified:
             return "";
-        case parser::Predicate::ComparisonType::All:
+        case parser::Expression::ComparisonType::All:
             return "ALL";
-        case parser::Predicate::ComparisonType::None:
+        case parser::Expression::ComparisonType::None:
             return "NONE";
-        case parser::Predicate::ComparisonType::Any:
+        case parser::Expression::ComparisonType::Any:
             return "ANY";
     }
     return "";

@@ -1074,6 +1074,15 @@ double Query::sum_double(ColKey column_key) const
     return aggregate<act_Sum, double, double>(column_key);
 }
 
+Decimal128 Query::sum_decimal128(ColKey column_key) const
+{
+#if REALM_METRICS
+    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Sum);
+#endif
+
+    return aggregate<act_Sum, Decimal128, Decimal128>(column_key);
+}
+
 // Maximum
 
 int64_t Query::maximum_int(ColKey column_key, ObjKey* return_ndx) const

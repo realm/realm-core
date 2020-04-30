@@ -215,8 +215,17 @@ public:
     bool rename_group_level_table(TableKey table_key);
 
     /// Must have table selected.
-    bool create_object(ObjKey);
-    bool remove_object(ObjKey);
+    bool create_object(ObjKey key)
+    {
+        append_simple_instr(instr_CreateObject, key); // Throws
+        return true;
+    }
+
+    bool remove_object(ObjKey key)
+    {
+        append_simple_instr(instr_RemoveObject, key); // Throws
+        return true;
+    }
     bool modify_object(ColKey col_key, ObjKey key);
 
     // Must have descriptor selected:
@@ -306,10 +315,9 @@ private:
 class TransactLogConvenientEncoder {
 public:
     virtual ~TransactLogConvenientEncoder();
-    virtual void add_class(StringData table_name, bool is_embedded);
-    virtual void add_class_with_primary_key(StringData table_name, DataType pk_type, StringData pk_field,
+    virtual void add_class(TableKey table_key, StringData table_name, bool is_embedded);
+    virtual void add_class_with_primary_key(TableKey, StringData table_name, DataType pk_type, StringData pk_field,
                                             bool nullable);
-    virtual void insert_group_level_table(TableKey table_key, size_t num_tables, StringData name);
     virtual void erase_group_level_table(TableKey table_key, size_t num_tables);
     virtual void rename_group_level_table(TableKey table_key, StringData new_name);
     virtual void insert_column(const Table*, ColKey col_key, DataType type, StringData name, Table* target_table);
@@ -358,7 +366,6 @@ public:
     virtual void list_insert_decimal(const Lst<Decimal128>& list, size_t list_ndx, Decimal128 value);
 
     virtual void create_object(const Table*, GlobalKey);
-    virtual void create_object(const Table*, ObjKey);
     virtual void create_object_with_primary_key(const Table*, GlobalKey, Mixed);
     virtual void remove_object(const Table*, ObjKey);
 
@@ -719,12 +726,6 @@ inline bool TransactLogEncoder::insert_group_level_table(TableKey table_key)
     return true;
 }
 
-inline void TransactLogConvenientEncoder::insert_group_level_table(TableKey table_key, size_t, StringData)
-{
-    unselect_all();
-    m_encoder.insert_group_level_table(table_key); // Throws
-}
-
 inline bool TransactLogEncoder::erase_group_level_table(TableKey table_key)
 {
     append_simple_instr(instr_EraseGroupLevelTable, table_key); // Throws
@@ -1016,25 +1017,6 @@ inline void TransactLogConvenientEncoder::list_insert_decimal(const Lst<Decimal1
     select_list(list);               // Throws
     m_encoder.list_insert(list_ndx); // Throws
 }
-
-inline bool TransactLogEncoder::create_object(ObjKey key)
-{
-    append_simple_instr(instr_CreateObject, key); // Throws
-    return true;
-}
-
-inline void TransactLogConvenientEncoder::create_object(const Table* t, ObjKey key)
-{
-    select_table(t);              // Throws
-    m_encoder.create_object(key); // Throws
-}
-
-inline bool TransactLogEncoder::remove_object(ObjKey key)
-{
-    append_simple_instr(instr_RemoveObject, key); // Throws
-    return true;
-}
-
 
 inline void TransactLogConvenientEncoder::remove_object(const Table* t, ObjKey key)
 {

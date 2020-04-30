@@ -36,6 +36,7 @@ struct ObjKey;
 class StringData;
 class Timestamp;
 class LinkMap;
+enum class ExpressionComparisonType : unsigned char;
 
 namespace util {
 namespace serializer {
@@ -87,6 +88,7 @@ std::string print_value(Optional<T> value)
 struct SerialisationState {
     std::string describe_column(ConstTableRef table, ColKey col_key);
     std::string describe_columns(const LinkMap& link_map, ColKey target_col_key);
+    std::string describe_expression_type(ExpressionComparisonType type);
     std::string get_column_name(ConstTableRef table, ColKey col_key);
     std::string get_backlink_column_name(ConstTableRef from, ColKey col_key);
     std::string get_variable_name(ConstTableRef table);
