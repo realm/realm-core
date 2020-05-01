@@ -511,8 +511,8 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
         auto obj1 = foo_w->create_object();
         auto obj0 = foo_w->get_object(k0);
         k1 = obj1.get_key();
-        obj1.set_all(2, StringData("b"), true, 1.1f, 1.2, BinaryData("hopla"), Timestamp(100,300),
-                     Decimal("100"), ObjectId("abcdefabcdefabcdefabcdef"), k1);
+        obj1.set_all(2, StringData("b"), true, 1.1f, 1.2, BinaryData("hopla"), Timestamp(100, 300), Decimal("100"),
+                     ObjectId("abcdefabcdefabcdefabcdef"), k1);
         obj0.set<int>(cols[0], 1);
         obj0.set<StringData>(cols[1], "a");
         wt.commit();
