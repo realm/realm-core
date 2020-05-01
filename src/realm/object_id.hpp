@@ -36,7 +36,6 @@ public:
         : ObjectId()
     {
     }
-
     /**
      * Checks if the given string is a valid object id.
      */

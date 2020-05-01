@@ -26,6 +26,10 @@ using namespace realm;
 
 TEST(Decimal_Basics)
 {
+    auto test_str_nan = [&](const std::string& str) {
+        Decimal128 d = Decimal128(str);
+        CHECK_EQUAL(d.to_string(), "NaN");
+    };
     auto test_str = [&](const std::string& str, const std::string& ref) {
         Decimal128 d = Decimal128(str);
         CHECK_EQUAL(d.to_string(), ref);
@@ -48,10 +52,21 @@ TEST(Decimal_Basics)
     test_str("1.14142E27", "1.14142E27");
     test_str("+Infinity", "Inf");
     test_str("-INF", "-Inf");
-
+    test_str("  0", "0");
+    test_str_nan(":");
+    test_str_nan("0.0.0");
+    CHECK_THROW(Decimal128("10000000000000000000000000000000000000000000000000.0"), std::overflow_error);
+    CHECK_THROW(Decimal128("1.00000000000000000000000000000000000000000000000001"), std::overflow_error);
+    test_str_nan("0.0Q1");
+    test_str_nan("0.0Eq");
     Decimal128 pi = Decimal128("3.141592653589793238"); // 19 significant digits
     CHECK_EQUAL(pi.to_string(), "3.141592653589793238");
-
+    Decimal128::Bid128 bid;
+    int exp;
+    bool sign;
+    pi.unpack(bid, exp, sign);
+    Decimal128 pi2(bid, exp, sign);
+    CHECK_EQUAL(pi, pi2);
     Decimal128 d = Decimal128("-10.5");
     Decimal128 d1 = Decimal128("20.25");
     CHECK(d < d1);
