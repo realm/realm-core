@@ -140,6 +140,7 @@ TEST(Unresolved_Basic)
         auto doodad = parts->create_object(GlobalKey{999, 999});
         auto doodad1 = parts->create_object(GlobalKey{999, 999}); // Check idempotency
         CHECK_EQUAL(doodad.get_key(), doodad1.get_key());
+        CHECK_EQUAL(doodad.get_object_id(), doodad1.get_object_id());
         tesla.set(col_part, doodad.get_key());
         auto doodad_key = parts->get_objkey_from_global_key(GlobalKey{999, 999});
         CHECK(!doodad_key.is_unresolved());

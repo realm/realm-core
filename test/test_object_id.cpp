@@ -88,7 +88,6 @@ TEST(ObjectId_ArrayNull)
     arr.add({str0});
     arr.add({str1});
     arr.insert(1, {str2});
-
     ObjectId id2(str2);
     CHECK(!arr.is_null(0));
     CHECK_EQUAL(arr.get(0), ObjectId(str0));
@@ -110,7 +109,6 @@ TEST(ObjectId_ArrayNull)
 
     arr.erase(1);
     CHECK_EQUAL(arr.get(1), ObjectId(str1));
-
     ArrayObjectIdNull arr1(Allocator::get_default());
     arr1.create();
     arr.move(arr1, 1);
@@ -321,8 +319,13 @@ TEST(ObjectId_Query)
         Query q4 = target->backlink(*table, col_has).column<ObjectId>(col_id) == alternative_id;
         CHECK_EQUAL(q4.count(), 8);
 
+        // just check that it does not crash
         std::ostringstream ostr;
-        tv.to_json(ostr); // just check that it does not crash
+        tv.to_json(ostr);
+        Query q5 = table->column<ObjectId>(col) >= t0;
+        CHECK_EQUAL(q5.count(), 1000);
+        Query q6 = table->column<ObjectId>(col) <= t25;
+        CHECK_EQUAL(q6.count(), 26);
     }
 }
 
