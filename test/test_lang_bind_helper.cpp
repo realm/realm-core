@@ -535,7 +535,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
     CHECK_EQUAL(obj1.get<float>(cols[3]), 1.1f);
     CHECK_EQUAL(obj1.get<double>(cols[4]), 1.2);
     CHECK_EQUAL(obj1.get<BinaryData>(cols[5]), BinaryData("hopla"));
-    CHECK_EQUAL(obj1.get<Timestamp>(cols[6]), Timestamp(100,300));
+    CHECK_EQUAL(obj1.get<Timestamp>(cols[6]), Timestamp(100, 300));
     CHECK_EQUAL(obj1.get<Decimal>(cols[7]), Decimal("100"));
     CHECK_EQUAL(obj1.get<ObjectId>(cols[8]), ObjectId("abcdefabcdefabcdefabcdef"));
     CHECK_EQUAL(obj1.get<ObjKey>(cols[9]), obj1.get_key());
