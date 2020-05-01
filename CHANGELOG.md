@@ -17,6 +17,50 @@
 
 ----------------------------------------------
 
+# 10.0.0-alpha.8 Release notes
+
+### Enhancements
+
+* Add native core query support for ALL/NONE on some query expressions
+* Add query parser support for lists of primitives
+  * ANY/ALL/NONE support
+  * all existing comparison operators supported for appropriate types
+  * `.@count` (or `.@size`) for number of items in a list can be compared to other numeric expressions (numeric values or columns)
+  * a new operation `.length` (case insensitive) is supported for string and binary lists which evaluates the length of each item in the list
+* Add query parser support for keypath comparisons to null over links
+* Use the new core support for ALL/NONE queries instead of rewriting these queries as subqueries (optimizaiton)
+
+### Fixed
+* Fix an assertion failure when querying a list of primitives over a link
+* Fix serialisation of list of primitive queries
+* Fix queries of lists of nullable ObjectId, Int and Bool
+* Fix count of list of primitives with size 0
+* Fix aggregate queries of list of primitives which are nullable types
+* Throw an exception when someone tries to add a search index to a list of primitives instead of crashing
+* Changed query parser ALL/NONE support to belong to one side of a comparison instead of the entire expression, this enables support for reversing expressions (in addition to `ALL prices > 20` we now also support `20 < ALL prices`)
+
+-----------
+
+### Internals
+* Replication interface for adding tables and creating objects changed. Adaptation required in Sync.
+
+----------------------------------------------
+
+# 10.0.0-alpha.7 Release notes
+
+### Enhancements
+* Query::sum_decimal128 added.
+
+### Fixed
+* None.
+ 
+-----------
+
+### Internals
+* Switch back to default off_t size so consumers don't need to define _FILE_OFFSET_BITS=64
+
+----------------------------------------------
+
 # 10.0.0-alpha.6 Release notes
 
 ### Enhancements

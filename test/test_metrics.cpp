@@ -708,16 +708,16 @@ TEST(Metrics_SubQueries)
     CHECK_EQUAL(queries->size(), 4);
 
     std::string int_equal_description = queries->at(0).get_description();
-    CHECK_EQUAL(int_equal_description, "Serialisation of subtable expressions is not yet supported.");
+    CHECK_EQUAL(int_equal_description, "10 == integers");
 
     std::string int_max_description = queries->at(1).get_description();
-    CHECK_EQUAL(int_equal_description, "Serialisation of subtable expressions is not yet supported.");
+    CHECK_EQUAL(int_max_description, "5 < integers.@max");
 
     std::string str_begins_description = queries->at(2).get_description();
-    CHECK_EQUAL(int_equal_description, "Serialisation of subtable expressions is not yet supported.");
+    CHECK_EQUAL(str_begins_description, "strings BEGINSWITH \"Str\"");
 
     std::string str_equal_description = queries->at(3).get_description();
-    CHECK_EQUAL(int_equal_description, "Serialisation of subtable expressions is not yet supported.");
+    CHECK_EQUAL(str_equal_description, "\"Str_0\" == strings");
 }
 
 TEST(Metrics_TransactionTimings)

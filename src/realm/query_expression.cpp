@@ -262,7 +262,7 @@ void ColumnListBase::get_lists(size_t index, Value<ref_type>& destination, size_
             ref_type val = 0;
             if (sz == 1) {
                 ConstObj obj = m_link_map.get_target_table()->get_object(links[0]);
-                val = to_ref(obj.get<int64_t>(m_column_key));
+                val = to_ref(obj._get<int64_t>(m_column_key.get_index()));
             }
             destination.init(false, 1, val);
         }

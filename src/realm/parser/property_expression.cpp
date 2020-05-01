@@ -26,40 +26,17 @@
 namespace realm {
 namespace parser {
 
-PropertyExpression::PropertyExpression(Query& q, const std::string& key_path_string, parser::KeyPathMapping& mapping)
+PropertyExpression::PropertyExpression(Query& q, std::vector<KeyPathElement>&& chain, ExpressionComparisonType type)
     : query(q)
+    , link_chain(std::move(chain))
+    , comparison_type(type)
 {
-    ConstTableRef cur_table = query.get_table();
-    KeyPath key_path = key_path_from_string(key_path_string);
-    size_t index = 0;
-
-    while (index < key_path.size()) {
-        KeyPathElement element = mapping.process_next_path(cur_table, key_path, index);
-        if (index != key_path.size()) {
-            realm_precondition(element.col_type == type_Link || element.col_type == type_LinkList,
-                               util::format("Property '%1' is not a link in object of type '%2'",
-                                            element.table->get_column_name(element.col_key),
-                                            get_printable_table_name(*element.table)));
-            if (element.table == cur_table) {
-                if (element.col_key == ColKey()) {
-                    cur_table = element.table;
-                }
-                else {
-                    cur_table = element.table->get_link_target(element.col_key); // advance through forward link
-                }
-            }
-            else {
-                cur_table = element.table; // advance through backlink
-            }
-        }
-        link_chain.push_back(element);
-    }
 }
 
 LinkChain PropertyExpression::link_chain_getter() const
 {
     auto& tbl = query.get_table();
-    return KeyPathMapping::link_chain_getter(tbl, link_chain);
+    return KeyPathMapping::link_chain_getter(tbl, link_chain, comparison_type);
 }
 
 } // namespace parser

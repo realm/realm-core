@@ -1,6 +1,6 @@
 ////////////////////////////////////////////////////////////////////////////
 //
-// Copyright 2015 Realm Inc.
+// Copyright 2020 Realm Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,8 +16,8 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#ifndef REALM_PROPERTY_EXPRESSION_HPP
-#define REALM_PROPERTY_EXPRESSION_HPP
+#ifndef REALM_PRIMITIVE_LIST_EXPRESSION_HPP
+#define REALM_PRIMITIVE_LIST_EXPRESSION_HPP
 
 #include <realm/parser/keypath_mapping.hpp>
 #include <realm/query.hpp>
@@ -26,62 +26,46 @@
 namespace realm {
 namespace parser {
 
-struct PropertyExpression
-{
-    Query &query;
+struct PrimitiveListExpression {
+    Query& query;
     std::vector<KeyPathElement> link_chain;
     ExpressionComparisonType comparison_type;
     DataType get_dest_type() const;
     ColKey get_dest_col_key() const;
     ConstTableRef get_dest_table() const;
-    bool dest_type_is_backlink() const;
-    bool dest_type_is_list_of_primitives() const;
+    template <class T>
+    T size_of_list() const;
 
-    PropertyExpression(Query& q, std::vector<KeyPathElement>&& chain, ExpressionComparisonType type);
+    PrimitiveListExpression(Query& q, std::vector<KeyPathElement>&& chain, ExpressionComparisonType type);
 
     LinkChain link_chain_getter() const;
 
     template <typename RetType>
     auto value_of_type_for_query() const
     {
-        return this->link_chain_getter().template column<RetType>(get_dest_col_key());
+        return this->link_chain_getter().template column<Lst<RetType>>(get_dest_col_key());
     }
 };
 
-inline DataType PropertyExpression::get_dest_type() const
+inline DataType PrimitiveListExpression::get_dest_type() const
 {
     REALM_ASSERT_DEBUG(link_chain.size() > 0);
-    REALM_ASSERT_DEBUG(link_chain.back().operation != KeyPathElement::KeyPathOperation::BacklinkCount);
     return DataType(link_chain.back().col_key.get_type());
 }
 
-inline bool PropertyExpression::dest_type_is_backlink() const
-{
-    REALM_ASSERT_DEBUG(link_chain.size() > 0);
-    return link_chain.back().operation == KeyPathElement::KeyPathOperation::BacklinkTraversal;
-}
-
-inline bool PropertyExpression::dest_type_is_list_of_primitives() const
-{
-    REALM_ASSERT_DEBUG(link_chain.size() > 0);
-    return link_chain.back().is_list_of_primitives();
-}
-
-inline ColKey PropertyExpression::get_dest_col_key() const
+inline ColKey PrimitiveListExpression::get_dest_col_key() const
 {
     REALM_ASSERT_DEBUG(link_chain.size() > 0);
     return link_chain.back().col_key;
 }
 
-inline ConstTableRef PropertyExpression::get_dest_table() const
+inline ConstTableRef PrimitiveListExpression::get_dest_table() const
 {
     REALM_ASSERT_DEBUG(link_chain.size() > 0);
     return link_chain.back().table;
 }
 
-
 } // namespace parser
 } // namespace realm
 
-#endif // REALM_PROPERTY_EXPRESSION_HPP
-
+#endif // REALM_PRIMITIVE_LIST_EXPRESSION_HPP

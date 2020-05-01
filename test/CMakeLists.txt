@@ -94,6 +94,7 @@ set(REALM_TEST_HEADERS
     test_all.hpp
     test_string_types.hpp
     test_table_helper.hpp
+    test_types_helper.hpp
     testsettings.hpp
 ) # REALM_TEST_HEADERS
 
