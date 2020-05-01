@@ -1062,9 +1062,10 @@ TEST_CASE("object") {
         return;
 
     SyncServer server(false);
-    SyncTestFile config1(server, "shared");
+    TestSyncManager init_sync_manager(server);
+    SyncTestFile config1(init_sync_manager.app(), "shared");
     config1.schema = config.schema;
-    SyncTestFile config2(server, "shared");
+    SyncTestFile config2(init_sync_manager.app(), "shared");
     config2.schema = config.schema;
 
     SECTION("defaults do not override values explicitly passed to create()") {

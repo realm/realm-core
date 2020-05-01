@@ -180,8 +180,8 @@ void RealmCoordinator::set_config(const Realm::Config& config)
             if (m_config.sync_config->user != config.sync_config->user) {
                 throw MismatchedConfigException("Realm at path '%1' already opened with different sync user.", config.path);
             }
-            if (m_config.sync_config->realm_url != config.sync_config->realm_url) {
-                throw MismatchedConfigException("Realm at path '%1' already opened with different sync server URL.", config.path);
+            if (m_config.sync_config->partition_value != config.sync_config->partition_value) {
+                throw MismatchedConfigException("Realm at path '%1' already opened with different partition value.", config.path);
             }
             if (m_config.sync_config->transformer != config.sync_config->transformer) {
                 throw MismatchedConfigException("Realm at path '%1' already opened with different transformer.", config.path);
@@ -281,8 +281,9 @@ std::shared_ptr<AsyncOpenTask> RealmCoordinator::get_synchronized_realm(Realm::C
 
     util::CheckedLockGuard lock(m_realm_mutex);
     set_config(config);
-    bool exists = File::exists(m_config.path);
-    create_sync_session(!exists);
+    // FIXME: Re-enable once the server reintroduces support for State Realms.
+    // bool exists = File::exists(m_config.path);
+    create_sync_session(false /* exists */);
     return std::make_shared<AsyncOpenTask>(shared_from_this(), m_sync_session);
 }
 
@@ -291,8 +292,9 @@ void RealmCoordinator::create_session(const Realm::Config& config)
     REALM_ASSERT(config.sync_config);
     util::CheckedLockGuard lock(m_realm_mutex);
     set_config(config);
-    bool exists = File::exists(m_config.path);
-    create_sync_session(!exists);
+    // FIXME: Re-enable once the server reintroduces support for State Realms.
+    // bool exists = File::exists(m_config.path);
+    create_sync_session(false /* exists */);
 }
 
 #endif

@@ -16,7 +16,7 @@
 *
 **************************************************************************/
 
-#include "datetime.hpp"
+#include "util/bson/datetime.hpp"
 
 namespace realm {
 namespace bson {

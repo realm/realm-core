@@ -47,7 +47,7 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync]") {
         return;
 
     SyncServer server;
-    TestSyncManager init_sync_manager;
+    TestSyncManager init_sync_manager(server);
     const std::string realm_base_url = server.base_url();
 
     SECTION("a SyncUser can properly retrieve its owned sessions") {
@@ -57,13 +57,11 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync]") {
                                                    ENCODE_FAKE_JWT("fake_refresh_token"),
                                                    ENCODE_FAKE_JWT("fake_access_token"),
                                                    dummy_auth_url);
-        auto session1 = sync_session(server, user, "/test1a-1",
-                                     [](const auto&, const auto&) { return s_test_token; },
+        auto session1 = sync_session(user, "/test1a-1",
                                      [](auto, auto) { },
                                      SyncSessionStopPolicy::AfterChangesUploaded,
                                      &path_1);
-        auto session2 = sync_session(server, user, "/test1a-2",
-                                     [](const auto&, const auto&) { return s_test_token; },
+        auto session2 = sync_session(user, "/test1a-2",
                                      [](auto, auto) { },
                                      SyncSessionStopPolicy::AfterChangesUploaded,
                                      &path_2);
@@ -73,19 +71,17 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync]") {
         REQUIRE(user->all_sessions().size() == 2);
         auto s1 = user->session_for_on_disk_path(path_1);
         REQUIRE(s1);
-        CHECK(s1->config().realm_url == realm_base_url + "/test1a-1");
+        CHECK(s1->config().partition_value == "/test1a-1");
         auto s2 = user->session_for_on_disk_path(path_2);
         REQUIRE(s2);
-        CHECK(s2->config().realm_url == realm_base_url + "/test1a-2");
+        CHECK(s2->config().partition_value == "/test1a-2");
     }
 
     SECTION("a SyncUser properly unbinds its sessions upon logging out") {
         auto user = SyncManager::shared().get_user("user1b", ENCODE_FAKE_JWT("fake_refresh_token"), ENCODE_FAKE_JWT("fake_access_token"), dummy_auth_url);
-        auto session1 = sync_session(server, user, "/test1b-1",
-                                     [](const auto&, const auto&) { return s_test_token; },
+        auto session1 = sync_session(user, "/test1b-1",
                                      [](auto, auto) { });
-        auto session2 = sync_session(server, user, "/test1b-2",
-                                     [](const auto&, const auto&) { return s_test_token; },
+        auto session2 = sync_session(user, "/test1b-2",
                                      [](auto, auto) { });
         EventLoop::main().run_until([&] { return sessions_are_active(*session1, *session2); });
 
@@ -101,11 +97,9 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync]") {
         auto user = SyncManager::shared().get_user(user_id, ENCODE_FAKE_JWT("fake_refresh_token"), ENCODE_FAKE_JWT("fake_access_token"), dummy_auth_url);
         user->log_out();
         REQUIRE(user->state() == SyncUser::State::LoggedOut);
-        auto session1 = sync_session(server, user, "/test1c-1",
-                                     [](const auto&, const auto&) { return s_test_token; },
+        auto session1 = sync_session(user, "/test1c-1",
                                      [](auto, auto) { });
-        auto session2 = sync_session(server, user, "/test1c-2",
-                                     [](const auto&, const auto&) { return s_test_token; },
+        auto session2 = sync_session(user, "/test1c-2",
                                      [](auto, auto) { });
         // Run the runloop many iterations to see if the sessions spuriously bind.
         spin_runloop();
@@ -121,11 +115,9 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync]") {
     SECTION("a SyncUser properly rebinds existing sessions upon logging back in") {
         const std::string user_id = "user1d";
         auto user = SyncManager::shared().get_user(user_id, ENCODE_FAKE_JWT("fake_refresh_token"), ENCODE_FAKE_JWT("fake_access_token"), dummy_auth_url);
-        auto session1 = sync_session(server, user, "/test1d-1",
-                                     [](const auto&, const auto&) { return s_test_token; },
+        auto session1 = sync_session(user, "/test1d-1",
                                      [](auto, auto) { });
-        auto session2 = sync_session(server, user, "/test1d-2",
-                                     [](const auto&, const auto&) { return s_test_token; },
+        auto session2 = sync_session(user, "/test1d-2",
                                      [](auto, auto) { });
         // Make sure the sessions are bound.
         EventLoop::main().run_until([&] { return sessions_are_active(*session1, *session2); });
@@ -152,8 +144,7 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync]") {
         auto user = SyncManager::shared().get_user("user1e", ENCODE_FAKE_JWT("fake_refresh_token"), ENCODE_FAKE_JWT("fake_access_token"), dummy_auth_url);
         {
             // Create the session within a nested scope, so we can control its lifetime.
-            auto session = sync_session(server, user, path,
-                                        [](const auto&, const auto&) { return s_test_token; },
+            auto session = sync_session(user, path,
                                         [](auto, auto) { },
                                         SyncSessionStopPolicy::Immediately,
                                         &on_disk_path);
@@ -178,8 +169,7 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync]") {
         auto user = SyncManager::shared().get_user("user", ENCODE_FAKE_JWT("fake_refresh_token"), ENCODE_FAKE_JWT("fake_access_token"), dummy_auth_url);
         auto create_session = [&]() {
             // Note that this should put the sessions at different paths.
-            return sync_session(server, user, "/test",
-                                [](const auto&, const auto&) { return s_test_token; },
+            return sync_session(user, "/test",
                                 [](auto, auto) { },
                                 SyncSessionStopPolicy::Immediately);
         };
@@ -194,7 +184,7 @@ TEST_CASE("sync: log-in", "[sync]") {
 
     SyncServer server;
     // Disable file-related functionality and metadata functionality for testing purposes.
-    TestSyncManager init_sync_manager;
+    TestSyncManager init_sync_manager(server);
     auto user = SyncManager::shared().get_user("user",
                                                ENCODE_FAKE_JWT("fake_refresh_token"),
                                                ENCODE_FAKE_JWT("fake_access_token"),
@@ -202,8 +192,7 @@ TEST_CASE("sync: log-in", "[sync]") {
 
     SECTION("Can log in") {
         std::atomic<int> error_count(0);
-        auto session = sync_session(server, user, "/test",
-                                    [](const auto&, const auto&) { return s_test_token; },
+        auto session = sync_session(user, "/test",
                                     [&](auto, auto) { ++error_count; });
 
         std::atomic<bool> download_did_complete(false);
@@ -212,96 +201,18 @@ TEST_CASE("sync: log-in", "[sync]") {
         CHECK(error_count == 0);
     }
 
-    // FIXME: What should we do if we get an invalid access token? Presumably we want to retry at some point.
-    // What should drive that?
-    SECTION("Session is invalid after invalid token") {
-        std::atomic<int> error_count(0);
-        auto session = sync_session(server, user, "/test",
-                                    [](const auto&, const auto&) { return "this is not a valid access token"; },
-                                    [&](auto, auto) { ++error_count; });
-
-        EventLoop::main().run_until([&] { return error_count > 0; });
-    }
-
     // TODO: write a test that logs out a Realm with multiple sessions, then logs it back in?
     // TODO: write tests that check that a Session properly handles various types of errors reported via its callback.
 }
 
-TEST_CASE("sync: token refreshing", "[sync]") {
-    using PublicState = realm::SyncSession::PublicState;
-    using ProtocolError = realm::sync::ProtocolError;
-    if (!EventLoop::has_implementation())
-        return;
-
-    SyncServer server;
-    // Disable file-related functionality and metadata functionality for testing purposes.
-    TestSyncManager init_sync_manager;
-    auto user = SyncManager::shared().get_user("user-token-refreshing", ENCODE_FAKE_JWT("fake_refresh_token"), ENCODE_FAKE_JWT("fake_access_token"), dummy_auth_url);
-
-    SECTION("Can preemptively refresh token while session is active.") {
-        auto session = sync_session(server, user, "/test-token-refreshing",
-                                    [](const auto&, const auto&) { return s_test_token; },
-                                    [](auto, auto) { },
-                                    SyncSessionStopPolicy::AfterChangesUploaded);
-        EventLoop::main().run_until([&] { return sessions_are_active(*session); });
-
-        REQUIRE(session->state() == PublicState::Active);
-        session->refresh_access_token(s_test_token, none);
-        REQUIRE(session->state() == PublicState::Active);
-    }
-
-    SECTION("Can refresh token when expired while session is active.") {
-        std::atomic<bool> bind_function_called(false);
-        auto session = sync_session(server, user, "/test-token-refreshing",
-                                    [&](const auto&, const auto&) {
-                                        bind_function_called = true;
-                                        return s_test_token;
-                                    },
-                                    [](auto, SyncError err) {
-                                        printf("DEBUG: test received an error: %s\n", err.message.c_str());
-                                    },
-                                    SyncSessionStopPolicy::AfterChangesUploaded);
-        EventLoop::main().run_until([&] { return sessions_are_active(*session); });
-        bind_function_called = false;
-
-        // Simulate the "token expired" error, which should cause the object store
-        // to request another token from the binding.
-        std::error_code code = std::error_code{static_cast<int>(ProtocolError::token_expired), realm::sync::protocol_error_category()};
-        SyncSession::OnlyForTesting::handle_error(*session, {code, "Too many pugs in the office.", false});
-        REQUIRE(bind_function_called == true);
-        REQUIRE(session->state() == PublicState::Active);
-    }
-}
-
 TEST_CASE("SyncSession: close() API", "[sync]") {
-    using PublicState = realm::SyncSession::PublicState;
     SyncServer server;
+    TestSyncManager init_sync_manager(server);
 
     auto user = SyncManager::shared().get_user("close-api-tests-user", ENCODE_FAKE_JWT("fake_refresh_token"), ENCODE_FAKE_JWT("fake_access_token"), "https://realm.example.org");
 
-    SECTION("Behaves properly when called on session in the 'waiting for token' state for Immediate") {
-        std::atomic<bool> bind_function_called(false);
-        // Make a session that won't leave the 'waiting for token' state.
-        auto server_path = "/test-close-for-waiting-token";
-        auto session = sync_session_with_bind_handler(server, user, server_path,
-                                                      [&](const auto&, const auto&, std::shared_ptr<SyncSession>) {
-                                                          bind_function_called = true;
-                                                      },
-                                                      [&](auto, auto) { },
-                                                      SyncSessionStopPolicy::Immediately);
-        REQUIRE(session);
-        EventLoop::main().run_until([&] { return bind_function_called == true; });
-        REQUIRE(session->state() == PublicState::WaitingForAccessToken);
-        session->close();
-        REQUIRE(sessions_are_inactive(*session));
-        // Test trying to call bind on the session after it's been closed. Should be a no-op.
-        session->refresh_access_token(s_test_token, server.base_url() + server_path);
-        REQUIRE(sessions_are_inactive(*session));
-    }
-
     SECTION("Behaves properly when called on session in the 'active' or 'inactive' state") {
-        auto session = sync_session(server, user, "/test-close-for-active",
-                                    [](const auto&, const auto&) { return s_test_token; },
+        auto session = sync_session(user, "/test-close-for-active",
                                     [](auto, auto) { },
                                     SyncSessionStopPolicy::AfterChangesUploaded);
         EventLoop::main().run_until([&] { return sessions_are_active(*session); });
@@ -316,15 +227,13 @@ TEST_CASE("SyncSession: close() API", "[sync]") {
 }
 
 TEST_CASE("SyncSession: update_configuration()", "[sync]") {
-    TestSyncManager init_sync_manager;
-
     SyncServer server{false};
+    TestSyncManager init_sync_manager(server);
 
     auto user = SyncManager::shared().get_user("userid", ENCODE_FAKE_JWT("fake_refresh_token"), ENCODE_FAKE_JWT("fake_access_token"), dummy_auth_url);
-    auto session =  sync_session_with_bind_handler(server, user, "/update_configuration",
-                                                   [](const auto&, const auto&, auto) { },
-                                                   [](auto, auto) { },
-                                                   SyncSessionStopPolicy::AfterChangesUploaded);
+    auto session =  sync_session(user, "/update_configuration",
+                                 [](auto, auto) { },
+                                 SyncSessionStopPolicy::AfterChangesUploaded);
 
     SECTION("updates reported configuration") {
         auto config = session->config();
@@ -357,15 +266,14 @@ TEST_CASE("SyncSession: update_configuration()", "[sync]") {
 TEST_CASE("sync: error handling", "[sync]") {
     using ProtocolError = realm::sync::ProtocolError;
     SyncServer server;
-    TestSyncManager init_sync_manager;
+    TestSyncManager init_sync_manager(server);
 
     // Create a valid session.
     std::function<void(std::shared_ptr<SyncSession>, SyncError)> error_handler = [](auto, auto) { };
     const std::string user_id = "user1d";
     std::string on_disk_path;
     auto user = SyncManager::shared().get_user(user_id, ENCODE_FAKE_JWT("fake_refresh_token"), ENCODE_FAKE_JWT("fake_access_token"), "https://realm.example.org");
-    auto session = sync_session(server, user, "/test1e",
-                                [](const auto&, const auto&) { return s_test_token; },
+    auto session = sync_session(user, "/test1e",
                                 [&](auto session, SyncError error) {
                                     error_handler(std::move(session), std::move(error));
                                 },
@@ -450,6 +358,7 @@ TEMPLATE_TEST_CASE("sync: stop policy behavior", "[sync]", RegularUser) {
 
     // Server is initially stopped so we can control when the session exits the dying state.
     SyncServer server(false);
+    TestSyncManager init_sync_manager(server);
     auto schema = Schema{
         {"object", {
             {"value", PropertyType::Int},
@@ -461,8 +370,7 @@ TEMPLATE_TEST_CASE("sync: stop policy behavior", "[sync]", RegularUser) {
     auto user = TestType::user();
 
     auto create_session = [&](SyncSessionStopPolicy stop_policy) {
-        auto session = sync_session(server, user, "/test-dying-state",
-                                    [](const auto&, const auto&) { return s_test_token; },
+        auto session = sync_session(user, "/test-dying-state",
                                     [&](auto, auto) { error_handler_invoked = true; },
                                     stop_policy, nullptr, schema, &config);
         EventLoop::main().run_until([&] { return sessions_are_active(*session); });
@@ -539,13 +447,13 @@ TEST_CASE("sync: encrypt local realm file", "[sync]") {
 
     SyncServer server;
     // Disable file-related functionality and metadata functionality for testing purposes.
-    TestSyncManager init_sync_manager;
+    TestSyncManager init_sync_manager(server);
 
     std::array<char, 64> encryption_key;
     encryption_key.fill(12);
 
     SECTION("open a session with realm file encryption and then open the same file directly") {
-        SyncTestFile config(server, "encrypted_realm");
+        SyncTestFile config(init_sync_manager.app(), "encrypted_realm");
         std::copy_n(encryption_key.begin(), encryption_key.size(), std::back_inserter(config.encryption_key));
         config.sync_config->realm_encryption_key = encryption_key;
 
@@ -570,21 +478,21 @@ TEST_CASE("sync: encrypt local realm file", "[sync]") {
 
     SECTION("errors if encryption keys are different") {
         {
-            SyncTestFile config(server, "encrypted_realm");
+            SyncTestFile config(init_sync_manager.app(), "encrypted_realm");
             config.sync_config->realm_encryption_key = encryption_key;
 
             REQUIRE_THROWS(Realm::get_shared_realm(config));
         }
 
         {
-            SyncTestFile config(server, "encrypted_realm");
+            SyncTestFile config(init_sync_manager.app(), "encrypted_realm");
             std::copy_n(encryption_key.begin(), encryption_key.size(), std::back_inserter(config.encryption_key));
 
             REQUIRE_THROWS(Realm::get_shared_realm(config));
         }
 
         {
-            SyncTestFile config(server, "encrypted_realm");
+            SyncTestFile config(init_sync_manager.app(), "encrypted_realm");
             config.sync_config->realm_encryption_key = encryption_key;
             config.encryption_key.push_back(9);
 
@@ -599,11 +507,11 @@ TEST_CASE("sync: non-synced metadata table doesn't result in non-additive schema
 
     SyncServer server;
     // Disable file-related functionality and metadata functionality for testing purposes.
-    TestSyncManager init_sync_manager;
+    TestSyncManager init_sync_manager(server);
 
     // Create a synced Realm containing a class with two properties.
     {
-        SyncTestFile config1(server, "schema-version-test");
+        SyncTestFile config1(init_sync_manager.app(), "schema-version-test");
         config1.schema_version = 1;
         config1.schema = Schema{
             {"object", {
@@ -618,7 +526,7 @@ TEST_CASE("sync: non-synced metadata table doesn't result in non-additive schema
 
     // Download the existing Realm into a second local file without specifying a schema,
     // mirroring how `openAsync` works.
-    SyncTestFile config2(server, "schema-version-test");
+    SyncTestFile config2(init_sync_manager.app(), "schema-version-test");
     config2.schema_version = 1;
     {
         auto realm2 = Realm::get_shared_realm(config2);
@@ -629,7 +537,7 @@ TEST_CASE("sync: non-synced metadata table doesn't result in non-additive schema
     // only a single property. This should not result in us trying to remove `property2`,
     // and will throw an exception if it does.
     {
-        SyncTestFile config3(server, "schema-version-test");
+        SyncTestFile config3(init_sync_manager.app(), "schema-version-test");
         config3.path = config2.path;
         config3.schema_version = 1;
         config3.schema = Schema{
@@ -649,10 +557,10 @@ TEST_CASE("sync: stable IDs", "[sync]") {
 
     SyncServer server;
     // Disable file-related functionality and metadata functionality for testing purposes.
-    TestSyncManager init_sync_manager;
+    TestSyncManager init_sync_manager(server);
 
     SECTION("ID column isn't visible in schema read from Group") {
-        SyncTestFile config(server, "schema-test");
+        SyncTestFile config(init_sync_manager.app(), "schema-test");
         config.schema_version = 1;
         config.schema = Schema{
             {"object", {
@@ -740,10 +648,10 @@ TEST_CASE("sync: client resync") {
     if (!EventLoop::has_implementation())
         return;
 
-    TestSyncManager init_sync_manager;
-
     SyncServer server;
-    SyncTestFile config(server, "default");
+    TestSyncManager init_sync_manager(server);
+
+    SyncTestFile config(init_sync_manager.app(), "default");
     config.schema = Schema{
         {"object", {
             {"value", PropertyType::Int},
@@ -763,7 +671,7 @@ TEST_CASE("sync: client resync") {
             {"pk list", PropertyType::Object|PropertyType::Array, "pk link target"},
         }},
     };
-    SyncTestFile config2(server, "default");
+    SyncTestFile config2(init_sync_manager.app(), "default");
 
     auto get_table = [](Realm& realm, StringData object_type) {
         return ObjectStore::table_for_object_type(realm.read_group(), object_type);

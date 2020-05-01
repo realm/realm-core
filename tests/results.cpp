@@ -1320,7 +1320,8 @@ TEST_CASE("notifications: sync") {
     _impl::RealmCoordinator::assert_no_open_realms();
 
     SyncServer server(false);
-    SyncTestFile config(server);
+    TestSyncManager init_sync_manager(server);
+    SyncTestFile config(init_sync_manager.app());
     config.schema = Schema{
         {"object", {
             {"value", PropertyType::Int},

@@ -64,20 +64,18 @@ inline void spin_runloop(int count=2)
     EventLoop::main().run_until([count, spin_count=0]() mutable { spin_count++; return spin_count > count; });
 }
 
-// Identical to `sync_session(...)`, but takes a bind-session callback that is
-// passed directly into the configuration. This allows, for example, a session
-// that remains stalled in the 'waiting for token' state.
-template <typename BindCallback, typename ErrorHandler>
-std::shared_ptr<SyncSession> sync_session_with_bind_handler(SyncServer& server, std::shared_ptr<SyncUser> user, const std::string& path,
-                                                            BindCallback&& bind_callback, ErrorHandler&& error_handler,
-                                                            SyncSessionStopPolicy stop_policy=SyncSessionStopPolicy::AfterChangesUploaded,
-                                                            std::string* on_disk_path=nullptr,
-                                                            util::Optional<Schema> schema=none,
-                                                            Realm::Config* out_config=nullptr)
+// Convenience function for creating and configuring sync sessions for test use.
+// Many of the optional arguments can be used to pass information about the
+// session back out to the test, or configure the session more precisely.
+template <typename ErrorHandler>
+std::shared_ptr<SyncSession> sync_session(std::shared_ptr<SyncUser> user, const std::string& path,
+                                          ErrorHandler&& error_handler,
+                                          SyncSessionStopPolicy stop_policy=SyncSessionStopPolicy::AfterChangesUploaded,
+                                          std::string* on_disk_path=nullptr,
+                                          util::Optional<Schema> schema=none,
+                                          Realm::Config* out_config=nullptr)
 {
-    std::string url = server.base_url() + path;
-    SyncTestFile config({user, url}, std::move(stop_policy),
-        std::forward<BindCallback>(bind_callback), std::forward<ErrorHandler>(error_handler));
+    SyncTestFile config({user, path}, std::move(stop_policy), std::forward<ErrorHandler>(error_handler));
 
     // File should not be deleted when we leave this function
     config.persist();
@@ -98,24 +96,4 @@ std::shared_ptr<SyncSession> sync_session_with_bind_handler(SyncServer& server, 
         session = SyncManager::shared().get_session(config.path, *config.sync_config);
     }
     return session;
-}
-
-// Convenience function for creating and configuring sync sessions for test use.
-// Many of the optional arguments can be used to pass information about the
-// session back out to the test, or configure the session more precisely.
-template <typename FetchAccessToken, typename ErrorHandler>
-std::shared_ptr<SyncSession> sync_session(SyncServer& server, std::shared_ptr<SyncUser> user, const std::string& path,
-                                          FetchAccessToken&& fetch_access_token, ErrorHandler&& error_handler,
-                                          SyncSessionStopPolicy stop_policy=SyncSessionStopPolicy::AfterChangesUploaded,
-                                          std::string* on_disk_path=nullptr,
-                                          util::Optional<Schema> schema=none,
-                                          Realm::Config* out_config=nullptr)
-{
-    return sync_session_with_bind_handler(server, std::move(user), path,
-        [&, fetch_access_token=std::forward<FetchAccessToken>(fetch_access_token)](const auto& path, const auto& config, auto session) {
-            auto token = fetch_access_token(path, config.realm_url);
-            session->refresh_access_token(std::move(token), config.realm_url);
-        },
-        std::forward<ErrorHandler>(error_handler),
-        stop_policy, on_disk_path, std::move(schema), out_config);
 }

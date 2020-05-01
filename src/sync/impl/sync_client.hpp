@@ -110,6 +110,11 @@ struct SyncClient {
         return std::make_unique<sync::Session>(m_client, std::move(path), std::move(config));
     }
 
+    bool decompose_server_url(const std::string& url, sync::ProtocolEnvelope& protocol,
+                              std::string& address, sync::Client::port_type& port, std::string& path) const {
+        return m_client.decompose_server_url(url, protocol, address, port, path);
+    }
+
     ~SyncClient()
     {
         stop();

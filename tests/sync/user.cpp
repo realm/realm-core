@@ -88,7 +88,7 @@ TEST_CASE("sync_user: SyncManager `get_user()` API", "[sync]") {
 
 TEST_CASE("sync_user: SyncManager `get_existing_logged_in_user()` API", "[sync]") {
     reset_test_directory(base_path);
-    TestSyncManager init_sync_manager(base_path, SyncManager::MetadataMode::NoMetadata);
+    TestSyncManager init_sync_manager("", base_path, SyncManager::MetadataMode::NoMetadata);
     const std::string identity = "sync_test_identity";
     const std::string refresh_token = ENCODE_FAKE_JWT("1234567890-fake-refresh-token");
     const std::string access_token = ENCODE_FAKE_JWT("1234567890-fake-access-token");
@@ -122,7 +122,7 @@ TEST_CASE("sync_user: SyncManager `get_existing_logged_in_user()` API", "[sync]"
 
 TEST_CASE("sync_user: logout", "[sync]") {
     reset_test_directory(base_path);
-    TestSyncManager init_sync_manager(base_path, SyncManager::MetadataMode::NoMetadata);
+    TestSyncManager init_sync_manager("", base_path, SyncManager::MetadataMode::NoMetadata);
     const std::string identity = "sync_test_identity";
     const std::string refresh_token = ENCODE_FAKE_JWT("1234567890-fake-refresh-token");
     const std::string access_token = ENCODE_FAKE_JWT("1234567890-fake-access-token");
@@ -138,7 +138,7 @@ TEST_CASE("sync_user: logout", "[sync]") {
 
 TEST_CASE("sync_user: user persistence", "[sync]") {
     reset_test_directory(base_path);
-    TestSyncManager init_sync_manager(base_path, SyncManager::MetadataMode::NoEncryption);
+    TestSyncManager init_sync_manager("", base_path, SyncManager::MetadataMode::NoEncryption);
     auto file_manager = SyncFileManager(base_path);
     // Open the metadata separately, so we can investigate it ourselves.
     SyncMetadataManager manager(file_manager.metadata_path(), false);

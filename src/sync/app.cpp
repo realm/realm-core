@@ -72,22 +72,30 @@ static std::map<std::string, std::string> get_request_headers(std::shared_ptr<Sy
     return headers;
 }
 
-const static uint64_t    default_timeout_ms = 60000;
 const static std::string default_base_url = "https://stitch.mongodb.com";
-const static std::string default_base_path = "/api/client/v2.0";
+const static std::string base_path = "/api/client/v2.0";
 const static std::string app_path = "/app";
 const static std::string auth_path = "/auth";
+const static std::string sync_path = "/realm-sync";
+const static uint64_t    default_timeout_ms = 60000;
 const static std::string username_password_provider_key = "local-userpass";
 const static std::string user_api_key_provider_key_path = "api_keys";
 
 App::App(const Config& config)
 : m_config(config)
-, m_base_route(config.base_url.value_or(default_base_url) + default_base_path)
+, m_base_url(config.base_url.value_or(default_base_url))
+, m_base_route(m_base_url + base_path)
 , m_app_route(m_base_route + app_path + "/" + config.app_id)
 , m_auth_route(m_app_route + auth_path)
+, m_sync_route(m_app_route + sync_path)
 , m_request_timeout_ms(config.default_request_timeout_ms.value_or(default_timeout_ms))
 {
     REALM_ASSERT(m_config.transport_generator);
+
+    // change the scheme in the base url to ws from http to satisfy the sync client
+    size_t uri_scheme_start = m_sync_route.find("http");
+    if (uri_scheme_start == 0)
+        m_sync_route.replace(uri_scheme_start, 4, "ws");
 }
 
 static void handle_default_response(const Response& response,
@@ -410,7 +418,7 @@ void App::UserAPIKeyProviderClient::fetch_api_keys(std::shared_ptr<SyncUser> use
 
 
 void App::UserAPIKeyProviderClient::delete_api_key(const realm::ObjectId& id, std::shared_ptr<SyncUser> user,
-                                                   std::function<void(Optional<AppError>)> completion_block)
+                                                   std::function<void(util::Optional<AppError>)> completion_block)
 {
     std::string route = url_for_path(id.to_string());
 
@@ -484,7 +492,7 @@ std::vector<std::shared_ptr<SyncUser>> App::all_users() const
 }
 
 void App::get_profile(std::shared_ptr<SyncUser> sync_user,
-                      std::function<void(std::shared_ptr<SyncUser>, Optional<AppError>)> completion_block)
+                      std::function<void(std::shared_ptr<SyncUser>, util::Optional<AppError>)> completion_block)
 {
     auto profile_handler = [completion_block, sync_user](const Response& profile_response) {
         if (auto error = check_for_errors(profile_response)) {
@@ -741,9 +749,11 @@ void App::init_app_metadata(std::function<void (util::Optional<AppError>, util::
                                            value_from_json<std::string>(json, "hostname"),
                                            value_from_json<std::string>(json, "ws_hostname"));
 
-            m_base_route = m_metadata->m_hostname + default_base_path;
-            m_app_route = (m_base_route + app_path + "/" + m_config.app_id);
-            m_auth_route = (m_app_route + auth_path);
+            m_base_route = m_metadata->m_hostname + base_path;
+            std::string this_app_path = app_path + "/" + m_config.app_id;
+            m_app_route = m_base_route + this_app_path;
+            m_auth_route = m_app_route + auth_path;
+            m_sync_route = m_metadata->m_ws_hostname + base_path + this_app_path + sync_path;
 
         } catch (const AppError& err) {
             return completion_block(err, response);

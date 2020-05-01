@@ -416,16 +416,16 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
     if (!util::EventLoop::has_implementation())
         return;
 
-    TestSyncManager init_sync_manager;
-
     SyncServer server;
-    SyncTestFile config(server, "default");
+    TestSyncManager init_sync_manager(server);
+
+    SyncTestFile config(init_sync_manager.app(), "default");
     config.schema = Schema{
         {"object", {
             {"value", PropertyType::Int},
         }},
     };
-    SyncTestFile config2(server, "default");
+    SyncTestFile config2(init_sync_manager.app(), "default");
     config2.schema = config.schema;
 
     std::mutex mutex;
@@ -493,10 +493,10 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
     }
 
     SECTION("can download multiple Realms at a time") {
-        SyncTestFile config1(server, "realm1");
-        SyncTestFile config2(server, "realm2");
-        SyncTestFile config3(server, "realm3");
-        SyncTestFile config4(server, "realm4");
+        SyncTestFile config1(init_sync_manager.app(), "realm1");
+        SyncTestFile config2(init_sync_manager.app(), "realm2");
+        SyncTestFile config3(init_sync_manager.app(), "realm3");
+        SyncTestFile config4(init_sync_manager.app(), "realm4");
 
         std::vector<std::shared_ptr<AsyncOpenTask>> tasks = {
             Realm::get_synchronized_realm(config1),

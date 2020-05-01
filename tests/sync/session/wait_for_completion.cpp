@@ -32,16 +32,16 @@ TEST_CASE("SyncSession: wait_for_download_completion() API", "[sync]") {
 
     const std::string dummy_auth_url = "https://realm.example.org";
 
-    SyncServer server;
+    SyncServer server{false};
     // Disable file-related functionality and metadata functionality for testing purposes.
-    TestSyncManager init_sync_manager("", SyncManager::MetadataMode::NoMetadata);
+    TestSyncManager init_sync_manager(server, "", SyncManager::MetadataMode::NoMetadata);
 
     std::atomic<bool> handler_called(false);
 
     SECTION("works properly when called after the session is bound") {
+        server.start();
         auto user = SyncManager::shared().get_user("user-async-wait-download-1", ENCODE_FAKE_JWT("not_a_real_token"), ENCODE_FAKE_JWT("not_a_real_token"), dummy_auth_url);
-        auto session = sync_session(server, user, "/async-wait-download-1",
-                                    [](const auto&, const auto&) { return s_test_token; },
+        auto session = sync_session(user, "/async-wait-download-1",
                                     [](auto, auto) { });
         EventLoop::main().run_until([&] { return sessions_are_active(*session); });
         // Register the download-completion notification
@@ -51,36 +51,11 @@ TEST_CASE("SyncSession: wait_for_download_completion() API", "[sync]") {
         EventLoop::main().run_until([&] { return handler_called == true; });
     }
 
-    SECTION("works properly when called on a session waiting for its access token") {
-        auto user = SyncManager::shared().get_user("user-async-wait-download-2", ENCODE_FAKE_JWT("not_a_real_token"), ENCODE_FAKE_JWT("not_a_real_token"), dummy_auth_url);
-        std::atomic<bool> login_handler_called(false);
-        auto server_path = "/async-wait-download-2";
-        std::shared_ptr<SyncSession> session = sync_session_with_bind_handler(server, user, server_path,
-                                                                              [&](auto, auto, std::shared_ptr<SyncSession> s){
-                                                                                  session = std::move(s);
-                                                                                  login_handler_called = true;
-                                                                              },
-                                                                              [](auto, auto) { });
-        // Register the download-completion notification
-        session->wait_for_download_completion([&](auto) {
-            handler_called = true;
-        });
-        EventLoop::main().run_until([&] { return login_handler_called == true; });
-        REQUIRE(session);
-        REQUIRE(handler_called == false);
-        spin_runloop();
-        REQUIRE(handler_called == false);
-        // Now bind the session
-        session->refresh_access_token(s_test_token, server.base_url() + server_path);
-        EventLoop::main().run_until([&] { return sessions_are_active(*session); });
-        EventLoop::main().run_until([&] { return handler_called == true; });
-    }
-
     SECTION("works properly when called on a logged-out session") {
+        server.start();
         const auto user_id = "user-async-wait-download-3";
         auto user = SyncManager::shared().get_user(user_id, ENCODE_FAKE_JWT("not_a_real_token"), ENCODE_FAKE_JWT("not_a_real_token"), dummy_auth_url);
-        auto session = sync_session(server, user, "/user-async-wait-download-3",
-                                    [](const auto&, const auto&) { return s_test_token; },
+        auto session = sync_session(user, "/user-async-wait-download-3",
                                     [](auto, auto) { });
         EventLoop::main().run_until([&] { return sessions_are_active(*session); });
         // Log the user out, and wait for the sessions to log out.
@@ -102,22 +77,15 @@ TEST_CASE("SyncSession: wait_for_download_completion() API", "[sync]") {
     SECTION("aborts properly when queued and the session errors out") {
         using ProtocolError = realm::sync::ProtocolError;
         auto user = SyncManager::shared().get_user("user-async-wait-download-4", ENCODE_FAKE_JWT("not_a_real_token"), ENCODE_FAKE_JWT("not_a_real_token"), dummy_auth_url);
-        std::atomic<bool> login_handler_called(false);
         std::atomic<int> error_count(0);
-        auto server_path = "/async-wait-download-4";
-        std::shared_ptr<SyncSession> session = sync_session_with_bind_handler(server, user, server_path,
-                                                                              [&](auto, auto, std::shared_ptr<SyncSession> s){
-                                                                                  session = std::move(s);
-                                                                                  login_handler_called = true;
-                                                                              },
-                                                                              [&](auto, auto) { ++error_count; });
+        std::shared_ptr<SyncSession> session = sync_session(user, "/async-wait-download-4",
+                                                            [&](auto, auto) { ++error_count; });
         std::error_code code = std::error_code{static_cast<int>(ProtocolError::bad_syntax), realm::sync::protocol_error_category()};
         // Register the download-completion notification
         session->wait_for_download_completion([&](std::error_code error) {
             REQUIRE(error == code);
             handler_called = true;
         });
-        EventLoop::main().run_until([&] { return login_handler_called == true; });
         REQUIRE(handler_called == false);
         // Now trigger an error
         SyncSession::OnlyForTesting::handle_error(*session, {code, "Not a real error message", true});
@@ -132,16 +100,16 @@ TEST_CASE("SyncSession: wait_for_upload_completion() API", "[sync]") {
 
     const std::string dummy_auth_url = "https://realm.example.org";
 
-    SyncServer server;
+    SyncServer server{false};
     // Disable file-related functionality and metadata functionality for testing purposes.
-    TestSyncManager init_sync_manager("", SyncManager::MetadataMode::NoMetadata);
+    TestSyncManager init_sync_manager(server, "", SyncManager::MetadataMode::NoMetadata);
 
     std::atomic<bool> handler_called(false);
 
     SECTION("works properly when called after the session is bound") {
+        server.start();
         auto user = SyncManager::shared().get_user("user-async-wait-upload-1", ENCODE_FAKE_JWT("not_a_real_token"), ENCODE_FAKE_JWT("not_a_real_token"), dummy_auth_url);
-        auto session = sync_session(server, user, "/async-wait-upload-1",
-                                    [](const auto&, const auto&) { return s_test_token; },
+        auto session = sync_session(user, "/async-wait-upload-1",
                                     [](auto, auto) { });
         EventLoop::main().run_until([&] { return sessions_are_active(*session); });
         // Register the upload-completion notification
@@ -151,36 +119,11 @@ TEST_CASE("SyncSession: wait_for_upload_completion() API", "[sync]") {
         EventLoop::main().run_until([&] { return handler_called == true; });
     }
 
-    SECTION("works properly when called on a session waiting for its access token") {
-        auto user = SyncManager::shared().get_user("user-async-wait-upload-2", ENCODE_FAKE_JWT("not_a_real_token"), ENCODE_FAKE_JWT("not_a_real_token"), dummy_auth_url);
-        std::atomic<bool> login_handler_called(false);
-        auto server_path = "/async-wait-upload-2";
-        std::shared_ptr<SyncSession> session = sync_session_with_bind_handler(server, user, server_path,
-                                                                              [&](auto, auto, std::shared_ptr<SyncSession> s){
-                                                                                  session = std::move(s);
-                                                                                  login_handler_called = true;
-                                                                              },
-                                                                              [](auto, auto) { });
-        // Register the upload-completion notification
-        session->wait_for_upload_completion([&](auto) {
-            handler_called = true;
-        });
-        EventLoop::main().run_until([&] { return login_handler_called == true; });
-        REQUIRE(session);
-        REQUIRE(handler_called == false);
-        spin_runloop();
-        REQUIRE(handler_called == false);
-        // Now bind the session
-        session->refresh_access_token(s_test_token, server.base_url() + server_path);
-        EventLoop::main().run_until([&] { return sessions_are_active(*session); });
-        EventLoop::main().run_until([&] { return handler_called == true; });
-    }
-
     SECTION("works properly when called on a logged-out session") {
+        server.start();
         const auto user_id = "user-async-wait-upload-3";
         auto user = SyncManager::shared().get_user(user_id, ENCODE_FAKE_JWT("not_a_real_token"), ENCODE_FAKE_JWT("not_a_real_token"), dummy_auth_url);
-        auto session = sync_session(server, user, "/user-async-wait-upload-3",
-                                    [](const auto&, const auto&) { return s_test_token; },
+        auto session = sync_session(user, "/user-async-wait-upload-3",
                                     [](auto, auto) { });
         EventLoop::main().run_until([&] { return sessions_are_active(*session); });
         // Log the user out, and wait for the sessions to log out.
@@ -202,22 +145,15 @@ TEST_CASE("SyncSession: wait_for_upload_completion() API", "[sync]") {
     SECTION("aborts properly when queued and the session errors out") {
         using ProtocolError = realm::sync::ProtocolError;
         auto user = SyncManager::shared().get_user("user-async-wait-upload-4", ENCODE_FAKE_JWT("not_a_real_token"), ENCODE_FAKE_JWT("not_a_real_token"), dummy_auth_url);
-        std::atomic<bool> login_handler_called(false);
         std::atomic<int> error_count(0);
-        auto server_path = "/async-wait-upload-4";
-        std::shared_ptr<SyncSession> session = sync_session_with_bind_handler(server, user, server_path,
-                                                                              [&](auto, auto, std::shared_ptr<SyncSession> s){
-                                                                                  session = std::move(s);
-                                                                                  login_handler_called = true;
-                                                                              },
-                                                                              [&](auto, auto) { ++error_count; });
+        std::shared_ptr<SyncSession> session = sync_session(user, "/async-wait-upload-4",
+                                                            [&](auto, auto) { ++error_count; });
         std::error_code code = std::error_code{static_cast<int>(ProtocolError::bad_syntax), realm::sync::protocol_error_category()};
         // Register the upload-completion notification
         session->wait_for_upload_completion([&](std::error_code error) {
             REQUIRE(error == code);
             handler_called = true;
         });
-        EventLoop::main().run_until([&] { return login_handler_called == true; });
         REQUIRE(handler_called == false);
         // Now trigger an error
         SyncSession::OnlyForTesting::handle_error(*session, {code, "Not a real error message", true});
