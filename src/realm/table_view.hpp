@@ -23,6 +23,7 @@
 #include <realm/table.hpp>
 #include <realm/util/features.h>
 #include <realm/obj_list.hpp>
+#include <realm/list.hpp>
 
 namespace realm {
 

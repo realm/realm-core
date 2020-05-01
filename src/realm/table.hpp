@@ -30,7 +30,6 @@
 #include <realm/util/function_ref.hpp>
 #include <realm/util/thread.hpp>
 #include <realm/table_ref.hpp>
-#include <realm/list.hpp>
 #include <realm/spec.hpp>
 #include <realm/query.hpp>
 #include <realm/cluster_tree.hpp>

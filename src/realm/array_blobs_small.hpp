@@ -21,7 +21,6 @@
 
 #include <realm/binary_data.hpp>
 #include <realm/array_blob.hpp>
-#include <realm/array_integer.hpp>
 #include <realm/exceptions.hpp>
 
 namespace realm {
@@ -122,7 +121,7 @@ public:
 
 private:
     friend class ArrayString;
-    ArrayInteger m_offsets;
+    Array m_offsets;
     ArrayBlob m_blob;
     Array m_nulls;
 

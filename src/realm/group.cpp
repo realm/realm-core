@@ -1357,7 +1357,7 @@ size_t Group::get_used_space() const noexcept
     if (m_top.size() > 4) {
         Array free_lengths(const_cast<SlabAlloc&>(m_alloc));
         free_lengths.init_from_ref(ref_type(m_top.get(4)));
-        used_space -= size_t(free_lengths.sum());
+        used_space -= size_t(free_lengths.get_sum());
     }
 
     return used_space;
@@ -1810,7 +1810,7 @@ void Group::verify() const
                             m_top.size() == 11,
                         m_top.size());
         Allocator& alloc = m_top.get_alloc();
-        ArrayInteger pos(alloc), len(alloc), ver(alloc);
+        Array pos(alloc), len(alloc), ver(alloc);
         pos.set_parent(const_cast<Array*>(&m_top), s_free_pos_ndx);
         len.set_parent(const_cast<Array*>(&m_top), s_free_size_ndx);
         ver.set_parent(const_cast<Array*>(&m_top), s_free_version_ndx);
@@ -1909,7 +1909,7 @@ void Group::print() const
 void Group::print_free() const
 {
     Allocator& alloc = m_top.get_alloc();
-    ArrayInteger pos(alloc), len(alloc), ver(alloc);
+    Array pos(alloc), len(alloc), ver(alloc);
     pos.set_parent(const_cast<Array*>(&m_top), s_free_pos_ndx);
     len.set_parent(const_cast<Array*>(&m_top), s_free_size_ndx);
     ver.set_parent(const_cast<Array*>(&m_top), s_free_version_ndx);
@@ -1934,12 +1934,12 @@ void Group::print_free() const
 
     size_t n = pos.size();
     for (size_t i = 0; i != n; ++i) {
-        size_t offset = to_size_t(pos[i]);
-        size_t size_of_i = to_size_t(len[i]);
+        size_t offset = to_size_t(pos.get(i));
+        size_t size_of_i = to_size_t(len.get(i));
         std::cout << i << ": " << offset << " " << size_of_i;
 
         if (has_versions) {
-            size_t version = to_size_t(ver[i]);
+            size_t version = to_size_t(ver.get(i));
             std::cout << " " << version;
         }
         std::cout << "\n";

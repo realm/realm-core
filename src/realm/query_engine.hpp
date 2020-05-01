@@ -96,7 +96,9 @@ AggregateState      State of the aggregate - contains a state variable that stor
 #include <realm/array_binary.hpp>
 #include <realm/array_timestamp.hpp>
 #include <realm/array_decimal128.hpp>
+#include <realm/array_object_id.hpp>
 #include <realm/array_list.hpp>
+#include <realm/array_bool.hpp>
 #include <realm/array_backlink.hpp>
 #include <realm/column_type_traits.hpp>
 #include <realm/metrics/query_info.hpp>

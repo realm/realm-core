@@ -447,10 +447,27 @@ DataType Spec::get_public_column_type(size_t ndx) const noexcept
     return DataType(type);
 }
 
+namespace {
+
+template <class T>
+bool compare(const T& a, const T& b)
+{
+    if (a.size() != b.size())
+        return false;
+
+    for (size_t i = 0; i < a.size(); ++i) {
+        if (b.get(i) != a.get(i))
+            return false;
+    }
+
+    return true;
+}
+
+} // namespace
 
 bool Spec::operator==(const Spec& spec) const noexcept
 {
-    if (!m_attr.compare(spec.m_attr))
+    if (!compare(m_attr, spec.m_attr))
         return false;
     if (!m_names.compare_string(spec.m_names))
         return false;
