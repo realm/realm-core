@@ -767,8 +767,13 @@ void App::do_authenticated_request(Request request,
                                    std::shared_ptr<SyncUser> sync_user,
                                    std::function<void (Response)> completion_block)
 {
-    init_app_metadata([completion_block, &request, sync_user, this](const util::Optional<AppError> error,
-                                                                    const util::Optional<Response> response) {
+    request.timeout_ms = m_request_timeout_ms;
+    request.headers = get_request_headers(sync_user,
+                                          request.uses_refresh_token ?
+                                          RequestTokenType::RefreshToken : RequestTokenType::AccessToken);
+    
+    init_app_metadata([completion_block, request, sync_user, this](const util::Optional<AppError> error,
+                                                                   const util::Optional<Response> response) {
         if (error) {
             return completion_block(*response);
         }
@@ -781,10 +786,7 @@ void App::do_authenticated_request(Request request,
             }
         };
 
-        request.timeout_ms = m_request_timeout_ms;
-        request.headers = get_request_headers(sync_user,
-                                              request.uses_refresh_token ?
-                                              RequestTokenType::RefreshToken : RequestTokenType::AccessToken);
+
         m_config.transport_generator()->send_request_to_server(request, handler);
     });
 }
