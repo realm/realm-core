@@ -477,7 +477,7 @@ def buildPerformance() {
   return {
     // Select docker-cph-X.  We want docker, metal (brix) and only one executor
     // (exclusive), if the machine changes also change REALM_BENCH_MACHID below
-    node('docker && brix && exclusive') {
+    node('brix && exclusive') {
       getArchive()
 
       // REALM_BENCH_DIR tells the gen_bench_hist.sh script where to place results
