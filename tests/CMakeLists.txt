@@ -82,10 +82,10 @@ endif()
 if(REALM_ENABLE_SYNC)
     # It's necessary to explicitly link to realm-sync here to control the order in which libraries are
     # linked to avoid link errors when using GNU ld.
-    target_link_libraries(tests realm-sync realm-sync-server realm-parser)
+    target_link_libraries(tests realm-sync realm-sync-server)
 endif()
 
-target_link_libraries(tests realm-object-store ${EXTRA_LIBRARIES} ${PLATFORM_LIBRARIES})
+target_link_libraries(tests realm-object-store ${EXTRA_LIBRARIES} ${PLATFORM_LIBRARIES} realm-parser)
 
 add_custom_command(TARGET tests POST_BUILD
                    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/sync-1.x.realm $<TARGET_FILE_DIR:tests>)
