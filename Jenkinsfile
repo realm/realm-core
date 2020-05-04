@@ -96,18 +96,18 @@ jobWrapper {
     }
     stage('Checking') {
         parallelExecutors = [
-            checkLinuxDebug         : doCheckInDocker('Debug'),
-            checkLinuxRelease       : doCheckInDocker('Release'),
-            checkLinuxDebugNoEncryp : doCheckInDocker('Debug', '4', 'OFF'),
-            checkMacOsRelease       : doBuildMacOs('Release', true),
-            checkWin32Release       : doBuildWindows('Release', false, 'Win32', true),
-            checkWin32DebugUWP      : doBuildWindows('Debug', true, 'Win32', true),
-            iosDebug                : doBuildAppleDevice('ios', 'MinSizeDebug'),
-            androidArm64Debug       : doAndroidBuildInDocker('arm64-v8a', 'Debug', false),
-            checkRaspberryPi        : doLinuxCrossCompile('armhf', 'Debug', 'qemu-arm -cpu cortex-a7'),
-            threadSanitizer         : doCheckSanity('Debug', '1000', 'thread'),
+            // checkLinuxDebug         : doCheckInDocker('Debug'),
+            // checkLinuxRelease       : doCheckInDocker('Release'),
+            // checkLinuxDebugNoEncryp : doCheckInDocker('Debug', '4', 'OFF'),
+            // checkMacOsRelease       : doBuildMacOs('Release', true),
+            // checkWin32Release       : doBuildWindows('Release', false, 'Win32', true),
+            // checkWin32DebugUWP      : doBuildWindows('Debug', true, 'Win32', true),
+            // iosDebug                : doBuildAppleDevice('ios', 'MinSizeDebug'),
+            // androidArm64Debug       : doAndroidBuildInDocker('arm64-v8a', 'Debug', false),
+            // checkRaspberryPi        : doLinuxCrossCompile('armhf', 'Debug', 'qemu-arm -cpu cortex-a7'),
+            // threadSanitizer         : doCheckSanity('Debug', '1000', 'thread'),
             addressSanitizer        : doCheckSanity('Debug', '1000', 'address'),
-            performance             : buildPerformance(),
+            performance             : optionalBuildPerformance(releaseTesting), // always build performance on releases, otherwise make it optional
         ]
         if (releaseTesting) {
             extendedChecks = [
@@ -472,9 +472,36 @@ def doBuildWindows(String buildType, boolean isUWP, String platform, boolean run
     }
 }
 
+def optionalBuildPerformance(boolean force) {
+    if (force) {
+        return {
+            buildPerformance()
+        }
+    } else {
+        return {
+            def doPerformance = true
+            stage("Input") {
+                try {
+                    timeout(time: 1, unit: 'MINUTES') {
+                        script {
+                            input message: 'Build Performance?', ok: 'Yes'
+                        }
+                    }
+                } catch (err) { // manual abort or timeout
+                    println "Not building performance on this run: ${err}"
+                    doPerformance = false
+                }
+            }
+            if (doPerformance) {
+                stage("Build") {
+                    buildPerformance()
+                }
+            }
+        }
+    }
+}
 
 def buildPerformance() {
-  return {
     // Select docker-cph-X.  We want docker, metal (brix) and only one executor
     // (exclusive), if the machine changes also change REALM_BENCH_MACHID below
     node('brix && exclusive') {
@@ -506,7 +533,6 @@ def buildPerformance() {
         }
       }
     }
-  }
 }
 
 def doBuildMacOs(String buildType, boolean runTests) {
