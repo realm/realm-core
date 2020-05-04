@@ -5974,4 +5974,35 @@ TEST(LangBindHelper_ArrayXoverMapping)
     }
 }
 
+TEST(LangBindHelper_SchemaChangeNotification)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    auto hist = make_in_realm_history(path);
+    DBRef db = DB::create(*hist);
+
+    auto rt = db->start_read();
+    bool handler_called;
+    rt->set_schema_change_notification_handler([&handler_called]() { handler_called = true; });
+    CHECK(rt->has_schema_change_notification_handler());
+
+    {
+        auto tr = db->start_write();
+        tr->add_table("my_table");
+        tr->commit();
+    }
+    handler_called = false;
+    rt->advance_read();
+    CHECK(handler_called);
+
+    {
+        auto tr = db->start_write();
+        auto table = tr->get_table("my_table");
+        table->add_column(type_Int, "integer");
+        tr->commit();
+    }
+    handler_called = false;
+    rt->advance_read();
+    CHECK(handler_called);
+}
+
 #endif

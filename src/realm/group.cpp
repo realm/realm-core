@@ -796,7 +796,7 @@ Table* Group::do_add_table(StringData name, bool is_embedded, bool do_repl)
     }
 
     Replication* repl = *get_repl();
-    if (do_repl && repl && name.begins_with(g_class_name_prefix))
+    if (do_repl && repl)
         repl->add_class(key, name, is_embedded);
 
     ++m_num_tables;
