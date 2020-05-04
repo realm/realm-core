@@ -197,12 +197,6 @@ ref_type ConstLstBase::get_child_ref(size_t) const noexcept
     }
 }
 
-std::pair<ref_type, size_t> ConstLstBase::get_to_dot_parent(size_t) const
-{
-    // TODO
-    return {};
-}
-
 void ConstLstBase::erase_repl(Replication* repl, size_t ndx) const
 {
     repl->list_erase(*this, ndx);

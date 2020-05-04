@@ -372,44 +372,6 @@ inline size_t BasicArray<T>::calc_aligned_byte_size(size_t size)
     return aligned_byte_size;
 }
 
-#ifdef REALM_DEBUG
-
-// LCOV_EXCL_START
-template <class T>
-void BasicArray<T>::to_dot(std::ostream& out, StringData title) const
-{
-    ref_type ref = get_ref();
-    if (title.size() != 0) {
-        out << "subgraph cluster_" << ref << " {\n";
-        out << " label = \"" << title << "\";\n";
-        out << " color = white;\n";
-    }
-
-    out << "n" << std::hex << ref << std::dec << "[shape=none,label=<";
-    out << "<TABLE BORDER=\"0\" CELLBORDER=\"1\" CELLSPACING=\"0\" CELLPADDING=\"4\"><TR>\n";
-
-    // Header
-    out << "<TD BGCOLOR=\"lightgrey\"><FONT POINT-SIZE=\"7\"> ";
-    out << "0x" << std::hex << ref << std::dec << "<BR/>";
-    out << "</FONT></TD>\n";
-
-    // Values
-    size_t n = m_size;
-    for (size_t i = 0; i != n; ++i)
-        out << "<TD>" << get(i) << "</TD>\n";
-
-    out << "</TR></TABLE>>];\n";
-
-    if (title.size() != 0)
-        out << "}\n";
-
-    to_dot_parent_edge(out);
-}
-// LCOV_EXCL_STOP
-
-#endif // REALM_DEBUG
-
-
 } // namespace realm
 
 #endif // REALM_ARRAY_BASIC_TPL_HPP

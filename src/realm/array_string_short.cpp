@@ -324,33 +324,4 @@ void ArrayStringShort::string_stats() const
     std::cout << "         avg: " << zavg << "\n";
 }
 
-
-void ArrayStringShort::to_dot(std::ostream& out, StringData title) const
-{
-    ref_type ref = get_ref();
-
-    if (title.size() != 0) {
-        out << "subgraph cluster_" << ref << " {" << std::endl;
-        out << " label = \"" << title << "\";" << std::endl;
-        out << " color = white;" << std::endl;
-    }
-
-    out << "n" << std::hex << ref << std::dec << "[shape=none,label=<";
-    out << "<TABLE BORDER=\"0\" CELLBORDER=\"1\" CELLSPACING=\"0\" CELLPADDING=\"4\"><TR>" << std::endl;
-
-    // Header
-    out << "<TD BGCOLOR=\"lightgrey\"><FONT POINT-SIZE=\"7\">";
-    out << "0x" << std::hex << ref << std::dec << "</FONT></TD>" << std::endl;
-
-    for (size_t i = 0; i < m_size; ++i)
-        out << "<TD>\"" << get(i) << "\"</TD>" << std::endl;
-
-    out << "</TR></TABLE>>];" << std::endl;
-
-    if (title.size() != 0)
-        out << "}" << std::endl;
-
-    to_dot_parent_edge(out);
-}
-
 #endif // LCOV_EXCL_STOP ignore debug functions

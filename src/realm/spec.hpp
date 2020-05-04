@@ -82,10 +82,7 @@ public:
     size_t get_ndx_in_parent() const noexcept;
     void set_ndx_in_parent(size_t) noexcept;
 
-#ifdef REALM_DEBUG
     void verify() const;
-    void to_dot(std::ostream&, StringData title = StringData()) const;
-#endif
 
 private:
     // Underlying array structure.
