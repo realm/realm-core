@@ -221,9 +221,6 @@ public:
     template <class T>
     void verify_entries(const ClusterColumn& column) const;
     void do_dump_node_structure(std::ostream&, int) const;
-    void to_dot() const;
-    void to_dot(std::ostream&, StringData title = StringData()) const;
-    void to_dot_2(std::ostream&, StringData title = StringData()) const;
 #endif
 
     typedef int32_t key_type;
@@ -309,8 +306,6 @@ private:
 
 #ifdef REALM_DEBUG
     static void dump_node_structure(const Array& node, std::ostream&, int level);
-    static void array_to_dot(std::ostream&, const Array&);
-    static void keys_to_dot(std::ostream&, const Array&, StringData title = StringData());
 #endif
 };
 

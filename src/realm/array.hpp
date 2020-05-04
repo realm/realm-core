@@ -688,22 +688,6 @@ public:
 
     void verify() const;
 
-#ifdef REALM_DEBUG
-    void print() const;
-    typedef size_t (*LeafVerifier)(MemRef, Allocator&);
-    void verify_bptree(LeafVerifier) const;
-    typedef void (*LeafDumper)(MemRef, Allocator&, std::ostream&, int level);
-    void dump_bptree_structure(std::ostream&, int level, LeafDumper) const;
-    void to_dot(std::ostream&, StringData title = StringData()) const;
-    class ToDotHandler {
-    public:
-        virtual void to_dot(MemRef leaf_mem, ArrayParent*, size_t ndx_in_parent, std::ostream&) = 0;
-        ~ToDotHandler() {}
-    };
-    void bptree_to_dot(std::ostream&, ToDotHandler&) const;
-    void to_dot_parent_edge(std::ostream&) const;
-#endif
-
     Array& operator=(const Array&) = delete; // not allowed
     Array(const Array&) = delete;            // not allowed
 protected:
@@ -755,8 +739,6 @@ protected:
     ref_type get_child_ref(size_t) const noexcept override;
 
     void destroy_children(size_t offset = 0) noexcept;
-
-    std::pair<ref_type, size_t> get_to_dot_parent(size_t ndx_in_parent) const override;
 
 protected:
     // Getters and Setters for adaptive-packed arrays

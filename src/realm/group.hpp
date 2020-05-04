@@ -827,8 +827,6 @@ private:
     /// The specified history type must be a value of Replication::HistoryType.
     static int get_target_file_format_version_for_session(int current_file_format_version, int history_type) noexcept;
 
-    std::pair<ref_type, size_t> get_to_dot_parent(size_t ndx_in_parent) const override;
-
     void send_cascade_notification(const CascadeNotification& notification) const;
     void send_schema_change_notification() const;
 

@@ -156,7 +156,6 @@ protected:
     virtual bool init_from_parent() const = 0;
 
     ref_type get_child_ref(size_t) const noexcept override;
-    std::pair<ref_type, size_t> get_to_dot_parent(size_t) const override;
 
     void update_if_needed() const
     {

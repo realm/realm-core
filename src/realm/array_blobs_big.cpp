@@ -188,10 +188,10 @@ void ArrayBigBlobs::find_all(IntegerColumn& result, BinaryData value, bool is_st
 }
 
 
-#ifdef REALM_DEBUG // LCOV_EXCL_START ignore debug functions
 
 void ArrayBigBlobs::verify() const
 {
+#ifdef REALM_DEBUG
     REALM_ASSERT(has_refs());
     for (size_t i = 0; i < size(); ++i) {
         ref_type blob_ref = Array::get_as_ref(i);
@@ -202,32 +202,6 @@ void ArrayBigBlobs::verify() const
             blob.verify();
         }
     }
+#endif
 }
 
-
-void ArrayBigBlobs::to_dot(std::ostream& out, bool, StringData title) const
-{
-    ref_type ref = get_ref();
-
-    out << "subgraph cluster_binary" << ref << " {" << std::endl;
-    out << " label = \"ArrayBinary";
-    if (title.size() != 0)
-        out << "\\n'" << title << "'";
-    out << "\";" << std::endl;
-
-    Array::to_dot(out, "big_blobs_leaf");
-
-    for (size_t i = 0; i < size(); ++i) {
-        ref_type blob_ref = Array::get_as_ref(i);
-        ArrayBlob blob(m_alloc);
-        blob.init_from_ref(blob_ref);
-        blob.set_parent(const_cast<ArrayBigBlobs*>(this), i);
-        blob.to_dot(out);
-    }
-
-    out << "}" << std::endl;
-
-    to_dot_parent_edge(out);
-}
-
-#endif // LCOV_EXCL_STOP ignore debug functions

@@ -1948,9 +1948,4 @@ void Group::print_free() const
 }
 #endif
 
-std::pair<ref_type, size_t> Group::get_to_dot_parent(size_t ndx_in_parent) const
-{
-    return std::make_pair(m_tables.get_ref(), ndx_in_parent);
-}
-
 // LCOV_EXCL_STOP ignore debug functions
