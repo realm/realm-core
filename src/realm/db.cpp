@@ -1182,8 +1182,8 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
                 if (m_key && info->session_initiator_pid != pid) {
                     std::stringstream ss;
                     ss << path << ": Encrypted interprocess sharing is currently unsupported."
-                       << "DB has been opened by pid: " << info->session_initiator_pid << ". Current pid is "
-                       << pid << ".";
+                       << "DB has been opened by pid: " << info->session_initiator_pid << ". Current pid is " << pid
+                       << ".";
                     throw std::runtime_error(ss.str());
                 }
 
