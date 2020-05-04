@@ -171,7 +171,8 @@ def splitTagSemVer(tag):
 
 orderingColumns = ['versionMajor', 'versionMinor', 'versionPatch', 'versionExtra', 'versionExtra2', 'versionExtra3']
 def addVersionColumns(data):
-    newStructure = np.dtype(data.dtype.descr + [('versionMajor', '<i8'), ('versionMinor', '<i8'), ('versionPatch', '<i8'), ('versionExtra', 'S100'), ('versionExtra2', 'S100'), ('versionExtra3', 'S100')])
+    extraTypes = np.dtype({'names': orderingColumns, 'formats': ['int32', 'int32', 'int32', 'U100', 'U100', 'U100']})
+    newStructure = np.dtype(data.dtype.descr + extraTypes.descr)
     space = np.zeros(data.shape, dtype=newStructure)
     for col in list(data.dtype.fields):
         space[col] = data[col]
