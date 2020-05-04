@@ -305,7 +305,7 @@ public:
     // This method re-initialises the last used ringbuffer entry to hold a new entry.
     // Precondition: This should *only* be done if the caller has established that she
     // is the only thread/process that has access to the ringbuffer. It is currently
-    // called from init_versioning(), which is called by SharedGroup::open() under the
+    // called from init_versioning(), which is called by DB::open() under the
     // condition that it is the session initiator and under guard by the control mutex,
     // thus ensuring the precondition.
     // It is most likely not suited for any other use.
@@ -388,8 +388,8 @@ private:
 /// The structure of the contents of the per session `.lock` file. Note that
 /// this file is transient in that it is recreated/reinitialized at the
 /// beginning of every session. A session is any sequence of temporally
-/// overlapping openings of a particular Realm file via SharedGroup objects. For
-/// example, if there are two SharedGroup objects, A and B, and the file is
+/// overlapping openings of a particular Realm file via DB objects. For
+/// example, if there are two DB objects, A and B, and the file is
 /// first opened via A, then opened via B, then closed via A, and finally closed
 /// via B, then the session streaches from the opening via A to the closing via
 /// B.
@@ -976,7 +976,7 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
         // - attachment of the database file
         // - start of the async daemon
         // - stop of the async daemon
-        // - SharedGroup beginning/ending a session
+        // - DB beginning/ending a session
         // - Waiting for and signalling database changes
         {
             std::lock_guard<InterprocessMutex> lock(m_controlmutex); // Throws
@@ -1038,11 +1038,7 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
                     throw e;
                 }
             }
-            // If we fail in any way, we must detach the allocator. Failure to do so
-            // will retain memory mappings in the mmap cache shared between allocators.
-            // This would allow other SharedGroups to reuse the mappings even in
-            // situations, where the database has been re-initialised (e.g. through
-            // compact()). This could render the mappings (partially) undefined.
+            // If we fail in any way, we must detach the allocator.
             SlabAlloc::DetachGuard alloc_detach_guard(alloc);
             alloc.note_reader_start(this);
             // must come after the alloc detach guard
@@ -1055,7 +1051,7 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
             current_file_format_version = alloc.get_committed_file_format_version();
 
             bool file_format_ok = false;
-            // In shared mode (Realm file opened via a SharedGroup instance) this
+            // In shared mode (Realm file opened via a DB instance) this
             // version of the core library is able to open Realms using file format
             // versions from 2 to 9. Please see Group::get_file_format_version() for
             // information about the individual file format versions.
@@ -1186,7 +1182,7 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
                 if (m_key && info->session_initiator_pid != pid) {
                     std::stringstream ss;
                     ss << path << ": Encrypted interprocess sharing is currently unsupported."
-                       << "SharedGroup has been opened by pid: " << info->session_initiator_pid << ". Current pid is "
+                       << "DB has been opened by pid: " << info->session_initiator_pid << ". Current pid is "
                        << pid << ".";
                     throw std::runtime_error(ss.str());
                 }
@@ -1787,7 +1783,7 @@ void DB::upgrade_file_format(bool allow_file_format_upgrade, int target_file_for
         int current_hist_schema_version_2 = wt->get_history_schema_version();
         // The history must either still be using its initial schema or have
         // been upgraded already to the chosen target schema version via a
-        // concurrent SharedGroup object.
+        // concurrent DB object.
         REALM_ASSERT(current_hist_schema_version_2 == current_hist_schema_version ||
                      current_hist_schema_version_2 == target_hist_schema_version);
         bool need_hist_schema_upgrade = (current_hist_schema_version_2 < target_hist_schema_version);
@@ -1805,7 +1801,7 @@ void DB::upgrade_file_format(bool allow_file_format_upgrade, int target_file_for
         int current_file_format_version_2 = m_alloc.get_committed_file_format_version();
         // The file must either still be using its initial file_format or have
         // been upgraded already to the chosen target file format via a
-        // concurrent SharedGroup object.
+        // concurrent DB object.
         REALM_ASSERT(current_file_format_version_2 == current_file_format_version ||
                      current_file_format_version_2 == target_file_format_version);
         bool need_file_format_upgrade = (current_file_format_version_2 < target_file_format_version);
@@ -2049,7 +2045,7 @@ Replication::version_type DB::do_commit(Transaction& transaction)
     if (Replication* repl = get_replication()) {
         // If Replication::prepare_commit() fails, then the entire transaction
         // fails. The application then has the option of terminating the
-        // transaction with a call to SharedGroup::rollback(), which in turn
+        // transaction with a call to Transaction::Rollback(), which in turn
         // must call Replication::abort_transact().
         new_version = repl->prepare_commit(current_version); // Throws
         try {

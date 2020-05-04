@@ -269,31 +269,28 @@ public:
 
         /// Group::open() is called on a group accessor that is already in the
         /// attached state. Or Group::open() or Group::commit() is called on a
-        /// group accessor that is managed by a SharedGroup object.
+        /// group accessor that is managed by a DB object.
         wrong_group_state,
 
-        /// No active transaction on a particular SharedGroup object (e.g.,
-        /// SharedGroup::commit()), or the active transaction on the SharedGroup
-        /// object is of the wrong type (read/write), or an attampt was made to
-        /// initiate a new transaction while one is already in progress on the
-        /// same SharedGroup object.
+        /// No active transaction on a particular Transaction object (e.g. after commit)
+        /// or the Transaction object is of the wrong type (write to a read-only transaction)
         wrong_transact_state,
 
-        /// Attempted use of a continuous transaction through a SharedGroup
+        /// Attempted use of a continuous transaction through a DB
         /// object with no history. See Replication::get_history().
         no_history,
 
-        /// Durability setting (as passed to the SharedGroup constructor) was
+        /// Durability setting (as passed to the DB constructor) was
         /// not consistent across the session.
         mixed_durability,
 
         /// History type (as specified by the Replication implementation passed
-        /// to the SharedGroup constructor) was not consistent across the
+        /// to the DB constructor) was not consistent across the
         /// session.
         mixed_history_type,
 
         /// History schema version (as specified by the Replication
-        /// implementation passed to the SharedGroup constructor) was not
+        /// implementation passed to the DB constructor) was not
         /// consistent across the session.
         mixed_history_schema_version,
 

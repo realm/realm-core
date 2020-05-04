@@ -688,7 +688,7 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
     // file exists already but is empty. This can happen if another process is
     // currently creating it. Note however, that it is only legal for multiple
     // processes to access a database file concurrently if it is done via a
-    // SharedGroup, and in that case 'read_only' can never be true.
+    // DB, and in that case 'read_only' can never be true.
     REALM_ASSERT_EX(!(cfg.is_shared && cfg.read_only), cfg.is_shared, cfg.read_only, get_file_path_for_assertions());
     // session_initiator can be set *only* if we're shared.
     REALM_ASSERT_EX(cfg.is_shared || !cfg.session_initiator, cfg.is_shared, cfg.session_initiator, get_file_path_for_assertions());

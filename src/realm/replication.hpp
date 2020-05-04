@@ -41,7 +41,7 @@ class Logger;
 // transaction logging.
 
 /// Replication is enabled by passing an instance of an implementation of this
-/// class to the SharedGroup constructor.
+/// class to the DB constructor.
 class Replication : public _impl::TransactLogConvenientEncoder {
 public:
     // Be sure to keep this type aligned with what is actually used in DB.

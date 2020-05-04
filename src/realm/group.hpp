@@ -131,7 +131,7 @@ public:
     /// there is no concurrent access to the file (see below for more on
     /// concurrency), but if the file is modified via Group::commit() the
     /// history will be discarded. To retain the history, the application must
-    /// instead access the file in shared mode, i.e., via SharedGroup, and
+    /// instead access the file in shared mode, i.e., via DB, and
     /// supply the right kind of replication plugin (see
     /// Replication::get_history_type()).
     ///
@@ -146,7 +146,7 @@ public:
     /// Accessing a Realm database file through manual construction
     /// of a Group object does not offer any level of thread safety or
     /// transaction safety. When any of those kinds of safety are a
-    /// concern, consider using a SharedGroup instead. When accessing
+    /// concern, consider using a DB instead. When accessing
     /// a database file in read/write mode through a manually
     /// constructed Group object, it is entirely the responsibility of
     /// the application that the file is not accessed in any way by a
@@ -530,7 +530,7 @@ public:
     };
     /// Compute the sum of the sizes in number of bytes of all the array nodes
     /// that currently make up this group. When this group represents a snapshot
-    /// in a Realm file (such as during a read transaction via a SharedGroup
+    /// in a Realm file (such as during a read transaction via a Transaction
     /// instance), this function computes the footprint of that snapshot within
     /// the Realm file.
     ///
@@ -538,8 +538,8 @@ public:
     /// zero.
     size_t compute_aggregated_byte_size(SizeAggregateControl ctrl = SizeAggregateControl::size_of_all) const noexcept;
     /// Return the size taken up by the current snapshot. This is in contrast to
-    /// the number returned by SharedGroup::get_stats() which will return the
-    /// size of the last snapshot done in that SharedGroup. If the snapshots are
+    /// the number returned by DB::get_stats() which will return the
+    /// size of the last snapshot done in that DB. If the snapshots are
     /// identical, the numbers will of course be equal.
     size_t get_used_space() const noexcept;
 
@@ -600,7 +600,7 @@ private:
     /// Group::write(), none of the optional entries are present and the size of
     /// `m_top` is 3. In files updated by Group::commit(), the 4th and 5th entry
     /// are present, and the size of `m_top` is 5. In files updated by way of a
-    /// transaction (SharedGroup::commit()), the 4th, 5th, 6th, and 7th entry
+    /// transaction (Transaction::commit()), the 4th, 5th, 6th, and 7th entry
     /// are present, and the size of `m_top` is 7. In files that contain a
     /// changeset history, the 8th, 9th, and 10th entry are present, except that
     /// if the file was opened in nonshared mode (via Group::open()), and the
@@ -764,17 +764,17 @@ private:
     /// with the unattached_tag). The version number will then be determined in the
     /// subsequent call to Group::open.
     ///
-    /// In shared mode (when a Realm file is opened via a SharedGroup instance)
+    /// In shared mode (when a Realm file is opened via a DB instance)
     /// it can happen that the file format is upgraded asyncronously (via
-    /// another SharedGroup instance), and in that case the file format version
+    /// another DB instance), and in that case the file format version
     /// field can get out of date, but only for a short while. It is always
     /// guaranteed to be, and remain up to date after the opening process completes
-    /// (when SharedGroup::do_open() returns).
+    /// (when DB::do_open() returns).
     ///
     /// An empty Realm file (one whose top-ref is zero) may specify a file
     /// format version of zero to indicate that the format is not yet
     /// decided. In that case the file format version must be changed to a proper
-    /// before the opening process completes (Group::open() or SharedGroup::open()).
+    /// before the opening process completes (Group::open() or DB::open()).
     ///
     /// File format versions:
     ///
@@ -815,7 +815,7 @@ private:
     ///  11 New data types: Decimal128 and ObjectId. Embedded tables.
     ///
     /// IMPORTANT: When introducing a new file format version, be sure to review
-    /// the file validity checks in Group::open() and SharedGroup::do_open, the file
+    /// the file validity checks in Group::open() and DB::do_open, the file
     /// format selection logic in
     /// Group::get_target_file_format_version_for_session(), and the file format
     /// upgrade logic in Group::upgrade_file_format().
@@ -1153,7 +1153,7 @@ inline ref_type Group::get_history_ref(const Array& top) noexcept
 {
     bool has_history = (top.is_attached() && top.size() > s_hist_type_ndx);
     if (has_history) {
-        // This function is only used is shared mode (from SharedGroup)
+        // This function is only used is shared mode (from DB)
         REALM_ASSERT(top.size() > s_hist_version_ndx);
         return top.get_as_ref(s_hist_ref_ndx);
     }
@@ -1164,7 +1164,7 @@ inline int Group::get_history_schema_version() noexcept
 {
     bool has_history = (m_top.is_attached() && m_top.size() > s_hist_type_ndx);
     if (has_history) {
-        // This function is only used is shared mode (from SharedGroup)
+        // This function is only used is shared mode (from DB)
         REALM_ASSERT(m_top.size() > s_hist_version_ndx);
         return int(m_top.get_as_ref_or_tagged(s_hist_version_ndx).get_as_int());
     }
@@ -1180,7 +1180,7 @@ inline void Group::set_sync_file_id(uint64_t id)
 
 inline void Group::set_history_schema_version(int version)
 {
-    // This function is only used is shared mode (from SharedGroup)
+    // This function is only used is shared mode (from DB)
     REALM_ASSERT(m_top.size() >= 10);
     m_top.set(9, RefOrTagged::make_tagged(unsigned(version))); // Throws
 }
