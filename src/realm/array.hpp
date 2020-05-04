@@ -419,12 +419,10 @@ public:
     /// \return the index of the value if found, or realm::not_found otherwise
     size_t find_gte(const int64_t target, size_t start, size_t end = size_t(-1)) const;
 
-    int64_t sum(size_t start = 0, size_t end = size_t(-1)) const;
-    size_t count(int64_t value) const noexcept;
-
-    bool maximum(int64_t& result, size_t start = 0, size_t end = size_t(-1), size_t* return_ndx = nullptr) const;
-
-    bool minimum(int64_t& result, size_t start = 0, size_t end = size_t(-1), size_t* return_ndx = nullptr) const;
+    int64_t get_sum(size_t start = 0, size_t end = size_t(-1)) const
+    {
+        return sum(start, end);
+    }
 
     /// This information is guaranteed to be cached in the array accessor.
     bool is_inner_bptree_node() const noexcept;
@@ -724,6 +722,13 @@ private:
     void update_width_cache_from_header() noexcept;
 
     void do_ensure_minimum_width(int_fast64_t);
+
+    int64_t sum(size_t start, size_t end) const;
+    size_t count(int64_t value) const noexcept;
+
+    bool maximum(int64_t& result, size_t start = 0, size_t end = size_t(-1), size_t* return_ndx = nullptr) const;
+
+    bool minimum(int64_t& result, size_t start = 0, size_t end = size_t(-1), size_t* return_ndx = nullptr) const;
 
     template <size_t w>
     int64_t sum(size_t start, size_t end) const;
