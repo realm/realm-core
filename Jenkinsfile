@@ -94,8 +94,10 @@ jobWrapper {
             }
         }
     }
-    def armhfTestOptions = [
+    def armhfQemuTestOptions = [
         emulator: 'LD_LIBRARY_PATH=/usr/arm-linux-gnueabihf/lib qemu-arm -cpu cortex-a7',
+    ]
+    def armhfNativeTestOptions = [
         nativeNode: 'docker-arm',
         nativeDocker: 'armhf-native.Dockerfile',
         nativeDockerPlatform: 'linux/arm/v7',
@@ -110,19 +112,21 @@ jobWrapper {
             checkWin32DebugUWP      : doBuildWindows('Debug', true, 'Win32', true),
             iosDebug                : doBuildAppleDevice('ios', 'MinSizeDebug'),
             androidArm64Debug       : doAndroidBuildInDocker('arm64-v8a', 'Debug', false),
-            checkRaspberryPi        : doLinuxCrossCompile('armhf', 'Debug', armhfTestOptions),
+            checkRaspberryPiQemu    : doLinuxCrossCompile('armhf', 'Debug', armhfQemuTestOptions),
+            checkRaspberryPiNative  : doLinuxCrossCompile('armhf', 'Debug', armhfNativeTestOptions),
             threadSanitizer         : doCheckSanity('Debug', '1000', 'thread'),
             addressSanitizer        : doCheckSanity('Debug', '1000', 'address'),
         ]
         if (releaseTesting) {
             extendedChecks = [
-                checkLinuxRelease       : doCheckInDocker('Release'),
-                checkRaspberryPiRelease : doLinuxCrossCompile('armhf', 'Release', armhfTestOptions),
-                checkMacOsDebug         : doBuildMacOs('Debug', true),
-                buildUwpx64Debug        : doBuildWindows('Debug', true, 'x64', false),
-                androidArmeabiRelease   : doAndroidBuildInDocker('armeabi-v7a', 'Release', true),
-                coverage                : doBuildCoverage(),
-                performance             : buildPerformance(),
+                checkLinuxRelease             : doCheckInDocker('Release'),
+                checkRaspberryPiQemuRelease   : doLinuxCrossCompile('armhf', 'Release', armhfQemuTestOptions),
+                checkRaspberryPiNativeRelease : doLinuxCrossCompile('armhf', 'Release', armhfNativeTestOptions),
+                checkMacOsDebug               : doBuildMacOs('Debug', true),
+                buildUwpx64Debug              : doBuildWindows('Debug', true, 'x64', false),
+                androidArmeabiRelease         : doAndroidBuildInDocker('armeabi-v7a', 'Release', true),
+                coverage                      : doBuildCoverage(),
+                performance                   : buildPerformance(),
                 // valgrind                : doCheckValgrind()
             ]
             parallelExecutors.putAll(extendedChecks)
@@ -632,6 +636,28 @@ def doBuildAppleDevice(String sdk, String buildType) {
 }
 
 def doLinuxCrossCompile(String target, String buildType, Map testOptions = null) {
+    def runTests = { emulated ->
+            def runner = emulated ? testOptions.emulator : ''
+            try {
+                def environment = environment()
+                environment << 'UNITTEST_PROGRESS=1'
+                if (emulated) {
+                    environment << 'UNITTEST_FILTER=- Thread_RobustMutex*'  // robust mutexes can't work under qemu
+                }
+                withEnv(environment) {
+                    sh """
+                        cd test
+                        ulimit -s 256 # launching thousands of threads in 32-bit address space requires smaller stacks
+                        ${runner} ./realm-tests
+                    """
+                }
+            } finally {
+                dir('..') {
+                    def suffix = emulated ? '-emulated' : ''
+                    recordTests("Linux-${target}-${buildType}${suffix}")
+                }
+            }
+    }
     return {
         node('docker') {
             getArchive()
@@ -650,7 +676,12 @@ def doLinuxCrossCompile(String target, String buildType, Map testOptions = null)
                     runAndCollectWarnings(script: "ninja")
 
                     if (testOptions != null) {
-                        stash includes: 'test/**/*', name: "realm-tests-Linux-${target}"
+                        if (testOptions.get('emulator')) {
+                            runTests(true)
+                        }
+                        if (testOptions.get('nativeNode')) {
+                            stash includes: 'test/**/*', name: "realm-tests-Linux-${target}"
+                        }
                     } else {
                         sh 'cpack'
                         archiveArtifacts '*.tar.gz'
@@ -661,51 +692,16 @@ def doLinuxCrossCompile(String target, String buildType, Map testOptions = null)
                 }
             }
 
-            if (testOptions != null) {
-                def runTests = { emulated ->
-                    dir('build-dir') {
-                        unstash "realm-tests-Linux-${target}"
-                        def runner = emulated ? testOptions.emulator : ''
-                        try {
-                            def environment = environment()
-                            environment << 'UNITTEST_PROGRESS=1'
-                            if (emulated) {
-                                environment << 'UNITTEST_FILTER=- Thread_RobustMutex*'  // robust mutexes can't work under qemu
-                            }
-                            withEnv(environment) {
-                                sh """
-                                    cd test
-                                    ulimit -s 256 # launching thousands of threads in 32-bit address space requires smaller stacks
-                                    ${runner} ./realm-tests
-                                """
-                            }
-                        } finally {
-                            dir('..') {
-                                def suffix = emulated ? '-emulated' : ''
-                                recordTests("Linux-${target}-${buildType}${suffix}")
-                            }
-                        }
-                    }
-                }
-
-                // Note: Jenkins BlueOcean view doesn't display nested parallelism correctly while it is running.
-                // It waits until all tasks have finished before showing subnodes.
-                def parallelPrefix = "checkLinux-${target}-${buildType}"
-                def parallelTasks = [:]
-                parallelTasks["${parallelPrefix}-emulated".toString()] = {
-                    docker.build("realm-core-crosscompiling:${target}", "-f ${target}.Dockerfile .").inside {
-                        runTests(true)
-                    }
-                }
-                parallelTasks["${parallelPrefix}-native".toString()] = {
-                    node(testOptions.nativeNode) {
-                        getArchive()
-                        docker.build("realm-core-native:${target}", "-f ${testOptions.nativeDocker} --platform ${testOptions.nativeDockerPlatform} .").inside {
+            if (testOptions != null && testOptions.get('nativeNode')) {
+                node(testOptions.nativeNode) {
+                    getArchive()
+                    docker.build("realm-core-native:${target}", "-f ${testOptions.nativeDocker} --platform ${testOptions.nativeDockerPlatform} .").inside {
+                        dir('build-dir') {
+                            unstash "realm-tests-Linux-${target}"
                             runTests(false)
                         }
                     }
                 }
-                parallel parallelTasks
             }
         }
     }
