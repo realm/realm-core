@@ -346,7 +346,7 @@ void Transaction::upgrade_file_format(int target_file_format_version)
     int current_file_format_version = get_file_format_version();
     REALM_ASSERT(current_file_format_version < target_file_format_version);
 
-    // SharedGroup::do_open() must ensure this. Be sure to revisit the
+    // DB::do_open() must ensure this. Be sure to revisit the
     // following upgrade logic when DB::do_open() is changed (or
     // vice versa).
     REALM_ASSERT_EX(current_file_format_version >= 5 && current_file_format_version <= 10,
@@ -499,7 +499,7 @@ void Group::open(BinaryData buffer, bool take_ownership)
 Group::~Group() noexcept
 {
     // If this group accessor is detached at this point in time, it is either
-    // because it is SharedGroup::m_group (m_is_shared), or it is a free-stading
+    // because it is DB::m_group (m_is_shared), or it is a free-stading
     // group accessor that was never successfully opened.
     if (!m_top.is_attached())
         return;
@@ -1108,7 +1108,7 @@ void Group::write(std::ostream& out, int file_format_version, TableWriter& table
         // the top-array. The free-space information of the group will only be
         // included if a non-zero version number is given as parameter,
         // indicating that versioning info is to be saved. This is used from
-        // SharedGroup to compact the database by writing only the live data
+        // DB to compact the database by writing only the live data
         // into a separate file.
         ref_type names_ref = table_writer.write_names(out_2);   // Throws
         ref_type tables_ref = table_writer.write_tables(out_2); // Throws

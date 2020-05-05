@@ -92,7 +92,7 @@ namespace realm {
 //    promote_to_write();
 //    view = table.where().less_than(salary_column,limit).find_all();
 //    for (size_t i = 0; i < view.size(); ++i) {
-//        view.set_int(salary_column, i, limit);
+//        view[i].set(salary_column, limit);
 //        // add this to get reflective mode: view.sync_if_needed();
 //    }
 //    commit_and_continue_as_read();
@@ -113,7 +113,7 @@ namespace realm {
 //    view = table.where().less_than(salary_column,limit).find_all();
 //    for (size_t i = 0; i < view.size(); ++i) {
 //        promote_to_write();
-//        view.set_int(salary_column, i, limit);
+//        view[i].set(salary_column, limit);
 //        commit_and_continue_as_write();
 //    }
 //
@@ -126,14 +126,14 @@ namespace realm {
 //    for (size_t i = 0; i < view.size(); ++i) {
 //        promote_to_write();
 //        // add r.sync_if_needed(); to get reflective mode
-//        if (r.is_row_attached(i)) {
-//            Row r = view[i];
-//            r.set_int(salary_column, limit);
+//        if (r.is_obj_valid(i)) {
+//            auto r = view[i];
+//            view[i].set(salary_column, limit);
 //        }
 //        commit_and_continue_as_write();
 //    }
 //
-// This is safe, and we just aim for providing low level safety: is_row_attached() can tell
+// This is safe, and we just aim for providing low level safety: is_obj_valid() can tell
 // if the reference is valid, and the references in the view continue to point to the
 // same object at all times, also following implicit updates. The rest is up to the
 // application logic.
