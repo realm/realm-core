@@ -20,6 +20,7 @@
 #include <realm/util/assert.hpp>
 #include <realm/table.hpp>
 #include <realm/group.hpp>
+#include <realm/list.hpp>
 
 using namespace realm;
 

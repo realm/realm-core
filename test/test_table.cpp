@@ -44,6 +44,7 @@ using namespace std::chrono;
 
 #include "test.hpp"
 #include "test_table_helper.hpp"
+#include "test_types_helper.hpp"
 
 // #include <valgrind/callgrind.h>
 //#define PERFORMACE_TESTING
@@ -3322,65 +3323,6 @@ TEST(Table_ListOfPrimitives)
     t->remove_object(ObjKey(7));
     CHECK_NOT(timestamp_list.is_attached());
 }
-
-template <typename T>
-inline T convert_for_test(int64_t v)
-{
-    return static_cast<T>(v);
-}
-
-template <>
-inline Timestamp convert_for_test<Timestamp>(int64_t v)
-{
-    return Timestamp{v, 0};
-}
-
-template <>
-inline ObjectId convert_for_test<ObjectId>(int64_t v)
-{
-    static const char hex_digits[] = "0123456789abcdef";
-    std::string value;
-    uint64_t cur = static_cast<uint64_t>(v);
-    for (size_t i = 0; i < 24; ++i) {
-        value += char(hex_digits[cur % 16]);
-        cur -= (cur % 16);
-        if (cur == 0) {
-            cur += static_cast<uint64_t>(v);
-        }
-    }
-    return ObjectId(value.c_str());
-}
-
-template <>
-inline Optional<ObjectId> convert_for_test(int64_t v)
-{
-    return Optional<ObjectId>(convert_for_test<ObjectId>(v));
-}
-
-template <typename T, typename U>
-std::vector<T> values_from_int(const std::vector<int64_t>& values)
-{
-    std::vector<T> ret;
-    for (size_t i = 0; i < values.size(); ++i) {
-        ret.push_back(convert_for_test<U>(values[i]));
-    }
-    return ret;
-}
-
-struct less {
-    template <typename T>
-    auto operator()(T&& a, T&& b) const noexcept
-    {
-        return Mixed(a).compare(Mixed(b)) < 0;
-    }
-};
-struct greater {
-    template <typename T>
-    auto operator()(T&& a, T&& b) const noexcept
-    {
-        return Mixed(a).compare(Mixed(b)) > 0;
-    }
-};
 
 TEST_TYPES(Table_ListOfPrimitivesSort, int64_t, float, double, Decimal128, ObjectId, Timestamp, Optional<int64_t>,
            Optional<float>, Optional<double>, Optional<ObjectId>)

@@ -432,9 +432,8 @@ private:
 TEST(LangBindHelper_AdvanceReadTransact_Basics)
 {
     SHARED_GROUP_TEST_PATH(path);
-    ShortCircuitHistory hist(path);
-    DBRef sg = DB::create(hist, DBOptions(crypt_key()));
-    DBRef sg_w = DB::create(hist, DBOptions(crypt_key()));
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
 
     // Start a read transaction (to be repeatedly advanced)
     TransactionRef rt = sg->start_read();
@@ -447,7 +446,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
 
     // Try to advance after an empty write transaction
     {
-        WriteTransaction wt(sg_w);
+        WriteTransaction wt(sg);
         wt.commit();
     }
     rt->advance_read();
@@ -456,7 +455,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
 
     // Try to advance after a superfluous rollback
     {
-        WriteTransaction wt(sg_w);
+        WriteTransaction wt(sg);
         // Implicit rollback
     }
     rt->advance_read();
@@ -465,7 +464,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
 
     // Try to advance after a propper rollback
     {
-        WriteTransaction wt(sg_w);
+        WriteTransaction wt(sg);
         wt.add_table("bad");
         // Implicit rollback
     }
@@ -476,7 +475,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
     // Create a table via the other SharedGroup
     ObjKey k0;
     {
-        WriteTransaction wt(sg_w);
+        WriteTransaction wt(sg);
         TableRef foo_w = wt.add_table("foo");
         foo_w->add_column(type_Int, "i");
         k0 = foo_w->create_object().get_key();
@@ -497,24 +496,32 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
     // Modify the table via the other SharedGroup
     ObjKey k1;
     {
-        WriteTransaction wt(sg_w);
+        WriteTransaction wt(sg);
         TableRef foo_w = wt.get_table("foo");
         foo_w->add_column(type_String, "s");
+        foo_w->add_column(type_Bool, "b");
+        foo_w->add_column(type_Float, "f");
+        foo_w->add_column(type_Double, "d");
+        foo_w->add_column(type_Binary, "bin");
+        foo_w->add_column(type_Timestamp, "t");
+        foo_w->add_column(type_Decimal, "dec");
+        foo_w->add_column(type_ObjectId, "oid");
+        foo_w->add_column_link(type_Link, "link", *foo_w);
         cols = foo_w->get_column_keys();
-        k1 = foo_w->create_object().get_key();
+        auto obj1 = foo_w->create_object();
         auto obj0 = foo_w->get_object(k0);
-        auto obj1 = foo_w->get_object(k1);
+        k1 = obj1.get_key();
+        obj1.set_all(2, StringData("b"), true, 1.1f, 1.2, BinaryData("hopla"), Timestamp(100, 300), Decimal("100"),
+                     ObjectId("abcdefabcdefabcdefabcdef"), k1);
         obj0.set<int>(cols[0], 1);
-        obj1.set<int>(cols[0], 2);
         obj0.set<StringData>(cols[1], "a");
-        obj1.set<StringData>(cols[1], "b");
         wt.commit();
     }
     rt->advance_read();
     CHECK(version != foo->get_content_version());
     rt->verify();
     cols = foo->get_column_keys();
-    CHECK_EQUAL(2, foo->get_column_count());
+    CHECK_EQUAL(10, foo->get_column_count());
     CHECK_EQUAL(type_Int, foo->get_column_type(cols[0]));
     CHECK_EQUAL(type_String, foo->get_column_type(cols[1]));
     CHECK_EQUAL(2, foo->size());
@@ -524,12 +531,20 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
     CHECK_EQUAL(2, obj1.get<int64_t>(cols[0]));
     CHECK_EQUAL("a", obj0.get<StringData>(cols[1]));
     CHECK_EQUAL("b", obj1.get<StringData>(cols[1]));
+    CHECK_EQUAL(obj1.get<Bool>(cols[2]), true);
+    CHECK_EQUAL(obj1.get<float>(cols[3]), 1.1f);
+    CHECK_EQUAL(obj1.get<double>(cols[4]), 1.2);
+    CHECK_EQUAL(obj1.get<BinaryData>(cols[5]), BinaryData("hopla"));
+    CHECK_EQUAL(obj1.get<Timestamp>(cols[6]), Timestamp(100, 300));
+    CHECK_EQUAL(obj1.get<Decimal>(cols[7]), Decimal("100"));
+    CHECK_EQUAL(obj1.get<ObjectId>(cols[8]), ObjectId("abcdefabcdefabcdefabcdef"));
+    CHECK_EQUAL(obj1.get<ObjKey>(cols[9]), obj1.get_key());
     CHECK_EQUAL(foo, rt->get_table("foo"));
 
     // Again, with no change
     rt->advance_read();
     rt->verify();
-    CHECK_EQUAL(2, foo->get_column_count());
+    CHECK_EQUAL(10, foo->get_column_count());
     CHECK_EQUAL(type_Int, foo->get_column_type(cols[0]));
     CHECK_EQUAL(type_String, foo->get_column_type(cols[1]));
     CHECK_EQUAL(2, foo->size());
@@ -541,27 +556,27 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
 
     // Perform several write transactions before advancing the read transaction
     {
-        WriteTransaction wt(sg_w);
+        WriteTransaction wt(sg);
         TableRef bar_w = wt.add_table("bar");
         bar_w->add_column(type_Int, "a");
         wt.commit();
     }
     {
-        WriteTransaction wt(sg_w);
+        WriteTransaction wt(sg);
         wt.commit();
     }
     {
-        WriteTransaction wt(sg_w);
+        WriteTransaction wt(sg);
         TableRef bar_w = wt.get_table("bar");
         bar_w->add_column(type_Float, "b");
         wt.commit();
     }
     {
-        WriteTransaction wt(sg_w);
+        WriteTransaction wt(sg);
         // Implicit rollback
     }
     {
-        WriteTransaction wt(sg_w);
+        WriteTransaction wt(sg);
         TableRef bar_w = wt.get_table("bar");
         bar_w->add_column(type_Double, "c");
         wt.commit();
@@ -570,7 +585,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
     rt->advance_read();
     rt->verify();
     CHECK_EQUAL(2, rt->size());
-    CHECK_EQUAL(2, foo->get_column_count());
+    CHECK_EQUAL(10, foo->get_column_count());
     cols = foo->get_column_keys();
     CHECK_EQUAL(type_Int, foo->get_column_type(cols[0]));
     CHECK_EQUAL(type_String, foo->get_column_type(cols[1]));
@@ -589,7 +604,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
 
     // Clear tables - not supported before backlinks work again
     {
-        WriteTransaction wt(sg_w);
+        WriteTransaction wt(sg);
         TableRef foo_w = wt.get_table("foo");
         foo_w->clear();
         TableRef bar_w = wt.get_table("bar");
@@ -600,14 +615,14 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
     rt->verify();
 
     size_t free_space, used_space;
-    sg_w->get_stats(free_space, used_space);
+    sg->get_stats(free_space, used_space);
     auto state_size = rt->compute_aggregated_byte_size(Group::SizeAggregateControl::size_of_all);
     CHECK_EQUAL(used_space, state_size);
 
     CHECK_EQUAL(2, rt->size());
     CHECK(foo);
     cols = foo->get_column_keys();
-    CHECK_EQUAL(2, foo->get_column_count());
+    CHECK_EQUAL(10, foo->get_column_count());
     CHECK_EQUAL(type_Int, foo->get_column_type(cols[0]));
     CHECK_EQUAL(type_String, foo->get_column_type(cols[1]));
     CHECK_EQUAL(0, foo->size());
@@ -5957,6 +5972,37 @@ TEST(LangBindHelper_ArrayXoverMapping)
                 REALM_ASSERT(str[j] == 'a');
         }
     }
+}
+
+TEST(LangBindHelper_SchemaChangeNotification)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    auto hist = make_in_realm_history(path);
+    DBRef db = DB::create(*hist);
+
+    auto rt = db->start_read();
+    bool handler_called;
+    rt->set_schema_change_notification_handler([&handler_called]() { handler_called = true; });
+    CHECK(rt->has_schema_change_notification_handler());
+
+    {
+        auto tr = db->start_write();
+        tr->add_table("my_table");
+        tr->commit();
+    }
+    handler_called = false;
+    rt->advance_read();
+    CHECK(handler_called);
+
+    {
+        auto tr = db->start_write();
+        auto table = tr->get_table("my_table");
+        table->add_column(type_Int, "integer");
+        tr->commit();
+    }
+    handler_called = false;
+    rt->advance_read();
+    CHECK(handler_called);
 }
 
 #endif

@@ -31,11 +31,11 @@ public:
      * Constructs an ObjectId with all bytes 0x00.
      */
     ObjectId() noexcept = default;
+
     ObjectId(null) noexcept
         : ObjectId()
     {
     }
-
     /**
      * Checks if the given string is a valid object id.
      */
