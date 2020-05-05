@@ -200,7 +200,7 @@ function(download_realm_core core_version)
     set_property(TARGET realm PROPERTY IMPORTED_LOCATION_RELEASE ${core_library_release})
     set_property(TARGET realm PROPERTY IMPORTED_LOCATION ${core_library_release})
 
-    set_property(TARGET realm PROPERTY INTERFACE_LINK_LIBRARIES Threads::Threads ${CRYPTO_LIBRARIES})
+    set_property(TARGET realm PROPERTY INTERFACE_LINK_LIBRARIES ${CRYPTO_LIBRARIES} Threads::Threads)
 
     # Create directories that are included in INTERFACE_INCLUDE_DIRECTORIES, as CMake requires they exist at
     # configure time, when they'd otherwise not be created until we download and extract core.
