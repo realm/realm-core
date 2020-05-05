@@ -1,0 +1,6 @@
+{
+    "identity": "test",
+    "access": ["download", "upload"],
+    "timestamp": 1455530614,
+    "app_id": "io.realm.Test"
+}

@@ -91,51 +91,55 @@
 
 #define CHECK_OR_RETURN(cond)                                                                                        \
     do {                                                                                                             \
-        if (!CHECK(cond)) {                                                                                          \
+        if (!CHECK(cond))                                                                                            \
             return;                                                                                                  \
-        }                                                                                                            \
-    } while (false)
+    }                                                                                                                \
+    while (false)
 
 #define CHECK_THROW(expr, exception_class)                                                                           \
-    do {                                                                                                             \
+    ([&] {                                                                                                           \
         try {                                                                                                        \
             (expr);                                                                                                  \
             test_context.throw_failed(__FILE__, __LINE__, #expr, #exception_class);                                  \
         }                                                                                                            \
         catch (exception_class&) {                                                                                   \
             test_context.check_succeeded();                                                                          \
+            return true;                                                                                             \
         }                                                                                                            \
-    } while (false)
+        return false;                                                                                                \
+    }())
 
 #define CHECK_THROW_EX(expr, exception_class, exception_cond)                                                        \
-    do {                                                                                                             \
+    ([&] {                                                                                                           \
         try {                                                                                                        \
             (expr);                                                                                                  \
             test_context.throw_ex_failed(__FILE__, __LINE__, #expr, #exception_class, #exception_cond);              \
         }                                                                                                            \
-        catch (exception_class & e) {                                                                                \
+        catch (exception_class& e) {                                                                                 \
             if (exception_cond) {                                                                                    \
                 test_context.check_succeeded();                                                                      \
+                return true;                                                                                         \
             }                                                                                                        \
-            else {                                                                                                   \
-                test_context.throw_ex_cond_failed(__FILE__, __LINE__, #expr, #exception_class, #exception_cond);     \
-            }                                                                                                        \
+            test_context.throw_ex_cond_failed(__FILE__, __LINE__, #expr, #exception_class, #exception_cond);         \
         }                                                                                                            \
-    } while (false)
+        return false;                                                                                                \
+    }())
 
 #define CHECK_THROW_ANY(expr)                                                                                        \
-    do {                                                                                                             \
+    ([&] {                                                                                                           \
         try {                                                                                                        \
             (expr);                                                                                                  \
             test_context.throw_any_failed(__FILE__, __LINE__, #expr);                                                \
         }                                                                                                            \
         catch (...) {                                                                                                \
             test_context.check_succeeded();                                                                          \
+            return true;                                                                                             \
         }                                                                                                            \
-    } while (false)
+        return false;                                                                                                \
+    }())
 
 #define CHECK_THROW_ANY_GET_MESSAGE(expr, message)                                                                   \
-    do {                                                                                                             \
+    ([&] {                                                                                                           \
         try {                                                                                                        \
             (expr);                                                                                                  \
             test_context.throw_any_failed(__FILE__, __LINE__, #expr);                                                \
@@ -144,7 +148,23 @@
             test_context.check_succeeded();                                                                          \
             message = e.what();                                                                                      \
         }                                                                                                            \
-    } while (false)
+    }())
+
+#define CHECK_NOTHROW(expr)                                                                                          \
+    ([&] {                                                                                                           \
+        try {                                                                                                        \
+            (expr);                                                                                                  \
+            test_context.check_succeeded();                                                                          \
+            return true;                                                                                             \
+        }                                                                                                            \
+        catch (std::exception& ex) {                                                                                 \
+            test_context.nothrow_failed(__FILE__, __LINE__, #expr, &ex);                                             \
+        }                                                                                                            \
+        catch (...) {                                                                                                \
+            test_context.nothrow_failed(__FILE__, __LINE__, #expr, nullptr);                                         \
+        }                                                                                                            \
+        return false;                                                                                                \
+    }())
 
 #if REALM_VALGRIND
 static const bool running_with_valgrind = true;
@@ -163,7 +183,6 @@ static const bool running_with_asan = true;
 #else
 static const bool running_with_asan = false;
 #endif
-
 
 //@{
 
@@ -278,9 +297,7 @@ public:
     void sort(Compare);
 
     struct Config {
-        Config()
-        {
-        }
+        Config() {}
 
         int num_threads = 1;
         int num_repetitions = 1;
@@ -303,6 +320,11 @@ public:
         /// The log level threshold to use for the intra test loggers
         /// (TestContext::logger).
         util::Logger::Level intra_test_log_level = util::Logger::Level::off;
+
+        /// If \ref logger is null, use an instance of
+        /// util::TimestampStderrorLogger instead of an instance
+        /// util::StderrLogger.
+        bool log_timestamps = false;
 
         /// By default, all test threads send log messages through a single
         /// shared logger (\ref logger), but if \ref per_thread_log_path is set
@@ -501,6 +523,7 @@ public:
     void throw_any_failed(const char* file, long line, const char* expr_text);
 
     std::string get_test_name() const;
+    void nothrow_failed(const char* file, long line, const char* expr_text, std::exception*);
 
     TestContext(const TestContext&) = delete;
     TestContext& operator=(const TestContext&) = delete;

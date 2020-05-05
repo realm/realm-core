@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Workspace
+   version = "1.0">
+   <FileRef
+      location = "group:test/test_crypto.cpp">
+   </FileRef>
+   <FileRef
+      location = "group:../realm-core/realm.xcodeproj">
+   </FileRef>
+   <FileRef
+      location = "container:realm-sync.xcodeproj">
+   </FileRef>
+</Workspace>

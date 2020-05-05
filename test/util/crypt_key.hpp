@@ -19,6 +19,8 @@
 #ifndef REALM_TEST_UTIL_CRYPT_KEY_HPP
 #define REALM_TEST_UTIL_CRYPT_KEY_HPP
 
+#include <string>
+
 namespace realm {
 namespace test_util {
 
@@ -28,9 +30,14 @@ namespace test_util {
 /// "always encrypt" can be enabled by calling always_encrypt(), but pay
 /// attention to the rules governing its use.
 ///
+/// The returned string, if not null, is null terminated.
+///
 /// This function is thread-safe as long as there are no concurrent invocations
 /// of always_encrypt().
 const char* crypt_key(bool always = false);
+
+/// Returns the empty string when, and only when crypt_key() returns null.
+std::string crypt_key_2(bool always = false);
 
 /// Returns true if global mode "always encrypt" is enabled.
 ///
@@ -43,6 +50,17 @@ bool is_always_encrypt_enabled();
 /// This function is **not** thread-safe. If you call it, be sure to call it
 /// prior to any invocation of crypt_key().
 void enable_always_encrypt();
+
+
+
+// Implementation
+
+inline std::string crypt_key_2(bool always)
+{
+    if (const char* key = crypt_key(always)) // Throws
+        return {key};
+    return {};
+}
 
 } // namespace test_util
 } // namespace realm

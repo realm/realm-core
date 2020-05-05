@@ -26,6 +26,7 @@
 #include <iomanip>
 
 #include <realm/util/thread.hpp>
+#include <realm/util/timestamp_logger.hpp>
 
 #include "demangle.hpp"
 #include "timer.hpp"
@@ -245,6 +246,12 @@ public:
             r->end(context, elapsed_seconds);
     }
 
+    void thread_end(const ThreadContext& context) override
+    {
+        for (Reporter* r : m_subreporters)
+            r->thread_end(context);
+    }
+
     void summary(const SharedContext& context, const Summary& results_summary) override
     {
         for (Reporter* r : m_subreporters)
@@ -460,9 +467,25 @@ bool TestList::run(Config config)
     if (config.num_threads < 1)
         throw std::runtime_error("Bad number of threads");
 
-    util::StderrLogger fallback_logger;
-    util::Logger& root_logger = config.logger ? *config.logger : fallback_logger;
-    util::ThreadSafeLogger shared_logger(root_logger);
+    std::unique_ptr<Logger> fallback_logger;
+    util::Logger* root_logger;
+    if (config.logger) {
+        root_logger = config.logger;
+    }
+    else {
+        if (config.log_timestamps) {
+            util::TimestampStderrLogger::Config config;
+            config.precision = util::TimestampStderrLogger::Precision::milliseconds;
+            config.format = "%FT%T";
+            fallback_logger =
+                std::make_unique<util::TimestampStderrLogger>(std::move(config)); // Throws
+        }
+        else {
+            fallback_logger = std::make_unique<util::StderrLogger>(); // Throws
+        }
+        root_logger = &*fallback_logger;
+    }
+    util::ThreadSafeLogger shared_logger(*root_logger);
 
     Reporter fallback_reporter;
     Reporter& reporter = config.reporter ? *config.reporter : fallback_reporter;
@@ -833,6 +856,19 @@ std::string TestContext::get_test_name() const
     out.imbue(locale_classic);
     out << test_details.test_name << '.' << (recurrence_index + 1);
     return out.str();
+}
+
+void TestContext::nothrow_failed(const char* file, long line, const char* expr_text, std::exception* ex)
+{
+    std::ostringstream out;
+    out << "CHECK_NOTHROW(" << expr_text << ") failed: Did throw ";
+    if (ex) {
+        out << get_type_name(*ex) << ": " << ex->what();
+    }
+    else {
+        out << "exception of unknown type";
+    }
+    check_failed(file, line, out.str());
 }
 
 

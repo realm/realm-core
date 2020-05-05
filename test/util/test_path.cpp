@@ -186,5 +186,15 @@ void SharedGroupTestPathGuard::cleanup() const noexcept
     }
 }
 
+TestDirNameGenerator::TestDirNameGenerator(std::string path)
+    : m_path{std::move(path)}
+{
+}
+
+std::string TestDirNameGenerator::next()
+{
+    return m_path + "/" + std::to_string(m_counter++);
+}
+
 } // namespace test_util
 } // namespace realm
