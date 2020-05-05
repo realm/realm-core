@@ -96,16 +96,16 @@ jobWrapper {
     }
     stage('Checking') {
         parallelExecutors = [
-            // checkLinuxDebug         : doCheckInDocker('Debug'),
-            // checkLinuxRelease       : doCheckInDocker('Release'),
-            // checkLinuxDebugNoEncryp : doCheckInDocker('Debug', '4', 'OFF'),
-            // checkMacOsRelease       : doBuildMacOs('Release', true),
-            // checkWin32Release       : doBuildWindows('Release', false, 'Win32', true),
-            // checkWin32DebugUWP      : doBuildWindows('Debug', true, 'Win32', true),
-            // iosDebug                : doBuildAppleDevice('ios', 'MinSizeDebug'),
-            // androidArm64Debug       : doAndroidBuildInDocker('arm64-v8a', 'Debug', false),
-            // checkRaspberryPi        : doLinuxCrossCompile('armhf', 'Debug', 'qemu-arm -cpu cortex-a7'),
-            // threadSanitizer         : doCheckSanity('Debug', '1000', 'thread'),
+            checkLinuxDebug         : doCheckInDocker('Debug'),
+            checkLinuxRelease       : doCheckInDocker('Release'),
+            checkLinuxDebugNoEncryp : doCheckInDocker('Debug', '4', 'OFF'),
+            checkMacOsRelease       : doBuildMacOs('Release', true),
+            checkWin32Release       : doBuildWindows('Release', false, 'Win32', true),
+            checkWin32DebugUWP      : doBuildWindows('Debug', true, 'Win32', true),
+            iosDebug                : doBuildAppleDevice('ios', 'MinSizeDebug'),
+            androidArm64Debug       : doAndroidBuildInDocker('arm64-v8a', 'Debug', false),
+            checkRaspberryPi        : doLinuxCrossCompile('armhf', 'Debug', 'qemu-arm -cpu cortex-a7'),
+            threadSanitizer         : doCheckSanity('Debug', '1000', 'thread'),
             addressSanitizer        : doCheckSanity('Debug', '1000', 'address'),
             performance             : optionalBuildPerformance(releaseTesting), // always build performance on releases, otherwise make it optional
         ]
@@ -482,7 +482,7 @@ def optionalBuildPerformance(boolean force) {
             def doPerformance = true
             stage("Input") {
                 try {
-                    timeout(time: 1, unit: 'MINUTES') {
+                    timeout(time: 10, unit: 'MINUTES') {
                         script {
                             input message: 'Build Performance?', ok: 'Yes'
                         }
@@ -520,14 +520,14 @@ def buildPerformance() {
             cd test/bench
             mkdir -p core-benchmarks results
             ./gen_bench_hist.sh origin/${env.CHANGE_TARGET}
-            ./parse_bench_hist.py --local-html results/ core-benchmarks/
           """
           zip dir: 'test/bench', glob: 'core-benchmarks/**/*', zipFile: 'core-benchmarks.zip'
           rlmS3Put file: 'core-benchmarks.zip', path: 'downloads/core/core-benchmarks.zip'
+          sh 'cd test/bench && ./parse_bench_hist.py --local-html results/ core-benchmarks/'
           publishHTML(target: [allowMissing: false, alwaysLinkToLastBuild: false, keepAll: true, reportDir: 'test/bench/results', reportFiles: 'report.html', reportName: 'Performance_Report'])
           withCredentials([[$class: 'StringBinding', credentialsId: 'bot-github-token', variable: 'githubToken']]) {
               sh "curl -H \"Authorization: token ${env.githubToken}\" " +
-                 "-d '{ \"body\": \"Check the performance result here: ${env.BUILD_URL}Performance_Report\"}' " +
+                 "-d '{ \"body\": \"Check the performance result here: ${env.BUILD_URL}Performance_5fReport\"}' " +
                  "\"https://api.github.com/repos/realm/${repo}/issues/${env.CHANGE_ID}/comments\""
           }
         }

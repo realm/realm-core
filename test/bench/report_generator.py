@@ -171,8 +171,11 @@ def splitTagSemVer(tag):
 
 orderingColumns = ['versionMajor', 'versionMinor', 'versionPatch', 'versionExtra', 'versionExtra2', 'versionExtra3']
 def addVersionColumns(data):
-    extraTypes = np.dtype({'names': orderingColumns, 'formats': ['int32', 'int32', 'int32', 'U100', 'U100', 'U100']})
-    newStructure = np.dtype(data.dtype.descr + extraTypes.descr)
+    types = {'names': list(orderingColumns), 'formats': ['int32', 'int32', 'int32', 'U100', 'int32', 'U100']}
+    for element in data.dtype.descr:
+        types['names'].append(element[0])
+        types['formats'].append(element[1])
+    newStructure = np.dtype(types)
     space = np.zeros(data.shape, dtype=newStructure)
     for col in list(data.dtype.fields):
         space[col] = data[col]
@@ -184,10 +187,10 @@ def addVersionColumns(data):
             row['versionPatch'] = int(splits[2])
             if len(splits) >= 4:
                 row['versionExtra'] = splits[3]
-            if len(splits) >= 5:
-                row['versionExtra2'] = splits[4]
             if len(splits) >= 6:
                 row['versionExtra3'] = splits[5]
+            if len(splits) >= 5: # if the conversion to int fails here, we still have part 5 above
+                row['versionExtra2'] = int(splits[4])
         except Exception as e:
             print("parse error while processing semver of " + str(row['tag']) + str(e))
     return space
@@ -197,7 +200,7 @@ def generateStats(outputDirectory, statsfiles):
     colors = ['yellow', 'indigo', 'orange', 'lightblue', 'green', 'violet',
               'orangered', 'gray', 'lightblue', 'limegreen', 'navy']
     for index, fname in enumerate(statsfiles):
-        benchmarkData = csv2rec(fname)
+        benchmarkData = csv2rec(fname, delimiter=',')
         benchmarkData = addVersionColumns(benchmarkData)
         benchmarkData = np.sort(benchmarkData, order=orderingColumns)
         print ("generating stats graph: " + str(index + 1) +
@@ -241,7 +244,7 @@ def generateReport(outputDirectory, csvFiles, statsfiles):
     summary = {}
 
     for index, fname in enumerate(csvFiles):
-        benchmarkData = csv2rec(fname)
+        benchmarkData = csv2rec(fname, delimiter=',')
         # csv files are ordered by commit timestamp which will sort properly most of the time
         # but not when comparing branches under concurrent development
         benchmarkData = addVersionColumns(benchmarkData)

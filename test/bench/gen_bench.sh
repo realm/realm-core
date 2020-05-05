@@ -118,10 +118,15 @@ else
             ls -lah
             exit 0
         fi
-        REALM_VERSION_MAJOR=$(sed -n "s/^VERSION=\s*\S*\([0-9]*\).\([0-9]*\).\([0-9]*\).*$/\1/p" "${CHECKOUT_DIR}/src/dependencies.list")
-        REALM_VERSION_MINOR=$(sed -n "s/^VERSION=\s*\S*\([0-9]*\).\([0-9]*\).\([0-9]*\).*$/\2/p" "${CHECKOUT_DIR}/src/dependencies.list")
-        REALM_VERSION_PATCH=$(sed -n "s/^VERSION=\s*\S*\([0-9]*\).\([0-9]*\).\([0-9]*\).*$/\3/p" "${CHECKOUT_DIR}/src/dependencies.list")
+        REALM_VERSION_MAJOR=$(sed -n "s/^VERSION=\([0-9]*\).\([0-9]*\).\([0-9]*\).*$/\1/p" "${CHECKOUT_DIR}/src/dependencies.list")
+        REALM_VERSION_MINOR=$(sed -n "s/^VERSION=\([0-9]*\).\([0-9]*\).\([0-9]*\).*$/\2/p" "${CHECKOUT_DIR}/src/dependencies.list")
+        REALM_VERSION_PATCH=$(sed -n "s/^VERSION=\([0-9]*\).\([0-9]*\).\([0-9]*\).*$/\3/p" "${CHECKOUT_DIR}/src/dependencies.list")
         echo "Versions found: ${REALM_VERSION_MAJOR}.${REALM_VERSION_MINOR}.${REALM_VERSION_PATCH}"
+        if [ -z "${REALM_VERSION_MAJOR}" ]; then
+            echo "fatal error: could not parse version from dependencies.list: ${CHECKOUT_DIR}"
+            ls -lah "${CHECKOUT_DIR}/src"
+            exit 0
+        fi
 
         cd ../benchmark-common-tasks || exit 1
         BCT_DIR="../bench/core-builds/${remoteref}/src/test/benchmark-common-tasks"
@@ -130,13 +135,15 @@ else
         # we will either need the makefile (with build.sh) or the CMakeLists.txt (with cmake)
         cp compatibility_makefile "${BCT_DIR}/Makefile"
         cp CMakeLists.txt "${BCT_DIR}/"
-        if (( REALM_VERSION_MAJOR < 6 || ( REALM_VERSION_MAJOR == 6 && REALM_VERSION_MINOR == 0 && REALM_VERSION_PATCH <= 1 ) )) ; then
+        if [ $(( REALM_VERSION_MAJOR < 6 || ( REALM_VERSION_MAJOR == 6 && REALM_VERSION_MINOR == 0 && REALM_VERSION_PATCH <= 1) )) -eq 1 ] ; then
             # in 6.0.1 the CMake target changed from "Core" to "Storage" so we need to change it back for older versions
-            echo "compatibility cmake targets Realm and not Storage"
-            cat "${BCT_DIR}/CMakeLists.txt"
-            sed -i.bak -e "s/^target_link_libraries(realm-stats.*/target_link_libraries(realm-stats \${PLATFORM_LIBRARIES} Core)/" "${BCT_DIR}/CMakeLists.txt"
-            echo "changed into: "
-            cat "${BCT_DIR}/CMakeLists.txt"
+            echo "compatibility pre 6.0.1 cmake targets Realm and not Storage"
+            sed -i.bak -e "s/Storage/Core/g" "${BCT_DIR}/CMakeLists.txt"
+        fi
+        if [ $(( REALM_VERSION_MAJOR < 5 || ( REALM_VERSION_MAJOR == 5 && REALM_VERSION_MINOR < 4 ) || ( REALM_VERSION_VERSION_MAJOR == 5 && REALM_VERSION_MINOR == 4 && REALM_VERSION_PATCH <= 1 ) )) -eq 1 ]; then
+            echo "compatibility pre 5.4.1"
+            sed -i.bak -e "s/TestUtil/test-util/g" "${BCT_DIR}/CMakeLists.txt"
+            sed -i.bak -e "s/Core/realm/g" "${BCT_DIR}/CMakeLists.txt"
         fi
         echo "unix timestamp of build is ${unixtime}"
         # The breaking change of SharedGroup construction syntax occured after tags/v2.0.0-rc2, we must use a legacy
