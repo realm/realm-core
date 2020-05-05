@@ -24,7 +24,7 @@
 
 namespace realm {
 /// Populate the mapping from public name to internal name for queries.
-static void populate_keypath_mapping(parser::KeyPathMapping& mapping, Realm& realm)
+inline void populate_keypath_mapping(parser::KeyPathMapping& mapping, Realm& realm)
 {
     mapping.set_backlink_class_prefix("class_");
 
@@ -77,7 +77,7 @@ inline IncludeDescriptor generate_include_from_keypaths(std::vector<StringData> 
         while (index < path.size()) {
             parser::KeyPathElement element = mapping.process_next_path(cur_table, path, index); // throws if invalid
             // backlinks use type_LinkList since list operations apply to them (and is_backlink is set)
-            if (element.col_type != type_Link && element.col_type != type_LinkList) {
+            if (!element.table->is_link_type(element.col_key.get_type()) && element.col_key.get_type() != col_type_BackLink) {
                 throw InvalidPathError(util::format("Property '%1' is not a link in object of type '%2' in 'INCLUDE' clause",
                                                     element.table->get_column_name(element.col_key),
                                                     get_printable_table_name(*element.table)));
@@ -94,7 +94,7 @@ inline IncludeDescriptor generate_include_from_keypaths(std::vector<StringData> 
                 cur_table = element.table; // advance through backlink
             }
             ConstTableRef tr;
-            if (element.is_backlink) {
+            if (element.operation == parser::KeyPathElement::KeyPathOperation::BacklinkTraversal) {
                 tr = element.table;
             }
             links.emplace_back(element.col_key, tr);

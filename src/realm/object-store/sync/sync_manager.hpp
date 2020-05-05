@@ -21,6 +21,7 @@
 
 #include "shared_realm.hpp"
 
+#include "app.hpp"
 #include "sync_user.hpp"
 
 #include <realm/sync/client.hpp>
@@ -101,7 +102,8 @@ public:
     // Configure the metadata and file management subsystems and sync client
     // options. This must be called before a SyncSession is first created, and
     // will not reconfigure anything if the SyncClient already exists.
-    void configure(SyncClientConfig config);
+    // FIXME: App should not be a member of the singleton SyncManager
+    void configure(SyncClientConfig, util::Optional<app::App::Config> = none);
 
     // Immediately run file actions for a single Realm at a given original path.
     // Returns whether or not a file action was successfully executed for the specified Realm.
@@ -185,6 +187,9 @@ public:
     // Get the default path for a Realm for the given user and absolute unresolved URL.
     std::string path_for_realm(const SyncUser& user, const std::string& raw_realm_url) const;
 
+    // Get the default path for a Realm for the given configuration.
+    std::string path_for_realm(const SyncConfig& config) const;
+
     // Get the path of the recovery directory for backed-up or recovered Realms.
     std::string recovery_directory_path(util::Optional<std::string> const& custom_dir_name=none) const;
 
@@ -195,6 +200,10 @@ public:
     // Precondition: any synced Realms or `SyncSession`s must be closed or rendered inactive prior to
     // calling this method.
     void reset_for_testing();
+
+    std::shared_ptr<app::App> app() const {
+        return m_app;
+    }
 
 private:
     using ReconnectMode = sync::Client::ReconnectMode;
@@ -246,6 +255,8 @@ private:
 
     // The unique identifier of this client.
     util::Optional<std::string> m_client_uuid;
+
+    std::shared_ptr<app::App> m_app;
 };
 
 } // namespace realm

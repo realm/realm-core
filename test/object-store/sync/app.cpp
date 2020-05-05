@@ -1375,7 +1375,25 @@ private:
                                     .headers = {},
                                     .body = response });
     }
-    
+
+    void handle_location(const Request request,
+                         std::function<void (Response)> completion_block)
+    {
+        CHECK(request.method == HttpMethod::get);
+        CHECK(request.timeout_ms == 60000);
+
+        std::string response = nlohmann::json({
+            {"deployment_model", "this"},
+            {"hostname", "field"},
+            {"ws_hostname", "shouldn't"},
+            {"location", "matter"}}).dump();
+
+        completion_block(Response { .http_status_code = 200,
+                                    .custom_status_code = 0,
+                                    .headers = {},
+                                    .body = response });
+    }
+
     void handle_create_api_key(const Request request,
                       std::function<void (Response)> completion_block)
     {
@@ -1476,6 +1494,8 @@ public:
             handle_fetch_api_keys(request, completion_block);
         } else if (request.url.find("/session") != std::string::npos && request.method == HttpMethod::post) {
             handle_token_refresh(request, completion_block);
+        } else if (request.url.find("/location") != std::string::npos && request.method == HttpMethod::get) {
+            handle_location(request, completion_block);
         } else {
             completion_block(Response { .http_status_code = 200, .custom_status_code = 0, .headers = {}, .body = "something arbitrary" });
         }
@@ -1655,6 +1675,9 @@ TEST_CASE("app: user_semantics", "[app]") {
                 } else if (request.url.find("/session") != std::string::npos) {
                     CHECK(request.method == HttpMethod::del);
                     completion_block({ 200, 0, {}, "" });
+                } else if (request.url.find("/location") != std::string::npos) {
+                    CHECK(request.method == HttpMethod::get);
+                    completion_block({ 200, 0, {},  "{\"deployment_model\":\"GLOBAL\",\"location\":\"US-VA\",\"hostname\":\"http://localhost:9090\",\"ws_hostname\":\"ws://localhost:9090\"}"});
                 }
             }
         };
@@ -1662,9 +1685,9 @@ TEST_CASE("app: user_semantics", "[app]") {
     };
 
     const auto app_id = random_string(36);
-    const App app(App::Config{app_id, factory});
+    App app(App::Config{app_id, factory});
 
-    const std::function<std::shared_ptr<SyncUser>(app::AppCredentials)> login_user = [app](app::AppCredentials creds) {
+    const std::function<std::shared_ptr<SyncUser>(app::AppCredentials)> login_user = [&app](app::AppCredentials creds) {
         std::shared_ptr<SyncUser> test_user;
         app.log_in_with_credentials(creds,
                                     [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
@@ -2085,6 +2108,9 @@ TEST_CASE("app: remove user with credentials", "[sync][app]") {
                 } else if (request.url.find("/session") != std::string::npos) {
                     CHECK(request.method == HttpMethod::del);
                     completion_block({ 200, 0, {}, "" });
+                } else if (request.url.find("/location") != std::string::npos) {
+                    CHECK(request.method == HttpMethod::get);
+                    completion_block({ 200, 0, {},  "{\"deployment_model\":\"GLOBAL\",\"location\":\"US-VA\",\"hostname\":\"http://localhost:9090\",\"ws_hostname\":\"ws://localhost:9090\"}"});
                 }
             }
         };
@@ -2161,6 +2187,9 @@ TEST_CASE("app: link_user", "[sync][app]") {
                     } else if (request.url.find("/session") != std::string::npos) {
                         CHECK(request.method == HttpMethod::del);
                         completion_block({ 200, 0, {}, "" });
+                    } else if (request.url.find("/location") != std::string::npos) {
+                        CHECK(request.method == HttpMethod::get);
+                        completion_block({ 200, 0, {},  "{\"deployment_model\":\"GLOBAL\",\"location\":\"US-VA\",\"hostname\":\"http://localhost:9090\",\"ws_hostname\":\"ws://localhost:9090\"}"});
                     }
                 }
             };
@@ -2222,6 +2251,9 @@ TEST_CASE("app: link_user", "[sync][app]") {
                     } else if (request.url.find("/session") != std::string::npos) {
                         CHECK(request.method == HttpMethod::del);
                         completion_block({ 200, 0, {}, "" });
+                    } else if (request.url.find("/location") != std::string::npos) {
+                        CHECK(request.method == HttpMethod::get);
+                        completion_block({ 200, 0, {},  "{\"deployment_model\":\"GLOBAL\",\"location\":\"US-VA\",\"hostname\":\"http://localhost:9090\",\"ws_hostname\":\"ws://localhost:9090\"}"});
                     }
                 }
             };
@@ -2365,6 +2397,9 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
                             { "access_token", good_access_token }
                         };
                         completion_block({ 200, 0, {}, json.dump() });
+                    } else if (request.url.find("/location") != std::string::npos) {
+                        CHECK(request.method == HttpMethod::get);
+                        completion_block({ 200, 0, {},  "{\"deployment_model\":\"GLOBAL\",\"location\":\"US-VA\",\"hostname\":\"http://localhost:9090\",\"ws_hostname\":\"ws://localhost:9090\"}"});
                     }
                 }
             };
@@ -2416,6 +2451,9 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
                             { "access_token", bad_access_token }
                         };
                         completion_block({ 200, 0, {}, json.dump() });
+                    }  else if (request.url.find("/location") != std::string::npos) {
+                        CHECK(request.method == HttpMethod::get);
+                        completion_block({ 200, 0, {},  "{\"deployment_model\":\"GLOBAL\",\"location\":\"US-VA\",\"hostname\":\"http://localhost:9090\",\"ws_hostname\":\"ws://localhost:9090\"}"});
                     }
                 }
             };
@@ -2516,6 +2554,9 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
                             { "access_token", good_access_token2 }
                         };
                         completion_block({ 200, 0, {}, json.dump() });
+                    }  else if (request.url.find("/location") != std::string::npos) {
+                        CHECK(request.method == HttpMethod::get);
+                        completion_block({ 200, 0, {},  "{\"deployment_model\":\"GLOBAL\",\"location\":\"US-VA\",\"hostname\":\"http://localhost:9090\",\"ws_hostname\":\"ws://localhost:9090\"}"});
                     }
                 }
             };

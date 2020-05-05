@@ -72,22 +72,30 @@ static std::map<std::string, std::string> get_request_headers(std::shared_ptr<Sy
     return headers;
 }
 
-const static uint64_t    default_timeout_ms = 60000;
 const static std::string default_base_url = "https://stitch.mongodb.com";
-const static std::string default_base_path = "/api/client/v2.0";
+const static std::string base_path = "/api/client/v2.0";
 const static std::string app_path = "/app";
 const static std::string auth_path = "/auth";
+const static std::string sync_path = "/realm-sync";
+const static uint64_t    default_timeout_ms = 60000;
 const static std::string username_password_provider_key = "local-userpass";
 const static std::string user_api_key_provider_key_path = "api_keys";
 
 App::App(const Config& config)
 : m_config(config)
-, m_base_route(config.base_url.value_or(default_base_url) + default_base_path)
+, m_base_url(config.base_url.value_or(default_base_url))
+, m_base_route(m_base_url + base_path)
 , m_app_route(m_base_route + app_path + "/" + config.app_id)
 , m_auth_route(m_app_route + auth_path)
+, m_sync_route(m_app_route + sync_path)
 , m_request_timeout_ms(config.default_request_timeout_ms.value_or(default_timeout_ms))
 {
     REALM_ASSERT(m_config.transport_generator);
+
+    // change the scheme in the base url to ws from http to satisfy the sync client
+    size_t uri_scheme_start = m_sync_route.find("http");
+    if (uri_scheme_start == 0)
+        m_sync_route.replace(uri_scheme_start, 4, "ws");
 }
 
 static void handle_default_response(const Response& response,
@@ -410,7 +418,7 @@ void App::UserAPIKeyProviderClient::fetch_api_keys(std::shared_ptr<SyncUser> use
 
 
 void App::UserAPIKeyProviderClient::delete_api_key(const realm::ObjectId& id, std::shared_ptr<SyncUser> user,
-                                                   std::function<void(Optional<AppError>)> completion_block)
+                                                   std::function<void(util::Optional<AppError>)> completion_block)
 {
     std::string route = url_for_path(id.to_string());
 
@@ -484,7 +492,7 @@ std::vector<std::shared_ptr<SyncUser>> App::all_users() const
 }
 
 void App::get_profile(std::shared_ptr<SyncUser> sync_user,
-                      std::function<void(std::shared_ptr<SyncUser>, Optional<AppError>)> completion_block) const
+                      std::function<void(std::shared_ptr<SyncUser>, util::Optional<AppError>)> completion_block)
 {
     auto profile_handler = [completion_block, sync_user](const Response& profile_response) {
         if (auto error = check_for_errors(profile_response)) {
@@ -545,7 +553,7 @@ void App::get_profile(std::shared_ptr<SyncUser> sync_user,
 
 void App::log_in_with_credentials(const AppCredentials& credentials,
                                   const std::shared_ptr<SyncUser> linking_user,
-                                  std::function<void(std::shared_ptr<SyncUser>, Optional<AppError>)> completion_block) const
+                                  std::function<void(std::shared_ptr<SyncUser>, Optional<AppError>)> completion_block)
 {
     // construct the route
     std::string route = util::format("%1/providers/%2/login%3",
@@ -592,12 +600,12 @@ void App::log_in_with_credentials(const AppCredentials& credentials,
 }
 
 void App::log_in_with_credentials(const AppCredentials& credentials,
-                                  std::function<void(std::shared_ptr<SyncUser>, Optional<AppError>)> completion_block) const
+                                  std::function<void(std::shared_ptr<SyncUser>, Optional<AppError>)> completion_block)
 {
     App::log_in_with_credentials(credentials, nullptr, completion_block);
 }
 
-void App::log_out(std::shared_ptr<SyncUser> user, std::function<void (Optional<AppError>)> completion_block) const
+void App::log_out(std::shared_ptr<SyncUser> user, std::function<void (Optional<AppError>)> completion_block)
 {
     if (!user || user->state() != SyncUser::State::LoggedIn) {
         return completion_block(util::none);
@@ -623,7 +631,7 @@ void App::log_out(std::shared_ptr<SyncUser> user, std::function<void (Optional<A
     do_authenticated_request(req, user, handler);
 }
 
-void App::log_out(std::function<void (Optional<AppError>)> completion_block) const {
+void App::log_out(std::function<void (Optional<AppError>)> completion_block) {
     log_out(current_user(), completion_block);
 }
 
@@ -649,7 +657,7 @@ std::shared_ptr<SyncUser> App::switch_user(std::shared_ptr<SyncUser> user) const
 }
 
 void App::remove_user(std::shared_ptr<SyncUser> user,
-                      std::function<void(Optional<AppError>)> completion_block) const
+                      std::function<void(Optional<AppError>)> completion_block)
 {
     if (!user || user->state() == SyncUser::State::Removed) {
         return completion_block(AppError(make_client_error_code(ClientErrorCode::user_not_found),
@@ -679,7 +687,7 @@ void App::remove_user(std::shared_ptr<SyncUser> user,
 
 void App::link_user(std::shared_ptr<SyncUser> user,
                     const AppCredentials& credentials,
-                    std::function<void(std::shared_ptr<SyncUser>, Optional<AppError>)> completion_block) const
+                    std::function<void(std::shared_ptr<SyncUser>, Optional<AppError>)> completion_block)
 {
     if (!user || user->state() != SyncUser::State::LoggedIn) {
         return completion_block(nullptr, AppError(make_client_error_code(ClientErrorCode::user_not_found),
@@ -710,23 +718,77 @@ std::string App::url_for_path(const std::string& path="") const
     return util::format("%1%2", m_base_route, path);
 }
 
-void App::do_authenticated_request(Request request,
-                                   std::shared_ptr<SyncUser> sync_user,
-                                   std::function<void (Response)> completion_block) const
+// FIXME: This passes back the response to bubble up any potential errors, making this somewhat leaky
+void App::init_app_metadata(std::function<void (util::Optional<AppError>, util::Optional<Response>)> completion_block)
 {
-    auto handler = [completion_block, request, sync_user, this](const Response& response) {
-        if (auto error = check_for_errors(response)) {
-            App::handle_auth_failure(error.value(), response, request, sync_user, completion_block);
-        } else {
-            completion_block(response);
-        }
+    if (m_metadata) {
+        return completion_block(util::none, util::none);
+    }
+
+    std::string route = util::format("%1/location",
+                                     m_app_route);
+
+    const Request req = {
+        .method = HttpMethod::get,
+        .url = route,
+        .timeout_ms = m_request_timeout_ms
     };
 
+    m_config.transport_generator()->send_request_to_server(req, [this, completion_block](const Response& response) {
+        nlohmann::json json;
+        try {
+            json = nlohmann::json::parse(response.body);
+        } catch (const std::exception& e) {
+            return completion_block(AppError(make_error_code(JSONErrorCode::malformed_json), e.what()),
+                                    response);
+        }
+
+        try {
+            this->m_metadata = AppMetadata(value_from_json<std::string>(json, "deployment_model"),
+                                           value_from_json<std::string>(json, "location"),
+                                           value_from_json<std::string>(json, "hostname"),
+                                           value_from_json<std::string>(json, "ws_hostname"));
+
+            m_base_route = m_metadata->m_hostname + base_path;
+            std::string this_app_path = app_path + "/" + m_config.app_id;
+            m_app_route = m_base_route + this_app_path;
+            m_auth_route = m_app_route + auth_path;
+            m_sync_route = m_metadata->m_ws_hostname + base_path + this_app_path + sync_path;
+
+        } catch (const AppError& err) {
+            return completion_block(err, response);
+        }
+
+        completion_block(util::none, util::none);
+    });
+}
+
+void App::do_authenticated_request(Request request,
+                                   std::shared_ptr<SyncUser> sync_user,
+                                   std::function<void (Response)> completion_block)
+{
     request.timeout_ms = m_request_timeout_ms;
     request.headers = get_request_headers(sync_user,
                                           request.uses_refresh_token ?
                                           RequestTokenType::RefreshToken : RequestTokenType::AccessToken);
-    m_config.transport_generator()->send_request_to_server(request, handler);
+    
+    init_app_metadata([completion_block, request, sync_user, this](const util::Optional<AppError> error,
+                                                                   const util::Optional<Response> response) {
+        if (error) {
+            return completion_block(*response);
+        }
+
+        auto handler = [completion_block, request, sync_user, this](const Response& response) {
+            if (auto error = check_for_errors(response)) {
+                App::handle_auth_failure(error.value(), response, request, sync_user, completion_block);
+            } else {
+                completion_block(response);
+            }
+        };
+
+
+        m_config.transport_generator()->send_request_to_server(request, handler);
+    });
 }
 
 void App::handle_auth_failure(const AppError& error,
@@ -812,7 +874,7 @@ void App::refresh_access_token(std::shared_ptr<SyncUser> sync_user,
 }
 
 
-RemoteMongoClient App::remote_mongo_client(const std::string& service_name) const
+RemoteMongoClient App::remote_mongo_client(const std::string& service_name)
 {
     return RemoteMongoClient(AppServiceClient(service_name,
                                               m_base_route,

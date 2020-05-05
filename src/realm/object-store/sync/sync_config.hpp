@@ -44,10 +44,6 @@ using ChangesetTransformer = sync::ClientReplication::ChangesetCooker;
 enum class SyncSessionStopPolicy;
 
 struct SyncConfig;
-using SyncBindSessionHandler = void(const std::string&,          // path on disk of the Realm file.
-                                    const SyncConfig&,           // the sync configuration object.
-                                    std::shared_ptr<SyncSession> // the session which should be bound.
-                                    );
 
 struct SyncError;
 using SyncSessionErrorHandler = void(std::shared_ptr<SyncSession>, SyncError);
@@ -126,9 +122,8 @@ struct SyncConfig {
     using ProxyConfig = sync::Session::Config::ProxyConfig;
 
     std::shared_ptr<SyncUser> user;
-    std::string realm_url;
+    std::string partition_value;
     SyncSessionStopPolicy stop_policy = SyncSessionStopPolicy::AfterChangesUploaded;
-    std::function<SyncBindSessionHandler> bind_session_handler;
     std::function<SyncSessionErrorHandler> error_handler;
     std::shared_ptr<ChangesetTransformer> transformer;
     util::Optional<std::array<char, 64>> realm_encryption_key;
@@ -143,18 +138,14 @@ struct SyncConfig {
     util::Optional<std::string> authorization_header_name;
     std::map<std::string, std::string> custom_http_headers;
 
-    // Set the URL path prefix sync will use when opening a websocket for this session. Default is `/realm-sync`.
-    // Useful when the sync worker sits behind a firewall or load-balancer that rewrites incoming requests.
-    util::Optional<std::string> url_prefix = none;
-
     // The name of the directory which Realms should be backed up to following
     // a client reset
     util::Optional<std::string> recovery_directory;
     ClientResyncMode client_resync_mode = ClientResyncMode::Recover;
 
-    SyncConfig(std::shared_ptr<SyncUser> user, std::string realm_url)
+    SyncConfig(std::shared_ptr<SyncUser> user, std::string partition_value)
     : user(std::move(user))
-    , realm_url(std::move(realm_url))
+    , partition_value(std::move(partition_value))
     { }
 };
 

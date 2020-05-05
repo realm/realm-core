@@ -36,21 +36,21 @@ public:
     const std::string name;
                                                      
     RemoteMongoDatabase(const std::string& name,
-                        const AppServiceClient& service)
+                        AppServiceClient& service)
     : name(name), m_service(service) { };
     
     /// Gets a collection.
     /// @param collection_name The name of the collection to return
     /// @returns The collection as json
-    RemoteMongoCollection collection(const std::string& collection_name) const;
+    RemoteMongoCollection collection(const std::string& collection_name);
     
     /// Gets a collection.
     /// @param collection_name The name of the collection to return
     /// @returns The collection as json
-    RemoteMongoCollection operator[](const std::string& collection_name) const;
+    RemoteMongoCollection operator[](const std::string& collection_name);
     
 private:
-    const AppServiceClient& m_service;
+    AppServiceClient& m_service;
 };
 
 } // namespace app

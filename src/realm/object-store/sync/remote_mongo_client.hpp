@@ -38,14 +38,14 @@ public:
     
     /// Gets a `RemoteMongoDatabase` instance for the given database name.
     /// @param name the name of the database to retrieve
-    RemoteMongoDatabase operator[](const std::string& name) const;
+    RemoteMongoDatabase operator[](const std::string& name);
   
     /// Gets a `RemoteMongoDatabase` instance for the given database name.
     /// @param name the name of the database to retrieve
-    RemoteMongoDatabase db(const std::string& name) const;
+    RemoteMongoDatabase db(const std::string& name);
     
 private:
-    const AppServiceClient m_service;
+    AppServiceClient m_service;
 };
 
 } // namespace app

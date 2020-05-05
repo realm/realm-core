@@ -32,7 +32,7 @@ public:
 
     virtual void do_authenticated_request(Request,
                                           std::shared_ptr<SyncUser> sync_user,
-                                          std::function<void (Response)>) const = 0;
+                                          std::function<void (Response)>) = 0;
 };
 
 } // namespace app
