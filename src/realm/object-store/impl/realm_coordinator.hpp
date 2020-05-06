@@ -104,7 +104,7 @@ public:
     uint_fast64_t get_number_of_versions() const
     {
         return m_db->get_number_of_versions();
-    };
+    }
 
     // To avoid having to re-read and validate the file's schema every time a
     // new read transaction is begun, RealmCoordinator maintains a cache of the

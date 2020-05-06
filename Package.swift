@@ -28,6 +28,8 @@ let package = Package(
                 "realm/parser",
                 "realm/metrics",
                 "realm/exec",
+                "realm/object-store",
+                "external/pegtl",
                 "win32",
             ],
             sources: [
