@@ -33,6 +33,7 @@
 #include <realm/util/safe_int_ops.hpp>
 #include <realm/util/thread.hpp>
 #include <realm/util/scope_exit.hpp>
+#include <realm/util/to_string.hpp>
 #include <realm/group_writer.hpp>
 #include <realm/group_writer.hpp>
 #include <realm/replication.hpp>
@@ -1029,14 +1030,11 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
             catch (const SlabAlloc::Retry&) {
                 continue;
             }
-            catch (const InvalidDatabase& e) {
-                if (e.get_path().size() == 0) {
-                    std::string msg = e.what();
-                    throw InvalidDatabase(msg, path);
+            catch (InvalidDatabase& e) {
+                if (e.get_path().empty()) {
+                    e.set_path(path);
                 }
-                else {
-                    throw e;
-                }
+                throw;
             }
             // If we fail in any way, we must detach the allocator.
             SlabAlloc::DetachGuard alloc_detach_guard(alloc);
@@ -1053,7 +1051,7 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
             bool file_format_ok = false;
             // In shared mode (Realm file opened via a DB instance) this
             // version of the core library is able to open Realms using file format
-            // versions from 2 to 9. Please see Group::get_file_format_version() for
+            // versions listed below. Please see Group::get_file_format_version() for
             // information about the individual file format versions.
             switch (current_file_format_version) {
                 case 0:
@@ -1088,7 +1086,10 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
                     case Replication::hist_None:
                         good_history_type = (stored_hist_type == Replication::hist_None);
                         if (!good_history_type)
-                            throw IncompatibleHistories("Expected a Realm without history", path);
+                            throw IncompatibleHistories(
+                                util::format("Expected a Realm without history, but found history type %1",
+                                             stored_hist_type),
+                                path);
                         break;
                     case Replication::hist_OutOfRealm:
                         REALM_ASSERT(false); // No longer in use
@@ -1097,32 +1098,46 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
                         good_history_type = (stored_hist_type == Replication::hist_InRealm ||
                                              stored_hist_type == Replication::hist_None);
                         if (!good_history_type)
-                            throw IncompatibleHistories("Expected a Realm with no or in-realm history", path);
+                            throw IncompatibleHistories(
+                                util::format(
+                                    "Expected a Realm with no or in-realm history, but found history type %1",
+                                    stored_hist_type),
+                                path);
                         break;
                     case Replication::hist_SyncClient:
                         good_history_type = ((stored_hist_type == Replication::hist_SyncClient) || (top_ref == 0));
                         if (!good_history_type)
                             throw IncompatibleHistories(
-                                "Expected an empty Realm or a Realm written by Realm Mobile Platform", path);
+                                util::format(
+                                    "Expected an empty or synced Realm, but found history type %1, top ref %2",
+                                    stored_hist_type, top_ref),
+                                path);
                         break;
                     case Replication::hist_SyncServer:
                         good_history_type = ((stored_hist_type == Replication::hist_SyncServer) || (top_ref == 0));
                         if (!good_history_type)
-                            throw IncompatibleHistories("Expected a Realm containing "
-                                                        "a server-side history",
+                            throw IncompatibleHistories(util::format("Expected a Realm containing a server-side "
+                                                                     "history, but found history type %1, top ref %2",
+                                                                     stored_hist_type, top_ref),
                                                         path);
                         break;
                 }
 
                 REALM_ASSERT(stored_hist_schema_version >= 0);
                 if (stored_hist_schema_version > openers_hist_schema_version)
-                    throw IncompatibleHistories("Unexpected future history schema version", path);
+                    throw IncompatibleHistories(
+                        util::format("Unexpected future history schema version %1, current schema %2",
+                                     stored_hist_schema_version, openers_hist_schema_version),
+                        path);
                 bool need_hist_schema_upgrade =
                     (stored_hist_schema_version < openers_hist_schema_version && top_ref != 0);
                 if (need_hist_schema_upgrade) {
                     Replication* repl = get_replication();
                     if (!repl->is_upgradable_history_schema(stored_hist_schema_version))
-                        throw IncompatibleHistories("Nonupgradable history schema", path);
+                        throw IncompatibleHistories(util::format("Nonupgradable history schema %1, current schema %2",
+                                                                 stored_hist_schema_version,
+                                                                 openers_hist_schema_version),
+                                                    path);
                 }
 
                 if (Replication* repl = get_replication())
