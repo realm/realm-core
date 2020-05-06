@@ -910,7 +910,12 @@ public:
 
     /// Return the associated file system path, or the empty string if there is
     /// no associated file system path, or if the file system path is unknown.
-    std::string get_path() const;
+    const std::string& get_path() const;
+
+    void set_path(std::string path)
+    {
+        m_path = std::move(path);
+    }
 
     const char* message() const noexcept
     {
@@ -1248,7 +1253,7 @@ inline File::AccessError::AccessError(const std::string& msg, const std::string&
 {
 }
 
-inline std::string File::AccessError::get_path() const
+inline const std::string& File::AccessError::get_path() const
 {
     return m_path;
 }
