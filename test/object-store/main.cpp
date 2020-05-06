@@ -22,8 +22,11 @@
 #include <limits.h>
 
 #ifdef _MSC_VER
-#include <Shlwapi.h>
-#pragma comment(lib, "Shlwapi.lib")
+#include <Windows.h>
+
+// PathCchRemoveFileSpec()
+#include <pathcch.h>
+#pragma comment(lib, "Pathcch.lib")
 #else
 #include <libgen.h>
 #endif
@@ -31,13 +34,13 @@
 int main(int argc, char** argv)
 {
 #ifdef _MSC_VER
-    char path[MAX_PATH];
-    if (GetModuleFileNameA(NULL, path, sizeof(path)) == 0) {
+    wchar_t path[MAX_PATH];
+    if (GetModuleFileName(NULL, path, MAX_PATH) == 0) {
         fprintf(stderr, "Failed to retrieve path to exectuable.\n");
         return 1;
     }
-    PathRemoveFileSpecA(path);
-    SetCurrentDirectoryA(path);
+    PathCchRemoveFileSpec(path, MAX_PATH);
+    SetCurrentDirectory(path);
 #else
     char executable[PATH_MAX];
     if (realpath(argv[0], executable) == NULL) {

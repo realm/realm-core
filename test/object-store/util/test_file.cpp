@@ -78,8 +78,13 @@ TestFile::TestFile()
         int err = errno;
         throw std::system_error(err, std::system_category());
     }
+#ifdef _WIN32
+    _close(fd);
+    _unlink(path.c_str());
+#else // POSIX
     close(fd);
     unlink(path.c_str());
+#endif
 
     schema_version = 0;
 }
@@ -87,7 +92,11 @@ TestFile::TestFile()
 TestFile::~TestFile()
 {
     if (!m_persist)
+#ifdef _WIN32
+        _unlink(path.c_str());
+#else // POSIX
         unlink(path.c_str());
+#endif
 }
 
 DBOptions TestFile::options() const
