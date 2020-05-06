@@ -33,7 +33,8 @@ using File = realm::util::File;
 
 static const std::string base_path = tmp_dir() + "/realm_objectstore_sync_file/";
 
-static void prepare_sync_manager_test() {
+static void prepare_sync_manager_test()
+{
     // Remove the base directory in /tmp where all test-related file status lives.
     try_remove_dir_recursive(base_path);
     const std::string manager_path = base_path + "syncmanager/";
@@ -41,35 +42,41 @@ static void prepare_sync_manager_test() {
     util::make_dir(manager_path);
 }
 
-TEST_CASE("sync_file: percent-encoding APIs", "[sync]") {
-    SECTION("does not encode a string that has no restricted characters") {
+TEST_CASE("sync_file: percent-encoding APIs", "[sync]")
+{
+    SECTION("does not encode a string that has no restricted characters")
+    {
         const std::string expected = "abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_-";
         auto actual = make_percent_encoded_string(expected);
         REQUIRE(actual == expected);
     }
 
-    SECTION("properly encodes a sample Realm URL") {
+    SECTION("properly encodes a sample Realm URL")
+    {
         const std::string expected = "realms%3A%2F%2Fexample.com%2F%7E%2Ffoo_bar%2Fuser-realm";
         const std::string raw_string = "realms://example.com/~/foo_bar/user-realm";
         auto actual = make_percent_encoded_string(raw_string);
         REQUIRE(actual == expected);
     }
 
-    SECTION("properly decodes a sample Realm URL") {
+    SECTION("properly decodes a sample Realm URL")
+    {
         const std::string expected = "realms://example.com/~/foo_bar/user-realm";
         const std::string encoded_string = "realms%3A%2F%2Fexample.com%2F%7E%2Ffoo_bar%2Fuser-realm";
         auto actual = make_raw_string(encoded_string);
         REQUIRE(actual == expected);
     }
 
-    SECTION("properly encodes non-latin characters") {
+    SECTION("properly encodes non-latin characters")
+    {
         const std::string expected = "\%D0\%BF\%D1\%80\%D0\%B8\%D0\%B2\%D0\%B5\%D1\%82";
         const std::string raw_string = "\xd0\xbf\xd1\x80\xd0\xb8\xd0\xb2\xd0\xb5\xd1\x82";
         auto actual = make_percent_encoded_string(raw_string);
         REQUIRE(actual == expected);
     }
 
-    SECTION("properly decodes non-latin characters") {
+    SECTION("properly decodes non-latin characters")
+    {
         const std::string expected = "\xd0\xbf\xd1\x80\xd0\xb8\xd0\xb2\xd0\xb5\xd1\x82";
         const std::string encoded_string = "\%D0\%BF\%D1\%80\%D0\%B8\%D0\%B2\%D0\%B5\%D1\%82";
         auto actual = make_raw_string(encoded_string);
@@ -77,8 +84,10 @@ TEST_CASE("sync_file: percent-encoding APIs", "[sync]") {
     }
 }
 
-TEST_CASE("sync_file: URL manipulation APIs", "[sync]") {
-    SECTION("properly concatenates a path when the path has a trailing slash") {
+TEST_CASE("sync_file: URL manipulation APIs", "[sync]")
+{
+    SECTION("properly concatenates a path when the path has a trailing slash")
+    {
         const std::string expected = "/foo/bar";
         const std::string path = "/foo/";
         const std::string component = "bar";
@@ -86,7 +95,8 @@ TEST_CASE("sync_file: URL manipulation APIs", "[sync]") {
         REQUIRE(actual == expected);
     }
 
-    SECTION("properly concatenates a path when the component has a leading slash") {
+    SECTION("properly concatenates a path when the component has a leading slash")
+    {
         const std::string expected = "/foo/bar";
         const std::string path = "/foo";
         const std::string component = "/bar";
@@ -94,7 +104,8 @@ TEST_CASE("sync_file: URL manipulation APIs", "[sync]") {
         REQUIRE(actual == expected);
     }
 
-    SECTION("properly concatenates a path when both arguments have slashes") {
+    SECTION("properly concatenates a path when both arguments have slashes")
+    {
         const std::string expected = "/foo/bar";
         const std::string path = "/foo/";
         const std::string component = "/bar";
@@ -102,7 +113,8 @@ TEST_CASE("sync_file: URL manipulation APIs", "[sync]") {
         REQUIRE(actual == expected);
     }
 
-    SECTION("properly concatenates a directory path when the component doesn't have a trailing slash") {
+    SECTION("properly concatenates a directory path when the component doesn't have a trailing slash")
+    {
         const std::string expected = "/foo/bar/";
         const std::string path = "/foo/";
         const std::string component = "/bar";
@@ -110,7 +122,8 @@ TEST_CASE("sync_file: URL manipulation APIs", "[sync]") {
         REQUIRE(actual == expected);
     }
 
-    SECTION("properly concatenates a directory path when the component has a trailing slash") {
+    SECTION("properly concatenates a directory path when the component has a trailing slash")
+    {
         const std::string expected = "/foo/bar/";
         const std::string path = "/foo/";
         const std::string component = "/bar/";
@@ -118,7 +131,8 @@ TEST_CASE("sync_file: URL manipulation APIs", "[sync]") {
         REQUIRE(actual == expected);
     }
 
-    SECTION("properly concatenates an extension when the path has a trailing dot") {
+    SECTION("properly concatenates an extension when the path has a trailing dot")
+    {
         const std::string expected = "/foo.management";
         const std::string path = "/foo.";
         const std::string component = "management";
@@ -126,7 +140,8 @@ TEST_CASE("sync_file: URL manipulation APIs", "[sync]") {
         REQUIRE(actual == expected);
     }
 
-    SECTION("properly concatenates a path when the extension has a leading dot") {
+    SECTION("properly concatenates a path when the extension has a leading dot")
+    {
         const std::string expected = "/foo.management";
         const std::string path = "/foo";
         const std::string component = ".management";
@@ -134,7 +149,8 @@ TEST_CASE("sync_file: URL manipulation APIs", "[sync]") {
         REQUIRE(actual == expected);
     }
 
-    SECTION("properly concatenates a path when both arguments have dots") {
+    SECTION("properly concatenates a path when both arguments have dots")
+    {
         const std::string expected = "/foo.management";
         const std::string path = "/foo.";
         const std::string component = ".management";
@@ -143,36 +159,44 @@ TEST_CASE("sync_file: URL manipulation APIs", "[sync]") {
     }
 }
 
-TEST_CASE("sync_file: SyncFileManager APIs", "[sync]") {
+TEST_CASE("sync_file: SyncFileManager APIs", "[sync]")
+{
     const std::string local_identity = "123456789";
     const std::string manager_path = base_path + "syncmanager/";
     prepare_sync_manager_test();
     auto manager = SyncFileManager(manager_path);
 
-    SECTION("user directory APIs") {
+    SECTION("user directory APIs")
+    {
         const std::string expected = manager_path + "realm-object-server/" + local_identity + "/";
 
-        SECTION("getting a user directory") {
-            SECTION("that didn't exist before succeeds") {
+        SECTION("getting a user directory")
+        {
+            SECTION("that didn't exist before succeeds")
+            {
                 auto actual = manager.user_directory(local_identity);
                 REQUIRE(actual == expected);
                 REQUIRE_DIR_EXISTS(expected);
             }
-            SECTION("that already existed succeeds") {
+            SECTION("that already existed succeeds")
+            {
                 auto actual = manager.user_directory(local_identity);
                 REQUIRE(actual == expected);
                 REQUIRE_DIR_EXISTS(expected);
             }
         }
 
-        SECTION("deleting a user directory") {
+        SECTION("deleting a user directory")
+        {
             manager.user_directory(local_identity);
             REQUIRE_DIR_EXISTS(expected);
-            SECTION("that wasn't yet deleted succeeds") {
+            SECTION("that wasn't yet deleted succeeds")
+            {
                 manager.remove_user_directory(local_identity);
                 REQUIRE_DIR_DOES_NOT_EXIST(expected);
             }
-            SECTION("that was already deleted succeeds") {
+            SECTION("that was already deleted succeeds")
+            {
                 manager.remove_user_directory(local_identity);
                 REQUIRE(opendir(expected.c_str()) == NULL);
                 REQUIRE_DIR_DOES_NOT_EXIST(expected);
@@ -180,19 +204,24 @@ TEST_CASE("sync_file: SyncFileManager APIs", "[sync]") {
         }
     }
 
-    SECTION("Realm path APIs") {
+    SECTION("Realm path APIs")
+    {
         auto relative_path = "realms://r.example.com/~/my/realm/path";
 
-        SECTION("getting a Realm path") {
-            const std::string expected = manager_path + "realm-object-server/123456789/realms%3A%2F%2Fr.example.com%2F%7E%2Fmy%2Frealm%2Fpath";
+        SECTION("getting a Realm path")
+        {
+            const std::string expected =
+                manager_path + "realm-object-server/123456789/realms%3A%2F%2Fr.example.com%2F%7E%2Fmy%2Frealm%2Fpath";
             auto actual = manager.path(local_identity, relative_path);
             REQUIRE(expected == actual);
         }
 
-        SECTION("deleting a Realm for a valid user") {
+        SECTION("deleting a Realm for a valid user")
+        {
             manager.path(local_identity, relative_path);
             // Create the required files
-            auto realm_base_path = manager_path + "realm-object-server/123456789/realms%3A%2F%2Fr.example.com%2F%7E%2Fmy%2Frealm%2Fpath";
+            auto realm_base_path =
+                manager_path + "realm-object-server/123456789/realms%3A%2F%2Fr.example.com%2F%7E%2Fmy%2Frealm%2Fpath";
             REQUIRE(create_dummy_realm(realm_base_path));
             REQUIRE(File::exists(realm_base_path));
             REQUIRE(File::exists(realm_base_path + ".lock"));
@@ -205,20 +234,24 @@ TEST_CASE("sync_file: SyncFileManager APIs", "[sync]") {
             REQUIRE_DIR_DOES_NOT_EXIST(realm_base_path + ".management");
         }
 
-        SECTION("deleting a Realm for an invalid user") {
+        SECTION("deleting a Realm for an invalid user")
+        {
             manager.remove_realm("invalid_user", relative_path);
         }
     }
 
-    SECTION("Utility path APIs") {
+    SECTION("Utility path APIs")
+    {
         auto metadata_dir = manager_path + "realm-object-server/io.realm.object-server-utility/metadata/";
 
-        SECTION("getting the metadata path") {
+        SECTION("getting the metadata path")
+        {
             auto path = manager.metadata_path();
             REQUIRE(path == (metadata_dir + "sync_metadata.realm"));
         }
 
-        SECTION("removing the metadata Realm") {
+        SECTION("removing the metadata Realm")
+        {
             manager.metadata_path();
             REQUIRE_DIR_EXISTS(metadata_dir);
             manager.remove_metadata_realm();

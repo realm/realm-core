@@ -47,7 +47,8 @@ public:
     // Cancels the download and stops the session. No further functions should be called on this class.
     void cancel();
 
-    uint64_t register_download_progress_notifier(std::function<void(uint64_t transferred_bytes, uint64_t transferrable_bytes)> callback);
+    uint64_t register_download_progress_notifier(
+        std::function<void(uint64_t transferred_bytes, uint64_t transferrable_bytes)> callback);
     void unregister_download_progress_notifier(uint64_t token);
 
 private:
@@ -55,6 +56,6 @@ private:
     util::AtomicSharedPtr<SyncSession> m_session;
 };
 
-}
+} // namespace realm
 
 #endif // // ASYNC_OPEN_TASK_HPP

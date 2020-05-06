@@ -34,13 +34,14 @@ class EventLoopDispatcher;
 template <typename... Args>
 class EventLoopDispatcher<void(Args...)> {
     using Tuple = std::tuple<typename std::remove_reference<Args>::type...>;
+
 private:
     struct Callback;
 
     struct State {
     public:
         State(std::function<void(Args...)> func)
-        : m_func(std::move(func))
+            : m_func(std::move(func))
         {
         }
 
@@ -70,12 +71,15 @@ private:
 
 public:
     EventLoopDispatcher(std::function<void(Args...)> func)
-    : m_state(std::make_shared<State>(func))
-    , m_signal(std::make_shared<EventLoopSignal<Callback>>(Callback{m_state}))
+        : m_state(std::make_shared<State>(func))
+        , m_signal(std::make_shared<EventLoopSignal<Callback>>(Callback{m_state}))
     {
     }
 
-    const std::function<void(Args...)>& func() const { return m_state->m_func; }
+    const std::function<void(Args...)>& func() const
+    {
+        return m_state->m_func;
+    }
 
     void operator()(Args... args)
     {
@@ -96,4 +100,3 @@ public:
 } // namespace realm
 
 #endif
-

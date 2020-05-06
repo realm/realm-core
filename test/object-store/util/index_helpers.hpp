@@ -16,32 +16,35 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#define REQUIRE_INDICES(index_set, ...) do { \
-    index_set.verify(); \
-    std::initializer_list<size_t> expected = {__VA_ARGS__}; \
-    auto actual = index_set.as_indexes(); \
-    INFO("Checking " #index_set); \
-    REQUIRE(expected.size() == static_cast<size_t>(std::distance(actual.begin(), actual.end()))); \
-    auto begin = actual.begin(); \
-    for (auto index : expected) { \
-        REQUIRE(*begin++ == index); \
-    } \
-} while (0)
+#define REQUIRE_INDICES(index_set, ...)                                                                              \
+    do {                                                                                                             \
+        index_set.verify();                                                                                          \
+        std::initializer_list<size_t> expected = {__VA_ARGS__};                                                      \
+        auto actual = index_set.as_indexes();                                                                        \
+        INFO("Checking " #index_set);                                                                                \
+        REQUIRE(expected.size() == static_cast<size_t>(std::distance(actual.begin(), actual.end())));                \
+        auto begin = actual.begin();                                                                                 \
+        for (auto index : expected) {                                                                                \
+            REQUIRE(*begin++ == index);                                                                              \
+        }                                                                                                            \
+    } while (0)
 
-#define REQUIRE_COLUMN_INDICES(columns, col, ...) do { \
-    auto it = (columns).find(col); \
-    REQUIRE(it != (columns).end()); \
-    REQUIRE_INDICES(it->second, __VA_ARGS__); \
-} while (0)
+#define REQUIRE_COLUMN_INDICES(columns, col, ...)                                                                    \
+    do {                                                                                                             \
+        auto it = (columns).find(col);                                                                               \
+        REQUIRE(it != (columns).end());                                                                              \
+        REQUIRE_INDICES(it->second, __VA_ARGS__);                                                                    \
+    } while (0)
 
-#define REQUIRE_MOVES(c, ...) do { \
-    auto actual = (c); \
-    std::initializer_list<CollectionChangeSet::Move> expected = {__VA_ARGS__}; \
-    REQUIRE(expected.size() == actual.moves.size()); \
-    auto begin = actual.moves.begin(); \
-    for (auto move : expected) { \
-        CHECK(begin->from == move.from); \
-        CHECK(begin->to == move.to); \
-        ++begin; \
-    } \
-} while (0)
+#define REQUIRE_MOVES(c, ...)                                                                                        \
+    do {                                                                                                             \
+        auto actual = (c);                                                                                           \
+        std::initializer_list<CollectionChangeSet::Move> expected = {__VA_ARGS__};                                   \
+        REQUIRE(expected.size() == actual.moves.size());                                                             \
+        auto begin = actual.moves.begin();                                                                           \
+        for (auto move : expected) {                                                                                 \
+            CHECK(begin->from == move.from);                                                                         \
+            CHECK(begin->to == move.to);                                                                             \
+            ++begin;                                                                                                 \
+        }                                                                                                            \
+    } while (0)

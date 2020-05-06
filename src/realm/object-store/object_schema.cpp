@@ -33,27 +33,29 @@ ObjectSchema::ObjectSchema() = default;
 ObjectSchema::~ObjectSchema() = default;
 
 ObjectSchema::ObjectSchema(std::string name, std::initializer_list<Property> persisted_properties)
-: ObjectSchema(std::move(name), persisted_properties, {})
+    : ObjectSchema(std::move(name), persisted_properties, {})
 {
 }
 
-ObjectSchema::ObjectSchema(std::string name, IsEmbedded is_embedded, std::initializer_list<Property> persisted_properties)
-: ObjectSchema(std::move(name), is_embedded, persisted_properties, {})
+ObjectSchema::ObjectSchema(std::string name, IsEmbedded is_embedded,
+                           std::initializer_list<Property> persisted_properties)
+    : ObjectSchema(std::move(name), is_embedded, persisted_properties, {})
 {
 }
 
 ObjectSchema::ObjectSchema(std::string name, std::initializer_list<Property> persisted_properties,
                            std::initializer_list<Property> computed_properties)
-: ObjectSchema(std::move(name), IsEmbedded{false}, persisted_properties, computed_properties)
+    : ObjectSchema(std::move(name), IsEmbedded{false}, persisted_properties, computed_properties)
 {
 }
 
-ObjectSchema::ObjectSchema(std::string name, IsEmbedded is_embedded, std::initializer_list<Property> persisted_properties,
+ObjectSchema::ObjectSchema(std::string name, IsEmbedded is_embedded,
+                           std::initializer_list<Property> persisted_properties,
                            std::initializer_list<Property> computed_properties)
-: name(std::move(name))
-, persisted_properties(persisted_properties)
-, computed_properties(computed_properties)
-, is_embedded(is_embedded)
+    : name(std::move(name))
+    , persisted_properties(persisted_properties)
+    , computed_properties(computed_properties)
+    , is_embedded(is_embedded)
 {
     for (auto const& prop : persisted_properties) {
         if (prop.is_primary) {
@@ -72,24 +74,37 @@ PropertyType ObjectSchema::from_core_type(ColKey col)
     if (attr.test(col_attr_List))
         flags |= PropertyType::Array;
     switch (col.get_type()) {
-        case col_type_Int:       return PropertyType::Int | flags;
-        case col_type_Float:     return PropertyType::Float | flags;
-        case col_type_Double:    return PropertyType::Double | flags;
-        case col_type_Bool:      return PropertyType::Bool | flags;
-        case col_type_String:    return PropertyType::String | flags;
-        case col_type_Binary:    return PropertyType::Data | flags;
-        case col_type_Timestamp: return PropertyType::Date | flags;
-        case col_type_OldMixed:  return PropertyType::Any | flags;
-        case col_type_ObjectId:  return PropertyType::ObjectId | flags;
-        case col_type_Decimal:   return PropertyType::Decimal | flags;
-        case col_type_Link:      return PropertyType::Object | PropertyType::Nullable;
-        case col_type_LinkList:  return PropertyType::Object | PropertyType::Array;
-        default: REALM_UNREACHABLE();
+        case col_type_Int:
+            return PropertyType::Int | flags;
+        case col_type_Float:
+            return PropertyType::Float | flags;
+        case col_type_Double:
+            return PropertyType::Double | flags;
+        case col_type_Bool:
+            return PropertyType::Bool | flags;
+        case col_type_String:
+            return PropertyType::String | flags;
+        case col_type_Binary:
+            return PropertyType::Data | flags;
+        case col_type_Timestamp:
+            return PropertyType::Date | flags;
+        case col_type_OldMixed:
+            return PropertyType::Any | flags;
+        case col_type_ObjectId:
+            return PropertyType::ObjectId | flags;
+        case col_type_Decimal:
+            return PropertyType::Decimal | flags;
+        case col_type_Link:
+            return PropertyType::Object | PropertyType::Nullable;
+        case col_type_LinkList:
+            return PropertyType::Object | PropertyType::Array;
+        default:
+            REALM_UNREACHABLE();
     }
 }
 
 ObjectSchema::ObjectSchema(Group const& group, StringData name, TableKey key)
-: name(name)
+    : name(name)
 {
     ConstTableRef table;
     if (key) {
@@ -132,7 +147,7 @@ ObjectSchema::ObjectSchema(Group const& group, StringData name, TableKey key)
     set_primary_key_property();
 }
 
-Property *ObjectSchema::property_for_name(StringData name) noexcept
+Property* ObjectSchema::property_for_name(StringData name) noexcept
 {
     for (auto& prop : persisted_properties) {
         if (StringData(prop.name) == name) {
@@ -147,7 +162,7 @@ Property *ObjectSchema::property_for_name(StringData name) noexcept
     return nullptr;
 }
 
-Property *ObjectSchema::property_for_public_name(StringData public_name) noexcept
+Property* ObjectSchema::property_for_public_name(StringData public_name) noexcept
 {
     // If no `public_name` is defined, the internal `name` is also considered the public name.
     for (auto& prop : persisted_properties) {
@@ -165,14 +180,14 @@ Property *ObjectSchema::property_for_public_name(StringData public_name) noexcep
     return nullptr;
 }
 
-const Property *ObjectSchema::property_for_public_name(StringData public_name) const noexcept
+const Property* ObjectSchema::property_for_public_name(StringData public_name) const noexcept
 {
-    return const_cast<ObjectSchema *>(this)->property_for_public_name(public_name);
+    return const_cast<ObjectSchema*>(this)->property_for_public_name(public_name);
 }
 
-const Property *ObjectSchema::property_for_name(StringData name) const noexcept
+const Property* ObjectSchema::property_for_name(StringData name) const noexcept
 {
-    return const_cast<ObjectSchema *>(this)->property_for_name(name);
+    return const_cast<ObjectSchema*>(this)->property_for_name(name);
 }
 
 bool ObjectSchema::property_is_computed(Property const& property) const noexcept
@@ -190,23 +205,19 @@ void ObjectSchema::set_primary_key_property() noexcept
     }
 }
 
-static void validate_property(Schema const& schema,
-                              ObjectSchema const& parent_object_schema,
-                              Property const& prop,
-                              Property const** primary,
-                              std::vector<ObjectSchemaValidationException>& exceptions)
+static void validate_property(Schema const& schema, ObjectSchema const& parent_object_schema, Property const& prop,
+                              Property const** primary, std::vector<ObjectSchemaValidationException>& exceptions)
 {
     auto& object_name = parent_object_schema.name;
 
     if (prop.type == PropertyType::LinkingObjects && !is_array(prop.type)) {
-        exceptions.emplace_back("Linking Objects property '%1.%2' must be an array.",
-                                object_name, prop.name);
+        exceptions.emplace_back("Linking Objects property '%1.%2' must be an array.", object_name, prop.name);
     }
 
     // check nullablity
     if (is_nullable(prop.type) && !prop.type_is_nullable()) {
-        exceptions.emplace_back("Property '%1.%2' of type '%3' cannot be nullable.",
-                                object_name, prop.name, string_for_property_type(prop.type));
+        exceptions.emplace_back("Property '%1.%2' of type '%3' cannot be nullable.", object_name, prop.name,
+                                string_for_property_type(prop.type));
     }
     else if (prop.type == PropertyType::Object && !is_nullable(prop.type) && !is_array(prop.type)) {
         exceptions.emplace_back("Property '%1.%2' of type 'object' must be nullable.", object_name, prop.name);
@@ -214,37 +225,38 @@ static void validate_property(Schema const& schema,
 
     // check primary keys
     if (prop.is_primary) {
-        if (prop.type != PropertyType::Int && prop.type != PropertyType::String && prop.type != PropertyType::ObjectId) {
-            exceptions.emplace_back("Property '%1.%2' of type '%3' cannot be made the primary key.",
-                                    object_name, prop.name, string_for_property_type(prop.type));
+        if (prop.type != PropertyType::Int && prop.type != PropertyType::String &&
+            prop.type != PropertyType::ObjectId) {
+            exceptions.emplace_back("Property '%1.%2' of type '%3' cannot be made the primary key.", object_name,
+                                    prop.name, string_for_property_type(prop.type));
         }
         if (*primary) {
-            exceptions.emplace_back("Properties '%1' and '%2' are both marked as the primary key of '%3'.",
-                                    prop.name, (*primary)->name, object_name);
+            exceptions.emplace_back("Properties '%1' and '%2' are both marked as the primary key of '%3'.", prop.name,
+                                    (*primary)->name, object_name);
         }
         *primary = &prop;
     }
 
     // check indexable
     if (prop.is_indexed && !prop.type_is_indexable()) {
-        exceptions.emplace_back("Property '%1.%2' of type '%3' cannot be indexed.",
-                                object_name, prop.name, string_for_property_type(prop.type));
+        exceptions.emplace_back("Property '%1.%2' of type '%3' cannot be indexed.", object_name, prop.name,
+                                string_for_property_type(prop.type));
     }
 
     // check that only link properties have object types
     if (prop.type != PropertyType::LinkingObjects && !prop.link_origin_property_name.empty()) {
-        exceptions.emplace_back("Property '%1.%2' of type '%3' cannot have an origin property name.",
-                                object_name, prop.name, string_for_property_type(prop.type));
+        exceptions.emplace_back("Property '%1.%2' of type '%3' cannot have an origin property name.", object_name,
+                                prop.name, string_for_property_type(prop.type));
     }
     else if (prop.type == PropertyType::LinkingObjects && prop.link_origin_property_name.empty()) {
-        exceptions.emplace_back("Property '%1.%2' of type '%3' must have an origin property name.",
-                                object_name, prop.name, string_for_property_type(prop.type));
+        exceptions.emplace_back("Property '%1.%2' of type '%3' must have an origin property name.", object_name,
+                                prop.name, string_for_property_type(prop.type));
     }
 
     if (prop.type != PropertyType::Object && prop.type != PropertyType::LinkingObjects) {
         if (!prop.object_type.empty()) {
-            exceptions.emplace_back("Property '%1.%2' of type '%3' cannot have an object type.",
-                                    object_name, prop.name, prop.type_string());
+            exceptions.emplace_back("Property '%1.%2' of type '%3' cannot have an object type.", object_name,
+                                    prop.name, prop.type_string());
         }
         return;
     }
@@ -253,8 +265,8 @@ static void validate_property(Schema const& schema,
     // check that the object_type is valid for link properties
     auto it = schema.find(prop.object_type);
     if (it == schema.end()) {
-        exceptions.emplace_back("Property '%1.%2' of type '%3' has unknown object type '%4'",
-                                object_name, prop.name, string_for_property_type(prop.type), prop.object_type);
+        exceptions.emplace_back("Property '%1.%2' of type '%3' has unknown object type '%4'", object_name, prop.name,
+                                string_for_property_type(prop.type), prop.object_type);
         return;
     }
     if (prop.type != PropertyType::LinkingObjects) {
@@ -267,21 +279,21 @@ static void validate_property(Schema const& schema,
         return;
     }
 
-    const Property *origin_property = it->property_for_name(prop.link_origin_property_name);
+    const Property* origin_property = it->property_for_name(prop.link_origin_property_name);
     if (!origin_property) {
-        exceptions.emplace_back("Property '%1.%2' declared as origin of linking objects property '%3.%4' does not exist",
-                                prop.object_type, prop.link_origin_property_name,
-                                object_name, prop.name);
+        exceptions.emplace_back(
+            "Property '%1.%2' declared as origin of linking objects property '%3.%4' does not exist",
+            prop.object_type, prop.link_origin_property_name, object_name, prop.name);
     }
     else if (origin_property->type != PropertyType::Object) {
-        exceptions.emplace_back("Property '%1.%2' declared as origin of linking objects property '%3.%4' is not a link",
-                                prop.object_type, prop.link_origin_property_name,
-                                object_name, prop.name);
+        exceptions.emplace_back(
+            "Property '%1.%2' declared as origin of linking objects property '%3.%4' is not a link", prop.object_type,
+            prop.link_origin_property_name, object_name, prop.name);
     }
     else if (origin_property->object_type != object_name) {
-        exceptions.emplace_back("Property '%1.%2' declared as origin of linking objects property '%3.%4' links to type '%5'",
-                                prop.object_type, prop.link_origin_property_name,
-                                object_name, prop.name, origin_property->object_type);
+        exceptions.emplace_back(
+            "Property '%1.%2' declared as origin of linking objects property '%3.%4' links to type '%5'",
+            prop.object_type, prop.link_origin_property_name, object_name, prop.name, origin_property->object_type);
     }
 }
 
@@ -290,8 +302,8 @@ void ObjectSchema::validate(Schema const& schema, std::vector<ObjectSchemaValida
     std::vector<StringData> public_property_names;
     std::vector<StringData> internal_property_names;
     internal_property_names.reserve(persisted_properties.size() + computed_properties.size());
-    auto gather_names = [&](auto const &properties) {
-        for (auto const &prop : properties) {
+    auto gather_names = [&](auto const& properties) {
+        for (auto const& prop : properties) {
             internal_property_names.push_back(prop.name);
             if (!prop.public_name.empty())
                 public_property_names.push_back(prop.public_name);
@@ -303,7 +315,7 @@ void ObjectSchema::validate(Schema const& schema, std::vector<ObjectSchemaValida
     std::sort(internal_property_names.begin(), internal_property_names.end());
 
     // Check that property names and aliases are unique
-    auto for_each_duplicate = [](auto &&container, auto &&fn) {
+    auto for_each_duplicate = [](auto&& container, auto&& fn) {
         auto end = container.end();
         for (auto it = std::adjacent_find(container.begin(), end); it != end; it = std::adjacent_find(it + 2, end))
             fn(*it);
@@ -313,8 +325,8 @@ void ObjectSchema::validate(Schema const& schema, std::vector<ObjectSchemaValida
                                 public_property_name, name);
     });
     for_each_duplicate(internal_property_names, [&](auto internal_name) {
-        exceptions.emplace_back("Property '%1' appears more than once in the schema for type '%2'.",
-                                internal_name, name);
+        exceptions.emplace_back("Property '%1' appears more than once in the schema for type '%2'.", internal_name,
+                                name);
     });
 
     // Check that no aliases conflict with property names
@@ -322,20 +334,34 @@ void ObjectSchema::validate(Schema const& schema, std::vector<ObjectSchemaValida
         ObjectSchema const& os;
         std::vector<ObjectSchemaValidationException>& exceptions;
 
-        ErrorWriter& operator=(StringData name) {
-            exceptions.emplace_back("Property '%1.%2' has an alias '%3' that conflicts with a property of the same name.",
-                                    os.name, os.property_for_public_name(name)->name, name);
+        ErrorWriter& operator=(StringData name)
+        {
+            exceptions.emplace_back(
+                "Property '%1.%2' has an alias '%3' that conflicts with a property of the same name.", os.name,
+                os.property_for_public_name(name)->name, name);
             return *this;
         }
 
         ErrorWriter(ErrorWriter const&) = default;
-        ErrorWriter& operator=(ErrorWriter const&) { return *this; }
-        ErrorWriter& operator*() { return *this; }
-        ErrorWriter& operator++() { return *this; }
-        ErrorWriter& operator++(int) { return *this; }
+        ErrorWriter& operator=(ErrorWriter const&)
+        {
+            return *this;
+        }
+        ErrorWriter& operator*()
+        {
+            return *this;
+        }
+        ErrorWriter& operator++()
+        {
+            return *this;
+        }
+        ErrorWriter& operator++(int)
+        {
+            return *this;
+        }
     } writer{*this, exceptions};
-    std::set_intersection(public_property_names.begin(), public_property_names.end(),
-                          internal_property_names.begin(), internal_property_names.end(), writer);
+    std::set_intersection(public_property_names.begin(), public_property_names.end(), internal_property_names.begin(),
+                          internal_property_names.end(), writer);
 
     // Validate all properties
     const Property* primary = nullptr;
@@ -357,8 +383,7 @@ void ObjectSchema::validate(Schema const& schema, std::vector<ObjectSchemaValida
 namespace realm {
 bool operator==(ObjectSchema const& a, ObjectSchema const& b) noexcept
 {
-    return std::tie(a.name, a.is_embedded, a.primary_key, a.persisted_properties, a.computed_properties)
-        == std::tie(b.name, b.is_embedded, b.primary_key, b.persisted_properties, b.computed_properties);
-
+    return std::tie(a.name, a.is_embedded, a.primary_key, a.persisted_properties, a.computed_properties) ==
+           std::tie(b.name, b.is_embedded, b.primary_key, b.persisted_properties, b.computed_properties);
 }
-}
+} // namespace realm

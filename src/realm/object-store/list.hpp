@@ -60,7 +60,10 @@ public:
     List(List&&);
     List& operator=(List&&);
 
-    const std::shared_ptr<Realm>& get_realm() const { return m_realm; }
+    const std::shared_ptr<Realm>& get_realm() const
+    {
+        return m_realm;
+    }
     Query get_query() const;
 
     ColKey get_parent_column_key() const;
@@ -68,7 +71,10 @@ public:
     TableKey get_parent_table_key() const;
 
     // Get the type of the values contained in this List
-    PropertyType get_type() const { return m_type; }
+    PropertyType get_type() const
+    {
+        return m_type;
+    }
 
     // Get the ObjectSchema of the values in this List
     // Only valid if get_type() returns PropertyType::Object
@@ -87,19 +93,19 @@ public:
     void delete_at(size_t list_ndx);
     void delete_all();
 
-    template<typename T = Obj>
+    template <typename T = Obj>
     T get(size_t row_ndx) const;
-    template<typename T>
+    template <typename T>
     size_t find(T const& value) const;
 
     // Find the index in the List of the first row matching the query
     size_t find(Query&& query) const;
 
-    template<typename T>
+    template <typename T>
     void add(T value);
-    template<typename T>
+    template <typename T>
     void insert(size_t list_ndx, T value);
-    template<typename T>
+    template <typename T>
     void set(size_t row_ndx, T value);
 
     Results sort(SortDescriptor order) const;
@@ -123,36 +129,39 @@ public:
     // sum() returns 0,
     // Throws UnsupportedColumnTypeException for sum/average on timestamp or non-numeric column
     // Throws OutOfBoundsIndexException for an out-of-bounds column
-    util::Optional<Mixed> max(ColKey column={}) const;
-    util::Optional<Mixed> min(ColKey column={}) const;
-    util::Optional<Mixed> average(ColKey column={}) const;
-    Mixed sum(ColKey column={}) const;
+    util::Optional<Mixed> max(ColKey column = {}) const;
+    util::Optional<Mixed> min(ColKey column = {}) const;
+    util::Optional<Mixed> average(ColKey column = {}) const;
+    Mixed sum(ColKey column = {}) const;
 
     bool operator==(List const& rgt) const noexcept;
 
     NotificationToken add_notification_callback(CollectionChangeCallback cb) &;
 
-    template<typename Context>
+    template <typename Context>
     auto get(Context&, size_t row_ndx) const;
-    template<typename T, typename Context>
+    template <typename T, typename Context>
     size_t find(Context&, T&& value) const;
 
-    template<typename T, typename Context>
-    void add(Context&, T&& value, CreatePolicy=CreatePolicy::SetLink);
-    template<typename T, typename Context>
-    void insert(Context&, size_t list_ndx, T&& value, CreatePolicy=CreatePolicy::SetLink);
-    template<typename T, typename Context>
-    void set(Context&, size_t row_ndx, T&& value, CreatePolicy=CreatePolicy::SetLink);
+    template <typename T, typename Context>
+    void add(Context&, T&& value, CreatePolicy = CreatePolicy::SetLink);
+    template <typename T, typename Context>
+    void insert(Context&, size_t list_ndx, T&& value, CreatePolicy = CreatePolicy::SetLink);
+    template <typename T, typename Context>
+    void set(Context&, size_t row_ndx, T&& value, CreatePolicy = CreatePolicy::SetLink);
 
     // Replace the values in this list with the values from an enumerable object
-    template<typename T, typename Context>
-    void assign(Context&, T&& value, CreatePolicy=CreatePolicy::SetLink);
+    template <typename T, typename Context>
+    void assign(Context&, T&& value, CreatePolicy = CreatePolicy::SetLink);
 
     // The List object has been invalidated (due to the Realm being invalidated,
     // or the containing object being deleted)
     // All non-noexcept functions can throw this
     struct InvalidatedException : public std::logic_error {
-        InvalidatedException() : std::logic_error("Access to invalidated List object") {}
+        InvalidatedException()
+            : std::logic_error("Access to invalidated List object")
+        {
+        }
     };
 
     // The input index parameter was out of bounds
@@ -165,7 +174,9 @@ public:
     // The object being added to the list is already a managed embedded object
     struct InvalidEmbeddedOperationException : public std::logic_error {
         InvalidEmbeddedOperationException()
-        : std::logic_error("Cannot add an existing managed embedded object to a List.") { }
+            : std::logic_error("Cannot add an existing managed embedded object to a List.")
+        {
+        }
     };
 
 private:
@@ -179,59 +190,61 @@ private:
     void verify_valid_row(size_t row_ndx, bool insertion = false) const;
     void validate(const Obj&) const;
 
-    template<typename T, typename Context>
+    template <typename T, typename Context>
     void validate_embedded(Context& ctx, T&& value, CreatePolicy policy) const;
 
-    template<typename Fn>
+    template <typename Fn>
     auto dispatch(Fn&&) const;
-    template<typename T>
+    template <typename T>
     auto& as() const;
 
-    template<typename T, typename Context>
+    template <typename T, typename Context>
     void set_if_different(Context&, size_t row_ndx, T&& value, CreatePolicy);
 
     friend struct std::hash<List>;
 };
 
-template<typename T>
+template <typename T>
 auto& List::as() const
 {
     return static_cast<Lst<T>&>(*m_list_base);
 }
 
-template<>
+template <>
 inline auto& List::as<Obj>() const
 {
     return static_cast<LnkLst&>(*m_list_base);
 }
 
-template<typename Fn>
+template <typename Fn>
 auto List::dispatch(Fn&& fn) const
 {
     verify_attached();
     return switch_on_type(get_type(), std::forward<Fn>(fn));
 }
 
-template<typename Context>
+template <typename Context>
 auto List::get(Context& ctx, size_t row_ndx) const
 {
     return dispatch([&](auto t) { return ctx.box(this->get<std::decay_t<decltype(*t)>>(row_ndx)); });
 }
 
-template<typename T, typename Context>
+template <typename T, typename Context>
 size_t List::find(Context& ctx, T&& value) const
 {
-    return dispatch([&](auto t) { return this->find(ctx.template unbox<std::decay_t<decltype(*t)>>(value, CreatePolicy::Skip)); });
+    return dispatch([&](auto t) {
+        return this->find(ctx.template unbox<std::decay_t<decltype(*t)>>(value, CreatePolicy::Skip));
+    });
 }
 
-template<typename T, typename Context>
+template <typename T, typename Context>
 void List::validate_embedded(Context& ctx, T&& value, CreatePolicy policy) const
 {
     if (!policy.copy && ctx.template unbox<Obj>(value, CreatePolicy::Skip).is_valid())
         throw InvalidEmbeddedOperationException();
 }
 
-template<typename T, typename Context>
+template <typename T, typename Context>
 void List::add(Context& ctx, T&& value, CreatePolicy policy)
 {
     if (m_is_embedded) {
@@ -243,7 +256,7 @@ void List::add(Context& ctx, T&& value, CreatePolicy policy)
     dispatch([&](auto t) { this->add(ctx.template unbox<std::decay_t<decltype(*t)>>(value, policy)); });
 }
 
-template<typename T, typename Context>
+template <typename T, typename Context>
 void List::insert(Context& ctx, size_t list_ndx, T&& value, CreatePolicy policy)
 {
     if (m_is_embedded) {
@@ -255,28 +268,26 @@ void List::insert(Context& ctx, size_t list_ndx, T&& value, CreatePolicy policy)
     dispatch([&](auto t) { this->insert(list_ndx, ctx.template unbox<std::decay_t<decltype(*t)>>(value, policy)); });
 }
 
-template<typename T, typename Context>
+template <typename T, typename Context>
 void List::set(Context& ctx, size_t list_ndx, T&& value, CreatePolicy policy)
 {
     if (m_is_embedded) {
         validate_embedded(ctx, value, policy);
 
         auto& list = as<Obj>();
-        auto key = policy.diff ? list.get(list_ndx)
-                               : list.create_and_set_linked_object(list_ndx).get_key();
+        auto key = policy.diff ? list.get(list_ndx) : list.create_and_set_linked_object(list_ndx).get_key();
         ctx.template unbox<Obj>(value, policy, key);
         return;
     }
     dispatch([&](auto t) { this->set(list_ndx, ctx.template unbox<std::decay_t<decltype(*t)>>(value, policy)); });
 }
 
-template<typename T, typename Context>
+template <typename T, typename Context>
 void List::set_if_different(Context& ctx, size_t row_ndx, T&& value, CreatePolicy policy)
 {
     if (m_is_embedded) {
         validate_embedded(ctx, value, policy);
-        auto key = policy.diff ? this->get<Obj>(row_ndx)
-                               : as<Obj>().create_and_set_linked_object(row_ndx);
+        auto key = policy.diff ? this->get<Obj>(row_ndx) : as<Obj>().create_and_set_linked_object(row_ndx);
         ctx.template unbox<Obj>(value, policy, key.get_key());
         return;
     }
@@ -289,7 +300,7 @@ void List::set_if_different(Context& ctx, size_t row_ndx, T&& value, CreatePolic
                 this->set(row_ndx, new_value);
         }
         else {
-            auto old_value =  this->get<U>(row_ndx);
+            auto old_value = this->get<U>(row_ndx);
             auto new_value = ctx.template unbox<U>(value, policy);
             if (old_value != new_value)
                 this->set(row_ndx, new_value);
@@ -297,7 +308,7 @@ void List::set_if_different(Context& ctx, size_t row_ndx, T&& value, CreatePolic
     });
 }
 
-template<typename T, typename Context>
+template <typename T, typename Context>
 void List::assign(Context& ctx, T&& values, CreatePolicy policy)
 {
     if (ctx.is_same_list(*this, values))
@@ -329,9 +340,10 @@ void List::assign(Context& ctx, T&& values, CreatePolicy policy)
 } // namespace realm
 
 namespace std {
-template<> struct hash<realm::List> {
+template <>
+struct hash<realm::List> {
     size_t operator()(realm::List const&) const;
 };
-}
+} // namespace std
 
 #endif // REALM_OS_LIST_HPP

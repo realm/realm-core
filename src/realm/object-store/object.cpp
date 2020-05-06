@@ -28,11 +28,11 @@
 using namespace realm;
 
 /* The nice syntax is not supported by MSVC */
-CreatePolicy CreatePolicy::Skip = {/*.create =*/ false, /*.copy =*/ false, /*.update =*/ false, /*.diff =*/ false};
-CreatePolicy CreatePolicy::ForceCreate = {/*.create =*/ true, /*.copy =*/ true, /*.update =*/ false, /*.diff =*/ false};
-CreatePolicy CreatePolicy::UpdateAll = {/*.create =*/ true, /*.copy =*/ true, /*.update =*/ true, /*.diff =*/ false};
-CreatePolicy CreatePolicy::UpdateModified = {/*.create =*/ true, /*.copy =*/ true, /*.update =*/ true, /*.diff =*/ true};
-CreatePolicy CreatePolicy::SetLink = {/*.create =*/ true, /*.copy =*/ false, /*.update =*/ false, /*.diff =*/ false};
+CreatePolicy CreatePolicy::Skip = {/*.create =*/false, /*.copy =*/false, /*.update =*/false, /*.diff =*/false};
+CreatePolicy CreatePolicy::ForceCreate = {/*.create =*/true, /*.copy =*/true, /*.update =*/false, /*.diff =*/false};
+CreatePolicy CreatePolicy::UpdateAll = {/*.create =*/true, /*.copy =*/true, /*.update =*/true, /*.diff =*/false};
+CreatePolicy CreatePolicy::UpdateModified = {/*.create =*/true, /*.copy =*/true, /*.update =*/true, /*.diff =*/true};
+CreatePolicy CreatePolicy::SetLink = {/*.create =*/true, /*.copy =*/false, /*.update =*/false, /*.diff =*/false};
 
 Object Object::freeze(std::shared_ptr<Realm> frozen_realm) const
 {
@@ -45,54 +45,71 @@ bool Object::is_frozen() const noexcept
 }
 
 InvalidatedObjectException::InvalidatedObjectException(const std::string& object_type)
-: std::logic_error("Accessing object of type " + object_type + " which has been invalidated or deleted")
-, object_type(object_type)
-{}
+    : std::logic_error("Accessing object of type " + object_type + " which has been invalidated or deleted")
+    , object_type(object_type)
+{
+}
 
 InvalidPropertyException::InvalidPropertyException(const std::string& object_type, const std::string& property_name)
-: std::logic_error(util::format("Property '%1.%2' does not exist", object_type, property_name))
-, object_type(object_type), property_name(property_name)
-{}
+    : std::logic_error(util::format("Property '%1.%2' does not exist", object_type, property_name))
+    , object_type(object_type)
+    , property_name(property_name)
+{
+}
 
-MissingPropertyValueException::MissingPropertyValueException(const std::string& object_type, const std::string& property_name)
-: std::logic_error(util::format("Missing value for property '%1.%2'", object_type, property_name))
-, object_type(object_type), property_name(property_name)
-{}
+MissingPropertyValueException::MissingPropertyValueException(const std::string& object_type,
+                                                             const std::string& property_name)
+    : std::logic_error(util::format("Missing value for property '%1.%2'", object_type, property_name))
+    , object_type(object_type)
+    , property_name(property_name)
+{
+}
 
 MissingPrimaryKeyException::MissingPrimaryKeyException(const std::string& object_type)
-: std::logic_error(util::format("'%1' does not have a primary key defined", object_type))
-, object_type(object_type)
-{}
+    : std::logic_error(util::format("'%1' does not have a primary key defined", object_type))
+    , object_type(object_type)
+{
+}
 
 ReadOnlyPropertyException::ReadOnlyPropertyException(const std::string& object_type, const std::string& property_name)
-: std::logic_error(util::format("Cannot modify read-only property '%1.%2'", object_type, property_name))
-, object_type(object_type), property_name(property_name) {}
+    : std::logic_error(util::format("Cannot modify read-only property '%1.%2'", object_type, property_name))
+    , object_type(object_type)
+    , property_name(property_name)
+{
+}
 
 ModifyPrimaryKeyException::ModifyPrimaryKeyException(const std::string& object_type, const std::string& property_name)
-: std::logic_error(util::format("Cannot modify primary key after creation: '%1.%2'", object_type, property_name))
-, object_type(object_type), property_name(property_name) {}
+    : std::logic_error(util::format("Cannot modify primary key after creation: '%1.%2'", object_type, property_name))
+    , object_type(object_type)
+    , property_name(property_name)
+{
+}
 
 Object::Object(SharedRealm r, ObjectSchema const& s, Obj const& o)
-: m_realm(std::move(r)), m_object_schema(&s), m_obj(o) { }
+    : m_realm(std::move(r))
+    , m_object_schema(&s)
+    , m_obj(o)
+{
+}
 
 Object::Object(SharedRealm r, Obj const& o)
-: m_realm(std::move(r))
-, m_object_schema(&*m_realm->schema().find(ObjectStore::object_type_for_table_name(o.get_table()->get_name())))
-, m_obj(o)
+    : m_realm(std::move(r))
+    , m_object_schema(&*m_realm->schema().find(ObjectStore::object_type_for_table_name(o.get_table()->get_name())))
+    , m_obj(o)
 {
 }
 
 Object::Object(SharedRealm r, StringData object_type, ObjKey key)
-: m_realm(std::move(r))
-, m_object_schema(&*m_realm->schema().find(object_type))
-, m_obj(ObjectStore::table_for_object_type(m_realm->read_group(), object_type)->get_object(key))
+    : m_realm(std::move(r))
+    , m_object_schema(&*m_realm->schema().find(object_type))
+    , m_obj(ObjectStore::table_for_object_type(m_realm->read_group(), object_type)->get_object(key))
 {
 }
 
 Object::Object(SharedRealm r, StringData object_type, size_t index)
-: m_realm(std::move(r))
-, m_object_schema(&*m_realm->schema().find(object_type))
-, m_obj(ObjectStore::table_for_object_type(m_realm->read_group(), object_type)->get_object(index))
+    : m_realm(std::move(r))
+    , m_object_schema(&*m_realm->schema().find(object_type))
+    , m_obj(ObjectStore::table_for_object_type(m_realm->read_group(), object_type)->get_object(index))
 {
 }
 
@@ -130,4 +147,3 @@ Property const& Object::property_for_name(StringData prop_name) const
     }
     return *prop;
 }
-

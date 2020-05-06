@@ -23,31 +23,32 @@
 namespace realm {
 namespace util {
 
-    struct GenericEventLoop {
-    public:
-        virtual void post(std::function<void()>) = 0;
-        virtual ~GenericEventLoop() = default;
-        static void set_event_loop_factory(std::function<std::unique_ptr<GenericEventLoop>()>);
-        static std::unique_ptr<GenericEventLoop> get();
-    };
+struct GenericEventLoop {
+public:
+    virtual void post(std::function<void()>) = 0;
+    virtual ~GenericEventLoop() = default;
+    static void set_event_loop_factory(std::function<std::unique_ptr<GenericEventLoop>()>);
+    static std::unique_ptr<GenericEventLoop> get();
+};
 
-    template<typename Callback>
-    class EventLoopSignal {
-    public:
-        EventLoopSignal(Callback&& callback)
-                : m_callback(std::move(callback))
-                , m_eventloop(GenericEventLoop::get())
-        { }
+template <typename Callback>
+class EventLoopSignal {
+public:
+    EventLoopSignal(Callback&& callback)
+        : m_callback(std::move(callback))
+        , m_eventloop(GenericEventLoop::get())
+    {
+    }
 
-        void notify()
-        {
-            m_eventloop->post(m_callback);
-        }
-    private:
-        Callback m_callback;
-        std::unique_ptr<GenericEventLoop> m_eventloop;
-    };
+    void notify()
+    {
+        m_eventloop->post(m_callback);
+    }
+
+private:
+    Callback m_callback;
+    std::unique_ptr<GenericEventLoop> m_eventloop;
+};
 
 } // namespace util
 } // namespace realm
-

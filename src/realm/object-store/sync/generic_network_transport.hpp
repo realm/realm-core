@@ -35,10 +35,7 @@
 namespace realm {
 namespace app {
 
-enum class ClientErrorCode {
-    user_not_found = 1,
-    user_not_logged_in = 2
-};
+enum class ClientErrorCode { user_not_found = 1, user_not_logged_in = 2 };
 
 enum class JSONErrorCode {
     bad_token = 1,
@@ -124,8 +121,8 @@ struct AppError {
     std::string message;
 
     AppError(std::error_code error_code, std::string message)
-    : error_code(error_code)
-    , message(message)
+        : error_code(error_code)
+        , message(message)
     {
     }
 
@@ -148,7 +145,7 @@ struct AppError {
     {
         return error_code.category() == custom_error_category();
     }
-    
+
     bool is_client_error() const
     {
         return error_code.category() == client_error_category();
@@ -169,9 +166,7 @@ T value_from_json(const nlohmann::json& data, const std::string& key)
 /**
  * An HTTP method type.
  */
-enum class HttpMethod {
-    get, post, patch, put, del
-};
+enum class HttpMethod { get, post, patch, put, del };
 
 /**
  * An HTTP request that can be made to an arbitrary server.
@@ -188,8 +183,8 @@ struct Request {
     std::string url;
 
     /**
-     * The number of milliseconds that the underlying transport should spend on an HTTP round trip before failing with an
-     * error.
+     * The number of milliseconds that the underlying transport should spend on an HTTP round trip before failing with
+     * an error.
      */
     uint64_t timeout_ms;
 
@@ -202,7 +197,7 @@ struct Request {
      * The body of the request.
      */
     std::string body;
-    
+
     /// Indicates if the request uses the refresh token or the access token
     bool uses_refresh_token;
 };

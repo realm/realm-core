@@ -21,7 +21,8 @@
 
 #include <realm/util/features.h>
 
-#if (defined(REALM_HAVE_EPOLL) && REALM_HAVE_EPOLL) || REALM_ANDROID || (defined(REALM_PLATFORM_NODE) && REALM_PLATFORM_NODE && !REALM_PLATFORM_APPLE && !defined(_WIN32))
+#if (defined(REALM_HAVE_EPOLL) && REALM_HAVE_EPOLL) || REALM_ANDROID ||                                              \
+    (defined(REALM_PLATFORM_NODE) && REALM_PLATFORM_NODE && !REALM_PLATFORM_APPLE && !defined(_WIN32))
 #define REALM_USE_EPOLL 1
 #else
 #define REALM_USE_EPOLL 0

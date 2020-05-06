@@ -21,7 +21,7 @@
 
 namespace realm {
 namespace util {
-template<typename Callback>
+template <typename Callback>
 class EventLoopSignal {
 public:
     struct Data {
@@ -31,7 +31,7 @@ public:
 
     EventLoopSignal(Callback&& callback)
     {
-        m_handle->data = new Data { std::move(callback), {false} };
+        m_handle->data = new Data{std::move(callback), {false}};
 
         // This assumes that only one thread matters: the main thread (default loop).
         uv_async_init(uv_default_loop(), m_handle, [](uv_async_t* handle) {
@@ -41,7 +41,8 @@ public:
                     delete reinterpret_cast<Data*>(handle->data);
                     delete reinterpret_cast<uv_async_t*>(handle);
                 });
-            } else {
+            }
+            else {
                 data.callback();
             }
         });

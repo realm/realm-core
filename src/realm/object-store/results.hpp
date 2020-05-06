@@ -37,7 +37,7 @@ class Mixed;
 class ObjectSchema;
 
 namespace _impl {
-    class ResultsNotifierBase;
+class ResultsNotifierBase;
 }
 
 class Results {
@@ -51,7 +51,8 @@ public:
     Results(std::shared_ptr<Realm> r, std::shared_ptr<LstBase> list, DescriptorOrdering o);
     Results(std::shared_ptr<Realm> r, Query q, DescriptorOrdering o = {});
     Results(std::shared_ptr<Realm> r, TableView tv, DescriptorOrdering o = {});
-    Results(std::shared_ptr<Realm> r, std::shared_ptr<LnkLst> list, util::Optional<Query> q = {}, SortDescriptor s = {});
+    Results(std::shared_ptr<Realm> r, std::shared_ptr<LnkLst> list, util::Optional<Query> q = {},
+            SortDescriptor s = {});
     ~Results();
 
     // Results is copyable and moveable
@@ -61,20 +62,29 @@ public:
     Results& operator=(const Results&);
 
     // Get the Realm
-    std::shared_ptr<Realm> get_realm() const { return m_realm; }
+    std::shared_ptr<Realm> get_realm() const
+    {
+        return m_realm;
+    }
 
     // Object schema describing the vendored object type
-    const ObjectSchema &get_object_schema() const REQUIRES(!m_mutex);
+    const ObjectSchema& get_object_schema() const REQUIRES(!m_mutex);
 
     // Get a query which will match the same rows as is contained in this Results
     // Returned query will not be valid if the current mode is Empty
     Query get_query() const REQUIRES(!m_mutex);
 
     // Get the Lst this Results is derived from, if any
-    std::shared_ptr<LstBase> const& get_list() const { return m_list; }
+    std::shared_ptr<LstBase> const& get_list() const
+    {
+        return m_list;
+    }
 
     // Get the list of sort and distinct operations applied for this Results.
-    DescriptorOrdering const& get_descriptor_ordering() const noexcept { return m_descriptor_ordering; }
+    DescriptorOrdering const& get_descriptor_ordering() const noexcept
+    {
+        return m_descriptor_ordering;
+    }
 
     // Get a tableview containing the same rows as this Results
     TableView get_tableview() REQUIRES(!m_mutex);
@@ -90,19 +100,19 @@ public:
 
     // Get the row accessor for the given index
     // Throws OutOfBoundsIndexException if index >= size()
-    template<typename T = Obj>
+    template <typename T = Obj>
     T get(size_t index) REQUIRES(!m_mutex);
 
     // Get the boxed row accessor for the given index
     // Throws OutOfBoundsIndexException if index >= size()
-    template<typename Context>
+    template <typename Context>
     auto get(Context&, size_t index) REQUIRES(!m_mutex);
 
     // Get a row accessor for the first/last row, or none if the results are empty
     // More efficient than calling size()+get()
-    template<typename T = Obj>
+    template <typename T = Obj>
     util::Optional<T> first() REQUIRES(!m_mutex);
-    template<typename T = Obj>
+    template <typename T = Obj>
     util::Optional<T> last() REQUIRES(!m_mutex);
 
     // Get the index of the first row matching the query in this table
@@ -111,7 +121,7 @@ public:
     // Get the first index of the given value in this results, or not_found
     // Throws DetachedAccessorException if row is not attached
     // Throws IncorrectTableException if row belongs to a different table
-    template<typename T>
+    template <typename T>
     size_t index_of(T const& value) REQUIRES(!m_mutex);
 
     // Delete all of the rows in this Results from the Realm
@@ -149,21 +159,33 @@ public:
     // sum() returns 0, except for when it returns none
     // Throws UnsupportedColumnTypeException for sum/average on timestamp or non-numeric column
     // Throws OutOfBoundsIndexException for an out-of-bounds column
-    util::Optional<Mixed> max(ColKey column={}) REQUIRES(!m_mutex);
-    util::Optional<Mixed> min(ColKey column={}) REQUIRES(!m_mutex);
-    util::Optional<Mixed> average(ColKey column={}) REQUIRES(!m_mutex);
-    util::Optional<Mixed> sum(ColKey column={}) REQUIRES(!m_mutex);
+    util::Optional<Mixed> max(ColKey column = {}) REQUIRES(!m_mutex);
+    util::Optional<Mixed> min(ColKey column = {}) REQUIRES(!m_mutex);
+    util::Optional<Mixed> average(ColKey column = {}) REQUIRES(!m_mutex);
+    util::Optional<Mixed> sum(ColKey column = {}) REQUIRES(!m_mutex);
 
-    util::Optional<Mixed> max(StringData column_name) REQUIRES(!m_mutex) { return max(key(column_name)); }
-    util::Optional<Mixed> min(StringData column_name) REQUIRES(!m_mutex) { return min(key(column_name)); }
-    util::Optional<Mixed> average(StringData column_name) REQUIRES(!m_mutex) { return average(key(column_name)); }
-    util::Optional<Mixed> sum(StringData column_name) REQUIRES(!m_mutex) { return sum(key(column_name)); }
+    util::Optional<Mixed> max(StringData column_name) REQUIRES(!m_mutex)
+    {
+        return max(key(column_name));
+    }
+    util::Optional<Mixed> min(StringData column_name) REQUIRES(!m_mutex)
+    {
+        return min(key(column_name));
+    }
+    util::Optional<Mixed> average(StringData column_name) REQUIRES(!m_mutex)
+    {
+        return average(key(column_name));
+    }
+    util::Optional<Mixed> sum(StringData column_name) REQUIRES(!m_mutex)
+    {
+        return sum(key(column_name));
+    }
 
     enum class Mode {
-        Empty, // Backed by nothing (for missing tables)
-        Table, // Backed directly by a Table
-        List,  // Backed by a list-of-primitives that is not a link list.
-        Query, // Backed by a query that has not yet been turned into a TableView
+        Empty,     // Backed by nothing (for missing tables)
+        Table,     // Backed directly by a Table
+        List,      // Backed by a list-of-primitives that is not a link list.
+        Query,     // Backed by a query that has not yet been turned into a TableView
         LinkList,  // Backed directly by a LinkList
         TableView, // Backed by a TableView created from a Query
     };
@@ -177,7 +199,10 @@ public:
     // The Results object has been invalidated (due to the Realm being invalidated)
     // All non-noexcept functions can throw this
     struct InvalidatedException : public std::logic_error {
-        InvalidatedException() : std::logic_error("Access to invalidated Results objects") {}
+        InvalidatedException()
+            : std::logic_error("Access to invalidated Results objects")
+        {
+        }
     };
 
     // The input index parameter was out of bounds
@@ -189,7 +214,10 @@ public:
 
     // The input Row object is not attached
     struct DetatchedAccessorException : public std::logic_error {
-        DetatchedAccessorException() : std::logic_error("Attempting to access an invalid object") {}
+        DetatchedAccessorException()
+            : std::logic_error("Attempting to access an invalid object")
+        {
+        }
     };
 
     // The input Row object belongs to a different table
@@ -214,11 +242,11 @@ public:
         InvalidPropertyException(StringData object_type, StringData property_name);
         const std::string object_type;
         const std::string property_name;
-	};
+    };
 
     // The requested operation is valid, but has not yet been implemented
     struct UnimplementedOperationException : public std::logic_error {
-        UnimplementedOperationException(const char *message);
+        UnimplementedOperationException(const char* message);
     };
 
     // Create an async query from this Results
@@ -229,16 +257,18 @@ public:
     // Returns whether the rows are guaranteed to be in table order.
     bool is_in_table_order() const;
 
-    template<typename Context> auto first(Context&) REQUIRES(!m_mutex);
-    template<typename Context> auto last(Context&) REQUIRES(!m_mutex);
+    template <typename Context>
+    auto first(Context&) REQUIRES(!m_mutex);
+    template <typename Context>
+    auto last(Context&) REQUIRES(!m_mutex);
 
-    template<typename Context, typename T>
+    template <typename Context, typename T>
     size_t index_of(Context&, T value) REQUIRES(!m_mutex);
 
     // Batch updates all items in this collection with the provided value
     // Must be called inside a transaction
     // Throws an exception if the value does not match the type for given prop_name
-    template<typename ValueType, typename ContextType>
+    template <typename ValueType, typename ContextType>
     void set_property_value(ContextType& ctx, StringData prop_name, ValueType value) REQUIRES(!m_mutex);
 
     // Execute the query immediately if needed. When the relevant query is slow, size()
@@ -252,7 +282,10 @@ public:
         Never,     // Never update.
     };
     // For tests only. Use snapshot() for normal uses.
-    void set_update_policy(UpdatePolicy policy) { m_update_policy = policy; }
+    void set_update_policy(UpdatePolicy policy)
+    {
+        m_update_policy = policy;
+    }
 
 private:
     std::shared_ptr<Realm> m_realm;
@@ -284,18 +317,17 @@ private:
 
     ColKey key(StringData) const;
 
-    template<typename T>
+    template <typename T>
     util::Optional<T> try_get(size_t) REQUIRES(m_mutex);
 
-    template<typename AggregateFunction>
-    util::Optional<Mixed> aggregate(ColKey column, const char* name,
-                                    AggregateFunction&& func) REQUIRES(!m_mutex);
+    template <typename AggregateFunction>
+    util::Optional<Mixed> aggregate(ColKey column, const char* name, AggregateFunction&& func) REQUIRES(!m_mutex);
     DataType prepare_for_aggregate(ColKey column, const char* name) REQUIRES(m_mutex);
 
-    template<typename Fn>
+    template <typename Fn>
     auto dispatch(Fn&&) const REQUIRES(!m_mutex);
 
-    template<typename T>
+    template <typename T>
     auto& list_as() const;
 
     void evaluate_sort_and_distinct_on_list() REQUIRES(m_mutex);
@@ -310,6 +342,7 @@ private:
         IteratorWrapper& operator=(IteratorWrapper&&) = default;
 
         Obj get(Table const& table, size_t ndx);
+
     private:
         std::unique_ptr<Table::ConstIterator> m_it;
     } m_table_iterator;
@@ -323,19 +356,19 @@ private:
     void assert_unlocked() ACQUIRE(!m_mutex) {}
 };
 
-template<typename Fn>
+template <typename Fn>
 auto Results::dispatch(Fn&& fn) const
 {
     return switch_on_type(get_type(), std::forward<Fn>(fn));
 }
 
-template<typename Context>
+template <typename Context>
 auto Results::get(Context& ctx, size_t row_ndx)
 {
     return dispatch([&](auto t) { return ctx.box(this->get<std::decay_t<decltype(*t)>>(row_ndx)); });
 }
 
-template<typename Context>
+template <typename Context>
 auto Results::first(Context& ctx)
 {
     // GCC 4.9 complains about `ctx` not being defined within the lambda without this goofy capture
@@ -345,7 +378,7 @@ auto Results::first(Context& ctx)
     });
 }
 
-template<typename Context>
+template <typename Context>
 auto Results::last(Context& ctx)
 {
     return dispatch([&](auto t) {
@@ -354,7 +387,7 @@ auto Results::last(Context& ctx)
     });
 }
 
-template<typename Context, typename T>
+template <typename Context, typename T>
 size_t Results::index_of(Context& ctx, T value)
 {
     return dispatch([&](auto t) {

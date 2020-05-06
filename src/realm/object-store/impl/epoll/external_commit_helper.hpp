@@ -39,10 +39,17 @@ private:
     class FdHolder {
     public:
         FdHolder() = default;
-        ~FdHolder() { close(); }
-        operator int() const { return m_fd; }
+        ~FdHolder()
+        {
+            close();
+        }
+        operator int() const
+        {
+            return m_fd;
+        }
 
-        FdHolder& operator=(int new_fd) {
+        FdHolder& operator=(int new_fd)
+        {
             close();
             m_fd = new_fd;
             return *this;
@@ -67,4 +74,3 @@ private:
 
 } // namespace _impl
 } // namespace realm
-

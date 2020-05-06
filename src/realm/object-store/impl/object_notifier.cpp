@@ -24,9 +24,9 @@ using namespace realm;
 using namespace realm::_impl;
 
 ObjectNotifier::ObjectNotifier(std::shared_ptr<Realm> realm, TableKey table, ObjKey obj)
-: CollectionNotifier(std::move(realm))
-, m_table(table)
-, m_obj(obj)
+    : CollectionNotifier(std::move(realm))
+    , m_table(table)
+    , m_obj(obj)
 {
 }
 

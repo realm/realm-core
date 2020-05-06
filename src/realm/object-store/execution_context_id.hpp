@@ -50,7 +50,6 @@ class AnyExecutionContextID {
     };
 
 public:
-
     // Convert from the representation used by Realm::Config, where the absence of an
     // explicit abstract execution context indicates that the current thread's identifier
     // should be used.
@@ -63,9 +62,13 @@ public:
     }
 
     AnyExecutionContextID(std::thread::id thread_id) noexcept
-    : AnyExecutionContextID(Type::Thread, std::move(thread_id)) { }
+        : AnyExecutionContextID(Type::Thread, std::move(thread_id))
+    {
+    }
     AnyExecutionContextID(AbstractExecutionContextID abstract_id) noexcept
-    : AnyExecutionContextID(Type::Abstract, abstract_id) { }
+        : AnyExecutionContextID(Type::Abstract, abstract_id)
+    {
+    }
 
     template <typename StorageType>
     bool contains() const noexcept
@@ -92,7 +95,8 @@ public:
 
 private:
     template <typename T>
-    AnyExecutionContextID(Type type, T value) noexcept : m_type(type)
+    AnyExecutionContextID(Type type, T value) noexcept
+        : m_type(type)
     {
         // operator== relies on being able to compare the raw bytes of m_storage,
         // so zero everything before intializing the portion in use.
@@ -100,7 +104,8 @@ private:
         new (&m_storage) T(std::move(value));
     }
 
-    template <typename> struct TypeForStorageType;
+    template <typename>
+    struct TypeForStorageType;
 
 #if defined(__GNUC__) && __GNUC__ < 5
     util::AlignedUnion<1, std::thread::id, AbstractExecutionContextID>::type m_storage;

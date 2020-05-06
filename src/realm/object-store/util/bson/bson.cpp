@@ -48,15 +48,19 @@ Bson::~Bson() noexcept
     }
 }
 
-Bson::Bson(const Bson& v) {
+Bson::Bson(const Bson& v)
+{
     m_type = Type::Null;
     *this = v;
 }
 
-Bson& Bson::operator=(Bson&& v) noexcept {
-    if (this == &v) return *this;
+Bson& Bson::operator=(Bson&& v) noexcept
+{
+    if (this == &v)
+        return *this;
 
-    if (m_type != v.m_type) this->~Bson();
+    if (m_type != v.m_type)
+        this->~Bson();
     m_type = v.m_type;
 
     switch (v.m_type) {
@@ -102,12 +106,14 @@ Bson& Bson::operator=(Bson&& v) noexcept {
             new (&string_val) std::string(std::move(v.string_val));
             break;
         case Type::Document:
-            if (document_val) delete document_val;
+            if (document_val)
+                delete document_val;
             document_val = v.document_val;
             v.document_val = nullptr;
             break;
         case Type::Array:
-            if (array_val) delete array_val;
+            if (array_val)
+                delete array_val;
             array_val = v.array_val;
             v.array_val = nullptr;
             break;
@@ -116,11 +122,14 @@ Bson& Bson::operator=(Bson&& v) noexcept {
     return *this;
 }
 
-Bson& Bson::operator=(const Bson& v) {
-    if (&v == this) return *this;
-    if (m_type != v.m_type) this->~Bson();
+Bson& Bson::operator=(const Bson& v)
+{
+    if (&v == this)
+        return *this;
+    if (m_type != v.m_type)
+        this->~Bson();
     m_type = v.m_type;
-    
+
     switch (v.m_type) {
         case Type::Null:
             break;
@@ -230,97 +239,97 @@ bool Bson::operator!=(const Bson& other) const
     return !(*this == other);
 }
 
-template<>
+template <>
 bool holds_alternative<util::None>(const Bson& bson)
 {
     return bson.m_type == Bson::Type::Null;
 }
 
-template<>
+template <>
 bool holds_alternative<int32_t>(const Bson& bson)
 {
     return bson.m_type == Bson::Type::Int32;
 }
 
-template<>
+template <>
 bool holds_alternative<int64_t>(const Bson& bson)
 {
     return bson.m_type == Bson::Type::Int64;
 }
 
-template<>
+template <>
 bool holds_alternative<bool>(const Bson& bson)
 {
     return bson.m_type == Bson::Type::Bool;
 }
 
-template<>
+template <>
 bool holds_alternative<double>(const Bson& bson)
 {
     return bson.m_type == Bson::Type::Double;
 }
 
-template<>
+template <>
 bool holds_alternative<std::string>(const Bson& bson)
 {
     return bson.m_type == Bson::Type::String;
 }
 
-template<>
+template <>
 bool holds_alternative<std::vector<char>>(const Bson& bson)
 {
     return bson.m_type == Bson::Type::Binary;
 }
 
-template<>
+template <>
 bool holds_alternative<Timestamp>(const Bson& bson)
 {
     return bson.m_type == Bson::Type::Timestamp;
 }
 
-template<>
+template <>
 bool holds_alternative<ObjectId>(const Bson& bson)
 {
     return bson.m_type == Bson::Type::ObjectId;
 }
 
-template<>
+template <>
 bool holds_alternative<Decimal128>(const Bson& bson)
 {
     return bson.m_type == Bson::Type::Decimal128;
 }
 
-template<>
+template <>
 bool holds_alternative<RegularExpression>(const Bson& bson)
 {
     return bson.m_type == Bson::Type::RegularExpression;
 }
 
-template<>
+template <>
 bool holds_alternative<MinKey>(const Bson& bson)
 {
     return bson.m_type == Bson::Type::MinKey;
 }
 
-template<>
+template <>
 bool holds_alternative<MaxKey>(const Bson& bson)
 {
     return bson.m_type == Bson::Type::MaxKey;
 }
 
-template<>
+template <>
 bool holds_alternative<IndexedMap<Bson>>(const Bson& bson)
 {
     return bson.m_type == Bson::Type::Document;
 }
 
-template<>
+template <>
 bool holds_alternative<std::vector<Bson>>(const Bson& bson)
 {
     return bson.m_type == Bson::Type::Array;
 }
 
-template<>
+template <>
 bool holds_alternative<Datetime>(const Bson& bson)
 {
     return bson.m_type == Bson::Type::Datetime;
@@ -333,24 +342,33 @@ std::ostream& operator<<(std::ostream& out, const Bson& b)
             out << "null";
             break;
         case Bson::Type::Int32:
-            out << "{" << "\"$numberInt\"" << ":" << '"' << static_cast<int32_t>(b) << '"' << "}";
+            out << "{"
+                << "\"$numberInt\""
+                << ":" << '"' << static_cast<int32_t>(b) << '"' << "}";
             break;
         case Bson::Type::Int64:
-            out << "{" << "\"$numberLong\"" << ":" << '"' << static_cast<int64_t>(b) << '"' << "}";
+            out << "{"
+                << "\"$numberLong\""
+                << ":" << '"' << static_cast<int64_t>(b) << '"' << "}";
             break;
         case Bson::Type::Bool:
             out << (b ? "true" : "false");
             break;
         case Bson::Type::Double: {
             double d = static_cast<double>(b);
-            out << "{" << "\"$numberDouble\"" << ":" << '"';
+            out << "{"
+                << "\"$numberDouble\""
+                << ":" << '"';
             if (std::isnan(d)) {
                 out << "NaN";
-            } else if (d == std::numeric_limits<double>::infinity()) {
+            }
+            else if (d == std::numeric_limits<double>::infinity()) {
                 out << "Infinity";
-            } else if (d == (-1 * std::numeric_limits<double>::infinity())) {
+            }
+            else if (d == (-1 * std::numeric_limits<double>::infinity())) {
                 out << "-Infinity";
-            } else {
+            }
+            else {
                 out << d;
             }
             out << '"' << "}";
@@ -361,8 +379,7 @@ std::ostream& operator<<(std::ostream& out, const Bson& b)
             break;
         case Bson::Type::Binary: {
             const std::vector<char>& vec = static_cast<std::vector<char>>(b);
-            out << "{\"$binary\":{\"base64\":\"" <<
-            std::string(vec.begin(), vec.end()) << "\",\"subType\":\"00\"}}";
+            out << "{\"$binary\":{\"base64\":\"" << std::string(vec.begin(), vec.end()) << "\",\"subType\":\"00\"}}";
             break;
         }
         case Bson::Type::Timestamp: {
@@ -377,19 +394,26 @@ std::ostream& operator<<(std::ostream& out, const Bson& b)
         }
         case Bson::Type::ObjectId: {
             const ObjectId& oid = static_cast<ObjectId>(b);
-            out << "{" << "\"$oid\"" << ":" << '"' << oid << '"' << "}";
+            out << "{"
+                << "\"$oid\""
+                << ":" << '"' << oid << '"' << "}";
             break;
         }
         case Bson::Type::Decimal128: {
             const Decimal128& d = static_cast<Decimal128>(b);
-            out << "{" << "\"$numberDecimal\"" << ":" << '"';
+            out << "{"
+                << "\"$numberDecimal\""
+                << ":" << '"';
             if (d.is_nan()) {
                 out << "NaN";
-            } else if (d == Decimal128("Infinity")) {
+            }
+            else if (d == Decimal128("Infinity")) {
                 out << "Infinity";
-            } else if (d == Decimal128("-Infinity")) {
+            }
+            else if (d == Decimal128("-Infinity")) {
                 out << "-Infinity";
-            } else {
+            }
+            else {
                 out << d;
             }
             out << '"' << "}";
@@ -397,8 +421,8 @@ std::ostream& operator<<(std::ostream& out, const Bson& b)
         }
         case Bson::Type::RegularExpression: {
             const RegularExpression& regex = static_cast<RegularExpression>(b);
-            out << "{\"$regularExpression\":{\"pattern\":\"" << regex.pattern()
-            << "\",\"options\":\"" << regex.options() << "\"}}";
+            out << "{\"$regularExpression\":{\"pattern\":\"" << regex.pattern() << "\",\"options\":\""
+                << regex.options() << "\"}}";
             break;
         }
         case Bson::Type::MaxKey:
@@ -410,8 +434,7 @@ std::ostream& operator<<(std::ostream& out, const Bson& b)
         case Bson::Type::Document: {
             const BsonDocument& doc = static_cast<BsonDocument>(b);
             out << "{";
-            for (auto const& pair : doc)
-            {
+            for (auto const& pair : doc) {
                 out << '"' << pair.first << "\":" << pair.second << ",";
             }
             if (doc.size())
@@ -422,8 +445,7 @@ std::ostream& operator<<(std::ostream& out, const Bson& b)
         case Bson::Type::Array: {
             const BsonArray& arr = static_cast<BsonArray>(b);
             out << "[";
-            for (auto const& b : arr)
-            {
+            for (auto const& b : arr) {
                 out << b << ",";
             }
             if (arr.size())
@@ -500,9 +522,7 @@ public:
 
     bool end_array() override;
 
-    bool parse_error(std::size_t,
-                     const std::string&,
-                     const nlohmann::detail::exception& ex) override;
+    bool parse_error(std::size_t, const std::string&, const nlohmann::detail::exception& ex) override;
 
     Bson parse(const std::string& json);
 
@@ -514,44 +534,57 @@ protected:
 
     /// Convenience class that overloads similar collection functionality
     class BsonContainer {
-        typedef enum Type {
-            DOCUMENT, ARRAY
-        } Type;
+        typedef enum Type { DOCUMENT, ARRAY } Type;
         Type m_type;
 
         union {
             BsonDocument* document;
             BsonArray* array;
         };
+
     public:
         ~BsonContainer() noexcept
         {
             if (m_type == DOCUMENT) {
                 delete document;
                 document = nullptr;
-            } else {
+            }
+            else {
                 delete array;
                 array = nullptr;
             }
         }
 
-        BsonContainer(const BsonDocument& v) noexcept : document(new BsonDocument(v)) {
+        BsonContainer(const BsonDocument& v) noexcept
+            : document(new BsonDocument(v))
+        {
             m_type = DOCUMENT;
         }
-        BsonContainer(const BsonArray& v) noexcept : array(new BsonArray(v)) {
+        BsonContainer(const BsonArray& v) noexcept
+            : array(new BsonArray(v))
+        {
             m_type = ARRAY;
         }
-        BsonContainer(BsonDocument&& v) noexcept :
-            m_type(DOCUMENT), document(new BsonDocument(std::move(v))) {}
+        BsonContainer(BsonDocument&& v) noexcept
+            : m_type(DOCUMENT)
+            , document(new BsonDocument(std::move(v)))
+        {
+        }
 
-        BsonContainer(BsonArray&& v) noexcept : m_type(ARRAY), array(new BsonArray(std::move(v))) {}
+        BsonContainer(BsonArray&& v) noexcept
+            : m_type(ARRAY)
+            , array(new BsonArray(std::move(v)))
+        {
+        }
 
-        explicit operator const BsonDocument&&() const {
+        explicit operator const BsonDocument &&() const
+        {
             REALM_ASSERT(is_document());
             return std::move(*document);
         }
 
-        explicit operator const BsonArray&&() const {
+        explicit operator const BsonArray &&() const
+        {
             REALM_ASSERT(is_array());
             return std::move(*array);
         }
@@ -562,7 +595,8 @@ protected:
             if (m_type == DOCUMENT) {
                 document = new BsonDocument;
                 *document = *v.document;
-            } else {
+            }
+            else {
                 array = new BsonArray;
                 *array = *v.array;
             }
@@ -570,14 +604,16 @@ protected:
 
         BsonContainer& operator=(const BsonContainer& v)
         {
-            if (&v == this) return *this;
+            if (&v == this)
+                return *this;
             this->~BsonContainer();
 
             m_type = v.m_type;
             if (m_type == DOCUMENT) {
                 document = new BsonDocument;
                 *document = *v.document;
-            } else {
+            }
+            else {
                 array = new BsonArray;
                 *array = *v.array;
             }
@@ -586,39 +622,51 @@ protected:
 
         BsonContainer& operator=(BsonContainer&& v)
         {
-            if (&v == this) return *this;
+            if (&v == this)
+                return *this;
             this->~BsonContainer();
 
             m_type = v.m_type;
             if (m_type == DOCUMENT) {
                 document = v.document;
                 v.document = nullptr;
-            } else {
+            }
+            else {
                 array = v.array;
                 v.array = nullptr;
             }
             return *this;
         }
 
-        BsonContainer(BsonContainer&& v) {
+        BsonContainer(BsonContainer&& v)
+        {
             m_type = v.m_type;
 
             if (m_type == DOCUMENT) {
                 document = v.document;
                 v.document = nullptr;
-            } else {
+            }
+            else {
                 array = v.array;
                 v.array = nullptr;
             }
         }
 
-        bool is_array() const { return m_type == ARRAY; }
-        bool is_document() const { return m_type == DOCUMENT; }
+        bool is_array() const
+        {
+            return m_type == ARRAY;
+        }
+        bool is_document() const
+        {
+            return m_type == DOCUMENT;
+        }
 
-        void push_back(std::pair<std::string, Bson> value) {
+        void push_back(std::pair<std::string, Bson> value)
+        {
             if (m_type == DOCUMENT) {
                 (*document)[value.first] = value.second;
-            } else {
+            }
+            else {
                 array->emplace_back(value.second);
             }
         }
@@ -629,7 +677,8 @@ protected:
             if (m_type == DOCUMENT) {
                 auto pair = document->back();
                 return pair;
-            } else {
+            }
+            else {
                 return {"", array->back()};
             }
         }
@@ -638,7 +687,8 @@ protected:
         {
             if (m_type == DOCUMENT) {
                 document->pop_back();
-            } else {
+            }
+            else {
                 array->pop_back();
             }
         }
@@ -647,7 +697,8 @@ protected:
         {
             if (m_type == DOCUMENT) {
                 return document->size();
-            } else {
+            }
+            else {
                 return array->size();
             }
         }
@@ -658,30 +709,32 @@ protected:
 };
 
 struct BsonError : public std::runtime_error {
-    BsonError(std::string message) : std::runtime_error(message)
+    BsonError(std::string message)
+        : std::runtime_error(message)
     {
     }
 };
 
-static constexpr const char * key_number_int                 = "$numberInt";
-static constexpr const char * key_number_long                = "$numberLong";
-static constexpr const char * key_number_double              = "$numberDouble";
-static constexpr const char * key_number_decimal             = "$numberDecimal";
-static constexpr const char * key_timestamp                  = "$timestamp";
-static constexpr const char * key_timestamp_time             = "t";
-static constexpr const char * key_timestamp_increment        = "i";
-static constexpr const char * key_date                       = "$date";
-static constexpr const char * key_object_id                  = "$oid";
-static constexpr const char * key_max_key                    = "$maxKey";
-static constexpr const char * key_min_key                    = "$minKey";
-static constexpr const char * key_regular_expression         = "$regularExpression";
-static constexpr const char * key_regular_expression_pattern = "pattern";
-static constexpr const char * key_regular_expression_options = "options";
-static constexpr const char * key_binary                     = "$binary";
-static constexpr const char * key_binary_base64              = "base64";
-static constexpr const char * key_binary_sub_type            = "subType";
+static constexpr const char* key_number_int = "$numberInt";
+static constexpr const char* key_number_long = "$numberLong";
+static constexpr const char* key_number_double = "$numberDouble";
+static constexpr const char* key_number_decimal = "$numberDecimal";
+static constexpr const char* key_timestamp = "$timestamp";
+static constexpr const char* key_timestamp_time = "t";
+static constexpr const char* key_timestamp_increment = "i";
+static constexpr const char* key_date = "$date";
+static constexpr const char* key_object_id = "$oid";
+static constexpr const char* key_max_key = "$maxKey";
+static constexpr const char* key_min_key = "$minKey";
+static constexpr const char* key_regular_expression = "$regularExpression";
+static constexpr const char* key_regular_expression_pattern = "pattern";
+static constexpr const char* key_regular_expression_options = "options";
+static constexpr const char* key_binary = "$binary";
+static constexpr const char* key_binary_base64 = "base64";
+static constexpr const char* key_binary_sub_type = "subType";
 
-static constexpr const char* state_to_string(const Parser::State& i) {
+static constexpr const char* state_to_string(const Parser::State& i)
+{
     switch (i) {
         case Parser::State::StartDocument:
             return "start_document";
@@ -732,7 +785,7 @@ static constexpr const char* state_to_string(const Parser::State& i) {
         case Parser::State::Skip:
             return "skip";
     }
-    
+
     return "unknown";
 }
 
@@ -747,8 +800,7 @@ static std::map<std::string, Parser::State> bson_type_for_key = {
     {key_max_key, Parser::State::MaxKey},
     {key_min_key, Parser::State::MinKey},
     {key_regular_expression, Parser::State::RegularExpression},
-    {key_binary, Parser::State::Binary}
-};
+    {key_binary, Parser::State::Binary}};
 
 static void check_state(const Parser::State& current_state, const Parser::State& expected_state)
 {
@@ -758,7 +810,8 @@ static void check_state(const Parser::State& current_state, const Parser::State&
                                      std::string(state_to_string(expected_state))));
 }
 
-Parser::Parser() {
+Parser::Parser()
+{
     // use a vector container to hold any fragmented values
     m_marks.emplace(BsonArray());
 }
@@ -767,7 +820,8 @@ Parser::Parser() {
  @brief a null value was read
  @return whether parsing should proceed
  */
-bool Parser::null() {
+bool Parser::null()
+{
     auto instruction = m_instructions.top();
     m_instructions.pop();
     check_state(instruction.type, State::JsonKey);
@@ -780,7 +834,8 @@ bool Parser::null() {
  @param[in] val  boolean value
  @return whether parsing should proceed
  */
-bool Parser::boolean(bool val) {
+bool Parser::boolean(bool val)
+{
     auto instruction = m_instructions.top();
     m_instructions.pop();
     check_state(instruction.type, State::JsonKey);
@@ -793,7 +848,8 @@ bool Parser::boolean(bool val) {
  @param[in] val  integer value
  @return whether parsing should proceed
  */
-bool Parser::number_integer(number_integer_t val) {
+bool Parser::number_integer(number_integer_t val)
+{
     auto instruction = m_instructions.top();
     m_instructions.pop();
     m_marks.top().push_back({instruction.key, static_cast<int32_t>(val)});
@@ -805,7 +861,8 @@ bool Parser::number_integer(number_integer_t val) {
  @param[in] val  unsigned integer value
  @return whether parsing should proceed
  */
-bool Parser::number_unsigned(number_unsigned_t val) {
+bool Parser::number_unsigned(number_unsigned_t val)
+{
     auto instruction = m_instructions.top();
     m_instructions.pop();
     switch (instruction.type) {
@@ -827,7 +884,8 @@ bool Parser::number_unsigned(number_unsigned_t val) {
                 m_instructions.pop();
                 m_instructions.push({State::Skip});
                 m_instructions.push({State::Skip});
-            } else {
+            }
+            else {
                 m_marks.top().push_back({instruction.key, Timestamp(0, 1)});
                 instruction.type = State::Timestamp;
             }
@@ -842,7 +900,8 @@ bool Parser::number_unsigned(number_unsigned_t val) {
                 m_instructions.pop();
                 m_instructions.push({State::Skip});
                 m_instructions.push({State::Skip});
-            } else {
+            }
+            else {
                 m_marks.top().push_back({instruction.key, Timestamp(val, 0)});
                 instruction.type = State::Timestamp;
             }
@@ -860,7 +919,8 @@ bool Parser::number_unsigned(number_unsigned_t val) {
  @param[in] s    raw token value
  @return whether parsing should proceed
  */
-bool Parser::number_float(number_float_t val, const string_t&) {
+bool Parser::number_float(number_float_t val, const string_t&)
+{
     auto instruction = m_instructions.top();
     m_instructions.pop();
     m_marks.top().push_back({instruction.key, static_cast<double>(val)});
@@ -873,7 +933,8 @@ bool Parser::number_float(number_float_t val, const string_t&) {
  @return whether parsing should proceed
  @note It is safe to move the passed string.
  */
-bool Parser::string(string_t& val) {
+bool Parser::string(string_t& val)
+{
     // pop last instruction
     auto instruction = m_instructions.top();
     if (instruction.type != State::StartArray)
@@ -919,7 +980,8 @@ bool Parser::string(string_t& val) {
                 m_instructions.pop();
                 m_instructions.push({State::Skip});
                 m_instructions.push({State::Skip});
-            } else {
+            }
+            else {
                 m_marks.top().push_back({instruction.key, RegularExpression(val, "")});
             }
 
@@ -934,7 +996,8 @@ bool Parser::string(string_t& val) {
                 m_instructions.pop();
                 m_instructions.push({State::Skip});
                 m_instructions.push({State::Skip});
-            } else {
+            }
+            else {
                 m_marks.top().push_back({instruction.key, RegularExpression("", val)});
             }
 
@@ -947,7 +1010,8 @@ bool Parser::string(string_t& val) {
                 m_instructions.pop();
                 m_instructions.push({State::Skip});
                 m_instructions.push({State::Skip});
-            } else {
+            }
+            else {
                 // we will ignore the subtype for now
                 m_marks.top().push_back({instruction.key, std::vector<char>()});
             }
@@ -963,7 +1027,8 @@ bool Parser::string(string_t& val) {
                 m_instructions.pop();
                 m_instructions.push({State::Skip});
                 m_instructions.push({State::Skip});
-            } else {
+            }
+            else {
                 // we will ignore the subtype for now
                 m_marks.top().push_back({instruction.key, std::vector<char>(val.begin(), val.end())});
             }
@@ -983,30 +1048,37 @@ bool Parser::string(string_t& val) {
  @return whether parsing should proceed
  @note It is safe to move the passed string.
  */
-bool Parser::key(string_t& val) {
+bool Parser::key(string_t& val)
+{
     if (!m_instructions.empty()) {
         auto top = m_instructions.top();
 
         if (top.type == State::RegularExpression) {
             if (val == key_regular_expression_pattern) {
                 m_instructions.push({State::RegularExpressionPattern, top.key});
-            } else if (val == key_regular_expression_options) {
+            }
+            else if (val == key_regular_expression_options) {
                 m_instructions.push({State::RegularExpressionOptions, top.key});
             }
             return true;
-        } else if (top.type == State::Date) {
+        }
+        else if (top.type == State::Date) {
             return true;
-        } else if (top.type == State::Binary) {
+        }
+        else if (top.type == State::Binary) {
             if (val == key_binary_base64) {
                 m_instructions.push({State::BinaryBase64, top.key});
-            } else if (val == key_binary_sub_type) {
+            }
+            else if (val == key_binary_sub_type) {
                 m_instructions.push({State::BinarySubType, top.key});
             }
             return true;
-        } else if (top.type == State::Timestamp) {
+        }
+        else if (top.type == State::Timestamp) {
             if (val == key_timestamp_time) {
                 m_instructions.push({State::TimestampT, top.key});
-            } else if (val == key_timestamp_increment) {
+            }
+            else if (val == key_timestamp_increment) {
                 m_instructions.push({State::TimestampI, top.key});
             }
             return true;
@@ -1026,14 +1098,13 @@ bool Parser::key(string_t& val) {
                 m_instructions.pop();
             }
             m_instructions.top().type = type;
-        } else {
+        }
+        else {
             m_instructions.push({type});
         }
-    } else {
-        m_instructions.push({
-            type,
-            std::move(val)
-        });
+    }
+    else {
+        m_instructions.push({type, std::move(val)});
     }
     return true;
 }
@@ -1045,7 +1116,8 @@ bool Parser::key(string_t& val) {
  @return whether parsing should proceed
  @note binary formats may report the number of elements
  */
-bool Parser::start_object(std::size_t) {
+bool Parser::start_object(std::size_t)
+{
     if (!m_instructions.empty()) {
         auto top = m_instructions.top();
 
@@ -1073,10 +1145,7 @@ bool Parser::start_object(std::size_t) {
     }
 
     if (m_marks.size() > 1) {
-        m_instructions.push({
-            State::StartDocument,
-            m_instructions.size() ? m_instructions.top().key : ""
-        });
+        m_instructions.push({State::StartDocument, m_instructions.size() ? m_instructions.top().key : ""});
     }
 
     m_marks.emplace(BsonDocument());
@@ -1087,7 +1156,8 @@ bool Parser::start_object(std::size_t) {
  @brief the end of an object was read
  @return whether parsing should proceed
  */
-bool Parser::end_object() {
+bool Parser::end_object()
+{
     if (m_instructions.size() && m_instructions.top().type == State::Skip) {
         m_instructions.pop();
         return true;
@@ -1110,7 +1180,8 @@ bool Parser::end_object() {
  @return whether parsing should proceed
  @note binary formats may report the number of elements
  */
-bool Parser::start_array(std::size_t) {
+bool Parser::start_array(std::size_t)
+{
     m_instructions.push(Instruction{State::StartArray, m_instructions.top().key});
     m_marks.emplace(BsonArray());
 
@@ -1121,7 +1192,8 @@ bool Parser::start_array(std::size_t) {
  @brief the end of an array was read
  @return whether parsing should proceed
  */
-bool Parser::end_array() {
+bool Parser::end_array()
+{
     if (m_marks.size() > 1) {
         const auto& container = static_cast<BsonArray>(m_marks.top());
         m_marks.pop();
@@ -1140,9 +1212,8 @@ bool Parser::end_array() {
  @param[in] ex          an exception object describing the error
  @return whether parsing should proceed (must return false)
  */
-bool Parser::parse_error(std::size_t,
-                         const std::string&,
-                         const nlohmann::detail::exception& ex) {
+bool Parser::parse_error(std::size_t, const std::string&, const nlohmann::detail::exception& ex)
+{
     throw ex;
 };
 
@@ -1153,7 +1224,8 @@ Bson Parser::parse(const std::string& json)
         const BsonContainer& top = m_marks.top();
         if (top.is_document()) {
             return static_cast<BsonDocument>(m_marks.top());
-        } else {
+        }
+        else {
             return static_cast<BsonArray>(m_marks.top());
         }
     }
@@ -1162,7 +1234,8 @@ Bson Parser::parse(const std::string& json)
 }
 } // anonymous namespace
 
-Bson parse(const std::string& json) {
+Bson parse(const std::string& json)
+{
     return Parser().parse(json);
 }
 

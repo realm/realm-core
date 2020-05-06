@@ -25,11 +25,10 @@
 using namespace realm;
 using namespace realm::_impl;
 
-CollectionChangeBuilder::CollectionChangeBuilder(IndexSet deletions,
-                                                 IndexSet insertions,
-                                                 IndexSet modifications,
+CollectionChangeBuilder::CollectionChangeBuilder(IndexSet deletions, IndexSet insertions, IndexSet modifications,
                                                  std::vector<Move> moves)
-: CollectionChangeSet({std::move(deletions), std::move(insertions), std::move(modifications), {}, std::move(moves)})
+    : CollectionChangeSet(
+          {std::move(deletions), std::move(insertions), std::move(modifications), {}, std::move(moves)})
 {
     for (auto&& move : this->moves) {
         this->deletions.add(move.from);
@@ -70,9 +69,7 @@ void CollectionChangeBuilder::merge(CollectionChangeBuilder&& c)
     if (!c.moves.empty() || !c.deletions.empty() || !c.insertions.empty()) {
         auto it = std::remove_if(begin(moves), end(moves), [&](auto& old) {
             // Check if the moved row was moved again, and if so just update the destination
-            auto it = find_if(begin(c.moves), end(c.moves), [&](auto const& m) {
-                return old.to == m.from;
-            });
+            auto it = find_if(begin(c.moves), end(c.moves), [&](auto const& m) { return old.to == m.from; });
             if (it != c.moves.end()) {
                 for_each_col([&](auto& col, auto& other) {
                     if (col.contains(it->from))
@@ -99,9 +96,9 @@ void CollectionChangeBuilder::merge(CollectionChangeBuilder&& c)
     // Ignore new moves of rows which were previously inserted (the implicit
     // delete from the move will remove the insert)
     if (!insertions.empty() && !c.moves.empty()) {
-        c.moves.erase(std::remove_if(begin(c.moves), end(c.moves),
-                              [&](auto const& m) { return insertions.contains(m.from); }),
-                    end(c.moves));
+        c.moves.erase(
+            std::remove_if(begin(c.moves), end(c.moves), [&](auto const& m) { return insertions.contains(m.from); }),
+            end(c.moves));
     }
 
     // Ensure that any previously modified rows which were moved are still modified
@@ -148,13 +145,16 @@ void CollectionChangeBuilder::clean_up_stale_moves()
     // Look for moves which are now no-ops, and remove them plus the associated
     // insert+delete. Note that this isn't just checking for from == to due to
     // that rows can also be shifted by other inserts and deletes
-    moves.erase(std::remove_if(begin(moves), end(moves), [&](auto const& move) {
-        if (move.from - deletions.count(0, move.from) != move.to - insertions.count(0, move.to))
-            return false;
-        deletions.remove(move.from);
-        insertions.remove(move.to);
-        return true;
-    }), end(moves));
+    moves.erase(std::remove_if(begin(moves), end(moves),
+                               [&](auto const& move) {
+                                   if (move.from - deletions.count(0, move.from) !=
+                                       move.to - insertions.count(0, move.to))
+                                       return false;
+                                   deletions.remove(move.from);
+                                   insertions.remove(move.to);
+                                   return true;
+                               }),
+                end(moves));
 }
 
 void CollectionChangeBuilder::modify(size_t ndx, size_t col)
@@ -165,7 +165,7 @@ void CollectionChangeBuilder::modify(size_t ndx, size_t col)
     columns[col].add(ndx);
 }
 
-template<typename Func>
+template <typename Func>
 void CollectionChangeBuilder::for_each_col(Func&& f)
 {
     f(modifications);
@@ -362,14 +362,13 @@ public:
     };
     std::vector<Match> m_longest_matches;
 
-    LongestCommonSubsequenceCalculator(std::vector<Row>& a, std::vector<Row>& b,
-                                       size_t start_index,
+    LongestCommonSubsequenceCalculator(std::vector<Row>& a, std::vector<Row>& b, size_t start_index,
                                        IndexSet const& modifications)
-    : m_modified(modifications)
-    , a(a), b(b)
+        : m_modified(modifications)
+        , a(a)
+        , b(b)
     {
-        find_longest_matches(start_index, a.size(),
-                             start_index, b.size());
+        find_longest_matches(start_index, a.size(), start_index, b.size());
         m_longest_matches.push_back({a.size(), b.size(), 0});
     }
 
@@ -378,7 +377,7 @@ private:
 
     // The two arrays of rows being diffed
     // a is sorted by tv_index, b is sorted by key
-    std::vector<Row> &a, &b;
+    std::vector<Row>&a, &b;
 
     // Find the longest matching range in (a + begin1, a + end1) and (b + begin2, b + end2)
     // "Matching" is defined as "has the same row index"; the TV index is just
@@ -416,8 +415,7 @@ private:
             // Find the TV indicies at which this row appears in the new results
             // There should always be at least one (or it would have been
             // filtered out earlier), but there can be multiple if there are dupes
-            auto it = lower_bound(begin(b), end(b), ai,
-                                  [](auto lft, auto rgt) { return lft.key < rgt; });
+            auto it = lower_bound(begin(b), end(b), ai, [](auto lft, auto rgt) { return lft.key < rgt; });
             REALM_ASSERT(it != end(b) && it->key == ai);
             for (; it != end(b) && it->key == ai; ++it) {
                 size_t j = it->tv_index;
@@ -489,9 +487,8 @@ void calculate_moves_sorted(std::vector<RowInfo>& rows, CollectionChangeSet& cha
     a.reserve(rows.size());
     for (auto& row : rows)
         a.push_back({row.key, row.prev_tv_index});
-    std::sort(begin(a), end(a), [](auto lft, auto rgt) {
-        return std::tie(lft.tv_index, lft.key) < std::tie(rgt.tv_index, rgt.key);
-    });
+    std::sort(begin(a), end(a),
+              [](auto lft, auto rgt) { return std::tie(lft.tv_index, lft.key) < std::tie(rgt.tv_index, rgt.key); });
 
     // Before constructing `b`, first find the first index in `a` which will
     // actually differ in `b`, and skip everything else if there aren't any
@@ -509,13 +506,12 @@ void calculate_moves_sorted(std::vector<RowInfo>& rows, CollectionChangeSet& cha
     b.reserve(rows.size());
     for (size_t i = 0; i < rows.size(); ++i)
         b.push_back({rows[i].key, i});
-    std::sort(begin(b), end(b), [](auto lft, auto rgt) {
-        return std::tie(lft.key, lft.tv_index) < std::tie(rgt.key, rgt.tv_index);
-    });
+    std::sort(begin(b), end(b),
+              [](auto lft, auto rgt) { return std::tie(lft.key, lft.tv_index) < std::tie(rgt.key, rgt.tv_index); });
 
     // Calculate the LCS of the two sequences
-    auto matches = LongestCommonSubsequenceCalculator(a, b, first_difference,
-                                                      changeset.modifications).m_longest_matches;
+    auto matches =
+        LongestCommonSubsequenceCalculator(a, b, first_difference, changeset.modifications).m_longest_matches;
 
     // And then insert and delete rows as needed to align them
     size_t i = first_difference, j = first_difference;
@@ -529,9 +525,8 @@ void calculate_moves_sorted(std::vector<RowInfo>& rows, CollectionChangeSet& cha
     }
 }
 
-template<typename T>
-void verify_changeset(std::vector<T> const& prev_rows,
-                      std::vector<T> const& next_rows,
+template <typename T>
+void verify_changeset(std::vector<T> const& prev_rows, std::vector<T> const& next_rows,
                       CollectionChangeBuilder const& changeset)
 {
 #ifdef REALM_DEBUG
@@ -556,9 +551,8 @@ void verify_changeset(std::vector<T> const& prev_rows,
 #endif
 }
 
-void calculate(CollectionChangeBuilder& ret,
-               std::vector<RowInfo> old_rows, std::vector<RowInfo> new_rows,
-               std::function<bool (int64_t)> key_did_change, bool in_table_order)
+void calculate(CollectionChangeBuilder& ret, std::vector<RowInfo> old_rows, std::vector<RowInfo> new_rows,
+               std::function<bool(int64_t)> key_did_change, bool in_table_order)
 {
     // Now that our old and new sets of rows are sorted by key, we can
     // iterate over them and either record old+new TV indices for rows present
@@ -589,11 +583,10 @@ void calculate(CollectionChangeBuilder& ret,
 
     // Filter out the new insertions since we don't need them for any of the
     // further calculations
-    new_rows.erase(std::remove_if(begin(new_rows), end(new_rows),
-                                  [](auto& row) { return row.prev_tv_index == IndexSet::npos; }),
-                   end(new_rows));
-    std::sort(begin(new_rows), end(new_rows),
-              [](auto& lft, auto& rgt) { return lft.tv_index < rgt.tv_index; });
+    new_rows.erase(
+        std::remove_if(begin(new_rows), end(new_rows), [](auto& row) { return row.prev_tv_index == IndexSet::npos; }),
+        end(new_rows));
+    std::sort(begin(new_rows), end(new_rows), [](auto& lft, auto& rgt) { return lft.tv_index < rgt.tv_index; });
 
     for (auto& row : new_rows) {
         if (key_did_change(row.key)) {
@@ -609,7 +602,7 @@ void calculate(CollectionChangeBuilder& ret,
 
 CollectionChangeBuilder CollectionChangeBuilder::calculate(std::vector<int64_t> const& prev_rows,
                                                            std::vector<int64_t> const& next_rows,
-                                                           std::function<bool (int64_t)> key_did_change,
+                                                           std::function<bool(int64_t)> key_did_change,
                                                            bool in_table_order)
 {
 
@@ -631,7 +624,7 @@ CollectionChangeBuilder CollectionChangeBuilder::calculate(std::vector<int64_t> 
 
 CollectionChangeBuilder CollectionChangeBuilder::calculate(std::vector<size_t> const& prev_rows,
                                                            std::vector<size_t> const& next_rows,
-                                                           std::function<bool (int64_t)> key_did_change)
+                                                           std::function<bool(int64_t)> key_did_change)
 {
 
     auto build_row_info = [](auto& rows) {
@@ -662,12 +655,6 @@ CollectionChangeSet CollectionChangeBuilder::finalize() &&
     // but we don't want inserts in the final modification set
     modifications.remove(insertions);
 
-    return {
-        std::move(deletions),
-        std::move(insertions),
-        std::move(modifications_in_old),
-        std::move(modifications),
-        std::move(moves),
-        std::move(columns)
-    };
+    return {std::move(deletions),     std::move(insertions), std::move(modifications_in_old),
+            std::move(modifications), std::move(moves),      std::move(columns)};
 }

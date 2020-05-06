@@ -33,7 +33,7 @@
 #include <realm/sync/server.hpp>
 
 namespace realm::app {
-    class App;
+class App;
 }
 
 #endif // REALM_ENABLE_SYNC
@@ -44,14 +44,24 @@ class Schema;
 enum class SyncSessionStopPolicy;
 struct DBOptions;
 struct SyncConfig;
-}
+} // namespace realm
 
 class JoiningThread {
 public:
-    template<typename... Args>
-    JoiningThread(Args&&... args) : m_thread(std::forward<Args>(args)...) { }
-    ~JoiningThread() { if (m_thread.joinable()) m_thread.join(); }
-    void join() { m_thread.join(); }
+    template <typename... Args>
+    JoiningThread(Args&&... args)
+        : m_thread(std::forward<Args>(args)...)
+    {
+    }
+    ~JoiningThread()
+    {
+        if (m_thread.joinable())
+            m_thread.join();
+    }
+    void join()
+    {
+        m_thread.join();
+    }
 
 private:
     std::thread m_thread;
@@ -87,23 +97,36 @@ void on_change_but_no_notify(realm::Realm& realm);
 
 struct TestLogger : realm::util::Logger::LevelThreshold, realm::util::Logger {
     void do_log(realm::util::Logger::Level, std::string) override {}
-    Level get() const noexcept override { return Level::off; }
-    TestLogger() : Logger::LevelThreshold(), Logger(static_cast<Logger::LevelThreshold&>(*this)) { }
+    Level get() const noexcept override
+    {
+        return Level::off;
+    }
+    TestLogger()
+        : Logger::LevelThreshold()
+        , Logger(static_cast<Logger::LevelThreshold&>(*this))
+    {
+    }
 };
 
 using StartImmediately = realm::util::TaggedBool<class StartImmediatelyTag>;
 
 class SyncServer : private realm::sync::Clock {
 public:
-    SyncServer(StartImmediately start_immediately=true, std::string local_dir = "");
+    SyncServer(StartImmediately start_immediately = true, std::string local_dir = "");
     ~SyncServer();
 
     void start();
     void stop();
 
     std::string url_for_realm(realm::StringData realm_name) const;
-    std::string base_url() const { return m_url; }
-    std::string local_root_dir() const { return m_local_root_dir; }
+    std::string base_url() const
+    {
+        return m_url;
+    }
+    std::string local_root_dir() const
+    {
+        return m_local_root_dir;
+    }
 
     template <class R, class P>
     void advance_clock(std::chrono::duration<R, P> duration = std::chrono::seconds(1)) noexcept
@@ -126,10 +149,9 @@ private:
 };
 
 struct SyncTestFile : TestFile {
-    template<typename ErrorHandler>
-    SyncTestFile(const realm::SyncConfig& sync_config,
-        realm::SyncSessionStopPolicy stop_policy,
-        ErrorHandler&& error_handler)
+    template <typename ErrorHandler>
+    SyncTestFile(const realm::SyncConfig& sync_config, realm::SyncSessionStopPolicy stop_policy,
+                 ErrorHandler&& error_handler)
     {
         this->sync_config = std::make_shared<realm::SyncConfig>(sync_config);
         this->sync_config->stop_policy = stop_policy;
@@ -137,15 +159,21 @@ struct SyncTestFile : TestFile {
         schema_mode = realm::SchemaMode::Additive;
     }
 
-    SyncTestFile(std::shared_ptr<realm::app::App> app = nullptr, std::string name="", std::string user_name="test");
+    SyncTestFile(std::shared_ptr<realm::app::App> app = nullptr, std::string name = "",
+                 std::string user_name = "test");
 };
 
 struct TestSyncManager {
-    TestSyncManager(const std::string& base_url, std::string const& base_path="", realm::SyncManager::MetadataMode = realm::SyncManager::MetadataMode::NoEncryption);
-    TestSyncManager(const SyncServer& server, std::string const& base_path="", realm::SyncManager::MetadataMode metadataMode = realm::SyncManager::MetadataMode::NoEncryption)
-     : TestSyncManager(server.base_url(), base_path, metadataMode) {}
+    TestSyncManager(const std::string& base_url, std::string const& base_path = "",
+                    realm::SyncManager::MetadataMode = realm::SyncManager::MetadataMode::NoEncryption);
+    TestSyncManager(const SyncServer& server, std::string const& base_path = "",
+                    realm::SyncManager::MetadataMode metadataMode = realm::SyncManager::MetadataMode::NoEncryption)
+        : TestSyncManager(server.base_url(), base_path, metadataMode)
+    {
+    }
     ~TestSyncManager();
-    static void configure(const std::string& base_url, std::string const& base_path, realm::SyncManager::MetadataMode);
+    static void configure(const std::string& base_url, std::string const& base_path,
+                          realm::SyncManager::MetadataMode);
     std::shared_ptr<realm::app::App> app() const;
 };
 

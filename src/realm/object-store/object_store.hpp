@@ -38,7 +38,7 @@ class StringData;
 enum class SchemaMode : uint8_t;
 
 namespace util {
-template<typename... Args>
+template <typename... Args>
 std::string format(const char* fmt, Args&&... args);
 }
 
@@ -68,8 +68,7 @@ public:
     // check if any of the schema changes in the list are forbidden in
     // additive-only mode, and if any are throw an exception
     // returns true if any of the changes are not no-ops
-    static bool verify_valid_additive_changes(std::vector<SchemaChange> const& changes,
-                                              bool update_indexes=false);
+    static bool verify_valid_additive_changes(std::vector<SchemaChange> const& changes, bool update_indexes = false);
 
     // check if the schema changes made by a different process made any changes
     // which will prevent us from being able to continue (such as removing a
@@ -85,10 +84,10 @@ public:
     // passed in target schema is updated with the correct column mapping
     // optionally runs migration function if schema is out of date
     // NOTE: must be performed within a write transaction
-    static void apply_schema_changes(Transaction& group, uint64_t schema_version,
-                                     Schema& target_schema, uint64_t target_schema_version,
-                                     SchemaMode mode, std::vector<SchemaChange> const& changes,
-                                     std::function<void()> migration_function={});
+    static void apply_schema_changes(Transaction& group, uint64_t schema_version, Schema& target_schema,
+                                     uint64_t target_schema_version, SchemaMode mode,
+                                     std::vector<SchemaChange> const& changes,
+                                     std::function<void()> migration_function = {});
 
     static void apply_additive_changes(Group&, std::vector<SchemaChange> const&, bool update_indexes);
 
@@ -112,7 +111,8 @@ public:
     static bool is_empty(Group const& group);
 
     // renames the object_type's column of the old_name to the new name
-    static void rename_property(Group& group, Schema& schema, StringData object_type, StringData old_name, StringData new_name);
+    static void rename_property(Group& group, Schema& schema, StringData object_type, StringData old_name,
+                                StringData new_name);
 
     // get primary key property name for object type
     static StringData get_primary_key_for_object(Group const& group, StringData object_type);
@@ -131,19 +131,31 @@ private:
 class InvalidSchemaVersionException : public std::logic_error {
 public:
     InvalidSchemaVersionException(uint64_t old_version, uint64_t new_version);
-    uint64_t old_version() const { return m_old_version; }
-    uint64_t new_version() const { return m_new_version; }
+    uint64_t old_version() const
+    {
+        return m_old_version;
+    }
+    uint64_t new_version() const
+    {
+        return m_new_version;
+    }
+
 private:
     uint64_t m_old_version, m_new_version;
 };
 
 // Schema validation exceptions
 struct ObjectSchemaValidationException : public std::logic_error {
-    ObjectSchemaValidationException(std::string message) : logic_error(std::move(message)) {}
+    ObjectSchemaValidationException(std::string message)
+        : logic_error(std::move(message))
+    {
+    }
 
-    template<typename... Args>
+    template <typename... Args>
     ObjectSchemaValidationException(const char* fmt, Args&&... args)
-    : std::logic_error(util::format(fmt, std::forward<Args>(args)...)) { }
+        : std::logic_error(util::format(fmt, std::forward<Args>(args)...))
+    {
+    }
 };
 
 struct SchemaValidationException : public std::logic_error {

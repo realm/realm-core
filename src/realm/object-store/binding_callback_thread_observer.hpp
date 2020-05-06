@@ -37,6 +37,6 @@ public:
 };
 
 extern BindingCallbackThreadObserver* g_binding_callback_thread_observer;
-}
+} // namespace realm
 
 #endif // REALM_OS_BINDING_CALLBACK_THREAD_OBSERVER_HPP

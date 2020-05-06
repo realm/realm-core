@@ -26,7 +26,8 @@
 
 namespace realm {
 
-bool results_contains_user(SyncUserMetadataResults& results, const std::string& identity, const std::string& auth_server);
+bool results_contains_user(SyncUserMetadataResults& results, const std::string& identity,
+                           const std::string& auth_server);
 bool results_contains_original_name(SyncFileActionMetadataResults& results, const std::string& original_name);
 
 } // namespace realm

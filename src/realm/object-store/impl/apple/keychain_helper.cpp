@@ -26,15 +26,17 @@
 
 #include <string>
 
-using realm::util::CFPtr;
 using realm::util::adoptCF;
+using realm::util::CFPtr;
 using realm::util::retainCF;
 
 namespace realm {
 namespace keychain {
 
 KeychainAccessException::KeychainAccessException(int32_t error_code)
-: std::runtime_error(util::format("Keychain returned unexpected status code: %1", error_code)) { }
+    : std::runtime_error(util::format("Keychain returned unexpected status code: %1", error_code))
+{
+}
 
 namespace {
 
@@ -55,8 +57,8 @@ CFPtr<CFStringRef> convert_string(const std::string& string)
 CFPtr<CFMutableDictionaryRef> build_search_dictionary(CFStringRef account, CFStringRef service,
                                                       __unused util::Optional<std::string> group)
 {
-    auto d = adoptCF(CFDictionaryCreateMutable(nullptr, 0, &kCFTypeDictionaryKeyCallBacks,
-                                               &kCFTypeDictionaryValueCallBacks));
+    auto d = adoptCF(
+        CFDictionaryCreateMutable(nullptr, 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks));
     if (!d)
         throw std::bad_alloc();
 
@@ -77,7 +79,7 @@ util::Optional<std::vector<char>> get_key(CFStringRef account, CFStringRef servi
 {
     auto search_dictionary = build_search_dictionary(account, service, none);
     CFDataRef retained_key_data;
-    if (OSStatus status = SecItemCopyMatching(search_dictionary.get(), (CFTypeRef *)&retained_key_data)) {
+    if (OSStatus status = SecItemCopyMatching(search_dictionary.get(), (CFTypeRef*)&retained_key_data)) {
         if (status != errSecItemNotFound)
             throw KeychainAccessException(status);
 
@@ -90,14 +92,14 @@ util::Optional<std::vector<char>> get_key(CFStringRef account, CFStringRef servi
     if (key_size != CFDataGetLength(key_data.get()))
         throw std::runtime_error("Password stored in keychain was not expected size.");
 
-    auto key_bytes = reinterpret_cast<const char *>(CFDataGetBytePtr(key_data.get()));
+    auto key_bytes = reinterpret_cast<const char*>(CFDataGetBytePtr(key_data.get()));
     return std::vector<char>(key_bytes, key_bytes + key_size);
 }
 
 void set_key(const std::vector<char>& key, CFStringRef account, CFStringRef service)
 {
     auto search_dictionary = build_search_dictionary(account, service, none);
-    auto key_data = adoptCF(CFDataCreate(nullptr, reinterpret_cast<const UInt8 *>(key.data()), key_size));
+    auto key_data = adoptCF(CFDataCreate(nullptr, reinterpret_cast<const UInt8*>(key.data()), key_size));
     if (!key_data)
         throw std::bad_alloc();
 
@@ -106,7 +108,7 @@ void set_key(const std::vector<char>& key, CFStringRef account, CFStringRef serv
         throw KeychainAccessException(status);
 }
 
-}   // anonymous namespace
+} // anonymous namespace
 
 std::vector<char> metadata_realm_encryption_key(bool check_legacy_service)
 {
@@ -124,7 +126,8 @@ std::vector<char> metadata_realm_encryption_key(bool check_legacy_service)
     // Try retrieving the key.
     if (auto existing_key = get_key(account, service.get())) {
         return *existing_key;
-    } else if (check_legacy_service) {
+    }
+    else if (check_legacy_service) {
         // See if there's a key stored using the legacy shared keychain item.
         if (auto existing_legacy_key = get_key(account, legacy_service)) {
             // If so, copy it to the per-app keychain item before returning it.
@@ -139,5 +142,5 @@ std::vector<char> metadata_realm_encryption_key(bool check_legacy_service)
     return key;
 }
 
-}   // keychain
-}   // realm
+} // namespace keychain
+} // namespace realm

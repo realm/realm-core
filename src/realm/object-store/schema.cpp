@@ -32,30 +32,30 @@ bool operator==(Schema const& a, Schema const& b) noexcept
 {
     return static_cast<Schema::base const&>(a) == static_cast<Schema::base const&>(b);
 }
-}
+} // namespace realm
 
 Schema::Schema() noexcept = default;
 Schema::~Schema() = default;
 Schema::Schema(Schema const&) = default;
-Schema::Schema(Schema &&) noexcept = default;
+Schema::Schema(Schema&&) noexcept = default;
 Schema& Schema::operator=(Schema const&) = default;
 Schema& Schema::operator=(Schema&&) noexcept = default;
 
-Schema::Schema(std::initializer_list<ObjectSchema> types) : Schema(base(types)) { }
+Schema::Schema(std::initializer_list<ObjectSchema> types)
+    : Schema(base(types))
+{
+}
 
 Schema::Schema(base types) noexcept
-: base(std::move(types))
+    : base(std::move(types))
 {
-    std::sort(begin(), end(), [](ObjectSchema const& lft, ObjectSchema const& rgt) {
-        return lft.name < rgt.name;
-    });
+    std::sort(begin(), end(), [](ObjectSchema const& lft, ObjectSchema const& rgt) { return lft.name < rgt.name; });
 }
 
 Schema::iterator Schema::find(StringData name) noexcept
 {
-    auto it = std::lower_bound(begin(), end(), name, [](ObjectSchema const& lft, StringData rgt) {
-        return lft.name < rgt;
-    });
+    auto it = std::lower_bound(begin(), end(), name,
+                               [](ObjectSchema const& lft, StringData rgt) { return lft.name < rgt; });
     if (it != end() && it->name != name) {
         it = end();
     }
@@ -64,7 +64,7 @@ Schema::iterator Schema::find(StringData name) noexcept
 
 Schema::const_iterator Schema::find(StringData name) const noexcept
 {
-    return const_cast<Schema *>(this)->find(name);
+    return const_cast<Schema*>(this)->find(name);
 }
 
 Schema::iterator Schema::find(ObjectSchema const& object) noexcept
@@ -74,7 +74,7 @@ Schema::iterator Schema::find(ObjectSchema const& object) noexcept
 
 Schema::const_iterator Schema::find(ObjectSchema const& object) const noexcept
 {
-    return const_cast<Schema *>(this)->find(object);
+    return const_cast<Schema*>(this)->find(object);
 }
 
 void Schema::validate() const
@@ -83,14 +83,13 @@ void Schema::validate() const
 
     // As the types are added sorted by name, we can detect duplicates by just looking at the following element.
     auto find_next_duplicate = [&](const_iterator start) {
-        return std::adjacent_find(start, cend(), [](ObjectSchema const& lft, ObjectSchema const& rgt) {
-            return lft.name == rgt.name;
-        });
+        return std::adjacent_find(
+            start, cend(), [](ObjectSchema const& lft, ObjectSchema const& rgt) { return lft.name == rgt.name; });
     };
 
     for (auto it = find_next_duplicate(cbegin()); it != cend(); it = find_next_duplicate(++it)) {
-        exceptions.push_back(ObjectSchemaValidationException("Type '%1' appears more than once in the schema.",
-                                                             it->name));
+        exceptions.push_back(
+            ObjectSchemaValidationException("Type '%1' appears more than once in the schema.", it->name));
     }
 
     for (auto const& object : *this) {
@@ -102,8 +101,7 @@ void Schema::validate() const
     }
 }
 
-static void compare(ObjectSchema const& existing_schema,
-                    ObjectSchema const& target_schema,
+static void compare(ObjectSchema const& existing_schema, ObjectSchema const& target_schema,
                     std::vector<SchemaChange>& changes)
 {
     for (auto& current_prop : existing_schema.persisted_properties) {
@@ -117,8 +115,7 @@ static void compare(ObjectSchema const& existing_schema,
             changes.emplace_back(schema_change::RemoveProperty{&existing_schema, &current_prop});
             continue;
         }
-        if (current_prop.type != target_prop->type ||
-            current_prop.object_type != target_prop->object_type ||
+        if (current_prop.type != target_prop->type || current_prop.object_type != target_prop->object_type ||
             is_array(current_prop.type) != is_array(target_prop->type)) {
 
             changes.emplace_back(schema_change::ChangePropertyType{&existing_schema, &current_prop, target_prop});
@@ -150,7 +147,7 @@ static void compare(ObjectSchema const& existing_schema,
     }
 }
 
-template<typename T, typename U, typename Func>
+template <typename T, typename U, typename Func>
 void Schema::zip_matching(T&& a, U&& b, Func&& func) noexcept
 {
     size_t i = 0, j = 0;
@@ -176,7 +173,6 @@ void Schema::zip_matching(T&& a, U&& b, Func&& func) noexcept
         func(&a[i], nullptr);
     for (; j < b.size(); ++j)
         func(nullptr, &b[j]);
-
 }
 
 std::vector<SchemaChange> Schema::compare(Schema const& target_schema, bool include_table_removals) const
@@ -235,12 +231,12 @@ bool operator==(SchemaChange const& lft, SchemaChange const& rgt) noexcept
     struct Visitor {
         SchemaChange const& value;
 
-        #define REALM_SC_COMPARE(type, ...) \
-            bool operator()(type rgt) const \
-            { \
-                auto cmp = [](auto&& v) { return std::tie(__VA_ARGS__); }; \
-                return cmp(value.type) == cmp(rgt); \
-            }
+#define REALM_SC_COMPARE(type, ...)                                                                                  \
+    bool operator()(type rgt) const                                                                                  \
+    {                                                                                                                \
+        auto cmp = [](auto&& v) { return std::tie(__VA_ARGS__); };                                                   \
+        return cmp(value.type) == cmp(rgt);                                                                          \
+    }
 
         REALM_SC_COMPARE(AddIndex, v.object, v.property)
         REALM_SC_COMPARE(AddProperty, v.object, v.property)
@@ -255,7 +251,7 @@ bool operator==(SchemaChange const& lft, SchemaChange const& rgt) noexcept
         REALM_SC_COMPARE(RemoveIndex, v.object, v.property)
         REALM_SC_COMPARE(RemoveProperty, v.object, v.property)
 
-        #undef REALM_SC_COMPARE
+#undef REALM_SC_COMPARE
     } visitor{lft};
     return rgt.visit(visitor);
 }

@@ -29,26 +29,25 @@ namespace app {
 class AppServiceClient;
 
 class RemoteMongoDatabase {
-    
-public:
 
+public:
     /// The name of this database
     const std::string name;
-                                                     
-    RemoteMongoDatabase(const std::string& name,
-                        AppServiceClient& service)
-    : name(name), m_service(service) { };
-    
+
+    RemoteMongoDatabase(const std::string& name, AppServiceClient& service)
+        : name(name)
+        , m_service(service){};
+
     /// Gets a collection.
     /// @param collection_name The name of the collection to return
     /// @returns The collection as json
     RemoteMongoCollection collection(const std::string& collection_name);
-    
+
     /// Gets a collection.
     /// @param collection_name The name of the collection to return
     /// @returns The collection as json
     RemoteMongoCollection operator[](const std::string& collection_name);
-    
+
 private:
     AppServiceClient& m_service;
 };

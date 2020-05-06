@@ -30,28 +30,32 @@
 
 using namespace realm;
 
-TEST_CASE("ObjectStore: table_name_for_object_type()") {
-    SECTION("should work with strings that aren't null-terminated") {
+TEST_CASE("ObjectStore: table_name_for_object_type()")
+{
+    SECTION("should work with strings that aren't null-terminated")
+    {
         auto input = StringData("good_no_bad", 4);
         auto result = ObjectStore::table_name_for_object_type(input);
         REQUIRE(result == "class_good");
     }
 }
 
-TEST_CASE("ObjectStore:: property_for_column_key()") {
-    SECTION("Property should match the schema") {
+TEST_CASE("ObjectStore:: property_for_column_key()")
+{
+    SECTION("Property should match the schema")
+    {
         Schema schema = {
-            {"object", {
-                {"int", PropertyType::Int},
-                {"boolNullable", PropertyType::Bool | PropertyType::Nullable},
-                {"stringPK", PropertyType::String, true},
-                {"dateNullableIndexed", PropertyType::Date | PropertyType::Nullable, false, true},
-                {"floatNullableArray", PropertyType::Float | PropertyType::Nullable | PropertyType::Array},
-                {"doubleArray", PropertyType::Double | PropertyType::Array},
-                {"object", PropertyType::Object | PropertyType::Nullable, "object"},
-                {"objectArray", PropertyType::Object | PropertyType::Array, "object"},
-            }}
-        };
+            {"object",
+             {
+                 {"int", PropertyType::Int},
+                 {"boolNullable", PropertyType::Bool | PropertyType::Nullable},
+                 {"stringPK", PropertyType::String, true},
+                 {"dateNullableIndexed", PropertyType::Date | PropertyType::Nullable, false, true},
+                 {"floatNullableArray", PropertyType::Float | PropertyType::Nullable | PropertyType::Array},
+                 {"doubleArray", PropertyType::Double | PropertyType::Array},
+                 {"object", PropertyType::Object | PropertyType::Nullable, "object"},
+                 {"objectArray", PropertyType::Object | PropertyType::Array, "object"},
+             }}};
 
         TestFile config;
         config.schema = schema;
@@ -73,5 +77,5 @@ TEST_CASE("ObjectStore:: property_for_column_key()") {
             auto actual_property = *object_schema.property_for_name(property->name);
             REQUIRE(property.value() == actual_property);
         }
-   }
+    }
 }

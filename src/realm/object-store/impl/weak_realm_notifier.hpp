@@ -28,7 +28,8 @@ namespace realm {
 class Realm;
 
 namespace util {
-template<typename> class EventLoopSignal;
+template <typename>
+class EventLoopSignal;
 }
 
 namespace _impl {
@@ -43,13 +44,22 @@ public:
     ~WeakRealmNotifier();
 
     // Get a strong reference to the cached realm
-    std::shared_ptr<Realm> realm() const { return m_realm.lock(); }
+    std::shared_ptr<Realm> realm() const
+    {
+        return m_realm.lock();
+    }
 
     // Has the Realm instance been destroyed?
-    bool expired() const { return m_realm.expired(); }
+    bool expired() const
+    {
+        return m_realm.expired();
+    }
 
     // Is this a WeakRealmNotifier for the given Realm instance?
-    bool is_for_realm(Realm* realm) const { return realm == m_realm_key; }
+    bool is_for_realm(Realm* realm) const
+    {
+        return realm == m_realm_key;
+    }
 
     void notify();
 

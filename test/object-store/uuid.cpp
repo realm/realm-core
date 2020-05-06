@@ -25,7 +25,8 @@
 
 using namespace realm;
 
-TEST_CASE("uuid") {
+TEST_CASE("uuid")
+{
     auto isxdigit = [](char c) { return std::isxdigit(c); };
 
     auto uuid = util::uuid_string();

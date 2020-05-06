@@ -39,11 +39,13 @@ inline bool sessions_are_inactive(const SyncSession& session)
     return session.state() == SyncSession::PublicState::Inactive;
 }
 
-inline bool sessions_are_disconnected(const SyncSession& session) {
+inline bool sessions_are_disconnected(const SyncSession& session)
+{
     return session.connection_state() == SyncSession::ConnectionState::Disconnected;
 }
 
-inline bool sessions_are_connected(const SyncSession& session) {
+inline bool sessions_are_connected(const SyncSession& session)
+{
     return session.connection_state() == SyncSession::ConnectionState::Connected;
 }
 
@@ -59,21 +61,23 @@ bool sessions_are_inactive(const SyncSession& session, const S&... s)
     return sessions_are_inactive(session) && sessions_are_inactive(s...);
 }
 
-inline void spin_runloop(int count=2)
+inline void spin_runloop(int count = 2)
 {
-    EventLoop::main().run_until([count, spin_count=0]() mutable { spin_count++; return spin_count > count; });
+    EventLoop::main().run_until([count, spin_count = 0]() mutable {
+        spin_count++;
+        return spin_count > count;
+    });
 }
 
 // Convenience function for creating and configuring sync sessions for test use.
 // Many of the optional arguments can be used to pass information about the
 // session back out to the test, or configure the session more precisely.
 template <typename ErrorHandler>
-std::shared_ptr<SyncSession> sync_session(std::shared_ptr<SyncUser> user, const std::string& path,
-                                          ErrorHandler&& error_handler,
-                                          SyncSessionStopPolicy stop_policy=SyncSessionStopPolicy::AfterChangesUploaded,
-                                          std::string* on_disk_path=nullptr,
-                                          util::Optional<Schema> schema=none,
-                                          Realm::Config* out_config=nullptr)
+std::shared_ptr<SyncSession>
+sync_session(std::shared_ptr<SyncUser> user, const std::string& path, ErrorHandler&& error_handler,
+             SyncSessionStopPolicy stop_policy = SyncSessionStopPolicy::AfterChangesUploaded,
+             std::string* on_disk_path = nullptr, util::Optional<Schema> schema = none,
+             Realm::Config* out_config = nullptr)
 {
     SyncTestFile config({user, path}, std::move(stop_policy), std::forward<ErrorHandler>(error_handler));
 

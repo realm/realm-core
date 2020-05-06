@@ -29,7 +29,8 @@
 #include <string>
 
 namespace realm {
-template<typename T> class BasicRowExpr;
+template <typename T>
+class BasicRowExpr;
 using RowExpr = BasicRowExpr<Table>;
 class SyncMetadataManager;
 
@@ -77,7 +78,7 @@ public:
     void set_state(SyncUser::State);
 
     SyncUser::State state() const;
-    
+
     // Cannot be set after creation.
     std::string provider_type() const;
 
@@ -94,6 +95,7 @@ public:
 
     // INTERNAL USE ONLY
     SyncUserMetadata(Schema schema, SharedRealm realm, const Obj& obj);
+
 private:
     bool m_invalid = false;
     SharedRealm m_realm;
@@ -142,6 +144,7 @@ public:
 
     // INTERNAL USE ONLY
     SyncFileActionMetadata(Schema schema, SharedRealm realm, const Obj& obj);
+
 private:
     SharedRealm m_realm;
     Schema m_schema;
@@ -156,7 +159,7 @@ public:
     };
 };
 
-template<class T>
+template <class T>
 class SyncMetadataResults {
 public:
     size_t size() const
@@ -173,10 +176,12 @@ public:
     }
 
     SyncMetadataResults(Results results, SharedRealm realm, typename T::Schema schema)
-    : m_schema(std::move(schema))
-    , m_realm(std::move(realm))
-    , m_results(std::move(results))
-    { }
+        : m_schema(std::move(schema))
+        , m_realm(std::move(realm))
+        , m_results(std::move(results))
+    {
+    }
+
 private:
     typename T::Schema m_schema;
     SharedRealm m_realm;
@@ -188,15 +193,16 @@ using SyncFileActionMetadataResults = SyncMetadataResults<SyncFileActionMetadata
 
 // A facade for the application's metadata Realm.
 class SyncMetadataManager {
-friend class SyncUserMetadata;
-friend class SyncFileActionMetadata;
+    friend class SyncUserMetadata;
+    friend class SyncFileActionMetadata;
+
 public:
     // Return a Results object containing all users not marked for removal.
     SyncUserMetadataResults all_unmarked_users() const;
 
     // Return a Results object containing all users marked for removal. It is the binding's responsibility to call
-    // `remove()` on each user to actually remove it from the database. (This is so that already-open Realm files can be
-    // safely cleaned up the next time the host is launched.)
+    // `remove()` on each user to actually remove it from the database. (This is so that already-open Realm files can
+    // be safely cleaned up the next time the host is launched.)
     SyncUserMetadataResults all_users_marked_for_removal() const;
 
     // Return a Results object containing all pending actions.
@@ -205,31 +211,31 @@ public:
     // Retrieve or create user metadata.
     // Note: if `make_is_absent` is true and the user has been marked for deletion, it will be unmarked.
     util::Optional<SyncUserMetadata> get_or_make_user_metadata(const std::string& identity, const std::string& url,
-                                                               bool make_if_absent=true) const;
+                                                               bool make_if_absent = true) const;
 
     // Retrieve file action metadata.
     util::Optional<SyncFileActionMetadata> get_file_action_metadata(StringData path) const;
 
     // Create file action metadata.
-    void make_file_action_metadata(StringData original_name, StringData url,
-                                   StringData local_uuid,
-                                   SyncFileActionMetadata::Action action,
-                                   StringData new_name = {}) const;
+    void make_file_action_metadata(StringData original_name, StringData url, StringData local_uuid,
+                                   SyncFileActionMetadata::Action action, StringData new_name = {}) const;
 
     // Get the unique identifier of this client.
-    const std::string& client_uuid() const { return m_client_uuid; }
+    const std::string& client_uuid() const
+    {
+        return m_client_uuid;
+    }
 
     util::Optional<std::string> get_current_user_identity() const;
     void set_current_user_identity(const std::string& identity);
-    
+
     /// Construct the metadata manager.
     ///
     /// If the platform supports it, setting `should_encrypt` to `true` and not specifying an encryption key will make
     /// the object store handle generating and persisting an encryption key for the metadata database. Otherwise, an
     /// exception will be thrown.
-    SyncMetadataManager(std::string path,
-                        bool should_encrypt,
-                        util::Optional<std::vector<char>> encryption_key=none);
+    SyncMetadataManager(std::string path, bool should_encrypt,
+                        util::Optional<std::vector<char>> encryption_key = none);
 
 private:
     SyncUserMetadataResults get_users(bool marked) const;
@@ -245,6 +251,6 @@ private:
     std::shared_ptr<Realm> get_realm() const;
 };
 
-}
+} // namespace realm
 
 #endif // REALM_OS_SYNC_METADATA_HPP

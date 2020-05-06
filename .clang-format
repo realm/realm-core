@@ -1,4 +1,11 @@
 ---
+BasedOnStyle: LLVM
+TabWidth: 4
+UseTab: Never
+---
+Language:  JavaScript
+DisableFormat: true
+---
 Language:        Cpp
 AccessModifierOffset: -4
 AlignAfterOpenBracket: Align

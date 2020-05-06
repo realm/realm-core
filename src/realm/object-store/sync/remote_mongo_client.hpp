@@ -32,18 +32,19 @@ class RemoteMongoDatabase;
 /// A client responsible for communication with the Stitch API
 class RemoteMongoClient {
 public:
+    RemoteMongoClient(AppServiceClient&& service)
+        : m_service(std::move(service))
+    {
+    }
 
-    RemoteMongoClient(AppServiceClient&& service) :
-    m_service(std::move(service)) { }
-    
     /// Gets a `RemoteMongoDatabase` instance for the given database name.
     /// @param name the name of the database to retrieve
     RemoteMongoDatabase operator[](const std::string& name);
-  
+
     /// Gets a `RemoteMongoDatabase` instance for the given database name.
     /// @param name the name of the database to retrieve
     RemoteMongoDatabase db(const std::string& name);
-    
+
 private:
     AppServiceClient m_service;
 };

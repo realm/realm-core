@@ -33,6 +33,7 @@ struct Property;
 class Schema : private std::vector<ObjectSchema> {
 private:
     using base = std::vector<ObjectSchema>;
+
 public:
     Schema() noexcept;
     ~Schema();
@@ -58,22 +59,25 @@ public:
     void validate() const;
 
     // Get the changes which must be applied to this schema to produce the passed-in schema
-    std::vector<SchemaChange> compare(Schema const&, bool include_removals=false) const;
+    std::vector<SchemaChange> compare(Schema const&, bool include_removals = false) const;
 
     void copy_keys_from(Schema const&) noexcept;
 
     friend bool operator==(Schema const&, Schema const&) noexcept;
-    friend bool operator!=(Schema const& a, Schema const& b) noexcept { return !(a == b); }
+    friend bool operator!=(Schema const& a, Schema const& b) noexcept
+    {
+        return !(a == b);
+    }
 
-    using base::iterator;
-    using base::const_iterator;
     using base::begin;
-    using base::end;
+    using base::const_iterator;
     using base::empty;
+    using base::end;
+    using base::iterator;
     using base::size;
 
 private:
-    template<typename T, typename U, typename Func>
+    template <typename T, typename U, typename Func>
     static void zip_matching(T&& a, U&& b, Func&& func) noexcept;
 };
 
@@ -134,40 +138,39 @@ struct ChangePrimaryKey {
     const ObjectSchema* object;
     const Property* property;
 };
-}
+} // namespace schema_change
 
-#define REALM_FOR_EACH_SCHEMA_CHANGE_TYPE(macro) \
-    macro(AddTable) \
-    macro(RemoveTable) \
-    macro(ChangeTableType) \
-    macro(AddInitialProperties) \
-    macro(AddProperty) \
-    macro(RemoveProperty) \
-    macro(ChangePropertyType) \
-    macro(MakePropertyNullable) \
-    macro(MakePropertyRequired) \
-    macro(AddIndex) \
-    macro(RemoveIndex) \
-    macro(ChangePrimaryKey) \
+#define REALM_FOR_EACH_SCHEMA_CHANGE_TYPE(macro)                                                                     \
+    macro(AddTable) macro(RemoveTable) macro(ChangeTableType) macro(AddInitialProperties) macro(AddProperty)         \
+        macro(RemoveProperty) macro(ChangePropertyType) macro(MakePropertyNullable) macro(MakePropertyRequired)      \
+            macro(AddIndex) macro(RemoveIndex) macro(ChangePrimaryKey)
 
 class SchemaChange {
 public:
-#define REALM_SCHEMA_CHANGE_CONSTRUCTOR(name) \
-    SchemaChange(schema_change::name value) : m_kind(Kind::name) { name = value; }
-        REALM_FOR_EACH_SCHEMA_CHANGE_TYPE(REALM_SCHEMA_CHANGE_CONSTRUCTOR)
+#define REALM_SCHEMA_CHANGE_CONSTRUCTOR(name)                                                                        \
+    SchemaChange(schema_change::name value)                                                                          \
+        : m_kind(Kind::name)                                                                                         \
+    {                                                                                                                \
+        name = value;                                                                                                \
+    }
+    REALM_FOR_EACH_SCHEMA_CHANGE_TYPE(REALM_SCHEMA_CHANGE_CONSTRUCTOR)
 #undef REALM_SCHEMA_CHANGE_CONSTRUCTOR
 
-    template<typename Visitor>
-    auto visit(Visitor&& visitor) const {
+    template <typename Visitor>
+    auto visit(Visitor&& visitor) const
+    {
         switch (m_kind) {
-#define REALM_SWITCH_CASE(name) case Kind::name: return visitor(name);
-        REALM_FOR_EACH_SCHEMA_CHANGE_TYPE(REALM_SWITCH_CASE)
+#define REALM_SWITCH_CASE(name)                                                                                      \
+    case Kind::name:                                                                                                 \
+        return visitor(name);
+            REALM_FOR_EACH_SCHEMA_CHANGE_TYPE(REALM_SWITCH_CASE)
 #undef REALM_SWITCH_CASE
         }
         REALM_COMPILER_HINT_UNREACHABLE();
     }
 
     friend bool operator==(SchemaChange const& lft, SchemaChange const& rgt) noexcept;
+
 private:
     enum class Kind {
 #define REALM_SCHEMA_CHANGE_TYPE(name) name,
@@ -183,6 +186,6 @@ private:
 };
 
 #undef REALM_FOR_EACH_SCHEMA_CHANGE_TYPE
-}
+} // namespace realm
 
 #endif /* defined(REALM_SCHEMA_HPP) */

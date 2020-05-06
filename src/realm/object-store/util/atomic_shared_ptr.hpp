@@ -29,14 +29,20 @@ namespace _impl {
 // Check if std::atomic_load has an overload taking a std::shared_ptr, and set
 // HasAtomicPtrOps to either true_type or false_type
 
-template<typename... Ts> struct make_void { typedef void type; };
-template<typename... Ts> using void_t = typename make_void<Ts...>::type;
+template <typename... Ts>
+struct make_void {
+    typedef void type;
+};
+template <typename... Ts>
+using void_t = typename make_void<Ts...>::type;
 
-template<typename, typename = void_t<>>
-struct HasAtomicPtrOps : std::false_type { };
+template <typename, typename = void_t<>>
+struct HasAtomicPtrOps : std::false_type {
+};
 
-template<class T>
-struct HasAtomicPtrOps<T, void_t<decltype(std::atomic_load(std::declval<T*>()))>> : std::true_type { };
+template <class T>
+struct HasAtomicPtrOps<T, void_t<decltype(std::atomic_load(std::declval<T*>()))>> : std::true_type {
+};
 } // namespace _impl
 
 namespace util {
@@ -45,17 +51,26 @@ namespace util {
 // lock-free iff the underlying shared_ptr implementation supports atomic
 // operations. Currently the only implemented operation other than copy/move
 // construction/assignment is exchange().
-template<typename T, bool = _impl::HasAtomicPtrOps<std::shared_ptr<T>>::value>
+template <typename T, bool = _impl::HasAtomicPtrOps<std::shared_ptr<T>>::value>
 class AtomicSharedPtr;
 
-template<typename T>
+template <typename T>
 class AtomicSharedPtr<T, true> {
 public:
     AtomicSharedPtr() = default;
-    AtomicSharedPtr(std::shared_ptr<T> ptr) : m_ptr(std::move(ptr)) { }
+    AtomicSharedPtr(std::shared_ptr<T> ptr)
+        : m_ptr(std::move(ptr))
+    {
+    }
 
-    AtomicSharedPtr(AtomicSharedPtr const& ptr) : m_ptr(std::atomic_load(&ptr.m_ptr)) { }
-    AtomicSharedPtr(AtomicSharedPtr&& ptr) : m_ptr(std::atomic_exchange(&ptr.m_ptr, {})) { }
+    AtomicSharedPtr(AtomicSharedPtr const& ptr)
+        : m_ptr(std::atomic_load(&ptr.m_ptr))
+    {
+    }
+    AtomicSharedPtr(AtomicSharedPtr&& ptr)
+        : m_ptr(std::atomic_exchange(&ptr.m_ptr, {}))
+    {
+    }
 
     AtomicSharedPtr& operator=(AtomicSharedPtr const& ptr)
     {
@@ -85,11 +100,14 @@ private:
     std::shared_ptr<T> m_ptr = nullptr;
 };
 
-template<typename T>
+template <typename T>
 class AtomicSharedPtr<T, false> {
 public:
     AtomicSharedPtr() = default;
-    AtomicSharedPtr(std::shared_ptr<T> ptr) : m_ptr(std::move(ptr)) { }
+    AtomicSharedPtr(std::shared_ptr<T> ptr)
+        : m_ptr(std::move(ptr))
+    {
+    }
 
     AtomicSharedPtr(AtomicSharedPtr const& ptr)
     {
@@ -142,7 +160,7 @@ private:
     std::shared_ptr<T> m_ptr = nullptr;
 };
 
-}
-}
+} // namespace util
+} // namespace realm
 
 #endif // REALM_ATOMIC_SHARED_PTR_HPP

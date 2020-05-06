@@ -146,4 +146,3 @@ void ObjectChangeSet::verify()
     }
 #endif
 }
-

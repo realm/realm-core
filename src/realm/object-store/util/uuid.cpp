@@ -34,8 +34,8 @@ T create_and_seed_engine()
     constexpr auto bytes_needed = T::state_size * sizeof(typename T::result_type);
 
     constexpr auto numbers_needed = sizeof(std::random_device::result_type) < sizeof(std::seed_seq::result_type)
-                                    ? (bytes_needed / sizeof(std::random_device::result_type))
-                                    : (bytes_needed / sizeof(std::seed_seq::result_type));
+                                        ? (bytes_needed / sizeof(std::random_device::result_type))
+                                        : (bytes_needed / sizeof(std::seed_seq::result_type));
 
     std::array<std::random_device::result_type, numbers_needed> state;
     std::random_device rd;
@@ -67,11 +67,10 @@ std::string uuid_string()
 
     std::array<char, 37> uuid_formatted;
     snprintf(uuid_formatted.data(), uuid_formatted.size(),
-             "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x",
-             uuid_bytes[0], uuid_bytes[1], uuid_bytes[2], uuid_bytes[3],
-             uuid_bytes[4], uuid_bytes[5], uuid_bytes[6], uuid_bytes[7],
-             uuid_bytes[8], uuid_bytes[9], uuid_bytes[10], uuid_bytes[11],
-             uuid_bytes[12], uuid_bytes[13], uuid_bytes[14], uuid_bytes[15]);
+             "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x", uuid_bytes[0], uuid_bytes[1],
+             uuid_bytes[2], uuid_bytes[3], uuid_bytes[4], uuid_bytes[5], uuid_bytes[6], uuid_bytes[7], uuid_bytes[8],
+             uuid_bytes[9], uuid_bytes[10], uuid_bytes[11], uuid_bytes[12], uuid_bytes[13], uuid_bytes[14],
+             uuid_bytes[15]);
 
     return std::string(uuid_formatted.data(), uuid_formatted.size() - 1);
 }

@@ -24,14 +24,16 @@
 using namespace realm;
 using namespace realm::_impl;
 
-static std::wstring create_condvar_sharedmemory_name(std::string realm_path) {
+static std::wstring create_condvar_sharedmemory_name(std::string realm_path)
+{
     std::replace(realm_path.begin(), realm_path.end(), '\\', '/');
-    return L"Local\\Realm_ObjectStore_ExternalCommitHelper_SharedCondVar_" + std::wstring(realm_path.begin(), realm_path.end());
+    return L"Local\\Realm_ObjectStore_ExternalCommitHelper_SharedCondVar_" +
+           std::wstring(realm_path.begin(), realm_path.end());
 }
 
 ExternalCommitHelper::ExternalCommitHelper(RealmCoordinator& parent)
-: m_parent(parent)
-, m_condvar_shared(create_condvar_sharedmemory_name(parent.get_path()).c_str())
+    : m_parent(parent)
+    , m_condvar_shared(create_condvar_sharedmemory_name(parent.get_path()).c_str())
 {
     m_mutex.set_shared_part(InterprocessMutex::SharedPart(), parent.get_path(), "ExternalCommitHelper_ControlMutex");
     m_commit_available.set_shared_part(m_condvar_shared.get(), parent.get_path(),
@@ -63,7 +65,7 @@ void ExternalCommitHelper::listen()
     while (m_keep_listening) {
         m_commit_available.wait(m_mutex, nullptr);
         if (m_keep_listening) {
-			m_parent.on_change();
+            m_parent.on_change();
         }
     }
 }

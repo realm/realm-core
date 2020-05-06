@@ -42,7 +42,7 @@ public:
 private:
     BindingContext* m_context;
     std::vector<BindingContext::ObserverState>& m_observers;
-    std::vector<void *> m_invalidated;
+    std::vector<void*> m_invalidated;
 
     struct ListInfo {
         BindingContext::ObserverState* observer;
@@ -54,9 +54,9 @@ private:
 };
 
 KVOAdapter::KVOAdapter(std::vector<BindingContext::ObserverState>& observers, BindingContext* context)
-: _impl::TransactionChangeInfo{}
-, m_context(context)
-, m_observers(observers)
+    : _impl::TransactionChangeInfo{}
+    , m_context(context)
+    , m_observers(observers)
 {
     if (m_observers.empty())
         return;
@@ -66,8 +66,7 @@ KVOAdapter::KVOAdapter(std::vector<BindingContext::ObserverState>& observers, Bi
         tables_needed.push_back(observer.table_key);
     }
     std::sort(begin(tables_needed), end(tables_needed));
-    tables_needed.erase(std::unique(begin(tables_needed), end(tables_needed)),
-                        end(tables_needed));
+    tables_needed.erase(std::unique(begin(tables_needed), end(tables_needed)), end(tables_needed));
 
     auto realm = context->realm.lock();
     auto& group = realm->read_group();
@@ -83,8 +82,7 @@ KVOAdapter::KVOAdapter(std::vector<BindingContext::ObserverState>& observers, Bi
     for (auto& tbl : tables_needed)
         tables[tbl.value] = {};
     for (auto& list : m_lists)
-        lists.push_back({list.observer->table_key,
-            list.observer->obj_key, list.col.value, &list.builder});
+        lists.push_back({list.observer->table_key, list.observer->obj_key, list.col.value, &list.builder});
 }
 
 void KVOAdapter::before(Transaction& sg)
@@ -138,7 +136,8 @@ void KVOAdapter::before(Transaction& sg)
 
         // KVO can't express moves (becaue NSArray doesn't have them), so
         // transform them into a series of sets on each affected index when possible
-        if (!builder.moves.empty() && builder.insertions.count() == builder.moves.size() && builder.deletions.count() == builder.moves.size()) {
+        if (!builder.moves.empty() && builder.insertions.count() == builder.moves.size() &&
+            builder.deletions.count() == builder.moves.size()) {
             changes.kind = BindingContext::ColumnInfo::Kind::Set;
             changes.indices = builder.modifications;
             changes.indices.add(builder.deletions);
@@ -195,8 +194,7 @@ void KVOAdapter::after(Transaction& sg)
     if (!m_context)
         return;
     m_context->did_change(m_observers, m_invalidated,
-                          m_version != VersionID{} &&
-                          m_version != sg.get_version_of_current_transaction());
+                          m_version != VersionID{} && m_version != sg.get_version_of_current_transaction());
 }
 
 class TransactLogValidationMixin {
@@ -211,10 +209,12 @@ class TransactLogValidationMixin {
     }
 
 protected:
-    TableKey current_table() const noexcept { return m_current_table; }
+    TableKey current_table() const noexcept
+    {
+        return m_current_table;
+    }
 
 public:
-
     bool select_table(TableKey key) noexcept
     {
         m_current_table = key;
@@ -222,35 +222,89 @@ public:
     }
 
     // Removing or renaming things while a Realm is open is never supported
-    bool erase_group_level_table(TableKey) { schema_error(); }
-    bool rename_group_level_table(TableKey) { schema_error(); }
-    bool erase_column(ColKey) { schema_error(); }
-    bool rename_column(ColKey) { schema_error(); }
+    bool erase_group_level_table(TableKey)
+    {
+        schema_error();
+    }
+    bool rename_group_level_table(TableKey)
+    {
+        schema_error();
+    }
+    bool erase_column(ColKey)
+    {
+        schema_error();
+    }
+    bool rename_column(ColKey)
+    {
+        schema_error();
+    }
 
     // Additive changes and reorderings are supported
-    bool insert_group_level_table(TableKey) { return true; }
-    bool insert_column(ColKey) { return true; }
-    bool set_link_type(ColKey) { return true; }
+    bool insert_group_level_table(TableKey)
+    {
+        return true;
+    }
+    bool insert_column(ColKey)
+    {
+        return true;
+    }
+    bool set_link_type(ColKey)
+    {
+        return true;
+    }
 
     // Non-schema changes are all allowed
-    void parse_complete() { }
-    bool create_object(ObjKey) { return true; }
-    bool remove_object(ObjKey) { return true; }
-    bool clear_table(size_t=0) noexcept { return true; }
-    bool list_set(size_t) { return true; }
-    bool list_insert(size_t) { return true; }
-    bool list_erase(size_t) { return true; }
-    bool list_clear(size_t) { return true; }
-    bool list_move(size_t, size_t) { return true; }
-    bool list_swap(size_t, size_t) { return true; }
+    void parse_complete() {}
+    bool create_object(ObjKey)
+    {
+        return true;
+    }
+    bool remove_object(ObjKey)
+    {
+        return true;
+    }
+    bool clear_table(size_t = 0) noexcept
+    {
+        return true;
+    }
+    bool list_set(size_t)
+    {
+        return true;
+    }
+    bool list_insert(size_t)
+    {
+        return true;
+    }
+    bool list_erase(size_t)
+    {
+        return true;
+    }
+    bool list_clear(size_t)
+    {
+        return true;
+    }
+    bool list_move(size_t, size_t)
+    {
+        return true;
+    }
+    bool list_swap(size_t, size_t)
+    {
+        return true;
+    }
 };
 
 
 // A transaction log handler that just validates that all operations made are
 // ones supported by the object store
 struct TransactLogValidator : public TransactLogValidationMixin {
-    bool modify_object(ColKey, ObjKey) { return true; }
-    bool select_list(ColKey, ObjKey) { return true; }
+    bool modify_object(ColKey, ObjKey)
+    {
+        return true;
+    }
+    bool select_list(ColKey, ObjKey)
+    {
+        return true;
+    }
 };
 
 // Extends TransactLogValidator to track changes made to LinkViews
@@ -274,13 +328,15 @@ class TransactLogObserver : public TransactLogValidationMixin {
 
 public:
     TransactLogObserver(_impl::TransactionChangeInfo& info)
-    : m_info(info) { }
+        : m_info(info)
+    {
+    }
 
     void parse_complete()
     {
         for (auto& list : m_info.lists)
             list.changes->clean_up_stale_moves();
-        for (auto it = m_info.tables.begin(); it != m_info.tables.end(); ) {
+        for (auto it = m_info.tables.begin(); it != m_info.tables.end();) {
             if (it->second.empty())
                 it = m_info.tables.erase(it);
             else
@@ -426,14 +482,12 @@ class KVOTransactLogObserver : public TransactLogObserver {
     Transaction& m_sg;
 
 public:
-    KVOTransactLogObserver(std::vector<BindingContext::ObserverState>& observers,
-                           BindingContext* context,
-                           _impl::NotifierPackage& notifiers,
-                           Transaction& sg)
-    : TransactLogObserver(m_adapter)
-    , m_adapter(observers, context)
-    , m_notifiers(notifiers)
-    , m_sg(sg)
+    KVOTransactLogObserver(std::vector<BindingContext::ObserverState>& observers, BindingContext* context,
+                           _impl::NotifierPackage& notifiers, Transaction& sg)
+        : TransactLogObserver(m_adapter)
+        , m_adapter(observers, context)
+        , m_notifiers(notifiers)
+        , m_sg(sg)
     {
     }
 
@@ -452,10 +506,9 @@ public:
     }
 };
 
-template<typename Func>
-void advance_with_notifications(BindingContext* context,
-                                const std::shared_ptr<Transaction>& sg,
-                                Func&& func, _impl::NotifierPackage& notifiers)
+template <typename Func>
+void advance_with_notifications(BindingContext* context, const std::shared_ptr<Transaction>& sg, Func&& func,
+                                _impl::NotifierPackage& notifiers)
 {
     auto old_version = sg->get_version_of_current_transaction();
     std::vector<BindingContext::ObserverState> observers;
@@ -495,7 +548,8 @@ void advance_with_notifications(BindingContext* context,
         KVOTransactLogObserver observer(observers, context, notifiers, *sg);
         func(&observer);
     }
-    notifiers.package_and_wait(sg->get_version_of_current_transaction().version); // is a no-op if parse_complete() was called
+    notifiers.package_and_wait(
+        sg->get_version_of_current_transaction().version); // is a no-op if parse_complete() was called
     notifiers.after_advance();
     if (context)
         context->did_send_notifications();
@@ -507,7 +561,8 @@ namespace realm {
 namespace _impl {
 
 UnsupportedSchemaChange::UnsupportedSchemaChange()
-: std::logic_error("Schema mismatch detected: another process has modified the Realm file's schema in an incompatible way")
+    : std::logic_error(
+          "Schema mismatch detected: another process has modified the Realm file's schema in an incompatible way")
 {
 }
 
@@ -520,16 +575,16 @@ void advance(Transaction& tr, BindingContext*, VersionID version)
 
 void advance(const std::shared_ptr<Transaction>& tr, BindingContext* context, NotifierPackage& notifiers)
 {
-    advance_with_notifications(context, tr, [&](auto&&... args) {
-        tr->advance_read(std::move(args)..., notifiers.version().value_or(VersionID{}));
-    }, notifiers);
+    advance_with_notifications(
+        context, tr,
+        [&](auto&&... args) { tr->advance_read(std::move(args)..., notifiers.version().value_or(VersionID{})); },
+        notifiers);
 }
 
 void begin(const std::shared_ptr<Transaction>& tr, BindingContext* context, NotifierPackage& notifiers)
 {
-    advance_with_notifications(context, tr, [&](auto&&... args) {
-        tr->promote_to_write(std::move(args)...);
-    }, notifiers);
+    advance_with_notifications(
+        context, tr, [&](auto&&... args) { tr->promote_to_write(std::move(args)...); }, notifiers);
 }
 
 void cancel(Transaction& tr, BindingContext* context)

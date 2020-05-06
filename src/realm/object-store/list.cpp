@@ -29,17 +29,17 @@
 namespace {
 using namespace realm;
 
-template<typename T>
+template <typename T>
 struct ListType {
     using type = Lst<T>;
 };
 
-template<>
+template <>
 struct ListType<Obj> {
     using type = LnkLst;
 };
 
-}
+} // namespace
 
 namespace realm {
 using namespace _impl;
@@ -53,18 +53,18 @@ List::List(List&&) = default;
 List& List::operator=(List&&) = default;
 
 List::List(std::shared_ptr<Realm> r, const Obj& parent_obj, ColKey col)
-: m_realm(std::move(r))
-, m_type(ObjectSchema::from_core_type(col) & ~PropertyType::Array)
-, m_list_base(parent_obj.get_listbase_ptr(col))
-, m_is_embedded(m_type == PropertyType::Object && as<Obj>().get_target_table()->is_embedded())
+    : m_realm(std::move(r))
+    , m_type(ObjectSchema::from_core_type(col) & ~PropertyType::Array)
+    , m_list_base(parent_obj.get_listbase_ptr(col))
+    , m_is_embedded(m_type == PropertyType::Object && as<Obj>().get_target_table()->is_embedded())
 {
 }
 
 List::List(std::shared_ptr<Realm> r, const LstBase& list)
-: m_realm(std::move(r))
-, m_type(ObjectSchema::from_core_type(list.get_col_key()) & ~PropertyType::Array)
-, m_list_base(list.clone())
-, m_is_embedded(m_type == PropertyType::Object && as<Obj>().get_target_table()->is_embedded())
+    : m_realm(std::move(r))
+    , m_type(ObjectSchema::from_core_type(list.get_col_key()) & ~PropertyType::Array)
+    , m_list_base(list.clone())
+    , m_is_embedded(m_type == PropertyType::Object && as<Obj>().get_target_table()->is_embedded())
 {
 }
 
@@ -129,8 +129,7 @@ void List::validate(const Obj& obj) const
     auto target = static_cast<LnkLst&>(*m_list_base).get_target_table();
     if (obj.get_table() != target)
         throw std::invalid_argument(util::format("Object of type (%1) does not match List type (%2)",
-                                                 object_name(*obj.get_table()),
-                                                 object_name(*target)));
+                                                 object_name(*obj.get_table()), object_name(*target)));
 }
 
 bool List::is_valid() const
@@ -162,14 +161,14 @@ size_t List::size() const
     return m_list_base->size();
 }
 
-template<typename T>
+template <typename T>
 T List::get(size_t row_ndx) const
 {
     verify_valid_row(row_ndx);
     return as<T>().get(row_ndx);
 }
 
-template<>
+template <>
 Obj List::get(size_t row_ndx) const
 {
     verify_valid_row(row_ndx);
@@ -177,14 +176,14 @@ Obj List::get(size_t row_ndx) const
     return list.get_target_table()->get_object(list.get(row_ndx));
 }
 
-template<typename T>
+template <typename T>
 size_t List::find(T const& value) const
 {
     verify_attached();
     return as<T>().find_first(value);
 }
 
-template<>
+template <>
 size_t List::find(Obj const& o) const
 {
     verify_attached();
@@ -205,14 +204,14 @@ size_t List::find(Query&& q) const
     throw std::runtime_error("not implemented");
 }
 
-template<typename T>
+template <typename T>
 void List::add(T value)
 {
     verify_in_transaction();
     as<T>().add(value);
 }
 
-template<>
+template <>
 void List::add(Obj o)
 {
     verify_in_transaction();
@@ -222,7 +221,7 @@ void List::add(Obj o)
     as<Obj>().add(o.get_key());
 }
 
-template<typename T>
+template <typename T>
 void List::insert(size_t row_ndx, T value)
 {
     verify_in_transaction();
@@ -230,7 +229,7 @@ void List::insert(size_t row_ndx, T value)
     as<T>().insert(row_ndx, value);
 }
 
-template<>
+template <>
 void List::insert(size_t row_ndx, Obj o)
 {
     verify_in_transaction();
@@ -265,16 +264,16 @@ void List::remove_all()
     m_list_base->clear();
 }
 
-template<typename T>
+template <typename T>
 void List::set(size_t row_ndx, T value)
 {
     verify_in_transaction();
     verify_valid_row(row_ndx);
-//    validate(row);
+    //    validate(row);
     as<T>().set(row_ndx, value);
 }
 
-template<>
+template <>
 void List::set(size_t row_ndx, Obj o)
 {
     verify_in_transaction();
@@ -339,9 +338,8 @@ Results List::filter(Query q) const
 Results List::as_results() const
 {
     verify_attached();
-    return m_type == PropertyType::Object
-        ? Results(m_realm, std::static_pointer_cast<LnkLst>(m_list_base))
-        : Results(m_realm, m_list_base);
+    return m_type == PropertyType::Object ? Results(m_realm, std::static_pointer_cast<LnkLst>(m_list_base))
+                                          : Results(m_realm, m_list_base);
 }
 
 Results List::snapshot() const
@@ -354,32 +352,46 @@ Results List::snapshot() const
 
 // template<class...> using VoidT = void;
 namespace _impl {
-    template<class... > struct MakeVoid { using type = void; };
-}
-template<class... T> using VoidT = typename _impl::MakeVoid<T...>::type;
+template <class...>
+struct MakeVoid {
+    using type = void;
+};
+} // namespace _impl
+template <class... T>
+using VoidT = typename _impl::MakeVoid<T...>::type;
 
-template<class, class = VoidT<>>
-struct HasMinmaxType : std::false_type { };
-template<class T>
-struct HasMinmaxType<T, VoidT<typename ColumnTypeTraits<T>::minmax_type>> : std::true_type { };
+template <class, class = VoidT<>>
+struct HasMinmaxType : std::false_type {
+};
+template <class T>
+struct HasMinmaxType<T, VoidT<typename ColumnTypeTraits<T>::minmax_type>> : std::true_type {
+};
 
-template<class, class = VoidT<>>
-struct HasSumType : std::false_type { };
-template<class T>
-struct HasSumType<T, VoidT<typename ColumnTypeTraits<T>::sum_type>> : std::true_type { };
+template <class, class = VoidT<>>
+struct HasSumType : std::false_type {
+};
+template <class T>
+struct HasSumType<T, VoidT<typename ColumnTypeTraits<T>::sum_type>> : std::true_type {
+};
 
-template<bool cond>
+template <bool cond>
 struct If;
 
-template<>
+template <>
 struct If<true> {
-    template<typename T, typename Then, typename Else>
-    static auto call(T self, Then&& fn, Else&&) { return fn(self); }
+    template <typename T, typename Then, typename Else>
+    static auto call(T self, Then&& fn, Else&&)
+    {
+        return fn(self);
+    }
 };
-template<>
+template <>
 struct If<false> {
-    template<typename T, typename Then, typename Else>
-    static auto call(T, Then&&, Else&& fn) { return fn(); }
+    template <typename T, typename Then, typename Else>
+    static auto call(T, Then&&, Else&& fn)
+    {
+        return fn();
+    }
 };
 
 util::Optional<Mixed> List::max(ColKey col) const
@@ -389,7 +401,8 @@ util::Optional<Mixed> List::max(ColKey col) const
     size_t out_ndx = not_found;
     auto result = m_list_base->max(&out_ndx);
     if (result.is_null()) {
-        throw realm::Results::UnsupportedColumnTypeException(m_list_base->get_col_key(), m_list_base->get_table(), "max");
+        throw realm::Results::UnsupportedColumnTypeException(m_list_base->get_col_key(), m_list_base->get_table(),
+                                                             "max");
     }
     return out_ndx == not_found ? none : make_optional(result);
 }
@@ -402,7 +415,8 @@ util::Optional<Mixed> List::min(ColKey col) const
     size_t out_ndx = not_found;
     auto result = m_list_base->min(&out_ndx);
     if (result.is_null()) {
-        throw realm::Results::UnsupportedColumnTypeException(m_list_base->get_col_key(), m_list_base->get_table(), "min");
+        throw realm::Results::UnsupportedColumnTypeException(m_list_base->get_col_key(), m_list_base->get_table(),
+                                                             "min");
     }
     return out_ndx == not_found ? none : make_optional(result);
 }
@@ -414,7 +428,8 @@ Mixed List::sum(ColKey col) const
 
     auto result = m_list_base->sum();
     if (result.is_null()) {
-        throw realm::Results::UnsupportedColumnTypeException(m_list_base->get_col_key(), m_list_base->get_table(), "sum");
+        throw realm::Results::UnsupportedColumnTypeException(m_list_base->get_col_key(), m_list_base->get_table(),
+                                                             "sum");
     }
     return result;
 }
@@ -426,16 +441,17 @@ util::Optional<Mixed> List::average(ColKey col) const
     size_t count = 0;
     auto result = m_list_base->avg(&count);
     if (result.is_null()) {
-        throw realm::Results::UnsupportedColumnTypeException(m_list_base->get_col_key(), m_list_base->get_table(), "average");
+        throw realm::Results::UnsupportedColumnTypeException(m_list_base->get_col_key(), m_list_base->get_table(),
+                                                             "average");
     }
     return count == 0 ? none : util::make_optional(result);
 }
 
 bool List::operator==(List const& rgt) const noexcept
 {
-    return m_list_base->get_table() == rgt.m_list_base->get_table()
-        && m_list_base->get_key() == rgt.m_list_base->get_key()
-        && m_list_base->get_col_key() == rgt.m_list_base->get_col_key();
+    return m_list_base->get_table() == rgt.m_list_base->get_table() &&
+           m_list_base->get_key() == rgt.m_list_base->get_key() &&
+           m_list_base->get_col_key() == rgt.m_list_base->get_col_key();
 }
 
 NotificationToken List::add_notification_callback(CollectionChangeCallback cb) &
@@ -468,14 +484,17 @@ bool List::is_frozen() const noexcept
 }
 
 List::OutOfBoundsIndexException::OutOfBoundsIndexException(size_t r, size_t c)
-: std::out_of_range(util::format("Requested index %1 greater than max %2", r, c - 1))
-, requested(r), valid_count(c) {}
+    : std::out_of_range(util::format("Requested index %1 greater than max %2", r, c - 1))
+    , requested(r)
+    , valid_count(c)
+{
+}
 
-#define REALM_PRIMITIVE_LIST_TYPE(T) \
-    template T List::get<T>(size_t) const; \
-    template size_t List::find<T>(T const&) const; \
-    template void List::add<T>(T); \
-    template void List::insert<T>(size_t, T); \
+#define REALM_PRIMITIVE_LIST_TYPE(T)                                                                                 \
+    template T List::get<T>(size_t) const;                                                                           \
+    template size_t List::find<T>(T const&) const;                                                                   \
+    template void List::add<T>(T);                                                                                   \
+    template void List::insert<T>(size_t, T);                                                                        \
     template void List::set<T>(size_t, T);
 
 REALM_PRIMITIVE_LIST_TYPE(bool)
@@ -498,21 +517,23 @@ REALM_PRIMITIVE_LIST_TYPE(util::Optional<ObjectId>)
 } // namespace realm
 
 namespace {
-size_t hash_combine() { return 0; }
-template<typename T, typename... Rest>
+size_t hash_combine()
+{
+    return 0;
+}
+template <typename T, typename... Rest>
 size_t hash_combine(const T& v, Rest... rest)
 {
     size_t h = hash_combine(rest...);
-    h ^= std::hash<T>()(v) + 0x9e3779b9 + (h<<6) + (h>>2);
+    h ^= std::hash<T>()(v) + 0x9e3779b9 + (h << 6) + (h >> 2);
     return h;
 }
-}
+} // namespace
 
 namespace std {
 size_t hash<List>::operator()(List const& list) const
 {
     auto& impl = *list.m_list_base;
-    return hash_combine(impl.get_key().value, impl.get_table()->get_key().value,
-                        impl.get_col_key().value);
+    return hash_combine(impl.get_key().value, impl.get_table()->get_key().value, impl.get_col_key().value);
 }
-}
+} // namespace std

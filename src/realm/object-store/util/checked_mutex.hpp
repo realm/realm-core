@@ -35,34 +35,26 @@
 // See https://clang.llvm.org/docs/ThreadSafetyAnalysis.html for more information on this
 
 #if defined(__clang__)
-    #define REALM_THREAD_ANNOTATION_ATTRIBUTE__(x) __attribute__((x))
+#define REALM_THREAD_ANNOTATION_ATTRIBUTE__(x) __attribute__((x))
 #else
-    #define REALM_THREAD_ANNOTATION_ATTRIBUTE__(x)
+#define REALM_THREAD_ANNOTATION_ATTRIBUTE__(x)
 #endif
 
-#define CAPABILITY(x) \
-    REALM_THREAD_ANNOTATION_ATTRIBUTE__(capability(x))
+#define CAPABILITY(x) REALM_THREAD_ANNOTATION_ATTRIBUTE__(capability(x))
 
-#define SCOPED_CAPABILITY \
-    REALM_THREAD_ANNOTATION_ATTRIBUTE__(scoped_lockable)
+#define SCOPED_CAPABILITY REALM_THREAD_ANNOTATION_ATTRIBUTE__(scoped_lockable)
 
-#define GUARDED_BY(x) \
-    REALM_THREAD_ANNOTATION_ATTRIBUTE__(guarded_by(x))
+#define GUARDED_BY(x) REALM_THREAD_ANNOTATION_ATTRIBUTE__(guarded_by(x))
 
-#define REQUIRES(...) \
-    REALM_THREAD_ANNOTATION_ATTRIBUTE__(requires_capability(__VA_ARGS__))
+#define REQUIRES(...) REALM_THREAD_ANNOTATION_ATTRIBUTE__(requires_capability(__VA_ARGS__))
 
-#define ACQUIRE(...) \
-    REALM_THREAD_ANNOTATION_ATTRIBUTE__(acquire_capability(__VA_ARGS__))
+#define ACQUIRE(...) REALM_THREAD_ANNOTATION_ATTRIBUTE__(acquire_capability(__VA_ARGS__))
 
-#define RELEASE(...) \
-    REALM_THREAD_ANNOTATION_ATTRIBUTE__(release_capability(__VA_ARGS__))
+#define RELEASE(...) REALM_THREAD_ANNOTATION_ATTRIBUTE__(release_capability(__VA_ARGS__))
 
-#define EXCLUDES(...) \
-    REALM_THREAD_ANNOTATION_ATTRIBUTE__(locks_excluded(__VA_ARGS__))
+#define EXCLUDES(...) REALM_THREAD_ANNOTATION_ATTRIBUTE__(locks_excluded(__VA_ARGS__))
 
-#define NO_THREAD_SAFETY_ANALYSIS \
-    REALM_THREAD_ANNOTATION_ATTRIBUTE__(no_thread_safety_analysis)
+#define NO_THREAD_SAFETY_ANALYSIS REALM_THREAD_ANNOTATION_ATTRIBUTE__(no_thread_safety_analysis)
 
 namespace realm {
 namespace util {
@@ -70,21 +62,43 @@ namespace util {
 // std::unique_lock with thread safety annotations
 class SCOPED_CAPABILITY CheckedUniqueLock {
     using Impl = std::unique_lock<std::mutex>;
+
 public:
-    template<typename Mutex>
-    CheckedUniqueLock(Mutex const& m) ACQUIRE(m) : m_impl(m.lock()) { }
-    ~CheckedUniqueLock() RELEASE() { }
+    template <typename Mutex>
+    CheckedUniqueLock(Mutex const& m) ACQUIRE(m)
+        : m_impl(m.lock())
+    {
+    }
+    ~CheckedUniqueLock() RELEASE() {}
 
     CheckedUniqueLock(CheckedUniqueLock&&) = default;
     CheckedUniqueLock& operator=(CheckedUniqueLock&&) = default;
 
-    void lock() ACQUIRE() { m_impl.lock(); }
-    void unlock() RELEASE() { m_impl.unlock(); }
-    void lock_unchecked() { m_impl.lock(); }
-    void unlock_unchecked() { m_impl.unlock(); }
-    bool owns_lock() const noexcept { return m_impl.owns_lock(); }
+    void lock() ACQUIRE()
+    {
+        m_impl.lock();
+    }
+    void unlock() RELEASE()
+    {
+        m_impl.unlock();
+    }
+    void lock_unchecked()
+    {
+        m_impl.lock();
+    }
+    void unlock_unchecked()
+    {
+        m_impl.unlock();
+    }
+    bool owns_lock() const noexcept
+    {
+        return m_impl.owns_lock();
+    }
 
-    Impl& native_handle() { return m_impl; }
+    Impl& native_handle()
+    {
+        return m_impl;
+    }
 
 private:
     Impl m_impl;
@@ -93,10 +107,14 @@ private:
 // std::lock_guard with thread safety annotations
 class SCOPED_CAPABILITY CheckedLockGuard {
     using Impl = std::unique_lock<std::mutex>;
+
 public:
-    template<typename Mutex>
-    CheckedLockGuard(Mutex const& m) ACQUIRE(m) : m_impl(m.lock()) { }
-    ~CheckedLockGuard() RELEASE() { }
+    template <typename Mutex>
+    CheckedLockGuard(Mutex const& m) ACQUIRE(m)
+        : m_impl(m.lock())
+    {
+    }
+    ~CheckedLockGuard() RELEASE() {}
 
     CheckedLockGuard(CheckedLockGuard&&) = delete;
     CheckedLockGuard& operator=(CheckedLockGuard&&) = delete;
@@ -111,7 +129,11 @@ public:
     CheckedMutex() = default;
 
     // Required for REQUIRE(!m); do not actually call
-    CheckedMutex const& operator!() const { return *this; }
+    CheckedMutex const& operator!() const
+    {
+        return *this;
+    }
+
 private:
     mutable std::mutex m_mutex;
     friend class CheckedUniqueLock;
@@ -128,14 +150,18 @@ private:
 // a no-op.
 class CAPABILITY("mutex") CheckedOptionalMutex {
 public:
-    CheckedOptionalMutex(bool enable=false);
+    CheckedOptionalMutex(bool enable = false);
     CheckedOptionalMutex(CheckedOptionalMutex const&);
     CheckedOptionalMutex& operator=(CheckedOptionalMutex const&);
     CheckedOptionalMutex(CheckedOptionalMutex&&) = default;
     CheckedOptionalMutex& operator=(CheckedOptionalMutex&&) = default;
 
     // Required for REQUIRE(!m); do not actually call
-    CheckedOptionalMutex const& operator!() const { return *this; }
+    CheckedOptionalMutex const& operator!() const
+    {
+        return *this;
+    }
+
 private:
     mutable std::unique_ptr<std::mutex> m_mutex;
     friend class CheckedUniqueLock;
@@ -145,12 +171,12 @@ private:
 };
 
 inline CheckedOptionalMutex::CheckedOptionalMutex(bool enable)
-: m_mutex(enable ? std::make_unique<std::mutex>() : nullptr)
+    : m_mutex(enable ? std::make_unique<std::mutex>() : nullptr)
 {
 }
 
 inline CheckedOptionalMutex::CheckedOptionalMutex(CheckedOptionalMutex const& o)
-: CheckedOptionalMutex(!!o.m_mutex)
+    : CheckedOptionalMutex(!!o.m_mutex)
 {
 }
 

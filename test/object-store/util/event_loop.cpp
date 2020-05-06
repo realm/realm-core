@@ -60,7 +60,10 @@ private:
     uv_loop_t* m_loop;
     uv_async_t m_perform_work;
 #elif REALM_PLATFORM_APPLE
-    Impl(util::CFPtr<CFRunLoopRef> loop) : m_loop(std::move(loop)) { }
+    Impl(util::CFPtr<CFRunLoopRef> loop)
+        : m_loop(std::move(loop))
+    {
+    }
 
     util::CFPtr<CFRunLoopRef> m_loop;
 #endif
@@ -72,7 +75,8 @@ EventLoop& EventLoop::main()
     return main;
 }
 
-EventLoop::EventLoop(std::unique_ptr<Impl> impl) : m_impl(std::move(impl))
+EventLoop::EventLoop(std::unique_ptr<Impl> impl)
+    : m_impl(std::move(impl))
 {
 }
 
@@ -90,7 +94,10 @@ void EventLoop::perform(std::function<void()> function)
 
 #if REALM_USE_UV
 
-bool EventLoop::has_implementation() { return true; }
+bool EventLoop::has_implementation()
+{
+    return true;
+}
 
 std::unique_ptr<EventLoop::Impl> EventLoop::Impl::main()
 {
@@ -116,7 +123,7 @@ EventLoop::Impl::Impl(uv_loop_t* loop)
 
 EventLoop::Impl::~Impl()
 {
-    uv_close((uv_handle_t*)&m_perform_work, [](uv_handle_t*){});
+    uv_close((uv_handle_t*)&m_perform_work, [](uv_handle_t*) {});
     uv_loop_close(m_loop);
 }
 
@@ -129,9 +136,8 @@ struct IdleHandler {
     }
     ~IdleHandler()
     {
-        uv_close(reinterpret_cast<uv_handle_t*>(idle), [](uv_handle_t* handle) {
-            delete reinterpret_cast<uv_idle_t*>(handle);
-        });
+        uv_close(reinterpret_cast<uv_handle_t*>(idle),
+                 [](uv_handle_t* handle) { delete reinterpret_cast<uv_idle_t*>(handle); });
     }
 };
 
@@ -165,7 +171,10 @@ void EventLoop::Impl::perform(std::function<void()> f)
 
 #elif REALM_PLATFORM_APPLE
 
-bool EventLoop::has_implementation() { return true; }
+bool EventLoop::has_implementation()
+{
+    return true;
+}
 
 std::unique_ptr<EventLoop::Impl> EventLoop::Impl::main()
 {
@@ -185,12 +194,13 @@ void EventLoop::Impl::run_until(std::function<bool()> predicate)
     };
     CFRunLoopObserverContext ctx{};
     ctx.info = &predicate;
-    auto observer = adoptCF(CFRunLoopObserverCreate(kCFAllocatorDefault, kCFRunLoopAllActivities,
-                                                    true, 0, callback, &ctx));
-    auto timer = adoptCF(CFRunLoopTimerCreateWithHandler(kCFAllocatorDefault, CFAbsoluteTimeGetCurrent(), 0.0005, 0, 0,
-                                                         ^(CFRunLoopTimerRef){
-        // Do nothing. The timer firing is sufficient to cause our runloop observer to run.
-    }));
+    auto observer =
+        adoptCF(CFRunLoopObserverCreate(kCFAllocatorDefault, kCFRunLoopAllActivities, true, 0, callback, &ctx));
+    auto timer = adoptCF(CFRunLoopTimerCreateWithHandler(
+        kCFAllocatorDefault, CFAbsoluteTimeGetCurrent(), 0.0005, 0, 0,
+        ^(CFRunLoopTimerRef){
+            // Do nothing. The timer firing is sufficient to cause our runloop observer to run.
+        }));
     CFRunLoopAddObserver(CFRunLoopGetCurrent(), observer.get(), kCFRunLoopCommonModes);
     CFRunLoopAddTimer(CFRunLoopGetCurrent(), timer.get(), kCFRunLoopCommonModes);
     CFRunLoopRun();
@@ -200,16 +210,30 @@ void EventLoop::Impl::run_until(std::function<bool()> predicate)
 
 void EventLoop::Impl::perform(std::function<void()> f)
 {
-    CFRunLoopPerformBlock(m_loop.get(), kCFRunLoopDefaultMode, ^{ f(); });
+    CFRunLoopPerformBlock(m_loop.get(), kCFRunLoopDefaultMode, ^{
+      f();
+    });
     CFRunLoopWakeUp(m_loop.get());
 }
 
 #else
 
-bool EventLoop::has_implementation() { return false; }
-std::unique_ptr<EventLoop::Impl> EventLoop::Impl::main() { return nullptr; }
+bool EventLoop::has_implementation()
+{
+    return false;
+}
+std::unique_ptr<EventLoop::Impl> EventLoop::Impl::main()
+{
+    return nullptr;
+}
 EventLoop::Impl::~Impl() = default;
-void EventLoop::Impl::run_until(std::function<bool()>) { printf("WARNING: there is no event loop implementation and nothing is happening.\n"); }
-void EventLoop::Impl::perform(std::function<void()>) { printf("WARNING: there is no event loop implementation and nothing is happening.\n"); }
+void EventLoop::Impl::run_until(std::function<bool()>)
+{
+    printf("WARNING: there is no event loop implementation and nothing is happening.\n");
+}
+void EventLoop::Impl::perform(std::function<void()>)
+{
+    printf("WARNING: there is no event loop implementation and nothing is happening.\n");
+}
 
 #endif

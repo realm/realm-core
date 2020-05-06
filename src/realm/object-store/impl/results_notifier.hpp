@@ -31,8 +31,14 @@ public:
     using ListIndices = util::Optional<std::vector<size_t>>;
     using CollectionNotifier::CollectionNotifier;
 
-    virtual bool get_tableview(TableView&) { return false; }
-    virtual bool get_list_indices(ListIndices&) { return false; }
+    virtual bool get_tableview(TableView&)
+    {
+        return false;
+    }
+    virtual bool get_list_indices(ListIndices&)
+    {
+        return false;
+    }
 };
 
 class ResultsNotifier : public ResultsNotifierBase {

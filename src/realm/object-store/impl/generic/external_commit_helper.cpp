@@ -27,19 +27,19 @@ using namespace realm;
 using namespace realm::_impl;
 
 ExternalCommitHelper::ExternalCommitHelper(RealmCoordinator& parent)
-: m_parent(parent)
-, m_history(realm::make_in_realm_history(parent.get_path()))
-, m_sg(*m_history, TransactionOptions(parent.is_in_memory() ? TransactionOptions::Durability::MemOnly
-                                                            : TransactionOptions::Durability::Full,
-                                      parent.get_encryption_key().data()))
-, m_thread(std::async(std::launch::async, [=] {
-    m_sg.begin_read();
-    while (m_sg.wait_for_change()) {
-        m_sg.end_read();
+    : m_parent(parent)
+    , m_history(realm::make_in_realm_history(parent.get_path()))
+    , m_sg(*m_history, TransactionOptions(parent.is_in_memory() ? TransactionOptions::Durability::MemOnly
+                                                                : TransactionOptions::Durability::Full,
+                                          parent.get_encryption_key().data()))
+    , m_thread(std::async(std::launch::async, [=] {
         m_sg.begin_read();
-        m_parent.on_change();
-    }
-}))
+        while (m_sg.wait_for_change()) {
+            m_sg.end_read();
+            m_sg.begin_read();
+            m_parent.on_change();
+        }
+    }))
 {
 }
 

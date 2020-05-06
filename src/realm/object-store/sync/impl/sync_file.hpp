@@ -29,9 +29,7 @@ namespace realm {
 
 namespace util {
 
-enum class FilePathType {
-    File, Directory
-};
+enum class FilePathType { File, Directory };
 
 // FIXME: Does it make sense to use realm::StringData arguments for these functions instead of std::string?
 
@@ -42,31 +40,33 @@ std::string make_percent_encoded_string(const std::string& raw_string);
 std::string make_raw_string(const std::string& percent_encoded_string);
 
 /// Given a file path and a path component, return a new path created by appending the component to the path.
-std::string file_path_by_appending_component(const std::string& path,
-                                             const std::string& component,
-                                             FilePathType path_type=FilePathType::File);
+std::string file_path_by_appending_component(const std::string& path, const std::string& component,
+                                             FilePathType path_type = FilePathType::File);
 
 /// Given a file path and an extension, append the extension to the path.
 std::string file_path_by_appending_extension(const std::string& path, const std::string& extension);
 
 /// Create a timestamped `mktemp`-compatible template string using the current local time.
-std::string create_timestamped_template(const std::string& prefix, int wildcard_count=8);
+std::string create_timestamped_template(const std::string& prefix, int wildcard_count = 8);
 
 /// Reserve a unique file name based on a base directory path and a `mktemp`-compatible template string.
 /// Returns the path of the file.
 std::string reserve_unique_file_name(const std::string& path, const std::string& template_string);
 
-} // util
+} // namespace util
 
 class SyncFileManager {
 public:
-    SyncFileManager(std::string base_path) : m_base_path(std::move(base_path)) { }
+    SyncFileManager(std::string base_path)
+        : m_base_path(std::move(base_path))
+    {
+    }
 
     /// Return the user directory for a given user, creating it if it does not already exist.
     std::string user_directory(const std::string& local_identity) const;
 
     /// Remove the user directory for a given user.
-    void remove_user_directory(const std::string& local_identity) const;       // throws
+    void remove_user_directory(const std::string& local_identity) const; // throws
 
     /// Rename a user directory. Returns true if a directory at `old_name` existed
     /// and was successfully renamed to `new_name`. Returns false if no directory
@@ -97,7 +97,7 @@ public:
         return m_base_path;
     }
 
-    std::string recovery_directory_path(util::Optional<std::string> const& directory=none) const
+    std::string recovery_directory_path(util::Optional<std::string> const& directory = none) const
     {
         return get_special_directory(directory.value_or(c_recovery_directory));
     }
@@ -121,6 +121,6 @@ private:
     std::string get_base_sync_directory() const;
 };
 
-} // realm
+} // namespace realm
 
 #endif // REALM_OS_SYNC_FILE_HPP

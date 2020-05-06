@@ -37,15 +37,20 @@ public:
     // used when recurring into a link or array property during object creation
     // (i.e. prop.type will always be Object or Array).
     CppContext(CppContext& c, Obj parent, Property const& prop)
-    : realm(c.realm)
-    , object_schema(prop.type == PropertyType::Object ? &*realm->schema().find(prop.object_type) : c.object_schema)
-    , m_parent(std::move(parent))
-    , m_property(&prop)
-    { }
+        : realm(c.realm)
+        , object_schema(prop.type == PropertyType::Object ? &*realm->schema().find(prop.object_type)
+                                                          : c.object_schema)
+        , m_parent(std::move(parent))
+        , m_property(&prop)
+    {
+    }
 
     CppContext() = default;
-    CppContext(std::shared_ptr<Realm> realm, const ObjectSchema* os=nullptr)
-    : realm(std::move(realm)), object_schema(os) { }
+    CppContext(std::shared_ptr<Realm> realm, const ObjectSchema* os = nullptr)
+        : realm(std::move(realm))
+        , object_schema(os)
+    {
+    }
 
     // The use of util::Optional for the following two functions is not a hard
     // requirement; only that it be some type which can be evaluated in a
@@ -56,8 +61,7 @@ public:
     // value present. The property is identified both by the name of the
     // property and its index within the ObjectScehma's persisted_properties
     // array.
-    util::Optional<util::Any> value_for_property(util::Any& dict,
-                                                 const Property& prop,
+    util::Optional<util::Any> value_for_property(util::Any& dict, const Property& prop,
                                                  size_t /* property_index */) const
     {
         auto const& v = any_cast<AnyDict&>(dict);
@@ -71,15 +75,15 @@ public:
     //
     // This implementation does not support default values; see the default
     // value tests for an example of one which does.
-    util::Optional<util::Any>
-    default_value_for_property(ObjectSchema const&, Property const&) const
+    util::Optional<util::Any> default_value_for_property(ObjectSchema const&, Property const&) const
     {
         return util::none;
     }
 
     // Invoke `fn` with each of the values from an enumerable type
-    template<typename Func>
-    void enumerate_list(util::Any& value, Func&& fn) {
+    template <typename Func>
+    void enumerate_list(util::Any& value, Func&& fn)
+    {
         for (auto&& v : any_cast<AnyVector&>(value))
             fn(v);
     }
@@ -93,29 +97,83 @@ public:
     }
 
     // Convert from core types to the boxed type
-    util::Any box(BinaryData v) const { return std::string(v); }
-    util::Any box(List v) const { return v; }
-    util::Any box(Object v) const { return v; }
-    util::Any box(Results v) const { return v; }
-    util::Any box(StringData v) const { return std::string(v); }
-    util::Any box(Timestamp v) const { return v; }
-    util::Any box(bool v) const { return v; }
-    util::Any box(double v) const { return v; }
-    util::Any box(float v) const { return v; }
-    util::Any box(int64_t v) const { return v; }
-    util::Any box(ObjectId v) const { return v; }
-    util::Any box(Decimal v) const { return v; }
-    util::Any box(util::Optional<bool> v) const { return v; }
-    util::Any box(util::Optional<double> v) const { return v; }
-    util::Any box(util::Optional<float> v) const { return v; }
-    util::Any box(util::Optional<int64_t> v) const { return v; }
-    util::Any box(util::Optional<ObjectId> v) const { return v; }
+    util::Any box(BinaryData v) const
+    {
+        return std::string(v);
+    }
+    util::Any box(List v) const
+    {
+        return v;
+    }
+    util::Any box(Object v) const
+    {
+        return v;
+    }
+    util::Any box(Results v) const
+    {
+        return v;
+    }
+    util::Any box(StringData v) const
+    {
+        return std::string(v);
+    }
+    util::Any box(Timestamp v) const
+    {
+        return v;
+    }
+    util::Any box(bool v) const
+    {
+        return v;
+    }
+    util::Any box(double v) const
+    {
+        return v;
+    }
+    util::Any box(float v) const
+    {
+        return v;
+    }
+    util::Any box(int64_t v) const
+    {
+        return v;
+    }
+    util::Any box(ObjectId v) const
+    {
+        return v;
+    }
+    util::Any box(Decimal v) const
+    {
+        return v;
+    }
+    util::Any box(util::Optional<bool> v) const
+    {
+        return v;
+    }
+    util::Any box(util::Optional<double> v) const
+    {
+        return v;
+    }
+    util::Any box(util::Optional<float> v) const
+    {
+        return v;
+    }
+    util::Any box(util::Optional<int64_t> v) const
+    {
+        return v;
+    }
+    util::Any box(util::Optional<ObjectId> v) const
+    {
+        return v;
+    }
     util::Any box(Obj) const;
 
     // Any properties are only supported by the Cocoa binding to enable reading
     // old Realm files that may have used them. Other bindings can safely not
     // implement this.
-    util::Any box(Mixed) const { REALM_TERMINATE("not supported"); }
+    util::Any box(Mixed) const
+    {
+        REALM_TERMINATE("not supported");
+    }
 
     // Convert from the boxed type to core types. This needs to be implemented
     // for all of the types which `box()` can take, plus `Obj` and optional
@@ -131,14 +189,26 @@ public:
     // already existing properties should be updated. If `create` and `update_only_diff`
     // is true, `current_row` may hold a reference to the object that should
     // be compared against.
-    template<typename T>
-    T unbox(util::Any& v, CreatePolicy = CreatePolicy::Skip, ObjKey /*current_row*/ = ObjKey()) const { return any_cast<T>(v); }
+    template <typename T>
+    T unbox(util::Any& v, CreatePolicy = CreatePolicy::Skip, ObjKey /*current_row*/ = ObjKey()) const
+    {
+        return any_cast<T>(v);
+    }
 
     Obj create_embedded_object();
 
-    bool is_null(util::Any const& v) const noexcept { return !v.has_value(); }
-    util::Any null_value() const noexcept { return {}; }
-    util::Optional<util::Any> no_value() const noexcept { return {}; }
+    bool is_null(util::Any const& v) const noexcept
+    {
+        return !v.has_value();
+    }
+    util::Any null_value() const noexcept
+    {
+        return {};
+    }
+    util::Optional<util::Any> no_value() const noexcept
+    {
+        return {};
+    }
 
     // KVO hooks which will be called before and after modying a property from
     // within Object::create().
@@ -146,19 +216,24 @@ public:
     void did_change() {}
 
     // Get a string representation of the given value for use in error messages.
-    std::string print(util::Any const&) const { return "not implemented"; }
+    std::string print(util::Any const&) const
+    {
+        return "not implemented";
+    }
 
     // Cocoa allows supplying fewer values than there are properties when
     // creating objects using an array of values. Other bindings should not
     // mimick this behavior so just return false here.
-    bool allow_missing(util::Any const&) const { return false; }
+    bool allow_missing(util::Any const&) const
+    {
+        return false;
+    }
 
 private:
     std::shared_ptr<Realm> realm;
     const ObjectSchema* object_schema = nullptr;
     Obj m_parent;
     const Property* m_property = nullptr;
-
 };
 
 inline util::Any CppContext::box(Obj obj) const
@@ -167,7 +242,7 @@ inline util::Any CppContext::box(Obj obj) const
     return Object(realm, *object_schema, obj);
 }
 
-template<>
+template <>
 inline StringData CppContext::unbox(util::Any& v, CreatePolicy, ObjKey) const
 {
     if (!v.has_value())
@@ -176,7 +251,7 @@ inline StringData CppContext::unbox(util::Any& v, CreatePolicy, ObjKey) const
     return StringData(value.c_str(), value.size());
 }
 
-template<>
+template <>
 inline BinaryData CppContext::unbox(util::Any& v, CreatePolicy, ObjKey) const
 {
     if (!v.has_value())
@@ -185,7 +260,7 @@ inline BinaryData CppContext::unbox(util::Any& v, CreatePolicy, ObjKey) const
     return BinaryData(value.c_str(), value.size());
 }
 
-template<>
+template <>
 inline Obj CppContext::unbox(util::Any& v, CreatePolicy policy, ObjKey current_obj) const
 {
     if (auto object = any_cast<Object>(&v))
@@ -199,37 +274,37 @@ inline Obj CppContext::unbox(util::Any& v, CreatePolicy policy, ObjKey current_o
     return Object::create(const_cast<CppContext&>(*this), realm, *object_schema, v, policy, current_obj).obj();
 }
 
-template<>
+template <>
 inline util::Optional<bool> CppContext::unbox(util::Any& v, CreatePolicy, ObjKey) const
 {
     return v.has_value() ? util::make_optional(unbox<bool>(v)) : util::none;
 }
 
-template<>
+template <>
 inline util::Optional<int64_t> CppContext::unbox(util::Any& v, CreatePolicy, ObjKey) const
 {
     return v.has_value() ? util::make_optional(unbox<int64_t>(v)) : util::none;
 }
 
-template<>
+template <>
 inline util::Optional<double> CppContext::unbox(util::Any& v, CreatePolicy, ObjKey) const
 {
     return v.has_value() ? util::make_optional(unbox<double>(v)) : util::none;
 }
 
-template<>
+template <>
 inline util::Optional<float> CppContext::unbox(util::Any& v, CreatePolicy, ObjKey) const
 {
     return v.has_value() ? util::make_optional(unbox<float>(v)) : util::none;
 }
 
-template<>
+template <>
 inline util::Optional<ObjectId> CppContext::unbox(util::Any& v, CreatePolicy, ObjKey) const
 {
     return v.has_value() ? util::make_optional(unbox<ObjectId>(v)) : util::none;
 }
 
-template<>
+template <>
 inline Mixed CppContext::unbox(util::Any&, CreatePolicy, ObjKey) const
 {
     throw std::logic_error("'Any' type is unsupported");
@@ -239,6 +314,6 @@ inline Obj CppContext::create_embedded_object()
 {
     return m_parent.create_and_set_linked_object(m_property->column_key);
 }
-}
+} // namespace realm
 
 #endif // REALM_OS_OBJECT_ACCESSOR_IMPL_HPP

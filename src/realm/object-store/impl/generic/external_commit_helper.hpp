@@ -32,7 +32,7 @@ public:
     ~ExternalCommitHelper();
 
     // A no-op in this version, but needed for the Apple version
-    void notify_others() { }
+    void notify_others() {}
 
 private:
     RealmCoordinator& m_parent;
@@ -47,4 +47,3 @@ private:
 
 } // namespace _impl
 } // namespace realm
-

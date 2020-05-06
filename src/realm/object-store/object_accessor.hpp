@@ -40,15 +40,13 @@
 
 namespace realm {
 template <typename ValueType, typename ContextType>
-void Object::set_property_value(ContextType& ctx, StringData prop_name,
-                                ValueType value, CreatePolicy policy)
+void Object::set_property_value(ContextType& ctx, StringData prop_name, ValueType value, CreatePolicy policy)
 {
     set_property_value(ctx, property_for_name(prop_name), value, policy);
 }
 
 template <typename ValueType, typename ContextType>
-void Object::set_property_value(ContextType& ctx, Property const& property,
-                                ValueType value, CreatePolicy policy)
+void Object::set_property_value(ContextType& ctx, Property const& property, ValueType value, CreatePolicy policy)
 {
     verify_attached();
     m_realm->verify_in_write();
@@ -105,7 +103,7 @@ struct ValueUpdater {
         }
     }
 
-    template<typename T>
+    template <typename T>
     void operator()(T*)
     {
         auto new_val = ctx.template unbox<T>(value);
@@ -114,11 +112,11 @@ struct ValueUpdater {
         }
     }
 };
-}
+} // namespace
 
 template <typename ValueType, typename ContextType>
-void Object::set_property_value_impl(ContextType& ctx, const Property &property,
-                                     ValueType value, CreatePolicy policy, bool is_default)
+void Object::set_property_value_impl(ContextType& ctx, const Property& property, ValueType value, CreatePolicy policy,
+                                     bool is_default)
 {
     ctx.will_change(*this, property);
 
@@ -149,14 +147,13 @@ void Object::set_property_value_impl(ContextType& ctx, const Property &property,
         return;
     }
 
-    ValueUpdater<ValueType, ContextType> updater{ctx, property, value,
-        m_obj, col, policy, is_default};
+    ValueUpdater<ValueType, ContextType> updater{ctx, property, value, m_obj, col, policy, is_default};
     switch_on_type(property.type, updater);
     ctx.did_change();
 }
 
 template <typename ValueType, typename ContextType>
-ValueType Object::get_property_value_impl(ContextType& ctx, const Property &property) const
+ValueType Object::get_property_value_impl(ContextType& ctx, const Property& property) const
 {
     verify_attached();
 
@@ -167,20 +164,30 @@ ValueType Object::get_property_value_impl(ContextType& ctx, const Property &prop
         return ctx.box(List(m_realm, m_obj, column));
 
     switch (property.type & ~PropertyType::Flags) {
-        case PropertyType::Bool:   return ctx.box(m_obj.get<bool>(column));
-        case PropertyType::Int:    return is_nullable(property.type) ? ctx.box(*m_obj.get<util::Optional<int64_t>>(column)) : ctx.box(m_obj.get<int64_t>(column));
-        case PropertyType::Float:  return ctx.box(m_obj.get<float>(column));
-        case PropertyType::Double: return ctx.box(m_obj.get<double>(column));
-        case PropertyType::String: return ctx.box(m_obj.get<StringData>(column));
-        case PropertyType::Data:   return ctx.box(m_obj.get<BinaryData>(column));
-        case PropertyType::Date:   return ctx.box(m_obj.get<Timestamp>(column));
-        case PropertyType::ObjectId: return is_nullable(property.type) ? ctx.box(m_obj.get<util::Optional<ObjectId>>(column)) : ctx.box(m_obj.get<ObjectId>(column));
-        case PropertyType::Decimal:  return ctx.box(m_obj.get<Decimal>(column));
-//        case PropertyType::Any:    return ctx.box(m_obj.get<Mixed>(column));
+        case PropertyType::Bool:
+            return ctx.box(m_obj.get<bool>(column));
+        case PropertyType::Int:
+            return is_nullable(property.type) ? ctx.box(*m_obj.get<util::Optional<int64_t>>(column))
+                                              : ctx.box(m_obj.get<int64_t>(column));
+        case PropertyType::Float:
+            return ctx.box(m_obj.get<float>(column));
+        case PropertyType::Double:
+            return ctx.box(m_obj.get<double>(column));
+        case PropertyType::String:
+            return ctx.box(m_obj.get<StringData>(column));
+        case PropertyType::Data:
+            return ctx.box(m_obj.get<BinaryData>(column));
+        case PropertyType::Date:
+            return ctx.box(m_obj.get<Timestamp>(column));
+        case PropertyType::ObjectId:
+            return is_nullable(property.type) ? ctx.box(m_obj.get<util::Optional<ObjectId>>(column))
+                                              : ctx.box(m_obj.get<ObjectId>(column));
+        case PropertyType::Decimal:
+            return ctx.box(m_obj.get<Decimal>(column));
+            //        case PropertyType::Any:    return ctx.box(m_obj.get<Mixed>(column));
         case PropertyType::Object: {
             auto linkObjectSchema = m_realm->schema().find(property.object_type);
-            return ctx.box(Object(m_realm, *linkObjectSchema,
-                                  const_cast<Obj&>(m_obj).get_linked_object(column)));
+            return ctx.box(Object(m_realm, *linkObjectSchema, const_cast<Obj&>(m_obj).get_linked_object(column)));
         }
         case PropertyType::LinkingObjects: {
             auto target_object_schema = m_realm->schema().find(property.object_type);
@@ -189,13 +196,13 @@ ValueType Object::get_property_value_impl(ContextType& ctx, const Property &prop
             auto tv = const_cast<Obj&>(m_obj).get_backlink_view(table, ColKey(link_property->column_key));
             return ctx.box(Results(m_realm, std::move(tv)));
         }
-        default: REALM_UNREACHABLE();
+        default:
+            REALM_UNREACHABLE();
     }
 }
 
-template<typename ValueType, typename ContextType>
-Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
-                      StringData object_type, ValueType value,
+template <typename ValueType, typename ContextType>
+Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm, StringData object_type, ValueType value,
                       CreatePolicy policy, ObjKey current_obj, Obj* out_row)
 {
     auto object_schema = realm->schema().find(object_type);
@@ -203,10 +210,9 @@ Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
     return create(ctx, realm, *object_schema, value, policy, current_obj, out_row);
 }
 
-template<typename ValueType, typename ContextType>
-Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
-                      ObjectSchema const& object_schema, ValueType value,
-                      CreatePolicy policy, ObjKey current_obj, Obj* out_row)
+template <typename ValueType, typename ContextType>
+Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm, ObjectSchema const& object_schema,
+                      ValueType value, CreatePolicy policy, ObjKey current_obj, Obj* out_row)
 {
     realm->verify_in_write();
 
@@ -219,8 +225,8 @@ Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
 
     if (auto primary_prop = object_schema.primary_key_property()) {
         // search for existing object based on primary key type
-        auto primary_value = ctx.value_for_property(value, *primary_prop,
-                                                    primary_prop - &object_schema.persisted_properties[0]);
+        auto primary_value =
+            ctx.value_for_property(value, *primary_prop, primary_prop - &object_schema.persisted_properties[0]);
         if (!primary_value)
             primary_value = ctx.default_value_for_property(object_schema, *primary_prop);
         if (!primary_value) {
@@ -231,8 +237,9 @@ Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
         auto key = get_for_primary_key_impl(ctx, *table, *primary_prop, *primary_value);
         if (key) {
             if (!policy.update)
-                throw std::logic_error(util::format("Attempting to create an object of type '%1' with an existing primary key value '%2'.",
-                                                    object_schema.name, ctx.print(*primary_value)));
+                throw std::logic_error(util::format(
+                    "Attempting to create an object of type '%1' with an existing primary key value '%2'.",
+                    object_schema.name, ctx.print(*primary_value)));
             obj = table->get_object(key);
         }
         else {
@@ -294,19 +301,18 @@ Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
     return object;
 }
 
-template<typename ValueType, typename ContextType>
-Object Object::get_for_primary_key(ContextType& ctx, std::shared_ptr<Realm> const& realm,
-                      StringData object_type, ValueType primary_value)
+template <typename ValueType, typename ContextType>
+Object Object::get_for_primary_key(ContextType& ctx, std::shared_ptr<Realm> const& realm, StringData object_type,
+                                   ValueType primary_value)
 {
     auto object_schema = realm->schema().find(object_type);
     REALM_ASSERT(object_schema != realm->schema().end());
     return get_for_primary_key(ctx, realm, *object_schema, primary_value);
 }
 
-template<typename ValueType, typename ContextType>
+template <typename ValueType, typename ContextType>
 Object Object::get_for_primary_key(ContextType& ctx, std::shared_ptr<Realm> const& realm,
-                                   const ObjectSchema &object_schema,
-                                   ValueType primary_value)
+                                   const ObjectSchema& object_schema, ValueType primary_value)
 {
     auto primary_prop = object_schema.primary_key_property();
     if (!primary_prop) {
@@ -322,10 +328,10 @@ Object Object::get_for_primary_key(ContextType& ctx, std::shared_ptr<Realm> cons
     return Object(realm, object_schema, key ? table->get_object(key) : Obj{});
 }
 
-template<typename ValueType, typename ContextType>
-ObjKey Object::get_for_primary_key_impl(ContextType& ctx, Table const& table,
-                                        const Property &primary_prop,
-                                        ValueType primary_value) {
+template <typename ValueType, typename ContextType>
+ObjKey Object::get_for_primary_key_impl(ContextType& ctx, Table const& table, const Property& primary_prop,
+                                        ValueType primary_value)
+{
     if (ctx.is_null(primary_value)) {
         if (!is_nullable(primary_prop.type))
             throw std::logic_error("Invalid null value for non-nullable primary key.");

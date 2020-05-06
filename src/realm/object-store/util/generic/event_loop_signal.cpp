@@ -25,7 +25,9 @@ public:
     void post(std::function<void()>) override {}
 };
 
-static std::function<std::unique_ptr<GenericEventLoop>()> s_factory = [] { return std::unique_ptr<GenericEventLoop>(new DummyLoop); };
+static std::function<std::unique_ptr<GenericEventLoop>()> s_factory = [] {
+    return std::unique_ptr<GenericEventLoop>(new DummyLoop);
+};
 
 void GenericEventLoop::set_event_loop_factory(std::function<std::unique_ptr<GenericEventLoop>()> factory)
 {

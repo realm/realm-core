@@ -25,9 +25,10 @@
 
 namespace realm {
 
-AsyncOpenTask::AsyncOpenTask(std::shared_ptr<_impl::RealmCoordinator> coordinator, std::shared_ptr<realm::SyncSession> session)
-: m_coordinator(coordinator)
-, m_session(session)
+AsyncOpenTask::AsyncOpenTask(std::shared_ptr<_impl::RealmCoordinator> coordinator,
+                             std::shared_ptr<realm::SyncSession> session)
+    : m_coordinator(coordinator)
+    , m_session(session)
 {
 }
 
@@ -39,7 +40,7 @@ void AsyncOpenTask::start(std::function<void(ThreadSafeReference, std::exception
 
     std::shared_ptr<AsyncOpenTask> self(shared_from_this());
     session->wait_for_download_completion([callback, self, this](std::error_code ec) {
-       auto session = m_session.exchange(nullptr);
+        auto session = m_session.exchange(nullptr);
         if (!session)
             return; // Swallow all events if the task as been canceled.
 
@@ -86,4 +87,4 @@ void AsyncOpenTask::unregister_download_progress_notifier(uint64_t token)
         session->unregister_progress_notifier(token);
 }
 
-}
+} // namespace realm

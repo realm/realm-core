@@ -40,12 +40,13 @@ using namespace realm;
 constexpr uint64_t ObjectStore::NotVersioned;
 
 namespace {
-const char * const c_metadataTableName = "metadata";
-const char * const c_versionColumnName = "version";
+const char* const c_metadataTableName = "metadata";
+const char* const c_versionColumnName = "version";
 
 const char c_object_table_prefix[] = "class_";
 
-void create_metadata_tables(Group& group) {
+void create_metadata_tables(Group& group)
+{
     // The 'metadata' table is simply ignored by Sync
     TableRef metadata_table = group.get_or_add_table(c_metadataTableName);
 
@@ -55,11 +56,12 @@ void create_metadata_tables(Group& group) {
     }
 }
 
-void set_schema_version(Group& group, uint64_t version) {
+void set_schema_version(Group& group, uint64_t version)
+{
     group.get_table(c_metadataTableName)->get_object(0).set<int64_t>(c_versionColumnName, version);
 }
 
-template<typename Group>
+template <typename Group>
 auto table_for_object_schema(Group& group, ObjectSchema const& object_schema)
 {
     return ObjectStore::table_for_object_type(group, object_schema.name);
@@ -68,18 +70,28 @@ auto table_for_object_schema(Group& group, ObjectSchema const& object_schema)
 DataType to_core_type(PropertyType type)
 {
     REALM_ASSERT(type != PropertyType::Object); // Link columns have to be handled differently
-    REALM_ASSERT(type != PropertyType::Any); // Mixed columns can't be created
+    REALM_ASSERT(type != PropertyType::Any);    // Mixed columns can't be created
     switch (type & ~PropertyType::Flags) {
-        case PropertyType::Int:         return type_Int;
-        case PropertyType::Bool:        return type_Bool;
-        case PropertyType::Float:       return type_Float;
-        case PropertyType::Double:      return type_Double;
-        case PropertyType::String:      return type_String;
-        case PropertyType::Date:        return type_Timestamp;
-        case PropertyType::Data:        return type_Binary;
-        case PropertyType::ObjectId:    return type_ObjectId;
-        case PropertyType::Decimal:     return type_Decimal;
-        default: REALM_COMPILER_HINT_UNREACHABLE();
+        case PropertyType::Int:
+            return type_Int;
+        case PropertyType::Bool:
+            return type_Bool;
+        case PropertyType::Float:
+            return type_Float;
+        case PropertyType::Double:
+            return type_Double;
+        case PropertyType::String:
+            return type_String;
+        case PropertyType::Date:
+            return type_Timestamp;
+        case PropertyType::Data:
+            return type_Binary;
+        case PropertyType::ObjectId:
+            return type_ObjectId;
+        case PropertyType::Decimal:
+            return type_Decimal;
+        default:
+            REALM_COMPILER_HINT_UNREACHABLE();
     }
 }
 
@@ -99,12 +111,11 @@ ColKey add_column(Group& group, Table& table, Property const& property)
         auto target_name = ObjectStore::table_name_for_object_type(property.object_type);
         TableRef link_table = group.get_table(target_name);
         REALM_ASSERT(link_table);
-        return table.add_column_link(is_array(property.type) ? type_LinkList : type_Link,
-                                     property.name, *link_table);
+        return table.add_column_link(is_array(property.type) ? type_LinkList : type_Link, property.name, *link_table);
     }
     else if (is_array(property.type)) {
-        return table.add_column_list(to_core_type(property.type & ~PropertyType::Flags),
-                                     property.name, is_nullable(property.type));
+        return table.add_column_list(to_core_type(property.type & ~PropertyType::Flags), property.name,
+                                     is_nullable(property.type));
     }
     else {
         auto key = table.add_column(to_core_type(property.type), property.name, is_nullable(property.type));
@@ -114,8 +125,7 @@ ColKey add_column(Group& group, Table& table, Property const& property)
     }
 }
 
-void replace_column(Group& group, Table& table, Property const& old_property,
-                    Property const& new_property)
+void replace_column(Group& group, Table& table, Property const& old_property, Property const& new_property)
 {
     table.remove_column(old_property.column_key);
     add_column(group, table, new_property);
@@ -176,12 +186,14 @@ void make_property_required(Group& group, Table& table, Property property)
 
 } // anonymous namespace
 
-void ObjectStore::set_schema_version(Group& group, uint64_t version) {
+void ObjectStore::set_schema_version(Group& group, uint64_t version)
+{
     ::create_metadata_tables(group);
     ::set_schema_version(group, version);
 }
 
-uint64_t ObjectStore::get_schema_version(Group const& group) {
+uint64_t ObjectStore::get_schema_version(Group const& group)
+{
     ConstTableRef table = group.get_table(c_metadataTableName);
     if (!table || table->get_column_count() == 0) {
         return ObjectStore::NotVersioned;
@@ -189,7 +201,8 @@ uint64_t ObjectStore::get_schema_version(Group const& group) {
     return table->get_object(0).get<int64_t>(c_versionColumnName);
 }
 
-StringData ObjectStore::get_primary_key_for_object(Group const& group, StringData object_type) {
+StringData ObjectStore::get_primary_key_for_object(Group const& group, StringData object_type)
+{
     if (ConstTableRef table = table_for_object_type(group, object_type)) {
         if (auto col = table->get_primary_key_column()) {
             return table->get_column_name(col);
@@ -198,7 +211,8 @@ StringData ObjectStore::get_primary_key_for_object(Group const& group, StringDat
     return "";
 }
 
-void ObjectStore::set_primary_key_for_object(Group& group, StringData object_type, StringData primary_key) {
+void ObjectStore::set_primary_key_for_object(Group& group, StringData object_type, StringData primary_key)
+{
     auto t = table_for_object_type(group, object_type);
     ColKey pk_col;
     if (primary_key.size()) {
@@ -208,23 +222,27 @@ void ObjectStore::set_primary_key_for_object(Group& group, StringData object_typ
     t->set_primary_key_column(pk_col);
 }
 
-StringData ObjectStore::object_type_for_table_name(StringData table_name) {
+StringData ObjectStore::object_type_for_table_name(StringData table_name)
+{
     if (table_name.begins_with(c_object_table_prefix)) {
         return table_name.substr(sizeof(c_object_table_prefix) - 1);
     }
     return StringData();
 }
 
-std::string ObjectStore::table_name_for_object_type(StringData object_type) {
+std::string ObjectStore::table_name_for_object_type(StringData object_type)
+{
     return std::string(c_object_table_prefix) + std::string(object_type);
 }
 
-TableRef ObjectStore::table_for_object_type(Group& group, StringData object_type) {
+TableRef ObjectStore::table_for_object_type(Group& group, StringData object_type)
+{
     auto name = table_name_for_object_type(object_type);
     return group.get_table(name);
 }
 
-ConstTableRef ObjectStore::table_for_object_type(Group const& group, StringData object_type) {
+ConstTableRef ObjectStore::table_for_object_type(Group const& group, StringData object_type)
+{
     auto name = table_name_for_object_type(object_type);
     return group.get_table(name);
 }
@@ -268,10 +286,8 @@ struct SchemaDifferenceExplainer {
 
     void operator()(schema_change::ChangePropertyType op)
     {
-        errors.emplace_back("Property '%1.%2' has been changed from '%3' to '%4'.",
-                            op.object->name, op.new_property->name,
-                            op.old_property->type_string(),
-                            op.new_property->type_string());
+        errors.emplace_back("Property '%1.%2' has been changed from '%3' to '%4'.", op.object->name,
+                            op.new_property->name, op.old_property->type_string(), op.new_property->type_string());
     }
 
     void operator()(schema_change::MakePropertyNullable op)
@@ -287,8 +303,8 @@ struct SchemaDifferenceExplainer {
     void operator()(schema_change::ChangePrimaryKey op)
     {
         if (op.property && !op.object->primary_key.empty()) {
-            errors.emplace_back("Primary Key for class '%1' has changed from '%2' to '%3'.",
-                                op.object->name, op.object->primary_key, op.property->name);
+            errors.emplace_back("Primary Key for class '%1' has changed from '%2' to '%3'.", op.object->name,
+                                op.object->primary_key, op.property->name);
         }
         else if (op.property) {
             errors.emplace_back("Primary Key for class '%1' has been added.", op.object->name);
@@ -311,7 +327,10 @@ struct SchemaDifferenceExplainer {
 
 class TableHelper {
 public:
-    TableHelper(Group& g) : m_group(g) { }
+    TableHelper(Group& g)
+        : m_group(g)
+    {
+    }
 
     Table& operator()(const ObjectSchema* object_schema)
     {
@@ -329,7 +348,7 @@ private:
     TableRef m_current_table;
 };
 
-template<typename ErrorType, typename Verifier>
+template <typename ErrorType, typename Verifier>
 void verify_no_errors(Verifier&& verifier, std::vector<SchemaChange> const& changes)
 {
     for (auto& change : changes) {
@@ -346,22 +365,57 @@ bool ObjectStore::needs_migration(std::vector<SchemaChange> const& changes)
 {
     using namespace schema_change;
     struct Visitor {
-        bool operator()(AddIndex) { return false; }
-        bool operator()(AddInitialProperties) { return false; }
-        bool operator()(AddProperty) { return true; }
-        bool operator()(AddTable) { return false; }
-        bool operator()(RemoveTable) { return false; }
-        bool operator()(ChangeTableType) { return true; }
-        bool operator()(ChangePrimaryKey) { return true; }
-        bool operator()(ChangePropertyType) { return true; }
-        bool operator()(MakePropertyNullable) { return true; }
-        bool operator()(MakePropertyRequired) { return true; }
-        bool operator()(RemoveIndex) { return false; }
-        bool operator()(RemoveProperty) { return true; }
+        bool operator()(AddIndex)
+        {
+            return false;
+        }
+        bool operator()(AddInitialProperties)
+        {
+            return false;
+        }
+        bool operator()(AddProperty)
+        {
+            return true;
+        }
+        bool operator()(AddTable)
+        {
+            return false;
+        }
+        bool operator()(RemoveTable)
+        {
+            return false;
+        }
+        bool operator()(ChangeTableType)
+        {
+            return true;
+        }
+        bool operator()(ChangePrimaryKey)
+        {
+            return true;
+        }
+        bool operator()(ChangePropertyType)
+        {
+            return true;
+        }
+        bool operator()(MakePropertyNullable)
+        {
+            return true;
+        }
+        bool operator()(MakePropertyRequired)
+        {
+            return true;
+        }
+        bool operator()(RemoveIndex)
+        {
+            return false;
+        }
+        bool operator()(RemoveProperty)
+        {
+            return true;
+        }
     };
 
-    return std::any_of(begin(changes), end(changes),
-                       [](auto&& change) { return change.visit(Visitor()); });
+    return std::any_of(begin(changes), end(changes), [](auto&& change) { return change.visit(Visitor()); });
 }
 
 void ObjectStore::verify_no_changes_required(std::vector<SchemaChange> const& changes)
@@ -377,10 +431,10 @@ void ObjectStore::verify_no_migration_required(std::vector<SchemaChange> const& 
 
         // Adding a table or adding/removing indexes can be done automatically.
         // All other changes require migrations.
-        void operator()(AddTable) { }
-        void operator()(AddInitialProperties) { }
-        void operator()(AddIndex) { }
-        void operator()(RemoveIndex) { }
+        void operator()(AddTable) {}
+        void operator()(AddInitialProperties) {}
+        void operator()(AddIndex) {}
+        void operator()(RemoveIndex) {}
     } verifier;
     verify_no_errors<SchemaMismatchException>(verifier, changes);
 }
@@ -395,12 +449,27 @@ bool ObjectStore::verify_valid_additive_changes(std::vector<SchemaChange> const&
         bool other_changes = false;
 
         // Additive mode allows adding things, extra columns, and adding/removing indexes
-        void operator()(AddTable) { other_changes = true; }
-        void operator()(AddInitialProperties) { other_changes = true; }
-        void operator()(AddProperty) { other_changes = true; }
-        void operator()(RemoveProperty) { }
-        void operator()(AddIndex) { index_changes = true; }
-        void operator()(RemoveIndex) { index_changes = true; }
+        void operator()(AddTable)
+        {
+            other_changes = true;
+        }
+        void operator()(AddInitialProperties)
+        {
+            other_changes = true;
+        }
+        void operator()(AddProperty)
+        {
+            other_changes = true;
+        }
+        void operator()(RemoveProperty) {}
+        void operator()(AddIndex)
+        {
+            index_changes = true;
+        }
+        void operator()(RemoveIndex)
+        {
+            index_changes = true;
+        }
     } verifier;
     verify_no_errors<InvalidAdditiveSchemaChangeException>(verifier, changes);
     return verifier.other_changes || (verifier.index_changes && update_indexes);
@@ -413,14 +482,15 @@ void ObjectStore::verify_valid_external_changes(std::vector<SchemaChange> const&
         using SchemaDifferenceExplainer::operator();
 
         // Adding new things is fine
-        void operator()(AddTable) { }
-        void operator()(AddInitialProperties) { }
-        void operator()(AddProperty) { }
-        void operator()(AddIndex) { }
-        void operator()(RemoveIndex) { }
+        void operator()(AddTable) {}
+        void operator()(AddInitialProperties) {}
+        void operator()(AddProperty) {}
+        void operator()(AddIndex) {}
+        void operator()(RemoveIndex) {}
 
         // Deleting tables is not okay
-        void operator()(RemoveTable op) {
+        void operator()(RemoveTable op)
+        {
             errors.emplace_back("Class '%1' has been removed.", op.object->name);
         }
     } verifier;
@@ -433,12 +503,12 @@ void ObjectStore::verify_compatible_for_immutable_and_readonly(std::vector<Schem
     struct Verifier : SchemaDifferenceExplainer {
         using SchemaDifferenceExplainer::operator();
 
-        void operator()(AddTable) { }
-        void operator()(AddInitialProperties) { }
-        void operator()(ChangeTableType) { }
-        void operator()(RemoveProperty) { }
-        void operator()(AddIndex) { }
-        void operator()(RemoveIndex) { }
+        void operator()(AddTable) {}
+        void operator()(AddInitialProperties) {}
+        void operator()(ChangeTableType) {}
+        void operator()(RemoveProperty) {}
+        void operator()(AddIndex) {}
+        void operator()(RemoveIndex) {}
     } verifier;
     verify_no_errors<InvalidReadOnlySchemaChangeException>(verifier, changes);
 }
@@ -447,7 +517,11 @@ static void apply_non_migration_changes(Group& group, std::vector<SchemaChange> 
 {
     using namespace schema_change;
     struct Applier : SchemaDifferenceExplainer {
-        Applier(Group& group) : group{group}, table{group} { }
+        Applier(Group& group)
+            : group{group}
+            , table{group}
+        {
+        }
         Group& group;
         TableHelper table;
 
@@ -455,10 +529,22 @@ static void apply_non_migration_changes(Group& group, std::vector<SchemaChange> 
         // everything but the explicitly supported ones
         using SchemaDifferenceExplainer::operator();
 
-        void operator()(AddTable op) { create_table(group, *op.object); }
-        void operator()(AddInitialProperties op) { add_initial_columns(group, *op.object); }
-        void operator()(AddIndex op) { table(op.object).add_search_index(op.property->column_key); }
-        void operator()(RemoveIndex op) { table(op.object).remove_search_index(op.property->column_key); }
+        void operator()(AddTable op)
+        {
+            create_table(group, *op.object);
+        }
+        void operator()(AddInitialProperties op)
+        {
+            add_initial_columns(group, *op.object);
+        }
+        void operator()(AddIndex op)
+        {
+            table(op.object).add_search_index(op.property->column_key);
+        }
+        void operator()(RemoveIndex op)
+        {
+            table(op.object).remove_search_index(op.property->column_key);
+        }
     } applier{group};
     verify_no_errors<SchemaMismatchException>(applier, changes);
 }
@@ -466,8 +552,9 @@ static void apply_non_migration_changes(Group& group, std::vector<SchemaChange> 
 static void set_embedded(Table& table, ObjectSchema::IsEmbedded is_embedded)
 {
     if (!table.set_embedded(is_embedded) && is_embedded) {
-        auto msg = util::format("Cannot convert object type '%1' to embedded because objects have multiple incoming links.",
-                                ObjectStore::object_type_for_table_name(table.get_name()));
+        auto msg =
+            util::format("Cannot convert object type '%1' to embedded because objects have multiple incoming links.",
+                         ObjectStore::object_type_for_table_name(table.get_name()));
         throw std::logic_error(std::move(msg));
     }
 }
@@ -476,27 +563,62 @@ static void create_initial_tables(Group& group, std::vector<SchemaChange> const&
 {
     using namespace schema_change;
     struct Applier {
-        Applier(Group& group) : group{group}, table{group} { }
+        Applier(Group& group)
+            : group{group}
+            , table{group}
+        {
+        }
         Group& group;
         TableHelper table;
 
-        void operator()(AddTable op) { create_table(group, *op.object); }
-        void operator()(RemoveTable) { }
-        void operator()(AddInitialProperties op) { add_initial_columns(group, *op.object); }
+        void operator()(AddTable op)
+        {
+            create_table(group, *op.object);
+        }
+        void operator()(RemoveTable) {}
+        void operator()(AddInitialProperties op)
+        {
+            add_initial_columns(group, *op.object);
+        }
 
         // Note that in normal operation none of these will be hit, as if we're
         // creating the initial tables there shouldn't be anything to update.
         // Implementing these makes us better able to handle weird
         // not-quite-correct files produced by other things and has no obvious
         // downside.
-        void operator()(ChangeTableType op) { set_embedded(table(op.object), op.object->is_embedded); }
-        void operator()(AddProperty op) { add_column(group, table(op.object), *op.property); }
-        void operator()(RemoveProperty op) { table(op.object).remove_column(op.property->column_key); }
-        void operator()(MakePropertyNullable op) { make_property_optional(table(op.object), *op.property); }
-        void operator()(MakePropertyRequired op) { make_property_required(group, table(op.object), *op.property); }
-        void operator()(ChangePrimaryKey op) { ObjectStore::set_primary_key_for_object(group, op.object->name, op.property ? StringData{op.property->name} : ""); }
-        void operator()(AddIndex op) { table(op.object).add_search_index(op.property->column_key); }
-        void operator()(RemoveIndex op) { table(op.object).remove_search_index(op.property->column_key); }
+        void operator()(ChangeTableType op)
+        {
+            set_embedded(table(op.object), op.object->is_embedded);
+        }
+        void operator()(AddProperty op)
+        {
+            add_column(group, table(op.object), *op.property);
+        }
+        void operator()(RemoveProperty op)
+        {
+            table(op.object).remove_column(op.property->column_key);
+        }
+        void operator()(MakePropertyNullable op)
+        {
+            make_property_optional(table(op.object), *op.property);
+        }
+        void operator()(MakePropertyRequired op)
+        {
+            make_property_required(group, table(op.object), *op.property);
+        }
+        void operator()(ChangePrimaryKey op)
+        {
+            ObjectStore::set_primary_key_for_object(group, op.object->name,
+                                                    op.property ? StringData{op.property->name} : "");
+        }
+        void operator()(AddIndex op)
+        {
+            table(op.object).add_search_index(op.property->column_key);
+        }
+        void operator()(RemoveIndex op)
+        {
+            table(op.object).remove_search_index(op.property->column_key);
+        }
 
         void operator()(ChangePropertyType op)
         {
@@ -514,25 +636,46 @@ void ObjectStore::apply_additive_changes(Group& group, std::vector<SchemaChange>
     using namespace schema_change;
     struct Applier {
         Applier(Group& group, bool update_indexes)
-        : group{group}, table{group}, update_indexes{update_indexes} { }
+            : group{group}
+            , table{group}
+            , update_indexes{update_indexes}
+        {
+        }
         Group& group;
         TableHelper table;
         bool update_indexes;
 
-        void operator()(AddTable op) { create_table(group, *op.object); }
-        void operator()(RemoveTable) { }
-        void operator()(AddInitialProperties op) { add_initial_columns(group, *op.object); }
-        void operator()(AddProperty op) { add_column(group, table(op.object), *op.property); }
-        void operator()(AddIndex op) { if (update_indexes) table(op.object).add_search_index(op.property->column_key); }
-        void operator()(RemoveIndex op) { if (update_indexes) table(op.object).remove_search_index(op.property->column_key); }
-        void operator()(RemoveProperty) { }
+        void operator()(AddTable op)
+        {
+            create_table(group, *op.object);
+        }
+        void operator()(RemoveTable) {}
+        void operator()(AddInitialProperties op)
+        {
+            add_initial_columns(group, *op.object);
+        }
+        void operator()(AddProperty op)
+        {
+            add_column(group, table(op.object), *op.property);
+        }
+        void operator()(AddIndex op)
+        {
+            if (update_indexes)
+                table(op.object).add_search_index(op.property->column_key);
+        }
+        void operator()(RemoveIndex op)
+        {
+            if (update_indexes)
+                table(op.object).remove_search_index(op.property->column_key);
+        }
+        void operator()(RemoveProperty) {}
 
         // No need for errors for these, as we've already verified that they aren't present
-        void operator()(ChangeTableType) { }
-        void operator()(ChangePrimaryKey) { }
-        void operator()(ChangePropertyType) { }
-        void operator()(MakePropertyNullable) { }
-        void operator()(MakePropertyRequired) { }
+        void operator()(ChangeTableType) {}
+        void operator()(ChangePrimaryKey) {}
+        void operator()(ChangePropertyType) {}
+        void operator()(MakePropertyNullable) {}
+        void operator()(MakePropertyRequired) {}
     } applier{group, update_indexes};
 
     for (auto& change : changes) {
@@ -544,22 +687,58 @@ static void apply_pre_migration_changes(Group& group, std::vector<SchemaChange> 
 {
     using namespace schema_change;
     struct Applier {
-        Applier(Group& group) : group{group}, table{group} { }
+        Applier(Group& group)
+            : group{group}
+            , table{group}
+        {
+        }
         Group& group;
         TableHelper table;
 
-        void operator()(AddTable op) { create_table(group, *op.object); }
-        void operator()(RemoveTable) { }
-        void operator()(ChangeTableType op) { set_embedded(table(op.object), op.object->is_embedded); }
-        void operator()(AddInitialProperties op) { add_initial_columns(group, *op.object); }
-        void operator()(AddProperty op) { add_column(group, table(op.object), *op.property); }
-        void operator()(RemoveProperty) { /* delayed until after the migration */ }
-        void operator()(ChangePropertyType op) { replace_column(group, table(op.object), *op.old_property, *op.new_property); }
-        void operator()(MakePropertyNullable op) { make_property_optional(table(op.object), *op.property); }
-        void operator()(MakePropertyRequired op) { make_property_required(group, table(op.object), *op.property); }
-        void operator()(ChangePrimaryKey op) { table(op.object).set_primary_key_column(ColKey{}); }
-        void operator()(AddIndex op) { table(op.object).add_search_index(op.property->column_key); }
-        void operator()(RemoveIndex op) { table(op.object).remove_search_index(op.property->column_key); }
+        void operator()(AddTable op)
+        {
+            create_table(group, *op.object);
+        }
+        void operator()(RemoveTable) {}
+        void operator()(ChangeTableType op)
+        {
+            set_embedded(table(op.object), op.object->is_embedded);
+        }
+        void operator()(AddInitialProperties op)
+        {
+            add_initial_columns(group, *op.object);
+        }
+        void operator()(AddProperty op)
+        {
+            add_column(group, table(op.object), *op.property);
+        }
+        void operator()(RemoveProperty)
+        { /* delayed until after the migration */
+        }
+        void operator()(ChangePropertyType op)
+        {
+            replace_column(group, table(op.object), *op.old_property, *op.new_property);
+        }
+        void operator()(MakePropertyNullable op)
+        {
+            make_property_optional(table(op.object), *op.property);
+        }
+        void operator()(MakePropertyRequired op)
+        {
+            make_property_required(group, table(op.object), *op.property);
+        }
+        void operator()(ChangePrimaryKey op)
+        {
+            table(op.object).set_primary_key_column(ColKey{});
+        }
+        void operator()(AddIndex op)
+        {
+            table(op.object).add_search_index(op.property->column_key);
+        }
+        void operator()(RemoveIndex op)
+        {
+            table(op.object).remove_search_index(op.property->column_key);
+        }
     } applier{group};
 
     for (auto& change : changes) {
@@ -569,17 +748,18 @@ static void apply_pre_migration_changes(Group& group, std::vector<SchemaChange> 
 
 enum class DidRereadSchema { Yes, No };
 
-static void apply_post_migration_changes(Group& group,
-                                         std::vector<SchemaChange> const& changes,
-                                         Schema const& initial_schema,
-                                         DidRereadSchema did_reread_schema)
+static void apply_post_migration_changes(Group& group, std::vector<SchemaChange> const& changes,
+                                         Schema const& initial_schema, DidRereadSchema did_reread_schema)
 {
     using namespace schema_change;
     struct Applier {
         Applier(Group& group, Schema const& initial_schema, DidRereadSchema did_reread_schema)
-        : group{group}, initial_schema(initial_schema), table(group)
-        , did_reread_schema(did_reread_schema == DidRereadSchema::Yes)
-        { }
+            : group{group}
+            , initial_schema(initial_schema)
+            , table(group)
+            , did_reread_schema(did_reread_schema == DidRereadSchema::Yes)
+        {
+        }
         Group& group;
         Schema const& initial_schema;
         TableHelper table;
@@ -587,8 +767,10 @@ static void apply_post_migration_changes(Group& group,
 
         void operator()(RemoveProperty op)
         {
-            if (!initial_schema.empty() && !initial_schema.find(op.object->name)->property_for_name(op.property->name))
-                throw std::logic_error(util::format("Renamed property '%1.%2' does not exist.", op.object->name, op.property->name));
+            if (!initial_schema.empty() &&
+                !initial_schema.find(op.object->name)->property_for_name(op.property->name))
+                throw std::logic_error(
+                    util::format("Renamed property '%1.%2' does not exist.", op.object->name, op.property->name));
             auto table = table_for_object_schema(group, *op.object);
             table->remove_column(op.property->column_key);
         }
@@ -606,9 +788,13 @@ static void apply_post_migration_changes(Group& group,
             }
         }
 
-        void operator()(AddTable op) { create_table(group, *op.object); }
+        void operator()(AddTable op)
+        {
+            create_table(group, *op.object);
+        }
 
-        void operator()(AddInitialProperties op) {
+        void operator()(AddInitialProperties op)
+        {
             if (did_reread_schema)
                 add_initial_columns(group, *op.object);
             else {
@@ -617,15 +803,21 @@ static void apply_post_migration_changes(Group& group,
             }
         }
 
-        void operator()(AddIndex op) { table(op.object).add_search_index(op.property->column_key); }
-        void operator()(RemoveIndex op) { table(op.object).remove_search_index(op.property->column_key); }
+        void operator()(AddIndex op)
+        {
+            table(op.object).add_search_index(op.property->column_key);
+        }
+        void operator()(RemoveIndex op)
+        {
+            table(op.object).remove_search_index(op.property->column_key);
+        }
 
-        void operator()(ChangeTableType) { }
-        void operator()(RemoveTable) { }
-        void operator()(ChangePropertyType) { }
-        void operator()(MakePropertyNullable) { }
-        void operator()(MakePropertyRequired) { }
-        void operator()(AddProperty) { }
+        void operator()(ChangeTableType) {}
+        void operator()(RemoveTable) {}
+        void operator()(ChangePropertyType) {}
+        void operator()(MakePropertyNullable) {}
+        void operator()(MakePropertyRequired) {}
+        void operator()(AddProperty) {}
     } applier{group, initial_schema, did_reread_schema};
 
     for (auto& change : changes) {
@@ -634,16 +826,16 @@ static void apply_post_migration_changes(Group& group,
 }
 
 
-void ObjectStore::apply_schema_changes(Transaction& group, uint64_t schema_version,
-                                       Schema& target_schema, uint64_t target_schema_version,
-                                       SchemaMode mode, std::vector<SchemaChange> const& changes,
+void ObjectStore::apply_schema_changes(Transaction& group, uint64_t schema_version, Schema& target_schema,
+                                       uint64_t target_schema_version, SchemaMode mode,
+                                       std::vector<SchemaChange> const& changes,
                                        std::function<void()> migration_function)
 {
     create_metadata_tables(group);
 
     if (mode == SchemaMode::Additive) {
-        bool target_schema_is_newer = (schema_version < target_schema_version
-            || schema_version == ObjectStore::NotVersioned);
+        bool target_schema_is_newer =
+            (schema_version < target_schema_version || schema_version == ObjectStore::NotVersioned);
 
         // With sync v2.x, indexes are no longer synced, so there's no reason to avoid creating them.
         bool update_indexes = true;
@@ -701,7 +893,8 @@ void ObjectStore::apply_schema_changes(Transaction& group, uint64_t schema_versi
     set_schema_keys(group, target_schema);
 }
 
-Schema ObjectStore::schema_from_group(Group const& group) {
+Schema ObjectStore::schema_from_group(Group const& group)
+{
     std::vector<ObjectSchema> schema;
     schema.reserve(group.size());
     for (auto key : group.get_table_keys()) {
@@ -769,30 +962,35 @@ bool ObjectStore::is_empty(Group const& group)
     return true;
 }
 
-void ObjectStore::rename_property(Group& group, Schema& target_schema, StringData object_type, StringData old_name, StringData new_name)
+void ObjectStore::rename_property(Group& group, Schema& target_schema, StringData object_type, StringData old_name,
+                                  StringData new_name)
 {
     TableRef table = table_for_object_type(group, object_type);
     if (!table) {
-        throw std::logic_error(util::format("Cannot rename properties for type '%1' because it does not exist.", object_type));
+        throw std::logic_error(
+            util::format("Cannot rename properties for type '%1' because it does not exist.", object_type));
     }
 
     auto target_object_schema = target_schema.find(object_type);
     if (target_object_schema == target_schema.end()) {
-        throw std::logic_error(util::format("Cannot rename properties for type '%1' because it has been removed from the Realm.", object_type));
+        throw std::logic_error(util::format(
+            "Cannot rename properties for type '%1' because it has been removed from the Realm.", object_type));
     }
 
     if (target_object_schema->property_for_name(old_name)) {
-        throw std::logic_error(util::format("Cannot rename property '%1.%2' to '%3' because the source property still exists.",
-                                            object_type, old_name, new_name));
+        throw std::logic_error(
+            util::format("Cannot rename property '%1.%2' to '%3' because the source property still exists.",
+                         object_type, old_name, new_name));
     }
 
     ObjectSchema table_object_schema(group, object_type, table->get_key());
-    Property *old_property = table_object_schema.property_for_name(old_name);
+    Property* old_property = table_object_schema.property_for_name(old_name);
     if (!old_property) {
-        throw std::logic_error(util::format("Cannot rename property '%1.%2' because it does not exist.", object_type, old_name));
+        throw std::logic_error(
+            util::format("Cannot rename property '%1.%2' because it does not exist.", object_type, old_name));
     }
 
-    Property *new_property = table_object_schema.property_for_name(new_name);
+    Property* new_property = table_object_schema.property_for_name(new_name);
     if (!new_property) {
         // New property doesn't exist in the table, which means we're probably
         // renaming to an intermediate property in a multi-version migration.
@@ -803,13 +1001,15 @@ void ObjectStore::rename_property(Group& group, Schema& target_schema, StringDat
     }
 
     if (old_property->type != new_property->type || old_property->object_type != new_property->object_type) {
-        throw std::logic_error(util::format("Cannot rename property '%1.%2' to '%3' because it would change from type '%4' to '%5'.",
-                                            object_type, old_name, new_name, old_property->type_string(), new_property->type_string()));
+        throw std::logic_error(
+            util::format("Cannot rename property '%1.%2' to '%3' because it would change from type '%4' to '%5'.",
+                         object_type, old_name, new_name, old_property->type_string(), new_property->type_string()));
     }
 
     if (is_nullable(old_property->type) && !is_nullable(new_property->type)) {
-        throw std::logic_error(util::format("Cannot rename property '%1.%2' to '%3' because it would change from optional to required.",
-                                            object_type, old_name, new_name));
+        throw std::logic_error(
+            util::format("Cannot rename property '%1.%2' to '%3' because it would change from optional to required.",
+                         object_type, old_name, new_name));
     }
 
     table->remove_column(new_property->column_key);
@@ -828,8 +1028,10 @@ void ObjectStore::rename_property(Group& group, Schema& target_schema, StringDat
 }
 
 InvalidSchemaVersionException::InvalidSchemaVersionException(uint64_t old_version, uint64_t new_version)
-: logic_error(util::format("Provided schema version %1 is less than last set version %2.", new_version, old_version))
-, m_old_version(old_version), m_new_version(new_version)
+    : logic_error(
+          util::format("Provided schema version %1 is less than last set version %2.", new_version, old_version))
+    , m_old_version(old_version)
+    , m_new_version(new_version)
 {
 }
 
@@ -842,49 +1044,51 @@ static void append_errors(std::string& message, std::vector<ObjectSchemaValidati
 }
 
 SchemaValidationException::SchemaValidationException(std::vector<ObjectSchemaValidationException> const& errors)
-: std::logic_error([&] {
-    std::string message = "Schema validation failed due to the following errors:";
-    append_errors(message, errors);
-    return message;
-}())
+    : std::logic_error([&] {
+        std::string message = "Schema validation failed due to the following errors:";
+        append_errors(message, errors);
+        return message;
+    }())
 {
 }
 
 SchemaMismatchException::SchemaMismatchException(std::vector<ObjectSchemaValidationException> const& errors)
-: std::logic_error([&] {
-    std::string message = "Migration is required due to the following errors:";
-    append_errors(message, errors);
-    return message;
-}())
+    : std::logic_error([&] {
+        std::string message = "Migration is required due to the following errors:";
+        append_errors(message, errors);
+        return message;
+    }())
 {
 }
 
-InvalidReadOnlySchemaChangeException::InvalidReadOnlySchemaChangeException(std::vector<ObjectSchemaValidationException> const& errors)
-: std::logic_error([&] {
-    std::string message = "The following changes cannot be made in read-only schema mode:";
-    append_errors(message, errors);
-    return message;
-}())
+InvalidReadOnlySchemaChangeException::InvalidReadOnlySchemaChangeException(
+    std::vector<ObjectSchemaValidationException> const& errors)
+    : std::logic_error([&] {
+        std::string message = "The following changes cannot be made in read-only schema mode:";
+        append_errors(message, errors);
+        return message;
+    }())
 {
 }
 
-InvalidAdditiveSchemaChangeException::InvalidAdditiveSchemaChangeException(std::vector<ObjectSchemaValidationException> const& errors)
-: std::logic_error([&] {
-    std::string message = "The following changes cannot be made in additive-only schema mode:";
-    append_errors(message, errors);
-    return message;
-}())
+InvalidAdditiveSchemaChangeException::InvalidAdditiveSchemaChangeException(
+    std::vector<ObjectSchemaValidationException> const& errors)
+    : std::logic_error([&] {
+        std::string message = "The following changes cannot be made in additive-only schema mode:";
+        append_errors(message, errors);
+        return message;
+    }())
 {
 }
 
-InvalidExternalSchemaChangeException::InvalidExternalSchemaChangeException(std::vector<ObjectSchemaValidationException> const& errors)
-: std::logic_error([&] {
-    std::string message =
-        "Unsupported schema changes were made by another client or process. For a "
-        "synchronized Realm, this may be due to the server reverting schema changes which "
-        "the local user did not have permission to make.";
-    append_errors(message, errors);
-    return message;
-}())
+InvalidExternalSchemaChangeException::InvalidExternalSchemaChangeException(
+    std::vector<ObjectSchemaValidationException> const& errors)
+    : std::logic_error([&] {
+        std::string message = "Unsupported schema changes were made by another client or process. For a "
+                              "synchronized Realm, this may be due to the server reverting schema changes which "
+                              "the local user did not have permission to make.";
+        append_errors(message, errors);
+        return message;
+    }())
 {
 }

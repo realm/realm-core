@@ -26,14 +26,13 @@
 using namespace realm;
 using namespace realm::_impl;
 
-ListNotifier::ListNotifier(std::shared_ptr<Realm> realm, LstBase const& list,
-                           PropertyType type)
-: CollectionNotifier(std::move(realm))
-, m_type(type)
-, m_table(list.get_table()->get_key())
-, m_col(list.get_col_key())
-, m_obj(list.get_key())
-, m_prev_size(list.size())
+ListNotifier::ListNotifier(std::shared_ptr<Realm> realm, LstBase const& list, PropertyType type)
+    : CollectionNotifier(std::move(realm))
+    , m_type(type)
+    , m_table(list.get_table()->get_key())
+    , m_col(list.get_col_key())
+    , m_obj(list.get_key())
+    , m_prev_size(list.size())
 {
     if (m_type == PropertyType::Object) {
         set_table(static_cast<const LnkLst&>(list).get_target_table());

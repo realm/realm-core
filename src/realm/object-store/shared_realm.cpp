@@ -49,10 +49,11 @@
 using namespace realm;
 using namespace realm::_impl;
 
-Realm::Realm(Config config, util::Optional<VersionID> version, std::shared_ptr<_impl::RealmCoordinator> coordinator, MakeSharedTag)
-: m_config(std::move(config))
-, m_frozen_version(std::move(version))
-, m_execution_context(m_config.execution_context)
+Realm::Realm(Config config, util::Optional<VersionID> version, std::shared_ptr<_impl::RealmCoordinator> coordinator,
+             MakeSharedTag)
+    : m_config(std::move(config))
+    , m_frozen_version(std::move(version))
+    , m_execution_context(m_config.execution_context)
 {
     if (!coordinator->get_cached_schema(m_schema, m_schema_version, m_schema_transaction_version)) {
         m_group = coordinator->begin_read();
@@ -103,7 +104,8 @@ std::shared_ptr<Transaction> Realm::duplicate() const
     return std::static_pointer_cast<Transaction>(m_coordinator->begin_read(read_transaction_version(), is_frozen()));
 }
 
-std::shared_ptr<DB>& Realm::Internal::get_db(Realm& realm) {
+std::shared_ptr<DB>& Realm::Internal::get_db(Realm& realm)
+{
     return realm.m_coordinator->m_db;
 }
 
@@ -134,7 +136,8 @@ SharedRealm Realm::get_frozen_realm(Config config, VersionID version)
     return realm;
 }
 
-SharedRealm Realm::get_shared_realm(ThreadSafeReference ref, util::Optional<AbstractExecutionContextID> execution_context)
+SharedRealm Realm::get_shared_realm(ThreadSafeReference ref,
+                                    util::Optional<AbstractExecutionContextID> execution_context)
 {
     SharedRealm realm = ref.resolve<std::shared_ptr<Realm>>(nullptr);
     REALM_ASSERT(realm);
@@ -181,8 +184,7 @@ void Realm::read_schema_from_group_if_needed()
     m_schema_version = ObjectStore::get_schema_version(group);
     auto schema = ObjectStore::schema_from_group(group);
     if (m_coordinator)
-        m_coordinator->cache_schema(schema, m_schema_version,
-                                    m_schema_transaction_version);
+        m_coordinator->cache_schema(schema, m_schema_version, m_schema_transaction_version);
 
     if (m_dynamic_schema) {
         if (m_schema == schema) {
@@ -218,8 +220,7 @@ bool Realm::reset_file(Schema& schema, std::vector<SchemaChange>& required_chang
     return false;
 }
 
-bool Realm::schema_change_needs_write_transaction(Schema& schema,
-                                                  std::vector<SchemaChange>& changes,
+bool Realm::schema_change_needs_write_transaction(Schema& schema, std::vector<SchemaChange>& changes,
                                                   uint64_t version)
 {
     if (version == m_schema_version && changes.empty())
@@ -381,13 +382,14 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
             m_in_migration = false;
         });
 
-        ObjectStore::apply_schema_changes(transaction(), version, m_schema, m_schema_version,
-                                          m_config.schema_mode, required_changes, wrapper);
+        ObjectStore::apply_schema_changes(transaction(), version, m_schema, m_schema_version, m_config.schema_mode,
+                                          required_changes, wrapper);
     }
     else {
-        ObjectStore::apply_schema_changes(transaction(), m_schema_version, schema, version,
-                                          m_config.schema_mode, required_changes);
-        REALM_ASSERT_DEBUG(additive || (required_changes = ObjectStore::schema_from_group(read_group()).compare(schema)).empty());
+        ObjectStore::apply_schema_changes(transaction(), m_schema_version, schema, version, m_config.schema_mode,
+                                          required_changes);
+        REALM_ASSERT_DEBUG(additive ||
+                           (required_changes = ObjectStore::schema_from_group(read_group()).compare(schema)).empty());
     }
 
     if (initialization_function && old_schema_version == ObjectStore::NotVersioned) {
@@ -435,8 +437,7 @@ void Realm::cache_new_schema()
     if (!is_closed()) {
         auto new_version = transaction().get_version_of_current_transaction().version;
         if (m_new_schema)
-            m_coordinator->cache_schema(std::move(*m_new_schema),
-                                        m_schema_version, new_version);
+            m_coordinator->cache_schema(std::move(*m_new_schema), m_schema_version, new_version);
         else
             m_coordinator->advance_schema_cache(m_schema_transaction_version, new_version);
         m_schema_transaction_version = new_version;
@@ -479,9 +480,9 @@ static void check_can_create_write_transaction(const Realm* realm)
         throw InvalidTransactionException("Can't perform transactions on a frozen Realm");
     }
     if (!realm->is_closed() && realm->get_number_of_versions() > realm->config().max_number_of_active_versions) {
-        throw InvalidTransactionException(util::format("Number of active versions (%1) in the Realm exceeded the limit of %2",
-                realm->get_number_of_versions(),
-                realm->config().max_number_of_active_versions));
+        throw InvalidTransactionException(
+            util::format("Number of active versions (%1) in the Realm exceeded the limit of %2",
+                         realm->get_number_of_versions(), realm->config().max_number_of_active_versions));
     }
 }
 
@@ -513,7 +514,8 @@ bool Realm::verify_notifications_available(bool throw_on_error) const
 {
     if (is_frozen()) {
         if (throw_on_error)
-            throw InvalidTransactionException("Notifications are not available on frozen lists since they do not change.");
+            throw InvalidTransactionException(
+                "Notifications are not available on frozen lists since they do not change.");
         return false;
     }
     if (config().immutable()) {
@@ -547,9 +549,8 @@ uint_fast64_t Realm::get_number_of_versions() const
 
 bool Realm::is_in_transaction() const noexcept
 {
-    return !m_config.immutable()
-        && !is_closed()
-        && m_group && transaction().get_transact_stage() == DB::transact_Writing;
+    return !m_config.immutable() && !is_closed() && m_group &&
+           transaction().get_transact_stage() == DB::transact_Writing;
 }
 
 util::Optional<VersionID> Realm::current_transaction_version() const
@@ -609,9 +610,7 @@ void Realm::begin_transaction()
     read_group();
 
     m_is_sending_notifications = true;
-    auto cleanup = util::make_scope_exit([this]() noexcept {
-        m_is_sending_notifications = false;
-    });
+    auto cleanup = util::make_scope_exit([this]() noexcept { m_is_sending_notifications = false; });
 
     try {
         m_coordinator->promote_to_write(*this);
@@ -760,7 +759,7 @@ void Realm::notify()
             if (!is_closed())
                 cache_new_schema();
         }
-        else  {
+        else {
             if (m_binding_context) {
                 m_binding_context->did_change({}, {});
             }
@@ -842,7 +841,7 @@ bool Realm::can_deliver_notifications() const noexcept
     return true;
 }
 
-uint64_t Realm::get_schema_version(const Realm::Config &config)
+uint64_t Realm::get_schema_version(const Realm::Config& config)
 {
     auto coordinator = RealmCoordinator::get_coordinator(config.path);
     auto version = coordinator->get_schema_version();
@@ -859,7 +858,8 @@ bool Realm::is_frozen() const
     return result;
 }
 
-SharedRealm Realm::freeze() {
+SharedRealm Realm::freeze()
+{
     return Realm::get_frozen_realm(m_config, read_transaction_version());
 }
 
@@ -883,8 +883,11 @@ AuditInterface* Realm::audit_context() const noexcept
 }
 
 MismatchedConfigException::MismatchedConfigException(StringData message, StringData path)
-: std::logic_error(util::format(message.data(), path)) { }
+    : std::logic_error(util::format(message.data(), path))
+{
+}
 
 MismatchedRealmException::MismatchedRealmException(StringData message)
-: std::logic_error(message.data()) { }
-
+    : std::logic_error(message.data())
+{
+}

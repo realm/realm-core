@@ -44,12 +44,12 @@ struct TestContext : CppContext {
 
     using CppContext::CppContext;
     TestContext(TestContext& parent, realm::Property const& prop)
-    : CppContext(parent, prop)
-    , defaults(parent.defaults)
-    { }
+        : CppContext(parent, prop)
+        , defaults(parent.defaults)
+    {
+    }
 
-    util::Optional<util::Any>
-    default_value_for_property(ObjectSchema const& object, Property const& prop)
+    util::Optional<util::Any> default_value_for_property(ObjectSchema const& object, Property const& prop)
     {
         auto obj_it = defaults.find(object.name);
         if (obj_it == defaults.end())
@@ -62,18 +62,27 @@ struct TestContext : CppContext {
 
     void will_change(Object const&, Property const&) {}
     void did_change() {}
-    std::string print(util::Any) { return "not implemented"; }
-    bool allow_missing(util::Any) { return false; }
+    std::string print(util::Any)
+    {
+        return "not implemented";
+    }
+    bool allow_missing(util::Any)
+    {
+        return false;
+    }
 };
 
-TEST_CASE("Benchmark index change calculations", "[benchmark]") {
+TEST_CASE("Benchmark index change calculations", "[benchmark]")
+{
     _impl::CollectionChangeBuilder c;
 
     auto all_modified = [](size_t) { return true; };
     auto none_modified = [](size_t) { return false; };
 
-    SECTION("reports inserts/deletes for simple reorderings") {
-        auto calc = [&](std::vector<int64_t> old_rows, std::vector<int64_t> new_rows, std::function<bool (size_t)> modifications) {
+    SECTION("reports inserts/deletes for simple reorderings")
+    {
+        auto calc = [&](std::vector<int64_t> old_rows, std::vector<int64_t> new_rows,
+                        std::function<bool(size_t)> modifications) {
             return _impl::CollectionChangeBuilder::calculate(old_rows, new_rows, modifications);
         };
         std::vector<int64_t> indices = {};
@@ -83,43 +92,50 @@ TEST_CASE("Benchmark index change calculations", "[benchmark]") {
             indices.push_back(i);
         }
 
-        BENCHMARK("no changes") {
+        BENCHMARK("no changes")
+        {
             c = calc(indices, indices, none_modified);
         };
         REQUIRE(c.insertions.empty());
         REQUIRE(c.deletions.empty());
 
-        BENCHMARK("all modified") {
+        BENCHMARK("all modified")
+        {
             c = calc(indices, indices, all_modified);
         };
         REQUIRE(c.insertions.empty());
         REQUIRE(c.deletions.empty());
 
-        BENCHMARK("calc 1") {
+        BENCHMARK("calc 1")
+        {
             c = calc({1, 2, 3}, {1, 3, 2}, none_modified);
         };
         REQUIRE_INDICES(c.insertions, 1);
         REQUIRE_INDICES(c.deletions, 2);
 
-        BENCHMARK("calc 2") {
+        BENCHMARK("calc 2")
+        {
             c = calc({1, 2, 3}, {2, 1, 3}, none_modified);
         };
         REQUIRE_INDICES(c.insertions, 0);
         REQUIRE_INDICES(c.deletions, 1);
 
-        BENCHMARK("calc 3") {
+        BENCHMARK("calc 3")
+        {
             c = calc({1, 2, 3}, {2, 3, 1}, none_modified);
         };
         REQUIRE_INDICES(c.insertions, 2);
         REQUIRE_INDICES(c.deletions, 0);
 
-        BENCHMARK("calc 4") {
+        BENCHMARK("calc 4")
+        {
             c = calc({1, 2, 3}, {3, 1, 2}, none_modified);
         };
         REQUIRE_INDICES(c.insertions, 0);
         REQUIRE_INDICES(c.deletions, 2);
 
-        BENCHMARK("calc 5") {
+        BENCHMARK("calc 5")
+        {
             c = calc({1, 2, 3}, {3, 2, 1}, none_modified);
         };
         REQUIRE_INDICES(c.insertions, 0, 1);
@@ -127,7 +143,8 @@ TEST_CASE("Benchmark index change calculations", "[benchmark]") {
     }
 }
 
-TEST_CASE("Benchmark object", "[benchmark]") {
+TEST_CASE("Benchmark object", "[benchmark]")
+{
     using namespace std::string_literals;
     using AnyVec = std::vector<util::Any>;
     using AnyDict = std::map<std::string, util::Any>;
@@ -136,120 +153,134 @@ TEST_CASE("Benchmark object", "[benchmark]") {
     InMemoryTestFile config;
     config.automatic_change_notifications = false;
     config.schema = Schema{
-        {"all types", {
-            {"pk", PropertyType::Int, Property::IsPrimary{true}},
-            {"bool", PropertyType::Bool},
-            {"int", PropertyType::Int},
-            {"float", PropertyType::Float},
-            {"double", PropertyType::Double},
-            {"string", PropertyType::String},
-            {"data", PropertyType::Data},
-            {"date", PropertyType::Date},
-            {"object", PropertyType::Object|PropertyType::Nullable, "link target"},
+        {"all types",
+         {
+             {"pk", PropertyType::Int, Property::IsPrimary{true}},
+             {"bool", PropertyType::Bool},
+             {"int", PropertyType::Int},
+             {"float", PropertyType::Float},
+             {"double", PropertyType::Double},
+             {"string", PropertyType::String},
+             {"data", PropertyType::Data},
+             {"date", PropertyType::Date},
+             {"object", PropertyType::Object | PropertyType::Nullable, "link target"},
 
-            {"bool array", PropertyType::Array|PropertyType::Bool},
-            {"int array", PropertyType::Array|PropertyType::Int},
-            {"float array", PropertyType::Array|PropertyType::Float},
-            {"double array", PropertyType::Array|PropertyType::Double},
-            {"string array", PropertyType::Array|PropertyType::String},
-            {"data array", PropertyType::Array|PropertyType::Data},
-            {"date array", PropertyType::Array|PropertyType::Date},
-            {"object array", PropertyType::Array|PropertyType::Object, "array target"},
-        }},
-        {"link target", {
-            {"value", PropertyType::Int},
-        }, {
-            {"origin", PropertyType::LinkingObjects|PropertyType::Array, "all types", "object"},
-        }},
-        {"array target", {
-            {"value", PropertyType::Int},
-        }},
-        {"person", {
-            {"name", PropertyType::String, Property::IsPrimary{true}},
-            {"age", PropertyType::Int},
-            {"scores", PropertyType::Array|PropertyType::Int},
-            {"assistant", PropertyType::Object|PropertyType::Nullable, "person"},
-            {"team", PropertyType::Array|PropertyType::Object, "person"},
-        }},
+             {"bool array", PropertyType::Array | PropertyType::Bool},
+             {"int array", PropertyType::Array | PropertyType::Int},
+             {"float array", PropertyType::Array | PropertyType::Float},
+             {"double array", PropertyType::Array | PropertyType::Double},
+             {"string array", PropertyType::Array | PropertyType::String},
+             {"data array", PropertyType::Array | PropertyType::Data},
+             {"date array", PropertyType::Array | PropertyType::Date},
+             {"object array", PropertyType::Array | PropertyType::Object, "array target"},
+         }},
+        {"link target",
+         {
+             {"value", PropertyType::Int},
+         },
+         {
+             {"origin", PropertyType::LinkingObjects | PropertyType::Array, "all types", "object"},
+         }},
+        {"array target",
+         {
+             {"value", PropertyType::Int},
+         }},
+        {"person",
+         {
+             {"name", PropertyType::String, Property::IsPrimary{true}},
+             {"age", PropertyType::Int},
+             {"scores", PropertyType::Array | PropertyType::Int},
+             {"assistant", PropertyType::Object | PropertyType::Nullable, "person"},
+             {"team", PropertyType::Array | PropertyType::Object, "person"},
+         }},
     };
 
     config.schema_version = 0;
     auto r = Realm::get_shared_realm(config);
     TestContext d(r);
 
-    SECTION("create object") {
+    SECTION("create object")
+    {
         r->begin_transaction();
         ObjectSchema all_types = *r->schema().find("all types");
 
         int64_t benchmark_pk = 0;
-        BENCHMARK("create object") {
-            return Object::create(d, r, all_types, util::Any(AnyDict{
-                {"pk", benchmark_pk++},
-                {"bool", true},
-                {"int", INT64_C(5)},
-                {"float", 2.2f},
-                {"double", 3.3},
-                {"string", "hello"s},
-                {"data", "olleh"s},
-                {"date", Timestamp(10, 20)},
-                {"object", AnyDict{{"value", INT64_C(10)}}},
+        BENCHMARK("create object")
+        {
+            return Object::create(d, r, all_types,
+                                  util::Any(AnyDict{
+                                      {"pk", benchmark_pk++},
+                                      {"bool", true},
+                                      {"int", INT64_C(5)},
+                                      {"float", 2.2f},
+                                      {"double", 3.3},
+                                      {"string", "hello"s},
+                                      {"data", "olleh"s},
+                                      {"date", Timestamp(10, 20)},
+                                      {"object", AnyDict{{"value", INT64_C(10)}}},
 
-                {"bool array", AnyVec{true, false}},
-                {"int array", AnyVec{INT64_C(5), INT64_C(6)}},
-                {"float array", AnyVec{1.1f, 2.2f}},
-                {"double array", AnyVec{3.3, 4.4}},
-                {"string array", AnyVec{"a"s, "b"s, "c"s}},
-                {"data array", AnyVec{"d"s, "e"s, "f"s}},
-                {"date array", AnyVec{}},
-                {"object array", AnyVec{AnyDict{{"value", INT64_C(20)}}}},
-            }), CreatePolicy::ForceCreate);
+                                      {"bool array", AnyVec{true, false}},
+                                      {"int array", AnyVec{INT64_C(5), INT64_C(6)}},
+                                      {"float array", AnyVec{1.1f, 2.2f}},
+                                      {"double array", AnyVec{3.3, 4.4}},
+                                      {"string array", AnyVec{"a"s, "b"s, "c"s}},
+                                      {"data array", AnyVec{"d"s, "e"s, "f"s}},
+                                      {"date array", AnyVec{}},
+                                      {"object array", AnyVec{AnyDict{{"value", INT64_C(20)}}}},
+                                  }),
+                                  CreatePolicy::ForceCreate);
         };
         r->commit_transaction();
     }
 
-    SECTION("update object") {
+    SECTION("update object")
+    {
         auto table = r->read_group().get_table("class_all types");
         r->begin_transaction();
         ObjectSchema all_types = *r->schema().find("all types");
-        auto obj = Object::create(d, r, all_types, util::Any(AnyDict{
-            {"pk", INT64_C(0)},
-            {"bool", true},
-            {"int", INT64_C(5)},
-            {"float", 2.2f},
-            {"double", 3.3},
-            {"string", "hello"s},
-            {"data", "olleh"s},
-            {"date", Timestamp(10, 20)},
-            {"object", AnyDict{{"value", INT64_C(10)}}},
+        auto obj = Object::create(d, r, all_types,
+                                  util::Any(AnyDict{
+                                      {"pk", INT64_C(0)},
+                                      {"bool", true},
+                                      {"int", INT64_C(5)},
+                                      {"float", 2.2f},
+                                      {"double", 3.3},
+                                      {"string", "hello"s},
+                                      {"data", "olleh"s},
+                                      {"date", Timestamp(10, 20)},
+                                      {"object", AnyDict{{"value", INT64_C(10)}}},
 
-            {"bool array", AnyVec{true, false}},
-            {"int array", AnyVec{INT64_C(5), INT64_C(6)}},
-            {"float array", AnyVec{1.1f, 2.2f}},
-            {"double array", AnyVec{3.3, 4.4}},
-            {"string array", AnyVec{"a"s, "b"s, "c"s}},
-            {"data array", AnyVec{"d"s, "e"s, "f"s}},
-            {"date array", AnyVec{}},
-            {"object array", AnyVec{AnyDict{{"value", INT64_C(20)}}}},
-        }), CreatePolicy::ForceCreate);
+                                      {"bool array", AnyVec{true, false}},
+                                      {"int array", AnyVec{INT64_C(5), INT64_C(6)}},
+                                      {"float array", AnyVec{1.1f, 2.2f}},
+                                      {"double array", AnyVec{3.3, 4.4}},
+                                      {"string array", AnyVec{"a"s, "b"s, "c"s}},
+                                      {"data array", AnyVec{"d"s, "e"s, "f"s}},
+                                      {"date array", AnyVec{}},
+                                      {"object array", AnyVec{AnyDict{{"value", INT64_C(20)}}}},
+                                  }),
+                                  CreatePolicy::ForceCreate);
         r->commit_transaction();
 
         Results result(r, table);
         size_t num_modifications = 0;
-        auto token = result.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
-            num_modifications += c.modifications.count();
-        });
+        auto token = result.add_notification_callback(
+            [&](CollectionChangeSet c, std::exception_ptr) { num_modifications += c.modifications.count(); });
 
         advance_and_notify(*r);
         int64_t update_int = 1;
         ColKey col_int = table->get_column_key("int");
         REQUIRE(col_int);
-        BENCHMARK_ADVANCED("update object")(Catch::Benchmark::Chronometer meter) {
+        BENCHMARK_ADVANCED("update object")(Catch::Benchmark::Chronometer meter)
+        {
             r->begin_transaction();
             meter.measure([&d, &all_types, &update_int, &r] {
-                auto shadow = Object::create(d, r, all_types, util::Any(AnyDict{
-                    {"pk", INT64_C(0)},
-                    {"int", update_int},
-                }), CreatePolicy::UpdateModified);
+                auto shadow = Object::create(d, r, all_types,
+                                             util::Any(AnyDict{
+                                                 {"pk", INT64_C(0)},
+                                                 {"int", update_int},
+                                             }),
+                                             CreatePolicy::UpdateModified);
             });
             r->commit_transaction();
             advance_and_notify(*r);
@@ -259,7 +290,8 @@ TEST_CASE("Benchmark object", "[benchmark]") {
         };
     }
 
-    SECTION("change notifications reporting") {
+    SECTION("change notifications reporting")
+    {
         auto table = r->read_group().get_table("class_person");
         Results result(r, table);
         size_t num_calls = 0;
@@ -277,7 +309,8 @@ TEST_CASE("Benchmark object", "[benchmark]") {
         ObjectSchema person_schema = *r->schema().find("person");
         constexpr size_t num_objects = 1000;
 
-        BENCHMARK_ADVANCED("create notifications")(Catch::Benchmark::Chronometer meter) {
+        BENCHMARK_ADVANCED("create notifications")(Catch::Benchmark::Chronometer meter)
+        {
             r->begin_transaction();
             result.clear();
             r->commit_transaction();
@@ -290,16 +323,14 @@ TEST_CASE("Benchmark object", "[benchmark]") {
             for (size_t i = 0; i < num_objects; ++i) {
                 std::stringstream name;
                 name << "person_" << i;
-                AnyDict person {
+                AnyDict person{
                     {"name", name.str()},
                     {"age", static_cast<int64_t>(i)},
                 };
                 Object::create(d, r, person_schema, Any(person), CreatePolicy::ForceCreate);
             }
             r->commit_transaction();
-            meter.measure([&r] {
-                on_change_but_no_notify(*r);
-            });
+            meter.measure([&r] { on_change_but_no_notify(*r); });
             r->notify();
             REQUIRE(num_insertions == num_objects);
             REQUIRE(num_modifications == 0);
@@ -313,7 +344,8 @@ TEST_CASE("Benchmark object", "[benchmark]") {
         advance_and_notify(*r);
         num_calls = 0;
 
-        BENCHMARK_ADVANCED("delete notifications")(Catch::Benchmark::Chronometer meter) {
+        BENCHMARK_ADVANCED("delete notifications")(Catch::Benchmark::Chronometer meter)
+        {
             r->begin_transaction();
             result.clear();
             r->commit_transaction();
@@ -326,7 +358,7 @@ TEST_CASE("Benchmark object", "[benchmark]") {
             for (size_t i = 0; i < num_objects; ++i) {
                 std::stringstream name;
                 name << "person_" << i;
-                AnyDict person {
+                AnyDict person{
                     {"name", name.str()},
                     {"age", static_cast<int64_t>(i)},
                 };
@@ -343,9 +375,7 @@ TEST_CASE("Benchmark object", "[benchmark]") {
             result.clear();
             r->commit_transaction();
 
-            meter.measure([&r] {
-                on_change_but_no_notify(*r);
-            });
+            meter.measure([&r] { on_change_but_no_notify(*r); });
             r->notify();
             REQUIRE(num_insertions == num_objects);
             REQUIRE(num_modifications == 0);
@@ -353,7 +383,8 @@ TEST_CASE("Benchmark object", "[benchmark]") {
             REQUIRE(result.size() == 0);
         };
 
-        BENCHMARK_ADVANCED("modify notifications")(Catch::Benchmark::Chronometer meter) {
+        BENCHMARK_ADVANCED("modify notifications")(Catch::Benchmark::Chronometer meter)
+        {
             r->begin_transaction();
             result.clear();
             r->commit_transaction();
@@ -366,7 +397,7 @@ TEST_CASE("Benchmark object", "[benchmark]") {
             for (size_t i = 0; i < num_objects; ++i) {
                 std::stringstream name;
                 name << "person_" << i;
-                AnyDict person {
+                AnyDict person{
                     {"name", name.str()},
                     {"age", static_cast<int64_t>(i)},
                 };
@@ -386,17 +417,14 @@ TEST_CASE("Benchmark object", "[benchmark]") {
             for (size_t i = 0; i < num_objects; ++i) {
                 std::stringstream name;
                 name << "person_" << i;
-                AnyDict person {
-                    {"name", name.str()},
-                    {"age", static_cast<int64_t>(i + 1)}, // age differs
+                AnyDict person{
+                    {"name", name.str()}, {"age", static_cast<int64_t>(i + 1)}, // age differs
                 };
                 Object::create(d, r, person_schema, Any(person), CreatePolicy::UpdateModified);
             }
             r->commit_transaction();
 
-            meter.measure([&r] {
-                on_change_but_no_notify(*r);
-            });
+            meter.measure([&r] { on_change_but_no_notify(*r); });
             r->notify();
             REQUIRE(num_insertions == 0);
             REQUIRE(num_modifications == num_objects);
@@ -405,12 +433,13 @@ TEST_CASE("Benchmark object", "[benchmark]") {
         };
     }
 
-    SECTION("merging notifications from different versions") {
+    SECTION("merging notifications from different versions")
+    {
         advance_and_notify(*r);
         ObjectSchema schema = *r->schema().find("all types");
 
         r->begin_transaction();
-        AnyDict values {
+        AnyDict values{
             {"pk", INT64_C(0)},
             {"bool", true},
             {"int", INT64_C(5)},
@@ -434,7 +463,8 @@ TEST_CASE("Benchmark object", "[benchmark]") {
         r->commit_transaction();
         advance_and_notify(*r);
 
-        BENCHMARK_ADVANCED("object modify notifications")(Catch::Benchmark::Chronometer meter) {
+        BENCHMARK_ADVANCED("object modify notifications")(Catch::Benchmark::Chronometer meter)
+        {
             struct CallbackState {
                 Object obj;
                 NotificationToken token;
@@ -476,9 +506,8 @@ TEST_CASE("Benchmark object", "[benchmark]") {
                 change_object();
             }
 
-            REQUIRE(std::all_of(notifiers.begin(), notifiers.end(), [](auto& it) {
-                return it.num_calls == 0 && it.num_modifications == 0;
-            }));
+            REQUIRE(std::all_of(notifiers.begin(), notifiers.end(),
+                                [](auto& it) { return it.num_calls == 0 && it.num_modifications == 0; }));
 
             // Each of the Objects now has a different source version and state at
             // that version, so they should all see different changes despite
@@ -488,22 +517,21 @@ TEST_CASE("Benchmark object", "[benchmark]") {
                     advance_and_notify(*notifier.obj.get_realm());
             });
 
-            REQUIRE(std::all_of(notifiers.begin(), notifiers.end(), [](auto& it) {
-                return it.num_calls == 1 && it.num_modifications == 1;
-            }));
+            REQUIRE(std::all_of(notifiers.begin(), notifiers.end(),
+                                [](auto& it) { return it.num_calls == 1 && it.num_modifications == 1; }));
 
             // After making another change, they should all get the same notification
             change_object();
             for (auto& notifier : notifiers)
                 advance_and_notify(*notifier.obj.get_realm());
 
-            REQUIRE(std::all_of(notifiers.begin(), notifiers.end(), [](auto& it) {
-                return it.num_calls == 2 && it.num_modifications == 2;
-            }));
+            REQUIRE(std::all_of(notifiers.begin(), notifiers.end(),
+                                [](auto& it) { return it.num_calls == 2 && it.num_modifications == 2; }));
         };
     }
 
-    SECTION("change notifications sorted") {
+    SECTION("change notifications sorted")
+    {
         auto table = r->read_group().get_table("class_person");
         auto age_col = table->get_column_key("age");
         Results result = Results(r, table).sort({{"age", true}});
@@ -524,7 +552,7 @@ TEST_CASE("Benchmark object", "[benchmark]") {
                 size_t index = i + start_index;
                 std::stringstream name;
                 name << "person_" << index;
-                AnyDict person {
+                AnyDict person{
                     {"name", name.str()},
                     {"age", static_cast<int64_t>(index)},
                 };
@@ -533,7 +561,8 @@ TEST_CASE("Benchmark object", "[benchmark]") {
             r->commit_transaction();
         };
 
-        BENCHMARK_ADVANCED("prepend insertions")(Catch::Benchmark::Chronometer meter) {
+        BENCHMARK_ADVANCED("prepend insertions")(Catch::Benchmark::Chronometer meter)
+        {
             constexpr size_t num_initial_objects = 1000;
             constexpr size_t num_prepend_objects = 1000;
             r->begin_transaction();
@@ -549,19 +578,19 @@ TEST_CASE("Benchmark object", "[benchmark]") {
             num_modifications = 0;
             num_deletions = 0;
 
-            meter.measure([&r] {
-                on_change_but_no_notify(*r);
-            });
+            meter.measure([&r] { on_change_but_no_notify(*r); });
             r->notify();
             REQUIRE(num_insertions == num_prepend_objects);
             REQUIRE(num_modifications == 0);
             REQUIRE(num_deletions == 0);
             REQUIRE(result.size() == num_prepend_objects + num_initial_objects);
             REQUIRE(result.get(0).get<int64_t>(age_col) == 0);
-            REQUIRE(result.get(result.size() - 1).get<int64_t>(age_col) == num_prepend_objects + num_initial_objects - 1);
+            REQUIRE(result.get(result.size() - 1).get<int64_t>(age_col) ==
+                    num_prepend_objects + num_initial_objects - 1);
         };
 
-        BENCHMARK_ADVANCED("insert, delete odds")(Catch::Benchmark::Chronometer meter) {
+        BENCHMARK_ADVANCED("insert, delete odds")(Catch::Benchmark::Chronometer meter)
+        {
             constexpr size_t num_objects = 800;
             r->begin_transaction();
             result.clear();
@@ -586,9 +615,7 @@ TEST_CASE("Benchmark object", "[benchmark]") {
             num_modifications = 0;
             num_deletions = 0;
 
-            meter.measure([&r] {
-                on_change_but_no_notify(*r);
-            });
+            meter.measure([&r] { on_change_but_no_notify(*r); });
             r->notify();
             REQUIRE(num_insertions == 0);
             REQUIRE(num_modifications == 0);
@@ -606,7 +633,8 @@ TEST_CASE("Benchmark object", "[benchmark]") {
         add_objects(num_objects);
         advance_and_notify(*r);
 
-        BENCHMARK_ADVANCED("modify all")(Catch::Benchmark::Chronometer meter) {
+        BENCHMARK_ADVANCED("modify all")(Catch::Benchmark::Chronometer meter)
+        {
             r->begin_transaction();
             for (size_t i = 0; i < table->size(); ++i) {
                 Obj obj = table->get_object(i);
@@ -618,9 +646,7 @@ TEST_CASE("Benchmark object", "[benchmark]") {
             num_modifications = 0;
             num_deletions = 0;
 
-            meter.measure([&r] {
-                on_change_but_no_notify(*r);
-            });
+            meter.measure([&r] { on_change_but_no_notify(*r); });
             r->notify();
             REQUIRE(num_insertions == 0);
             REQUIRE(num_modifications == num_objects);
@@ -628,7 +654,8 @@ TEST_CASE("Benchmark object", "[benchmark]") {
             REQUIRE(result.size() == num_objects);
         };
 
-        BENCHMARK_ADVANCED("modify odds")(Catch::Benchmark::Chronometer meter) {
+        BENCHMARK_ADVANCED("modify odds")(Catch::Benchmark::Chronometer meter)
+        {
             r->begin_transaction();
             result.clear();
             r->commit_transaction();
@@ -638,7 +665,7 @@ TEST_CASE("Benchmark object", "[benchmark]") {
             for (size_t i = 0; i < num_objects; ++i) {
                 std::stringstream name;
                 name << "person_" << i;
-                AnyDict person {
+                AnyDict person{
                     {"name", name.str()},
                     {"age", static_cast<int64_t>(i * 2)},
                 };
@@ -662,9 +689,7 @@ TEST_CASE("Benchmark object", "[benchmark]") {
             num_modifications = 0;
             num_deletions = 0;
 
-            meter.measure([&r] {
-                on_change_but_no_notify(*r);
-            });
+            meter.measure([&r] { on_change_but_no_notify(*r); });
             r->notify();
             REQUIRE(num_insertions == 0);
             REQUIRE(num_modifications == num_objects / 2);

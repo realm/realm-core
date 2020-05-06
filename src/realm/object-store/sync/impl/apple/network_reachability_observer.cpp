@@ -46,23 +46,24 @@ NetworkReachabilityStatus reachability_status_for_flags(SCNetworkReachabilityFla
     return status;
 }
 
-} // (anonymous namespace)
+} // namespace
 
 NetworkReachabilityObserver::NetworkReachabilityObserver(util::Optional<std::string> hostname,
-                                                         std::function<void (const NetworkReachabilityStatus)> handler)
-: m_callback_queue(dispatch_queue_create("io.realm.sync.reachability", DISPATCH_QUEUE_SERIAL))
-, m_change_handler(std::move(handler))
+                                                         std::function<void(const NetworkReachabilityStatus)> handler)
+    : m_callback_queue(dispatch_queue_create("io.realm.sync.reachability", DISPATCH_QUEUE_SERIAL))
+    , m_change_handler(std::move(handler))
 {
     if (hostname) {
-        m_reachability_ref = util::adoptCF(SystemConfiguration::shared().network_reachability_create_with_name(nullptr,
-                                                                                                               hostname->c_str()));
-    } else {
+        m_reachability_ref = util::adoptCF(
+            SystemConfiguration::shared().network_reachability_create_with_name(nullptr, hostname->c_str()));
+    }
+    else {
         struct sockaddr zeroAddress = {};
         zeroAddress.sa_len = sizeof(zeroAddress);
         zeroAddress.sa_family = AF_INET;
 
-        m_reachability_ref = util::adoptCF(SystemConfiguration::shared().network_reachability_create_with_address(nullptr,
-                                                                                                                  &zeroAddress));
+        m_reachability_ref = util::adoptCF(
+            SystemConfiguration::shared().network_reachability_create_with_address(nullptr, &zeroAddress));
     }
 }
 
@@ -92,10 +93,12 @@ bool NetworkReachabilityObserver::start_observing()
 
     SCNetworkReachabilityContext context = {0, this, nullptr, nullptr, nullptr};
 
-    if (!SystemConfiguration::shared().network_reachability_set_callback(m_reachability_ref.get(), callback, &context))
+    if (!SystemConfiguration::shared().network_reachability_set_callback(m_reachability_ref.get(), callback,
+                                                                         &context))
         return false;
 
-    if (!SystemConfiguration::shared().network_reachability_set_dispatch_queue(m_reachability_ref.get(), m_callback_queue))
+    if (!SystemConfiguration::shared().network_reachability_set_dispatch_queue(m_reachability_ref.get(),
+                                                                               m_callback_queue))
         return false;
 
     return true;
@@ -108,7 +111,8 @@ void NetworkReachabilityObserver::stop_observing()
 
     // Wait for all previously-enqueued blocks to execute to guarantee that
     // no callback will be called after returning from this method
-    dispatch_sync(m_callback_queue, ^{});
+    dispatch_sync(m_callback_queue, ^{
+                  });
 }
 
 void NetworkReachabilityObserver::reachability_changed()

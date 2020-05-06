@@ -26,10 +26,10 @@ using namespace realm::_impl;
 
 
 WeakRealmNotifier::WeakRealmNotifier(const std::shared_ptr<Realm>& realm, bool bind_to_context)
-: m_realm(realm)
-, m_execution_context(realm->config().execution_context)
-, m_realm_key(realm.get())
-, m_signal(bind_to_context ? std::make_shared<util::EventLoopSignal<Callback>>(Callback{realm}) : nullptr)
+    : m_realm(realm)
+    , m_execution_context(realm->config().execution_context)
+    , m_realm_key(realm.get())
+    , m_signal(bind_to_context ? std::make_shared<util::EventLoopSignal<Callback>>(Callback{realm}) : nullptr)
 {
 }
 

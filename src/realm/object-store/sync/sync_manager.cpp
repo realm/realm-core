@@ -67,7 +67,8 @@ void SyncManager::configure(SyncClientConfig config, util::Optional<app::App::Co
             // Changing the base path for tests requires calling reset_for_testing()
             // first, and otherwise isn't supported
             REALM_ASSERT(m_file_manager->base_path() == m_config.base_file_path);
-        } else {
+        }
+        else {
             m_file_manager = std::make_unique<SyncFileManager>(m_config.base_file_path);
         }
 
@@ -78,15 +79,15 @@ void SyncManager::configure(SyncClientConfig config, util::Optional<app::App::Co
 
         bool encrypt = m_config.metadata_mode == MetadataMode::Encryption;
         try {
-            m_metadata_manager = std::make_unique<SyncMetadataManager>(m_file_manager->metadata_path(),
-                                                                       encrypt,
+            m_metadata_manager = std::make_unique<SyncMetadataManager>(m_file_manager->metadata_path(), encrypt,
                                                                        m_config.custom_encryption_key);
-        } catch (RealmFileException const& ex) {
+        }
+        catch (RealmFileException const& ex) {
             if (m_config.reset_metadata_on_error && m_file_manager->remove_metadata_realm()) {
-                m_metadata_manager = std::make_unique<SyncMetadataManager>(m_file_manager->metadata_path(),
-                                                                           encrypt,
+                m_metadata_manager = std::make_unique<SyncMetadataManager>(m_file_manager->metadata_path(), encrypt,
                                                                            std::move(m_config.custom_encryption_key));
-            } else {
+            }
+            else {
                 throw;
             }
         }
@@ -115,14 +116,9 @@ void SyncManager::configure(SyncClientConfig config, util::Optional<app::App::Co
             auto refresh_token = user_data.refresh_token();
             auto access_token = user_data.access_token();
             if (refresh_token && access_token) {
-                users_to_add.push_back(UserCreationData{
-                    user_data.identity(),
-                    std::move(*refresh_token),
-                    std::move(*access_token),
-                    user_data.provider_type(),
-                    user_data.identities(),
-                    user_data.state()
-                });
+                users_to_add.push_back(UserCreationData{user_data.identity(), std::move(*refresh_token),
+                                                        std::move(*access_token), user_data.provider_type(),
+                                                        user_data.identities(), user_data.state()});
             }
         }
 
@@ -137,7 +133,8 @@ void SyncManager::configure(SyncClientConfig config, util::Optional<app::App::Co
             try {
                 m_file_manager->remove_user_directory(user.local_uuid());
                 dead_users.emplace_back(std::move(user));
-            } catch (util::File::AccessError const&) {
+            }
+            catch (util::File::AccessError const&) {
                 continue;
             }
         }
@@ -150,11 +147,8 @@ void SyncManager::configure(SyncClientConfig config, util::Optional<app::App::Co
         for (auto& user_data : users_to_add) {
             auto& identity = user_data.identity;
             auto& provider_type = user_data.provider_type;
-            auto user = std::make_shared<SyncUser>(user_data.refresh_token,
-                                                   identity,
-                                                   provider_type,
-                                                   user_data.access_token,
-                                                   user_data.state);
+            auto user = std::make_shared<SyncUser>(user_data.refresh_token, identity, provider_type,
+                                                   user_data.access_token, user_data.state);
             m_users.emplace_back(std::move(user));
         }
     }
@@ -190,7 +184,8 @@ bool SyncManager::run_file_action(const SyncFileActionMetadata& md)
                 // The Realm file doesn't exist anymore.
                 return true;
             }
-            if (new_name && !util::File::exists(*new_name) && m_file_manager->copy_realm_file(original_name, *new_name)) {
+            if (new_name && !util::File::exists(*new_name) &&
+                m_file_manager->copy_realm_file(original_name, *new_name)) {
                 // We successfully copied the Realm file to the recovery directory.
                 m_file_manager->remove_realm(original_name);
                 return true;
@@ -208,7 +203,7 @@ void SyncManager::reset_for_testing()
     m_file_manager = nullptr;
     m_metadata_manager = nullptr;
     m_client_uuid = util::none;
-    
+
     {
         // Destroy all the users.
         std::lock_guard<std::mutex> lock(m_user_mutex);
@@ -305,27 +300,21 @@ bool SyncManager::perform_metadata_update(std::function<void(const SyncMetadataM
     return true;
 }
 
-std::shared_ptr<SyncUser> SyncManager::get_user(const std::string& user_id,
-                                                std::string refresh_token,
-                                                std::string access_token,
-                                                const std::string provider_type)
+std::shared_ptr<SyncUser> SyncManager::get_user(const std::string& user_id, std::string refresh_token,
+                                                std::string access_token, const std::string provider_type)
 {
     std::lock_guard<std::mutex> lock(m_user_mutex);
-    auto it = std::find_if(m_users.begin(),
-                           m_users.end(),
-                           [user_id, provider_type](const auto& user) {
+    auto it = std::find_if(m_users.begin(), m_users.end(), [user_id, provider_type](const auto& user) {
         return user->identity() == user_id && user->provider_type() == provider_type;
     });
     if (it == m_users.end()) {
         // No existing user.
-        auto new_user = std::make_shared<SyncUser>(std::move(refresh_token),
-                                                   user_id,
-                                                   provider_type,
-                                                   std::move(access_token),
-                                                   SyncUser::State::LoggedIn);
+        auto new_user = std::make_shared<SyncUser>(std::move(refresh_token), user_id, provider_type,
+                                                   std::move(access_token), SyncUser::State::LoggedIn);
         m_users.emplace(m_users.begin(), new_user);
         return new_user;
-    } else {
+    }
+    else {
         auto user = *it;
         if (user->state() == SyncUser::State::Removed) {
             return nullptr;
@@ -343,9 +332,9 @@ std::shared_ptr<SyncUser> SyncManager::get_user(const std::string& user_id,
 std::vector<std::shared_ptr<SyncUser>> SyncManager::all_users()
 {
     std::lock_guard<std::mutex> lock(m_user_mutex);
-    m_users.erase(std::remove_if(m_users.begin(), m_users.end(), [](auto& user) {
-        return user->state() == SyncUser::State::Removed;
-    }), m_users.end());
+    m_users.erase(std::remove_if(m_users.begin(), m_users.end(),
+                                 [](auto& user) { return user->state() == SyncUser::State::Removed; }),
+                  m_users.end());
     return m_users;
 }
 
@@ -363,9 +352,7 @@ std::shared_ptr<SyncUser> SyncManager::get_current_user() const
     }
 
     std::string ident = *cur_user_ident;
-    auto is_active_user = [&](auto& el) {
-        return el->identity() == ident;
-    };
+    auto is_active_user = [&](auto& el) { return el->identity() == ident; };
 
     auto it = std::find_if(m_users.begin(), m_users.end(), is_active_user);
     if (it == m_users.end())
@@ -384,11 +371,8 @@ void SyncManager::log_out_user(const std::string& user_id)
     }
 
     if (m_users.size() > 1) {
-        auto it = std::find_if(m_users.begin(),
-                               m_users.end(),
-                               [user_id](const auto& user) {
-            return user->identity() == user_id;
-        });
+        auto it = std::find_if(m_users.begin(), m_users.end(),
+                               [user_id](const auto& user) { return user->identity() == user_id; });
 
         if (it == m_users.end())
             return;
@@ -422,21 +406,18 @@ void SyncManager::remove_user(const std::string& user_id)
 {
     std::lock_guard<std::mutex> lock(m_user_mutex);
 
-    auto it = std::find_if(m_users.begin(),
-                           m_users.end(),
-                           [user_id](const auto& user) {
-        return user->identity() == user_id;
-    });
-    
+    auto it = std::find_if(m_users.begin(), m_users.end(),
+                           [user_id](const auto& user) { return user->identity() == user_id; });
+
     if (it == m_users.end())
         return;
-    
+
     auto user = *it;
-    
+
     if (!m_metadata_manager) {
         return;
     }
-    
+
     for (size_t i = 0; i < m_metadata_manager->all_unmarked_users().size(); i++) {
         auto metadata = m_metadata_manager->all_unmarked_users().get(i);
         if (user->identity() == metadata.identity()) {
@@ -449,11 +430,8 @@ void SyncManager::remove_user(const std::string& user_id)
 std::shared_ptr<SyncUser> SyncManager::get_existing_logged_in_user(const std::string& user_id) const
 {
     std::lock_guard<std::mutex> lock(m_user_mutex);
-    auto it = std::find_if(m_users.begin(),
-                           m_users.end(),
-                           [user_id](const auto& user) {
-        return user->identity() == user_id;
-    });
+    auto it = std::find_if(m_users.begin(), m_users.end(),
+                           [user_id](const auto& user) { return user->identity() == user_id; });
     if (it == m_users.end())
         return nullptr;
 
@@ -513,7 +491,8 @@ std::shared_ptr<SyncSession> SyncManager::get_existing_session(const std::string
     return nullptr;
 }
 
-std::shared_ptr<SyncSession> SyncManager::get_session(const std::string& path, const SyncConfig& sync_config, bool force_client_resync)
+std::shared_ptr<SyncSession> SyncManager::get_session(const std::string& path, const SyncConfig& sync_config,
+                                                      bool force_client_resync)
 {
     auto& client = get_sync_client(); // Throws
 
@@ -542,10 +521,10 @@ bool SyncManager::has_existing_sessions()
     return do_has_existing_sessions();
 }
 
-bool SyncManager::do_has_existing_sessions(){
-    return std::any_of(m_sessions.begin(), m_sessions.end(), [](auto& element){
-        return element.second->existing_external_reference();
-    });
+bool SyncManager::do_has_existing_sessions()
+{
+    return std::any_of(m_sessions.begin(), m_sessions.end(),
+                       [](auto& element) { return element.second->existing_external_reference(); });
 }
 
 void SyncManager::unregister_session(const std::string& path)

@@ -33,7 +33,7 @@ public:
     KeychainAccessException(int32_t error_code);
 };
 
-}
-}
+} // namespace keychain
+} // namespace realm
 
 #endif // REALM_OS_KEYCHAIN_HELPER_HPP

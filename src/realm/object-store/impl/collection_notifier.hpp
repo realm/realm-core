@@ -97,8 +97,7 @@ private:
     std::array<Path, 4> m_current_path;
 
     bool check_row(Table const& table, ObjKeyType obj_key, size_t depth = 0);
-    bool check_outgoing_links(TableKey table_key, Table const& table,
-                              int64_t obj_key, size_t depth = 0);
+    bool check_outgoing_links(TableKey table_key, Table const& table, int64_t obj_key, size_t depth = 0);
 };
 
 // A base class for a notifier that keeps a collection up to date and/or
@@ -133,12 +132,18 @@ public:
     // API for RealmCoordinator to manage running things and calling callbacks
 
     bool is_for_realm(Realm&) const noexcept;
-    Realm* get_realm() const noexcept { return m_realm.get(); }
+    Realm* get_realm() const noexcept
+    {
+        return m_realm.get();
+    }
 
     // Get the Transaction version which this collection can attach to (if it's
     // in handover mode), or can deliver to (if it's been handed over to the BG worker alredad)
     // precondition: RealmCoordinator::m_notifier_mutex is locked
-    VersionID version() const noexcept { return m_sg_version; }
+    VersionID version() const noexcept
+    {
+        return m_sg_version;
+    }
 
     // Release references to all core types
     // This is called on the worker thread to ensure that non-thread-safe things
@@ -163,7 +168,10 @@ public:
     bool is_alive() const noexcept;
 
     // precondition: RealmCoordinator::m_notifier_mutex is locked *or* is called on worker thread
-    bool has_run() const noexcept { return m_has_run; }
+    bool has_run() const noexcept
+    {
+        return m_has_run;
+    }
 
     // Attach the handed-over query to `sg`. Must not be already attached to a Transaction.
     // precondition: RealmCoordinator::m_notifier_mutex is locked
@@ -183,7 +191,11 @@ public:
     template <typename T>
     class Handle;
 
-    bool have_callbacks() const noexcept { return m_have_callbacks; }
+    bool have_callbacks() const noexcept
+    {
+        return m_have_callbacks;
+    }
+
 protected:
     void add_changes(CollectionChangeBuilder change) REQUIRES(!m_callback_mutex);
     void set_table(ConstTableRef table);
@@ -191,16 +203,20 @@ protected:
     Transaction& source_shared_group();
 
     bool all_related_tables_covered(const TableVersions& versions);
-    std::function<bool (ObjectChangeSet::ObjectKeyType)> get_modification_checker(TransactionChangeInfo const&, ConstTableRef);
+    std::function<bool(ObjectChangeSet::ObjectKeyType)> get_modification_checker(TransactionChangeInfo const&,
+                                                                                 ConstTableRef);
 
     // The actual change, calculated in run() and delivered in prepare_handover()
     CollectionChangeBuilder m_change;
 
 private:
-    virtual void do_attach_to(Transaction&) { }
-    virtual void do_prepare_handover(Transaction&) { }
+    virtual void do_attach_to(Transaction&) {}
+    virtual void do_prepare_handover(Transaction&) {}
     virtual bool do_add_required_change_info(TransactionChangeInfo&) = 0;
-    virtual bool prepare_to_deliver() { return true; }
+    virtual bool prepare_to_deliver()
+    {
+        return true;
+    }
 
     mutable std::mutex m_realm_mutex;
     std::shared_ptr<Realm> m_realm;
@@ -243,7 +259,7 @@ private:
 
     uint64_t m_next_token = 0;
 
-    template<typename Fn>
+    template <typename Fn>
     void for_each_callback(Fn&& fn) REQUIRES(!m_callback_mutex);
 
     std::vector<Callback>::iterator find_callback(uint64_t token);
@@ -257,10 +273,16 @@ public:
     using std::shared_ptr<T>::shared_ptr;
 
     Handle() = default;
-    ~Handle() { reset(); }
+    ~Handle()
+    {
+        reset();
+    }
 
     // Copying a Handle produces a null Handle.
-    Handle(const Handle&) : Handle() { }
+    Handle(const Handle&)
+        : Handle()
+    {
+    }
     Handle& operator=(const Handle& other)
     {
         if (this != &other) {
@@ -277,7 +299,7 @@ public:
         return *this;
     }
 
-    template<typename U>
+    template <typename U>
     Handle& operator=(std::shared_ptr<U>&& other)
     {
         reset();
@@ -299,15 +321,20 @@ public:
 class NotifierPackage {
 public:
     NotifierPackage() = default;
-    NotifierPackage(std::exception_ptr error,
-                    std::vector<std::shared_ptr<CollectionNotifier>> notifiers,
+    NotifierPackage(std::exception_ptr error, std::vector<std::shared_ptr<CollectionNotifier>> notifiers,
                     RealmCoordinator* coordinator);
 
-    explicit operator bool() { return !m_notifiers.empty(); }
+    explicit operator bool()
+    {
+        return !m_notifiers.empty();
+    }
 
     // Get the version which this package can deliver into, or VersionID{} if
     // it has not yet been packaged
-    util::Optional<VersionID> version() { return m_version; }
+    util::Optional<VersionID> version()
+    {
+        return m_version;
+    }
 
     // Package the notifiers for delivery, blocking if they aren't ready for
     // the given version.
@@ -335,8 +362,9 @@ private:
 //
 // LinkViews and Subtables know what row of their parent they're in, but not
 // what column, so we have to just check each one.
-template<typename Table, typename T, typename U>
-size_t find_container_column(Table& table, size_t row_ndx, T const& expected, int type, U (Table::*getter)(size_t, size_t))
+template <typename Table, typename T, typename U>
+size_t find_container_column(Table& table, size_t row_ndx, T const& expected, int type,
+                             U (Table::*getter)(size_t, size_t))
 {
     for (size_t i = 0, count = table.get_column_count(); i != count; ++i) {
         if (table.get_column_type(i) == type && (table.*getter)(i, row_ndx) == expected) {

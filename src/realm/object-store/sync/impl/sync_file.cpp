@@ -31,7 +31,10 @@
 #include <io.h>
 #include <fcntl.h>
 
-inline static int mkstemp(char* _template) { return _open(_mktemp(_template), _O_CREAT | _O_TEMPORARY, _S_IREAD | _S_IWRITE); }
+inline static int mkstemp(char* _template)
+{
+    return _open(_mktemp(_template), _O_CREAT | _O_TEMPORARY, _S_IREAD | _S_IWRITE);
+}
 #else
 #include <unistd.h>
 #endif
@@ -47,16 +50,20 @@ uint8_t value_of_hex_digit(char hex_digit)
 {
     if (hex_digit >= '0' && hex_digit <= '9') {
         return hex_digit - '0';
-    } else if (hex_digit >= 'A' && hex_digit <= 'F') {
+    }
+    else if (hex_digit >= 'A' && hex_digit <= 'F') {
         return 10 + hex_digit - 'A';
-    } else if (hex_digit >= 'a' && hex_digit <= 'f') {
+    }
+    else if (hex_digit >= 'a' && hex_digit <= 'f') {
         return 10 + hex_digit - 'a';
-    } else {
+    }
+    else {
         throw std::invalid_argument("Cannot get the value of a character that isn't a hex digit.");
     }
 }
 
-bool filename_is_reserved(const std::string& filename) {
+bool filename_is_reserved(const std::string& filename)
+{
     return (filename == "." || filename == "..");
 }
 
@@ -71,14 +78,14 @@ bool character_is_unreserved(char character)
 
 char decoded_char_for(const std::string& percent_encoding, size_t index)
 {
-    if (index+2 >= percent_encoding.length()) {
+    if (index + 2 >= percent_encoding.length()) {
         throw std::invalid_argument("Malformed string: not enough characters after '%' before end of string.");
     }
     REALM_ASSERT(percent_encoding[index] == '%');
-    return (16*value_of_hex_digit(percent_encoding[index + 1])) + value_of_hex_digit(percent_encoding[index + 2]);
+    return (16 * value_of_hex_digit(percent_encoding[index + 1])) + value_of_hex_digit(percent_encoding[index + 2]);
 }
 
-} // (anonymous namespace)
+} // namespace
 
 namespace util {
 
@@ -86,11 +93,12 @@ std::string make_percent_encoded_string(const std::string& raw_string)
 {
     std::string buffer;
     buffer.reserve(raw_string.size());
-    for (size_t i=0; i<raw_string.size(); i++) {
+    for (size_t i = 0; i < raw_string.size(); i++) {
         unsigned char character = raw_string[i];
         if (character_is_unreserved(character)) {
             buffer.push_back(character);
-        } else {
+        }
+        else {
             buffer.resize(buffer.size() + 3);
             // Format string must resolve to exactly 3 characters.
             sprintf(&buffer.back() - 2, "%%%2X", character);
@@ -111,7 +119,8 @@ std::string make_raw_string(const std::string& percent_encoded_string)
             // Decode. +3.
             buffer.push_back(decoded_char_for(percent_encoded_string, idx));
             idx += 3;
-        } else {
+        }
+        else {
             // No need to decode. +1.
             if (!character_is_unreserved(current)) {
                 throw std::invalid_argument("Input string is invalid: contains reserved characters.");
@@ -123,7 +132,8 @@ std::string make_raw_string(const std::string& percent_encoded_string)
     return buffer;
 }
 
-std::string file_path_by_appending_component(const std::string& path, const std::string& component, FilePathType path_type)
+std::string file_path_by_appending_component(const std::string& path, const std::string& component,
+                                             FilePathType path_type)
 {
     // FIXME: Does this have to be changed to accomodate Windows platforms?
     std::string buffer;
@@ -138,10 +148,12 @@ std::string file_path_by_appending_component(const std::string& path, const std:
     if (path_last == '/' && component_first == '/') {
         buffer.append(component.substr(1));
         buffer.append(terminal);
-    } else if (path_last == '/' || component_first == '/') {
+    }
+    else if (path_last == '/' || component_first == '/') {
         buffer.append(component);
         buffer.append(terminal);
-    } else {
+    }
+    else {
         buffer.append("/");
         buffer.append(component);
         buffer.append(terminal);
@@ -158,9 +170,11 @@ std::string file_path_by_appending_extension(const std::string& path, const std:
     char extension_first = extension[0];
     if (path_last == '.' && extension_first == '.') {
         buffer.append(extension.substr(1));
-    } else if (path_last == '.' || extension_first == '.') {
+    }
+    else if (path_last == '.' || extension_first == '.') {
         buffer.append(extension);
-    } else {
+    }
+    else {
         buffer.append(".");
         buffer.append(extension);
     }
@@ -174,7 +188,8 @@ std::string create_timestamped_template(const std::string& prefix, int wildcard_
     wildcard_count = std::min(WILDCARD_MAX, std::max(WILDCARD_MIN, wildcard_count));
     std::time_t time = std::time(nullptr);
     std::stringstream stream;
-    stream << prefix << "-" << util::format_local_time(time, "%Y%m%d-%H%M%S") << "-" << std::string(wildcard_count, 'X');
+    stream << prefix << "-" << util::format_local_time(time, "%Y%m%d-%H%M%S") << "-"
+           << std::string(wildcard_count, 'X');
     return stream.str();
 }
 
@@ -198,7 +213,7 @@ std::string reserve_unique_file_name(const std::string& path, const std::string&
     return path_buffer;
 }
 
-} // util
+} // namespace util
 
 constexpr const char SyncFileManager::c_sync_directory[];
 constexpr const char SyncFileManager::c_utility_directory[];
@@ -208,18 +223,15 @@ constexpr const char SyncFileManager::c_metadata_realm[];
 
 std::string SyncFileManager::get_special_directory(std::string directory_name) const
 {
-    auto dir_path = file_path_by_appending_component(get_base_sync_directory(),
-                                                     directory_name,
-                                                     util::FilePathType::Directory);
+    auto dir_path =
+        file_path_by_appending_component(get_base_sync_directory(), directory_name, util::FilePathType::Directory);
     util::try_make_dir(dir_path);
     return dir_path;
 }
 
 std::string SyncFileManager::get_base_sync_directory() const
 {
-    auto sync_path = file_path_by_appending_component(m_base_path,
-                                                      c_sync_directory,
-                                                      util::FilePathType::Directory);
+    auto sync_path = file_path_by_appending_component(m_base_path, c_sync_directory, util::FilePathType::Directory);
     util::try_make_dir(sync_path);
     return sync_path;
 }
@@ -231,9 +243,8 @@ std::string SyncFileManager::user_directory(const std::string& local_identity) c
     if (filename_is_reserved(escaped))
         throw std::invalid_argument("A user can't have an identifier reserved by the filesystem.");
 
-    auto user_path = file_path_by_appending_component(get_base_sync_directory(),
-                                                      escaped,
-                                                      util::FilePathType::Directory);
+    auto user_path =
+        file_path_by_appending_component(get_base_sync_directory(), escaped, util::FilePathType::Directory);
     util::try_make_dir(user_path);
     return user_path;
 }
@@ -245,9 +256,8 @@ void SyncFileManager::remove_user_directory(const std::string& local_identity) c
     if (filename_is_reserved(escaped))
         throw std::invalid_argument("A user can't have an identifier reserved by the filesystem.");
 
-    auto user_path = file_path_by_appending_component(get_base_sync_directory(),
-                                                      escaped,
-                                                      util::FilePathType::Directory);
+    auto user_path =
+        file_path_by_appending_component(get_base_sync_directory(), escaped, util::FilePathType::Directory);
     util::try_remove_dir_recursive(user_path);
 }
 
@@ -265,7 +275,8 @@ bool SyncFileManager::try_rename_user_directory(const std::string& old_name, con
 
     try {
         File::move(old_path, new_path);
-    } catch (File::NotFound const&) {
+    }
+    catch (File::NotFound const&) {
         return false;
     }
     return true;
@@ -334,8 +345,7 @@ std::string SyncFileManager::path(const std::string& local_identity, const std::
 
 std::string SyncFileManager::metadata_path() const
 {
-    auto dir_path = file_path_by_appending_component(get_utility_directory(),
-                                                     c_metadata_directory,
+    auto dir_path = file_path_by_appending_component(get_utility_directory(), c_metadata_directory,
                                                      util::FilePathType::Directory);
     util::try_make_dir(dir_path);
     return util::file_path_by_appending_component(dir_path, c_metadata_realm);
@@ -343,8 +353,7 @@ std::string SyncFileManager::metadata_path() const
 
 bool SyncFileManager::remove_metadata_realm() const
 {
-    auto dir_path = file_path_by_appending_component(get_utility_directory(),
-                                                     c_metadata_directory,
+    auto dir_path = file_path_by_appending_component(get_utility_directory(), c_metadata_directory,
                                                      util::FilePathType::Directory);
     try {
         util::try_remove_dir_recursive(dir_path);
@@ -355,4 +364,4 @@ bool SyncFileManager::remove_metadata_realm() const
     }
 }
 
-} // realm
+} // namespace realm

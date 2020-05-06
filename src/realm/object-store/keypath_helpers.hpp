@@ -44,8 +44,7 @@ inline void populate_keypath_mapping(parser::KeyPathMapping& mapping, Realm& rea
         for (auto& property : object_schema.computed_properties) {
             if (property.type != PropertyType::LinkingObjects)
                 continue;
-            auto native_name = util::format("@links.%1.%2", property.object_type,
-                                            property.link_origin_property_name);
+            auto native_name = util::format("@links.%1.%2", property.object_type, property.link_origin_property_name);
             mapping.add_mapping(get_table(), property.name, std::move(native_name));
         }
     }
@@ -55,8 +54,8 @@ inline void populate_keypath_mapping(parser::KeyPathMapping& mapping, Realm& rea
 ///
 /// Each key path in the list is a period ('.') seperated property path, beginning
 /// at the class defined by `object_schema` and ending with a linkingObjects relationship.
-inline IncludeDescriptor generate_include_from_keypaths(std::vector<StringData> const& paths,
-                                                        Realm& realm, ObjectSchema const& object_schema,
+inline IncludeDescriptor generate_include_from_keypaths(std::vector<StringData> const& paths, Realm& realm,
+                                                        ObjectSchema const& object_schema,
                                                         parser::KeyPathMapping& mapping)
 {
     auto base_table = realm.read_group().get_table(object_schema.table_key);
@@ -77,10 +76,11 @@ inline IncludeDescriptor generate_include_from_keypaths(std::vector<StringData> 
         while (index < path.size()) {
             parser::KeyPathElement element = mapping.process_next_path(cur_table, path, index); // throws if invalid
             // backlinks use type_LinkList since list operations apply to them (and is_backlink is set)
-            if (!element.table->is_link_type(element.col_key.get_type()) && element.col_key.get_type() != col_type_BackLink) {
-                throw InvalidPathError(util::format("Property '%1' is not a link in object of type '%2' in 'INCLUDE' clause",
-                                                    element.table->get_column_name(element.col_key),
-                                                    get_printable_table_name(*element.table)));
+            if (!element.table->is_link_type(element.col_key.get_type()) &&
+                element.col_key.get_type() != col_type_BackLink) {
+                throw InvalidPathError(util::format(
+                    "Property '%1' is not a link in object of type '%2' in 'INCLUDE' clause",
+                    element.table->get_column_name(element.col_key), get_printable_table_name(*element.table)));
             }
             if (element.table == cur_table) {
                 if (!element.col_key) {
@@ -103,4 +103,4 @@ inline IncludeDescriptor generate_include_from_keypaths(std::vector<StringData> 
     }
     return IncludeDescriptor{base_table, properties};
 }
-}
+} // namespace realm

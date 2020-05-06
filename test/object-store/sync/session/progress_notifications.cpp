@@ -24,44 +24,52 @@
 
 using namespace realm;
 
-TEST_CASE("progress notification", "[sync]") {
+TEST_CASE("progress notification", "[sync]")
+{
     using NotifierType = SyncSession::NotifierType;
     _impl::SyncProgressNotifier progress;
 
-    SECTION("callback is not called prior to first update") {
+    SECTION("callback is not called prior to first update")
+    {
         bool callback_was_called = false;
         progress.register_callback([&](auto, auto) { callback_was_called = true; }, NotifierType::upload, false);
         progress.register_callback([&](auto, auto) { callback_was_called = true; }, NotifierType::download, false);
         REQUIRE_FALSE(callback_was_called);
     }
 
-    SECTION("callback is invoked immediately when a progress update has already occurred") {
+    SECTION("callback is invoked immediately when a progress update has already occurred")
+    {
         progress.set_local_version(1);
         progress.update(0, 0, 0, 0, 1, 1);
 
         bool callback_was_called = false;
-        SECTION("for upload notifications, with no data transfer ongoing") {
+        SECTION("for upload notifications, with no data transfer ongoing")
+        {
             progress.register_callback([&](auto, auto) { callback_was_called = true; }, NotifierType::upload, false);
             REQUIRE(callback_was_called);
         }
 
-        SECTION("for download notifications, with no data transfer ongoing") {
-            progress.register_callback([&](auto, auto) { callback_was_called = true; }, NotifierType::download, false);
+        SECTION("for download notifications, with no data transfer ongoing")
+        {
+            progress.register_callback([&](auto, auto) { callback_was_called = true; }, NotifierType::download,
+                                       false);
         }
 
-        SECTION("can register another notifier while in the initial notification without deadlock") {
+        SECTION("can register another notifier while in the initial notification without deadlock")
+        {
             int counter = 0;
-            progress.register_callback([&](auto, auto) {
-                counter++;
-                progress.register_callback([&](auto, auto) {
+            progress.register_callback(
+                [&](auto, auto) {
                     counter++;
-                }, NotifierType::upload, false);
-            }, NotifierType::download, false);
+                    progress.register_callback([&](auto, auto) { counter++; }, NotifierType::upload, false);
+                },
+                NotifierType::download, false);
             REQUIRE(counter == 2);
         }
     }
 
-    SECTION("callback is invoked after each update for streaming notifiers") {
+    SECTION("callback is invoked after each update for streaming notifiers")
+    {
         progress.update(0, 0, 0, 0, 1, 1);
 
         bool callback_was_called = false;
@@ -70,12 +78,15 @@ TEST_CASE("progress notification", "[sync]") {
         uint64_t current_transferred = 0;
         uint64_t current_transferrable = 0;
 
-        SECTION("for upload notifications") {
-            progress.register_callback([&](auto xferred, auto xferable) {
-                transferred = xferred;
-                transferrable = xferable;
-                callback_was_called = true;
-            }, NotifierType::upload, true);
+        SECTION("for upload notifications")
+        {
+            progress.register_callback(
+                [&](auto xferred, auto xferable) {
+                    transferred = xferred;
+                    transferrable = xferable;
+                    callback_was_called = true;
+                },
+                NotifierType::upload, true);
             REQUIRE(callback_was_called);
 
             // Now manually call the notifier handler a few times.
@@ -106,12 +117,15 @@ TEST_CASE("progress notification", "[sync]") {
             CHECK(transferrable == current_transferrable);
         }
 
-        SECTION("for download notifications") {
-            progress.register_callback([&](auto xferred, auto xferable) {
-                transferred = xferred;
-                transferrable = xferable;
-                callback_was_called = true;
-            }, NotifierType::download, true);
+        SECTION("for download notifications")
+        {
+            progress.register_callback(
+                [&](auto xferred, auto xferable) {
+                    transferred = xferred;
+                    transferrable = xferable;
+                    callback_was_called = true;
+                },
+                NotifierType::download, true);
             REQUIRE(callback_was_called);
 
             // Now manually call the notifier handler a few times.
@@ -142,12 +156,15 @@ TEST_CASE("progress notification", "[sync]") {
             CHECK(transferrable == current_transferrable);
         }
 
-        SECTION("token unregistration works") {
-            uint64_t token = progress.register_callback([&](auto xferred, auto xferable) {
-                transferred = xferred;
-                transferrable = xferable;
-                callback_was_called = true;
-            }, NotifierType::download, true);
+        SECTION("token unregistration works")
+        {
+            uint64_t token = progress.register_callback(
+                [&](auto xferred, auto xferable) {
+                    transferred = xferred;
+                    transferrable = xferable;
+                    callback_was_called = true;
+                },
+                NotifierType::download, true);
             REQUIRE(callback_was_called);
 
             // Now manually call the notifier handler a few times.
@@ -170,23 +187,28 @@ TEST_CASE("progress notification", "[sync]") {
             CHECK(!callback_was_called);
         }
 
-        SECTION("for multiple notifiers") {
-            progress.register_callback([&](auto xferred, auto xferable) {
-                transferred = xferred;
-                transferrable = xferable;
-                callback_was_called = true;
-            }, NotifierType::download, true);
+        SECTION("for multiple notifiers")
+        {
+            progress.register_callback(
+                [&](auto xferred, auto xferable) {
+                    transferred = xferred;
+                    transferrable = xferable;
+                    callback_was_called = true;
+                },
+                NotifierType::download, true);
             REQUIRE(callback_was_called);
 
             // Register a second notifier.
             bool callback_was_called_2 = false;
             uint64_t transferred_2 = 0;
             uint64_t transferrable_2 = 0;
-            progress.register_callback([&](auto xferred, auto xferable) {
-                transferred_2 = xferred;
-                transferrable_2 = xferable;
-                callback_was_called_2 = true;
-            }, NotifierType::upload, true);
+            progress.register_callback(
+                [&](auto xferred, auto xferable) {
+                    transferred_2 = xferred;
+                    transferrable_2 = xferable;
+                    callback_was_called_2 = true;
+                },
+                NotifierType::upload, true);
             REQUIRE(callback_was_called_2);
 
             // Now manually call the notifier handler a few times.
@@ -221,25 +243,29 @@ TEST_CASE("progress notification", "[sync]") {
         }
     }
 
-    SECTION("properly runs for non-streaming notifiers") {
+    SECTION("properly runs for non-streaming notifiers")
+    {
         bool callback_was_called = false;
         uint64_t transferred = 0;
         uint64_t transferrable = 0;
         uint64_t current_transferred = 0;
         uint64_t current_transferrable = 0;
 
-        SECTION("for upload notifications") {
+        SECTION("for upload notifications")
+        {
             // Prime the progress updater
             current_transferred = 60;
             current_transferrable = 501;
             const uint64_t original_transferrable = current_transferrable;
             progress.update(21, 26, current_transferred, current_transferrable, 1, 1);
 
-            progress.register_callback([&](auto xferred, auto xferable) {
-                transferred = xferred;
-                transferrable = xferable;
-                callback_was_called = true;
-            }, NotifierType::upload, false);
+            progress.register_callback(
+                [&](auto xferred, auto xferable) {
+                    transferred = xferred;
+                    transferrable = xferable;
+                    callback_was_called = true;
+                },
+                NotifierType::upload, false);
             // Wait for the initial callback.
             REQUIRE(callback_was_called);
 
@@ -269,14 +295,17 @@ TEST_CASE("progress notification", "[sync]") {
             CHECK(!callback_was_called);
         }
 
-        SECTION("upload notifications are not sent until all local changesets have been processed") {
+        SECTION("upload notifications are not sent until all local changesets have been processed")
+        {
             progress.set_local_version(4);
 
-            progress.register_callback([&](auto xferred, auto xferable) {
-                transferred = xferred;
-                transferrable = xferable;
-                callback_was_called = true;
-            }, NotifierType::upload, false);
+            progress.register_callback(
+                [&](auto xferred, auto xferable) {
+                    transferred = xferred;
+                    transferrable = xferable;
+                    callback_was_called = true;
+                },
+                NotifierType::upload, false);
             REQUIRE_FALSE(callback_was_called);
 
             current_transferred = 66;
@@ -293,18 +322,21 @@ TEST_CASE("progress notification", "[sync]") {
             CHECK(transferrable == current_transferrable);
         }
 
-        SECTION("for download notifications") {
+        SECTION("for download notifications")
+        {
             // Prime the progress updater
             current_transferred = 60;
             current_transferrable = 501;
             const uint64_t original_transferrable = current_transferrable;
             progress.update(current_transferred, current_transferrable, 21, 26, 1, 1);
 
-            progress.register_callback([&](auto xferred, auto xferable) {
-                transferred = xferred;
-                transferrable = xferable;
-                callback_was_called = true;
-            }, NotifierType::download, false);
+            progress.register_callback(
+                [&](auto xferred, auto xferable) {
+                    transferred = xferred;
+                    transferrable = xferable;
+                    callback_was_called = true;
+                },
+                NotifierType::download, false);
             // Wait for the initial callback.
             REQUIRE(callback_was_called);
 
@@ -334,14 +366,17 @@ TEST_CASE("progress notification", "[sync]") {
             CHECK(!callback_was_called);
         }
 
-        SECTION("download notifications are not sent until a DOWNLOAD message has been received") {
+        SECTION("download notifications are not sent until a DOWNLOAD message has been received")
+        {
             _impl::SyncProgressNotifier progress;
 
-            progress.register_callback([&](auto xferred, auto xferable) {
-                transferred = xferred;
-                transferrable = xferable;
-                callback_was_called = true;
-            }, NotifierType::download, false);
+            progress.register_callback(
+                [&](auto xferred, auto xferable) {
+                    transferred = xferred;
+                    transferrable = xferable;
+                    callback_was_called = true;
+                },
+                NotifierType::download, false);
 
             current_transferred = 100;
             current_transferrable = 100;
@@ -366,29 +401,34 @@ TEST_CASE("progress notification", "[sync]") {
             transferrable = 0;
             callback_was_called = false;
 
-            progress.register_callback([&](auto xferred, auto xferable) {
-                transferred = xferred;
-                transferrable = xferable;
-                callback_was_called = true;
-            }, NotifierType::download, false);
+            progress.register_callback(
+                [&](auto xferred, auto xferable) {
+                    transferred = xferred;
+                    transferrable = xferable;
+                    callback_was_called = true;
+                },
+                NotifierType::download, false);
 
             REQUIRE(callback_was_called);
             REQUIRE(current_transferrable == transferrable);
             REQUIRE(current_transferred == transferred);
         }
 
-        SECTION("token unregistration works") {
+        SECTION("token unregistration works")
+        {
             // Prime the progress updater
             current_transferred = 60;
             current_transferrable = 501;
             const uint64_t original_transferrable = current_transferrable;
             progress.update(21, 26, current_transferred, current_transferrable, 1, 1);
 
-            uint64_t token = progress.register_callback([&](auto xferred, auto xferable) {
-                transferred = xferred;
-                transferrable = xferable;
-                callback_was_called = true;
-            }, NotifierType::upload, false);
+            uint64_t token = progress.register_callback(
+                [&](auto xferred, auto xferable) {
+                    transferred = xferred;
+                    transferrable = xferable;
+                    callback_was_called = true;
+                },
+                NotifierType::upload, false);
             // Wait for the initial callback.
             REQUIRE(callback_was_called);
 
@@ -412,7 +452,8 @@ TEST_CASE("progress notification", "[sync]") {
             CHECK(!callback_was_called);
         }
 
-        SECTION("for multiple notifiers, different directions") {
+        SECTION("for multiple notifiers, different directions")
+        {
             // Prime the progress updater
             uint64_t current_uploaded = 16;
             uint64_t current_uploadable = 201;
@@ -422,22 +463,26 @@ TEST_CASE("progress notification", "[sync]") {
             const uint64_t original_downloadable = current_downloadable;
             progress.update(current_downloaded, current_downloadable, current_uploaded, current_uploadable, 1, 1);
 
-            progress.register_callback([&](auto xferred, auto xferable) {
-                transferred = xferred;
-                transferrable = xferable;
-                callback_was_called = true;
-            }, NotifierType::upload, false);
+            progress.register_callback(
+                [&](auto xferred, auto xferable) {
+                    transferred = xferred;
+                    transferrable = xferable;
+                    callback_was_called = true;
+                },
+                NotifierType::upload, false);
             REQUIRE(callback_was_called);
 
             // Register a second notifier.
             bool callback_was_called_2 = false;
             uint64_t downloaded = 0;
             uint64_t downloadable = 0;
-            progress.register_callback([&](auto xferred, auto xferable) {
-                downloaded = xferred;
-                downloadable = xferable;
-                callback_was_called_2 = true;
-            }, NotifierType::download, false);
+            progress.register_callback(
+                [&](auto xferred, auto xferable) {
+                    downloaded = xferred;
+                    downloadable = xferable;
+                    callback_was_called_2 = true;
+                },
+                NotifierType::download, false);
             REQUIRE(callback_was_called_2);
 
             // Now manually call the notifier handler a few times.
@@ -494,7 +539,8 @@ TEST_CASE("progress notification", "[sync]") {
             CHECK(!callback_was_called_2);
         }
 
-        SECTION("for multiple notifiers, same direction") {
+        SECTION("for multiple notifiers, same direction")
+        {
             // Prime the progress updater
             uint64_t current_uploaded = 16;
             uint64_t current_uploadable = 201;
@@ -503,11 +549,13 @@ TEST_CASE("progress notification", "[sync]") {
             const uint64_t original_downloadable = current_downloadable;
             progress.update(current_downloaded, current_downloadable, current_uploaded, current_uploadable, 1, 1);
 
-            progress.register_callback([&](auto xferred, auto xferable) {
-                transferred = xferred;
-                transferrable = xferable;
-                callback_was_called = true;
-            }, NotifierType::download, false);
+            progress.register_callback(
+                [&](auto xferred, auto xferable) {
+                    transferred = xferred;
+                    transferrable = xferable;
+                    callback_was_called = true;
+                },
+                NotifierType::download, false);
             REQUIRE(callback_was_called);
 
             // Now manually call the notifier handler a few times.
@@ -526,11 +574,13 @@ TEST_CASE("progress notification", "[sync]") {
             uint64_t downloaded = 0;
             uint64_t downloadable = 0;
             const uint64_t original_downloadable_2 = current_downloadable;
-            progress.register_callback([&](auto xferred, auto xferable) {
-                downloaded = xferred;
-                downloadable = xferable;
-                callback_was_called_2 = true;
-            }, NotifierType::download, false);
+            progress.register_callback(
+                [&](auto xferred, auto xferable) {
+                    downloaded = xferred;
+                    downloadable = xferable;
+                    callback_was_called_2 = true;
+                },
+                NotifierType::download, false);
             // Wait for the initial callback.
             REQUIRE(callback_was_called_2);
 

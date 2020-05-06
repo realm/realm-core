@@ -46,19 +46,19 @@ std::vector<T> get_vector(std::initializer_list<T> list)
 {
     return std::vector<T>(list);
 }
-}
+} // namespace
 
 struct TestContext : CppContext {
     std::map<std::string, AnyDict> defaults;
 
     using CppContext::CppContext;
     TestContext(TestContext& parent, realm::Obj& obj, realm::Property const& prop)
-    : CppContext(parent, obj, prop)
-    , defaults(parent.defaults)
-    { }
+        : CppContext(parent, obj, prop)
+        , defaults(parent.defaults)
+    {
+    }
 
-    util::Optional<util::Any>
-    default_value_for_property(ObjectSchema const& object, Property const& prop)
+    util::Optional<util::Any> default_value_for_property(ObjectSchema const& object, Property const& prop)
     {
         auto obj_it = defaults.find(object.name);
         if (obj_it == defaults.end())
@@ -71,104 +71,123 @@ struct TestContext : CppContext {
 
     void will_change(Object const&, Property const&) {}
     void did_change() {}
-    std::string print(util::Any) { return "not implemented"; }
-    bool allow_missing(util::Any) { return false; }
+    std::string print(util::Any)
+    {
+        return "not implemented";
+    }
+    bool allow_missing(util::Any)
+    {
+        return false;
+    }
 };
 
-TEST_CASE("object") {
+TEST_CASE("object")
+{
     using namespace std::string_literals;
     _impl::RealmCoordinator::assert_no_open_realms();
 
     InMemoryTestFile config;
     config.automatic_change_notifications = false;
     config.schema = Schema{
-        {"table", {
-            {"value 1", PropertyType::Int},
-            {"value 2", PropertyType::Int},
-        }},
-        {"all types", {
-            {"pk", PropertyType::Int, Property::IsPrimary{true}},
-            {"bool", PropertyType::Bool},
-            {"int", PropertyType::Int},
-            {"float", PropertyType::Float},
-            {"double", PropertyType::Double},
-            {"string", PropertyType::String},
-            {"data", PropertyType::Data},
-            {"date", PropertyType::Date},
-            {"object id", PropertyType::ObjectId},
-            {"decimal", PropertyType::Decimal},
-            {"object", PropertyType::Object|PropertyType::Nullable, "link target"},
+        {"table",
+         {
+             {"value 1", PropertyType::Int},
+             {"value 2", PropertyType::Int},
+         }},
+        {"all types",
+         {
+             {"pk", PropertyType::Int, Property::IsPrimary{true}},
+             {"bool", PropertyType::Bool},
+             {"int", PropertyType::Int},
+             {"float", PropertyType::Float},
+             {"double", PropertyType::Double},
+             {"string", PropertyType::String},
+             {"data", PropertyType::Data},
+             {"date", PropertyType::Date},
+             {"object id", PropertyType::ObjectId},
+             {"decimal", PropertyType::Decimal},
+             {"object", PropertyType::Object | PropertyType::Nullable, "link target"},
 
-            {"bool array", PropertyType::Array|PropertyType::Bool},
-            {"int array", PropertyType::Array|PropertyType::Int},
-            {"float array", PropertyType::Array|PropertyType::Float},
-            {"double array", PropertyType::Array|PropertyType::Double},
-            {"string array", PropertyType::Array|PropertyType::String},
-            {"data array", PropertyType::Array|PropertyType::Data},
-            {"date array", PropertyType::Array|PropertyType::Date},
-            {"object array", PropertyType::Array|PropertyType::Object, "array target"},
-            {"object id array", PropertyType::Array|PropertyType::ObjectId},
-            {"decimal array", PropertyType::Array|PropertyType::Decimal},
-        }},
-        {"all optional types", {
-            {"pk", PropertyType::Int|PropertyType::Nullable, Property::IsPrimary{true}},
-            {"bool", PropertyType::Bool|PropertyType::Nullable},
-            {"int", PropertyType::Int|PropertyType::Nullable},
-            {"float", PropertyType::Float|PropertyType::Nullable},
-            {"double", PropertyType::Double|PropertyType::Nullable},
-            {"string", PropertyType::String|PropertyType::Nullable},
-            {"data", PropertyType::Data|PropertyType::Nullable},
-            {"date", PropertyType::Date|PropertyType::Nullable},
-            {"object id", PropertyType::ObjectId|PropertyType::Nullable},
-            {"decimal", PropertyType::Decimal|PropertyType::Nullable},
+             {"bool array", PropertyType::Array | PropertyType::Bool},
+             {"int array", PropertyType::Array | PropertyType::Int},
+             {"float array", PropertyType::Array | PropertyType::Float},
+             {"double array", PropertyType::Array | PropertyType::Double},
+             {"string array", PropertyType::Array | PropertyType::String},
+             {"data array", PropertyType::Array | PropertyType::Data},
+             {"date array", PropertyType::Array | PropertyType::Date},
+             {"object array", PropertyType::Array | PropertyType::Object, "array target"},
+             {"object id array", PropertyType::Array | PropertyType::ObjectId},
+             {"decimal array", PropertyType::Array | PropertyType::Decimal},
+         }},
+        {"all optional types",
+         {
+             {"pk", PropertyType::Int | PropertyType::Nullable, Property::IsPrimary{true}},
+             {"bool", PropertyType::Bool | PropertyType::Nullable},
+             {"int", PropertyType::Int | PropertyType::Nullable},
+             {"float", PropertyType::Float | PropertyType::Nullable},
+             {"double", PropertyType::Double | PropertyType::Nullable},
+             {"string", PropertyType::String | PropertyType::Nullable},
+             {"data", PropertyType::Data | PropertyType::Nullable},
+             {"date", PropertyType::Date | PropertyType::Nullable},
+             {"object id", PropertyType::ObjectId | PropertyType::Nullable},
+             {"decimal", PropertyType::Decimal | PropertyType::Nullable},
 
-            {"bool array", PropertyType::Array|PropertyType::Bool|PropertyType::Nullable},
-            {"int array", PropertyType::Array|PropertyType::Int|PropertyType::Nullable},
-            {"float array", PropertyType::Array|PropertyType::Float|PropertyType::Nullable},
-            {"double array", PropertyType::Array|PropertyType::Double|PropertyType::Nullable},
-            {"string array", PropertyType::Array|PropertyType::String|PropertyType::Nullable},
-            {"data array", PropertyType::Array|PropertyType::Data|PropertyType::Nullable},
-            {"date array", PropertyType::Array|PropertyType::Date|PropertyType::Nullable},
-            {"object id array", PropertyType::Array|PropertyType::ObjectId|PropertyType::Nullable},
-            {"decimal array", PropertyType::Array|PropertyType::Decimal|PropertyType::Nullable},
-        }},
-        {"link target", {
-            {"value", PropertyType::Int},
-        }, {
-            {"origin", PropertyType::LinkingObjects|PropertyType::Array, "all types", "object"},
-        }},
-        {"array target", {
-            {"value", PropertyType::Int},
-        }},
-        {"pk after list", {
-            {"array 1", PropertyType::Array|PropertyType::Object, "array target"},
-            {"int 1", PropertyType::Int},
-            {"pk", PropertyType::Int, Property::IsPrimary{true}},
-            {"int 2", PropertyType::Int},
-            {"array 2", PropertyType::Array|PropertyType::Object, "array target"},
-        }},
-        {"nullable int pk", {
-            {"pk", PropertyType::Int|PropertyType::Nullable, Property::IsPrimary{true}},
-        }},
-        {"nullable string pk", {
-            {"pk", PropertyType::String|PropertyType::Nullable, Property::IsPrimary{true}},
-        }},
-        {"nullable object id pk", {
-            {"pk", PropertyType::ObjectId|PropertyType::Nullable, Property::IsPrimary{true}},
-        }},
-        {"person", {
-            {"name", PropertyType::String, Property::IsPrimary{true}},
-            {"age", PropertyType::Int},
-            {"scores", PropertyType::Array|PropertyType::Int},
-            {"assistant", PropertyType::Object|PropertyType::Nullable, "person"},
-            {"team", PropertyType::Array|PropertyType::Object, "person"},
-        }},
+             {"bool array", PropertyType::Array | PropertyType::Bool | PropertyType::Nullable},
+             {"int array", PropertyType::Array | PropertyType::Int | PropertyType::Nullable},
+             {"float array", PropertyType::Array | PropertyType::Float | PropertyType::Nullable},
+             {"double array", PropertyType::Array | PropertyType::Double | PropertyType::Nullable},
+             {"string array", PropertyType::Array | PropertyType::String | PropertyType::Nullable},
+             {"data array", PropertyType::Array | PropertyType::Data | PropertyType::Nullable},
+             {"date array", PropertyType::Array | PropertyType::Date | PropertyType::Nullable},
+             {"object id array", PropertyType::Array | PropertyType::ObjectId | PropertyType::Nullable},
+             {"decimal array", PropertyType::Array | PropertyType::Decimal | PropertyType::Nullable},
+         }},
+        {"link target",
+         {
+             {"value", PropertyType::Int},
+         },
+         {
+             {"origin", PropertyType::LinkingObjects | PropertyType::Array, "all types", "object"},
+         }},
+        {"array target",
+         {
+             {"value", PropertyType::Int},
+         }},
+        {"pk after list",
+         {
+             {"array 1", PropertyType::Array | PropertyType::Object, "array target"},
+             {"int 1", PropertyType::Int},
+             {"pk", PropertyType::Int, Property::IsPrimary{true}},
+             {"int 2", PropertyType::Int},
+             {"array 2", PropertyType::Array | PropertyType::Object, "array target"},
+         }},
+        {"nullable int pk",
+         {
+             {"pk", PropertyType::Int | PropertyType::Nullable, Property::IsPrimary{true}},
+         }},
+        {"nullable string pk",
+         {
+             {"pk", PropertyType::String | PropertyType::Nullable, Property::IsPrimary{true}},
+         }},
+        {"nullable object id pk",
+         {
+             {"pk", PropertyType::ObjectId | PropertyType::Nullable, Property::IsPrimary{true}},
+         }},
+        {"person",
+         {
+             {"name", PropertyType::String, Property::IsPrimary{true}},
+             {"age", PropertyType::Int},
+             {"scores", PropertyType::Array | PropertyType::Int},
+             {"assistant", PropertyType::Object | PropertyType::Nullable, "person"},
+             {"team", PropertyType::Array | PropertyType::Object, "person"},
+         }},
     };
     config.schema_version = 0;
     auto r = Realm::get_shared_realm(config);
     auto& coordinator = *_impl::RealmCoordinator::get_coordinator(config.path);
 
-    SECTION("add_notification_callback()") {
+    SECTION("add_notification_callback()")
+    {
         auto table = r->read_group().get_table("class_table");
         auto col_keys = table->get_column_keys();
         ObjKeys object_keys({3, 4, 7, 9, 10, 21, 24, 34, 42, 50});
@@ -192,9 +211,8 @@ TEST_CASE("object") {
         };
 
         auto require_change = [&] {
-            auto token = object.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
-                change = c;
-            });
+            auto token =
+                object.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) { change = c; });
             advance_and_notify(*r);
             return token;
         };
@@ -209,19 +227,22 @@ TEST_CASE("object") {
             return token;
         };
 
-        SECTION("deleting the object sends a change notification") {
+        SECTION("deleting the object sends a change notification")
+        {
             auto token = require_change();
             write([&] { obj.remove(); });
             REQUIRE_INDICES(change.deletions, 0);
         }
 
-        SECTION("clearing the table sends a change notification") {
+        SECTION("clearing the table sends a change notification")
+        {
             auto token = require_change();
             write([&] { table->clear(); });
             REQUIRE_INDICES(change.deletions, 0);
         }
 
-        SECTION("clearing the table sends a change notification to the last object") {
+        SECTION("clearing the table sends a change notification to the last object")
+        {
             obj = table->get_object(table->size() - 1);
             object = Object(r, obj);
 
@@ -230,7 +251,8 @@ TEST_CASE("object") {
             REQUIRE_INDICES(change.deletions, 0);
         }
 
-        SECTION("modifying the object sends a change notification") {
+        SECTION("modifying the object sends a change notification")
+        {
             auto token = require_change();
 
             write([&] { obj.set(col_keys[0], 10); });
@@ -244,12 +266,14 @@ TEST_CASE("object") {
             REQUIRE_INDICES(change.columns[col_keys[1].value], 0);
         }
 
-        SECTION("modifying a different object") {
+        SECTION("modifying a different object")
+        {
             auto token = require_no_change();
             write([&] { table->get_object(1).set(col_keys[0], 10); });
         }
 
-        SECTION("multiple write transactions") {
+        SECTION("multiple write transactions")
+        {
             auto token = require_change();
 
             auto r2row = r2->read_group().get_table("class_table")->get_object(0);
@@ -266,7 +290,8 @@ TEST_CASE("object") {
             REQUIRE_INDICES(change.columns[col_keys[1].value], 0);
         }
 
-        SECTION("skipping a notification") {
+        SECTION("skipping a notification")
+        {
             auto token = require_no_change();
             write([&] {
                 obj.set(col_keys[0], 1);
@@ -274,13 +299,12 @@ TEST_CASE("object") {
             });
         }
 
-        SECTION("skipping only effects the current transaction even if no notification would occur anyway") {
+        SECTION("skipping only effects the current transaction even if no notification would occur anyway")
+        {
             auto token = require_change();
 
             // would not produce a notification even if it wasn't skipped because no changes were made
-            write([&] {
-                token.suppress_next();
-            });
+            write([&] { token.suppress_next(); });
             REQUIRE(change.empty());
 
             // should now produce a notification
@@ -288,21 +312,20 @@ TEST_CASE("object") {
             REQUIRE_INDICES(change.modifications, 0);
         }
 
-        SECTION("add notification callback, remove it, then add another notification callback") {
+        SECTION("add notification callback, remove it, then add another notification callback")
+        {
             {
-                auto token = object.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
-                    FAIL("This should never happen");
-                });
+                auto token = object.add_notification_callback(
+                    [&](CollectionChangeSet, std::exception_ptr) { FAIL("This should never happen"); });
             }
             auto token = require_change();
             write([&] { obj.remove(); });
             REQUIRE_INDICES(change.deletions, 0);
         }
 
-        SECTION("observing deleted object throws") {
-            write([&] {
-                obj.remove();
-            });
+        SECTION("observing deleted object throws")
+        {
+            write([&] { obj.remove(); });
             REQUIRE_THROWS(require_change());
         }
     }
@@ -327,7 +350,8 @@ TEST_CASE("object") {
         return obj;
     };
 
-    SECTION("create object") {
+    SECTION("create object")
+    {
         auto obj = create(AnyDict{
             {"pk", INT64_C(1)},
             {"bool", true},
@@ -391,7 +415,8 @@ TEST_CASE("object") {
         check_array(table->get_column_key("string array"), StringData("a"), StringData("b"), StringData("c"));
         check_array(table->get_column_key("data array"), BinaryData("d", 1), BinaryData("e", 1), BinaryData("f", 1));
         check_array(table->get_column_key("date array"), Timestamp(10, 20), Timestamp(30, 40));
-        check_array(table->get_column_key("object id array"), ObjectId("AAAAAAAAAAAAAAAAAAAAAAAA"), ObjectId("BBBBBBBBBBBBBBBBBBBBBBBB"));
+        check_array(table->get_column_key("object id array"), ObjectId("AAAAAAAAAAAAAAAAAAAAAAAA"),
+                    ObjectId("BBBBBBBBBBBBBBBBBBBBBBBB"));
         check_array(table->get_column_key("decimal array"), Decimal128("1.23e45"), Decimal128("6.78e9"));
 
         auto list = row.get_linklist_ptr(table->get_column_key("object array"));
@@ -399,7 +424,8 @@ TEST_CASE("object") {
         REQUIRE(list->get_object(0).get<Int>(array_target_table->get_column_key("value")) == 20);
     }
 
-    SECTION("create uses defaults for missing values") {
+    SECTION("create uses defaults for missing values")
+    {
         d.defaults["all types"] = {
             {"bool", true},
             {"int", INT64_C(5)},
@@ -454,7 +480,8 @@ TEST_CASE("object") {
         REQUIRE(row.get_listbase_ptr(table->get_column_key("decimal array"))->size() == 2);
     }
 
-    SECTION("create can use defaults for primary key") {
+    SECTION("create can use defaults for primary key")
+    {
         d.defaults["all types"] = {
             {"pk", INT64_C(10)},
         };
@@ -476,7 +503,8 @@ TEST_CASE("object") {
         REQUIRE(row.get<Int>(row.get_table()->get_column_key("pk")) == 10);
     }
 
-    SECTION("create does not complain about missing values for nullable fields") {
+    SECTION("create does not complain about missing values for nullable fields")
+    {
         r->begin_transaction();
         realm::Object obj;
         REQUIRE_NOTHROW(obj = Object::create(d, r, *r->schema().find("all optional types"), util::Any(AnyDict{})));
@@ -500,14 +528,16 @@ TEST_CASE("object") {
         REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "date array")).size() == 0);
     }
 
-    SECTION("create throws for missing values if there is no default") {
+    SECTION("create throws for missing values if there is no default")
+    {
         REQUIRE_THROWS(create(AnyDict{
             {"pk", INT64_C(1)},
             {"float", 6.6f},
         }));
     }
 
-    SECTION("create always sets the PK first") {
+    SECTION("create always sets the PK first")
+    {
         AnyDict value{
             {"array 1", AnyVector{AnyDict{{"value", INT64_C(1)}}}},
             {"array 2", AnyVector{AnyDict{{"value", INT64_C(2)}}}},
@@ -520,7 +550,8 @@ TEST_CASE("object") {
         REQUIRE_NOTHROW(Object::create(d, r, *r->schema().find("pk after list"), util::Any(value)));
     }
 
-    SECTION("create with update") {
+    SECTION("create with update")
+    {
         CollectionChangeSet change;
         bool callback_called;
         Object obj = create(AnyDict{
@@ -554,11 +585,13 @@ TEST_CASE("object") {
         });
         advance_and_notify(*r);
 
-        create(AnyDict{
-            {"pk", INT64_C(1)},
-            {"int", INT64_C(6)},
-            {"string", "a"s},
-        }, CreatePolicy::UpdateAll);
+        create(
+            AnyDict{
+                {"pk", INT64_C(1)},
+                {"int", INT64_C(6)},
+                {"string", "a"s},
+            },
+            CreatePolicy::UpdateAll);
 
         callback_called = false;
         advance_and_notify(*r);
@@ -579,33 +612,26 @@ TEST_CASE("object") {
         REQUIRE(row.get<Decimal128>(table->get_column_key("decimal")) == Decimal128("1.23e45"));
     }
 
-    SECTION("create with update - only with diffs") {
+    SECTION("create with update - only with diffs")
+    {
         CollectionChangeSet change;
         bool callback_called;
-        AnyDict adam {
+        AnyDict adam{
             {"name", "Adam"s},
             {"age", INT64_C(32)},
             {"scores", AnyVec{INT64_C(1), INT64_C(2)}},
         };
-        AnyDict brian {
+        AnyDict brian{
             {"name", "Brian"s},
             {"age", INT64_C(33)},
         };
-        AnyDict charley {
-            {"name", "Charley"s},
-            {"age", INT64_C(34)},
-            {"team", AnyVec{adam, brian}}
-        };
-        AnyDict donald {
+        AnyDict charley{{"name", "Charley"s}, {"age", INT64_C(34)}, {"team", AnyVec{adam, brian}}};
+        AnyDict donald{
             {"name", "Donald"s},
             {"age", INT64_C(35)},
         };
-        AnyDict eddie {
-            {"name", "Eddie"s},
-            {"age", INT64_C(36)},
-            {"assistant", donald},
-            {"team", AnyVec{donald, charley}}
-        };
+        AnyDict eddie{
+            {"name", "Eddie"s}, {"age", INT64_C(36)}, {"assistant", donald}, {"team", AnyVec{donald, charley}}};
         Object obj = create_company(eddie, CreatePolicy::UpdateAll);
 
         auto table = r->read_group().get_table("class_person");
@@ -657,7 +683,8 @@ TEST_CASE("object") {
         REQUIRE_INDICES(change.modifications, 1);
     }
 
-    SECTION("create with update - identical sub-object") {
+    SECTION("create with update - identical sub-object")
+    {
         Object sub_obj = create_sub(AnyDict{{"value", INT64_C(10)}});
         Object obj = create(AnyDict{
             {"pk", INT64_C(1)},
@@ -679,31 +706,30 @@ TEST_CASE("object") {
         bool callback_called;
         bool results_callback_called;
         bool sub_callback_called;
-        auto token1 = obj.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
-            callback_called = true;
-        });
-        auto token2 = result.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
-            results_callback_called = true;
-        });
-        auto token3 = sub_obj.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
-            sub_callback_called = true;
-        });
+        auto token1 =
+            obj.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) { callback_called = true; });
+        auto token2 = result.add_notification_callback(
+            [&](CollectionChangeSet, std::exception_ptr) { results_callback_called = true; });
+        auto token3 = sub_obj.add_notification_callback(
+            [&](CollectionChangeSet, std::exception_ptr) { sub_callback_called = true; });
         advance_and_notify(*r);
 
         auto table = r->read_group().get_table("class_link target");
         REQUIRE(table->size() == 1);
 
-        create(AnyDict{
-            {"pk", INT64_C(1)},
-            {"bool", true},
-            {"int", INT64_C(5)},
-            {"float", 2.2f},
-            {"double", 3.3},
-            {"string", "hello"s},
-            {"data", "olleh"s},
-            {"date", Timestamp(10, 20)},
-            {"object", AnyDict{{"value", INT64_C(10)}}},
-        }, CreatePolicy::UpdateModified);
+        create(
+            AnyDict{
+                {"pk", INT64_C(1)},
+                {"bool", true},
+                {"int", INT64_C(5)},
+                {"float", 2.2f},
+                {"double", 3.3},
+                {"string", "hello"s},
+                {"data", "olleh"s},
+                {"date", Timestamp(10, 20)},
+                {"object", AnyDict{{"value", INT64_C(10)}}},
+            },
+            CreatePolicy::UpdateModified);
 
         REQUIRE(table->size() == 1);
         callback_called = false;
@@ -715,17 +741,19 @@ TEST_CASE("object") {
         REQUIRE(!sub_callback_called);
 
         // Now change sub object
-        create(AnyDict{
-            {"pk", INT64_C(1)},
-            {"bool", true},
-            {"int", INT64_C(5)},
-            {"float", 2.2f},
-            {"double", 3.3},
-            {"string", "hello"s},
-            {"data", "olleh"s},
-            {"date", Timestamp(10, 20)},
-            {"object", AnyDict{{"value", INT64_C(11)}}},
-        }, CreatePolicy::UpdateModified);
+        create(
+            AnyDict{
+                {"pk", INT64_C(1)},
+                {"bool", true},
+                {"int", INT64_C(5)},
+                {"float", 2.2f},
+                {"double", 3.3},
+                {"string", "hello"s},
+                {"data", "olleh"s},
+                {"date", Timestamp(10, 20)},
+                {"object", AnyDict{{"value", INT64_C(11)}}},
+            },
+            CreatePolicy::UpdateModified);
 
         callback_called = false;
         results_callback_called = false;
@@ -736,7 +764,8 @@ TEST_CASE("object") {
         REQUIRE(sub_callback_called);
     }
 
-    SECTION("create with update - identical array of sub-objects") {
+    SECTION("create with update - identical array of sub-objects")
+    {
         bool callback_called;
         auto dict = AnyDict{
             {"pk", INT64_C(1)},
@@ -755,9 +784,8 @@ TEST_CASE("object") {
 
         auto obj_table = r->read_group().get_table("class_all types");
         Results result(r, obj_table);
-        auto token1 = result.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
-            callback_called = true;
-        });
+        auto token1 = result.add_notification_callback(
+            [&](CollectionChangeSet, std::exception_ptr) { callback_called = true; });
         advance_and_notify(*r);
 
         create(dict, CreatePolicy::UpdateModified);
@@ -776,7 +804,8 @@ TEST_CASE("object") {
     }
 
     for (auto policy : {CreatePolicy::UpdateAll, CreatePolicy::UpdateModified}) {
-        SECTION("set existing fields to null with update "s + (policy.diff ? "(diffed)" : "(all)")) {
+        SECTION("set existing fields to null with update "s + (policy.diff ? "(diffed)" : "(all)"))
+        {
             AnyDict initial_values{
                 {"pk", INT64_C(1)},
                 {"bool", true},
@@ -804,8 +833,8 @@ TEST_CASE("object") {
             auto obj = Object::create(d, r, *r->schema().find("all optional types"), util::Any(initial_values));
 
             // Missing fields in dictionary do not update anything
-            Object::create(d, r, *r->schema().find("all optional types"),
-                           util::Any(AnyDict{{"pk", INT64_C(1)}}), policy);
+            Object::create(d, r, *r->schema().find("all optional types"), util::Any(AnyDict{{"pk", INT64_C(1)}}),
+                           policy);
 
             REQUIRE(any_cast<bool>(obj.get_property_value<util::Any>(d, "bool")) == true);
             REQUIRE(any_cast<int64_t>(obj.get_property_value<util::Any>(d, "int")) == 5);
@@ -813,17 +842,27 @@ TEST_CASE("object") {
             REQUIRE(any_cast<double>(obj.get_property_value<util::Any>(d, "double")) == 3.3);
             REQUIRE(any_cast<std::string>(obj.get_property_value<util::Any>(d, "string")) == "hello");
             REQUIRE(any_cast<Timestamp>(obj.get_property_value<util::Any>(d, "date")) == Timestamp(10, 20));
-            REQUIRE(any_cast<Optional<ObjectId>>(obj.get_property_value<util::Any>(d, "object id")).value() == ObjectId("000000000000000000000001"));
+            REQUIRE(any_cast<Optional<ObjectId>>(obj.get_property_value<util::Any>(d, "object id")).value() ==
+                    ObjectId("000000000000000000000001"));
             REQUIRE(any_cast<Decimal128>(obj.get_property_value<util::Any>(d, "decimal")) == Decimal128("1.23e45"));
 
-            REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "bool array")).get<util::Optional<bool>>(0) == true);
-            REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "int array")).get<util::Optional<int64_t>>(0) == 5);
-            REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "float array")).get<util::Optional<float>>(0) == 1.1f);
-            REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "double array")).get<util::Optional<double>>(0) == 3.3);
+            REQUIRE(
+                any_cast<List&&>(obj.get_property_value<util::Any>(d, "bool array")).get<util::Optional<bool>>(0) ==
+                true);
+            REQUIRE(
+                any_cast<List&&>(obj.get_property_value<util::Any>(d, "int array")).get<util::Optional<int64_t>>(0) ==
+                5);
+            REQUIRE(
+                any_cast<List&&>(obj.get_property_value<util::Any>(d, "float array")).get<util::Optional<float>>(0) ==
+                1.1f);
+            REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "double array"))
+                        .get<util::Optional<double>>(0) == 3.3);
             REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "string array")).get<StringData>(0) == "a");
             REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "date array")).size() == 0);
-            REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "object id array")).get<Optional<ObjectId>>(0) == ObjectId("000000000000000000000001"));
-            REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "decimal array")).get<Decimal128>(0) == Decimal128("1.23e45"));
+            REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "object id array"))
+                        .get<Optional<ObjectId>>(0) == ObjectId("000000000000000000000001"));
+            REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "decimal array")).get<Decimal128>(0) ==
+                    Decimal128("1.23e45"));
 
             // Set all properties to null
             AnyDict null_values{
@@ -860,15 +899,27 @@ TEST_CASE("object") {
             REQUIRE_FALSE(obj.get_property_value<util::Any>(d, "object id").has_value());
             REQUIRE_FALSE(obj.get_property_value<util::Any>(d, "decimal").has_value());
 
-            REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "bool array")).get<util::Optional<bool>>(0) == util::none);
-            REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "int array")).get<util::Optional<int64_t>>(0) == util::none);
-            REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "float array")).get<util::Optional<float>>(0) == util::none);
-            REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "double array")).get<util::Optional<double>>(0) == util::none);
-            REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "string array")).get<StringData>(0) == StringData());
-            REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "data array")).get<BinaryData>(0) == BinaryData());
-            REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "date array")).get<Timestamp>(0) == Timestamp());
-            REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "object id array")).get<Optional<ObjectId>>(0) == util::none);
-            REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "decimal array")).get<Decimal>(0) == Decimal128(realm::null()));
+            REQUIRE(
+                any_cast<List&&>(obj.get_property_value<util::Any>(d, "bool array")).get<util::Optional<bool>>(0) ==
+                util::none);
+            REQUIRE(
+                any_cast<List&&>(obj.get_property_value<util::Any>(d, "int array")).get<util::Optional<int64_t>>(0) ==
+                util::none);
+            REQUIRE(
+                any_cast<List&&>(obj.get_property_value<util::Any>(d, "float array")).get<util::Optional<float>>(0) ==
+                util::none);
+            REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "double array"))
+                        .get<util::Optional<double>>(0) == util::none);
+            REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "string array")).get<StringData>(0) ==
+                    StringData());
+            REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "data array")).get<BinaryData>(0) ==
+                    BinaryData());
+            REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "date array")).get<Timestamp>(0) ==
+                    Timestamp());
+            REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "object id array"))
+                        .get<Optional<ObjectId>>(0) == util::none);
+            REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "decimal array")).get<Decimal>(0) ==
+                    Decimal128(realm::null()));
 
             // Set all properties back to non-null
             Object::create(d, r, *r->schema().find("all optional types"), util::Any(initial_values), policy);
@@ -878,21 +929,32 @@ TEST_CASE("object") {
             REQUIRE(any_cast<double>(obj.get_property_value<util::Any>(d, "double")) == 3.3);
             REQUIRE(any_cast<std::string>(obj.get_property_value<util::Any>(d, "string")) == "hello");
             REQUIRE(any_cast<Timestamp>(obj.get_property_value<util::Any>(d, "date")) == Timestamp(10, 20));
-            REQUIRE(any_cast<Optional<ObjectId>>(obj.get_property_value<util::Any>(d, "object id")).value() == ObjectId("000000000000000000000001"));
+            REQUIRE(any_cast<Optional<ObjectId>>(obj.get_property_value<util::Any>(d, "object id")).value() ==
+                    ObjectId("000000000000000000000001"));
             REQUIRE(any_cast<Decimal128>(obj.get_property_value<util::Any>(d, "decimal")) == Decimal128("1.23e45"));
 
-            REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "bool array")).get<util::Optional<bool>>(0) == true);
-            REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "int array")).get<util::Optional<int64_t>>(0) == 5);
-            REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "float array")).get<util::Optional<float>>(0) == 1.1f);
-            REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "double array")).get<util::Optional<double>>(0) == 3.3);
+            REQUIRE(
+                any_cast<List&&>(obj.get_property_value<util::Any>(d, "bool array")).get<util::Optional<bool>>(0) ==
+                true);
+            REQUIRE(
+                any_cast<List&&>(obj.get_property_value<util::Any>(d, "int array")).get<util::Optional<int64_t>>(0) ==
+                5);
+            REQUIRE(
+                any_cast<List&&>(obj.get_property_value<util::Any>(d, "float array")).get<util::Optional<float>>(0) ==
+                1.1f);
+            REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "double array"))
+                        .get<util::Optional<double>>(0) == 3.3);
             REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "string array")).get<StringData>(0) == "a");
             REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "date array")).size() == 0);
-            REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "object id array")).get<Optional<ObjectId>>(0) == ObjectId("000000000000000000000001"));
-            REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "decimal array")).get<Decimal128>(0) == Decimal128("1.23e45"));
+            REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "object id array"))
+                        .get<Optional<ObjectId>>(0) == ObjectId("000000000000000000000001"));
+            REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "decimal array")).get<Decimal128>(0) ==
+                    Decimal128("1.23e45"));
         }
     }
 
-    SECTION("create throws for duplicate pk if update is not specified") {
+    SECTION("create throws for duplicate pk if update is not specified")
+    {
         create(AnyDict{
             {"pk", INT64_C(1)},
             {"bool", true},
@@ -923,7 +985,8 @@ TEST_CASE("object") {
         }));
     }
 
-    SECTION("create with explicit null pk does not fall back to default") {
+    SECTION("create with explicit null pk does not fall back to default")
+    {
         d.defaults["nullable int pk"] = {
             {"pk", INT64_C(10)},
         };
@@ -950,7 +1013,8 @@ TEST_CASE("object") {
         REQUIRE(obj.obj().get<String>(col_pk_str) == "value");
     }
 
-    SECTION("create null and 0 primary keys for Int types") {
+    SECTION("create null and 0 primary keys for Int types")
+    {
         auto create = [&](util::Any&& value, StringData type) {
             r->begin_transaction();
             auto obj = Object::create(d, r, *r->schema().find(type), value);
@@ -962,7 +1026,8 @@ TEST_CASE("object") {
         REQUIRE(Results(r, r->read_group().get_table("class_all optional types")).size() == 2);
     }
 
-    SECTION("create null and default primary keys for ObjectId types") {
+    SECTION("create null and default primary keys for ObjectId types")
+    {
         auto create = [&](util::Any&& value, StringData type) {
             r->begin_transaction();
             auto obj = Object::create(d, r, *r->schema().find(type), value);
@@ -974,7 +1039,8 @@ TEST_CASE("object") {
         REQUIRE(Results(r, r->read_group().get_table("class_nullable object id pk")).size() == 2);
     }
 
-    SECTION("getters and setters") {
+    SECTION("getters and setters")
+    {
         r->begin_transaction();
 
         auto table = r->read_group().get_table("class_all types");
@@ -1007,14 +1073,16 @@ TEST_CASE("object") {
         REQUIRE(any_cast<Timestamp>(obj.get_property_value<util::Any>(d, "date")) == Timestamp(1, 2));
 
         obj.set_property_value(d, "object id", util::Any(ObjectId("111111111111111111111111")));
-        REQUIRE(any_cast<ObjectId>(obj.get_property_value<util::Any>(d, "object id")) == ObjectId("111111111111111111111111"));
+        REQUIRE(any_cast<ObjectId>(obj.get_property_value<util::Any>(d, "object id")) ==
+                ObjectId("111111111111111111111111"));
 
         obj.set_property_value(d, "decimal", util::Any(Decimal128("42.4242e42")));
         REQUIRE(any_cast<Decimal128>(obj.get_property_value<util::Any>(d, "decimal")) == Decimal128("42.4242e42"));
 
         REQUIRE_FALSE(obj.get_property_value<util::Any>(d, "object").has_value());
         obj.set_property_value(d, "object", util::Any(linkobj));
-        REQUIRE(any_cast<Object>(obj.get_property_value<util::Any>(d, "object")).obj().get_key() == linkobj.obj().get_key());
+        REQUIRE(any_cast<Object>(obj.get_property_value<util::Any>(d, "object")).obj().get_key() ==
+                linkobj.obj().get_key());
 
         auto linking = any_cast<Results>(linkobj.get_property_value<util::Any>(d, "origin"));
         REQUIRE(linking.size() == 1);
@@ -1028,7 +1096,8 @@ TEST_CASE("object") {
         REQUIRE_THROWS(obj.set_property_value(d, "int", util::Any(INT64_C(5))));
     }
 
-    SECTION("list property self-assign is a no-op") {
+    SECTION("list property self-assign is a no-op")
+    {
         auto obj = create(AnyDict{
             {"pk", INT64_C(1)},
             {"bool", true},
@@ -1068,7 +1137,8 @@ TEST_CASE("object") {
     SyncTestFile config2(init_sync_manager.app(), "shared");
     config2.schema = config.schema;
 
-    SECTION("defaults do not override values explicitly passed to create()") {
+    SECTION("defaults do not override values explicitly passed to create()")
+    {
         AnyDict v1{
             {"pk", INT64_C(7)},
             {"array 1", AnyVector{AnyDict{{"value", INT64_C(1)}}}},
@@ -1098,9 +1168,8 @@ TEST_CASE("object") {
         r1->commit_transaction();
 
         server.start();
-        util::EventLoop::main().run_until([&] {
-            return r1->read_group().get_table("class_array target")->size() == 4;
-        });
+        util::EventLoop::main().run_until(
+            [&] { return r1->read_group().get_table("class_array target")->size() == 4; });
 
         Obj obj = object1.obj();
         REQUIRE(obj.get<Int>("pk") == 7); // pk
@@ -1108,29 +1177,35 @@ TEST_CASE("object") {
         REQUIRE(obj.get<Int>("int 1") == 1); // non-default from r1
         REQUIRE(obj.get<Int>("int 2") == 2); // non-default from r2
         REQUIRE(obj.get_linklist("array 2").size() == 2);
-
     }
 #endif
 }
 
-TEST_CASE("Embedded Object") {
+TEST_CASE("Embedded Object")
+{
     Schema schema{
-        {"all types", {
-            {"pk", PropertyType::Int, Property::IsPrimary{true}},
-            {"object", PropertyType::Object|PropertyType::Nullable, "link target"},
-            {"array", PropertyType::Object|PropertyType::Array, "array target"},
-        }},
-        {"all types no pk", {
-            {"value", PropertyType::Int},
-            {"object", PropertyType::Object|PropertyType::Nullable, "link target"},
-            {"array", PropertyType::Object|PropertyType::Array, "array target"},
-        }},
-        {"link target", ObjectSchema::IsEmbedded{true}, {
-            {"value", PropertyType::Int},
-        }},
-        {"array target", ObjectSchema::IsEmbedded{true}, {
-            {"value", PropertyType::Int},
-        }},
+        {"all types",
+         {
+             {"pk", PropertyType::Int, Property::IsPrimary{true}},
+             {"object", PropertyType::Object | PropertyType::Nullable, "link target"},
+             {"array", PropertyType::Object | PropertyType::Array, "array target"},
+         }},
+        {"all types no pk",
+         {
+             {"value", PropertyType::Int},
+             {"object", PropertyType::Object | PropertyType::Nullable, "link target"},
+             {"array", PropertyType::Object | PropertyType::Array, "array target"},
+         }},
+        {"link target",
+         ObjectSchema::IsEmbedded{true},
+         {
+             {"value", PropertyType::Int},
+         }},
+        {"array target",
+         ObjectSchema::IsEmbedded{true},
+         {
+             {"value", PropertyType::Int},
+         }},
     };
     InMemoryTestFile config;
     config.automatic_change_notifications = false;
@@ -1147,7 +1222,8 @@ TEST_CASE("Embedded Object") {
         return obj;
     };
 
-    SECTION("Basic object creation") {
+    SECTION("Basic object creation")
+    {
         auto obj = create(AnyDict{
             {"pk", INT64_C(1)},
             {"object", AnyDict{{"value", INT64_C(10)}}},
@@ -1164,21 +1240,25 @@ TEST_CASE("Embedded Object") {
         REQUIRE(list.get(1).get<int64_t>("value") == 30);
     }
 
-    SECTION("set_property_value() on link to embedded object") {
+    SECTION("set_property_value() on link to embedded object")
+    {
         auto obj = create(AnyDict{
             {"pk", INT64_C(1)},
             {"object", AnyDict{{"value", INT64_C(10)}}},
             {"array", AnyVector{AnyDict{{"value", INT64_C(20)}}, AnyDict{{"value", INT64_C(30)}}}},
         });
 
-        SECTION("throws when given a managed object") {
+        SECTION("throws when given a managed object")
+        {
             realm->begin_transaction();
-            REQUIRE_THROWS_WITH(obj.set_property_value(ctx, "object", obj.get_property_value<util::Any>(ctx, "object")),
-                                "Cannot set a link to an existing managed embedded object");
+            REQUIRE_THROWS_WITH(
+                obj.set_property_value(ctx, "object", obj.get_property_value<util::Any>(ctx, "object")),
+                "Cannot set a link to an existing managed embedded object");
             realm->cancel_transaction();
         }
 
-        SECTION("replaces object when given a dictionary and CreatePolicy::UpdateAll") {
+        SECTION("replaces object when given a dictionary and CreatePolicy::UpdateAll")
+        {
             realm->begin_transaction();
             auto old_linked = any_cast<Object>(obj.get_property_value<util::Any>(ctx, "object"));
             obj.set_property_value(ctx, "object", util::Any(AnyDict{{"value", INT64_C(40)}}));
@@ -1188,11 +1268,11 @@ TEST_CASE("Embedded Object") {
             realm->cancel_transaction();
         }
 
-        SECTION("mutates existing object when given a dictionary and CreatePolicy::UpdateModified") {
+        SECTION("mutates existing object when given a dictionary and CreatePolicy::UpdateModified")
+        {
             realm->begin_transaction();
             auto old_linked = any_cast<Object>(obj.get_property_value<util::Any>(ctx, "object"));
-            obj.set_property_value(ctx, "object",
-                                   util::Any(AnyDict{{"value", INT64_C(40)}}),
+            obj.set_property_value(ctx, "object", util::Any(AnyDict{{"value", INT64_C(40)}}),
                                    CreatePolicy::UpdateModified);
             auto new_linked = any_cast<Object>(obj.get_property_value<util::Any>(ctx, "object"));
             REQUIRE(old_linked.is_valid());
@@ -1201,7 +1281,8 @@ TEST_CASE("Embedded Object") {
             realm->cancel_transaction();
         }
 
-        SECTION("can set embedded link to null") {
+        SECTION("can set embedded link to null")
+        {
             realm->begin_transaction();
             auto old_linked = any_cast<Object>(obj.get_property_value<util::Any>(ctx, "object"));
             obj.set_property_value(ctx, "object", util::Any());
@@ -1212,7 +1293,8 @@ TEST_CASE("Embedded Object") {
         }
     }
 
-    SECTION("set_property_value() on list of embedded objects") {
+    SECTION("set_property_value() on list of embedded objects")
+    {
         auto obj = create(AnyDict{
             {"pk", INT64_C(1)},
             {"array", AnyVector{AnyDict{{"value", INT64_C(1)}}, AnyDict{{"value", INT64_C(2)}}}},
@@ -1224,22 +1306,23 @@ TEST_CASE("Embedded Object") {
         });
         List list2(realm, obj2.obj().get_linklist("array"));
 
-        SECTION("throws when given a managed object") {
+        SECTION("throws when given a managed object")
+        {
             realm->begin_transaction();
             REQUIRE_THROWS_WITH(obj.set_property_value(ctx, "array", util::Any{AnyVector{list2.get(0)}}),
                                 "Cannot add an existing managed embedded object to a List.");
             realm->cancel_transaction();
         }
 
-        SECTION("replaces objects when given a dictionary and CreatePolicy::UpdateAll") {
+        SECTION("replaces objects when given a dictionary and CreatePolicy::UpdateAll")
+        {
             realm->begin_transaction();
             auto old_obj_1 = list.get(0);
             auto old_obj_2 = list.get(1);
-            obj.set_property_value(ctx, "array", util::Any(AnyVector{
-                AnyDict{{"value", INT64_C(1)}},
-                AnyDict{{"value", INT64_C(2)}},
-                AnyDict{{"value", INT64_C(3)}}
-            }), CreatePolicy::UpdateAll);
+            obj.set_property_value(ctx, "array",
+                                   util::Any(AnyVector{AnyDict{{"value", INT64_C(1)}}, AnyDict{{"value", INT64_C(2)}},
+                                                       AnyDict{{"value", INT64_C(3)}}}),
+                                   CreatePolicy::UpdateAll);
             REQUIRE(list.size() == 3);
             REQUIRE_FALSE(old_obj_1.is_valid());
             REQUIRE_FALSE(old_obj_2.is_valid());
@@ -1249,15 +1332,15 @@ TEST_CASE("Embedded Object") {
             realm->cancel_transaction();
         }
 
-        SECTION("mutates existing objects when given a dictionary and CreatePolicy::UpdateModified") {
+        SECTION("mutates existing objects when given a dictionary and CreatePolicy::UpdateModified")
+        {
             realm->begin_transaction();
             auto old_obj_1 = list.get(0);
             auto old_obj_2 = list.get(1);
-            obj.set_property_value(ctx, "array", util::Any(AnyVector{
-                AnyDict{{"value", INT64_C(1)}},
-                AnyDict{{"value", INT64_C(2)}},
-                AnyDict{{"value", INT64_C(3)}}
-            }), CreatePolicy::UpdateModified);
+            obj.set_property_value(ctx, "array",
+                                   util::Any(AnyVector{AnyDict{{"value", INT64_C(1)}}, AnyDict{{"value", INT64_C(2)}},
+                                                       AnyDict{{"value", INT64_C(3)}}}),
+                                   CreatePolicy::UpdateModified);
             REQUIRE(list.size() == 3);
             REQUIRE(old_obj_1.is_valid());
             REQUIRE(old_obj_2.is_valid());
@@ -1267,7 +1350,8 @@ TEST_CASE("Embedded Object") {
             realm->cancel_transaction();
         }
 
-        SECTION("clears list when given null") {
+        SECTION("clears list when given null")
+        {
             realm->begin_transaction();
             obj.set_property_value(ctx, "array", util::Any());
             REQUIRE(list.size() == 0);
@@ -1275,7 +1359,8 @@ TEST_CASE("Embedded Object") {
         }
     }
 
-    SECTION("create with UpdateModified diffs child objects") {
+    SECTION("create with UpdateModified diffs child objects")
+    {
         auto obj = create(AnyDict{
             {"pk", INT64_C(1)},
             {"object", AnyDict{{"value", INT64_C(10)}}},
@@ -1286,20 +1371,20 @@ TEST_CASE("Embedded Object") {
         Results result(realm, array_table);
 
         bool obj_callback_called = false;
-        auto token = obj.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
-            obj_callback_called = true;
-        });
+        auto token = obj.add_notification_callback(
+            [&](CollectionChangeSet, std::exception_ptr) { obj_callback_called = true; });
         bool list_callback_called = false;
-        auto token1 = result.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
-            list_callback_called = true;
-        });
+        auto token1 = result.add_notification_callback(
+            [&](CollectionChangeSet, std::exception_ptr) { list_callback_called = true; });
         advance_and_notify(*realm);
 
         // Update with identical value
-        create(AnyDict{
-            {"pk", INT64_C(1)},
-            {"object", AnyDict{{"value", INT64_C(10)}}},
-        }, CreatePolicy::UpdateModified);
+        create(
+            AnyDict{
+                {"pk", INT64_C(1)},
+                {"object", AnyDict{{"value", INT64_C(10)}}},
+            },
+            CreatePolicy::UpdateModified);
 
         obj_callback_called = false;
         list_callback_called = false;
@@ -1308,10 +1393,12 @@ TEST_CASE("Embedded Object") {
         REQUIRE(!list_callback_called);
 
         // Update with different values
-        create(AnyDict{
-            {"pk", INT64_C(1)},
-            {"array", AnyVector{AnyDict{{"value", INT64_C(40)}}, AnyDict{{"value", INT64_C(50)}}}},
-        }, CreatePolicy::UpdateModified);
+        create(
+            AnyDict{
+                {"pk", INT64_C(1)},
+                {"array", AnyVector{AnyDict{{"value", INT64_C(40)}}, AnyDict{{"value", INT64_C(50)}}}},
+            },
+            CreatePolicy::UpdateModified);
 
         obj_callback_called = false;
         list_callback_called = false;
@@ -1320,7 +1407,8 @@ TEST_CASE("Embedded Object") {
         REQUIRE(list_callback_called);
     }
 
-    SECTION("deleting parent object sends change notification") {
+    SECTION("deleting parent object sends change notification")
+    {
         auto parent = create(AnyDict{
             {"pk", INT64_C(1)},
             {"object", AnyDict{{"value", INT64_C(10)}}},

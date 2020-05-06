@@ -42,8 +42,8 @@ namespace sync_session_states {
 struct Active;
 struct Dying;
 struct Inactive;
-}
-}
+} // namespace sync_session_states
+} // namespace _impl
 
 namespace sync {
 class Session;
@@ -55,17 +55,15 @@ using SyncProgressNotifierCallback = void(uint64_t transferred_bytes, uint64_t t
 namespace _impl {
 class SyncProgressNotifier {
 public:
-    enum class NotifierType {
-        upload, download
-    };
+    enum class NotifierType { upload, download };
 
-    uint64_t register_callback(std::function<SyncProgressNotifierCallback>,
-                               NotifierType direction, bool is_streaming);
+    uint64_t register_callback(std::function<SyncProgressNotifierCallback>, NotifierType direction,
+                               bool is_streaming);
     void unregister_callback(uint64_t);
 
     void set_local_version(uint64_t);
-    void update(uint64_t downloaded, uint64_t downloadable,
-                uint64_t uploaded, uint64_t uploadable, uint64_t, uint64_t);
+    void update(uint64_t downloaded, uint64_t downloadable, uint64_t uploaded, uint64_t uploadable, uint64_t,
+                uint64_t);
 
 private:
     mutable std::mutex m_mutex;
@@ -130,7 +128,10 @@ public:
     ConnectionState connection_state() const;
 
     // The on-disk path of the Realm file backing the Realm this `SyncSession` represents.
-    std::string const& path() const { return m_realm_path; }
+    std::string const& path() const
+    {
+        return m_realm_path;
+    }
 
     // Register a callback that will be called when all pending uploads have completed.
     // The callback is run asynchronously, and upon whatever thread the underlying sync client
@@ -294,15 +295,18 @@ private:
 
     friend class realm::SyncManager;
     // Called by SyncManager {
-    static std::shared_ptr<SyncSession> create(_impl::SyncClient& client, std::string realm_path,
-                                               SyncConfig config, bool force_client_resync)
+    static std::shared_ptr<SyncSession> create(_impl::SyncClient& client, std::string realm_path, SyncConfig config,
+                                               bool force_client_resync)
     {
         struct MakeSharedEnabler : public SyncSession {
-            MakeSharedEnabler(_impl::SyncClient& client, std::string realm_path, SyncConfig config, bool force_client_resync)
-            : SyncSession(client, std::move(realm_path), std::move(config), force_client_resync)
-            {}
+            MakeSharedEnabler(_impl::SyncClient& client, std::string realm_path, SyncConfig config,
+                              bool force_client_resync)
+                : SyncSession(client, std::move(realm_path), std::move(config), force_client_resync)
+            {
+            }
         };
-        return std::make_shared<MakeSharedEnabler>(client, std::move(realm_path), std::move(config), force_client_resync);
+        return std::make_shared<MakeSharedEnabler>(client, std::move(realm_path), std::move(config),
+                                                   force_client_resync);
     }
     // }
 
@@ -371,6 +375,6 @@ private:
     std::weak_ptr<ExternalReference> m_external_reference;
 };
 
-}
+} // namespace realm
 
 #endif // REALM_OS_SYNC_SESSION_HPP

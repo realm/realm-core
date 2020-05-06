@@ -84,7 +84,7 @@ public:
     Bson(std::string&&) noexcept;
     Bson(IndexedMap<Bson>&&) noexcept;
     Bson(std::vector<Bson>&&) noexcept;
-    
+
     // These are shortcuts for Bson(StringData(c_str)), and are
     // needed to avoid unwanted implicit conversion of char* to bool.
     Bson(char* c_str) noexcept
@@ -186,13 +186,13 @@ public:
         return max_key_val;
     }
 
-    explicit operator const IndexedMap<Bson>&&() const
+    explicit operator const IndexedMap<Bson> &&() const
     {
         REALM_ASSERT(m_type == Bson::Type::Document);
         return std::move(*document_val);
     }
 
-    explicit operator const std::vector<Bson>&&() const
+    explicit operator const std::vector<Bson> &&() const
     {
         REALM_ASSERT(m_type == Bson::Type::Array);
         return std::move(*array_val);
@@ -203,6 +203,7 @@ public:
 
     bool operator==(const Bson& other) const;
     bool operator!=(const Bson& other) const;
+
 private:
     friend std::ostream& operator<<(std::ostream& out, const Bson& m);
     template <typename T>
@@ -349,5 +350,5 @@ Bson parse(const std::string& json);
 
 } // namespace bson
 } // namespace realm
-            
+
 #endif // REALM_BSON_HPP

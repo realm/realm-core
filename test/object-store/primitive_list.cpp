@@ -43,100 +43,241 @@
 using namespace realm;
 
 
-template<PropertyType prop_type, typename T>
+template <PropertyType prop_type, typename T>
 struct Base {
     using Type = T;
     using Wrapped = T;
     using Boxed = T;
     using AvgType = double;
 
-    static PropertyType property_type() { return prop_type; }
-    static util::Any to_any(T value) { return value; }
+    static PropertyType property_type()
+    {
+        return prop_type;
+    }
+    static util::Any to_any(T value)
+    {
+        return value;
+    }
 
-    template<typename Fn>
-    static auto unwrap(T value, Fn&& fn) { return fn(value); }
+    template <typename Fn>
+    static auto unwrap(T value, Fn&& fn)
+    {
+        return fn(value);
+    }
 
-    static T min() { abort(); }
-    static T max() { abort(); }
-    static T sum() { abort(); }
-    static AvgType average() { abort(); }
+    static T min()
+    {
+        abort();
+    }
+    static T max()
+    {
+        abort();
+    }
+    static T sum()
+    {
+        abort();
+    }
+    static AvgType average()
+    {
+        abort();
+    }
 
-    static bool can_sum() { return std::is_arithmetic<T>::value; }
-    static bool can_average() { return std::is_arithmetic<T>::value; }
-    static bool can_minmax() { return std::is_arithmetic<T>::value; }
+    static bool can_sum()
+    {
+        return std::is_arithmetic<T>::value;
+    }
+    static bool can_average()
+    {
+        return std::is_arithmetic<T>::value;
+    }
+    static bool can_minmax()
+    {
+        return std::is_arithmetic<T>::value;
+    }
 };
 
 struct Int : Base<PropertyType::Int, int64_t> {
-    static std::vector<int64_t> values() { return {3, 1, 2}; }
-    static int64_t min() { return 1; }
-    static int64_t max() { return 3; }
-    static int64_t sum() { return 6; }
-    static double average() { return 2.0; }
+    static std::vector<int64_t> values()
+    {
+        return {3, 1, 2};
+    }
+    static int64_t min()
+    {
+        return 1;
+    }
+    static int64_t max()
+    {
+        return 3;
+    }
+    static int64_t sum()
+    {
+        return 6;
+    }
+    static double average()
+    {
+        return 2.0;
+    }
 };
 
 struct Bool : Base<PropertyType::Bool, bool> {
-    static std::vector<bool> values() { return {true, false}; }
-    static bool can_sum() { return false; }
-    static bool can_average() { return false; }
-    static bool can_minmax() { return false; }
+    static std::vector<bool> values()
+    {
+        return {true, false};
+    }
+    static bool can_sum()
+    {
+        return false;
+    }
+    static bool can_average()
+    {
+        return false;
+    }
+    static bool can_minmax()
+    {
+        return false;
+    }
 };
 
 struct Float : Base<PropertyType::Float, float> {
-    static std::vector<float> values() { return {3.3f, 1.1f, 2.2f}; }
-    static float min() { return 1.1f; }
-    static float max() { return 3.3f; }
-    static auto sum() { return Approx(6.6f); }
-    static auto average() { return Approx(2.2f); }
+    static std::vector<float> values()
+    {
+        return {3.3f, 1.1f, 2.2f};
+    }
+    static float min()
+    {
+        return 1.1f;
+    }
+    static float max()
+    {
+        return 3.3f;
+    }
+    static auto sum()
+    {
+        return Approx(6.6f);
+    }
+    static auto average()
+    {
+        return Approx(2.2f);
+    }
 };
 
 struct Double : Base<PropertyType::Double, double> {
-    static std::vector<double> values() { return {3.3, 1.1, 2.2}; }
-    static double min() { return 1.1; }
-    static double max() { return 3.3; }
-    static auto sum() { return Approx(6.6); }
-    static auto average() { return Approx(2.2); }
+    static std::vector<double> values()
+    {
+        return {3.3, 1.1, 2.2};
+    }
+    static double min()
+    {
+        return 1.1;
+    }
+    static double max()
+    {
+        return 3.3;
+    }
+    static auto sum()
+    {
+        return Approx(6.6);
+    }
+    static auto average()
+    {
+        return Approx(2.2);
+    }
 };
 
 struct String : Base<PropertyType::String, StringData> {
     using Boxed = std::string;
-    static std::vector<StringData> values() { return {"c", "a", "b"}; }
-    static util::Any to_any(StringData value) { return value ? std::string(value) : util::Any(); }
+    static std::vector<StringData> values()
+    {
+        return {"c", "a", "b"};
+    }
+    static util::Any to_any(StringData value)
+    {
+        return value ? std::string(value) : util::Any();
+    }
 };
 
 struct Binary : Base<PropertyType::Data, BinaryData> {
     using Boxed = std::string;
-    static std::vector<BinaryData> values() { return {BinaryData("a", 1)}; }
-    static util::Any to_any(BinaryData value) { return value ? std::string(value) : util::Any(); }
+    static std::vector<BinaryData> values()
+    {
+        return {BinaryData("a", 1)};
+    }
+    static util::Any to_any(BinaryData value)
+    {
+        return value ? std::string(value) : util::Any();
+    }
 };
 
 struct Date : Base<PropertyType::Date, Timestamp> {
-    static std::vector<Timestamp> values() { return {Timestamp(1, 1)}; }
-    static bool can_minmax() { return true; }
-    static Timestamp min() { return Timestamp(1, 1); }
-    static Timestamp max() { return Timestamp(1, 1); }
+    static std::vector<Timestamp> values()
+    {
+        return {Timestamp(1, 1)};
+    }
+    static bool can_minmax()
+    {
+        return true;
+    }
+    static Timestamp min()
+    {
+        return Timestamp(1, 1);
+    }
+    static Timestamp max()
+    {
+        return Timestamp(1, 1);
+    }
 };
 
 struct OID : Base<PropertyType::ObjectId, ObjectId> {
-    static std::vector<ObjectId> values() { return {ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa"), ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb")}; }
+    static std::vector<ObjectId> values()
+    {
+        return {ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa"), ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb")};
+    }
 };
 
 struct Decimal : Base<PropertyType::Decimal, Decimal128> {
     using AvgType = Decimal128;
-    static std::vector<Decimal128> values() { return {Decimal128("123.45e6"), Decimal128("876.54e32")}; }
-    static Decimal128 min() { return Decimal128("123.45e6"); }
-    static Decimal128 max() { return Decimal128("876.54e32"); }
-    static Decimal128 sum() { return Decimal128("123.45e6") + Decimal128("876.54e32"); }
-    static Decimal128 average() { return ((Decimal128("123.45e6") + Decimal128("876.54e32")) / Decimal128(2)); }
-    static bool can_sum() { return true; }
-    static bool can_average() { return true; }
-    static bool can_minmax() { return true; }
+    static std::vector<Decimal128> values()
+    {
+        return {Decimal128("123.45e6"), Decimal128("876.54e32")};
+    }
+    static Decimal128 min()
+    {
+        return Decimal128("123.45e6");
+    }
+    static Decimal128 max()
+    {
+        return Decimal128("876.54e32");
+    }
+    static Decimal128 sum()
+    {
+        return Decimal128("123.45e6") + Decimal128("876.54e32");
+    }
+    static Decimal128 average()
+    {
+        return ((Decimal128("123.45e6") + Decimal128("876.54e32")) / Decimal128(2));
+    }
+    static bool can_sum()
+    {
+        return true;
+    }
+    static bool can_average()
+    {
+        return true;
+    }
+    static bool can_minmax()
+    {
+        return true;
+    }
 };
 
-template<typename BaseT>
+template <typename BaseT>
 struct BoxedOptional : BaseT {
     using Type = util::Optional<typename BaseT::Type>;
     using Boxed = Type;
-    static PropertyType property_type() { return BaseT::property_type()|PropertyType::Nullable; }
+    static PropertyType property_type()
+    {
+        return BaseT::property_type() | PropertyType::Nullable;
+    }
     static std::vector<Type> values()
     {
         std::vector<Type> ret;
@@ -145,16 +286,28 @@ struct BoxedOptional : BaseT {
         ret.push_back(util::none);
         return ret;
     }
-    static auto unwrap(Type value) { return *value; }
-    static util::Any to_any(Type value) { return value ? util::Any(*value) : util::Any(); }
+    static auto unwrap(Type value)
+    {
+        return *value;
+    }
+    static util::Any to_any(Type value)
+    {
+        return value ? util::Any(*value) : util::Any();
+    }
 
-    template<typename Fn>
-    static auto unwrap(Type value, Fn&& fn) { return value ? fn(*value) : fn(null()); }
+    template <typename Fn>
+    static auto unwrap(Type value, Fn&& fn)
+    {
+        return value ? fn(*value) : fn(null());
+    }
 };
 
-template<typename BaseT>
+template <typename BaseT>
 struct UnboxedOptional : BaseT {
-    static PropertyType property_type() { return BaseT::property_type()|PropertyType::Nullable; }
+    static PropertyType property_type()
+    {
+        return BaseT::property_type() | PropertyType::Nullable;
+    }
     static auto values() -> decltype(BaseT::values())
     {
         auto ret = BaseT::values();
@@ -163,18 +316,42 @@ struct UnboxedOptional : BaseT {
     }
 };
 
-template<typename T>
-T get(Mixed) { abort(); }
+template <typename T>
+T get(Mixed)
+{
+    abort();
+}
 
-template<> int64_t get(Mixed m) { return m.get_int(); }
-template<> float get(Mixed m) { return m.get_type() == type_Float ? m.get_float() : static_cast<float>(m.get_double()); }
-template<> double get(Mixed m) { return m.get_double(); }
-template<> Timestamp get(Mixed m) { return m.get_timestamp(); }
-template<> Decimal128 get(Mixed m) { return m.get<Decimal128>(); }
+template <>
+int64_t get(Mixed m)
+{
+    return m.get_int();
+}
+template <>
+float get(Mixed m)
+{
+    return m.get_type() == type_Float ? m.get_float() : static_cast<float>(m.get_double());
+}
+template <>
+double get(Mixed m)
+{
+    return m.get_double();
+}
+template <>
+Timestamp get(Mixed m)
+{
+    return m.get_timestamp();
+}
+template <>
+Decimal128 get(Mixed m)
+{
+    return m.get<Decimal128>();
+}
 
 namespace realm {
-template<typename T>
-bool operator==(List const& list, std::vector<T> const& values) {
+template <typename T>
+bool operator==(List const& list, std::vector<T> const& values)
+{
     if (list.size() != values.size())
         return false;
     for (size_t i = 0; i < values.size(); ++i) {
@@ -184,8 +361,9 @@ bool operator==(List const& list, std::vector<T> const& values) {
     return true;
 }
 
-template<typename T>
-bool operator==(Results const& results, std::vector<T> const& values) {
+template <typename T>
+bool operator==(Results const& results, std::vector<T> const& values)
+{
     // FIXME: this is only necessary because Results::size() and ::get() are not const
     Results copy{results};
     if (copy.size() != values.size())
@@ -197,10 +375,10 @@ bool operator==(Results const& results, std::vector<T> const& values) {
     return true;
 }
 
-}
+} // namespace realm
 
 struct StringifyingContext {
-    template<typename T>
+    template <typename T>
     std::string box(T value)
     {
         std::stringstream ss;
@@ -208,11 +386,14 @@ struct StringifyingContext {
         return ss.str();
     }
 
-    std::string box(Obj obj) { return util::to_string(obj.get_key().value); }
+    std::string box(Obj obj)
+    {
+        return util::to_string(obj.get_key().value);
+    }
 };
 
 namespace Catch {
-template<>
+template <>
 struct StringMaker<List> {
     static std::string convert(List const& list)
     {
@@ -232,7 +413,7 @@ struct StringMaker<List> {
         return str;
     }
 };
-template<>
+template <>
 struct StringMaker<Results> {
     static std::string convert(Results const& r)
     {
@@ -253,7 +434,7 @@ struct StringMaker<Results> {
         return str;
     }
 };
-template<>
+template <>
 struct StringMaker<util::None> {
     static std::string convert(util::None)
     {
@@ -263,15 +444,21 @@ struct StringMaker<util::None> {
 } // namespace Catch
 
 struct less {
-    template<class T, class U>
-    auto operator()(T&& a, U&& b) const noexcept { return a < b; }
+    template <class T, class U>
+    auto operator()(T&& a, U&& b) const noexcept
+    {
+        return a < b;
+    }
 };
 struct greater {
-    template<class T, class U>
-    auto operator()(T&& a, U&& b) const noexcept { return a > b; }
+    template <class T, class U>
+    auto operator()(T&& a, U&& b) const noexcept
+    {
+        return a > b;
+    }
 };
 
-template<>
+template <>
 auto less::operator()<Timestamp&, Timestamp&>(Timestamp& a, Timestamp& b) const noexcept
 {
     if (b.is_null())
@@ -281,7 +468,7 @@ auto less::operator()<Timestamp&, Timestamp&>(Timestamp& a, Timestamp& b) const 
     return a < b;
 }
 
-template<>
+template <>
 auto greater::operator()<Timestamp&, Timestamp&>(Timestamp& a, Timestamp& b) const noexcept
 {
     if (a.is_null())
@@ -291,9 +478,10 @@ auto greater::operator()<Timestamp&, Timestamp&>(Timestamp& a, Timestamp& b) con
     return a > b;
 }
 
-TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::Double, ::String, ::Binary, ::Date, ::OID, ::Decimal,
-                   BoxedOptional<::Int>, BoxedOptional<::Bool>, BoxedOptional<::Float>, BoxedOptional<::Double>,
-                   UnboxedOptional<::String>, UnboxedOptional<::Binary>, UnboxedOptional<::Date>)
+TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::Double, ::String, ::Binary, ::Date,
+                   ::OID, ::Decimal, BoxedOptional<::Int>, BoxedOptional<::Bool>, BoxedOptional<::Float>,
+                   BoxedOptional<::Double>, UnboxedOptional<::String>, UnboxedOptional<::Binary>,
+                   UnboxedOptional<::Date>)
 {
     auto values = TestType::values();
     using T = typename TestType::Type;
@@ -303,9 +491,7 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
     InMemoryTestFile config;
     config.automatic_change_notifications = false;
     config.schema = Schema{
-        {"object", {
-            {"value", PropertyType::Array|TestType::property_type()}
-        }},
+        {"object", {{"value", PropertyType::Array | TestType::property_type()}}},
     };
     auto r = Realm::get_shared_realm(config);
     auto r2 = Realm::get_shared_realm(config);
@@ -320,7 +506,8 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
     auto results = list.as_results();
     CppContext ctx(r);
 
-    SECTION("get_realm()") {
+    SECTION("get_realm()")
+    {
         REQUIRE(list.get_realm() == r);
         REQUIRE(results.get_realm() == r);
     }
@@ -333,93 +520,111 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
         REQUIRE(results.get_query().count() == 1);
     }
 #endif
-    SECTION("get_origin_row_index()") {
+    SECTION("get_origin_row_index()")
+    {
         REQUIRE(list.get_parent_object_key() == obj.get_key());
         table->create_object();
         REQUIRE(list.get_parent_object_key() == obj.get_key());
     }
 
-    SECTION("get_type()") {
+    SECTION("get_type()")
+    {
         REQUIRE(list.get_type() == TestType::property_type());
         REQUIRE(results.get_type() == TestType::property_type());
     }
 
-    SECTION("get_object_type()") {
+    SECTION("get_object_type()")
+    {
         REQUIRE(results.get_object_type() == StringData());
     }
 
-    SECTION("is_valid()") {
+    SECTION("is_valid()")
+    {
         REQUIRE(list.is_valid());
         REQUIRE(results.is_valid());
 
-        SECTION("invalidate") {
+        SECTION("invalidate")
+        {
             r->invalidate();
             REQUIRE_FALSE(list.is_valid());
             REQUIRE_FALSE(results.is_valid());
         }
 
-        SECTION("close") {
+        SECTION("close")
+        {
             r->close();
             REQUIRE_FALSE(list.is_valid());
             REQUIRE_FALSE(results.is_valid());
         }
 
-        SECTION("delete row") {
+        SECTION("delete row")
+        {
             obj.remove();
             REQUIRE_FALSE(list.is_valid());
             REQUIRE_FALSE(results.is_valid());
         }
 
-        SECTION("rollback transaction creating list") {
+        SECTION("rollback transaction creating list")
+        {
             r->cancel_transaction();
             REQUIRE_FALSE(list.is_valid());
             REQUIRE_FALSE(results.is_valid());
         }
     }
 
-    SECTION("verify_attached()") {
+    SECTION("verify_attached()")
+    {
         REQUIRE_NOTHROW(list.verify_attached());
 
-        SECTION("invalidate") {
+        SECTION("invalidate")
+        {
             r->invalidate();
             REQUIRE_THROWS(list.verify_attached());
         }
 
-        SECTION("close") {
+        SECTION("close")
+        {
             r->close();
             REQUIRE_THROWS(list.verify_attached());
         }
 
-        SECTION("delete row") {
+        SECTION("delete row")
+        {
             obj.remove();
             REQUIRE_THROWS(list.verify_attached());
         }
 
-        SECTION("rollback transaction creating list") {
+        SECTION("rollback transaction creating list")
+        {
             r->cancel_transaction();
             REQUIRE_THROWS(list.verify_attached());
         }
     }
 
-    SECTION("verify_in_transaction()") {
+    SECTION("verify_in_transaction()")
+    {
         REQUIRE_NOTHROW(list.verify_in_transaction());
 
-        SECTION("invalidate") {
+        SECTION("invalidate")
+        {
             r->invalidate();
             REQUIRE_THROWS(list.verify_in_transaction());
         }
 
-        SECTION("close") {
+        SECTION("close")
+        {
             r->close();
             REQUIRE_THROWS(list.verify_in_transaction());
         }
 
-        SECTION("delete row") {
+        SECTION("delete row")
+        {
             obj.remove();
             REQUIRE_THROWS(list.verify_in_transaction());
         }
 
-        SECTION("end write") {
+        SECTION("end write")
+        {
             r->commit_transaction();
             REQUIRE_THROWS(list.verify_in_transaction());
         }
@@ -431,7 +636,8 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
     for (T value : values)
         list.add(value);
 
-    SECTION("move()") {
+    SECTION("move()")
+    {
         if (list.size() < 3)
             return;
 
@@ -456,7 +662,8 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
         REQUIRE(results == values);
     }
 
-    SECTION("remove()") {
+    SECTION("remove()")
+    {
         if (list.size() < 3)
             return;
 
@@ -466,13 +673,15 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
         REQUIRE(results == values);
     }
 
-    SECTION("remove_all()") {
+    SECTION("remove_all()")
+    {
         list.remove_all();
         REQUIRE(list.size() == 0);
         REQUIRE(results.size() == 0);
     }
 
-    SECTION("swap()") {
+    SECTION("swap()")
+    {
         if (list.size() < 3)
             return;
 
@@ -482,19 +691,22 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
         REQUIRE(results == values);
     }
 
-    SECTION("delete_all()") {
+    SECTION("delete_all()")
+    {
         list.delete_all();
         REQUIRE(list.size() == 0);
         REQUIRE(results.size() == 0);
     }
 
-    SECTION("clear()") {
+    SECTION("clear()")
+    {
         results.clear();
         REQUIRE(list.size() == 0);
         REQUIRE(results.size() == 0);
     }
 
-    SECTION("get()") {
+    SECTION("get()")
+    {
         for (size_t i = 0; i < values.size(); ++i) {
             CAPTURE(i);
             REQUIRE(list.get<T>(i) == values[i]);
@@ -508,20 +720,23 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
         REQUIRE_THROWS(results.get(ctx, values.size()));
     }
 
-    SECTION("first()") {
+    SECTION("first()")
+    {
         REQUIRE(*results.first<T>() == values.front());
         REQUIRE(any_cast<Boxed>(*results.first(ctx)) == Boxed(values.front()));
         list.remove_all();
         REQUIRE(results.first<T>() == util::none);
     }
 
-    SECTION("last()") {
+    SECTION("last()")
+    {
         REQUIRE(*results.last<T>() == values.back());
         list.remove_all();
         REQUIRE(results.last<T>() == util::none);
     }
 
-    SECTION("set()") {
+    SECTION("set()")
+    {
         for (size_t i = 0; i < values.size(); ++i) {
             CAPTURE(i);
             auto rev = values.size() - i - 1;
@@ -539,7 +754,8 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
         REQUIRE_THROWS(list.set(list.size(), static_cast<T>(values[0])));
     }
 
-    SECTION("find()") {
+    SECTION("find()")
+    {
         for (size_t i = 0; i < values.size(); ++i) {
             CAPTURE(i);
             REQUIRE(list.find<T>(values[i]) == i);
@@ -561,7 +777,8 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
         REQUIRE(list.find(ctx, TestType::to_any(values[0])) == npos);
         REQUIRE(results.index_of(ctx, TestType::to_any(values[0])) == npos);
     }
-    SECTION("sorted index_of()") {
+    SECTION("sorted index_of()")
+    {
         auto sorted = list.sort({{"self", true}});
         std::sort(begin(values), end(values), less());
         for (size_t i = 0; i < values.size(); ++i) {
@@ -588,7 +805,8 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
         }
     }
 #endif
-    SECTION("sort()") {
+    SECTION("sort()")
+    {
         auto unsorted = list.sort(std::vector<std::pair<std::string, bool>>{});
         REQUIRE(unsorted == values);
 
@@ -613,7 +831,8 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
                                          string_for_property_type(TestType::property_type() & ~PropertyType::Flags)));
     }
 
-    SECTION("distinct()") {
+    SECTION("distinct()")
+    {
         for (T value : values)
             list.add(value);
         auto values2 = values;
@@ -627,9 +846,10 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
         REQUIRE(distinct == values);
         REQUIRE(distinct2 == values);
 
-        REQUIRE_THROWS_WITH(results.distinct({{"not self"}}),
-                            util::format("Cannot sort on key path 'not self': arrays of '%1' can only be sorted on 'self'",
-                                         string_for_property_type(TestType::property_type() & ~PropertyType::Flags)));
+        REQUIRE_THROWS_WITH(
+            results.distinct({{"not self"}}),
+            util::format("Cannot sort on key path 'not self': arrays of '%1' can only be sorted on 'self'",
+                         string_for_property_type(TestType::property_type() & ~PropertyType::Flags)));
         REQUIRE_THROWS_WITH(results.distinct({{"self"}, {"self"}}),
                             util::format("Cannot sort array of '%1' on more than one key path",
                                          string_for_property_type(TestType::property_type() & ~PropertyType::Flags)));
@@ -651,7 +871,8 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
     }
 #endif
 
-    SECTION("min()") {
+    SECTION("min()")
+    {
         if (!TestType::can_minmax()) {
             REQUIRE_THROWS(list.min());
             // REQUIRE_THROWS(results.min());
@@ -665,7 +886,8 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
         // REQUIRE(results.min() == util::none);
     }
 
-    SECTION("max()") {
+    SECTION("max()")
+    {
         if (!TestType::can_minmax()) {
             REQUIRE_THROWS(list.max());
             // REQUIRE_THROWS(results.max());
@@ -679,7 +901,8 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
         // REQUIRE(results.max() == util::none);
     }
 
-    SECTION("sum()") {
+    SECTION("sum()")
+    {
         if (!TestType::can_sum()) {
             REQUIRE_THROWS(list.sum());
             return;
@@ -692,7 +915,8 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
         // REQUIRE(get<W>(*results.sum()) == W{});
     }
 
-    SECTION("average()") {
+    SECTION("average()")
+    {
         if (!TestType::can_average()) {
             REQUIRE_THROWS(list.average());
             return;
@@ -705,20 +929,23 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
         // REQUIRE(results.average() == util::none);
     }
 
-    SECTION("operator==()") {
+    SECTION("operator==()")
+    {
         Obj obj1 = table->create_object();
         REQUIRE(list == List(r, obj, col));
         REQUIRE_FALSE(list == List(r, obj1, col));
     }
 
-    SECTION("hash") {
+    SECTION("hash")
+    {
         Obj obj1 = table->create_object();
         std::hash<List> h;
         REQUIRE(h(list) == h(List(r, obj, col)));
         REQUIRE_FALSE(h(list) == h(List(r, obj1, col)));
     }
 
-    SECTION("handover") {
+    SECTION("handover")
+    {
         r->commit_transaction();
 
         auto list2 = ThreadSafeReference(list).resolve<List>(r);
@@ -729,17 +956,17 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
 #endif
     }
 
-    SECTION("notifications") {
+    SECTION("notifications")
+    {
         r->commit_transaction();
 
         CollectionChangeSet change, rchange;
-        SECTION("add value to list") {
-            auto token = list.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
-                change = c;
-            });
-            auto rtoken = results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
-                rchange = c;
-            });
+        SECTION("add value to list")
+        {
+            auto token =
+                list.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) { change = c; });
+            auto rtoken =
+                results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) { rchange = c; });
             advance_and_notify(*r);
 
             r->begin_transaction();
@@ -752,13 +979,12 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
 #endif
         }
 
-        SECTION("clear list") {
-            auto token = list.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
-                change = c;
-            });
-            auto rtoken = results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
-                rchange = c;
-            });
+        SECTION("clear list")
+        {
+            auto token =
+                list.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) { change = c; });
+            auto rtoken =
+                results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) { rchange = c; });
             advance_and_notify(*r);
 
             r->begin_transaction();
@@ -771,7 +997,8 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
 #endif
         }
 
-        SECTION("delete containing row") {
+        SECTION("delete containing row")
+        {
             size_t calls = 0;
             auto token = list.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
                 change = c;
@@ -802,10 +1029,10 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
             REQUIRE(calls == 4);
         }
 
-        SECTION("deleting containing row before first run of notifier") {
-            auto token = list.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
-                change = c;
-            });
+        SECTION("deleting containing row before first run of notifier")
+        {
+            auto token =
+                list.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) { change = c; });
             r2->begin_transaction();
             table2->begin()->remove();
             r2->commit_transaction();
@@ -815,7 +1042,8 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
     }
 
 #if REALM_ENABLE_SYNC && REALM_HAVE_SYNC_STABLE_IDS
-    SECTION("sync compatibility") {
+    SECTION("sync compatibility")
+    {
         if (!util::EventLoop::has_implementation())
             return;
 
@@ -843,9 +1071,7 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
             auto r = Realm::get_shared_realm(sync_config);
             auto table = r->read_group().get_table("class_object");
 
-            util::EventLoop::main().run_until([&] {
-                return table->size() == 1;
-            });
+            util::EventLoop::main().run_until([&] { return table->size() == 1; });
 
             CppContext ctx(r);
             Object obj(r, "object", 0);

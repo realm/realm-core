@@ -37,8 +37,7 @@ IdentityProvider const IdentityProviderServerAPIKey = "api-key";
 
 IdentityProvider provider_type_from_enum(AuthProvider provider)
 {
-    switch (provider)
-    {
+    switch (provider) {
         case AuthProvider::ANONYMOUS:
             return IdentityProviderAnonymous;
         case AuthProvider::APPLE:
@@ -62,8 +61,8 @@ IdentityProvider provider_type_from_enum(AuthProvider provider)
 }
 
 AppCredentials::AppCredentials(AuthProvider provider, std::function<std::string()> factory)
-: m_provider(provider)
-, m_payload_factory(factory)
+    : m_provider(provider)
+    , m_payload_factory(factory)
 {
 }
 
@@ -84,99 +83,66 @@ std::string AppCredentials::serialize_as_json() const
 
 AppCredentials AppCredentials::anonymous()
 {
-    return AppCredentials(AuthProvider::ANONYMOUS,
-                          [=] {
-                              return nlohmann::json({
-                                  {kAppProviderKey, IdentityProviderAnonymous}
-                              }).dump();
-                          });
+    return AppCredentials(AuthProvider::ANONYMOUS, [=] {
+        return nlohmann::json({{kAppProviderKey, IdentityProviderAnonymous}}).dump();
+    });
 }
 
 AppCredentials AppCredentials::apple(AppCredentialsToken id_token)
 {
-    return AppCredentials(AuthProvider::APPLE,
-                          [=] {
-                              return nlohmann::json({
-                                  {kAppProviderKey, IdentityProviderApple},
-                                  {"id_token", id_token}
-                              }).dump();
-                          });
+    return AppCredentials(AuthProvider::APPLE, [=] {
+        return nlohmann::json({{kAppProviderKey, IdentityProviderApple}, {"id_token", id_token}}).dump();
+    });
 }
 
 AppCredentials AppCredentials::facebook(AppCredentialsToken access_token)
 {
-    return AppCredentials(AuthProvider::FACEBOOK,
-                          [=] {
-                              return nlohmann::json({
-                                  {kAppProviderKey, IdentityProviderFacebook},
-                                  {"access_token", access_token}
-                              }).dump();
-                          });
+    return AppCredentials(AuthProvider::FACEBOOK, [=] {
+        return nlohmann::json({{kAppProviderKey, IdentityProviderFacebook}, {"access_token", access_token}}).dump();
+    });
 }
 
 AppCredentials AppCredentials::google(AppCredentialsToken auth_token)
 {
-    return AppCredentials(AuthProvider::GOOGLE,
-                          [=] {
-                              return nlohmann::json({
-                                  {kAppProviderKey, IdentityProviderGoogle},
-                                  {"authCode", auth_token}
-                              }).dump();
-                          });
+    return AppCredentials(AuthProvider::GOOGLE, [=] {
+        return nlohmann::json({{kAppProviderKey, IdentityProviderGoogle}, {"authCode", auth_token}}).dump();
+    });
 }
 
 AppCredentials AppCredentials::custom(AppCredentialsToken token)
 {
-    return AppCredentials(AuthProvider::CUSTOM,
-                          [=] {
-                              return nlohmann::json({
-                                  {kAppProviderKey, IdentityProviderCustom},
-                                  {"token", token}
-                              }).dump();
-                          });
+    return AppCredentials(AuthProvider::CUSTOM, [=] {
+        return nlohmann::json({{kAppProviderKey, IdentityProviderCustom}, {"token", token}}).dump();
+    });
 }
 
-AppCredentials AppCredentials::username_password(std::string username,
-                                                 std::string password)
+AppCredentials AppCredentials::username_password(std::string username, std::string password)
 {
-    return AppCredentials(AuthProvider::USERNAME_PASSWORD,
-                          [=] {
-                              return nlohmann::json({
-                                  {kAppProviderKey, IdentityProviderUsernamePassword},
-                                  {"username", username},
-                                  {"password", password}
-                              }).dump();
-                          });
+    return AppCredentials(AuthProvider::USERNAME_PASSWORD, [=] {
+        return nlohmann::json({{kAppProviderKey, IdentityProviderUsernamePassword},
+                               {"username", username},
+                               {"password", password}})
+            .dump();
+    });
 }
 
 AppCredentials AppCredentials::function(std::string payload_json)
 {
-    return AppCredentials(AuthProvider::FUNCTION,
-                          [=] {
-                            return payload_json;
-                          });
+    return AppCredentials(AuthProvider::FUNCTION, [=] { return payload_json; });
 }
 
 AppCredentials AppCredentials::user_api_key(std::string api_key)
 {
-    return AppCredentials(AuthProvider::USER_API_KEY,
-                          [=] {
-                              return nlohmann::json({
-                                  {kAppProviderKey, IdentityProviderUserAPIKey},
-                                  {"key", api_key}
-                              }).dump();
-                          });
+    return AppCredentials(AuthProvider::USER_API_KEY, [=] {
+        return nlohmann::json({{kAppProviderKey, IdentityProviderUserAPIKey}, {"key", api_key}}).dump();
+    });
 }
 
 AppCredentials AppCredentials::server_api_key(std::string api_key)
 {
-    return AppCredentials(AuthProvider::SERVER_API_KEY,
-                          [=] {
-                              return nlohmann::json({
-                                  {kAppProviderKey, IdentityProviderServerAPIKey},
-                                  {"key", api_key}
-                              }).dump();
-                          });
+    return AppCredentials(AuthProvider::SERVER_API_KEY, [=] {
+        return nlohmann::json({{kAppProviderKey, IdentityProviderServerAPIKey}, {"key", api_key}}).dump();
+    });
 }
 
 } // namespace app

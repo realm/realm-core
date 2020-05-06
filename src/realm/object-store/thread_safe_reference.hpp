@@ -37,20 +37,24 @@ public:
     ThreadSafeReference(ThreadSafeReference&&) noexcept;
     ThreadSafeReference& operator=(ThreadSafeReference&&) noexcept;
 
-    template<typename T>
+    template <typename T>
     ThreadSafeReference(T const& value);
 
     // Import the object into the destination Realm
-    template<typename T>
+    template <typename T>
     T resolve(std::shared_ptr<Realm> const&);
 
-    explicit operator bool() const noexcept { return !!m_payload; }
+    explicit operator bool() const noexcept
+    {
+        return !!m_payload;
+    }
 
 private:
     class Payload;
-    template<typename> class PayloadImpl;
+    template <typename>
+    class PayloadImpl;
     std::unique_ptr<Payload> m_payload;
 };
-}
+} // namespace realm
 
 #endif /* REALM_OS_THREAD_SAFE_REFERENCE_HPP */

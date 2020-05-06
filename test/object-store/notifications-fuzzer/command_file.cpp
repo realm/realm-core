@@ -35,7 +35,7 @@ using namespace realm;
 #define log(...)
 #endif
 
-template<typename T>
+template <typename T>
 static T read_value(std::istream& input)
 {
     T ret;
@@ -43,11 +43,10 @@ static T read_value(std::istream& input)
     return ret;
 }
 
-template<typename... Args>
-static auto make_reader(void (*fn)(RealmState&, Args...)) {
-    return [=](std::istream& input) {
-        return std::bind(fn, std::placeholders::_1, read_value<Args>(input)...);
-    };
+template <typename... Args>
+static auto make_reader(void (*fn)(RealmState&, Args...))
+{
+    return [=](std::istream& input) { return std::bind(fn, std::placeholders::_1, read_value<Args>(input)...); };
 }
 
 static void run_add(RealmState& state, int64_t value)
@@ -85,7 +84,8 @@ static void run_commit(RealmState& state)
 
 static void run_lv_insert(RealmState& state, size_t pos, size_t target)
 {
-    if (!state.lv) return;
+    if (!state.lv)
+        return;
     if (target < state.table.size() && pos <= state.lv->size()) {
         log("lv insert %zu %zu\n", pos, target);
         state.lv->insert(pos, target);
@@ -94,7 +94,8 @@ static void run_lv_insert(RealmState& state, size_t pos, size_t target)
 
 static void run_lv_set(RealmState& state, size_t pos, size_t target)
 {
-    if (!state.lv) return;
+    if (!state.lv)
+        return;
     if (target < state.table.size() && pos < state.lv->size()) {
         log("lv set %zu %zu\n", pos, target);
         // We can't reliably detect self-assignment for verification, so don't do it
@@ -105,7 +106,8 @@ static void run_lv_set(RealmState& state, size_t pos, size_t target)
 
 static void run_lv_move(RealmState& state, size_t from, size_t to)
 {
-    if (!state.lv) return;
+    if (!state.lv)
+        return;
     if (from < state.lv->size() && to < state.lv->size()) {
         log("lv move %zu %zu\n", from, to);
         // FIXME: only do the move if it has an effect to avoid getting a
@@ -121,7 +123,8 @@ static void run_lv_move(RealmState& state, size_t from, size_t to)
 
 static void run_lv_swap(RealmState& state, size_t ndx1, size_t ndx2)
 {
-    if (!state.lv) return;
+    if (!state.lv)
+        return;
     if (ndx1 < state.lv->size() && ndx2 < state.lv->size()) {
         log("lv swap %zu %zu\n", ndx1, ndx2);
         if (state.lv->get(ndx1).get_index() != state.lv->get(ndx2).get_index()) {
@@ -136,7 +139,8 @@ static void run_lv_swap(RealmState& state, size_t ndx1, size_t ndx2)
 
 static void run_lv_remove(RealmState& state, size_t pos)
 {
-    if (!state.lv) return;
+    if (!state.lv)
+        return;
     if (pos < state.lv->size()) {
         log("lv remove %zu\n", pos);
         state.lv->remove(pos);
@@ -145,14 +149,15 @@ static void run_lv_remove(RealmState& state, size_t pos)
 
 static void run_lv_remove_target(RealmState& state, size_t pos)
 {
-    if (!state.lv) return;
+    if (!state.lv)
+        return;
     if (pos < state.lv->size()) {
         log("lv target remove %zu\n", pos);
         state.lv->remove_target_row(pos);
     }
 }
 
-static std::map<char, std::function<std::function<void (RealmState&)>(std::istream&)>> readers = {
+static std::map<char, std::function<std::function<void(RealmState&)>(std::istream&)>> readers = {
     // Row functions
     {'a', make_reader(run_add)},
     {'c', make_reader(run_commit)},
@@ -168,7 +173,7 @@ static std::map<char, std::function<std::function<void (RealmState&)>(std::istre
     {'t', make_reader(run_lv_remove_target)},
 };
 
-template<typename T>
+template <typename T>
 static std::vector<T> read_int_list(std::istream& input_stream)
 {
     std::vector<T> ret;
@@ -190,8 +195,8 @@ static std::vector<T> read_int_list(std::istream& input_stream)
 }
 
 CommandFile::CommandFile(std::istream& input)
-: initial_values(read_int_list<int64_t>(input))
-, initial_list_indices(read_int_list<size_t>(input))
+    : initial_values(read_int_list<int64_t>(input))
+    , initial_list_indices(read_int_list<size_t>(input))
 {
     if (!input.good())
         return;
@@ -233,7 +238,6 @@ void CommandFile::import(RealmState& state)
     }
 
     state.realm.commit_transaction();
-
 }
 
 void CommandFile::run(RealmState& state)

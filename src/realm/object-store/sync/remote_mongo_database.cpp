@@ -31,5 +31,5 @@ RemoteMongoCollection RemoteMongoDatabase::operator[](const std::string& collect
     return RemoteMongoCollection(collection_name, name, m_service);
 }
 
-}
-}
+} // namespace app
+} // namespace realm

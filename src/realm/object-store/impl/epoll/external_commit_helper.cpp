@@ -42,10 +42,11 @@
 using namespace realm;
 using namespace realm::_impl;
 
-#define LOGE(...) do { \
-    fprintf(stderr, __VA_ARGS__); \
-    ANDROID_LOG(ANDROID_LOG_ERROR, "REALM", __VA_ARGS__); \
-} while (0)
+#define LOGE(...)                                                                                                    \
+    do {                                                                                                             \
+        fprintf(stderr, __VA_ARGS__);                                                                                \
+        ANDROID_LOG(ANDROID_LOG_ERROR, "REALM", __VA_ARGS__);                                                        \
+    } while (0)
 
 namespace {
 // Write a byte to a pipe to notify anyone waiting for data on the pipe
@@ -84,6 +85,7 @@ public:
     void remove_commit_helper(ExternalCommitHelper* helper);
 
     static DaemonThread& shared();
+
 private:
     void listen();
 
@@ -111,7 +113,7 @@ void ExternalCommitHelper::FdHolder::close()
 }
 
 ExternalCommitHelper::ExternalCommitHelper(RealmCoordinator& parent)
-: m_parent(parent)
+    : m_parent(parent)
 {
     std::string path;
     std::string temp_dir = util::normalize_dir(parent.get_config().fifo_files_fallback_path);
@@ -119,7 +121,8 @@ ExternalCommitHelper::ExternalCommitHelper(RealmCoordinator& parent)
 
     // Object Store needs to create a named pipe in order to coordinate notifications.
     // This can be a problem on some file systems (e.g. FAT32) or due to security policies in SELinux. Most commonly
-    // it is a problem when saving Realms on external storage: https://stackoverflow.com/questions/2740321/how-to-create-named-pipe-mkfifo-in-android
+    // it is a problem when saving Realms on external storage:
+    // https://stackoverflow.com/questions/2740321/how-to-create-named-pipe-mkfifo-in-android
     //
     // For this reason we attempt to create this file in a temporary location known to be safe to write these files.
     //

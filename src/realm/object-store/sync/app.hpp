@@ -63,11 +63,13 @@ public:
     App& operator=(App const&) = default;
     App& operator=(App&&) = default;
 
-    const Config& config() const {
+    const Config& config() const
+    {
         return m_config;
     }
 
-    const std::string& base_url() const {
+    const std::string& base_url() const
+    {
         return m_base_url;
     }
 
@@ -137,7 +139,7 @@ public:
     private:
         friend class App;
         UserAPIKeyProviderClient(AuthRequestClient& auth_request_client)
-        : m_auth_request_client(auth_request_client)
+            : m_auth_request_client(auth_request_client)
         {
         }
 
@@ -151,22 +153,19 @@ public:
     ///
     class UsernamePasswordProviderClient {
     public:
-
         /// Registers a new email identity with the username/password provider,
         /// and sends a confirmation email to the provided address.
         /// @param email The email address of the user to register.
         /// @param password The password that the user created for the new username/password identity.
         /// @param completion_block A callback to be invoked once the call is complete.
-        void register_email(const std::string& email,
-                            const std::string& password,
+        void register_email(const std::string& email, const std::string& password,
                             std::function<void(util::Optional<AppError>)> completion_block);
 
         /// Confirms an email identity with the username/password provider.
         /// @param token The confirmation token that was emailed to the user.
         /// @param token_id The confirmation token id that was emailed to the user.
         /// @param completion_block A callback to be invoked once the call is complete.
-        void confirm_user(const std::string& token,
-                          const std::string& token_id,
+        void confirm_user(const std::string& token, const std::string& token_id,
                           std::function<void(util::Optional<AppError>)> completion_block);
 
         /// Re-sends a confirmation email to a user that has registered but
@@ -184,9 +183,7 @@ public:
         /// @param token The password reset token that was emailed to the user.
         /// @param token_id The password reset token id that was emailed to the user.
         /// @param completion_block A callback to be invoked once the call is complete.
-        void reset_password(const std::string& password,
-                            const std::string& token,
-                            const std::string& token_id,
+        void reset_password(const std::string& password, const std::string& token, const std::string& token_id,
                             std::function<void(util::Optional<AppError>)> completion_block);
 
         /// Resets the password of an email identity using the
@@ -198,14 +195,14 @@ public:
         /// @param password The desired new password.
         /// @param args A pre-serialized list of arguments. Must be a JSON array.
         /// @param completion_block A callback to be invoked once the call is complete.
-        void call_reset_password_function(const std::string& email,
-                                          const std::string& password,
+        void call_reset_password_function(const std::string& email, const std::string& password,
                                           const std::string& args,
                                           std::function<void(util::Optional<AppError>)> completion_block);
+
     private:
         friend class App;
         UsernamePasswordProviderClient(App* app)
-        : m_parent(app)
+            : m_parent(app)
         {
             REALM_ASSERT(app);
         }
@@ -225,15 +222,14 @@ public:
 
     /// Logout the current user.
     void log_out(std::function<void(util::Optional<AppError>)>);
-            
+
     /// Refreshes the custom data for a specified user
     /// @param sync_user The user you want to refresh
-    void refresh_custom_data(std::shared_ptr<SyncUser> sync_user,
-                             std::function<void(util::Optional<AppError>)>);
+    void refresh_custom_data(std::shared_ptr<SyncUser> sync_user, std::function<void(util::Optional<AppError>)>);
 
     /// Log out the given user if they are not already logged out.
     void log_out(std::shared_ptr<SyncUser> user, std::function<void(util::Optional<AppError>)> completion_block);
-    
+
     /// Links the currently authenticated user with a new identity, where the identity is defined by the credential
     /// specified as a parameter. This will only be successful if this `SyncUser` is the currently authenticated
     /// with the client from which it was created. On success the user will be returned with the new identity.
@@ -254,27 +250,28 @@ public:
     /// @param user The user to switch to
     /// @returns A shared pointer to the new current user
     std::shared_ptr<SyncUser> switch_user(std::shared_ptr<SyncUser> user) const;
-    
+
     /// Logs out and removes the provided user
     /// this is a local operation and does not invoke any server side function
     /// @param user the user to remove
     /// @param completion_block Will return an error if the user is not found
-    void remove_user(std::shared_ptr<SyncUser> user,
-                     std::function<void(util::Optional<AppError>)> completion_block);
+    void remove_user(std::shared_ptr<SyncUser> user, std::function<void(util::Optional<AppError>)> completion_block);
 
     // Get a provider client for the given class type.
     template <class T>
-    T provider_client() {
+    T provider_client()
+    {
         return T(this);
     }
 
     /// Retrieves a general-purpose service client for the Stitch service
-    RemoteMongoClient remote_mongo_client(); 
+    RemoteMongoClient remote_mongo_client();
 
     class Internal {
         friend class realm::SyncSession;
 
-        static const std::string& sync_route(const App& app) {
+        static const std::string& sync_route(const App& app)
+        {
             return app.m_sync_route;
         }
     };
@@ -282,7 +279,8 @@ public:
     // Expose some internal functionality to testing code.
     class OnlyForTesting {
     public:
-        static void set_sync_route(App& app, std::string sync_route) {
+        static void set_sync_route(App& app, std::string sync_route)
+        {
             app.m_sync_route = std::move(sync_route);
         }
     };
@@ -290,22 +288,23 @@ public:
     /// Retrieves a general-purpose service client for the Realm Cloud service
     /// @param service_name The name of the cluster
     RemoteMongoClient remote_mongo_client(const std::string& service_name);
-    
+
 private:
     friend class Internal;
     friend class OnlyForTesting;
     struct AppMetadata {
         AppMetadata() = default;
-        AppMetadata(const std::string& deployment_model,
-                    const std::string& location,
-                    const std::string& hostname,
+        AppMetadata(const std::string& deployment_model, const std::string& location, const std::string& hostname,
                     const std::string& ws_hostname)
             : m_deployment_model(deployment_model)
             , m_location(location)
             , m_hostname(hostname)
-            , m_ws_hostname(ws_hostname) {}
+            , m_ws_hostname(ws_hostname)
+        {
+        }
         AppMetadata(AppMetadata&&) = default;
         AppMetadata& operator=(AppMetadata&&) = default;
+
     private:
         friend class App;
         std::string m_deployment_model;
@@ -322,7 +321,7 @@ private:
     std::string m_auth_route;
     std::string m_sync_route;
     uint64_t m_request_timeout_ms;
-    
+
     /// Refreshes the access token for a specified `SyncUser`
     /// @param completion_block Passes an error should one occur.
     void refresh_access_token(std::shared_ptr<SyncUser> sync_user,
@@ -334,32 +333,29 @@ private:
     /// @param error The error to check for auth failures
     /// @param response The original response to pass back should this not be an auth error
     /// @param request The request to perform
-    /// @param completion_block returns the original response in the case it is not an auth error, or if a failure occurs,
-    /// if the refresh was a success the newly attempted response will be passed back
-    void handle_auth_failure(const AppError& error,
-                             const Response& response,
-                             Request request,
+    /// @param completion_block returns the original response in the case it is not an auth error, or if a failure
+    /// occurs, if the refresh was a success the newly attempted response will be passed back
+    void handle_auth_failure(const AppError& error, const Response& response, Request request,
                              std::shared_ptr<SyncUser> sync_user,
-                             std::function<void (Response)> completion_block) const;
+                             std::function<void(Response)> completion_block) const;
 
 
     std::string url_for_path(const std::string& path) const override;
 
-    void init_app_metadata(std::function<void (util::Optional<AppError>, util::Optional<Response>)> completion_block);
-    
+    void init_app_metadata(std::function<void(util::Optional<AppError>, util::Optional<Response>)> completion_block);
+
     /// Performs an authenticated request to the Stitch server, using the current authentication state
     /// @param request The request to be performed
     /// @param completion_block Returns the response from the server
-    void do_authenticated_request(Request request,
-                                  std::shared_ptr<SyncUser> sync_user,
-                                  std::function<void (Response)> completion_block) override;
-        
-    
+    void do_authenticated_request(Request request, std::shared_ptr<SyncUser> sync_user,
+                                  std::function<void(Response)> completion_block) override;
+
+
     /// Gets the social profile for a `SyncUser`
     /// @param completion_block Callback will pass the `SyncUser` with the social profile details
     void get_profile(std::shared_ptr<SyncUser> sync_user,
                      std::function<void(std::shared_ptr<SyncUser>, util::Optional<AppError>)> completion_block);
-    
+
     /// Log in a user and asynchronously retrieve a user object.
     /// If the log in completes successfully, the completion block will be called, and a
     /// `SyncUser` representing the logged-in user will be passed to it. This user object
@@ -369,16 +365,15 @@ private:
     /// @param credentials A `SyncCredentials` object representing the user to log in.
     /// @param linking_user A `SyncUser` you want to link these credentials too
     /// @param completion_block A callback block to be invoked once the log in completes.
-    void log_in_with_credentials(const AppCredentials& credentials,
-                                 const std::shared_ptr<SyncUser> linking_user,
-                                 std::function<void(std::shared_ptr<SyncUser>, util::Optional<AppError>)> completion_block);
-
+    void log_in_with_credentials(
+        const AppCredentials& credentials, const std::shared_ptr<SyncUser> linking_user,
+        std::function<void(std::shared_ptr<SyncUser>, util::Optional<AppError>)> completion_block);
 };
 
 // MARK: Provider client templates
-template<>
+template <>
 App::UsernamePasswordProviderClient App::provider_client<App::UsernamePasswordProviderClient>();
-template<>
+template <>
 App::UserAPIKeyProviderClient App::provider_client<App::UserAPIKeyProviderClient>();
 
 } // namespace app

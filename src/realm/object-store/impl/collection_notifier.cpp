@@ -35,9 +35,7 @@ bool CollectionNotifier::all_related_tables_covered(const TableVersions& version
     auto last = versions.end();
     for (auto& it : m_related_tables) {
         TableKey tk{it.table_key};
-        auto match = std::find_if(first, last, [tk](auto& elem) {
-            return elem.first == tk;
-        });
+        auto match = std::find_if(first, last, [tk](auto& elem) { return elem.first == tk; });
         if (match == last) {
             // tk not found in versions
             return false;
@@ -46,9 +44,8 @@ bool CollectionNotifier::all_related_tables_covered(const TableVersions& version
     return true;
 }
 
-std::function<bool (ObjectChangeSet::ObjectKeyType)>
-CollectionNotifier::get_modification_checker(TransactionChangeInfo const& info,
-                                             ConstTableRef root_table)
+std::function<bool(ObjectChangeSet::ObjectKeyType)>
+CollectionNotifier::get_modification_checker(TransactionChangeInfo const& info, ConstTableRef root_table)
 {
     if (info.schema_changed)
         set_table(root_table);
@@ -65,7 +62,8 @@ CollectionNotifier::get_modification_checker(TransactionChangeInfo const& info,
     }
     if (m_related_tables.size() == 1) {
         auto& object_set = info.tables.find(m_related_tables[0].table_key.value)->second;
-        return [&](ObjectChangeSet::ObjectKeyType object_key) { return object_set.modifications_contains(object_key); };
+        return
+            [&](ObjectChangeSet::ObjectKeyType object_key) { return object_set.modifications_contains(object_key); };
     }
 
     return DeepChangeChecker(info, *root_table, m_related_tables);
@@ -93,22 +91,20 @@ void DeepChangeChecker::find_related_tables(std::vector<RelatedTable>& out, Tabl
     }
 }
 
-DeepChangeChecker::DeepChangeChecker(TransactionChangeInfo const& info,
-                                     Table const& root_table,
+DeepChangeChecker::DeepChangeChecker(TransactionChangeInfo const& info, Table const& root_table,
                                      std::vector<RelatedTable> const& related_tables)
-: m_info(info)
-, m_root_table(root_table)
-, m_root_table_key(root_table.get_key().value)
-, m_root_object_changes([&] {
-    auto it = info.tables.find(m_root_table_key.value);
-    return it != info.tables.end() ? &it->second : nullptr;
-}())
-, m_related_tables(related_tables)
+    : m_info(info)
+    , m_root_table(root_table)
+    , m_root_table_key(root_table.get_key().value)
+    , m_root_object_changes([&] {
+        auto it = info.tables.find(m_root_table_key.value);
+        return it != info.tables.end() ? &it->second : nullptr;
+    }())
+    , m_related_tables(related_tables)
 {
 }
 
-bool DeepChangeChecker::check_outgoing_links(TableKey table_key, Table const& table,
-                                             int64_t obj_key, size_t depth)
+bool DeepChangeChecker::check_outgoing_links(TableKey table_key, Table const& table, int64_t obj_key, size_t depth)
 {
     auto it = find_if(begin(m_related_tables), end(m_related_tables),
                       [&](auto&& tbl) { return tbl.table_key == table_key; });
@@ -121,11 +117,11 @@ bool DeepChangeChecker::check_outgoing_links(TableKey table_key, Table const& ta
     // modified, and if not add it to the stack
     auto already_checking = [&](int64_t col) {
         auto end = m_current_path.begin() + depth;
-        auto match = std::find_if(m_current_path.begin(), end, [&](auto& p) {
-            return p.obj_key == obj_key && p.col_key == col;
-        });
+        auto match = std::find_if(m_current_path.begin(), end,
+                                  [&](auto& p) { return p.obj_key == obj_key && p.col_key == col; });
         if (match != end) {
-            for (; match < end; ++match) match->depth_exceeded = true;
+            for (; match < end; ++match)
+                match->depth_exceeded = true;
             return true;
         }
         m_current_path[depth] = {obj_key, col, false};
@@ -188,8 +184,8 @@ bool DeepChangeChecker::operator()(ObjKeyType key)
 }
 
 CollectionNotifier::CollectionNotifier(std::shared_ptr<Realm> realm)
-: m_realm(std::move(realm))
-, m_sg_version(Realm::Internal::get_transaction(*m_realm).get_version_of_current_transaction())
+    : m_realm(std::move(realm))
+    , m_sg_version(Realm::Internal::get_transaction(*m_realm).get_version_of_current_transaction())
 {
 }
 
@@ -265,8 +261,7 @@ std::vector<CollectionNotifier::Callback>::iterator CollectionNotifier::find_cal
 {
     REALM_ASSERT(m_error || m_callbacks.size() > 0);
 
-    auto it = find_if(begin(m_callbacks), end(m_callbacks),
-                      [=](const auto& c) { return c.token == token; });
+    auto it = find_if(begin(m_callbacks), end(m_callbacks), [=](const auto& c) { return c.token == token; });
     // We should only fail to find the callback if it was removed due to an error
     REALM_ASSERT(m_error || it != end(m_callbacks));
     return it;
@@ -391,7 +386,7 @@ bool CollectionNotifier::package_for_delivery()
     return true;
 }
 
-template<typename Fn>
+template <typename Fn>
 void CollectionNotifier::for_each_callback(Fn&& fn)
 {
     util::CheckedUniqueLock callback_lock(m_callback_mutex);
@@ -433,17 +428,17 @@ void CollectionNotifier::add_changes(CollectionChangeBuilder change)
     }
 }
 
-NotifierPackage::NotifierPackage(std::exception_ptr error,
-                                 std::vector<std::shared_ptr<CollectionNotifier>> notifiers,
+NotifierPackage::NotifierPackage(std::exception_ptr error, std::vector<std::shared_ptr<CollectionNotifier>> notifiers,
                                  RealmCoordinator* coordinator)
-: m_notifiers(std::move(notifiers))
-, m_coordinator(coordinator)
-, m_error(std::move(error))
+    : m_notifiers(std::move(notifiers))
+    , m_coordinator(coordinator)
+    , m_error(std::move(error))
 {
 }
 
 // Clang TSE seems to not like returning a unique_lock from a function
-void NotifierPackage::package_and_wait(util::Optional<VersionID::version_type> target_version) NO_THREAD_SAFETY_ANALYSIS
+void NotifierPackage::package_and_wait(util::Optional<VersionID::version_type> target_version)
+    NO_THREAD_SAFETY_ANALYSIS
 {
     if (!m_coordinator || m_error || !*this)
         return;

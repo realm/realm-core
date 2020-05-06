@@ -87,14 +87,10 @@ struct SyncUserProfile {
     // The maximum age of the user.
     util::Optional<std::string> max_age;
 
-    SyncUserProfile(util::Optional<std::string> name,
-                    util::Optional<std::string> email,
-                    util::Optional<std::string> picture_url,
-                    util::Optional<std::string> first_name,
-                    util::Optional<std::string> last_name,
-                    util::Optional<std::string> gender,
-                    util::Optional<std::string> birthday,
-                    util::Optional<std::string> min_age,
+    SyncUserProfile(util::Optional<std::string> name, util::Optional<std::string> email,
+                    util::Optional<std::string> picture_url, util::Optional<std::string> first_name,
+                    util::Optional<std::string> last_name, util::Optional<std::string> gender,
+                    util::Optional<std::string> birthday, util::Optional<std::string> min_age,
                     util::Optional<std::string> max_age);
     SyncUserProfile() = default;
 };
@@ -122,7 +118,8 @@ struct SyncUserIdentity {
 // A `SyncUser` represents a single user account. Each user manages the sessions that
 // are associated with it.
 class SyncUser {
-friend class SyncSession;
+    friend class SyncSession;
+
 public:
     enum class State : std::size_t {
         LoggedOut,
@@ -131,11 +128,8 @@ public:
     };
 
     // Don't use this directly; use the `SyncManager` APIs. Public for use with `make_shared`.
-    SyncUser(std::string refresh_token,
-             const std::string id,
-             const std::string provider_type,
-             std::string access_token,
-             SyncUser::State state);
+    SyncUser(std::string refresh_token, const std::string id, const std::string provider_type,
+             std::string access_token, SyncUser::State state);
 
     // Return a list of all sessions belonging to this user.
     std::vector<std::shared_ptr<SyncSession>> all_sessions();
@@ -162,7 +156,7 @@ public:
 
     // Log the user out and mark it as such. This will also close its associated Sessions.
     void log_out();
-    
+
     /// Returns true id the users access_token and refresh_token are set.
     bool is_logged_in() const;
 
@@ -194,7 +188,7 @@ public:
 
     State state() const;
     void set_state(SyncUser::State state);
-    
+
     std::shared_ptr<SyncUserContext> binding_context() const
     {
         return m_binding_context.load();
@@ -250,12 +244,13 @@ private:
     SyncUserProfile m_user_profile;
 };
 
-}
+} // namespace realm
 
 namespace std {
-template<> struct hash<realm::SyncUserIdentity> {
+template <>
+struct hash<realm::SyncUserIdentity> {
     size_t operator()(realm::SyncUserIdentity const&) const;
 };
-}
+} // namespace std
 
 #endif // REALM_OS_SYNC_USER_HPP

@@ -19,7 +19,8 @@
 namespace realm {
 class Table;
 class TableView;
-template<typename> class BasicRowExpr;
+template <typename>
+class BasicRowExpr;
 using RowExpr = BasicRowExpr<Table>;
 struct VersionID;
 
@@ -31,4 +32,4 @@ public:
     virtual void record_read(realm::VersionID, realm::RowExpr) = 0;
     virtual void record_write(realm::VersionID, realm::VersionID) = 0;
 };
-}
+} // namespace realm

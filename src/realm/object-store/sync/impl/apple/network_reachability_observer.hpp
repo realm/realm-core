@@ -34,16 +34,12 @@
 namespace realm {
 namespace _impl {
 
-enum NetworkReachabilityStatus {
-    NotReachable,
-    ReachableViaWiFi,
-    ReachableViaWWAN
-};
+enum NetworkReachabilityStatus { NotReachable, ReachableViaWiFi, ReachableViaWWAN };
 
 class NetworkReachabilityObserver {
 public:
     NetworkReachabilityObserver(util::Optional<std::string> hostname,
-                                std::function<void (const NetworkReachabilityStatus)> handler);
+                                std::function<void(const NetworkReachabilityStatus)> handler);
 
     ~NetworkReachabilityObserver();
 
@@ -58,7 +54,7 @@ private:
     util::CFPtr<SCNetworkReachabilityRef> m_reachability_ref;
     NetworkReachabilityStatus m_previous_status;
     dispatch_queue_t m_callback_queue;
-    std::function<void (const NetworkReachabilityStatus)> m_change_handler;
+    std::function<void(const NetworkReachabilityStatus)> m_change_handler;
 };
 
 } // namespace _impl

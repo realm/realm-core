@@ -27,12 +27,18 @@ namespace util {
 // involving a memory order than `relaxed` is probably broken). In addition,
 // the copying itself cannot be thread-safe. These limitations make this type
 // suitable for storing Results/List's object schema pointer, but not most things.
-template<typename T>
+template <typename T>
 struct CopyableAtomic : std::atomic<T> {
     using std::atomic<T>::atomic;
 
-    CopyableAtomic(CopyableAtomic const& a) noexcept : std::atomic<T>(a.load()) { }
-    CopyableAtomic(CopyableAtomic&& a) noexcept : std::atomic<T>(a.load()) { }
+    CopyableAtomic(CopyableAtomic const& a) noexcept
+        : std::atomic<T>(a.load())
+    {
+    }
+    CopyableAtomic(CopyableAtomic&& a) noexcept
+        : std::atomic<T>(a.load())
+    {
+    }
     CopyableAtomic& operator=(CopyableAtomic const& a) noexcept
     {
         this->store(a.load());
@@ -45,6 +51,6 @@ struct CopyableAtomic : std::atomic<T> {
     }
 };
 
-}
-}
+} // namespace util
+} // namespace realm
 #endif // REALM_OS_COPYABLE_ATOMIC_HPP

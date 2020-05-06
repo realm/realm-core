@@ -32,26 +32,21 @@ class SystemConfiguration {
 public:
     static SystemConfiguration& shared();
 
-    SCNetworkReachabilityRef network_reachability_create_with_name(CFAllocatorRef allocator,
-                                                                   const char *hostname);
+    SCNetworkReachabilityRef network_reachability_create_with_name(CFAllocatorRef allocator, const char* hostname);
     SCNetworkReachabilityRef network_reachability_create_with_address(CFAllocatorRef allocator,
-                                                                      const sockaddr *address);
-    bool network_reachability_set_dispatch_queue(SCNetworkReachabilityRef target,
-                                                 dispatch_queue_t queue);
-    bool network_reachability_set_callback(SCNetworkReachabilityRef target,
-                                           SCNetworkReachabilityCallBack callback,
-                                           SCNetworkReachabilityContext *context);
-    bool network_reachability_get_flags(SCNetworkReachabilityRef target,
-                                        SCNetworkReachabilityFlags *flags);
+                                                                      const sockaddr* address);
+    bool network_reachability_set_dispatch_queue(SCNetworkReachabilityRef target, dispatch_queue_t queue);
+    bool network_reachability_set_callback(SCNetworkReachabilityRef target, SCNetworkReachabilityCallBack callback,
+                                           SCNetworkReachabilityContext* context);
+    bool network_reachability_get_flags(SCNetworkReachabilityRef target, SCNetworkReachabilityFlags* flags);
 
 private:
-    using create_with_name_t = SCNetworkReachabilityRef(*)(CFAllocatorRef, const char*);
-    using create_with_address_t = SCNetworkReachabilityRef(*)(CFAllocatorRef, const sockaddr*);
-    using set_dispatch_queue_t = bool(*)(SCNetworkReachabilityRef, dispatch_queue_t);
-    using set_callback_t = bool(*)(SCNetworkReachabilityRef,
-                                   SCNetworkReachabilityCallBack,
-                                   SCNetworkReachabilityContext*);
-    using get_flags_t = bool(*)(SCNetworkReachabilityRef, SCNetworkReachabilityFlags*);
+    using create_with_name_t = SCNetworkReachabilityRef (*)(CFAllocatorRef, const char*);
+    using create_with_address_t = SCNetworkReachabilityRef (*)(CFAllocatorRef, const sockaddr*);
+    using set_dispatch_queue_t = bool (*)(SCNetworkReachabilityRef, dispatch_queue_t);
+    using set_callback_t = bool (*)(SCNetworkReachabilityRef, SCNetworkReachabilityCallBack,
+                                    SCNetworkReachabilityContext*);
+    using get_flags_t = bool (*)(SCNetworkReachabilityRef, SCNetworkReachabilityFlags*);
 
     SystemConfiguration();
 

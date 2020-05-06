@@ -101,11 +101,10 @@ struct SyncError {
             return false;
         }
         // Documented here: https://realm.io/docs/realm-object-server/#client-recovery-from-a-backup
-        return (error_code == ProtocolError::bad_server_file_ident
-                || error_code == ProtocolError::bad_client_file_ident
-                || error_code == ProtocolError::bad_server_version
-                || error_code == ProtocolError::diverging_histories
-                || error_code == ProtocolError::client_file_expired);
+        return (error_code == ProtocolError::bad_server_file_ident ||
+                error_code == ProtocolError::bad_client_file_ident ||
+                error_code == ProtocolError::bad_server_version || error_code == ProtocolError::diverging_histories ||
+                error_code == ProtocolError::client_file_expired);
     }
 };
 
@@ -144,9 +143,10 @@ struct SyncConfig {
     ClientResyncMode client_resync_mode = ClientResyncMode::Recover;
 
     SyncConfig(std::shared_ptr<SyncUser> user, std::string partition_value)
-    : user(std::move(user))
-    , partition_value(std::move(partition_value))
-    { }
+        : user(std::move(user))
+        , partition_value(std::move(partition_value))
+    {
+    }
 };
 
 } // namespace realm

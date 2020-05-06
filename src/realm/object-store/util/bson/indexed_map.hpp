@@ -1,20 +1,20 @@
 /*************************************************************************
-*
-* Copyright 2020 Realm Inc.
-*
-* Licensed under the Apache License, Version 2.0 (the "License");
-* you may not use this file except in compliance with the License.
-* You may obtain a copy of the License at
-*
-* http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
-*
-**************************************************************************/
+ *
+ * Copyright 2020 Realm Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ **************************************************************************/
 
 #ifndef REALM_BSON_INDEXED_MAP_HPP
 #define REALM_BSON_INDEXED_MAP_HPP
@@ -29,17 +29,15 @@ namespace bson {
 
 /// A map type that orders based on insertion order.
 template <typename T>
-class IndexedMap
-{
+class IndexedMap {
 public:
     using entry = std::pair<std::string, T>;
 
-    class iterator
-    {
+    class iterator {
         size_t m_idx = 0;
         const IndexedMap* m_map;
-    public:
 
+    public:
         iterator(const IndexedMap* map, size_t idx);
         entry operator*()
         {
@@ -92,6 +90,7 @@ public:
     void pop_back();
 
     const std::vector<std::string> keys() const;
+
 private:
     template <typename V>
     friend bool operator==(const IndexedMap<V>& lhs, const IndexedMap<V>& rhs) noexcept;
@@ -102,15 +101,13 @@ private:
 };
 
 template <typename T>
-bool operator==(const typename IndexedMap<T>::iterator& lhs,
-                const typename IndexedMap<T>::iterator& rhs) noexcept
+bool operator==(const typename IndexedMap<T>::iterator& lhs, const typename IndexedMap<T>::iterator& rhs) noexcept
 {
     return lhs.m_idx == rhs.m_idx;
 }
 
 template <typename T>
-bool operator!=(const typename IndexedMap<T>::iterator lhs,
-                const typename IndexedMap<T>::iterator rhs) noexcept
+bool operator!=(const typename IndexedMap<T>::iterator lhs, const typename IndexedMap<T>::iterator rhs) noexcept
 {
     return !(lhs.m_idx == rhs.m_idx);
 }
@@ -128,7 +125,11 @@ bool operator!=(const IndexedMap<T>& lhs, const IndexedMap<T>& rhs) noexcept
 }
 
 template <typename T>
-IndexedMap<T>::iterator::iterator(const IndexedMap<T>* map, size_t idx) : m_idx(idx), m_map(map) {}
+IndexedMap<T>::iterator::iterator(const IndexedMap<T>* map, size_t idx)
+    : m_idx(idx)
+    , m_map(map)
+{
+}
 
 template <typename T>
 typename IndexedMap<T>::iterator& IndexedMap<T>::iterator::operator++()
@@ -157,10 +158,13 @@ typename IndexedMap<T>::iterator IndexedMap<T>::iterator::operator--(int)
 }
 
 template <typename T>
-constexpr IndexedMap<T>::IndexedMap() noexcept {}
+constexpr IndexedMap<T>::IndexedMap() noexcept
+{
+}
 
 template <typename T>
-IndexedMap<T>::IndexedMap(std::initializer_list<entry> entries) {
+IndexedMap<T>::IndexedMap(std::initializer_list<entry> entries)
+{
     for (auto& entry : entries) {
         m_keys.push_back(entry.first);
         m_map[entry.first] = entry.second;
@@ -177,7 +181,7 @@ template <typename T>
 std::pair<std::string, T> IndexedMap<T>::operator[](size_t idx) const
 {
     auto key = m_keys[idx];
-    return { key, m_map.at(key) };
+    return {key, m_map.at(key)};
 }
 
 template <typename T>

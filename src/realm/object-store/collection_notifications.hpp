@@ -30,7 +30,7 @@
 
 namespace realm {
 namespace _impl {
-    class CollectionNotifier;
+class CollectionNotifier;
 }
 
 // A token which keeps an asynchronous query alive
@@ -57,7 +57,10 @@ struct CollectionChangeSet {
         size_t from;
         size_t to;
 
-        bool operator==(Move m) const noexcept { return from == m.from && to == m.to; }
+        bool operator==(Move m) const noexcept
+        {
+            return from == m.from && to == m.to;
+        }
     };
 
     // Indices which were removed from the _old_ collection
@@ -91,8 +94,8 @@ struct CollectionChangeSet {
 
     bool empty() const noexcept
     {
-        return deletions.empty() && insertions.empty() && modifications.empty()
-            && modifications_new.empty() && moves.empty();
+        return deletions.empty() && insertions.empty() && modifications.empty() && modifications_new.empty() &&
+               moves.empty();
     }
 };
 
@@ -105,12 +108,19 @@ struct CollectionChangeSet {
 // outlives the collection.
 class CollectionChangeCallback {
 public:
-    CollectionChangeCallback(std::nullptr_t={}) { }
+    CollectionChangeCallback(std::nullptr_t = {}) {}
 
-    template<typename Callback>
-    CollectionChangeCallback(Callback cb) : m_impl(make_impl(std::move(cb))) { }
-    template<typename Callback>
-    CollectionChangeCallback& operator=(Callback cb) { m_impl = make_impl(std::move(cb)); return *this; }
+    template <typename Callback>
+    CollectionChangeCallback(Callback cb)
+        : m_impl(make_impl(std::move(cb)))
+    {
+    }
+    template <typename Callback>
+    CollectionChangeCallback& operator=(Callback cb)
+    {
+        m_impl = make_impl(std::move(cb));
+        return *this;
+    }
 
     // Explicitly default the copy/move constructors as otherwise they'll use
     // the above ones and add an extra layer of wrapping
@@ -119,61 +129,109 @@ public:
     CollectionChangeCallback& operator=(CollectionChangeCallback&&) = default;
     CollectionChangeCallback& operator=(CollectionChangeCallback const&) = default;
 
-    void before(CollectionChangeSet const& c) { m_impl->before(c); }
-    void after(CollectionChangeSet const& c) { m_impl->after(c); }
-    void error(std::exception_ptr e) { m_impl->error(e); }
+    void before(CollectionChangeSet const& c)
+    {
+        m_impl->before(c);
+    }
+    void after(CollectionChangeSet const& c)
+    {
+        m_impl->after(c);
+    }
+    void error(std::exception_ptr e)
+    {
+        m_impl->error(e);
+    }
 
-    explicit operator bool() const { return !!m_impl; }
+    explicit operator bool() const
+    {
+        return !!m_impl;
+    }
 
 private:
     struct Base {
         virtual ~Base() {}
-        virtual void before(CollectionChangeSet const&)=0;
-        virtual void after(CollectionChangeSet const&)=0;
-        virtual void error(std::exception_ptr)=0;
+        virtual void before(CollectionChangeSet const&) = 0;
+        virtual void after(CollectionChangeSet const&) = 0;
+        virtual void error(std::exception_ptr) = 0;
     };
 
-    template<typename Callback, typename = decltype(std::declval<Callback>()(CollectionChangeSet(), std::exception_ptr()))>
+    template <typename Callback,
+              typename = decltype(std::declval<Callback>()(CollectionChangeSet(), std::exception_ptr()))>
     std::shared_ptr<Base> make_impl(Callback cb)
     {
         return std::make_shared<Impl<Callback>>(std::move(cb));
     }
 
-    template<typename Callback, typename = decltype(std::declval<Callback>().after(CollectionChangeSet())), typename = void>
+    template <typename Callback, typename = decltype(std::declval<Callback>().after(CollectionChangeSet())),
+              typename = void>
     std::shared_ptr<Base> make_impl(Callback cb)
     {
         return std::make_shared<Impl2<Callback>>(std::move(cb));
     }
 
-    template<typename Callback, typename = decltype(std::declval<Callback>().after(CollectionChangeSet())), typename = void>
+    template <typename Callback, typename = decltype(std::declval<Callback>().after(CollectionChangeSet())),
+              typename = void>
     std::shared_ptr<Base> make_impl(Callback* cb)
     {
         return std::make_shared<Impl3<Callback>>(cb);
     }
 
-    template<typename T>
+    template <typename T>
     struct Impl : public Base {
         T impl;
-        Impl(T impl) : impl(std::move(impl)) { }
-        void before(CollectionChangeSet const&) override { }
-        void after(CollectionChangeSet const& change) override { impl(change, {}); }
-        void error(std::exception_ptr error) override { impl({}, error); }
+        Impl(T impl)
+            : impl(std::move(impl))
+        {
+        }
+        void before(CollectionChangeSet const&) override {}
+        void after(CollectionChangeSet const& change) override
+        {
+            impl(change, {});
+        }
+        void error(std::exception_ptr error) override
+        {
+            impl({}, error);
+        }
     };
-    template<typename T>
+    template <typename T>
     struct Impl2 : public Base {
         T impl;
-        Impl2(T impl) : impl(std::move(impl)) { }
-        void before(CollectionChangeSet const& c) override { impl.before(c); }
-        void after(CollectionChangeSet const& c) override { impl.after(c); }
-        void error(std::exception_ptr error) override { impl.error(error); }
+        Impl2(T impl)
+            : impl(std::move(impl))
+        {
+        }
+        void before(CollectionChangeSet const& c) override
+        {
+            impl.before(c);
+        }
+        void after(CollectionChangeSet const& c) override
+        {
+            impl.after(c);
+        }
+        void error(std::exception_ptr error) override
+        {
+            impl.error(error);
+        }
     };
-    template<typename T>
+    template <typename T>
     struct Impl3 : public Base {
         T* impl;
-        Impl3(T* impl) : impl(impl) { }
-        void before(CollectionChangeSet const& c) override { impl->before(c); }
-        void after(CollectionChangeSet const& c) override { impl->after(c); }
-        void error(std::exception_ptr error) override { impl->error(error); }
+        Impl3(T* impl)
+            : impl(impl)
+        {
+        }
+        void before(CollectionChangeSet const& c) override
+        {
+            impl->before(c);
+        }
+        void after(CollectionChangeSet const& c) override
+        {
+            impl->after(c);
+        }
+        void error(std::exception_ptr error) override
+        {
+            impl->error(error);
+        }
     };
 
     std::shared_ptr<Base> m_impl;

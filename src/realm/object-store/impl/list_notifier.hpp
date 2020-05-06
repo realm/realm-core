@@ -52,7 +52,7 @@ private:
     void release_data() noexcept override;
     bool do_add_required_change_info(TransactionChangeInfo& info) override;
 };
-}
-}
+} // namespace _impl
+} // namespace realm
 
 #endif // REALM_LIST_NOTIFIER_HPP

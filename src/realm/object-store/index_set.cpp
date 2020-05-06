@@ -27,7 +27,7 @@ using namespace realm::_impl;
 
 const size_t IndexSet::npos;
 
-template<typename T>
+template <typename T>
 void MutableChunkedRangeVectorIterator<T>::set(size_t front, size_t back)
 {
     this->m_outer->count -= this->m_inner->second - this->m_inner->first;
@@ -42,7 +42,7 @@ void MutableChunkedRangeVectorIterator<T>::set(size_t front, size_t back)
     this->m_inner->second = back;
 }
 
-template<typename T>
+template <typename T>
 void MutableChunkedRangeVectorIterator<T>::adjust(ptrdiff_t front, ptrdiff_t back)
 {
     if (this->offset() == 0) {
@@ -56,7 +56,7 @@ void MutableChunkedRangeVectorIterator<T>::adjust(ptrdiff_t front, ptrdiff_t bac
     this->m_inner->second += back;
 }
 
-template<typename T>
+template <typename T>
 void MutableChunkedRangeVectorIterator<T>::shift(ptrdiff_t distance)
 {
     if (this->offset() == 0) {
@@ -201,6 +201,7 @@ public:
     void push_back(size_t index);
     void push_back(std::pair<size_t, size_t> range);
     std::vector<ChunkedRangeVector::Chunk> finalize();
+
 private:
     std::vector<ChunkedRangeVector::Chunk> m_data;
     size_t m_outer_pos = 0;
@@ -262,7 +263,7 @@ std::vector<ChunkedRangeVector::Chunk> ChunkedRangeVectorBuilder::finalize()
     }
     return std::move(m_data);
 }
-}
+} // namespace
 
 IndexSet::IndexSet(std::initializer_list<size_t> values)
 {
@@ -327,8 +328,7 @@ IndexSet::iterator IndexSet::find(size_t index) noexcept
 
 IndexSet::iterator IndexSet::find(size_t index, iterator begin) noexcept
 {
-    auto it = std::find_if(begin.outer(), m_data.end(),
-                           [&](auto const& lft) { return lft.end > index; });
+    auto it = std::find_if(begin.outer(), m_data.end(), [&](auto const& lft) { return lft.end > index; });
     if (it == m_data.end())
         return end();
     if (index < it->begin)

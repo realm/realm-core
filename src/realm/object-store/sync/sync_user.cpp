@@ -28,14 +28,16 @@
 
 namespace realm {
 
-static std::string base64_decode(const std::string &in) {
+static std::string base64_decode(const std::string& in)
+{
     std::string out;
     out.resize(util::base64_decoded_size(in.size()));
     util::base64_decode(in, &out[0], out.size());
     return out;
 }
 
-static std::vector<std::string> split_token(const std::string& jwt) {
+static std::vector<std::string> split_token(const std::string& jwt)
+{
     constexpr static char delimiter = '.';
 
     std::vector<std::string> parts;
@@ -71,46 +73,39 @@ RealmJWT::RealmJWT(const std::string& token)
     }
 }
 
-SyncUserProfile::SyncUserProfile(util::Optional<std::string> name,
-                                 util::Optional<std::string> email,
-                                 util::Optional<std::string> picture_url,
-                                 util::Optional<std::string> first_name,
-                                 util::Optional<std::string> last_name,
-                                 util::Optional<std::string> gender,
-                                 util::Optional<std::string> birthday,
-                                 util::Optional<std::string> min_age,
+SyncUserProfile::SyncUserProfile(util::Optional<std::string> name, util::Optional<std::string> email,
+                                 util::Optional<std::string> picture_url, util::Optional<std::string> first_name,
+                                 util::Optional<std::string> last_name, util::Optional<std::string> gender,
+                                 util::Optional<std::string> birthday, util::Optional<std::string> min_age,
                                  util::Optional<std::string> max_age)
-: name(std::move(name))
-, email(std::move(email))
-, picture_url(std::move(picture_url))
-, first_name(std::move(first_name))
-, last_name(std::move(last_name))
-, gender(std::move(gender))
-, birthday(std::move(birthday))
-, min_age(std::move(min_age))
-, max_age(std::move(max_age))
+    : name(std::move(name))
+    , email(std::move(email))
+    , picture_url(std::move(picture_url))
+    , first_name(std::move(first_name))
+    , last_name(std::move(last_name))
+    , gender(std::move(gender))
+    , birthday(std::move(birthday))
+    , min_age(std::move(min_age))
+    , max_age(std::move(max_age))
 {
 }
 
 SyncUserIdentity::SyncUserIdentity(const std::string& id, const std::string& provider_type)
-: id(id)
-, provider_type(provider_type)
+    : id(id)
+    , provider_type(provider_type)
 {
 }
 
 SyncUserContextFactory SyncUser::s_binding_context_factory;
 std::mutex SyncUser::s_binding_context_factory_mutex;
 
-SyncUser::SyncUser(std::string refresh_token,
-                   const std::string identity,
-                   const std::string provider_type,
-                   std::string access_token,
-                   SyncUser::State state)
-: m_state(state)
-, m_provider_type(provider_type)
-, m_refresh_token(RealmJWT(std::move(refresh_token)))
-, m_identity(std::move(identity))
-, m_access_token(RealmJWT(std::move(access_token)))
+SyncUser::SyncUser(std::string refresh_token, const std::string identity, const std::string provider_type,
+                   std::string access_token, SyncUser::State state)
+    : m_state(state)
+    , m_provider_type(provider_type)
+    , m_refresh_token(RealmJWT(std::move(refresh_token)))
+    , m_identity(std::move(identity))
+    , m_access_token(RealmJWT(std::move(access_token)))
 {
     {
         std::lock_guard<std::mutex> lock(s_binding_context_factory_mutex);
@@ -289,7 +284,7 @@ void SyncUser::log_out()
 
     SyncManager::shared().log_out_user(m_identity);
     m_access_token.token = "";
-    
+
     // Mark the user as 'dead' in the persisted metadata Realm
     // if they were an anonymous user
     if (this->m_provider_type == app::IdentityProviderAnonymous) {
@@ -389,11 +384,11 @@ void SyncUser::set_binding_context_factory(SyncUserContextFactory factory)
     std::lock_guard<std::mutex> lock(s_binding_context_factory_mutex);
     s_binding_context_factory = std::move(factory);
 }
-}
+} // namespace realm
 
 namespace std {
 size_t hash<realm::SyncUserIdentity>::operator()(const realm::SyncUserIdentity& k) const
 {
     return ((hash<string>()(k.id) ^ (hash<string>()(k.provider_type) << 1)) >> 1);
 }
-}
+} // namespace std

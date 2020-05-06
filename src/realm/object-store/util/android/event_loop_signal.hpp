@@ -28,18 +28,21 @@
 #include <android/log.h>
 #include <android/looper.h>
 
-#define LOGE(...) do { \
-    fprintf(stderr, __VA_ARGS__); \
-    __android_log_print(ANDROID_LOG_ERROR, "REALM", __VA_ARGS__); \
-} while (0)
+#define LOGE(...)                                                                                                    \
+    do {                                                                                                             \
+        fprintf(stderr, __VA_ARGS__);                                                                                \
+        __android_log_print(ANDROID_LOG_ERROR, "REALM", __VA_ARGS__);                                                \
+    } while (0)
 
 namespace realm {
 namespace util {
-template<typename Callback>
+template <typename Callback>
 class EventLoopSignal : public std::enable_shared_from_this<EventLoopSignal<Callback>> {
 public:
     EventLoopSignal(Callback&& callback)
-    : m_callback(std::move(callback)), m_looper(ALooper_forThread()) {
+        : m_callback(std::move(callback))
+        , m_looper(ALooper_forThread())
+    {
         if (!m_looper) {
             return;
         }
@@ -96,8 +99,8 @@ private:
 
     // pipe file descriptor pair we use to signal ALooper
     struct {
-      int read = -1;
-      int write = -1;
+        int read = -1;
+        int write = -1;
     } m_message_pipe;
 
     // We need to delay the init to the first time notify since we cannot get the weak_ptr in the contructor.
@@ -128,9 +131,8 @@ private:
             // It still works in blocking mode.
         }
 
-        if (ALooper_addFd(m_looper, message_pipe[0], ALOOPER_POLL_CALLBACK,
-                          ALOOPER_EVENT_INPUT,
-                          &looper_callback, &m_weak) != 1) {
+        if (ALooper_addFd(m_looper, message_pipe[0], ALOOPER_POLL_CALLBACK, ALOOPER_EVENT_INPUT, &looper_callback,
+                          &m_weak) != 1) {
             LOGE("Error adding WeakRealmNotifier callback to looper.");
             ::close(message_pipe[0]);
             ::close(message_pipe[1]);
@@ -156,10 +158,10 @@ private:
                 }
             }
             if (shared) {
-                // Clear the buffer. Note that there might be a small chance than more than 1024 bytes left in the pipe,
-                // but it is OK. Since we also want to support blocking read here.
-                // Clear here instead of in the notify is because of whenever there are bytes left in the pipe, the
-                // ALOOPER_EVENT_INPUT will be triggered.
+                // Clear the buffer. Note that there might be a small chance than more than 1024 bytes left in the
+                // pipe, but it is OK. Since we also want to support blocking read here. Clear here instead of in the
+                // notify is because of whenever there are bytes left in the pipe, the ALOOPER_EVENT_INPUT will be
+                // triggered.
                 std::vector<uint8_t> buff(1024);
                 read(fd, buff.data(), buff.size());
                 // By holding a shared_ptr, this object won't be destroyed in the m_callback.
@@ -188,8 +190,8 @@ private:
             return;
         }
 
-        // If the pipe's buffer is full, ALOOPER_EVENT_INPUT will be triggered anyway. Also the buffer clearing happens
-        // before calling the callback. So after this call, the callback will be called. Just return here.
+        // If the pipe's buffer is full, ALOOPER_EVENT_INPUT will be triggered anyway. Also the buffer clearing
+        // happens before calling the callback. So after this call, the callback will be called. Just return here.
         if (ret != 0) {
             int err = errno;
             if (err != EAGAIN) {
@@ -199,9 +201,9 @@ private:
     }
 };
 
-template<typename Callback>
+template <typename Callback>
 std::vector<std::weak_ptr<EventLoopSignal<Callback>>*> EventLoopSignal<Callback>::s_weak_ptrs;
-template<typename Callback>
+template <typename Callback>
 std::shared_timed_mutex EventLoopSignal<Callback>::s_mutex;
 
 } // namespace util

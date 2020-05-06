@@ -37,27 +37,23 @@ public:
     CollectionChangeBuilder& operator=(CollectionChangeBuilder const&) = default;
     CollectionChangeBuilder& operator=(CollectionChangeBuilder&&) = default;
 
-    CollectionChangeBuilder(IndexSet deletions = {},
-                            IndexSet insertions = {},
-                            IndexSet modification = {},
+    CollectionChangeBuilder(IndexSet deletions = {}, IndexSet insertions = {}, IndexSet modification = {},
                             std::vector<Move> moves = {});
 
     // Calculate where rows need to be inserted or deleted from old_rows to turn
     // it into new_rows, and check all matching rows for modifications
     static CollectionChangeBuilder calculate(std::vector<int64_t> const& old_rows,
                                              std::vector<int64_t> const& new_rows,
-                                             std::function<bool (int64_t)> key_did_change,
-                                             bool in_table_order);
-    static CollectionChangeBuilder calculate(std::vector<size_t> const& old_rows,
-                                             std::vector<size_t> const& new_rows,
-                                             std::function<bool (int64_t)> key_did_change);
+                                             std::function<bool(int64_t)> key_did_change, bool in_table_order);
+    static CollectionChangeBuilder calculate(std::vector<size_t> const& old_rows, std::vector<size_t> const& new_rows,
+                                             std::function<bool(int64_t)> key_did_change);
 
     // generic operations {
     CollectionChangeSet finalize() &&;
     void merge(CollectionChangeBuilder&&);
 
-    void insert(size_t ndx, size_t count=1, bool track_moves=true);
-    void modify(size_t ndx, size_t col=-1);
+    void insert(size_t ndx, size_t count = 1, bool track_moves = true);
+    void modify(size_t ndx, size_t col = -1);
     void erase(size_t ndx);
     void clear(size_t old_size);
     // }
@@ -70,7 +66,7 @@ public:
 private:
     bool m_track_columns = true;
 
-    template<typename Func>
+    template <typename Func>
     void for_each_col(Func&& f);
 
     void verify();

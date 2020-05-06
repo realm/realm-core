@@ -39,7 +39,7 @@ private:
 
     bool do_add_required_change_info(TransactionChangeInfo& info) override;
 };
-}
-}
+} // namespace _impl
+} // namespace realm
 
 #endif // REALM_OS_OBJECT_NOTIFIER_HPP

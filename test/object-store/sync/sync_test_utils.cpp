@@ -20,7 +20,9 @@
 
 namespace realm {
 
-bool results_contains_user(SyncUserMetadataResults& results, const std::string& identity, const std::string& provider_type) {
+bool results_contains_user(SyncUserMetadataResults& results, const std::string& identity,
+                           const std::string& provider_type)
+{
     for (size_t i = 0; i < results.size(); i++) {
         auto this_result = results.get(i);
         if (this_result.identity() == identity && this_result.provider_type() == provider_type) {
@@ -30,7 +32,8 @@ bool results_contains_user(SyncUserMetadataResults& results, const std::string& 
     return false;
 }
 
-bool results_contains_original_name(SyncFileActionMetadataResults& results, const std::string& original_name) {
+bool results_contains_original_name(SyncFileActionMetadataResults& results, const std::string& original_name)
+{
     for (size_t i = 0; i < results.size(); i++) {
         if (results.get(i).original_name() == original_name) {
             return true;
@@ -39,4 +42,4 @@ bool results_contains_original_name(SyncFileActionMetadataResults& results, cons
     return false;
 }
 
-}
+} // namespace realm

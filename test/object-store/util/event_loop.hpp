@@ -53,4 +53,4 @@ private:
 } // namespace util
 } // namespace realm
 
-#endif  // REALM_OS_TESTS_UTIL_EVENT_LOOP_HPP
+#endif // REALM_OS_TESTS_UTIL_EVENT_LOOP_HPP

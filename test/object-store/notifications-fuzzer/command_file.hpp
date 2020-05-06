@@ -24,13 +24,13 @@
 #include <vector>
 
 namespace realm {
-    class Table;
-    class LinkView;
-    class Realm;
-    namespace _impl {
-        class RealmCoordinator;
-    }
+class Table;
+class LinkView;
+class Realm;
+namespace _impl {
+class RealmCoordinator;
 }
+} // namespace realm
 
 namespace fuzzer {
 struct RealmState {
@@ -46,11 +46,11 @@ struct RealmState {
 struct CommandFile {
     std::vector<int64_t> initial_values;
     std::vector<size_t> initial_list_indices;
-    std::vector<std::function<void (RealmState&)>> commands;
+    std::vector<std::function<void(RealmState&)>> commands;
 
     CommandFile(std::istream& input);
 
     void import(RealmState& state);
     void run(RealmState& state);
 };
-}
+} // namespace fuzzer

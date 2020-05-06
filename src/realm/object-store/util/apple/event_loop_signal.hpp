@@ -21,7 +21,7 @@
 
 namespace realm {
 namespace util {
-template<typename Callback>
+template <typename Callback>
 class EventLoopSignal {
 public:
     EventLoopSignal(Callback&& callback)
@@ -33,11 +33,10 @@ public:
 
         CFRunLoopSourceContext ctx{};
         ctx.info = new RefCountedRunloopCallback{std::move(callback), {0}};
-        ctx.perform = [](void* info) {
-            static_cast<RefCountedRunloopCallback*>(info)->callback();
-        };
+        ctx.perform = [](void* info) { static_cast<RefCountedRunloopCallback*>(info)->callback(); };
         ctx.retain = [](const void* info) {
-            static_cast<RefCountedRunloopCallback*>(const_cast<void*>(info))->ref_count.fetch_add(1, std::memory_order_relaxed);
+            static_cast<RefCountedRunloopCallback*>(const_cast<void*>(info))
+                ->ref_count.fetch_add(1, std::memory_order_relaxed);
             return info;
         };
         ctx.release = [](const void* info) {

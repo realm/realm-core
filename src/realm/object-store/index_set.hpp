@@ -28,11 +28,11 @@
 
 namespace realm {
 namespace _impl {
-template<typename OuterIterator>
+template <typename OuterIterator>
 class MutableChunkedRangeVectorIterator;
 
 // An iterator for ChunkedRangeVector, templated on the vector iterator/const_iterator
-template<typename OuterIterator>
+template <typename OuterIterator>
 class ChunkedRangeVectorIterator {
 public:
     using iterator_category = std::bidirectional_iterator_tag;
@@ -42,13 +42,25 @@ public:
     using reference = const value_type&;
 
     ChunkedRangeVectorIterator(OuterIterator outer, OuterIterator end, value_type* inner)
-    : m_outer(outer), m_end(end), m_inner(inner) { }
+        : m_outer(outer)
+        , m_end(end)
+        , m_inner(inner)
+    {
+    }
 
-    reference operator*() const noexcept { return *m_inner; }
-    pointer operator->() const noexcept { return m_inner; }
+    reference operator*() const noexcept
+    {
+        return *m_inner;
+    }
+    pointer operator->() const noexcept
+    {
+        return m_inner;
+    }
 
-    template<typename Other> bool operator==(Other const& it) const noexcept;
-    template<typename Other> bool operator!=(Other const& it) const noexcept;
+    template <typename Other>
+    bool operator==(Other const& it) const noexcept;
+    template <typename Other>
+    bool operator!=(Other const& it) const noexcept;
 
     ChunkedRangeVectorIterator& operator++() noexcept;
     ChunkedRangeVectorIterator operator++(int) noexcept;
@@ -59,8 +71,14 @@ public:
     // Advance directly to the next outer block
     void next_chunk() noexcept;
 
-    OuterIterator outer() const noexcept { return m_outer; }
-    size_t offset() const noexcept { return m_inner - &m_outer->data[0]; }
+    OuterIterator outer() const noexcept
+    {
+        return m_outer;
+    }
+    size_t offset() const noexcept
+    {
+        return m_inner - &m_outer->data[0];
+    }
 
 private:
     OuterIterator m_outer;
@@ -71,7 +89,7 @@ private:
 };
 
 // A mutable iterator that adds some invariant-preserving mutation methods
-template<typename OuterIterator>
+template <typename OuterIterator>
 class MutableChunkedRangeVectorIterator : public ChunkedRangeVectorIterator<OuterIterator> {
 public:
     using ChunkedRangeVectorIterator<OuterIterator>::ChunkedRangeVectorIterator;
@@ -105,14 +123,35 @@ struct ChunkedRangeVector {
     static const size_t max_size = 4096 / sizeof(std::pair<size_t, size_t>);
 #endif
 
-    iterator begin() noexcept { return empty() ? end() : iterator(m_data.begin(), m_data.end(), &m_data[0].data[0]); }
-    iterator end() noexcept { return iterator(m_data.end(), m_data.end(), nullptr); }
-    const_iterator begin() const noexcept { return cbegin(); }
-    const_iterator end() const noexcept { return cend(); }
-    const_iterator cbegin() const noexcept { return empty() ? cend() : const_iterator(m_data.cbegin(), m_data.end(), &m_data[0].data[0]); }
-    const_iterator cend() const noexcept { return const_iterator(m_data.end(), m_data.end(), nullptr); }
+    iterator begin() noexcept
+    {
+        return empty() ? end() : iterator(m_data.begin(), m_data.end(), &m_data[0].data[0]);
+    }
+    iterator end() noexcept
+    {
+        return iterator(m_data.end(), m_data.end(), nullptr);
+    }
+    const_iterator begin() const noexcept
+    {
+        return cbegin();
+    }
+    const_iterator end() const noexcept
+    {
+        return cend();
+    }
+    const_iterator cbegin() const noexcept
+    {
+        return empty() ? cend() : const_iterator(m_data.cbegin(), m_data.end(), &m_data[0].data[0]);
+    }
+    const_iterator cend() const noexcept
+    {
+        return const_iterator(m_data.end(), m_data.end(), nullptr);
+    }
 
-    bool empty() const noexcept { return m_data.empty(); }
+    bool empty() const noexcept
+    {
+        return m_data.empty();
+    }
 
     iterator insert(iterator pos, value_type value);
     iterator erase(iterator pos) noexcept;
@@ -127,12 +166,12 @@ class IndexSet : private _impl::ChunkedRangeVector {
 public:
     static const size_t npos = -1;
 
-    using ChunkedRangeVector::value_type;
-    using ChunkedRangeVector::iterator;
-    using ChunkedRangeVector::const_iterator;
     using ChunkedRangeVector::begin;
-    using ChunkedRangeVector::end;
+    using ChunkedRangeVector::const_iterator;
     using ChunkedRangeVector::empty;
+    using ChunkedRangeVector::end;
+    using ChunkedRangeVector::iterator;
+    using ChunkedRangeVector::value_type;
     using ChunkedRangeVector::verify;
 
     IndexSet() = default;
@@ -142,7 +181,7 @@ public:
     bool contains(size_t index) const noexcept;
 
     // Counts the number of indices in the set in the given range
-    size_t count(size_t start_index=0, size_t end_index=-1) const noexcept;
+    size_t count(size_t start_index = 0, size_t end_index = -1) const noexcept;
 
     // Add an index to the set, doing nothing if it's already present
     void add(size_t index);
@@ -161,11 +200,11 @@ public:
 
     // Insert an index at the given position, shifting existing indexes at or
     // after that point back by one
-    void insert_at(size_t index, size_t count=1);
+    void insert_at(size_t index, size_t count = 1);
     void insert_at(IndexSet const&);
 
     // Shift indexes at or after the given point back by one
-    void shift_for_insert_at(size_t index, size_t count=1);
+    void shift_for_insert_at(size_t index, size_t count = 1);
     void shift_for_insert_at(IndexSet const&);
 
     // Delete an index at the given position, shifting indexes after that point
@@ -177,7 +216,7 @@ public:
     size_t erase_or_unshift(size_t index);
 
     // Remove the indexes at the given index from the set, without shifting
-    void remove(size_t index, size_t count=1);
+    void remove(size_t index, size_t count = 1);
     void remove(IndexSet const&);
 
     // Shift an index by inserting each of the indexes in this set
@@ -191,10 +230,22 @@ public:
     // An iterator over the individual indices in the set rather than the ranges
     class IndexIterator : public std::iterator<std::forward_iterator_tag, size_t> {
     public:
-        IndexIterator(IndexSet::const_iterator it) : m_iterator(it) { }
-        size_t operator*() const noexcept { return m_iterator->first + m_offset; }
-        bool operator==(IndexIterator const& it) const noexcept { return m_iterator == it.m_iterator; }
-        bool operator!=(IndexIterator const& it) const noexcept { return m_iterator != it.m_iterator; }
+        IndexIterator(IndexSet::const_iterator it)
+            : m_iterator(it)
+        {
+        }
+        size_t operator*() const noexcept
+        {
+            return m_iterator->first + m_offset;
+        }
+        bool operator==(IndexIterator const& it) const noexcept
+        {
+            return m_iterator == it.m_iterator;
+        }
+        bool operator!=(IndexIterator const& it) const noexcept
+        {
+            return m_iterator != it.m_iterator;
+        }
 
         IndexIterator& operator++() noexcept
         {
@@ -224,15 +275,28 @@ public:
         using iterator = IndexIterator;
         using const_iterator = iterator;
 
-        const_iterator begin() const noexcept { return m_index_set.begin(); }
-        const_iterator end() const noexcept { return m_index_set.end(); }
+        const_iterator begin() const noexcept
+        {
+            return m_index_set.begin();
+        }
+        const_iterator end() const noexcept
+        {
+            return m_index_set.end();
+        }
 
-        IndexIteratableAdaptor(IndexSet const& is) : m_index_set(is) { }
+        IndexIteratableAdaptor(IndexSet const& is)
+            : m_index_set(is)
+        {
+        }
+
     private:
         IndexSet const& m_index_set;
     };
 
-    IndexIteratableAdaptor as_indexes() const noexcept { return *this; }
+    IndexIteratableAdaptor as_indexes() const noexcept
+    {
+        return *this;
+    }
 
 private:
     // Find the range which contains the index, or the first one after it if
@@ -251,7 +315,7 @@ private:
 
 namespace util {
 // This was added in C++14 but is missing from libstdc++ 4.9
-template<typename Iterator>
+template <typename Iterator>
 std::reverse_iterator<Iterator> make_reverse_iterator(Iterator it) noexcept
 {
     return std::reverse_iterator<Iterator>(it);
@@ -260,21 +324,21 @@ std::reverse_iterator<Iterator> make_reverse_iterator(Iterator it) noexcept
 
 
 namespace _impl {
-template<typename T>
-template<typename OtherIterator>
+template <typename T>
+template <typename OtherIterator>
 inline bool ChunkedRangeVectorIterator<T>::operator==(OtherIterator const& it) const noexcept
 {
     return m_outer == it.outer() && m_inner == it.operator->();
 }
 
-template<typename T>
-template<typename OtherIterator>
+template <typename T>
+template <typename OtherIterator>
 inline bool ChunkedRangeVectorIterator<T>::operator!=(OtherIterator const& it) const noexcept
 {
     return !(*this == it);
 }
 
-template<typename T>
+template <typename T>
 inline ChunkedRangeVectorIterator<T>& ChunkedRangeVectorIterator<T>::operator++() noexcept
 {
     ++m_inner;
@@ -283,7 +347,7 @@ inline ChunkedRangeVectorIterator<T>& ChunkedRangeVectorIterator<T>::operator++(
     return *this;
 }
 
-template<typename T>
+template <typename T>
 inline ChunkedRangeVectorIterator<T> ChunkedRangeVectorIterator<T>::operator++(int) noexcept
 {
     auto value = *this;
@@ -291,7 +355,7 @@ inline ChunkedRangeVectorIterator<T> ChunkedRangeVectorIterator<T>::operator++(i
     return value;
 }
 
-template<typename T>
+template <typename T>
 inline ChunkedRangeVectorIterator<T>& ChunkedRangeVectorIterator<T>::operator--() noexcept
 {
     if (!m_inner || m_inner == &m_outer->data.front()) {
@@ -304,7 +368,7 @@ inline ChunkedRangeVectorIterator<T>& ChunkedRangeVectorIterator<T>::operator--(
     return *this;
 }
 
-template<typename T>
+template <typename T>
 inline ChunkedRangeVectorIterator<T> ChunkedRangeVectorIterator<T>::operator--(int) noexcept
 {
     auto value = *this;
@@ -312,7 +376,7 @@ inline ChunkedRangeVectorIterator<T> ChunkedRangeVectorIterator<T>::operator--(i
     return value;
 }
 
-template<typename T>
+template <typename T>
 inline void ChunkedRangeVectorIterator<T>::next_chunk() noexcept
 {
     ++m_outer;

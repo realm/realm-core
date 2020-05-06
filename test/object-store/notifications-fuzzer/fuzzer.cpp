@@ -158,7 +158,8 @@ static auto verify(CollectionChangeIndices const& changes, std::vector<int64_t> 
     return values;
 }
 
-static void verify_no_op(CollectionChangeIndices const& changes, std::vector<int64_t> values, fuzzer::RealmState& state)
+static void verify_no_op(CollectionChangeIndices const& changes, std::vector<int64_t> values,
+                         fuzzer::RealmState& state)
 {
     auto new_values = verify(changes, values, state);
     if (!std::equal(begin(values), end(values), begin(new_values), end(new_values)))
@@ -167,14 +168,12 @@ static void verify_no_op(CollectionChangeIndices const& changes, std::vector<int
 
 static void test(Realm::Config const& config, SharedRealm& r, SharedRealm& r2, std::istream& input_stream)
 {
-    fuzzer::RealmState state = {
-        *r,
-        *_impl::RealmCoordinator::get_existing_coordinator(r->config().path),
-        *r->read_group()->get_table("class_object"),
-        r->read_group()->get_table("class_linklist")->get_linklist(0, 0),
-        0,
-        {}
-    };
+    fuzzer::RealmState state = {*r,
+                                *_impl::RealmCoordinator::get_existing_coordinator(r->config().path),
+                                *r->read_group()->get_table("class_object"),
+                                r->read_group()->get_table("class_linklist")->get_linklist(0, 0),
+                                0,
+                                {}};
 
     fuzzer::CommandFile command(input_stream);
     if (command.initial_values.empty()) {
@@ -200,7 +199,7 @@ static void test(Realm::Config const& config, SharedRealm& r, SharedRealm& r2, s
 #else
     auto results = Results(r, ObjectSchema(), query(state))
 #if FUZZ_SORTED
-        .sort({{1, 0}, {true, true}})
+                       .sort({{1, 0}, {true, true}})
 #endif
         ;
 #endif // FUZZ_LINKVIEW
@@ -218,13 +217,15 @@ static void test(Realm::Config const& config, SharedRealm& r, SharedRealm& r2, s
         ++notification_calls;
     });
 
-    state.coordinator.on_change(); r->notify();
+    state.coordinator.on_change();
+    r->notify();
     if (notification_calls != 1) {
         abort();
     }
 
     bool expect_notification = apply_changes(command, state2);
-    state.coordinator.on_change(); r->notify();
+    state.coordinator.on_change();
+    r->notify();
 
     if (expect_notification) {
         if (notification_calls != 2)
@@ -237,7 +238,8 @@ static void test(Realm::Config const& config, SharedRealm& r, SharedRealm& r2, s
     }
 }
 
-int main(int argc, char** argv) {
+int main(int argc, char** argv)
+{
     std::ios_base::sync_with_stdio(false);
     realm::disable_sync_to_disk();
 
@@ -246,15 +248,8 @@ int main(int argc, char** argv) {
     config.in_memory = true;
     config.automatic_change_notifications = false;
 
-    Schema schema{
-        {"object", "", {
-            {"id", PropertyTypeInt},
-            {"value", PropertyTypeInt}
-        }},
-        {"linklist", "", {
-            {"list", PropertyTypeArray, "object"}
-        }}
-    };
+    Schema schema{{"object", "", {{"id", PropertyTypeInt}, {"value", PropertyTypeInt}}},
+                  {"linklist", "", {{"list", PropertyTypeArray, "object"}}}};
 
     config.schema = std::make_unique<Schema>(schema);
     unlink(config.path.c_str());

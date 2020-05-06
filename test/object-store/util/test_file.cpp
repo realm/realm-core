@@ -41,7 +41,10 @@
 #include <io.h>
 #include <fcntl.h>
 
-inline static int mkstemp(char* _template) { return _open(_mktemp(_template), _O_CREAT | _O_TEMPORARY, _S_IREAD | _S_IWRITE); }
+inline static int mkstemp(char* _template)
+{
+    return _open(_mktemp(_template), _O_CREAT | _O_TEMPORARY, _S_IREAD | _S_IWRITE);
+}
 #else
 #include <unistd.h>
 #endif
@@ -90,9 +93,7 @@ TestFile::~TestFile()
 DBOptions TestFile::options() const
 {
     DBOptions options;
-    options.durability = in_memory
-                       ? DBOptions::Durability::MemOnly
-                       : DBOptions::Durability::Full;
+    options.durability = in_memory ? DBOptions::Durability::MemOnly : DBOptions::Durability::Full;
     return options;
 }
 
@@ -115,40 +116,41 @@ SyncTestFile::SyncTestFile(std::shared_ptr<app::App> app, std::string name, std:
 
     std::string fake_refresh_token = ENCODE_FAKE_JWT("not_a_real_token");
     std::string fake_access_token = ENCODE_FAKE_JWT("also_not_real");
-    sync_config = std::make_shared<SyncConfig>(SyncManager::shared().get_user(user_name, fake_refresh_token, fake_access_token, app->base_url()), name);
+    sync_config = std::make_shared<SyncConfig>(
+        SyncManager::shared().get_user(user_name, fake_refresh_token, fake_access_token, app->base_url()), name);
     sync_config->stop_policy = SyncSessionStopPolicy::Immediately;
     sync_config->error_handler = [](auto, auto) { abort(); };
     schema_mode = SchemaMode::Additive;
 }
 
 SyncServer::SyncServer(StartImmediately start_immediately, std::string local_dir)
-: m_local_root_dir(local_dir.empty() ? util::make_temp_dir() : local_dir)
-, m_server(m_local_root_dir, util::none, ([&] {
-    using namespace std::literals::chrono_literals;
+    : m_local_root_dir(local_dir.empty() ? util::make_temp_dir() : local_dir)
+    , m_server(m_local_root_dir, util::none, ([&] {
+                   using namespace std::literals::chrono_literals;
 
 #if TEST_ENABLE_SYNC_LOGGING
-    auto logger = new util::StderrLogger();
-    logger->set_level_threshold(util::Logger::Level::all);
-    m_logger.reset(logger);
+                   auto logger = new util::StderrLogger();
+                   logger->set_level_threshold(util::Logger::Level::all);
+                   m_logger.reset(logger);
 #else
-    m_logger.reset(new TestLogger());
+                   m_logger.reset(new TestLogger());
 #endif
 
-    sync::Server::Config config;
-    config.logger = m_logger.get();
-    config.history_compaction_clock = this;
-    config.token_expiration_clock = this;
+                   sync::Server::Config config;
+                   config.logger = m_logger.get();
+                   config.history_compaction_clock = this;
+                   config.token_expiration_clock = this;
 #if REALM_SYNC_VER_MAJOR > 4 || (REALM_SYNC_VER_MAJOR == 4 && REALM_SYNC_VER_MINOR >= 7)
-    config.disable_history_compaction = false;
+                   config.disable_history_compaction = false;
 #else
-    config.enable_log_compaction = true;
+                   config.enable_log_compaction = true;
 #endif
-    config.history_ttl = 1s;
-    config.history_compaction_interval = 1s;
-    config.listen_address = "127.0.0.1";
+                   config.history_ttl = 1s;
+                   config.history_compaction_interval = 1s;
+                   config.listen_address = "127.0.0.1";
 
-    return config;
-})())
+                   return config;
+               })())
 {
 #if TEST_ENABLE_SYNC_LOGGING
     SyncManager::shared().set_log_level(util::Logger::Level::all);
@@ -171,7 +173,7 @@ SyncServer::~SyncServer()
 void SyncServer::start()
 {
     REALM_ASSERT(!m_thread.joinable());
-    m_thread = std::thread([this]{ m_server.run(); });
+    m_thread = std::thread([this] { m_server.run(); });
 }
 
 void SyncServer::stop()
@@ -214,7 +216,8 @@ std::error_code wait_for_download(Realm& realm)
     return wait_for_session(realm, &SyncSession::wait_for_download_completion);
 }
 
-TestSyncManager::TestSyncManager(const std::string& base_url, std::string const& base_path, SyncManager::MetadataMode mode)
+TestSyncManager::TestSyncManager(const std::string& base_url, std::string const& base_path,
+                                 SyncManager::MetadataMode mode)
 {
     configure(base_url, base_path, mode);
 }
@@ -224,7 +227,8 @@ TestSyncManager::~TestSyncManager()
     SyncManager::shared().reset_for_testing();
 }
 
-void TestSyncManager::configure(const std::string& base_url, std::string const& base_path, SyncManager::MetadataMode mode)
+void TestSyncManager::configure(const std::string& base_url, std::string const& base_path,
+                                SyncManager::MetadataMode mode)
 {
     SyncClientConfig config;
     config.base_file_path = base_path.empty() ? tmp_dir() : base_path;
@@ -235,13 +239,16 @@ void TestSyncManager::configure(const std::string& base_url, std::string const& 
     config.log_level = util::Logger::Level::off;
 #endif
     app::App::Config app_config;
-    app_config.transport_generator = []() -> std::unique_ptr<app::GenericNetworkTransport> { REALM_ASSERT_RELEASE(false); };
+    app_config.transport_generator = []() -> std::unique_ptr<app::GenericNetworkTransport> {
+        REALM_ASSERT_RELEASE(false);
+    };
     app_config.base_url = base_url;
     SyncManager::shared().configure(config, app_config);
     app::App::OnlyForTesting::set_sync_route(*SyncManager::shared().app(), base_url + "/realm-sync");
 }
 
-std::shared_ptr<app::App> TestSyncManager::app() const {
+std::shared_ptr<app::App> TestSyncManager::app() const
+{
     return SyncManager::shared().app();
 }
 
@@ -274,7 +281,7 @@ public:
                 m_signal.load();
             }
 
-            auto c = reinterpret_cast<_impl::RealmCoordinator *>(value);
+            auto c = reinterpret_cast<_impl::RealmCoordinator*>(value);
             c->on_change();
             m_signal.store(1, std::memory_order_relaxed);
         }
@@ -291,13 +298,15 @@ public:
         auto& it = m_published_coordinators[c.get()];
         if (it.lock()) {
             m_signal.store(reinterpret_cast<uintptr_t>(c.get()), std::memory_order_relaxed);
-        } else {
+        }
+        else {
             // Synchronize on the first handover of a given coordinator.
             it = c;
             m_signal = reinterpret_cast<uintptr_t>(c.get()) | 1;
         }
 
-        while (m_signal.load(std::memory_order_relaxed) != 1) ;
+        while (m_signal.load(std::memory_order_relaxed) != 1)
+            ;
     }
 
 private:

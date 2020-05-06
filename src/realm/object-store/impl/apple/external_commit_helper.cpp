@@ -90,7 +90,7 @@ void ExternalCommitHelper::FdHolder::close()
 // written to the anonymous pipe the background thread removes the runloop
 // source from the runloop and and shuts down.
 ExternalCommitHelper::ExternalCommitHelper(RealmCoordinator& parent)
-: m_parent(parent)
+    : m_parent(parent)
 {
     m_kq = kqueue();
     if (m_kq == -1) {
@@ -102,7 +102,8 @@ ExternalCommitHelper::ExternalCommitHelper(RealmCoordinator& parent)
 
     // Object Store needs to create a named pipe in order to coordinate notifications.
     // This can be a problem on some file systems (e.g. FAT32) or due to security policies in SELinux. Most commonly
-    // it is a problem when saving Realms on external storage: https://stackoverflow.com/questions/2740321/how-to-create-named-pipe-mkfifo-in-android
+    // it is a problem when saving Realms on external storage:
+    // https://stackoverflow.com/questions/2740321/how-to-create-named-pipe-mkfifo-in-android
     //
     // For this reason we attempt to create this file in a temporary location known to be safe to write these files.
     //
@@ -176,11 +177,12 @@ ExternalCommitHelper::ExternalCommitHelper(RealmCoordinator& parent)
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
         catch (std::exception const& e) {
             fprintf(stderr, "uncaught exception in notifier thread: %s: %s\n", typeid(e).name(), e.what());
-            asl_log(nullptr, nullptr, ASL_LEVEL_ERR, "uncaught exception in notifier thread: %s: %s", typeid(e).name(), e.what());
+            asl_log(nullptr, nullptr, ASL_LEVEL_ERR, "uncaught exception in notifier thread: %s: %s",
+                    typeid(e).name(), e.what());
             throw;
         }
         catch (...) {
-            fprintf(stderr,  "uncaught exception in notifier thread\n");
+            fprintf(stderr, "uncaught exception in notifier thread\n");
             asl_log(nullptr, nullptr, ASL_LEVEL_ERR, "uncaught exception in notifier thread");
             throw;
         }

@@ -28,7 +28,7 @@ class ObjectSchema;
 struct Property;
 
 namespace _impl {
-    class ObjectNotifier;
+class ObjectNotifier;
 }
 
 /// Options for how objects should be unboxed by a context.
@@ -83,12 +83,27 @@ public:
 
     ~Object();
 
-    std::shared_ptr<Realm> const& realm() const { return m_realm; }
-    std::shared_ptr<Realm> const& get_realm() const { return m_realm; }
-    ObjectSchema const& get_object_schema() const { return *m_object_schema; }
-    Obj obj() const { return m_obj; }
+    std::shared_ptr<Realm> const& realm() const
+    {
+        return m_realm;
+    }
+    std::shared_ptr<Realm> const& get_realm() const
+    {
+        return m_realm;
+    }
+    ObjectSchema const& get_object_schema() const
+    {
+        return *m_object_schema;
+    }
+    Obj obj() const
+    {
+        return m_obj;
+    }
 
-    bool is_valid() const { return m_obj.is_valid(); }
+    bool is_valid() const
+    {
+        return m_obj.is_valid();
+    }
 
     // Returns a frozen copy of this object.
     Object freeze(std::shared_ptr<Realm> frozen_realm) const;
@@ -98,11 +113,17 @@ public:
 
     NotificationToken add_notification_callback(CollectionChangeCallback callback) &;
 
-    template<typename ValueType>
-    void set_column_value(StringData prop_name, ValueType&& value) { m_obj.set(prop_name, value); }
+    template <typename ValueType>
+    void set_column_value(StringData prop_name, ValueType&& value)
+    {
+        m_obj.set(prop_name, value);
+    }
 
-    template<typename ValueType>
-    ValueType get_column_value(StringData prop_name) const { return m_obj.get<ValueType>(prop_name); }
+    template <typename ValueType>
+    ValueType get_column_value(StringData prop_name) const
+    {
+        return m_obj.get<ValueType>(prop_name);
+    }
 
     // The following functions require an accessor context which converts from
     // the binding's native data types to the core data types. See CppContext
@@ -111,62 +132,55 @@ public:
     // The actual definitions of these templated functions is in object_accessor.hpp
 
     // property getter/setter
-    template<typename ValueType, typename ContextType>
-    void set_property_value(ContextType& ctx, StringData prop_name,
-                            ValueType value, CreatePolicy policy = CreatePolicy::SetLink);
-    template<typename ValueType, typename ContextType>
-    void set_property_value(ContextType& ctx, Property const& prop,
-                            ValueType value, CreatePolicy policy = CreatePolicy::SetLink);
+    template <typename ValueType, typename ContextType>
+    void set_property_value(ContextType& ctx, StringData prop_name, ValueType value,
+                            CreatePolicy policy = CreatePolicy::SetLink);
+    template <typename ValueType, typename ContextType>
+    void set_property_value(ContextType& ctx, Property const& prop, ValueType value,
+                            CreatePolicy policy = CreatePolicy::SetLink);
 
-    template<typename ValueType, typename ContextType>
+    template <typename ValueType, typename ContextType>
     ValueType get_property_value(ContextType& ctx, StringData prop_name) const;
 
-    template<typename ValueType, typename ContextType>
+    template <typename ValueType, typename ContextType>
     ValueType get_property_value(ContextType& ctx, const Property& property) const;
 
     // create an Object from a native representation
-    template<typename ValueType, typename ContextType>
-    static Object create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
-                         const ObjectSchema &object_schema, ValueType value,
-                         CreatePolicy policy = CreatePolicy::ForceCreate,
+    template <typename ValueType, typename ContextType>
+    static Object create(ContextType& ctx, std::shared_ptr<Realm> const& realm, const ObjectSchema& object_schema,
+                         ValueType value, CreatePolicy policy = CreatePolicy::ForceCreate,
                          ObjKey current_obj = ObjKey(), Obj* = nullptr);
 
-    template<typename ValueType, typename ContextType>
-    static Object create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
-                         StringData object_type, ValueType value,
-                         CreatePolicy policy = CreatePolicy::ForceCreate,
+    template <typename ValueType, typename ContextType>
+    static Object create(ContextType& ctx, std::shared_ptr<Realm> const& realm, StringData object_type,
+                         ValueType value, CreatePolicy policy = CreatePolicy::ForceCreate,
                          ObjKey current_obj = ObjKey(), Obj* = nullptr);
 
-    template<typename ValueType, typename ContextType>
-    static Object get_for_primary_key(ContextType& ctx,
-                                      std::shared_ptr<Realm> const& realm,
-                                      const ObjectSchema &object_schema,
-                                      ValueType primary_value);
+    template <typename ValueType, typename ContextType>
+    static Object get_for_primary_key(ContextType& ctx, std::shared_ptr<Realm> const& realm,
+                                      const ObjectSchema& object_schema, ValueType primary_value);
 
-    template<typename ValueType, typename ContextType>
-    static Object get_for_primary_key(ContextType& ctx,
-                                      std::shared_ptr<Realm> const& realm,
-                                      StringData object_type,
+    template <typename ValueType, typename ContextType>
+    static Object get_for_primary_key(ContextType& ctx, std::shared_ptr<Realm> const& realm, StringData object_type,
                                       ValueType primary_value);
 
 private:
     friend class Results;
 
     std::shared_ptr<Realm> m_realm;
-    const ObjectSchema *m_object_schema;
+    const ObjectSchema* m_object_schema;
     Obj m_obj;
     _impl::CollectionNotifier::Handle<_impl::ObjectNotifier> m_notifier;
 
 
-    template<typename ValueType, typename ContextType>
-    void set_property_value_impl(ContextType& ctx, const Property &property,
-                                 ValueType value, CreatePolicy policy, bool is_default);
-    template<typename ValueType, typename ContextType>
-    ValueType get_property_value_impl(ContextType& ctx, const Property &property) const;
+    template <typename ValueType, typename ContextType>
+    void set_property_value_impl(ContextType& ctx, const Property& property, ValueType value, CreatePolicy policy,
+                                 bool is_default);
+    template <typename ValueType, typename ContextType>
+    ValueType get_property_value_impl(ContextType& ctx, const Property& property) const;
 
-    template<typename ValueType, typename ContextType>
-    static ObjKey get_for_primary_key_impl(ContextType& ctx, Table const& table,
-                                           const Property &primary_prop,
+    template <typename ValueType, typename ContextType>
+    static ObjKey get_for_primary_key_impl(ContextType& ctx, Table const& table, const Property& primary_prop,
                                            ValueType primary_value);
 
     void verify_attached() const;
