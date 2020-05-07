@@ -127,7 +127,6 @@ if(REALM_ENABLE_SYNC)
         sync/remote_mongo_client.cpp
         sync/remote_mongo_collection.cpp
         sync/remote_mongo_database.cpp
-        sync/app_service_client.cpp
         sync/impl/sync_file.cpp
         sync/impl/sync_metadata.cpp
         util/bson/bson.cpp

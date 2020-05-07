@@ -24,12 +24,12 @@ namespace app {
 
 RemoteMongoDatabase RemoteMongoClient::operator[](const std::string& name)
 {
-    return RemoteMongoDatabase(name, m_service);
+    return RemoteMongoDatabase(name, m_service, m_service_name);
 }
 
 RemoteMongoDatabase RemoteMongoClient::db(const std::string& name)
 {
-    return RemoteMongoDatabase(name, m_service);
+    return RemoteMongoDatabase(name, m_service, m_service_name);
 }
 
 } // namespace app

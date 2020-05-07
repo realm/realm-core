@@ -359,28 +359,28 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app]") {
         // the imported test app will accept password reset if the password contains "realm_tests_do_reset" via a function
         std::string accepted_new_password = util::format("realm_tests_do_reset%1", random_string(10));
         app.provider_client<App::UsernamePasswordProviderClient>()
-            .call_reset_password_function(email,
-                accepted_new_password,
-                "[]",
-                [&](Optional<app::AppError> error) {
-                    REQUIRE(!error);
-                    processed = true;
-            });
+        .call_reset_password_function(email,
+                                      accepted_new_password,
+                                      {},
+                                      [&](Optional<app::AppError> error) {
+            REQUIRE(!error);
+            processed = true;
+        });
         CHECK(processed);
     }
 
     SECTION("reset password function failure") {
         std::string rejected_password = util::format("%1", random_string(10));
         app.provider_client<App::UsernamePasswordProviderClient>()
-            .call_reset_password_function(email,
-                rejected_password,
-                "[\"foo\", \"bar\"]",
-                [&](Optional<app::AppError> error) {
-                    REQUIRE(error);
-                    CHECK(error->message == util::format("failed to reset password for user %1", email));
-                    CHECK(error->is_service_error());
-                    processed = true;
-                });
+        .call_reset_password_function(email,
+                                      rejected_password,
+                                      {"foo", "bar"},
+                                      [&](Optional<app::AppError> error) {
+            REQUIRE(error);
+            CHECK(error->message == util::format("failed to reset password for user %1", email));
+            CHECK(error->is_service_error());
+            processed = true;
+        });
         CHECK(processed);
     }
 
@@ -388,7 +388,7 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app]") {
         app.provider_client<App::UsernamePasswordProviderClient>()
             .call_reset_password_function(util::format("%1@%2.com", random_string(5), random_string(5)),
                 password,
-                "[\"foo\", \"bar\"]",
+                {"foo", "bar"},
                 [&](Optional<app::AppError> error) {
                     REQUIRE(error);
                     CHECK(error->message == "user not found");
@@ -827,8 +827,7 @@ TEST_CASE("app: link_user integration", "[sync][app]") {
     }
 }
 
-TEST_CASE("app: remote mongo client", "[sync][app]") {
-    
+TEST_CASE("app: call function", "[sync][app]") {
     std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
         return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
     };
@@ -841,13 +840,6 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
     std::string base_path = tmp_dir() + "/" + config.app_id;
     reset_test_directory(base_path);
     TestSyncManager init_sync_manager(base_path);
-    
-    auto remote_client = app.remote_mongo_client("BackingDB");
-    auto db = remote_client.db("test_data");
-    auto collection = db["Dog"];
-    
-    auto dog_document = "{\"name\":\"fido\", \"breed\":\"king charles\"}";
-    auto dog_document2 = "{\"name\":\"fido\", \"breed\":\"french bulldog\"}";
 
     auto email = util::format("realm_tests_do_autoverify%1@%2.com", random_string(10), random_string(10));
     auto password = random_string(10);
@@ -856,10 +848,71 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
     .register_email(email,
                     password,
                     [&](Optional<app::AppError> error) {
+        CHECK(!error);
+    });
+
+    app.log_in_with_credentials(realm::app::AppCredentials::username_password(email, password),
+                                [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+        REQUIRE(user);
+        CHECK(!error);
+    });
+
+    app.call_function<int64_t>("sumFunc", {1, 2, 3, 4, 5}, [&](Optional<app::AppError> error, Optional<int64_t> sum) {
+        REQUIRE(!error);
+        CHECK(*sum == 15);
+    });
+    
+    app.call_function<int64_t>(SyncManager::shared().get_current_user(),
+                               "sumFunc", {1, 2, 3, 4, 5}, [&](Optional<app::AppError> error, Optional<int64_t> sum) {
+        REQUIRE(!error);
+        CHECK(*sum == 15);
+    });
+}
+
+TEST_CASE("app: remote mongo client", "[sync][app]") {
+    
+    std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
+        return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
+    };
+    std::string base_url = get_base_url();
+    std::string config_path = get_config_path();
+    REQUIRE(!base_url.empty());
+    REQUIRE(!config_path.empty());
+    auto config = App::Config{get_runtime_app_id(config_path), factory, base_url};
+    auto app = App::get_shared_app(config);
+    std::string base_path = tmp_dir() + "/" + config.app_id;
+    reset_test_directory(base_path);
+    TestSyncManager init_sync_manager(base_path);
+    
+    auto remote_client = app->remote_mongo_client("BackingDB");
+    auto db = remote_client.db("test_data");
+    auto collection = db["Dog"];
+    
+    bson::BsonDocument dog_document {
+        {"name", "fido"},
+        {"breed", "king charles"}
+    };
+    
+    bson::BsonDocument dog_document2 {
+        {"name", "fido"},
+        {"breed", "french bulldog"}
+    };
+    
+    bson::BsonDocument bad_document {
+        {"bad", "value"}
+    };
+
+    auto email = util::format("realm_tests_do_autoverify%1@%2.com", random_string(10), random_string(10));
+    auto password = random_string(10);
+    
+    app->provider_client<App::UsernamePasswordProviderClient>()
+    .register_email(email,
+                    password,
+                    [&](Optional<app::AppError> error) {
                         CHECK(!error);
                     });
     
-    app.log_in_with_credentials(realm::app::AppCredentials::username_password(email, password),
+    app->log_in_with_credentials(realm::app::AppCredentials::username_password(email, password),
                                 [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
                                     REQUIRE(user);
                                     CHECK(!error);
@@ -877,27 +930,27 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
     SECTION("insert") {
         
         bool processed = false;
-        std::string dog_object_id;
+        ObjectId dog_object_id;
         
-        collection.insert_one("{\"bad\" : \"value\"}",
-                              [&](Optional<std::string> document, Optional<app::AppError> error) {
+        collection.insert_one(bad_document,
+                              [&](Optional<ObjectId> object_id, Optional<app::AppError> error) {
             CHECK(error);
-            CHECK(!document);
+            CHECK(!object_id);
         });
         
         collection.insert_one(dog_document,
-                              [&](Optional<std::string> document_json, Optional<app::AppError> error) {
+                              [&](Optional<ObjectId> object_id, Optional<app::AppError> error) {
             CHECK(!error);
-            auto json = nlohmann::json::parse(*document_json);
-            auto object_id = json.at("insertedId").at("$oid").get<std::string>();
-            dog_object_id = object_id;
+            CHECK((*object_id).to_string() != "");
+            dog_object_id = *object_id;
         });
         
-        auto documents = std::vector<std::string>();
-        documents.push_back(dog_document2);
+        bson::BsonArray documents {
+            dog_document2
+        };
         
         collection.insert_many(documents,
-                               [&](std::vector<std::string> inserted_docs,
+                               [&](std::vector<ObjectId> inserted_docs,
                                    Optional<app::AppError> error) {
             CHECK(!error);
             CHECK(inserted_docs.size() == 1);
@@ -911,88 +964,77 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
         bool processed = false;
         
         collection.find(dog_document,
-                        [&](Optional<std::string> document_json, Optional<app::AppError> error) {
+                        [&](Optional<bson::BsonArray> document_array, Optional<app::AppError> error) {
             CHECK(!error);
-            auto json = nlohmann::json::parse(*document_json);
-            CHECK(json.is_array());
+            CHECK((*document_array).size() == 0);
         });
         
         collection.find_one(dog_document,
-                            [&](Optional<std::string> document_json, Optional<app::AppError> error) {
+                            [&](Optional<bson::BsonDocument> document, Optional<app::AppError> error) {
             CHECK(!error);
-            CHECK(!document_json);
+            CHECK(!document);
         });
         
         collection.insert_one(dog_document,
-                              [&](Optional<std::string> document_json, Optional<app::AppError> error) {
+                              [&](Optional<ObjectId> object_id, Optional<app::AppError> error) {
             CHECK(!error);
-            auto json = nlohmann::json::parse(*document_json);
-            auto object_id = json.at("insertedId").at("$oid").get<std::string>();
-            CHECK(object_id != "");
+            CHECK((*object_id).to_string() != "");
         });
         
         collection.find(dog_document,
-                        [&](Optional<std::string> document_json, Optional<app::AppError> error) {
+                        [&](Optional<bson::BsonArray> documents, Optional<app::AppError> error) {
             CHECK(!error);
-            auto json = nlohmann::json::parse(*document_json);
-            CHECK(json.is_array());
-            CHECK(json.size() == 1);
+            CHECK((*documents).size() == 1);
         });
         
         realm::app::RemoteMongoCollection::RemoteFindOptions options {
             1, //document limit
-            util::Optional<std::string>(nlohmann::json({{"name", "fido"}}).dump()), //project
-            util::Optional<std::string>(nlohmann::json({{"name", -1}}).dump()) //sort
+            util::Optional<bson::BsonDocument>({{"name", "fido"}}), //project
+            util::Optional<bson::BsonDocument>({{"name", -1}}) //sort
         };
         
-        collection.find(dog_document, options, [&](Optional<std::string> document_json, Optional<app::AppError> error) {
+        collection.find(dog_document,
+                        options,
+                        [&](Optional<bson::BsonArray> document_array, Optional<app::AppError> error) {
             CHECK(!error);
-            auto json = nlohmann::json::parse(*document_json);
-            CHECK(json.is_array());
-            auto json_array = json.get<std::vector<nlohmann::json>>();
-            CHECK(json_array.size() == 1);
+            CHECK((*document_array).size() == 1);
         });
         
         collection.find_one(dog_document,
-                            [&](Optional<std::string> document_json, Optional<app::AppError> error) {
+                            [&](Optional<bson::BsonDocument> document, Optional<app::AppError> error) {
             CHECK(!error);
-            auto json = nlohmann::json::parse(*document_json);
-            auto name = json.at("name").get<std::string>();
+            auto name = (*document)["name"];
             CHECK(name == "fido");
         });
         
-        collection.find_one(dog_document, options, [&](Optional<std::string> document_json, Optional<app::AppError> error) {
+        collection.find_one(dog_document, options,
+                            [&](Optional<bson::BsonDocument> document, Optional<app::AppError> error) {
             CHECK(!error);
-            auto json = nlohmann::json::parse(*document_json);
-            auto name = json.at("name").get<std::string>();
+            auto name = (*document)["name"];
             CHECK(name == "fido");
         });
         
         realm::app::RemoteMongoCollection::RemoteFindOneAndModifyOptions find_and_modify_options {
-            util::Optional<std::string>(nlohmann::json({{"name", "fido"}}).dump()), //project
-            util::Optional<std::string>(nlohmann::json({{"name", 1}}).dump()), //sort,
+            util::Optional<bson::BsonDocument>({{"name", "fido"}}), //project
+            util::Optional<bson::BsonDocument>({{"name", 1}}), //sort,
             true, //upsert
             true // return new doc
         };
         
-        collection.find(dog_document, options, [&](Optional<std::string> document_json, Optional<app::AppError> error) {
+        collection.find(dog_document,
+                        [&](Optional<bson::BsonArray> documents, Optional<app::AppError> error) {
             CHECK(!error);
-            auto json = nlohmann::json::parse(*document_json);
-            CHECK(json.is_array());
-            auto json_array = json.get<std::vector<nlohmann::json>>();
-            CHECK(json_array.size() == 1);
+            CHECK((*documents).size() == 1);
         });
         
         collection.find_one_and_delete(dog_document, find_and_modify_options, [&](Optional<app::AppError> error) {
             CHECK(!error);
         });
         
-        collection.find(dog_document, options, [&](Optional<std::string> document_json, Optional<app::AppError> error) {
+        collection.find(dog_document,
+                        [&](Optional<bson::BsonArray> documents, Optional<app::AppError> error) {
             CHECK(!error);
-            auto json = nlohmann::json::parse(*document_json);
-            CHECK(json.is_array());
-            auto json_array = json.get<std::vector<nlohmann::json>>();
-            CHECK(json_array.size() == 0);
+            CHECK((*documents).size() == 0);
             processed = true;
         });
         
@@ -1003,38 +1045,41 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
         bool processed = false;
         
         collection.insert_one(dog_document,
-                              [&](Optional<std::string> document_json, Optional<app::AppError> error) {
+                              [&](Optional<ObjectId> object_id, Optional<app::AppError> error) {
             CHECK(!error);
-            auto json = nlohmann::json::parse(*document_json);
-            auto object_id = json.at("insertedId").at("$oid").get<std::string>();
-            CHECK(object_id != "");
+            CHECK((*object_id).to_string() != "");
         });
         
         collection.insert_one(dog_document,
-                              [&](Optional<std::string> document_json, Optional<app::AppError> error) {
+                              [&](Optional<ObjectId> object_id, Optional<app::AppError> error) {
             CHECK(!error);
-            auto json = nlohmann::json::parse(*document_json);
-            auto object_id = json.at("insertedId").at("$oid").get<std::string>();
-            CHECK(object_id != "");
+            CHECK((*object_id).to_string() != "");
         });
         
-        std::vector<std::string> pipeline = {
-            "{\"$match\": { \"name\": \"fido\"}}",
-            "{\"$group\": { \"_id\": \"$name\"}}"
+        bson::BsonDocument match {
+            {"$match" , bson::BsonDocument({{"name","fido"}})}
         };
         
-        collection.aggregate(pipeline, [&](Optional<std::string> document_json, Optional<app::AppError> error) {
-            CHECK(!error);
-            auto json = nlohmann::json::parse(*document_json);
-            CHECK(json.is_array());
-        });
+        bson::BsonDocument group {
+            {"$group", bson::BsonDocument({{"_id", "$name"}})}
+        };
         
-        collection.count("{\"breed\":\"king charles\"}", [&](uint64_t count, Optional<app::AppError> error) {
+        bson::BsonArray pipeline {
+            match,
+            group
+        };
+
+        collection.aggregate(pipeline, [&](Optional<bson::BsonArray> documents, Optional<app::AppError> error) {
+            CHECK(!error);
+            CHECK((*documents).size() == 1);
+        });
+
+        collection.count({{"breed", "king charles"}}, [&](uint64_t count, Optional<app::AppError> error) {
             CHECK(!error);
             CHECK(count >= 1);
         });
-        
-        collection.count("{\"breed\":\"king charles\"}", 1, [&](uint64_t count, Optional<app::AppError> error) {
+
+        collection.count({{"breed", "king charles"}}, 1, [&](uint64_t count, Optional<app::AppError> error) {
             CHECK(!error);
             CHECK(count == 1);
             processed = true;
@@ -1048,37 +1093,33 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
         bool processed = false;
         
         realm::app::RemoteMongoCollection::RemoteFindOneAndModifyOptions find_and_modify_options {
-            util::Optional<std::string>(nlohmann::json({{"name", "fido"}}).dump()), //project
-            util::Optional<std::string>(nlohmann::json({{"name", 1}}).dump()), //sort,
+            util::Optional<bson::BsonDocument>({{"name", "fido"}}), //project
+            util::Optional<bson::BsonDocument>({{"name", 1}}), //sort,
             true, //upsert
             true // return new doc
         };
         
-        collection.find_one_and_update(dog_document, dog_document2, [&](Optional<std::string> document, Optional<app::AppError> error) {
+        collection.find_one_and_update(dog_document, dog_document2, [&](Optional<bson::BsonDocument> document, Optional<app::AppError> error) {
             CHECK(!error);
             CHECK(!document);
         });
         
         collection.insert_one(dog_document,
-                              [&](Optional<std::string> document_json, Optional<app::AppError> error) {
+                              [&](Optional<ObjectId> object_id, Optional<app::AppError> error) {
             CHECK(!error);
-            auto json = nlohmann::json::parse(*document_json);
-            auto object_id = json.at("insertedId").at("$oid").get<std::string>();
-            CHECK(object_id != "");
+            CHECK((*object_id).to_string() != "");
         });
         
-        collection.find_one_and_update(dog_document, dog_document2, [&](Optional<std::string> document, Optional<app::AppError> error) {
+        collection.find_one_and_update(dog_document, dog_document2, find_and_modify_options, [&](Optional<bson::BsonDocument> document, Optional<app::AppError> error) {
             CHECK(!error);
-            auto json = nlohmann::json::parse(*document);
-            auto breed = json.at("breed").get<std::string>();
-            CHECK(breed == "king charles");
-        });
-        
-        collection.find_one_and_update(dog_document, dog_document2, find_and_modify_options, [&](Optional<std::string> document, Optional<app::AppError> error) {
-            CHECK(!error);
-            auto json = nlohmann::json::parse(*document);
-            auto breed = json.at("breed").get<std::string>();
+            auto breed = static_cast<std::string>((*document)["breed"]);
             CHECK(breed == "french bulldog");
+        });
+        
+        collection.find_one_and_update(dog_document2, dog_document, find_and_modify_options, [&](Optional<bson::BsonDocument> document, Optional<app::AppError> error) {
+            CHECK(!error);
+            auto breed = static_cast<std::string>((*document)["breed"]);
+            CHECK(breed == "king charles");
             processed = true;
         });
         
@@ -1093,14 +1134,14 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
                               true,
                               [&](realm::app::RemoteMongoCollection::RemoteUpdateResult result, Optional<app::AppError> error) {
             CHECK(!error);
-            CHECK(result.upserted_id != "");
+            CHECK((*result.upserted_id).to_string() != "");
         });
         
         collection.update_one(dog_document2,
                               dog_document,
                               [&](realm::app::RemoteMongoCollection::RemoteUpdateResult result, Optional<app::AppError> error) {
             CHECK(!error);
-            CHECK(result.upserted_id == "");
+            CHECK(!result.upserted_id);
             processed = true;
         });
         
@@ -1111,21 +1152,19 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
         bool processed = false;
         
         collection.insert_one(dog_document,
-                              [&](Optional<std::string> document_json, Optional<app::AppError> error) {
+                              [&](Optional<ObjectId> object_id, Optional<app::AppError> error) {
             CHECK(!error);
-            auto json = nlohmann::json::parse(*document_json);
-            auto object_id = json.at("insertedId").at("$oid").get<std::string>();
-            CHECK(object_id != "");
+            CHECK((*object_id).to_string() != "");
         });
 
-        collection.update_many(dog_document, dog_document2, true, [&](realm::app::RemoteMongoCollection::RemoteUpdateResult result, Optional<app::AppError> error) {
+        collection.update_many(dog_document2, dog_document, true, [&](realm::app::RemoteMongoCollection::RemoteUpdateResult result, Optional<app::AppError> error) {
             CHECK(!error);
-            CHECK(result.upserted_id == "");
+            CHECK((*result.upserted_id).to_string() != "");
         });
         
         collection.update_many(dog_document2, dog_document, [&](realm::app::RemoteMongoCollection::RemoteUpdateResult result, Optional<app::AppError> error) {
             CHECK(!error);
-            CHECK(result.upserted_id == "");
+            CHECK(!result.upserted_id);
             processed = true;
         });
         
@@ -1136,43 +1175,39 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
         bool processed = false;
 
         realm::app::RemoteMongoCollection::RemoteFindOneAndModifyOptions find_and_modify_options {
-            util::Optional<std::string>(nlohmann::json({{ "name", "fido" }}).dump()), //project
-            util::Optional<std::string>(nlohmann::json({{ "name", 1 }}).dump()), //sort,
+            util::Optional<bson::BsonDocument>({{"name", "fido"}}), //project
+            util::Optional<bson::BsonDocument>({{"name", 1}}), //sort,
             true, //upsert
             true // return new doc
         };
         
         collection.find_one_and_replace(dog_document,
                                         dog_document2,
-                                        [&](Optional<std::string> document, Optional<app::AppError> error) {
+                                        [&](Optional<bson::BsonDocument> document, Optional<app::AppError> error) {
             CHECK(!error);
             CHECK(!document);
         });
         
         collection.insert_one(dog_document,
-                              [&](Optional<std::string> document_json, Optional<app::AppError> error) {
+                              [&](Optional<ObjectId> object_id, Optional<app::AppError> error) {
             CHECK(!error);
-            auto json = nlohmann::json::parse(*document_json);
-            auto object_id = json.at("insertedId").at("$oid").get<std::string>();
-            CHECK(object_id != "");
+            CHECK((*object_id).to_string() != "");
         });
         
         collection.find_one_and_replace(dog_document,
                                         dog_document2,
-                                        [&](Optional<std::string> document, Optional<app::AppError> error) {
+                                        [&](Optional<bson::BsonDocument> document, Optional<app::AppError> error) {
             CHECK(!error);
-            auto json = nlohmann::json::parse(*document);
-            auto name = json.at("name").get<std::string>();
+            auto name = static_cast<std::string>((*document)["name"]);
             CHECK(name == "fido");
         });
         
         collection.find_one_and_replace(dog_document,
                                         dog_document2,
                                         find_and_modify_options,
-                                        [&](Optional<std::string> document, Optional<app::AppError> error) {
+                                        [&](Optional<bson::BsonDocument> document, Optional<app::AppError> error) {
             CHECK(!error);
-            auto json = nlohmann::json::parse(*document);
-            auto name = json.at("name").get<std::string>();
+            auto name = static_cast<std::string>((*document)["name"]);
             CHECK(name == "fido");
             processed = true;
         });
@@ -1184,19 +1219,19 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
         
         bool processed = false;
         
-        auto documents = std::vector<std::string>();
+        bson::BsonArray documents;
         documents.assign(3, dog_document);
         
         collection.insert_many(documents,
-                               [&](std::vector<std::string> inserted_docs,
+                               [&](std::vector<ObjectId> inserted_docs,
                                    Optional<app::AppError> error) {
                                    CHECK(!error);
                                    CHECK(inserted_docs.size() == 3);
                                });
         
         realm::app::RemoteMongoCollection::RemoteFindOneAndModifyOptions find_and_modify_options {
-            util::Optional<std::string>(nlohmann::json({{ "name", "fido" }}).dump()), //project
-            util::Optional<std::string>(nlohmann::json({{ "name", 1 }}).dump()), //sort,
+            util::Optional<bson::BsonDocument>({{"name", "fido"}}), //project
+            util::Optional<bson::BsonDocument>({{"name", 1}}), //sort,
             true, //upsert
             true // return new doc
         };
@@ -1518,7 +1553,6 @@ const std::string UnitTestTransport::user_id = "Ailuropoda melanoleuca";
 std::string UnitTestTransport::provider_type = "anon-user";
 const std::string UnitTestTransport::identity_0_id = "Ursus arctos isabellinus";
 const std::string UnitTestTransport::identity_1_id = "Ursus arctos horribilis";
-
 
 TEST_CASE("app: login_with_credentials unit_tests", "[sync][app]") {
     static const std::string base_path = realm::tmp_dir();

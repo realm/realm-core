@@ -21,53 +21,17 @@
 namespace realm {
 namespace app {
 
-// FIXME: This class has alot of json parsing with hardcoded strings,
-// this will go away with a subsequent PR that replaces JSON with BSON
-
-static void handle_response(util::Optional<AppError> error,
-                            util::Optional<std::string> value,
-                            std::function<void(Optional<std::string>, util::Optional<AppError>)> completion_block)
-{
-    if (value && !error) {
-        //response can be a http 200 and return "null" in the body
-        if (value && (*value == "null" || *value == "")) {
-            return completion_block(util::none, error);
-        } else {
-            return completion_block(*value, error);
-        }
-    }
-    
-    return completion_block(util::none, error);
-}
-
-static void handle_count_response(util::Optional<AppError> error,
-                                  util::Optional<std::string> value,
-                                  std::function<void(uint64_t, util::Optional<AppError>)> completion_block)
-{
-    if (value && !error) {
-        try {
-            auto json = nlohmann::json::parse(*value);
-            auto count_string = json.at("$numberLong").get<std::string>();
-            return completion_block(std::stoll(count_string), error);
-        } catch (const std::exception& e) {
-            return completion_block(0, AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
-        }
-    }
-    
-    return completion_block(0, error);
-}
-
 static void handle_delete_count_response(util::Optional<AppError> error,
-                                         util::Optional<std::string> value,
+                                         util::Optional<bson::Bson> value,
                                          std::function<void(uint64_t, util::Optional<AppError>)> completion_block)
 {
     if (value && !error) {
         try {
-            auto json = nlohmann::json::parse(*value);
-            auto count_string = json.at("deletedCount").at("$numberInt").get<std::string>();
-            return completion_block(std::stoi(count_string), error);
+            auto document = static_cast<bson::BsonDocument>(*value);
+            auto count = static_cast<int32_t>(document["deletedCount"]);
+            return completion_block(count, error);
         } catch (const std::exception& e) {
-            return completion_block(0, AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
+            return completion_block(0, AppError(make_error_code(JSONErrorCode::bad_bson_parse), e.what()));
         }
     }
     
@@ -75,407 +39,388 @@ static void handle_delete_count_response(util::Optional<AppError> error,
 }
 
 static void handle_update_response(util::Optional<AppError> error,
-                                   util::Optional<std::string> value,
-                                   std::function<void(RemoteMongoCollection::RemoteUpdateResult, util::Optional<AppError>)> completion_block)
+                                   util::Optional<bson::Bson> value,
+                                   std::function<void(RemoteMongoCollection::RemoteUpdateResult,
+                                                      util::Optional<AppError>)> completion_block)
 {
-    if (value && !error) {
-        
-        try {
-            auto json = nlohmann::json::parse(*value);
-            auto matched_count_string = json.at("matchedCount").at("$numberInt").get<std::string>();
-            auto matched_count = std::stoull(matched_count_string);
-            auto modified_count_string = json.at("modifiedCount").at("$numberInt").get<std::string>();
-            auto modified_count = std::stoull(modified_count_string);
-            std::string upserted_id;
-            auto it = json.find("upsertedId");
-            if (it != json.end()) {
-                upserted_id = json.at("upsertedId").at("$oid").get<std::string>();
-            }
-            
-            return completion_block(RemoteMongoCollection::RemoteUpdateResult {
-                matched_count,
-                modified_count,
-                upserted_id
-            }, error);
-        } catch (const std::exception& e) {
-            return completion_block({}, AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
-        }
+    
+    if (error) {
+        return completion_block({}, error);
     }
     
-    return completion_block({}, error);
+    try {
+        auto document = static_cast<bson::BsonDocument>(*value);
+        auto matched_count = static_cast<int32_t>(document["matchedCount"]);
+        auto modified_count = static_cast<int32_t>(document["modifiedCount"]);
+
+        Optional<ObjectId> upserted_id;
+        auto it = document.find("upsertedId");
+        if (it != document.end()) {
+            upserted_id = static_cast<ObjectId>(document["upsertedId"]);
+        }
+        
+        return completion_block(RemoteMongoCollection::RemoteUpdateResult {
+            matched_count,
+            modified_count,
+            upserted_id
+        }, error);
+    } catch (const std::exception& e) {
+        return completion_block({}, AppError(make_error_code(JSONErrorCode::bad_bson_parse), e.what()));
+    }
 }
 
-void RemoteMongoCollection::find(const std::string& filter_json,
+void RemoteMongoCollection::find(const bson::BsonDocument& filter_bson,
                                  RemoteFindOptions options,
-                                 std::function<void(Optional<std::string>, util::Optional<AppError>)> completion_block)
+                                 std::function<void(util::Optional<bson::BsonArray>, util::Optional<AppError>)> completion_block)
 {
     try {
         auto base_args = m_base_operation_args;
-        base_args.push_back({"query", nlohmann::json::parse(filter_json)});
-        
-        if (options.limit) {
-            base_args.push_back({"limit", options.limit.value()});
-        }
-        
-        if (options.projection_json) {
-            base_args.push_back({"project", nlohmann::json::parse(options.projection_json.value())});
-        }
-        
-        if (options.sort_json) {
-            base_args.push_back({"sort", nlohmann::json::parse(options.sort_json.value())});
-        }
-        
-        auto args = nlohmann::json({{"arguments", nlohmann::json::array({base_args})}});
+        base_args["query"] = filter_bson;
 
-        m_service.call_function("find",
-                                args.dump(),
-                                [completion_block](util::Optional<AppError> error, util::Optional<std::string> value) {
-            handle_response(error, value, completion_block);
+        if (options.limit) {
+            base_args["limit"] = *options.limit;
+        }
+
+        if (options.projection_bson) {
+            base_args["project"] = *options.projection_bson;
+        }
+
+        if (options.sort_bson) {
+            base_args["sort"] = *options.sort_bson;
+        }
+        
+        m_service->call_function("find",
+                                 bson::BsonArray({base_args}),
+                                 m_service_name,
+                                 [completion_block](util::Optional<AppError> error, util::Optional<bson::Bson> value) {
+            if (error) {
+                return completion_block(util::none, error);
+            }
+
+            return completion_block(util::some<bson::BsonArray>(static_cast<bson::BsonArray>(*value)), util::none);
         });
     } catch (const std::exception& e) {
         return completion_block(util::none, AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
     }
 }
 
-void RemoteMongoCollection::find(const std::string& filter_json,
-                                 std::function<void(Optional<std::string>, util::Optional<AppError>)> completion_block)
+void RemoteMongoCollection::find(const bson::BsonDocument& filter_bson,
+                                 std::function<void(util::Optional<bson::BsonArray>, util::Optional<AppError>)> completion_block)
 {
-    find(filter_json, {}, completion_block);
+    find(filter_bson, {}, completion_block);
 }
 
-void RemoteMongoCollection::find_one(const std::string& filter_json,
+void RemoteMongoCollection::find_one(const bson::BsonDocument& filter_bson,
                                      RemoteFindOptions options,
-                                     std::function<void(Optional<std::string>, util::Optional<AppError>)> completion_block)
+                                     std::function<void(util::Optional<bson::BsonDocument>, util::Optional<AppError>)> completion_block)
 {
-        
     try {
         auto base_args = m_base_operation_args;
-        base_args.push_back({"query", nlohmann::json::parse(filter_json)});
-        
+        base_args["query"] = filter_bson;
+
         if (options.limit) {
-            base_args.push_back({"limit", options.limit.value()});
+            base_args["limit"] = *options.limit;
         }
-        
-        if (options.projection_json) {
-            base_args.push_back({"project", nlohmann::json::parse(options.projection_json.value())});
-        }
-        
-        if (options.projection_json) {
-            base_args.push_back({"sort", nlohmann::json::parse(options.sort_json.value())});
-        }
-        
-        auto args = nlohmann::json({{"arguments", nlohmann::json::array({base_args} )}});
 
-        m_service.call_function("findOne",
-                                args.dump(),
-                                [completion_block](util::Optional<AppError> error, util::Optional<std::string> value) {
-            handle_response(error, value, completion_block);
+        if (options.projection_bson) {
+            base_args["project"] = *options.projection_bson;
+        }
+
+        if (options.sort_bson) {
+            base_args["sort"] = *options.sort_bson;
+        }
+        
+        m_service->call_function("findOne",
+                                 bson::BsonArray({base_args}),
+                                 m_service_name,
+                                 [completion_block](util::Optional<AppError> error,
+                                                    util::Optional<bson::Bson> value) {
+            if (error) {
+                return completion_block(util::none, error);
+            }
+
+            if (bson::holds_alternative<util::None>(*value)) {
+                // no docs were found
+                return completion_block(util::none, util::none);
+            }
+            
+            return completion_block(util::some<bson::BsonDocument>(static_cast<bson::BsonDocument>(*value)),
+                                    util::none);
         });
+
     } catch (const std::exception& e) {
         return completion_block(util::none, AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
     }
 }
 
-void RemoteMongoCollection::find_one(const std::string& filter_json,
-                                     std::function<void(Optional<std::string>, util::Optional<AppError>)> completion_block)
+void RemoteMongoCollection::find_one(const bson::BsonDocument& filter_bson,
+                                     std::function<void(util::Optional<bson::BsonDocument>,
+                                                        util::Optional<AppError>)> completion_block)
 {
-    find_one(filter_json, {}, completion_block);
+    find_one(filter_bson, {}, completion_block);
 }
 
-void RemoteMongoCollection::insert_one(const std::string& value_json,
-                                       std::function<void(Optional<std::string>, util::Optional<AppError>)> completion_block)
+void RemoteMongoCollection::insert_one(const bson::BsonDocument& value_bson,
+                                       std::function<void(util::Optional<ObjectId>, util::Optional<AppError>)> completion_block)
 {
-    try {
-        auto base_args = m_base_operation_args;
-        auto document_json = nlohmann::json::parse(value_json);
-        base_args.push_back({"document", document_json});
-        auto args = nlohmann::json({{"arguments", nlohmann::json::array({base_args})}});
-
-        m_service.call_function("insertOne",
-                                 args.dump(),
-                                 [completion_block](util::Optional<AppError> error, util::Optional<std::string> value) {
-            handle_response(error, value, completion_block);
-        });
-    } catch (const std::exception& e) {
-       return completion_block(util::none, AppError(make_error_code(JSONErrorCode::malformed_json), util::format("document parse %1", e.what())));
-    }
-}
-
-void RemoteMongoCollection::aggregate(std::vector<std::string> pipline,
-                                      std::function<void(Optional<std::string>, util::Optional<AppError>)> completion_block)
-{
-    try {
-        auto pipelines = nlohmann::json::array();
-        for (std::string& pipeline_json : pipline) {
-            pipelines.push_back(nlohmann::json::parse(pipeline_json));
+    auto base_args = m_base_operation_args;
+    base_args["document"] = value_bson;
+    
+    m_service->call_function("insertOne",
+                             bson::BsonArray({base_args}),
+                             m_service_name,
+                             [completion_block](util::Optional<AppError> error, util::Optional<bson::Bson> value) {
+        if (error) {
+            return completion_block(util::none, error);
         }
-        
-        auto base_args = m_base_operation_args;
-        base_args.push_back({"pipeline", pipelines});
-        auto args = nlohmann::json({{"arguments", nlohmann::json::array({base_args})}});
-         
-        m_service.call_function("aggregate",
-                              args.dump(),
-                              [completion_block](util::Optional<AppError> error, util::Optional<std::string> value) {
-            handle_response(error, value, completion_block);
-        });
-    } catch (const std::exception& e) {
-        return completion_block(util::none, AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
-    }
+
+        auto document = static_cast<bson::BsonDocument>(*value);
+
+        return completion_block(static_cast<ObjectId>(document["insertedId"]),
+                                util::none);
+    });
 }
 
-void RemoteMongoCollection::count(const std::string& filter_json,
-                                  uint64_t limit,
+void RemoteMongoCollection::aggregate(const bson::BsonArray& pipline,
+                                      std::function<void(util::Optional<bson::BsonArray>, util::Optional<AppError>)> completion_block)
+{
+    auto base_args = m_base_operation_args;
+    base_args["pipeline"] = pipline;
+    
+    m_service->call_function("aggregate",
+                             bson::BsonArray({base_args}),
+                             m_service_name,
+                             [completion_block](util::Optional<AppError> error, util::Optional<bson::Bson> value) {
+        if (error) {
+            return completion_block(util::none, error);
+        }
+
+        return completion_block(static_cast<bson::BsonArray>(*value), util::none);
+    });
+}
+
+void RemoteMongoCollection::count(const bson::BsonDocument& filter_bson,
+                                  int64_t limit,
                                   std::function<void(uint64_t, util::Optional<AppError>)> completion_block)
 {
-    try {
-        auto base_args = m_base_operation_args;
-        base_args.push_back({"query", nlohmann::json::parse(filter_json)});
-        
-        if (limit != 0) {
-            base_args.push_back({"limit", limit});
-        }
-        
-        auto args = nlohmann::json({{"arguments", nlohmann::json::array({base_args})}});
-
-        m_service.call_function("count",
-                                 args.dump(),
-                                 [completion_block](util::Optional<AppError> error, util::Optional<std::string> value) {
-            handle_count_response(error, value, completion_block);
-        });
-    } catch (const std::exception& e) {
-        return completion_block(0, AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
+    auto base_args = m_base_operation_args;
+    base_args["document"] = filter_bson;
+    
+    if (limit != 0) {
+        base_args["limit"] = limit;
     }
+    
+    m_service->call_function("count",
+                             bson::BsonArray({base_args}),
+                             m_service_name,
+                             [completion_block](util::Optional<AppError> error, util::Optional<bson::Bson> value) {
+        if (error) {
+            return completion_block(0, error);
+        }
+
+        return completion_block(static_cast<int64_t>(*value), util::none);
+    });
 }
 
-void RemoteMongoCollection::count(const std::string& filter_json,
+void RemoteMongoCollection::count(const bson::BsonDocument& filter_bson,
                                   std::function<void(uint64_t, util::Optional<AppError>)> completion_block)
 {
-    count(filter_json, 0, completion_block);
+    count(filter_bson, 0, completion_block);
 }
 
-void RemoteMongoCollection::insert_many(std::vector<std::string> documents,
-                                        std::function<void(std::vector<std::string>, util::Optional<AppError>)> completion_block)
+void RemoteMongoCollection::insert_many(bson::BsonArray documents,
+                                        std::function<void(std::vector<ObjectId>,
+                                                           util::Optional<AppError>)> completion_block)
 {
-     try {
+    auto base_args = m_base_operation_args;
+    base_args["documents"] = documents;
+    
+    m_service->call_function("insertMany",
+                             bson::BsonArray({base_args}),
+                             m_service_name,
+                             [completion_block](util::Optional<AppError> error, util::Optional<bson::Bson> value) {
+        if (error) {
+            return completion_block({}, error);
+        }
 
-         auto documents_array = nlohmann::json::array();
-         for (std::string& document_json : documents) {
-             documents_array.push_back(nlohmann::json::parse(document_json));
-         }
-
-         auto base_args = m_base_operation_args;
-         base_args.push_back({"documents", documents_array});
-         auto args = nlohmann::json({{"arguments", nlohmann::json::array({base_args})}});
-
-         m_service.call_function("insertMany",
-                                  args.dump(),
-                                  [completion_block](util::Optional<AppError> error, util::Optional<std::string> value) {
-             if (value && !error) {
-                 try {
-                     auto json = nlohmann::json::parse(*value);
-                     auto inserted_ids = json.at("insertedIds").get<std::vector<nlohmann::json>>();
-                     auto oid_array = std::vector<std::string>();
-                     for(auto& inserted_id : inserted_ids) {
-                         auto oid = inserted_id.at("$oid").get<std::string>();
-                         oid_array.push_back(oid);
-                     }
-                     return completion_block(oid_array, error);
-                 } catch (const std::exception& e) {
-                     return completion_block(std::vector<std::string>(), AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
-                 }
-             }
-
-             return completion_block(std::vector<std::string>(), error);
-         });
-    } catch (const std::exception& e) {
-        return completion_block(std::vector<std::string>(), AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
-    }
+        auto bson = static_cast<bson::BsonDocument>(*value);
+        auto inserted_ids = static_cast<bson::BsonArray>(bson["insertedIds"]);
+        return completion_block(std::vector<ObjectId>(inserted_ids.begin(), inserted_ids.end()), error);
+    });
 }
 
-void RemoteMongoCollection::delete_one(const std::string& filter_json,
+void RemoteMongoCollection::delete_one(const bson::BsonDocument& filter_bson,
                                        std::function<void(uint64_t, util::Optional<AppError>)> completion_block)
 {
-    try {
-
-         auto base_args = m_base_operation_args;
-         base_args.push_back({"query", nlohmann::json::parse(filter_json)});
-         auto args = nlohmann::json({{"arguments", nlohmann::json::array({base_args})}});
-
-        m_service.call_function("deleteOne",
-                                  args.dump(),
-                                  [completion_block](util::Optional<AppError> error, util::Optional<std::string> value) {
-             handle_delete_count_response(error, value, completion_block);
-         });
-    } catch (const std::exception& e) {
-        return completion_block(0, AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
-    }
+    auto base_args = m_base_operation_args;
+    base_args["query"] = filter_bson;
+    
+    m_service->call_function("deleteOne",
+                             bson::BsonArray({base_args}),
+                             m_service_name,
+                             [completion_block](util::Optional<AppError> error, util::Optional<bson::Bson> value) {
+        handle_delete_count_response(error, value, completion_block);
+    });
 }
 
-void RemoteMongoCollection::delete_many(const std::string& filter_json,
+void RemoteMongoCollection::delete_many(const bson::BsonDocument& filter_bson,
                                         std::function<void(uint64_t, util::Optional<AppError>)> completion_block)
 {
-    try {
-
-         auto base_args = m_base_operation_args;
-         base_args.push_back({"query", nlohmann::json::parse(filter_json)});
-         auto args = nlohmann::json({{"arguments", nlohmann::json::array({base_args})}});
-
-        m_service.call_function("deleteMany",
-                                  args.dump(),
-                                  [completion_block](util::Optional<AppError> error, util::Optional<std::string> value) {
-             handle_delete_count_response(error, value, completion_block);
-         });
-    } catch (const std::exception& e) {
-        return completion_block(0, AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
-    }
+    auto base_args = m_base_operation_args;
+    base_args["query"] = filter_bson;
+    
+    m_service->call_function("deleteMany",
+                             bson::BsonArray({base_args}),
+                             m_service_name,
+                             [completion_block](util::Optional<AppError> error, util::Optional<bson::Bson> value) {
+        handle_delete_count_response(error, value, completion_block);
+    });
 }
 
-void RemoteMongoCollection::update_one(const std::string& filter_json,
-                                       const std::string& update_json,
+void RemoteMongoCollection::update_one(const bson::BsonDocument& filter_bson,
+                                       const bson::BsonDocument& update_bson,
                                        bool upsert,
-                                       std::function<void(RemoteMongoCollection::RemoteUpdateResult, util::Optional<AppError>)> completion_block)
+                                       std::function<void(RemoteMongoCollection::RemoteUpdateResult,
+                                                          util::Optional<AppError>)> completion_block)
 {
-    try {
-        auto base_args = m_base_operation_args;
-        base_args.push_back({"query", nlohmann::json::parse(filter_json)});
-        base_args.push_back({"update", nlohmann::json::parse(update_json)});
-        base_args.push_back({"upsert", upsert});
-        auto args = nlohmann::json({{"arguments", nlohmann::json::array({base_args})}});
+    auto base_args = m_base_operation_args;
+    base_args["query"] = filter_bson;
+    base_args["update"] = update_bson;
+    base_args["upsert"] = upsert;
 
-        m_service.call_function("updateOne",
-                                 args.dump(),
-                                 [completion_block](util::Optional<AppError> error, util::Optional<std::string> value) {
-            handle_update_response(error, value, completion_block);
-        });
-    } catch (const std::exception& e) {
-        return completion_block({}, AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
-    }
+    m_service->call_function("updateOne",
+                             bson::BsonArray({base_args}),
+                             m_service_name,
+                             [completion_block](util::Optional<AppError> error, util::Optional<bson::Bson> value) {
+        handle_update_response(error, value, completion_block);
+    });
 }
 
-void RemoteMongoCollection::update_one(const std::string& filter_json,
-                                       const std::string& update_json,
-                                       std::function<void(RemoteMongoCollection::RemoteUpdateResult, util::Optional<AppError>)> completion_block)
+void RemoteMongoCollection::update_one(const bson::BsonDocument& filter_bson,
+                                       const bson::BsonDocument& update_bson,
+                                       std::function<void(RemoteMongoCollection::RemoteUpdateResult,
+                                                          util::Optional<AppError>)> completion_block)
 {
-    update_one(filter_json, update_json, {}, completion_block);
+    update_one(filter_bson, update_bson, {}, completion_block);
 }
 
-void RemoteMongoCollection::update_many(const std::string& filter_json,
-                                        const std::string& update_json,
+void RemoteMongoCollection::update_many(const bson::BsonDocument& filter_bson,
+                                        const bson::BsonDocument& update_bson,
                                         bool upsert,
-                                        std::function<void(RemoteMongoCollection::RemoteUpdateResult, util::Optional<AppError>)> completion_block)
+                                        std::function<void(RemoteMongoCollection::RemoteUpdateResult,
+                                                           util::Optional<AppError>)> completion_block)
 {
-    try {
-        auto base_args = m_base_operation_args;
-        base_args.push_back({"query", nlohmann::json::parse(filter_json)});
-        base_args.push_back({"update", nlohmann::json::parse(update_json)});
-        auto args = nlohmann::json({{"arguments", nlohmann::json::array({base_args})}});
-
-        args.push_back({"upsert", upsert });
-                
-        m_service.call_function("updateMany",
-                                 args.dump(),
-                                 [completion_block](util::Optional<AppError> error, util::Optional<std::string> value) {
-            handle_update_response(error, value, completion_block);
-        });
-    } catch (const std::exception& e) {
-        return completion_block({}, AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
-    }
+    auto base_args = m_base_operation_args;
+    base_args["query"] = filter_bson;
+    base_args["update"] = update_bson;
+    base_args["upsert"] = upsert;
+    
+    m_service->call_function("updateMany",
+                             bson::BsonArray({base_args}),
+                             m_service_name,
+                             [completion_block](util::Optional<AppError> error, util::Optional<bson::Bson> value) {
+        handle_update_response(error, value, completion_block);
+    });
 }
 
-void RemoteMongoCollection::update_many(const std::string& filter_json,
-                                        const std::string& update_json,
+void RemoteMongoCollection::update_many(const bson::BsonDocument& filter_bson,
+                                        const bson::BsonDocument& update_bson,
                                         std::function<void(RemoteMongoCollection::RemoteUpdateResult, util::Optional<AppError>)> completion_block)
 {
-    update_many(filter_json, update_json, {}, completion_block);
+    update_many(filter_bson, update_bson, {}, completion_block);
 }
 
-void RemoteMongoCollection::find_one_and_update(const std::string& filter_json,
-                                                const std::string& update_json,
+void RemoteMongoCollection::find_one_and_update(const bson::BsonDocument& filter_bson,
+                                                const bson::BsonDocument& update_bson,
                                                 RemoteMongoCollection::RemoteFindOneAndModifyOptions options,
-                                                std::function<void(Optional<std::string>, util::Optional<AppError>)> completion_block)
+                                                std::function<void(util::Optional<bson::BsonDocument>, util::Optional<AppError>)> completion_block)
 {
-    try {
-        auto base_args = m_base_operation_args;
-        base_args.push_back({"query", nlohmann::json::parse(filter_json)});
-        base_args.push_back({"update", nlohmann::json::parse(update_json)});
-        options.set_json(base_args);
+    auto base_args = m_base_operation_args;
+    base_args["query"] = filter_bson;
+    base_args["update"] = update_bson;
+    options.set_bson(base_args);
+    
+    m_service->call_function("findOneAndUpdate",
+                             bson::BsonArray({base_args}),
+                             m_service_name,
+                             [completion_block](util::Optional<AppError> error, util::Optional<bson::Bson> value) {
+        if (error) {
+            return completion_block(util::none, error);
+        }
 
-        auto args = nlohmann::json({{"arguments", nlohmann::json::array({base_args} )}});
-        
-        m_service.call_function("findOneAndUpdate",
-                                 args.dump(),
-                                 [completion_block](util::Optional<AppError> error, util::Optional<std::string> value) {
-            handle_response(error, value, completion_block);
-        });
-    } catch (const std::exception& e) {
-        return completion_block(util::none, AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
-    }
+        if (bson::holds_alternative<util::None>(*value)) {
+            // no docs were found
+            return completion_block(util::none, util::none);
+        }
+
+        return completion_block(util::some<bson::BsonDocument>(static_cast<bson::BsonDocument>(*value)),
+                                util::none);
+    });
 }
 
-void RemoteMongoCollection::find_one_and_update(const std::string& filter_json,
-                                                const std::string& update_json,
-                                                std::function<void(Optional<std::string>, util::Optional<AppError>)> completion_block)
+void RemoteMongoCollection::find_one_and_update(const bson::BsonDocument& filter_bson,
+                                                const bson::BsonDocument& update_bson,
+                                                std::function<void(util::Optional<bson::BsonDocument>, util::Optional<AppError>)> completion_block)
 {
-    find_one_and_update(filter_json, update_json, {}, completion_block);
+    find_one_and_update(filter_bson, update_bson, {}, completion_block);
 }
 
-void RemoteMongoCollection::find_one_and_replace(const std::string& filter_json,
-                                                 const std::string& replacement_json,
+void RemoteMongoCollection::find_one_and_replace(const bson::BsonDocument& filter_bson,
+                                                 const bson::BsonDocument& replacement_bson,
                                                  RemoteMongoCollection::RemoteFindOneAndModifyOptions options,
-                                                 std::function<void(Optional<std::string>, util::Optional<AppError>)> completion_block)
+                                                 std::function<void(util::Optional<bson::BsonDocument>, util::Optional<AppError>)> completion_block)
 {
-    try {
-        auto base_args = m_base_operation_args;
-        base_args.push_back({"query", nlohmann::json::parse(filter_json)});
-        base_args.push_back({"update", nlohmann::json::parse(replacement_json)});
-        options.set_json(base_args);
+    auto base_args = m_base_operation_args;
+    base_args["query"] = filter_bson;
+    base_args["update"] = replacement_bson;
+    options.set_bson(base_args);
 
-        auto args = nlohmann::json({{"arguments", nlohmann::json::array({base_args})}});
-                
-        m_service.call_function("findOneAndReplace",
-                                 args.dump(),
-                                 [completion_block](util::Optional<AppError> error, util::Optional<std::string> value) {
-            handle_response(error, value, completion_block);
-        });
-    } catch (const std::exception& e) {
-        return completion_block(util::none, AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
-    }
+    m_service->call_function("findOneAndReplace",
+                             bson::BsonArray({base_args}),
+                             m_service_name,
+                             [completion_block](util::Optional<AppError> error, util::Optional<bson::Bson> value) {
+        if (error) {
+            return completion_block(util::none, error);
+        }
+
+        if (bson::holds_alternative<util::None>(*value)) {
+            // no docs were found
+            return completion_block(util::none, util::none);
+        }
+
+        return completion_block(static_cast<bson::BsonDocument>(*value),
+                                util::none);
+    });
 }
 
-void RemoteMongoCollection::find_one_and_replace(const std::string& filter_json,
-                                                 const std::string& replacement_json,
-                                                 std::function<void(Optional<std::string>, util::Optional<AppError>)> completion_block)
+void RemoteMongoCollection::find_one_and_replace(const bson::BsonDocument& filter_bson,
+                                                 const bson::BsonDocument& replacement_bson,
+                                                 std::function<void(util::Optional<bson::BsonDocument>, util::Optional<AppError>)> completion_block)
 {
-    find_one_and_replace(filter_json, replacement_json, {}, completion_block);
+    find_one_and_replace(filter_bson, replacement_bson, {}, completion_block);
 }
 
-void RemoteMongoCollection::find_one_and_delete(const std::string& filter_json,
+void RemoteMongoCollection::find_one_and_delete(const bson::BsonDocument& filter_bson,
                                                 RemoteMongoCollection::RemoteFindOneAndModifyOptions options,
                                                 std::function<void(util::Optional<AppError>)> completion_block)
 {
-    try {
-        auto base_args = m_base_operation_args;
-        base_args.push_back({"query", nlohmann::json::parse(filter_json)});
-        options.set_json(base_args);
-        auto args = nlohmann::json({{"arguments", nlohmann::json::array({base_args})}});
-        
-        m_service.call_function("findOneAndDelete",
-                                 args.dump(),
-                                 [completion_block](util::Optional<AppError> error, util::Optional<std::string>) {
-            completion_block(error);
-        });
-    } catch (const std::exception& e) {
-        return completion_block(AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
-    }
+    auto base_args = m_base_operation_args;
+    base_args["query"] = filter_bson;
+    options.set_bson(base_args);
+
+    m_service->call_function("findOneAndDelete",
+                             bson::BsonArray({base_args}),
+                             m_service_name,
+                             [completion_block](util::Optional<AppError> error, util::Optional<bson::Bson>) {
+        completion_block(error);
+    });
 }
 
-void RemoteMongoCollection::find_one_and_delete(const std::string& filter_json,
+void RemoteMongoCollection::find_one_and_delete(const bson::BsonDocument& filter_bson,
                                                 std::function<void(util::Optional<AppError>)> completion_block)
 {
-    find_one_and_delete(filter_json, {}, completion_block);
+    find_one_and_delete(filter_bson, {}, completion_block);
 }
 
 } // namespace app
 } // namespace realm
-

@@ -23,12 +23,12 @@ namespace app {
 
 RemoteMongoCollection RemoteMongoDatabase::collection(const std::string& collection_name)
 {
-    return RemoteMongoCollection(collection_name, name, m_service);
+    return RemoteMongoCollection(collection_name, m_name, m_service, m_service_name);
 }
 
 RemoteMongoCollection RemoteMongoDatabase::operator[](const std::string& collection_name)
 {
-    return RemoteMongoCollection(collection_name, name, m_service);
+    return RemoteMongoCollection(collection_name, m_name, m_service, m_service_name);
 }
 
 }

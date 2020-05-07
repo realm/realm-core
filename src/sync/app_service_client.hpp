@@ -32,44 +32,53 @@ namespace app {
 /// Stitch service.
 class AppServiceClient {
 public:
-        
-    AppServiceClient(const std::string& service_name,
-                     const std::string& base_route,
-                     const std::string& app_id,
-                     AuthRequestClient& auth_request_client) :
-    service_name(service_name),
-    m_base_route(base_route),
-    m_app_id(app_id),
-    m_auth_request_client(auth_request_client) { }
-    
-    AppServiceClient(const AppServiceClient& other) = default;
-    AppServiceClient(AppServiceClient&&) = default;
-
-    /// The name of the Realm Cloud service
-    std::string service_name;
+    virtual ~AppServiceClient() = default;
 
     /// Calls the Realm Cloud function with the provided name and arguments.
+    /// @param user The sync user to perform this request.
     /// @param name The name of the Realm Cloud function to be called.
-    /// @param args_json The `BSONArray` of arguments to be provided to the function.
+    /// @param args_bson The `BSONArray` of arguments to be provided to the function.
     /// @param service_name The name of the service, this is optional.
-    /// @param completion_block Returns the result from the intended call, will return an Optional AppError is an error is thrown and a json string if successful
-    void call_function(const std::string& name,
-                       const std::string& args_json,
-                       const util::Optional<std::string>& service_name,
-                       std::function<void (util::Optional<AppError>, util::Optional<std::string>)> completion_block);
+    /// @param completion_block Returns the result from the intended call, will return an Optional AppError is an error is thrown and bson if successful
+    virtual void call_function(std::shared_ptr<SyncUser> user,
+                               const std::string& name,
+                               const bson::BsonArray& args_bson,
+                               const util::Optional<std::string>& service_name,
+                               std::function<void (util::Optional<AppError>,
+                                                   util::Optional<bson::Bson>)> completion_block) = 0;
     
     /// Calls the Realm Cloud function with the provided name and arguments.
+    /// @param user The sync user to perform this request.
     /// @param name The name of the Realm Cloud function to be called.
-    /// @param args_json The `BSONArray` of arguments to be provided to the function.
-    /// @param completion_block Returns the result from the intended call, will return an Optional AppError is an error is thrown and a json string if successful
-    void call_function(const std::string& name,
-                       const std::string& args_json,
-                       std::function<void (util::Optional<AppError>, util::Optional<std::string>)> completion_block);
+    /// @param args_bson The `BSONArray` of arguments to be provided to the function.
+    /// @param completion_block Returns the result from the intended call, will return an Optional AppError is an error is thrown and bson if successful
+    virtual void call_function(std::shared_ptr<SyncUser> user,
+                               const std::string& name,
+                               const bson::BsonArray& args_bson,
+                               std::function<void (util::Optional<AppError>,
+                                                   util::Optional<bson::Bson>)> completion_block) = 0;
     
-private:
-    std::string m_base_route;
-    std::string m_app_id;
-    AuthRequestClient& m_auth_request_client;
+    /// Calls the Realm Cloud function with the provided name and arguments.
+    /// This will use the current logged in user to perform the request
+    /// @param name The name of the Realm Cloud function to be called.
+    /// @param args_bson The `BSONArray` of arguments to be provided to the function.
+    /// @param service_name The name of the service, this is optional.
+    /// @param completion_block Returns the result from the intended call, will return an Optional AppError is an error is thrown and bson if successful
+    virtual void call_function(const std::string& name,
+                               const bson::BsonArray& args_bson,
+                               const util::Optional<std::string>& service_name,
+                               std::function<void (util::Optional<AppError>,
+                                                   util::Optional<bson::Bson>)> completion_block) = 0;
+    
+    /// Calls the Realm Cloud function with the provided name and arguments.
+    /// This will use the current logged in user to perform the request
+    /// @param name The name of the Realm Cloud function to be called.
+    /// @param args_bson The `BSONArray` of arguments to be provided to the function.
+    /// @param completion_block Returns the result from the intended call, will return an Optional AppError is an error is thrown and bson if successful
+    virtual void call_function(const std::string& name,
+                               const bson::BsonArray& args_bson,
+                               std::function<void (util::Optional<AppError>,
+                                                   util::Optional<bson::Bson>)> completion_block) = 0;
 };
 
 } // namespace app

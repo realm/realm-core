@@ -98,6 +98,7 @@ public:
 
     ~Bson() noexcept;
 
+    Bson(Bson&& v) noexcept;
     Bson(const Bson& v);
     Bson& operator=(Bson&& v) noexcept;
     Bson& operator=(const Bson& v);
@@ -186,20 +187,19 @@ public:
         return max_key_val;
     }
 
-    explicit operator const IndexedMap<Bson>&&() const
+    explicit operator const IndexedMap<Bson>&() const noexcept
     {
         REALM_ASSERT(m_type == Bson::Type::Document);
-        return std::move(*document_val);
+        return *document_val;
     }
 
-    explicit operator const std::vector<Bson>&&() const
+    explicit operator const std::vector<Bson>&() const noexcept
     {
         REALM_ASSERT(m_type == Bson::Type::Array);
-        return std::move(*array_val);
+        return *array_val;
     }
 
     Type type() const noexcept;
-
 
     bool operator==(const Bson& other) const;
     bool operator!=(const Bson& other) const;
@@ -225,8 +225,8 @@ private:
         RegularExpression regex_val;
         std::string string_val;
         std::vector<char> binary_val;
-        IndexedMap<Bson>* document_val;
-        std::vector<Bson>* array_val;
+        std::unique_ptr<IndexedMap<Bson>> document_val;
+        std::unique_ptr<std::vector<Bson>> array_val;
     };
 };
 
@@ -314,27 +314,27 @@ inline Bson::Bson(ObjectId v) noexcept
 }
 
 inline Bson::Bson(const IndexedMap<Bson>& v) noexcept
+: m_type(Bson::Type::Document)
+, document_val(new IndexedMap<Bson>(v))
 {
-    m_type = Bson::Type::Document;
-    document_val = new IndexedMap<Bson>(v);
 }
 
 inline Bson::Bson(const std::vector<Bson>& v) noexcept
+: m_type(Bson::Type::Array)
+, array_val(new std::vector<Bson>(std::move(v)))
 {
-    m_type = Bson::Type::Array;
-    array_val = new std::vector(v);
 }
 
 inline Bson::Bson(IndexedMap<Bson>&& v) noexcept
+: m_type(Bson::Type::Document)
+, document_val(new IndexedMap<Bson>(std::move(v)))
 {
-    m_type = Bson::Type::Document;
-    document_val = new IndexedMap<Bson>(std::move(v));
 }
 
 inline Bson::Bson(std::vector<Bson>&& v) noexcept
+: m_type(Bson::Type::Array)
+, array_val(new std::vector<Bson>(std::move(v)))
 {
-    m_type = Bson::Type::Array;
-    array_val = new std::vector(std::move(v));
 }
 
 template <typename T>

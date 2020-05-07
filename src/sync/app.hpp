@@ -34,8 +34,9 @@ class SyncSession;
 
 namespace app {
 
+class App;
 class RemoteMongoClient;
-class AppServiceClient;
+typedef std::shared_ptr<App> SharedApp;
 
 /// The `App` has the fundamental set of methods for communicating with a MongoDB Realm application backend.
 ///
@@ -45,7 +46,7 @@ class AppServiceClient;
 /// and writing on the database.
 ///
 /// You can also use it to execute [Functions](https://docs.mongodb.com/stitch/functions/).
-class App : std::enable_shared_from_this<App>, public AuthRequestClient {
+class App : public std::enable_shared_from_this<App>, public AuthRequestClient, public AppServiceClient {
 public:
     struct Config {
         std::string app_id;
@@ -56,8 +57,8 @@ public:
         util::Optional<uint64_t> default_request_timeout_ms;
     };
 
+    // `enable_shared_from_this` is unsafe with public constructors; use `get_shared_app` instead
     App(const Config& config);
-    App() = default;
     App(const App&) = default;
     App(App&&) noexcept = default;
     App& operator=(App const&) = default;
@@ -73,6 +74,8 @@ public:
 
     /// Get the last used user.
     std::shared_ptr<SyncUser> current_user() const;
+
+    /// Get all users.
     std::vector<std::shared_ptr<SyncUser>> all_users() const;
 
     /// A struct representing a user API key as returned by the App server.
@@ -175,6 +178,7 @@ public:
         /// @param completion_block A callback to be invoked once the call is complete.
         void resend_confirmation_email(const std::string& email,
                                        std::function<void(util::Optional<AppError>)> completion_block);
+        
         void send_reset_password_email(const std::string& email,
                                        std::function<void(util::Optional<AppError>)> completion_block);
 
@@ -191,16 +195,13 @@ public:
 
         /// Resets the password of an email identity using the
         /// password reset function set up in the application.
-        ///
-        /// TODO: Add an overloaded version of this method that takes
-        /// TODO: raw, non-serialized args.
         /// @param email The email address of the user.
         /// @param password The desired new password.
-        /// @param args A pre-serialized list of arguments. Must be a JSON array.
+        /// @param args A bson array of arguments.
         /// @param completion_block A callback to be invoked once the call is complete.
         void call_reset_password_function(const std::string& email,
                                           const std::string& password,
-                                          const std::string& args,
+                                          const bson::BsonArray& args,
                                           std::function<void(util::Optional<AppError>)> completion_block);
     private:
         friend class App;
@@ -211,6 +212,8 @@ public:
         }
         App* m_parent;
     };
+
+    static SharedApp get_shared_app(const Config& config);
 
     /// Log in a user and asynchronously retrieve a user object.
     /// If the log in completes successfully, the completion block will be called, and a
@@ -268,9 +271,6 @@ public:
         return T(this);
     }
 
-    /// Retrieves a general-purpose service client for the Stitch service
-    RemoteMongoClient remote_mongo_client(); 
-
     class Internal {
         friend class realm::SyncSession;
 
@@ -290,6 +290,56 @@ public:
     /// Retrieves a general-purpose service client for the Realm Cloud service
     /// @param service_name The name of the cluster
     RemoteMongoClient remote_mongo_client(const std::string& service_name);
+
+    void call_function(std::shared_ptr<SyncUser> user,
+                       const std::string& name,
+                       const bson::BsonArray& args_bson,
+                       const util::Optional<std::string>& service_name,
+                       std::function<void (util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block) override;
+
+    void call_function(std::shared_ptr<SyncUser> user,
+                       const std::string&,
+                       const bson::BsonArray& args_bson,
+                       std::function<void (util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block) override;
+    
+    void call_function(const std::string& name,
+                       const bson::BsonArray& args_bson,
+                       const util::Optional<std::string>& service_name,
+                       std::function<void (util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block) override;
+
+    void call_function(const std::string&,
+                       const bson::BsonArray& args_bson,
+                       std::function<void (util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block) override;
+
+    template <typename T>
+    void call_function(std::shared_ptr<SyncUser> user,
+                       const std::string& name,
+                       const bson::BsonArray& args_bson,
+                       std::function<void (util::Optional<AppError>,
+                                           util::Optional<T>)> completion_block)
+    {
+        call_function(user,
+                      name,
+                      args_bson,
+                      util::none,
+                      [completion_block](util::Optional<AppError> error,
+                                         util::Optional<bson::Bson> value) {
+            if (value) {
+                return completion_block(error, util::some<T>(static_cast<T>(*value)));
+            }
+            
+            return completion_block(error, util::none);
+        });
+    }
+    
+    template <typename T>
+    void call_function(const std::string& name,
+                       const bson::BsonArray& args_bson,
+                       std::function<void (util::Optional<AppError>,
+                                           util::Optional<T>)> completion_block)
+    {
+        call_function(current_user(), name, args_bson, completion_block);
+    }
     
 private:
     friend class Internal;
@@ -341,7 +391,6 @@ private:
                              Request request,
                              std::shared_ptr<SyncUser> sync_user,
                              std::function<void (Response)> completion_block) const;
-
 
     std::string url_for_path(const std::string& path) const override;
 

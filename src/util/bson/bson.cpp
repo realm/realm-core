@@ -29,19 +29,17 @@ Bson::~Bson() noexcept
         case Type::String:
             string_val.~basic_string();
             break;
-        case Type::Document:
-            delete document_val;
-            document_val = nullptr;
-            break;
-        case Type::Array:
-            delete array_val;
-            array_val = nullptr;
-            break;
         case Type::Binary:
             binary_val.~vector<char>();
             break;
         case Type::RegularExpression:
             regex_val.~RegularExpression();
+            break;
+        case Type::Document:
+            document_val.reset();
+            break;
+        case Type::Array:
+            array_val.reset();
             break;
         default:
             break;
@@ -53,10 +51,17 @@ Bson::Bson(const Bson& v) {
     *this = v;
 }
 
-Bson& Bson::operator=(Bson&& v) noexcept {
-    if (this == &v) return *this;
+Bson::Bson(Bson&& v) noexcept {
+    m_type = Type::Null;
+    *this = std::move(v);
+}
 
-    if (m_type != v.m_type) this->~Bson();
+Bson& Bson::operator=(Bson&& v) noexcept {
+    if (this == &v)
+        return *this;
+
+    this->~Bson();
+
     m_type = v.m_type;
 
     switch (v.m_type) {
@@ -102,14 +107,10 @@ Bson& Bson::operator=(Bson&& v) noexcept {
             new (&string_val) std::string(std::move(v.string_val));
             break;
         case Type::Document:
-            if (document_val) delete document_val;
-            document_val = v.document_val;
-            v.document_val = nullptr;
+            new (&document_val) std::unique_ptr<BsonDocument>{std::move(v.document_val)};
             break;
         case Type::Array:
-            if (array_val) delete array_val;
-            array_val = v.array_val;
-            v.array_val = nullptr;
+            new (&array_val) std::unique_ptr<BsonArray>{std::move(v.array_val)};
             break;
     }
 
@@ -117,8 +118,11 @@ Bson& Bson::operator=(Bson&& v) noexcept {
 }
 
 Bson& Bson::operator=(const Bson& v) {
-    if (&v == this) return *this;
-    if (m_type != v.m_type) this->~Bson();
+    if (&v == this)
+        return *this;
+
+    this->~Bson();
+
     m_type = v.m_type;
     
     switch (v.m_type) {
@@ -164,13 +168,12 @@ Bson& Bson::operator=(const Bson& v) {
             new (&string_val) std::string(v.string_val);
             break;
         case Type::Document:
-            document_val = new IndexedMap<Bson>;
-            *document_val = *v.document_val;
+            new (&document_val) std::unique_ptr<BsonDocument>(new BsonDocument(*v.document_val));
             break;
-        case Type::Array:
-            array_val = new std::vector<Bson>;
-            *array_val = *v.array_val;
+        case Type::Array: {
+            new (&array_val) std::unique_ptr<BsonArray>(new BsonArray(*v.array_val));
             break;
+        }
     }
 
     return *this;
@@ -520,106 +523,61 @@ protected:
         Type m_type;
 
         union {
-            BsonDocument* document;
-            BsonArray* array;
+            std::unique_ptr<BsonDocument> document;
+            std::unique_ptr<BsonArray> array;
         };
     public:
         ~BsonContainer() noexcept
         {
             if (m_type == DOCUMENT) {
-                delete document;
-                document = nullptr;
+                document.reset();
             } else {
-                delete array;
-                array = nullptr;
+                array.reset();
             }
         }
 
-        BsonContainer(const BsonDocument& v) noexcept : document(new BsonDocument(v)) {
-            m_type = DOCUMENT;
+        BsonContainer(const BsonDocument& v)
+        : m_type(DOCUMENT)
+        , document(new BsonDocument(v))
+        {
         }
-        BsonContainer(const BsonArray& v) noexcept : array(new BsonArray(v)) {
-            m_type = ARRAY;
+
+        BsonContainer(const BsonArray& v)
+        : m_type(ARRAY)
+        , array(new BsonArray(v))
+        {
         }
-        BsonContainer(BsonDocument&& v) noexcept :
-            m_type(DOCUMENT), document(new BsonDocument(std::move(v))) {}
 
-        BsonContainer(BsonArray&& v) noexcept : m_type(ARRAY), array(new BsonArray(std::move(v))) {}
+        BsonContainer(BsonDocument&& v)
+        : m_type(DOCUMENT)
+        , document(new BsonDocument(std::move(v)))
+        {
+        }
 
-        explicit operator const BsonDocument&&() const {
+        BsonContainer(BsonArray&& v)
+        : m_type(ARRAY)
+        , array(new BsonArray(std::move(v)))
+        {
+        }
+
+        explicit operator BsonDocument&&() noexcept {
             REALM_ASSERT(is_document());
             return std::move(*document);
         }
 
-        explicit operator const BsonArray&&() const {
+        explicit operator BsonArray&&() noexcept {
             REALM_ASSERT(is_array());
             return std::move(*array);
-        }
-
-        BsonContainer(const BsonContainer& v)
-        {
-            m_type = v.m_type;
-            if (m_type == DOCUMENT) {
-                document = new BsonDocument;
-                *document = *v.document;
-            } else {
-                array = new BsonArray;
-                *array = *v.array;
-            }
-        }
-
-        BsonContainer& operator=(const BsonContainer& v)
-        {
-            if (&v == this) return *this;
-            this->~BsonContainer();
-
-            m_type = v.m_type;
-            if (m_type == DOCUMENT) {
-                document = new BsonDocument;
-                *document = *v.document;
-            } else {
-                array = new BsonArray;
-                *array = *v.array;
-            }
-            return *this;
-        }
-
-        BsonContainer& operator=(BsonContainer&& v)
-        {
-            if (&v == this) return *this;
-            this->~BsonContainer();
-
-            m_type = v.m_type;
-            if (m_type == DOCUMENT) {
-                document = v.document;
-                v.document = nullptr;
-            } else {
-                array = v.array;
-                v.array = nullptr;
-            }
-            return *this;
-        }
-
-        BsonContainer(BsonContainer&& v) {
-            m_type = v.m_type;
-
-            if (m_type == DOCUMENT) {
-                document = v.document;
-                v.document = nullptr;
-            } else {
-                array = v.array;
-                v.array = nullptr;
-            }
         }
 
         bool is_array() const { return m_type == ARRAY; }
         bool is_document() const { return m_type == DOCUMENT; }
 
-        void push_back(std::pair<std::string, Bson> value) {
+        void push_back(const std::string& key, Bson&& value) {
             if (m_type == DOCUMENT) {
-                (*document)[value.first] = value.second;
+                (*document)[key] = std::move(value);
             } else {
-                array->emplace_back(value.second);
+                array->emplace_back(value);
             }
         }
 
@@ -681,61 +639,6 @@ static constexpr const char * key_binary                     = "$binary";
 static constexpr const char * key_binary_base64              = "base64";
 static constexpr const char * key_binary_sub_type            = "subType";
 
-static constexpr const char* state_to_string(const Parser::State& i) {
-    switch (i) {
-        case Parser::State::StartDocument:
-            return "start_document";
-        case Parser::State::EndDocument:
-            return "end_document";
-        case Parser::State::StartArray:
-            return "start_array";
-        case Parser::State::EndArray:
-            return "end_array";
-        case Parser::State::NumberInt:
-            return "number_int";
-        case Parser::State::NumberLong:
-            return "number_long";
-        case Parser::State::NumberDouble:
-            return "number_double";
-        case Parser::State::NumberDecimal:
-            return "number_decimal";
-        case Parser::State::Binary:
-            return "binary";
-        case Parser::State::BinaryBase64:
-            return "binary_base64";
-        case Parser::State::BinarySubType:
-            return "binary_sub_type";
-        case Parser::State::Date:
-            return "date";
-        case Parser::State::Timestamp:
-            return "timestamp";
-        case Parser::State::TimestampT:
-            return "timestamp_t";
-        case Parser::State::TimestampI:
-            return "timestamp_i";
-        case Parser::State::ObjectId:
-            return "object_id";
-        case Parser::State::String:
-            return "string";
-        case Parser::State::MaxKey:
-            return "max_key";
-        case Parser::State::MinKey:
-            return "min_key";
-        case Parser::State::RegularExpression:
-            return "regular_expression";
-        case Parser::State::RegularExpressionPattern:
-            return "regular_expression_pattern";
-        case Parser::State::RegularExpressionOptions:
-            return "regular_expression_options";
-        case Parser::State::JsonKey:
-            return "json_key";
-        case Parser::State::Skip:
-            return "skip";
-    }
-    
-    return "unknown";
-}
-
 static std::map<std::string, Parser::State> bson_type_for_key = {
     {key_number_int, Parser::State::NumberInt},
     {key_number_long, Parser::State::NumberLong},
@@ -750,14 +653,6 @@ static std::map<std::string, Parser::State> bson_type_for_key = {
     {key_binary, Parser::State::Binary}
 };
 
-static void check_state(const Parser::State& current_state, const Parser::State& expected_state)
-{
-    if (current_state != expected_state)
-        throw BsonError(util::format("current state '$1' is not of expected state '$2'",
-                                     std::string(state_to_string(current_state)),
-                                     std::string(state_to_string(expected_state))));
-}
-
 Parser::Parser() {
     // use a vector container to hold any fragmented values
     m_marks.emplace(BsonArray());
@@ -768,10 +663,18 @@ Parser::Parser() {
  @return whether parsing should proceed
  */
 bool Parser::null() {
-    auto instruction = m_instructions.top();
-    m_instructions.pop();
-    check_state(instruction.type, State::JsonKey);
-    m_marks.top().push_back({instruction.key, util::none});
+    if (m_instructions.size()) {
+        auto instruction = m_instructions.top();
+        m_instructions.pop();
+        m_marks.top().push_back(instruction.key, util::none);
+    }
+    // if there have been no previous instructions
+    // this is considered fragmented JSON, which is allowed.
+    // this means we have received a string of "null"
+    else {
+        m_marks.top().push_back("", util::none);
+    }
+
     return true;
 }
 
@@ -781,10 +684,18 @@ bool Parser::null() {
  @return whether parsing should proceed
  */
 bool Parser::boolean(bool val) {
-    auto instruction = m_instructions.top();
-    m_instructions.pop();
-    check_state(instruction.type, State::JsonKey);
-    m_marks.top().push_back({instruction.key, val});
+    if (m_instructions.size()) {
+        auto instruction = m_instructions.top();
+        m_instructions.pop();
+        m_marks.top().push_back(instruction.key, val);
+    }
+    // if there have been no previous instructions
+    // this is considered fragmented JSON, which is allowed.
+    // this means we have received a raw boolean
+    else {
+        m_marks.top().push_back("", val);
+    }
+
     return true;
 }
 
@@ -794,9 +705,18 @@ bool Parser::boolean(bool val) {
  @return whether parsing should proceed
  */
 bool Parser::number_integer(number_integer_t val) {
-    auto instruction = m_instructions.top();
-    m_instructions.pop();
-    m_marks.top().push_back({instruction.key, static_cast<int32_t>(val)});
+    if (m_instructions.size()) {
+        auto instruction = m_instructions.top();
+        m_instructions.pop();
+        m_marks.top().push_back(instruction.key, static_cast<int32_t>(val));
+    }
+    // if there have been no previous instructions
+    // this is considered fragmented JSON, which is allowed.
+    // this means we have received a raw int32
+    else {
+        m_marks.top().push_back("", static_cast<int32_t>(val));
+    }
+
     return true;
 }
 
@@ -810,25 +730,25 @@ bool Parser::number_unsigned(number_unsigned_t val) {
     m_instructions.pop();
     switch (instruction.type) {
         case State::MaxKey:
-            m_marks.top().push_back({instruction.key, max_key});
+            m_marks.top().push_back(instruction.key, max_key);
             m_instructions.push({State::Skip});
             break;
         case State::MinKey:
-            m_marks.top().push_back({instruction.key, min_key});
+            m_marks.top().push_back(instruction.key, min_key);
             m_instructions.push({State::Skip});
             break;
         case State::TimestampI:
             if (m_marks.top().size() && m_marks.top().back().first == instruction.key) {
                 auto ts = (Timestamp)m_marks.top().back().second;
                 m_marks.top().pop_back();
-                m_marks.top().push_back({instruction.key, Timestamp(ts.get_seconds(), 1)});
+                m_marks.top().push_back(instruction.key, Timestamp(ts.get_seconds(), 1));
 
                 // pop vestigal timestamp instruction
                 m_instructions.pop();
                 m_instructions.push({State::Skip});
                 m_instructions.push({State::Skip});
             } else {
-                m_marks.top().push_back({instruction.key, Timestamp(0, 1)});
+                m_marks.top().push_back(instruction.key, Timestamp(0, 1));
                 instruction.type = State::Timestamp;
             }
             break;
@@ -836,34 +756,37 @@ bool Parser::number_unsigned(number_unsigned_t val) {
             if (m_marks.top().size() && m_marks.top().back().first == instruction.key) {
                 auto ts = (Timestamp)m_marks.top().back().second;
                 m_marks.top().pop_back();
-                m_marks.top().push_back({instruction.key, Timestamp(val, ts.get_nanoseconds())});
+                m_marks.top().push_back(instruction.key, Timestamp(val, ts.get_nanoseconds()));
 
                 // pop vestigal teimstamp instruction
                 m_instructions.pop();
                 m_instructions.push({State::Skip});
                 m_instructions.push({State::Skip});
             } else {
-                m_marks.top().push_back({instruction.key, Timestamp(val, 0)});
+                m_marks.top().push_back(instruction.key, Timestamp(val, 0));
                 instruction.type = State::Timestamp;
             }
             break;
         default:
-            m_marks.top().push_back({instruction.key, static_cast<int64_t>(val)});
+            m_marks.top().push_back(instruction.key, static_cast<int64_t>(val));
             break;
     }
     return true;
 }
 
-/*!
- @brief an floating-point number was read
- @param[in] val  floating-point value
- @param[in] s    raw token value
- @return whether parsing should proceed
- */
 bool Parser::number_float(number_float_t val, const string_t&) {
-    auto instruction = m_instructions.top();
-    m_instructions.pop();
-    m_marks.top().push_back({instruction.key, static_cast<double>(val)});
+    if (m_instructions.size()) {
+        auto instruction = m_instructions.top();
+        m_instructions.pop();
+        m_marks.top().push_back(instruction.key, static_cast<double>(val));
+    }
+    // if there have been no previous instructions
+    // this is considered fragmented JSON, which is allowed.
+    // this means we have received a raw double
+    else {
+        m_marks.top().push_back("", static_cast<double>(val));
+    }
+
     return true;
 }
 
@@ -874,6 +797,11 @@ bool Parser::number_float(number_float_t val, const string_t&) {
  @note It is safe to move the passed string.
  */
 bool Parser::string(string_t& val) {
+    if (!m_instructions.size()) {
+        m_marks.top().push_back("", std::string(val.begin(), val.end()));
+        return false;
+    }
+
     // pop last instruction
     auto instruction = m_instructions.top();
     if (instruction.type != State::StartArray)
@@ -881,28 +809,28 @@ bool Parser::string(string_t& val) {
 
     switch (instruction.type) {
         case State::NumberInt:
-            m_marks.top().push_back({instruction.key, atoi(val.data())});
+            m_marks.top().push_back(instruction.key, atoi(val.data()));
             m_instructions.push({State::Skip});
             break;
         case State::NumberLong:
-            m_marks.top().push_back({instruction.key, (int64_t)atol(val.data())});
+            m_marks.top().push_back(instruction.key, (int64_t)atol(val.data()));
             m_instructions.push({State::Skip});
             break;
         case State::NumberDouble:
-            m_marks.top().push_back({instruction.key, std::stod(val.data())});
+            m_marks.top().push_back(instruction.key, std::stod(val.data()));
             m_instructions.push({State::Skip});
             break;
         case State::NumberDecimal:
-            m_marks.top().push_back({instruction.key, Decimal128(val)});
+            m_marks.top().push_back(instruction.key, Decimal128(val));
             m_instructions.push({State::Skip});
             break;
         case State::ObjectId:
-            m_marks.top().push_back({instruction.key, ObjectId(val.data())});
+            m_marks.top().push_back(instruction.key, ObjectId(val.data()));
             m_instructions.push({State::Skip});
             break;
         case State::Date: {
             auto epoch = atol(val.data());
-            m_marks.top().push_back({instruction.key, Datetime(epoch)});
+            m_marks.top().push_back(instruction.key, Datetime(epoch));
             // skip twice because this is a number long
             m_instructions.push({State::Skip});
             m_instructions.push({State::Skip});
@@ -913,14 +841,14 @@ bool Parser::string(string_t& val) {
             if (m_marks.top().size() && m_marks.top().back().first == instruction.key) {
                 auto regex = (RegularExpression)m_marks.top().back().second;
                 m_marks.top().pop_back();
-                m_marks.top().push_back({instruction.key, RegularExpression(val, regex.options())});
+                m_marks.top().push_back(instruction.key, RegularExpression(val, regex.options()));
 
                 // pop vestigal regex instruction
                 m_instructions.pop();
                 m_instructions.push({State::Skip});
                 m_instructions.push({State::Skip});
             } else {
-                m_marks.top().push_back({instruction.key, RegularExpression(val, "")});
+                m_marks.top().push_back(instruction.key, RegularExpression(val, ""));
             }
 
             break;
@@ -929,13 +857,13 @@ bool Parser::string(string_t& val) {
             if (m_marks.top().size() && m_marks.top().back().first == instruction.key) {
                 auto regex = (RegularExpression)m_marks.top().back().second;
                 m_marks.top().pop_back();
-                m_marks.top().push_back({instruction.key, RegularExpression(regex.pattern(), val)});
+                m_marks.top().push_back(instruction.key, RegularExpression(regex.pattern(), val));
                 // pop vestigal regex instruction
                 m_instructions.pop();
                 m_instructions.push({State::Skip});
                 m_instructions.push({State::Skip});
             } else {
-                m_marks.top().push_back({instruction.key, RegularExpression("", val)});
+                m_marks.top().push_back(instruction.key, RegularExpression("", val));
             }
 
             break;
@@ -949,7 +877,7 @@ bool Parser::string(string_t& val) {
                 m_instructions.push({State::Skip});
             } else {
                 // we will ignore the subtype for now
-                m_marks.top().push_back({instruction.key, std::vector<char>()});
+                m_marks.top().push_back(instruction.key, std::vector<char>());
             }
 
             break;
@@ -957,7 +885,7 @@ bool Parser::string(string_t& val) {
             // if we have already pushed a binary type
             if (m_marks.top().size() && m_marks.top().back().first == instruction.key) {
                 m_marks.top().pop_back();
-                m_marks.top().push_back({instruction.key, std::vector<char>(val.begin(), val.end())});
+                m_marks.top().push_back(instruction.key, std::vector<char>(val.begin(), val.end()));
 
                 // pop vestigal binary instruction
                 m_instructions.pop();
@@ -965,13 +893,13 @@ bool Parser::string(string_t& val) {
                 m_instructions.push({State::Skip});
             } else {
                 // we will ignore the subtype for now
-                m_marks.top().push_back({instruction.key, std::vector<char>(val.begin(), val.end())});
+                m_marks.top().push_back(instruction.key, std::vector<char>(val.begin(), val.end()));
             }
 
             break;
         }
         default:
-            m_marks.top().push_back({instruction.key, std::string(val.begin(), val.end())});
+            m_marks.top().push_back(instruction.key, std::string(val.begin(), val.end()));
             break;
     }
     return true;
@@ -1038,13 +966,6 @@ bool Parser::key(string_t& val) {
     return true;
 }
 
-
-/*!
- @brief the beginning of an object was read
- @param[in] elements  number of object elements or -1 if unknown
- @return whether parsing should proceed
- @note binary formats may report the number of elements
- */
 bool Parser::start_object(std::size_t) {
     if (!m_instructions.empty()) {
         auto top = m_instructions.top();
@@ -1094,26 +1015,23 @@ bool Parser::end_object() {
     }
 
     if (m_marks.size() > 2) {
-        const auto& document = static_cast<BsonDocument>(m_marks.top());
+        BsonDocument document = static_cast<BsonDocument>(m_marks.top());
         m_marks.pop();
-        m_marks.top().push_back({m_instructions.top().key, document});
+        m_marks.top().push_back(m_instructions.top().key, document);
         // pop key and document instructions
         m_instructions.pop();
-        m_instructions.pop();
+        if (m_instructions.size())
+            m_instructions.pop();
     }
     return true;
 };
 
-/*!
- @brief the beginning of an array was read
- @param[in] elements  number of array elements or -1 if unknown
- @return whether parsing should proceed
- @note binary formats may report the number of elements
- */
 bool Parser::start_array(std::size_t) {
-    m_instructions.push(Instruction{State::StartArray, m_instructions.top().key});
-    m_marks.emplace(BsonArray());
+    if (m_marks.size() > 1) {
+        m_instructions.push(Instruction{State::StartArray, m_instructions.top().key});
+    }
 
+    m_marks.emplace(BsonArray());
     return true;
 };
 
@@ -1122,24 +1040,18 @@ bool Parser::start_array(std::size_t) {
  @return whether parsing should proceed
  */
 bool Parser::end_array() {
-    if (m_marks.size() > 1) {
-        const auto& container = static_cast<BsonArray>(m_marks.top());
+    if (m_marks.size() > 2) {
+        BsonArray container = static_cast<BsonArray>(m_marks.top());
         m_marks.pop();
-        m_marks.top().push_back({m_instructions.top().key, container});
+        m_marks.top().push_back(m_instructions.top().key, container);
         // pop key and document instructions
         m_instructions.pop();
-        m_instructions.pop();
+        if (m_instructions.size())
+            m_instructions.pop();
     }
     return true;
 };
 
-/*!
- @brief a parse error occurred
- @param[in] position    the position in the input where the error occurs
- @param[in] last_token  the last read token
- @param[in] ex          an exception object describing the error
- @return whether parsing should proceed (must return false)
- */
 bool Parser::parse_error(std::size_t,
                          const std::string&,
                          const nlohmann::detail::exception& ex) {
@@ -1150,11 +1062,11 @@ Bson Parser::parse(const std::string& json)
 {
     nlohmann::json::sax_parse(json, this);
     if (m_marks.size() == 2) {
-        const BsonContainer& top = m_marks.top();
+        BsonContainer& top = m_marks.top();
         if (top.is_document()) {
             return static_cast<BsonDocument>(m_marks.top());
         } else {
-            return static_cast<BsonArray>(m_marks.top());
+            return static_cast<BsonArray>(top);
         }
     }
 

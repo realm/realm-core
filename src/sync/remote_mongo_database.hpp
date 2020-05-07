@@ -29,15 +29,18 @@ namespace app {
 class AppServiceClient;
 
 class RemoteMongoDatabase {
-    
 public:
+    ~RemoteMongoDatabase() = default;
+    RemoteMongoDatabase(const RemoteMongoDatabase&) = default;
+    RemoteMongoDatabase(RemoteMongoDatabase&&) = default;
+    RemoteMongoDatabase& operator=(const RemoteMongoDatabase&) = default;
+    RemoteMongoDatabase& operator=(RemoteMongoDatabase&&) = default;
 
     /// The name of this database
-    const std::string name;
-                                                     
-    RemoteMongoDatabase(const std::string& name,
-                        AppServiceClient& service)
-    : name(name), m_service(service) { };
+    const std::string& name() const
+    {
+        return m_name;
+    }
     
     /// Gets a collection.
     /// @param collection_name The name of the collection to return
@@ -50,7 +53,18 @@ public:
     RemoteMongoCollection operator[](const std::string& collection_name);
     
 private:
-    AppServiceClient& m_service;
+    RemoteMongoDatabase(std::string name,
+                        std::shared_ptr<AppServiceClient> service,
+                        std::string service_name)
+    : m_name(name)
+    , m_service(service)
+    , m_service_name(service_name) { };
+
+    friend class RemoteMongoClient;
+
+    std::string m_name;
+    std::shared_ptr<AppServiceClient> m_service;
+    std::string m_service_name;
 };
 
 } // namespace app

@@ -63,6 +63,43 @@ static inline void run_corpus(const char* test_key, const CorpusEntry<T>& entry)
     }
 }
 
+TEST_CASE("canonical_extjson_fragments", "[bson]") {
+    SECTION("Array") {
+        auto const b = bson::parse("[]");
+        auto const array = static_cast<BsonArray>(b);
+        CHECK(array.empty());
+    }
+
+    SECTION("Array with Object") {
+        auto const b = bson::parse("[{\"a\": \"foo\"}]");
+        auto const array = static_cast<BsonArray>(b);
+        CHECK(array.size() == 1);
+        auto doc = static_cast<BsonDocument>(array[0]);
+        CHECK(static_cast<std::string>(doc["a"]) == "foo");
+    }
+
+    SECTION("Null") {
+        auto const b = bson::parse("null");
+        CHECK(bson::holds_alternative<util::None>(b));
+    }
+
+    SECTION("String") {
+        auto const b = bson::parse("\"foo\"");
+        auto const str = static_cast<std::string>(b);
+        CHECK(str == "foo");
+    }
+
+    SECTION("Boolean") {
+        auto b = bson::parse("true");
+        auto boolean = static_cast<bool>(b);
+        CHECK(boolean);
+
+        b = bson::parse("false");
+        boolean = static_cast<bool>(b);
+        CHECK(!boolean);
+    }
+}
+
 TEST_CASE("canonical_extjson_corpus", "[bson]") {
     SECTION("Array") {
         SECTION("Empty") {
@@ -75,6 +112,12 @@ TEST_CASE("canonical_extjson_corpus", "[bson]") {
             run_corpus<BsonArray>("a", {
                 "{\"a\" : [{\"$numberInt\": \"10\"}]}",
                 [](auto val) { return (int32_t)val[0] == 10; }
+            });
+        }
+        SECTION("Single Element Boolean Array") {
+            run_corpus<BsonArray>("a", {
+                "{\"a\" : [true]}",
+                [](auto val) { return (bool)val[0]; }
             });
         }
         SECTION("Multi Element Array") {
