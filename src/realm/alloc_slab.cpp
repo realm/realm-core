@@ -1127,6 +1127,7 @@ void SlabAlloc::update_reader_view(size_t file_size)
         // 0. Special case: figure out if extension is to be done entirely within a single
         // existing mapping. This is the case if the new baseline (which must be larger
         // then the old baseline) is still below the old base of the slab area.
+        REALM_ASSERT(old_num_mappings > 0);
         const auto earlier_last_index = old_num_mappings - 1;
         MapEntry& cur_entry = m_mappings[earlier_last_index];
         if (file_size < old_slab_base) {
